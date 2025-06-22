@@ -10,6 +10,7 @@ import logging
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 import openai
 
 # System prompt for risk scoring
@@ -63,11 +64,27 @@ def main():
     )
     parser.add_argument(
         "--output", required=True,
-        help="Path to output CSV; adds 'risk_score' column"
+        help="Path to output CSV; adds 'risk_deepseek' column"
     )
     parser.add_argument(
         "--model", default="o4-mini",
         help="OpenAI model name (e.g., o4-mini, gpt-4.1, o3)"
+    )
+    parser.add_argument(
+        "--symbol-column", default="symbol",
+        help="Name of the column for stock symbol in input CSV"
+    )
+    parser.add_argument(
+        "--text-column", default="headline",
+        help="Name of the column for text/summary in input CSV"
+    )
+    parser.add_argument(
+        "--date-column", default=None,
+        help="Name of the column for date in input CSV (optional)"
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, default=1000,
+        help="Number of rows to process at a time (for resumable processing)"
     )
     args = parser.parse_args()
 
@@ -76,21 +93,49 @@ def main():
         parser.error("OPENAI_API_KEY environment variable not set")
     openai.api_key = api_key
 
-    df = pd.read_csv(args.input)
-    if not all(col in df.columns for col in ["symbol", "headline"]):
-        parser.error("Input CSV must contain 'symbol' and 'headline' columns")
+    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause):
+        # Resume logic: count already processed rows
+        if os.path.exists(output_csv):
+            prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
+                               on_bad_lines='warn', engine='python')
+            processed_rows = len(prev)
+        else:
+            processed_rows = 0
 
-    risks = []
-    for idx, row in df.iterrows():
-        sym = row["symbol"]
-        text = row["headline"]
-        risk = score_headline(text, sym, args.model)
-        risks.append(risk)
-        time.sleep(0.1)
+        reader = pd.read_csv(input_csv, chunksize=chunk_size,
+                             on_bad_lines='warn', engine='python')
+        out_col = "risk_deepseek"
+        for i, chunk in enumerate(reader):
+            if i * chunk_size < processed_rows:
+                continue
+            # Validate required columns
+            required = [sym_col, text_col] + ([date_col] if date_col else [])
+            missing = [c for c in required if c and c not in chunk.columns]
+            if missing:
+                parser.error(f"Input CSV missing columns: {missing}")
+            # Initialize output column
+            chunk[out_col] = np.nan
+            # Score each row
+            for idx, row in chunk.iterrows():
+                val = score_headline(row[text_col], row[sym_col], model)
+                chunk.at[idx, out_col] = val
+                time.sleep(pause)
+            # Save only date, symbol and score columns
+            save_cols = ([date_col] if date_col else []) + [sym_col, out_col]
+            chunk.to_csv(
+                output_csv,
+                mode='a',
+                header=not os.path.exists(output_csv),
+                index=False,
+                columns=save_cols
+            )
+        print(f"Scoring completed; results saved to {output_csv}")
 
-    df["risk_score"] = risks
-    df.to_csv(args.output, index=False)
-    print(f"Wrote output with risk scores to {args.output}")
+    process_csv(
+        args.input, args.output, args.model,
+        args.symbol_column, args.text_column, args.date_column,
+        args.chunk_size, pause=0.1,
+    )
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

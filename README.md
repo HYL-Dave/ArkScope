@@ -25,15 +25,27 @@ This folder contains a self-contained toolkit to:
 ## Workflow
 
 ### 1. Score News Headlines
-- Sentiment:
+- Sentiment (resumable, chunked):
   ```bash
-  python score_sentiment_openai.py --input data/headlines.csv \
-    --output sentiment_scored.csv --model o4-mini
+  python score_sentiment_openai.py \
+    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+    --output sentiment_scored.csv \
+    --model o4-mini \
+    --chunk-size 5000 \
+    --symbol-column Stock_symbol \
+    --text-column Lsa_summary \
+    --date-column Date
   ```
-- Risk:
+- Risk (resumable, chunked):
   ```bash
-  python score_risk_openai.py --input data/headlines.csv \
-    --output risk_scored.csv --model o4-mini
+  python score_risk_openai.py \
+    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+    --output risk_scored.csv \
+    --model o4-mini \
+    --chunk-size 5000 \
+    --symbol-column Stock_symbol \
+    --text-column Lsa_summary \
+    --date-column Date
   ```
 
 ### 2. Prepare Dataset
@@ -42,6 +54,8 @@ python prepare_dataset_openai.py \
   --price-data data/intraday.csv \
   --sentiment sentiment_scored.csv \
   --risk risk_scored.csv \
+  --date-col Date \
+  --symbol-col Stock_symbol \
   --output merged_dataset.csv
 ```
 
