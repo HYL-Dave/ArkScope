@@ -34,7 +34,9 @@ This folder contains a self-contained toolkit to:
     --chunk-size 5000 \
     --symbol-column Stock_symbol \
     --text-column Lsa_summary \
-    --date-column Date
+    --date-column Date \
+    --api-keys-file api_keys.txt \
+    --daily-token-limit 1000000
   ```
 - Risk (resumable, chunked):
   ```bash
@@ -45,7 +47,9 @@ This folder contains a self-contained toolkit to:
     --chunk-size 5000 \
     --symbol-column Stock_symbol \
     --text-column Lsa_summary \
-    --date-column Date
+    --date-column Date \
+    --api-keys-file api_keys.txt \
+    --daily-token-limit 250000
   ```
 
 ### 2. Prepare Dataset

@@ -13,6 +13,29 @@ import pandas as pd
 import numpy as np
 import openai
 
+# API key rotation and token limit support
+API_KEYS = []
+TOKENS_USED = {}
+CURRENT_KEY_IDX = 0
+DAILY_TOKEN_LIMIT = None
+
+def set_api_keys(keys, daily_limit):
+    global API_KEYS, TOKENS_USED, CURRENT_KEY_IDX, DAILY_TOKEN_LIMIT
+    API_KEYS = keys
+    TOKENS_USED = {k: 0 for k in keys}
+    CURRENT_KEY_IDX = 0
+    DAILY_TOKEN_LIMIT = daily_limit
+    openai.api_key = API_KEYS[0]
+
+def rotate_key_if_needed(usage):
+    global CURRENT_KEY_IDX
+    if DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
+        logging.warning(
+            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key"
+        )
+        CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
+        openai.api_key = API_KEYS[CURRENT_KEY_IDX]
+
 # System prompt for risk scoring
 SYSTEM_PROMPT = """
 You are a financial risk officer.
@@ -43,6 +66,10 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                 temperature=0,
                 max_tokens=50,
             )
+            # track token usage and rotate key if needed
+            usage = getattr(response.usage, 'total_tokens', 0)
+            TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
+            rotate_key_if_needed(usage)
             text = response.choices[0].message.content.strip()
             data = json.loads(text)
             if isinstance(data, dict) and "risks" in data and isinstance(data["risks"], list):
@@ -86,12 +113,34 @@ def main():
         "--chunk-size", type=int, default=1000,
         help="Number of rows to process at a time (for resumable processing)"
     )
+    parser.add_argument(
+        "--api-key", default=None,
+        help="OpenAI API key; if not set, uses OPENAI_API_KEY env var or --api-keys-file"
+    )
+    parser.add_argument(
+        "--api-keys-file", default=None,
+        help="Path to file with one OpenAI API key per line; keys are rotated upon reaching token limit"
+    )
+    parser.add_argument(
+        "--daily-token-limit", type=int, default=None,
+        help="Token limit per API key per run (approximate); keys rotate upon reaching this limit"
+    )
     args = parser.parse_args()
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        parser.error("OPENAI_API_KEY environment variable not set")
-    openai.api_key = api_key
+    # setup API keys and token limits
+    keys = []
+    if args.api_keys_file:
+        with open(args.api_keys_file) as f:
+            keys = [l.strip() for l in f if l.strip()]
+    elif args.api_key:
+        keys = [args.api_key]
+    else:
+        env_key = os.getenv("OPENAI_API_KEY")
+        if env_key:
+            keys = [env_key]
+    if not keys:
+        parser.error("No OpenAI API key provided; set --api-key, --api-keys-file, or OPENAI_API_KEY env var")
+    set_api_keys(keys, args.daily_token_limit)
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause):
         # Resume logic: count already processed rows

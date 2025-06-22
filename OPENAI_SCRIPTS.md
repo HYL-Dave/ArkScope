@@ -145,7 +145,9 @@ python score_sentiment_openai.py \
   --chunk-size 5000 \
   --symbol-column Stock_symbol \
   --text-column Lsa_summary \
-  --date-column Date
+  --date-column Date \
+  --api-keys-file api_keys.txt \
+  --daily-token-limit 1000000
 ```
 
 ### score_risk_openai.py
@@ -160,7 +162,9 @@ python score_risk_openai.py \
   --chunk-size 5000 \
   --symbol-column Stock_symbol \
   --text-column Lsa_summary \
-  --date-column Date
+  --date-column Date \
+  --api-keys-file api_keys.txt \
+  --daily-token-limit 250000
 ```
 
 ### prepare_dataset_openai.py
