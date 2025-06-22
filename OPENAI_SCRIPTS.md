@@ -146,7 +146,7 @@ python score_sentiment_openai.py \
   --symbol-column Stock_symbol \
   --text-column Lsa_summary \
   --date-column Date \
-  --api-keys-file api_keys.txt \
+  --api-keys-file api_keys_tier5.txt \
   --daily-token-limit 1000000
 ```
 
@@ -179,7 +179,7 @@ python score_risk_openai.py \
   --symbol-column Stock_symbol \
   --text-column Lsa_summary \
   --date-column Date \
-  --api-keys-file api_keys.txt \
+  --api-keys-file api_keys_tier5.txt \
   --daily-token-limit 250000
 ```
 

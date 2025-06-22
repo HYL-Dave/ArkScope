@@ -35,7 +35,7 @@ This folder contains a self-contained toolkit to:
     --symbol-column Stock_symbol \
     --text-column Lsa_summary \
     --date-column Date \
-    --api-keys-file api_keys.txt \
+    --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 1000000
   ```
 - Risk (resumable, chunked):
@@ -48,7 +48,7 @@ This folder contains a self-contained toolkit to:
     --symbol-column Stock_symbol \
     --text-column Lsa_summary \
     --date-column Date \
-    --api-keys-file api_keys.txt \
+    --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 250000
   ```
 
@@ -84,3 +84,4 @@ python backtest_openai.py --data merged_dataset.csv \
 - `train_ppo_llm.py`, `train_cppo_llm_risk.py`: core training scripts.
 - `env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`: environment definitions.
 - `requirements.txt`: Python dependencies.
+- `filter_fns_data_by_date.py`: filter FNSPID raw news CSV by a start date, e.g., extract records on/after 2022-11-01.
