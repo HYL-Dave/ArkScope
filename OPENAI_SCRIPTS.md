@@ -150,8 +150,24 @@ python score_sentiment_openai.py \
   --daily-token-limit 1000000
 ```
 
+#### 参数说明
+
+| 参数                 | 默认值     | 说明                                                                 |
+|----------------------|-----------|----------------------------------------------------------------------|
+| `--input`            | 必填       | 输入 CSV 文件路径，必须包含 symbol, headline（或通过 --symbol-column/--text-column 指定）|
+| `--output`           | 必填       | 输出 CSV 文件路径，会添加 `sentiment_deepseek` 列                      |
+| `--model`            | o4-mini   | OpenAI 模型名称（如 o4-mini, gpt-4.1, o3 等）                          |
+| `--symbol-column`    | symbol    | 输入 CSV 中股票代码列名                                                |
+| `--text-column`      | headline  | 输入 CSV 中文本列名                                                    |
+| `--date-column`      | None      | 输入 CSV 中日期列名，用于保留日期用于后续合并                          |
+| `--chunk-size`       | 1000      | 分块大小，用于断点续跑                                                 |
+| `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
+| `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
+| `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
+
 ### score_risk_openai.py
 Score financial news headlines for downside risk using OpenAI, with resumable chunked processing.
+
 
 Usage:
 ```bash
@@ -166,6 +182,21 @@ python score_risk_openai.py \
   --api-keys-file api_keys.txt \
   --daily-token-limit 250000
 ```
+
+#### 参数说明
+
+| 参数                 | 默认值     | 说明                                                                 |
+|----------------------|-----------|----------------------------------------------------------------------|
+| `--input`            | 必填       | 输入 CSV 文件路径，必须包含 symbol, headline（或通过 --symbol-column/--text-column 指定）|
+| `--output`           | 必填       | 输出 CSV 文件路径，会添加 `risk_deepseek` 列                          |
+| `--model`            | o4-mini   | OpenAI 模型名称（如 o4-mini, gpt-4.1, o3 等）                          |
+| `--symbol-column`    | symbol    | 输入 CSV 中股票代码列名                                                |
+| `--text-column`      | headline  | 输入 CSV 中文本列名                                                    |
+| `--date-column`      | None      | 输入 CSV 中日期列名，用于保留日期用于后续合并                          |
+| `--chunk-size`       | 1000      | 分块大小，用于断点续跑                                                 |
+| `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
+| `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
+| `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
 
 ### prepare_dataset_openai.py
 Merge base price+indicator CSV with sentiment and risk score CSVs into a single dataset for RL.
