@@ -5,7 +5,6 @@ Score downside risk of financial news headlines using OpenAI LLMs.
 import os
 import argparse
 import time
-import json
 import logging
 from typing import Optional
 
@@ -45,7 +44,7 @@ Score each headline for downside risk of holding the stock:
  3 = moderate / unknown (default)
  4 = high risk
  5 = very high / catastrophic risk
-Return ONLY valid JSON: {"risks": [r1, r2, ...]}. No other keys, no explanation.
+Respond with only the integer risk score (1–5). No JSON, no extra text.
 Use 3 when risk cannot be inferred.
 """
 
@@ -60,22 +59,31 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
     ]
     for attempt in range(1, retry + 1):
         try:
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-                max_tokens=50,
-            )
+            # Use appropriate max tokens parameter for o3 vs others
+            if model.startswith("o3"):
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_completion_tokens=500,
+                )
+            else:
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=500,
+                )
             # track token usage and rotate key if needed
-            usage = getattr(response.usage, 'total_tokens', 0)
+            usage = response.usage.total_tokens
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
             rotate_key_if_needed(usage)
             text = response.choices[0].message.content.strip()
-            data = json.loads(text)
-            if isinstance(data, dict) and "risks" in data and isinstance(data["risks"], list):
-                return data["risks"][0]
-            logging.warning(f"Unexpected response format: {data}")
-            return None
+            # Parse single integer risk score from model response
+            try:
+                return int(text.split()[0])
+            except Exception:
+                logging.warning(f"Cannot parse integer risk from response: {text}")
+                return None
         except Exception as e:
             logging.error(f"Attempt {attempt}/{retry} failed: {e}")
             time.sleep(pause * attempt)

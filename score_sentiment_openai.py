@@ -5,7 +5,6 @@ Score sentiment of financial news headlines using OpenAI LLMs.
 import os
 import argparse
 import time
-import json
 import logging
 from typing import Optional
 
@@ -45,8 +44,8 @@ For each news headline about one stock, assign an integer sentiment score:
  3 = neutral / not relevant
  4 = bullish       (2–5 % rise)
  5 = very bullish  (>5 % rise)
-Return ONLY valid JSON: {"scores": [s1, s2, ...]}. No other keys, no explanation.
-If information is insufficient, use 3.
+Respond with only the integer sentiment score (1–5). No JSON, no extra text.
+If information is insufficient, respond with 3.
 """
 
 def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause: float = 0.5) -> Optional[int]:
@@ -60,23 +59,32 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
     ]
     for attempt in range(1, retry + 1):
         try:
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-                max_tokens=50,
-            )
+            # Use appropriate max tokens parameter for o3 vs others
+            if model.startswith("o"):
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_completion_tokens=500,
+                )
+            else:
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=500,
+                )
             # track token usage and rotate key if needed
-            usage = getattr(response.usage, 'total_tokens', 0)
+            usage = response.usage.total_tokens
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
             rotate_key_if_needed(usage)
 
             text = response.choices[0].message.content.strip()
-            data = json.loads(text)
-            if isinstance(data, dict) and "scores" in data and isinstance(data["scores"], list):
-                return data["scores"][0]
-            logging.warning(f"Unexpected response format: {data}")
-            return None
+            # Parse single integer score from model response
+            try:
+                return int(text.split()[0])
+            except Exception:
+                logging.warning(f"Cannot parse integer score from response: {text}")
+                return None
         except Exception as e:
             logging.error(f"Attempt {attempt}/{retry} failed: {e}")
             time.sleep(pause * attempt)

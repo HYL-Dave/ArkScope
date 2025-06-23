@@ -35,7 +35,14 @@ def main():
     )
     args = parser.parse_args()
 
-    df = pd.read_csv(args.input, parse_dates=[args.date_col])
+    df = pd.read_csv(
+        args.input,
+        low_memory=False,
+    )
+    # Robustly parse date column (handles mixed formats and UTC suffix)
+    df[args.date_col] = pd.to_datetime(
+        df[args.date_col], utc=True, errors='coerce'
+    ).dt.tz_localize(None)
     df_filtered = df[df[args.date_col] >= args.start_date]
     df_filtered.to_csv(args.output, index=False)
     print(f"Filtered {len(df_filtered)} records on or after {args.start_date}, saved to {args.output}")
