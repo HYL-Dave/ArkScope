@@ -37,6 +37,7 @@ This folder contains a self-contained toolkit to:
     --date-column Date \
     --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 1000000 \
+    --retry-missing 3 \
     --verbose
   ```
   # The script will auto-create the output directory if needed.

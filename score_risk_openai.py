@@ -185,7 +185,8 @@ def main():
             chunk[out_col] = np.nan
             # Score each row
             for idx, row in chunk.iterrows():
-                logging.debug(f"Requesting risk for {row[sym_col]}: {row[text_col][:200]}")
+                snippet = str(row[text_col])[:200]
+                logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
                 val = score_headline(row[text_col], row[sym_col], model)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)

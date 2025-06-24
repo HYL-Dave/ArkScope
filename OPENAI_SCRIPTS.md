@@ -155,7 +155,8 @@ python score_sentiment_openai.py \
   --text-column Lsa_summary \
   --date-column Date \
   --api-keys-file api_keys_tier5.txt \
-  --daily-token-limit 1000000
+  --daily-token-limit 1000000 \
+  --retry-missing 3
 ```
 
 #### 参数说明
@@ -172,6 +173,22 @@ python score_sentiment_openai.py \
 | `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
 | `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
 | `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
+| `--retry-missing`    | 3         | 对未获取到分数的行进行额外重试次数                                    |
+
+### check_sentiment_csv.py
+Validate sentiment-scored CSV output for missing or invalid scores and required columns.
+
+Usage:
+```bash
+python check_sentiment_csv.py \
+  --input /mnt/md0/finrl/o3/sentiment/sentiment_o3_2.csv \
+  --symbol-column Stock_symbol \
+  --text-column Lsa_summary \
+  --date-column Date \
+  --sentiment-column sentiment_deepseek
+```
+
+### score_risk_openai.py
 
 ### score_risk_openai.py
 Score financial news headlines for downside risk using OpenAI, with resumable chunked processing.
