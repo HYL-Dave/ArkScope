@@ -61,10 +61,11 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
         try:
             # Use appropriate max tokens parameter for o3 vs others
             if model.startswith("o"):
+                # print(f'Use {model} model')
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_completion_tokens=50,
+                    max_completion_tokens=100,
                 )
             else:
                 response = openai.chat.completions.create(
