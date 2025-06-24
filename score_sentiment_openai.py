@@ -64,14 +64,14 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_completion_tokens=500,
+                    max_completion_tokens=50,
                 )
             else:
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=0.0,
-                    max_tokens=500,
+                    max_tokens=2,
                 )
             # track token usage and rotate key if needed
             usage = response.usage.total_tokens
@@ -158,6 +158,10 @@ def main():
     set_api_keys(keys, args.daily_token_limit)
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause):
+        # Ensure output directory exists for chunked writes
+        out_dir = os.path.dirname(output_csv)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
         # Resume logic: count already processed rows
         if os.path.exists(output_csv):
             prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],

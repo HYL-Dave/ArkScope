@@ -39,7 +39,9 @@ This folder contains a self-contained toolkit to:
     --daily-token-limit 1000000 \
     --verbose
   ```
-  # The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'
+  # The script will auto-create the output directory if needed.
+  # The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'.
+  # Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
 - Risk (resumable, chunked):
   ```bash
   python score_risk_openai.py \
@@ -54,7 +56,9 @@ This folder contains a self-contained toolkit to:
     --daily-token-limit 250000 \
     --verbose
   ```
-  # The output CSV will include all original columns from the input plus a new column 'risk_deepseek'
+  # The script will auto-create the output directory if needed.
+  # The output CSV will include all original columns from the input plus a new column 'risk_deepseek'.
+  # Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
 
 ### 2. Prepare Dataset
 ```bash

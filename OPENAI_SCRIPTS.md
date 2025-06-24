@@ -97,7 +97,9 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --date-column Date \
      --verbose
    ```
-   # The output CSV will preserve all input columns plus the new 'sentiment_deepseek' column
+   # The script will auto-create the output directory if needed.
+   # The output CSV will preserve all input columns plus the new 'sentiment_deepseek' column.
+   # Results are appended chunk by chunk; interrupt (Ctrl+C) anytime and re-run with the same arguments to resume.
 2. Score risk:
    ```bash
    python score_risk_openai.py \
@@ -110,7 +112,9 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --date-column Date \
      --verbose
    ```
-   # The output CSV will preserve all input columns plus the new 'risk_deepseek' column
+   # The script will auto-create the output directory if needed.
+   # The output CSV will preserve all input columns plus the new 'risk_deepseek' column.
+   # Results are appended chunk by chunk; interrupt (Ctrl+C) anytime and re-run with the same arguments to resume.
 3. Prepare merged dataset:
    ```bash
    python prepare_dataset_openai.py \
