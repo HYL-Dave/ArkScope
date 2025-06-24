@@ -133,7 +133,13 @@ def main():
         "--daily-token-limit", type=int, default=None,
         help="Token limit per API key per run (approximate); keys rotate upon reaching this limit"
     )
+    parser.add_argument(
+        "--verbose", action="store_true",
+        help="Enable verbose logging of each request and chunk processing"
+    )
     args = parser.parse_args()
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     # setup API keys and token limits
     keys = []
@@ -163,6 +169,7 @@ def main():
                              on_bad_lines='warn', engine='python')
         out_col = "risk_deepseek"
         for i, chunk in enumerate(reader):
+            logging.info(f"Processing chunk {i}, {len(chunk)} rows")
             if i * chunk_size < processed_rows:
                 continue
             # Validate required columns
@@ -174,17 +181,16 @@ def main():
             chunk[out_col] = np.nan
             # Score each row
             for idx, row in chunk.iterrows():
+                logging.debug(f"Requesting risk for {row[sym_col]}: {row[text_col][:200]}")
                 val = score_headline(row[text_col], row[sym_col], model)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)
-            # Save only date, symbol and score columns
-            save_cols = ([date_col] if date_col else []) + [sym_col, out_col]
+            # Write all original columns plus new risk score
             chunk.to_csv(
                 output_csv,
                 mode='a',
                 header=not os.path.exists(output_csv),
-                index=False,
-                columns=save_cols
+                index=False
             )
         print(f"Scoring completed; results saved to {output_csv}")
 

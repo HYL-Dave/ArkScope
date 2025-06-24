@@ -94,8 +94,10 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --chunk-size 5000 \
      --symbol-column Stock_symbol \
      --text-column Lsa_summary \
-     --date-column Date
+     --date-column Date \
+     --verbose
    ```
+   # The output CSV will preserve all input columns plus the new 'sentiment_deepseek' column
 2. Score risk:
    ```bash
    python score_risk_openai.py \
@@ -105,8 +107,10 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --chunk-size 5000 \
      --symbol-column Stock_symbol \
      --text-column Lsa_summary \
-     --date-column Date
+     --date-column Date \
+     --verbose
    ```
+   # The output CSV will preserve all input columns plus the new 'risk_deepseek' column
 3. Prepare merged dataset:
    ```bash
    python prepare_dataset_openai.py \

@@ -36,8 +36,10 @@ This folder contains a self-contained toolkit to:
     --text-column Lsa_summary \
     --date-column Date \
     --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 1000000
+    --daily-token-limit 1000000 \
+    --verbose
   ```
+  # The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'
 - Risk (resumable, chunked):
   ```bash
   python score_risk_openai.py \
@@ -49,8 +51,10 @@ This folder contains a self-contained toolkit to:
     --text-column Lsa_summary \
     --date-column Date \
     --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 250000
+    --daily-token-limit 250000 \
+    --verbose
   ```
+  # The output CSV will include all original columns from the input plus a new column 'risk_deepseek'
 
 ### 2. Prepare Dataset
 ```bash
