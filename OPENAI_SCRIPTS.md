@@ -156,6 +156,7 @@ python score_sentiment_openai.py \
   --date-column Date \
   --api-keys-file api_keys_tier5.txt \
   --daily-token-limit 1000000 \
+  --retry 3 \
   --retry-missing 3
 ```
 
@@ -171,6 +172,7 @@ python score_sentiment_openai.py \
   --date-column Date \
   --api-keys-file api_keys_tier5.txt \
   --daily-token-limit 1000000 \
+  --retry 3 \
   --retry-missing 3 \
   --allow-flex --flex-timeout 900 --flex-retries 1
 ```
@@ -194,6 +196,7 @@ python score_sentiment_openai.py \
 | `--allow-flex`       | False     | 启用 Flex 模式：达到 token 限额后切换到 service_tier='flex'                 |
 | `--flex-timeout`     | 900.0     | Flex 模式下的超时时间（秒），默认为 900                                |
 | `--flex-retries`     | 1         | Flex 模式下的重试次数，默认为 1                                       |
+| `--retry`            | 3         | score_headline() 内部解析失败时的重试次数（默认=3）                      |
 | `--retry-missing`    | 3         | 对未获取到分数的行进行额外重试次数                                    |
 
 ### check_sentiment_csv.py

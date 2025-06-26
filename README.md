@@ -37,6 +37,7 @@ This folder contains a self-contained toolkit to:
     --date-column Date \
     --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 1000000 \
+    --retry 3 \
     --retry-missing 3 \
     --verbose
 
@@ -51,6 +52,7 @@ This folder contains a self-contained toolkit to:
     --date-column Date \
     --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 1000000 \
+    --retry 3 \
     --retry-missing 3 \
     --allow-flex --flex-timeout 900 --flex-retries 1
   ```

@@ -197,6 +197,10 @@ def main():
         help="Enable verbose logging of each request and chunk processing"
     )
     parser.add_argument(
+        "--retry", type=int, default=3,
+        help="Number of internal retry attempts when parsing model responses"
+    )
+    parser.add_argument(
         "--retry-missing", type=int, default=3,
         help="Number of extra attempts for rows with missing sentiment score"
     )
@@ -238,7 +242,7 @@ def main():
     set_api_keys(keys, args.daily_token_limit)
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
-                    chunk_size, pause, retry_missing):
+                    chunk_size, pause, retry_missing, retry_internal):
         # Ensure output directory exists for chunked writes
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -269,16 +273,16 @@ def main():
             for idx, row in chunk.iterrows():
                 snippet = str(row[text_col])[:200]
                 logging.debug(f"Requesting score for {row[sym_col]}: {snippet}")
-                # initial inference
-                val = score_headline(row[text_col], row[sym_col], model)
-                # extra retries if missing
+                # initial inference with internal retry
+                val = score_headline(row[text_col], row[sym_col], model, retry=retry_internal)
+                # extra retries if still missing
                 for _ in range(retry_missing):
                     if val is not None:
                         break
                     logging.warning(
                         f"Missing sentiment for {row[sym_col]}:{idx}, retrying"
                     )
-                    val = score_headline(row[text_col], row[sym_col], model)
+                    val = score_headline(row[text_col], row[sym_col], model, retry=retry_internal)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)
             # Write all original columns plus new sentiment score
@@ -297,7 +301,9 @@ def main():
     process_csv(
         args.input, args.output, args.model,
         args.symbol_column, args.text_column, args.date_column,
-        args.chunk_size, pause=0.1, retry_missing=args.retry_missing,
+        args.chunk_size, pause=0.1,
+        retry_missing=args.retry_missing,
+        retry_internal=args.retry,
     )
 
 if __name__ == "__main__":
