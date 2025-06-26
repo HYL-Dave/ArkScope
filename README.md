@@ -39,6 +39,20 @@ This folder contains a self-contained toolkit to:
     --daily-token-limit 1000000 \
     --retry-missing 3 \
     --verbose
+
+  # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
+  python score_sentiment_openai.py \
+    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+    --output sentiment_scored.csv \
+    --model o4-mini \
+    --chunk-size 5000 \
+    --symbol-column Stock_symbol \
+    --text-column Lsa_summary \
+    --date-column Date \
+    --api-keys-file api_keys_tier5.txt \
+    --daily-token-limit 1000000 \
+    --retry-missing 3 \
+    --allow-flex --flex-timeout 900 --flex-retries 1
   ```
   # The script will auto-create the output directory if needed.
   # The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'.
@@ -57,6 +71,19 @@ This folder contains a self-contained toolkit to:
     --api-keys-file api_keys_tier5.txt \
     --daily-token-limit 250000 \
     --verbose
+
+  # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
+  python score_risk_openai.py \
+    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+    --output risk_scored.csv \
+    --model o4-mini \
+    --chunk-size 5000 \
+    --symbol-column Stock_symbol \
+    --text-column Lsa_summary \
+    --date-column Date \
+    --api-keys-file api_keys_tier5.txt \
+    --daily-token-limit 250000 \
+    --allow-flex --flex-timeout 900 --flex-retries 1
   ```
   # The script will auto-create the output directory if needed.
   # The output CSV will include all original columns from the input plus a new column 'risk_deepseek'.

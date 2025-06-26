@@ -159,6 +159,22 @@ python score_sentiment_openai.py \
   --retry-missing 3
 ```
 
+# Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
+```bash
+python score_sentiment_openai.py \
+  --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+  --output sentiment_scored.csv \
+  --model o4-mini \
+  --chunk-size 5000 \
+  --symbol-column Stock_symbol \
+  --text-column Lsa_summary \
+  --date-column Date \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 1000000 \
+  --retry-missing 3 \
+  --allow-flex --flex-timeout 900 --flex-retries 1
+```
+
 > **Note:** 脚本在执行完触发每日 token 限额的整个 chunk 并写入输出后会自动退出，便于您根据 `--daily-token-limit` 调整 `--chunk-size`。
 
 #### 参数说明
@@ -175,6 +191,9 @@ python score_sentiment_openai.py \
 | `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
 | `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
 | `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
+| `--allow-flex`       | False     | 启用 Flex 模式：达到 token 限额后切换到 service_tier='flex'                 |
+| `--flex-timeout`     | 900.0     | Flex 模式下的超时时间（秒），默认为 900                                |
+| `--flex-retries`     | 1         | Flex 模式下的重试次数，默认为 1                                       |
 | `--retry-missing`    | 3         | 对未获取到分数的行进行额外重试次数                                    |
 
 ### check_sentiment_csv.py
@@ -208,6 +227,21 @@ python score_risk_openai.py \
   --daily-token-limit 250000
 ```
 
+# Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
+```bash
+python score_risk_openai.py \
+  --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+  --output risk_scored.csv \
+  --model o4-mini \
+  --chunk-size 5000 \
+  --symbol-column Stock_symbol \
+  --text-column Lsa_summary \
+  --date-column Date \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 250000 \
+  --allow-flex --flex-timeout 900 --flex-retries 1
+```
+
 #### 参数说明
 
 | 参数                 | 默认值     | 说明                                                                 |
@@ -222,6 +256,9 @@ python score_risk_openai.py \
 | `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
 | `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
 | `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
+| `--allow-flex`       | False     | 启用 Flex 模式：达到 token 限额后切换到 service_tier='flex'                 |
+| `--flex-timeout`     | 900.0     | Flex 模式下的超时时间（秒），默认为 900                                |
+| `--flex-retries`     | 1         | Flex 模式下的重试次数，默认为 1                                       |
 
 ### prepare_dataset_openai.py
 Merge base price+indicator CSV with sentiment and risk score CSVs into a single dataset for RL.

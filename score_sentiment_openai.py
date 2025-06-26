@@ -22,6 +22,11 @@ DAILY_TOKEN_LIMIT = None
 # flag to signal stopping after finishing current chunk when limit reached
 STOP_AFTER_CHUNK = False
 
+# Flex mode configuration: switch to flex service_tier after daily token limit
+ALLOW_FLEX = False
+FLEX_TIMEOUT = 900.0
+FLEX_RETRIES = 1
+
 def set_api_keys(keys, daily_limit):
     global API_KEYS, TOKENS_USED, CURRENT_KEY_IDX, DAILY_TOKEN_LIMIT
     API_KEYS = keys
@@ -74,25 +79,33 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"TICKER: {symbol}\nHEADLINES:\n1. {headline}"}
     ]
-    for attempt in range(1, retry + 1):
+    # Determine if we should switch to Flex mode after reaching daily token limit
+    use_flex = ALLOW_FLEX and DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT
+    max_attempts = FLEX_RETRIES if use_flex else retry
+    for attempt in range(1, max_attempts + 1):
         try:
-            # Use function-calling for o4 models; fallback to simple JSON/text parsing for others
+            # Prepare call parameters, with optional Flex settings
             if model.startswith("o"):
-                response = openai.chat.completions.create(
-                    model=model,
-                    reasoning_effort="high",
-                    messages=messages,
-                    max_completion_tokens=600,
-                    functions=functions,
-                    function_call={"name": "record_score"}
-                )
+                params = {
+                    "model": model,
+                    "reasoning_effort": "high",
+                    "messages": messages,
+                    "max_completion_tokens": 600,
+                    "functions": functions,
+                    "function_call": {"name": "record_score"},
+                }
             else:
-                response = openai.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=0.0,
-                    max_tokens=2,
-                )
+                params = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.0,
+                    "max_tokens": 2,
+                }
+            if use_flex:
+                params["service_tier"] = "flex"
+                params["timeout"] = FLEX_TIMEOUT
+
+            response = openai.chat.completions.create(**params)
             # track token usage and rotate key if needed
             usage = response.usage.total_tokens
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
@@ -187,9 +200,27 @@ def main():
         "--retry-missing", type=int, default=3,
         help="Number of extra attempts for rows with missing sentiment score"
     )
+    parser.add_argument(
+        "--allow-flex", action="store_true",
+        help="After daily token limit, continue calls in service_tier='flex' mode"
+    )
+    parser.add_argument(
+        "--flex-timeout", type=float, default=900.0,
+        help="Timeout in seconds for Flex service calls (e.g. 900s)"
+    )
+    parser.add_argument(
+        "--flex-retries", type=int, default=1,
+        help="Number of retries when running in Flex mode (default=1)"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Flex mode parameters
+    global ALLOW_FLEX, FLEX_TIMEOUT, FLEX_RETRIES
+    ALLOW_FLEX = args.allow_flex
+    FLEX_TIMEOUT = args.flex_timeout
+    FLEX_RETRIES = args.flex_retries
 
     # setup API keys and token limits
     keys = []
