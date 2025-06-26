@@ -205,6 +205,10 @@ def main():
         help="Number of extra attempts for rows with missing sentiment score"
     )
     parser.add_argument(
+        "--max-runtime", type=float, default=None,
+        help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
+    )
+    parser.add_argument(
         "--allow-flex", action="store_true",
         help="After daily token limit, continue calls in service_tier='flex' mode"
     )
@@ -242,7 +246,7 @@ def main():
     set_api_keys(keys, args.daily_token_limit)
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
-                    chunk_size, pause, retry_missing, retry_internal):
+                    chunk_size, pause, retry_missing, retry_internal, max_runtime=None):
         # Ensure output directory exists for chunked writes
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -255,6 +259,7 @@ def main():
         else:
             processed_rows = 0
 
+        start_time = time.time()
         reader = pd.read_csv(input_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='python')
         out_col = "sentiment_deepseek"
@@ -296,6 +301,10 @@ def main():
             if STOP_AFTER_CHUNK:
                 print(f"Daily token limit reached; stopping after chunk {i}.")
                 return
+            # stop if runtime exceeded max_runtime (after finishing this chunk)
+            if max_runtime and (time.time() - start_time) >= max_runtime:
+                print(f"Time limit reached; stopping after chunk {i}.")
+                return
         print(f"Scoring completed; results saved to {output_csv}")
 
     process_csv(
@@ -304,6 +313,7 @@ def main():
         args.chunk_size, pause=0.1,
         retry_missing=args.retry_missing,
         retry_internal=args.retry,
+        max_runtime=args.max_runtime,
     )
 
 if __name__ == "__main__":

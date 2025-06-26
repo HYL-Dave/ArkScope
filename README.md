@@ -39,6 +39,7 @@ This folder contains a self-contained toolkit to:
     --daily-token-limit 1000000 \
     --retry 3 \
     --retry-missing 3 \
+    --max-runtime 3600 \
     --verbose
 
   # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
@@ -54,6 +55,7 @@ This folder contains a self-contained toolkit to:
     --daily-token-limit 1000000 \
     --retry 3 \
     --retry-missing 3 \
+    --max-runtime 3600 \
     --allow-flex --flex-timeout 900 --flex-retries 1
   ```
   # The script will auto-create the output directory if needed.
