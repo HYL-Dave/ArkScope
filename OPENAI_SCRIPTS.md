@@ -159,6 +159,8 @@ python score_sentiment_openai.py \
   --retry-missing 3
 ```
 
+> **Note:** 脚本在执行完触发每日 token 限额的整个 chunk 并写入输出后会自动退出，便于您根据 `--daily-token-limit` 调整 `--chunk-size`。
+
 #### 参数说明
 
 | 参数                 | 默认值     | 说明                                                                 |
@@ -187,8 +189,6 @@ python check_sentiment_csv.py \
   --date-column Date \
   --sentiment-column sentiment_deepseek
 ```
-
-### score_risk_openai.py
 
 ### score_risk_openai.py
 Score financial news headlines for downside risk using OpenAI, with resumable chunked processing.

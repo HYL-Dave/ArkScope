@@ -19,6 +19,8 @@ API_KEYS = []
 TOKENS_USED = {}
 CURRENT_KEY_IDX = 0
 DAILY_TOKEN_LIMIT = None
+# flag to signal stopping after finishing current chunk when limit reached
+STOP_AFTER_CHUNK = False
 
 def set_api_keys(keys, daily_limit):
     global API_KEYS, TOKENS_USED, CURRENT_KEY_IDX, DAILY_TOKEN_LIMIT
@@ -30,12 +32,14 @@ def set_api_keys(keys, daily_limit):
 
 def rotate_key_if_needed(usage):
     global CURRENT_KEY_IDX
+    global STOP_AFTER_CHUNK
     if DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
         logging.warning(
-            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key"
+            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key and will stop after current chunk"
         )
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
+        STOP_AFTER_CHUNK = True
 
 # System prompt for sentiment scoring
 SYSTEM_PROMPT = """
@@ -72,7 +76,7 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
     ]
     for attempt in range(1, retry + 1):
         try:
-            # Use function-calling for o3 models; fallback to simple JSON/text parsing for others
+            # Use function-calling for o4 models; fallback to simple JSON/text parsing for others
             if model.startswith("o"):
                 response = openai.chat.completions.create(
                     model=model,
@@ -253,6 +257,10 @@ def main():
                 header=not os.path.exists(output_csv),
                 index=False
             )
+            # stop if daily token limit was reached during this chunk
+            if STOP_AFTER_CHUNK:
+                print(f"Daily token limit reached; stopping after chunk {i}.")
+                return
         print(f"Scoring completed; results saved to {output_csv}")
 
     process_csv(

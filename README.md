@@ -43,6 +43,7 @@ This folder contains a self-contained toolkit to:
   # The script will auto-create the output directory if needed.
   # The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'.
   # Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
+  # 当触发每日 token 限额时，会在当前 chunk 写入完成后自动退出，以便第二天继续执行并重用剩余行。
 - Risk (resumable, chunked):
   ```bash
   python score_risk_openai.py \
