@@ -21,7 +21,8 @@ CURRENT_KEY_IDX = 0
 DAILY_TOKEN_LIMIT = None
 # flag to signal stopping after finishing current chunk when limit reached
 STOP_AFTER_CHUNK = False
-
+# global flag to switch to Flex mode once token limit is hit
+USE_FLEX_MODE = False
 # Flex mode configuration: switch to flex service_tier after daily token limit
 ALLOW_FLEX = False
 FLEX_TIMEOUT = 900.0
@@ -36,15 +37,20 @@ def set_api_keys(keys, daily_limit):
     openai.api_key = API_KEYS[0]
 
 def rotate_key_if_needed(usage):
-    global CURRENT_KEY_IDX
-    global STOP_AFTER_CHUNK
-    if DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
-        logging.warning(
-            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key and will stop after current chunk"
-        )
+    global CURRENT_KEY_IDX, STOP_AFTER_CHUNK, USE_FLEX_MODE
+    if DAILY_TOKEN_LIMIT is not None and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
+        if ALLOW_FLEX:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); switching to Flex mode"
+            )
+            USE_FLEX_MODE = True
+        else:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); rotating key and will stop after current chunk"
+            )
+            STOP_AFTER_CHUNK = True
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
-        STOP_AFTER_CHUNK = True
 
 # System prompt for sentiment scoring
 SYSTEM_PROMPT = """
@@ -79,8 +85,8 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"TICKER: {symbol}\nHEADLINES:\n1. {headline}"}
     ]
-    # Determine if we should switch to Flex mode after reaching daily token limit
-    use_flex = ALLOW_FLEX and DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT
+    # Determine if we should switch to Flex mode once limit was hit
+    use_flex = ALLOW_FLEX and USE_FLEX_MODE
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
