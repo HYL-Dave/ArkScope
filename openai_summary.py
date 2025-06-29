@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Score downside risk of financial news headlines using OpenAI LLMs.
+Summarize financial news articles using OpenAI LLMs.
 """
 import os
 import argparse
@@ -11,8 +11,6 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 import openai
-import json
-import re
 
 # API key rotation and token limit support
 API_KEYS = []
@@ -42,57 +40,41 @@ def rotate_key_if_needed(usage):
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
 
-### System prompt for risk scoring (JSON + function-calling)
+# System prompt for article summarization
 SYSTEM_PROMPT = """
-You are a financial risk officer.
-Score each headline for downside risk of holding the stock:
- 1 = very low risk
- 2 = low risk
- 3 = moderate / unknown
- 4 = high risk
- 5 = very high / catastrophic risk
-Respond with only the integer risk score (1–5) in JSON format:
-```json
-{"score": <integer>}
-```
-Use {"score": 3} when risk cannot be inferred.
+You are a financial news summarization assistant.
+Summarize the following news article in a concise paragraph, focusing on the core facts and implications.
+Respond with only the summary text, no additional commentary.
 """
-functions = [{
-    "name": "record_score",
-    "parameters": {
-        "type": "object",
-        "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}},
-        "required": ["score"]
-    }
-}]
 
-def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause: float = 0.5) -> Optional[int]:
+def summarize_article(text: str, symbol: str, model: str,
+                      retry: int = 3, pause: float = 0.5) -> Optional[str]:
     """
-    Call OpenAI ChatCompletion to score one headline for risk.
-    Returns integer risk or None on failure.
+    Call OpenAI ChatCompletion to summarize one article.
+    Returns summary string or None on failure.
     """
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"TICKER: {symbol}\nHEADLINES:\n1. {headline}"}
+        {"role": "user", "content": f"TICKER: {symbol}\nARTICLE:\n{text}"}
     ]
     use_flex = ALLOW_FLEX and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT if DAILY_TOKEN_LIMIT else False
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
+            # choose better defaults for 'o' series models
             if model.startswith("o"):
                 params = {
                     "model": model,
+                    "reasoning_effort": "high",
                     "messages": messages,
-                    "max_completion_tokens": 50,
-                    "functions": functions,
-                    "function_call": {"name": "record_score"},
+                    "max_completion_tokens": 200,
                 }
             else:
                 params = {
                     "model": model,
                     "messages": messages,
                     "temperature": 0.0,
-                    "max_tokens": 2,
+                    "max_tokens": 200,
                 }
             if use_flex:
                 params["service_tier"] = "flex"
@@ -103,28 +85,10 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
             rotate_key_if_needed(usage)
 
-            msg = response.choices[0].message
-            if hasattr(msg, "function_call") and msg.function_call is not None:
-                try:
-                    args = json.loads(msg.function_call.arguments)
-                    score = int(args.get("score"))
-                except Exception:
-                    logging.warning(
-                        f"Cannot parse risk score from function_call arguments: {msg.function_call.arguments}"
-                    )
-                    score = None
-            else:
-                txt = msg.content.strip()
-                try:
-                    score = json.loads(txt)["score"]
-                except Exception:
-                    m = re.search(r"\b([1-5])\b", txt)
-                    score = int(m.group(1)) if m else None
-            if score is not None:
-                return score
-            logging.warning(
-                f"Attempt {attempt}/{retry}: no valid risk score parsed (got: '{txt}'), retrying"
-            )
+            summary = response.choices[0].message.content.strip()
+            if summary:
+                return summary
+            logging.warning(f"Attempt {attempt}/{retry}: empty summary, retrying")
             time.sleep(pause * attempt)
         except Exception as e:
             logging.error(f"Attempt {attempt}/{retry} failed: {e}")
@@ -133,15 +97,15 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Score downside risk for financial news headlines using OpenAI"
+        description="Summarize financial news articles using OpenAI"
     )
     parser.add_argument(
         "--input", required=True,
-        help="Path to input CSV with columns: symbol, headline"
+        help="Path to input CSV with columns: symbol, article text"
     )
     parser.add_argument(
         "--output", required=True,
-        help="Path to output CSV; adds 'risk_deepseek' column"
+        help="Path to output CSV; adds summary column"
     )
     parser.add_argument(
         "--model", default="o4-mini",
@@ -152,20 +116,12 @@ def main():
         help="Name of the column for stock symbol in input CSV (default: Stock_symbol)"
     )
     parser.add_argument(
-        "--text-column", default="Article_title",
-        choices=[
-            "Article_title", "Article", "Lsa_summary",
-            "Luhn_summary", "Textrank_summary", "Lexrank_summary",
-        ],
-        help=(
-            "Name of the column for text/summary in input CSV; one of "
-            "Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary "
-            "(default: Article_title)"
-        )
+        "--text-column", default="Article",
+        help="Name of the column for article text in input CSV (default: Article)"
     )
     parser.add_argument(
-        "--date-column", default=None,
-        help="Name of the column for date in input CSV (optional)"
+        "--summary-column", default=None,
+        help="Name of the column to store summaries (default: <model>_summary)"
     )
     parser.add_argument(
         "--chunk-size", type=int, default=1000,
@@ -197,13 +153,20 @@ def main():
     )
     parser.add_argument(
         "--verbose", action="store_true",
-        help="Enable verbose logging of each request and chunk processing"
+        help="Enable verbose logging"
+    )
+    parser.add_argument(
+        "--retry", type=int, default=3,
+        help="Number of internal retry attempts on failure"
+    )
+    parser.add_argument(
+        "--retry-missing", type=int, default=1,
+        help="Number of extra attempts for rows with missing summary"
     )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Flex mode parameters
     global ALLOW_FLEX, FLEX_TIMEOUT, FLEX_RETRIES
     ALLOW_FLEX = args.allow_flex
     FLEX_TIMEOUT = args.flex_timeout
@@ -224,14 +187,18 @@ def main():
         parser.error("No OpenAI API key provided; set --api-key, --api-keys-file, or OPENAI_API_KEY env var")
     set_api_keys(keys, args.daily_token_limit)
 
-    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause):
-        # Ensure output directory exists for chunked writes
+    # determine summary column name
+    summary_col = args.summary_column or f"{args.model.replace('-', '_')}_summary"
+
+    def process_csv(input_csv, output_csv, model, sym_col, text_col,
+                    summary_col, chunk_size, pause, retry, retry_missing):
+        # Ensure output directory exists
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
         # Resume logic: count already processed rows
         if os.path.exists(output_csv):
-            prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
+            prev = pd.read_csv(output_csv, usecols=[summary_col],
                                on_bad_lines='warn', engine='python')
             processed_rows = len(prev)
         else:
@@ -239,42 +206,46 @@ def main():
 
         reader = pd.read_csv(input_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='python')
-        out_col = "risk_deepseek"
         for i, chunk in enumerate(reader):
             logging.info(f"Processing chunk {i}, {len(chunk)} rows")
             if i * chunk_size < processed_rows:
                 continue
             # Validate required columns
-            required = [sym_col, text_col] + ([date_col] if date_col else [])
-            missing = [c for c in required if c and c not in chunk.columns]
+            required = [sym_col, text_col]
+            missing = [c for c in required if c not in chunk.columns]
             if missing:
                 parser.error(f"Input CSV missing columns: {missing}")
-            # Initialize output column
-            chunk[out_col] = np.nan
-            # Score each row
+            # Initialize summary column
+            chunk[summary_col] = np.nan
+            # Summarize each row
             for idx, row in chunk.iterrows():
                 cell = row[text_col]
                 if pd.isna(cell) or not str(cell).strip():
-                    logging.warning(f"Skipping empty text for {row[sym_col]}:{idx}")
+                    logging.warning(f"Skipping empty article for {row[sym_col]}:{idx}")
                     continue
-                snippet = str(cell)[:200]
-                logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
-                val = score_headline(cell, row[sym_col], model)
-                chunk.at[idx, out_col] = val
+                summary = summarize_article(cell, row[sym_col], model, retry=retry)
+                for _ in range(retry_missing):
+                    if summary is not None:
+                        break
+                    logging.warning(f"Missing summary for {row[sym_col]}:{idx}, retrying")
+                    summary = summarize_article(cell, row[sym_col], model, retry=retry)
+                chunk.at[idx, summary_col] = summary
                 time.sleep(pause)
-            # Write all original columns plus new risk score
+            # Append chunk to output
             chunk.to_csv(
                 output_csv,
                 mode='a',
                 header=not os.path.exists(output_csv),
                 index=False
             )
-        print(f"Scoring completed; results saved to {output_csv}")
+        print(f"Summarization completed; results saved to {output_csv}")
 
     process_csv(
         args.input, args.output, args.model,
-        args.symbol_column, args.text_column, args.date_column,
-        args.chunk_size, pause=0.1,
+        args.symbol_column, args.text_column,
+        summary_col, args.chunk_size,
+        pause=0.1, retry=args.retry,
+        retry_missing=args.retry_missing,
     )
 
 if __name__ == "__main__":

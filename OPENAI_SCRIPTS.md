@@ -218,6 +218,27 @@ python check_sentiment_csv.py \
 ### score_risk_openai.py
 Score financial news headlines for downside risk using OpenAI, with resumable chunked processing.
 
+# Script: openai_summary.py
+
+Path: `openai_summary.py`
+
+### Description
+Summarizes the full `Article` text of each news entry into a new `<model>_summary` column, skipping empty articles. Supports resumable chunked processing, API key rotation, and daily token limits.
+
+### Usage example
+```bash
+python openai_summary.py \
+  --input sentiment_deepseek_new_cleaned_nasdaq_news_full.csv \
+  --output news_with_summary.csv \
+  --model o4-mini \
+  --symbol-column Stock_symbol \
+  --text-column Article \
+  --summary-column o4_mini_summary \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 9260000 \
+  --chunk-size 500 \
+  --verbose
+```
 
 Usage:
 ```bash

@@ -290,10 +290,14 @@ def main():
             chunk[out_col] = np.nan
             # Score each row
             for idx, row in chunk.iterrows():
-                snippet = str(row[text_col])[:200]
+                cell = row[text_col]
+                if pd.isna(cell) or not str(cell).strip():
+                    logging.warning(f"Skipping empty text for {row[sym_col]}:{idx}")
+                    continue
+                snippet = str(cell)[:200]
                 logging.debug(f"Requesting score for {row[sym_col]}: {snippet}")
                 # initial inference with internal retry
-                val = score_headline(row[text_col], row[sym_col], model, retry=retry_internal)
+                val = score_headline(cell, row[sym_col], model, retry=retry_internal)
                 # extra retries if still missing
                 for _ in range(retry_missing):
                     if val is not None:
@@ -301,7 +305,7 @@ def main():
                     logging.warning(
                         f"Missing sentiment for {row[sym_col]}:{idx}, retrying"
                     )
-                    val = score_headline(row[text_col], row[sym_col], model, retry=retry_internal)
+                    val = score_headline(cell, row[sym_col], model, retry=retry_internal)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)
             # Write all original columns plus new sentiment score
