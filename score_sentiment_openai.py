@@ -286,8 +286,7 @@ def main():
             missing = [c for c in required if c and c not in chunk.columns]
             if missing:
                 parser.error(f"Input CSV missing columns: {missing}")
-            # Initialize output column
-            chunk[out_col] = np.nan
+            chunk[out_col] = None
             # Score each row
             for idx, row in chunk.iterrows():
                 cell = row[text_col]

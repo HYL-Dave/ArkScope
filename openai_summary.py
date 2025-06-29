@@ -18,7 +18,10 @@ API_KEYS = []
 TOKENS_USED = {}
 CURRENT_KEY_IDX = 0
 DAILY_TOKEN_LIMIT = None
-
+# flag to signal stopping after finishing current chunk when limit reached
+STOP_AFTER_CHUNK = False
+# global flag to switch to Flex mode once token limit is hit
+USE_FLEX_MODE = False
 # Flex mode configuration: switch to flex service_tier after daily token limit
 ALLOW_FLEX = False
 FLEX_TIMEOUT = 900.0
@@ -33,11 +36,18 @@ def set_api_keys(keys, daily_limit):
     openai.api_key = API_KEYS[0]
 
 def rotate_key_if_needed(usage):
-    global CURRENT_KEY_IDX
-    if DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
-        logging.warning(
-            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key"
-        )
+    global CURRENT_KEY_IDX, STOP_AFTER_CHUNK, USE_FLEX_MODE
+    if DAILY_TOKEN_LIMIT is not None and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
+        if ALLOW_FLEX:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); switching to Flex mode"
+            )
+            USE_FLEX_MODE = True
+        else:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); rotating key and will stop after current chunk"
+            )
+            STOP_AFTER_CHUNK = True
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
 
@@ -70,7 +80,7 @@ def summarize_article(text: str, symbol: str, model: str,
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"TICKER: {symbol}\nARTICLE:\n{text}"}
     ]
-    use_flex = ALLOW_FLEX and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT if DAILY_TOKEN_LIMIT is not None else False
+    use_flex = ALLOW_FLEX and USE_FLEX_MODE
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
@@ -251,8 +261,7 @@ def main():
             missing = [c for c in required if c not in chunk.columns]
             if missing:
                 parser.error(f"Input CSV missing columns: {missing}")
-            # Initialize summary column
-            chunk[summary_col] = np.nan
+            chunk[summary_col] = None
             # Summarize each row
             for idx, row in chunk.iterrows():
                 cell = row[text_col]
