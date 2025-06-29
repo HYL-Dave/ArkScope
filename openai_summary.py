@@ -45,6 +45,7 @@ SYSTEM_PROMPT = """
 You are a financial news summarization assistant.
 Summarize the following news article in a concise paragraph, focusing on the core facts and implications.
 Respond with only the summary text, no additional commentary.
+If the article is too short or has insufficient content, still return a brief sentence describing that fact.
 """
 
 def summarize_article(text: str, symbol: str, model: str,
@@ -57,7 +58,7 @@ def summarize_article(text: str, symbol: str, model: str,
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"TICKER: {symbol}\nARTICLE:\n{text}"}
     ]
-    use_flex = ALLOW_FLEX and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT if DAILY_TOKEN_LIMIT else False
+    use_flex = ALLOW_FLEX and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) >= DAILY_TOKEN_LIMIT if DAILY_TOKEN_LIMIT is not None else False
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
