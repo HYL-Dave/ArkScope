@@ -163,6 +163,10 @@ def main():
         "--retry-missing", type=int, default=1,
         help="Number of extra attempts for rows with missing summary"
     )
+    parser.add_argument(
+        "--max-runtime", type=float, default=None,
+        help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -191,7 +195,8 @@ def main():
     summary_col = args.summary_column or f"{args.model.replace('-', '_')}_summary"
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col,
-                    summary_col, chunk_size, pause, retry, retry_missing):
+                    summary_col, chunk_size, pause, retry, retry_missing,
+                    max_runtime=None):
         # Ensure output directory exists
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -204,6 +209,8 @@ def main():
         else:
             processed_rows = 0
 
+        # start timer for max-runtime enforcement
+        start_time = time.time()
         reader = pd.read_csv(input_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='python')
         for i, chunk in enumerate(reader):
@@ -238,6 +245,10 @@ def main():
                 header=not os.path.exists(output_csv),
                 index=False
             )
+            # stop if runtime exceeded max_runtime (after finishing this chunk)
+            if max_runtime and (time.time() - start_time) >= max_runtime:
+                print(f"Time limit reached; stopping after chunk {i}.")
+                return
         print(f"Summarization completed; results saved to {output_csv}")
 
     process_csv(
@@ -246,6 +257,7 @@ def main():
         summary_col, args.chunk_size,
         pause=0.1, retry=args.retry,
         retry_missing=args.retry_missing,
+        max_runtime=args.max_runtime,
     )
 
 if __name__ == "__main__":
