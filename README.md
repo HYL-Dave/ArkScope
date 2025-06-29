@@ -25,6 +25,11 @@ This folder contains a self-contained toolkit to:
 ## Workflow
 
 ### 1. Score News Headlines
+
+#### 可选列说明 / Column options
+
+- `--symbol-column` : 输入 CSV 中存放股票代号的列，例如 `Stock_symbol`（默认 `Stock_symbol`）。
+- `--text-column`   : 输入 CSV 中存放要打分的新闻文本／摘要的列，可选 `Article_title`、`Article`、`Lsa_summary`、`Luhn_summary`、`Textrank_summary`、`Lexrank_summary`（默认 `Article_title`）。
 - Sentiment (resumable, chunked):
   ```bash
   python score_sentiment_openai.py \
