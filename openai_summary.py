@@ -11,6 +11,7 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 import openai
+import json
 
 # API key rotation and token limit support
 API_KEYS = []
@@ -40,13 +41,24 @@ def rotate_key_if_needed(usage):
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
 
-# System prompt for article summarization
+### System prompt for article summarization (JSON + function-calling)
 SYSTEM_PROMPT = """
 You are a financial news summarization assistant.
 Summarize the following news article in a concise paragraph, focusing on the core facts and implications.
-Respond with only the summary text, no additional commentary.
-If the article is too short or has insufficient content, still return a brief sentence describing that fact.
+Respond with only the summary text in JSON format:
+```json
+{"summary": "<your summary>"}
+```
+If the article is too short or has insufficient content, still return a concise sentence describing that fact.
 """
+functions = [{
+    "name": "record_summary",
+    "parameters": {
+        "type": "object",
+        "properties": {"summary": {"type": "string"}},
+        "required": ["summary"]
+    }
+}]
 
 def summarize_article(text: str, symbol: str, model: str,
                       retry: int = 3, pause: float = 0.5) -> Optional[str]:
@@ -62,13 +74,14 @@ def summarize_article(text: str, symbol: str, model: str,
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
-            # choose better defaults for 'o' series models
             if model.startswith("o"):
                 params = {
                     "model": model,
                     "reasoning_effort": "high",
                     "messages": messages,
-                    "max_completion_tokens": 200,
+                    "max_completion_tokens": 1000,
+                    "functions": functions,
+                    "function_call": {"name": "record_summary"},
                 }
             else:
                 params = {
@@ -76,6 +89,8 @@ def summarize_article(text: str, symbol: str, model: str,
                     "messages": messages,
                     "temperature": 0.0,
                     "max_tokens": 200,
+                    "functions": functions,
+                    "function_call": {"name": "record_summary"},
                 }
             if use_flex:
                 params["service_tier"] = "flex"
@@ -86,7 +101,20 @@ def summarize_article(text: str, symbol: str, model: str,
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
             rotate_key_if_needed(usage)
 
-            summary = response.choices[0].message.content.strip()
+            msg = response.choices[0].message
+            if hasattr(msg, "function_call") and msg.function_call is not None:
+                try:
+                    args = json.loads(msg.function_call.arguments)
+                    summary = args.get("summary")
+                except Exception:
+                    logging.warning(f"Cannot parse summary from function_call arguments: {msg.function_call.arguments}")
+                    summary = None
+            else:
+                txt = msg.content.strip()
+                try:
+                    summary = json.loads(txt)["summary"]
+                except Exception:
+                    summary = txt
             if summary:
                 return summary
             logging.warning(f"Attempt {attempt}/{retry}: empty summary, retrying")
