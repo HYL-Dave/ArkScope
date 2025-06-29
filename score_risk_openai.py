@@ -119,12 +119,20 @@ def main():
         help="OpenAI model name (e.g., o4-mini, gpt-4.1, o3)"
     )
     parser.add_argument(
-        "--symbol-column", default="symbol",
-        help="Name of the column for stock symbol in input CSV"
+        "--symbol-column", default="Stock_symbol",
+        help="Name of the column for stock symbol in input CSV (default: Stock_symbol)"
     )
     parser.add_argument(
-        "--text-column", default="headline",
-        help="Name of the column for text/summary in input CSV"
+        "--text-column", default="Article_title",
+        choices=[
+            "Article_title", "Article", "Lsa_summary",
+            "Luhn_summary", "Textrank_summary", "Lexrank_summary",
+        ],
+        help=(
+            "Name of the column for text/summary in input CSV; one of "
+            "Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary "
+            "(default: Article_title)"
+        )
     )
     parser.add_argument(
         "--date-column", default=None,
