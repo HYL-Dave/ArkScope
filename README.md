@@ -130,5 +130,5 @@ python backtest_openai.py --data merged_dataset.csv \
 - `train_ppo_llm.py`, `train_cppo_llm_risk.py`: core training scripts.
 - `env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`: environment definitions.
 - `requirements.txt`: Python dependencies.
-- `openai_summary.py`: summarize the Article text into a new `<model>_summary` column using OpenAI (skips empty articles).
+- `openai_summary.py`: summarize the Article text into a new `<model>_summary` column using OpenAI (skips empty articles). Output CSV also includes per-row `prompt_tokens` and `completion_tokens`.
 - `filter_fns_data_by_date.py`: filter FNSPID raw news CSV by a start date, e.g., extract records on/after 2022-11-01.

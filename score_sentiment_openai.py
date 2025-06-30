@@ -24,9 +24,15 @@ STOP_AFTER_CHUNK = False
 # global flag to switch to Flex mode once token limit is hit
 USE_FLEX_MODE = False
 # Flex mode configuration: switch to flex service_tier after daily token limit
+# Flex mode configuration: switch to flex service_tier after daily token limit
 ALLOW_FLEX = False
 FLEX_TIMEOUT = 900.0
 FLEX_RETRIES = 1
+# global counters for token usage statistics
+TOTAL_PROMPT_TOKENS = 0
+TOTAL_COMPLETION_TOKENS = 0
+TOTAL_TOKENS = 0
+N_CALLS = 0
 
 def set_api_keys(keys, daily_limit):
     global API_KEYS, TOKENS_USED, CURRENT_KEY_IDX, DAILY_TOKEN_LIMIT
@@ -111,11 +117,20 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                 params["service_tier"] = "flex"
                 params["timeout"] = FLEX_TIMEOUT
 
+            # call and track token usage
+            global TOTAL_PROMPT_TOKENS, TOTAL_COMPLETION_TOKENS, TOTAL_TOKENS, N_CALLS
+            N_CALLS += 1
             response = openai.chat.completions.create(**params)
-            # track token usage and rotate key if needed
-            usage = response.usage.total_tokens
-            TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
-            rotate_key_if_needed(usage)
+            usage = response.usage
+            pt = usage.prompt_tokens
+            ct = usage.completion_tokens
+            tt = usage.total_tokens
+            TOTAL_PROMPT_TOKENS += pt
+            TOTAL_COMPLETION_TOKENS += ct
+            TOTAL_TOKENS += tt
+            TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += tt
+            rotate_key_if_needed(tt)
+            logging.info(f"Sentiment token usage: prompt={pt}, completion={ct}, total={tt}")
 
             # text = response.choices[0].message.content.strip()
             # # Parse single integer score from model response
@@ -331,6 +346,12 @@ def main():
         retry_missing=args.retry_missing,
         retry_internal=args.retry,
         max_runtime=args.max_runtime,
+    )
+    # overall token usage summary
+    logging.info(
+        f"Total calls={N_CALLS}, avg prompt={TOTAL_PROMPT_TOKENS/N_CALLS:.1f}, "
+        f"avg completion={TOTAL_COMPLETION_TOKENS/N_CALLS:.1f}, "
+        f"avg total={TOTAL_TOKENS/N_CALLS:.1f}, sum total={TOTAL_TOKENS}"
     )
 
 if __name__ == "__main__":

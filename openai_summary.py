@@ -6,7 +6,7 @@ import os
 import argparse
 import time
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 import numpy as np
@@ -26,6 +26,13 @@ USE_FLEX_MODE = False
 ALLOW_FLEX = False
 FLEX_TIMEOUT = 900.0
 FLEX_RETRIES = 1
+# global counters for token usage statistics
+TOTAL_PROMPT_TOKENS = 0
+TOTAL_COMPLETION_TOKENS = 0
+TOTAL_TOKENS = 0
+# additional stats: number of calls and max completion tokens
+N_CALLS = 0
+MAX_COMPLETION_TOKENS = 0
 
 def set_api_keys(keys, daily_limit):
     global API_KEYS, TOKENS_USED, CURRENT_KEY_IDX, DAILY_TOKEN_LIMIT
@@ -71,7 +78,7 @@ functions = [{
 }]
 
 def summarize_article(text: str, symbol: str, model: str,
-                      retry: int = 3, pause: float = 0.5) -> Optional[str]:
+                      retry: int = 3, pause: float = 0.5) -> Tuple[Optional[str], Optional[int], Optional[int]]:
     """
     Call OpenAI ChatCompletion to summarize one article.
     Returns summary string or None on failure.
@@ -89,7 +96,7 @@ def summarize_article(text: str, symbol: str, model: str,
                     "model": model,
                     "reasoning_effort": "high",
                     "messages": messages,
-                    "max_completion_tokens": 1000,
+                    "max_completion_tokens": 1200,
                     "functions": functions,
                     "function_call": {"name": "record_summary"},
                 }
@@ -106,10 +113,24 @@ def summarize_article(text: str, symbol: str, model: str,
                 params["service_tier"] = "flex"
                 params["timeout"] = FLEX_TIMEOUT
 
+            # perform API call and record token usage
+            global TOTAL_PROMPT_TOKENS, TOTAL_COMPLETION_TOKENS, TOTAL_TOKENS, N_CALLS, MAX_COMPLETION_TOKENS
+            N_CALLS += 1
             response = openai.chat.completions.create(**params)
-            usage = response.usage.total_tokens
-            TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += usage
-            rotate_key_if_needed(usage)
+            usage = response.usage
+            prompt_tokens = usage.prompt_tokens
+            completion_tokens = usage.completion_tokens
+            total_tokens = usage.total_tokens
+            TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += total_tokens
+            rotate_key_if_needed(total_tokens)
+            # accumulate statistics
+            TOTAL_PROMPT_TOKENS += prompt_tokens
+            TOTAL_COMPLETION_TOKENS += completion_tokens
+            TOTAL_TOKENS += total_tokens
+            MAX_COMPLETION_TOKENS = max(MAX_COMPLETION_TOKENS, completion_tokens)
+            logging.info(
+                f"Token usage (prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens})"
+            )
 
             msg = response.choices[0].message
             if hasattr(msg, "function_call") and msg.function_call is not None:
@@ -126,13 +147,13 @@ def summarize_article(text: str, symbol: str, model: str,
                 except Exception:
                     summary = txt
             if summary:
-                return summary
+                return summary, prompt_tokens, completion_tokens
             logging.warning(f"Attempt {attempt}/{retry}: empty summary, retrying")
             time.sleep(pause * attempt)
         except Exception as e:
             logging.error(f"Attempt {attempt}/{retry} failed: {e}")
             time.sleep(pause * attempt)
-    return None
+    return None, None, None
 
 def main():
     parser = argparse.ArgumentParser(
@@ -262,19 +283,24 @@ def main():
             if missing:
                 parser.error(f"Input CSV missing columns: {missing}")
             chunk[summary_col] = None
+            # per-row token usage columns
+            chunk["prompt_tokens"] = None
+            chunk["completion_tokens"] = None
             # Summarize each row
             for idx, row in chunk.iterrows():
                 cell = row[text_col]
                 if pd.isna(cell) or not str(cell).strip():
                     logging.warning(f"Skipping empty article for {row[sym_col]}:{idx}")
                     continue
-                summary = summarize_article(cell, row[sym_col], model, retry=retry)
+                summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, retry=retry)
                 for _ in range(retry_missing):
                     if summary is not None:
                         break
                     logging.warning(f"Missing summary for {row[sym_col]}:{idx}, retrying")
-                    summary = summarize_article(cell, row[sym_col], model, retry=retry)
+                    summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, retry=retry)
                 chunk.at[idx, summary_col] = summary
+                chunk.at[idx, "prompt_tokens"] = p_tokens
+                chunk.at[idx, "completion_tokens"] = c_tokens
                 time.sleep(pause)
             # Append chunk to output
             chunk.to_csv(
@@ -296,6 +322,12 @@ def main():
         pause=0.1, retry=args.retry,
         retry_missing=args.retry_missing,
         max_runtime=args.max_runtime,
+    )
+    # overall token usage summary
+    logging.info(
+        f"Total calls={N_CALLS}, avg prompt={TOTAL_PROMPT_TOKENS/N_CALLS:.1f}, "
+        f"avg completion={TOTAL_COMPLETION_TOKENS/N_CALLS:.1f}, "
+        f"avg total={TOTAL_TOKENS/N_CALLS:.1f}, max completion={MAX_COMPLETION_TOKENS}"
     )
 
 if __name__ == "__main__":

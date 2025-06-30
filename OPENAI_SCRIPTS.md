@@ -240,6 +240,11 @@ python openai_summary.py \
   --verbose
 ```
 
+The output CSV will preserve all original columns and add:
+- `<model>_summary`: the generated summary text per row
+- `prompt_tokens`: number of prompt tokens used for each summary
+- `completion_tokens`: number of completion tokens used for each summary
+
 Usage:
 ```bash
 python score_risk_openai.py \
