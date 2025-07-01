@@ -245,6 +245,25 @@ The output CSV will preserve all original columns and add:
 - `prompt_tokens`: number of prompt tokens used for each summary
 - `completion_tokens`: number of completion tokens used for each summary
 
+# Script: compare_sentiment.py
+
+Path: `compare_sentiment.py`
+
+### Description
+Compares sentiment score columns between two CSV files and writes all rows where the scores differ, along with key columns, the old/new scores, and any other shared columns.
+
+### Usage example
+```bash
+python compare_sentiment.py \
+  --old old_sentiment.csv \
+  --new new_sentiment.csv \
+  --score-col sentiment_deepseek \
+  --on Date Stock_symbol \
+  --output diff_sentiment.csv
+```
+
+The output CSV will include all join key columns plus two score columns (`sentiment_deepseek_old`, `sentiment_deepseek_new`) and any other common columns shared between the inputs.
+
 Usage:
 ```bash
 python score_risk_openai.py \

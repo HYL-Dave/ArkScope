@@ -89,7 +89,7 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                 params = {
                     "model": model,
                     "messages": messages,
-                    "max_completion_tokens": 50,
+                    "max_completion_tokens": 600,
                     "functions": functions,
                     "function_call": {"name": "record_score"},
                 }
@@ -215,6 +215,10 @@ def main():
         "--verbose", action="store_true",
         help="Enable verbose logging of each request and chunk processing"
     )
+    parser.add_argument(
+        "--max-runtime", type=float, default=None,
+        help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -240,7 +244,7 @@ def main():
         parser.error("No OpenAI API key provided; set --api-key, --api-keys-file, or OPENAI_API_KEY env var")
     set_api_keys(keys, args.daily_token_limit)
 
-    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause):
+    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause, max_runtime=None):
         # Ensure output directory exists for chunked writes
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -253,6 +257,8 @@ def main():
         else:
             processed_rows = 0
 
+        # start timer for max-runtime enforcement
+        start_time = time.time()
         reader = pd.read_csv(input_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='python')
         out_col = "risk_deepseek"
@@ -284,12 +290,17 @@ def main():
                 header=not os.path.exists(output_csv),
                 index=False
             )
+            # stop if runtime exceeded max_runtime (after finishing this chunk)
+            if max_runtime and (time.time() - start_time) >= max_runtime:
+                print(f"Time limit reached; stopping after chunk {i}.")
+                return
         print(f"Scoring completed; results saved to {output_csv}")
 
     process_csv(
         args.input, args.output, args.model,
         args.symbol_column, args.text_column, args.date_column,
         args.chunk_size, pause=0.1,
+        max_runtime=args.max_runtime,
     )
     # overall token usage summary
     logging.info(
