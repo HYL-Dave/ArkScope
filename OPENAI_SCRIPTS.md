@@ -218,6 +218,27 @@ python check_sentiment_csv.py \
 ### score_risk_openai.py
 Score financial news headlines for downside risk using OpenAI, with resumable chunked processing.
 
+### Script: audit_stock_news.py
+Path: `audit_stock_news.py`
+
+### Description
+Audit CSV files in a directory for two issues:
+1. Whether the specified date column is strictly monotonic (increasing or decreasing).
+2. Whether any stock has more than one news entry per calendar date.
+
+The script writes a report CSV listing each file, issue type (`order` or `duplicate`), and details.
+
+### Usage example
+```bash
+python audit_stock_news.py \
+  --path /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news \
+  --date-column Date \
+  --symbol-column Stock_symbol \
+  --output audit_report.csv
+```
+
+The output `audit_report.csv` will have columns `[file, issue, detail]`, capturing any ordering or duplicate issues found.
+
 # Script: openai_summary.py
 
 Path: `openai_summary.py`

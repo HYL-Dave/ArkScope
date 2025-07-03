@@ -133,3 +133,4 @@ python backtest_openai.py --data merged_dataset.csv \
 `openai_summary.py`: summarize the Article text into a new `<model>_summary` column using OpenAI (skips empty articles). Output CSV also includes per-row `prompt_tokens` and `completion_tokens`.
 `compare_sentiment.py`: compare sentiment score columns between two CSVs and dump differing rows to a new CSV for analysis.
 `filter_fns_data_by_date.py`: filter FNSPID raw news CSV by a start date, e.g., extract records on/after 2022-11-01.
+`audit_stock_news.py`: audit news CSVs for chronological ordering of date column and identify per-stock daily duplicates; outputs an audit report.

@@ -21,6 +21,10 @@ CURRENT_KEY_IDX = 0
 DAILY_TOKEN_LIMIT = None
 
 # Flex mode configuration: switch to flex service_tier after daily token limit
+# flag to signal stopping after finishing current chunk when limit reached
+STOP_AFTER_CHUNK = False
+# global flag to switch to Flex mode once token limit is hit
+USE_FLEX_MODE = False
 # Flex mode configuration: switch to flex service_tier after daily token limit
 ALLOW_FLEX = False
 FLEX_TIMEOUT = 900.0
@@ -40,11 +44,18 @@ def set_api_keys(keys, daily_limit):
     openai.api_key = API_KEYS[0]
 
 def rotate_key_if_needed(usage):
-    global CURRENT_KEY_IDX
-    if DAILY_TOKEN_LIMIT and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
-        logging.warning(
-            f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}), rotating key"
-        )
+    global CURRENT_KEY_IDX, STOP_AFTER_CHUNK, USE_FLEX_MODE
+    if DAILY_TOKEN_LIMIT is not None and TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
+        if ALLOW_FLEX:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); switching to Flex mode"
+            )
+            USE_FLEX_MODE = True
+        else:
+            logging.warning(
+                f"API key {CURRENT_KEY_IDX} reached token limit ({DAILY_TOKEN_LIMIT}); rotating key and will stop after current chunk"
+            )
+            STOP_AFTER_CHUNK = True
         CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
         openai.api_key = API_KEYS[CURRENT_KEY_IDX]
 
@@ -216,6 +227,14 @@ def main():
         help="Enable verbose logging of each request and chunk processing"
     )
     parser.add_argument(
+        "--retry", type=int, default=3,
+        help="Number of internal retry attempts when parsing model responses"
+    )
+    parser.add_argument(
+        "--retry-missing", type=int, default=3,
+        help="Number of extra attempts for rows with missing risk score"
+    )
+    parser.add_argument(
         "--max-runtime", type=float, default=None,
         help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
     )
@@ -244,7 +263,9 @@ def main():
         parser.error("No OpenAI API key provided; set --api-key, --api-keys-file, or OPENAI_API_KEY env var")
     set_api_keys(keys, args.daily_token_limit)
 
-    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col, chunk_size, pause, max_runtime=None):
+    def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
+                    chunk_size, pause, retry_internal, retry_missing,
+                    max_runtime=None):
         # Ensure output directory exists for chunked writes
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -280,7 +301,14 @@ def main():
                     continue
                 snippet = str(cell)[:200]
                 logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
-                val = score_headline(cell, row[sym_col], model)
+                # initial inference with internal retry
+                val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                # extra retries if still missing
+                for _ in range(retry_missing):
+                    if val is not None:
+                        break
+                    logging.warning(f"Missing risk for {row[sym_col]}:{idx}, retrying")
+                    val = score_headline(cell, row[sym_col], model, retry=retry_internal)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)
             # Write all original columns plus new risk score
@@ -290,6 +318,9 @@ def main():
                 header=not os.path.exists(output_csv),
                 index=False
             )
+            if STOP_AFTER_CHUNK:
+                print(f"Daily token limit reached; stopping after chunk {i}.")
+                return
             # stop if runtime exceeded max_runtime (after finishing this chunk)
             if max_runtime and (time.time() - start_time) >= max_runtime:
                 print(f"Time limit reached; stopping after chunk {i}.")
@@ -300,6 +331,8 @@ def main():
         args.input, args.output, args.model,
         args.symbol_column, args.text_column, args.date_column,
         args.chunk_size, pause=0.1,
+        retry_internal=args.retry,
+        retry_missing=args.retry_missing,
         max_runtime=args.max_runtime,
     )
     # overall token usage summary
