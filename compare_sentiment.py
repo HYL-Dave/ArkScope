@@ -28,6 +28,10 @@ def main():
         )
     )
     parser.add_argument(
+        "--keep", nargs='+', default=None,
+        help="Additional columns to include in the output CSV"
+    )
+    parser.add_argument(
         "--score-col", default="sentiment_deepseek",
         help="Name of the sentiment score column to compare (default: sentiment_deepseek)"
     )
@@ -68,9 +72,15 @@ def main():
     if diff.empty:
         print("No differences in sentiment scores found.")
     else:
-        diff.to_csv(args.output, index=False)
+        # Determine columns to output: join keys + old/new score + any extras
+        extras = args.keep or []
+        # filter extras to those present in merged
+        extras = [c for c in extras if c in merged.columns]
+        cols_to_output = on_cols + [old_col, new_col] + extras
+        diff_out = diff[cols_to_output]
+        diff_out.to_csv(args.output, index=False)
         print(
-            f"Found {len(diff)} rows with differing scores; written to {args.output}"
+            f"Found {len(diff_out)} rows with differing scores; written to {args.output}"
         )
 
 if __name__ == "__main__":

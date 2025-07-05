@@ -131,6 +131,8 @@ python backtest_openai.py --data merged_dataset.csv \
 - `env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`: environment definitions.
 - `requirements.txt`: Python dependencies.
 `openai_summary.py`: summarize the Article text into a new `<model>_summary` column using OpenAI (skips empty articles). Output CSV also includes per-row `prompt_tokens` and `completion_tokens`.
-`compare_sentiment.py`: compare sentiment score columns between two CSVs and dump differing rows to a new CSV for analysis.
+`compare_sentiment.py`: compare sentiment score columns between two CSVs and dump only the join key columns plus old/new score columns (and any additional specified columns) for rows with differing scores.
+  - `--keep`: 额外指定一个或多个列名，将这些列也包含到输出文件中。可选列：Article_title, Url, Publisher, Author, Article,
+    Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary
 `filter_fns_data_by_date.py`: filter FNSPID raw news CSV by a start date, e.g., extract records on/after 2022-11-01.
 `audit_stock_news.py`: audit news CSVs for chronological ordering of date column and identify per-stock daily duplicates or invalid dates; outputs an audit report.
