@@ -309,6 +309,10 @@ def main():
                 header=not os.path.exists(output_csv),
                 index=False
             )
+            # stop if daily token limit was reached during this chunk
+            if STOP_AFTER_CHUNK:
+                print(f"Daily token limit reached; stopping after chunk {i}.")
+                return
             # stop if runtime exceeded max_runtime (after finishing this chunk)
             if max_runtime and (time.time() - start_time) >= max_runtime:
                 print(f"Time limit reached; stopping after chunk {i}.")

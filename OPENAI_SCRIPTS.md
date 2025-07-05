@@ -222,11 +222,12 @@ Score financial news headlines for downside risk using OpenAI, with resumable ch
 Path: `audit_stock_news.py`
 
 ### Description
-Audit CSV files in a directory for two issues:
-1. Whether the specified date column is strictly monotonic (increasing or decreasing).
-2. Whether any stock has more than one news entry per calendar date.
+Audit one or more CSV files for issues in the date column and per-stock duplicates:
+1. Rows where the date column cannot be parsed into datetime (`bad_date`).
+2. Date column not strictly monotonic (`order`).
+3. Same stock symbol has multiple news entries on the same calendar date (`duplicate`).
 
-The script writes a report CSV listing each file, issue type (`order` or `duplicate`), and details.
+Outputs a CSV report (`file,issue,detail`) capturing any issues found.
 
 ### Usage example
 ```bash
