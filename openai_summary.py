@@ -11,6 +11,8 @@ from typing import Optional, Tuple
 import pandas as pd
 import numpy as np
 import openai
+import csv
+import sys
 import json
 
 # API key rotation and token limit support
@@ -302,13 +304,19 @@ def main():
                 chunk.at[idx, "prompt_tokens"] = p_tokens
                 chunk.at[idx, "completion_tokens"] = c_tokens
                 time.sleep(pause)
-            # Append chunk to output
-            chunk.to_csv(
-                output_csv,
-                mode='a',
-                header=not os.path.exists(output_csv),
-                index=False
-            )
+            # Append chunk to output, with escaping to avoid CSV errors
+            try:
+                chunk.to_csv(
+                    output_csv,
+                    mode='a',
+                    header=not os.path.exists(output_csv),
+                    index=False,
+                    quoting=csv.QUOTE_MINIMAL,
+                    escapechar='\\'
+                )
+            except Exception as e:
+                logging.error(f"Failed to write chunk {i} to {output_csv}: {e}")
+                sys.exit(1)
             # stop if daily token limit was reached during this chunk
             if STOP_AFTER_CHUNK:
                 print(f"Daily token limit reached; stopping after chunk {i}.")
