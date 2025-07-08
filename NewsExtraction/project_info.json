@@ -1,0 +1,28 @@
+{
+  "project_name": "FinRL 新聞數據處理系統",
+  "version": "2.0.0",
+  "last_updated": "2025-07-08T21:07:42.563347",
+  "models_supported": [
+    "o3",
+    "o4-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini"
+  ],
+  "key_features": [
+    "Reasoning 模型支援 (o3, o4-mini)",
+    "Flex Processing 整合",
+    "多模型混合策略",
+    "成本優化工具",
+    "深度質量分析"
+  ],
+  "next_steps": [
+    "測試模型配置: python test_o3_flex.py --api-key YOUR_KEY --model o3",
+    "估算成本: python cost_calculator.py --compare",
+    "運行處理: python finrl_news_pipeline.py --model o4-mini --use-flex"
+  ],
+  "important_notes": [
+    "Reasoning 模型使用 reasoning_effort 而非 temperature",
+    "只有 reasoning 模型支援 Flex Processing",
+    "Flex Processing 可節省 50% 成本但響應較慢"
+  ]
+}
