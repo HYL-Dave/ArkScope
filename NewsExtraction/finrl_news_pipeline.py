@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-FinRL 新聞數據完整處理管道 v2.0
+FinRL 新聞數據完整處理管道 v2.1
 增強功能：錯誤恢復、資料驗證、多語言支援、多格式導出
+修正：確保只處理 89 檔股票（同時有新聞和價格數據）
 """
 
 import json
@@ -43,13 +44,17 @@ logging.basicConfig(
 # ===== 資料驗證層 =====
 @dataclass
 class NewsRecord:
-    """新聞記錄資料結構"""
+    """新聞記錄資料結構 - 使用 FNSPID 原始欄位名稱"""
     Date: str
     Stock_symbol: str
-    News_title: str
-    News_text: str
+    Article_title: str  # 使用原始名稱
+    Article: str  # 使用原始名稱
     Sentiment: float
-    Topic: str
+    # 額外欄位（可選）
+    Url: str = ""
+    Publisher: str = ""
+    Author: str = ""
+    Lsa_summary: str = ""
 
     def validate(self) -> List[str]:
         """驗證資料完整性"""
@@ -66,11 +71,11 @@ class NewsRecord:
             errors.append(f"Invalid stock symbol: {self.Stock_symbol}")
 
         # 文本驗證
-        if not self.News_title or len(self.News_title) < 5:
+        if not self.Article_title or len(self.Article_title) < 5:
             errors.append("Title too short or missing")
 
-        if not self.News_text or len(self.News_text) < 20:
-            errors.append("Text too short or missing")
+        if not self.Article or len(self.Article) < 20:
+            errors.append("Article text too short or missing")
 
         # 情感分數驗證
         if not -1 <= self.Sentiment <= 1:
@@ -234,8 +239,8 @@ class FinRLNewsProcessor:
         self.START_DATE = "2013-01-01"
         self.END_DATE = "2023-12-31"
         self.TICKERS_FILE = "tickers_89.json"
-        self.RAW_PARQUET = "news_89_2013_2023_raw.parquet"
-        self.CLEANED_PARQUET = "news_89_2013_2023_cleaned.parquet"
+        self.RAW_PARQUET = "fnspid_89_2013_2023_raw.parquet"  # 使用 fnspid 前綴
+        self.CLEANED_PARQUET = "fnspid_89_2013_2023_cleaned.parquet"
         self.QUALITY_REPORT = "data_quality_report.json"
 
         # 模型相關參數
@@ -264,10 +269,14 @@ class FinRLNewsProcessor:
                 record = NewsRecord(
                     Date=str(row['Date']),
                     Stock_symbol=row['Stock_symbol'],
-                    News_title=row['News_title'],
-                    News_text=row['News_text'],
+                    Article_title=row['Article_title'],
+                    Article=row['Article'],
                     Sentiment=float(row['Sentiment']),
-                    Topic=row['Topic']
+                    # 額外欄位
+                    Url=row.get('Url', ''),
+                    Publisher=row.get('Publisher', ''),
+                    Author=row.get('Author', ''),
+                    Lsa_summary=row.get('Lsa_summary', '')
                 )
 
                 errors = record.validate()
@@ -314,8 +323,8 @@ class FinRLNewsProcessor:
                 time.sleep(wait_time)
 
     def step1_fetch_tickers(self) -> List[str]:
-        """步驟1: 獲取股票代碼列表"""
-        self.logger.info("步驟1: 開始獲取股票代碼列表")
+        """步驟1: 獲取股票代碼列表（從已準備好的 89 檔列表）"""
+        self.logger.info("步驟1: 讀取股票代碼列表")
 
         # 檢查是否有檢查點
         checkpoint = self.checkpoint_manager.load_checkpoint('tickers')
@@ -323,28 +332,36 @@ class FinRLNewsProcessor:
             self.logger.info("從檢查點恢復股票列表")
             return checkpoint['data']
 
-        RAW_URL = ("https://raw.githubusercontent.com/Open-Finance-Lab/"
-                   "FinRL_Contest_2025/main/Task_1_FinRL_DeepSeek_Stock/"
-                   "train_trade_data.py")
-
         try:
-            code = self.retry_with_exponential_backoff(requests.get, RAW_URL, timeout=10).text
-            m = re.search(r"nasdaq_100_tickers_july_17_2023\s*=\s*\[(.*?)\]", code, re.S)
-            if not m:
-                raise ValueError("無法從代碼中提取股票列表")
+            # 直接讀取已準備好的 tickers_89.json
+            if not pathlib.Path(self.TICKERS_FILE).exists():
+                raise FileNotFoundError(
+                    f"找不到 {self.TICKERS_FILE} 文件。\n"
+                    f"請確保該文件存在於當前目錄中。\n"
+                    f"該文件應包含 89 個經過驗證的 NASDAQ 股票代碼。"
+                )
 
-            tickers = [t.strip().strip('"').strip("'")
-                       for t in m.group(1).split(",") if t.strip()]
+            with open(self.TICKERS_FILE, 'r') as f:
+                tickers = json.load(f)
+
+            # 驗證格式
+            if not isinstance(tickers, list) or not all(isinstance(t, str) for t in tickers):
+                raise ValueError(f"{self.TICKERS_FILE} 格式不正確，應為字符串列表")
+
+            # 驗證數量
+            if len(tickers) != 89:
+                self.logger.warning(f"預期 89 檔股票，但找到 {len(tickers)} 檔")
 
             # 保存檢查點
             self.checkpoint_manager.save_checkpoint('tickers', tickers)
 
-            pathlib.Path(self.TICKERS_FILE).write_text(json.dumps(tickers, indent=2))
-            self.logger.info(f"成功獲取 {len(tickers)} 個股票代碼，已保存到 {self.TICKERS_FILE}")
+            self.logger.info(f"✅ 成功讀取 {len(tickers)} 個股票代碼")
+            self.logger.info(f"股票列表: {', '.join(tickers[:10])}... (顯示前10個)")
+
             return tickers
 
         except Exception as e:
-            self.logger.error(f"獲取股票代碼失敗: {e}")
+            self.logger.error(f"讀取股票代碼失敗: {e}")
             raise
 
     def step2_download_news(self, tickers: List[str]) -> None:
@@ -366,14 +383,17 @@ class FinRLNewsProcessor:
         # 載入數據集
         ds = load_dataset("Zihan1004/FNSPID", split="train", streaming=True)
 
-        # 建立 Parquet Writer
+        # 建立 Parquet Schema - 使用 FNSPID 原始欄位名稱
         schema = pa.schema([
             ('Date', pa.string()),
             ('Stock_symbol', pa.string()),
-            ('News_title', pa.string()),
-            ('News_text', pa.string()),
+            ('Article_title', pa.string()),
+            ('Article', pa.string()),
             ('Sentiment', pa.float64()),
-            ('Topic', pa.string())
+            ('Url', pa.string()),
+            ('Publisher', pa.string()),
+            ('Author', pa.string()),
+            ('Lsa_summary', pa.string())
         ])
 
         # 如果是恢復下載，先寫入已有記錄
@@ -384,26 +404,59 @@ class FinRLNewsProcessor:
         count = start_index
         batch_records = []
         batch_size = 1000  # 每批保存檢查點
+        missing_fields_count = 0
 
         try:
             for idx, row in enumerate(tqdm(ds, desc="下載新聞", initial=start_index)):
                 if idx < start_index:
                     continue
 
-                if row["Stock_symbol"] in TICKERS_SET and self.START_DATE <= row["Date"][:10] <= self.END_DATE:
-                    batch_records.append(row)
-                    count += 1
+                # 檢查必要欄位是否存在
+                if 'Stock_symbol' not in row or 'Date' not in row:
+                    missing_fields_count += 1
+                    if missing_fields_count <= 10:  # 只記錄前10個錯誤
+                        self.logger.debug(f"記錄 {idx} 缺少必要欄位: {list(row.keys())}")
+                    continue
 
-                    # 定期保存檢查點
-                    if len(batch_records) >= batch_size:
-                        all_records = existing_records + batch_records
-                        self.checkpoint_manager.save_checkpoint(
-                            'download',
-                            all_records,
-                            {'last_index': idx}
-                        )
-                        existing_records = all_records
-                        batch_records = []
+                # 安全地檢查條件
+                try:
+                    stock_symbol = row.get("Stock_symbol", "")
+                    date_str = row.get("Date", "")[:10] if row.get("Date") else ""
+
+                    if (stock_symbol in TICKERS_SET and
+                            date_str and
+                            self.START_DATE <= date_str <= self.END_DATE):
+
+                        # 保持 FNSPID 原始欄位名稱
+                        clean_row = {
+                            'Date': row.get('Date', ''),
+                            'Stock_symbol': row.get('Stock_symbol', ''),
+                            'Article_title': row.get('Article_title', ''),
+                            'Article': row.get('Article', ''),
+                            'Sentiment': float(row.get('Sentiment', 0.0)),
+                            'Url': row.get('Url', ''),
+                            'Publisher': row.get('Publisher', ''),
+                            'Author': row.get('Author', ''),
+                            'Lsa_summary': row.get('Lsa_summary', '')
+                        }
+
+                        batch_records.append(clean_row)
+                        count += 1
+
+                        # 定期保存檢查點
+                        if len(batch_records) >= batch_size:
+                            all_records = existing_records + batch_records
+                            self.checkpoint_manager.save_checkpoint(
+                                'download',
+                                all_records,
+                                {'last_index': idx, 'missing_fields': missing_fields_count}
+                            )
+                            existing_records = all_records
+                            batch_records = []
+
+                except Exception as e:
+                    self.logger.debug(f"處理記錄 {idx} 時出錯: {e}")
+                    continue
 
             # 保存最終數據
             final_records = existing_records + batch_records
@@ -411,6 +464,8 @@ class FinRLNewsProcessor:
             final_df.to_parquet(self.RAW_PARQUET)
 
             self.logger.info(f"成功下載 {count} 條新聞數據")
+            if missing_fields_count > 0:
+                self.logger.warning(f"跳過 {missing_fields_count} 條缺少必要欄位的記錄")
 
         except Exception as e:
             self.logger.error(f"下載中斷: {e}")
@@ -420,7 +475,8 @@ class FinRLNewsProcessor:
                 self.checkpoint_manager.save_checkpoint(
                     'download',
                     all_records,
-                    {'last_index': idx if 'idx' in locals() else count}
+                    {'last_index': idx if 'idx' in locals() else count,
+                     'missing_fields': missing_fields_count}
                 )
             raise
 
@@ -450,14 +506,23 @@ class FinRLNewsProcessor:
 
         # 3.2 移除重複數據
         before_dedup = len(df)
-        df = df.drop_duplicates(subset=['Stock_symbol', 'Date', 'News_title'])
+        df = df.drop_duplicates(subset=['Stock_symbol', 'Date', 'Article_title'])
         self.logger.info(f"移除 {before_dedup - len(df)} 條重複數據")
 
         # 3.3 處理缺失值
-        df['News_title'] = df['News_title'].fillna('')
-        df['News_text'] = df['News_text'].fillna('')
+        df['Article_title'] = df['Article_title'].fillna('')
+        df['Article'] = df['Article'].fillna('')
         df['Sentiment'] = df['Sentiment'].fillna(0.0)
-        df['Topic'] = df['Topic'].fillna('Unknown')
+
+        # 處理額外欄位的缺失值
+        if 'Url' in df.columns:
+            df['Url'] = df['Url'].fillna('')
+        if 'Publisher' in df.columns:
+            df['Publisher'] = df['Publisher'].fillna('')
+        if 'Author' in df.columns:
+            df['Author'] = df['Author'].fillna('')
+        if 'Lsa_summary' in df.columns:
+            df['Lsa_summary'] = df['Lsa_summary'].fillna('')
 
         # 3.4 文本清洗
         def clean_text(text):
@@ -469,15 +534,19 @@ class FinRLNewsProcessor:
             text = ''.join(char for char in text if ord(char) >= 32 or char == '\n')
             return text.strip()
 
-        df['News_title'] = df['News_title'].apply(clean_text)
-        df['News_text'] = df['News_text'].apply(clean_text)
+        df['Article_title'] = df['Article_title'].apply(clean_text)
+        df['Article'] = df['Article'].apply(clean_text)
+
+        # 清洗 LSA 摘要
+        if 'Lsa_summary' in df.columns:
+            df['Lsa_summary'] = df['Lsa_summary'].apply(clean_text)
 
         # 3.5 排序
         df = df.sort_values(['Stock_symbol', 'Date'])
 
         # 3.6 添加基礎特徵
-        df['title_length'] = df['News_title'].str.len()
-        df['text_length'] = df['News_text'].str.len()
+        df['title_length'] = df['Article_title'].str.len()
+        df['text_length'] = df['Article'].str.len()
         df['weekday'] = df['Date'].dt.day_name()
         df['month'] = df['Date'].dt.month
         df['year'] = df['Date'].dt.year
@@ -486,6 +555,14 @@ class FinRLNewsProcessor:
         self.checkpoint_manager.save_checkpoint('basic_clean', df)
 
         self.logger.info(f"基礎清洗完成，剩餘 {len(df)} 條數據")
+
+        # 顯示每個股票的新聞數量
+        stock_counts = df['Stock_symbol'].value_counts()
+        self.logger.info(f"股票新聞分佈：\n{stock_counts.head(10)}")
+
+        # 顯示欄位資訊
+        self.logger.info(f"資料欄位: {list(df.columns)}")
+
         return df
 
     def step4_quality_check_with_llm(self, df: pd.DataFrame, sample_size: int = 100) -> Dict:
@@ -545,8 +622,8 @@ class FinRLNewsProcessor:
                         client,
                         comprehensive_prompt.format(
                             symbol=row['Stock_symbol'],
-                            title=row['News_title'],
-                            text_snippet=row['News_text'][:1000],
+                            title=row['Article_title'],
+                            text_snippet=row['Article'][:1000],
                             date=row['Date'],
                             original_sentiment=row['Sentiment']
                         )
@@ -655,29 +732,51 @@ class FinRLNewsProcessor:
                 self.logger.warning(f"無法導出 {format.value} 格式: {e}")
 
         # 創建 DuckDB 數據庫
-        con = duckdb.connect('finrl_news.db')
-        con.execute(f"CREATE TABLE IF NOT EXISTS news AS SELECT * FROM df")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_symbol_date ON news(Stock_symbol, Date)")
+        con = duckdb.connect('finrl_fnspid.db')
+        con.execute(f"CREATE TABLE IF NOT EXISTS fnspid AS SELECT * FROM df")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_symbol_date ON fnspid(Stock_symbol, Date)")
         con.close()
         self.logger.info("DuckDB 數據庫已創建")
 
         # 創建每日聚合版本
         daily_df = df.groupby(['Stock_symbol', 'Date']).agg({
-            'News_title': lambda x: ' | '.join(x),
-            'News_text': lambda x: ' '.join(x[:3]),
+            'Article_title': lambda x: ' | '.join(x),
+            'Article': lambda x: ' '.join(x[:3]),  # 只取前3篇文章的內容
             'Sentiment': 'mean',
             'importance_score': 'max',
             'tags': lambda x: list(set([tag for tags in x for tag in tags]))
         }).reset_index()
 
-        self.export_data(daily_df, ExportFormat.PARQUET, 'news_89_2013_2023_daily')
+        # 如果有 LSA 摘要，也進行聚合
+        if 'Lsa_summary' in df.columns:
+            daily_lsa = df.groupby(['Stock_symbol', 'Date'])['Lsa_summary'].apply(
+                lambda x: ' '.join(x[:3])  # 合併前3篇的摘要
+            )
+            daily_df['Lsa_summary'] = daily_lsa
+
+        self.export_data(daily_df, ExportFormat.PARQUET, 'fnspid_89_2013_2023_daily')
         self.logger.info("每日聚合數據已創建")
+
+        # 創建統計摘要
+        stats_summary = {
+            'total_records': len(df),
+            'date_range': f"{df['Date'].min()} to {df['Date'].max()}",
+            'stocks_count': df['Stock_symbol'].nunique(),
+            'avg_news_per_stock': len(df) / df['Stock_symbol'].nunique(),
+            'sentiment_stats': df['Sentiment'].describe().to_dict(),
+            'top_publishers': df['Publisher'].value_counts().head(10).to_dict() if 'Publisher' in df.columns else {}
+        }
+
+        with open('data_summary.json', 'w', encoding='utf-8') as f:
+            json.dump(stats_summary, f, indent=2, ensure_ascii=False, default=str)
+
+        self.logger.info("數據統計摘要已保存")
 
     def run_pipeline(self, skip_download: bool = False, skip_llm: bool = False,
                      resume: bool = True):
         """運行完整管道（支援斷點續傳）"""
         self.logger.info("=" * 50)
-        self.logger.info("開始運行 FinRL 新聞數據處理管道 v2.0")
+        self.logger.info("開始運行 FinRL 新聞數據處理管道 v2.1")
         self.logger.info(f"語言設置: {self.language.value}")
         self.logger.info("=" * 50)
 
@@ -691,7 +790,7 @@ class FinRLNewsProcessor:
             # 執行各步驟...
             # (保持原有邏輯，每個步驟都檢查檢查點)
 
-            # 步驟1: 獲取股票列表
+            # 步驟1: 獲取股票列表 (修正版)
             if pathlib.Path(self.TICKERS_FILE).exists():
                 tickers = json.load(open(self.TICKERS_FILE))
                 self.logger.info(f"從緩存讀取 {len(tickers)} 個股票代碼")
@@ -724,6 +823,7 @@ class FinRLNewsProcessor:
             self.logger.info("=" * 50)
             self.logger.info("管道執行完成！")
             self.logger.info(f"最終數據集: {len(df)} 條新聞")
+            self.logger.info(f"涵蓋股票: {df['Stock_symbol'].nunique()} 檔")
             self.logger.info(f"查看質量報告: {self.QUALITY_REPORT}")
             self.logger.info("=" * 50)
 
@@ -747,8 +847,23 @@ class FinRLNewsProcessor:
         else:
             df['low_relevance'] = False
 
+    def step5_advanced_cleaning(self, df: pd.DataFrame, quality_results: Dict) -> pd.DataFrame:
+        """步驟5: 基於質量檢查的進階清洗"""
+        self.logger.info("步驟5: 開始進階清洗")
+
+        # 5.1 標記低質量數據
+        if quality_results.get('relevance_checks'):
+            low_relevance_indices = [
+                r['index'] for r in quality_results['relevance_checks']
+                if r.get('relevance_score', 0) < 5
+            ]
+            df['low_relevance'] = df.index.isin(low_relevance_indices)
+        else:
+            df['low_relevance'] = False
+
         # 5.2 添加新聞標籤
-        def extract_keywords(text):
+        def extract_keywords(text, lsa_summary=''):
+            """從標題和 LSA 摘要提取關鍵詞"""
             keywords = {
                 'earnings': ['earnings', 'revenue', 'profit', 'quarterly', 'EPS'],
                 'merger': ['merger', 'acquisition', 'acquire', 'buyout', 'deal'],
@@ -760,13 +875,35 @@ class FinRLNewsProcessor:
             }
 
             tags = []
-            text_lower = text.lower()
+            # 結合標題和 LSA 摘要進行關鍵詞提取
+            combined_text = f"{text} {lsa_summary}".lower()
+
             for tag, words in keywords.items():
-                if any(word in text_lower for word in words):
+                if any(word in combined_text for word in words):
                     tags.append(tag)
             return tags
 
-        df['tags'] = df['News_title'].apply(extract_keywords)
+        # 使用標題和 LSA 摘要（如果有）來提取標籤
+        if 'Lsa_summary' in df.columns:
+            df['tags'] = df.apply(lambda row: extract_keywords(row['Article_title'], row.get('Lsa_summary', '')),
+                                  axis=1)
+        else:
+            df['tags'] = df['Article_title'].apply(lambda x: extract_keywords(x))
+
+        # 5.3 計算新聞重要性分數
+        df['importance_score'] = (
+                df['title_length'].clip(upper=100) / 100 * 0.2 +
+                (df['text_length'] > 100).astype(int) * 0.3 +
+                df['Sentiment'].abs() * 0.3 +
+                (~df['low_relevance']).astype(int) * 0.2
+        )
+
+        # 5.4 處理異常值
+        df = df[df['title_length'] > 10]  # 移除過短的標題
+        df = df[df['text_length'] > 50]  # 移除過短的內容
+
+        self.logger.info(f"進階清洗完成，最終數據量: {len(df)}")
+        return df
 
         # 5.3 計算新聞重要性分數
         df['importance_score'] = (
@@ -837,7 +974,7 @@ def main():
     """主函數"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='FinRL 新聞數據處理管道 v2.0')
+    parser = argparse.ArgumentParser(description='FinRL 新聞數據處理管道 v2.1')
     parser.add_argument('--openai-key', type=str, help='OpenAI API Key')
     parser.add_argument('--skip-download', action='store_true', help='跳過下載步驟')
     parser.add_argument('--skip-llm', action='store_true', help='跳過 LLM 檢查')
