@@ -924,28 +924,60 @@ class FinRLNewsProcessor:
         """步驟6: 生成數據質量報告"""
         self.logger.info("步驟6: 生成數據質量報告")
 
+        # 計算情感分佈，將 Interval 轉換為字符串
+        sentiment_bins = pd.cut(df['Sentiment'], bins=5)
+        sentiment_dist = sentiment_bins.value_counts().sort_index()
+        sentiment_dist_dict = {str(k): int(v) for k, v in sentiment_dist.items()}
+
+        # 轉換所有 numpy/pandas 類型為 Python 原生類型的輔助函數
+        def convert_to_native(obj):
+            import numpy as np
+            if isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
+                return int(obj)
+            elif isinstance(obj, (np.float64, np.float32)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, pd.Series):
+                return {str(k): convert_to_native(v) for k, v in obj.to_dict().items()}
+            elif isinstance(obj, dict):
+                return {str(k): convert_to_native(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_to_native(item) for item in obj]
+            elif pd.isna(obj):
+                return None
+            else:
+                return obj
+
         report = {
             'summary': {
-                'total_records': len(df),
+                'total_records': int(len(df)),
                 'date_range': f"{df['Date'].min()} to {df['Date'].max()}",
-                'unique_stocks': df['Stock_symbol'].nunique(),
+                'unique_stocks': int(df['Stock_symbol'].nunique()),
                 'stocks_list': df['Stock_symbol'].unique().tolist(),
                 'language': self.language.value,
                 'processing_date': datetime.now().isoformat()
             },
             'data_coverage': {
-                'by_year': df.groupby('year').size().to_dict(),
-                'by_stock': df.groupby('Stock_symbol').size().to_dict(),
+                'by_year': convert_to_native(df.groupby('year').size().to_dict()),
+                'by_stock': convert_to_native(df.groupby('Stock_symbol').size().to_dict()),
                 'missing_stocks': list(set(json.load(open(self.TICKERS_FILE))) - set(df['Stock_symbol'].unique()))
             },
             'data_quality': {
-                'null_values': df.isnull().sum().to_dict(),
+                'null_values': convert_to_native(df.isnull().sum().to_dict()),
                 'text_length_stats': {
-                    'title': df['title_length'].describe().to_dict(),
-                    'text': df['text_length'].describe().to_dict()
+                    'title': convert_to_native(df['title_length'].describe().to_dict()),
+                    'text': convert_to_native(df['text_length'].describe().to_dict())
                 },
-                'sentiment_distribution': df['Sentiment'].value_counts(bins=5).to_dict(),
-                'low_relevance_count': df['low_relevance'].sum() if 'low_relevance' in df.columns else 0
+                'sentiment_distribution': sentiment_dist_dict,  # 使用轉換後的字典
+                'sentiment_stats': {  # 新增情感統計
+                    'mean': float(df['Sentiment'].mean()),
+                    'std': float(df['Sentiment'].std()),
+                    'min': float(df['Sentiment'].min()),
+                    'max': float(df['Sentiment'].max()),
+                    'median': float(df['Sentiment'].median())
+                },
+                'low_relevance_count': int(df['low_relevance'].sum()) if 'low_relevance' in df.columns else 0
             },
             'llm_validation': quality_results,
             'recommendations': []
@@ -964,7 +996,7 @@ class FinRLNewsProcessor:
 
         # 保存報告
         with open(self.QUALITY_REPORT, 'w', encoding='utf-8') as f:
-            json.dump(report, f, indent=2, ensure_ascii=False)
+            json.dump(report, f, indent=2, ensure_ascii=False, default=str)
 
         self.logger.info(f"質量報告已保存到 {self.QUALITY_REPORT}")
         return report
