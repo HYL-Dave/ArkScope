@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-FinRL 新聞數據完整處理管道 v2.1
+FinRL 新聞數據完整處理管道 v2.2
 增強功能：錯誤恢復、資料驗證、多語言支援、多格式導出
 修正：確保只處理 89 檔股票（同時有新聞和價格數據）
+更新：修復 Excel 時區問題和索引不匹配問題，移除不需要的導出格式
 """
 
 import json
@@ -96,10 +97,7 @@ class ExportFormat(Enum):
     """支援的導出格式"""
     PARQUET = "parquet"
     CSV = "csv"
-    EXCEL = "excel"
     JSON = "json"
-    FEATHER = "feather"
-    HDF5 = "hdf5"
 
 
 # ===== 檢查點管理器 =====
@@ -239,7 +237,7 @@ class FinRLNewsProcessor:
         self.START_DATE = "2013-01-01"
         self.END_DATE = "2023-12-31"
         self.TICKERS_FILE = "tickers_89.json"
-        self.RAW_PARQUET = "fnspid_89_2013_2023_raw.parquet"  # 使用 fnspid 前綴
+        self.RAW_PARQUET = "fnspid_89_2013_2023_raw.parquet"
         self.CLEANED_PARQUET = "fnspid_89_2013_2023_cleaned.parquet"
         self.QUALITY_REPORT = "data_quality_report.json"
 
@@ -501,8 +499,8 @@ class FinRLNewsProcessor:
         if len(invalid_df) > 0:
             invalid_df.to_parquet('invalid_records.parquet')
 
-        # 3.1 轉換日期格式
-        df['Date'] = pd.to_datetime(df['Date'])
+        # 3.1 轉換日期格式（移除時區信息以避免導出問題）
+        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
 
         # 3.2 移除重複數據
         before_dedup = len(df)
@@ -700,11 +698,8 @@ class FinRLNewsProcessor:
         export_functions = {
             ExportFormat.PARQUET: lambda: df.to_parquet(f"{filename}.parquet", index=False),
             ExportFormat.CSV: lambda: df.to_csv(f"{filename}.csv", index=False, encoding='utf-8-sig'),
-            ExportFormat.EXCEL: lambda: df.to_excel(f"{filename}.xlsx", index=False, engine='openpyxl'),
             ExportFormat.JSON: lambda: df.to_json(f"{filename}.json", orient='records',
-                                                  force_ascii=False, indent=2),
-            ExportFormat.FEATHER: lambda: df.to_feather(f"{filename}.feather"),
-            ExportFormat.HDF5: lambda: df.to_hdf(f"{filename}.h5", key='data', mode='w')
+                                                  force_ascii=False, indent=2)
         }
 
         try:
@@ -718,11 +713,10 @@ class FinRLNewsProcessor:
         """步驟7: 創建最終數據集（支援多格式導出）"""
         self.logger.info("步驟7: 創建最終數據集")
 
-        # 保存為多種格式
+        # 保存為多種格式（只保留需要的格式）
         formats_to_export = [
             ExportFormat.PARQUET,
-            ExportFormat.CSV,
-            ExportFormat.EXCEL
+            ExportFormat.CSV
         ]
 
         for format in formats_to_export:
@@ -739,20 +733,19 @@ class FinRLNewsProcessor:
         self.logger.info("DuckDB 數據庫已創建")
 
         # 創建每日聚合版本
-        daily_df = df.groupby(['Stock_symbol', 'Date']).agg({
+        daily_agg = {
             'Article_title': lambda x: ' | '.join(x),
             'Article': lambda x: ' '.join(x[:3]),  # 只取前3篇文章的內容
             'Sentiment': 'mean',
             'importance_score': 'max',
             'tags': lambda x: list(set([tag for tags in x for tag in tags]))
-        }).reset_index()
+        }
 
-        # 如果有 LSA 摘要，也進行聚合
+        # 如果有 LSA 摘要，添加到聚合字典
         if 'Lsa_summary' in df.columns:
-            daily_lsa = df.groupby(['Stock_symbol', 'Date'])['Lsa_summary'].apply(
-                lambda x: ' '.join(x[:3])  # 合併前3篇的摘要
-            )
-            daily_df['Lsa_summary'] = daily_lsa
+            daily_agg['Lsa_summary'] = lambda x: ' '.join(x[:3])  # 合併前3篇的摘要
+
+        daily_df = df.groupby(['Stock_symbol', 'Date']).agg(daily_agg).reset_index()
 
         self.export_data(daily_df, ExportFormat.PARQUET, 'fnspid_89_2013_2023_daily')
         self.logger.info("每日聚合數據已創建")
@@ -776,7 +769,7 @@ class FinRLNewsProcessor:
                      resume: bool = True):
         """運行完整管道（支援斷點續傳）"""
         self.logger.info("=" * 50)
-        self.logger.info("開始運行 FinRL 新聞數據處理管道 v2.1")
+        self.logger.info("開始運行 FinRL 新聞數據處理管道 v2.2")
         self.logger.info(f"語言設置: {self.language.value}")
         self.logger.info("=" * 50)
 
@@ -787,10 +780,7 @@ class FinRLNewsProcessor:
                 if resume_point:
                     self.logger.info(f"發現檢查點，從 '{resume_point}' 階段恢復")
 
-            # 執行各步驟...
-            # (保持原有邏輯，每個步驟都檢查檢查點)
-
-            # 步驟1: 獲取股票列表 (修正版)
+            # 步驟1: 獲取股票列表
             if pathlib.Path(self.TICKERS_FILE).exists():
                 tickers = json.load(open(self.TICKERS_FILE))
                 self.logger.info(f"從緩存讀取 {len(tickers)} 個股票代碼")
@@ -832,21 +822,6 @@ class FinRLNewsProcessor:
             self.logger.info("可以使用 --resume 參數從中斷處繼續")
             raise
 
-    # 保留原有的 step5 和 step6 方法
-    def step5_advanced_cleaning(self, df: pd.DataFrame, quality_results: Dict) -> pd.DataFrame:
-        """步驟5: 基於質量檢查的進階清洗"""
-        self.logger.info("步驟5: 開始進階清洗")
-
-        # 5.1 標記低質量數據
-        if quality_results.get('relevance_checks'):
-            low_relevance_indices = [
-                r['index'] for r in quality_results['relevance_checks']
-                if r.get('relevance_score', 0) < 5
-            ]
-            df['low_relevance'] = df.index.isin(low_relevance_indices)
-        else:
-            df['low_relevance'] = False
-
     def step5_advanced_cleaning(self, df: pd.DataFrame, quality_results: Dict) -> pd.DataFrame:
         """步驟5: 基於質量檢查的進階清洗"""
         self.logger.info("步驟5: 開始進階清洗")
@@ -879,7 +854,7 @@ class FinRLNewsProcessor:
             combined_text = f"{text} {lsa_summary}".lower()
 
             for tag, words in keywords.items():
-                if any(word in combined_text for word in words):
+                if any(word.lower() in combined_text for word in words):
                     tags.append(tag)
             return tags
 
@@ -889,21 +864,6 @@ class FinRLNewsProcessor:
                                   axis=1)
         else:
             df['tags'] = df['Article_title'].apply(lambda x: extract_keywords(x))
-
-        # 5.3 計算新聞重要性分數
-        df['importance_score'] = (
-                df['title_length'].clip(upper=100) / 100 * 0.2 +
-                (df['text_length'] > 100).astype(int) * 0.3 +
-                df['Sentiment'].abs() * 0.3 +
-                (~df['low_relevance']).astype(int) * 0.2
-        )
-
-        # 5.4 處理異常值
-        df = df[df['title_length'] > 10]  # 移除過短的標題
-        df = df[df['text_length'] > 50]  # 移除過短的內容
-
-        self.logger.info(f"進階清洗完成，最終數據量: {len(df)}")
-        return df
 
         # 5.3 計算新聞重要性分數
         df['importance_score'] = (
@@ -1006,7 +966,7 @@ def main():
     """主函數"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='FinRL 新聞數據處理管道 v2.1')
+    parser = argparse.ArgumentParser(description='FinRL 新聞數據處理管道 v2.2')
     parser.add_argument('--openai-key', type=str, help='OpenAI API Key')
     parser.add_argument('--skip-download', action='store_true', help='跳過下載步驟')
     parser.add_argument('--skip-llm', action='store_true', help='跳過 LLM 檢查')
@@ -1029,7 +989,7 @@ def main():
                         help='從檢查點恢復 (預設: True)')
     parser.add_argument('--export-formats', nargs='+',
                         default=['parquet', 'csv'],
-                        choices=['parquet', 'csv', 'excel', 'json', 'feather', 'hdf5'],
+                        choices=['parquet', 'csv', 'json'],
                         help='導出格式 (預設: parquet csv)')
     args = parser.parse_args()
 
