@@ -194,6 +194,7 @@ def main():
         choices=[
             "Article_title", "Article", "Lsa_summary",
             "Luhn_summary", "Textrank_summary", "Lexrank_summary",
+            "o3_summary"
         ],
         help=(
             "Name of the column for text/summary in input CSV; one of "
