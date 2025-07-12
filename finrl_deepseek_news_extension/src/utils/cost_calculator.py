@@ -18,31 +18,41 @@ class CostCalculator:
         # 最新的API定價表 (2025年1月)
         self.pricing = {
             'openai': {
-                'gpt-4o': {
-                    'input': 0.005,   # per 1K tokens
-                    'output': 0.015
+                # GPT-4.1 家族
+                'gpt-4.1': {
+                    'input': 0.002,
+                    'output': 0.008
                 },
+                'gpt-4.1-mini': {
+                    'input': 0.0004,
+                    'output': 0.0016
+                },
+                'gpt-4.1-nano': {  # ← 新增
+                    'input': 0.0001,  # per 1K tokens
+                    'output': 0.0004
+                },
+                # o-系列 reasoning
+                'o4-mini': {
+                    'input': 0.0011,
+                    'output': 0.0044
+                },
+                'o3': {
+                    'input': 0.002,
+                    'output': 0.008
+                },
+                # 仍保留 4o-mini 以兼顧超低價
                 'gpt-4o-mini': {
                     'input': 0.00015,
                     'output': 0.0006
-                },
-                'gpt-3.5-turbo': {
-                    'input': 0.001,
-                    'output': 0.002
                 }
             },
-            'infrastructure': {
-                'aws_s3_storage': 0.023,  # per GB/month
-                'bandwidth': 0.09,        # per GB transfer
-                'compute_hour': 0.10      # per hour basic compute
-            },
             'news_apis': {
-                'newsapi': 0.0002,        # per request (paid plan)
-                'alpha_vantage': 0.001,   # per request (premium)
-                'polygon': 0.002          # per request
+                'newsapi': 0.0002,
+                'alpha_vantage': 0.001,
+                'polygon': 0.002
             }
         }
-        
+
         # token計算器
         self.tokenizers = {}
         self._init_tokenizers()
