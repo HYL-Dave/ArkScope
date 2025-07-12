@@ -259,13 +259,13 @@ class OptimizedPromptManager:
 class ModelSelector:
     def __init__(self):
         self.model_configs = {
-            'gpt-4o-mini': {
-                'cost_per_token': 0.00015,
+            'gpt-4.1-mini': {
+                'cost_per_token': 0.0004,
                 'quality_score': 8.5,
                 'speed_score': 9.0
             },
-            'gpt-4o': {
-                'cost_per_token': 0.005,
+            'gpt-4.1': {
+                'cost_per_token': 0.002,
                 'quality_score': 9.5,
                 'speed_score': 7.0
             }

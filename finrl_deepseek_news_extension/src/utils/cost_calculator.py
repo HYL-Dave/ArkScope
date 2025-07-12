@@ -66,7 +66,12 @@ class CostCalculator:
             try:
                 self.tokenizers[name] = tiktoken.encoding_for_model(name)
             except Exception:
-                pass
+                # 對於未知模型，使用 GPT-4 的 tokenizer
+                if "4.1" in name or "o3" in name or "o4" in name:
+                    try:
+                        self.tokenizers[name] = tiktoken.encoding_for_model("gpt-4")
+                    except:
+                        pass
 
         # 通用備援
         if "default" not in self.tokenizers:

@@ -261,7 +261,7 @@ class TestCostCalculator(unittest.TestCase):
         estimate = self.calculator.estimate_batch_llm_cost(
             articles_count=1000,
             avg_article_length=500,
-            model='gpt-4o-mini'
+            model='gpt-4.1-mini'
         )
         
         self.assertIsInstance(estimate, dict)

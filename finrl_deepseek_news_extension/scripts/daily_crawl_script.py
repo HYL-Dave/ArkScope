@@ -21,7 +21,7 @@ from src.data_extraction.stock_list_parser import StockListParser
 from src.data_extraction.finnlp_crawler import FinNLPCrawler
 from src.data_processing.llm_scorer import LLMScorer
 from src.data_processing.schema_formatter import SchemaFormatter
-from src.utils.logger import setup_logger, ProgressLogger, CostTracker
+from src.utils.logger_util import setup_logger, CostTracker
 from src.utils.cost_calculator import CostCalculator
 
 class DailyCrawlManager:

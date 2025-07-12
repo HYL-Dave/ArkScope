@@ -23,7 +23,7 @@ from src.data_extraction.newsplease_crawler import NewsPleaseCrawler
 from src.data_processing.llm_scorer import LLMScorer
 from src.data_processing.schema_formatter import SchemaFormatter
 from src.integration.data_merger import DataMerger
-from src.utils.logger import setup_logger
+from src.utils.logger_util import setup_logger
 from src.utils.cost_calculator import CostCalculator
 
 class FinRLDeepSeekPipeline:

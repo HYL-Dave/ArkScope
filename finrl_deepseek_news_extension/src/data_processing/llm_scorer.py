@@ -107,8 +107,17 @@ class LLMScorer:
     def _init_tokenizers(self):
         tk = {}
         for name in self.pricing.keys():
-            try: tk[name] = tiktoken.encoding_for_model(name)
-            except Exception: pass
+            try:
+                # 嘗試直接獲取模型的 tokenizer
+                tk[name] = tiktoken.encoding_for_model(name)
+            except Exception:
+                # 如果失敗，使用相近模型的 tokenizer
+                if "4.1" in name or "o3" in name or "o4" in name:
+                    # 使用 GPT-4 的 tokenizer 作為替代
+                    try:
+                        tk[name] = tiktoken.encoding_for_model("gpt-4")
+                    except:
+                        pass
         tk["default"] = tiktoken.get_encoding("cl100k_base")
         return tk
 
