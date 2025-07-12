@@ -1,0 +1,168 @@
+{
+  "project_info": {
+    "name": "FinRL-DeepSeek News Extension",
+    "version": "1.0.0",
+    "description": "Extend FinRL-DeepSeek dataset from 2013-2023 to 2024-2025"
+  },
+  
+  "data_sources": {
+    "finrl_deepseek_path": "huggingface_datasets/FinRL_DeepSeek_sentiment/sentiment_deepseek_new_cleaned_nasdaq_news_full.csv",
+    "output_directory": "data/final/",
+    "backup_directory": "backups/"
+  },
+  
+  "stock_parser": {
+    "expected_ticker_count": 89,
+    "validation_enabled": true,
+    "save_formats": ["csv", "python"]
+  },
+  
+  "crawl_strategy": {
+    "primary_method": "finnlp",
+    "use_commoncrawl_supplement": true,
+    "max_articles_per_day": 1000,
+    "target_sources_per_ticker": 3
+  },
+  
+  "finnlp_crawler": {
+    "active_sources": ["cnbc", "reuters", "marketwatch", "investorplace"],
+    "use_proxy": null,
+    "max_retry": 3,
+    "proxy_pages": 5,
+    "rate_limiting": {
+      "min_delay": 2,
+      "max_delay": 5,
+      "requests_per_minute": 30,
+      "daily_limit": 5000
+    },
+    "max_workers": 3,
+    "timeout_seconds": 30
+  },
+  
+  "newsplease_crawler": {
+    "temp_dir": "./temp_cc_data",
+    "cc_archives": [
+      "CC-MAIN-2024-10",
+      "CC-MAIN-2024-18", 
+      "CC-MAIN-2024-22",
+      "CC-MAIN-2024-26",
+      "CC-MAIN-2024-30",
+      "CC-MAIN-2024-33",
+      "CC-MAIN-2024-38",
+      "CC-MAIN-2024-42",
+      "CC-MAIN-2024-46",
+      "CC-MAIN-2024-51",
+      "CC-MAIN-2025-07"
+    ],
+    "financial_domains": [
+      "cnbc.com", "reuters.com", "marketwatch.com", "bloomberg.com",
+      "finance.yahoo.com", "fool.com", "seekingalpha.com", 
+      "investorplace.com", "benzinga.com", "thestreet.com",
+      "barrons.com", "wsj.com", "ft.com"
+    ],
+    "max_warc_files": 10,
+    "filter_language": "en",
+    "minimal_article_length": 500
+  },
+  
+  "llm_scorer": {
+    "openai_api_key": "YOUR_OPENAI_API_KEY_HERE",
+    "model": "gpt-4o-mini",
+    "temperature": 0,
+    "max_tokens": 5,
+    "timeout": 30,
+    "rate_limiting": {
+      "requests_per_minute": 100,
+      "tokens_per_minute": 30000,
+      "batch_size": 50
+    },
+    "max_workers": 5,
+    "cost_limit_usd": 100.0,
+    "fallback_scores": {
+      "sentiment_u": 3,
+      "risk_q": 3
+    }
+  },
+  
+  "schema_formatter": {
+    "max_title_length": 200,
+    "max_article_length": 5000,
+    "summary_sentences": 2,
+    "remove_html": true,
+    "required_columns": [
+      "Date", "Article_title", "Stock_symbol", "Url", "Publisher", 
+      "Author", "Article", "Lsa_summary", "Luhn_summary", 
+      "Textrank_summary", "Lexrank_summary", "sentiment_u", "risk_q"
+    ]
+  },
+  
+  "data_merger": {
+    "overlap_strategy": "prefer_new",
+    "date_validation": true,
+    "schema_validation": true,
+    "deduplication": true,
+    "quality_filters": {
+      "min_title_length": 10,
+      "min_article_length": 50,
+      "require_valid_url": true,
+      "max_duplicate_percentage": 10
+    },
+    "backup_original": true
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_enabled": true,
+    "file_path": "logs/finrl_extension.log",
+    "console_enabled": true,
+    "max_file_size_mb": 100,
+    "backup_count": 5
+  },
+  
+  "performance": {
+    "chunk_size": 1000,
+    "memory_limit_gb": 8,
+    "progress_report_interval": 100,
+    "checkpoint_enabled": true,
+    "checkpoint_interval": 500
+  },
+  
+  "validation": {
+    "data_quality_checks": true,
+    "duplicate_detection": true,
+    "date_range_validation": true,
+    "stock_symbol_validation": true,
+    "score_range_validation": true
+  },
+  
+  "output_formats": {
+    "primary": "csv",
+    "secondary": "parquet",
+    "include_metadata": true,
+    "compression": "gzip",
+    "save_intermediate_steps": true
+  },
+  
+  "notifications": {
+    "email_enabled": false,
+    "email_settings": {
+      "smtp_server": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "to_address": "",
+      "subject_prefix": "[FinRL Extension]"
+    },
+    "slack_enabled": false,
+    "slack_webhook": ""
+  },
+  
+  "development": {
+    "debug_mode": false,
+    "sample_mode": false,
+    "sample_size": 100,
+    "dry_run": false,
+    "profiling_enabled": false
+  }
+}
