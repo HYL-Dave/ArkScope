@@ -81,8 +81,13 @@ class DataMerger:
         for col in common_columns:
             if col in ['sentiment_u', 'risk_q']:
                 # 檢查評分欄位是否在有效範圍內
-                df1_invalid = df1[~df1[col].between(1, 5, na=True)][col].count()
-                df2_invalid = df2[~df2[col].between(1, 5, na=True)][col].count()
+                # Replicate the previous `na=True` semantics by excluding NaN from the
+                # invalid count (i.e. consider NaN as valid here).
+                valid_mask_df1 = df1[col].between(1, 5, inclusive="both") | df1[col].isna()
+                valid_mask_df2 = df2[col].between(1, 5, inclusive="both") | df2[col].isna()
+
+                df1_invalid = df1[~valid_mask_df1][col].count()
+                df2_invalid = df2[~valid_mask_df2][col].count()
                 
                 if df1_invalid > 0:
                     validation_result['warnings'].append(f"df1 的 {col} 有 {df1_invalid} 個超出1-5範圍的值")
@@ -139,7 +144,8 @@ class DataMerger:
         for score_col in ['sentiment_u', 'risk_q']:
             if score_col in processed_df.columns:
                 # 將超出範圍的值設為3（中性）
-                out_of_range = ~processed_df[score_col].between(1, 5, na=True)
+                valid_mask = processed_df[score_col].between(1, 5, inclusive="both") | processed_df[score_col].isna()
+                out_of_range = ~valid_mask
                 if out_of_range.sum() > 0:
                     self.logger.warning(f"{source_name}: 修正 {out_of_range.sum()} 個超出範圍的 {score_col} 值")
                     processed_df.loc[out_of_range, score_col] = 3

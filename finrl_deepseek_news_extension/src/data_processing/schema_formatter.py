@@ -355,7 +355,8 @@ class SchemaFormatter:
         # 檢查評分範圍
         for score_col in ['sentiment_u', 'risk_q']:
             if score_col in df.columns:
-                invalid_scores = df[~df[score_col].between(1, 5, na=True)][score_col].count()
+                valid_mask = df[score_col].between(1, 5, inclusive="both") | df[score_col].isna()
+                invalid_scores = df[~valid_mask][score_col].count()
                 if invalid_scores > 0:
                     quality_issues.append(f"{score_col} 有 {invalid_scores} 個超出1-5範圍的值")
         
