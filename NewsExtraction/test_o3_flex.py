@@ -190,7 +190,7 @@ def main():
     print("開始測試 o3 模型與 Flex Processing...\n")
     
     # 主要測試
-    success = test_o3_flex(args.api_key)
+    success = test_model(args.api_key)
     
     # 對比測試（可選）
     if args.compare:

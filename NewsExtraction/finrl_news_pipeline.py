@@ -57,29 +57,36 @@ class NewsRecord:
     Author: str = ""
     Lsa_summary: str = ""
 
+    # 修改 NewsRecord 的 validate 方法
     def validate(self) -> List[str]:
-        """驗證資料完整性"""
+        """驗證資料完整性（放寬版本）"""
         errors = []
 
+        # 只檢查必要欄位
         # 日期格式驗證
-        try:
-            pd.to_datetime(self.Date)
-        except:
-            errors.append(f"Invalid date format: {self.Date}")
+        if not self.Date:
+            errors.append("Date is missing")
+        else:
+            try:
+                pd.to_datetime(self.Date)
+            except:
+                errors.append(f"Invalid date format: {self.Date}")
 
         # 股票代碼驗證
-        if not self.Stock_symbol or not self.Stock_symbol.isupper():
-            errors.append(f"Invalid stock symbol: {self.Stock_symbol}")
+        if not self.Stock_symbol:
+            errors.append("Stock symbol is missing")
+        # 移除大寫檢查，因為有些股票代碼可能有特殊情況
 
-        # 文本驗證
-        if not self.Article_title or len(self.Article_title) < 5:
-            errors.append("Title too short or missing")
+        # 標題驗證（放寬長度要求）
+        if not self.Article_title:
+            errors.append("Title is missing")
 
-        if not self.Article or len(self.Article) < 20:
-            errors.append("Article text too short or missing")
+        # 文章內容驗證（放寬長度要求）
+        if not self.Article:
+            errors.append("Article content is missing")
 
-        # 情感分數驗證
-        if not -1 <= self.Sentiment <= 1:
+        # 情感分數驗證（如果有值才檢查範圍）
+        if self.Sentiment is not None and not -1 <= self.Sentiment <= 1:
             errors.append(f"Sentiment out of range: {self.Sentiment}")
 
         return errors
@@ -255,8 +262,9 @@ class FinRLNewsProcessor:
         self.max_retries = 3
         self.retry_delay = 5  # 秒
 
+    # 修改 validate_dataframe 方法
     def validate_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """驗證整個 DataFrame 的資料品質"""
+        """驗證整個 DataFrame 的資料品質（放寬版本）"""
         self.logger.info("開始資料驗證...")
 
         valid_rows = []
@@ -264,29 +272,43 @@ class FinRLNewsProcessor:
 
         for idx, row in df.iterrows():
             try:
-                record = NewsRecord(
-                    Date=str(row['Date']),
-                    Stock_symbol=row['Stock_symbol'],
-                    Article_title=row['Article_title'],
-                    Article=row['Article'],
-                    Sentiment=float(row['Sentiment']),
-                    # 額外欄位
-                    Url=row.get('Url', ''),
-                    Publisher=row.get('Publisher', ''),
-                    Author=row.get('Author', ''),
-                    Lsa_summary=row.get('Lsa_summary', '')
-                )
+                # 只檢查必要欄位是否存在
+                required_fields = ['Date', 'Stock_symbol', 'Article_title', 'Article']
+                missing_fields = [field for field in required_fields if
+                                  pd.isna(row.get(field, None)) or row.get(field, '') == '']
 
-                errors = record.validate()
-
-                if errors:
+                if missing_fields:
                     invalid_rows.append({
                         'index': idx,
-                        'errors': errors,
+                        'errors': [f"Missing required fields: {missing_fields}"],
                         'data': row.to_dict()
                     })
                 else:
-                    valid_rows.append(row)
+                    # 創建記錄，可選欄位使用 get 方法
+                    record = NewsRecord(
+                        Date=str(row['Date']),
+                        Stock_symbol=row['Stock_symbol'],
+                        Article_title=row['Article_title'],
+                        Article=row['Article'],
+                        Sentiment=float(row.get('Sentiment', 0.0)) if pd.notna(row.get('Sentiment')) else 0.0,
+                        # 可選欄位
+                        Url=str(row.get('Url', '')) if pd.notna(row.get('Url')) else '',
+                        Publisher=str(row.get('Publisher', '')) if pd.notna(row.get('Publisher')) else '',
+                        Author=str(row.get('Author', '')) if pd.notna(row.get('Author')) else '',
+                        Lsa_summary=str(row.get('Lsa_summary', '')) if pd.notna(row.get('Lsa_summary')) else ''
+                    )
+
+                    # 執行基本驗證
+                    errors = record.validate()
+
+                    if errors:
+                        invalid_rows.append({
+                            'index': idx,
+                            'errors': errors,
+                            'data': row.to_dict()
+                        })
+                    else:
+                        valid_rows.append(row)
 
             except Exception as e:
                 invalid_rows.append({
