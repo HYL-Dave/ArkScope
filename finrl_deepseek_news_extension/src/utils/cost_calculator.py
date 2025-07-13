@@ -35,7 +35,6 @@ class CostCalculator:
                 'alpha_vantage': 0.001,
                 'polygon': 0.002
             }
-            # ❌ 不再包含 infrastructure
         }
 
         # token 計算器
@@ -254,12 +253,12 @@ class CostCalculator:
                 'other_overhead': 0.0
             },
             'cost_distribution_percent': {
-                'llm_processing': round((llm_est['total_estimated_cost_usd'] / total_cost) * 100, 1),
-                'infrastructure': round(((storage_cost + bandwidth_cost) / total_cost) * 100, 1)
+                'llm_processing': round((llm_est['total_estimated_cost_usd'] / total_cost) * 100, 1) if total_cost > 0 else 0,
+                'infrastructure': round(((storage_cost + bandwidth_cost) / total_cost) * 100, 1) if total_cost > 0 else 0
             },
             'monthly_breakdown': {
                 'initial_processing': llm_est['total_estimated_cost_usd'],
-                'ongoing_storage': round(storage_cost / 12, 2),
+                'ongoing_storage': round(storage_cost / 12, 2) if storage_cost > 0 else 0,
                 'maintenance': 0.0
             },
             'recommendations': llm_est['recommendations']

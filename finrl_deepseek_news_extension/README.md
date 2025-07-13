@@ -50,47 +50,66 @@
 - 50GB+ 可用硬碟空間
 - OpenAI API 密鑰
 
-### 安裝步驟
+### 使用步驟
 
-1. **克隆專案**
+#### 1. 替換修改後的檔案
 ```bash
-git clone https://github.com/your-username/finrl-deepseek-extension.git
-cd finrl-deepseek-extension
+# 備份原檔案（可選）
+cp src/data_processing/llm_scorer.py src/data_processing/llm_scorer.py.bak
+cp src/utils/cost_calculator.py src/utils/cost_calculator.py.bak
+
+# 使用修改後的版本替換原檔案
 ```
 
-2. **建立虛擬環境**
+#### 2. 執行設置檢查
+```bash
+python check_setup.py
+```
+
+#### 3. 準備配置
+```bash
+cp config/config_template.json config/config.json
+# 編輯 config.json，填入您的 OpenAI API 密鑰
+```
+
+#### 4. 安裝依賴
+```bash
+pip install -r requirements.txt
+```
+
+#### 5. 執行測試
+```bash
+# 測試關鍵模組
+python -m pytest tests/test_integration.py::TestLLMScorer -v
+python -m pytest tests/test_integration.py::TestCostCalculator -v
+```
+
+#### 6. 開始使用
+```bash
+# 小規模測試
+python scripts/run_daily_crawl.py --config config/config.json --date 2024-07-12
+
+# 完整執行
+python scripts/run_full_pipeline.py \
+    --config config/config.json \
+    --start-date 2024-01-01 \
+    --end-date 2024-07-12
+```
+
+### 環境設置
+
+#### 建立虛擬環境
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # 或 venv\Scripts\activate  # Windows
 ```
 
-3. **安裝依賴**
-```bash
-pip install -r requirements.txt
-```
-
-4. **配置設定**
-```bash
-cp config/config_template.json config/config.json
-# 編輯 config.json，設置 OpenAI API 密鑰等參數
-```
-
-5. **準備原始數據**
+#### 準備原始數據
 ```bash
 # 下載原始 FinRL-DeepSeek 資料集
 mkdir -p huggingface_datasets/FinRL_DeepSeek_sentiment/
 # 將 sentiment_deepseek_new_cleaned_nasdaq_news_full.csv 放入上述目錄
-```
-
-### 基本使用
-
-```bash
-# 執行完整流程
-python scripts/run_full_pipeline.py \
-    --config config/config.json \
-    --start-date 2024-01-01 \
-    --end-date 2025-07-12
 ```
 
 ## 📋 詳細使用說明

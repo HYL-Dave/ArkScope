@@ -264,6 +264,25 @@ class LLMScorer:
                     break
         return df
 
+    def batch_score_articles(self, df: pd.DataFrame, max_workers: int = 5) -> pd.DataFrame:
+        """批量評分文章 - 為了保持向後相容性"""
+        return self.batch_score(df, max_workers)
+
+    def get_cost_summary(self) -> Dict:
+        """獲取成本摘要 - 為了保持向後相容性"""
+        return self.cost_summary()
+
+    def save_cost_report(self, output_path: str) -> None:
+        """儲存成本報告"""
+        import json
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'cost_summary': self.cost_summary(),
+            'model_used': self.model_cfg['model']
+        }
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+
     # ─────────────────────── 成本報告 ─────────────────────── #
     def cost_summary(self) -> Dict:
         req = max(self.cost["requests"], 1)
@@ -272,7 +291,7 @@ class LLMScorer:
             "requests": self.cost["requests"],
             "input_tokens": self.cost["input_tokens"],
             "output_tokens": self.cost["output_tokens"],
-            "est_cost_usd": round(self.cost["usd"],4),
+            "estimated_cost_usd": round(self.cost["usd"],4),
             "avg_per_request": round(self.cost["usd"]/req,4)
         }
 

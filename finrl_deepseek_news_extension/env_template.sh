@@ -50,20 +50,6 @@ EMAIL_USER=your-email@gmail.com
 EMAIL_PASSWORD=your-app-password
 EMAIL_TO=notifications@yourcompany.com
 
-# 雲端儲存配置 (可選)
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_REGION=us-east-1
-S3_BUCKET=finrl-news-data
-
-# Google Cloud 配置 (可選)
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-GCS_BUCKET=finrl-news-data
-
-# Azure 配置 (可選)
-AZURE_STORAGE_CONNECTION_STRING=
-AZURE_CONTAINER_NAME=finrl-news-data
-
 # 時區設定
 TZ=Asia/Taipei
 
