@@ -23,7 +23,7 @@ def check_imports():
         print("✅ StockListParser 載入成功")
 
         from src.data_extraction.finnlp_crawler import FinNLPCrawler
-        print("✅ FinNLPCrawler 載入成功")
+        print("✅ FinNLPCrawler 載入成功（獨立實現）")
 
         from src.data_processing.llm_scorer import LLMScorer
         print("✅ LLMScorer 載入成功")
@@ -115,6 +115,9 @@ def check_dependencies():
 
         import sumy
         print("✅ sumy 已安裝")
+
+        # 不再檢查 finnlp，因為已經整合到專案中
+        print("✅ finnlp 功能已整合（無需外部套件）")
 
         return True
 

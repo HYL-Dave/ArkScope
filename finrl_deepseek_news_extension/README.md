@@ -284,7 +284,7 @@ grep "進度" logs/finrl_extension.log
 ## 🙏 致謝
 
 - [FinRL-DeepSeek](https://github.com/benstaf/FinRL_DeepSeek) 原始專案
-- [FinNLP](https://github.com/AI4Finance-Foundation/FinNLP) 新聞爬取框架
+- FinNLP 新聞爬取功能（已整合到專案中）
 - [news-please](https://github.com/fhamborg/news-please) CommonCrawl 爬取工具
 
 ## 📞 聯絡資訊
