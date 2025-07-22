@@ -264,69 +264,104 @@ def main():
         parser.error("No OpenAI API key provided; set --api-key, --api-keys-file, or OPENAI_API_KEY env var")
     set_api_keys(keys, args.daily_token_limit)
 
+    def clean_csv_file(input_csv, temp_csv):
+        """Clean CSV file by removing NULL bytes and other problematic characters."""
+        logging.info(f"Cleaning CSV file: {input_csv}")
+        try:
+            with open(input_csv, 'rb') as f_in:
+                content = f_in.read()
+            
+            # Remove NULL bytes and other control characters except newlines and tabs
+            cleaned_content = content.replace(b'\x00', b'')  # Remove NULL bytes
+            cleaned_content = re.sub(rb'[\x01-\x08\x0b-\x0c\x0e-\x1f]', b'', cleaned_content)
+            
+            with open(temp_csv, 'wb') as f_out:
+                f_out.write(cleaned_content)
+            
+            logging.info(f"Cleaned CSV saved to: {temp_csv}")
+            return temp_csv
+        except Exception as e:
+            logging.error(f"Error cleaning CSV file: {e}")
+            return input_csv  # Return original if cleaning fails
+
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
                     chunk_size, pause, retry_internal, retry_missing,
                     max_runtime=None):
-        # Ensure output directory exists for chunked writes
-        out_dir = os.path.dirname(output_csv)
-        if out_dir and not os.path.exists(out_dir):
-            os.makedirs(out_dir, exist_ok=True)
-        # Resume logic: count already processed rows
-        if os.path.exists(output_csv):
-            prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
-                               on_bad_lines='warn', engine='python')
-            processed_rows = len(prev)
-        else:
-            processed_rows = 0
+        # Clean the input CSV first to remove NULL bytes
+        import tempfile
+        temp_dir = os.path.dirname(input_csv)
+        temp_csv = os.path.join(temp_dir, f"temp_cleaned_{os.path.basename(input_csv)}")
+        cleaned_csv = clean_csv_file(input_csv, temp_csv)
+        
+        try:
+            # Ensure output directory exists for chunked writes
+            out_dir = os.path.dirname(output_csv)
+            if out_dir and not os.path.exists(out_dir):
+                os.makedirs(out_dir, exist_ok=True)
+            # Resume logic: count already processed rows
+            if os.path.exists(output_csv):
+                prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
+                                   on_bad_lines='warn', engine='python')
+                processed_rows = len(prev)
+            else:
+                processed_rows = 0
 
-        # start timer for max-runtime enforcement
-        start_time = time.time()
-        reader = pd.read_csv(input_csv, chunksize=chunk_size,
-                             on_bad_lines='warn', engine='python')
-        out_col = "risk_deepseek"
-        for i, chunk in enumerate(reader):
-            logging.info(f"Processing chunk {i}, {len(chunk)} rows")
-            if i * chunk_size < processed_rows:
-                continue
-            # Validate required columns
-            required = [sym_col, text_col] + ([date_col] if date_col else [])
-            missing = [c for c in required if c and c not in chunk.columns]
-            if missing:
-                parser.error(f"Input CSV missing columns: {missing}")
-            chunk[out_col] = None
-            # Score each row
-            for idx, row in chunk.iterrows():
-                cell = row[text_col]
-                if pd.isna(cell) or not str(cell).strip():
-                    logging.warning(f"Skipping empty text for {row[sym_col]}:{idx}")
+            # start timer for max-runtime enforcement
+            start_time = time.time()
+            reader = pd.read_csv(cleaned_csv, chunksize=chunk_size,
+                                 on_bad_lines='warn', engine='python')
+            out_col = "risk_deepseek"
+            for i, chunk in enumerate(reader):
+                logging.info(f"Processing chunk {i}, {len(chunk)} rows")
+                if i * chunk_size < processed_rows:
                     continue
-                snippet = str(cell)[:200]
-                logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
-                # initial inference with internal retry
-                val = score_headline(cell, row[sym_col], model, retry=retry_internal)
-                # extra retries if still missing
-                for _ in range(retry_missing):
-                    if val is not None:
-                        break
-                    logging.warning(f"Missing risk for {row[sym_col]}:{idx}, retrying")
+                # Validate required columns
+                required = [sym_col, text_col] + ([date_col] if date_col else [])
+                missing = [c for c in required if c and c not in chunk.columns]
+                if missing:
+                    parser.error(f"Input CSV missing columns: {missing}")
+                chunk[out_col] = None
+                # Score each row
+                for idx, row in chunk.iterrows():
+                    cell = row[text_col]
+                    if pd.isna(cell) or not str(cell).strip():
+                        logging.warning(f"Skipping empty text for {row[sym_col]}:{idx}")
+                        continue
+                    snippet = str(cell)[:200]
+                    logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
+                    # initial inference with internal retry
                     val = score_headline(cell, row[sym_col], model, retry=retry_internal)
-                chunk.at[idx, out_col] = val
-                time.sleep(pause)
-            # Write all original columns plus new risk score
-            chunk.to_csv(
-                output_csv,
-                mode='a',
-                header=not os.path.exists(output_csv),
-                index=False
-            )
-            if STOP_AFTER_CHUNK:
-                print(f"Daily token limit reached; stopping after chunk {i}.")
-                return
-            # stop if runtime exceeded max_runtime (after finishing this chunk)
-            if max_runtime and (time.time() - start_time) >= max_runtime:
-                print(f"Time limit reached; stopping after chunk {i}.")
-                return
-        print(f"Scoring completed; results saved to {output_csv}")
+                    # extra retries if still missing
+                    for _ in range(retry_missing):
+                        if val is not None:
+                            break
+                        logging.warning(f"Missing risk for {row[sym_col]}:{idx}, retrying")
+                        val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                    chunk.at[idx, out_col] = val
+                    time.sleep(pause)
+                # Write all original columns plus new risk score
+                chunk.to_csv(
+                    output_csv,
+                    mode='a',
+                    header=not os.path.exists(output_csv),
+                    index=False
+                )
+                if STOP_AFTER_CHUNK:
+                    print(f"Daily token limit reached; stopping after chunk {i}.")
+                    return
+                # stop if runtime exceeded max_runtime (after finishing this chunk)
+                if max_runtime and (time.time() - start_time) >= max_runtime:
+                    print(f"Time limit reached; stopping after chunk {i}.")
+                    return
+            print(f"Scoring completed; results saved to {output_csv}")
+        finally:
+            # Clean up temporary file
+            if cleaned_csv != input_csv and os.path.exists(cleaned_csv):
+                try:
+                    os.remove(cleaned_csv)
+                    logging.info(f"Cleaned up temporary file: {cleaned_csv}")
+                except Exception as e:
+                    logging.warning(f"Could not remove temporary file {cleaned_csv}: {e}")
 
     process_csv(
         args.input, args.output, args.model,

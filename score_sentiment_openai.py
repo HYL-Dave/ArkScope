@@ -290,7 +290,15 @@ def main():
             processed_rows = 0
 
         start_time = time.time()
-        reader = pd.read_csv(input_csv, chunksize=chunk_size,
+        
+        # Clean CSV file of NUL characters
+        cleaned_csv = input_csv + '.cleaned'
+        with open(input_csv, 'rb') as f_in, open(cleaned_csv, 'wb') as f_out:
+            content = f_in.read()
+            content = content.replace(b'\x00', b'')
+            f_out.write(content)
+        
+        reader = pd.read_csv(cleaned_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='python')
         out_col = "sentiment_deepseek"
         for i, chunk in enumerate(reader):
@@ -339,6 +347,10 @@ def main():
                 print(f"Time limit reached; stopping after chunk {i}.")
                 return
         print(f"Scoring completed; results saved to {output_csv}")
+        
+        # Clean up temporary file
+        if os.path.exists(cleaned_csv):
+            os.remove(cleaned_csv)
 
     process_csv(
         args.input, args.output, args.model,
