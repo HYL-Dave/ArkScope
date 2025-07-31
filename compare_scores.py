@@ -121,6 +121,95 @@ def merge_dataframes(dataframes):
     
     return merged
 
+def analyze_pairwise_similarity(merged_df, score_columns):
+    """分析模型兩兩之間的相似度"""
+    from itertools import combinations
+    from scipy.stats import pearsonr, spearmanr
+    from sklearn.metrics import accuracy_score, cohen_kappa_score
+    
+    pairwise_results = {}
+    model_names = [col.split('_')[-1] for col in score_columns]
+    
+    # 計算所有模型對的相似度指標
+    for i, (col1, model1) in enumerate(zip(score_columns, model_names)):
+        for j, (col2, model2) in enumerate(zip(score_columns, model_names)):
+            if i >= j:  # 避免重複計算
+                continue
+                
+            pair_key = f"{model1}_vs_{model2}"
+            
+            # 移除任一模型有NaN的記錄
+            valid_mask = (~merged_df[col1].isna()) & (~merged_df[col2].isna())
+            if valid_mask.sum() == 0:
+                continue
+                
+            scores1 = merged_df.loc[valid_mask, col1].values
+            scores2 = merged_df.loc[valid_mask, col2].values
+            
+            # 計算各種相似度指標
+            pair_stats = {}
+            
+            # 1. 完全一致率 (Exact Match Rate)
+            exact_match_rate = (scores1 == scores2).mean() * 100
+            pair_stats['exact_match_rate'] = exact_match_rate
+            
+            # 2. 相差1分以內的比率
+            within_1_rate = (np.abs(scores1 - scores2) <= 1).mean() * 100
+            pair_stats['within_1_point_rate'] = within_1_rate
+            
+            # 3. 皮爾森相關係數
+            try:
+                pearson_r, pearson_p = pearsonr(scores1, scores2)
+                pair_stats['pearson_correlation'] = pearson_r
+                pair_stats['pearson_p_value'] = pearson_p
+            except:
+                pair_stats['pearson_correlation'] = np.nan
+                pair_stats['pearson_p_value'] = np.nan
+            
+            # 4. 斯皮爾曼相關係數 (適合有序數據)
+            try:
+                spearman_r, spearman_p = spearmanr(scores1, scores2)
+                pair_stats['spearman_correlation'] = spearman_r
+                pair_stats['spearman_p_value'] = spearman_p
+            except:
+                pair_stats['spearman_correlation'] = np.nan
+                pair_stats['spearman_p_value'] = np.nan
+            
+            # 5. Cohen's Kappa (一致性指標)
+            try:
+                kappa = cohen_kappa_score(scores1, scores2)
+                pair_stats['cohen_kappa'] = kappa
+            except:
+                pair_stats['cohen_kappa'] = np.nan
+            
+            # 6. 平均絕對誤差 (MAE)
+            mae = np.mean(np.abs(scores1 - scores2))
+            pair_stats['mean_absolute_error'] = mae
+            
+            # 7. 分數差異分佈
+            diff_distribution = {}
+            differences = scores2 - scores1  # model2 - model1
+            for diff in np.unique(differences):
+                if not np.isnan(diff):
+                    diff_distribution[float(diff)] = int(np.sum(differences == diff))
+            pair_stats['difference_distribution'] = diff_distribution
+            
+            # 8. 混淆矩陣統計
+            confusion_stats = {}
+            unique_scores = sorted(set(list(scores1) + list(scores2)))
+            for s1 in unique_scores:
+                for s2 in unique_scores:
+                    count = int(np.sum((scores1 == s1) & (scores2 == s2)))
+                    if count > 0:
+                        confusion_stats[f"{s1}_vs_{s2}"] = count
+            pair_stats['confusion_matrix'] = confusion_stats
+            
+            pair_stats['total_comparisons'] = len(scores1)
+            
+            pairwise_results[pair_key] = pair_stats
+    
+    return pairwise_results
+
 def analyze_score_differences(merged_df, score_columns):
     """分析分數差異"""
     results = {}
@@ -162,6 +251,9 @@ def analyze_score_differences(merged_df, score_columns):
     most_common_combos = Counter(score_combinations).most_common(10)
     results['most_common_combinations'] = [(str(combo), count) for combo, count in most_common_combos]
     
+    # 添加兩兩相似度分析
+    results['pairwise_similarity'] = analyze_pairwise_similarity(merged_df, score_columns)
+    
     return results, different_scores_df, same_scores_df
 
 def save_results(different_scores_df, same_scores_df, analysis, output_path, stats_path):
@@ -185,7 +277,123 @@ def save_results(different_scores_df, same_scores_df, analysis, output_path, sta
         same_scores_df.to_csv(same_output_path)
         logging.info(f"Saved {len(same_scores_df)} records with same scores to {same_output_path}")
 
-def print_summary(analysis):
+def print_pairwise_similarity_summary(pairwise_results, top_n=None):
+    """打印兩兩相似度分析摘要"""
+    print("\n" + "="*80)
+    print("PAIRWISE MODEL SIMILARITY ANALYSIS")
+    print("="*80)
+    
+    if not pairwise_results:
+        print("No pairwise comparisons available.")
+        return
+    
+    # 排序模型對按相似度指標
+    similarity_rankings = {}
+    
+    for metric in ['exact_match_rate', 'within_1_point_rate', 'pearson_correlation', 
+                   'spearman_correlation', 'cohen_kappa']:
+        pairs_with_metric = []
+        for pair, stats in pairwise_results.items():
+            if metric in stats and not np.isnan(stats[metric]):
+                pairs_with_metric.append((pair, stats[metric]))
+        
+        if pairs_with_metric:
+            # 對於相關係數，取絕對值排序；對於其他指標，直接排序
+            if 'correlation' in metric:
+                pairs_with_metric.sort(key=lambda x: abs(x[1]), reverse=True)
+            else:
+                pairs_with_metric.sort(key=lambda x: x[1], reverse=True)
+            
+            similarity_rankings[metric] = pairs_with_metric
+    
+    # 打印各種相似度指標的排名
+    print("\n📊 Model Similarity Rankings:")
+    print("-" * 80)
+    
+    # 決定顯示的條目數量
+    display_count = len(pairwise_results) if top_n is None else min(top_n, len(pairwise_results))
+    
+    # 1. 完全一致率排名
+    if 'exact_match_rate' in similarity_rankings:
+        print("\n🎯 Exact Match Rate (Higher = More Similar):")
+        for i, (pair, rate) in enumerate(similarity_rankings['exact_match_rate'][:display_count], 1):
+            print(f"  {i}. {pair.replace('_vs_', ' ↔ ')}: {rate:.2f}%")
+    
+    # 2. 相差1分以內比率排名
+    if 'within_1_point_rate' in similarity_rankings:
+        print("\n📏 Within 1 Point Rate (Higher = More Similar):")
+        for i, (pair, rate) in enumerate(similarity_rankings['within_1_point_rate'][:display_count], 1):
+            print(f"  {i}. {pair.replace('_vs_', ' ↔ ')}: {rate:.2f}%")
+    
+    # 3. 皮爾森相關係數排名  
+    if 'pearson_correlation' in similarity_rankings:
+        print("\n📈 Pearson Correlation (Higher absolute value = More Similar):")
+        for i, (pair, corr) in enumerate(similarity_rankings['pearson_correlation'][:display_count], 1):
+            print(f"  {i}. {pair.replace('_vs_', ' ↔ ')}: {corr:.4f}")
+    
+    # 4. 斯皮爾曼相關係數排名
+    if 'spearman_correlation' in similarity_rankings:
+        print("\n📊 Spearman Correlation (Higher absolute value = More Similar):")
+        for i, (pair, corr) in enumerate(similarity_rankings['spearman_correlation'][:display_count], 1):
+            print(f"  {i}. {pair.replace('_vs_', ' ↔ ')}: {corr:.4f}")
+    
+    # 5. Cohen's Kappa排名
+    if 'cohen_kappa' in similarity_rankings:
+        print("\n🤝 Cohen's Kappa Agreement (Higher = More Similar):")
+        for i, (pair, kappa) in enumerate(similarity_rankings['cohen_kappa'][:display_count], 1):
+            print(f"  {i}. {pair.replace('_vs_', ' ↔ ')}: {kappa:.4f}")
+    
+    # 綜合相似度排名（基於多個指標的平均排名）
+    print("\n🏆 OVERALL SIMILARITY RANKING:")
+    print("-" * 50)
+    
+    pair_scores = defaultdict(list)
+    
+    # 計算每個模型對在各指標中的排名分數
+    for metric, pairs in similarity_rankings.items():
+        if metric in ['exact_match_rate', 'within_1_point_rate', 'cohen_kappa']:
+            # 這些指標越高越好
+            for rank, (pair, value) in enumerate(pairs):
+                pair_scores[pair].append(len(pairs) - rank)  # 轉換為分數
+        elif 'correlation' in metric:
+            # 相關係數取絕對值，越高越好
+            for rank, (pair, value) in enumerate(pairs):
+                pair_scores[pair].append(len(pairs) - rank)
+    
+    # 計算平均分數並排序
+    average_scores = {}
+    for pair, scores in pair_scores.items():
+        if len(scores) >= 3:  # 至少有3個指標的分數
+            average_scores[pair] = np.mean(scores)
+    
+    if average_scores:
+        sorted_pairs = sorted(average_scores.items(), key=lambda x: x[1], reverse=True)
+        for i, (pair, avg_score) in enumerate(sorted_pairs, 1):
+            models = pair.replace('_vs_', ' ↔ ')
+            print(f"  {i}. {models}: {avg_score:.2f} points")
+            
+            # 顯示詳細指標
+            if pair in pairwise_results:
+                stats = pairwise_results[pair]
+                details = []
+                if 'exact_match_rate' in stats:
+                    details.append(f"Exact: {stats['exact_match_rate']:.1f}%")
+                if 'pearson_correlation' in stats and not np.isnan(stats['pearson_correlation']):
+                    details.append(f"Pearson: {stats['pearson_correlation']:.3f}")
+                if 'cohen_kappa' in stats and not np.isnan(stats['cohen_kappa']):
+                    details.append(f"Kappa: {stats['cohen_kappa']:.3f}")
+                if details:
+                    print(f"     ({', '.join(details)})")
+    
+    # 最相似和最不相似的模型對
+    if 'exact_match_rate' in similarity_rankings and similarity_rankings['exact_match_rate']:
+        most_similar = similarity_rankings['exact_match_rate'][0]
+        least_similar = similarity_rankings['exact_match_rate'][-1]
+        
+        print(f"\n🥇 Most Similar Models: {most_similar[0].replace('_vs_', ' ↔ ')} ({most_similar[1]:.2f}% exact match)")
+        print(f"🥉 Least Similar Models: {least_similar[0].replace('_vs_', ' ↔ ')} ({least_similar[1]:.2f}% exact match)")
+
+def print_summary(analysis, top_n_combos=5, top_n_similarity=None):
     """打印摘要統計"""
     print("\n" + "="*60)
     print("SCORE COMPARISON ANALYSIS SUMMARY")
@@ -202,10 +410,16 @@ def print_summary(analysis):
         for score, count in sorted(dist.items()):
             print(f"  {score}: {count:,} ({count/analysis['total_records']*100:.1f}%)")
     
-    print("\nMost Common Score Combinations:")
-    for i, (combo, count) in enumerate(analysis['most_common_combinations'][:5], 1):
+    # 動態決定顯示的組合數量
+    combo_count = len(analysis['most_common_combinations']) if top_n_combos is None else min(top_n_combos, len(analysis['most_common_combinations']))
+    print(f"\nMost Common Score Combinations (Top {combo_count}):")
+    for i, (combo, count) in enumerate(analysis['most_common_combinations'][:combo_count], 1):
         percentage = count / analysis['total_records'] * 100
         print(f"{i}. {combo}: {count:,} ({percentage:.1f}%)")
+    
+    # 打印兩兩相似度分析
+    if 'pairwise_similarity' in analysis:
+        print_pairwise_similarity_summary(analysis['pairwise_similarity'], top_n_similarity)
 
 def main():
     parser = argparse.ArgumentParser(description="Compare scores across multiple CSV files")
@@ -218,6 +432,10 @@ def main():
                        help='Output CSV file for different scores')
     parser.add_argument('--stats', 
                        help='Output JSON file for statistics (default: output_stats.json)')
+    parser.add_argument('--top-n-combos', type=int, default=5,
+                       help='Number of top score combinations to display (default: 5, use 0 for all)')
+    parser.add_argument('--top-n-similarity', type=int, default=None,
+                       help='Number of top similarity rankings to display (default: all, use specific number to limit)')
     
     args = parser.parse_args()
     
@@ -257,8 +475,11 @@ def main():
         # 保存結果
         save_results(different_scores_df, same_scores_df, analysis, args.output, stats_path)
         
+        # 處理參數
+        top_n_combos = None if args.top_n_combos == 0 else args.top_n_combos
+        
         # 打印摘要
-        print_summary(analysis)
+        print_summary(analysis, top_n_combos, args.top_n_similarity)
         
     except Exception as e:
         logging.error(f"Error during processing: {e}")
