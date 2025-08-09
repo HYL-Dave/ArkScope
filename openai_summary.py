@@ -102,6 +102,16 @@ def summarize_article(text: str, symbol: str, model: str,
                     "functions": functions,
                     "function_call": {"name": "record_summary"},
                 }
+            elif model.startswith("gpt-5"):
+                params = {
+                    "model": model,
+                    "reasoning_effort": "high",
+                    "verbosity": "low",
+                    "messages": messages,
+                    "max_completion_tokens": 3600,
+                    "functions": functions,
+                    "function_call": {"name": "record_summary"},
+                }
             else:
                 params = {
                     "model": model,
