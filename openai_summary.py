@@ -80,6 +80,7 @@ functions = [{
 }]
 
 def summarize_article(text: str, symbol: str, model: str,
+                      reasoning_effort: str = "high", verbosity: str = "low",
                       retry: int = 3, pause: float = 0.5) -> Tuple[Optional[str], Optional[int], Optional[int]]:
     """
     Call OpenAI ChatCompletion to summarize one article.
@@ -96,7 +97,7 @@ def summarize_article(text: str, symbol: str, model: str,
             if model.startswith("o"):
                 params = {
                     "model": model,
-                    "reasoning_effort": "high",
+                    "reasoning_effort": reasoning_effort,
                     "messages": messages,
                     "max_completion_tokens": 1200,
                     "functions": functions,
@@ -105,8 +106,8 @@ def summarize_article(text: str, symbol: str, model: str,
             elif model.startswith("gpt-5"):
                 params = {
                     "model": model,
-                    "reasoning_effort": "high",
-                    "verbosity": "low",
+                    "reasoning_effort": reasoning_effort,
+                    "verbosity": verbosity,
                     "messages": messages,
                     "max_completion_tokens": 3600,
                     "functions": functions,
@@ -239,6 +240,14 @@ def main():
         "--max-runtime", type=float, default=None,
         help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
     )
+    parser.add_argument(
+        "--reasoning-effort", default="high",
+        help="Reasoning effort level for reasoning models (o3, o4-mini, etc.) - choices: low, medium, high; gpt-5 also supports minimal (default: high)"
+    )
+    parser.add_argument(
+        "--verbosity", default="low", choices=["low", "medium", "high"],
+        help="Verbosity level for reasoning models (gpt-5) (default: medium)"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -268,7 +277,7 @@ def main():
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col,
                     summary_col, chunk_size, pause, retry, retry_missing,
-                    max_runtime=None):
+                    reasoning_effort, verbosity, max_runtime=None):
         # Ensure output directory exists
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -304,12 +313,12 @@ def main():
                 if pd.isna(cell) or not str(cell).strip():
                     logging.warning(f"Skipping empty article for {row[sym_col]}:{idx}")
                     continue
-                summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, retry=retry)
+                summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry)
                 for _ in range(retry_missing):
                     if summary is not None:
                         break
                     logging.warning(f"Missing summary for {row[sym_col]}:{idx}, retrying")
-                    summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, retry=retry)
+                    summary, p_tokens, c_tokens = summarize_article(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry)
                 chunk.at[idx, summary_col] = summary
                 chunk.at[idx, "prompt_tokens"] = p_tokens
                 chunk.at[idx, "completion_tokens"] = c_tokens
@@ -337,12 +346,22 @@ def main():
                 return
         print(f"Summarization completed; results saved to {output_csv}")
 
+    # Validate reasoning_effort choices based on model
+    valid_efforts = ["low", "medium", "high"]
+    if args.model.startswith("gpt-5"):
+        valid_efforts.append("minimal")
+    
+    if args.reasoning_effort not in valid_efforts:
+        parser.error(f"Invalid reasoning effort '{args.reasoning_effort}' for model '{args.model}'. Valid options: {valid_efforts}")
+    
     process_csv(
         args.input, args.output, args.model,
         args.symbol_column, args.text_column,
         summary_col, args.chunk_size,
         pause=0.1, retry=args.retry,
         retry_missing=args.retry_missing,
+        reasoning_effort=args.reasoning_effort,
+        verbosity=args.verbosity,
         max_runtime=args.max_runtime,
     )
     # overall token usage summary
