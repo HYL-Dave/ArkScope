@@ -1,4 +1,3 @@
-```markdown
 # FinRL-DeepSeek 新聞爬取延伸專案（增強版）
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -388,4 +387,3 @@ grep "進度" logs/finrl_extension.log
 ---
 
 **免責聲明**: 本專案僅供研究和教育用途。請遵守相關網站的 robots.txt 和使用條款。
-```
