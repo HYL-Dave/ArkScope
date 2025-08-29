@@ -234,3 +234,8 @@ python backtest_openai.py --data merged_dataset.csv \
 - **`train_ppo_llm.py`, `train_cppo_llm_risk.py`**: Core training implementations
 - **`env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`**: Trading environment definitions
 
+## Documentation
+- **`CLAUDE.md`**: Main project documentation and architecture overview
+- **`finrl_deepseek_news_extension/CLAUDE.md`**: News extension module documentation
+- **`NewsExtraction/CLAUDE.md`**: News extraction module documentation
+- **`requirements.txt`**: Python dependencies

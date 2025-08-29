@@ -83,7 +83,7 @@ functions = [{
     }
 }]
 
-def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause: float = 0.5) -> Optional[int]:
+def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str = "high", verbosity: str = "low", retry: int = 3, pause: float = 0.5) -> Optional[int]:
     """
     Call OpenAI ChatCompletion to score one headline for risk.
     Returns integer risk or None on failure.
@@ -99,8 +99,19 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
             if model.startswith("o"):
                 params = {
                     "model": model,
+                    "reasoning_effort": reasoning_effort,
                     "messages": messages,
-                    "max_completion_tokens": 600,
+                    "max_completion_tokens": 800,
+                    "functions": functions,
+                    "function_call": {"name": "record_score"},
+                }
+            elif model.startswith("gpt-5"):
+                params = {
+                    "model": model,
+                    "reasoning_effort": reasoning_effort,
+                    "verbosity": verbosity,
+                    "messages": messages,
+                    "max_completion_tokens": 2400,
                     "functions": functions,
                     "function_call": {"name": "record_score"},
                 }
@@ -109,7 +120,7 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                     "model": model,
                     "messages": messages,
                     "temperature": 0.0,
-                    "max_tokens": 2,
+                    "max_tokens": 20,
                 }
             if use_flex:
                 params["service_tier"] = "flex"
@@ -183,7 +194,7 @@ def main():
         choices=[
             "Article_title", "Article", "Lsa_summary",
             "Luhn_summary", "Textrank_summary", "Lexrank_summary",
-            "o3_summary"
+            "o3_summary", "gpt_5_summary"
         ],
         help=(
             "Name of the column for text/summary in input CSV; one of "
@@ -239,6 +250,14 @@ def main():
         "--max-runtime", type=float, default=None,
         help="Maximum runtime in seconds; after exceeding, finish current chunk and stop"
     )
+    parser.add_argument(
+        "--reasoning-effort", default="high",
+        help="Reasoning effort level for reasoning models (o3, o4-mini, etc.) - choices: low, medium, high; gpt-5 also supports minimal (default: high)"
+    )
+    parser.add_argument(
+        "--verbosity", default="low", choices=["low", "medium", "high"],
+        help="Verbosity level for gpt-5 models only (default: low)"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -286,7 +305,7 @@ def main():
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
                     chunk_size, pause, retry_internal, retry_missing,
-                    max_runtime=None):
+                    reasoning_effort, verbosity, max_runtime=None):
         # Clean the input CSV first to remove NULL bytes
         import tempfile
         temp_dir = os.path.dirname(input_csv)
@@ -330,13 +349,13 @@ def main():
                     snippet = str(cell)[:200]
                     logging.debug(f"Requesting risk for {row[sym_col]}: {snippet}")
                     # initial inference with internal retry
-                    val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                    val = score_headline(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry_internal)
                     # extra retries if still missing
                     for _ in range(retry_missing):
                         if val is not None:
                             break
                         logging.warning(f"Missing risk for {row[sym_col]}:{idx}, retrying")
-                        val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                        val = score_headline(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry_internal)
                     chunk.at[idx, out_col] = val
                     time.sleep(pause)
                 # Write all original columns plus new risk score
@@ -363,12 +382,22 @@ def main():
                 except Exception as e:
                     logging.warning(f"Could not remove temporary file {cleaned_csv}: {e}")
 
+    # Validate reasoning_effort choices based on model
+    valid_efforts = ["low", "medium", "high"]
+    if args.model.startswith("gpt-5"):
+        valid_efforts.append("minimal")
+    
+    if args.reasoning_effort not in valid_efforts:
+        parser.error(f"Invalid reasoning effort '{args.reasoning_effort}' for model '{args.model}'. Valid options: {valid_efforts}")
+    
     process_csv(
         args.input, args.output, args.model,
         args.symbol_column, args.text_column, args.date_column,
         args.chunk_size, pause=0.1,
         retry_internal=args.retry,
         retry_missing=args.retry_missing,
+        reasoning_effort=args.reasoning_effort,
+        verbosity=args.verbosity,
         max_runtime=args.max_runtime,
     )
     # overall token usage summary

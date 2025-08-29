@@ -82,7 +82,7 @@ functions=[{
   }
 }]
 
-def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause: float = 0.5) -> Optional[int]:
+def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str = "high", verbosity: str = "low", retry: int = 3, pause: float = 0.5) -> Optional[int]:
     """
     Call OpenAI ChatCompletion to score one headline.
     Returns integer score or None on failure.
@@ -100,9 +100,19 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
             if model.startswith("o"):
                 params = {
                     "model": model,
-                    "reasoning_effort": "high",
+                    "reasoning_effort": reasoning_effort,
                     "messages": messages,
-                    "max_completion_tokens": 600,
+                    "max_completion_tokens": 800,
+                    "functions": functions,
+                    "function_call": {"name": "record_score"},
+                }
+            elif model.startswith("gpt-5"):
+                params = {
+                    "model": model,
+                    "reasoning_effort": reasoning_effort,
+                    "verbosity": verbosity,
+                    "messages": messages,
+                    "max_completion_tokens": 2400,
                     "functions": functions,
                     "function_call": {"name": "record_score"},
                 }
@@ -111,7 +121,7 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
                     "model": model,
                     "messages": messages,
                     "temperature": 0.0,
-                    "max_tokens": 2,
+                    "max_tokens": 20,
                 }
             if use_flex:
                 params["service_tier"] = "flex"
@@ -132,13 +142,6 @@ def score_headline(headline: str, symbol: str, model: str, retry: int = 3, pause
             rotate_key_if_needed(tt)
             logging.info(f"Sentiment token usage: prompt={pt}, completion={ct}, total={tt}")
 
-            # text = response.choices[0].message.content.strip()
-            # # Parse single integer score from model response
-            # try:
-            #     return int(text.split()[0])
-            # except Exception:
-            #     logging.warning(f"Cannot parse integer score from response: {text}")
-            #     return None
             msg = response.choices[0].message
             # parse score from function_call arguments or JSON/text content
             if hasattr(msg, "function_call") and msg.function_call is not None:
@@ -194,7 +197,7 @@ def main():
         choices=[
             "Article_title", "Article", "Lsa_summary",
             "Luhn_summary", "Textrank_summary", "Lexrank_summary",
-            "o3_summary"
+            "o3_summary", "gpt_5_summary"
         ],
         help=(
             "Name of the column for text/summary in input CSV; one of "
@@ -250,6 +253,14 @@ def main():
         "--flex-retries", type=int, default=1,
         help="Number of retries when running in Flex mode (default=1)"
     )
+    parser.add_argument(
+        "--reasoning-effort", default="high",
+        help="Reasoning effort level for reasoning models (o3, o4-mini, etc.) - choices: low, medium, high; gpt-5 also supports minimal (default: high)"
+    )
+    parser.add_argument(
+        "--verbosity", default="low", choices=["low", "medium", "high"],
+        help="Verbosity level for gpt-5 models only (default: low)"
+    )
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -276,7 +287,7 @@ def main():
     set_api_keys(keys, args.daily_token_limit)
 
     def process_csv(input_csv, output_csv, model, sym_col, text_col, date_col,
-                    chunk_size, pause, retry_missing, retry_internal, max_runtime=None):
+                    chunk_size, pause, retry_missing, retry_internal, reasoning_effort, verbosity, max_runtime=None):
         # Ensure output directory exists for chunked writes
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
@@ -320,7 +331,7 @@ def main():
                 snippet = str(cell)[:200]
                 logging.debug(f"Requesting score for {row[sym_col]}: {snippet}")
                 # initial inference with internal retry
-                val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                val = score_headline(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry_internal)
                 # extra retries if still missing
                 for _ in range(retry_missing):
                     if val is not None:
@@ -328,7 +339,7 @@ def main():
                     logging.warning(
                         f"Missing sentiment for {row[sym_col]}:{idx}, retrying"
                     )
-                    val = score_headline(cell, row[sym_col], model, retry=retry_internal)
+                    val = score_headline(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry_internal)
                 chunk.at[idx, out_col] = val
                 time.sleep(pause)
             # Write all original columns plus new sentiment score
@@ -352,12 +363,22 @@ def main():
         if os.path.exists(cleaned_csv):
             os.remove(cleaned_csv)
 
+    # Validate reasoning_effort choices based on model
+    valid_efforts = ["low", "medium", "high"]
+    if args.model.startswith("gpt-5"):
+        valid_efforts.append("minimal")
+    
+    if args.reasoning_effort not in valid_efforts:
+        parser.error(f"Invalid reasoning effort '{args.reasoning_effort}' for model '{args.model}'. Valid options: {valid_efforts}")
+    
     process_csv(
         args.input, args.output, args.model,
         args.symbol_column, args.text_column, args.date_column,
         args.chunk_size, pause=0.1,
         retry_missing=args.retry_missing,
         retry_internal=args.retry,
+        reasoning_effort=args.reasoning_effort,
+        verbosity=args.verbosity,
         max_runtime=args.max_runtime,
     )
     # overall token usage summary
