@@ -40,7 +40,7 @@ All scoring scripts now support advanced reasoning model parameters:
 - `--reasoning-effort`: Reasoning effort level ("low", "medium", "high"; gpt-5 also supports "minimal")
 - `--verbosity`: Verbosity level for gpt-5 models only ("low", "medium", "high")
 - `--symbol-column`: Stock symbol column name (default: `Stock_symbol`)
-- `--text-column`: Text/summary column to score (choices: `Article_title`, `Article`, `Lsa_summary`, `Luhn_summary`, `Textrank_summary`, `Lexrank_summary`, `o3_summary`)
+- `--text-column`: Text/summary column to score (choices: `Article_title`, `Article`, `Lsa_summary`, `Luhn_summary`, `Textrank_summary`, `Lexrank_summary`, `o3_summary`, `gpt_5_summary`)
 
 #### Sentiment Scoring (resumable, chunked):
   ```bash
