@@ -113,6 +113,7 @@ class ScoreFileScanner:
     def _extract_model_info(self, file_path: Path, model_name: str = None) -> Dict:
         """提取模型資訊，包括新的檔案命名模式"""
         filename = file_path.stem
+        logging.debug(f"Extracting model info from filename: {filename}")
 
         # 從路徑獲取模型名稱（如果不是從檔案名）
         if model_name is None:
@@ -150,11 +151,25 @@ class ScoreFileScanner:
             })
             return info
 
-        # 模式 2: reasoning effort 格式
-        effort_pattern = r'(sentiment|risk)_(.+?)_by_(.+?)(?:_reason_(\w+)_verbosity_(\w+))?'
+        # 模式 2: 傳統格式 (移到前面，優先匹配)
+        traditional_pattern = r'(sentiment|risk)_(.+?)_by_(.+)_summary'
+        traditional_match = re.search(traditional_pattern, filename)
+        if traditional_match:
+            score_type, model, source = traditional_match.groups()
+            logging.debug(f"Traditional pattern matched: score_type={score_type}, model={model}, source={source}")
+            info.update({
+                'base_model': model.replace('_', '-'),
+                'source_summary': source,
+                'pattern': 'traditional'
+            })
+            return info
+
+        # 模式 3: reasoning effort 格式 (修正，只匹配有 reason_ 的格式)
+        effort_pattern = r'(sentiment|risk)_(.+?)_by_(.+?)_reason_(\w+)_verbosity_(\w+)'
         effort_match = re.search(effort_pattern, filename)
         if effort_match:
             score_type, model_part, source, reasoning, verbosity = effort_match.groups()
+            logging.debug(f"Effort pattern matched: model_part={model_part}, source={source}, reasoning={reasoning}")
 
             # 進一步分析 model_part 以提取模型和effort
             model_effort_pattern = r'(.+?)_(\w+)$'
@@ -176,18 +191,6 @@ class ScoreFileScanner:
                     'source_summary': source,
                     'pattern': 'standard'
                 })
-            return info
-
-        # 模式 3: 傳統格式
-        traditional_pattern = r'(sentiment|risk)_(.+?)_by_(.+)_summary'
-        traditional_match = re.search(traditional_pattern, filename)
-        if traditional_match:
-            score_type, model, source = traditional_match.groups()
-            info.update({
-                'base_model': model.replace('_', '-'),
-                'source_summary': source,
-                'pattern': 'traditional'
-            })
             return info
 
         # 如果從檔案名提取失敗，使用路徑資訊
@@ -361,31 +364,35 @@ class EnhancedScoreComparator:
         return analysis
 
     def _generate_model_id(self, file_info: Dict) -> str:
-        """生成模型標識符"""
-        model_info = file_info['model_info']
+        """生成模型標識符 - 基於資料夾名稱，更清晰準確"""
+        file_path = Path(file_info['file_path'])
 
-        base = model_info['base_model']
+        # 優先使用資料夾名稱作為模型標識
+        # 路徑格式: /mnt/md0/finrl/gpt-4.1/sentiment/sentiment_gpt-4.1_by_o3_summary.csv
+        path_parts = file_path.parts
 
-        # 添加 reasoning effort
-        if model_info.get('reasoning_effort'):
-            base += f"_{model_info['reasoning_effort']}"
+        # 找到模型資料夾名稱（假設在 finrl 之後的第一個目錄）
+        model_folder = None
+        for i, part in enumerate(path_parts):
+            if part == 'finrl' and i + 1 < len(path_parts):
+                model_folder = path_parts[i + 1]
+                break
 
-        # 添加 verbosity（僅適用於 GPT-5）
-        if model_info.get('verbosity'):
-            base += f"_v{model_info['verbosity']}"
+        if model_folder:
+            # 使用資料夾名稱作為主要標識
+            base_id = model_folder
+        else:
+            # 回退到從檔案名解析
+            model_info = file_info['model_info']
+            base_id = model_info.get('base_model', 'unknown')
 
-        # 添加來源摘要資訊
-        if model_info.get('source_summary'):
-            source = model_info['source_summary']
-            # 簡化來源名稱
-            if 'gpt-5' in source:
-                base += "_by_gpt5"
-            elif 'o3' in source:
-                base += "_by_o3"
-            else:
-                base += f"_by_{source[:10]}"  # 限制長度
+        # 選項：為了完全避免歧義，可以使用完整檔案名作為標識符
+        # 這會產生如 "sentiment_gpt-4.1_by_o3_summary" 這樣的詳細標識
+        # 取消註釋下面兩行來啟用檔案名模式：
+        # filename = file_path.stem
+        # return filename
 
-        return base
+        return base_id
 
     def _merge_dataframes(self, dataframes: Dict) -> pd.DataFrame:
         """合併資料框進行比較"""
