@@ -181,26 +181,72 @@ python score_sentiment_openai.py \
 
 > **Note:** 脚本在执行完触发每日 token 限额的整个 chunk 并写入输出后会自动退出，便于您根据 `--daily-token-limit` 调整 `--chunk-size`。
 
-#### 参数说明
+#### score_sentiment_openai.py 完整參數說明
 
-| 参数                 | 默认值     | 说明                                                                 |
+| 參數                 | 默認值     | 說明                                                                 |
 |----------------------|-----------|----------------------------------------------------------------------|
-| `--input`            | 必填       | 输入 CSV 文件路径，必须包含 symbol, headline（或通过 --symbol-column/--text-column 指定）|
-| `--output`           | 必填       | 输出 CSV 文件路径，会添加 `sentiment_deepseek` 列                      |
-| `--model`            | o4-mini   | OpenAI 模型名称（如 o4-mini, gpt-4.1, o3 等）                          |
-| `--symbol-column`    | symbol    | 输入 CSV 中股票代码列名                                                |
-| `--text-column`      | headline  | 输入 CSV 中文本列名                                                    |
-| `--date-column`      | None      | 输入 CSV 中日期列名，用于保留日期用于后续合并                          |
-| `--chunk-size`       | 1000      | 分块大小，用于断点续跑                                                 |
-| `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
-| `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
-| `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
-| `--allow-flex`       | False     | 启用 Flex 模式：达到 token 限额后切换到 service_tier='flex'                 |
-| `--flex-timeout`     | 900.0     | Flex 模式下的超时时间（秒），默认为 900                                |
-| `--flex-retries`     | 1         | Flex 模式下的重试次数，默认为 1                                       |
-| `--retry`            | 3         | score_headline() 内部解析失败时的重试次数（默认=3）                      |
-| `--max-runtime`      | None      | 最大运行时间（秒），超时后在当前 chunk 完成后停止脚本                  |
-| `--retry-missing`    | 3         | 对未获取到分数的行进行额外重试次数                                    |
+| `--input`            | 必填       | 輸入 CSV 文件路徑，必須包含 symbol, headline（或通過 --symbol-column/--text-column 指定）|
+| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `sentiment_deepseek` 列                      |
+| `--model`            | o4-mini   | OpenAI 模型名稱（如 o4-mini, gpt-4.1, o3, gpt-5, gpt-5-mini 等）        |
+| `--symbol-column`    | Stock_symbol | 輸入 CSV 中股票代碼列名                                             |
+| `--text-column`      | Article_title | 輸入 CSV 中文本列名（可選：Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary, o3_summary, gpt_5_summary） |
+| `--date-column`      | None      | 輸入 CSV 中日期列名，用於保留日期用於後續合併                          |
+| `--chunk-size`       | 1000      | 分塊大小，用於斷點續跑                                                 |
+| `--api-key`          | None      | 單個 OpenAI API Key，如未指定則使用環境變量 `OPENAI_API_KEY`            |
+| `--api-keys-file`    | None      | API Key 文件路徑，文件內每行一個 key，達到限額時自動輪轉                |
+| `--daily-token-limit`| None      | 單個 Key token 限額（近似值），達到後自動輪轉或停止                     |
+| `--allow-flex`       | False     | 啟用 Flex 模式：達到 token 限額後切換到 service_tier='flex'                 |
+| `--flex-timeout`     | 900.0     | Flex 模式下的超時時間（秒），默認為 900                                |
+| `--flex-retries`     | 1         | Flex 模式下的重試次數，默認為 1                                       |
+| `--verbose`          | False     | 啟用詳細日誌輸出                                                     |
+| `--retry`            | 3         | score_headline() 內部解析失敗時的重試次數                             |
+| `--retry-missing`    | 3         | 對未獲取到分數的行進行額外重試次數                                    |
+| `--max-runtime`      | None      | 最大運行時間（秒），超時後在當前 chunk 完成後停止腳本                  |
+| `--reasoning-effort` | high      | 推理努力等級（o3, o4-mini 等模型：low, medium, high；gpt-5 額外支援 minimal） |
+| `--verbosity`        | low       | 詳細程度等級（僅 gpt-5 模型：low, medium, high）                       |
+
+#### 實用範例
+
+##### 範例 1：使用 Flex 模式連續運行（不受 daily token limit 停止）
+```bash
+python score_sentiment_openai.py \
+  --input /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
+  --output /mnt/md0/finrl/gpt-5/sentiment/sentiment_gpt-5_R_medium_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv \
+  --model gpt-5 \
+  --symbol-column Stock_symbol \
+  --text-column gpt_5_summary \
+  --date-column Date \
+  --chunk-size 20 \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 0 \
+  --retry-missing 5 \
+  --retry 6 \
+  --reasoning-effort medium \
+  --verbosity low \
+  --allow-flex \
+  --flex-timeout 1000 \
+  --flex-retries 5
+```
+> **說明**：`--daily-token-limit 0` 關閉 token 限制檢測，`--allow-flex` 啟用 flex 服務層以獲得更高的可用性和更長的超時時間。
+
+##### 範例 2：受 daily token limit 控制的運行
+```bash
+python score_sentiment_openai.py \
+  --input /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
+  --output /mnt/md0/finrl/gpt-5-mini/sentiment/sentiment_gpt-5-mini_by_gpt-5_reason_high_verbosity_high_summary.csv \
+  --model gpt-5-mini \
+  --symbol-column Stock_symbol \
+  --text-column gpt_5_summary \
+  --date-column Date \
+  --chunk-size 20 \
+  --api-keys-file api_keys_tier1.txt \
+  --daily-token-limit 2480000 \
+  --retry-missing 5 \
+  --retry 6 \
+  --reasoning-effort high \
+  --verbosity low
+```
+> **說明**：達到 `--daily-token-limit 2480000` 後會完成當前 chunk 並停止運行，適合成本控制。
 
 ### check_sentiment_csv.py
 Validate sentiment-scored CSV output for missing or invalid scores and required columns.
@@ -247,7 +293,33 @@ Path: `openai_summary.py`
 ### Description
 Summarizes the full `Article` text of each news entry into a new `<model>_summary` column, skipping empty articles. Supports resumable chunked processing, API key rotation, and daily token limits.
 
-### Usage example
+### 完整參數說明
+
+| 參數                 | 默認值     | 說明                                                                 |
+|----------------------|-----------|----------------------------------------------------------------------|
+| `--input`            | 必填       | 輸入 CSV 文件路徑，必須包含 symbol, article（或通過 --symbol-column/--text-column 指定）|
+| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `<model>_summary`、`prompt_tokens`、`completion_tokens` 列 |
+| `--model`            | o4-mini   | OpenAI 模型名稱（如 o4-mini, gpt-4.1, o3, gpt-5, gpt-5-mini 等）        |
+| `--symbol-column`    | Stock_symbol | 輸入 CSV 中股票代碼列名                                              |
+| `--text-column`      | Article   | 輸入 CSV 中文本列名                                                    |
+| `--summary-column`   | None      | 輸出摘要列名（默認為 `<model>_summary`）                              |
+| `--chunk-size`       | 1000      | 分塊大小，用於斷點續跑                                                 |
+| `--api-key`          | None      | 單個 OpenAI API Key，如未指定則使用環境變量 `OPENAI_API_KEY`            |
+| `--api-keys-file`    | None      | API Key 文件路徑，文件內每行一個 key，達到限額時自動輪轉                |
+| `--daily-token-limit`| None      | 單個 Key token 限額（近似值），達到後自動輪轉或停止                     |
+| `--allow-flex`       | False     | 啟用 Flex 模式：達到 token 限額後切換到 service_tier='flex'                 |
+| `--flex-timeout`     | 900.0     | Flex 模式下的超時時間（秒），默認為 900                                |
+| `--flex-retries`     | 1         | Flex 模式下的重試次數，默認為 1                                       |
+| `--verbose`          | False     | 啟用詳細日誌輸出                                                     |
+| `--retry`            | 3         | summarize_article() 內部解析失敗時的重試次數                          |
+| `--retry-missing`    | 1         | 對未獲取到摘要的行進行額外重試次數                                    |
+| `--max-runtime`      | None      | 最大運行時間（秒），超時後在當前 chunk 完成後停止腳本                  |
+| `--reasoning-effort` | high      | 推理努力等級（o3, o4-mini 等模型：low, medium, high；gpt-5 額外支援 minimal） |
+| `--verbosity`        | low       | 詳細程度等級（僅 gpt-5 模型：low, medium, high）                       |
+
+### Usage examples
+
+#### 基本用法
 ```bash
 python openai_summary.py \
   --input sentiment_deepseek_new_cleaned_nasdaq_news_full.csv \
@@ -262,10 +334,44 @@ python openai_summary.py \
   --verbose
 ```
 
-The output CSV will preserve all original columns and add:
-- `<model>_summary`: the generated summary text per row
-- `prompt_tokens`: number of prompt tokens used for each summary
-- `completion_tokens`: number of completion tokens used for each summary
+#### 使用 GPT-5 模型與新參數
+```bash
+python openai_summary.py \
+  --input /mnt/md0/finrl/news_data/full_articles.csv \
+  --output /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
+  --model gpt-5 \
+  --symbol-column Stock_symbol \
+  --text-column Article \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 2480000 \
+  --chunk-size 20 \
+  --reasoning-effort high \
+  --verbosity high \
+  --retry 6 \
+  --retry-missing 5
+```
+
+#### Flex 模式範例
+```bash
+python openai_summary.py \
+  --input large_dataset.csv \
+  --output news_with_summary.csv \
+  --model gpt-5-mini \
+  --symbol-column Stock_symbol \
+  --text-column Article \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 0 \
+  --allow-flex \
+  --flex-timeout 1000 \
+  --flex-retries 5 \
+  --chunk-size 50
+```
+
+### 輸出格式
+輸出 CSV 將保留所有原始列並添加：
+- `<model>_summary`: 生成的摘要文本
+- `prompt_tokens`: 每個摘要使用的 prompt tokens 數量
+- `completion_tokens`: 每個摘要使用的 completion tokens 數量
 
 # Script: compare_sentiment.py
 
@@ -315,23 +421,80 @@ python score_risk_openai.py \
   --allow-flex --flex-timeout 900 --flex-retries 1
 ```
 
-#### 参数说明
+#### score_risk_openai.py 完整參數說明
 
-| 参数                 | 默认值     | 说明                                                                 |
+| 參數                 | 默認值     | 說明                                                                 |
 |----------------------|-----------|----------------------------------------------------------------------|
-| `--input`            | 必填       | 输入 CSV 文件路径，必须包含 symbol, headline（或通过 --symbol-column/--text-column 指定）|
-| `--output`           | 必填       | 输出 CSV 文件路径，会添加 `risk_deepseek` 列                          |
-| `--model`            | o4-mini   | OpenAI 模型名称（如 o4-mini, gpt-4.1, o3 等）                          |
-| `--symbol-column`    | symbol    | 输入 CSV 中股票代码列名                                                |
-| `--text-column`      | headline  | 输入 CSV 中文本列名                                                    |
-| `--date-column`      | None      | 输入 CSV 中日期列名，用于保留日期用于后续合并                          |
-| `--chunk-size`       | 1000      | 分块大小，用于断点续跑                                                 |
-| `--api-key`          | None      | 单个 OpenAI API Key，如未指定则使用环境变量 `OPENAI_API_KEY`            |
-| `--api-keys-file`    | None      | API Key 文件路径，文件内每行一个 key，达到限额时自动轮转                |
-| `--daily-token-limit`| None      | 单个 Key token 限额（近似值），达到后自动轮转                          |
-| `--allow-flex`       | False     | 启用 Flex 模式：达到 token 限额后切换到 service_tier='flex'                 |
-| `--flex-timeout`     | 900.0     | Flex 模式下的超时时间（秒），默认为 900                                |
-| `--flex-retries`     | 1         | Flex 模式下的重试次数，默认为 1                                       |
+| `--input`            | 必填       | 輸入 CSV 文件路徑，必須包含 symbol, headline（或通過 --symbol-column/--text-column 指定）|
+| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `risk_deepseek` 列                          |
+| `--model`            | o4-mini   | OpenAI 模型名稱（如 o4-mini, gpt-4.1, o3, gpt-5, gpt-5-mini 等）        |
+| `--symbol-column`    | Stock_symbol | 輸入 CSV 中股票代碼列名                                             |
+| `--text-column`      | Article_title | 輸入 CSV 中文本列名（可選：Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary, o3_summary, gpt_5_summary） |
+| `--date-column`      | None      | 輸入 CSV 中日期列名，用於保留日期用於後續合併                          |
+| `--chunk-size`       | 1000      | 分塊大小，用於斷點續跑                                                 |
+| `--api-key`          | None      | 單個 OpenAI API Key，如未指定則使用環境變量 `OPENAI_API_KEY`            |
+| `--api-keys-file`    | None      | API Key 文件路徑，文件內每行一個 key，達到限額時自動輪轉                |
+| `--daily-token-limit`| None      | 單個 Key token 限額（近似值），達到後自動輪轉或停止                     |
+| `--allow-flex`       | False     | 啟用 Flex 模式：達到 token 限額後切換到 service_tier='flex'                 |
+| `--flex-timeout`     | 900.0     | Flex 模式下的超時時間（秒），默認為 900                                |
+| `--flex-retries`     | 1         | Flex 模式下的重試次數，默認為 1                                       |
+| `--verbose`          | False     | 啟用詳細日誌輸出                                                     |
+| `--retry`            | 3         | score_headline() 內部解析失敗時的重試次數                             |
+| `--retry-missing`    | 3         | 對未獲取到風險分數的行進行額外重試次數                                |
+| `--max-runtime`      | None      | 最大運行時間（秒），超時後在當前 chunk 完成後停止腳本                  |
+| `--reasoning-effort` | high      | 推理努力等級（o3, o4-mini 等模型：low, medium, high；gpt-5 額外支援 minimal） |
+| `--verbosity`        | low       | 詳細程度等級（僅 gpt-5 模型：low, medium, high）                       |
+
+#### 實用範例
+
+##### 基本風險評分
+```bash
+python score_risk_openai.py \
+  --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+  --output risk_scored.csv \
+  --model o4-mini \
+  --chunk-size 5000 \
+  --symbol-column Stock_symbol \
+  --text-column Lsa_summary \
+  --date-column Date \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 250000
+```
+
+##### Flex 模式風險評分
+```bash
+python score_risk_openai.py \
+  --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
+  --output risk_scored.csv \
+  --model o4-mini \
+  --chunk-size 5000 \
+  --symbol-column Stock_symbol \
+  --text-column Lsa_summary \
+  --date-column Date \
+  --api-keys-file api_keys_tier5.txt \
+  --daily-token-limit 250000 \
+  --allow-flex \
+  --flex-timeout 900 \
+  --flex-retries 1
+```
+
+##### 使用 GPT-5 模型進行風險評分
+```bash
+python score_risk_openai.py \
+  --input /mnt/md0/finrl/gpt-5/summary/gpt-5_summaries.csv \
+  --output /mnt/md0/finrl/gpt-5/risk/risk_gpt-5_analysis.csv \
+  --model gpt-5 \
+  --symbol-column Stock_symbol \
+  --text-column gpt_5_summary \
+  --date-column Date \
+  --chunk-size 20 \
+  --api-keys-file api_keys_tier1.txt \
+  --daily-token-limit 2480000 \
+  --reasoning-effort high \
+  --verbosity medium \
+  --retry 6 \
+  --retry-missing 5
+```
 
 ### prepare_dataset_openai.py
 Merge base price+indicator CSV with sentiment and risk score CSVs into a single dataset for RL.
@@ -368,3 +531,132 @@ python backtest_openai.py \
   --env sentiment \
   --output-plot outputs/equity.png
 ```
+
+## 新模型特性：GPT-5 和 GPT-5-mini
+
+### 新參數說明
+
+所有三個腳本現在都支援新的 GPT-5 系列模型，並包含兩個新的參數：
+
+#### `--reasoning-effort`
+控制推理模型的推理深度和詳細程度：
+
+**支援的模型和選項**：
+- **o3, o4-mini 系列**：`low`, `medium`, `high` (默認: `high`)
+- **gpt-5, gpt-5-mini 系列**：`minimal`, `low`, `medium`, `high` (默認: `high`)
+
+**使用邏輯**：
+- `high`: 最深度的推理，質量最高但消耗更多 tokens
+- `medium`: 平衡的推理深度和效率
+- `low`: 快速推理，較少 token 消耗
+- `minimal`: 僅 gpt-5 系列支援，最少的推理步驟
+
+#### `--verbosity`
+控制模型輸出的詳細程度（僅 gpt-5 系列支援）：
+
+**選項**：`low`, `medium`, `high` (默認: `low`)
+
+**使用邏輯**：
+- `low`: 簡潔的輸出，適合批量處理
+- `medium`: 適中的詳細程度
+- `high`: 詳細的輸出，包含更多推理過程
+
+### 應用邏輯與策略
+
+#### 1. 成本控制策略
+
+**高成本控制（使用 daily-token-limit）**：
+```bash
+# 範例：嚴格控制成本，達到 2.48M tokens 後停止
+python score_sentiment_openai.py \
+  --model gpt-5-mini \
+  --daily-token-limit 2480000 \
+  --reasoning-effort high \
+  --verbosity low
+```
+
+**無限制運行（Flex 模式）**：
+```bash
+# 範例：不受 token 限制，持續運行直到完成
+python score_sentiment_openai.py \
+  --model gpt-5 \
+  --daily-token-limit 0 \
+  --allow-flex \
+  --flex-timeout 1000 \
+  --flex-retries 5 \
+  --reasoning-effort medium \
+  --verbosity low
+```
+
+#### 2. 模型選擇與參數配置建議
+
+| 場景 | 模型 | reasoning_effort | verbosity | 適用情況 |
+|------|------|------------------|-----------|----------|
+| 快速批量處理 | gpt-5-mini | low | low | 大量數據，追求速度 |
+| 平衡質量與效率 | gpt-5-mini | medium | low | 日常使用，中等質量要求 |
+| 高質量分析 | gpt-5 | high | medium | 關鍵決策，需要高質量結果 |
+| 研究探索 | gpt-5 | high | high | 深度分析，需要詳細推理過程 |
+
+#### 3. Flex 模式使用時機
+
+**啟用 Flex 模式的情況**：
+- 處理大型數據集，需要長時間運行
+- 不希望因 token 限制中斷處理
+- 可以接受更高的 API 調用延遲
+
+**關閉 Flex 模式的情況**：
+- 嚴格的成本控制需求
+- 需要快速響應時間
+- 分批處理，希望在達到限制後停止
+
+### 實際應用範例
+
+#### 場景1：研究級高質量情感分析
+```bash
+python score_sentiment_openai.py \
+  --input /mnt/md0/finrl/research_data/critical_news.csv \
+  --output /mnt/md0/finrl/gpt-5/high_quality_sentiment.csv \
+  --model gpt-5 \
+  --reasoning-effort high \
+  --verbosity high \
+  --daily-token-limit 0 \
+  --allow-flex \
+  --chunk-size 10 \
+  --retry 8 \
+  --retry-missing 5
+```
+
+#### 場景2：生產環境批量處理
+```bash
+python score_sentiment_openai.py \
+  --input /mnt/md0/finrl/production_data/daily_news.csv \
+  --output /mnt/md0/finrl/gpt-5-mini/daily_sentiment.csv \
+  --model gpt-5-mini \
+  --reasoning-effort medium \
+  --verbosity low \
+  --daily-token-limit 5000000 \
+  --chunk-size 100 \
+  --retry 3 \
+  --retry-missing 2
+```
+
+#### 場景3：成本敏感的試驗性分析
+```bash
+python score_risk_openai.py \
+  --input /mnt/md0/finrl/test_data/sample_news.csv \
+  --output /mnt/md0/finrl/gpt-5-mini/test_risk.csv \
+  --model gpt-5-mini \
+  --reasoning-effort low \
+  --verbosity low \
+  --daily-token-limit 1000000 \
+  --chunk-size 50 \
+  --retry 2 \
+  --retry-missing 1
+```
+
+### 注意事項
+
+1. **模型特性**：`reasoning_effort` 和 `verbosity` 參數會顯著影響 token 消耗
+2. **成本控制**：使用 `--daily-token-limit 0` 時需謹慎，可能產生意外的高額費用
+3. **Flex 模式**：提供更高的可用性，但可能有更長的響應延遲
+4. **參數驗證**：腳本會自動驗證模型和參數的兼容性，無效組合會報錯
