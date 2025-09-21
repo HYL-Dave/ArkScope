@@ -25,12 +25,13 @@ def setup_logging():
     )
 
 def extract_model_name(filepath):
-    """從文件路徑提取模型名稱"""
+    """從文件路徑提取模型名稱，支持reasoning_effort參數"""
     path = Path(filepath)
     filename = path.stem
     
-    # 常見模型名稱映射
+    # 常見模型名稱映射（包含reasoning effort）
     model_mappings = {
+        # 標準模型名稱
         'sentiment_o3_by_o3_summary': 'o3',
         'sentiment_o4_mini_by_o3_summary': 'o4-mini', 
         'sentiment_gpt-4.1-mini_by_o3_summary': 'gpt-4.1-mini',
@@ -38,25 +39,46 @@ def extract_model_name(filepath):
         'risk_o3_by_o3_summary': 'o3',
         'risk_o4_mini_by_o3_summary': 'o4-mini',
         'risk_gpt-4.1-mini_by_o3_summary': 'gpt-4.1-mini',
-        'risk_gpt-4.1-nano_by_o3_summary': 'gpt-4.1-nano'
+        'risk_gpt-4.1-nano_by_o3_summary': 'gpt-4.1-nano',
+        
+        # 帶reasoning effort的模型名稱
+        'sentiment_o3_low_by_o3_summary': 'o3-low',
+        'sentiment_o3_medium_by_o3_summary': 'o3-medium',
+        'sentiment_o3_high_by_o3_summary': 'o3-high',
+        'risk_o3_low_by_o3_summary': 'o3-low',
+        'risk_o3_medium_by_o3_summary': 'o3-medium', 
+        'risk_o3_high_by_o3_summary': 'o3-high'
     }
     
     if filename in model_mappings:
         return model_mappings[filename]
     
-    # 如果沒有找到，嘗試從文件名中提取
-    if 'o3' in filename:
-        return 'o3'
-    elif 'o4-mini' in filename or 'o4_mini' in filename:
-        return 'o4-mini'
-    elif 'gpt-4.1-mini' in filename:
-        return 'gpt-4.1-mini'
-    elif 'gpt-4.1-nano' in filename:
-        return 'gpt-4.1-nano'
-    elif 'gpt-4.1' in filename:
-        return 'gpt-4.1'
-    else:
-        return filename
+    # 如果沒有找到精確匹配，嘗試從文件名中智能提取
+    import re
+    
+    # 模式1: model_effort 格式 (如 o3_high, o3_medium, o3_low)
+    effort_pattern = r'(o3|o4-mini|o4_mini|gpt-4\.1-mini|gpt-4\.1-nano|gpt-4\.1)_(low|medium|high)'
+    effort_match = re.search(effort_pattern, filename)
+    if effort_match:
+        model, effort = effort_match.groups()
+        model = model.replace('_', '-')  # 統一使用 - 分隔符
+        return f"{model}-{effort}"
+    
+    # 模式2: 標準模型名稱
+    model_patterns = [
+        (r'o4[-_]mini', 'o4-mini'),
+        (r'gpt-4\.1-mini', 'gpt-4.1-mini'),
+        (r'gpt-4\.1-nano', 'gpt-4.1-nano'),
+        (r'gpt-4\.1', 'gpt-4.1'),
+        (r'o3', 'o3')
+    ]
+    
+    for pattern, model_name in model_patterns:
+        if re.search(pattern, filename):
+            return model_name
+    
+    # 如果都沒有匹配，返回原始文件名
+    return filename
 
 def load_and_prepare_data(filepaths, score_column):
     """載入並準備數據進行比較"""
