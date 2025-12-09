@@ -1,389 +1,186 @@
-# FinRL-DeepSeek 新聞爬取延伸專案（增強版）
+# FinRL-DeepSeek 數據處理模組
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Enhanced](https://img.shields.io/badge/Enhanced-10%2B%20Sources-green.svg)](https://github.com/your-username/finrl-deepseek-extension)
 
-## 📖 專案簡介
+## 📖 模組簡介
 
-本專案旨在將 FinRL-DeepSeek 資料集從原本的 2013-2023 年擴展至 2024-2025 年，保持相同的 89 檔 Nasdaq 股票和資料格式。**增強版提供 10+ 個專業新聞源的統一爬取系統**，包含專業財經、社群情緒、監管公告等全方位市場信息。
+本模組提供 **通用數據處理組件**，用於新聞數據的 LLM 評分、格式標準化、數據合併等操作。
 
-### 🎯 主要目標
+> **注意**: 爬蟲功能已遷移至專案根目錄的 `data_sources/` 模組。本模組專注於數據處理。
 
-- 擴展 FinRL-DeepSeek 資料集時間範圍至 2024-2025
-- 維持原始 89 檔 Nasdaq 股票的一致性
-- 保持相同的資料格式和評分系統
-- **NEW**: 提供多源新聞整合和智能去重功能
-- **NEW**: 實現企業級成本控制和性能優化
+## 🏗️ 模組架構
 
-### ⭐ 主要特色
-
-- **🌐 10+ 新聞源整合**: Finnhub, Alpha Vantage, Yahoo, Google News, GDELT, SEC, Reddit, IBKR 等
-- **⚡ 智能並行處理**: 多源同步爬取，效率提升 400%
-- **💰 成本智能控制**: 動態批次調整，成本效益提升 200%
-- **🔄 無縫向後兼容**: 完全支援原有腳本和配置
-- **📊 企業級監控**: 完整的性能指標和報告
-- **🎯 智能去重**: 多維度內容去重和來源優先級
-- **🛡️ 錯誤恢復**: 自動重試和降級機制
-
-## 🏗️ 系統架構（增強版）
-
-### 新舊版本對比
-| 特性 | 原版本 | 增強版 | 提升倍數 |
-|------|--------|--------|----------|
-| **新聞源數量** | 2個 | 10+ 個 | **5x** |
-| **數據覆蓋範圍** | 基礎財經 | 專業+社群+監管 | **3x** |
-| **處理效率** | 單線程 | 多源並行 | **4x** |
-| **成本效益** | 基礎控制 | 智能優化 | **2x** |
-
-### 增強版架構圖
 ```
-                    【統一新聞系統 (NEW)】
-                    ┌─────────────────┐
-                    │   UnifiedNews   │
-                    │     System      │
-                    └─────────┬───────┘
-                              │
-                    ┌─────────v───────┐
-                    │  Enhanced News  │  
-                    │    Crawler      │
-                    └─────────┬───────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        v                     v                     v
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│  Core APIs   │    │ Free Sources │    │ Advanced     │
-│ • Finnhub    │    │ • Yahoo      │    │ • GDELT      │
-│ • AlphaVant. │    │ • Google     │    │ • SEC        │
-│ • IBKR       │    │ • StockTwits │    │ • Reddit     │
-└──────────────┘    └──────────────┘    └──────────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              │
-                    ┌─────────v───────┐
-                    │  智能去重與     │
-                    │   優先級管理     │
-                    └─────────┬───────┘
-                              │
-                    ┌─────────v───────┐
-                    │   LLM 評分器    │ <- 成本優化
-                    │  (Enhanced)     │
-                    └─────────┬───────┘
-                              │
-                    ┌─────────v───────┐
-                    │   資料合併器    │ <- 品質檢查
-                    │  (Enhanced)     │
-                    └─────────────────┘
+finrl_deepseek_news_extension/
+├── src/
+│   ├── data_processing/
+│   │   ├── llm_scorer.py         # LLM 情緒/風險評分器
+│   │   └── schema_formatter.py   # 數據格式標準化
+│   ├── integration/
+│   │   └── data_merger.py        # 數據合併與去重
+│   ├── utils/
+│   │   ├── cost_calculator.py    # API 成本計算器
+│   │   └── logger_util.py        # 日誌與進度追蹤
+│   └── data_extraction/
+│       └── stock_list_parser.py  # 股票清單解析
+├── docs/                         # 文檔
+└── tests/                        # 測試
 ```
 
-## 🚀 快速開始
+## 🎯 核心功能
 
-### 💫 增強版快速設置（推薦）
+### 1. LLM 評分器 (llm_scorer.py)
 
-#### ⚡ 一鍵設置（2分鐘）
-```bash
-# 1. 運行自動設置腳本
-python src/data_extraction/setup_script.py
-
-# 2. 快速測試
-python scripts/test_enhanced_integration.py
-
-# 3. 試運行
-python scripts/run_enhanced_pipeline.py --config config/enhanced_config.json --dry-run
-```
-
-#### 🚀 開始使用增強版
-```bash
-# 小規模測試（1檔股票，1天數據）
-python scripts/run_enhanced_pipeline.py \
-    --config config/enhanced_config.json \
-    --start-date 2024-07-12 \
-    --end-date 2024-07-12
-
-# 完整增強版流程（10+ 新聞源）
-python scripts/run_enhanced_pipeline.py \
-    --config config/enhanced_config.json \
-    --start-date 2024-07-01 \
-    --end-date 2024-07-12
-
-# 每日自動化
-python scripts/enhanced_daily_crawl.py --config config/enhanced_config.json
-```
-
-#### 📚 更多資源
-- 📖 [10分鐘快速指南](QUICK_START.md)
-- 🔄 [遷移指南](MIGRATION_GUIDE.md) 
-- ⚡ [性能優化](docs/performance_guide.md)
-
----
-
-### 🔧 原版設置（兼容性）
-
-#### 系統需求
-- Python 3.8+
-- 8GB+ RAM
-- 50GB+ 可用硬碟空間
-- OpenAI API 密鑰
-
-#### 使用步驟
-
-##### 1. 替換修改後的檔案
-```bash
-# 備份原檔案（可選）
-cp src/data_processing/llm_scorer.py src/data_processing/llm_scorer.py.bak
-cp src/utils/cost_calculator.py src/utils/cost_calculator.py.bak
-```
-
-##### 2. 執行設置檢查
-```bash
-python check_setup.py
-```
-
-##### 3. 準備配置
-```bash
-cp config/config_template.json config/config.json
-# 編輯 config.json，填入您的 OpenAI API 密鑰
-```
-
-##### 4. 安裝依賴
-```bash
-pip install -r requirements.txt
-```
-
-##### 5. 執行測試
-```bash
-# 測試關鍵模組
-python -m pytest tests/test_integration.py::TestLLMScorer -v
-python -m pytest tests/test_integration.py::TestCostCalculator -v
-```
-
-##### 6. 開始使用（原版）
-```bash
-# 小規模測試
-python scripts/run_daily_crawl.py --config config/config.json --date 2024-07-12
-
-# 完整執行
-python scripts/run_full_pipeline.py \
-    --config config/config.json \
-    --start-date 2024-01-01 \
-    --end-date 2024-07-12
-```
-
-### 環境設置
-
-#### 建立虛擬環境
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-```
-
-#### 準備原始數據
-```bash
-# 下載原始 FinRL-DeepSeek 資料集
-mkdir -p huggingface_datasets/FinRL_DeepSeek_sentiment/
-# 將 sentiment_deepseek_new_cleaned_nasdaq_news_full.csv 放入上述目錄
-```
-
-## 📋 詳細使用說明
-
-### 配置文件設置
-
-編輯 `config/config.json` 中的關鍵參數：
-
-```json
-{
-  "llm_scorer": {
-    "openai_api_key": "YOUR_API_KEY_HERE",
-    "model": "gpt-4o-mini",
-    "cost_limit_usd": 100.0
-  },
-  "crawl_strategy": {
-    "primary_method": "finnlp",
-    "max_articles_per_day": 1000
-  }
-}
-```
-
-### 分步執行
-
-如果需要分步執行，可以使用個別腳本：
-
-```bash
-# 1. 每日增量爬取
-python scripts/run_daily_crawl.py --date 2024-07-12
-
-# 2. 歷史回補
-python scripts/run_historical_backfill.py \
-    --start-date 2024-01-01 --end-date 2024-06-30
-
-# 3. 僅處理已有數據
-python scripts/process_existing_data.py --input data/raw/news_data.csv
-```
-
-### 成本控制
-
-專案內建多種成本控制機制：
+使用 OpenAI API 對新聞進行情緒和風險評分。
 
 ```python
-# 估算處理成本
-from src.utils.cost_calculator import CostCalculator
+from finrl_deepseek_news_extension.src.data_processing.llm_scorer import LLMScorer
 
-calculator = CostCalculator()
-estimate = calculator.estimate_project_total_cost(
-    articles_count=10000,
-    model='gpt-4o-mini'
+scorer = LLMScorer(
+    api_key="your_openai_key",
+    model="gpt-4o-mini",
+    cost_limit_usd=50.0
 )
-print(f"估算總成本: ${estimate['project_summary']['total_estimated_cost_usd']}")
+
+# 評分單篇文章
+result = scorer.score_article(article_text, ticker="AAPL")
+# 返回: {'sentiment': 4, 'risk': 2, 'reasoning': '...'}
+
+# 批量評分
+results = scorer.score_batch(articles_list)
 ```
 
-## 📊 輸出格式
+**特色功能:**
+- 多 API Key 輪換支援
+- 智能成本追蹤與限制
+- 批量處理優化
+- 結構化輸出 (Function Calling)
 
-專案輸出的資料格式與原始 FinRL-DeepSeek 完全相容：
+### 2. 數據格式化器 (schema_formatter.py)
+
+將各種新聞源的數據轉換為標準 FinRL-DeepSeek 格式。
+
+```python
+from finrl_deepseek_news_extension.src.data_processing.schema_formatter import SchemaFormatter
+
+formatter = SchemaFormatter()
+standardized_df = formatter.format_news(raw_news_df)
+```
+
+**標準輸出欄位:**
 
 | 欄位名稱 | 類型 | 說明 |
 |---------|------|------|
 | Date | string | 日期 (YYYY-MM-DD) |
-| Article_title | string | 新聞標題 |
 | Stock_symbol | string | 股票代號 |
-| Url | string | 新聞來源URL |
-| Publisher | string | 發佈者 |
-| Author | string | 作者 |
+| Article_title | string | 新聞標題 |
 | Article | string | 新聞正文 |
-| Lsa_summary | string | LSA摘要 |
-| Luhn_summary | string | Luhn摘要 |
-| Textrank_summary | string | TextRank摘要 |
-| Lexrank_summary | string | LexRank摘要 |
+| Url | string | 來源 URL |
+| Publisher | string | 發佈者 |
 | sentiment_u | integer | 情緒分數 (1-5) |
 | risk_q | integer | 風險分數 (1-5) |
 
+### 3. 數據合併器 (data_merger.py)
+
+合併多個數據源，處理去重和衝突。
+
+```python
+from finrl_deepseek_news_extension.src.integration.data_merger import DataMerger
+
+merger = DataMerger()
+merged_df = merger.merge_datasets(new_data, existing_data, strategy="prefer_new")
+```
+
+### 4. 成本計算器 (cost_calculator.py)
+
+估算和追蹤 API 使用成本。
+
+```python
+from finrl_deepseek_news_extension.src.utils.cost_calculator import CostCalculator
+
+calc = CostCalculator()
+estimate = calc.estimate_batch_llm_cost(
+    articles_count=1000,
+    avg_article_length=500,
+    model="gpt-4o-mini"
+)
+print(f"預估成本: ${estimate['total_cost']:.2f}")
+```
+
+## 🔗 與數據源模組整合
+
+```python
+# 1. 從 data_sources 獲取數據
+from data_sources import TiingoDataSource
+
+tiingo = TiingoDataSource()
+articles = tiingo.fetch_news(['AAPL', 'MSFT'], days_back=7)
+
+# 2. 轉換為 DataFrame
+import pandas as pd
+df = pd.DataFrame([a.to_dict() for a in articles])
+
+# 3. 使用本模組處理
+from finrl_deepseek_news_extension.src.data_processing.schema_formatter import SchemaFormatter
+from finrl_deepseek_news_extension.src.data_processing.llm_scorer import LLMScorer
+
+formatter = SchemaFormatter()
+formatted_df = formatter.format_news(df)
+
+scorer = LLMScorer(api_key="...", cost_limit_usd=50.0)
+scored_df = scorer.score_dataframe(formatted_df)
+```
+
+## 💰 成本管理
+
+### 模型定價參考 (2024-12)
+
+| 模型 | 輸入 ($/1M tokens) | 輸出 ($/1M tokens) | 建議用途 |
+|------|-------------------|-------------------|---------|
+| gpt-4o-mini | $0.15 | $0.60 | 日常評分 (推薦) |
+| gpt-4o | $2.50 | $10.00 | 高品質分析 |
+
+### 成本控制
+
+```python
+scorer = LLMScorer(
+    api_key="...",
+    model="gpt-4o-mini",       # 使用較便宜的模型
+    cost_limit_usd=50.0,       # 每日上限
+    batch_size=30,             # 批量處理
+)
+```
+
 ## 🧪 測試
 
-執行測試套件：
-
 ```bash
-# 執行所有測試
+cd finrl_deepseek_news_extension
 python -m pytest tests/ -v
-
-# 執行特定測試
-python -m pytest tests/test_integration.py -v
-
-# 生成覆蓋率報告
-python -m pytest tests/ --cov=src --cov-report=html
 ```
 
-## 📈 監控和日誌
+## 📚 相關模組
 
-專案提供完整的監控和日誌功能：
-
-- **即時進度追蹤**: 顯示爬取和處理進度
-- **成本實時監控**: 追蹤 API 使用成本
-- **品質檢查報告**: 自動生成資料品質報告
-- **詳細錯誤日誌**: 記錄所有錯誤和警告
-
-查看日誌：
-```bash
-tail -f logs/finrl_extension.log
-```
-
-## 🛠️ 故障排除
-
-### 常見問題
-
-**Q: OpenAI API 超出限制**
-```
-A: 檢查配置中的 cost_limit_usd 設置，或使用 gpt-4o-mini 模型降低成本
-```
-
-**Q: 爬取被網站限制**
-```
-A: 增加 rate_limiting 中的延遲時間，或啟用代理設置
-```
-
-**Q: 記憶體不足**
-```
-A: 減少 batch_size 或啟用 chunk_size 分批處理
-```
-
-### 日誌分析
-
-檢查關鍵日誌訊息：
-```bash
-# 查看錯誤
-grep "ERROR" logs/finrl_extension.log
-
-# 查看成本資訊
-grep "成本" logs/finrl_extension.log
-
-# 查看進度
-grep "進度" logs/finrl_extension.log
-```
-
-## 📝 開發指南
-
-### 添加新的新聞源
-
-1. 在 `src/data_extraction/` 創建新的爬取器
-2. 實現必要的介面方法
-3. 在配置文件中添加新源設置
-4. 更新測試用例
-
-### 自定義 LLM 評分
-
-1. 修改 `src/data_processing/llm_scorer.py` 中的 prompt
-2. 調整評分邏輯
-3. 更新成本計算
-
-### 擴展資料驗證
-
-1. 在 `src/integration/data_merger.py` 添加驗證規則
-2. 更新品質檢查報告
-3. 添加相應測試
-
-## 🤝 貢獻指南
-
-歡迎提交 Issue 和 Pull Request！
-
-1. Fork 專案
-2. 創建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交變更 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 開啟 Pull Request
-
-## 📄 許可證
-
-本專案採用 MIT 許可證 - 詳見 [LICENSE](LICENSE) 文件。
-
-## 🎉 版本更新日誌
-
-### v2.0.0 增強版 (2024-07-13)
-- ✅ **新增 10+ 新聞源**: Finnhub, Alpha Vantage, Yahoo, Google News, GDELT, SEC, Reddit, IBKR
-- ✅ **統一新聞系統**: UnifiedNewsSystem 架構
-- ✅ **智能成本控制**: 動態批次調整和模型選擇
-- ✅ **企業級監控**: 完整的性能指標和報告
-- ✅ **無縫向後兼容**: 保持所有原有功能
-- ✅ **自動化遷移**: 一鍵升級和配置遷移
-
-### v1.0.0 原版 (2024)
-- ✅ FinNLP 和 CommonCrawl 新聞爬取
-- ✅ OpenAI LLM 評分系統
-- ✅ 成本計算和監控
-- ✅ 資料格式標準化
-
-## 🙏 致謝
-
-- [FinRL-DeepSeek](https://github.com/benstaf/FinRL_DeepSeek) 原始專案
-- FinNLP 新聞爬取功能（已整合到專案中）
-- [news-please](https://github.com/fhamborg/news-please) CommonCrawl 爬取工具
-- **NEW**: 各新聞源提供商的 API 支援
-
-## 📞 聯絡資訊
-
-如有問題或建議，請：
-- 開啟 [GitHub Issue](https://github.com/your-username/finrl-deepseek-extension/issues)
-- 發送郵件至 your-email@example.com
+- [📋 data_sources/](../data_sources/) - 統一數據源介面 (Tiingo, Finnhub)
+- [📋 NewsExtraction/](../NewsExtraction/) - 歷史新聞數據處理
+- [📋 主專案 README](../README.md)
 
 ---
 
-**免責聲明**: 本專案僅供研究和教育用途。請遵守相關網站的 robots.txt 和使用條款。
+## 📝 變更記錄
+
+**v3.0.0** (2024-12-09)
+- ⚠️ 移除所有爬蟲代碼（遷移至 `data_sources/`）
+- ✅ 保留 LLM 評分、格式化、合併等通用組件
+
+**v2.0.0** (2024-07)
+- 新增 10+ 新聞源整合（已移除）
+- 統一新聞系統架構（已移除）
+
+**v1.0.0** (2024)
+- 基礎 LLM 評分系統
+- 數據格式標準化
+
+---
+
+**License**: MIT
