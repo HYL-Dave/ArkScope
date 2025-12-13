@@ -15,6 +15,14 @@ from .sec_edgar_source import SECEdgarDataSource
 from .polygon_source import PolygonDataSource
 from .alpha_vantage_source import AlphaVantageDataSource
 
+# IBKR requires ib_insync, import conditionally
+try:
+    from .ibkr_source import IBKRDataSource
+    _HAS_IBKR = True
+except ImportError:
+    IBKRDataSource = None
+    _HAS_IBKR = False
+
 logger = logging.getLogger(__name__)
 
 # Registry of available data sources
@@ -27,6 +35,10 @@ _SOURCE_REGISTRY: Dict[str, Type[BaseDataSource]] = {
     # Future sources can be added here:
     # 'financial_datasets': FinancialDatasetsSource,
 }
+
+# Add IBKR if available
+if _HAS_IBKR and IBKRDataSource is not None:
+    _SOURCE_REGISTRY['ibkr'] = IBKRDataSource
 
 
 def get_data_source(
@@ -65,6 +77,10 @@ def get_data_source(
 
     # SEC EDGAR doesn't need API key
     if source_name_lower == 'sec_edgar':
+        return source_class(**kwargs)
+
+    # IBKR doesn't need API key, uses TWS/Gateway connection
+    if source_name_lower == 'ibkr':
         return source_class(**kwargs)
 
     # Try to get API key from environment if not provided

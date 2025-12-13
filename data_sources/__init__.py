@@ -23,6 +23,15 @@ from .sec_edgar_source import SECEdgarDataSource
 from .polygon_source import PolygonDataSource
 from .source_factory import get_data_source, list_available_sources
 
+# IBKR requires ib_insync, import conditionally
+try:
+    from .ibkr_source import IBKRDataSource, IntradayBar
+    _HAS_IBKR = True
+except ImportError:
+    _HAS_IBKR = False
+    IBKRDataSource = None
+    IntradayBar = None
+
 __all__ = [
     'BaseDataSource',
     'NewsArticle',
@@ -32,6 +41,8 @@ __all__ = [
     'FinnhubDataSource',
     'SECEdgarDataSource',
     'PolygonDataSource',
+    'IBKRDataSource',
+    'IntradayBar',
     'get_data_source',
     'list_available_sources',
 ]
