@@ -285,7 +285,7 @@ def main():
         # Resume logic: count already processed rows
         if os.path.exists(output_csv):
             prev = pd.read_csv(output_csv, usecols=[summary_col],
-                               on_bad_lines='warn', engine='python')
+                               on_bad_lines='warn', engine='c')
             processed_rows = len(prev)
         else:
             processed_rows = 0
@@ -293,7 +293,7 @@ def main():
         # start timer for max-runtime enforcement
         start_time = time.time()
         reader = pd.read_csv(input_csv, chunksize=chunk_size,
-                             on_bad_lines='warn', engine='python')
+                             on_bad_lines='warn', engine='c')
         for i, chunk in enumerate(reader):
             logging.info(f"Processing chunk {i}, {len(chunk)} rows")
             if i * chunk_size < processed_rows:

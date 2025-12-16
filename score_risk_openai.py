@@ -320,7 +320,7 @@ def main():
             # Resume logic: count already processed rows
             if os.path.exists(output_csv):
                 prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
-                                   on_bad_lines='warn', engine='python')
+                                   on_bad_lines='warn', engine='c')
                 processed_rows = len(prev)
             else:
                 processed_rows = 0
