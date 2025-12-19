@@ -20,6 +20,12 @@ Finnhub 特點:
 
     # 僅收集指定股票
     python collect_finnhub_news.py --tickers AAPL,MSFT
+
+    # 查看現有資料狀態
+    python collect_finnhub_news.py --status
+
+    # 增量更新 (每日執行)
+    python collect_finnhub_news.py --incremental
 """
 
 import os
@@ -322,6 +328,69 @@ class StorageManager:
 
         return len(new_df)
 
+    def get_data_status(self) -> Dict[str, any]:
+        """
+        取得現有資料的狀態統計。
+
+        Returns:
+            包含統計資訊的字典。
+        """
+        status = {
+            'total_articles': 0,
+            'total_files': 0,
+            'date_range': {'earliest': None, 'latest': None},
+            'by_year': {},
+        }
+
+        if not self.data_dir.exists():
+            return status
+
+        all_tickers = set()
+        earliest_date = None
+        latest_date = None
+
+        for year_dir in sorted(self.data_dir.iterdir()):
+            if not year_dir.is_dir():
+                continue
+
+            year = year_dir.name
+            year_count = 0
+
+            for parquet_file in year_dir.glob("*.parquet"):
+                try:
+                    df = pd.read_parquet(parquet_file)
+                    status['total_files'] += 1
+                    status['total_articles'] += len(df)
+                    year_count += len(df)
+
+                    # Track tickers
+                    if 'ticker' in df.columns:
+                        all_tickers.update(df['ticker'].unique())
+
+                    # Track date range
+                    if 'published_at' in df.columns:
+                        df['_pub_date'] = pd.to_datetime(df['published_at'], errors='coerce')
+                        file_min = df['_pub_date'].min()
+                        file_max = df['_pub_date'].max()
+
+                        if pd.notna(file_min):
+                            if earliest_date is None or file_min < earliest_date:
+                                earliest_date = file_min
+                        if pd.notna(file_max):
+                            if latest_date is None or file_max > latest_date:
+                                latest_date = file_max
+
+                except Exception as e:
+                    logger.warning(f"Error reading {parquet_file}: {e}")
+
+            status['by_year'][year] = year_count
+
+        status['date_range']['earliest'] = earliest_date.isoformat() if earliest_date else None
+        status['date_range']['latest'] = latest_date.isoformat() if latest_date else None
+        status['unique_tickers'] = len(all_tickers)
+
+        return status
+
 
 # =============================================================================
 # Main Collection Logic
@@ -474,15 +543,51 @@ For historical news, use collect_polygon_news.py instead.
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD), default: today')
     parser.add_argument('--days', type=int, default=7, help='Days back from today (default: 7)')
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers')
+    parser.add_argument('--status', action='store_true',
+                       help='Show current data status without collecting')
+    parser.add_argument('--incremental', action='store_true',
+                       help='Incremental update: fetch last 7 days and merge with existing')
 
     args = parser.parse_args()
+
+    # Handle --status mode first
+    if args.status:
+        config = FinnhubConfig()
+        storage = StorageManager(config.data_dir)
+        status = storage.get_data_status()
+
+        logger.info("\n" + "=" * 60)
+        logger.info("FINNHUB NEWS DATA STATUS")
+        logger.info("=" * 60)
+        logger.info(f"Total articles: {status['total_articles']:,}")
+        logger.info(f"Total files: {status['total_files']}")
+        logger.info(f"Unique tickers: {status.get('unique_tickers', 0)}")
+        logger.info(f"Date range: {status['date_range']['earliest']} to {status['date_range']['latest']}")
+
+        if status['by_year']:
+            logger.info("\nBy year:")
+            for year, count in sorted(status['by_year'].items()):
+                logger.info(f"  {year}: {count:,} articles")
+
+        logger.info("\nNote: Finnhub only provides ~7 days of history.")
+        logger.info("Run without --status to collect/update recent news.")
+
+        return
 
     # Determine date range
     end_date = date.today()
     if args.end:
         end_date = date.fromisoformat(args.end)
 
-    if args.start:
+    # For incremental mode, always use last 7 days (Finnhub limitation)
+    # Note: Finnhub API only provides ~7 days of history, so we always fetch
+    # the full 7-day window. Deduplication handles overlaps automatically.
+    # Historical data is preserved - new articles are appended, not overwritten.
+    if args.incremental:
+        start_date = end_date - timedelta(days=7)
+        logger.info(f"INCREMENTAL MODE: Fetching last 7 days ({start_date} to {end_date})")
+        logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
+    elif args.start:
         start_date = date.fromisoformat(args.start)
     else:
         start_date = end_date - timedelta(days=args.days)
