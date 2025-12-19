@@ -19,6 +19,7 @@
 │   └── test_*.py             # API 測試腳本
 │
 └── scripts/collection/        # ⭐ 實際使用的收集腳本
+    ├── daily_update.py           # ⭐ 統一調度入口 (推薦)
     ├── collect_polygon_news.py   # Polygon 新聞 (獨立實作)
     ├── collect_finnhub_news.py   # Finnhub 新聞 (獨立實作)
     └── collect_ibkr_prices.py    # IBKR 股價 (使用 data_sources)
@@ -118,6 +119,8 @@ python scripts/collection/collect_polygon_news.py --full-history
 | `--tickers AAPL,MSFT` | 指定股票 |
 | `--resume` | 從 checkpoint 繼續 |
 | `--estimate` | 僅估算時間 |
+| `--incremental` | ⭐ 增量更新 (從最後日期開始) |
+| `--status` | 查看現有資料狀態 |
 
 **Rate Limit**: 5 次/分鐘 (12 秒間隔) - 免費版限制
 
@@ -129,18 +132,68 @@ python scripts/collection/collect_polygon_news.py --full-history
 |------|------|
 | `--days N` | 最近 N 天 (最多 7 天) |
 | `--tickers AAPL,MSFT` | 指定股票 |
+| `--incremental` | ⭐ 增量更新 (抓取最近 7 天) |
+| `--status` | 查看現有資料狀態 |
 
 **Rate Limit**: 60 次/分鐘 (1 秒間隔) - 比 Polygon 快 12 倍
 
 **注意**: Finnhub 免費版只有 ~7 天歷史，不適合歷史收集！
 
-### collect_all_news.py (統一入口)
+---
+
+## 每日更新 (daily_update.py) ⭐
+
+**推薦使用**: 統一管理所有資料源的增量更新
+
+### 查看資料狀態
 
 ```bash
-python collect_all_news.py --full-history  # 執行 Polygon 歷史收集
-python collect_all_news.py --daily         # 執行 Finnhub 每日更新
-python collect_all_news.py --merge         # 合併兩個來源 (去重)
-python collect_all_news.py --stats         # 查看收集統計
+python scripts/collection/daily_update.py --status
+```
+
+輸出範例：
+```
+📰 POLYGON NEWS:
+   Total articles: 107,713
+   Latest data:    2025-12-17 (0 days ago)
+
+📰 FINNHUB NEWS:
+   Total articles: 3,484
+   Latest data:    2025-12-16 (1 days ago)
+
+📈 IBKR PRICES:
+   Total bars:     1,473,563
+   Tickers:        75
+   Latest data:    2025-12-16 (1 days ago)
+```
+
+### 增量更新命令
+
+```bash
+# 更新所有新聞 (Polygon + Finnhub)
+python scripts/collection/daily_update.py --news
+
+# 更新所有資料 (新聞 + 股價)
+python scripts/collection/daily_update.py --all
+
+# 只更新特定來源
+python scripts/collection/daily_update.py --polygon
+python scripts/collection/daily_update.py --finnhub
+python scripts/collection/daily_update.py --ibkr
+
+# 模擬執行 (不實際收集)
+python scripts/collection/daily_update.py --all --dry-run
+```
+
+### Cron 排程範例
+
+```bash
+# crontab -e
+# 每天 UTC 6:00 更新新聞 (~1-2 分鐘)
+0 6 * * * cd /mnt/md0/PycharmProjects/MindfulRL-Intraday && python scripts/collection/daily_update.py --news
+
+# 每天 UTC 22:00 更新股價 (美股收盤後，需要 IBKR 連線)
+0 22 * * * cd /mnt/md0/PycharmProjects/MindfulRL-Intraday && python scripts/collection/daily_update.py --ibkr
 ```
 
 ---
@@ -168,6 +221,10 @@ pip install ib_insync
 | `--hourly-only` | 只收 2023 年 1 小時資料 |
 | `--minute-only` | 只收 2024+ 年 15 分鐘資料 |
 | `--dry-run` | 模擬執行，不實際呼叫 API |
+| `--incremental` | ⭐ 增量更新 (從最後日期開始) |
+| `--status` | 查看現有資料狀態 |
+| `--resume` | 從 checkpoint 繼續 |
+| `--clear-checkpoint` | 清除 checkpoint 重新開始 |
 
 ### 常用命令
 
@@ -189,6 +246,12 @@ python scripts/collection/collect_ibkr_prices.py --port 4001
 
 # 載入所有股票 (tier1 + tier2)
 python scripts/collection/collect_ibkr_prices.py --tier all
+
+# 查看現有資料狀態
+python scripts/collection/collect_ibkr_prices.py --status
+
+# 增量更新 (只抓取最後日期之後的新資料)
+python scripts/collection/collect_ibkr_prices.py --incremental --minute-only
 ```
 
 ### 中斷與恢復 (Checkpoint/Resume)
