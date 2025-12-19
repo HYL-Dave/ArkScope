@@ -26,6 +26,10 @@ Resume from interruption:
     python collect_ibkr_prices.py --resume  # Continue from last checkpoint
     python collect_ibkr_prices.py --resume --tier all  # Resume with all tickers
 
+Incremental update (daily):
+    python collect_ibkr_prices.py --incremental  # Only fetch new data since last update
+    python collect_ibkr_prices.py --incremental --tier all  # Incremental for all tickers
+
 Checkpoint file is saved at: data/prices/ibkr_checkpoint.json
 """
 
@@ -180,6 +184,161 @@ def clear_checkpoint(output_dir: str) -> None:
     if os.path.exists(checkpoint_path):
         os.remove(checkpoint_path)
         logger.info("Checkpoint cleared (collection complete)")
+
+
+# ============================================================================
+# Incremental Update Functions
+# ============================================================================
+
+def get_last_datetime_from_csv(csv_path: str) -> Optional[datetime]:
+    """
+    Get the last datetime from an existing CSV file.
+
+    Args:
+        csv_path: Path to the CSV file.
+
+    Returns:
+        The last datetime in the file, or None if file doesn't exist or is empty.
+    """
+    if not os.path.exists(csv_path):
+        return None
+
+    try:
+        df = pd.read_csv(csv_path)
+        if df.empty or 'datetime' not in df.columns:
+            return None
+
+        # Parse the last datetime
+        last_dt_str = df['datetime'].iloc[-1]
+        # Handle both ISO format and other formats
+        try:
+            return datetime.fromisoformat(last_dt_str.replace('Z', '+00:00'))
+        except ValueError:
+            return pd.to_datetime(last_dt_str).to_pydatetime()
+    except Exception as e:
+        logger.warning(f"Error reading {csv_path}: {e}")
+        return None
+
+
+def find_existing_price_files(output_dir: str, ticker: str, data_type: str) -> List[str]:
+    """
+    Find existing price files for a ticker.
+
+    Args:
+        output_dir: Base output directory (e.g., data/prices/).
+        ticker: Stock ticker symbol.
+        data_type: Either 'hourly' or '15min'.
+
+    Returns:
+        List of matching file paths.
+    """
+    subdir = os.path.join(output_dir, data_type)
+    if not os.path.exists(subdir):
+        return []
+
+    pattern = f"{ticker}_{data_type.replace('min', 'min')}_"
+    files = [
+        os.path.join(subdir, f)
+        for f in os.listdir(subdir)
+        if f.startswith(f"{ticker}_") and f.endswith('.csv')
+    ]
+    return sorted(files)
+
+
+def get_incremental_start_date(
+    output_dir: str,
+    ticker: str,
+    data_type: str,
+    default_start: date
+) -> date:
+    """
+    Determine the start date for incremental update.
+
+    Args:
+        output_dir: Base output directory.
+        ticker: Stock ticker symbol.
+        data_type: Either 'hourly' or '15min'.
+        default_start: Default start date if no existing data.
+
+    Returns:
+        The date to start fetching from (day after last existing data).
+    """
+    files = find_existing_price_files(output_dir, ticker, data_type)
+
+    if not files:
+        return default_start
+
+    # Check all files and find the latest datetime
+    latest_dt = None
+    for f in files:
+        last_dt = get_last_datetime_from_csv(f)
+        if last_dt and (latest_dt is None or last_dt > latest_dt):
+            latest_dt = last_dt
+
+    if latest_dt is None:
+        return default_start
+
+    # Return the next day to avoid overlap
+    return (latest_dt + timedelta(days=1)).date()
+
+
+def merge_price_data(existing_path: str, new_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Merge new price data with existing data, removing duplicates.
+
+    Args:
+        existing_path: Path to existing CSV file.
+        new_df: New data DataFrame.
+
+    Returns:
+        Merged DataFrame with duplicates removed.
+    """
+    if os.path.exists(existing_path):
+        existing_df = pd.read_csv(existing_path)
+        # Combine and remove duplicates based on datetime and ticker
+        combined = pd.concat([existing_df, new_df], ignore_index=True)
+        combined = combined.drop_duplicates(subset=['datetime', 'ticker'], keep='last')
+        combined = combined.sort_values('datetime').reset_index(drop=True)
+        return combined
+    return new_df
+
+
+def get_incremental_status(output_dir: str, tickers: List[str]) -> Dict[str, Dict]:
+    """
+    Get the incremental update status for all tickers.
+
+    Args:
+        output_dir: Base output directory.
+        tickers: List of ticker symbols.
+
+    Returns:
+        Dictionary with status info for each ticker.
+    """
+    status = {}
+    for ticker in tickers:
+        hourly_files = find_existing_price_files(output_dir, ticker, 'hourly')
+        minute_files = find_existing_price_files(output_dir, ticker, '15min')
+
+        hourly_last = None
+        for f in hourly_files:
+            dt = get_last_datetime_from_csv(f)
+            if dt and (hourly_last is None or dt > hourly_last):
+                hourly_last = dt
+
+        minute_last = None
+        for f in minute_files:
+            dt = get_last_datetime_from_csv(f)
+            if dt and (minute_last is None or dt > minute_last):
+                minute_last = dt
+
+        status[ticker] = {
+            'hourly_last': hourly_last.isoformat() if hourly_last else None,
+            '15min_last': minute_last.isoformat() if minute_last else None,
+            'hourly_files': len(hourly_files),
+            '15min_files': len(minute_files),
+        }
+
+    return status
 
 
 # ============================================================================
@@ -417,6 +576,14 @@ def main():
         help='Clear existing checkpoint and start fresh'
     )
     parser.add_argument(
+        '--incremental', action='store_true',
+        help='Incremental update: only fetch data since last update, merge with existing'
+    )
+    parser.add_argument(
+        '--status', action='store_true',
+        help='Show current data status for all tickers (no collection)'
+    )
+    parser.add_argument(
         '--verbose', action='store_true',
         help='Enable verbose logging'
     )
@@ -439,6 +606,27 @@ def main():
     hourly_end = date.fromisoformat(args.hourly_end)
     minute_start = date.fromisoformat(args.minute_start)
     minute_end = date.fromisoformat(args.minute_end) if args.minute_end else date.today()
+
+    # Status mode - show current data status
+    if args.status:
+        logger.info("\n=== DATA STATUS ===")
+        status = get_incremental_status(args.output, tickers)
+
+        # Count tickers with data
+        has_hourly = sum(1 for s in status.values() if s['hourly_last'])
+        has_minute = sum(1 for s in status.values() if s['15min_last'])
+
+        logger.info(f"Tickers with hourly data: {has_hourly}/{len(tickers)}")
+        logger.info(f"Tickers with 15-min data: {has_minute}/{len(tickers)}")
+
+        # Show details for each ticker
+        logger.info("\nPer-ticker status:")
+        for ticker, s in sorted(status.items()):
+            hourly_str = s['hourly_last'][:10] if s['hourly_last'] else 'None'
+            minute_str = s['15min_last'][:10] if s['15min_last'] else 'None'
+            logger.info(f"  {ticker}: hourly={hourly_str}, 15min={minute_str}")
+
+        return
 
     # Dry run mode
     if args.dry_run:
@@ -586,24 +774,38 @@ def main():
             # Collect 15-minute data (2024+)
             if minute_tickers and not args.hourly_only and not interrupted:
                 logger.info(f"\n{'='*60}")
-                logger.info(f"Collecting 15-MIN data: {minute_start} to {minute_end}")
+                if args.incremental:
+                    logger.info(f"INCREMENTAL 15-MIN data update (from last data to {minute_end})")
+                else:
+                    logger.info(f"Collecting 15-MIN data: {minute_start} to {minute_end}")
                 logger.info(f"Tickers: {len(minute_tickers)} remaining")
                 logger.info('='*60)
 
                 for i, ticker in enumerate(minute_tickers):
-                    logger.info(f"[{i+1}/{len(minute_tickers)}] Collecting 15-min data for {ticker}")
+                    # Determine start date for this ticker
+                    if args.incremental:
+                        ticker_start = get_incremental_start_date(
+                            args.output, ticker, '15min', minute_start
+                        )
+                        if ticker_start > minute_end:
+                            logger.info(f"[{i+1}/{len(minute_tickers)}] {ticker}: already up to date (last: {ticker_start - timedelta(days=1)})")
+                            minute_completed.add(ticker)
+                            continue
+                        logger.info(f"[{i+1}/{len(minute_tickers)}] {ticker}: incremental from {ticker_start} to {minute_end}")
+                    else:
+                        ticker_start = minute_start
+                        logger.info(f"[{i+1}/{len(minute_tickers)}] Collecting 15-min data for {ticker}")
 
                     try:
                         bars = ibkr.fetch_historical_intraday(
                             tickers=[ticker],
-                            start_date=minute_start,
+                            start_date=ticker_start,
                             end_date=minute_end,
                             interval='15 mins',
                             include_extended=False,
                         )
 
                         ticker_bars = bars.get(ticker, [])
-                        minute_results[ticker] = len(ticker_bars)
 
                         if ticker_bars:
                             df = pd.DataFrame([
@@ -618,11 +820,21 @@ def main():
                                 }
                                 for bar in ticker_bars
                             ])
+
+                            # For incremental mode, merge with existing data
                             output_path = os.path.join(minute_dir, f"{ticker}_15min_{minute_start.year}_{minute_end.year}.csv")
+                            if args.incremental:
+                                df = merge_price_data(output_path, df)
+                                logger.info(f"  Merged {len(ticker_bars)} new bars (total: {len(df)} bars)")
+
                             df.to_csv(output_path, index=False)
-                            logger.info(f"  Saved {len(ticker_bars)} bars to {output_path}")
+                            minute_results[ticker] = len(df) if args.incremental else len(ticker_bars)
+
+                            if not args.incremental:
+                                logger.info(f"  Saved {len(ticker_bars)} bars to {output_path}")
                         else:
-                            logger.warning(f"  No data for {ticker}")
+                            logger.warning(f"  No new data for {ticker}")
+                            minute_results[ticker] = minute_results.get(ticker, 0)
 
                         # Mark as completed and save checkpoint
                         minute_completed.add(ticker)
