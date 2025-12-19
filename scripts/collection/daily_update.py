@@ -3,8 +3,9 @@
 Daily Data Update Script - 每日資料更新統一入口
 
 整合所有資料收集腳本，一鍵更新：
-- Polygon 新聞 (增量更新)
+- Polygon 新聞 (增量更新，3+ 年歷史)
 - Finnhub 新聞 (最近 7 天)
+- IBKR 新聞 (增量更新，~1 個月歷史，高品質來源)
 - IBKR 股價 (增量更新，需要 TWS/Gateway 運行)
 
 使用方式:
@@ -23,8 +24,11 @@ Daily Data Update Script - 每日資料更新統一入口
     # 只更新 Finnhub 新聞
     python daily_update.py --finnhub
 
-    # 只更新 IBKR 股價
-    python daily_update.py --ibkr
+    # 只更新 IBKR 新聞 (需要 TWS/Gateway)
+    python daily_update.py --ibkr-news
+
+    # 只更新 IBKR 股價 (需要 TWS/Gateway)
+    python daily_update.py --ibkr-prices
 
     # 模擬執行 (不實際收集)
     python daily_update.py --all --dry-run
@@ -256,7 +260,43 @@ def get_finnhub_status() -> Dict:
     }
 
 
-def get_ibkr_status() -> Dict:
+def get_ibkr_news_status() -> Dict:
+    """Get IBKR news data status."""
+    data_dir = Path("data/news/raw/ibkr")
+
+    if not data_dir.exists():
+        return {'exists': False, 'total_articles': 0, 'latest_date': None}
+
+    total = 0
+    latest_date = None
+
+    try:
+        import pandas as pd
+
+        for year_dir in data_dir.iterdir():
+            if not year_dir.is_dir():
+                continue
+            for pq in year_dir.glob("*.parquet"):
+                df = pd.read_parquet(pq)
+                total += len(df)
+
+                if 'published_at' in df.columns:
+                    df['_dt'] = pd.to_datetime(df['published_at'], errors='coerce')
+                    max_dt = df['_dt'].max()
+                    if pd.notna(max_dt):
+                        if latest_date is None or max_dt > latest_date:
+                            latest_date = max_dt
+    except Exception as e:
+        logger.warning(f"Error reading IBKR news data: {e}")
+
+    return {
+        'exists': True,
+        'total_articles': total,
+        'latest_date': latest_date.date() if latest_date else None,
+    }
+
+
+def get_ibkr_prices_status() -> Dict:
     """Get IBKR price data status."""
     data_dir = Path("data/prices")
 
@@ -328,16 +368,27 @@ def show_status():
     else:
         logger.info(f"\n📰 FINNHUB NEWS: No data found")
 
-    # IBKR status
-    ibkr = get_ibkr_status()
-    if ibkr['exists']:
-        days_behind = (today - ibkr['latest_date']).days if ibkr['latest_date'] else '?'
-        logger.info(f"\n📈 IBKR PRICES:")
-        logger.info(f"   Total bars:     {ibkr['total_bars']:,}")
-        logger.info(f"   Tickers:        {ibkr['tickers']}")
-        logger.info(f"   Latest data:    {ibkr['latest_date']} ({days_behind} days ago)")
+    # IBKR news status
+    ibkr_news = get_ibkr_news_status()
+    if ibkr_news['exists'] and ibkr_news['total_articles'] > 0:
+        days_behind = (today - ibkr_news['latest_date']).days if ibkr_news['latest_date'] else '?'
+        logger.info(f"\n📰 IBKR NEWS (Dow Jones, Briefing, The Fly):")
+        logger.info(f"   Total articles: {ibkr_news['total_articles']:,}")
+        logger.info(f"   Latest data:    {ibkr_news['latest_date']} ({days_behind} days ago)")
+        logger.info(f"   Note: IBKR provides ~1 month of high-quality news history")
     else:
-        logger.info(f"\n📈 IBKR PRICES: No data found")
+        logger.info(f"\n📰 IBKR NEWS: No data found (requires TWS/Gateway)")
+
+    # IBKR prices status
+    ibkr_prices = get_ibkr_prices_status()
+    if ibkr_prices['exists'] and ibkr_prices['total_bars'] > 0:
+        days_behind = (today - ibkr_prices['latest_date']).days if ibkr_prices['latest_date'] else '?'
+        logger.info(f"\n📈 IBKR PRICES:")
+        logger.info(f"   Total bars:     {ibkr_prices['total_bars']:,}")
+        logger.info(f"   Tickers:        {ibkr_prices['tickers']}")
+        logger.info(f"   Latest data:    {ibkr_prices['latest_date']} ({days_behind} days ago)")
+    else:
+        logger.info(f"\n📈 IBKR PRICES: No data found (requires TWS/Gateway)")
 
     logger.info("\n" + "=" * 70)
 
@@ -350,12 +401,16 @@ def show_status():
     if not finnhub['exists'] or (finnhub['latest_date'] and (today - finnhub['latest_date']).days > 1):
         logger.info("   - Run: python daily_update.py --finnhub")
 
-    if not ibkr['exists'] or (ibkr['latest_date'] and (today - ibkr['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --ibkr (requires TWS/Gateway)")
+    if not ibkr_news['exists'] or (ibkr_news['latest_date'] and (today - ibkr_news['latest_date']).days > 1):
+        logger.info("   - Run: python daily_update.py --ibkr-news (requires TWS/Gateway)")
 
-    if polygon['exists'] and finnhub['exists']:
+    if not ibkr_prices['exists'] or (ibkr_prices['latest_date'] and (today - ibkr_prices['latest_date']).days > 1):
+        logger.info("   - Run: python daily_update.py --ibkr-prices (requires TWS/Gateway)")
+
+    if polygon['exists'] and finnhub['exists'] and ibkr_news['exists']:
         if (polygon['latest_date'] and (today - polygon['latest_date']).days <= 1 and
-            finnhub['latest_date'] and (today - finnhub['latest_date']).days <= 1):
+            finnhub['latest_date'] and (today - finnhub['latest_date']).days <= 1 and
+            ibkr_news['latest_date'] and (today - ibkr_news['latest_date']).days <= 1):
             logger.info("   ✅ News data is up to date!")
 
     logger.info("")
@@ -395,8 +450,25 @@ def update_finnhub(dry_run: bool = False) -> bool:
     return success
 
 
-def update_ibkr(dry_run: bool = False) -> bool:
-    """Run IBKR incremental update."""
+def update_ibkr_news(dry_run: bool = False) -> bool:
+    """Run IBKR news incremental update."""
+    logger.info("\n" + "=" * 50)
+    logger.info("UPDATING IBKR NEWS (Dow Jones, Briefing, The Fly)")
+    logger.info("=" * 50)
+
+    script = SCRIPT_DIR / "collect_ibkr_news.py"
+    if not script.exists():
+        logger.error(f"Script not found: {script}")
+        return False
+
+    cmd = [sys.executable, str(script), "--incremental"]
+    success, output = run_command(cmd, dry_run)
+
+    return success
+
+
+def update_ibkr_prices(dry_run: bool = False) -> bool:
+    """Run IBKR price incremental update."""
     logger.info("\n" + "=" * 50)
     logger.info("UPDATING IBKR PRICES")
     logger.info("=" * 50)
@@ -425,7 +497,7 @@ Examples:
     # Show all data status
     python daily_update.py --status
 
-    # Update all news (Polygon + Finnhub)
+    # Update all news (Polygon + Finnhub + IBKR news)
     python daily_update.py --news
 
     # Update everything (news + prices)
@@ -434,13 +506,16 @@ Examples:
     # Update specific source
     python daily_update.py --polygon
     python daily_update.py --finnhub
-    python daily_update.py --ibkr
+    python daily_update.py --ibkr-news     # High-quality: Dow Jones, Briefing, The Fly
+    python daily_update.py --ibkr-prices   # Intraday price data
 
     # Dry run (show what would be done)
     python daily_update.py --all --dry-run
 
 Cron example (daily at 6 AM):
     0 6 * * * cd /path/to/project && python scripts/collection/daily_update.py --news
+
+Note: IBKR sources require TWS/Gateway running.
         """
     )
 
@@ -449,13 +524,15 @@ Cron example (daily at 6 AM):
     parser.add_argument('--all', action='store_true',
                        help='Update all sources (news + prices)')
     parser.add_argument('--news', action='store_true',
-                       help='Update all news sources (Polygon + Finnhub)')
+                       help='Update all news sources (Polygon + Finnhub + IBKR news)')
     parser.add_argument('--polygon', action='store_true',
                        help='Update Polygon news only')
     parser.add_argument('--finnhub', action='store_true',
                        help='Update Finnhub news only')
-    parser.add_argument('--ibkr', action='store_true',
-                       help='Update IBKR prices only')
+    parser.add_argument('--ibkr-news', action='store_true',
+                       help='Update IBKR news only (requires TWS/Gateway)')
+    parser.add_argument('--ibkr-prices', action='store_true',
+                       help='Update IBKR prices only (requires TWS/Gateway)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Show what would be done without executing')
     parser.add_argument('--parallel', action='store_true',
@@ -465,8 +542,13 @@ Cron example (daily at 6 AM):
 
     args = parser.parse_args()
 
+    # Handle hyphenated arguments
+    args.ibkr_news = getattr(args, 'ibkr_news', False)
+    args.ibkr_prices = getattr(args, 'ibkr_prices', False)
+
     # Default to status if no action specified
-    if not any([args.status, args.all, args.news, args.polygon, args.finnhub, args.ibkr]):
+    if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
+                args.ibkr_news, args.ibkr_prices]):
         args.status = True
 
     if args.status:
@@ -490,9 +572,10 @@ Cron example (daily at 6 AM):
     # Determine which sources to update
     update_polygon_flag = args.all or args.news or args.polygon
     update_finnhub_flag = args.all or args.news or args.finnhub
-    update_ibkr_flag = args.all or args.ibkr
+    update_ibkr_news_flag = args.all or args.news or args.ibkr_news
+    update_ibkr_prices_flag = args.all or args.ibkr_prices
 
-    # Parallel execution for news sources
+    # Parallel execution for news sources (Polygon + Finnhub only, IBKR needs dedicated connection)
     if args.parallel and (update_polygon_flag or update_finnhub_flag):
         commands = []
 
@@ -512,8 +595,10 @@ Cron example (daily at 6 AM):
             results.update(parallel_results)
 
         # IBKR runs separately (needs dedicated connection)
-        if update_ibkr_flag:
-            results['ibkr'] = update_ibkr(args.dry_run)
+        if update_ibkr_news_flag:
+            results['ibkr_news'] = update_ibkr_news(args.dry_run)
+        if update_ibkr_prices_flag:
+            results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
 
     else:
         # Sequential execution (default)
@@ -523,8 +608,11 @@ Cron example (daily at 6 AM):
         if update_finnhub_flag:
             results['finnhub'] = update_finnhub(args.dry_run)
 
-        if update_ibkr_flag:
-            results['ibkr'] = update_ibkr(args.dry_run)
+        if update_ibkr_news_flag:
+            results['ibkr_news'] = update_ibkr_news(args.dry_run)
+
+        if update_ibkr_prices_flag:
+            results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
 
     # Summary
     end_time = datetime.now()

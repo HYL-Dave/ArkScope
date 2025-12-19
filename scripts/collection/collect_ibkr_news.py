@@ -61,6 +61,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from data_sources.ibkr_source import IBKRDataSource
 
+
+def load_ibkr_config_from_env(env_path: str = "config/.env") -> Dict[str, str]:
+    """
+    Load IBKR configuration from .env file.
+    Same logic as collect_ibkr_prices.py for consistency.
+    """
+    config = {
+        'IBKR_HOST': '127.0.0.1',
+        'IBKR_PORT': '4002',
+        'IBKR_CLIENT_ID': '50',
+    }
+
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key in config:
+                        config[key] = value
+
+    return config
+
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -591,20 +617,29 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD), default: today')
     parser.add_argument('--days', type=int, default=7, help='Days back from today (default: 7)')
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers')
-    parser.add_argument('--host', type=str, default='127.0.0.1', help='IB Gateway host')
-    parser.add_argument('--port', type=int, default=4002, help='IB Gateway port (4001=live, 4002=paper)')
-    parser.add_argument('--client-id', type=int, default=50, help='Client ID for connection')
+    parser.add_argument('--host', type=str, default=None,
+                       help='IB Gateway host (default: from config/.env)')
+    parser.add_argument('--port', type=int, default=None,
+                       help='IB Gateway port (default: from config/.env)')
+    parser.add_argument('--client-id', type=int, default=None,
+                       help='Client ID for connection (default: from config/.env)')
     parser.add_argument('--status', action='store_true', help='Show current data status')
     parser.add_argument('--incremental', action='store_true',
                        help='Incremental update: fetch since last collected date')
 
     args = parser.parse_args()
 
+    # Load IBKR config from .env (command line args override)
+    ibkr_env = load_ibkr_config_from_env()
+    ibkr_host = args.host if args.host else ibkr_env['IBKR_HOST']
+    ibkr_port = args.port if args.port else int(ibkr_env['IBKR_PORT'])
+    ibkr_client_id = args.client_id if args.client_id else int(ibkr_env.get('IBKR_CLIENT_ID', '50'))
+
     # Build config
     config = IBKRConfig(
-        host=args.host,
-        port=args.port,
-        client_id=args.client_id,
+        host=ibkr_host,
+        port=ibkr_port,
+        client_id=ibkr_client_id,
     )
 
     # Handle --status mode
