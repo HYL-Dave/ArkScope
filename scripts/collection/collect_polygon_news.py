@@ -22,6 +22,12 @@ Polygon.io 新聞收集腳本
 
     # 從 checkpoint 繼續
     python collect_polygon_news.py --resume
+
+    # 增量更新 (只抓取最後收集日期之後的新聞)
+    python collect_polygon_news.py --incremental
+
+    # 查看現有資料狀態
+    python collect_polygon_news.py --status
 """
 
 import os
@@ -364,17 +370,41 @@ class PolygonNewsCollector:
 # =============================================================================
 
 class StorageManager:
-    """管理 Parquet 檔案儲存"""
+    """管理 Parquet 檔案儲存 (帶快取)"""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Cache for parquet data: {(year, month): {'df': DataFrame, 'hashes': set}}
+        self._cache: Dict[Tuple[int, int], Dict] = {}
 
     def get_parquet_path(self, year: int, month: int) -> Path:
         """取得指定月份的 parquet 檔案路徑"""
         year_dir = self.data_dir / str(year)
         year_dir.mkdir(parents=True, exist_ok=True)
         return year_dir / f"{year}-{month:02d}.parquet"
+
+    def _load_cache(self, year: int, month: int) -> Dict:
+        """載入並快取 parquet 資料"""
+        key = (year, month)
+        if key in self._cache:
+            return self._cache[key]
+
+        path = self.get_parquet_path(year, month)
+        if path.exists():
+            df = pd.read_parquet(path)
+            hashes = set(df['dedup_hash'].tolist()) if 'dedup_hash' in df.columns else set()
+            self._cache[key] = {'df': df, 'hashes': hashes, 'count': len(df)}
+        else:
+            self._cache[key] = {'df': None, 'hashes': set(), 'count': 0}
+
+        return self._cache[key]
+
+    def _invalidate_cache(self, year: int, month: int):
+        """清除指定月份的快取"""
+        key = (year, month)
+        if key in self._cache:
+            del self._cache[key]
 
     def save_articles(
         self,
@@ -383,7 +413,7 @@ class StorageManager:
         month: int,
         append: bool = True,
     ) -> int:
-        """儲存文章到 parquet 檔案"""
+        """儲存文章到 parquet 檔案 (使用快取優化)"""
         if not articles:
             return 0
 
@@ -392,30 +422,34 @@ class StorageManager:
         # Convert to DataFrame
         new_df = pd.DataFrame([asdict(a) for a in articles])
 
-        # Load existing if appending
+        # Load existing if appending (use cache)
         if append and path.exists():
-            existing_df = pd.read_parquet(path)
+            cache = self._load_cache(year, month)
+            existing_df = cache['df']
+            existing_hashes = cache['hashes']
 
-            # Deduplicate by hash
-            existing_hashes = set(existing_df['dedup_hash'].tolist())
-            new_df = new_df[~new_df['dedup_hash'].isin(existing_hashes)]
+            if existing_df is not None:
+                # Deduplicate by hash using cached hashes
+                new_df = new_df[~new_df['dedup_hash'].isin(existing_hashes)]
 
-            if len(new_df) == 0:
-                logger.debug(f"  All articles already exist in {path.name}")
-                return 0
+                if len(new_df) == 0:
+                    logger.debug(f"  All articles already exist in {path.name}")
+                    return 0
 
-            # Ensure consistent dtypes to avoid FutureWarning
-            for col in new_df.columns:
-                if col in existing_df.columns:
-                    # Match dtype of existing column
-                    if existing_df[col].dtype != new_df[col].dtype:
-                        try:
-                            new_df[col] = new_df[col].astype(existing_df[col].dtype)
-                        except (ValueError, TypeError):
-                            pass  # Keep original dtype if conversion fails
+                # Ensure consistent dtypes to avoid FutureWarning
+                for col in new_df.columns:
+                    if col in existing_df.columns:
+                        # Match dtype of existing column
+                        if existing_df[col].dtype != new_df[col].dtype:
+                            try:
+                                new_df[col] = new_df[col].astype(existing_df[col].dtype)
+                            except (ValueError, TypeError):
+                                pass  # Keep original dtype if conversion fails
 
-            # Append
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+                # Append
+                combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            else:
+                combined_df = new_df
         else:
             combined_df = new_df
 
@@ -423,15 +457,132 @@ class StorageManager:
         combined_df.to_parquet(path, index=False, compression='snappy')
         logger.info(f"  Saved {len(new_df)} new articles to {path.name} (total: {len(combined_df)})")
 
+        # Update cache with new data
+        new_hashes = set(new_df['dedup_hash'].tolist())
+        key = (year, month)
+        if key in self._cache:
+            self._cache[key]['df'] = combined_df
+            self._cache[key]['hashes'].update(new_hashes)
+            self._cache[key]['count'] = len(combined_df)
+        else:
+            self._cache[key] = {
+                'df': combined_df,
+                'hashes': set(combined_df['dedup_hash'].tolist()),
+                'count': len(combined_df)
+            }
+
         return len(new_df)
 
     def get_existing_count(self, year: int, month: int) -> int:
-        """取得現有文章數量"""
-        path = self.get_parquet_path(year, month)
-        if path.exists():
-            df = pd.read_parquet(path)
-            return len(df)
-        return 0
+        """取得現有文章數量 (使用快取)"""
+        cache = self._load_cache(year, month)
+        return cache['count']
+
+    def get_latest_date(self) -> Optional[date]:
+        """
+        取得所有現有資料中最新的發布日期。
+
+        Returns:
+            最新的發布日期，如果沒有資料則返回 None。
+        """
+        latest_date = None
+
+        if not self.data_dir.exists():
+            return None
+
+        # Scan all parquet files
+        for year_dir in sorted(self.data_dir.iterdir(), reverse=True):
+            if not year_dir.is_dir():
+                continue
+
+            for parquet_file in sorted(year_dir.glob("*.parquet"), reverse=True):
+                try:
+                    df = pd.read_parquet(parquet_file)
+                    if df.empty or 'published_at' not in df.columns:
+                        continue
+
+                    # Parse published_at and find max
+                    df['_pub_date'] = pd.to_datetime(df['published_at'], errors='coerce')
+                    max_dt = df['_pub_date'].max()
+
+                    if pd.notna(max_dt):
+                        file_latest = max_dt.date()
+                        if latest_date is None or file_latest > latest_date:
+                            latest_date = file_latest
+
+                        # Since we're scanning in reverse order, we can stop after first file
+                        # that has valid data in the latest year
+                        return latest_date
+
+                except Exception as e:
+                    logger.warning(f"Error reading {parquet_file}: {e}")
+                    continue
+
+        return latest_date
+
+    def get_data_status(self) -> Dict[str, any]:
+        """
+        取得現有資料的狀態統計。
+
+        Returns:
+            包含統計資訊的字典。
+        """
+        status = {
+            'total_articles': 0,
+            'total_files': 0,
+            'date_range': {'earliest': None, 'latest': None},
+            'by_year': {},
+            'by_ticker': {},
+        }
+
+        if not self.data_dir.exists():
+            return status
+
+        all_tickers = set()
+        earliest_date = None
+        latest_date = None
+
+        for year_dir in sorted(self.data_dir.iterdir()):
+            if not year_dir.is_dir():
+                continue
+
+            year = year_dir.name
+            year_count = 0
+
+            for parquet_file in year_dir.glob("*.parquet"):
+                try:
+                    df = pd.read_parquet(parquet_file)
+                    status['total_files'] += 1
+                    status['total_articles'] += len(df)
+                    year_count += len(df)
+
+                    # Track tickers
+                    if 'ticker' in df.columns:
+                        all_tickers.update(df['ticker'].unique())
+
+                    # Track date range
+                    if 'published_at' in df.columns:
+                        df['_pub_date'] = pd.to_datetime(df['published_at'], errors='coerce')
+                        file_min = df['_pub_date'].min()
+                        file_max = df['_pub_date'].max()
+
+                        if pd.notna(file_min):
+                            if earliest_date is None or file_min < earliest_date:
+                                earliest_date = file_min
+                        if pd.notna(file_max):
+                            if latest_date is None or file_max > latest_date:
+                                latest_date = file_max
+
+                except Exception as e:
+                    logger.warning(f"Error reading {parquet_file}: {e}")
+
+            status['by_year'][year] = year_count
+
+        status['date_range']['earliest'] = earliest_date.isoformat() if earliest_date else None
+        status['date_range']['latest'] = latest_date.isoformat() if latest_date else None
+        status['unique_tickers'] = len(all_tickers)
+
+        return status
 
 
 # =============================================================================
@@ -701,15 +852,67 @@ Examples:
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers (default: tier1 from config)')
     parser.add_argument('--resume', action='store_true', help='Resume from last checkpoint')
     parser.add_argument('--estimate', action='store_true', help='Estimate time without collecting')
+    parser.add_argument('--incremental', action='store_true',
+                       help='Incremental update: only fetch news since last collected date')
+    parser.add_argument('--status', action='store_true',
+                       help='Show current data status without collecting')
 
     args = parser.parse_args()
+
+    # Handle --status mode first
+    if args.status:
+        config = CollectionConfig()
+        storage = StorageManager(config.data_dir)
+        status = storage.get_data_status()
+
+        logger.info("\n" + "=" * 60)
+        logger.info("POLYGON NEWS DATA STATUS")
+        logger.info("=" * 60)
+        logger.info(f"Total articles: {status['total_articles']:,}")
+        logger.info(f"Total files: {status['total_files']}")
+        logger.info(f"Unique tickers: {status.get('unique_tickers', 0)}")
+        logger.info(f"Date range: {status['date_range']['earliest']} to {status['date_range']['latest']}")
+
+        if status['by_year']:
+            logger.info("\nBy year:")
+            for year, count in sorted(status['by_year'].items()):
+                logger.info(f"  {year}: {count:,} articles")
+
+        # Show incremental update info
+        latest = storage.get_latest_date()
+        if latest:
+            days_behind = (date.today() - latest).days
+            logger.info(f"\nLast collected: {latest} ({days_behind} days ago)")
+            if days_behind > 0:
+                logger.info(f"Run --incremental to fetch {days_behind} days of new data")
+        else:
+            logger.info("\nNo existing data. Run --full-history to start collection.")
+
+        return
 
     # Determine date range
     end_date = date.today()
     if args.end:
         end_date = date.fromisoformat(args.end)
 
-    if args.full_history:
+    # Handle --incremental mode
+    if args.incremental:
+        config = CollectionConfig()
+        storage = StorageManager(config.data_dir)
+        latest = storage.get_latest_date()
+
+        if latest:
+            # Start from the day after the latest data
+            start_date = latest + timedelta(days=1)
+            if start_date > end_date:
+                logger.info(f"Data is already up to date (latest: {latest})")
+                return
+            logger.info(f"INCREMENTAL MODE: Fetching from {start_date} to {end_date}")
+        else:
+            # No existing data, use default full history start
+            start_date = date(2022, 1, 1)
+            logger.info(f"No existing data found. Starting full collection from {start_date}")
+    elif args.full_history:
         start_date = date(2022, 1, 1)
     elif args.days:
         start_date = end_date - timedelta(days=args.days)
