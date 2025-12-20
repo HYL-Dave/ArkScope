@@ -22,6 +22,7 @@
     ├── daily_update.py           # ⭐ 統一調度入口 (推薦)
     ├── collect_polygon_news.py   # Polygon 新聞 (獨立實作)
     ├── collect_finnhub_news.py   # Finnhub 新聞 (獨立實作)
+    ├── collect_ibkr_news.py      # IBKR 新聞 (使用 data_sources)
     └── collect_ibkr_prices.py    # IBKR 股價 (使用 data_sources)
 ```
 
@@ -32,6 +33,7 @@
 |------|-------------------|------|
 | collect_polygon_news.py | ❌ 獨立 | 針對批量收集優化，直接呼叫 API |
 | collect_finnhub_news.py | ❌ 獨立 | 針對批量收集優化，直接呼叫 API |
+| collect_ibkr_news.py | ✅ 依賴 | 使用 `data_sources.IBKRDataSource` |
 | collect_ibkr_prices.py | ✅ 依賴 | 使用 `data_sources.IBKRDataSource` |
 
 **data_sources/ 用途**:
@@ -119,7 +121,7 @@ python scripts/collection/collect_polygon_news.py --full-history
 | `--tickers AAPL,MSFT` | 指定股票 |
 | `--resume` | 從 checkpoint 繼續 |
 | `--estimate` | 僅估算時間 |
-| `--incremental` | ⭐ 增量更新 (從最後日期開始) |
+| `--incremental` | ⭐ 增量更新 (時間戳精度，見下方說明) |
 | `--status` | 查看現有資料狀態 |
 
 **Rate Limit**: 5 次/分鐘 (12 秒間隔) - 免費版限制
@@ -132,12 +134,63 @@ python scripts/collection/collect_polygon_news.py --full-history
 |------|------|
 | `--days N` | 最近 N 天 (最多 7 天) |
 | `--tickers AAPL,MSFT` | 指定股票 |
-| `--incremental` | ⭐ 增量更新 (抓取最近 7 天) |
+| `--incremental` | ⭐ 增量更新 (動態天數，見下方說明) |
 | `--status` | 查看現有資料狀態 |
 
 **Rate Limit**: 60 次/分鐘 (1 秒間隔) - 比 Polygon 快 12 倍
 
 **注意**: Finnhub 免費版只有 ~7 天歷史，不適合歷史收集！
+
+### collect_ibkr_news.py (高品質)
+
+**用途**: 收集 IBKR 新聞 (Dow Jones, Briefing.com, The Fly)
+
+| 參數 | 說明 |
+|------|------|
+| `--days N` | 最近 N 天 (最多 ~30 天) |
+| `--tickers AAPL,MSFT` | 指定股票 |
+| `--host` / `--port` | IBKR Gateway 連線設定 |
+| `--incremental` | ⭐ 增量更新 (時間戳精度) |
+| `--status` | 查看現有資料狀態 |
+
+**需求**: IB Gateway/TWS 運行中 + 新聞訂閱
+
+---
+
+## 增量更新邏輯 (--incremental)
+
+各來源使用不同精度的增量更新策略：
+
+| 來源 | 精度 | 邏輯說明 |
+|------|------|---------|
+| **Polygon** | 秒級時間戳 | `published_utc.gte = latest_ts + 1秒` |
+| **IBKR** | 秒級時間戳 | `startDateTime = latest_ts + 1秒` |
+| **Finnhub** | 動態天數 | `days = ceil(hours_behind / 24)`，max 7 天 |
+
+### Polygon / IBKR 時間戳精度
+
+```
+INCREMENTAL MODE (timestamp precision)
+  Latest article: 2025-12-20T14:32:00Z
+  Fetching from:  2025-12-20T14:32:01Z
+```
+
+**效益**:
+- 可每小時更新，幾乎無重複資料
+- API 呼叫效率最大化
+
+### Finnhub 動態天數
+
+```
+INCREMENTAL MODE (dynamic days)
+  Latest article: 2025-12-20T10:00:00
+  Hours behind: 4.5h → fetching 1 days
+```
+
+**邏輯**:
+- 計算距離最新文章的小時數
+- 無條件進位到整數天 (`math.ceil`)
+- 上限 7 天 (API 限制)
 
 ---
 
@@ -170,7 +223,7 @@ python scripts/collection/daily_update.py --status
 ### 增量更新命令
 
 ```bash
-# 更新所有新聞 (Polygon + Finnhub)
+# 更新所有新聞 (Polygon + Finnhub + IBKR)
 python scripts/collection/daily_update.py --news
 
 # 更新所有資料 (新聞 + 股價)
@@ -179,7 +232,8 @@ python scripts/collection/daily_update.py --all
 # 只更新特定來源
 python scripts/collection/daily_update.py --polygon
 python scripts/collection/daily_update.py --finnhub
-python scripts/collection/daily_update.py --ibkr
+python scripts/collection/daily_update.py --ibkr-news    # IBKR 新聞
+python scripts/collection/daily_update.py --ibkr-prices  # IBKR 股價
 
 # 模擬執行 (不實際收集)
 python scripts/collection/daily_update.py --all --dry-run
@@ -318,7 +372,11 @@ data/news/
 │   │   ├── 2024/
 │   │   └── 2025/
 │   │
-│   └── finnhub/           # Finnhub 原始資料
+│   ├── finnhub/           # Finnhub 原始資料
+│   │   └── 2025/
+│   │       └── 2025-12.parquet
+│   │
+│   └── ibkr/              # IBKR 原始資料 (高品質)
 │       └── 2025/
 │           └── 2025-12.parquet
 │
@@ -329,6 +387,7 @@ data/news/
 └── metadata/
     ├── collection_stats.json           # Polygon 統計
     ├── finnhub_collection_stats.json   # Finnhub 統計
+    ├── ibkr_collection_stats.json      # IBKR 統計
     └── polygon_collection_checkpoint.json  # 進度檔
 ```
 
@@ -336,17 +395,19 @@ data/news/
 
 ## 收集策略比較
 
-| 來源 | 歷史深度 | 每日文章數 | 主要發布商 | 有情緒分數 |
-|------|---------|----------|-----------|----------|
-| Polygon | 3+ 年 | ~20-40 | Motley Fool, Benzinga | ✅ |
-| Finnhub | 7 天 | ~150+ | Yahoo (77%) | ❌ |
+| 來源 | 歷史深度 | 每日文章數 | 主要發布商 | 有情緒分數 | 增量精度 |
+|------|---------|----------|-----------|----------|---------|
+| Polygon | 3+ 年 | ~20-40 | Motley Fool, Benzinga | ✅ | 秒級時間戳 |
+| Finnhub | 7 天 | ~150+ | Yahoo (77%) | ❌ | 動態天數 |
+| IBKR | ~30 天 | 高品質 | Dow Jones, Briefing.com | ❌ | 秒級時間戳 |
 
 ### 建議策略
 
 1. **歷史收集**: 只用 Polygon (有完整歷史 + 情緒分數)
 2. **每日更新**:
    - 選項 A: 只用 Polygon (品質優先)
-   - 選項 B: 兩者都用 + 合併 (數量優先)
+   - 選項 B: 三者都用 + 合併 (覆蓋優先)
+3. **高頻更新**: Polygon + IBKR (秒級時間戳，可每小時更新)
 
 ---
 
@@ -398,4 +459,4 @@ data/news/
 
 ---
 
-*最後更新: 2025-12-17*
+*最後更新: 2025-12-20*
