@@ -237,16 +237,30 @@ class PolygonNewsCollector:
         ticker: str,
         start_date: date,
         end_date: date,
+        start_timestamp: Optional[datetime] = None,
     ) -> List[dict]:
         """
         Fetch all news for a ticker in a date range.
         Handles pagination automatically.
+
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date for the range
+            end_date: End date for the range
+            start_timestamp: Optional precise start timestamp (for incremental updates)
         """
         all_articles = []
 
+        # Use precise timestamp if provided, otherwise use date
+        if start_timestamp:
+            # Format: 2024-01-15T14:30:00Z (ISO 8601)
+            start_str = start_timestamp.strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            start_str = start_date.isoformat()
+
         params = {
             'ticker': ticker,
-            'published_utc.gte': start_date.isoformat(),
+            'published_utc.gte': start_str,
             'published_utc.lte': f"{end_date.isoformat()}T23:59:59Z",
             'limit': self.config.articles_per_request,
             'sort': 'published_utc',
@@ -485,12 +499,22 @@ class StorageManager:
         Returns:
             最新的發布日期，如果沒有資料則返回 None。
         """
-        latest_date = None
+        ts = self.get_latest_timestamp()
+        return ts.date() if ts else None
+
+    def get_latest_timestamp(self) -> Optional[datetime]:
+        """
+        取得所有現有資料中最新的發布時間戳 (精確到秒)。
+
+        Returns:
+            最新的發布時間 (datetime)，如果沒有資料則返回 None。
+        """
+        latest_ts = None
 
         if not self.data_dir.exists():
             return None
 
-        # Scan all parquet files
+        # Scan all parquet files in reverse order (newest first)
         for year_dir in sorted(self.data_dir.iterdir(), reverse=True):
             if not year_dir.is_dir():
                 continue
@@ -502,23 +526,23 @@ class StorageManager:
                         continue
 
                     # Parse published_at and find max
-                    df['_pub_date'] = pd.to_datetime(df['published_at'], errors='coerce')
-                    max_dt = df['_pub_date'].max()
+                    df['_pub_ts'] = pd.to_datetime(df['published_at'], errors='coerce')
+                    max_ts = df['_pub_ts'].max()
 
-                    if pd.notna(max_dt):
-                        file_latest = max_dt.date()
-                        if latest_date is None or file_latest > latest_date:
-                            latest_date = file_latest
+                    if pd.notna(max_ts):
+                        file_latest = max_ts.to_pydatetime()
+                        if latest_ts is None or file_latest > latest_ts:
+                            latest_ts = file_latest
 
                         # Since we're scanning in reverse order, we can stop after first file
                         # that has valid data in the latest year
-                        return latest_date
+                        return latest_ts
 
                 except Exception as e:
                     logger.warning(f"Error reading {parquet_file}: {e}")
                     continue
 
-        return latest_date
+        return latest_ts
 
     def get_data_status(self) -> Dict[str, any]:
         """
@@ -899,15 +923,65 @@ Examples:
     if args.incremental:
         config = CollectionConfig()
         storage = StorageManager(config.data_dir)
-        latest = storage.get_latest_date()
+        latest_ts = storage.get_latest_timestamp()
 
-        if latest:
-            # Start from the day after the latest data
-            start_date = latest + timedelta(days=1)
-            if start_date > end_date:
-                logger.info(f"Data is already up to date (latest: {latest})")
+        if latest_ts:
+            # Use timestamp precision: start from 1 second after latest article
+            start_timestamp = latest_ts + timedelta(seconds=1)
+            start_date = start_timestamp.date()
+
+            # Check if already up to date
+            now = datetime.now()
+            if start_timestamp > now:
+                logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
                 return
-            logger.info(f"INCREMENTAL MODE: Fetching from {start_date} to {end_date}")
+
+            logger.info(f"INCREMENTAL MODE (timestamp precision)")
+            logger.info(f"  Latest article: {latest_ts.isoformat()}")
+            logger.info(f"  Fetching from:  {start_timestamp.isoformat()}")
+
+            # Run incremental collection with timestamp precision
+            api_key = load_env()
+            if not api_key:
+                logger.error("POLYGON_API_KEY not found")
+                return
+
+            collector = PolygonNewsCollector(api_key, config)
+            tickers = load_tickers(args.tickers)
+            collected_at = datetime.now()
+
+            logger.info(f"Tickers: {len(tickers)} stocks")
+
+            for i, ticker in enumerate(tickers):
+                progress = (i + 1) / len(tickers) * 100
+                logger.info(f"[{progress:.1f}%] {ticker}")
+
+                # Fetch with timestamp precision
+                raw_articles = collector.fetch_news_range(
+                    ticker, start_date, end_date,
+                    start_timestamp=start_timestamp
+                )
+
+                if raw_articles:
+                    articles = [collector.parse_article(a, collected_at) for a in raw_articles]
+                    ticker_articles = [a for a in articles if a.ticker.upper() == ticker.upper()]
+
+                    # Group by month and save
+                    from collections import defaultdict
+                    by_month = defaultdict(list)
+                    for article in ticker_articles:
+                        pub_date = article.published_at[:10]
+                        year, month = int(pub_date[:4]), int(pub_date[5:7])
+                        by_month[(year, month)].append(article)
+
+                    for (year, month), month_articles in by_month.items():
+                        saved = storage.save_articles(month_articles, year, month)
+                        collector.stats['total_articles'] += saved
+
+            logger.info("\n" + "=" * 60)
+            logger.info(f"Incremental update complete: {collector.stats['total_articles']} new articles")
+            logger.info("=" * 60)
+            return
         else:
             # No existing data, use default full history start
             start_date = date(2022, 1, 1)
