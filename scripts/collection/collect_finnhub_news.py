@@ -391,6 +391,37 @@ class StorageManager:
 
         return status
 
+    def get_latest_timestamp(self) -> Optional[datetime]:
+        """
+        取得所有現有資料中最新的發布時間戳 (精確到秒)。
+
+        Returns:
+            最新的發布時間 (datetime)，如果沒有資料則返回 None。
+        """
+        if not self.data_dir.exists():
+            return None
+
+        for year_dir in sorted(self.data_dir.iterdir(), reverse=True):
+            if not year_dir.is_dir():
+                continue
+
+            for parquet_file in sorted(year_dir.glob("*.parquet"), reverse=True):
+                try:
+                    df = pd.read_parquet(parquet_file)
+                    if df.empty or 'published_at' not in df.columns:
+                        continue
+
+                    df['_pub_ts'] = pd.to_datetime(df['published_at'], errors='coerce')
+                    max_ts = df['_pub_ts'].max()
+
+                    if pd.notna(max_ts):
+                        return max_ts.to_pydatetime()
+
+                except Exception as e:
+                    logger.warning(f"Error reading {parquet_file}: {e}")
+
+        return None
+
 
 # =============================================================================
 # Main Collection Logic
@@ -579,13 +610,37 @@ For historical news, use collect_polygon_news.py instead.
     if args.end:
         end_date = date.fromisoformat(args.end)
 
-    # For incremental mode, always use last 7 days (Finnhub limitation)
-    # Note: Finnhub API only provides ~7 days of history, so we always fetch
-    # the full 7-day window. Deduplication handles overlaps automatically.
-    # Historical data is preserved - new articles are appended, not overwritten.
+    # For incremental mode, dynamically calculate days based on latest article
+    # Finnhub API only provides ~7 days of history, so we cap at 7 days
     if args.incremental:
-        start_date = end_date - timedelta(days=7)
-        logger.info(f"INCREMENTAL MODE: Fetching last 7 days ({start_date} to {end_date})")
+        import math
+        config = FinnhubConfig()
+        storage = StorageManager(config.data_dir)
+        latest_ts = storage.get_latest_timestamp()
+
+        if latest_ts:
+            # Calculate time since latest article
+            now = datetime.now()
+            hours_behind = (now - latest_ts).total_seconds() / 3600
+            days_behind = math.ceil(hours_behind / 24)  # Round up to full days
+
+            # Cap at 7 days (Finnhub API limitation)
+            days_to_fetch = min(days_behind, 7)
+
+            if days_to_fetch <= 0:
+                logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
+                return
+
+            start_date = end_date - timedelta(days=days_to_fetch)
+            logger.info(f"INCREMENTAL MODE (dynamic days)")
+            logger.info(f"  Latest article: {latest_ts.isoformat()}")
+            logger.info(f"  Hours behind: {hours_behind:.1f}h → fetching {days_to_fetch} days")
+            logger.info(f"  Date range: {start_date} to {end_date}")
+        else:
+            # No existing data, fetch full 7 days
+            start_date = end_date - timedelta(days=7)
+            logger.info(f"No existing data. Fetching last 7 days ({start_date} to {end_date})")
+
         logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
     elif args.start:
         start_date = date.fromisoformat(args.start)
