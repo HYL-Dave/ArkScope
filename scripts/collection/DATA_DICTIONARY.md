@@ -77,19 +77,20 @@ data/news/
 | `source_sentiment` | float | 內建情緒分數 | `-1.0` (負面) ~ `1.0` (正面) |
 | `source_sentiment_label` | str | 情緒標籤 | `positive`, `neutral`, `negative` |
 
-**重要說明**:
+**各來源情緒欄位狀態**:
 
-| 來源    | 有分數比例 | 說明                                      |
-|---------|------------|-------------------------------------------|
-| Polygon | ~78%       | 僅 positive/negative 有分數，neutral = 0  |
-| Finnhub | 0%         | API 不提供情緒分數                        |
-| IBKR    | 0%         | API 不提供情緒分數                        |
+| 來源    | source_sentiment         | source_sentiment_label      |
+|---------|--------------------------|----------------------------|
+| Polygon | **100% 有值** (0=neutral, 正=positive, 負=negative) | 100% 有值 |
+| Finnhub | **100% None** (空值)     | 100% 空字串                |
+| IBKR    | **100% None** (空值)     | 100% 空字串                |
 
-Polygon 情緒分數覆蓋率按發布商:
-- The Motley Fool: ~81%
-- Benzinga: ~77%
-- GlobeNewswire: ~74%
-- Investing.com: ~73%
+> 注意：Polygon 的 0 是「中性」評分，不是空值；Finnhub/IBKR 是真正沒給分數 (None)
+
+Polygon 情緒分數分布:
+- 正數 (positive): ~61%
+- 零 (neutral): ~22%
+- 負數 (negative): ~17%
 
 ### 元數據
 
@@ -156,7 +157,25 @@ dedup_hash = md5(hash_input).hexdigest()
 
 ### 欄位一致性
 
-三個來源的 Parquet 欄位**完全一致** (18 欄位)，已在收集腳本中標準化處理。
+三個來源的 Parquet 欄位**結構一致** (18 欄位)，但**內容完整度不同**：
+
+| 欄位                   | Polygon | Finnhub | IBKR    |
+|------------------------|---------|---------|---------|
+| `title`                | ✓       | ✓       | ✓       |
+| `published_at`         | ✓       | ✓       | ✓       |
+| `publisher`            | ✓       | ✓       | ✓       |
+| `description`          | ✓       | ✓ (1%空)| **空**  |
+| `content`              | ✓       | ✓ (1%空)| **空**  |
+| `url`                  | ✓       | ✓       | **空**  |
+| `author`               | ✓       | **空**  | **空**  |
+| `category`             | **空**  | ✓       | **空**  |
+| `tags`                 | ✓       | ✓       | **空**  |
+| `source_sentiment`     | ✓       | **None**| **None**|
+| `source_sentiment_label`| ✓      | **空**  | **空**  |
+
+> **IBKR 說明**: `reqHistoricalNews` API 只回傳標題/發布商，
+> 完整內容需對每篇文章額外呼叫 `reqNewsArticle`。
+> 目前收集腳本為求速度未取內容，可視需求調整。
 
 ### 跨來源重複分析
 
