@@ -303,6 +303,11 @@ class StorageManager:
 
     def get_latest_date(self) -> Optional[date]:
         """取得最新的發布日期"""
+        ts = self.get_latest_timestamp()
+        return ts.date() if ts else None
+
+    def get_latest_timestamp(self) -> Optional[datetime]:
+        """取得最新的發布時間戳 (精確到秒)"""
         if not self.data_dir.exists():
             return None
 
@@ -316,11 +321,11 @@ class StorageManager:
                     if df.empty or 'published_at' not in df.columns:
                         continue
 
-                    df['_pub_date'] = pd.to_datetime(df['published_at'], errors='coerce')
-                    max_dt = df['_pub_date'].max()
+                    df['_pub_ts'] = pd.to_datetime(df['published_at'], errors='coerce')
+                    max_ts = df['_pub_ts'].max()
 
-                    if pd.notna(max_dt):
-                        return max_dt.date()
+                    if pd.notna(max_ts):
+                        return max_ts.to_pydatetime()
 
                 except Exception as e:
                     logger.warning(f"Error reading {parquet_file}: {e}")
@@ -684,14 +689,21 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     # Handle --incremental mode
     if args.incremental:
         storage = StorageManager(config.data_dir)
-        latest = storage.get_latest_date()
+        latest_ts = storage.get_latest_timestamp()
 
-        if latest:
-            start_date = latest + timedelta(days=1)
-            if start_date > end_date:
-                logger.info(f"Data is already up to date (latest: {latest})")
+        if latest_ts:
+            # Use timestamp precision: start from 1 second after latest article
+            start_timestamp = latest_ts + timedelta(seconds=1)
+            start_date = start_timestamp.date()
+
+            now = datetime.now()
+            if start_timestamp > now:
+                logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
                 return
-            logger.info(f"INCREMENTAL MODE: Fetching from {start_date} to {end_date}")
+
+            logger.info(f"INCREMENTAL MODE (timestamp precision)")
+            logger.info(f"  Latest article: {latest_ts.isoformat()}")
+            logger.info(f"  Fetching from:  {start_timestamp.isoformat()}")
         else:
             start_date = end_date - timedelta(days=config.max_history_days)
             logger.info(f"No existing data. Fetching last {config.max_history_days} days.")
