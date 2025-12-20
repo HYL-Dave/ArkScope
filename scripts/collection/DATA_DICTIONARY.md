@@ -13,7 +13,11 @@ data/news/
 │   │   ├── 2024/
 │   │   └── 2025/
 │   │
-│   └── finnhub/
+│   ├── finnhub/
+│   │   └── 2025/
+│   │       └── 2025-12.parquet
+│   │
+│   └── ibkr/               # IBKR 高品質新聞
 │       └── 2025/
 │           └── 2025-12.parquet
 │
@@ -24,6 +28,7 @@ data/news/
 └── metadata/
     ├── collection_stats.json              # Polygon 收集統計
     ├── finnhub_collection_stats.json      # Finnhub 收集統計
+    ├── ibkr_collection_stats.json         # IBKR 收集統計
     └── polygon_collection_checkpoint.json # Polygon 進度檔
 ```
 
@@ -65,14 +70,26 @@ data/news/
 | `related_tickers` | str (JSON) | 相關股票清單 | `["AAPL", "NVDA", "TSLA"]` |
 | `tags` | str (JSON) | 標籤關鍵字 | `["earnings", "tech"]` |
 
-### 情緒分數 (僅 Polygon)
+### 情緒分數 (僅 Polygon 有值)
 
 | 欄位 | 類型 | 說明 | 範例 |
 |------|------|------|------|
 | `source_sentiment` | float | 內建情緒分數 | `-1.0` (負面) ~ `1.0` (正面) |
 | `source_sentiment_label` | str | 情緒標籤 | `positive`, `neutral`, `negative` |
 
-**注意**: Finnhub 沒有情緒分數，這兩欄會是 `None` 和空字串。
+**重要說明**:
+
+| 來源    | 有分數比例 | 說明                                      |
+|---------|------------|-------------------------------------------|
+| Polygon | ~78%       | 僅 positive/negative 有分數，neutral = 0  |
+| Finnhub | 0%         | API 不提供情緒分數                        |
+| IBKR    | 0%         | API 不提供情緒分數                        |
+
+Polygon 情緒分數覆蓋率按發布商:
+- The Motley Fool: ~81%
+- Benzinga: ~77%
+- GlobeNewswire: ~74%
+- Investing.com: ~73%
 
 ### 元數據
 
@@ -109,28 +126,78 @@ dedup_hash = md5(hash_input).hexdigest()
 ### 發布商分布
 
 **Polygon (歷史數據)**:
-| 發布商 | 佔比 |
-|--------|------|
-| The Motley Fool | ~50% |
-| Benzinga | ~20% |
-| Investing.com | ~15% |
-| Zacks | ~10% |
-| Seeking Alpha | ~5% (僅 6 個月前有) |
+
+| 發布商          | 佔比  |
+|-----------------|-------|
+| The Motley Fool | ~50%  |
+| Benzinga        | ~20%  |
+| Investing.com   | ~15%  |
+| Zacks           | ~10%  |
+| Seeking Alpha   | ~5%   |
+
+> 注：Seeking Alpha 僅 6 個月前有資料
 
 **Finnhub (最近 7 天)**:
-| 發布商 | 文章數 | 佔比 |
-|--------|--------|------|
-| Yahoo | 2,135 | 70% |
-| SeekingAlpha | 723 | 24% |
-| CNBC | 176 | 6% |
-| 其他 | 34 | <1% |
+
+| 發布商       | 文章數 | 佔比  |
+|--------------|--------|-------|
+| Yahoo        | 2,135  | 70%   |
+| SeekingAlpha | 723    | 24%   |
+| CNBC         | 176    | 6%    |
+| 其他         | 34     | <1%   |
+
+**IBKR (高品質來源)**:
+
+| 發布商        | 說明                    |
+|---------------|-------------------------|
+| Dow Jones     | 頂級財經新聞            |
+| Briefing.com  | 即時市場分析            |
+| The Fly       | 盤前/盤後快訊           |
+
+### 欄位一致性
+
+三個來源的 Parquet 欄位**完全一致** (18 欄位)，已在收集腳本中標準化處理。
+
+### 跨來源重複分析
+
+使用 `dedup_hash` (同股票 + 標題 + 日期) 偵測跨來源重複:
+
+| 來源組合               | 重複筆數 | 說明                              |
+|------------------------|----------|-----------------------------------|
+| Finnhub ↔ Polygon      | 48       | Yahoo 轉載 The Motley Fool        |
+| Finnhub ↔ IBKR         | 20       | Yahoo 轉載 The Fly                |
+| IBKR ↔ Polygon         | 1        | Benzinga 與 DJ-RTA 偶有重疊       |
+| 三來源皆重複           | 1        | 極少數                            |
+
+**關鍵發現**:
+
+1. **Yahoo 是二手來源**: Finnhub 的 Yahoo 新聞大多轉載自 The Motley Fool、The Fly 等原始來源
+2. **摘要內容不同**: 同一篇新聞在不同 API 的 `description` 欄位內容不同
+   - Polygon: 通常較完整 (可能有 AI 摘要)
+   - Finnhub: 較簡短
+   - 原因: 各 API 的摘要生成邏輯不同
+3. **去重建議**: 合併時保留 Polygon 版本 (有情緒分數 + 較完整摘要)
+
+**範例** (同一篇新聞):
+```
+標題: The Best Warren Buffett Stocks to Buy With $10,000 Right Now
+
+[Polygon/The Motley Fool] (170 字)
+As Warren Buffett retires, the article recommends investing equally
+in Alphabet, Amazon, and Apple as top picks...
+
+[Finnhub/Yahoo] (96 字)
+Invest equally in these three companies to profit from the
+expansion of artificial intelligence...
+```
 
 ### 結論
 
-| 來源 | 優點 | 缺點 | 用途 |
-|------|------|------|------|
-| **Polygon** | 有情緒分數、3 年歷史 | 文章較少、無 Yahoo | 歷史收集、訓練資料 |
-| **Finnhub** | 文章多、有 Yahoo/CNBC | 無情緒、僅 7 天歷史 | 每日補充、即時新聞 |
+| 來源        | 優點                       | 缺點                   | 用途                 |
+|-------------|----------------------------|------------------------|----------------------|
+| **Polygon** | 有情緒分數、3 年歷史       | 文章較少、無 Yahoo     | 歷史收集、訓練資料   |
+| **Finnhub** | 文章多、有 Yahoo/CNBC      | 無情緒、僅 7 天歷史    | 每日補充、即時新聞   |
+| **IBKR**    | 高品質來源 (Dow Jones 等)  | 需 IBKR 帳號、速度較慢 | 專業新聞、即時補充   |
 
 ---
 
@@ -191,4 +258,4 @@ combined = combined.drop_duplicates(subset=['dedup_hash'], keep='last')
 
 ---
 
-*最後更新: 2025-12-15*
+*最後更新: 2025-12-20*
