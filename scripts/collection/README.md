@@ -151,7 +151,23 @@ python scripts/collection/collect_polygon_news.py --full-history
 | `--tickers AAPL,MSFT` | 指定股票 |
 | `--host` / `--port` | IBKR Gateway 連線設定 |
 | `--incremental` | ⭐ 增量更新 (時間戳精度) |
+| `--headlines-only` | 只抓標題 (快速模式，跳過內文) |
+| `--backfill-body` | 補抓現有標題的完整內文 |
 | `--status` | 查看現有資料狀態 |
+
+**預設行為**: 抓取標題 + 完整內文 (每篇需額外呼叫 `reqNewsArticle`)
+
+**常用命令**:
+```bash
+# 標準收集 (完整內文，速度較慢)
+python scripts/collection/collect_ibkr_news.py --incremental
+
+# 快速收集 (只抓標題)
+python scripts/collection/collect_ibkr_news.py --incremental --headlines-only
+
+# 補抓現有標題的內文
+python scripts/collection/collect_ibkr_news.py --backfill-body
+```
 
 **需求**: IB Gateway/TWS 運行中 + 新聞訂閱
 
@@ -408,6 +424,46 @@ data/news/
    - 選項 A: 只用 Polygon (品質優先)
    - 選項 B: 三者都用 + 合併 (覆蓋優先)
 3. **高頻更新**: Polygon + IBKR (秒級時間戳，可每小時更新)
+
+---
+
+## API 限制與注意事項
+
+### 呼叫頻率限制
+
+| 來源    | Rate Limit          | 歷史深度     | 說明                          |
+|---------|---------------------|--------------|-------------------------------|
+| Polygon | 5 calls/min (免費)  | 3+ 年        | 付費版無限制                  |
+| Finnhub | 60 calls/min        | ~7 天        | API 只支援天數範圍 (from/to)  |
+| IBKR    | 60 requests/10min   | ~1 個月      | 文章內容保留 2+ 年            |
+
+### ⚠️ 內容截斷風險
+
+各 API 回傳的內容類型和長度限制不同：
+
+| 來源    | 內容類型     | 最大長度      | 截斷風險          |
+|---------|--------------|---------------|-------------------|
+| Polygon | 摘要/節錄    | ~8,300 chars  | 低 (明確標示)     |
+| Finnhub | 摘要         | ~2,300 chars  | **高 (隱性截斷)** |
+| IBKR    | 完整文章     | ~12,400 chars | 低 (無固定截斷)   |
+
+**Finnhub 截斷警告**:
+
+Finnhub 有固定截斷點，內容會在句子中間被切斷：
+
+| 截斷點     | 影響文章數 | 症狀                                  |
+|------------|------------|---------------------------------------|
+| 500 chars  | ~241 篇    | 句子未完成 (`...mainland`)            |
+| 100 chars  | ~228 篇    | 單字未完成 (`...the te`)              |
+
+**建議對策**:
+
+1. **Finnhub**: 標記 `content_length=500` 或 `100` 的文章為「可能截斷」，對 LLM 評分結果降低信心度
+2. **Polygon**: 接受其為摘要來源，適合快速情緒分析，不適合需要完整上下文的深度分析
+3. **IBKR**: 優先使用，提供最完整的內容 (失敗率 ~0.6% 可忽略)
+4. **合併策略**: 有重複時優先保留 IBKR 版本，其次 Polygon (有情緒分數)，最後 Finnhub
+
+> 詳細分析請參考 [DATA_DICTIONARY.md](DATA_DICTIONARY.md#api-限制與內容截斷)
 
 ---
 
