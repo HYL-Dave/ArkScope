@@ -7,7 +7,10 @@ IBKR 特點:
 - 來源品質最高: Dow Jones, Briefing.com, The Fly
 - 歷史深度: ~1 個月
 - 每次查詢上限: 300 篇/股票
-- 抓取速度: ~0.5 秒/股票 (比 Polygon 快 24 倍)
+
+收集模式:
+- 預設: 取完整內容 (標題 + 內文)，適合 LLM 評分
+- --headlines-only: 只取標題，快速模式 (~0.5 秒/股票)
 
 適合用於:
 - 需要高品質新聞來源 (Dow Jones)
@@ -15,8 +18,11 @@ IBKR 特點:
 - 與 Polygon 新聞做交叉驗證
 
 使用方式:
-    # 收集最近 7 天新聞 (預設)
+    # 收集最近 7 天新聞 (含完整內容，預設)
     python collect_ibkr_news.py
+
+    # 快速模式: 只取標題 (不取內文)
+    python collect_ibkr_news.py --headlines-only
 
     # 收集最近 30 天
     python collect_ibkr_news.py --days 30
@@ -35,6 +41,9 @@ IBKR 特點:
 
     # 增量更新
     python collect_ibkr_news.py --incremental
+
+    # 補抓現有標題的內文
+    python collect_ibkr_news.py --backfill-body
 
 需求:
     - IB Gateway 或 TWS 運行中
@@ -340,8 +349,9 @@ class StorageManager:
 class IBKRNewsCollector:
     """IBKR 新聞收集器"""
 
-    def __init__(self, config: IBKRConfig):
+    def __init__(self, config: IBKRConfig, fetch_body: bool = True):
         self.config = config
+        self.fetch_body = fetch_body
         self.ibkr: Optional[IBKRDataSource] = None
         self.providers: List[Dict] = []
 
@@ -349,6 +359,8 @@ class IBKRNewsCollector:
         self.stats = {
             'total_articles': 0,
             'total_tickers': 0,
+            'body_fetched': 0,
+            'body_failed': 0,
             'errors': 0,
             'by_provider': {},
         }
@@ -389,13 +401,26 @@ class IBKRNewsCollector:
             self.ibkr.disconnect()
             logger.info("Disconnected from IB Gateway")
 
+    def fetch_article_body(self, provider_code: str, article_id: str) -> Optional[str]:
+        """抓取單篇文章的完整內容"""
+        if not self.ibkr:
+            return None
+
+        try:
+            time.sleep(self.config.request_delay)  # Rate limiting
+            body = self.ibkr.fetch_news_article_body(provider_code, article_id)
+            return body
+        except Exception as e:
+            logger.debug(f"Failed to fetch body for {article_id}: {e}")
+            return None
+
     def fetch_news(
         self,
         ticker: str,
         start_date: date,
         end_date: date,
     ) -> List[NewsArticle]:
-        """抓取單一股票的新聞"""
+        """抓取單一股票的新聞 (含內文，如果 fetch_body=True)"""
         if not self.ibkr:
             raise RuntimeError("Not connected to IBKR")
 
@@ -427,17 +452,35 @@ class IBKRNewsCollector:
 
                 # Extract article_id from description if present
                 article_id = dedup_hash
+                provider = raw.source or 'unknown'
                 if raw.description and '[Article ID:' in raw.description:
                     try:
-                        start = raw.description.index('[Article ID: ') + 13
-                        end = raw.description.index(']', start)
-                        article_id = raw.description[start:end]
+                        start_idx = raw.description.index('[Article ID: ') + 13
+                        end_idx = raw.description.index(']', start_idx)
+                        article_id = raw.description[start_idx:end_idx]
                     except ValueError:
                         pass
 
                 # Track by provider
-                provider = raw.source or 'unknown'
                 self.stats['by_provider'][provider] = self.stats['by_provider'].get(provider, 0) + 1
+
+                # Fetch article body if enabled
+                description = ""
+                content = ""
+                content_length = 0
+
+                if self.fetch_body and article_id != dedup_hash:
+                    body = self.fetch_article_body(provider, article_id)
+                    if body:
+                        content = body
+                        # Use first 500 chars as description
+                        description = body[:500].strip()
+                        if len(body) > 500:
+                            description += "..."
+                        content_length = len(body)
+                        self.stats['body_fetched'] += 1
+                    else:
+                        self.stats['body_failed'] += 1
 
                 articles.append(NewsArticle(
                     article_id=article_id,
@@ -445,8 +488,8 @@ class IBKRNewsCollector:
                     title=title,
                     published_at=published_at,
                     source_api="ibkr",
-                    description="",  # IBKR doesn't provide description in headlines
-                    content="",
+                    description=description,
+                    content=content,
                     url=raw.url or "",
                     publisher=provider,
                     author="",
@@ -456,7 +499,7 @@ class IBKRNewsCollector:
                     source_sentiment=None,
                     source_sentiment_label="",
                     collected_at=collected_at.isoformat(),
-                    content_length=0,
+                    content_length=content_length,
                     dedup_hash=dedup_hash,
                 ))
 
@@ -510,6 +553,7 @@ def collect_news(
     start_date: date,
     end_date: date,
     config: IBKRConfig,
+    fetch_body: bool = True,
 ) -> dict:
     """Main collection function."""
 
@@ -523,7 +567,7 @@ def collect_news(
         start_date = oldest_allowed
 
     # Initialize
-    collector = IBKRNewsCollector(config)
+    collector = IBKRNewsCollector(config, fetch_body=fetch_body)
     storage = StorageManager(config.data_dir)
 
     # Connect
@@ -535,7 +579,9 @@ def collect_news(
         target_year = end_date.year
         target_month = end_date.month
 
+        mode_str = "完整內容" if fetch_body else "僅標題 (快速模式)"
         logger.info(f"\nStarting IBKR news collection")
+        logger.info(f"Mode: {mode_str}")
         logger.info(f"Tickers: {len(tickers)}")
         logger.info(f"Date range: {start_date} to {end_date}")
         logger.info(f"Storage: {config.data_dir}")
@@ -551,14 +597,19 @@ def collect_news(
 
             if articles:
                 all_articles.extend(articles)
-                logger.info(f"  Found {len(articles)} articles")
+                body_info = ""
+                if fetch_body:
+                    with_body = sum(1 for a in articles if a.content_length > 0)
+                    body_info = f" (with body: {with_body})"
+                logger.info(f"  Found {len(articles)} articles{body_info}")
             else:
                 logger.debug(f"  No articles")
 
             collector.stats['total_tickers'] += 1
 
-            # Small delay between requests
-            time.sleep(config.request_delay)
+            # Small delay between requests (only needed between tickers if not fetching body)
+            if not fetch_body:
+                time.sleep(config.request_delay)
 
         # Save all articles
         if all_articles:
@@ -571,11 +622,24 @@ def collect_news(
         logger.info("\n" + "=" * 60)
         logger.info("Collection Complete")
         logger.info("=" * 60)
+        logger.info(f"Mode: {mode_str}")
         logger.info(f"Total articles: {len(all_articles)}")
         logger.info(f"Saved (deduplicated): {collector.stats['total_articles']}")
         logger.info(f"Tickers processed: {collector.stats['total_tickers']}")
+
+        if fetch_body:
+            logger.info(f"Body fetched: {collector.stats['body_fetched']}")
+            logger.info(f"Body failed: {collector.stats['body_failed']}")
+
         logger.info(f"Errors: {collector.stats['errors']}")
-        logger.info(f"Time elapsed: {elapsed:.1f}s ({len(tickers) / elapsed:.2f} tickers/sec)")
+        logger.info(f"Time elapsed: {elapsed:.1f}s")
+
+        if len(tickers) > 0 and elapsed > 0:
+            if fetch_body:
+                total_requests = len(all_articles) + len(tickers)
+                logger.info(f"Rate: {total_requests / elapsed:.2f} requests/sec")
+            else:
+                logger.info(f"Rate: {len(tickers) / elapsed:.2f} tickers/sec")
 
         if collector.stats['by_provider']:
             logger.info("\nBy provider:")
@@ -583,6 +647,113 @@ def collect_news(
                 logger.info(f"  {provider}: {count}")
 
         return collector.stats
+
+    finally:
+        collector.disconnect()
+
+
+def backfill_body(config: IBKRConfig) -> dict:
+    """補抓現有標題的內文"""
+    from collections import defaultdict
+
+    storage = StorageManager(config.data_dir)
+
+    if not config.data_dir.exists():
+        logger.error("No existing data to backfill")
+        return {'error': 'no_data'}
+
+    # Find articles without body
+    articles_to_update = []
+
+    for year_dir in sorted(config.data_dir.iterdir()):
+        if not year_dir.is_dir():
+            continue
+
+        for parquet_file in year_dir.glob("*.parquet"):
+            try:
+                df = pd.read_parquet(parquet_file, engine='pyarrow')
+
+                # Find articles with empty content
+                empty_content = df[
+                    (df['content'].isna()) |
+                    (df['content'] == '') |
+                    (df['content_length'] == 0)
+                ]
+
+                if not empty_content.empty:
+                    for _, row in empty_content.iterrows():
+                        # Only process if we have a valid article_id (not just dedup_hash)
+                        if row['article_id'] != row['dedup_hash']:
+                            articles_to_update.append({
+                                'file': parquet_file,
+                                'article_id': row['article_id'],
+                                'publisher': row['publisher'],
+                                'dedup_hash': row['dedup_hash'],
+                            })
+
+            except Exception as e:
+                logger.warning(f"Error reading {parquet_file}: {e}")
+
+    if not articles_to_update:
+        logger.info("All articles already have content, nothing to backfill")
+        return {'updated': 0}
+
+    logger.info(f"Found {len(articles_to_update)} articles without content")
+
+    # Connect to IBKR
+    collector = IBKRNewsCollector(config, fetch_body=True)
+    if not collector.connect():
+        logger.error("Failed to connect to IB Gateway")
+        return {'error': 'connection_failed'}
+
+    try:
+        stats = {'updated': 0, 'failed': 0}
+        start_time = time.time()
+
+        # Group by file for efficient updates
+        by_file = defaultdict(list)
+        for art in articles_to_update:
+            by_file[art['file']].append(art)
+
+        for parquet_file, articles in by_file.items():
+            logger.info(f"\nProcessing {parquet_file.name}: {len(articles)} articles")
+
+            df = pd.read_parquet(parquet_file, engine='pyarrow')
+            updated_count = 0
+
+            for i, art in enumerate(articles):
+                progress = (i + 1) / len(articles) * 100
+                logger.info(f"  [{progress:.1f}%] Fetching body for {art['article_id'][:20]}...")
+
+                body = collector.fetch_article_body(art['publisher'], art['article_id'])
+
+                if body:
+                    # Update the row
+                    mask = df['dedup_hash'] == art['dedup_hash']
+                    df.loc[mask, 'content'] = body
+                    df.loc[mask, 'description'] = body[:500].strip() + ("..." if len(body) > 500 else "")
+                    df.loc[mask, 'content_length'] = len(body)
+                    updated_count += 1
+                    stats['updated'] += 1
+                    logger.info(f"    ✓ Got {len(body)} chars")
+                else:
+                    stats['failed'] += 1
+                    logger.info(f"    ✗ Failed")
+
+            # Save updated file
+            if updated_count > 0:
+                df.to_parquet(parquet_file, index=False, compression='snappy')
+                logger.info(f"  Saved {updated_count} updates to {parquet_file.name}")
+
+        elapsed = time.time() - start_time
+        logger.info("\n" + "=" * 60)
+        logger.info("Backfill Complete")
+        logger.info("=" * 60)
+        logger.info(f"Updated: {stats['updated']}")
+        logger.info(f"Failed: {stats['failed']}")
+        logger.info(f"Time: {elapsed:.1f}s")
+
+        return stats
 
     finally:
         collector.disconnect()
@@ -631,6 +802,10 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     parser.add_argument('--status', action='store_true', help='Show current data status')
     parser.add_argument('--incremental', action='store_true',
                        help='Incremental update: fetch since last collected date')
+    parser.add_argument('--headlines-only', action='store_true',
+                       help='Fast mode: only fetch headlines, skip article body')
+    parser.add_argument('--backfill-body', action='store_true',
+                       help='Backfill: fetch body for existing headlines without content')
 
     args = parser.parse_args()
 
@@ -681,10 +856,19 @@ Note: IBKR provides ~1 month of news history with highest quality sources
 
         return
 
+    # Handle --backfill-body mode
+    if getattr(args, 'backfill_body', False):
+        logger.info("BACKFILL MODE: Fetching body for existing headlines")
+        backfill_body(config)
+        return
+
     # Determine date range
     end_date = date.today()
     if args.end:
         end_date = date.fromisoformat(args.end)
+
+    # Determine fetch_body mode (default: True, unless --headlines-only)
+    fetch_body = not getattr(args, 'headlines_only', False)
 
     # Handle --incremental mode
     if args.incremental:
@@ -719,7 +903,7 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     logger.info(f"Date range: {start_date} to {end_date}")
 
     # Collect
-    stats = collect_news(tickers, start_date, end_date, config)
+    stats = collect_news(tickers, start_date, end_date, config, fetch_body=fetch_body)
 
     # Save stats
     stats_path = Path("data/news/metadata/ibkr_collection_stats.json")
