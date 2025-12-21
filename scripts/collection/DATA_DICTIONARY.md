@@ -17,9 +17,12 @@ data/news/
 │   │   └── 2025/
 │   │       └── 2025-12.parquet
 │   │
-│   └── ibkr/               # IBKR 高品質新聞
+│   └── ibkr/               # IBKR 高品質新聞 (按月份儲存)
+│       ├── 2023/
+│       │   ├── 2023-01.parquet
+│       │   └── ...
+│       ├── 2024/
 │       └── 2025/
-│           └── 2025-12.parquet
 │
 ├── merged/                 # 合併去重後 (未來使用)
 │
@@ -237,6 +240,26 @@ expansion of artificial intelligence...
 | Polygon | 5 calls/min (免費)  | 3+ 年        | 付費版無限制                  |
 | Finnhub | 60 calls/min        | ~7 天        | API 只支援天數範圍 (from/to)  |
 | IBKR    | 60 requests/10min   | ~1 個月      | 文章內容保留 2+ 年            |
+
+### 內容完整度限制 (2025-12-21)
+
+**重要發現**: Polygon 和 Finnhub 只提供摘要，這是 **API 設計如此，非付費限制**。
+
+| API | 免費版 | 付費版 | 完整內文取得方式 |
+|-----|--------|--------|------------------|
+| **Polygon** | 摘要 + 連結 | 摘要 + 連結 | 需加購 [Benzinga Partner API](https://massive.com/docs/rest/partners/benzinga/news) ($99/月) |
+| **Finnhub** | 摘要 | 摘要 | **不提供**（需用其他 API 如 [finlight](https://finlight.me/blog/finnhub-vs-finlight-news-api-comparison)）|
+| **IBKR** | 完整內文 | 完整內文 | 透過 `reqNewsArticle` API 取得 |
+
+**實測內容長度統計**:
+
+| 來源 | 平均長度 | 中位數 | 最大長度 |
+|------|----------|--------|----------|
+| Polygon | 246 chars | 147 chars | 8,339 chars |
+| Finnhub | 207 chars | 148 chars | 2,547 chars |
+| **IBKR** | **3,453 chars** | **2,054 chars** | 12,415 chars |
+
+**結論**: 若需要完整新聞內文進行 LLM 分析，**IBKR 是唯一免費提供完整內文的來源**。
 
 ### ⚠️ 內容截斷分析
 
