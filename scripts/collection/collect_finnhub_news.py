@@ -210,8 +210,12 @@ class FinnhubNewsCollector:
             self.stats['errors'] += 1
             return []
 
-    def parse_article(self, raw: dict, ticker: str, collected_at: datetime) -> NewsArticle:
-        """Parse raw API response to NewsArticle."""
+    def parse_article(self, raw: dict, ticker: str, collected_at: datetime) -> Optional[NewsArticle]:
+        """Parse raw API response to NewsArticle.
+
+        Returns None for truncated articles (Yahoo 100/500 chars) which are
+        skipped due to insufficient content for reliable LLM scoring.
+        """
 
         # Parse timestamp (Finnhub uses Unix timestamp)
         timestamp = raw.get('datetime', 0)
@@ -225,11 +229,19 @@ class FinnhubNewsCollector:
         headline = raw.get('headline', '')
         summary = raw.get('summary', '')
         content = summary
+        content_length = len(content)
 
         # Publisher (source field)
         publisher = raw.get('source', '')
 
-        # Track by source
+        # Skip truncated Yahoo articles (100/500 chars are 99.8% truncated)
+        # Reason: 100 chars has 0 complete sentences, 500 chars lacks key details
+        # These provide insufficient context for reliable sentiment/risk scoring
+        if publisher == 'Yahoo' and content_length in [100, 500]:
+            self.stats['skipped_truncated'] = self.stats.get('skipped_truncated', 0) + 1
+            return None
+
+        # Track by source (only for kept articles)
         if publisher:
             self.stats['by_source'][publisher] = self.stats['by_source'].get(publisher, 0) + 1
 
@@ -258,7 +270,7 @@ class FinnhubNewsCollector:
             source_sentiment=None,  # Finnhub doesn't provide sentiment
             source_sentiment_label='',
             collected_at=collected_at.isoformat(),
-            content_length=len(content),
+            content_length=content_length,
             dedup_hash=dedup_hash,
         )
 
@@ -517,8 +529,12 @@ def collect_news(
         raw_articles = collector.fetch_news(ticker, start_date, end_date)
 
         if raw_articles:
-            # Parse
-            articles = [collector.parse_article(a, ticker, collected_at) for a in raw_articles]
+            # Parse (filter out None for truncated articles)
+            articles = [
+                a for a in
+                (collector.parse_article(raw, ticker, collected_at) for raw in raw_articles)
+                if a is not None
+            ]
             all_articles.extend(articles)
             logger.info(f"  Found {len(articles)} articles")
         else:
@@ -537,6 +553,12 @@ def collect_news(
     logger.info(f"Saved (deduplicated): {collector.stats['total_articles']}")
     logger.info(f"Total requests: {collector.stats['total_requests']}")
     logger.info(f"Errors: {collector.stats['errors']}")
+
+    # Skipped truncated articles stats
+    skipped_count = collector.stats.get('skipped_truncated', 0)
+    if skipped_count > 0:
+        total_fetched = len(all_articles) + skipped_count
+        logger.info(f"Skipped truncated (Yahoo 100/500 chars): {skipped_count} ({100*skipped_count/total_fetched:.1f}%)")
 
     if collector.stats['by_source']:
         logger.info("\nBy source:")
