@@ -880,6 +880,9 @@ Note: IBKR provides ~1 month of news history with highest quality sources
             start_timestamp = latest_ts + timedelta(seconds=1)
             start_date = start_timestamp.date()
 
+            # Handle timezone: start_timestamp may be timezone-aware (UTC)
+            if start_timestamp.tzinfo is not None:
+                start_timestamp = start_timestamp.replace(tzinfo=None)
             now = datetime.now()
             if start_timestamp > now:
                 logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")

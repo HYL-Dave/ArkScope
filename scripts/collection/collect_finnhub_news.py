@@ -642,6 +642,9 @@ For historical news, use collect_polygon_news.py instead.
 
         if latest_ts:
             # Calculate time since latest article
+            # Handle timezone: latest_ts may be timezone-aware (UTC)
+            if latest_ts.tzinfo is not None:
+                latest_ts = latest_ts.replace(tzinfo=None)
             now = datetime.now()
             hours_behind = (now - latest_ts).total_seconds() / 3600
             days_behind = math.ceil(hours_behind / 24)  # Round up to full days

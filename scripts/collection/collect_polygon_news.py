@@ -931,6 +931,9 @@ Examples:
             start_date = start_timestamp.date()
 
             # Check if already up to date
+            # Handle timezone: start_timestamp may be timezone-aware (UTC)
+            if start_timestamp.tzinfo is not None:
+                start_timestamp = start_timestamp.replace(tzinfo=None)
             now = datetime.now()
             if start_timestamp > now:
                 logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
