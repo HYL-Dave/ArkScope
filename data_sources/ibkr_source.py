@@ -164,7 +164,7 @@ class IBKRDataSource(BaseDataSource):
 
     @property
     def supports_news(self) -> bool:
-        return False  # IBKR news requires separate subscription
+        return True  # IBKR news available with subscription (DJ, FLY, Briefing, etc.)
 
     @property
     def supports_prices(self) -> bool:
@@ -263,6 +263,22 @@ class IBKRDataSource(BaseDataSource):
             logger.error(f"Credential validation failed: {e}")
             return False
 
+    def get_news_providers(self) -> List[Dict[str, str]]:
+        """
+        Get list of available news providers for the account.
+
+        Returns:
+            List of dicts with 'code' and 'name' keys.
+        """
+        self._ensure_connected()
+
+        try:
+            providers = self._ib.reqNewsProviders()
+            return [{'code': p.code, 'name': p.name} for p in providers]
+        except Exception as e:
+            logger.error(f"Error fetching news providers: {e}")
+            return []
+
     def fetch_news(
         self,
         tickers: List[str],
@@ -270,14 +286,140 @@ class IBKRDataSource(BaseDataSource):
         end_date: Optional[date] = None,
         days_back: int = 7,
         limit: Optional[int] = None,
+        providers: Optional[str] = None,
     ) -> List[NewsArticle]:
         """
-        Fetch news articles - NOT SUPPORTED by default IBKR data.
+        Fetch news articles from IBKR news providers.
 
-        IBKR news requires a separate Wall Street Horizon or similar subscription.
+        Requires news subscription (DJ, FLY, Briefing, etc.)
+
+        Args:
+            tickers: List of stock symbols.
+            start_date: Start date (default: days_back from today).
+            end_date: End date (default: today).
+            days_back: Days to look back if start_date not specified.
+            limit: Max articles per ticker (default: 100, max: 300).
+            providers: Provider codes separated by '+' (e.g., 'DJ-N+FLY').
+                      If None, uses all available providers.
+
+        Returns:
+            List of NewsArticle objects.
         """
-        logger.warning("IBKR data source does not support news without additional subscriptions")
-        return []
+        self._ensure_connected()
+
+        # Get available providers if not specified
+        if providers is None:
+            available = self.get_news_providers()
+            if not available:
+                logger.warning("No news providers available for this account")
+                return []
+            providers = '+'.join([p['code'] for p in available])
+            logger.info(f"Using providers: {providers}")
+
+        # Set date range
+        if end_date is None:
+            end_date = date.today()
+        if start_date is None:
+            start_date = end_date - timedelta(days=days_back)
+
+        # Format times for IBKR API (yyyyMMdd HH:mm:ss)
+        start_str = datetime.combine(start_date, datetime.min.time()).strftime('%Y%m%d %H:%M:%S')
+        end_str = datetime.combine(end_date, datetime.max.time()).strftime('%Y%m%d %H:%M:%S')
+
+        max_results = min(limit or 100, 300)  # IBKR max is 300
+        all_articles = []
+
+        for ticker in tickers:
+            logger.info(f"Fetching news for {ticker}")
+
+            try:
+                self._rate_limit_wait()
+
+                contract = self._create_contract(ticker)
+                self._ib.qualifyContracts(contract)
+
+                headlines = self._ib.reqHistoricalNews(
+                    contract.conId,
+                    providers,
+                    start_str,
+                    end_str,
+                    max_results,
+                )
+
+                if headlines:
+                    for h in headlines:
+                        # Parse the headline metadata
+                        # Format: {A:conId:L:lang:K:sentiment:C:confidence}headline
+                        headline_text = h.headline
+                        sentiment = None
+
+                        # Extract sentiment if present
+                        if headline_text.startswith('{'):
+                            try:
+                                end_meta = headline_text.index('}')
+                                meta = headline_text[1:end_meta]
+                                headline_text = headline_text[end_meta + 1:]
+
+                                # Parse K: (sentiment) value
+                                for part in meta.split(':'):
+                                    if part.startswith('K:'):
+                                        try:
+                                            sentiment = float(part[2:])
+                                        except ValueError:
+                                            pass
+                            except (ValueError, IndexError):
+                                pass
+
+                        # Convert time to datetime
+                        pub_time = h.time
+                        if isinstance(pub_time, str):
+                            try:
+                                pub_time = datetime.strptime(pub_time, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                pub_time = datetime.now()
+
+                        all_articles.append(NewsArticle(
+                            ticker=ticker,
+                            title=headline_text,
+                            published_date=pub_time,
+                            source=h.providerCode,
+                            description=f"[Article ID: {h.articleId}]",  # Store article_id for later body fetch
+                            url='',  # IBKR doesn't provide URL in headlines
+                            data_source='ibkr',
+                        ))
+
+                    logger.info(f"  Got {len(headlines)} headlines for {ticker}")
+                else:
+                    logger.info(f"  No news for {ticker}")
+
+            except Exception as e:
+                logger.error(f"Error fetching news for {ticker}: {e}")
+
+        logger.info(f"Fetched {len(all_articles)} total news articles")
+        return all_articles
+
+    def fetch_news_article_body(self, provider_code: str, article_id: str) -> Optional[str]:
+        """
+        Fetch the full body of a news article.
+
+        Args:
+            provider_code: Provider code (e.g., 'DJ-N', 'FLY').
+            article_id: Article ID from headline.
+
+        Returns:
+            Article body text or None.
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        try:
+            body = self._ib.reqNewsArticle(provider_code, article_id)
+            if body:
+                return body.articleText
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching article body: {e}")
+            return None
 
     def fetch_prices(
         self,

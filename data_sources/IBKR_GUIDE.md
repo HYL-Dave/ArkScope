@@ -235,6 +235,11 @@ fetch_intraday_prices(ticker, trade_date, interval)
 fetch_historical_intraday(tickers, start_date, end_date, interval)
 fetch_adjusted_prices(tickers, start_date, end_date)
 
+# 新聞數據
+get_news_providers()  # 取得可用新聞來源
+fetch_news(tickers, start_date, end_date, days_back, limit, providers)
+fetch_news_article_body(provider_code, article_id)
+
 # 其他數據
 fetch_historical_volatility(ticker, start_date, end_date)
 fetch_short_borrow_rate(ticker, start_date, end_date)
@@ -441,6 +446,77 @@ ib.connect('127.0.0.1', 7496, clientId=1)
 **相關資源**：
 - [Elite Trader: IB TWS and firewall](https://www.elitetrader.com/et/threads/ib-tws-and-firewall.352215/)
 - [TWS API Connectivity](https://interactivebrokers.github.io/tws-api/connection.html)
+
+## 新聞數據 (News API)
+
+IBKR 提供專業新聞源的即時和歷史新聞，需要有相應的新聞訂閱（Dow Jones、Briefing.com 等）。
+
+### 可用新聞來源 (測試於 2025-12)
+
+| 代碼 | 來源 | 說明 |
+|------|------|------|
+| DJ-N | Dow Jones Global Equity Trader | 即時市場新聞 |
+| DJ-RT | Dow Jones Trader News | 交易相關新聞 |
+| DJ-RTA | Dow Jones Top Stories Asia Pacific | 亞太區要聞 |
+| DJ-RTE | Dow Jones Top Stories Europe | 歐洲要聞 |
+| DJ-RTG | Dow Jones Top Stories Global | 全球要聞 |
+| DJNL | Dow Jones Newsletters | 電子報 |
+| FLY | The Fly | 即時市場解讀 |
+| BRFG | Briefing.com General Market Columns | 市場分析 |
+| BRFUPDN | Briefing.com Analyst Actions | 分析師評級 |
+
+### API 限制 (實測結果)
+
+| 項目 | 限制 |
+|------|------|
+| **歷史深度** | ~1 個月 (約 30 天) |
+| **每次查詢上限** | 300 篇/股票 |
+| **抓取速度** | ~0.5 秒/股票 |
+| **Rate Limit** | 無明顯限制 (連續 10 請求無錯誤) |
+| **文章內文** | ✅ 可透過 `reqNewsArticle()` 取得 |
+
+### 使用範例
+
+```python
+from data_sources import IBKRDataSource
+from datetime import date, timedelta
+
+with IBKRDataSource(host='192.168.0.152', port=4001) as ibkr:
+    # 1. 查看可用的新聞來源
+    providers = ibkr.get_news_providers()
+    print(providers)
+    # [{'code': 'DJ-N', 'name': 'Dow Jones Global Equity Trader'}, ...]
+
+    # 2. 抓取新聞標題
+    articles = ibkr.fetch_news(
+        tickers=['AAPL', 'MSFT', 'NVDA'],
+        days_back=7,
+        limit=50  # 每支股票最多 50 篇
+    )
+
+    for a in articles[:5]:
+        print(f"[{a.published_date}] {a.source}: {a.title}")
+
+    # 3. 抓取文章內文 (需要 article_id)
+    import re
+    match = re.search(r'\[Article ID: ([^\]]+)\]', articles[0].description)
+    if match:
+        body = ibkr.fetch_news_article_body(articles[0].source, match.group(1))
+        print(body[:500])  # HTML 格式
+```
+
+### 與 Polygon/Finnhub 比較
+
+| 來源 | 歷史深度 | 品質 | 情緒分數 | 費用 |
+|------|---------|------|---------|------|
+| **IBKR** | ~1 個月 | **專業 (Dow Jones)** | ❌ | 需訂閱 |
+| Polygon | 3+ 年 | 中 (Benzinga, Motley Fool) | ✅ | 免費方案 |
+| Finnhub | 7 天 | 中 (Yahoo 70%) | ❌ | 免費方案 |
+
+**建議策略**：
+- **歷史數據**: 使用 Polygon (3+ 年)
+- **即時高品質**: 使用 IBKR (Dow Jones)
+- **補充覆蓋**: 使用 Finnhub
 
 ### Q: 數據缺失？
 
