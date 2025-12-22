@@ -22,6 +22,8 @@
     ├── daily_update.py           # ⭐ 統一調度入口 (推薦)
     ├── collect_polygon_news.py   # Polygon 新聞 (獨立實作)
     ├── collect_finnhub_news.py   # Finnhub 新聞 (獨立實作)
+    ├── collect_eodhd_news.py     # EODHD 新聞 (獨立實作) ⭐ NEW
+    ├── collect_alphavantage_news.py  # Alpha Vantage 新聞 (獨立實作) ⭐ NEW
     ├── collect_ibkr_news.py      # IBKR 新聞 (使用 data_sources)
     └── collect_ibkr_prices.py    # IBKR 股價 (使用 data_sources)
 ```
@@ -29,12 +31,15 @@
 **日常使用**: 直接執行 `scripts/collection/` 下的腳本即可
 
 **設計說明**:
-| 腳本 | 依賴 data_sources? | 說明 |
-|------|-------------------|------|
-| collect_polygon_news.py | ❌ 獨立 | 針對批量收集優化，直接呼叫 API |
-| collect_finnhub_news.py | ❌ 獨立 | 針對批量收集優化，直接呼叫 API |
-| collect_ibkr_news.py | ✅ 依賴 | 使用 `data_sources.IBKRDataSource` |
-| collect_ibkr_prices.py | ✅ 依賴 | 使用 `data_sources.IBKRDataSource` |
+
+| 腳本                          | 依賴 data_sources? | 說明                                    |
+|-------------------------------|--------------------|-----------------------------------------|
+| collect_polygon_news.py       | ❌ 獨立            | 針對批量收集優化，直接呼叫 API          |
+| collect_finnhub_news.py       | ❌ 獨立            | 針對批量收集優化，直接呼叫 API          |
+| collect_eodhd_news.py         | ❌ 獨立            | 針對批量收集優化，直接呼叫 API          |
+| collect_alphavantage_news.py  | ❌ 獨立            | 針對批量收集優化，直接呼叫 API          |
+| collect_ibkr_news.py          | ✅ 依賴            | 使用 `data_sources.IBKRDataSource`      |
+| collect_ibkr_prices.py        | ✅ 依賴            | 使用 `data_sources.IBKRDataSource`      |
 
 **data_sources/ 用途**:
 - API 測試和驗證 (`test_polygon.py`, `test_finnhub.py` 等)
@@ -170,6 +175,75 @@ python scripts/collection/collect_ibkr_news.py --backfill-body
 ```
 
 **需求**: IB Gateway/TWS 運行中 + 新聞訂閱
+
+### collect_eodhd_news.py (全球市場) ⭐ NEW
+
+**用途**: 收集 EODHD 新聞 (150k+ 代號, 60+ 交易所, 含情緒分析)
+
+| 參數 | 說明 |
+|------|------|
+| `--days N` | 最近 N 天 |
+| `--start` / `--end` | 日期範圍 |
+| `--tickers AAPL,MSFT` | 指定股票 |
+| `--incremental` | 增量更新 |
+| `--status` | 查看現有資料狀態 |
+
+**Rate Limit**:
+- 免費版: **20 calls/天** (新聞每次消耗 5 calls = **僅 4 次新聞查詢/天!**)
+- 付費版: 100,000 calls/天
+
+**特點**:
+- 提供 AI 情緒分數 (-1 到 1)
+- 覆蓋全球 60+ 交易所
+- 歷史深度: 1972 年起 (付費)
+
+**注意**: 免費版極為有限，建議付費用戶使用！
+
+```bash
+# 收集最近 7 天
+python scripts/collection/collect_eodhd_news.py --days 7
+
+# 指定股票
+python scripts/collection/collect_eodhd_news.py --tickers AAPL,MSFT --days 30
+```
+
+### collect_alphavantage_news.py (AI 情緒) ⭐ NEW
+
+**用途**: 收集 Alpha Vantage 新聞 (最詳細的 AI 情緒分析)
+
+| 參數 | 說明 |
+|------|------|
+| `--start` / `--end` | 日期範圍 |
+| `--tickers AAPL,MSFT` | 指定股票 |
+| `--incremental` | 增量更新 |
+| `--status` | 查看現有資料狀態 |
+
+**Rate Limit**:
+- 免費版: **25 calls/天**, 5 calls/分鐘 (極為有限!)
+- 付費版: 75-1200 calls/分鐘
+
+**情緒分析特點** (最詳細):
+```json
+{
+  "overall_sentiment_score": 0.312,
+  "overall_sentiment_label": "Somewhat-Bullish",
+  "ticker_sentiment": {
+    "AAPL": {"relevance_score": 0.705, "sentiment_score": 0.306}
+  }
+}
+```
+
+**注意**:
+- 免費版每天只能查詢 ~25 支股票
+- 腳本會自動過濾低相關度文章 (relevance < 0.3)
+
+```bash
+# 收集指定股票
+python scripts/collection/collect_alphavantage_news.py --tickers AAPL,MSFT,GOOGL
+
+# 指定日期範圍
+python scripts/collection/collect_alphavantage_news.py --start 2024-12-01 --end 2024-12-15
+```
 
 ---
 
@@ -411,11 +485,13 @@ data/news/
 
 ## 收集策略比較
 
-| 來源 | 歷史深度 | 每日文章數 | 主要發布商 | 有情緒分數 | 增量精度 |
-|------|---------|----------|-----------|----------|---------|
-| Polygon | 3+ 年 | ~20-40 | Motley Fool, Benzinga | ✅ | 秒級時間戳 |
-| Finnhub | 7 天 | ~150+ | Yahoo (77%) | ❌ | 動態天數 |
-| IBKR | ~30 天 | 高品質 | Dow Jones, Briefing.com | ❌ | 秒級時間戳 |
+| 來源 | 歷史深度 | 每日文章數 | 主要發布商 | 有情緒分數 | 免費 Rate Limit |
+|------|---------|----------|-----------|----------|----------------|
+| Polygon | 3+ 年 | ~20-40 | Motley Fool, Benzinga | ✅ | 5 calls/min |
+| Finnhub | 7 天 | ~150+ | Yahoo (77%) | ❌ | 60 calls/min |
+| IBKR | ~30 天 | 高品質 | Dow Jones, Briefing.com | ❌ | 60 req/10min |
+| **EODHD** | 1年 (免費) | 中 | 全球 60+ 交易所 | ✅ | **4 news/day** |
+| **Alpha Vantage** | ? | ~50 | 多來源 | ✅ **最詳細** | **25 calls/day** |
 
 ### 建議策略
 
@@ -515,4 +591,4 @@ Finnhub 有固定截斷點，內容會在句子中間被切斷：
 
 ---
 
-*最後更新: 2025-12-20*
+*最後更新: 2025-12-22*
