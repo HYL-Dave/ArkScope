@@ -481,7 +481,7 @@ IBKR 提供專業新聞源的即時和歷史新聞，需要有相應的新聞訂
 from data_sources import IBKRDataSource
 from datetime import date, timedelta
 
-with IBKRDataSource(host='192.168.0.152', port=4001) as ibkr:
+with IBKRDataSource(host=os.environ.get('IBKR_HOST', '127.0.0.1'), port=4001) as ibkr:
     # 1. 查看可用的新聞來源
     providers = ibkr.get_news_providers()
     print(providers)

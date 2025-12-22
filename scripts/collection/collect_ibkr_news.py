@@ -33,8 +33,8 @@ IBKR 特點:
     # 僅收集指定股票
     python collect_ibkr_news.py --tickers AAPL,MSFT
 
-    # 使用不同的 IB Gateway 連接
-    python collect_ibkr_news.py --port 4001 --host 192.168.0.152
+    # 使用不同的 IB Gateway 連接 (或設置 IBKR_HOST 環境變數)
+    python collect_ibkr_news.py --port 4001 --host <your-host>
 
     # 查看現有資料狀態
     python collect_ibkr_news.py --status
@@ -778,8 +778,8 @@ Examples:
     # Specific tickers
     python collect_ibkr_news.py --tickers AAPL,MSFT,GOOGL
 
-    # Use different IB Gateway connection
-    python collect_ibkr_news.py --host 192.168.0.152 --port 4001
+    # Use different IB Gateway connection (or set IBKR_HOST env var)
+    python collect_ibkr_news.py --host <your-host> --port 4001
 
     # Show data status
     python collect_ibkr_news.py --status
