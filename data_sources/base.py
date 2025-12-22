@@ -21,6 +21,7 @@ class DataSourceType(Enum):
     SEC_EDGAR = "sec_edgar"
     POLYGON = "polygon"
     ALPHA_VANTAGE = "alpha_vantage"
+    EODHD = "eodhd"
     YAHOO = "yahoo"
 
 

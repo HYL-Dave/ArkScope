@@ -21,6 +21,8 @@ from .tiingo_source import TiingoDataSource
 from .finnhub_source import FinnhubDataSource
 from .sec_edgar_source import SECEdgarDataSource
 from .polygon_source import PolygonDataSource
+from .alpha_vantage_source import AlphaVantageDataSource
+from .eodhd_source import EODHDDataSource
 from .source_factory import get_data_source, list_available_sources
 
 # IBKR requires ib_insync, import conditionally
@@ -41,6 +43,8 @@ __all__ = [
     'FinnhubDataSource',
     'SECEdgarDataSource',
     'PolygonDataSource',
+    'AlphaVantageDataSource',
+    'EODHDDataSource',
     'IBKRDataSource',
     'IntradayBar',
     'get_data_source',
