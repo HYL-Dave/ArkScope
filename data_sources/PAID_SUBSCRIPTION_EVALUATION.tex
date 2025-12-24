@@ -4,7 +4,7 @@
 % Packages
 % ============================================================
 \usepackage{xeCJK}  % Chinese support
-\setCJKmainfont[AutoFakeBold=true]{Noto Sans CJK TC}  % fallback if not found
+\setCJKmainfont[AutoFakeBold=true]{Noto Sans CJK TC}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{booktabs}
 \usepackage{tabularx}
@@ -19,7 +19,10 @@
 \usepackage{tcolorbox}
 \usepackage{multirow}
 \usepackage{makecell}
-\usepackage{amssymb}  % for symbols
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{float}
 
 % ============================================================
 % Colors
@@ -33,6 +36,7 @@
 \definecolor{successgreen}{HTML}{16A34A}
 \definecolor{warningyellow}{HTML}{CA8A04}
 \definecolor{dangered}{HTML}{DC2626}
+\definecolor{codegray}{HTML}{F5F5F5}
 
 % ============================================================
 % Hyperref settings
@@ -45,13 +49,24 @@
 }
 
 % ============================================================
-% Custom commands (avoid reserved names)
+% Custom commands
 % ============================================================
 \newcommand{\cmark}{\textcolor{successgreen}{$\checkmark$}}
 \newcommand{\xmark}{\textcolor{dangered}{$\times$}}
 \newcommand{\wmark}{\textcolor{warningyellow}{$\triangle$}}
 \newcommand{\fire}{\textcolor{orange}{*}}
 \newcommand{\starmark}{\textcolor{warningyellow}{$\bigstar$}}
+
+% ============================================================
+% Listings settings
+% ============================================================
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{codegray},
+    frame=single,
+    breaklines=true,
+    showstringspaces=false
+}
 
 % ============================================================
 % Title formatting
@@ -106,7 +121,7 @@
 % ============================================================
 \section{執行摘要}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{資料提供商總覽}
 \begin{tabular}{@{}lccll@{}}
@@ -140,26 +155,59 @@
 
 \subsection{完整 API 生態系統}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lll@{}}
 \toprule
 \textbf{類別} & \textbf{資料類型} & \textbf{投資應用} \\
 \midrule
-Stocks & Tickers, Aggregates, Trades, Quotes & 股票策略 \\
+Stocks & Tickers, Aggregates, Trades, Quotes, Snapshots & 股票策略 \\
 Options & Contracts, Greeks, Snapshots, Trades & \textbf{衍生品策略} \\
 Futures & Products, Schedules, Aggregates & \textbf{期貨對沖} \\
 Indices & Aggregates, Snapshots & 大盤追蹤 \\
 Forex & 貨幣轉換, Quotes & \textbf{外匯策略} \\
 Crypto & Aggregates, Trades & \textbf{加密貨幣} \\
-Economy & 國庫利率, 通膨數據 & \textbf{宏觀配置} \\
+Economy & 國庫利率, 通膨數據, 通膨預期 & \textbf{宏觀配置} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{獨特數據資產}
+
+\begin{tcolorbox}[colback=polygonpurple!5,colframe=polygonpurple,title={Partner Data (合作夥伴數據)}]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Benzinga} -- 分析師評級變動、財報預期、即時新聞
+    \item \textbf{ETF Global} -- ETF 成分股、資金流向
+    \item \textbf{TMX} -- 公司事件
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{技術指標 API}
+\begin{itemize}
+    \item SMA, EMA, MACD, RSI, Bollinger Bands
+    \item 直接 API 返回，無需自行計算
+\end{itemize}
+
+\subsection{投資領域擴展潛力}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{策略類型} & \textbf{可行性} & \textbf{所需數據} \\
+\midrule
+股票日內交易 & \cmark 完全支援 & 分鐘/秒級數據 \\
+Options 策略 & \cmark 完全支援 & Greeks, IV, Chain \\
+Futures 對沖 & \cmark 完全支援 & 期貨價格 \\
+宏觀配置 & \cmark 支援 & 經濟指標 \\
+跨資產套利 & \cmark 可能 & 多資產即時數據 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{訂閱方案}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lrll@{}}
 \toprule
@@ -169,17 +217,38 @@ Free & \$0 & 5 calls/min & 延遲數據, 2 年歷史 \\
 \textbf{Starter} & \$29 & 無限 & \textbf{即時串流 + Options + Futures + 經濟數據} \\
 Developer & \$199 & 無限 & + Options 完整歷史 + 商業使用 \\
 Business & \$1,999 & 無限 & + 無交易所費用 + 20+ 年歷史 \\
+Enterprise & 洽詢 & 無限 & + SLA + 專屬 Slack + 客製化數據源 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{tcolorbox}[colback=polygonpurple!5,colframe=polygonpurple]
-\textbf{結論}: \$29/月解鎖 Options + Futures + 經濟數據，對多策略開發價值極高。
+\textbf{結論}: \$29/月解鎖 Options + Futures + 經濟數據，對多策略開發價值極高。新創可享首年最高 50\% 折扣。
 \end{tcolorbox}
 
 % ------------------------------------------------------------
 \newpage
 \section{Finnhub}
+
+\subsection{完整 API 生態系統}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{類別} & \textbf{資料類型} & \textbf{投資應用} \\
+\midrule
+Stock Data & 歷史價格, 公司資料, 基本財務 & 基礎分析 \\
+Alternative Data & 國會交易, Insider, 專利 & \textbf{另類阿爾法} \\
+ESG & 環境/社會/治理評分 & \textbf{ESG 投資} \\
+Earnings & 財報日曆, 電話會議逐字稿 & 事件驅動 \\
+Ownership & 機構持股, 共同基金持股 & 跟隨大資金 \\
+SEC Filings & 完整搜索, 文件情緒分析 & 文本挖掘 \\
+Economic & 經濟日曆, 各國指標 & 宏觀判斷 \\
+Forex/Crypto & 匯率, 歷史數據 & 跨市場 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{獨特另類數據}
 
@@ -193,9 +262,20 @@ Business & \$1,999 & 無限 & + 無交易所費用 + 20+ 年歷史 \\
 \end{itemize}
 \end{tcolorbox}
 
+\textbf{國會交易數據的價值}:
+\begin{itemize}
+    \item 研究顯示國會議員的交易有超額回報
+    \item 可作為反向/跟隨指標
+    \item 其他提供商少有此數據
+\end{itemize}
+
+\subsection{SEC 文件情緒分析}
+
+Finnhub 獨有功能：對 SEC 文件進行語言分析，包括 positive, negative, litigious, uncertainty 等情緒維度。
+
 \subsection{免費 vs 付費 API 實測結果}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lccp{6cm}@{}}
 \toprule
@@ -216,9 +296,185 @@ Earnings Calendar & \cmark & \cmark & EPS 實際/預估 \\
 \textbf{重要發現}: 歷史股價 (Stock Candles) 在免費版無法存取！建議搭配 \textbf{Tiingo} 取得歷史股價。
 \end{tcolorbox}
 
+\subsection{訂閱方案}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{方案} & \textbf{月費} & \textbf{核心功能} \\
+\midrule
+Free & \$0 & 60 calls/min, 基礎股價、新聞、公司資料 \\
+Market Data Basic & \$49.99 & 即時報價、歷史數據 \\
+Market Data Standard & \$129.99 & + 進階報價功能 \\
+Market Data Professional & \$199.99 & + 完整市場深度 \\
+Fundamental Data Tier 1 & \$50 & 基礎財務數據 \\
+Fundamental Data Tier 2 & \$200 & 完整財務數據 \\
+Estimates Tier 1 & \$75 & 分析師預測 \\
+ETF Data & \$500--1,000 & ETF 成分與資金流 \\
+All Endpoints & \$3,000 & 所有 API 完整存取 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{結論}: 免費版已足夠新聞/即時報價/內線交易，但歷史股價和社群情緒需付費。
+
+% ------------------------------------------------------------
+\newpage
+\section{Alpha Vantage}
+
+\subsection{完整 API 生態系統}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{類別} & \textbf{資料類型} & \textbf{投資應用} \\
+\midrule
+Stocks & 日/週/月 + Intraday, 20+ 年 & 長期回測 \\
+Options & Greeks, IV, 15+ 年歷史 & 衍生品 \\
+Forex & 匯率, 多時間框架 & 外匯 \\
+Crypto & 數位貨幣匯率 & 加密 \\
+\textbf{Commodities} & 原油/天然氣/金屬/農產品 & \textbf{大宗商品} \\
+Economic & GDP/利率/通膨/失業率 & 宏觀 \\
+\textbf{Technical} & \textbf{50+ 技術指標} & 技術分析 \\
+Fundamental & 財報/股息/分割 & 基本面 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{獨特優勢: 50+ 技術指標 API}
+
+\begin{tcolorbox}[colback=avblue!5,colframe=avblue,title={直接 API 返回 (無需自行計算)}]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{趨勢指標}: SMA, EMA, WMA, DEMA, TEMA, T3, KAMA
+    \item \textbf{動量指標}: RSI, STOCH, STOCHRSI, WILLR, ADX, CCI, AROON, MOM, ROC
+    \item \textbf{波動指標}: ATR, NATR, TRANGE
+    \item \textbf{成交量}: OBV, AD, ADOSC
+    \item \textbf{形態}: BBANDS, HT\_TRENDLINE, HT\_SINE
+    \item \textbf{週期}: HT\_DCPERIOD, HT\_DCPHASE, HT\_PHASOR
+\end{itemize}
+\end{tcolorbox}
+
+\textbf{價值}: 省去自行實作 TA-Lib 的時間，直接獲得計算結果。
+
+\subsection{獨特優勢: 大宗商品}
+
+\begin{tcolorbox}[colback=avblue!5,colframe=avblue,title={Commodities API (其他少有)}]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{能源}: WTI 原油, Brent, 天然氣
+    \item \textbf{金屬}: 黃金, 白銀, 銅, 鋁
+    \item \textbf{農產品}: 小麥, 玉米, 大豆, 咖啡, 糖, 棉花
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{訂閱方案}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrll@{}}
+\toprule
+\textbf{方案} & \textbf{月費} & \textbf{API 限制} & \textbf{核心功能} \\
+\midrule
+Free & \$0 & 25 calls/day & 基礎數據，嚴重限制 \\
+Plan 1 & \$49.99 & 75 calls/min & 無日限 + 全功能 + Premium 支援 \\
+Plan 2 & \$99.99 & 150 calls/min & 更高頻率 \\
+Plan 3 & \$149.99 & 300 calls/min & 中等規模應用 \\
+Plan 4 & \$199.99 & 600 calls/min & 高頻應用 \\
+Plan 5 & \$249.99 & 1,200 calls/min & 最高頻率 + Intraday \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+年繳優惠：相當於 2 個月免費。
+
+\textbf{結論}: 對技術分析派和大宗商品交易者價值高。
+
+% ------------------------------------------------------------
+\newpage
+\section{EODHD}
+
+\subsection{完整 API 生態系統}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{類別} & \textbf{資料類型} & \textbf{投資應用} \\
+\midrule
+EOD Data & 1972+ 歷史 & 超長期回測 \\
+Intraday & 分鐘/Tick 級 & 日內交易 \\
+Fundamentals & 財報 + 20 年 & 價值投資 \\
+Options & Greeks, Chain & 衍生品 \\
+Forex & 全球貨幣對 & 外匯 \\
+Crypto & 主流幣種 & 加密 \\
+Bonds & 債券數據 & 固定收益 \\
+ETFs/Funds & ETF + 共同基金 & 被動投資 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{獨特優勢: 全球覆蓋}
+
+\begin{tcolorbox}[colback=eohdorange!5,colframe=eohdorange,title={60+ 交易所 (其他少有的廣度)}]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{北美}: NYSE, NASDAQ, TSX
+    \item \textbf{歐洲}: LSE, XETRA, Euronext, SIX, OMX
+    \item \textbf{亞太}: TSE, HKEX, SSE, SZSE, ASX, SGX, KRX
+    \item \textbf{新興}: BMV (墨西哥), BVSP (巴西), JSE (南非)
+    \item \textbf{中東}: TASE (以色列), Tadawul (沙烏地)
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{獨特優勢: ID 對照系統}
+
+跨系統識別碼轉換: CUSIP $\leftrightarrow$ ISIN $\leftrightarrow$ FIGI $\leftrightarrow$ LEI $\leftrightarrow$ CIK，解決不同資料源的代碼匹配問題。
+
+\subsection{訂閱方案}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrrll@{}}
+\toprule
+\textbf{方案} & \textbf{月費} & \textbf{年費} & \textbf{API 限制} & \textbf{核心功能} \\
+\midrule
+Free & \$0 & \$0 & 20/day & 基礎 EOD 數據 \\
+EOD Historical & \$19.99 & \$199 & 100k/day & 1972+ EOD + 150k+ tickers \\
+EOD+Intraday & \$29.99 & \$299.90 & 100k/day & + 分鐘級數據 + WebSocket \\
+Fundamentals & \$59.99 & \$599.90 & 100k/day & + 30+ 年財務數據 \\
+All-In-One & \$99.99 & \$999.90 & 100k/day & 所有功能 + 優先支援 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{結論}: 全球市場覆蓋是獨特優勢，適合國際分散投資。
+
 % ------------------------------------------------------------
 \newpage
 \section{Interactive Brokers (IBKR)}
+
+\subsection{完整交易生態系統}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{類別} & \textbf{說明} & \textbf{投資應用} \\
+\midrule
+Stocks & 90+ 市場中心 & 全球股票 \\
+Options & 多腿策略 & 衍生品 \\
+Futures & 商品+指數期貨 & 對沖/投機 \\
+Forex & 現貨外匯 & 匯率 \\
+Bonds & 公司債+政府債 & 固定收益 \\
+ETFs & 免佣 ETF & 被動投資 \\
+Mutual Funds & 共同基金 & 長期配置 \\
+Crypto & 加密貨幣 & 數位資產 \\
+Metals & 現貨黃金 & 貴金屬 \\
+Forecast & 政治/經濟/氣候合約 & 預測市場 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{獨特優勢: 執行能力}
 
@@ -236,7 +492,7 @@ TWS API 功能:
 
 \subsection{專業新聞與研究 (其他 API 無法獲得)}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}ll@{}}
 \toprule
@@ -252,7 +508,9 @@ The Fly & 即時頭條 \\
 Morningstar & 股票/基金評級 \\
 Zacks & 盈餘預測 \\
 TipRanks & 分析師追蹤 \\
+Trading Central & 技術分析 \\
 ORATS & Options Greeks/IV \\
+Seeking Alpha & 投資想法 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -261,7 +519,7 @@ ORATS & Options Greeks/IV \\
 
 \subsubsection{基礎 Bundle (必需)}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lrrp{5cm}@{}}
 \toprule
@@ -272,9 +530,11 @@ US Securities Snapshot Bundle & \$10 & \$10 & 月佣金 $\geq$ \$30 可免除 \\
 \end{tabular}
 \end{table}
 
+\textbf{包含內容} (Snapshot 快照模式): NYSE, AMEX, NASDAQ 快照報價, OTC Markets, CBOE 指數, US Bond Quotes, 期貨快照。
+
 \subsubsection{Add-On 方案 (需先訂閱基礎 Bundle)}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lrrp{4cm}@{}}
 \toprule
@@ -288,7 +548,7 @@ Cboe One Add-On & \$1.00 & \$5 & 佣金 $\geq$ \$5 可免除 \\
 
 \subsubsection{實際成本計算}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lcc@{}}
 \toprule
@@ -310,7 +570,7 @@ Cboe One Add-On & \$1.00 & \$5 & 佣金 $\geq$ \$5 可免除 \\
 \newpage
 \subsection{reqFundamentalData API 實測結果 (2025-12-23)}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{IBKR 基本面數據 API 測試結果}
 \begin{tabular}{@{}lcrl@{}}
@@ -330,7 +590,7 @@ CalendarReport & \xmark & 0 & WSH 日曆需訂閱 \\
 
 \subsubsection{ReportSnapshot 獲取的財務指標}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}ll@{}}
 \toprule
@@ -346,11 +606,74 @@ CalendarReport & \xmark & 0 & WSH 日曆需訂閱 \\
 \end{tabular}
 \end{table}
 
+\subsubsection{API vs TWS 的差異}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{功能} & \textbf{TWS 桌面版} & \textbf{API (程式化存取)} \\
+\midrule
+Option Chain & \cmark 免費 & \cmark 免費 \\
+即時 Greeks & \cmark 免費 & \xmark 需訂閱 \\
+即時報價 & \cmark 免費 & \xmark 需訂閱 \\
+Historical IV & \cmark 免費 & \cmark 免費 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=warningyellow!10,colframe=warningyellow]
+\textbf{重要}: TWS 桌面版可以免費看到 Greeks，但 API 存取需要額外訂閱！這是因為 IBKR 的免費即時報價只提供給「人工」使用，程式化存取需付費。
+\end{tcolorbox}
+
+% ------------------------------------------------------------
+\newpage
+\section{Tiingo}
+
+\subsection{定位}
+主要用於\textbf{歷史股價數據}，30+ 年歷史，免費版已足夠基本使用。
+
+\subsection{訂閱方案}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrll@{}}
+\toprule
+\textbf{方案} & \textbf{費用} & \textbf{限制} & \textbf{說明} \\
+\midrule
+Free & \$0 & 50 calls/hr, 500 symbols/月 & 30+ 年 EOD，基本使用 \\
+Power & \textasciitilde\$10+/月 & 更高 & + 無限儲存 + 3 個月新聞查詢 \\
+Business & \$50/月 & 商業 & 內部商業使用授權 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+本專案選擇 Tiingo 作為免費歷史股價來源，付費數據需求交給其他提供商。
+
 % ============================================================
 \newpage
 \section{Financial Datasets}
 
-\subsection{獨特優勢: Segmented Revenue API}
+\subsection{定位}
+專為 \textbf{AI Financial Agent} 設計的 LLM-optimized API，提供直接來自 SEC/EDGAR 的原始財務數據。
+
+\subsection{核心規格}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{項目} & \textbf{說明} \\
+\midrule
+覆蓋範圍 & 30,000+ tickers, 30+ 年歷史 \\
+數據來源 & \textbf{直接來自 SEC/EDGAR} (非第三方聚合) \\
+設計目標 & \textbf{LLM-optimized APIs} \\
+API 風格 & RESTful, JSON 格式 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{獨特優勢: Segmented Revenues API}
 
 \begin{tcolorbox}[colback=fdsblue!5,colframe=fdsblue,title={其他 API 少見的功能}]
 直接從 XBRL 格式 10-K/10-Q 解析:
@@ -372,7 +695,7 @@ CalendarReport & \xmark & 0 & WSH 日曆需訂閱 \\
 
 \subsection{訂閱方案}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lrll@{}}
 \toprule
@@ -381,9 +704,12 @@ CalendarReport & \xmark & 0 & WSH 日曆需訂閱 \\
 Pay-As-You-Go & \$20 起 & 按次計費 & 彈性使用，適合測試 \\
 Developer & \$200 & 1,000 req/min & 個人使用，完整存取 \\
 Pro & \$2,000 & 無限 & + 數據再分發權 \\
+Enterprise & 洽詢 & 客製 & 專屬運算資源 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\textbf{結論}: 若 \textbf{PEAD 策略}是重點，Financial Datasets 的 Segmented Revenue API 是極高價值的差異化來源。建議先用 Pay-As-You-Go (\$20) 測試。
 
 % ============================================================
 \newpage
@@ -391,9 +717,10 @@ Pro & \$2,000 & 無限 & + 數據再分發權 \\
 
 \subsection{Financial Metrics 比較}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \caption{各提供商 Financial Metrics 能力}
+\small
 \begin{tabular}{@{}llll@{}}
 \toprule
 \textbf{提供商} & \textbf{類型} & \textbf{涵蓋指標} & \textbf{費用} \\
@@ -411,7 +738,7 @@ Polygon & \textbf{技術} & 基礎技術指標 & \$29/月 \\
 
 \subsection{功能比較矩陣}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lccccc@{}}
 \toprule
@@ -425,6 +752,29 @@ Options 數據 & \cmark & \cmark & \xmark & \cmark & \xmark \\
 Segmented Revenue & \xmark & \xmark & \xmark & \xmark & \cmark \\
 國會交易 & \xmark & \xmark & \cmark & \xmark & \xmark \\
 全球覆蓋 & \cmark & \xmark & \wmark & \cmark & \xmark \\
+技術指標 API & \xmark & \cmark & \xmark & \xmark & \xmark \\
+LLM 優化 & \xmark & \xmark & \xmark & \xmark & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{資產類別覆蓋}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{資產} & \textbf{Polygon} & \textbf{Finnhub} & \textbf{Alpha V} & \textbf{EODHD} & \textbf{IBKR} \\
+\midrule
+美股 & \cmark & \cmark & \cmark & \cmark & \cmark \\
+全球股票 & \xmark & \xmark & \wmark & \cmark & \cmark \\
+Options & \cmark & \xmark & \cmark & \cmark & \cmark \\
+Futures & \cmark & \xmark & \xmark & \xmark & \cmark \\
+Forex & \cmark & \cmark & \cmark & \cmark & \cmark \\
+Crypto & \cmark & \cmark & \cmark & \cmark & \cmark \\
+大宗商品 & \xmark & \xmark & \cmark & \xmark & \cmark \\
+債券 & \xmark & \xmark & \xmark & \cmark & \cmark \\
+ETF/基金 & \wmark & \wmark & \xmark & \cmark & \cmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -467,9 +817,26 @@ Segmented Revenue & \xmark & \xmark & \xmark & \xmark & \cmark \\
 \end{enumerate}
 \end{tcolorbox}
 
+\subsection{投資策略匹配建議}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{策略} & \textbf{推薦組合} & \textbf{月費} \\
+\midrule
+純美股日內交易 & Polygon (\$29) + IBKR (執行) & \textasciitilde\$40 \\
+美股 + Options 策略 & Polygon + IBKR + Alpha Vantage (\$50) & \textasciitilde\$90 \\
+全球多市場輪動 & EODHD (\$100) + IBKR + Polygon & \textasciitilde\$130 \\
+另類數據阿爾法 & Finnhub (付費) + IBKR & \textasciitilde\$85+ \\
+跨資產宏觀配置 & Alpha Vantage + EODHD + IBKR & \textasciitilde\$160 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{按需求選配}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -484,16 +851,454 @@ PEAD 策略 (細分營收) & + Financial Datasets & +\$20 (PAYG) \\
 \end{table}
 
 % ============================================================
-\section*{附錄: 更新日誌}
+\newpage
+\section{關鍵洞察}
 
+\begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue,title={\textbf{新聞只是冰山一角}}]
+真正的訂閱價值在於：
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{執行能力} -- IBKR 是唯一能將策略變現的選項
+    \item \textbf{資產廣度} -- 從美股擴展到全球、Options、Futures、大宗商品
+    \item \textbf{另類數據} -- 國會交易、專利、ESG 等潛在阿爾法來源
+    \item \textbf{效率工具} -- 技術指標 API 省去自行計算的時間
+\end{enumerate}
+\end{tcolorbox}
+
+\subsection{投資回報估算}
+
+假設管理 \$50,000 資金：
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{訂閱組合} & \textbf{月費} & \textbf{需要的超額回報} \\
+\midrule
+基礎 (Polygon + IBKR) & \textasciitilde\$40 & 0.10\%/月 \\
+進階 (+ EODHD) & \textasciitilde\$140 & 0.28\%/月 \\
+完整 (全部) & \textasciitilde\$300 & 0.60\%/月 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{結論}: 如果訂閱能帶來每月 0.5--1\% 的策略改進，投資回報是值得的。
+
+% ============================================================
+\newpage
+\section*{附錄 A: 新聞時效性分析與替代方案}
+\addcontentsline{toc}{section}{附錄 A: 新聞時效性分析}
+
+\subsection*{核心問題}
+
+新聞的主要價值有多高？延遲 1 天或幾小時會有多大影響？有沒有比新聞更快的方法？
+
+\subsection*{學術研究結論}
+
+\subsubsection*{價格對新聞的反應速度}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{時期} & \textbf{反應時間} & \textbf{說明} \\
+\midrule
+早期 (1990s) & 分鐘級 & 傳統交易環境 \\
+2000s & 秒級 & 電子交易普及 \\
+2010s+ & \textbf{毫秒級} & 高頻交易時代 \\
+現今 & \textbf{5 毫秒內} & 排程宏觀新聞 (Chordia 2018) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{關鍵洞察}: 對於大型股和排程發布的消息，價格在\textbf{毫秒內}就已反應完畢。
+
+\subsubsection*{Alpha 衰減時間表}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{訊號類型} & \textbf{Alpha 衰減時間} & \textbf{備註} \\
+\midrule
+高頻量化訊號 & 分鐘 $\rightarrow$ 小時 & 已被套利 \\
+新聞情緒訊號 & 4 小時達峰值 & 之後遞減 \\
+正面事件衝擊 & \textasciitilde 2 天 & 快速消化 \\
+負面事件衝擊 & \textasciitilde 5 天 & 消化較慢 \\
+小型股新聞 & 衰減更慢 & 流動性低 \\
+PEAD (盈餘漂移) & 60--90 天 & 最持久的異常 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{2024-2025 最新研究發現}
+
+\textbf{1. Alpha 衰減正在加速}
+\begin{itemize}
+    \item 美國市場: 5--10\%/年
+    \item 歐洲市場: 5--10\%/年
+    \item 壓力期間衰減更快
+\end{itemize}
+
+\textbf{2. 負面新聞的持續性優勢} (Frazzini Disposition Effect):
+\begin{itemize}
+    \item 投資者傾向持有虧損股票（避免實現損失）
+    \item 導致負面新聞反應不足
+    \item Overhang Spread Alpha: 2.201\%/年
+\end{itemize}
+
+\textbf{3. 小型股的結構性優勢} (Lord Abbett 2025):
+\begin{itemize}
+    \item 分析師覆蓋: 大型股 4x vs 小型股 1x
+    \item 主動管理勝率 (10年): 大型股 \textasciitilde 50\% vs 小型股 \textbf{69\%}
+    \item 5年 Active Return: 大型股 -0.02\%/年 vs 小型股 \textbf{+2.8\%/年}
+\end{itemize}
+
+\textbf{4. PEAD 仍然有效但收益降低}:
+\begin{itemize}
+    \item 60 天異常報酬約 6\%
+    \item 25-30\% 的漂移集中在後續三個季報公告日
+    \item 這只佔 5\% 的交易日
+\end{itemize}
+
+\subsection*{比新聞更快的訊號源}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{訊號源} & \textbf{領先新聞時間} & \textbf{說明} & \textbf{費用} \\
+\midrule
+異常選擇權活動 & 數分鐘至數小時 & Smart money 足跡 & \$30--100/月 \\
+社群媒體情緒 & 數分鐘至數小時 & StockTwits/Twitter & 付費 \\
+暗池大單 & 數分鐘 & 機構隱藏意圖 & \$30--100/月 \\
+Form 4 內線申報 & 申報後數小時 & 高價值訊號 & \textbf{免費} \\
+Earnings Whispers & 數天 & 比共識更準確 & 付費 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{策略建議}
+
+\textbf{對於日內交易者}: 如果你在新聞發布後才看到消息，你已經落後了。
+
+\textbf{對於波段交易者}: 新聞延遲 1 天仍有操作空間，特別是負面消息和小型股。
+
+\textbf{對於長期投資者}: 新聞時效性不是主要考量。
+
+\begin{tcolorbox}[colback=warningyellow!10,colframe=warningyellow]
+\textbf{新聞不是訊息的起點，而是終點}
+
+當新聞發布時，以下已經發生：
+\begin{enumerate}
+    \item 內部人士已經知道並可能已交易
+    \item 聰明錢已透過選擇權/暗池布局
+    \item 社群媒體已開始討論
+    \item 價格已開始反應
+\end{enumerate}
+\textbf{新聞只是「確認」了市場已知的事情}
+\end{tcolorbox}
+
+% ============================================================
+\newpage
+\section*{附錄 B: IBKR TWS API 實測結果}
+\addcontentsline{toc}{section}{附錄 B: IBKR TWS API 實測結果}
+
+\subsection*{測試環境}
+\begin{itemize}
+    \item IB Gateway
+    \item 測試時間: 2025-12-22/23 (含盤前測試)
+\end{itemize}
+
+\subsection*{完整 API 測試結果}
+
+\subsubsection*{免費且正常運作 (FREE\_OK)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{API} & \textbf{回傳數據量} & \textbf{說明} \\
+\midrule
+reqContractDetails & 1 record & 合約詳細資訊 \\
+reqSecDefOptParams & 39 交易所, 419 到期日 & 完整 Options Chain \\
+reqHistoricalData & 30 日線 & 歷史 OHLCV 數據 \\
+reqNewsProviders & 9 家提供商 & DJ, FLY, Briefing 等 \\
+reqScannerSubscription & 50 筆結果 & 市場掃描器 \\
+reqFundamentalData (ReportSnapshot) & 10,641 bytes & P/E, ROE, EPS 等 \\
+reqFundamentalData (ReportsFinSummary) & 45,403 bytes & 財務摘要 \\
+reqFundamentalData (ReportsOwnership) & \textbf{7.6 MB} & 機構持股數據！ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{免費但無數據 (FREE\_FAIL)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{API} & \textbf{原因} \\
+\midrule
+reqHistoricalNews & Timeout/無返回 \\
+reqFundamentalData (ReportsFinStatements) & 完整財務報表需訂閱 \\
+reqFundamentalData (RESC) & 分析師預測 (經常不可用) \\
+reqFundamentalData (CalendarReport) & WSH 日曆需訂閱 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{需付費訂閱 (PAID\_REQUIRED)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{API} & \textbf{錯誤碼} & \textbf{費用} & \textbf{說明} \\
+\midrule
+reqMktData & 10089 & \$1.50--10/月 & API 即時市場數據 \\
+Option Greeks & 10091, 354 & \$1.50/月 (Non-Pro) & OPRA L1 訂閱 \\
+reqTickByTickData & - & 需市場數據訂閱 & Tick-by-tick 數據 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{數據收集器}
+
+已實作 \texttt{scripts/collection/collect\_ibkr\_fundamentals.py}：
+
+使用 \texttt{defusedxml} + \texttt{ElementTree} 解析 XML (防禦 XXE 攻擊)，提取 P/E, ROE, EPS 等財務指標，輸出 JSON + CSV 格式。
+
+% ============================================================
+\newpage
+\section*{附錄 C: MindfulRL-Intraday 專案定位分析}
+\addcontentsline{toc}{section}{附錄 C: 專案定位分析}
+
+\subsection*{現行定位}
+
+使用強化學習和 LLM 增強的新聞情緒/風險分析，開發日內交易策略。
+
+\subsection*{問題診斷}
+
+\subsubsection*{時間框架錯配}
+
+「日內」交易需要秒級反應，但 LLM 情緒分析的優勢在\textbf{天級}時間框架。
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{訊號類型} & \textbf{Alpha 時間窗口} & \textbf{對「日內」策略的意義} \\
+\midrule
+大型股新聞 & 毫秒 $\rightarrow$ 秒 & \xmark LLM 處理太慢，已無 Alpha \\
+正面新聞 & \textasciitilde 2 天 & \wmark 日內可能只捕捉尾端 \\
+負面新聞 & \textasciitilde 5 天 & \cmark 日內+波段皆可操作 \\
+小型股新聞 & 數天 $\rightarrow$ 週 & \cmark 最適合 LLM 分析 \\
+PEAD (盈餘) & 60--90 天 & \cmark 極高價值，持續性強 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{標的選擇偏差}
+
+若專案聚焦 FAANG 等大型股，LLM 情緒分析的 Alpha 幾乎為零。
+
+\subsection*{建議調整方案}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{推薦定位調整}}]
+\textbf{原始}: 使用 RL + LLM 新聞情緒開發日內交易策略
+
+$\downarrow$
+
+\textbf{調整}: 使用 RL + LLM 文本分析開發事件驅動波段策略 (聚焦小型股、PEAD、負面事件)
+\end{tcolorbox}
+
+\subsection*{實作優先級}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}clcc@{}}
+\toprule
+\textbf{優先級} & \textbf{調整項目} & \textbf{複雜度} & \textbf{預期影響} \\
+\midrule
+1 & 加入 Earnings Call Transcript 分析 & 中 & \starmark\starmark\starmark\starmark\starmark \\
+2 & 聚焦小型股 (Russell 2000) & 低 & \starmark\starmark\starmark\starmark \\
+3 & 加入 Form 4 內線交易訊號 & 低 & \starmark\starmark\starmark\starmark \\
+4 & 調整持倉時間至 1--60 天 & 中 & \starmark\starmark\starmark\starmark \\
+5 & 專注負面事件偵測 & 低 & \starmark\starmark\starmark \\
+6 & 加入 SEC Filing Sentiment & 中 & \starmark\starmark\starmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{結論}
+
+\begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue]
+\textbf{「Intraday」不應指持倉時間，而應指分析粒度與執行精度}
+
+LLM 情緒分析的真正價值在於：
+\begin{enumerate}
+    \item 分析師覆蓋稀疏的\textbf{小型股}
+    \item 需要語義理解的 \textbf{Earnings Call Transcripts}
+    \item Alpha 衰減較慢的\textbf{負面事件}
+    \item 持續 60--90 天的 \textbf{PEAD}
+\end{enumerate}
+
+RL 代理的真正價值在於：
+\begin{enumerate}
+    \item 學習\textbf{日內最佳進場時機} (而非持倉決策)
+    \item 學習\textbf{何時退出} (基於 Alpha 衰減模型)
+    \item 在有限的 Alpha 窗口內\textbf{最大化收益}
+\end{enumerate}
+\end{tcolorbox}
+
+% ============================================================
+\newpage
+\section*{附錄 D: 分階段採購計畫}
+\addcontentsline{toc}{section}{附錄 D: 分階段採購計畫}
+
+\subsection*{階段 0: 驗證期 (免費資源)}
+
+\textbf{目標}: 驗證核心概念，建立 MVP
+
+\textbf{時長}: 1--2 個月 | \textbf{月費}: \$0
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{項目} & \textbf{來源} & \textbf{用途} \\
+\midrule
+歷史股價 & Tiingo (免費) & 回測數據 \\
+新聞數據 & Finnhub (免費) & 情緒分析 \\
+Form 4 內線 & Finnhub (免費) & 訊號生成 \\
+Options Chain & IBKR (免費) & 結構分析 \\
+Historical IV & IBKR (免費 30 天) & 波動率研究 \\
+Earnings Calendar & Finnhub (免費) & PEAD 研究 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{階段 1: 基礎建設期}
+
+\textbf{目標}: 建立核心交易能力
+
+\textbf{時長}: 2--3 個月 | \textbf{月費}: \textasciitilde\$35--40
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llrl@{}}
+\toprule
+\textbf{項目} & \textbf{來源} & \textbf{月費} & \textbf{用途} \\
+\midrule
+Options 即時數據 & Polygon Starter & \$29 & Smart Money 偵測 \\
+API 即時報價 & IBKR US Bundle & \$4.50--10 & 實盤執行 \\
+歷史股價 & Tiingo & \$0 & 持續使用 \\
+新聞+Form 4 & Finnhub & \$0 & 持續使用 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{階段 2: 能力擴展期}
+
+\textbf{目標}: 擴展標的範圍與訊號來源
+
+\textbf{時長}: 3--4 個月 | \textbf{月費}: \textasciitilde\$80--100
+
+新增: EODHD EOD+Intraday (\$30) 或 Fundamentals (\$60) 用於 Russell 2000 / 小型股策略。
+
+\subsection*{階段 3: 進階訊號期}
+
+\textbf{目標}: 建立差異化訊號優勢
+
+\textbf{時長}: 持續 | \textbf{月費}: \textasciitilde\$150--200
+
+新增: Finnhub Estimates (\$75) 用於 Earnings Transcripts、社群情緒、國會交易。
+
+\subsection*{階段 4: 完整系統期 (選配)}
+
+\textbf{月費}: \textasciitilde\$250--350+
+
+新增: EODHD All-In-One (\$100)、IBKR Dow Jones (\$10--35)、Alpha Vantage (\$50)。
+
+% ============================================================
+\newpage
+\section*{附錄 E: 資料品質驗收 Checklist}
+\addcontentsline{toc}{section}{附錄 E: 資料品質驗收}
+
+\subsection*{通用驗收項目}
+
+\subsubsection*{數據完整性}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{檢查項目} & \textbf{驗收標準} & \textbf{驗證方法} \\
+\midrule
+覆蓋率 & $>$ 99\% 標的有數據 & count(有數據) / count(標的池) \\
+時間連續性 & 無超過 1 天的缺口 & 檢查連續日期 \\
+欄位完整 & 必要欄位無 NULL & count(NULL) = 0 \\
+重複檢查 & 無重複記錄 & count(DISTINCT) = count(*) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{數據準確性}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{檢查項目} & \textbf{驗收標準} & \textbf{驗證方法} \\
+\midrule
+價格範圍 & 無負值或極端值 & $0 < price < 10000$ \\
+日期合理性 & 在營業日內 & 比對交易日曆 \\
+交叉驗證 & 與其他源一致 & 比對 2+ 來源 \\
+公司行動調整 & 股息/分割已調整 & 檢查調整因子 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{ROI 計算}
+
+\begin{equation*}
+\text{訂閱 ROI} = \frac{\text{策略改進帶來的額外收益} - \text{訂閱成本}}{\text{訂閱成本}} \times 100\%
+\end{equation*}
+
+例如: 管理資金 \$50,000，月訂閱 \$144，需要的超額回報 = \$144 / \$50,000 = 0.29\%/月。
+
+\subsection*{取消決策閾值}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{條件} & \textbf{動作} \\
+\midrule
+ROI $<$ 0 連續 3 個月 & 考慮降級或取消 \\
+使用量 $<$ 訂閱限制 10\% & 考慮降級 \\
+數據品質問題 $>$ 5\%/月 & 考慮替代方案 \\
+有更便宜的替代方案 & 評估切換成本 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section*{更新日誌}
+\addcontentsline{toc}{section}{更新日誌}
+
+\begin{table}[H]
+\centering
 \begin{tabular}{@{}ll@{}}
 \toprule
 \textbf{日期} & \textbf{更新內容} \\
 \midrule
-2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明 \\
+2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明；完整 LaTeX 版本 \\
 2025-12-23 & 加入 IBKR reqFundamentalData API 實測結果 \\
 2025-12-22 & 初版完成 \\
 \bottomrule
 \end{tabular}
+\end{table}
 
 \end{document}
