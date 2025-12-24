@@ -84,21 +84,19 @@ def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) ->
     try:
         if stream_output:
             # Stream output in real-time (user can see progress)
-            result = subprocess.run(
-                cmd,
-                timeout=7200,  # 2 hour timeout
-            )
+            # No total timeout - individual scripts handle their own per-request timeouts
+            result = subprocess.run(cmd)
             success = result.returncode == 0
             if not success:
                 logger.error(f"Command failed with code {result.returncode}")
             return success, ""
         else:
             # Capture output (for background/silent mode)
+            # No total timeout - individual scripts handle their own per-request timeouts
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=7200,
             )
 
             if result.returncode == 0:
@@ -108,9 +106,6 @@ def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) ->
                 logger.error(f"stderr: {result.stderr[:500]}")
                 return False, result.stderr
 
-    except subprocess.TimeoutExpired:
-        logger.error("Command timed out")
-        return False, "Timeout"
     except Exception as e:
         logger.error(f"Error running command: {e}")
         return False, str(e)
