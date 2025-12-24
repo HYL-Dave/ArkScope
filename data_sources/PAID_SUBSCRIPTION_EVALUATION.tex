@@ -23,6 +23,14 @@
 \usepackage{amsmath}
 \usepackage{listings}
 \usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, calc}
+
+% TikZ styles for flowcharts
+\tikzstyle{startstop} = [rectangle, rounded corners, minimum width=3cm, minimum height=1cm, text centered, draw=ibkrblue, fill=ibkrblue!10]
+\tikzstyle{process} = [rectangle, minimum width=3cm, minimum height=1cm, text centered, draw=ibkrblue, fill=white]
+\tikzstyle{decision} = [diamond, minimum width=3cm, minimum height=1cm, text centered, draw=ibkrblue, fill=warningyellow!10, aspect=2]
+\tikzstyle{arrow} = [thick,->,>=stealth]
 
 % ============================================================
 % Colors
@@ -626,6 +634,106 @@ Historical IV & \cmark 免費 & \cmark 免費 \\
 \textbf{重要}: TWS 桌面版可以免費看到 Greeks，但 API 存取需要額外訂閱！這是因為 IBKR 的免費即時報價只提供給「人工」使用，程式化存取需付費。
 \end{tcolorbox}
 
+\subsubsection{國際市場 Level II 價格表}
+
+\begin{table}[H]
+\centering
+\caption{IBKR 國際市場數據訂閱費用}
+\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+\textbf{交易所} & \textbf{Level} & \textbf{Non-Pro} & \textbf{Professional} \\
+\midrule
+Toronto TSX & L1 & CAD 9 & CAD 37.50 \\
+Tokyo TSE & L1 & ¥300 & ¥3,000 \\
+CME Real-Time & L2 & \$11 & \$140 \\
+CBOT Real-Time & L2 & \$11 & \$140 \\
+Eurex Core & L2 & \$13 & \$64 \\
+NASDAQ TotalView-OpenView EDS & L2 & \$1 & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Python 程式碼範例: ib\_insync 使用方法}
+
+\textbf{關鍵澄清}: \texttt{ib\_insync} 是 IBKR 官方推薦的 Python 封裝庫。
+
+\begin{lstlisting}[language=Python,caption={使用 ib\_insync 獲取基本面數據}]
+from ib_insync import IB, Stock
+from defusedxml import ElementTree as ET
+
+# 連接到 IB Gateway
+ib = IB()
+ib.connect('127.0.0.1', 7497, clientId=1)
+
+# 定義合約
+contract = Stock('AAPL', 'SMART', 'USD')
+ib.qualifyContracts(contract)
+
+# 請求基本面數據 (免費!)
+xml_data = ib.reqFundamentalData(contract, 'ReportSnapshot')
+
+# 安全解析 XML (使用 defusedxml 防禦 XXE 攻擊)
+root = ET.fromstring(xml_data)
+ratios = root.findall('.//Ratio')
+
+for ratio in ratios:
+    field = ratio.get('FieldName')
+    value = ratio.text
+    print(f"{field}: {value}")
+
+# 關閉連接
+ib.disconnect()
+\end{lstlisting}
+
+\textbf{ReportSnapshot 實際獲取的指標} (AAPL 範例):
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+\textbf{指標代碼} & \textbf{值} & \textbf{說明} \\
+\midrule
+NPRICE & 270.97 & 當前價格 \\
+MKTCAP & 4,003,948 & 市值 (百萬) \\
+TTMREV & 416,161 & TTM 營收 (百萬) \\
+TTMEBITD & 144,749 & TTM EBITDA \\
+TTMNIAC & 111,524 & TTM 淨利 \\
+TTMEPSXCLX & 7.43 & TTM EPS \\
+PEEXCLXOR & 36.49 & P/E 比率 \\
+TTMROEPCT & 170.68\% & ROE \\
+TTMGROSMGN & 46.91\% & 毛利率 \\
+QBVPS & 4.99 & Book Value Per Share \\
+EV & 4,047,908 & Enterprise Value \\
+CIK & 0000320193 & SEC CIK 代碼 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{lstlisting}[language=Python,caption={獲取 Options Chain}]
+from ib_insync import IB, Stock
+
+ib = IB()
+ib.connect('127.0.0.1', 7497, clientId=1)
+
+# 獲取 AAPL Options Chain
+stock = Stock('AAPL', 'SMART', 'USD')
+ib.qualifyContracts(stock)
+
+# 獲取 Options 參數 (免費!)
+chains = ib.reqSecDefOptParams(
+    stock.symbol, '', stock.secType, stock.conId
+)
+
+for chain in chains:
+    print(f"Exchange: {chain.exchange}")
+    print(f"Expirations: {len(chain.expirations)}")
+    print(f"Strikes: {len(chain.strikes)}")
+
+ib.disconnect()
+\end{lstlisting}
+
 % ------------------------------------------------------------
 \newpage
 \section{Tiingo}
@@ -930,6 +1038,31 @@ PEAD (盈餘漂移) & 60--90 天 & 最持久的異常 \\
 \end{tabular}
 \end{table}
 
+\textbf{學術研究來源}:
+\begin{itemize}
+    \item \href{https://www.sciencedirect.com/science/article/abs/pii/S0304405X03001466}{Chan (2003)} -- Stock Price Reaction to News
+    \item \href{https://www.mavensecurities.com/alpha-decay-what-does-it-look-like-and-what-does-it-mean-for-systematic-traders/}{Maven Securities Alpha Decay Research}
+\end{itemize}
+
+\subsubsection*{學術研究驗證狀態}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lcll@{}}
+\toprule
+\textbf{訊號類型} & \textbf{驗證} & \textbf{研究來源} & \textbf{說明} \\
+\midrule
+正面事件 \textasciitilde 2 天 & \cmark & \href{https://www.ravenpack.com/research/stock-market-reaction-to-news-sentiment/}{Hafez \& Xie (2012)} & 大量實證確認 \\
+負面事件 \textasciitilde 5 天 & \cmark & \href{https://pages.stern.nyu.edu/~afrazzin/pdf/The\%20Disposition\%20Effect\%20and\%20Underreaction\%20to\%20news\%20-\%20Frazzini.pdf}{Frazzini (2006)} & Disposition Effect \\
+PEAD 60--90 天 & \cmark & \href{https://quantpedia.com/50-years-in-pead-research/}{Bernard \& Thomas (1990)} & 50+ 年研究歷史 \\
+小型股衰減較慢 & \cmark & \href{https://www.lordabbett.com/en-us/financial-advisor/insights/markets-and-economy/2025/equities-addressing-some-big-questions-about-small-caps.html}{Lord Abbett (2025)} & 分析師覆蓋少 4x \\
+新聞情緒 4hr & \wmark & \href{https://www.tandfonline.com/doi/full/10.1080/1351847X.2024.2306942}{Huang et al. (2020)} & 仍是開放問題 \\
+高頻訊號分鐘級 & \cmark & Chordia (2018) & 5 毫秒內反應 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsubsection*{2024-2025 最新研究發現}
 
 \textbf{1. Alpha 衰減正在加速}
@@ -1221,6 +1354,40 @@ API 即時報價 & IBKR US Bundle & \$4.50--10 & 實盤執行 \\
 
 新增: EODHD All-In-One (\$100)、IBKR Dow Jones (\$10--35)、Alpha Vantage (\$50)。
 
+\subsection*{採購決策流程圖}
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.8cm]
+    % Nodes
+    \node (start) [startstop] {開始: 評估數據需求};
+    \node (need) [decision, below of=start, yshift=-0.5cm] {需要交易執行?};
+    \node (ibkr) [process, right of=need, xshift=3.5cm] {必須使用 IBKR};
+    \node (realtime) [decision, below of=need, yshift=-0.8cm] {需要即時數據?};
+    \node (polygon) [process, right of=realtime, xshift=3.5cm] {Polygon Starter \$29};
+    \node (global) [decision, below of=realtime, yshift=-0.8cm] {需要全球市場?};
+    \node (eodhd) [process, right of=global, xshift=3.5cm] {EODHD \$20--100};
+    \node (free) [process, below of=global, yshift=-0.5cm] {使用免費資源};
+    \node (tiingo) [process, below of=free] {Tiingo + Finnhub};
+    \node (stop) [startstop, below of=tiingo] {完成組合選擇};
+
+    % Arrows
+    \draw [arrow] (start) -- (need);
+    \draw [arrow] (need) -- node[anchor=south] {是} (ibkr);
+    \draw [arrow] (need) -- node[anchor=east] {否} (realtime);
+    \draw [arrow] (realtime) -- node[anchor=south] {是} (polygon);
+    \draw [arrow] (realtime) -- node[anchor=east] {否} (global);
+    \draw [arrow] (global) -- node[anchor=south] {是} (eodhd);
+    \draw [arrow] (global) -- node[anchor=east] {否} (free);
+    \draw [arrow] (free) -- (tiingo);
+    \draw [arrow] (tiingo) -- (stop);
+
+    % Connect right side back to flow
+    \draw [arrow] (ibkr) |- (realtime);
+    \draw [arrow] (polygon) |- (global);
+    \draw [arrow] (eodhd) |- (free);
+\end{tikzpicture}
+\end{center}
+
 % ============================================================
 \newpage
 \section*{附錄 E: 資料品質驗收 Checklist}
@@ -1283,6 +1450,89 @@ ROI $<$ 0 連續 3 個月 & 考慮降級或取消 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection*{Python 驗證腳本範例}
+
+\begin{lstlisting}[language=Python,caption={資料品質驗證腳本}]
+import pandas as pd
+from datetime import datetime, timedelta
+
+def validate_price_data(df: pd.DataFrame) -> dict:
+    """
+    驗證價格數據品質
+
+    Args:
+        df: 包含 date, open, high, low, close, volume 的 DataFrame
+
+    Returns:
+        dict: 驗證結果摘要
+    """
+    results = {
+        'coverage': 0,
+        'continuity': True,
+        'completeness': True,
+        'duplicates': 0,
+        'price_anomalies': 0,
+        'issues': []
+    }
+
+    # 1. 覆蓋率檢查
+    if 'date' in df.columns:
+        date_range = (df['date'].max() - df['date'].min()).days
+        actual_days = df['date'].nunique()
+        # 假設工作日約佔 5/7
+        expected_days = date_range * 5 / 7
+        results['coverage'] = actual_days / expected_days if expected_days > 0 else 0
+
+    # 2. 時間連續性 (檢查是否有超過 5 天的缺口)
+    if 'date' in df.columns:
+        df_sorted = df.sort_values('date')
+        gaps = df_sorted['date'].diff()
+        max_gap = gaps.max().days if gaps.max() else 0
+        if max_gap > 5:
+            results['continuity'] = False
+            results['issues'].append(f'最大缺口: {max_gap} 天')
+
+    # 3. 欄位完整性
+    required_cols = ['open', 'high', 'low', 'close', 'volume']
+    for col in required_cols:
+        if col in df.columns:
+            null_count = df[col].isna().sum()
+            if null_count > 0:
+                results['completeness'] = False
+                results['issues'].append(f'{col} 有 {null_count} 個 NULL 值')
+
+    # 4. 重複檢查
+    if 'date' in df.columns:
+        results['duplicates'] = df.duplicated(subset=['date']).sum()
+
+    # 5. 價格異常 (負值或極端值)
+    if 'close' in df.columns:
+        anomalies = ((df['close'] <= 0) | (df['close'] > 10000)).sum()
+        results['price_anomalies'] = anomalies
+
+    # OHLC 邏輯檢查
+    if all(c in df.columns for c in ['open', 'high', 'low', 'close']):
+        ohlc_issues = (
+            (df['high'] < df['low']) |
+            (df['high'] < df['open']) |
+            (df['high'] < df['close']) |
+            (df['low'] > df['open']) |
+            (df['low'] > df['close'])
+        ).sum()
+        if ohlc_issues > 0:
+            results['issues'].append(f'OHLC 邏輯錯誤: {ohlc_issues} 筆')
+
+    return results
+
+# 使用範例
+if __name__ == '__main__':
+    # 假設 df 是從 Tiingo/Finnhub 取得的數據
+    # df = pd.read_csv('price_data.csv')
+    # results = validate_price_data(df)
+    # print(results)
+    pass
+\end{lstlisting}
 
 % ============================================================
 \section*{更新日誌}
