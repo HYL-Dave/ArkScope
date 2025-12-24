@@ -124,6 +124,7 @@ class IBKRConfig:
     # Collection settings
     max_articles_per_ticker: int = 300  # IBKR max
     max_history_days: int = 30  # IBKR typically has ~1 month
+    save_every_n_tickers: int = 10  # Incremental save frequency (防止中斷時丟失數據)
 
     # Storage paths
     data_dir: Path = Path("data/news/raw/ibkr")
@@ -586,7 +587,9 @@ def collect_news(
         logger.info(f"Date range: {start_date} to {end_date}")
         logger.info(f"Storage: {config.data_dir}")
 
-        all_articles = []
+        batch_articles = []  # Current batch for incremental saving
+        total_collected = 0
+        total_saved = 0
         start_time = time.time()
 
         for i, ticker in enumerate(tickers):
@@ -596,7 +599,8 @@ def collect_news(
             articles = collector.fetch_news(ticker, start_date, end_date)
 
             if articles:
-                all_articles.extend(articles)
+                batch_articles.extend(articles)
+                total_collected += len(articles)
                 body_info = ""
                 if fetch_body:
                     with_body = sum(1 for a in articles if a.content_length > 0)
@@ -607,14 +611,24 @@ def collect_news(
 
             collector.stats['total_tickers'] += 1
 
+            # Incremental save: save every N tickers to prevent data loss
+            if (i + 1) % config.save_every_n_tickers == 0 and batch_articles:
+                saved = storage.save_articles(batch_articles, target_year, target_month)
+                total_saved += saved
+                logger.info(f"  [Checkpoint] Saved batch: {saved} new articles (total saved: {total_saved})")
+                batch_articles = []  # Clear batch after saving
+
             # Small delay between requests (only needed between tickers if not fetching body)
             if not fetch_body:
                 time.sleep(config.request_delay)
 
-        # Save all articles
-        if all_articles:
-            saved = storage.save_articles(all_articles, target_year, target_month)
-            collector.stats['total_articles'] = saved
+        # Save remaining articles in the last batch
+        if batch_articles:
+            saved = storage.save_articles(batch_articles, target_year, target_month)
+            total_saved += saved
+            logger.info(f"  [Final] Saved remaining: {saved} new articles")
+
+        collector.stats['total_articles'] = total_saved
 
         elapsed = time.time() - start_time
 
@@ -623,8 +637,8 @@ def collect_news(
         logger.info("Collection Complete")
         logger.info("=" * 60)
         logger.info(f"Mode: {mode_str}")
-        logger.info(f"Total articles: {len(all_articles)}")
-        logger.info(f"Saved (deduplicated): {collector.stats['total_articles']}")
+        logger.info(f"Total collected: {total_collected}")
+        logger.info(f"Saved (deduplicated): {total_saved}")
         logger.info(f"Tickers processed: {collector.stats['total_tickers']}")
 
         if fetch_body:
@@ -636,7 +650,7 @@ def collect_news(
 
         if len(tickers) > 0 and elapsed > 0:
             if fetch_body:
-                total_requests = len(all_articles) + len(tickers)
+                total_requests = total_collected + len(tickers)
                 logger.info(f"Rate: {total_requests / elapsed:.2f} requests/sec")
             else:
                 logger.info(f"Rate: {len(tickers) / elapsed:.2f} tickers/sec")
