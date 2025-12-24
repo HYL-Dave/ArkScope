@@ -1,0 +1,499 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================================
+% Packages
+% ============================================================
+\usepackage{xeCJK}  % Chinese support
+\setCJKmainfont[AutoFakeBold=true]{Noto Sans CJK TC}  % fallback if not found
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{amssymb}  % for symbols
+
+% ============================================================
+% Colors
+% ============================================================
+\definecolor{ibkrblue}{HTML}{1E3A5F}
+\definecolor{polygonpurple}{HTML}{8B5CF6}
+\definecolor{finnhubgreen}{HTML}{22C55E}
+\definecolor{avblue}{HTML}{3B82F6}
+\definecolor{eohdorange}{HTML}{F97316}
+\definecolor{fdsblue}{HTML}{0EA5E9}
+\definecolor{successgreen}{HTML}{16A34A}
+\definecolor{warningyellow}{HTML}{CA8A04}
+\definecolor{dangered}{HTML}{DC2626}
+
+% ============================================================
+% Hyperref settings
+% ============================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=ibkrblue,
+    urlcolor=ibkrblue,
+    citecolor=ibkrblue
+}
+
+% ============================================================
+% Custom commands (avoid reserved names)
+% ============================================================
+\newcommand{\cmark}{\textcolor{successgreen}{$\checkmark$}}
+\newcommand{\xmark}{\textcolor{dangered}{$\times$}}
+\newcommand{\wmark}{\textcolor{warningyellow}{$\triangle$}}
+\newcommand{\fire}{\textcolor{orange}{*}}
+\newcommand{\starmark}{\textcolor{warningyellow}{$\bigstar$}}
+
+% ============================================================
+% Title formatting
+% ============================================================
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{ibkrblue}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{1em}{}
+
+% ============================================================
+% Header/Footer
+% ============================================================
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{MindfulRL-Intraday}
+\lhead{付費訂閱評估}
+\rfoot{Page \thepage}
+\lfoot{2025-12-24 更新}
+
+% ============================================================
+% Document
+% ============================================================
+\begin{document}
+
+% ------------------------------------------------------------
+% Title Page
+% ------------------------------------------------------------
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\Huge\bfseries 付費訂閱完整價值評估\\[0.5cm]}
+{\Large Data Provider API Ecosystem Analysis}\\[2cm]
+{\large MindfulRL-Intraday Project}\\[1cm]
+{\large 評估日期: 2025-12-24}\\[3cm]
+
+\begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue,title={\textbf{文件目的}}]
+全面評估各資料提供商的 API 生態系統、投資領域擴展潛力與訂閱價值，為 RL 交易系統選擇最佳數據源組合。
+\end{tcolorbox}
+
+\vfill
+{\small 版本 2.0 | 含 IBKR API 實測結果}
+\end{titlepage}
+
+% ------------------------------------------------------------
+% Table of Contents
+% ------------------------------------------------------------
+\tableofcontents
+\newpage
+
+% ============================================================
+% Executive Summary
+% ============================================================
+\section{執行摘要}
+
+\begin{table}[h]
+\centering
+\caption{資料提供商總覽}
+\begin{tabular}{@{}lccll@{}}
+\toprule
+\textbf{Provider} & \textbf{月費起} & \textbf{資產類別} & \textbf{獨特價值} & \textbf{評分} \\
+\midrule
+\textbf{Polygon/Massive} & \$29 & 6 類 & Options + Futures + 經濟數據 & \starmark\starmark\starmark\starmark\starmark \\
+\textbf{Finnhub} & \$0--75 & 3 類 & 國會交易 + ESG + 專利 & \starmark\starmark\starmark\starmark \\
+\textbf{Alpha Vantage} & \$49.99 & 5 類 & 50+ 技術指標 + 大宗商品 & \starmark\starmark\starmark \\
+\textbf{EODHD} & \$19.99 & 6 類 & 全球 60+ 交易所 + ID 對照 & \starmark\starmark\starmark\starmark \\
+\textbf{IBKR} & \$0--50+ & 10+ 類 & \textbf{唯一可執行交易} + 90+ 市場 & \starmark\starmark\starmark\starmark\starmark \\
+\textbf{Financial Datasets} & \$20 (PAYG) & 4 類 & Segmented Revenue + LLM 優化 & \starmark\starmark\starmark\starmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{推薦組合}}]
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{IBKR} (免費) -- 交易執行 + 專業新聞 (Dow Jones, Briefing) + 基本面數據
+    \item \textbf{Polygon} (\$29/月) -- Options/Futures 數據 + 經濟指標
+    \item \textbf{Tiingo} (免費) -- 30+ 年歷史股價
+    \item \textbf{Finnhub} (免費版) -- 即時報價 + 公司新聞
+\end{enumerate}
+\end{tcolorbox}
+
+% ============================================================
+% Provider Details
+% ============================================================
+\newpage
+\section{Polygon.io / Massive}
+
+\subsection{完整 API 生態系統}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{類別} & \textbf{資料類型} & \textbf{投資應用} \\
+\midrule
+Stocks & Tickers, Aggregates, Trades, Quotes & 股票策略 \\
+Options & Contracts, Greeks, Snapshots, Trades & \textbf{衍生品策略} \\
+Futures & Products, Schedules, Aggregates & \textbf{期貨對沖} \\
+Indices & Aggregates, Snapshots & 大盤追蹤 \\
+Forex & 貨幣轉換, Quotes & \textbf{外匯策略} \\
+Crypto & Aggregates, Trades & \textbf{加密貨幣} \\
+Economy & 國庫利率, 通膨數據 & \textbf{宏觀配置} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{訂閱方案}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrll@{}}
+\toprule
+\textbf{方案} & \textbf{月費} & \textbf{API 限制} & \textbf{核心功能} \\
+\midrule
+Free & \$0 & 5 calls/min & 延遲數據, 2 年歷史 \\
+\textbf{Starter} & \$29 & 無限 & \textbf{即時串流 + Options + Futures + 經濟數據} \\
+Developer & \$199 & 無限 & + Options 完整歷史 + 商業使用 \\
+Business & \$1,999 & 無限 & + 無交易所費用 + 20+ 年歷史 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=polygonpurple!5,colframe=polygonpurple]
+\textbf{結論}: \$29/月解鎖 Options + Futures + 經濟數據，對多策略開發價值極高。
+\end{tcolorbox}
+
+% ------------------------------------------------------------
+\newpage
+\section{Finnhub}
+
+\subsection{獨特另類數據}
+
+\begin{tcolorbox}[colback=finnhubgreen!5,colframe=finnhubgreen,title={Alternative Data (極其獨特)}]
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Congressional Trading} -- 國會議員交易記錄！
+    \item \textbf{Lobbying Activities} -- 遊說活動
+    \item \textbf{USA Gov Spending} -- 政府支出
+    \item \textbf{H1B Visa Applications} -- 雇用趨勢
+    \item \textbf{USPTO Patents} -- 專利申請
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{免費 vs 付費 API 實測結果}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccp{6cm}@{}}
+\toprule
+\textbf{API} & \textbf{免費} & \textbf{付費} & \textbf{說明} \\
+\midrule
+Company News & \cmark & \cmark & Unix timestamp, 秒級精度 \\
+Market News & \cmark & \cmark & 一般/外匯/加密/併購 \\
+Insider Transactions & \cmark & \cmark & Form 4 交易記錄 \\
+Real-time Quote & \cmark & \cmark & 有延遲 \\
+Earnings Calendar & \cmark & \cmark & EPS 實際/預估 \\
+\textbf{Social Sentiment} & \xmark & \cmark & Reddit/Twitter 情緒 \\
+\textbf{Stock Candles} & \xmark & \cmark & 歷史 K 線 (日/分鐘) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=warningyellow!10,colframe=warningyellow]
+\textbf{重要發現}: 歷史股價 (Stock Candles) 在免費版無法存取！建議搭配 \textbf{Tiingo} 取得歷史股價。
+\end{tcolorbox}
+
+% ------------------------------------------------------------
+\newpage
+\section{Interactive Brokers (IBKR)}
+
+\subsection{獨特優勢: 執行能力}
+
+\begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue,title={\textbf{這是唯一能實際執行交易的選項！}}]
+TWS API 功能:
+\begin{itemize}[leftmargin=*]
+    \item 100+ 訂單類型
+    \item 演算法交易 (TWAP, VWAP, etc.)
+    \item 投資組合再平衡
+    \item 自動止損/止盈
+    \item 條件單/追蹤單
+    \item 實時帳戶監控
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{專業新聞與研究 (其他 API 無法獲得)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{來源} & \textbf{說明} \\
+\midrule
+Dow Jones Newswires & 專業級即時新聞 \\
+Dow Jones Trader & 即時交易新聞 \\
+Briefing.com & 市場評論 \\
+The Fly & 即時頭條 \\
+\midrule
+\multicolumn{2}{c}{\textbf{免費研究 (60+ 來源)}} \\
+\midrule
+Morningstar & 股票/基金評級 \\
+Zacks & 盈餘預測 \\
+TipRanks & 分析師追蹤 \\
+ORATS & Options Greeks/IV \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{市場數據訂閱費用 (2025-12-24 更新)}
+
+\subsubsection{基礎 Bundle (必需)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrp{5cm}@{}}
+\toprule
+\textbf{方案} & \textbf{Non-Pro} & \textbf{Professional} & \textbf{豁免條件} \\
+\midrule
+US Securities Snapshot Bundle & \$10 & \$10 & 月佣金 $\geq$ \$30 可免除 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Add-On 方案 (需先訂閱基礎 Bundle)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrp{4cm}@{}}
+\toprule
+\textbf{方案} & \textbf{Non-Pro} & \textbf{Professional} & \textbf{豁免條件} \\
+\midrule
+US Equity \& Options Streaming & \textbf{\$4.50} & \$125 & -- \\
+Cboe One Add-On & \$1.00 & \$5 & 佣金 $\geq$ \$5 可免除 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{實際成本計算}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{情境} & \textbf{月費} & \\
+\midrule
+只要 Snapshot 報價 (佣金 $<$ \$30) & \$10 & \\
+只要 Snapshot 報價 (佣金 $\geq$ \$30) & \textbf{\$0} & \cmark \\
+即時串流 + Options Greeks (佣金 $<$ \$30) & \$14.50 & \\
+即時串流 + Options Greeks (佣金 $\geq$ \$30) & \textbf{\$4.50} & \cmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen]
+\textbf{最佳方案}: 若月佣金 $\geq$ \$30，基礎 Bundle 免費，只需 \textbf{\$4.50/月} 即可獲得即時串流 + Options Greeks
+\end{tcolorbox}
+
+% ------------------------------------------------------------
+\newpage
+\subsection{reqFundamentalData API 實測結果 (2025-12-23)}
+
+\begin{table}[h]
+\centering
+\caption{IBKR 基本面數據 API 測試結果}
+\begin{tabular}{@{}lcrl@{}}
+\toprule
+\textbf{報告類型} & \textbf{狀態} & \textbf{數據量} & \textbf{說明} \\
+\midrule
+\textbf{ReportSnapshot} & \cmark & 10,641 chars & 財務比率 (P/E, ROE, EPS...) \\
+\textbf{ReportsFinSummary} & \cmark & 45,403 chars & 財務摘要 \\
+\textbf{ReportsOwnership} & \cmark & 7.6 MB & 機構持股數據！ \\
+\midrule
+ReportsFinStatements & \xmark & 0 & 完整財務報表需訂閱 \\
+RESC & \xmark & 0 & 分析師預測 (經常不可用) \\
+CalendarReport & \xmark & 0 & WSH 日曆需訂閱 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{ReportSnapshot 獲取的財務指標}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{類別} & \textbf{指標} \\
+\midrule
+估值 & P/E, P/B, P/S, EV/EBITDA, P/Cash, P/FCF \\
+獲利 & ROE, ROA, ROC, Gross Margin, Operating Margin, Net Margin \\
+成長 & Revenue Growth, EPS Growth, Net Income Growth \\
+財務 & Current Ratio, Quick Ratio, Debt/Equity, Interest Coverage \\
+效率 & Asset Turnover, Inventory Turnover, Days Receivable \\
+股利 & Dividend Yield, Payout Ratio \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\newpage
+\section{Financial Datasets}
+
+\subsection{獨特優勢: Segmented Revenue API}
+
+\begin{tcolorbox}[colback=fdsblue!5,colframe=fdsblue,title={其他 API 少見的功能}]
+直接從 XBRL 格式 10-K/10-Q 解析:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{產品線營收細分} (iPhone, Mac, iPad...)
+    \item \textbf{業務部門營收} (不同事業群)
+    \item \textbf{地理區域營收} (Americas, Europe, Greater China...)
+    \item 保留原始 XBRL 標籤，可追溯性高
+\end{itemize}
+\end{tcolorbox}
+
+\textbf{應用場景}:
+\begin{itemize}
+    \item 分析 Apple 的 iPhone vs Mac 營收趨勢
+    \item 追蹤公司區域曝險 (中國營收佔比)
+    \item 識別成長/衰退的業務線
+    \item \textbf{PEAD 策略}: 哪些產品線驅動 Earnings Surprise
+\end{itemize}
+
+\subsection{訂閱方案}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrll@{}}
+\toprule
+\textbf{方案} & \textbf{月費} & \textbf{API 限制} & \textbf{核心功能} \\
+\midrule
+Pay-As-You-Go & \$20 起 & 按次計費 & 彈性使用，適合測試 \\
+Developer & \$200 & 1,000 req/min & 個人使用，完整存取 \\
+Pro & \$2,000 & 無限 & + 數據再分發權 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\newpage
+\section{提供商比較}
+
+\subsection{Financial Metrics 比較}
+
+\begin{table}[h]
+\centering
+\caption{各提供商 Financial Metrics 能力}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{提供商} & \textbf{類型} & \textbf{涵蓋指標} & \textbf{費用} \\
+\midrule
+IBKR TWS API & 基本面 & 完整 (ROE, P/E, Margins...) & \textbf{免費} \\
+Financial Datasets & 基本面 & 50+ 指標，LLM 優化 & \$0.02/次 \\
+Finnhub & 基本面 & 基礎 (52週高低、PE等) & 免費/\$50+ \\
+EODHD & 基本面 & 30+ 年財務數據 & \$59.99/月 \\
+\midrule
+Alpha Vantage & \textbf{技術} & 50+ SMA, EMA, RSI, MACD... & \$49.99/月 \\
+Polygon & \textbf{技術} & 基礎技術指標 & \$29/月 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{功能比較矩陣}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{功能} & \textbf{IBKR} & \textbf{Polygon} & \textbf{Finnhub} & \textbf{EODHD} & \textbf{FDS} \\
+\midrule
+交易執行 & \cmark & \xmark & \xmark & \xmark & \xmark \\
+Options 數據 & \cmark & \cmark & \xmark & \cmark & \xmark \\
+即時報價 & \cmark & \cmark & \cmark & \cmark & \wmark \\
+專業新聞 & \cmark & \wmark & \cmark & \wmark & \xmark \\
+基本面數據 & \cmark & \xmark & \cmark & \cmark & \cmark \\
+Segmented Revenue & \xmark & \xmark & \xmark & \xmark & \cmark \\
+國會交易 & \xmark & \xmark & \cmark & \xmark & \xmark \\
+全球覆蓋 & \cmark & \xmark & \wmark & \cmark & \xmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\newpage
+\section{推薦策略}
+
+\subsection{最佳組合方案}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{成本效益最佳組合 (月費約 \$33.50)}}]
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{IBKR} (免費--\$4.50)
+    \begin{itemize}
+        \item 交易執行 (唯一選項)
+        \item 專業新聞 (Dow Jones, Briefing, The Fly)
+        \item 基本面數據 (reqFundamentalData)
+        \item 60+ 免費研究來源
+    \end{itemize}
+
+    \item \textbf{Polygon Starter} (\$29)
+    \begin{itemize}
+        \item Options/Futures 即時數據
+        \item 經濟指標
+        \item 合作夥伴數據 (Benzinga, ETF Global)
+    \end{itemize}
+
+    \item \textbf{Tiingo} (免費)
+    \begin{itemize}
+        \item 30+ 年歷史股價
+        \item 彌補 Finnhub 免費版缺失
+    \end{itemize}
+
+    \item \textbf{Finnhub 免費版}
+    \begin{itemize}
+        \item 公司新聞
+        \item Insider 交易
+        \item 即時報價 (延遲)
+    \end{itemize}
+\end{enumerate}
+\end{tcolorbox}
+
+\subsection{按需求選配}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{需求} & \textbf{推薦} & \textbf{費用} \\
+\midrule
+PEAD 策略 (細分營收) & + Financial Datasets & +\$20 (PAYG) \\
+技術指標 API & + Alpha Vantage & +\$49.99 \\
+全球市場 & + EODHD & +\$19.99 \\
+國會交易追蹤 & Finnhub 免費版已含 & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section*{附錄: 更新日誌}
+
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{日期} & \textbf{更新內容} \\
+\midrule
+2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明 \\
+2025-12-23 & 加入 IBKR reqFundamentalData API 實測結果 \\
+2025-12-22 & 初版完成 \\
+\bottomrule
+\end{tabular}
+
+\end{document}
