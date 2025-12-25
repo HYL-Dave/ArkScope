@@ -279,6 +279,158 @@ class IBKRDataSource(BaseDataSource):
             logger.error(f"Error fetching news providers: {e}")
             return []
 
+    def _fetch_news_single_query(
+        self,
+        con_id: int,
+        providers: str,
+        start_date: date,
+        end_date: date,
+        ticker: str,
+    ) -> List[NewsArticle]:
+        """
+        Single IBKR news query (max 300 results).
+
+        Internal helper - use fetch_news() instead.
+        """
+        start_str = datetime.combine(start_date, datetime.min.time()).strftime('%Y%m%d %H:%M:%S')
+        end_str = datetime.combine(end_date, datetime.max.time()).strftime('%Y%m%d %H:%M:%S')
+
+        self._rate_limit_wait()
+
+        headlines = self._ib.reqHistoricalNews(
+            con_id,
+            providers,
+            start_str,
+            end_str,
+            300,  # Always request max to detect if we need to split
+        )
+
+        if not headlines:
+            return []
+
+        articles = []
+        for h in headlines:
+            # Parse the headline metadata
+            # Format: {A:conId:L:lang:K:sentiment:C:confidence}headline
+            headline_text = h.headline
+            sentiment = None
+
+            # Extract sentiment if present
+            if headline_text.startswith('{'):
+                try:
+                    end_meta = headline_text.index('}')
+                    meta = headline_text[1:end_meta]
+                    headline_text = headline_text[end_meta + 1:]
+
+                    # Parse K: (sentiment) value
+                    for part in meta.split(':'):
+                        if part.startswith('K:'):
+                            try:
+                                sentiment = float(part[2:])
+                            except ValueError:
+                                pass
+                except (ValueError, IndexError):
+                    pass
+
+            # Convert time to datetime
+            pub_time = h.time
+            if isinstance(pub_time, str):
+                try:
+                    pub_time = datetime.strptime(pub_time, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    pub_time = datetime.now()
+
+            articles.append(NewsArticle(
+                ticker=ticker,
+                title=headline_text,
+                published_date=pub_time,
+                source=h.providerCode,
+                description=f"[Article ID: {h.articleId}]",  # Store article_id for later body fetch
+                url='',  # IBKR doesn't provide URL in headlines
+                data_source='ibkr',
+            ))
+
+        return articles
+
+    def _fetch_news_for_ticker_with_split(
+        self,
+        con_id: int,
+        providers: str,
+        start_date: date,
+        end_date: date,
+        ticker: str,
+        depth: int = 0,
+        max_depth: int = 5,  # Prevent infinite recursion (max 32 segments)
+    ) -> List[NewsArticle]:
+        """
+        Fetch news for a single ticker with automatic date range splitting.
+
+        If a query returns exactly 300 articles (API limit), automatically
+        splits the date range in half and queries each half recursively.
+
+        Args:
+            con_id: IBKR contract ID
+            providers: Provider codes string
+            start_date: Start date
+            end_date: End date
+            ticker: Stock symbol (for logging)
+            depth: Current recursion depth
+            max_depth: Maximum recursion depth (prevents infinite loops)
+
+        Returns:
+            List of all NewsArticle objects found
+        """
+        # Base case: invalid date range
+        if start_date > end_date:
+            return []
+
+        articles = self._fetch_news_single_query(con_id, providers, start_date, end_date, ticker)
+
+        # If we hit the 300 limit and haven't reached max depth, split the range
+        if len(articles) >= 300 and depth < max_depth:
+            # Calculate midpoint
+            days_diff = (end_date - start_date).days
+
+            if days_diff == 0:
+                # Same day - cannot split further by date
+                logger.warning(f"    [{ticker}] Single day {start_date} has 300+ articles, cannot split further")
+                return articles
+
+            # Split in half: for days_diff=1, mid_date=start_date, splitting into 2 single days
+            # For days_diff=2, mid_date=start_date+1, splitting into (start~start+1) and (start+2~end)
+            mid_date = start_date + timedelta(days=days_diff // 2)
+
+            logger.info(f"    [{ticker}] Hit 300 limit, splitting: {start_date}~{mid_date} + {mid_date + timedelta(days=1)}~{end_date}")
+
+            # Query first half (start to mid)
+            first_half = self._fetch_news_for_ticker_with_split(
+                con_id, providers, start_date, mid_date, ticker, depth + 1, max_depth
+            )
+
+            # Query second half (mid+1 to end)
+            second_half = self._fetch_news_for_ticker_with_split(
+                con_id, providers, mid_date + timedelta(days=1), end_date, ticker, depth + 1, max_depth
+            )
+
+            # Combine and deduplicate by article ID (in description field)
+            # Include original articles as fallback in case recursive calls failed
+            all_articles = articles + first_half + second_half
+            seen_ids = set()
+            unique_articles = []
+            for art in all_articles:
+                art_id = art.description  # Contains "[Article ID: xxx]"
+                if art_id not in seen_ids:
+                    seen_ids.add(art_id)
+                    unique_articles.append(art)
+
+            # Log if recursive calls returned fewer articles (potential API issue)
+            if len(unique_articles) < len(articles):
+                logger.warning(f"    [{ticker}] Recursive split returned fewer articles ({len(unique_articles)}) than original ({len(articles)})")
+
+            return unique_articles
+
+        return articles
+
     def fetch_news(
         self,
         tickers: List[str],
@@ -287,6 +439,7 @@ class IBKRDataSource(BaseDataSource):
         days_back: int = 7,
         limit: Optional[int] = None,
         providers: Optional[str] = None,
+        auto_split: bool = True,
     ) -> List[NewsArticle]:
         """
         Fetch news articles from IBKR news providers.
@@ -298,9 +451,12 @@ class IBKRDataSource(BaseDataSource):
             start_date: Start date (default: days_back from today).
             end_date: End date (default: today).
             days_back: Days to look back if start_date not specified.
-            limit: Max articles per ticker (default: 100, max: 300).
+            limit: Max articles per ticker (default: None = unlimited with auto_split).
             providers: Provider codes separated by '+' (e.g., 'DJ-N+FLY').
                       If None, uses all available providers.
+            auto_split: If True, automatically split date range when hitting
+                       300 article limit (default: True). Set False for faster
+                       queries when you only need recent articles.
 
         Returns:
             List of NewsArticle objects.
@@ -322,73 +478,29 @@ class IBKRDataSource(BaseDataSource):
         if start_date is None:
             start_date = end_date - timedelta(days=days_back)
 
-        # Format times for IBKR API (yyyyMMdd HH:mm:ss)
-        start_str = datetime.combine(start_date, datetime.min.time()).strftime('%Y%m%d %H:%M:%S')
-        end_str = datetime.combine(end_date, datetime.max.time()).strftime('%Y%m%d %H:%M:%S')
-
-        max_results = min(limit or 100, 300)  # IBKR max is 300
         all_articles = []
 
         for ticker in tickers:
             logger.info(f"Fetching news for {ticker}")
 
             try:
-                self._rate_limit_wait()
-
                 contract = self._create_contract(ticker)
                 self._ib.qualifyContracts(contract)
 
-                headlines = self._ib.reqHistoricalNews(
-                    contract.conId,
-                    providers,
-                    start_str,
-                    end_str,
-                    max_results,
-                )
+                if auto_split:
+                    # Use auto-splitting to get all articles
+                    ticker_articles = self._fetch_news_for_ticker_with_split(
+                        contract.conId, providers, start_date, end_date, ticker
+                    )
+                else:
+                    # Single query (may be truncated at 300)
+                    ticker_articles = self._fetch_news_single_query(
+                        contract.conId, providers, start_date, end_date, ticker
+                    )
 
-                if headlines:
-                    for h in headlines:
-                        # Parse the headline metadata
-                        # Format: {A:conId:L:lang:K:sentiment:C:confidence}headline
-                        headline_text = h.headline
-                        sentiment = None
-
-                        # Extract sentiment if present
-                        if headline_text.startswith('{'):
-                            try:
-                                end_meta = headline_text.index('}')
-                                meta = headline_text[1:end_meta]
-                                headline_text = headline_text[end_meta + 1:]
-
-                                # Parse K: (sentiment) value
-                                for part in meta.split(':'):
-                                    if part.startswith('K:'):
-                                        try:
-                                            sentiment = float(part[2:])
-                                        except ValueError:
-                                            pass
-                            except (ValueError, IndexError):
-                                pass
-
-                        # Convert time to datetime
-                        pub_time = h.time
-                        if isinstance(pub_time, str):
-                            try:
-                                pub_time = datetime.strptime(pub_time, '%Y-%m-%d %H:%M:%S')
-                            except ValueError:
-                                pub_time = datetime.now()
-
-                        all_articles.append(NewsArticle(
-                            ticker=ticker,
-                            title=headline_text,
-                            published_date=pub_time,
-                            source=h.providerCode,
-                            description=f"[Article ID: {h.articleId}]",  # Store article_id for later body fetch
-                            url='',  # IBKR doesn't provide URL in headlines
-                            data_source='ibkr',
-                        ))
-
-                    logger.info(f"  Got {len(headlines)} headlines for {ticker}")
+                if ticker_articles:
+                    all_articles.extend(ticker_articles)
+                    logger.info(f"  Got {len(ticker_articles)} headlines for {ticker}")
                 else:
                     logger.info(f"  No news for {ticker}")
 
