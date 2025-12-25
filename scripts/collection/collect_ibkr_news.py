@@ -344,23 +344,108 @@ class StorageManager:
 
 
 # =============================================================================
+# Global News Cache (優化：避免重複撈取相同文章的 body)
+# =============================================================================
+
+class GlobalNewsCache:
+    """
+    全域新聞快取，用 article_id 作為 key。
+
+    由於 IBKR 的市場總覽文章會被多支股票查詢到，
+    使用快取可以避免重複撈取相同文章的 body。
+
+    效益估算:
+    - 無快取: 100 tickers × 300 articles × body fetch = 30,000 body calls
+    - 有快取: 只撈取唯一文章 ≈ 5,000 body calls (減少 83%)
+    """
+
+    def __init__(self):
+        self.article_bodies: Dict[str, str] = {}  # article_id → body
+        self.seen_article_ids: set = set()  # 已處理的 article_id
+
+        # 統計
+        self.stats = {
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'total_lookups': 0,
+        }
+
+    def has(self, article_id: str) -> bool:
+        """檢查文章是否已在快取中"""
+        return article_id in self.seen_article_ids
+
+    def get(self, article_id: str) -> Optional[str]:
+        """取得快取的 body"""
+        self.stats['total_lookups'] += 1
+        if article_id in self.article_bodies:
+            self.stats['cache_hits'] += 1
+            return self.article_bodies[article_id]
+        return None
+
+    def put(self, article_id: str, body: Optional[str]):
+        """儲存 body 到快取"""
+        self.seen_article_ids.add(article_id)
+        if body:
+            self.article_bodies[article_id] = body
+
+    def mark_seen(self, article_id: str):
+        """標記文章已處理（即使沒有 body）"""
+        self.seen_article_ids.add(article_id)
+        if article_id not in self.article_bodies:
+            self.stats['cache_misses'] += 1
+
+    def get_stats(self) -> dict:
+        """取得快取統計"""
+        hit_rate = 0
+        if self.stats['total_lookups'] > 0:
+            hit_rate = self.stats['cache_hits'] / self.stats['total_lookups'] * 100
+        return {
+            **self.stats,
+            'unique_articles': len(self.seen_article_ids),
+            'cached_bodies': len(self.article_bodies),
+            'hit_rate_pct': round(hit_rate, 1),
+        }
+
+    def warm_up_from_existing(self, data_dir: Path):
+        """從現有數據預載入已知的 article_id（不載入 body，僅標記已存在）"""
+        if not data_dir.exists():
+            return 0
+
+        count = 0
+        for parquet_file in data_dir.rglob("*.parquet"):
+            try:
+                df = pd.read_parquet(parquet_file, columns=['article_id'])
+                for aid in df['article_id']:
+                    self.seen_article_ids.add(aid)
+                    count += 1
+            except Exception:
+                pass
+
+        logger.info(f"  Cache warm-up: loaded {len(self.seen_article_ids)} unique article_ids from existing data")
+        return len(self.seen_article_ids)
+
+
+# =============================================================================
 # IBKR News Collector
 # =============================================================================
 
 class IBKRNewsCollector:
     """IBKR 新聞收集器"""
 
-    def __init__(self, config: IBKRConfig, fetch_body: bool = True):
+    def __init__(self, config: IBKRConfig, fetch_body: bool = True, cache: Optional[GlobalNewsCache] = None):
         self.config = config
         self.fetch_body = fetch_body
         self.ibkr: Optional[IBKRDataSource] = None
         self.providers: List[Dict] = []
+        self.cache = cache or GlobalNewsCache()  # 使用傳入的快取或建立新的
 
         # Statistics
         self.stats = {
             'total_articles': 0,
             'total_tickers': 0,
             'body_fetched': 0,
+            'body_cached': 0,  # 從快取取得的數量
+            'body_skipped': 0,  # 已知文章，跳過 body 撈取
             'body_failed': 0,
             'errors': 0,
             'by_provider': {},
@@ -465,23 +550,38 @@ class IBKRNewsCollector:
                 # Track by provider
                 self.stats['by_provider'][provider] = self.stats['by_provider'].get(provider, 0) + 1
 
-                # Fetch article body if enabled
+                # Fetch article body if enabled (使用快取優化)
                 description = ""
                 content = ""
                 content_length = 0
 
                 if self.fetch_body and article_id != dedup_hash:
-                    body = self.fetch_article_body(provider, article_id)
-                    if body:
-                        content = body
-                        # Use first 500 chars as description
-                        description = body[:500].strip()
-                        if len(body) > 500:
+                    # 先檢查快取
+                    cached_body = self.cache.get(article_id)
+                    if cached_body is not None:
+                        # 快取命中
+                        content = cached_body
+                        description = cached_body[:500].strip()
+                        if len(cached_body) > 500:
                             description += "..."
-                        content_length = len(body)
-                        self.stats['body_fetched'] += 1
+                        content_length = len(cached_body)
+                        self.stats['body_cached'] += 1
+                    elif not self.cache.has(article_id):
+                        # 快取未命中且未見過，需要撈取
+                        body = self.fetch_article_body(provider, article_id)
+                        self.cache.put(article_id, body)  # 存入快取
+                        if body:
+                            content = body
+                            description = body[:500].strip()
+                            if len(body) > 500:
+                                description += "..."
+                            content_length = len(body)
+                            self.stats['body_fetched'] += 1
+                        else:
+                            self.stats['body_failed'] += 1
                     else:
-                        self.stats['body_failed'] += 1
+                        # 已知文章，跳過 body 撈取（從現有數據載入）
+                        self.stats['body_skipped'] += 1
 
                 articles.append(NewsArticle(
                     article_id=article_id,
@@ -555,6 +655,7 @@ def collect_news(
     end_date: date,
     config: IBKRConfig,
     fetch_body: bool = True,
+    warm_up_ticker: str = "SPY",  # 用 SPY 暖機快取
 ) -> dict:
     """Main collection function."""
 
@@ -567,8 +668,17 @@ def collect_news(
         logger.warning(f"Adjusting start_date from {start_date} to {oldest_allowed}")
         start_date = oldest_allowed
 
+    # Initialize shared cache
+    cache = GlobalNewsCache()
+
+    # === 預載入已知的 article_id（避免重複處理）===
+    logger.info(f"\n[Cache] Loading existing article_ids from {config.data_dir}...")
+    existing_count = cache.warm_up_from_existing(config.data_dir)
+    if existing_count > 0:
+        logger.info(f"[Cache] Loaded {existing_count} existing article_ids")
+
     # Initialize
-    collector = IBKRNewsCollector(config, fetch_body=fetch_body)
+    collector = IBKRNewsCollector(config, fetch_body=fetch_body, cache=cache)
     storage = StorageManager(config.data_dir)
 
     # Connect
@@ -586,6 +696,14 @@ def collect_news(
         logger.info(f"Tickers: {len(tickers)}")
         logger.info(f"Date range: {start_date} to {end_date}")
         logger.info(f"Storage: {config.data_dir}")
+
+        # === 快取暖機：先用 SPY 撈取市場新聞填充快取 ===
+        if fetch_body and warm_up_ticker and warm_up_ticker not in tickers:
+            logger.info(f"\n[Cache Warm-up] Fetching {warm_up_ticker} news to populate cache...")
+            warm_up_articles = collector.fetch_news(warm_up_ticker, start_date, end_date)
+            if warm_up_articles:
+                logger.info(f"  Warmed up cache with {len(warm_up_articles)} articles")
+                logger.info(f"  Unique bodies cached: {len(cache.article_bodies)}")
 
         batch_articles = []  # Current batch for incremental saving
         total_collected = 0
@@ -642,8 +760,23 @@ def collect_news(
         logger.info(f"Tickers processed: {collector.stats['total_tickers']}")
 
         if fetch_body:
-            logger.info(f"Body fetched: {collector.stats['body_fetched']}")
+            logger.info(f"Body fetched (new): {collector.stats['body_fetched']}")
+            logger.info(f"Body from cache: {collector.stats['body_cached']}")
+            logger.info(f"Body skipped (already known): {collector.stats['body_skipped']}")
             logger.info(f"Body failed: {collector.stats['body_failed']}")
+
+            # Cache statistics
+            cache_stats = cache.get_stats()
+            logger.info(f"\nCache Statistics:")
+            logger.info(f"  Unique articles seen: {cache_stats['unique_articles']}")
+            logger.info(f"  Bodies cached: {cache_stats['cached_bodies']}")
+            logger.info(f"  Cache hit rate: {cache_stats['hit_rate_pct']}%")
+
+            # Calculate savings
+            if collector.stats['body_cached'] > 0:
+                total_body_requests = collector.stats['body_fetched'] + collector.stats['body_cached']
+                savings_pct = collector.stats['body_cached'] / total_body_requests * 100
+                logger.info(f"  API calls saved: {collector.stats['body_cached']} ({savings_pct:.1f}%)")
 
         logger.info(f"Errors: {collector.stats['errors']}")
         logger.info(f"Time elapsed: {elapsed:.1f}s")
