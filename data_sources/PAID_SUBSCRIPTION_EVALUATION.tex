@@ -92,7 +92,7 @@
 \rhead{MindfulRL-Intraday}
 \lhead{付費訂閱評估}
 \rfoot{Page \thepage}
-\lfoot{2025-12-24 更新}
+\lfoot{2025-12-26 更新}
 
 % ============================================================
 % Document
@@ -108,7 +108,7 @@
 {\Huge\bfseries 付費訂閱完整價值評估\\[0.5cm]}
 {\Large Data Provider API Ecosystem Analysis}\\[2cm]
 {\large MindfulRL-Intraday Project}\\[1cm]
-{\large 評估日期: 2025-12-24}\\[3cm]
+{\large 評估日期: 2025-12-26}\\[3cm]
 
 \begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue,title={\textbf{文件目的}}]
 全面評估各資料提供商的 API 生態系統、投資領域擴展潛力與訂閱價值，為 RL 交易系統選擇最佳數據源組合。
@@ -1535,6 +1535,132 @@ if __name__ == '__main__':
 \end{lstlisting}
 
 % ============================================================
+\newpage
+\section*{附錄 F: 國會議員交易數據來源}
+\addcontentsline{toc}{section}{附錄 F: 國會議員交易數據來源}
+
+\subsection*{背景: STOCK Act (2012)}
+
+2012 年美國通過《停止利用國會知識進行交易法》(STOCK Act)，要求國會議員在股票交易後 45 天內公開披露。這些公開資訊可作為\textbf{另類阿爾法來源}。
+
+\textbf{學術研究發現}:
+\begin{itemize}
+    \item 國會議員的投資組合平均跑贏大盤 6\%/年
+    \item 部分高績效議員超額回報達 25\%+ (如 Nancy Pelosi)
+    \item 披露延遲 (最多 45 天) 創造資訊不對稱
+\end{itemize}
+
+\subsection*{數據來源比較}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}llllc@{}}
+\toprule
+\textbf{來源} & \textbf{費用} & \textbf{API} & \textbf{特色} & \textbf{推薦} \\
+\midrule
+\textbf{Quiver Quantitative} & 免費 & \cmark & 超額回報計算, 即時更新 & \starmark\starmark\starmark\starmark\starmark \\
+\textbf{Capitol Trades} & 免費/付費 & \xmark & UI 最佳, 績效排名 & \starmark\starmark\starmark\starmark \\
+\textbf{FMP} & \$14.99+/月 & \cmark & 250 req/day 免費 & \starmark\starmark\starmark \\
+\textbf{AltIndex} & 付費 & \cmark & AI 分析, 預警系統 & \starmark\starmark\starmark \\
+\textbf{Unusual Whales} & \$97/年 & \xmark & 交叉分析選擇權流 & \starmark\starmark\starmark \\
+\textbf{Finnhub} & 免費 & \cmark & 已整合於專案 & \starmark\starmark\starmark\starmark \\
+\textbf{House Stock Watcher} & 免費 & \cmark & 開源 GitHub 專案 & \starmark\starmark\starmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{專案整合狀態}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{已實作}}]
+\begin{itemize}[leftmargin=*]
+    \item \texttt{data\_sources/congressional\_source.py} -- \texttt{QuiverDataSource} 類
+    \item \texttt{scripts/collection/collect\_congressional\_trades.py} -- 數據收集腳本
+    \item 支援: 按議員/股票/政黨篩選, 超額回報排序
+\end{itemize}
+\end{tcolorbox}
+
+\subsection*{使用範例}
+
+\begin{lstlisting}[language=Python,caption={使用 QuiverDataSource 獲取國會交易}]
+from data_sources import QuiverDataSource
+
+quiver = QuiverDataSource()
+
+# 獲取所有近期交易
+trades = quiver.fetch_congressional_trades()
+
+# 篩選特定股票
+nvda_trades = quiver.fetch_congressional_trades(tickers=['NVDA'])
+
+# 獲取特定議員的交易
+pelosi = quiver.fetch_trades_by_representative('Nancy Pelosi')
+
+# 獲取表現最佳的交易 (按超額回報)
+top = quiver.get_top_performers(limit=20)
+
+# 查看股票的國會活動摘要
+activity = quiver.get_ticker_activity('AAPL')
+\end{lstlisting}
+
+\subsection*{投資策略應用}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{策略} & \textbf{說明} & \textbf{Alpha 來源} \\
+\midrule
+跟單策略 & 複製高績效議員交易 & 資訊優勢 \\
+逆向策略 & 反向低績效議員交易 & 行為偏誤 \\
+時機策略 & 在披露公開後快速進場 & 市場反應延遲 \\
+篩選訊號 & 結合其他訊號加權 & 多因子增強 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{高績效議員追蹤清單 (歷史表現)}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}llcl@{}}
+\toprule
+\textbf{議員} & \textbf{政黨} & \textbf{年化超額回報} & \textbf{主要持股} \\
+\midrule
+Nancy Pelosi & D & 25\%+ & NVDA, AAPL, GOOGL \\
+Dan Crenshaw & R & 15\%+ & 能源, 國防 \\
+Marjorie Taylor Greene & R & 12\%+ & 科技, 生技 \\
+Josh Gottheimer & D & 10\%+ & 金融科技 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{注意}: 歷史表現不代表未來結果。部分議員的高回報可能源於運氣或特定市場環境。
+
+\subsection*{數據品質注意事項}
+
+\begin{itemize}
+    \item \textbf{披露延遲}: 最多 45 天，部分議員經常延遲
+    \item \textbf{金額範圍}: 只披露範圍 (如 \$1,001--\$15,000)，非精確金額
+    \item \textbf{配偶/子女交易}: 部分平台追蹤，部分不追蹤
+    \item \textbf{數據來源差異}: 不同平台解析方式可能有出入
+\end{itemize}
+
+\subsection*{成本效益評估}
+
+\begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue]
+\textbf{推薦方案}: 使用 \textbf{Quiver Quantitative 免費 API}
+
+\begin{itemize}[leftmargin=*]
+    \item 已整合於專案 (\texttt{QuiverDataSource})
+    \item 提供超額回報計算
+    \item 免費且更新及時
+    \item 備用: FMP 免費版 (250 req/day) 或 Finnhub 國會交易 API
+\end{itemize}
+\end{tcolorbox}
+
+% ============================================================
 \section*{更新日誌}
 \addcontentsline{toc}{section}{更新日誌}
 
@@ -1544,6 +1670,7 @@ if __name__ == '__main__':
 \toprule
 \textbf{日期} & \textbf{更新內容} \\
 \midrule
+2025-12-26 & 加入國會議員交易數據來源附錄 F \\
 2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明；完整 LaTeX 版本 \\
 2025-12-23 & 加入 IBKR reqFundamentalData API 實測結果 \\
 2025-12-22 & 初版完成 \\
