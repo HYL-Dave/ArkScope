@@ -41,6 +41,12 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# 自動載入 config/.env
+ENV_FILE = PROJECT_ROOT / "config" / ".env"
+if ENV_FILE.exists():
+    from dotenv import load_dotenv
+    load_dotenv(ENV_FILE)
+
 # ============================================================================
 # 常數定義
 # ============================================================================
@@ -326,17 +332,33 @@ def get_missing_articles(original_csv: Path, missing_rows: List[int]) -> pd.Data
     return missing_df
 
 
+def get_api_keys() -> List[str]:
+    """從環境變數取得 API keys，支援單一或多 key"""
+    # 優先使用 OPENAI_API_KEYS (多 key，逗號分隔)
+    keys_str = os.getenv("OPENAI_API_KEYS", "")
+    if keys_str:
+        keys = [k.strip() for k in keys_str.split(",") if k.strip()]
+        if keys:
+            logging.info(f"Using {len(keys)} API keys from OPENAI_API_KEYS")
+            return keys
+
+    # 回退到 OPENAI_API_KEY (單一 key)
+    single_key = os.getenv("OPENAI_API_KEY", "")
+    if single_key:
+        logging.info("Using single API key from OPENAI_API_KEY")
+        return [single_key]
+
+    raise ValueError("No API keys found. Set OPENAI_API_KEYS or OPENAI_API_KEY in config/.env")
+
+
 def generate_summaries(articles_df: pd.DataFrame, model: str = "o3",
                        reasoning_effort: str = "high") -> pd.DataFrame:
     """呼叫 API 生成 summary"""
     try:
         from openai_summary import summarize_article, set_api_keys
-        import os
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not set")
-        set_api_keys([api_key], None)
+        keys = get_api_keys()
+        set_api_keys(keys, None)
 
         summaries = []
         for idx, row in articles_df.iterrows():
@@ -438,14 +460,13 @@ def score_articles(articles_df: pd.DataFrame, model: str, reasoning: Optional[st
     """呼叫 API 生成評分"""
     try:
         if task == "sentiment":
-            from score_sentiment_openai import score_sentiment as score_func
+            from score_sentiment_openai import score_headline as score_func, set_api_keys
         else:
-            from score_risk_openai import score_risk as score_func
+            from score_risk_openai import score_headline as score_func, set_api_keys
 
-        import os
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not set")
+        # 使用 get_api_keys() 取得多 key 支援
+        keys = get_api_keys()
+        set_api_keys(keys, None)  # None = 無每日限額
 
         scores = []
         for idx, row in articles_df.iterrows():
@@ -457,8 +478,9 @@ def score_articles(articles_df: pd.DataFrame, model: str, reasoning: Optional[st
                 scores.append(None)
                 continue
 
-            # 呼叫評分函數
-            score = score_func(text, symbol, model, reasoning)
+            # 呼叫評分函數 (reasoning_effort 使用預設 "high" 如果為 None)
+            reasoning_effort = reasoning if reasoning else "high"
+            score = score_func(text, symbol, model, reasoning_effort)
             scores.append(score)
             logging.info(f"Generated {task} score for {symbol}: {score}")
 
