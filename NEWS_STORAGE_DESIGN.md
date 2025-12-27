@@ -679,13 +679,29 @@ python score_risk_anthropic.py \
   - 所有使用 o3_summary 的評分檔案都繼承相同結構
 ```
 
+**為什麼只有 ~77,871 筆可評分？**
+```
+原始 HuggingFace 資料 (127,176 rows):
+- 有 Article 內容: 77,871 筆 (61.2%)
+- 無 Article 內容: 49,305 筆 (38.8%) ← 無法生成 summary
+
+Summary 來源限制:
+- Lsa_summary: 77,871 有效 (從 Article 生成)
+- gpt_5_summary: 77,871 有效 (從 Article 生成)
+- o3_summary: 77,865 有效 (遺失 6 筆 BKR)
+
+DeepSeek 原始評分: 126,224 有效 (可能基於 title 評分)
+```
+
 **N 值差異完整解釋:**
 
-| 輸入源 | 原始行數 | 有效評分數 | 差異原因 |
-|--------|----------|------------|----------|
-| gpt_5_summary | 127,176 | 77,871 | 基準值 |
-| o3_summary | 127,170 | 77,865 | 輸入源遺失 6 筆 BKR 文章 |
-| o4-mini high | 127,170 | 77,863 | 額外 2 筆 API 呼叫失敗 |
+| 輸入源 | 原始行數 | 有效 Summary | 有效評分數 | 差異原因 |
+|--------|----------|--------------|------------|----------|
+| gpt_5_summary | 127,176 | 77,871 | 77,871 | 基準值 |
+| o3_summary | 127,170 | 77,865 | 77,865 | 輸入源遺失 6 筆 BKR |
+| o4-mini high | 127,170 | 77,865 | 77,863 | 額外 2 筆 API 失敗 |
+| Lsa_summary (o3) | 127,176 | 77,871 | 85,119 | 原始評分含更多行 |
+| Lsa_summary (o4) | 127,176 | 77,871 | 79,631 | o4 評分子集 |
 
 **o4-mini high 額外遺失的 2 筆:**
 ```
@@ -701,75 +717,59 @@ Row 44887: 2015-11-17 | GILD (API 呼叫失敗)
 
 ---
 
-#### Sentiment 評分結果 (所有配置加總)
+#### Sentiment 評分結果 (每配置獨立 N 值)
 
-**按模型分組 (N 值為所有配置加總，僅供參考):**
+| 配置 | N | Mean | Std | 輸入源 |
+|------|---|------|-----|--------|
+| gpt-5 (R=high, in=gpt_5_summary) | 77,871 | 3.234 | 0.716 | gpt_5_summary |
+| gpt-5 (R=high, in=o3_summary) | 77,865 | 3.236 | 0.717 | o3_summary |
+| gpt-5 (R=medium, in=o3_summary) | 77,865 | 3.271 | 0.748 | o3_summary |
+| o3 (R=high, in=Lsa_summary) | 85,119 | 3.276 | 0.729 | Lsa_summary |
+| claude-opus (in=gpt_5_summary) | 77,871 | 3.287 | 0.694 | gpt_5_summary |
+| o3 (R=low, in=o3_summary) | 77,865 | 3.294 | 0.794 | o3_summary |
+| o3 (R=high, in=o3_summary) | 77,865 | 3.298 | 0.824 | o3_summary |
+| o3 (R=medium, in=o3_summary) | 77,865 | 3.299 | 0.817 | o3_summary |
+| o3 (in=gpt_5_summary) | 77,871 | 3.300 | 0.822 | gpt_5_summary |
+| gpt-5 (R=low, in=o3_summary) | 77,865 | 3.304 | 0.778 | o3_summary |
+| claude-sonnet (in=gpt_5_summary) | 77,871 | 3.307 | 0.781 | gpt_5_summary |
+| gpt-4.1-nano (in=o3_summary) | 77,865 | 3.319 | 0.886 | o3_summary |
+| claude-haiku (in=gpt_5_summary) | 77,871 | 3.344 | 0.899 | gpt_5_summary |
+| o4-mini (R=high, in=Lsa_summary) | 79,631 | 3.346 | 0.892 | Lsa_summary |
+| o4-mini (R=low, in=o3_summary) | 77,865 | 3.374 | 0.933 | o3_summary |
+| o4-mini (R=medium, in=o3_summary) | 77,865 | 3.392 | 0.953 | o3_summary |
+| gpt-5 (R=minimal, in=o3_summary) | 77,865 | 3.402 | 0.839 | o3_summary |
+| o4-mini (R=high, in=o3_summary) | **77,863** | 3.405 | 0.969 | o3_summary |
+| gpt-5-mini (R=high, in=gpt_5_summary) | 77,871 | 3.408 | 0.943 | gpt_5_summary |
+| gpt-5 (R=minimal, in=gpt_5_summary) | 77,871 | 3.412 | 0.834 | gpt_5_summary |
+| gpt-4.1-mini (in=o3_summary) | 77,865 | 3.439 | 0.961 | o3_summary |
+| gpt-4.1 (in=o3_summary) | 77,865 | 3.455 | 0.923 | o3_summary |
+| gpt-4.1-mini (in=gpt_5_summary, 5種配置) | 77,871 each | 3.458-3.476 | ~0.955 | gpt_5_summary |
 
-| Model | N | Mean | Std | 1分% | 2分% | 3分% | 4分% | 5分% |
-|-------|---|------|-----|------|------|------|------|------|
-| claude-haiku | 77,871 | 3.344 | 0.899 | 1.3 | 16.3 | 37.7 | 35.9 | 8.8 |
-| claude-opus | 77,871 | 3.287 | 0.694 | 0.5 | 10.8 | 50.1 | 37.0 | 1.7 |
-| claude-sonnet | 77,871 | 3.307 | 0.781 | 0.8 | 15.0 | 39.5 | 42.3 | 2.5 |
-| gpt-4.1 | 77,865 | 3.455 | 0.923 | 1.3 | 14.2 | 34.5 | 37.8 | 12.2 |
-| gpt-4.1-mini | 467,220 | 3.460 | 0.957 | 1.3 | 15.0 | 34.9 | 34.3 | 14.6 |
-| gpt-4.1-nano | 77,865 | 3.319 | 0.886 | 3.0 | 15.1 | 33.2 | 44.4 | 4.3 |
-| gpt-5 | 622,944 | 3.304 | 0.773 | 1.1 | 12.5 | 44.8 | 38.1 | 3.5 |
-| gpt-5-mini | 77,871 | 3.408 | 0.943 | 2.1 | 16.3 | 29.9 | 41.9 | 9.7 |
-| o3 | 396,585 | 3.293 | 0.797 | 1.2 | 15.2 | 39.6 | 41.3 | 2.7 |
-| o4-mini | 313,224 | 3.379 | 0.937 | 2.4 | 14.4 | 36.9 | 35.6 | 10.7 |
+#### Risk 評分結果 (每配置獨立 N 值)
 
-**按 Reasoning Level 分組:**
-
-| Reasoning | N | Mean | Std |
-|-----------|---|------|-----|
-| default | 934,434 | 3.398 | 0.902 |
-| high | 554,085 | 3.314 | 0.835 |
-| low | 311,466 | 3.319 | 0.823 |
-| medium | 311,466 | 3.308 | 0.822 |
-| minimal | 155,736 | 3.407 | 0.836 |
-
-**按輸入源分組:**
-
-| Input Source | N | Mean | Std |
-|--------------|---|------|-----|
-| Lsa_summary | 164,750 | 3.310 | 0.813 |
-| gpt_5_summary | 1,090,194 | 3.370 | 0.866 |
-| o3_summary | 1,012,243 | 3.345 | 0.864 |
-
-#### Risk 評分結果
-
-**按模型分組:**
-
-| Model | N | Mean | Std | 1分% | 2分% | 3分% | 4分% | 5分% |
-|-------|---|------|-----|------|------|------|------|------|
-| claude-haiku | 77,871 | 1.872 | 0.911 | 41.0 | 38.3 | 13.4 | 7.1 | 0.2 |
-| claude-opus | 77,871 | 2.397 | 0.809 | 13.1 | 41.6 | 38.0 | 7.1 | 0.2 |
-| claude-sonnet | 77,871 | 2.117 | 0.858 | 25.4 | 43.7 | 25.0 | 5.8 | 0.2 |
-| gpt-4.1 | 77,865 | 2.236 | 0.924 | 27.9 | 26.1 | 40.6 | 5.3 | 0.1 |
-| gpt-4.1-mini | 467,220 | 2.295 | 0.893 | 22.7 | 31.7 | 39.0 | 6.4 | 0.1 |
-| gpt-4.1-nano | 77,865 | 2.282 | 0.820 | 15.1 | 49.9 | 26.7 | 8.2 | 0.1 |
-| gpt-5 | 622,944 | 2.613 | 0.633 | 1.4 | 42.7 | 49.2 | 6.6 | 0.0 |
-| gpt-5-mini | 77,871 | 2.433 | 0.720 | 4.8 | 55.9 | 30.5 | 8.7 | 0.1 |
-| o3 | 389,337 | 2.498 | 0.641 | 2.0 | 52.3 | 39.7 | 6.0 | 0.0 |
-| o4-mini | 311,464 | 2.248 | 0.886 | 23.3 | 35.0 | 35.3 | 6.3 | 0.1 |
-
-**按 Reasoning Level 分組:**
-
-| Reasoning | N | Mean | Std |
-|-----------|---|------|-----|
-| default | 934,434 | 2.266 | 0.876 |
-| high | 389,335 | 2.480 | 0.717 |
-| low | 311,466 | 2.510 | 0.716 |
-| medium | 467,208 | 2.434 | 0.748 |
-| minimal | 155,736 | 2.630 | 0.636 |
-
-**按輸入源分組:**
-
-| Input Source | N | Mean | Std |
-|--------------|---|------|-----|
-| Lsa_summary | 155,742 | 2.301 | 0.788 |
-| gpt_5_summary | 1,090,194 | 2.374 | 0.816 |
-| o3_summary | 1,012,243 | 2.435 | 0.775 |
+| 配置 | N | Mean | Std | 輸入源 |
+|------|---|------|-----|--------|
+| claude-haiku (in=gpt_5_summary) | 77,871 | 1.872 | 0.911 | gpt_5_summary |
+| claude-sonnet (in=gpt_5_summary) | 77,871 | 2.117 | 0.858 | gpt_5_summary |
+| o4-mini (R=medium, in=Lsa_summary) | 77,871 | 2.152 | 0.906 | Lsa_summary |
+| gpt-4.1 (in=o3_summary) | 77,865 | 2.236 | 0.924 | o3_summary |
+| o4-mini (R=medium, in=o3_summary) | 77,865 | 2.271 | 0.880 | o3_summary |
+| gpt-4.1-nano (in=o3_summary) | 77,865 | 2.282 | 0.820 | o3_summary |
+| o4-mini (R=low, in=o3_summary) | 77,865 | 2.284 | 0.875 | o3_summary |
+| o4-mini (R=high, in=o3_summary) | **77,863** | 2.287 | 0.875 | o3_summary |
+| gpt-4.1-mini (in=gpt_5_summary, 5種配置) | 77,871 each | 2.283-2.300 | ~0.890 | gpt_5_summary |
+| gpt-4.1-mini (in=o3_summary) | 77,865 | 2.309 | 0.905 | o3_summary |
+| claude-opus (in=gpt_5_summary) | 77,871 | 2.397 | 0.809 | gpt_5_summary |
+| gpt-5-mini (R=high, in=gpt_5_summary) | 77,871 | 2.433 | 0.720 | gpt_5_summary |
+| o3 (R=medium, in=Lsa_summary) | 77,871 | 2.450 | 0.614 | Lsa_summary |
+| o3 (R=medium, in=o3_summary) | 77,865 | 2.496 | 0.646 | o3_summary |
+| o3 (R=low, in=o3_summary) | 77,865 | 2.513 | 0.647 | o3_summary |
+| o3 (R=high, in=o3_summary) | 77,865 | 2.515 | 0.647 | o3_summary |
+| o3 (in=gpt_5_summary) | 77,871 | 2.516 | 0.647 | gpt_5_summary |
+| gpt-5 (R=high, in=gpt_5_summary) | 77,871 | 2.578 | 0.637 | gpt_5_summary |
+| gpt-5 (R=high, in=o3_summary) | 77,865 | 2.586 | 0.634 | o3_summary |
+| gpt-5 (R=medium/low, in=o3/gpt_5) | 77,865-77,871 | 2.616-2.623 | ~0.629 | 混合 |
+| gpt-5 (R=minimal, in=o3/gpt_5) | 77,865-77,871 | 2.627-2.633 | ~0.636 | 混合 |
 
 #### 關鍵發現
 
