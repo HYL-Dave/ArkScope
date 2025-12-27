@@ -3,6 +3,12 @@
 修復 o3_summary 遺失的 6 筆 BKR 資料及所有下游評分檔案。
 
 Usage:
+    # 0. 強制備份 (修復前必須完成)
+    python repair_o3_data.py --stage backup --backup-dir /mnt/md0/finrl/backups/repair_YYYYMMDD
+
+    # 0.1 驗證備份完整性
+    python repair_o3_data.py --verify-backup /mnt/md0/finrl/backups/repair_YYYYMMDD
+
     # 1. 先執行乾跑模式查看影響範圍
     python repair_o3_data.py --dry-run
 
@@ -15,7 +21,7 @@ Usage:
     # 4. 修復 o4-mini high 額外遺失 (第三階段)
     python repair_o3_data.py --stage o4mini-extra
 
-    # 5. 完整修復 (全部階段)
+    # 5. 完整修復 (全部階段，需先完成備份)
     python repair_o3_data.py --stage all
 """
 
@@ -83,6 +89,194 @@ DOWNSTREAM_FILES = [
     ("gpt-4.1-nano/sentiment/sentiment_gpt-4.1-nano_by_o3_summary.csv", "gpt-4.1-nano", None, "sentiment"),
     ("gpt-4.1-nano/risk/risk_gpt-4.1-nano_by_o3_summary.csv", "gpt-4.1-nano", None, "risk"),
 ]
+
+# 備份標記檔案名稱
+BACKUP_MARKER_FILE = ".backup_complete"
+
+
+# ============================================================================
+# 第零階段：強制備份
+# ============================================================================
+
+def get_all_files_to_backup() -> List[Path]:
+    """取得所有需要備份的檔案列表"""
+    files = [O3_SUMMARY_CSV]
+    for rel_path, _, _, _ in DOWNSTREAM_FILES:
+        files.append(FINRL_BASE / rel_path)
+    return files
+
+
+def backup_all_files(backup_dir: Path, dry_run: bool = False) -> bool:
+    """
+    備份所有受影響的檔案到指定目錄
+
+    Args:
+        backup_dir: 備份目標目錄
+        dry_run: 乾跑模式
+
+    Returns:
+        True if successful
+    """
+    logging.info("=" * 60)
+    logging.info("Stage 0: Creating backups (MANDATORY)")
+    logging.info("=" * 60)
+
+    files_to_backup = get_all_files_to_backup()
+    logging.info(f"Total files to backup: {len(files_to_backup)}")
+
+    if dry_run:
+        logging.info("[DRY RUN] Would create backup directory and copy files:")
+        for f in files_to_backup:
+            if f.exists():
+                logging.info(f"  - {f.name}")
+            else:
+                logging.warning(f"  - {f.name} (NOT FOUND)")
+        return True
+
+    # 建立備份目錄
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    logging.info(f"Backup directory: {backup_dir}")
+
+    # 建立備份清單檔案
+    manifest_path = backup_dir / "backup_manifest.txt"
+    manifest_lines = [
+        f"# Backup created: {datetime.now().isoformat()}",
+        f"# Source: {FINRL_BASE}",
+        "",
+    ]
+
+    success_count = 0
+    failed_files = []
+
+    for file_path in files_to_backup:
+        if not file_path.exists():
+            logging.warning(f"File not found, skipping: {file_path}")
+            failed_files.append(str(file_path))
+            continue
+
+        # 保留相對路徑結構
+        try:
+            rel_path = file_path.relative_to(FINRL_BASE)
+        except ValueError:
+            rel_path = file_path.name
+
+        dest_path = backup_dir / rel_path
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            shutil.copy2(file_path, dest_path)
+            file_size = file_path.stat().st_size
+            manifest_lines.append(f"{rel_path}|{file_size}|{file_path.stat().st_mtime}")
+            logging.info(f"Backed up: {rel_path} ({file_size:,} bytes)")
+            success_count += 1
+        except Exception as e:
+            logging.error(f"Failed to backup {file_path}: {e}")
+            failed_files.append(str(file_path))
+
+    # 寫入清單
+    with open(manifest_path, "w") as f:
+        f.write("\n".join(manifest_lines))
+
+    # 寫入備份完成標記
+    if success_count == len(files_to_backup) - len([f for f in files_to_backup if not f.exists()]):
+        marker_path = backup_dir / BACKUP_MARKER_FILE
+        with open(marker_path, "w") as f:
+            f.write(f"Backup completed: {datetime.now().isoformat()}\n")
+            f.write(f"Files backed up: {success_count}\n")
+            f.write(f"Files not found: {len(failed_files)}\n")
+        logging.info(f"Backup marker created: {marker_path}")
+
+    logging.info(f"Backup complete: {success_count} files backed up")
+    if failed_files:
+        logging.warning(f"Files not found (skipped): {len(failed_files)}")
+
+    return len(failed_files) == 0 or all(not Path(f).exists() for f in failed_files)
+
+
+def verify_backup(backup_dir: Path) -> bool:
+    """
+    驗證備份完整性
+
+    Args:
+        backup_dir: 備份目錄
+
+    Returns:
+        True if backup is valid
+    """
+    logging.info("=" * 60)
+    logging.info("Verifying backup integrity")
+    logging.info("=" * 60)
+
+    if not backup_dir.exists():
+        logging.error(f"Backup directory not found: {backup_dir}")
+        return False
+
+    marker_path = backup_dir / BACKUP_MARKER_FILE
+    if not marker_path.exists():
+        logging.error(f"Backup marker not found: {marker_path}")
+        logging.error("Backup may be incomplete!")
+        return False
+
+    manifest_path = backup_dir / "backup_manifest.txt"
+    if not manifest_path.exists():
+        logging.error(f"Backup manifest not found: {manifest_path}")
+        return False
+
+    # 讀取清單並驗證
+    verified_count = 0
+    failed_count = 0
+
+    with open(manifest_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            parts = line.split("|")
+            if len(parts) != 3:
+                continue
+
+            rel_path, expected_size, _ = parts
+            backup_file = backup_dir / rel_path
+
+            if not backup_file.exists():
+                logging.error(f"Missing backup file: {rel_path}")
+                failed_count += 1
+                continue
+
+            actual_size = backup_file.stat().st_size
+            if actual_size != int(expected_size):
+                logging.error(f"Size mismatch for {rel_path}: expected {expected_size}, got {actual_size}")
+                failed_count += 1
+                continue
+
+            verified_count += 1
+
+    logging.info(f"Verified: {verified_count} files")
+    if failed_count > 0:
+        logging.error(f"Failed: {failed_count} files")
+        return False
+
+    logging.info("Backup verification: PASSED")
+    return True
+
+
+def check_backup_exists(backup_dir: Optional[Path] = None) -> bool:
+    """
+    檢查是否已完成備份
+
+    如果沒有提供 backup_dir，會檢查預設位置
+    """
+    if backup_dir is None:
+        # 檢查今天的備份
+        today = datetime.now().strftime("%Y%m%d")
+        backup_dir = Path(f"/mnt/md0/finrl/backups/repair_{today}")
+
+    if not backup_dir.exists():
+        return False
+
+    marker_path = backup_dir / BACKUP_MARKER_FILE
+    return marker_path.exists()
 
 
 # ============================================================================
@@ -416,13 +610,39 @@ def repair_o4mini_high_extra(dry_run: bool = False) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="修復 o3_summary 遺失資料及下游評分檔案"
+        description="修復 o3_summary 遺失資料及下游評分檔案",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+執行順序:
+  1. 先執行備份:     --stage backup --backup-dir /path/to/backup
+  2. 驗證備份:       --verify-backup /path/to/backup
+  3. 執行修復:       --stage all
+
+重要: 修復操作前必須先完成備份，否則會被拒絕執行。
+      使用 --skip-backup-check 可跳過此檢查（不建議）。
+        """
     )
     parser.add_argument(
         "--stage",
-        choices=["summary", "scores", "o4mini-extra", "all"],
+        choices=["backup", "summary", "scores", "o4mini-extra", "all"],
         default="all",
-        help="要執行的修復階段"
+        help="要執行的修復階段 (backup=強制備份)"
+    )
+    parser.add_argument(
+        "--backup-dir",
+        type=Path,
+        help="備份目標目錄 (用於 --stage backup)"
+    )
+    parser.add_argument(
+        "--verify-backup",
+        type=Path,
+        metavar="BACKUP_DIR",
+        help="驗證指定目錄的備份完整性"
+    )
+    parser.add_argument(
+        "--skip-backup-check",
+        action="store_true",
+        help="跳過備份檢查（危險，不建議使用）"
     )
     parser.add_argument(
         "--dry-run",
@@ -443,6 +663,11 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s"
     )
 
+    # 處理 --verify-backup 選項
+    if args.verify_backup:
+        success = verify_backup(args.verify_backup)
+        sys.exit(0 if success else 1)
+
     if args.dry_run:
         logging.info("=" * 60)
         logging.info("DRY RUN MODE - No changes will be made")
@@ -450,6 +675,51 @@ def main():
 
     success = True
 
+    # Stage 0: 備份
+    if args.stage == "backup":
+        if not args.backup_dir:
+            # 使用預設備份目錄
+            today = datetime.now().strftime("%Y%m%d")
+            args.backup_dir = Path(f"/mnt/md0/finrl/backups/repair_{today}")
+            logging.info(f"Using default backup directory: {args.backup_dir}")
+
+        success = backup_all_files(args.backup_dir, args.dry_run)
+        if success and not args.dry_run:
+            logging.info("")
+            logging.info("下一步：驗證備份完整性")
+            logging.info(f"  python {sys.argv[0]} --verify-backup {args.backup_dir}")
+        sys.exit(0 if success else 1)
+
+    # 檢查是否已完成備份 (除非跳過或是乾跑模式)
+    if args.stage in ["summary", "scores", "o4mini-extra", "all"]:
+        if not args.dry_run and not args.skip_backup_check:
+            if not check_backup_exists():
+                logging.error("=" * 60)
+                logging.error("錯誤：尚未完成備份！")
+                logging.error("=" * 60)
+                logging.error("")
+                logging.error("修復操作前必須先完成備份以確保資料安全。")
+                logging.error("請先執行：")
+                logging.error("")
+                today = datetime.now().strftime("%Y%m%d")
+                backup_dir = f"/mnt/md0/finrl/backups/repair_{today}"
+                logging.error(f"  python {sys.argv[0]} --stage backup --backup-dir {backup_dir}")
+                logging.error("")
+                logging.error("備份完成後再執行修復操作。")
+                logging.error("")
+                logging.error("如果您確定要跳過備份檢查（不建議），可使用 --skip-backup-check")
+                logging.error("=" * 60)
+                sys.exit(1)
+
+            logging.info("備份檢查: PASSED - 發現有效備份")
+
+        if args.skip_backup_check and not args.dry_run:
+            logging.warning("=" * 60)
+            logging.warning("警告：已跳過備份檢查！")
+            logging.warning("如果修復過程出錯，可能無法恢復資料。")
+            logging.warning("=" * 60)
+
+    # Stage 1-3: 修復操作
     if args.stage in ["summary", "all"]:
         success = repair_o3_summary(args.dry_run) and success
 
