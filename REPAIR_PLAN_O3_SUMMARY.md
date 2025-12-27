@@ -19,14 +19,9 @@
 ```
 備份目錄: /mnt/md0/finrl/backups/repair_YYYYMMDD/
 
-需備份檔案 (28 個):
+需備份檔案 (27 個):
 1. o3/summary/o3_news_with_summary.csv                    # o3_summary 原檔
-2. o3/sentiment/sentiment_o3_high_by_o3_summary.csv
-3. o3/sentiment/sentiment_o3_medium_by_o3_summary.csv
-4. o3/sentiment/sentiment_o3_low_by_o3_summary.csv
-5. o3/risk/risk_o3_high_by_o3_summary.csv
-6. o3/risk/risk_o3_medium_by_o3_summary.csv
-7. o3/risk/risk_o3_low_by_o3_summary.csv
+2-7. o3/sentiment/*.csv 和 o3/risk/*.csv (6 個)
 8-13. o4-mini/sentiment/*.csv 和 o4-mini/risk/*.csv (6 個)
 14-21. gpt-5/sentiment/*.csv 和 gpt-5/risk/*.csv (8 個)
 22-27. gpt-4.1*/sentiment/*.csv 和 gpt-4.1*/risk/*.csv (6 個)
@@ -48,7 +43,7 @@ python scripts/repair/repair_o3_data.py --verify-backup "$BACKUP_DIR"
 
 ### 0.3 備份驗證清單
 
-- [ ] 所有 28 個檔案已備份
+- [ ] 所有 27 個檔案已備份
 - [ ] 備份檔案大小與原檔一致
 - [ ] 備份目錄已記錄完整路徑
 - [ ] 備份完成時間已記錄
