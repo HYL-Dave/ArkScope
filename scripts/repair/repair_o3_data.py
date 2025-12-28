@@ -58,8 +58,10 @@ FINRL_BASE = Path("/mnt/md0/finrl")
 # o3_summary 遺失的 6 筆 BKR 資料 (原始 row index)
 MISSING_ROWS_O3 = [19334, 19335, 19336, 19337, 19338, 19339]
 
-# o4-mini high 額外遺失的 2 筆
-MISSING_ROWS_O4MINI_HIGH = [12543, 44887]
+# o4-mini high 額外遺失的 2 筆 (API 失敗)
+# 注意: 原本錯誤地列為 44887 (GILD 2015-11-25)，該行原始 Article 為空，所有模型都是 NaN
+# 正確的是 44893 (GILD 2015-11-17)，該行有 o3_summary 但 o4-mini high 評分失敗
+MISSING_ROWS_O4MINI_HIGH = [12543, 44893]
 
 # 所有使用 o3_summary 作為輸入的下游評分檔案
 DOWNSTREAM_FILES = [
@@ -568,13 +570,38 @@ def repair_all_downstream(dry_run: bool = False) -> bool:
 # 第三階段：修復 o4-mini high 額外遺失
 # ============================================================================
 
+def generate_single_score(text: str, symbol: str, model: str, reasoning: str, task: str) -> Optional[int]:
+    """為單一文本生成評分"""
+    try:
+        if task == "sentiment":
+            from score_sentiment_openai import score_headline as score_func, set_api_keys
+        else:
+            from score_risk_openai import score_headline as score_func, set_api_keys
+
+        keys = get_api_keys()
+        set_api_keys(keys, None)
+
+        if pd.isna(text) or not str(text).strip():
+            logging.warning(f"Empty text for {symbol}, returning None")
+            return None
+
+        score = score_func(text, symbol, model, reasoning)
+        logging.info(f"{task.capitalize()} token usage: see above")
+        logging.info(f"Generated {task} score for {symbol}: {score}")
+        return score
+
+    except Exception as e:
+        logging.error(f"Error generating {task} score for {symbol}: {e}")
+        return None
+
+
 def repair_o4mini_high_extra(dry_run: bool = False) -> bool:
-    """修復 o4-mini high 額外遺失的 2 筆"""
+    """修復 o4-mini high 額外遺失的 2 筆 (API 失敗導致的遺失)"""
     logging.info("=" * 60)
     logging.info("Stage 3: Repairing o4-mini high extra missing rows")
     logging.info("=" * 60)
 
-    # o4-mini high 特有的額外遺失
+    # o4-mini high 特有的額外遺失 (這些行有 o3_summary 但 o4-mini high 評分失敗)
     extra_missing = MISSING_ROWS_O4MINI_HIGH
 
     files_to_repair = [
@@ -582,7 +609,7 @@ def repair_o4mini_high_extra(dry_run: bool = False) -> bool:
         ("o4-mini/risk/risk_o4_mini_high_by_o3_summary.csv", "o4-mini", "high", "risk"),
     ]
 
-    logging.info(f"Extra missing rows: {extra_missing}")
+    logging.info(f"Extra missing rows to repair: {extra_missing}")
 
     if dry_run:
         logging.info(f"[DRY RUN] Would repair 2 files with {len(extra_missing)} extra rows each")
@@ -595,35 +622,81 @@ def repair_o4mini_high_extra(dry_run: bool = False) -> bool:
         return False
 
     repaired_summary_df = pd.read_csv(repaired_summary_path, on_bad_lines='warn')
+    logging.info(f"Loaded repaired o3_summary: {len(repaired_summary_df)} rows")
+
+    all_success = True
 
     for file_info in files_to_repair:
         rel_path, model, reasoning, task = file_info
         file_path = FINRL_BASE / rel_path
 
-        # 找到已修復的版本
+        # 優先使用已修復的版本（來自第二階段）
         repaired_path = file_path.with_suffix(".repaired.csv")
         if repaired_path.exists():
-            score_df = pd.read_csv(repaired_path, on_bad_lines='warn')
+            source_path = repaired_path
+            logging.info(f"Using existing repaired file: {repaired_path.name}")
         elif file_path.exists():
-            score_df = pd.read_csv(file_path, on_bad_lines='warn')
+            source_path = file_path
+            logging.info(f"Using original file: {file_path.name}")
         else:
-            logging.warning(f"File not found: {file_path}")
+            logging.error(f"File not found: {file_path}")
+            all_success = False
             continue
 
+        # 載入評分檔案
+        score_df = pd.read_csv(source_path, on_bad_lines='warn')
         logging.info(f"Processing: {rel_path}")
+        logging.info(f"  Current rows: {len(score_df)}")
 
-        # 對每個額外遺失的行進行處理
+        # 確定分數欄位名稱 (這些檔案使用 sentiment_deepseek 或 risk_deepseek)
+        score_column = "sentiment_deepseek" if task == "sentiment" else "risk_deepseek"
+
+        # 對每個額外遺失的行生成評分
+        repairs_made = 0
         for row_idx in extra_missing:
-            summary_row = repaired_summary_df.iloc[[row_idx]].copy()
-            scored_row = score_articles(summary_row, model, reasoning, task)
+            # 檢查該行目前是否為 NaN
+            current_score = score_df.iloc[row_idx][score_column]
+            if pd.notna(current_score):
+                logging.info(f"  Row {row_idx} already has score ({current_score}), skipping")
+                continue
 
-            # 插入到正確位置 (這需要更複雜的邏輯來處理)
-            # 暫時簡化：直接追加並記錄需要手動調整
-            logging.info(f"  Generated score for row {row_idx}")
+            # 取得該行的 o3_summary
+            summary_text = repaired_summary_df.iloc[row_idx].get("o3_summary", "")
+            symbol = repaired_summary_df.iloc[row_idx].get("Stock_symbol", "UNKNOWN")
 
-        logging.info(f"  Extra rows repaired for {rel_path}")
+            if pd.isna(summary_text) or not str(summary_text).strip():
+                logging.warning(f"  Row {row_idx} ({symbol}): o3_summary is empty, cannot score")
+                continue
 
-    return True
+            # 生成評分
+            score = generate_single_score(summary_text, symbol, model, reasoning, task)
+
+            if score is not None:
+                # 更新 DataFrame 中的分數
+                score_df.iloc[row_idx, score_df.columns.get_loc(score_column)] = score
+                repairs_made += 1
+                logging.info(f"  Row {row_idx} ({symbol}): {task} score = {score}")
+            else:
+                logging.error(f"  Row {row_idx} ({symbol}): Failed to generate {task} score")
+                all_success = False
+
+        # 備份原始 repaired 檔案（如果存在）
+        if repaired_path.exists():
+            backup_file(repaired_path)
+
+        # 儲存更新後的檔案（覆蓋 .repaired.csv）
+        score_df.to_csv(repaired_path, index=False)
+        logging.info(f"  Saved updated file to: {repaired_path}")
+        logging.info(f"  Repairs made: {repairs_made}/{len(extra_missing)}")
+
+        # 驗證修復結果
+        verify_df = pd.read_csv(repaired_path, on_bad_lines='warn')
+        for row_idx in extra_missing:
+            final_score = verify_df.iloc[row_idx][score_column]
+            status = "✓" if pd.notna(final_score) else "✗"
+            logging.info(f"  Verification row {row_idx}: {score_column}={final_score} {status}")
+
+    return all_success
 
 
 # ============================================================================
