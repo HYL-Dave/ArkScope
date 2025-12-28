@@ -15,10 +15,28 @@
 |------|------|----------|
 | 第零階段：強制備份 | ✅ 完成 | 2025-12-27 |
 | 第一階段：修復 o3_summary | ✅ 完成 | 2025-12-27 |
-| 第二階段：修復下游評分檔案 | ✅ 完成 | 2025-12-27 |
-| 第三階段：修復 o4-mini high 額外遺失 | ⏳ 待重新執行 | - |
+| 第二階段：修復下游 sentiment 評分 | ✅ 完成 | 2025-12-27 |
+| 第三階段：修復 o4-mini high sentiment 額外遺失 | ✅ 完成 | 2025-12-28 |
+| 第四階段：修復下游 risk 評分 (6 BKR) | ✅ 完成 | 2025-12-28 |
+| 第五階段：修復 o4-mini high risk 額外遺失 | ✅ 完成 | 2025-12-28 |
 
 備份位置: `/mnt/md0/finrl/backups/repair_20251227/`
+
+### 最終修復狀態 (2025-12-28)
+
+所有修復已完成：
+
+| 類型 | 修復狀態 | 有效分數 |
+|------|----------|----------|
+| 所有 sentiment | ✅ 完整 | 77,871 |
+| 所有 risk | ✅ 完整 | 77,871 |
+| o4-mini high risk | ✅ 完整 | 77,871 |
+
+### 技術備註
+
+- Stage 5 (o4-mini high risk 額外遺失) 需要 `max_completion_tokens=3200` 才能成功
+- Row 52326 (MRVL) 使用了 3031 completion tokens
+- 預設的 800 tokens 對於 o4-mini high reasoning 模型不足
 
 ---
 
@@ -197,8 +215,8 @@ Row 44893: 2015-11-17 | GILD (API 失敗)
 
 | Row | 股票 | 日期 | Sentiment | Risk | 狀態 |
 |-----|------|------|-----------|------|------|
-| 12543 | AMGN | 2018-03-16 | - | - | 待修復 |
-| 44893 | GILD | 2015-11-17 | - | - | 待修復 |
+| 12543 | AMGN | 2018-03-16 | 3 ✅ | 1 ✅ | 已修復 (2025-12-28) |
+| 44893 | GILD | 2015-11-17 | 4 ✅ | 3 ✅ | 已修復 (2025-12-28) |
 
 ### 3.3 原始錯誤診斷更正
 
@@ -230,6 +248,97 @@ Row 44893: 2015-11-17 | GILD (API 失敗)
 >
 > 原始 DeepSeek 能給出 3.0 分是因為它可能使用了 Article_title 作為輸入，
 > 而我們的評分流程是基於完整文章內容（Article → o3_summary → 評分）。
+
+---
+
+## 第四階段：修復下游 risk 評分 (6 BKR)
+
+### 4.1 問題識別
+
+第二階段修復時**只執行了 sentiment 評分，risk 評分被遺漏**。
+
+**所有 risk 檔案共同缺失的 6 筆 BKR (rows 19334-19339):**
+
+| Row | Stock | Date |
+|-----|-------|------|
+| 19334 | BKR | 2020-07-20 |
+| 19335 | BKR | 2020-07-17 |
+| 19336 | BKR | 2020-07-16 |
+| 19337 | BKR | 2020-07-12 |
+| 19338 | BKR | 2020-07-10 |
+| 19339 | BKR | 2020-07-07 |
+
+### 4.2 受影響檔案 (13 個 risk 檔案)
+
+| 模型 | Reasoning | 檔案 | 當前有效分數 |
+|------|-----------|------|-------------|
+| o3 | high | risk_o3_high_by_o3_summary.repaired.csv | 77,865 |
+| o3 | medium | risk_o3_medium_by_o3_summary.repaired.csv | 77,865 |
+| o3 | low | risk_o3_low_by_o3_summary.repaired.csv | 77,865 |
+| o4-mini | high | risk_o4_mini_high_by_o3_summary.repaired.csv | 77,863 ⚠️ |
+| o4-mini | medium | risk_o4_mini_medium_by_o3_summary.repaired.csv | 77,865 |
+| o4-mini | low | risk_o4_mini_low_by_o3_summary.repaired.csv | 77,865 |
+| gpt-5 | high | risk_gpt-5_high_by_o3_summary.repaired.csv | 77,865 |
+| gpt-5 | medium | risk_gpt-5_medium_by_o3_summary.repaired.csv | 77,865 |
+| gpt-5 | low | risk_gpt-5_low_by_o3_summary.repaired.csv | 77,865 |
+| gpt-5 | minimal | risk_gpt-5_minimal_by_o3_summary.repaired.csv | 77,865 |
+| gpt-4.1 | - | risk_gpt-4.1_by_o3_summary.repaired.csv | 77,865 |
+| gpt-4.1-mini | - | risk_gpt-4.1-mini_by_o3_summary.repaired.csv | 77,865 |
+| gpt-4.1-nano | - | risk_gpt-4.1-nano_by_o3_summary.repaired.csv | 77,865 |
+
+### 4.3 修復命令
+
+```bash
+python scripts/repair/repair_o3_data.py --stage risk-bkr --skip-backup-check
+```
+
+### 4.4 修復狀態
+
+| 步驟 | 狀態 | 日期 |
+|------|------|------|
+| 識別缺失行 | ✅ 完成 | 2025-12-28 |
+| 生成 risk 分數 | ✅ 完成 (77/78) | 2025-12-28 |
+| 驗證修復結果 | ✅ 完成 | 2025-12-28 |
+
+**備註**: 77/78 是因為 o4-mini high Row 19336 已有分數，自動跳過。
+
+---
+
+## 第五階段：修復 o4-mini high risk 額外遺失
+
+### 5.1 額外遺失識別
+
+o4-mini high risk 除了 6 筆 BKR 外，還額外缺失 2 筆 (原始 API 失敗)：
+
+| Row | Stock | Date | 原因 |
+|-----|-------|------|------|
+| 18077 | BKNG | 2018-02-27 | 原始評分時 API 失敗 |
+| 52326 | MRVL | 2014-09-02 | 原始評分時 API 失敗 |
+
+### 5.2 修復命令
+
+```bash
+python scripts/repair/repair_o3_data.py --stage o4mini-risk-extra --skip-backup-check
+```
+
+### 5.3 修復狀態
+
+| 步驟 | 狀態 | 日期 |
+|------|------|------|
+| 識別缺失行 | ✅ 完成 | 2025-12-28 |
+| 生成 risk 分數 | ✅ 完成 | 2025-12-28 |
+| 驗證修復結果 | ✅ 完成 | 2025-12-28 |
+
+### 5.4 修復結果
+
+| Row | 股票 | 日期 | Risk 分數 | 備註 |
+|-----|------|------|-----------|------|
+| 18077 | BKNG | 2018-02-27 | 1 ✅ | 使用 max_completion_tokens=1600 |
+| 52326 | MRVL | 2014-09-02 | 1 ✅ | 使用 max_completion_tokens=3200 (需 3031 tokens) |
+
+**技術問題**: o4-mini high 模型需要更多 completion tokens 才能完成評分：
+- 預設 800 tokens 不足
+- Row 52326 需要 3031 tokens 才能成功
 
 ---
 
@@ -310,26 +419,36 @@ cp file.csv file.csv.backup_$(date +%Y%m%d)
 
 ## 實際成本
 
-| 階段 | API 呼叫數 | 模型 | 實際成本 |
-|------|-----------|------|----------|
-| o3_summary 修復 | 6 | o3 | ~$0.50 |
-| o3 評分 (6 configs) | 36 | o3 | ~$3.00 |
-| o4-mini 評分 (6 configs) | 36 | o4-mini | ~$0.50 |
-| gpt-5 評分 (8 configs) | 48 | gpt-5 | ~$4.00 |
-| gpt-4.1 系列 (6 configs) | 36 | gpt-4.1-* | ~$0.50 |
-| o4-mini high 額外修復 | 4 | o4-mini | ~$0.04 |
-| **總計** | **166** | - | **~$8.54** |
+| 階段 | API 呼叫數 | 模型 | 實際成本 | 狀態 |
+|------|-----------|------|----------|------|
+| Stage 1: o3_summary 修復 | 6 | o3 | ~$0.50 | ✅ |
+| Stage 2: Sentiment 評分 (13 files × 6) | 78 | 混合 | ~$4.00 | ✅ |
+| Stage 3: o4-mini high sentiment 額外 | 4 | o4-mini | ~$0.04 | ✅ |
+| Stage 4: Risk 評分 (13 files × 6) | 78 | 混合 | ~$4.00 | ✅ |
+| Stage 5: o4-mini high risk 額外 | 2 | o4-mini | ~$0.06* | ✅ |
+| **總計** | **168** | - | **~$8.60** | ✅ |
+
+*Stage 5 使用 max_completion_tokens=3200，成本略高
+
+**Stage 4 成本細節:**
+- o3 (3 configs × 6) = 18 calls @ ~$1.50
+- o4-mini (3 configs × 6) = 18 calls @ ~$0.25
+- gpt-5 (4 configs × 6) = 24 calls @ ~$2.00
+- gpt-4.1 系列 (3 configs × 6) = 18 calls @ ~$0.25
 
 ---
 
 ## 執行順序
 
-1. ✅ **備份所有受影響檔案**
-2. ✅ **修復 o3_summary** (生成 6 筆 summary)
-3. ✅ **修復 26 個下游評分檔案** (每個生成 6 筆評分)
-4. ⏳ **修復 o4-mini high 額外遺失** (2 筆 × 2 任務 = Row 12543 AMGN, Row 44893 GILD)
-5. ⏳ **驗證所有檔案對齊正確性**
-6. ⏳ **更新 NEWS_STORAGE_DESIGN.md 的 N 值**
+1. ✅ **備份所有受影響檔案** (Stage 0)
+2. ✅ **修復 o3_summary** (Stage 1 - 生成 6 筆 summary)
+3. ✅ **修復 13 個 sentiment 評分檔案** (Stage 2 - 每個生成 6 筆評分)
+4. ✅ **修復 o4-mini high sentiment 額外遺失** (Stage 3 - Row 12543, 44893)
+5. ✅ **修復 13 個 risk 評分檔案 (6 BKR)** (Stage 4 - 2025-12-28)
+6. ✅ **修復 o4-mini high risk 額外遺失** (Stage 5 - Row 18077, 52326 - 2025-12-28)
+7. ⏳ **驗證所有檔案對齊正確性**
+8. ⏳ **更新 NEWS_STORAGE_DESIGN.md 的 N 值**
+9. ⏳ **用 .repaired.csv 替換原始檔案**
 
 ---
 
@@ -346,4 +465,4 @@ cp file.csv file.csv.backup_$(date +%Y%m%d)
 ---
 
 *建立日期: 2025-12-27*
-*最後更新: 2025-12-28 (更正 Row 44887 錯誤診斷)*
+*最後更新: 2025-12-28 (Stage 4 & 5 完成，所有修復已完成)*
