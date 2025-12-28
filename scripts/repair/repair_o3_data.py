@@ -21,7 +21,13 @@ Usage:
     # 4. 修復 o4-mini high 額外遺失 (第三階段)
     python repair_o3_data.py --stage o4mini-extra
 
-    # 5. 完整修復 (全部階段，需先完成備份)
+    # 5. 修復所有 risk 檔案遺失的 6 筆 BKR (第四階段)
+    python repair_o3_data.py --stage risk-bkr
+
+    # 6. 修復 o4-mini high risk 額外遺失的 2 筆 (第五階段)
+    python repair_o3_data.py --stage o4mini-risk-extra
+
+    # 7. 完整修復 (全部階段，需先完成備份)
     python repair_o3_data.py --stage all
 """
 
@@ -62,6 +68,15 @@ MISSING_ROWS_O3 = [19334, 19335, 19336, 19337, 19338, 19339]
 # 注意: 原本錯誤地列為 44887 (GILD 2015-11-25)，該行原始 Article 為空，所有模型都是 NaN
 # 正確的是 44893 (GILD 2015-11-17)，該行有 o3_summary 但 o4-mini high 評分失敗
 MISSING_ROWS_O4MINI_HIGH = [12543, 44893]
+
+# Risk 專用: 所有 risk 檔案遺失的 6 筆 BKR (與 MISSING_ROWS_O3 相同行號)
+# Stage 2 只修復了 sentiment，risk 被遺漏
+MISSING_ROWS_RISK_BKR = [19334, 19335, 19336, 19337, 19338, 19339]
+
+# o4-mini high risk 額外遺失的 2 筆 (API 失敗，與 sentiment 不同的行)
+# Row 18077: BKNG 2018-02-27
+# Row 52326: MRVL 2014-09-02
+MISSING_ROWS_O4MINI_HIGH_RISK_EXTRA = [18077, 52326]
 
 # 所有使用 o3_summary 作為輸入的下游評分檔案
 DOWNSTREAM_FILES = [
@@ -570,8 +585,14 @@ def repair_all_downstream(dry_run: bool = False) -> bool:
 # 第三階段：修復 o4-mini high 額外遺失
 # ============================================================================
 
-def generate_single_score(text: str, symbol: str, model: str, reasoning: str, task: str) -> Optional[int]:
-    """為單一文本生成評分"""
+def generate_single_score(text: str, symbol: str, model: str, reasoning: str, task: str,
+                          max_completion_tokens: Optional[int] = None) -> Optional[int]:
+    """為單一文本生成評分
+
+    Args:
+        max_completion_tokens: 如果提供，覆蓋預設的 max_completion_tokens
+                               (對於生成超長回應的模型很有用)
+    """
     try:
         if task == "sentiment":
             from score_sentiment_openai import score_headline as score_func, set_api_keys
@@ -585,7 +606,13 @@ def generate_single_score(text: str, symbol: str, model: str, reasoning: str, ta
             logging.warning(f"Empty text for {symbol}, returning None")
             return None
 
-        score = score_func(text, symbol, model, reasoning)
+        # 如果提供了 max_completion_tokens，傳遞給評分函數
+        if max_completion_tokens:
+            score = score_func(text, symbol, model, reasoning,
+                               max_completion_tokens_override=max_completion_tokens)
+            logging.info(f"  (Used max_completion_tokens={max_completion_tokens})")
+        else:
+            score = score_func(text, symbol, model, reasoning)
         logging.info(f"{task.capitalize()} token usage: see above")
         logging.info(f"Generated {task} score for {symbol}: {score}")
         return score
@@ -700,6 +727,215 @@ def repair_o4mini_high_extra(dry_run: bool = False) -> bool:
 
 
 # ============================================================================
+# 第四階段：修復所有 risk 檔案遺失的 6 筆 BKR
+# ============================================================================
+
+def repair_risk_bkr(dry_run: bool = False) -> bool:
+    """修復所有 risk 檔案遺失的 6 筆 BKR (Stage 2 只修復了 sentiment)"""
+    logging.info("=" * 60)
+    logging.info("Stage 4: Repairing 6 BKR risk scores across all risk files")
+    logging.info("=" * 60)
+
+    # 過濾出所有 risk 檔案
+    risk_files = [f for f in DOWNSTREAM_FILES if f[3] == "risk"]
+    logging.info(f"Risk files to repair: {len(risk_files)}")
+    logging.info(f"Missing rows (BKR): {MISSING_ROWS_RISK_BKR}")
+
+    if dry_run:
+        logging.info(f"[DRY RUN] Would repair {len(risk_files)} risk files with 6 BKR rows each")
+        for f in risk_files:
+            logging.info(f"  - {f[0]}")
+        return True
+
+    # 載入修復後的 o3_summary
+    repaired_summary_path = O3_SUMMARY_CSV.with_suffix(".repaired.csv")
+    if not repaired_summary_path.exists():
+        logging.error("Repaired o3_summary not found")
+        return False
+
+    repaired_summary_df = pd.read_csv(repaired_summary_path, on_bad_lines='warn')
+    logging.info(f"Loaded repaired o3_summary: {len(repaired_summary_df)} rows")
+
+    all_success = True
+    total_repairs = 0
+
+    for file_info in risk_files:
+        rel_path, model, reasoning, task = file_info
+        file_path = FINRL_BASE / rel_path
+
+        # 優先使用已修復的版本
+        repaired_path = file_path.with_suffix(".repaired.csv")
+        if repaired_path.exists():
+            source_path = repaired_path
+            logging.info(f"Using existing repaired file: {repaired_path.name}")
+        elif file_path.exists():
+            source_path = file_path
+            logging.info(f"Using original file: {file_path.name}")
+        else:
+            logging.error(f"File not found: {file_path}")
+            all_success = False
+            continue
+
+        # 載入評分檔案
+        score_df = pd.read_csv(source_path, on_bad_lines='warn')
+        logging.info(f"Processing: {rel_path}")
+        logging.info(f"  Current rows: {len(score_df)}")
+
+        # 確定分數欄位名稱
+        score_column = "risk_deepseek"
+
+        # 對每個遺失的 BKR 行生成評分
+        repairs_made = 0
+        for row_idx in MISSING_ROWS_RISK_BKR:
+            # 檢查該行目前是否為 NaN
+            current_score = score_df.iloc[row_idx][score_column]
+            if pd.notna(current_score):
+                logging.info(f"  Row {row_idx} already has score ({current_score}), skipping")
+                continue
+
+            # 取得該行的 o3_summary
+            summary_text = repaired_summary_df.iloc[row_idx].get("o3_summary", "")
+            symbol = repaired_summary_df.iloc[row_idx].get("Stock_symbol", "UNKNOWN")
+
+            if pd.isna(summary_text) or not str(summary_text).strip():
+                logging.warning(f"  Row {row_idx} ({symbol}): o3_summary is empty, cannot score")
+                continue
+
+            # 生成評分
+            score = generate_single_score(summary_text, symbol, model, reasoning or "high", task)
+
+            if score is not None:
+                # 更新 DataFrame 中的分數
+                score_df.iloc[row_idx, score_df.columns.get_loc(score_column)] = score
+                repairs_made += 1
+                logging.info(f"  Row {row_idx} ({symbol}): risk score = {score}")
+            else:
+                logging.error(f"  Row {row_idx} ({symbol}): Failed to generate risk score")
+                all_success = False
+
+        # 備份原始 repaired 檔案（如果存在）
+        if repaired_path.exists():
+            backup_file(repaired_path)
+
+        # 儲存更新後的檔案
+        score_df.to_csv(repaired_path, index=False)
+        logging.info(f"  Saved updated file to: {repaired_path}")
+        logging.info(f"  Repairs made: {repairs_made}/{len(MISSING_ROWS_RISK_BKR)}")
+        total_repairs += repairs_made
+
+    logging.info(f"Total BKR risk repairs: {total_repairs}")
+    return all_success
+
+
+# ============================================================================
+# 第五階段：修復 o4-mini high risk 額外遺失的 2 筆
+# ============================================================================
+
+def repair_o4mini_high_risk_extra(dry_run: bool = False) -> bool:
+    """修復 o4-mini high risk 額外遺失的 2 筆 (API 失敗導致的遺失)"""
+    logging.info("=" * 60)
+    logging.info("Stage 5: Repairing o4-mini high risk extra missing rows")
+    logging.info("=" * 60)
+
+    # o4-mini high risk 特有的額外遺失 (Row 18077 BKNG, Row 52326 MRVL)
+    extra_missing = MISSING_ROWS_O4MINI_HIGH_RISK_EXTRA
+
+    file_to_repair = ("o4-mini/risk/risk_o4_mini_high_by_o3_summary.csv", "o4-mini", "high", "risk")
+    rel_path, model, reasoning, task = file_to_repair
+
+    logging.info(f"Extra missing rows to repair: {extra_missing}")
+    logging.info(f"Target file: {rel_path}")
+
+    if dry_run:
+        logging.info(f"[DRY RUN] Would repair {len(extra_missing)} extra rows in o4-mini high risk")
+        return True
+
+    # 載入 o3_summary 取得這些行的 summary
+    repaired_summary_path = O3_SUMMARY_CSV.with_suffix(".repaired.csv")
+    if not repaired_summary_path.exists():
+        logging.error("Repaired o3_summary not found")
+        return False
+
+    repaired_summary_df = pd.read_csv(repaired_summary_path, on_bad_lines='warn')
+    logging.info(f"Loaded repaired o3_summary: {len(repaired_summary_df)} rows")
+
+    file_path = FINRL_BASE / rel_path
+
+    # 優先使用已修復的版本
+    repaired_path = file_path.with_suffix(".repaired.csv")
+    if repaired_path.exists():
+        source_path = repaired_path
+        logging.info(f"Using existing repaired file: {repaired_path.name}")
+    elif file_path.exists():
+        source_path = file_path
+        logging.info(f"Using original file: {file_path.name}")
+    else:
+        logging.error(f"File not found: {file_path}")
+        return False
+
+    # 載入評分檔案
+    score_df = pd.read_csv(source_path, on_bad_lines='warn')
+    logging.info(f"Processing: {rel_path}")
+    logging.info(f"  Current rows: {len(score_df)}")
+
+    # 確定分數欄位名稱
+    score_column = "risk_deepseek"
+
+    # 對每個額外遺失的行生成評分
+    all_success = True
+    repairs_made = 0
+    for row_idx in extra_missing:
+        # 檢查該行目前是否為 NaN
+        current_score = score_df.iloc[row_idx][score_column]
+        if pd.notna(current_score):
+            logging.info(f"  Row {row_idx} already has score ({current_score}), skipping")
+            continue
+
+        # 取得該行的 o3_summary
+        summary_text = repaired_summary_df.iloc[row_idx].get("o3_summary", "")
+        symbol = repaired_summary_df.iloc[row_idx].get("Stock_symbol", "UNKNOWN")
+
+        if pd.isna(summary_text) or not str(summary_text).strip():
+            logging.warning(f"  Row {row_idx} ({symbol}): o3_summary is empty, cannot score")
+            continue
+
+        # 生成評分 (使用較高的 max_completion_tokens，因為 o4-mini high 生成很長的回應)
+        # o4-mini high 預設 800 tokens 不夠用，某些特別長的回應需要 3200+
+        score = generate_single_score(summary_text, symbol, model, reasoning, task,
+                                      max_completion_tokens=3200)
+
+        if score is not None:
+            # 更新 DataFrame 中的分數
+            score_df.iloc[row_idx, score_df.columns.get_loc(score_column)] = score
+            repairs_made += 1
+            logging.info(f"  Row {row_idx} ({symbol}): risk score = {score}")
+        else:
+            logging.error(f"  Row {row_idx} ({symbol}): Failed to generate risk score")
+            all_success = False
+
+    # 備份原始 repaired 檔案（如果存在）
+    if repaired_path.exists():
+        backup_file(repaired_path)
+
+    # 儲存更新後的檔案
+    score_df.to_csv(repaired_path, index=False)
+    logging.info(f"  Saved updated file to: {repaired_path}")
+    logging.info(f"  Repairs made: {repairs_made}/{len(extra_missing)}")
+
+    # 驗證修復結果
+    verify_df = pd.read_csv(repaired_path, on_bad_lines='warn')
+    for row_idx in extra_missing:
+        final_score = verify_df.iloc[row_idx][score_column]
+        status = "✓" if pd.notna(final_score) else "✗"
+        logging.info(f"  Verification row {row_idx}: {score_column}={final_score} {status}")
+
+    # 記錄特殊處理
+    logging.info("  Note: Used max_completion_tokens=3200 (default 800 was insufficient)")
+
+    return all_success
+
+
+# ============================================================================
 # 主程式
 # ============================================================================
 
@@ -719,9 +955,9 @@ def main():
     )
     parser.add_argument(
         "--stage",
-        choices=["backup", "summary", "scores", "o4mini-extra", "all"],
+        choices=["backup", "summary", "scores", "o4mini-extra", "risk-bkr", "o4mini-risk-extra", "all"],
         default="all",
-        help="要執行的修復階段 (backup=強制備份)"
+        help="要執行的修復階段 (backup=強制備份, risk-bkr=修復 BKR risk, o4mini-risk-extra=修復 o4-mini high risk 額外遺失)"
     )
     parser.add_argument(
         "--backup-dir",
@@ -786,7 +1022,7 @@ def main():
         sys.exit(0 if success else 1)
 
     # 檢查是否已完成備份 (除非跳過或是乾跑模式)
-    if args.stage in ["summary", "scores", "o4mini-extra", "all"]:
+    if args.stage in ["summary", "scores", "o4mini-extra", "risk-bkr", "o4mini-risk-extra", "all"]:
         if not args.dry_run and not args.skip_backup_check:
             if not check_backup_exists():
                 logging.error("=" * 60)
@@ -814,7 +1050,7 @@ def main():
             logging.warning("如果修復過程出錯，可能無法恢復資料。")
             logging.warning("=" * 60)
 
-    # Stage 1-3: 修復操作
+    # Stage 1-5: 修復操作
     if args.stage in ["summary", "all"]:
         success = repair_o3_summary(args.dry_run) and success
 
@@ -823,6 +1059,12 @@ def main():
 
     if args.stage in ["o4mini-extra", "all"]:
         success = repair_o4mini_high_extra(args.dry_run) and success
+
+    if args.stage in ["risk-bkr", "all"]:
+        success = repair_risk_bkr(args.dry_run) and success
+
+    if args.stage in ["o4mini-risk-extra", "all"]:
+        success = repair_o4mini_high_risk_extra(args.dry_run) and success
 
     if success:
         logging.info("=" * 60)
