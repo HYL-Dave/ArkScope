@@ -696,37 +696,67 @@ DeepSeek 原始評分: 126,224 有效 (可能基於 title 評分)
 | `sentiment_o3_high_4.csv` | o3 | `Lsa_summary` | 85,119 | 混合 DeepSeek 分數 |
 | `sentiment_o4_mini_high_1.csv` | o4-mini | `Lsa_summary` | 79,631 | 混合 DeepSeek 分數 |
 
-**問題根因分析:**
+**✅ 污染假設驗證 (2025-12-28):**
+
+經過詳細數據分析，確認符合**單純污染**假設：
 
 ```
-原始 HuggingFace CSV (127,176 rows):
-├── 有 Lsa_summary: 77,871 筆 → 被 o3/o4-mini 重新評分 ✓
-└── 無 Lsa_summary: 49,305 筆 → 繼承原始 sentiment_deepseek ✗
-    ├── high_4 繼承: 7,248 筆 (其中 84% 與 DeepSeek 完全相同)
-    └── high_1 繼承: 1,760 筆
+基礎數據結構 (o3_news_with_summary.csv):
+├── 總行數: 127,176
+├── 有 Lsa_summary: 77,871 筆
+├── 有 Article 但無 Lsa_summary: 0 筆 ← 關鍵！
+└── 無 Article: 49,305 筆
+
+high_4 交叉分析:
+├── 有 Lsa_summary 且有評分: 77,871 筆 ← 100% 覆蓋 ✓
+├── 有 Lsa_summary 但無評分: 0 筆
+├── 無 Lsa_summary 但有評分: 7,248 筆 ← 污染
+│   ├── 其中有 Article: 0 筆
+│   └── 其中無 Article: 7,248 筆 ← 無法被 o3 評分
+└── 無 Lsa_summary 且無評分: 42,057 筆
+
+high_1 交叉分析:
+├── 有 Lsa_summary 且有評分: 77,870 筆 (缺 1 筆)
+├── 無 Lsa_summary 但有評分: 1,761 筆 ← 污染
+└── 其中無 Article: 1,761 筆
 ```
 
-**資料污染詳情:**
+**額外評分來源分析:**
 
-| 檔案 | 總分數 | 真正評分 | 繼承 DeepSeek | 污染比例 |
-|------|--------|----------|---------------|----------|
-| high_4 | 85,119 | 77,871 | 7,248 | 8.5% |
-| high_1 | 79,631 | 77,871 | 1,760 | 2.2% |
+| 類型 | high_4 | high_1 | 說明 |
+|------|--------|--------|------|
+| 與 DeepSeek 相同 | 6,100 (84.2%) | 1,460 (82.9%) | 直接複製 |
+| 與 DeepSeek 不同 | 1,148 (15.8%) | 301 (17.1%) | 模型評了 Article_title |
+| 不同分數值 | 全部 = 3.0 | - | 因無 Lsa_summary，返回預設值 |
 
-**修復方案評估:**
+**結論:** 這是單純污染，可使用**方案 A (過濾修復)**處理
+
+**修復方案:**
 
 | 方案 | 操作 | 優點 | 缺點 | 成本 |
 |------|------|------|------|------|
-| **A. 過濾修復** | 刪除無 Lsa_summary 的行 | 簡單快速 | 可能誤刪 ~1,148 筆真評分 | 免費 |
+| **A. 過濾修復** ✓ | 刪除無 Lsa_summary 的行 | 簡單、免費 | 損失 1,148 筆 Article_title 評分 | 免費 |
 | **B. 棄用舊版** | 使用 by_o3_summary 替代 | 資料乾淨 | 輸入源不同 (Lsa vs o3) | 免費 |
 | **C. 重新評分** | 用 Lsa_summary 重跑 | 完全乾淨 | 需 API 費用 | ~$934 (o3) / ~$69 (o4-mini) |
 
 **建議:**
-- 若研究需要 `Lsa_summary` 作為輸入源 → 選方案 A 或 C
+- 方案 A 最符合成本效益：損失的 1,148 筆都是因缺少 Lsa_summary 而返回預設值 3 的無效評分
+- 若研究需要 `Lsa_summary` 作為輸入源 → 選方案 A
 - 若只需乾淨資料且可接受 `o3_summary` 輸入 → 選方案 B (已有 by_o3_summary)
-- o4-mini 重新評分成本低 (~$69)，建議執行方案 C
 
-**命令範例 (從 bash history 取得):**
+**過濾修復命令:**
+```bash
+# 過濾 high_4: 只保留有 Lsa_summary 的行
+python3 << 'EOF'
+import pandas as pd
+df = pd.read_csv('/mnt/md0/finrl/o3/sentiment/sentiment_o3_high_4.csv', low_memory=False)
+has_lsa = df['Lsa_summary'].notna() & (df['Lsa_summary'].astype(str).str.strip() != '')
+df[has_lsa].to_csv('/mnt/md0/finrl/o3/sentiment/sentiment_o3_high_4_filtered.csv', index=False)
+print(f"過濾後: {has_lsa.sum()} 行")
+EOF
+```
+
+**原始評分命令參考 (從 bash history):**
 ```bash
 # o4-mini 評分命令 (早期版本)
 python score_sentiment_openai.py \
