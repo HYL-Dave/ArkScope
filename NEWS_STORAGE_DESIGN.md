@@ -1222,8 +1222,8 @@ Risk 分佈 (所有模型平均):
 ---
 
 *創建日期: 2024-12-14*
-*更新日期: 2025-12-28*
-*版本: 2.0*
+*更新日期: 2025-12-29*
+*版本: 2.1*
 
 > ✅ **修復完成 (2025-12-28)**: 全部 6 階段修復已完成。
 > - o3_summary 6 筆 BKR 資料已修復
@@ -1231,3 +1231,261 @@ Risk 分佈 (所有模型平均):
 > - 暫存檔案已清理 (122 個 .repaired.csv/.pre_repair.csv/.backup_*.csv)
 > - Row 44887 (GILD) 因原始資料品質問題無法修復（所有模型皆為 NaN）
 > - 備份位置: `/mnt/md0/finrl/backups/repair_20251227/`
+
+---
+
+## 11. 評分資料清單 (Scoring Data Inventory)
+
+### 11.1 總覽
+
+- **資料位置**: `/mnt/md0/finrl/`
+- **總檔案數**: 58 個評分 CSV
+- **基底行數**: 127,176 (原始新聞數據)
+- **有效摘要行數**: 77,871 (有 Lsa_summary 的記錄)
+- **欄位改名版本**: `/mnt/md0/finrl/renamed/`
+
+### 11.2 按評分模型分組
+
+| 模型 | 檔案數 | sentiment | risk | 有效評分數 |
+|------|-------|-----------|------|-----------|
+| o3 | 10 | 5 | 5 | 77,871 |
+| o4-mini | 8 | 4 | 4 | 77,871 |
+| gpt-5 | 16 | 8 | 8 | 77,871 |
+| gpt-5-mini | 2 | 1 | 1 | 77,871 |
+| gpt-4.1 | 2 | 1 | 1 | 77,871 |
+| gpt-4.1-mini | 12 | 6 | 6 | 77,871 |
+| gpt-4.1-nano | 2 | 1 | 1 | 77,871 |
+| haiku | 2 | 1 | 1 | 77,871 |
+| sonnet | 2 | 1 | 1 | 77,871 |
+| opus | 2 | 1 | 1 | 77,871 |
+
+### 11.3 檔案詳細清單
+
+#### claude/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_haiku_by_gpt5_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_claude | gpt_5_summary |
+| risk_opus_by_gpt5_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_claude | gpt_5_summary |
+| risk_sonnet_by_gpt5_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_claude | gpt_5_summary |
+| sentiment_haiku_by_gpt5_summary.csv | 127,176 | 126,224 | sentiment_deepseek, sentiment_claude | gpt_5_summary |
+| sentiment_opus_by_gpt5_summary.csv | 127,176 | 126,224 | sentiment_deepseek, sentiment_claude | gpt_5_summary |
+| sentiment_sonnet_by_gpt5_summary.csv | 127,176 | 126,224 | sentiment_deepseek, sentiment_claude | gpt_5_summary |
+
+**註**: Claude sentiment 有 126,224 筆評分，因為是對所有有 gpt_5_summary 的記錄評分
+
+#### gpt-4.1/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_gpt-4.1_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| sentiment_gpt-4.1_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+#### gpt-4.1-mini/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_gpt-4.1-mini_by_gpt-5_reason_*_summary.csv (5個) | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | gpt_5_summary |
+| risk_gpt-4.1-mini_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| sentiment_gpt-4.1-mini_by_gpt-5_reason_*_summary.csv (5個) | 127,176 | 77,871 | sentiment_deepseek | gpt_5_summary |
+| sentiment_gpt-4.1-mini_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+#### gpt-4.1-nano/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_gpt-4.1-nano_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| sentiment_gpt-4.1-nano_by_o3_summary.csv | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+#### gpt-5/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_gpt-5_R_*_V_low_by_gpt-5_summary.csv (4個) | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | gpt_5_summary |
+| risk_gpt-5_*_by_o3_summary.csv (4個) | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| sentiment_gpt-5_R_*_V_low_by_gpt-5_summary.csv (4個) | 127,176 | 77,871 | sentiment_deepseek | gpt_5_summary |
+| sentiment_gpt-5_*_by_o3_summary.csv (4個) | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+#### gpt-5-mini/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_gpt-5-mini_with_R_high_V_low_by_gpt-5_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | gpt_5_summary |
+| sentiment_gpt-5-mini_with_R_high_V_low_by_gpt-5_summary.csv | 127,176 | 77,871 | sentiment_deepseek | gpt_5_summary |
+
+#### o3/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_o3_high_by_gpt-5_summary.csv | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | gpt_5_summary |
+| risk_o3_*_by_o3_summary.csv (3個) | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| risk_o3_medium_2.csv | 127,176 | 77,871 | risk_deepseek | - |
+| sentiment_o3_high_4.csv | 77,871 | 77,871 | sentiment_deepseek | - |
+| sentiment_o3_high_by_gpt-5_summary.csv | 127,176 | 77,871 | sentiment_deepseek | gpt_5_summary |
+| sentiment_o3_*_by_o3_summary.csv (3個) | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+**註**: `sentiment_o3_high_4.csv` 是過濾修復後的版本，只保留有效記錄
+
+#### o4-mini/
+
+| 檔案 | 行數 | 有效評分 | 評分欄位 | 摘要來源 |
+|------|------|---------|---------|---------|
+| risk_o4_mini_*_by_o3_summary.csv (3個) | 127,176 | 77,871 | sentiment_deepseek, risk_deepseek | o3_summary |
+| risk_o4_mini_medium_2.csv | 127,176 | 77,871 | risk_deepseek | - |
+| sentiment_o4_mini_high_1.csv | 77,871 | 77,871 | sentiment_deepseek | - |
+| sentiment_o4_mini_*_by_o3_summary.csv (3個) | 127,176 | 77,871 | sentiment_deepseek | o3_summary |
+
+**註**: `sentiment_o4_mini_high_1.csv` 是過濾修復後的版本，只保留有效記錄
+
+### 11.4 標準欄位結構
+
+所有評分 CSV 包含以下基本欄位：
+
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| Date | string | YYYY-MM-DD |
+| Article_title | string | 文章標題 |
+| Stock_symbol | string | 股票代號 |
+| Url | string | 原始 URL |
+| Publisher | string | 發布商 |
+| Author | string | 作者 |
+| Article | string | 完整文章 (可能為空) |
+| Lsa_summary | string | LSA 摘要 |
+| Luhn_summary | string | Luhn 摘要 |
+| Textrank_summary | string | TextRank 摘要 |
+| Lexrank_summary | string | LexRank 摘要 |
+| o3_summary / gpt_5_summary | string | LLM 生成的摘要 (見 11.7) |
+| sentiment_deepseek | int | 情緒評分 (1-5) |
+| risk_deepseek | int | 風險評分 (1-5) |
+| prompt_tokens | int | API prompt token 數 |
+| completion_tokens | int | API completion token 數 |
+
+### 11.5 欄位名稱改名對照
+
+為開源發布準備，評分欄位需要改名以反映實際使用的模型：
+
+| 原欄位名 | 新欄位名 | 適用模型目錄 |
+|---------|---------|-------------|
+| sentiment_deepseek | sentiment_o3 | o3/ |
+| sentiment_deepseek | sentiment_o4_mini | o4-mini/ |
+| sentiment_deepseek | sentiment_gpt_5 | gpt-5/ |
+| sentiment_deepseek | sentiment_gpt_5_mini | gpt-5-mini/ |
+| sentiment_deepseek | sentiment_gpt_4_1 | gpt-4.1/ |
+| sentiment_deepseek | sentiment_gpt_4_1_mini | gpt-4.1-mini/ |
+| sentiment_deepseek | sentiment_gpt_4_1_nano | gpt-4.1-nano/ |
+| risk_deepseek | risk_o3 | o3/ |
+| risk_deepseek | risk_o4_mini | o4-mini/ |
+| risk_deepseek | risk_gpt_5 | gpt-5/ |
+| risk_deepseek | risk_gpt_5_mini | gpt-5-mini/ |
+| risk_deepseek | risk_gpt_4_1 | gpt-4.1/ |
+| risk_deepseek | risk_gpt_4_1_mini | gpt-4.1-mini/ |
+| risk_deepseek | risk_gpt_4_1_nano | gpt-4.1-nano/ |
+
+**注意**: Claude 模型檔案已使用正確命名 (`sentiment_claude`, `risk_claude`)，無需改名。
+
+### 11.6 改名工具
+
+改名腳本位置: `scripts/repair/rename_score_columns.py`
+
+```bash
+# 預覽改名 (dry-run)
+python scripts/repair/rename_score_columns.py --output-dir /mnt/md0/finrl/renamed --dry-run
+
+# 執行改名 (創建到新目錄)
+python scripts/repair/rename_score_columns.py --output-dir /mnt/md0/finrl/renamed
+```
+
+**改名結果:**
+- 52 個 OpenAI 模型檔案會被改名
+- 6 個 Claude 模型檔案保持不變
+- 原始檔案不會被修改
+- 改名版本儲存在 `/mnt/md0/finrl/renamed/`
+
+### 11.7 LLM Summary 來源檔案
+
+LLM 生成的摘要檔案位於各模型的 `summary/` 目錄下。
+
+#### Summary 目錄總覽
+
+| 目錄 | 檔案數 | Summary 欄位名 | 說明 |
+|------|--------|---------------|------|
+| `o3/summary/` | 1 | `o3_summary` | o3 模型生成 |
+| `gpt-5/summary/` | 12 | `gpt_5_summary` | 4 reasoning × 3 verbosity 組合 |
+| `gpt-5-mini/summary/` | 12 | `gpt_5_mini_summary` | 4 reasoning × 3 verbosity 組合 |
+| `gpt-5.1/summary/` | 1 | `gpt_5.1_summary` | gpt-5.1 模型生成 |
+| **合計** | **26** | | |
+
+#### 標準欄位結構 (所有 Summary 檔案通用)
+
+所有 summary 檔案都有 **17 個欄位**，結構完全相同 (僅 summary 欄位名不同)：
+
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| Unnamed: 0.1 | int | 索引 (遺留) |
+| Unnamed: 0 | int | 索引 (遺留) |
+| Date | string | YYYY-MM-DD |
+| Article_title | string | 文章標題 |
+| Stock_symbol | string | 股票代號 |
+| Url | string | 原始 URL |
+| Publisher | string | 發布商 |
+| Author | string | 作者 |
+| Article | string | 完整文章 |
+| Lsa_summary | string | LSA 摘要 |
+| Luhn_summary | string | Luhn 摘要 |
+| Textrank_summary | string | TextRank 摘要 |
+| Lexrank_summary | string | LexRank 摘要 |
+| sentiment_deepseek | int | 原始 DeepSeek 情緒評分 |
+| **{model}_summary** | string | **LLM 生成的摘要** |
+| prompt_tokens | int | API prompt token 數 |
+| completion_tokens | int | API completion token 數 |
+
+#### 有效記錄數
+
+| 檔案 | 總行數 | 有效 Summary |
+|------|--------|--------------|
+| `o3/summary/o3_news_with_summary.csv` | 127,176 | 77,871 |
+| `gpt-5/summary/*.csv` (各檔案) | 127,176 | 77,871 |
+| `gpt-5-mini/summary/*.csv` (各檔案) | 127,176 | 77,871 |
+| `gpt-5.1/summary/*.csv` | 127,176 | 77,871 |
+
+**註**: 只有 77,871 筆有效是因為原始資料中只有 61.2% 的記錄有 Article 內容可供生成摘要。
+
+#### 各目錄檔案清單
+
+**o3/summary/** (1 個檔案)
+```
+o3_news_with_summary.csv
+```
+
+**gpt-5/summary/** (12 個檔案)
+```
+gpt-5_reason_{R}_verbosity_{V}_news_with_summary.csv
+
+R = minimal | low | medium | high
+V = low | medium | high
+```
+
+**gpt-5-mini/summary/** (12 個檔案)
+```
+gpt-5-mini_reason_{R}_verbosity_{V}_news_with_summary.csv
+
+R = minimal | low | medium | high
+V = low | medium | high
+```
+
+**gpt-5.1/summary/** (1 個檔案)
+```
+gpt-5.1_reason_high_verbosity_high_news_with_summary.csv
+```
+
+#### 評分檔案中的 Summary 欄位使用
+
+評分檔案使用上述 summary 檔案作為輸入來源：
+
+| 評分檔案使用的欄位 | 檔案數 | 來源 |
+|------------------|--------|------|
+| `o3_summary` | 26 | 從 `o3/summary/` 合併 |
+| `gpt_5_summary` | 28 | 從 `gpt-5/summary/` 合併 |
+| (無 LLM summary) | 4 | 早期檔案，使用 `Lsa_summary` |
+
+**註**: `Lsa_summary` 是傳統演算法 (LSA) 生成的摘要，存在於所有檔案中但只有 77,871 筆有效記錄。
