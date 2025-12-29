@@ -1341,6 +1341,11 @@ Risk 分佈 (所有模型平均):
 
 所有評分 CSV 包含以下基本欄位：
 
+> **2025-12-29 更新**: 已移除所有 `Unnamed:` 索引欄位
+> - Sentiment 檔案: 15 欄位
+> - Risk 檔案: 16 欄位 (多一個 `risk_deepseek`)
+> 詳見 [REPAIR_LOG_COLUMN_CLEANUP_20251229.md](REPAIR_LOG_COLUMN_CLEANUP_20251229.md)
+
 | 欄位 | 類型 | 說明 |
 |------|------|------|
 | Date | string | YYYY-MM-DD |
@@ -1417,12 +1422,13 @@ LLM 生成的摘要檔案位於各模型的 `summary/` 目錄下。
 
 #### 標準欄位結構 (所有 Summary 檔案通用)
 
-所有 summary 檔案都有 **17 個欄位**，結構完全相同 (僅 summary 欄位名不同)：
+所有 summary 檔案都有 **15 個欄位**，結構完全相同 (僅 summary 欄位名不同)：
+
+> **2025-12-29 更新**: 已移除 `Unnamed: 0.1` 和 `Unnamed: 0` 索引欄位（pandas 讀寫殘留）
+> 詳見 [REPAIR_LOG_COLUMN_CLEANUP_20251229.md](REPAIR_LOG_COLUMN_CLEANUP_20251229.md)
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| Unnamed: 0.1 | int | 索引 (遺留) |
-| Unnamed: 0 | int | 索引 (遺留) |
 | Date | string | YYYY-MM-DD |
 | Article_title | string | 文章標題 |
 | Stock_symbol | string | 股票代號 |
