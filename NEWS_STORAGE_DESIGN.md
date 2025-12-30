@@ -362,11 +362,64 @@ python collect_all_news.py --stats         # 查看統計
 
 | 數據來源 | 位置 | 行數 | 時間範圍 | 情緒分數狀態 | 內容完整度 |
 |----------|------|------|----------|--------------|-----------|
-| **FinRL DeepSeek** | `/mnt/md0/finrl/huggingface_datasets/` | 2,092,986 | 歷史 | ✅ 已有 `sentiment_deepseek` | ✅ Article + 4種摘要 |
+| **FinRL DeepSeek** | `/mnt/md0/finrl/huggingface_datasets/` | 127,176 | 2009-2024 | ✅ 已有 `sentiment_deepseek` (99%) | ⚠️ Article 61% + 4種摘要 61% |
 | **FNSPID** | `NewsExtraction/fnspid_89_2013_2023_cleaned.csv` | 218,654 | 2013-2023 | ❌ 全部是 0 (佔位符) | ✅ Article + Lsa_summary |
 | **Polygon** | `data/news/polygon_for_scoring.csv` | 63,412 | 2022-2025 | ❌ 82% NULL | ❌ 只有 description |
 | **IBKR** | `data/news/raw/ibkr/` | 52,755 | 2023-2025 | ❌ 100% NULL | ✅ content 全文 |
 | **Finnhub** | `data/news/raw/finnhub/2025/` | ~9,419 | 2025 | 未評分 | 待確認 |
+
+#### FNSPID vs FinRL DeepSeek 詳細對比 (2025-12-30 驗證)
+
+| 指標 | FNSPID | FinRL DeepSeek | 差異說明 |
+|------|--------|----------------|----------|
+| **行數** | 218,654 | 127,176 | FNSPID 多 91K |
+| **日期範圍** | 2013-01-02 ~ 2023-12-31 | 2009-07-07 ~ 2024-01-09 | FinRL 更早更新 |
+| **唯一股票數** | 75 | 89 | FinRL 多 14 支 |
+| **Article 非空** | 218,654 (100%) | 77,871 (61.2%) | FNSPID 完整度高 |
+| **Lsa_summary** | 218,654 (100%) | 77,871 (61.2%) | FNSPID 完整度高 |
+| **額外摘要** | ❌ 無 | Luhn/Textrank/Lexrank (61.2%) | FinRL 有 3 種額外摘要 |
+| **情緒分數** | 全為 0 (佔位符) | 126,224 有效 (99.3%) | FinRL 已有評分 |
+| **Publisher 非空** | 0 (0%) | 49,305 (38.8%) | FinRL 有部分發布商資訊 |
+
+**欄位差異:**
+
+| FNSPID 獨有欄位 | FinRL DeepSeek 獨有欄位 |
+|----------------|------------------------|
+| `Sentiment` (全 0) | `sentiment_deepseek` (1-5) |
+| `tags` | `Luhn_summary` |
+| `importance_score` | `Textrank_summary` |
+| `low_relevance` | `Lexrank_summary` |
+| `title_length`, `text_length` | `Unnamed: 0`, `Unnamed: 0.1` |
+| `weekday`, `month`, `year` | |
+
+**股票重疊:**
+- 共同股票: 75 支
+- 僅 FNSPID: 0 支
+- 僅 FinRL: 14 支 (MDLZ, JD, LULU, GOOGL, INTU, ...)
+
+**年份分佈比較:**
+
+| 年份 | FNSPID | FinRL DeepSeek |
+|------|--------|----------------|
+| 2009 | - | 236 |
+| 2010-2012 | - | 9,871 |
+| 2013 | 4,496 | 5,361 |
+| 2014 | 7,486 | 6,345 |
+| 2015 | 9,321 | 8,987 |
+| 2016 | 10,358 | 9,859 |
+| 2017 | 16,404 | 11,299 |
+| 2018 | 18,131 | 13,379 |
+| 2019 | 13,788 | 14,417 |
+| 2020 | 17,455 | 11,515 |
+| 2021 | 19,583 | 9,005 |
+| 2022 | 38,854 | 12,473 |
+| 2023 | 62,778 | 14,420 |
+| 2024 | - | 9 |
+
+**結論:**
+- **FNSPID 優勢**: 內容完整度 100%，2022-2023 年資料量大
+- **FinRL 優勢**: 已有情緒評分，涵蓋更多股票，有多種摘要類型
+- **建議用途**: FNSPID 適合需要完整文章的任務；FinRL 適合需要預評分參照的任務
 
 ### 10.2 已處理數據 (`/mnt/md0/finrl/`)
 
@@ -383,7 +436,7 @@ python collect_all_news.py --stats         # 查看統計
 ├── o3/
 │   └── risk/             # o3 風險評分
 └── huggingface_datasets/
-    └── FinRL_DeepSeek_sentiment/  # 原始 FinRL DeepSeek 數據 (209萬條)
+    └── FinRL_DeepSeek_sentiment/  # 原始 FinRL DeepSeek 數據 (127,176 條)
 ```
 
 ### 10.3 合併文件
@@ -399,7 +452,7 @@ python collect_all_news.py --stats         # 查看統計
 | **1** | IBKR (52K) | sentiment + risk | 最新數據 (2023-2025)，有全文，完全沒有評分 |
 | **2** | Polygon (63K) | sentiment + risk | 較新數據，無評分 |
 | **3** | FNSPID (218K) | sentiment + risk | 歷史數據，Sentiment=0 是佔位符 |
-| 低 | FinRL DeepSeek (2M) | 可選 Anthropic 評分對照 | 已有 DeepSeek 評分 |
+| 低 | FinRL DeepSeek (127K) | 可選 Anthropic 評分對照 | 已有 DeepSeek 評分 |
 
 ### 10.5 Title vs Content 評分差異研究 (2025-12-26)
 
@@ -620,7 +673,7 @@ python score_risk_anthropic.py \
 
 ### 10.9 FinRL 跨模型評分比較分析
 
-使用 `/mnt/md0/finrl` 數據集（約 209 萬筆新聞）進行完整分析。
+使用 `/mnt/md0/finrl` 數據集（127,176 筆新聞）進行完整分析。
 
 #### 實驗設計
 - **數據源**: HuggingFace FinRL DeepSeek dataset
@@ -1390,12 +1443,15 @@ Risk 分佈 (所有模型平均):
 
 #### 11.4.2 Renamed 目錄 `/mnt/md0/finrl/renamed/` 的欄位結構
 
-經過 `rename_score_columns.py` 處理，評分欄位改為模型特定名稱：
+經過 `rename_score_columns.py` 處理（使用 `df.rename()` **重命名**而非複製），評分欄位改為模型特定名稱：
 
-| 檔案類型 | 評分欄位改名 |
-|---------|------------|
-| Sentiment | `sentiment_deepseek` → `sentiment_o3` / `sentiment_gpt_5` / ... |
-| Risk | `risk_deepseek` → `risk_o3` / `risk_gpt_5` / ... (保留 `sentiment_deepseek`) |
+| 檔案類型 | 評分欄位改名 | `sentiment_deepseek` 欄位 |
+|---------|------------|--------------------------|
+| Sentiment | `sentiment_deepseek` → `sentiment_o3` / `sentiment_gpt_5` / ... | **不存在** (已重命名) |
+| Risk | `risk_deepseek` → `risk_o3` / `risk_gpt_5` / ... | 保留 (來自輸入資料) |
+
+> **重要**: Renamed Sentiment 檔案中的 `sentiment_o3` 等欄位是該模型的評分值，
+> 這些檔案**完全沒有** `sentiment_deepseek` 欄位（因為它被重命名了）。
 
 > **注意**: Risk 檔案中的 `sentiment_deepseek` 是輸入檔案中既有的欄位，在風險評分過程中被原樣保留。
 > **風險評分腳本不使用情緒分數作為輸入**—它們獨立地對 headline 進行風險評分。
