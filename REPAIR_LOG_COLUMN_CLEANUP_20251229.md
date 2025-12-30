@@ -244,6 +244,8 @@ sentiment_deepseek, gpt_5_summary, prompt_tokens, completion_tokens
 
 #### Sentiment 檔案
 
+`rename_score_columns.py` 使用 `df.rename()` **重命名**欄位（非複製），因此 renamed 目錄的 Sentiment 檔案**不再有** `sentiment_deepseek` 欄位：
+
 | 原始欄位 | 改名後欄位 | 適用模型 |
 |---------|-----------|---------|
 | `sentiment_deepseek` | `sentiment_o3` | o3 |
@@ -253,12 +255,15 @@ sentiment_deepseek, gpt_5_summary, prompt_tokens, completion_tokens
 | `sentiment_deepseek` | `sentiment_gpt_4_1_mini` | gpt-4.1-mini |
 | `sentiment_deepseek` | `sentiment_gpt_4_1_nano` | gpt-4.1-nano |
 
-範例 (o3 sentiment):
+範例 (o3 sentiment, **15 欄**):
 ```
 Date, Article_title, Stock_symbol, Url, Publisher, Author, Article,
 Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary,
 sentiment_o3, o3_summary, prompt_tokens, completion_tokens
 ```
+
+> **注意**: Renamed Sentiment 檔案中的 `sentiment_o3` 等欄位，實際上是該模型重新評分的結果，
+> **不是**原始 DeepSeek 的評分值。這些檔案完全沒有 `sentiment_deepseek` 欄位。
 
 #### Risk 檔案
 
