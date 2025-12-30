@@ -439,11 +439,60 @@ python collect_all_news.py --stats         # 查看統計
     └── FinRL_DeepSeek_sentiment/  # 原始 FinRL DeepSeek 數據 (127,176 條)
 ```
 
-### 10.3 合併文件
+### 10.3 data/news/ 目錄結構 (2025-12-30 更新)
 
-| 文件 | 位置 | 行數 | 說明 |
-|------|------|------|------|
-| IBKR 全部新聞 | `data/news/ibkr_all_news.parquet` | 52,755 | 2023-2025 IBKR 新聞合併 |
+```
+data/news/
+├── ibkr_all_news.parquet       # 原始資料 (52,755 行)
+├── ibkr_scored_final.parquet   # ★ 最終評分檔 (Title + Content 合併)
+├── polygon_for_scoring.csv     # 原始資料 (63,412 行)
+├── polygon_scored_final.csv    # ★ 最終評分檔 (僅 Title)
+└── archive/                    # 中間檔歸檔
+    ├── ibkr_scoring_20251226/  # IBKR 評分中間檔
+    │   ├── ibkr_sentiment.parquet          # Title 評分
+    │   ├── ibkr_sentiment_content.parquet  # Content 評分
+    │   ├── ibkr_sentiment_merged.parquet   # 合併版
+    │   ├── ibkr_risk_title.parquet         # Title 風險評分
+    │   ├── ibkr_risk_content.parquet       # Content 風險評分
+    │   └── ibkr_scored.parquet             # 中間檔
+    └── polygon_scoring_20251226/
+        └── polygon_sentiment.csv
+```
+
+#### IBKR 評分結構 (Title + Content 雙軌)
+
+IBKR 新聞同時使用 **Title** 和 **Content** 進行評分，然後合併：
+
+| 欄位 | 非空數 | 說明 |
+|------|--------|------|
+| `sentiment_title` | 52,755 (100%) | 基於 `title` 欄位的情緒評分 |
+| `sentiment_content` | 45,246 (85.8%) | 基於 `content` 欄位的情緒評分 |
+| `sentiment_claude` | 52,755 (100%) | **最終評分** (優先 content，無 content 用 title) |
+| `sentiment_source` | 52,755 (100%) | 標記評分來源 ('content' 或 'title') |
+| `risk_title` | 52,755 (100%) | 基於 `title` 的風險評分 |
+| `risk_content` | 45,151 (85.6%) | 基於 `content` 的風險評分 |
+| `risk_claude` | 52,755 (100%) | **最終評分** (優先 content，無 content 用 title) |
+| `risk_source` | 52,755 (100%) | 標記評分來源 ('content' 或 'title') |
+
+**合併邏輯**: Content 評分優先，對於沒有 content 的 ~7,500 筆記錄 (14.2%)，使用 Title 評分補充。
+
+#### Polygon 評分結構 (僅 Title)
+
+Polygon 新聞只有 `description` 欄位 (無完整 content)，因此僅使用 Title 評分：
+
+| 欄位 | 非空數 | 說明 |
+|------|--------|------|
+| `sentiment_claude` | 63,412 (100%) | 基於 `Article_title` 的情緒評分 |
+| `risk_claude` | 63,412 (100%) | 基於 `Article_title` 的風險評分 |
+
+#### 檔案總覽
+
+| 文件 | 位置 | 行數 | 評分方式 |
+|------|------|------|----------|
+| IBKR 原始 | `data/news/ibkr_all_news.parquet` | 52,755 | - |
+| IBKR 評分完成 | `data/news/ibkr_scored_final.parquet` | 52,755 | Title + Content 合併 |
+| Polygon 原始 | `data/news/polygon_for_scoring.csv` | 63,412 | - |
+| Polygon 評分完成 | `data/news/polygon_scored_final.csv` | 63,412 | 僅 Title |
 
 ### 10.4 評分優先順序建議
 
@@ -641,6 +690,8 @@ Opus    0.578   0.571  1.000
 
 ### 10.8 Anthropic 評分命令
 
+#### 標準模式 (全量評分)
+
 ```bash
 # IBKR 新聞評分 (使用 Batch API 省 50%)
 python score_sentiment_anthropic.py \
@@ -656,18 +707,53 @@ python score_risk_anthropic.py \
     --batch --model haiku \
     --symbol-column ticker \
     --text-column title
+```
 
-# Polygon 新聞評分
+#### 增量模式 (推薦用於每日更新，2025-12-30 新增)
+
+增量模式會自動：
+1. 載入現有評分結果
+2. 合併新收集的資料
+3. 只對 NULL 分數的行進行評分
+4. 保留已有的評分結果
+
+```bash
+# IBKR 增量評分 (Parquet 使用 article_id 作為 merge key)
+python score_sentiment_anthropic.py \
+    --input data/news/ibkr_all_news.parquet \
+    --output data/news/ibkr_scored_final.parquet \
+    --incremental \
+    --batch --model haiku \
+    --symbol-column ticker \
+    --text-column title
+
+python score_risk_anthropic.py \
+    --input data/news/ibkr_all_news.parquet \
+    --output data/news/ibkr_scored_final.parquet \
+    --incremental \
+    --batch --model haiku \
+    --symbol-column ticker \
+    --text-column title
+
+# Polygon 增量評分 (CSV 使用 dedup_hash 作為 merge key)
 python score_sentiment_anthropic.py \
     --input data/news/polygon_for_scoring.csv \
-    --output data/news/polygon_sentiment.csv \
+    --output data/news/polygon_scored_final.csv \
+    --incremental \
     --batch --model haiku
 
 python score_risk_anthropic.py \
     --input data/news/polygon_for_scoring.csv \
-    --output data/news/polygon_risk.csv \
+    --output data/news/polygon_scored_final.csv \
+    --incremental \
     --batch --model haiku
 ```
+
+**增量模式參數:**
+- `--incremental`: 啟用增量模式
+- `--merge-key`: 指定合併用的欄位 (預設: Parquet 用 `article_id`, CSV 用 `dedup_hash`)
+
+**注意**: 增量模式要求輸入檔案有 merge key 欄位。若 merge key 不存在會報錯。
 
 ---
 
