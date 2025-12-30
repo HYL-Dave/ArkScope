@@ -1678,3 +1678,42 @@ gpt-5.1_reason_high_verbosity_high_news_with_summary.csv
 | (無 LLM summary) | 4 | 早期檔案，使用 `Lsa_summary` |
 
 **註**: `Lsa_summary` 是傳統演算法 (LSA) 生成的摘要，存在於所有檔案中但只有 77,871 筆有效記錄。
+
+---
+
+## 12. 歷史分析紀錄
+
+### 12.1 歸檔分析檔案位置
+
+`docs/analysis/` 目錄包含歷史分析結果：
+
+| 檔案 | 用途 | 建立日期 |
+|------|------|----------|
+| `gpt5_summary_analysis_20250921.json` | 分析 gpt_5_summary 在不同 verbosity/reasoning 設定下的統計 | 2025-09-21 |
+| `token_cost_analysis_20250921.json` | 估算 67 個評分檔案的 token 使用和成本 | 2025-09-21 |
+
+### 12.2 關鍵成本分析摘要 (來自 token_cost_analysis)
+
+| 指標 | 數值 |
+|------|------|
+| 總檔案數 | 67 |
+| 總記錄數 | 4,152,414 |
+| 總 prompt tokens | ~5.1B |
+| 總 completion tokens | ~3.1B |
+| 總 tokens | ~8.2B |
+| **估計總成本** | **~$242,360** |
+
+### 12.3 模型間一致性分析摘要
+
+從歷史比較測試中得出的關鍵發現：
+
+| 模型組合 | Exact Match | Pearson r | Cohen's κ |
+|----------|-------------|-----------|-----------|
+| gpt-4.1 vs o4-mini (medium) | 76.5% | 0.850 | 0.668 |
+| gpt-4.1 vs gpt-4.1-nano | 60.7% | 0.655 | 0.430 |
+| gpt-4.1-nano vs o4-mini (medium) | 60.8% | 0.665 | 0.435 |
+
+**觀察結論**:
+- `gpt-4.1` 和 `o4-mini` 一致性較高 (76.5%)
+- `gpt-4.1-nano` 傾向給出更多 score 4 (44.4% vs 37.8%)，較少 score 5 (4.3% vs 12.2%)
+- 所有模型組合在 ±1 分範圍內達到 94-99% 一致性
