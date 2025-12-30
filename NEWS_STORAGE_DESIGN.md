@@ -1222,8 +1222,8 @@ Risk 分佈 (所有模型平均):
 ---
 
 *創建日期: 2024-12-14*
-*更新日期: 2025-12-29*
-*版本: 2.1*
+*更新日期: 2025-12-30*
+*版本: 2.2*
 
 > ✅ **修復完成 (2025-12-28)**: 全部 6 階段修復已完成。
 > - o3_summary 6 筆 BKR 資料已修復
@@ -1339,16 +1339,34 @@ Risk 分佈 (所有模型平均):
 
 ### 11.4 標準欄位結構
 
-所有評分 CSV 包含以下基本欄位：
-
 > **2025-12-29 更新**: 已移除所有 `Unnamed:` 索引欄位
-> - Sentiment 檔案: 15 欄位
-> - Risk 檔案: 16 欄位 (多一個 `risk_deepseek`)
 > 詳見 [REPAIR_LOG_COLUMN_CLEANUP_20251229.md](REPAIR_LOG_COLUMN_CLEANUP_20251229.md)
+
+欄位結構因**檔案類型**和**目錄位置**而異：
+
+#### 11.4.1 原始目錄 `/mnt/md0/finrl/` 的欄位結構
+
+**類型 A: 無 LLM 摘要的基礎檔案** (檔名無 `_by_` 後綴)
+
+| 檔案類型 | 欄位數 | 評分欄位 |
+|---------|--------|---------|
+| Sentiment | 12 | `sentiment_deepseek` |
+| Risk | 13 | `sentiment_deepseek`, `risk_deepseek` |
+
+範例: `sentiment_o3_high_4.csv`, `risk_o3_medium_2.csv`
+
+**類型 B: 含 LLM 摘要的檔案** (檔名含 `_by_o3_summary` 或 `_by_gpt-5_*`)
+
+| 檔案類型 | 欄位數 | Summary 欄位 | 評分欄位 |
+|---------|--------|-------------|---------|
+| Sentiment | 15 | `o3_summary` 或 `gpt_5_summary` | `sentiment_deepseek` |
+| Risk | 16 | `o3_summary` 或 `gpt_5_summary` | `sentiment_deepseek`, `risk_deepseek` |
+
+**基本欄位 (所有檔案通用):**
 
 | 欄位 | 類型 | 說明 |
 |------|------|------|
-| Date | string | YYYY-MM-DD |
+| Date | string | YYYY-MM-DD HH:MM:SS UTC |
 | Article_title | string | 文章標題 |
 | Stock_symbol | string | 股票代號 |
 | Url | string | 原始 URL |
@@ -1359,11 +1377,34 @@ Risk 分佈 (所有模型平均):
 | Luhn_summary | string | Luhn 摘要 |
 | Textrank_summary | string | TextRank 摘要 |
 | Lexrank_summary | string | LexRank 摘要 |
-| o3_summary / gpt_5_summary | string | LLM 生成的摘要 (見 11.7) |
-| sentiment_deepseek | int | 情緒評分 (1-5) |
-| risk_deepseek | int | 風險評分 (1-5) |
-| prompt_tokens | int | API prompt token 數 |
-| completion_tokens | int | API completion token 數 |
+
+**評分與 LLM 欄位 (視檔案類型):**
+
+| 欄位 | 類型 | 存在條件 |
+|------|------|---------|
+| sentiment_deepseek | int | 所有檔案 |
+| risk_deepseek | int | 僅 Risk 檔案 |
+| o3_summary / gpt_5_summary | string | 僅含 LLM 摘要的檔案 |
+| prompt_tokens | int | 僅含 LLM 摘要的檔案 |
+| completion_tokens | int | 僅含 LLM 摘要的檔案 |
+
+#### 11.4.2 Renamed 目錄 `/mnt/md0/finrl/renamed/` 的欄位結構
+
+經過 `rename_score_columns.py` 處理，評分欄位改為模型特定名稱：
+
+| 檔案類型 | 評分欄位改名 |
+|---------|------------|
+| Sentiment | `sentiment_deepseek` → `sentiment_o3` / `sentiment_gpt_5` / ... |
+| Risk | `risk_deepseek` → `risk_o3` / `risk_gpt_5` / ... (保留 `sentiment_deepseek`) |
+
+> **注意**: Risk 檔案中的 `sentiment_deepseek` 是輸入檔案中既有的欄位，在風險評分過程中被原樣保留。
+> **風險評分腳本不使用情緒分數作為輸入**—它們獨立地對 headline 進行風險評分。
+>
+> **資料來源追蹤 (2025-12-30 驗證)**:
+> - Summary 檔案 input: 原始 HuggingFace 檔案 → `openai_summary.py` 只加 summary 欄位
+> - Risk 檔案 input: Summary 檔案 → `score_risk_*.py` 只加 risk 欄位
+> - 驗證: 所有 risk 檔案的 `sentiment_deepseek` hash 一致 = 原始 DeepSeek 評分 (126,224 筆)
+> - **結論**: 無模型混用，`sentiment_deepseek` 皆為原始 DeepSeek 評分
 
 ### 11.5 欄位名稱改名對照
 
