@@ -203,19 +203,85 @@
 
 ---
 
-## 7. Deep Reasoning Effort Analysis
+## 7. 系統性比較分析 (Systematic Comparison Analysis)
 
-### 7.0 實驗設計 (Controlled Variables)
+### 7.0 可用數據總覽
 
-本分析測試 **評分模型 (Scoring Model)** 的 reasoning effort 對 Risk 評分一致性的影響。
+**按 Input Source 分組 (可比較不同 Scoring Model):**
 
-**控制變因說明:**
+| Input Source | 可用 Scoring Models |
+|--------------|---------------------|
+| `o3_summary` | gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5×4, o3×3, o4-mini×3 (共 13 種) |
+| `gpt5_R_high_V_high_summary` | gpt-4.1-mini, gpt-5×4 (R variants), gpt-5-mini, o3 (共 7 種) |
+| `gpt5_summary` | claude-haiku, claude-sonnet, claude-opus (共 3 種) |
 
-| 變因 | 說明 | 本實驗設定 |
-|------|------|-----------|
-| **Input Source** (固定) | 餵給評分模型的摘要來源 | `o3_summary` (所有比較都使用相同 input) |
-| **Scoring Model** (固定) | 執行評分的模型 | O3 或 GPT-5 (同一組比較內模型固定) |
-| **Scoring Reasoning Effort** (變動) | 評分模型的推理強度 | minimal / low / medium / high |
+**按 Scoring Model 分組 (可比較不同 Input):**
+
+| Scoring Model | 可用 Input Sources |
+|---------------|-------------------|
+| `gpt-4.1-mini` | o3_summary, gpt5_R_high_V_high, gpt5_R_minimal_V_high, gpt5_R_medium_V_high, gpt5_R_low_V_high, gpt5_R_high_V_medium (共 6 種) |
+| `gpt-5` | o3_summary (4 reasoning), gpt5_R_high_V_high (4 R variants) |
+| `o3` | o3_summary (3 reasoning), gpt5_R_high_V_high (1) |
+
+---
+
+### 7.1 實驗 A: 固定 Scoring Model，比較不同 Input
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Scoring Model** (固定) | gpt-4.1-mini |
+| **Input Source** (變動) | o3_summary vs 各種 gpt5_summary |
+
+**結果 (from Section 2.6):**
+
+| Input A vs Input B | Exact Match | Correlation |
+|-------------------|-------------|-------------|
+| o3_summary vs gpt5_R_high_V_high | 42.5% | 0.699 |
+| o3_summary vs gpt5_R_minimal_V_high | 42.4% | 0.687 |
+| o3_summary vs gpt5_R_medium_V_high | 41.2% | 0.678 |
+| o3_summary vs gpt5_R_low_V_high | 42.5% | 0.696 |
+| o3_summary vs gpt5_R_high_V_medium | 43.0% | 0.701 |
+
+**結論**: 不同 input source 造成 ~41-43% exact match，correlation ~0.68-0.70
+
+---
+
+### 7.2 實驗 B: 固定 Input，比較不同 Scoring Model
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Input Source** (固定) | o3_summary |
+| **Scoring Model** (變動) | 13 種不同模型 |
+
+**結果 (from Section 3.1, 完整版):**
+
+| Model A vs Model B | Exact Match | Correlation |
+|-------------------|-------------|-------------|
+| gpt-5_high vs o3_low | 50.1% | 0.729 |
+| gpt-4.1 vs gpt-4.1-mini | 43.4% | 0.706 |
+| o4-mini_medium vs gpt-4.1-mini | 39.6% | 0.678 |
+| gpt-4.1-nano vs gpt-4.1-mini | 38.4% | 0.678 |
+| gpt-4.1 vs o4-mini_medium | 37.6% | 0.656 |
+| gpt-4.1 vs o3_low | 34.8% | 0.660 |
+| gpt-4.1-nano vs gpt-5_high | 31.9% | 0.469 |
+
+**結論**: 不同 scoring model 造成 ~32-50% exact match，差異比 input source 更大
+
+---
+
+### 7.3 實驗 C: 固定 Input + 固定 Scoring Model，比較不同 Reasoning Effort
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Input Source** (固定) | o3_summary |
+| **Scoring Model** (固定) | O3 或 GPT-5 |
+| **Scoring Reasoning Effort** (變動) | minimal / low / medium / high |
 
 **注意**: 這裡的 reasoning effort 是指 **評分時** 的參數，不是生成摘要時的參數。
 
@@ -223,12 +289,10 @@
 
 ---
 
-### 7.1 Risk Score Consistency by Scoring Model Reasoning Effort
-
-**O3 Scoring Model (3 reasoning levels: low/medium/high):**
+#### 7.3.1 O3 Scoring Model (3 reasoning levels: low/medium/high)
 - Input: `o3_summary` (固定)
 - Scoring Model: O3 (固定)
-- Variable: O3 的 reasoning effort
+- Variable: O3 的 scoring reasoning effort
 
 | Comparison | Exact Match | Within ±1 |
 |------------|-------------|-----------|
@@ -238,34 +302,36 @@
 
 **O3 Risk scores are virtually identical across reasoning levels!**
 
-**GPT-5 Scoring Model (minimal vs high):**
+#### 7.3.2 GPT-5 Scoring Model (minimal vs high)
 - Input: `o3_summary` (固定)
 - Scoring Model: GPT-5 (固定)
-- Variable: GPT-5 的 reasoning effort
+- Variable: GPT-5 的 scoring reasoning effort
 
 | Comparison | Exact Match | Records |
 |------------|-------------|---------|
 | minimal vs high | 79.9% | 77,871 |
 
-### 7.2 Comparison with Sentiment Scores
+---
+
+### 7.4 Risk vs Sentiment Consistency Comparison
 
 | Score Type | Model | Avg Exact Match | Note |
 |------------|-------|-----------------|------|
-| Risk | O3 | 99.3% | Near-perfect consistency |
-| Risk | GPT-5 | 79.9% | High consistency |
+| **Risk** | O3 | 99.3% | Near-perfect consistency |
+| **Risk** | GPT-5 | 79.9% | High consistency |
 | Sentiment | O3 | 53.7% | Moderate consistency |
 | Sentiment | GPT-5 | 50.3% | Lower consistency |
 
 **Key Finding**: Risk scoring is significantly more robust to reasoning effort changes than sentiment scoring.
 
-### 7.3 Why Risk Scores Are More Consistent
+### 7.5 Why Risk Scores Are More Consistent
 
 Risk scoring appears to be a more objective task:
 - Risk factors (debt, litigation, regulatory issues) are more concrete
 - Sentiment involves subjective interpretation of tone and outlook
 - Risk has clearer decision boundaries (is there a risk or not?)
 
-### 7.4 Risk Score Distribution
+### 7.6 Risk Score Distribution
 
 | Score | Percentage | Interpretation |
 |-------|------------|----------------|
@@ -277,7 +343,7 @@ Risk scoring appears to be a more objective task:
 
 Most articles are scored as moderate-to-high risk (scores 2-3).
 
-### 7.5 Sample Risk Score Differences (GPT-5 minimal vs high)
+### 7.7 Sample Risk Score Differences (GPT-5 minimal vs high)
 
 | Article Title | Stock | Risk (minimal) | Risk (high) |
 |---------------|-------|----------------|-------------|
@@ -286,6 +352,14 @@ Most articles are scored as moderate-to-high risk (scores 2-3).
 | Guru Fundamental Report for AAPL | AAPL | 1 | 2 |
 
 *Even with 20% disagreement, differences are typically only ±1 point.*
+
+### 7.8 Key Insights
+
+1. **Risk scoring is extremely robust**: 79.9%-99.3% consistency across reasoning levels
+2. **O3 is nearly deterministic for risk**: 99.3% exact match is effectively the same score
+3. **GPT-5 shows some variation**: 79.9% consistency is still high, with differences typically ±1
+4. **Objective tasks are easier to score consistently**: Risk vs Sentiment demonstrates this clearly
+5. **Production recommendation**: For risk scoring, reasoning effort doesn't matter much
 
 ---
 
