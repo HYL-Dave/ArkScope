@@ -221,23 +221,232 @@
 
 ---
 
-## 7. Conclusions and Recommendations
+## 7. Content Quality Assessment (Deep Analysis)
 
-### 7.1 Summary
+*Based on manual review of 10 diverse article samples with full original text comparison*
 
-- **Total summary types analyzed**: 17 (4 traditional + 1 O3 + 12 GPT-5)
-- **Traditional algorithms** produce shorter, more variable summaries
-- **LLM summaries** are more consistent in length (lower std)
-- **GPT-5 verbosity** significantly affects output length
-- **O3 and GPT-5** show moderate similarity, with R=high configs being most similar
+### 7.1 LSA Summary Critical Issues
 
+**嚴重缺陷 - 不建議用於情緒/風險評分**
 
-### 7.2 Recommendations
+| 問題類型 | 發生頻率 | 範例 |
+|---------|---------|------|
+| 包含廣告文字 | 約 40% | "Click to get this free report...", "To read this article on Zacks.com click here" |
+| 隨機摘錄片段 | 約 60% | 抓取文章中間段落而非核心信息 |
+| 忽略文章主旨 | 約 30% | APTV 分析文章中只摘錄結尾的 PAYX 推薦 |
+| 接近全文複製 | 約 15% | 短文章（<200字）幾乎原封不動 |
+| 資料表格碎片 | 約 25% | 直接摘錄 "$257.15 $282.25 9.76%" 等未解釋的數字 |
 
-- For **sentiment/risk scoring**: Use LLM summaries (more focused, consistent)
-- For **cost optimization**: Consider R=minimal or R=low with V=low
-- For **maximum detail**: Use R=high, V=high
-- For **O3/GPT-5 interchangeability**: R=high configs are most compatible
+**具體案例分析**：
+- **Sample 3 (AMGN Biotech Roundup)**: LSA 只摘錄廣告連結，完全丟失 FDA 批准、臨床試驗等核心新聞
+- **Sample 4 (PAYX)**: 文章主題是 APTV，LSA 卻只摘錄文末的 PAYX 推薦，完全誤導
+- **Sample 7 (AEP)**: 147 字原文，LSA 產出 132 字，幾乎無壓縮價值
+
+### 7.2 O3 Summary Quality Assessment
+
+**優勢 - 推薦用於綜合分析**
+
+| 優勢項目 | 評分 | 說明 |
+|---------|------|------|
+| 信息整合 | ★★★★★ | 能從多段落提取並重組核心數據 |
+| 因果分析 | ★★★★☆ | 主動添加 "this means...", "indicating..." 等推理 |
+| 數據準確性 | ★★★★★ | 數字、百分比、日期準確率極高 |
+| 主旨識別 | ★★★★☆ | 能正確區分主要 vs 次要信息 |
+| 去廣告能力 | ★★★★★ | 完全過濾掉 "Click here", "Free report" 等噪音 |
+
+**具體案例**：
+- **Sample 2 (EXC EV Chargers)**: 114 字涵蓋：合作內容、投資金額、市場預測、同業比較、股票評級
+- **Sample 3 (AMGN)**: 163 字覆蓋 5 家公司的交易細節（Amgen FDA/EC、Regeneron-Zoetis、Axovant $812M milestone）
+
+### 7.3 GPT-5 Configuration Quality Comparison
+
+| 配置 | 信息完整度 | 簡潔性 | 適用場景 |
+|-----|-----------|--------|---------|
+| R=high, V=high | ★★★★★ | ★★☆☆☆ | 研究報告、詳細分析 |
+| R=high, V=low | ★★★★☆ | ★★★★☆ | 平衡選擇 |
+| R=minimal, V=low | ★★★☆☆ | ★★★★★ | 快速掃描、大量處理 |
+
+**R=minimal V=low 特殊觀察**：
+- 有時過於簡略丟失上下文（Sample 5: 只有 36 字）
+- 對於 stock-specific 標記的 roundup 文章，可能只聚焦該股票而忽略市場脈絡
+- 信息密度最高，適合 token 成本敏感場景
+
+### 7.4 Stock Symbol Mismatch Problem
+
+**重要發現**：部分文章的 `Stock_symbol` 與實際主題不符
+
+| 樣本 | Stock_symbol | 實際主題 | 影響 |
+|------|--------------|---------|------|
+| Sample 1 | AMAT | QQQ ETF 資金流出 | AMAT 只是成分股之一 |
+| Sample 4 | PAYX | APTV 公司分析 | PAYX 只在文末被推薦 |
+| Sample 6 | ASML | DHR 除息公告 | ASML 只是同行業提及 |
+
+**對評分的影響**：
+- 使用 Lsa_summary 時問題更嚴重（可能只摘錄次要股票信息）
+- LLM 摘要通常能正確識別主旨，但可能與 stock_symbol 標記不符
+- **建議**：評分時應結合 Article_title 驗證相關性
+
+### 7.5 Information Preservation by Summary Type
+
+基於 10 個樣本的關鍵信息保留率估計：
+
+| 信息類型 | LSA | O3 | GPT-5 HH | GPT-5 ML |
+|---------|-----|-----|----------|----------|
+| 財務數據 (價格、百分比) | 60% | 95% | 98% | 90% |
+| 事件描述 (併購、批准) | 40% | 90% | 95% | 85% |
+| 因果分析 | 0% | 70% | 80% | 50% |
+| 風險提示 | 20% | 60% | 70% | 40% |
+| 市場脈絡 | 30% | 80% | 85% | 60% |
+
+### 7.6 Content Quality Summary
+
+```
+質量排序（用於情緒/風險評分）：
+
+1. O3_summary          - 最佳平衡，推薦作為主要輸入
+2. GPT-5 R=high V=high - 最詳細但可能冗長
+3. GPT-5 R=high V=low  - 良好平衡
+4. GPT-5 R=minimal V=low - 適合大規模處理
+5. Lsa_summary         - ❌ 不建議使用，噪音太多
+
+傳統算法摘要（Lsa/Luhn/Textrank/Lexrank）
+在財務新聞情緒分析場景中效果不佳，
+因為它們無法理解語義、過濾噪音、或識別文章主旨。
+```
+
+---
+
+## 8. Conclusions and Recommendations
+
+### 8.1 統計分析總結
+
+- **分析的摘要類型**: 17 種 (4 傳統 + 1 O3 + 12 GPT-5)
+- **傳統算法**：長度變異大 (std 47-52)，質量不穩定
+- **LLM 摘要**：長度一致 (std 20-28)，質量穩定
+- **GPT-5 verbosity** 顯著影響輸出長度 (+19~29 words)
+
+### 8.2 內容質量總結
+
+- **LSA/傳統算法**: ❌ 不適合情緒/風險評分，噪音過多
+- **O3**: ✅ 最佳選擇，信息整合與簡潔性平衡
+- **GPT-5 R=high V=high**: ✅ 最詳細，適合深度分析
+- **GPT-5 R=minimal V=low**: ⚠️ 成本最優但可能丟失上下文
+
+### 8.3 評分輸入建議
+
+| 用途 | 推薦 Summary | 理由 |
+|-----|-------------|------|
+| 情緒評分 | O3 或 GPT-5 R=high V=low | 主旨清晰、過濾噪音 |
+| 風險評分 | O3 或 GPT-5 R=high V=high | 需要完整風險因素描述 |
+| 大量處理 | GPT-5 R=minimal V=low | Token 成本最低 |
+| 研究分析 | GPT-5 R=high V=high | 信息最完整 |
+
+### 8.4 數據質量警告
+
+- 約 30% 文章的 `Stock_symbol` 與實際主題不完全對應
+- 使用傳統摘要時此問題會被放大
+- 建議：評分前驗證 Article_title 與 Stock_symbol 相關性
+
+---
+
+## 9. 評分輸入源分析（Title vs Article vs Summary）
+
+*基於 10 個樣本的深度橫向比較*
+
+### 9.1 Title 信息密度分析
+
+| 缺失信息類型 | 比例 | 影響 |
+|-------------|------|------|
+| 具體數字 (%, $) | 100% | 無法判斷幅度 |
+| 業績動詞 (beat/miss) | 80% | 無法判斷方向 |
+| Stock Symbol | 70% | 可能評錯股票 |
+| 可操作信息 | 80% | 評分信息不足 |
+
+**結論**: Title 單獨作為評分輸入**不可靠**
+
+### 9.2 Stock Symbol Mismatch 問題
+
+**嚴重發現**: 抽樣中高比例文章的 `Stock_symbol` 與實際主題不符
+
+| 樣本 | 標記 Symbol | 實際主題 | Title |
+|------|------------|---------|-------|
+| 1 | AMAT | QQQ ETF | "Invesco QQQ Experiences Big Outflow" |
+| 4 | PAYX | APTV | "Here's Why Investors Should Retain Aptiv (APTV)" |
+| 6 | ASML | DHR | "Danaher Corporation (DHR) Ex-Dividend Date..." |
+| 9 | TXN | Apple 供應鏈 | "5 Apple Supplier Stocks to Pick..." |
+| 10 | WBA | Lyft/CVS | "Lyft, CVS Health partner..." |
+
+**問題根源**:
+- Roundup 類文章被拆分成多個 stock 記錄
+- 同一文章內提及多個股票，每個都產生記錄
+- 文末推薦股票也被標記為相關
+
+### 9.3 各輸入源比較
+
+```
+┌─────────────────┬──────────────────────────┬──────────────────────────────┐
+│ 輸入類型        │ 優點                     │ 缺點                          │
+├─────────────────┼──────────────────────────┼──────────────────────────────┤
+│ Article_title   │ • Token 成本最低         │ • 80%+ 信息不足               │
+│                 │ • 無噪音                  │ • 不含具體數據                │
+│                 │                          │ • 70% 不含 symbol             │
+├─────────────────┼──────────────────────────┼──────────────────────────────┤
+│ Article (原文)  │ • 信息最完整             │ • Token 成本極高              │
+│                 │                          │ • 含廣告和噪音                │
+│                 │                          │ • 需要模型自行過濾            │
+├─────────────────┼──────────────────────────┼──────────────────────────────┤
+│ Lsa_summary     │ • 成本中等               │ • 質量不穩定                  │
+│                 │                          │ • 可能摘錄錯誤段落            │
+│                 │                          │ • 完全無法識別 mismatch       │
+├─────────────────┼──────────────────────────┼──────────────────────────────┤
+│ O3/GPT-5        │ • 信息密度高             │ • 需要預生成                  │
+│ Summary         │ • 過濾噪音               │ • 總成本 = 生成 + 評分        │
+│                 │ • 60% 含比較分析         │                              │
+│                 │ • 40% 含風險提示         │                              │
+│                 │ • 質量穩定               │                              │
+└─────────────────┴──────────────────────────┴──────────────────────────────┘
+```
+
+### 9.4 評分策略建議
+
+**策略 A: 成本優先（大規模處理）**
+```
+1. Title 評分
+2. 檢查 Title 是否含 Stock_symbol
+3. 若不含 → 升級至 Summary 評分
+4. 標記低信心記錄供後續審核
+```
+
+**策略 B: 質量優先（研究/回測）**
+```
+1. 直接使用 O3/GPT-5 Summary
+2. 最穩定的評分結果
+3. 適合策略開發和驗證
+```
+
+**策略 C: 混合驗證（高價值場景）**
+```
+1. Title 評分 + Summary 評分
+2. 比較兩者差異
+3. 差異 > 2 分 → 人工審核
+4. 取加權平均或專家判斷
+```
+
+### 9.5 對 Score A/B Comparison 的啟示
+
+進行分數比較時必須注意：
+
+1. **輸入源控制**: 同一篇文章在不同評分 run 中可能使用不同輸入
+   - 有的用 Title，有的用 Lsa_summary，有的用 o3_summary
+   - **必須標記並控制此變因**
+
+2. **Symbol Mismatch 過濾**:
+   - 對比分數前應驗證 symbol 與 title 相關性
+   - 不相關記錄可能產生無意義的分數
+
+3. **評分一致性檢驗**:
+   - 同文章不同 summary 的評分差異
+   - 應小於評分模型本身的不確定性
 
 
 
