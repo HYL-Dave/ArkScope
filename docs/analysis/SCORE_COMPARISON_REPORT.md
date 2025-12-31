@@ -205,11 +205,30 @@
 
 ## 7. Deep Reasoning Effort Analysis
 
-*Full dataset analysis (127,176 records) comparing same model with different reasoning levels, using identical input source (o3_summary) to isolate reasoning effect.*
+### 7.0 實驗設計 (Controlled Variables)
 
-### 7.1 Sentiment Score Consistency by Reasoning Effort
+本分析測試 **評分模型 (Scoring Model)** 的 reasoning effort 對評分一致性的影響。
 
-**O3 Model (3 reasoning levels: low/medium/high):**
+**控制變因說明:**
+
+| 變因 | 說明 | 本實驗設定 |
+|------|------|-----------|
+| **Input Source** (固定) | 餵給評分模型的摘要來源 | `o3_summary` (所有比較都使用相同 input) |
+| **Scoring Model** (固定) | 執行評分的模型 | O3 或 GPT-5 (同一組比較內模型固定) |
+| **Scoring Reasoning Effort** (變動) | 評分模型的推理強度 | minimal / low / medium / high |
+
+**注意**: 這裡的 reasoning effort 是指 **評分時** 的參數，不是生成摘要時的參數。
+
+**資料來源**: 127,176 筆記錄 (完整 FinRL 數據集)
+
+---
+
+### 7.1 Sentiment Score Consistency by Scoring Model Reasoning Effort
+
+**O3 Scoring Model (3 reasoning levels: low/medium/high):**
+- Input: `o3_summary` (固定)
+- Scoring Model: O3 (固定)
+- Variable: O3 的 reasoning effort
 
 | Comparison | Exact Match | Within ±1 | Mean A | Mean B |
 |------------|-------------|-----------|--------|--------|
@@ -219,7 +238,10 @@
 
 **O3 平均一致性: 53.7% exact match**
 
-**GPT-5 Model (4 reasoning levels: minimal/low/medium/high):**
+**GPT-5 Scoring Model (4 reasoning levels: minimal/low/medium/high):**
+- Input: `o3_summary` (固定)
+- Scoring Model: GPT-5 (固定)
+- Variable: GPT-5 的 reasoning effort
 
 | Comparison | Exact Match | Within ±1 | Mean A | Mean B |
 |------------|-------------|-----------|--------|--------|
