@@ -203,19 +203,87 @@
 
 ---
 
-## 7. Deep Reasoning Effort Analysis
+## 7. 系統性比較分析 (Systematic Comparison Analysis)
 
-### 7.0 實驗設計 (Controlled Variables)
+### 7.0 可用數據總覽
 
-本分析測試 **評分模型 (Scoring Model)** 的 reasoning effort 對評分一致性的影響。
+**按 Input Source 分組 (可比較不同 Scoring Model):**
 
-**控制變因說明:**
+| Input Source | 可用 Scoring Models |
+|--------------|---------------------|
+| `o3_summary` | gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5×4, o3×3, o4-mini×3 (共 13 種) |
+| `gpt5_R_high_V_high_summary` | gpt-4.1-mini, gpt-5×4 (R variants), gpt-5-mini, o3 (共 7 種) |
+| `gpt5_summary` | claude-haiku, claude-sonnet, claude-opus (共 3 種) |
 
-| 變因 | 說明 | 本實驗設定 |
-|------|------|-----------|
-| **Input Source** (固定) | 餵給評分模型的摘要來源 | `o3_summary` (所有比較都使用相同 input) |
-| **Scoring Model** (固定) | 執行評分的模型 | O3 或 GPT-5 (同一組比較內模型固定) |
-| **Scoring Reasoning Effort** (變動) | 評分模型的推理強度 | minimal / low / medium / high |
+**按 Scoring Model 分組 (可比較不同 Input):**
+
+| Scoring Model | 可用 Input Sources |
+|---------------|-------------------|
+| `gpt-4.1-mini` | o3_summary, gpt5_R_high_V_high, gpt5_R_minimal_V_high, gpt5_R_medium_V_high, gpt5_R_low_V_high, gpt5_R_high_V_medium (共 6 種) |
+| `gpt-5` | o3_summary (4 reasoning), gpt5_R_high_V_high (4 R variants) |
+| `o3` | o3_summary (3 reasoning), gpt5_R_high_V_high (1) |
+
+---
+
+### 7.1 實驗 A: 固定 Scoring Model，比較不同 Input
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Scoring Model** (固定) | gpt-4.1-mini |
+| **Input Source** (變動) | o3_summary vs 各種 gpt5_summary |
+
+**結果 (from Section 2.6):**
+
+| Input A vs Input B | Exact Match | Correlation |
+|-------------------|-------------|-------------|
+| o3_summary vs gpt5_R_high_V_high | 46.5% | 0.829 |
+| o3_summary vs gpt5_R_minimal_V_high | 47.4% | 0.830 |
+| o3_summary vs gpt5_R_medium_V_high | 46.5% | 0.827 |
+| o3_summary vs gpt5_R_low_V_high | 46.2% | 0.820 |
+| o3_summary vs gpt5_R_high_V_medium | 46.6% | 0.827 |
+
+**結論**: 不同 input source 造成 ~46-47% exact match，correlation ~0.82-0.83
+
+---
+
+### 7.2 實驗 B: 固定 Input，比較不同 Scoring Model
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Input Source** (固定) | o3_summary |
+| **Scoring Model** (變動) | 13 種不同模型 |
+
+**結果 (from Section 3.1, 完整版):**
+
+| Model A vs Model B | Exact Match | Correlation |
+|-------------------|-------------|-------------|
+| gpt-5_low vs o3_high | 54.1% | 0.880 |
+| gpt-4.1 vs gpt-4.1-mini | 50.0% | 0.864 |
+| o4-mini_medium vs o3_high | 47.8% | 0.827 |
+| gpt-4.1 vs gpt-5_low | 47.6% | 0.847 |
+| gpt-4.1 vs o4-mini_medium | 47.5% | 0.840 |
+| gpt-4.1 vs o3_high | 47.1% | 0.847 |
+| gpt-4.1-mini vs o3_high | 42.8% | 0.787 |
+| gpt-4.1-nano vs gpt-5_low | 40.7% | 0.636 |
+| gpt-4.1 vs gpt-4.1-nano | 38.6% | 0.674 |
+
+**結論**: 不同 scoring model 造成 ~38-54% exact match，差異比 input source 更大
+
+---
+
+### 7.3 實驗 C: 固定 Input + 固定 Scoring Model，比較不同 Reasoning Effort
+
+**實驗設計:**
+
+| 變因 | 設定 |
+|------|------|
+| **Input Source** (固定) | o3_summary |
+| **Scoring Model** (固定) | O3 或 GPT-5 |
+| **Scoring Reasoning Effort** (變動) | minimal / low / medium / high |
 
 **注意**: 這裡的 reasoning effort 是指 **評分時** 的參數，不是生成摘要時的參數。
 
@@ -223,12 +291,10 @@
 
 ---
 
-### 7.1 Sentiment Score Consistency by Scoring Model Reasoning Effort
-
-**O3 Scoring Model (3 reasoning levels: low/medium/high):**
+#### 7.3.1 O3 Scoring Model (3 reasoning levels: low/medium/high)
 - Input: `o3_summary` (固定)
 - Scoring Model: O3 (固定)
-- Variable: O3 的 reasoning effort
+- Variable: O3 的 scoring reasoning effort
 
 | Comparison | Exact Match | Within ±1 | Mean A | Mean B |
 |------------|-------------|-----------|--------|--------|
@@ -238,10 +304,10 @@
 
 **O3 平均一致性: 53.7% exact match**
 
-**GPT-5 Scoring Model (4 reasoning levels: minimal/low/medium/high):**
+#### 7.3.2 GPT-5 Scoring Model (4 reasoning levels: minimal/low/medium/high)
 - Input: `o3_summary` (固定)
 - Scoring Model: GPT-5 (固定)
-- Variable: GPT-5 的 reasoning effort
+- Variable: GPT-5 的 scoring reasoning effort
 
 | Comparison | Exact Match | Within ±1 | Mean A | Mean B |
 |------------|-------------|-----------|--------|--------|
@@ -254,16 +320,18 @@
 
 **GPT-5 平均一致性: 50.3% exact match**
 
-### 7.2 Risk Score Consistency by Reasoning Effort
+#### 7.3.3 Risk Score Consistency (同樣實驗設計)
 
-**GPT-5 Risk (minimal vs high):**
-- Exact Match: **79.9%** (significantly higher than sentiment)
-- Records compared: 77,871
+| Model | Comparison | Exact Match | Note |
+|-------|------------|-------------|------|
+| O3 | all levels | 99.3% | 幾乎完全一致 |
+| GPT-5 | minimal vs high | 79.9% | 高度一致 |
 
-**O3 Risk (all levels):**
-- Exact Match: **99.3%** (near-identical across reasoning levels)
+**結論**: Risk 評分比 Sentiment 更穩定，不受 reasoning effort 影響
 
-### 7.3 Score Drift Analysis
+---
+
+### 7.4 Score Drift Analysis
 
 **GPT-5 顯示系統性評分偏移 (Systematic Score Drift):**
 
@@ -282,14 +350,14 @@
 | medium | 3.299 |
 | high | 3.298 |
 
-### 7.4 Adjacent vs Non-Adjacent Comparison
+### 7.5 Adjacent vs Non-Adjacent Comparison
 
 | Category | Average Exact Match | Note |
 |----------|---------------------|------|
 | GPT-5 Adjacent (minimal↔low, low↔medium, medium↔high) | 52.7% | 鄰近層級較一致 |
 | GPT-5 Non-adjacent (minimal↔high, etc.) | 47.9% | 遠離層級差異較大 |
 
-### 7.5 Key Insights
+### 7.6 Key Insights
 
 1. **Risk scoring is more robust**: 79.9%-99.3% consistency vs 44.6%-54.0% for sentiment
 2. **GPT-5 has systematic bias**: Higher reasoning → more conservative (lower) scores
@@ -297,7 +365,7 @@
 4. **Adjacent levels agree more**: Score changes are gradual, not random
 5. **Sentiment is harder to score consistently**: ~50% disagreement rate even with same input
 
-### 7.6 Sample Disagreement Cases (GPT-5 minimal vs high)
+### 7.7 Sample Disagreement Cases (GPT-5 minimal vs high)
 
 | Article Title | Stock | Score (minimal) | Score (high) | Diff |
 |---------------|-------|-----------------|--------------|------|
