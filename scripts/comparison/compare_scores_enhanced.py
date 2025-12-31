@@ -13,6 +13,7 @@ Usage:
     python compare_scores_enhanced.py --root-dir /mnt/md0/finrl --score-type sentiment --output results.csv
     python compare_scores_enhanced.py --root-dir /mnt/md0/finrl --score-type risk --output results.csv
     python compare_scores_enhanced.py --directories /path/to/dir1 /path/to/dir2 --score-type sentiment --output results.csv
+    python compare_scores_enhanced.py --files /path/to/file1.csv /path/to/file2.csv /path/to/file3.csv --score-type sentiment --output results.csv
 """
 
 import argparse
@@ -88,6 +89,34 @@ class ScoreFileScanner:
                             files_info.append(info)
 
         logging.info(f"Found {len(files_info)} {self.score_type} files under {root_dir}")
+        return files_info
+
+    def scan_specific_files(self, file_paths: List[str]) -> List[Dict]:
+        """掃描指定的檔案列表"""
+        files_info = []
+
+        for file_path_str in file_paths:
+            file_path = Path(file_path_str)
+
+            if not file_path.exists():
+                logging.warning(f"File not found: {file_path_str}")
+                continue
+
+            if not file_path.name.endswith('.csv'):
+                logging.warning(f"Skipping non-CSV file: {file_path_str}")
+                continue
+
+            # 檢查檔案是否包含所需的分數類型
+            # 這裡我們可以放寬檢查，因為用戶明確指定了檔案
+            info = self._extract_file_info(file_path)
+            if info:
+                # 手動設置分數欄位（如果檔案不符合命名規範）
+                if self.score_column not in info:
+                    info['score_column'] = self.score_column
+                files_info.append(info)
+                logging.info(f"Added specific file: {file_path_str}")
+
+        logging.info(f"Found {len(files_info)} specified files")
         return files_info
 
     def _extract_file_info(self, file_path: Path, model_name: str = None) -> Optional[Dict]:
@@ -324,6 +353,11 @@ class EnhancedScoreComparator:
     def compare_from_root(self, root_dir: str, **kwargs) -> Dict:
         """從根目錄自動發現並比較分數"""
         files_info = self.scanner.scan_root_directory(root_dir)
+        return self._perform_comparison(files_info, **kwargs)
+
+    def compare_from_files(self, file_paths: List[str], **kwargs) -> Dict:
+        """從指定的檔案列表比較分數"""
+        files_info = self.scanner.scan_specific_files(file_paths)
         return self._perform_comparison(files_info, **kwargs)
 
     def _perform_comparison(self, files_info: List[Dict],
@@ -662,6 +696,8 @@ def main():
                            help='Root directory to scan (e.g., /mnt/md0/finrl)')
     input_group.add_argument('--directories', nargs='+',
                            help='Specific directories to scan')
+    input_group.add_argument('--files', nargs='+',
+                           help='Specific CSV files to compare (can be in different directories)')
 
     parser.add_argument('--score-type', required=True,
                        choices=['sentiment', 'risk'],
@@ -694,9 +730,15 @@ def main():
                 force_reload=args.force_reload,
                 max_files=args.max_files
             )
-        else:
+        elif args.directories:
             analysis = comparator.compare_from_directories(
                 args.directories,
+                force_reload=args.force_reload,
+                max_files=args.max_files
+            )
+        else:  # args.files
+            analysis = comparator.compare_from_files(
+                args.files,
                 force_reload=args.force_reload,
                 max_files=args.max_files
             )
