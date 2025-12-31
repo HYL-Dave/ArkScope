@@ -275,16 +275,22 @@ class ABScoreComparator:
         model_data = {}
 
         for model, files in self.files_by_model.items():
-            # Find files with matching input source
+            # Find ALL files with matching input source (not just the first one!)
             matching = [f for f in files if input_source in f['info']['input_source']]
-            if matching:
-                df = self.loader.load_score_file(matching[0]['path'], sample_size)
+
+            # Load EACH matching file as a separate scoring model configuration
+            for file_info in matching:
+                df = self.loader.load_score_file(file_info['path'], sample_size)
                 if not df.empty:
+                    # Build unique key: model + reasoning effort (if present)
                     model_key = f"{model}"
-                    if matching[0]['info']['reasoning']:
-                        model_key += f"_{matching[0]['info']['reasoning']}"
-                    model_data[model_key] = df
-                    results['models_compared'].append(model_key)
+                    if file_info['info']['reasoning']:
+                        model_key += f"_{file_info['info']['reasoning']}"
+
+                    # Avoid duplicates (same model_key from different files)
+                    if model_key not in model_data:
+                        model_data[model_key] = df
+                        results['models_compared'].append(model_key)
 
         # Pairwise agreement
         models = list(model_data.keys())
