@@ -13,13 +13,13 @@
 
 | Model | Files | Input Sources |
 |-------|-------|---------------|
-| claude | 3 | unknown |
+| claude | 3 | gpt_5_summary |
 | gpt-4.1 | 1 | o3_summary |
-| gpt-4.1-mini | 6 | o3_summary, gpt_5_summary |
+| gpt-4.1-mini | 6 | gpt_5_summary, o3_summary |
 | gpt-4.1-nano | 1 | o3_summary |
-| gpt-5 | 8 | o3_summary, gpt_5_summary |
+| gpt-5 | 8 | gpt_5_summary, o3_summary |
 | gpt-5-mini | 1 | gpt_5_summary |
-| o3 | 5 | o3_summary, gpt_5_summary, unknown |
+| o3 | 5 | unknown, gpt_5_summary, o3_summary |
 | o4-mini | 4 | o3_summary, unknown |
 
 
@@ -104,33 +104,107 @@
 
 ### 3.1 Pairwise Agreement (o3_summary input)
 
+**完整 78 對比較 (13 種模型配置):**
+
 | Model A vs Model B | Exact Match | Within ±1 | Correlation |
 |-------------------|-------------|-----------|-------------|
+| gpt-5_low vs gpt-5_medium | 56.3% | 63.0% | 0.905 |
+| gpt-5_high vs gpt-5_medium | 55.6% | 63.0% | 0.884 |
+| o3_high vs o3_medium | 55.6% | 63.0% | 0.910 |
+| o3_medium vs o3_low | 55.5% | 63.0% | 0.906 |
+| o3_high vs o3_low | 55.2% | 63.0% | 0.901 |
+| gpt-5_low vs o3_low | 55.0% | 62.9% | 0.888 |
+| gpt-5_low vs o3_medium | 54.1% | 63.0% | 0.887 |
 | gpt-5_low vs o3_high | 54.1% | 62.9% | 0.880 |
+| gpt-5_low vs gpt-5_high | 53.4% | 63.0% | 0.863 |
+| gpt-5_medium vs o3_low | 52.5% | 62.9% | 0.853 |
+| gpt-5_medium vs o3_high | 52.4% | 62.9% | 0.857 |
+| o4-mini_high vs o4-mini_low | 52.4% | 62.3% | 0.885 |
+| o4-mini_medium vs o4-mini_low | 52.3% | 62.4% | 0.882 |
+| gpt-5_low vs gpt-5_minimal | 52.2% | 63.0% | 0.875 |
+| o4-mini_medium vs o4-mini_high | 52.1% | 62.3% | 0.879 |
+| gpt-5_medium vs o3_medium | 51.8% | 62.9% | 0.853 |
+| gpt-4.1 vs gpt-5_minimal | 51.7% | 62.8% | 0.882 |
+| gpt-5_minimal vs o3_medium | 51.7% | 63.0% | 0.870 |
+| gpt-5_minimal vs o3_low | 51.6% | 62.9% | 0.865 |
 | gpt-4.1 vs gpt-4.1-mini | 50.0% | 62.4% | 0.864 |
+| gpt-5_minimal vs o3_high | 49.9% | 62.9% | 0.849 |
+| gpt-5_high vs o3_high | 49.7% | 62.7% | 0.813 |
+| gpt-5_high vs o3_low | 49.2% | 62.9% | 0.804 |
+| gpt-5_minimal vs gpt-5_medium | 48.9% | 63.0% | 0.839 |
+| gpt-4.1 vs o3_medium | 48.8% | 62.8% | 0.861 |
+| o4-mini_low vs o3_medium | 48.7% | 62.5% | 0.844 |
+| gpt-5_high vs o3_medium | 48.7% | 62.7% | 0.807 |
+| o4-mini_high vs o3_medium | 48.4% | 62.5% | 0.852 |
+| gpt-4.1 vs o3_low | 48.3% | 62.8% | 0.858 |
+| o4-mini_low vs gpt-4.1-mini | 48.3% | 62.4% | 0.852 |
+| gpt-4.1 vs o4-mini_high | 48.2% | 62.4% | 0.851 |
+| o4-mini_medium vs o3_medium | 48.1% | 62.3% | 0.831 |
+| o4-mini_high vs o3_high | 48.0% | 62.3% | 0.845 |
 | o4-mini_medium vs o3_high | 47.8% | 62.1% | 0.827 |
+| gpt-4.1 vs o4-mini_low | 47.7% | 62.6% | 0.846 |
 | gpt-4.1 vs gpt-5_low | 47.6% | 62.7% | 0.847 |
+| o4-mini_high vs gpt-4.1-mini | 47.5% | 62.2% | 0.842 |
 | gpt-4.1 vs o4-mini_medium | 47.5% | 62.4% | 0.840 |
+| o4-mini_low vs gpt-5_low | 47.5% | 62.4% | 0.830 |
+| o4-mini_low vs o3_high | 47.5% | 62.4% | 0.830 |
+| o4-mini_high vs o3_low | 47.3% | 62.3% | 0.835 |
+| o4-mini_low vs o3_low | 47.3% | 62.4% | 0.825 |
+| o4-mini_medium vs o3_low | 47.2% | 62.4% | 0.829 |
 | gpt-4.1 vs o3_high | 47.1% | 62.8% | 0.847 |
 | o4-mini_medium vs gpt-5_low | 46.9% | 62.2% | 0.816 |
+| o4-mini_low vs gpt-5_minimal | 46.9% | 62.4% | 0.820 |
 | o4-mini_medium vs gpt-4.1-mini | 46.9% | 62.0% | 0.831 |
+| o4-mini_high vs gpt-5_low | 46.8% | 62.3% | 0.833 |
+| o4-mini_high vs gpt-5_minimal | 46.7% | 62.4% | 0.827 |
+| gpt-5_minimal vs gpt-4.1-mini | 46.1% | 62.2% | 0.813 |
+| o4-mini_low vs gpt-5_medium | 46.1% | 62.1% | 0.808 |
+| gpt-5_minimal vs gpt-5_high | 45.9% | 62.8% | 0.799 |
+| o4-mini_medium vs gpt-5_minimal | 45.8% | 62.2% | 0.806 |
+| gpt-4.1 vs gpt-5_medium | 45.0% | 62.6% | 0.825 |
+| o4-mini_high vs gpt-5_medium | 44.7% | 62.0% | 0.806 |
+| o4-mini_medium vs gpt-5_medium | 44.6% | 61.9% | 0.789 |
+| gpt-4.1-mini vs o3_medium | 44.4% | 62.3% | 0.804 |
+| gpt-4.1-mini vs o3_low | 44.1% | 62.2% | 0.802 |
 | gpt-5_low vs gpt-4.1-mini | 43.9% | 62.2% | 0.799 |
+| o4-mini_low vs gpt-5_high | 43.6% | 61.4% | 0.764 |
 | gpt-4.1-mini vs o3_high | 42.8% | 62.1% | 0.787 |
+| o4-mini_medium vs gpt-5_high | 42.4% | 61.4% | 0.753 |
+| gpt-4.1 vs gpt-5_high | 42.2% | 62.2% | 0.785 |
+| gpt-5_medium vs gpt-4.1-mini | 42.2% | 61.9% | 0.778 |
+| o4-mini_high vs gpt-5_high | 41.8% | 61.4% | 0.762 |
 | gpt-4.1-nano vs gpt-5_low | 40.7% | 60.5% | 0.636 |
+| gpt-5_high vs gpt-4.1-mini | 40.3% | 61.4% | 0.749 |
+| gpt-4.1-nano vs o3_low | 40.3% | 60.5% | 0.643 |
+| gpt-4.1-nano vs o4-mini_low | 39.5% | 60.1% | 0.675 |
+| gpt-4.1-nano vs o3_medium | 39.5% | 60.2% | 0.627 |
+| gpt-4.1-nano vs gpt-5_minimal | 39.4% | 60.1% | 0.628 |
 | gpt-4.1-nano vs gpt-4.1-mini | 39.4% | 61.4% | 0.726 |
 | gpt-4.1-nano vs o4-mini_medium | 39.2% | 60.1% | 0.673 |
 | gpt-4.1-nano vs o3_high | 39.1% | 60.1% | 0.618 |
+| gpt-4.1-nano vs gpt-5_medium | 39.1% | 60.7% | 0.617 |
+| gpt-4.1-nano vs o4-mini_high | 38.7% | 60.0% | 0.673 |
 | gpt-4.1 vs gpt-4.1-nano | 38.6% | 60.3% | 0.674 |
+| gpt-4.1-nano vs gpt-5_high | 37.9% | 60.8% | 0.603 |
 
 ### 3.2 Score Distribution by Model
+
+**完整 13 種模型配置:**
 
 | Model | Mean | Std | Median |
 |-------|------|-----|--------|
 | gpt-4.1 | 3.46 | 0.92 | 4.0 |
 | gpt-4.1-mini | 3.44 | 0.95 | 3.0 |
 | gpt-4.1-nano | 3.33 | 0.87 | 3.0 |
+| gpt-5_high | 3.24 | 0.70 | 3.0 |
 | gpt-5_low | 3.31 | 0.76 | 3.0 |
+| gpt-5_medium | 3.27 | 0.73 | 3.0 |
+| gpt-5_minimal | 3.40 | 0.84 | 3.0 |
 | o3_high | 3.30 | 0.81 | 3.0 |
+| o3_low | 3.31 | 0.79 | 3.0 |
+| o3_medium | 3.33 | 0.82 | 3.0 |
+| o4-mini_high | 3.41 | 0.96 | 3.0 |
+| o4-mini_low | 3.40 | 0.93 | 3.0 |
 | o4-mini_medium | 3.40 | 0.94 | 3.0 |
 
 
@@ -257,21 +331,44 @@
 | **Input Source** (固定) | o3_summary |
 | **Scoring Model** (變動) | 13 種不同模型 |
 
-**結果 (from Section 3.1, 完整版):**
+**摘要 - 模型評分傾向排序 (依 prompt 定義: 1=very bearish, 5=very bullish，高分=樂觀):**
 
-| Model A vs Model B | Exact Match | Correlation |
-|-------------------|-------------|-------------|
-| gpt-5_low vs o3_high | 54.1% | 0.880 |
-| gpt-4.1 vs gpt-4.1-mini | 50.0% | 0.864 |
-| o4-mini_medium vs o3_high | 47.8% | 0.827 |
-| gpt-4.1 vs gpt-5_low | 47.6% | 0.847 |
-| gpt-4.1 vs o4-mini_medium | 47.5% | 0.840 |
-| gpt-4.1 vs o3_high | 47.1% | 0.847 |
-| gpt-4.1-mini vs o3_high | 42.8% | 0.787 |
-| gpt-4.1-nano vs gpt-5_low | 40.7% | 0.636 |
-| gpt-4.1 vs gpt-4.1-nano | 38.6% | 0.674 |
+| Rank | Model | Mean Sentiment | Std | 傾向 |
+|------|-------|----------------|-----|------|
+| 1 | gpt-4.1 | 3.46 | 0.92 | 最樂觀 |
+| 2 | gpt-4.1-mini | 3.44 | 0.95 | |
+| 3 | o4-mini_high | 3.41 | 0.96 | |
+| 4 | gpt-5_minimal | 3.40 | 0.84 | |
+| 5 | o4-mini_low | 3.40 | 0.93 | |
+| 6 | o4-mini_medium | 3.40 | 0.94 | |
+| 7 | gpt-4.1-nano | 3.33 | 0.87 | |
+| 8 | o3_medium | 3.33 | 0.82 | |
+| 9 | gpt-5_low | 3.31 | 0.76 | |
+| 10 | o3_low | 3.31 | 0.79 | |
+| 11 | o3_high | 3.30 | 0.81 | |
+| 12 | gpt-5_medium | 3.27 | 0.73 | |
+| 13 | gpt-5_high | 3.24 | 0.70 | 最保守 |
 
-**結論**: 不同 scoring model 造成 ~38-54% exact match，差異比 input source 更大
+**關鍵發現:**
+- **gpt-4.1 系列**: 評分最樂觀 (Mean 3.44-3.46)，標準差較大 (0.87-0.95)
+- **gpt-5 系列**: 隨 reasoning effort 增加，評分趨於保守 (3.40→3.24)
+- **o3 系列**: 評分穩定，不受 reasoning effort 影響 (Mean ~3.30-3.33)
+- **o4-mini 系列**: 評分較高且一致 (Mean ~3.40)
+
+**結果 (完整 78 對比較 見 Section 3.1):**
+
+| Model A vs Model B | Exact Match | Correlation | 說明 |
+|-------------------|-------------|-------------|------|
+| gpt-5_low vs gpt-5_medium | 56.3% | 0.905 | 同系列高一致性 |
+| o3_high vs o3_medium | 55.6% | 0.910 | 同系列高一致性 |
+| gpt-4.1 vs gpt-4.1-mini | 50.0% | 0.864 | 同系列中等一致性 |
+| gpt-4.1 vs gpt-5_high | 42.2% | 0.785 | 跨系列差異較大 |
+| gpt-4.1-nano vs gpt-5_high | 37.9% | 0.603 | 最低一致性 |
+
+**結論**:
+- 同系列模型 (gpt-5 內部、o3 內部): 54-56% exact match
+- 跨系列模型 (gpt-4.1 vs gpt-5/o3): 42-50% exact match
+- gpt-4.1-nano 與其他模型一致性最低: 37-40% exact match
 
 ---
 
@@ -357,15 +454,44 @@
 | GPT-5 Adjacent (minimal↔low, low↔medium, medium↔high) | 52.7% | 鄰近層級較一致 |
 | GPT-5 Non-adjacent (minimal↔high, etc.) | 47.9% | 遠離層級差異較大 |
 
-### 7.6 Key Insights
+### 7.6 Sentiment Score Distribution
+
+| Score | Interpretation (依 prompt 定義) | Typical % |
+|-------|--------------------------------|-----------|
+| 1 | Very Bearish (>5% drop) | ~2% |
+| 2 | Bearish (2-5% drop) | ~12% |
+| 3 | Neutral | ~45% |
+| 4 | Bullish (2-5% rise) | ~35% |
+| 5 | Very Bullish (>5% rise) | ~6% |
+
+多數文章被評為中性至看漲 (scores 3-4, 共 ~80%)，極端評分 (1 或 5) 較少 (~8%)。
+
+### 7.7 Cross-Report: Risk vs Sentiment 模型行為一致性
+
+**同一模型在 Risk 和 Sentiment 評分上表現一致嗎？**
+
+| Model Family | Risk Behavior | Sentiment Behavior | 結論 |
+|--------------|---------------|-------------------|------|
+| **gpt-5** (high reasoning) | 給高分 (2.58-2.63) = 判斷風險較高 = 保守 | 給低分 (3.24-3.31) = 較不樂觀 = 保守 | ✓ 一致保守 |
+| **gpt-4.1** | 給低分 (2.22-2.30) = 判斷風險較低 = 樂觀 | 給高分 (3.44-3.46) = 較樂觀 = 樂觀 | ✓ 一致樂觀 |
+| **o3** | 中等 (2.49-2.52) | 中等 (3.30-3.33) | ✓ 中性穩定 |
+| **o4-mini** | 偏低 (2.26-2.28) = 樂觀 | 偏高 (3.40-3.41) = 樂觀 | ✓ 一致樂觀 |
+
+**結論**: 模型的評分傾向在 risk 和 sentiment 上是一致的:
+- **gpt-5** 在兩種評分上都偏保守謹慎
+- **gpt-4.1** 在兩種評分上都偏樂觀激進
+- 這表明模型的「個性」(personality bias) 是跨任務穩定的
+
+### 7.8 Key Insights
 
 1. **Risk scoring is more robust**: 79.9%-99.3% consistency vs 44.6%-54.0% for sentiment
 2. **GPT-5 has systematic bias**: Higher reasoning → more conservative (lower) scores
 3. **O3 is more stable**: No significant score drift across reasoning levels
 4. **Adjacent levels agree more**: Score changes are gradual, not random
 5. **Sentiment is harder to score consistently**: ~50% disagreement rate even with same input
+6. **Model personality is consistent across tasks**: gpt-5 保守, gpt-4.1 樂觀
 
-### 7.7 Sample Disagreement Cases (GPT-5 minimal vs high)
+### 7.9 Sample Disagreement Cases (GPT-5 minimal vs high)
 
 | Article Title | Stock | Score (minimal) | Score (high) | Diff |
 |---------------|-------|-----------------|--------------|------|
