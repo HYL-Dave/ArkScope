@@ -285,6 +285,8 @@
 | `gpt5_R_high_V_high_summary` | gpt-4.1-mini, gpt-5×4 (R variants), gpt-5-mini, o3 (共 7 種) |
 | `gpt5_summary` | claude-haiku, claude-sonnet, claude-opus (共 3 種) |
 
+**注意**: gpt-5-mini 只有 `gpt5_R_high_V_high_summary` 輸入，無 `o3_summary` 輸入，因此不在 Section 7.2 的 13 模型比較中。詳見 Section 7.2b。
+
 **按 Scoring Model 分組 (可比較不同 Input):**
 
 | Scoring Model | 可用 Input Sources |
@@ -352,6 +354,32 @@
 - **gpt-4.1 系列** 傾向給出較低分數 (2.22-2.30)，認為風險較低 = 更樂觀/激進
 - 同系列內部差異小 (~0.05)，跨系列差異大 (~0.41)
 - **一致性模式**: 同系列模型間 Exact Match 最高 (50-54%)，跨系列最低 (30-37%)
+
+---
+
+### 7.2b 補充: gpt-5-mini 模型分析 (gpt5_summary 輸入)
+
+**為何 gpt-5-mini 不在 Section 7.2?**
+gpt-5-mini 只有 `gpt5_R_high_V_high_summary` 輸入，無 `o3_summary` 輸入，無法與 Section 7.2 的 13 個模型公平比較。
+
+**gpt-5-mini 統計數據:**
+
+| Model | Input Source | Mean | Std | Median | Records |
+|-------|--------------|------|-----|--------|---------|
+| gpt-5-mini | gpt5_R_high_V_high_summary | 2.433 | 0.720 | 2.0 | 127,176 |
+
+**與同輸入源模型比較 (gpt5_R_high_V_high_summary):**
+
+| Model | Mean Risk | Std | 傾向 |
+|-------|-----------|-----|------|
+| gpt-5 (R variants) | 2.58-2.63 | 0.62-0.63 | 最保守 |
+| **gpt-5-mini** | **2.433** | **0.720** | 中等 |
+| gpt-4.1-mini | 2.29 | 0.89 | 較樂觀 |
+
+**結論**:
+- gpt-5-mini (Mean 2.43) 介於 gpt-5_high (2.58) 和 gpt-4.1-mini (2.29) 之間
+- 標準差 (0.72) 介於 gpt-5 系列 (0.62-0.63) 和 gpt-4.1-mini (0.89) 之間
+- gpt-5-mini 風險評分較 gpt-5 樂觀，但仍比 gpt-4.1-mini 保守
 
 ---
 
