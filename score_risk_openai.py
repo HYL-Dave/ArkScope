@@ -83,10 +83,14 @@ functions = [{
     }
 }]
 
-def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str = "high", verbosity: str = "low", retry: int = 3, pause: float = 0.5) -> Optional[int]:
+def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str = "high", verbosity: str = "low", retry: int = 3, pause: float = 0.5, max_completion_tokens_override: Optional[int] = None) -> Optional[int]:
     """
     Call OpenAI ChatCompletion to score one headline for risk.
     Returns integer risk or None on failure.
+
+    Args:
+        max_completion_tokens_override: If provided, overrides the default max_completion_tokens
+                                        (useful for models that generate very long responses)
     """
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -97,11 +101,13 @@ def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str
     for attempt in range(1, max_attempts + 1):
         try:
             if model.startswith("o"):
+                # Default 800 for o-series, but allow override for models that need more tokens
+                max_tokens = max_completion_tokens_override if max_completion_tokens_override else 800
                 params = {
                     "model": model,
                     "reasoning_effort": reasoning_effort,
                     "messages": messages,
-                    "max_completion_tokens": 800,
+                    "max_completion_tokens": max_tokens,
                     "functions": functions,
                     "function_call": {"name": "record_score"},
                 }
