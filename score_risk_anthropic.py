@@ -619,6 +619,161 @@ def process_file_batch(
     logger.info(f"Estimated cost (batch pricing): ${token_usage.estimated_cost(model, is_batch=True):.4f}")
 
 
+def process_file_incremental(
+    input_path: str,
+    output_path: str,
+    client: anthropic.Anthropic,
+    model: str = "sonnet",
+    symbol_col: str = "Stock_symbol",
+    text_col: str = "Article_title",
+    merge_key: Optional[str] = None,
+    chunk_size: int = 1000,
+    retry: int = 3,
+    retry_missing: int = 3,
+    pause: float = 0.1,
+    max_runtime: Optional[float] = None,
+    use_batch: bool = False,
+    batch_size: int = 10000,
+    poll_interval: float = 60.0,
+) -> None:
+    """
+    Process file in incremental mode: merge with existing output and only score new/NULL rows.
+
+    This is the recommended mode for daily updates when new data is added to the input file.
+    """
+    input_format = get_file_format(input_path)
+    out_col = "risk_claude"
+
+    # Determine merge key
+    if merge_key is None:
+        merge_key = "article_id" if input_format == "parquet" else "dedup_hash"
+
+    # Load input data
+    logger.info(f"Loading input file: {input_path}")
+    if input_format == 'parquet':
+        df_input = pd.read_parquet(input_path)
+    else:
+        df_input = pd.read_csv(input_path, on_bad_lines='warn', engine='c', low_memory=False)
+    logger.info(f"Input rows: {len(df_input):,}")
+
+    # Validate merge key exists
+    if merge_key not in df_input.columns:
+        logger.error(f"Merge key '{merge_key}' not found in input. Available: {list(df_input.columns)[:10]}...")
+        raise ValueError(f"Merge key '{merge_key}' not found in input file")
+
+    # Load existing output if exists
+    if os.path.exists(output_path):
+        logger.info(f"Loading existing output: {output_path}")
+        df_existing = read_dataframe(output_path, on_bad_lines='warn', engine='c')
+        logger.info(f"Existing rows: {len(df_existing):,}")
+
+        if merge_key not in df_existing.columns:
+            logger.warning(f"Merge key '{merge_key}' not in existing output, will re-score all")
+            df_merged = df_input.copy()
+            df_merged[out_col] = None
+        else:
+            # Merge: keep all input rows, join existing scores
+            existing_scores = df_existing[[merge_key, out_col]].drop_duplicates(subset=[merge_key])
+            df_merged = df_input.merge(
+                existing_scores,
+                on=merge_key,
+                how='left',
+                suffixes=('', '_existing')
+            )
+            if out_col + '_existing' in df_merged.columns:
+                df_merged[out_col] = df_merged[out_col + '_existing']
+                df_merged.drop(columns=[out_col + '_existing'], inplace=True)
+            elif out_col not in df_merged.columns:
+                df_merged[out_col] = None
+
+            logger.info(f"Merged rows: {len(df_merged):,}")
+    else:
+        logger.info("No existing output file, will score all rows")
+        df_merged = df_input.copy()
+        df_merged[out_col] = None
+
+    # Find rows that need scoring
+    needs_scoring = df_merged[out_col].isna()
+    has_text = df_merged[text_col].notna() & (df_merged[text_col].astype(str).str.strip() != '')
+    to_score_mask = needs_scoring & has_text
+
+    to_score_count = to_score_mask.sum()
+    already_scored = (~needs_scoring).sum()
+
+    logger.info(f"Already scored: {already_scored:,}")
+    logger.info(f"Needs scoring: {to_score_count:,}")
+    logger.info(f"Empty text (skipped): {(needs_scoring & ~has_text).sum():,}")
+
+    if to_score_count == 0:
+        logger.info("All rows already scored, nothing to do")
+        out_dir = os.path.dirname(output_path)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+        write_dataframe(df_merged, output_path)
+        return
+
+    to_score_indices = df_merged[to_score_mask].index.tolist()
+    logger.info(f"Scoring {len(to_score_indices):,} rows...")
+
+    start_time = time.time()
+
+    if use_batch:
+        df_to_score = df_merged.loc[to_score_indices]
+        requests = prepare_batch_requests(df_to_score, symbol_col, text_col, model)
+
+        if requests:
+            for batch_start in range(0, len(requests), batch_size):
+                batch_end = min(batch_start + batch_size, len(requests))
+                batch_requests = requests[batch_start:batch_end]
+
+                logger.info(f"Submitting batch: {batch_start}-{batch_end} of {len(requests)}")
+                batch_id = submit_batch(client, batch_requests)
+                results = poll_batch_results(client, batch_id, poll_interval)
+
+                for idx_str, score in results.items():
+                    df_merged.at[int(idx_str), out_col] = score
+
+                write_dataframe(df_merged, output_path)
+                logger.info(f"Checkpoint saved after batch")
+    else:
+        scored_count = 0
+        for i, idx in enumerate(to_score_indices):
+            row = df_merged.loc[idx]
+            text = row[text_col]
+            symbol = row[symbol_col]
+
+            score = score_headline(client, str(text)[:500], symbol, model, retry)
+
+            for _ in range(retry_missing):
+                if score is not None:
+                    break
+                score = score_headline(client, str(text)[:500], symbol, model, retry)
+
+            df_merged.at[idx, out_col] = score
+            scored_count += 1
+            time.sleep(pause)
+
+            if scored_count % chunk_size == 0:
+                write_dataframe(df_merged, output_path)
+                logger.info(f"Checkpoint: {scored_count}/{to_score_count} scored, {token_usage.n_calls} API calls")
+
+            if max_runtime and (time.time() - start_time) >= max_runtime:
+                logger.info(f"Max runtime reached after {scored_count} rows")
+                break
+
+    # Final save
+    out_dir = os.path.dirname(output_path)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    write_dataframe(df_merged, output_path)
+
+    final_scored = df_merged[out_col].notna().sum()
+    logger.info(f"Incremental processing complete.")
+    logger.info(f"Total rows: {len(df_merged):,}, Scored: {final_scored:,}")
+    logger.info(f"Token usage: {token_usage.summary()}")
+    logger.info(f"Estimated cost: ${token_usage.estimated_cost(model, is_batch=use_batch):.4f}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Score downside risk for financial news using Anthropic Claude"
@@ -684,6 +839,14 @@ def main():
         "--dry-run", action="store_true",
         help="Validate setup without making API calls"
     )
+    parser.add_argument(
+        "--incremental", action="store_true",
+        help="Incremental mode: merge with existing output, only score rows with NULL scores"
+    )
+    parser.add_argument(
+        "--merge-key", default=None,
+        help="Column to use for merging in incremental mode (default: article_id for parquet, dedup_hash for csv)"
+    )
 
     args = parser.parse_args()
 
@@ -718,7 +881,26 @@ def main():
         return
 
     # Process based on mode
-    if args.batch:
+    if args.incremental:
+        # Incremental mode: merge with existing output, only score NULL rows
+        logger.info("Using INCREMENTAL mode (recommended for daily updates)")
+        process_file_incremental(
+            input_path=args.input,
+            output_path=args.output,
+            client=client,
+            model=args.model,
+            symbol_col=args.symbol_column,
+            text_col=args.text_column,
+            merge_key=args.merge_key,
+            chunk_size=args.chunk_size,
+            retry=args.retry,
+            retry_missing=args.retry_missing,
+            max_runtime=args.max_runtime,
+            use_batch=args.batch,
+            batch_size=args.batch_size,
+            poll_interval=args.poll_interval,
+        )
+    elif args.batch:
         process_file_batch(
             input_path=args.input,
             output_path=args.output,
