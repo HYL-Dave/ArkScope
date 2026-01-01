@@ -289,6 +289,8 @@
 | `gpt5_R_high_V_high_summary` | gpt-4.1-mini, gpt-5×4 (R variants), gpt-5-mini, o3 (共 7 種) |
 | `gpt5_summary` | claude-haiku, claude-sonnet, claude-opus (共 3 種) |
 
+**注意**: gpt-5-mini 只有 `gpt5_R_high_V_high_summary` 輸入，無 `o3_summary` 輸入，因此不在 Section 7.2 的 13 模型比較中。詳見 Section 7.2b。
+
 **按 Scoring Model 分組 (可比較不同 Input):**
 
 | Scoring Model | 可用 Input Sources |
@@ -369,6 +371,32 @@
 - 同系列模型 (gpt-5 內部、o3 內部): 54-56% exact match
 - 跨系列模型 (gpt-4.1 vs gpt-5/o3): 42-50% exact match
 - gpt-4.1-nano 與其他模型一致性最低: 37-40% exact match
+
+---
+
+### 7.2b 補充: gpt-5-mini 模型分析 (gpt5_summary 輸入)
+
+**為何 gpt-5-mini 不在 Section 7.2?**
+gpt-5-mini 只有 `gpt5_R_high_V_high_summary` 輸入，無 `o3_summary` 輸入，無法與 Section 7.2 的 13 個模型公平比較。
+
+**gpt-5-mini 統計數據:**
+
+| Model | Input Source | Mean | Std | Median | Records |
+|-------|--------------|------|-----|--------|---------|
+| gpt-5-mini | gpt5_R_high_V_high_summary | 3.408 | 0.943 | 4.0 | 127,176 |
+
+**與同輸入源模型比較 (gpt5_R_high_V_high_summary):**
+
+| Model | Mean Sentiment | Std | 傾向 |
+|-------|----------------|-----|------|
+| gpt-4.1-mini | 3.45 | 0.95 | 最樂觀 |
+| **gpt-5-mini** | **3.408** | **0.943** | 中等偏樂觀 |
+| gpt-5 (R variants) | 3.24-3.41 | 0.70-0.82 | 中等至保守 |
+
+**結論**:
+- gpt-5-mini (Mean 3.41) 評分介於 gpt-4.1-mini (3.45) 和 gpt-5_high (3.24) 之間
+- 標準差 (0.94) 接近 gpt-4.1-mini，高於 gpt-5 系列 (0.70-0.82)
+- gpt-5-mini 行為更接近 gpt-4.1-mini (樂觀傾向)，而非 gpt-5 (保守傾向)
 
 ---
 
@@ -473,12 +501,15 @@
 | Model Family | Risk Behavior | Sentiment Behavior | 結論 |
 |--------------|---------------|-------------------|------|
 | **gpt-5** (high reasoning) | 給高分 (2.58-2.63) = 判斷風險較高 = 保守 | 給低分 (3.24-3.31) = 較不樂觀 = 保守 | ✓ 一致保守 |
+| **gpt-5-mini** | 中等 (2.43) = 中間立場 | 中等偏高 (3.41) = 中間偏樂觀 | ✓ 中間立場 |
 | **gpt-4.1** | 給低分 (2.22-2.30) = 判斷風險較低 = 樂觀 | 給高分 (3.44-3.46) = 較樂觀 = 樂觀 | ✓ 一致樂觀 |
+| **gpt-4.1-mini** | 中等偏低 (2.30) = 偏樂觀 | 中等偏高 (3.44) = 偏樂觀 | ✓ 偏樂觀 |
 | **o3** | 中等 (2.49-2.52) | 中等 (3.30-3.33) | ✓ 中性穩定 |
 | **o4-mini** | 偏低 (2.26-2.28) = 樂觀 | 偏高 (3.40-3.41) = 樂觀 | ✓ 一致樂觀 |
 
 **結論**: 模型的評分傾向在 risk 和 sentiment 上是一致的:
 - **gpt-5** 在兩種評分上都偏保守謹慎
+- **gpt-5-mini** 介於 gpt-5 和 gpt-4.1 之間，行為偏向 gpt-4.1-mini
 - **gpt-4.1** 在兩種評分上都偏樂觀激進
 - 這表明模型的「個性」(personality bias) 是跨任務穩定的
 
