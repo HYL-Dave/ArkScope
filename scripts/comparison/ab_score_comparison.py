@@ -94,7 +94,7 @@ class ScoreDataLoader:
         # Detect input source from filename
         if 'by_o3_summary' in filename:
             info['input_source'] = 'o3_summary'
-        elif 'by_gpt-5_reason' in filename or 'by_gpt_5_summary' in filename:
+        elif 'by_gpt-5_reason' in filename or 'by_gpt_5_summary' in filename or 'by_gpt5_summary' in filename:
             info['input_source'] = 'gpt_5_summary'
             # Extract R/V config
             r_match = re.search(r'reason_(\w+)', filename)
