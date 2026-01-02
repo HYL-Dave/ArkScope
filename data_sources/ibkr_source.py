@@ -356,97 +356,6 @@ class IBKRDataSource(BaseDataSource):
 
         return articles
 
-    def _fetch_news_for_ticker_with_split(
-        self,
-        con_id: int,
-        providers: str,
-        start_dt: datetime,
-        end_dt: datetime,
-        ticker: str,
-        depth: int = 0,
-        max_depth: int = 8,  # Increased for time-based splits (max 256 segments)
-    ) -> List[NewsArticle]:
-        """
-        Fetch news for a single ticker with automatic date/time range splitting.
-
-        If a query returns exactly 300 articles (API limit), automatically
-        splits the date/time range in half and queries each half recursively.
-
-        Now supports time-based splitting for single-day queries.
-
-        Args:
-            con_id: IBKR contract ID
-            providers: Provider codes string
-            start_dt: Start datetime (with time precision)
-            end_dt: End datetime (with time precision)
-            ticker: Stock symbol (for logging)
-            depth: Current recursion depth
-            max_depth: Maximum recursion depth (prevents infinite loops)
-
-        Returns:
-            List of all NewsArticle objects found
-        """
-        # Base case: invalid datetime range
-        if start_dt >= end_dt:
-            return []
-
-        articles = self._fetch_news_single_query(con_id, providers, start_dt, end_dt, ticker)
-
-        # If we hit the 300 limit and haven't reached max depth, split the range
-        if len(articles) >= 300 and depth < max_depth:
-            # Calculate time difference
-            time_diff = end_dt - start_dt
-            total_seconds = time_diff.total_seconds()
-
-            # Minimum split: 30 minutes (1800 seconds)
-            if total_seconds < 1800:  # Less than 30 min - cannot split meaningfully
-                logger.warning(f"    [{ticker}] Time range {start_dt} ~ {end_dt} has 300+ articles, cannot split further")
-                return articles
-
-            # Calculate midpoint datetime
-            mid_dt = start_dt + timedelta(seconds=total_seconds / 2)
-
-            # Format for logging
-            if start_dt.date() == end_dt.date():
-                # Same day - show time
-                logger.info(f"    [{ticker}] Hit 300 limit on {start_dt.date()}, splitting by time: "
-                           f"{start_dt.strftime('%H:%M')}~{mid_dt.strftime('%H:%M')} + "
-                           f"{mid_dt.strftime('%H:%M')}~{end_dt.strftime('%H:%M')}")
-            else:
-                # Different days - show date and time
-                logger.info(f"    [{ticker}] Hit 300 limit, splitting: "
-                           f"{start_dt.strftime('%Y-%m-%d %H:%M')}~{mid_dt.strftime('%Y-%m-%d %H:%M')} + "
-                           f"{mid_dt.strftime('%Y-%m-%d %H:%M')}~{end_dt.strftime('%Y-%m-%d %H:%M')}")
-
-            # Query first half
-            first_half = self._fetch_news_for_ticker_with_split(
-                con_id, providers, start_dt, mid_dt, ticker, depth + 1, max_depth
-            )
-
-            # Query second half
-            second_half = self._fetch_news_for_ticker_with_split(
-                con_id, providers, mid_dt, end_dt, ticker, depth + 1, max_depth
-            )
-
-            # Combine and deduplicate by article ID (in description field)
-            # Include original articles as fallback in case recursive calls failed
-            all_articles = articles + first_half + second_half
-            seen_ids = set()
-            unique_articles = []
-            for art in all_articles:
-                art_id = art.description  # Contains "[Article ID: xxx]"
-                if art_id not in seen_ids:
-                    seen_ids.add(art_id)
-                    unique_articles.append(art)
-
-            # Log if recursive calls returned fewer articles (potential API issue)
-            if len(unique_articles) < len(articles):
-                logger.warning(f"    [{ticker}] Recursive split returned fewer articles ({len(unique_articles)}) than original ({len(articles)})")
-
-            return unique_articles
-
-        return articles
-
     def fetch_news(
         self,
         tickers: List[str],
@@ -455,27 +364,29 @@ class IBKRDataSource(BaseDataSource):
         days_back: int = 7,
         limit: Optional[int] = None,
         providers: Optional[str] = None,
-        auto_split: bool = True,
     ) -> List[NewsArticle]:
         """
         Fetch news articles from IBKR news providers.
 
         Requires news subscription (DJ, FLY, Briefing, etc.)
 
+        IMPORTANT API LIMITATION:
+            IBKR's reqHistoricalNews API IGNORES the date range parameters!
+            It always returns the 300 most recent articles regardless of
+            start_date/end_date. See docs/data/IBKR_NEWS_API_LIMITATIONS.md
+            for details and workarounds.
+
         Args:
             tickers: List of stock symbols.
-            start_date: Start date (default: days_back from today).
-            end_date: End date (default: today).
-            days_back: Days to look back if start_date not specified.
-            limit: Max articles per ticker (default: None = unlimited with auto_split).
+            start_date: Start date (IGNORED by IBKR API - see note above).
+            end_date: End date (IGNORED by IBKR API - see note above).
+            days_back: Days to look back if start_date not specified (IGNORED).
+            limit: Max articles per ticker (max 300 due to API limit).
             providers: Provider codes separated by '+' (e.g., 'DJ-N+FLY').
                       If None, uses all available providers.
-            auto_split: If True, automatically split date range when hitting
-                       300 article limit (default: True). Set False for faster
-                       queries when you only need recent articles.
 
         Returns:
-            List of NewsArticle objects.
+            List of NewsArticle objects (max 300 per ticker).
         """
         self._ensure_connected()
 
@@ -488,7 +399,7 @@ class IBKRDataSource(BaseDataSource):
             providers = '+'.join([p['code'] for p in available])
             logger.info(f"Using providers: {providers}")
 
-        # Set date range
+        # Set date range (note: IBKR ignores these, but we still need them for the API call)
         if end_date is None:
             end_date = date.today()
         if start_date is None:
@@ -504,19 +415,13 @@ class IBKRDataSource(BaseDataSource):
                 self._ib.qualifyContracts(contract)
 
                 # Convert dates to datetimes for the query
+                # Note: IBKR ignores these - always returns 300 most recent
                 start_dt = datetime.combine(start_date, datetime.min.time())
                 end_dt = datetime.combine(end_date, datetime.max.time())
 
-                if auto_split:
-                    # Use auto-splitting to get all articles
-                    ticker_articles = self._fetch_news_for_ticker_with_split(
-                        contract.conId, providers, start_dt, end_dt, ticker
-                    )
-                else:
-                    # Single query (may be truncated at 300)
-                    ticker_articles = self._fetch_news_single_query(
-                        contract.conId, providers, start_dt, end_dt, ticker
-                    )
+                ticker_articles = self._fetch_news_single_query(
+                    contract.conId, providers, start_dt, end_dt, ticker
+                )
 
                 if ticker_articles:
                     all_articles.extend(ticker_articles)
