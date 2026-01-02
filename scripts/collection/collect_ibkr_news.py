@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IBKR 新聞收集腳本
+IBKR 新聞收集腳本 (分離 metadata/content 設計)
 
 IBKR 特點:
 - 需要 IB Gateway/TWS 連線 (非 REST API)
@@ -8,27 +8,47 @@ IBKR 特點:
 - 歷史深度: ~1 個月
 - 每次查詢上限: 300 篇/股票
 
-收集模式:
-- 預設: 取完整內容 (標題 + 內文)，適合 LLM 評分
-- --headlines-only: 只取標題，快速模式 (~0.5 秒/股票)
+收集模式 (Phase 1/2 分離設計):
+- Phase 1 (metadata-only): 只取標題，快速 (~0.5 秒/股票)，不會超出 request 限制
+- Phase 2 (fetch-content): 補抓 content，支持中斷恢復，追蹤每篇文章的 content_status
 
-適合用於:
-- 需要高品質新聞來源 (Dow Jones)
-- 最近一個月的新聞補充
-- 與 Polygon 新聞做交叉驗證
+content_status 狀態:
+- pending: 只有 metadata，尚未抓取 content
+- fetched: 已成功抓取 content
+- empty: API 回傳但無內容（該文章本來就沒有 body）
+- failed: 抓取失敗（可重試）
 
 使用方式:
+    # ===== 基本收集 =====
     # 收集最近 7 天新聞 (含完整內容，預設)
     python collect_ibkr_news.py
 
-    # 快速模式: 只取標題 (不取內文)
-    python collect_ibkr_news.py --headlines-only
+    # 快速模式 Phase 1: 只取 metadata，避免 request 限制
+    python collect_ibkr_news.py --metadata-only    # 或 --headlines-only
 
     # 收集最近 30 天
     python collect_ibkr_news.py --days 30
 
-    # 收集指定日期範圍 (最遠約 1 個月)
-    python collect_ibkr_news.py --start 2025-11-20 --end 2025-12-19
+    # ===== 補抓 content (Phase 2) =====
+    # 補抓 pending 狀態的文章內容
+    python collect_ibkr_news.py --fetch-content    # 或 --backfill-body
+
+    # 重試 failed 狀態的文章
+    python collect_ibkr_news.py --fetch-content --retry-failed
+
+    # 限制每次抓取數量 (避免長時間執行)
+    python collect_ibkr_news.py --fetch-content --max-articles 1000
+
+    # ===== 狀態查詢 =====
+    # 查看現有資料狀態
+    python collect_ibkr_news.py --status
+
+    # 查看 content 收集狀態 (pending/fetched/empty/failed)
+    python collect_ibkr_news.py --content-status
+
+    # ===== 其他選項 =====
+    # 增量更新
+    python collect_ibkr_news.py --incremental
 
     # 僅收集指定股票
     python collect_ibkr_news.py --tickers AAPL,MSFT
@@ -36,14 +56,20 @@ IBKR 特點:
     # 使用不同的 IB Gateway 連接 (或設置 IBKR_HOST 環境變數)
     python collect_ibkr_news.py --port 4001 --host <your-host>
 
-    # 查看現有資料狀態
-    python collect_ibkr_news.py --status
+典型工作流程:
+    # 1. 快速收集所有 metadata (不會超出限制)
+    python collect_ibkr_news.py --metadata-only --days 30
 
-    # 增量更新
-    python collect_ibkr_news.py --incremental
+    # 2. 查看多少文章需要抓取 content
+    python collect_ibkr_news.py --content-status
 
-    # 補抓現有標題的內文
-    python collect_ibkr_news.py --backfill-body
+    # 3. 分批補抓 content (可中斷恢復)
+    python collect_ibkr_news.py --fetch-content --max-articles 500
+    # ... 可隨時中斷，下次繼續 ...
+    python collect_ibkr_news.py --fetch-content --max-articles 500
+
+    # 4. 重試失敗的文章
+    python collect_ibkr_news.py --fetch-content --retry-failed
 
 需求:
     - IB Gateway 或 TWS 運行中
@@ -163,6 +189,15 @@ class NewsArticle:
     collected_at: str = ""
     content_length: int = 0
     dedup_hash: str = ""
+
+    # Content status tracking (Phase 1/2 分離設計)
+    # pending: 只有 metadata，尚未抓取 content
+    # fetched: 已成功抓取 content
+    # empty: API 回傳但無內容（該文章本來就沒有 body）
+    # failed: 抓取失敗（可重試）
+    content_status: str = "pending"
+    content_fetch_attempts: int = 0
+    content_fetched_at: str = ""
 
 
 # =============================================================================
@@ -554,6 +589,9 @@ class IBKRNewsCollector:
                 description = ""
                 content = ""
                 content_length = 0
+                content_status = "pending"
+                content_fetch_attempts = 0
+                content_fetched_at = ""
 
                 if self.fetch_body and article_id != dedup_hash:
                     # 先檢查快取
@@ -565,19 +603,30 @@ class IBKRNewsCollector:
                         if len(cached_body) > 500:
                             description += "..."
                         content_length = len(cached_body)
+                        content_status = "fetched"
+                        content_fetched_at = collected_at.isoformat()
                         self.stats['body_cached'] += 1
                     elif not self.cache.has(article_id):
                         # 快取未命中且未見過，需要撈取
+                        content_fetch_attempts = 1
                         body = self.fetch_article_body(provider, article_id)
                         self.cache.put(article_id, body)  # 存入快取
+                        content_fetched_at = datetime.now().isoformat()
                         if body:
                             content = body
                             description = body[:500].strip()
                             if len(body) > 500:
                                 description += "..."
                             content_length = len(body)
+                            content_status = "fetched"
                             self.stats['body_fetched'] += 1
+                        elif body == "":
+                            # API 回傳空內容（文章本身沒有 body）
+                            content_status = "empty"
+                            self.stats['body_failed'] += 1
                         else:
+                            # None = 抓取失敗
+                            content_status = "failed"
                             self.stats['body_failed'] += 1
                     else:
                         # 已知文章，跳過 body 撈取（從現有數據載入）
@@ -602,6 +651,9 @@ class IBKRNewsCollector:
                     collected_at=collected_at.isoformat(),
                     content_length=content_length,
                     dedup_hash=dedup_hash,
+                    content_status=content_status,
+                    content_fetch_attempts=content_fetch_attempts,
+                    content_fetched_at=content_fetched_at,
                 ))
 
             return articles
@@ -799,18 +851,78 @@ def collect_news(
         collector.disconnect()
 
 
-def backfill_body(config: IBKRConfig) -> dict:
-    """補抓現有標題的內文"""
-    from collections import defaultdict
+def get_content_status(config: IBKRConfig) -> Dict[str, int]:
+    """
+    取得內容收集狀態統計
 
-    storage = StorageManager(config.data_dir)
+    Returns:
+        Dict with counts for each content_status: pending, fetched, empty, failed
+    """
+    stats = {
+        'pending': 0,
+        'fetched': 0,
+        'empty': 0,
+        'failed': 0,
+        'total': 0,
+        'unique_articles': 0,
+    }
+
+    if not config.data_dir.exists():
+        return stats
+
+    seen_article_ids = set()
+
+    for parquet_file in config.data_dir.rglob("*.parquet"):
+        try:
+            df = pd.read_parquet(parquet_file, engine='pyarrow')
+            stats['total'] += len(df)
+
+            # Track unique articles
+            for aid in df['article_id']:
+                seen_article_ids.add(aid)
+
+            # Count by content_status (with backward compatibility)
+            if 'content_status' in df.columns:
+                for status_val in ['pending', 'fetched', 'empty', 'failed']:
+                    stats[status_val] += int((df['content_status'] == status_val).sum())
+            else:
+                # Backward compatibility: infer from content_length
+                stats['fetched'] += int((df['content_length'] > 0).sum())
+                stats['pending'] += int((df['content_length'] == 0).sum())
+
+        except Exception as e:
+            logger.warning(f"Error reading {parquet_file}: {e}")
+
+    stats['unique_articles'] = len(seen_article_ids)
+    return stats
+
+
+def backfill_body(
+    config: IBKRConfig,
+    retry_failed: bool = False,
+    max_articles: Optional[int] = None,
+    save_every: int = 50,
+) -> dict:
+    """
+    補抓現有標題的內文（支持中斷恢復）
+
+    Args:
+        config: IBKR configuration
+        retry_failed: If True, also retry articles with content_status='failed'
+        max_articles: Maximum number of articles to process (for rate limiting)
+        save_every: Save progress every N articles
+    """
+    from collections import defaultdict
 
     if not config.data_dir.exists():
         logger.error("No existing data to backfill")
         return {'error': 'no_data'}
 
-    # Find articles without body
+    # Find articles to update based on content_status
     articles_to_update = []
+    target_statuses = ['pending']
+    if retry_failed:
+        target_statuses.append('failed')
 
     for year_dir in sorted(config.data_dir.iterdir()):
         if not year_dir.is_dir():
@@ -820,15 +932,19 @@ def backfill_body(config: IBKRConfig) -> dict:
             try:
                 df = pd.read_parquet(parquet_file, engine='pyarrow')
 
-                # Find articles with empty content
-                empty_content = df[
-                    (df['content'].isna()) |
-                    (df['content'] == '') |
-                    (df['content_length'] == 0)
-                ]
+                # Check if content_status column exists (backward compatibility)
+                if 'content_status' in df.columns:
+                    need_content = df[df['content_status'].isin(target_statuses)]
+                else:
+                    # Backward compatibility: use content_length
+                    need_content = df[
+                        (df['content'].isna()) |
+                        (df['content'] == '') |
+                        (df['content_length'] == 0)
+                    ]
 
-                if not empty_content.empty:
-                    for _, row in empty_content.iterrows():
+                if not need_content.empty:
+                    for _, row in need_content.iterrows():
                         # Only process if we have a valid article_id (not just dedup_hash)
                         if row['article_id'] != row['dedup_hash']:
                             articles_to_update.append({
@@ -841,11 +957,25 @@ def backfill_body(config: IBKRConfig) -> dict:
             except Exception as e:
                 logger.warning(f"Error reading {parquet_file}: {e}")
 
+    # Deduplicate by article_id (same article may appear for multiple tickers)
+    seen_ids = set()
+    unique_articles = []
+    for art in articles_to_update:
+        if art['article_id'] not in seen_ids:
+            seen_ids.add(art['article_id'])
+            unique_articles.append(art)
+
+    articles_to_update = unique_articles
+
     if not articles_to_update:
         logger.info("All articles already have content, nothing to backfill")
         return {'updated': 0}
 
-    logger.info(f"Found {len(articles_to_update)} articles without content")
+    logger.info(f"Found {len(articles_to_update)} unique articles without content")
+
+    if max_articles:
+        articles_to_update = articles_to_update[:max_articles]
+        logger.info(f"Processing first {max_articles} articles (--max-articles)")
 
     # Connect to IBKR
     collector = IBKRNewsCollector(config, fetch_body=True)
@@ -854,7 +984,7 @@ def backfill_body(config: IBKRConfig) -> dict:
         return {'error': 'connection_failed'}
 
     try:
-        stats = {'updated': 0, 'failed': 0}
+        stats = {'updated': 0, 'failed': 0, 'empty': 0}
         start_time = time.time()
 
         # Group by file for efficient updates
@@ -862,10 +992,24 @@ def backfill_body(config: IBKRConfig) -> dict:
         for art in articles_to_update:
             by_file[art['file']].append(art)
 
+        processed_count = 0
+
         for parquet_file, articles in by_file.items():
             logger.info(f"\nProcessing {parquet_file.name}: {len(articles)} articles")
 
             df = pd.read_parquet(parquet_file, engine='pyarrow')
+
+            # Ensure content_status columns exist
+            if 'content_status' not in df.columns:
+                df['content_status'] = df.apply(
+                    lambda r: 'fetched' if r.get('content_length', 0) > 0 else 'pending',
+                    axis=1
+                )
+            if 'content_fetch_attempts' not in df.columns:
+                df['content_fetch_attempts'] = 0
+            if 'content_fetched_at' not in df.columns:
+                df['content_fetched_at'] = ""
+
             updated_count = 0
 
             for i, art in enumerate(articles):
@@ -873,32 +1017,56 @@ def backfill_body(config: IBKRConfig) -> dict:
                 logger.info(f"  [{progress:.1f}%] Fetching body for {art['article_id'][:20]}...")
 
                 body = collector.fetch_article_body(art['publisher'], art['article_id'])
+                now_str = datetime.now().isoformat()
+
+                mask = df['dedup_hash'] == art['dedup_hash']
+
+                # Increment attempt count
+                df.loc[mask, 'content_fetch_attempts'] = df.loc[mask, 'content_fetch_attempts'] + 1
+                df.loc[mask, 'content_fetched_at'] = now_str
 
                 if body:
-                    # Update the row
-                    mask = df['dedup_hash'] == art['dedup_hash']
+                    # Success: update content
                     df.loc[mask, 'content'] = body
                     df.loc[mask, 'description'] = body[:500].strip() + ("..." if len(body) > 500 else "")
                     df.loc[mask, 'content_length'] = len(body)
+                    df.loc[mask, 'content_status'] = 'fetched'
                     updated_count += 1
                     stats['updated'] += 1
                     logger.info(f"    ✓ Got {len(body)} chars")
+                elif body == "":
+                    # API returned empty content (article has no body)
+                    df.loc[mask, 'content_status'] = 'empty'
+                    stats['empty'] += 1
+                    logger.info(f"    ○ Empty content (article has no body)")
                 else:
+                    # Failed to fetch
+                    df.loc[mask, 'content_status'] = 'failed'
                     stats['failed'] += 1
                     logger.info(f"    ✗ Failed")
 
-            # Save updated file
-            if updated_count > 0:
-                df.to_parquet(parquet_file, index=False, compression='snappy')
-                logger.info(f"  Saved {updated_count} updates to {parquet_file.name}")
+                processed_count += 1
+
+                # Save progress periodically
+                if processed_count % save_every == 0:
+                    df.to_parquet(parquet_file, index=False, compression='snappy')
+                    logger.info(f"  [Checkpoint] Saved progress ({processed_count} articles processed)")
+
+            # Save final updates for this file
+            df.to_parquet(parquet_file, index=False, compression='snappy')
+            logger.info(f"  Saved {updated_count} updates to {parquet_file.name}")
 
         elapsed = time.time() - start_time
         logger.info("\n" + "=" * 60)
-        logger.info("Backfill Complete")
+        logger.info("Backfill Complete (可中斷恢復)")
         logger.info("=" * 60)
-        logger.info(f"Updated: {stats['updated']}")
-        logger.info(f"Failed: {stats['failed']}")
+        logger.info(f"Updated (fetched): {stats['updated']}")
+        logger.info(f"Empty (no body):   {stats['empty']}")
+        logger.info(f"Failed (can retry): {stats['failed']}")
         logger.info(f"Time: {elapsed:.1f}s")
+
+        if stats['failed'] > 0:
+            logger.info(f"\nTo retry failed articles: --backfill-body --retry-failed")
 
         return stats
 
@@ -947,12 +1115,20 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     parser.add_argument('--client-id', type=int, default=None,
                        help='Client ID for connection (default: from config/.env)')
     parser.add_argument('--status', action='store_true', help='Show current data status')
+    parser.add_argument('--content-status', action='store_true',
+                       help='Show content collection status (pending/fetched/empty/failed)')
     parser.add_argument('--incremental', action='store_true',
                        help='Incremental update: fetch since last collected date')
-    parser.add_argument('--headlines-only', action='store_true',
-                       help='Fast mode: only fetch headlines, skip article body')
-    parser.add_argument('--backfill-body', action='store_true',
+    parser.add_argument('--headlines-only', '--metadata-only', action='store_true',
+                       dest='headlines_only',
+                       help='Fast mode: only fetch headlines/metadata, skip article body')
+    parser.add_argument('--backfill-body', '--fetch-content', action='store_true',
+                       dest='backfill_body',
                        help='Backfill: fetch body for existing headlines without content')
+    parser.add_argument('--retry-failed', action='store_true',
+                       help='With --backfill-body: also retry articles that previously failed')
+    parser.add_argument('--max-articles', type=int, default=None,
+                       help='With --backfill-body: limit number of articles to process')
 
     args = parser.parse_args()
 
@@ -1003,10 +1179,38 @@ Note: IBKR provides ~1 month of news history with highest quality sources
 
         return
 
+    # Handle --content-status mode
+    if args.content_status:
+        stats = get_content_status(config)
+
+        logger.info("\n" + "=" * 60)
+        logger.info("CONTENT COLLECTION STATUS")
+        logger.info("=" * 60)
+        logger.info(f"Total records:     {stats['total']:,}")
+        logger.info(f"Unique articles:   {stats['unique_articles']:,}")
+        logger.info("")
+        logger.info(f"  Fetched (完成):  {stats['fetched']:,}")
+        logger.info(f"  Pending (待抓):  {stats['pending']:,}")
+        logger.info(f"  Empty (無內容):  {stats['empty']:,}")
+        logger.info(f"  Failed (可重試): {stats['failed']:,}")
+
+        if stats['pending'] > 0 or stats['failed'] > 0:
+            logger.info("")
+            if stats['pending'] > 0:
+                logger.info(f"Run --backfill-body to fetch pending content")
+            if stats['failed'] > 0:
+                logger.info(f"Run --backfill-body --retry-failed to retry failed articles")
+
+        return
+
     # Handle --backfill-body mode
     if getattr(args, 'backfill_body', False):
         logger.info("BACKFILL MODE: Fetching body for existing headlines")
-        backfill_body(config)
+        backfill_body(
+            config,
+            retry_failed=getattr(args, 'retry_failed', False),
+            max_articles=getattr(args, 'max_articles', None),
+        )
         return
 
     # Determine date range
