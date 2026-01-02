@@ -85,20 +85,83 @@ Run the collector frequently to capture new articles before they fall out of the
 
 ### 2. Real-time Streaming (Recommended)
 
-Use `subscribeNews` to receive articles as they're published.
+There are **two methods** for real-time news in IBKR:
+
+#### Method A: BroadTape News (All News from Provider)
 
 ```python
-# ib_insync real-time news subscription
-def on_news(news):
-    # Process and store immediately
-    save_article(news)
+from ib_insync import IB, Contract
 
-ib.newsBulletinEvent += on_news
-ib.subscribeNewsBulletins(allMessages=True)
+ib = IB()
+ib.connect()
+
+# Create a NEWS contract for BroadTape feed
+contract = Contract()
+contract.symbol = "BZ:BZ_ALL"  # Benzinga all news
+contract.secType = "NEWS"
+contract.exchange = "BZ"
+
+# Available BroadTape providers:
+# - BZ (Benzinga)
+# - FLY (Fly on the Wall)
+# - DJ-N (Dow Jones)
+# - BRFG (Briefing.com)
+
+# Subscribe to news feed
+ib.reqMktData(contract, "", False, False)
+
+# Handle incoming news via tickNews callback
+def on_tick_news(ticker):
+    for news in ticker.newsTicks:
+        print(f"[{news.timeStamp}] {news.providerCode}: {news.headline}")
+        # news.articleId can be used to fetch full body
+
+ib.pendingTickersEvent += on_tick_news
+```
+
+#### Method B: Contract-Specific News (Per-Stock)
+
+```python
+from ib_insync import IB, Stock
+
+ib = IB()
+ib.connect()
+
+# Create stock contract
+stock = Stock('AAPL', 'SMART', 'USD')
+ib.qualifyContracts(stock)
+
+# Request market data with news generic tick
+# "292:BRFG" = Briefing.com news for this contract
+# "292:BZ" = Benzinga news
+ib.reqMktData(stock, "mdoff,292:BZ", False, False)
+
+# Process via pendingTickersEvent same as above
+```
+
+#### News Bulletins (System Messages)
+
+```python
+# For system-wide news bulletins (not stock-specific)
+def on_news_bulletin(bulletin):
+    print(f"Bulletin: {bulletin.message}")
+
+ib.newsBulletinEvent += on_news_bulletin
+ib.reqNewsBulletins(allMessages=True)
 ```
 
 **Pros**: Never miss articles, real-time processing
 **Cons**: Requires always-on process, more complex infrastructure
+
+#### Implementation Notes
+
+| Aspect | Detail |
+|--------|--------|
+| **NewsTick fields** | `timeStamp`, `providerCode`, `articleId`, `headline`, `extraData` |
+| **Body fetching** | Use `ib.reqNewsArticle(providerCode, articleId)` |
+| **Rate limiting** | No documented limit for streaming, but body fetch has pacing |
+| **Reconnection** | Must handle disconnects and resubscribe |
+| **Default providers** | BRFG, BRFUPDN, DJNL enabled free (TWS v966+) |
 
 ### 3. Alternative Data Sources
 
@@ -128,13 +191,58 @@ Based on IBKR documentation and community reports:
 
 ---
 
+## Data Duplication Issue
+
+### Current Deduplication Logic
+
+The collector uses `dedup_hash = f"{ticker.upper()}|{title.strip().lower()}|{pub_date}"` which causes **per-ticker deduplication** instead of global.
+
+### Impact
+
+Analysis of 84,539 collected articles:
+
+| Metric | Value |
+|--------|-------|
+| By dedup_hash (per-ticker) | 84,539 |
+| By article_id (global) | ~35,800 |
+| **Duplication rate** | **57.6%** |
+
+Example: Article "CFA Technology: Insider Review" appears **56 times** (once for each ticker it mentions).
+
+### Root Cause
+
+Same news article tagged to multiple tickers → stored N times.
+
+```
+article_id: "DJ-N$abc123" → stored for AAPL, MSFT, GOOGL, ...
+dedup_hash: "AAPL|cfa technology...|2026-01-02" ✓ unique
+dedup_hash: "MSFT|cfa technology...|2026-01-02" ✓ unique (different!)
+```
+
+### Recommendation
+
+Use `article_id` as primary key for global deduplication. Store ticker associations separately.
+
+```python
+# Proposed schema
+articles:
+  - article_id: "DJ-N$abc123"  # Primary key
+    title: "..."
+    content: "..."
+    published_at: "..."
+    tickers: ["AAPL", "MSFT", "GOOGL"]  # Multi-value
+```
+
+---
+
 ## Recommendations
 
-1. **Remove time-based splitting code** - It's useless and wastes API requests
+1. **Remove time-based splitting code** - It's useless and wastes API requests ✅ Done
 2. **Implement real-time streaming** - Essential for complete coverage
 3. **Run daily collection** - As backup and for batch processing
 4. **Use alternative sources for historical** - Finnhub/Polygon for date-range queries
 5. **Monitor collection gaps** - Alert if collector hasn't run in 24+ hours
+6. **Fix deduplication** - Use article_id as primary key to eliminate 57.6% redundancy
 
 ---
 
