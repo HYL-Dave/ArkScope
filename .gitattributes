@@ -6,6 +6,9 @@ data_sources/PAID_SUBSCRIPTION_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_EVALUATION.md filter=git-crypt diff=git-crypt
 ARCHITECTURE_VISION.md filter=git-crypt diff=git-crypt
 
+# 策略決策文件 (個人/內部使用)
+docs/strategy/** filter=git-crypt diff=git-crypt
+
 # 未來可以加入更多模式，例如：
 # research/*.md filter=git-crypt diff=git-crypt
 # notes/**/*.md filter=git-crypt diff=git-crypt
