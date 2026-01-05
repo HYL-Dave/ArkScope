@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os, sys
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 """
 Backtest RL agent with OpenAI LLM-enhanced environment (sentiment/risk).
@@ -11,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from finrl.config import INDICATORS
-from train_ppo_llm import MLPActorCritic
+from training.train_ppo_llm import MLPActorCritic
 
 def main():
     parser = argparse.ArgumentParser(
@@ -37,9 +39,9 @@ def main():
     if args.env == "baseline":
         from env_stocktrading import StockTradingEnv
     elif args.env == "sentiment":
-        from env_stocktrading_llm import StockTradingEnv
+        from training.envs.stocktrading_llm import StockTradingEnv
     else:
-        from env_stocktrading_llm_risk import StockTradingEnv
+        from training.envs.stocktrading_llm_risk import StockTradingEnv
 
     env = StockTradingEnv(
         df=df, stock_dim=stock_dim,

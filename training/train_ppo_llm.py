@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import os, sys
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # coding: utf-8
 from datasets import load_dataset
@@ -7,7 +9,7 @@ import pandas as pd
 #from finrl.agents.stablebaselines3.models import DRLAgent
 from finrl.config import INDICATORS, TRAINED_MODEL_DIR, RESULTS_DIR
 from finrl.main import check_and_make_directories
-from env_stocktrading_llm import StockTradingEnv
+from training.envs.stocktrading_llm import StockTradingEnv
 
 check_and_make_directories([TRAINED_MODEL_DIR])
 
