@@ -2,14 +2,15 @@
 
 > **生成日期**: 2026-01-06
 > **最後審核**: 2026-01-06
-> **總計**: 72 個 .md 檔案 (原 73，已刪除 1，建議再刪 3)
+> **總計**: 69 個 .md 檔案 (原 73，已刪除 4)
 > **目的**: 分類整理，決定各檔案處理方式
 >
 > **審核紀錄**:
-> - [x] NEWS_DATA_INVENTORY.md - 已加版本說明
-> - [x] SCORING_DATA_INVENTORY.md - 已加版本說明
-> - [x] 根目錄 note.md, research_note.md, PROJECT_PROPOSAL.md - 已審核
-> - [x] FLEX_MODE_EXTENSION.md, FNSPID_usage.md - 建議刪除
+> - [x] NEWS_DATA_INVENTORY.md - 已加版本說明 ✅ 已提交
+> - [x] SCORING_DATA_INVENTORY.md - 已加版本說明 ✅ 已提交
+> - [x] 根目錄 note.md - ✅ 已刪除 (數據與 notebook 實際輸出差異過大)
+> - [x] FLEX_MODE_EXTENSION.md - ✅ 已刪除 (功能已實作於 score_sentiment_openai.py)
+> - [x] FNSPID_usage.md - ✅ 已刪除 (引用的腳本已不存在)
 > - [x] NewsExtraction/ 所有 markdown - 已審核，保留
 > - [x] docs/ 所有 markdown - 已審核，保留
 
@@ -51,13 +52,13 @@
 | `ARCHITECTURE_VISION.md` | 三層智慧架構設計 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 | `PROJECT_PROPOSAL.md` | 專案提案文檔 | 🔵 INTERNAL | ❓ Untracked |
 | ~~`ANALYSIS_FINDINGS.md`~~ | ~~代碼分析發現~~ | 🔴 DELETE | ✅ 已刪除 |
-| ~~`note.md`~~ | ~~情緒版 vs 無情緒版筆記~~ | 🔴 DELETE | ❓ 待刪除 (已被 training/README.md 取代) |
+| ~~`note.md`~~ | ~~情緒版 vs 無情緒版筆記~~ | 🔴 DELETE | ✅ 已刪除 (數據與 notebook 差異過大) |
 | `research_note.md` | 30分鐘盤中評估 + OpenAI 模型建議 | 🔵 INTERNAL | ❓ Untracked |
 | `Claude-FinRL Contest 2025 Project Strategy.md` | 競賽策略 (Claude 對話導出) | 🔵 INTERNAL | ❓ Untracked |
-| `DYNAMIC_ANALYSIS_TOOLKIT.md` | 動態模型比較工具 | 🔵 INTERNAL | ➕ Staged |
+| `DYNAMIC_ANALYSIS_TOOLKIT.md` | 動態模型比較工具 | 🔵 INTERNAL | ✅ Tracked |
 | `ENHANCED_TOKEN_ANALYSIS_GUIDE.md` | Token 分析指南 | 🔵 INTERNAL | 📝 Modified |
-| ~~`FLEX_MODE_EXTENSION.md`~~ | ~~Flex 模式擴展說明~~ | 🔴 DELETE | ❓ 待刪除 (功能已實作於 score_sentiment_openai.py) |
-| ~~`FNSPID_usage.md`~~ | ~~FNSPID 數據使用說明~~ | 🔴 DELETE | ❓ 待刪除 (引用的腳本已不存在) |
+| ~~`FLEX_MODE_EXTENSION.md`~~ | ~~Flex 模式擴展說明~~ | 🔴 DELETE | ✅ 已刪除 (功能已實作) |
+| ~~`FNSPID_usage.md`~~ | ~~FNSPID 數據使用說明~~ | 🔴 DELETE | ✅ 已刪除 (腳本已不存在) |
 | `INTRADAY_TRADING_EVALUATION.md` | 盤內交易評估報告 | 🔵 INTERNAL | ➕ Staged |
 | `GIT_CRYPT_GUIDE.local.md` | Git-Crypt 使用指南 | ⚫ GITIGNORE | 🚫 gitignore (*.local.md) |
 | `REPAIR_LOG_COLUMN_CLEANUP_20251229.md` | 欄位清理修復記錄 | 🟡 TEMP | ✅ Tracked |
@@ -104,8 +105,8 @@
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
-| `NEWS_DATA_INVENTORY.md` | 新聞數據清單 | 🟢 PUBLIC | ❓ Untracked |
-| `SCORING_DATA_INVENTORY.md` | 評分數據清單 | 🟢 PUBLIC | ❓ Untracked |
+| `NEWS_DATA_INVENTORY.md` | 新聞數據清單 | 🟢 PUBLIC | ✅ Tracked |
+| `SCORING_DATA_INVENTORY.md` | 評分數據清單 | 🟢 PUBLIC | ✅ Tracked |
 | `IBKR_NEWS_API_LIMITATIONS.md` | IBKR API 限制分析 | 🔵 INTERNAL | 📝 Modified |
 | `POLYGON_SCORING_GAP_ANALYSIS.md` | Polygon 缺口分析 | 🟡 TEMP | ➕ Staged |
 
@@ -232,17 +233,17 @@
 | 🟢 **PUBLIC** | 16 | 正常 commit |
 | 🔵 **INTERNAL** | 38 | `export-ignore` 或加密 |
 | 🟡 **TEMP** | 7 | 問題解決後可刪除 |
-| 🔴 **DELETE** | 3 | 待刪除 (note.md, FLEX_MODE_EXTENSION.md, FNSPID_usage.md) |
+| 🔴 **DELETE** | 0 | 無待刪除檔案 |
 | ⚫ **GITIGNORE** | 6 | 不追蹤 |
 
 ### 按目前狀態分類
 
 | 狀態 | 數量 | 說明 |
 |------|------|------|
-| ✅ Tracked | 26 | 已追蹤且無變更 |
+| ✅ Tracked | 28 | 已追蹤且無變更 |
 | 📝 Modified | 11 | 有未提交修改 |
 | ➕ Staged | 7 | 已暫存待提交 |
-| ❓ Untracked | 22 | 尚未追蹤 |
+| ❓ Untracked | 20 | 尚未追蹤 |
 | 🚫 gitignore | 7 | 已設定忽略 |
 | 🔒 git-crypt | 5 | 已設定加密 |
 
@@ -276,6 +277,9 @@ docs/strategy/** filter=git-crypt diff=git-crypt
 ### 1. 立即可做
 - [x] 刪除 `ANALYSIS_FINDINGS.md` (過時內容) ✅ 已完成
 - [x] 將 `.serena/` 加入 `.gitignore` ✅ 已完成
+- [x] 刪除 `note.md` ✅ 已刪除 (數據與 notebook 實際輸出差異過大)
+- [x] 刪除 `FLEX_MODE_EXTENSION.md` ✅ 已刪除 (功能已實作於 `score_sentiment_openai.py`)
+- [x] 刪除 `FNSPID_usage.md` ✅ 已刪除 (引用的腳本已不存在)
 
 ### 2. 問題解決後刪除
 - [ ] `REPAIR_LOG_COLUMN_CLEANUP_20251229.md`
@@ -285,22 +289,27 @@ docs/strategy/** filter=git-crypt diff=git-crypt
 
 ### 3. 需要決定的 Untracked 檔案
 
-**建議追蹤 (PUBLIC)**:
-- `docs/data/NEWS_DATA_INVENTORY.md`
-- `docs/data/SCORING_DATA_INVENTORY.md`
+**建議追蹤 (PUBLIC)** - 已審核確認有價值:
+- ~~`docs/data/NEWS_DATA_INVENTORY.md`~~ ✅ 已提交
+- ~~`docs/data/SCORING_DATA_INVENTORY.md`~~ ✅ 已提交
 - `docs/FUNDAMENTALS_GUIDE.md`
 - `NewsExtraction/finrl_news_pipeline_documentation.md`
 - `NewsExtraction/quality_analysis_script_documentation.md`
 - `src/signals/README.md`
 
-**建議追蹤並加密 (INTERNAL)**:
-- `PROJECT_PROPOSAL.md`
-- `note.md`, `research_note.md`
+**建議追蹤並加密 (INTERNAL)** - 已審核確認保留:
+- `PROJECT_PROPOSAL.md` - 正式計畫書
+- `research_note.md` - 30-min bar 研究 + OpenAI 模型建議
 - `Claude-FinRL Contest 2025 Project Strategy.md`
 - `docs/analysis/HISTORICAL_ANALYSIS_LOG.md`
 - `docs/analysis/NEWS_TIMING_ANALYSIS.md`
+- `docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md`
+- `docs/insights/sector_breakout_patterns.md`
+- `docs/EXTENSIONS_REFERENCE.md`
 - `results/finrl_full_analysis/*.md`
-- 其他 NewsExtraction/ 內部文件
+- `NewsExtraction/project-improvements.md`
+- `NewsExtraction/quality-analysis-deep-dive.md`
+- `NewsExtraction/usage-workflow.md`
 
 ### 4. 建議加入 .gitignore
 ```gitignore
