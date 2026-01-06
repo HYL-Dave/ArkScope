@@ -10,8 +10,7 @@
 NewsExtraction/
 ├── 📜 核心脚本
 │   ├── finrl_news_pipeline.py                    # 主数据处理管道 v2.2
-│   ├── quality_analysis_script.py                # 深度质量分析工具 v2.0
-│   └── compare_news_datasets.py                  # 数据集比对工具
+│   └── quality_analysis_script.py                # 深度质量分析工具 v2.0
 │
 ├── 📊 数据文件
 │   ├── tickers_89.json                          # 89档股票代码列表
@@ -24,8 +23,7 @@ NewsExtraction/
 ├── 📋 报告文件
 │   ├── data_quality_report.json                 # 数据质量报告
 │   ├── data_summary.json                        # 数据统计摘要
-│   ├── invalid_records_report.json              # 无效记录报告
-│   └── fnspid_unique_articles_comparison_report.json # 数据集比对报告
+│   └── invalid_records_report.json              # 无效记录报告
 │
 ├── 📚 文档
 │   ├── finrl_news_pipeline_documentation.md     # 主管道文档
@@ -114,27 +112,41 @@ python quality_analysis_script.py --language zh --model o4-mini
 - `quality_score_distribution.png` - 质量分数分布图
 - `high_quality_news.parquet` - 高质量数据子集
 
-### 3. compare_news_datasets.py - 数据集比对工具
+### 3. FNSPID vs DeepSeek 数据集比对结果 (2025-01 执行)
 
-**功能**：比对 FNSPID 和 DeepSeek 数据集，找出独有文章
+以下是 FNSPID 与 DeepSeek 情感数据集的比对分析结果：
 
-**主要特性**：
-- 🔍 精确文章匹配（基于标题+内容 hash）
-- 📊 详细比对统计报告
-- 📅 日期和股票覆盖分析
-- 💾 保持原始文件格式
+| 指标 | 数值 |
+|------|------|
+| FNSPID 总文章数 | 218,654 |
+| DeepSeek 总文章数 | 127,176 |
+| FNSPID 独有文章 | **143,373** (65.57%) |
+| 重叠率 | 34.43% |
+| 日期范围 | 2013-01-02 至 2023-12-31 |
+| 共同股票数 | 75 档 |
 
-**使用方法**：
-```bash
-python compare_news_datasets.py \
-  --fnspid-path fnspid_89_2013_2023_cleaned.csv \
-  --deepseek-path /path/to/deepseek/dataset.csv \
-  --output unique_articles.csv
-```
+**各年独有文章分布**：
+| 年份 | 独有文章数 |
+|------|-----------|
+| 2013 | 2,115 |
+| 2014 | 4,131 |
+| 2015 | 5,055 |
+| 2016 | 5,522 |
+| 2017 | 10,163 |
+| 2018 | 11,778 |
+| 2019 | 8,580 |
+| 2020 | 10,595 |
+| 2021 | 10,609 |
+| 2022 | 26,418 |
+| 2023 | 48,407 |
 
-**输出文件**：
-- `fnspid_unique_articles.csv` - FNSPID 独有文章 (143,373条)
-- `fnspid_unique_articles_comparison_report.json` - 比对分析报告
+**独有文章数 Top 10 股票**：
+AAPL (8,115), MSFT (7,927), TSLA (7,837), NVDA (7,763), GOOG (7,096),
+INTC (6,978), AMD (6,824), GILD (5,150), MU (4,523), AMZN (4,403)
+
+> 比对方法：使用 MD5 hash (标题 + 内容前200字符) 进行文章指纹比对
+>
+> 独有文章已导出至 `fnspid_unique_articles.csv`
 
 ## 📊 数据文件说明
 
@@ -187,9 +199,25 @@ TXN, VRSK, VRTX, WBA, WDAY, XEL, ZM, ZS
 
 **缺失的 14 档股票**：
 ```
-CSCO, GOOGL, IDXX, ILMN, INTU, JD, LULU, MAR, MCHP, MDLZ, 
+CSCO, GOOGL, IDXX, ILMN, INTU, JD, LULU, MAR, MCHP, MDLZ,
 NFLX, NXPI, SGEN, SNPS
 ```
+
+> **缺失原因分析 (2026-01 调查)**：
+>
+> 这 14 档股票在 FNSPID 原始数据集中**确实存在**，但被过滤的原因：
+> 1. **数据截止于 2020-06-10** - 所有 14 档的最新记录都停在 2020 年中
+> 2. **情感分数全为 0.0** - 原始数据未提供有效情感标注
+>
+> | 股票 | 原始记录数 | 日期范围 |
+> |------|-----------|----------|
+> | NFLX | 3,028 | 2016-08 ~ 2020-06 |
+> | GOOGL | 1,579 | 2018-07 ~ 2020-06 |
+> | MAR | 1,325 | 2009-08 ~ 2020-06 |
+> | CSCO | 1,010 | 2016-08 ~ 2020-06 |
+> | LULU | 50 | 2020-04 ~ 2020-06 |
+>
+> 注：GOOGL 与 GOOG 在 FNSPID 中分开记录，本数据集使用 GOOG (8,665 条)
 
 ## 📈 数据统计
 
@@ -249,10 +277,8 @@ python finrl_news_pipeline.py --openai-key "$OPENAI_API_KEY" --model o4-mini
 # 步骤2: 深度质量分析
 python quality_analysis_script.py --data fnspid_89_2013_2023_cleaned.parquet
 
-# 步骤3: 数据集比对（可选）
-python compare_news_datasets.py \
-  --fnspid-path fnspid_89_2013_2023_cleaned.csv \
-  --deepseek-path /path/to/deepseek_dataset.csv
+# 步骤3: 数据集比对结果已记录在本文档第 3 节
+# 独有文章已导出至 fnspid_unique_articles.csv
 ```
 
 ### 3. 数据使用示例
