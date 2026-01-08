@@ -4,7 +4,12 @@
 # 敏感研究文件
 data_sources/PAID_SUBSCRIPTION_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_EVALUATION.md filter=git-crypt diff=git-crypt
+data_sources/*_VALUE.md filter=git-crypt diff=git-crypt
 ARCHITECTURE_VISION.md filter=git-crypt diff=git-crypt
+
+# 內部設計與特徵文件
+docs/design/** filter=git-crypt diff=git-crypt
+docs/features/** filter=git-crypt diff=git-crypt
 
 # 策略決策文件 (個人/內部使用)
 docs/strategy/** filter=git-crypt diff=git-crypt
