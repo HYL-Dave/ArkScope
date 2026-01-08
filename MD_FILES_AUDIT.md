@@ -1,8 +1,8 @@
 # Markdown 文檔審計報告
 
 > **生成日期**: 2026-01-06
-> **最後審核**: 2026-01-06
-> **總計**: 69 個 .md 檔案 (原 73，已刪除 4)
+> **最後審核**: 2026-01-08
+> **總計**: 66 個 .md 檔案 (原 73，已刪除 7)
 > **目的**: 分類整理，決定各檔案處理方式
 >
 > **審核紀錄**:
@@ -11,6 +11,11 @@
 > - [x] 根目錄 note.md - ✅ 已刪除 (數據與 notebook 實際輸出差異過大)
 > - [x] FLEX_MODE_EXTENSION.md - ✅ 已刪除 (功能已實作於 score_sentiment_openai.py)
 > - [x] FNSPID_usage.md - ✅ 已刪除 (引用的腳本已不存在)
+> - [x] DYNAMIC_ANALYSIS_TOOLKIT.md - ✅ 已刪除 (相關腳本已刪除)
+> - [x] ENHANCED_TOKEN_ANALYSIS_GUIDE.md - ✅ 已刪除 (相關腳本已刪除)
+> - [x] docs/data/POLYGON_SCORING_GAP_ANALYSIS.md - ✅ 已刪除 (問題已解決，數據已修復)
+> - [x] INTRADAY_TRADING_EVALUATION.md - ✅ 已移至 docs/strategy/ 並提交
+> - [x] docs/design/** 及 docs/features/** - ✅ 已加入 git-crypt 加密
 > - [x] NewsExtraction/ 所有 markdown - 已審核，保留
 > - [x] docs/ 所有 markdown - 已審核，保留
 
@@ -39,7 +44,7 @@
 
 ---
 
-## 1. 根目錄文檔 (20 個)
+## 1. 根目錄文檔 (15 個)
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
@@ -55,11 +60,10 @@
 | ~~`note.md`~~ | ~~情緒版 vs 無情緒版筆記~~ | 🔴 DELETE | ✅ 已刪除 (數據與 notebook 差異過大) |
 | `research_note.md` | 30分鐘盤中評估 + OpenAI 模型建議 | 🔵 INTERNAL | ❓ Untracked |
 | `Claude-FinRL Contest 2025 Project Strategy.md` | 競賽策略 (Claude 對話導出) | 🔵 INTERNAL | ❓ Untracked |
-| `DYNAMIC_ANALYSIS_TOOLKIT.md` | 動態模型比較工具 | 🔵 INTERNAL | ✅ Tracked |
-| `ENHANCED_TOKEN_ANALYSIS_GUIDE.md` | Token 分析指南 | 🔵 INTERNAL | 📝 Modified |
+| ~~`DYNAMIC_ANALYSIS_TOOLKIT.md`~~ | ~~動態模型比較工具~~ | 🔴 DELETE | ✅ 已刪除 (相關腳本已刪除) |
+| ~~`ENHANCED_TOKEN_ANALYSIS_GUIDE.md`~~ | ~~Token 分析指南~~ | 🔴 DELETE | ✅ 已刪除 (相關腳本已刪除) |
 | ~~`FLEX_MODE_EXTENSION.md`~~ | ~~Flex 模式擴展說明~~ | 🔴 DELETE | ✅ 已刪除 (功能已實作) |
 | ~~`FNSPID_usage.md`~~ | ~~FNSPID 數據使用說明~~ | 🔴 DELETE | ✅ 已刪除 (腳本已不存在) |
-| `INTRADAY_TRADING_EVALUATION.md` | 盤內交易評估報告 | 🔵 INTERNAL | ➕ Staged |
 | `GIT_CRYPT_GUIDE.local.md` | Git-Crypt 使用指南 | ⚫ GITIGNORE | 🚫 gitignore (*.local.md) |
 | `REPAIR_LOG_COLUMN_CLEANUP_20251229.md` | 欄位清理修復記錄 | 🟡 TEMP | ✅ Tracked |
 | `REPAIR_PLAN_O3_SUMMARY.md` | o3_summary 修復計畫 | 🟡 TEMP | ✅ Tracked |
@@ -68,19 +72,24 @@
 
 ## 2. docs/design/ (4 個) - 架構設計
 
+> 整個目錄已設定 `docs/design/** filter=git-crypt diff=git-crypt`
+
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
-| `FINRL_INTEGRATION_DESIGN.md` | FinRL 整合架構設計 | 🔵 INTERNAL | 📝 Modified |
-| `IBKR_NEWS_COLLECTION_IMPROVEMENTS.md` | IBKR 新聞收集改進 | 🔵 INTERNAL | ➕ Staged |
-| `MULTI_FACTOR_SIGNAL_DETECTION.md` | 多因子信號檢測設計 | 🔵 INTERNAL | 📝 Modified |
-| `TRAINING_PIPELINE_ARCHITECTURE.md` | 訓練管道架構 | 🟢 PUBLIC | ➕ Staged |
+| `FINRL_INTEGRATION_DESIGN.md` | FinRL 整合架構設計 | 🔵 INTERNAL | 📝 Modified 🔒 git-crypt |
+| `IBKR_NEWS_COLLECTION_IMPROVEMENTS.md` | IBKR 新聞收集改進 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
+| `MULTI_FACTOR_SIGNAL_DETECTION.md` | 多因子信號檢測設計 | 🔵 INTERNAL | 📝 Modified 🔒 git-crypt |
+| `TRAINING_PIPELINE_ARCHITECTURE.md` | 訓練管道架構 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 
 ---
 
-## 3. docs/strategy/ (2 個) - 策略規劃
+## 3. docs/strategy/ (3 個) - 策略規劃
+
+> 整個目錄已設定 `docs/strategy/** filter=git-crypt diff=git-crypt`
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
+| `INTRADAY_TRADING_EVALUATION.md` | 日內交易策略評估 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 | `SIDEQUEST_CLAUDE_CODE_PLUGINS.md` | Claude Code 插件評估 | 🔵 INTERNAL | 📝 Modified 🔒 git-crypt |
 | `STRATEGIC_DIRECTION_2026Q1.md` | 2026 Q1 策略方向 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 
@@ -101,22 +110,24 @@
 
 ---
 
-## 5. docs/data/ (4 個) - 數據文檔
+## 5. docs/data/ (3 個) - 數據文檔
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
 | `NEWS_DATA_INVENTORY.md` | 新聞數據清單 | 🟢 PUBLIC | ✅ Tracked |
 | `SCORING_DATA_INVENTORY.md` | 評分數據清單 | 🟢 PUBLIC | ✅ Tracked |
 | `IBKR_NEWS_API_LIMITATIONS.md` | IBKR API 限制分析 | 🔵 INTERNAL | 📝 Modified |
-| `POLYGON_SCORING_GAP_ANALYSIS.md` | Polygon 缺口分析 | 🟡 TEMP | ➕ Staged |
+| ~~`POLYGON_SCORING_GAP_ANALYSIS.md`~~ | ~~Polygon 缺口分析~~ | 🔴 DELETE | ✅ 已刪除 (問題已解決) |
 
 ---
 
 ## 6. docs/features/ (1 個)
 
+> 整個目錄已設定 `docs/features/** filter=git-crypt diff=git-crypt`
+
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
-| `SENTIMENT_DERIVED_FEATURES.md` | 情緒衍生特徵定義 | 🟢 PUBLIC | ➕ Staged |
+| `SENTIMENT_DERIVED_FEATURES.md` | 情緒衍生特徵定義 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 
 ---
 
@@ -145,7 +156,7 @@
 | `API_SPECIFICATIONS.md` | API 規格說明 | 🔵 INTERNAL | ✅ Tracked |
 | `DATA_SOURCES_EVALUATION.md` | 數據源評估 | 🔵 INTERNAL | 📝 Modified 🔒 git-crypt |
 | `IBKR_GUIDE.md` | IBKR 使用指南 | 🔵 INTERNAL | ✅ Tracked |
-| `IBKR_INVESTOR_DATA_VALUE.md` | IBKR 投資者數據價值分析 | 🔵 INTERNAL | ➕ Staged |
+| `IBKR_INVESTOR_DATA_VALUE.md` | IBKR 投資者數據價值分析 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 | `PAID_SUBSCRIPTION_EVALUATION.md` | 付費訂閱評估 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
 
 ---
@@ -230,22 +241,22 @@
 
 | 類別 | 數量 | 處理 |
 |------|------|------|
-| 🟢 **PUBLIC** | 16 | 正常 commit |
-| 🔵 **INTERNAL** | 38 | `export-ignore` 或加密 |
-| 🟡 **TEMP** | 7 | 問題解決後可刪除 |
-| 🔴 **DELETE** | 0 | 無待刪除檔案 |
-| ⚫ **GITIGNORE** | 6 | 不追蹤 |
+| 🟢 **PUBLIC** | 15 | 正常 commit |
+| 🔵 **INTERNAL** | 39 | `export-ignore` 或加密 |
+| 🟡 **TEMP** | 5 | 問題解決後可刪除 |
+| 🔴 **DELETE** | 0 | 無待刪除檔案 (8 個已刪除) |
+| ⚫ **GITIGNORE** | 7 | 不追蹤 |
 
 ### 按目前狀態分類
 
 | 狀態 | 數量 | 說明 |
 |------|------|------|
-| ✅ Tracked | 28 | 已追蹤且無變更 |
-| 📝 Modified | 11 | 有未提交修改 |
-| ➕ Staged | 7 | 已暫存待提交 |
-| ❓ Untracked | 20 | 尚未追蹤 |
+| ✅ Tracked | 27 | 已追蹤且無變更 |
+| 📝 Modified | 10 | 有未提交修改 |
+| ➕ Staged | 0 | 無 (已提交) |
+| ❓ Untracked | 19 | 尚未追蹤 |
 | 🚫 gitignore | 7 | 已設定忽略 |
-| 🔒 git-crypt | 5 | 已設定加密 |
+| 🔒 git-crypt | 12 | 已設定加密 |
 
 ---
 
@@ -264,9 +275,17 @@ ANALYSIS_FINDINGS.md
 
 ### .gitattributes 中的 git-crypt 設定
 ```gitattributes
+# 敏感研究文件
 data_sources/PAID_SUBSCRIPTION_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_EVALUATION.md filter=git-crypt diff=git-crypt
+data_sources/*_VALUE.md filter=git-crypt diff=git-crypt
 ARCHITECTURE_VISION.md filter=git-crypt diff=git-crypt
+
+# 內部設計與特徵文件
+docs/design/** filter=git-crypt diff=git-crypt
+docs/features/** filter=git-crypt diff=git-crypt
+
+# 策略決策文件
 docs/strategy/** filter=git-crypt diff=git-crypt
 ```
 
@@ -284,7 +303,7 @@ docs/strategy/** filter=git-crypt diff=git-crypt
 ### 2. 問題解決後刪除
 - [ ] `REPAIR_LOG_COLUMN_CLEANUP_20251229.md`
 - [ ] `REPAIR_PLAN_O3_SUMMARY.md`
-- [ ] `docs/data/POLYGON_SCORING_GAP_ANALYSIS.md`
+- [x] ~~`docs/data/POLYGON_SCORING_GAP_ANALYSIS.md`~~ ✅ 已刪除 (問題已解決，數據已修復)
 - [ ] `docs/analysis/*_COMPARISON_REPORT.md` (自動生成的)
 
 ### 3. 需要決定的 Untracked 檔案
