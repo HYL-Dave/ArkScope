@@ -1,0 +1,275 @@
+# Event type definitions for news classification
+# Each event type has keywords and optional weight
+
+# Bullish events
+POLICY_POSITIVE:
+  keywords:
+    - executive order
+    - legislation
+    - subsidy
+    - approve
+    - funding boost
+    - tax credit
+    - incentive
+    - support bill
+    - government contract
+    - regulatory approval
+    - fda approval
+    - clearance
+  weight: 1.0
+  sentiment_direction: positive
+
+TECH_MILESTONE:
+  keywords:
+    - launch
+    - breakthrough
+    - patent
+    - first ever
+    - successful test
+    - milestone
+    - achievement
+    - debut
+    - record
+    - innovation
+    - revolutionary
+    - pioneering
+  weight: 1.2
+  sentiment_direction: positive
+
+EARNINGS_BEAT:
+  keywords:
+    - beat
+    - exceed
+    - above estimate
+    - better than expected
+    - strong quarter
+    - raises guidance
+    - tops
+    - surpass
+    - outperform
+    - record revenue
+    - record profit
+  weight: 1.0
+  sentiment_direction: positive
+
+ANALYST_UPGRADE:
+  keywords:
+    - upgrade
+    - raise target
+    - overweight
+    - buy rating
+    - bullish
+    - initiates coverage
+    - price target raised
+    - increases price target
+    - outperform rating
+  weight: 0.7
+  sentiment_direction: positive
+
+FUNDING:
+  keywords:
+    - ipo
+    - fundraise
+    - acquisition
+    - merger
+    - private placement
+    - investment round
+    - raises
+    - series funding
+    - strategic investment
+    - capital raise
+  weight: 0.9
+  sentiment_direction: positive
+
+PRODUCT_LAUNCH:
+  keywords:
+    - launch
+    - release
+    - unveil
+    - introduce
+    - announce
+    - new product
+    - rollout
+    - debut
+    - available now
+    - shipping
+  weight: 0.8
+  sentiment_direction: positive
+
+PARTNERSHIP:
+  keywords:
+    - partner
+    - collaborate
+    - agreement
+    - deal
+    - alliance
+    - joint venture
+    - contract
+    - strategic partnership
+    - memorandum of understanding
+    - mou
+  weight: 0.8
+  sentiment_direction: positive
+
+EXEC_HIRE:
+  keywords:
+    - join
+    - appoint
+    - name
+    - hire
+    - promote
+    - new ceo
+    - new cfo
+    - brings on
+    - leadership
+    - veteran joins
+  weight: 0.6
+  sentiment_direction: positive
+
+# Bearish events
+POLICY_NEGATIVE:
+  keywords:
+    - ban
+    - restriction
+    - tariff
+    - sanction
+    - regulation
+    - crackdown
+    - investigation
+    - probe
+    - antitrust
+    - lawsuit
+    - compliance
+  weight: 1.0
+  sentiment_direction: negative
+
+EARNINGS_MISS:
+  keywords:
+    - miss
+    - below
+    - disappoint
+    - worse than expected
+    - weak quarter
+    - lowers guidance
+    - falls short
+    - revenue decline
+    - profit warning
+    - cut outlook
+  weight: 1.0
+  sentiment_direction: negative
+
+ANALYST_DOWNGRADE:
+  keywords:
+    - downgrade
+    - lower target
+    - underweight
+    - sell rating
+    - bearish
+    - cut price target
+    - reduces price target
+    - underperform rating
+    - cautious
+  weight: 0.7
+  sentiment_direction: negative
+
+EXEC_DEPARTURE:
+  keywords:
+    - resign
+    - step down
+    - retire
+    - leave
+    - departure
+    - exit
+    - ousted
+    - terminated
+    - fired
+    - steps aside
+  weight: 0.8
+  sentiment_direction: negative
+
+LEGAL:
+  keywords:
+    - lawsuit
+    - sue
+    - litigation
+    - court
+    - settlement
+    - judgment
+    - class action
+    - injunction
+    - violation
+    - fine
+    - penalty
+  weight: 0.9
+  sentiment_direction: negative
+
+LAYOFFS:
+  keywords:
+    - layoff
+    - job cuts
+    - workforce reduction
+    - restructuring
+    - downsizing
+    - furlough
+    - termination
+    - headcount reduction
+  weight: 0.8
+  sentiment_direction: negative
+
+RECALL:
+  keywords:
+    - recall
+    - defect
+    - safety issue
+    - product recall
+    - voluntary recall
+    - mandatory recall
+    - safety concern
+  weight: 0.9
+  sentiment_direction: negative
+
+# Neutral events
+GENERAL:
+  keywords: []
+  weight: 0.5
+  sentiment_direction: neutral
+
+CONFERENCE:
+  keywords:
+    - conference
+    - presentation
+    - keynote
+    - investor day
+    - analyst day
+    - webcast
+  weight: 0.3
+  sentiment_direction: neutral
+
+DIVIDEND:
+  keywords:
+    - dividend
+    - payout
+    - distribution
+    - yield
+    - ex-dividend
+  weight: 0.4
+  sentiment_direction: neutral
+
+STOCK_SPLIT:
+  keywords:
+    - stock split
+    - reverse split
+    - share split
+  weight: 0.3
+  sentiment_direction: neutral
+
+INSIDER_TRADING:
+  keywords:
+    - insider buying
+    - insider selling
+    - form 4
+    - sec filing
+    - executive purchase
+    - executive sale
+  weight: 0.6
+  sentiment_direction: variable

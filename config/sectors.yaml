@@ -1,0 +1,178 @@
+# Sector definitions for MindfulRL-Intraday
+# Maps sector names to constituent ticker symbols
+
+SPACE:
+  - RKLB   # Rocket Lab
+  - ASTS   # AST SpaceMobile
+  - LUNR   # Intuitive Machines
+  - SPCE   # Virgin Galactic
+  - ASTR   # Astra Space
+  - RDW    # Redwire
+  - MNTS   # Momentus
+  - BKSY   # BlackSky Technology
+  - PL     # Planet Labs
+  - IRDM   # Iridium
+
+AI_CHIPS:
+  - NVDA   # NVIDIA
+  - AMD    # AMD
+  - AVGO   # Broadcom
+  - MRVL   # Marvell
+  - INTC   # Intel
+  - QCOM   # Qualcomm
+  - MU     # Micron
+  - ARM    # Arm Holdings
+  - TSM    # TSMC
+  - ASML   # ASML
+
+AI_SOFTWARE:
+  - MSFT   # Microsoft
+  - GOOGL  # Google
+  - META   # Meta
+  - PLTR   # Palantir
+  - AI     # C3.ai
+  - PATH   # UiPath
+  - SNOW   # Snowflake
+  - CRM    # Salesforce
+  - IBM    # IBM
+
+EV:
+  - TSLA   # Tesla
+  - RIVN   # Rivian
+  - LCID   # Lucid
+  - NIO    # NIO
+  - XPEV   # XPeng
+  - LI     # Li Auto
+  - PTRA   # Proterra
+  - FSR    # Fisker
+  - F      # Ford (EV exposure)
+  - GM     # GM (EV exposure)
+
+BIOTECH:
+  - MRNA   # Moderna
+  - BNTX   # BioNTech
+  - REGN   # Regeneron
+  - GILD   # Gilead
+  - AMGN   # Amgen
+  - BIIB   # Biogen
+  - VRTX   # Vertex
+  - ALNY   # Alnylam
+  - SGEN   # Seagen
+
+FINTECH:
+  - SQ     # Block (Square)
+  - PYPL   # PayPal
+  - COIN   # Coinbase
+  - AFRM   # Affirm
+  - UPST   # Upstart
+  - SOFI   # SoFi
+  - HOOD   # Robinhood
+  - NU     # Nu Holdings
+  - BILL   # Bill.com
+
+CLOUD:
+  - SNOW   # Snowflake
+  - NET    # Cloudflare
+  - DDOG   # Datadog
+  - MDB    # MongoDB
+  - CRWD   # CrowdStrike
+  - ZS     # Zscaler
+  - OKTA   # Okta
+  - ESTC   # Elastic
+
+CYBERSECURITY:
+  - CRWD   # CrowdStrike
+  - PANW   # Palo Alto Networks
+  - ZS     # Zscaler
+  - OKTA   # Okta
+  - FTNT   # Fortinet
+  - S      # SentinelOne
+  - CYBR   # CyberArk
+  - RPD    # Rapid7
+
+CLEAN_ENERGY:
+  - ENPH   # Enphase
+  - SEDG   # SolarEdge
+  - FSLR   # First Solar
+  - RUN    # Sunrun
+  - PLUG   # Plug Power
+  - BE     # Bloom Energy
+  - CHPT   # ChargePoint
+  - STEM   # Stem Inc
+  - NEE    # NextEra Energy
+
+DEFENSE:
+  - LMT    # Lockheed Martin
+  - RTX    # Raytheon
+  - NOC    # Northrop Grumman
+  - BA     # Boeing
+  - GD     # General Dynamics
+  - HII    # Huntington Ingalls
+  - LHX    # L3Harris
+  - TXT    # Textron
+
+RETAIL:
+  - AMZN   # Amazon
+  - WMT    # Walmart
+  - TGT    # Target
+  - COST   # Costco
+  - HD     # Home Depot
+  - LOW    # Lowe's
+  - DG     # Dollar General
+  - DLTR   # Dollar Tree
+
+HEALTHCARE:
+  - UNH    # UnitedHealth
+  - JNJ    # Johnson & Johnson
+  - PFE    # Pfizer
+  - LLY    # Eli Lilly
+  - ABBV   # AbbVie
+  - MRK    # Merck
+  - CVS    # CVS Health
+  - CI     # Cigna
+
+BANKS:
+  - JPM    # JPMorgan Chase
+  - BAC    # Bank of America
+  - WFC    # Wells Fargo
+  - C      # Citigroup
+  - GS     # Goldman Sachs
+  - MS     # Morgan Stanley
+  - SCHW   # Charles Schwab
+  - BK     # Bank of NY Mellon
+
+SEMICONDUCTORS:
+  - NVDA   # NVIDIA
+  - AMD    # AMD
+  - INTC   # Intel
+  - TXN    # Texas Instruments
+  - QCOM   # Qualcomm
+  - AVGO   # Broadcom
+  - MU     # Micron
+  - ADI    # Analog Devices
+  - LRCX   # Lam Research
+  - KLAC   # KLA Corp
+
+SOCIAL_MEDIA:
+  - META   # Meta
+  - SNAP   # Snap
+  - PINS   # Pinterest
+  - TWTR   # Twitter (if still public)
+  - RDDT   # Reddit
+  - MTCH   # Match Group
+
+STREAMING:
+  - NFLX   # Netflix
+  - DIS    # Disney
+  - WBD    # Warner Bros Discovery
+  - PARA   # Paramount
+  - ROKU   # Roku
+  - SPOT   # Spotify
+
+GAMING:
+  - ATVI   # Activision Blizzard
+  - EA     # Electronic Arts
+  - TTWO   # Take-Two
+  - RBLX   # Roblox
+  - U      # Unity
+  - DKNG   # DraftKings
