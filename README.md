@@ -4,7 +4,7 @@
 ## Project Overview
 
 MindfulRL-Intraday is a comprehensive financial trading system that combines:
-- **Multi-source news data processing** via the `finrl_deepseek_news_extension/` and `NewsExtraction/` modules
+- **Multi-source news data processing** via `data_sources/` and `NewsExtraction/` modules
 - **Advanced LLM integration** with configurable reasoning effort and verbosity parameters
 - **Sophisticated model comparison** capabilities for analyzing different LLM outputs
 - **Enterprise-grade cost control** and monitoring systems
@@ -14,9 +14,10 @@ MindfulRL-Intraday is a comprehensive financial trading system that combines:
 1. **News Data Pipeline**: Extract and process news from 10+ sources (Finnhub, Alpha Vantage, Yahoo, etc.)
 2. **LLM Scoring**: Score financial news headlines for sentiment and risk using OpenAI models
 3. **Content Summarization**: Generate intelligent summaries with configurable parameters
-4. **Model Comparison**: Compare outputs across different models with statistical analysis
-5. **RL Training**: Train PPO/CPPO agents on sentiment and risk-enhanced data
-6. **Backtesting**: Comprehensive backtesting with performance visualization
+4. **Advanced Model Comparison**: Compare outputs across different models with statistical analysis
+5. **Dynamic Analysis Toolkit**: Interactive tools for large-scale model comparison and visualization
+6. **RL Training**: Train PPO/CPPO agents on sentiment and risk-enhanced data
+7. **Backtesting**: Comprehensive backtesting with performance visualization
 
 ## Setup
 1. Ensure you are in this directory (project root).
@@ -32,6 +33,30 @@ MindfulRL-Intraday is a comprehensive financial trading system that combines:
 ## Workflow
 
 ### 1. Score News Headlines
+
+#### Recommended Models
+
+**Current Strategy:** Use latest reasoning models only, continuously upgrade as new versions release.
+
+| Model | Usage | Best For |
+|-------|-------|----------|
+| **gpt-5.1** | Latest | All tasks (when available) |
+| **gpt-5** | Primary | Sentiment/risk scoring |
+| **gpt-5-mini** | Primary | Summary generation (cost-effective) |
+
+> **Note:** Non-reasoning models (gpt-4.1-mini, etc.) and o-series (o3, o4-mini) are deprecated. Historical data retained for comparison only.
+>
+> **Upgrade Path:** gpt-5 → gpt-5.1 → gpt-5.2 (upcoming) → ...
+
+**Typical Workflow:**
+1. Generate summaries with **gpt-5-mini** (cost-effective, quality sufficient for summarization)
+2. Score sentiment/risk with **gpt-5** (higher quality for scoring tasks)
+3. Use `--reasoning-effort high --verbosity high` for best quality
+
+**Model Parameters:**
+- `--reasoning-effort`: "minimal", "low", "medium", "high"
+- `--verbosity`: "low", "medium", "high" (gpt-5 family)
+- `--allow-flex`: Enable Flex mode for 50% cost savings (longer wait times)
 
 #### Advanced Parameter Configuration
 
@@ -167,18 +192,32 @@ python openai_summary.py \
 ```
 
 ### 3. Model Comparison and Analysis
+
+#### Enhanced Large-Scale Comparison
+```bash
+# Enhanced comparison with automatic directory scanning
+python compare_scores_enhanced.py \
+  --root-dir /mnt/md0/finrl \
+  --score-type sentiment \
+  --output sentiment_comparison.csv
+
+# Generate dynamic analysis results
+python quick_comparison_cli.py sentiment_comparison.json --all
+
+# Interactive exploration (recommended for large-scale analysis)
+python interactive_comparison_analyzer.py --input sentiment_comparison.json --interactive
+
+# Generate visualization dashboard
+python visualization_dashboard.py --input sentiment_comparison.json --output dashboard.html
+```
+
+#### Traditional Comparison (Legacy)
 ```bash
 # Compare scores across multiple CSV files from different models
 python compare_scores.py \
   --files sentiment_o3_high.csv,sentiment_o4_mini.csv,sentiment_gpt4o.csv \
   --column sentiment_deepseek \
   --display-count 10
-
-# Compare risk scores with full display
-python compare_scores.py \
-  --files risk_o3_low.csv,risk_o3_medium.csv,risk_o3_high.csv \
-  --column risk_deepseek \
-  --display-count all
 ```
 
 ### 4. Prepare Dataset
@@ -208,8 +247,11 @@ python backtest_openai.py --data merged_dataset.csv \
 ## Project Structure
 
 ### Core Modules
-- **`finrl_deepseek_news_extension/`**: Advanced news data extraction and processing system
-- **`NewsExtraction/`**: Specialized news content extraction and preprocessing
+- **`data_sources/`**: Unified data source interface
+  - **Finnhub**: News, real-time quotes, company profiles (free tier: 60 calls/min)
+  - **Tiingo**: Historical stock prices (free tier: 30+ years EOD data)
+  - **SEC EDGAR**: Official SEC filings, XBRL financial data (free, no API key)
+- **`NewsExtraction/`**: Historical news data processing and quality analysis
 
 ### Scoring Scripts
 - **`score_sentiment_openai.py`**: Sentiment analysis with configurable reasoning effort
@@ -217,10 +259,14 @@ python backtest_openai.py --data merged_dataset.csv \
 - **`openai_summary.py`**: Article summarization with verbosity control
 
 ### Analysis and Comparison
-- **`compare_scores.py`**: Advanced statistical comparison of model outputs
+- **`compare_scores_enhanced.py`**: Enhanced large-scale model comparison with auto-scanning and caching
+- **`interactive_comparison_analyzer.py`**: Interactive analysis tool with clustering and outlier detection
+- **`quick_comparison_cli.py`**: Fast command-line analysis for quick insights
+- **`visualization_dashboard.py`**: Generate interactive HTML dashboards with charts
+- **`compare_summaries.py`**: Text similarity analysis for summary content comparison
+- **`compare_scores.py`**: Legacy statistical comparison tool
   - Supports reasoning effort file naming (e.g., `o3_high`, `o3_medium`, `o3_low`)
   - Multiple similarity metrics: Pearson correlation, Spearman correlation, Cohen's Kappa
-  - Configurable display options for rankings
 
 ### Utility Scripts
 - **`compare_sentiment.py`**: Compare sentiment columns between CSVs
@@ -234,8 +280,41 @@ python backtest_openai.py --data merged_dataset.csv \
 - **`train_ppo_llm.py`, `train_cppo_llm_risk.py`**: Core training implementations
 - **`env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`**: Trading environment definitions
 
+### Configuration
+- **`config/tickers_core.json`**: Core stock ticker list (tiered: Tier 1 must-have, Tier 2 expanded, Tier 3 custom)
+- **`config/.env.template`**: API credentials template (copy to `.env` and fill in your keys)
+
 ## Documentation
-- **`CLAUDE.md`**: Main project documentation and architecture overview
-- **`finrl_deepseek_news_extension/CLAUDE.md`**: News extension module documentation
-- **`NewsExtraction/CLAUDE.md`**: News extraction module documentation
+- **`DYNAMIC_ANALYSIS_TOOLKIT.md`**: Comprehensive guide to the dynamic analysis tools and visualization suite
+- **`data_sources/`**: Unified data source module (Finnhub for news, Tiingo for prices)
+- **`NewsExtraction/README.md`**: Historical news processing documentation
 - **`requirements.txt`**: Python dependencies
+
+## Advanced Features
+
+### Dynamic Analysis Toolkit
+For large-scale model comparison scenarios (10+ models), use the enhanced analysis toolkit:
+
+**Quick Start:**
+```bash
+# 1. Generate comparison data
+python compare_scores_enhanced.py --root-dir /mnt/md0/finrl --score-type sentiment --output results.json
+
+# 2. Quick analysis (30 seconds)
+python quick_comparison_cli.py results.json --all
+
+# 3. Interactive exploration (5 minutes)
+python interactive_comparison_analyzer.py --input results.json --interactive
+
+# 4. Generate visualization report (10 minutes)
+python visualization_dashboard.py --input results.json --output dashboard.html
+```
+
+**Key Capabilities:**
+- **Smart Clustering**: Automatically group similar models to reduce complexity from N² to K groups
+- **Outlier Detection**: Identify models with unusual behavior patterns
+- **Conditional Analysis**: Analyze similarity patterns by score ranges (e.g., conservative vs optimistic models)
+- **Interactive Exploration**: Dynamic analysis with filtering and ranking
+- **Rich Visualizations**: Heatmaps, dendrograms, network graphs, and distribution charts
+
+📋 **For detailed usage and examples, see [DYNAMIC_ANALYSIS_TOOLKIT.md](DYNAMIC_ANALYSIS_TOOLKIT.md)**
