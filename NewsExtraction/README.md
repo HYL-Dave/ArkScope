@@ -13,7 +13,7 @@ NewsExtraction/
 │   └── quality_analysis_script.py                # 深度质量分析工具 v2.0
 │
 ├── 📊 数据文件
-│   ├── tickers_89.json                          # 89档股票代码列表
+│   ├── tickers_89.json                          # FNSPID 原始 89 檔股票 (見下方說明)
 │   ├── fnspid_89_2013_2023_cleaned.csv          # 清洗后的FNSPID数据集 (218,654条)
 │   ├── fnspid_89_2013_2023_cleaned.parquet      # Parquet格式数据
 │   ├── fnspid_89_2013_2023_daily.parquet        # 每日聚合数据
@@ -185,6 +185,12 @@ INTC (6,978), AMD (6,824), GILD (5,150), MU (4,523), AMZN (4,403)
 ```
 
 ### 股票覆盖
+
+> **Ticker 清單演變說明**：
+> - `tickers_89.json` - FNSPID 原始 89 檔股票清單
+> - 本目錄處理後實際可用 **75 檔** (14 檔因數據不完整被過濾)
+> - FinRL_DeepSeek 使用同樣 75 檔
+> - 主專案 `config/tickers_core.json` 已擴展至 130+ 檔 (含 Tier 1/2/3 分層)
 
 **涵盖的 75 档股票**：
 ```
