@@ -237,9 +237,11 @@ class FinRLNewsProcessor:
         self.START_DATE = "2013-01-01"
         self.END_DATE = "2023-12-31"
         self.TICKERS_FILE = "tickers_89.json"
-        self.RAW_PARQUET = "fnspid_89_2013_2023_raw.parquet"
-        self.CLEANED_PARQUET = "fnspid_89_2013_2023_cleaned.parquet"
-        self.QUALITY_REPORT = "data_quality_report.json"
+        # 輸出前綴，避免覆蓋原版管道的輸出
+        self.OUTPUT_PREFIX = "readcsvs_"
+        self.RAW_PARQUET = f"{self.OUTPUT_PREFIX}fnspid_89_2013_2023_raw.parquet"
+        self.CLEANED_PARQUET = f"{self.OUTPUT_PREFIX}fnspid_89_2013_2023_cleaned.parquet"
+        self.QUALITY_REPORT = f"{self.OUTPUT_PREFIX}data_quality_report.json"
 
         # 模型相關參數
         self.model = "o3"
@@ -248,8 +250,8 @@ class FinRLNewsProcessor:
         self.batch_size = 10
         self.reasoning_effort = "medium"
 
-        # 初始化檢查點管理器
-        self.checkpoint_manager = CheckpointManager()
+        # 初始化檢查點管理器（使用獨立目錄以免覆蓋原版管道的檢查點）
+        self.checkpoint_manager = CheckpointManager(checkpoint_dir="checkpoints_readcsvs")
 
         # 錯誤恢復設置
         self.max_retries = 3
@@ -299,9 +301,10 @@ class FinRLNewsProcessor:
 
         # 保存無效資料報告
         if invalid_rows:
-            with open('invalid_records_report.json', 'w', encoding='utf-8') as f:
+            report_file = f"{self.OUTPUT_PREFIX}invalid_records_report.json"
+            with open(report_file, 'w', encoding='utf-8') as f:
                 json.dump(invalid_rows, f, indent=2, ensure_ascii=False, default=str)
-            self.logger.warning(f"發現 {len(invalid_rows)} 筆無效資料，詳見 invalid_records_report.json")
+            self.logger.warning(f"發現 {len(invalid_rows)} 筆無效資料，詳見 {report_file}")
 
         self.logger.info(f"資料驗證完成：有效 {len(valid_df)} 筆，無效 {len(invalid_rows)} 筆")
 
@@ -421,7 +424,8 @@ class FinRLNewsProcessor:
 
         # 如果有無效資料，保存供後續檢查
         if len(invalid_df) > 0:
-            invalid_df.to_parquet('invalid_records.parquet')
+            invalid_file = f"{self.OUTPUT_PREFIX}invalid_records.parquet"
+            invalid_df.to_parquet(invalid_file)
 
         # 3.1 轉換日期格式（移除時區信息以避免導出問題）
         df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
@@ -650,7 +654,8 @@ class FinRLNewsProcessor:
                 self.logger.warning(f"無法導出 {format.value} 格式: {e}")
 
         # 創建 DuckDB 數據庫
-        con = duckdb.connect('finrl_fnspid.db')
+        db_file = f"{self.OUTPUT_PREFIX}finrl_fnspid.db"
+        con = duckdb.connect(db_file)
         con.execute(f"CREATE TABLE IF NOT EXISTS fnspid AS SELECT * FROM df")
         con.execute("CREATE INDEX IF NOT EXISTS idx_symbol_date ON fnspid(Stock_symbol, Date)")
         con.close()
@@ -671,7 +676,7 @@ class FinRLNewsProcessor:
 
         daily_df = df.groupby(['Stock_symbol', 'Date']).agg(daily_agg).reset_index()
 
-        self.export_data(daily_df, ExportFormat.PARQUET, 'fnspid_89_2013_2023_daily')
+        self.export_data(daily_df, ExportFormat.PARQUET, f"{self.OUTPUT_PREFIX}fnspid_89_2013_2023_daily")
         self.logger.info("每日聚合數據已創建")
 
         # 創建統計摘要
@@ -684,7 +689,8 @@ class FinRLNewsProcessor:
             'top_publishers': df['Publisher'].value_counts().head(10).to_dict() if 'Publisher' in df.columns else {}
         }
 
-        with open('data_summary.json', 'w', encoding='utf-8') as f:
+        summary_file = f"{self.OUTPUT_PREFIX}data_summary.json"
+        with open(summary_file, 'w', encoding='utf-8') as f:
             json.dump(stats_summary, f, indent=2, ensure_ascii=False, default=str)
 
         self.logger.info("數據統計摘要已保存")
