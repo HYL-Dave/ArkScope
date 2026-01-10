@@ -1,8 +1,8 @@
 # Markdown 文檔審計報告
 
 > **生成日期**: 2026-01-06
-> **最後審核**: 2026-01-08
-> **總計**: 66 個 .md 檔案 (原 73，已刪除 7)
+> **最後審核**: 2026-01-10
+> **總計**: 69 個 .md 檔案 (原 73，已刪除 7，新增 3)
 > **目的**: 分類整理，決定各檔案處理方式
 >
 > **審核紀錄**:
@@ -18,6 +18,11 @@
 > - [x] docs/design/** 及 docs/features/** - ✅ 已加入 git-crypt 加密
 > - [x] NewsExtraction/ 所有 markdown - 已審核，保留
 > - [x] docs/ 所有 markdown - 已審核，保留
+> - [x] PROJECT_STRUCTURE.md - ✅ 更新腳本清單、數據源、待整理項目 (2026-01-10)
+> - [x] README.md - ✅ 更新欄位命名、腳本路徑、移除不存在的腳本引用 (2026-01-10)
+> - [x] docs/analysis/SCORING_VALIDATION_METHODOLOGY.md - ✅ 新增評分驗證方法論
+> - [x] scripts/visualization/README.md - ✅ 新增視覺化工具指南
+> - [x] scripts/scoring/README.md - ✅ 新增評分工具指南
 
 ---
 
