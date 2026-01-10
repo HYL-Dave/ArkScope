@@ -174,6 +174,21 @@ CLAUDE.md
 ANALYSIS_FINDINGS.md
 
 # -----------------------------------------------------------------------------
+# Internal Documentation (detailed docs, learning notes, exploration)
+# -----------------------------------------------------------------------------
+# NewsExtraction internal docs (referenced by CLAUDE.md)
+NewsExtraction/finrl_news_pipeline_documentation.md
+NewsExtraction/quality_analysis_script_documentation.md
+NewsExtraction/quality-analysis-deep-dive.md
+NewsExtraction/usage-workflow.md
+
+# docs internal (learning/exploration)
+docs/EXTENSIONS_REFERENCE.md
+docs/FUNDAMENTALS_GUIDE.md
+docs/analysis/HISTORICAL_ANALYSIS_LOG.md
+docs/analysis/NEWS_TIMING_ANALYSIS.md
+
+# -----------------------------------------------------------------------------
 # Local-only files (never track)
 # -----------------------------------------------------------------------------
 *.local.md
