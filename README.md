@@ -111,7 +111,7 @@ All scoring scripts now support advanced reasoning model parameters:
     --allow-flex --flex-timeout 900 --flex-retries 1
   ```
   * The script will auto-create the output directory if needed.
-  * The output CSV will include all original columns from the input plus a new column 'sentiment_deepseek'.
+  * The output CSV will include all original columns from the input plus a new column `sentiment_{model}` (e.g., `sentiment_gpt_5`, `sentiment_o4_mini`).
   * Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
   * 当触发每日 token 限额时，会在当前 chunk 写入完成后自动退出，以便第二天继续执行并重用剩余行。
 #### Risk (resumable, chunked):
@@ -144,7 +144,7 @@ All scoring scripts now support advanced reasoning model parameters:
     --allow-flex --flex-timeout 900 --flex-retries 1
   ```
 * The script will auto-create the output directory if needed.
-* The output CSV will include all original columns from the input plus a new column 'risk_deepseek'.
+* The output CSV will include all original columns from the input plus a new column `risk_{model}` (e.g., `risk_gpt_5`, `risk_o4_mini`).
 * Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
 
 ### 2. Prepare Dataset
@@ -193,31 +193,33 @@ python openai_summary.py \
 
 ### 3. Model Comparison and Analysis
 
-#### Enhanced Large-Scale Comparison
+#### Score Comparison
 ```bash
+# Compare scores across multiple CSV files from different models
+python scripts/comparison/compare_scores.py \
+  --files sentiment_o3_high.csv,sentiment_o4_mini.csv,sentiment_gpt4o.csv \
+  --column sentiment_gpt_5 \
+  --display-count 10
+
 # Enhanced comparison with automatic directory scanning
-python compare_scores_enhanced.py \
+python scripts/comparison/compare_scores_enhanced.py \
   --root-dir /mnt/md0/finrl \
   --score-type sentiment \
   --output sentiment_comparison.csv
 
-# Generate dynamic analysis results
-python quick_comparison_cli.py sentiment_comparison.json --all
-
-# Interactive exploration (recommended for large-scale analysis)
-python interactive_comparison_analyzer.py --input sentiment_comparison.json --interactive
-
-# Generate visualization dashboard
-python visualization_dashboard.py --input sentiment_comparison.json --output dashboard.html
+# A/B score comparison between two models
+python scripts/comparison/ab_score_comparison.py \
+  --file-a model_a_scores.csv \
+  --file-b model_b_scores.csv \
+  --column sentiment_gpt_5
 ```
 
-#### Traditional Comparison (Legacy)
+#### Summary Comparison
 ```bash
-# Compare scores across multiple CSV files from different models
-python compare_scores.py \
-  --files sentiment_o3_high.csv,sentiment_o4_mini.csv,sentiment_gpt4o.csv \
-  --column sentiment_deepseek \
-  --display-count 10
+# Compare text summaries across models
+python scripts/comparison/compare_summaries.py \
+  --files summaries_o3.csv,summaries_gpt5.csv \
+  --column gpt_5_summary
 ```
 
 ### 4. Prepare Dataset
@@ -258,18 +260,20 @@ python backtest_openai.py --data merged_dataset.csv \
 - **`score_risk_openai.py`**: Risk assessment with advanced parameter control
 - **`openai_summary.py`**: Article summarization with verbosity control
 
-### Analysis and Comparison
-- **`compare_scores_enhanced.py`**: Enhanced large-scale model comparison with auto-scanning and caching
-- **`interactive_comparison_analyzer.py`**: Interactive analysis tool with clustering and outlier detection
-- **`quick_comparison_cli.py`**: Fast command-line analysis for quick insights
-- **`visualization_dashboard.py`**: Generate interactive HTML dashboards with charts
-- **`compare_summaries.py`**: Text similarity analysis for summary content comparison
-- **`compare_scores.py`**: Legacy statistical comparison tool
-  - Supports reasoning effort file naming (e.g., `o3_high`, `o3_medium`, `o3_low`)
-  - Multiple similarity metrics: Pearson correlation, Spearman correlation, Cohen's Kappa
+### Analysis and Comparison (`scripts/comparison/`, `scripts/analysis/`)
+- **`scripts/comparison/compare_scores.py`**: Statistical comparison across multiple score files
+- **`scripts/comparison/compare_scores_enhanced.py`**: Enhanced comparison with auto-scanning and caching
+- **`scripts/comparison/compare_summaries.py`**: Text similarity analysis for summary comparison
+- **`scripts/comparison/ab_score_comparison.py`**: A/B score comparison between two models
+- **`scripts/analysis/sentiment_backtest.py`**: Sentiment-based trading strategy backtest
+- **`scripts/analysis/validate_scoring_value.py`**: Validate LLM score predictive power (IC, Hit Rate)
+- **`scripts/analysis/detailed_factor_comparison.py`**: Factor comparison with distribution analysis
+
+### Visualization (`scripts/visualization/`)
+- **`scripts/visualization/news_dashboard.py`**: Streamlit news dashboard (Polygon, Finnhub, IBKR)
+- **`scripts/visualization/fundamentals_query.py`**: CLI for querying stock fundamentals
 
 ### Utility Scripts
-- **`compare_sentiment.py`**: Compare sentiment columns between CSVs
 - **`filter_fns_data_by_date.py`**: Filter news data by date ranges
 - **`audit_stock_news.py`**: Data quality auditing and validation
 
@@ -285,36 +289,47 @@ python backtest_openai.py --data merged_dataset.csv \
 - **`config/.env.template`**: API credentials template (copy to `.env` and fill in your keys)
 
 ## Documentation
-- **`DYNAMIC_ANALYSIS_TOOLKIT.md`**: Comprehensive guide to the dynamic analysis tools and visualization suite
-- **`data_sources/`**: Unified data source module (Finnhub for news, Tiingo for prices)
+- **`PROJECT_STRUCTURE.md`**: Detailed project structure and directory organization
+- **`OPENAI_SCRIPTS.md`**: OpenAI scoring scripts usage guide
+- **`data_sources/`**: Unified data source module documentation
 - **`NewsExtraction/README.md`**: Historical news processing documentation
-- **`requirements.txt`**: Python dependencies
+- **`docs/analysis/SCORING_VALIDATION_METHODOLOGY.md`**: LLM scoring validation methodology
+- **`scripts/visualization/README.md`**: Visualization tools guide
+- **`scripts/scoring/README.md`**: Batch scoring scripts guide
 
 ## Advanced Features
 
-### Dynamic Analysis Toolkit
-For large-scale model comparison scenarios (10+ models), use the enhanced analysis toolkit:
+### Score Validation and Backtesting
+Validate LLM scoring effectiveness with quantitative finance methods:
 
-**Quick Start:**
 ```bash
-# 1. Generate comparison data
-python compare_scores_enhanced.py --root-dir /mnt/md0/finrl --score-type sentiment --output results.json
+# Validate score predictive power (IC, Hit Rate, Quintile Analysis)
+python scripts/analysis/validate_scoring_value.py \
+  --file scored_data.csv \
+  --score-col sentiment_gpt_5
 
-# 2. Quick analysis (30 seconds)
-python quick_comparison_cli.py results.json --all
-
-# 3. Interactive exploration (5 minutes)
-python interactive_comparison_analyzer.py --input results.json --interactive
-
-# 4. Generate visualization report (10 minutes)
-python visualization_dashboard.py --input results.json --output dashboard.html
+# Backtest sentiment-based trading strategies
+python scripts/analysis/sentiment_backtest.py \
+  --file scored_data.csv \
+  --score-col sentiment_gpt_5
 ```
 
-**Key Capabilities:**
-- **Smart Clustering**: Automatically group similar models to reduce complexity from N² to K groups
-- **Outlier Detection**: Identify models with unusual behavior patterns
-- **Conditional Analysis**: Analyze similarity patterns by score ranges (e.g., conservative vs optimistic models)
-- **Interactive Exploration**: Dynamic analysis with filtering and ranking
-- **Rich Visualizations**: Heatmaps, dendrograms, network graphs, and distribution charts
+### News Dashboard
+Interactive Streamlit dashboard for exploring news data:
 
-📋 **For detailed usage and examples, see [DYNAMIC_ANALYSIS_TOOLKIT.md](DYNAMIC_ANALYSIS_TOOLKIT.md)**
+```bash
+streamlit run scripts/visualization/news_dashboard.py
+```
+
+### Fundamentals Query CLI
+Interactive command-line tool for stock fundamentals:
+
+```bash
+python scripts/visualization/fundamentals_query.py
+
+# Example commands:
+> AAPL                    # Query single stock
+> AAPL MSFT GOOGL         # Compare multiple stocks
+> top roe                 # ROE ranking (high→low)
+> pe<20 roe>15            # Filter by conditions
+```
