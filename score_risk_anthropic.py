@@ -440,7 +440,8 @@ def process_file_realtime(
         logger.info(f"Resuming from row {processed_rows}")
 
     start_time = time.time()
-    out_col = "risk_claude"
+    # Dynamic column name based on model (e.g., sonnet → risk_sonnet)
+    out_col = f"risk_{model}"
 
     if input_format == 'parquet':
         # Parquet: load entire file
@@ -576,7 +577,8 @@ def process_file_batch(
         raise ValueError(f"Missing required columns: {missing}. Available: {list(df.columns)}")
 
     # Process in batches
-    out_col = "risk_claude"
+    # Dynamic column name based on model (e.g., sonnet → risk_sonnet)
+    out_col = f"risk_{model}"
     df[out_col] = None
     all_results = {}
 
@@ -642,7 +644,8 @@ def process_file_incremental(
     This is the recommended mode for daily updates when new data is added to the input file.
     """
     input_format = get_file_format(input_path)
-    out_col = "risk_claude"
+    # Dynamic column name based on model (e.g., sonnet → risk_sonnet)
+    out_col = f"risk_{model}"
 
     # Determine merge key
     if merge_key is None:
@@ -784,7 +787,7 @@ def main():
     )
     parser.add_argument(
         "--output", required=True,
-        help="Path to output file (CSV or Parquet, adds 'risk_claude' column)"
+        help="Path to output file (CSV or Parquet, adds 'risk_{model}' column, e.g., risk_sonnet)"
     )
     parser.add_argument(
         "--model", default="sonnet",

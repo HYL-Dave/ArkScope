@@ -458,7 +458,8 @@ def process_file_realtime(
         logger.info(f"Resuming from row {processed_rows}")
 
     start_time = time.time()
-    out_col = "sentiment_claude"
+    # Dynamic column name based on model (e.g., sonnet → sentiment_sonnet)
+    out_col = f"sentiment_{model}"
 
     # Handle Parquet vs CSV differently
     if input_format == 'parquet':
@@ -645,7 +646,8 @@ def process_file_batch(
         raise ValueError(f"Missing required columns: {missing}. Available: {list(df.columns)}")
 
     # Process in batches
-    out_col = "sentiment_claude"
+    # Dynamic column name based on model (e.g., sonnet → sentiment_sonnet)
+    out_col = f"sentiment_{model}"
     df[out_col] = None
 
     all_results = {}
@@ -735,7 +737,8 @@ def process_file_incremental(
         poll_interval: Seconds between batch status checks.
     """
     input_format = get_file_format(input_path)
-    out_col = "sentiment_claude"
+    # Dynamic column name based on model (e.g., sonnet → sentiment_sonnet)
+    out_col = f"sentiment_{model}"
 
     # Determine merge key
     if merge_key is None:
@@ -901,7 +904,7 @@ def main():
     )
     parser.add_argument(
         "--output", required=True,
-        help="Path to output file (CSV or Parquet, adds 'sentiment_claude' column)"
+        help="Path to output file (CSV or Parquet, adds 'sentiment_{model}' column, e.g., sentiment_sonnet)"
     )
     parser.add_argument(
         "--model", default="sonnet",

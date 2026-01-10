@@ -182,7 +182,7 @@ def main():
     )
     parser.add_argument(
         "--output", required=True,
-        help="Path to output CSV; adds 'sentiment_deepseek' column"
+        help="Path to output CSV; adds 'sentiment_{model}' column (e.g., sentiment_gpt_5)"
     )
     parser.add_argument(
         "--model", default="o4-mini",
@@ -311,7 +311,9 @@ def main():
         
         reader = pd.read_csv(cleaned_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='c')
-        out_col = "sentiment_deepseek"
+        # Dynamic column name based on model (e.g., gpt-5 → sentiment_gpt_5)
+        model_suffix = model.replace("-", "_").replace(".", "_")
+        out_col = f"sentiment_{model_suffix}"
         for i, chunk in enumerate(reader):
             logging.info(f"Processing chunk {i}, {len(chunk)} rows")
             if i * chunk_size < processed_rows:
