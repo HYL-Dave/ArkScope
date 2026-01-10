@@ -24,6 +24,7 @@
 \usepackage{listings}
 \usepackage{float}
 \usepackage{tikz}
+\usepackage[normalem]{ulem}  % For \sout strikethrough
 \usetikzlibrary{shapes.geometric, arrows, positioning, calc}
 
 % TikZ styles for flowcharts
@@ -1559,12 +1560,12 @@ if __name__ == '__main__':
 \toprule
 \textbf{來源} & \textbf{費用} & \textbf{API} & \textbf{特色} & \textbf{推薦} \\
 \midrule
-\textbf{Quiver Quantitative} & 免費 & \cmark & 超額回報計算, 即時更新 & \starmark\starmark\starmark\starmark\starmark \\
+\textbf{Finnhub Fundamental-1} & \$50/月 & \cmark & 已整合於專案, 官方支援 & \starmark\starmark\starmark\starmark\starmark \\
 \textbf{Capitol Trades} & 免費/付費 & \xmark & UI 最佳, 績效排名 & \starmark\starmark\starmark\starmark \\
 \textbf{FMP} & \$14.99+/月 & \cmark & 250 req/day 免費 & \starmark\starmark\starmark \\
 \textbf{AltIndex} & 付費 & \cmark & AI 分析, 預警系統 & \starmark\starmark\starmark \\
 \textbf{Unusual Whales} & \$97/年 & \xmark & 交叉分析選擇權流 & \starmark\starmark\starmark \\
-\textbf{Finnhub} & 免費 & \cmark & 已整合於專案 & \starmark\starmark\starmark\starmark \\
+\sout{Quiver Quantitative} & Enterprise & \cmark & 需企業訂閱 (個人無法購買) & -- \\
 \textbf{House Stock Watcher} & 免費 & \cmark & 開源 GitHub 專案 & \starmark\starmark\starmark \\
 \bottomrule
 \end{tabular}
@@ -1572,35 +1573,25 @@ if __name__ == '__main__':
 
 \subsection*{專案整合狀態}
 
-\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={\textbf{已實作}}]
+\begin{tcolorbox}[colback=warningyellow!10,colframe=warningyellow,title={\textbf{已移除 (2026-01-10)}}]
 \begin{itemize}[leftmargin=*]
-    \item \texttt{data\_sources/congressional\_source.py} -- \texttt{QuiverDataSource} 類
-    \item \texttt{scripts/collection/collect\_congressional\_trades.py} -- 數據收集腳本
-    \item 支援: 按議員/股票/政黨篩選, 超額回報排序
+    \item \sout{\texttt{data\_sources/congressional\_source.py}} -- Quiver API 需 Enterprise 訂閱，個人無法購買
+    \item \sout{\texttt{scripts/collection/collect\_congressional\_trades.py}} -- 已刪除
+    \item \textbf{替代方案}: Finnhub Fundamental-1 (\$50/月) 提供國會交易 API
 \end{itemize}
 \end{tcolorbox}
 
-\subsection*{使用範例}
+\subsection*{使用範例 (Finnhub 替代方案)}
 
-\begin{lstlisting}[language=Python,caption={使用 QuiverDataSource 獲取國會交易}]
-from data_sources import QuiverDataSource
+\begin{lstlisting}[language=Python,caption={使用 Finnhub 獲取國會交易 (需 Fundamental-1 訂閱)}]
+from data_sources import FinnhubDataSource
 
-quiver = QuiverDataSource()
+# 需要 Finnhub Fundamental Data Tier 1 ($50/月) 訂閱
+finnhub = FinnhubDataSource()
 
-# 獲取所有近期交易
-trades = quiver.fetch_congressional_trades()
-
-# 篩選特定股票
-nvda_trades = quiver.fetch_congressional_trades(tickers=['NVDA'])
-
-# 獲取特定議員的交易
-pelosi = quiver.fetch_trades_by_representative('Nancy Pelosi')
-
-# 獲取表現最佳的交易 (按超額回報)
-top = quiver.get_top_performers(limit=20)
-
-# 查看股票的國會活動摘要
-activity = quiver.get_ticker_activity('AAPL')
+# Finnhub Congressional Trading API
+# https://finnhub.io/docs/api/congressional-trading
+# 注意: 此 API 需要付費訂閱才能存取
 \end{lstlisting}
 
 \subsection*{投資策略應用}
@@ -1650,14 +1641,16 @@ Josh Gottheimer & D & 10\%+ & 金融科技 \\
 \subsection*{成本效益評估}
 
 \begin{tcolorbox}[colback=ibkrblue!5,colframe=ibkrblue]
-\textbf{推薦方案}: 使用 \textbf{Quiver Quantitative 免費 API}
+\textbf{推薦方案}: 使用 \textbf{Finnhub Fundamental Data Tier 1} (\$50/月)
 
 \begin{itemize}[leftmargin=*]
-    \item 已整合於專案 (\texttt{QuiverDataSource})
-    \item 提供超額回報計算
-    \item 免費且更新及時
-    \item 備用: FMP 免費版 (250 req/day) 或 Finnhub 國會交易 API
+    \item 官方支援，穩定可靠
+    \item 包含國會交易 + 其他另類數據 (ESG, 專利等)
+    \item 整合於現有 \texttt{FinnhubDataSource}
+    \item 備用免費方案: FMP (250 req/day)、House Stock Watcher (開源)
 \end{itemize}
+
+\textbf{注意}: Quiver Quantitative API 需要 Enterprise 訂閱，個人無法購買，相關代碼已移除。
 \end{tcolorbox}
 
 % ============================================================
@@ -1670,6 +1663,7 @@ Josh Gottheimer & D & 10\%+ & 金融科技 \\
 \toprule
 \textbf{日期} & \textbf{更新內容} \\
 \midrule
+2026-01-10 & 更新附錄 F: 移除 Quiver (需 Enterprise)，改推薦 Finnhub \\
 2025-12-26 & 加入國會議員交易數據來源附錄 F \\
 2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明；完整 LaTeX 版本 \\
 2025-12-23 & 加入 IBKR reqFundamentalData API 實測結果 \\
