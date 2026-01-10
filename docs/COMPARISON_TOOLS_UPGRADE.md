@@ -171,17 +171,28 @@ Estimated total cost: $242,359.97
 - 支援新的模型和參數類型
 - 易於添加新的分析功能
 
-## 📁 檔案結構
+## 📁 檔案結構 (2025-12 更新)
 
 ```
 MindfulRL-Intraday/
-├── compare_scores.py                 # 原版本（保留）
-├── compare_scores_enhanced.py        # 升級版本
-├── token_usage_analyzer.py          # 新增：Token 分析工具
-├── COMPARISON_TOOLS_UPGRADE.md      # 本文檔
-└── .cache/                          # 快取目錄（自動生成）
-    ├── *.pkl                        # 快取檔案
-    └── ...
+├── scripts/
+│   ├── comparison/                    # 比較工具目錄
+│   │   ├── ab_score_comparison.py     # 新增：A/B 分數比較工具
+│   │   ├── compare_scores.py          # 原版分數比較
+│   │   ├── compare_scores_enhanced.py # 增強版分數比較
+│   │   ├── compare_summaries.py       # 摘要比較工具
+│   │   ├── compare_news_sources.py    # 新聞來源比較
+│   │   └── comprehensive_news_comparison.py
+│   ├── analysis/
+│   │   └── ab_summary_comparison.py   # A/B 摘要比較工具
+│   └── ...
+├── docs/
+│   ├── COMPARISON_TOOLS_UPGRADE.md    # 本文檔
+│   └── analysis/
+│       ├── SUMMARY_COMPARISON_REPORT.md   # Summary A/B 報告
+│       ├── SCORE_COMPARISON_REPORT.md     # Sentiment Score 報告
+│       └── RISK_SCORE_COMPARISON_REPORT.md # Risk Score 報告
+└── .cache/                            # 快取目錄
 ```
 
 ## 🔮 未來擴展計劃

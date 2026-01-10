@@ -98,7 +98,7 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --verbose
    ```
    # The script will auto-create the output directory if needed.
-   # The output CSV will preserve all input columns plus the new 'sentiment_deepseek' column.
+   # The output CSV will preserve all input columns plus the new 'sentiment_{model}' column (e.g., sentiment_o4_mini).
    # Results are appended chunk by chunk; interrupt (Ctrl+C) anytime and re-run with the same arguments to resume.
 2. Score risk:
    ```bash
@@ -113,7 +113,7 @@ Rather than duplicating full env/train scripts, follow this workflow:
      --verbose
    ```
    # The script will auto-create the output directory if needed.
-   # The output CSV will preserve all input columns plus the new 'risk_deepseek' column.
+   # The output CSV will preserve all input columns plus the new 'risk_{model}' column (e.g., risk_o4_mini).
    # Results are appended chunk by chunk; interrupt (Ctrl+C) anytime and re-run with the same arguments to resume.
 3. Prepare merged dataset:
    ```bash
@@ -186,7 +186,7 @@ python score_sentiment_openai.py \
 | 參數                 | 默認值     | 說明                                                                 |
 |----------------------|-----------|----------------------------------------------------------------------|
 | `--input`            | 必填       | 輸入 CSV 文件路徑，必須包含 symbol, headline（或通過 --symbol-column/--text-column 指定）|
-| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `sentiment_deepseek` 列                      |
+| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `sentiment_{model}` 列 (如 sentiment_o4_mini)  |
 | `--model`            | o4-mini   | OpenAI 模型名稱（如 o4-mini, gpt-4.1, o3, gpt-5, gpt-5-mini 等）        |
 | `--symbol-column`    | Stock_symbol | 輸入 CSV 中股票代碼列名                                             |
 | `--text-column`      | Article_title | 輸入 CSV 中文本列名（可選：Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary, o3_summary, gpt_5_summary） |
@@ -426,7 +426,7 @@ python score_risk_openai.py \
 | 參數                 | 默認值     | 說明                                                                 |
 |----------------------|-----------|----------------------------------------------------------------------|
 | `--input`            | 必填       | 輸入 CSV 文件路徑，必須包含 symbol, headline（或通過 --symbol-column/--text-column 指定）|
-| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `risk_deepseek` 列                          |
+| `--output`           | 必填       | 輸出 CSV 文件路徑，會添加 `risk_{model}` 列 (如 risk_o4_mini)            |
 | `--model`            | o4-mini   | OpenAI 模型名稱（如 o4-mini, gpt-4.1, o3, gpt-5, gpt-5-mini 等）        |
 | `--symbol-column`    | Stock_symbol | 輸入 CSV 中股票代碼列名                                             |
 | `--text-column`      | Article_title | 輸入 CSV 中文本列名（可選：Article_title, Article, Lsa_summary, Luhn_summary, Textrank_summary, Lexrank_summary, o3_summary, gpt_5_summary） |
