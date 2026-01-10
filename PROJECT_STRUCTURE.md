@@ -40,11 +40,13 @@ MindfulRL-Intraday/
 ├── data_sources/                    # 數據源 API 整合
 │   ├── __init__.py
 │   ├── base.py                     # 基礎類別
-│   ├── polygon_source.py           # Polygon API
-│   ├── finnhub_source.py           # Finnhub API
+│   ├── polygon_source.py           # Polygon API (新聞)
+│   ├── finnhub_source.py           # Finnhub API (新聞/報價)
 │   ├── tiingo_source.py            # Tiingo API (歷史股價)
 │   ├── sec_edgar_source.py         # SEC EDGAR (財報)
-│   ├── eodhd_source.py             # EODHD API
+│   ├── alpha_vantage_source.py     # Alpha Vantage API
+│   ├── eodhd_source.py             # EODHD API (基本面)
+│   ├── ibkr_source.py              # IBKR TWS API (需 ib_insync)
 │   └── source_factory.py           # 數據源工廠
 │
 ├── scripts/                         # 執行腳本
@@ -54,18 +56,33 @@ MindfulRL-Intraday/
 │   │   ├── collect_ibkr_fundamentals.py
 │   │   └── ...
 │   │
-│   ├── scoring/                    # LLM 評分 (待整理)
+│   ├── scoring/                    # LLM 評分工具
+│   │   ├── README.md               # 評分工具指南
+│   │   ├── score_ibkr_news.py      # IBKR 新聞評分
+│   │   ├── validate_scores.py      # 評分驗證
+│   │   ├── batch_sentiment_scoring.sh  # 批次情緒評分
+│   │   └── batch_risk_scoring.sh   # 批次風險評分
 │   │
 │   ├── comparison/                 # 數據比較分析
-│   │   ├── compare_news_sources.py
+│   │   ├── compare_scores.py       # 分數比較
+│   │   ├── compare_scores_enhanced.py  # 增強版分數比較
+│   │   ├── compare_summaries.py    # 摘要比較
+│   │   ├── compare_news_sources.py # 新聞來源比較
+│   │   ├── ab_score_comparison.py  # A/B 分數比較
 │   │   └── comprehensive_news_comparison.py
 │   │
 │   ├── analysis/                   # 資料分析
-│   │   ├── analyze_finrl_scores.py
-│   │   ├── sentiment_backtest.py
-│   │   └── validate_scoring_value.py
+│   │   ├── analyze_finrl_scores.py # FinRL 評分分析
+│   │   ├── sentiment_backtest.py   # 情緒回測
+│   │   ├── validate_scoring_value.py  # 評分預測力驗證
+│   │   ├── detailed_factor_comparison.py  # 因子比較
+│   │   └── ab_summary_comparison.py  # A/B 摘要比較
 │   │
 │   └── visualization/              # 視覺化
+│       ├── README.md               # 視覺化工具指南
+│       ├── news_dashboard.py       # Streamlit 新聞儀表板
+│       ├── data_loader.py          # 數據載入模組
+│       └── fundamentals_query.py   # 基本面查詢 CLI
 │
 ├── NewsExtraction/                  # 歷史資料處理 (FNSPID)
 │   ├── finrl_news_pipeline_read_csvs.py
@@ -138,10 +155,12 @@ MindfulRL-Intraday/
 | 數據源 | 用途 | 方案 |
 |--------|------|------|
 | Polygon | 歷史新聞 | 免費 |
-| Finnhub | 即時新聞/報價 | 免費 |
+| Finnhub | 即時新聞/報價/基本面 | 免費/付費 |
 | Tiingo | 歷史股價 | 免費 (30+年) |
 | SEC EDGAR | 官方財報 | 免費 |
+| Alpha Vantage | 新聞/股價 | 免費 (限額) |
 | EODHD | 基本面數據 | 付費 |
+| IBKR | TWS 即時數據 | 需訂閱 |
 
 ## 使用方式
 
@@ -221,7 +240,7 @@ python score_sentiment_anthropic.py --input data/news/merged/2024 --output data/
 
 ```
 數據準備 (data_prep/)
-    ↓ (sentiment_deepseek → llm_sentiment)
+    ↓ (sentiment_{model} → llm_sentiment)
 訓練 (train_ppo_llm.py / train_cppo_llm_risk.py)
     ↓
 模型輸出 (agent_*.pth)
@@ -234,19 +253,16 @@ python score_sentiment_anthropic.py --input data/news/merged/2024 --output data/
 | score_sentiment_openai.py | scripts/scoring/ | 待移動 |
 | score_risk_openai.py | scripts/scoring/ | 待移動 |
 | score_sentiment_anthropic.py | scripts/scoring/ | 待移動 |
-| train_ppo_llm.py | training/ | ✅ 已完成 |
-| train_cppo_llm_risk.py | training/ | ✅ 已完成 |
-| env_stocktrading_llm.py | training/envs/ | ✅ 已完成 |
-| env_stocktrading_llm_risk.py | training/envs/ | ✅ 已完成 |
-| backtest_openai.py | training/ | ✅ 已完成 |
-| visualization_dashboard.py | scripts/visualization/ | 待移動 |
+| score_risk_anthropic.py | scripts/scoring/ | 待移動 |
+| openai_summary.py | scripts/scoring/ | 待移動 |
 
 ## 相關文檔
 
 - [CLAUDE.md](CLAUDE.md) - AI 助手指南
 - [README.md](README.md) - 專案總覽
 - [docs/strategy/STRATEGIC_DIRECTION_2026Q1.md](docs/strategy/STRATEGIC_DIRECTION_2026Q1.md) - 2026 Q1 策略方向
+- [docs/analysis/SCORING_VALIDATION_METHODOLOGY.md](docs/analysis/SCORING_VALIDATION_METHODOLOGY.md) - 評分驗證方法論
 
 ---
 
-*最後更新: 2026-01-05*
+*最後更新: 2026-01-10*
