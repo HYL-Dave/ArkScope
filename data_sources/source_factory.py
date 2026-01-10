@@ -32,8 +32,8 @@ _SOURCE_REGISTRY: Dict[str, Type[BaseDataSource]] = {
     'sec_edgar': SECEdgarDataSource,
     'polygon': PolygonDataSource,
     'alpha_vantage': AlphaVantageDataSource,
-    # Future sources can be added here:
-    # 'financial_datasets': FinancialDatasetsSource,
+    # Note: Quiver API removed - requires Enterprise subscription (個人無法購買)
+    # Congressional trading data available via Finnhub Fundamental-1 ($50/月)
 }
 
 # Add IBKR if available

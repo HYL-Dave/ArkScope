@@ -23,6 +23,8 @@ class DataSourceType(Enum):
     ALPHA_VANTAGE = "alpha_vantage"
     EODHD = "eodhd"
     YAHOO = "yahoo"
+    IBKR = "ibkr"
+    # Note: Quiver removed - Enterprise only. Congressional data via Finnhub Fundamental-1
 
 
 @dataclass
