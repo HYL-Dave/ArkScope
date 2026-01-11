@@ -81,10 +81,28 @@ def model_to_column_suffix(model: str) -> str:
     return model.replace("-", "_").replace(".", "_")
 
 
-def get_score_column(mode: str, model: str) -> str:
-    """Get dynamic column name based on mode and model."""
+def get_score_column(mode: str, model: str, reasoning_effort: str = "high") -> str:
+    """
+    Get dynamic column name based on mode, model, and reasoning effort.
+
+    Column naming convention:
+        {mode}_{model}_{effort}
+        e.g., sentiment_gpt_5_2_high, risk_o4_mini_medium
+
+    Note: This includes reasoning_effort (not verbosity) to distinguish
+    different scoring configurations. Verbosity only affects output detail,
+    not the scoring quality.
+
+    Args:
+        mode: "sentiment" or "risk"
+        model: Model name (e.g., "gpt-5.2", "o4-mini")
+        reasoning_effort: Reasoning effort level (none/minimal/low/medium/high/xhigh)
+
+    Returns:
+        Column name like "sentiment_gpt_5_2_high"
+    """
     suffix = model_to_column_suffix(model)
-    return f"{mode}_{suffix}"
+    return f"{mode}_{suffix}_{reasoning_effort}"
 
 
 def set_api_keys(keys: List[str], daily_limit: Optional[int]):
@@ -285,6 +303,7 @@ def find_unscored_articles(
     data_dir: Path,
     mode: str,
     model: str,
+    reasoning_effort: str = "high",
     month: Optional[str] = None,
 ) -> Dict[Path, pd.DataFrame]:
     """
@@ -294,12 +313,13 @@ def find_unscored_articles(
         data_dir: IBKR news data directory
         mode: "sentiment" or "risk"
         model: Model name for dynamic column naming
+        reasoning_effort: Reasoning effort level for column naming
         month: Optional month filter (YYYY-MM)
 
     Returns:
         Dict mapping parquet file paths to DataFrames with unscored articles
     """
-    score_col = get_score_column(mode, model)
+    score_col = get_score_column(mode, model, reasoning_effort)
     result = {}
 
     for parquet_file in data_dir.rglob("*.parquet"):
@@ -360,7 +380,7 @@ def score_parquet_file(
     Returns:
         Stats dict with scored/failed counts
     """
-    score_col = get_score_column(mode, model)
+    score_col = get_score_column(mode, model, reasoning_effort)
     stats = {"scored": 0, "failed": 0, "skipped": 0}
 
     # Find unscored rows
@@ -450,8 +470,9 @@ def main():
     )
     parser.add_argument(
         "--reasoning-effort", default="high",
-        choices=["minimal", "low", "medium", "high"],
-        help="Reasoning effort level (default: high)"
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        help="Reasoning effort level: none/minimal/low/medium/high/xhigh (default: high). "
+             "Note: 'none' is GPT-5.2 default; 'xhigh' requires GPT-5.2 Pro."
     )
     parser.add_argument(
         "--verbosity", default="low",
@@ -539,11 +560,13 @@ def main():
     if not data_dir.exists():
         parser.error(f"Data directory not found: {data_dir}")
 
-    # Get dynamic column name based on model
-    score_col = get_score_column(args.mode, args.model)
+    # Get dynamic column name based on model and reasoning effort
+    score_col = get_score_column(args.mode, args.model, args.reasoning_effort)
     logging.info(f"Target column: {score_col}")
     logging.info(f"Scanning {data_dir} for unscored {args.mode} articles...")
-    files_to_score = find_unscored_articles(data_dir, args.mode, args.model, args.month)
+    files_to_score = find_unscored_articles(
+        data_dir, args.mode, args.model, args.reasoning_effort, args.month
+    )
 
     if not files_to_score:
         logging.info("No unscored articles found!")
