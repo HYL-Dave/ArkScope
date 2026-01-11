@@ -4,26 +4,36 @@ Incremental sentiment/risk scoring for IBKR news (parquet format).
 
 Features:
 - Scans IBKR news parquet files for unscored articles
-- Scores only articles without sentiment_deepseek/risk_deepseek
+- Dynamic column naming based on model (e.g., sentiment_gpt_5_2, risk_o4_mini)
 - Updates parquet files in-place with scores
-- Supports API key rotation and token limits
+- Supports multiple API keys with automatic rotation
+- Supports Flex mode fallback (--allow-flex)
 - Supports --dry-run to preview what would be scored
 
-Usage:
-    # Score all unscored articles in IBKR news directory
-    python scripts/scoring/score_ibkr_news.py --mode sentiment
+Column Naming Convention:
+    Model name is converted to column suffix: gpt-5.2 → gpt_5_2
+    sentiment_gpt_5_2, risk_gpt_5_2, sentiment_o4_mini, etc.
 
-    # Score risk
-    python scripts/scoring/score_ibkr_news.py --mode risk
+Usage:
+    # Score sentiment with gpt-5.2
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
+
+    # Score risk with o4-mini
+    python scripts/scoring/score_ibkr_news.py --mode risk --model o4-mini
 
     # Preview what would be scored
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --dry-run
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 --dry-run
+
+    # With multiple API keys (one per line in file)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+        --api-keys-file ~/.openai_keys --daily-token-limit 1000000
+
+    # Enable Flex mode fallback after token limit
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+        --daily-token-limit 1000000 --allow-flex
 
     # Limit to specific month
     python scripts/scoring/score_ibkr_news.py --mode sentiment --month 2025-01
-
-    # With token limit
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --daily-token-limit 100000
 """
 import os
 import sys
@@ -61,6 +71,20 @@ TOTAL_PROMPT_TOKENS = 0
 TOTAL_COMPLETION_TOKENS = 0
 TOTAL_TOKENS = 0
 N_CALLS = 0
+
+# Current model (for dynamic column naming)
+CURRENT_MODEL = "gpt-5"
+
+
+def model_to_column_suffix(model: str) -> str:
+    """Convert model name to column suffix (e.g., gpt-5.2 → gpt_5_2)."""
+    return model.replace("-", "_").replace(".", "_")
+
+
+def get_score_column(mode: str, model: str) -> str:
+    """Get dynamic column name based on mode and model."""
+    suffix = model_to_column_suffix(model)
+    return f"{mode}_{suffix}"
 
 
 def set_api_keys(keys: List[str], daily_limit: Optional[int]):
@@ -260,6 +284,7 @@ def score_article(
 def find_unscored_articles(
     data_dir: Path,
     mode: str,
+    model: str,
     month: Optional[str] = None,
 ) -> Dict[Path, pd.DataFrame]:
     """
@@ -268,12 +293,13 @@ def find_unscored_articles(
     Args:
         data_dir: IBKR news data directory
         mode: "sentiment" or "risk"
+        model: Model name for dynamic column naming
         month: Optional month filter (YYYY-MM)
 
     Returns:
         Dict mapping parquet file paths to DataFrames with unscored articles
     """
-    score_col = "sentiment_deepseek" if mode == "sentiment" else "risk_deepseek"
+    score_col = get_score_column(mode, model)
     result = {}
 
     for parquet_file in data_dir.rglob("*.parquet"):
@@ -298,7 +324,7 @@ def find_unscored_articles(
 
             if not unscored.empty:
                 result[parquet_file] = df  # Return full DataFrame for updating
-                logging.info(f"{parquet_file.name}: {len(unscored)}/{len(df)} unscored")
+                logging.info(f"{parquet_file.name}: {len(unscored)}/{len(df)} unscored ({score_col})")
 
         except Exception as e:
             logging.warning(f"Error reading {parquet_file}: {e}")
@@ -324,7 +350,7 @@ def score_parquet_file(
         parquet_file: Path to parquet file
         df: Full DataFrame (will be updated in-place)
         mode: "sentiment" or "risk"
-        model: OpenAI model name
+        model: OpenAI model name (determines column name)
         reasoning_effort: Effort level
         verbosity: Verbosity level
         max_articles: Max articles to score
@@ -334,7 +360,7 @@ def score_parquet_file(
     Returns:
         Stats dict with scored/failed counts
     """
-    score_col = "sentiment_deepseek" if mode == "sentiment" else "risk_deepseek"
+    score_col = get_score_column(mode, model)
     stats = {"scored": 0, "failed": 0, "skipped": 0}
 
     # Find unscored rows
@@ -513,8 +539,11 @@ def main():
     if not data_dir.exists():
         parser.error(f"Data directory not found: {data_dir}")
 
+    # Get dynamic column name based on model
+    score_col = get_score_column(args.mode, args.model)
+    logging.info(f"Target column: {score_col}")
     logging.info(f"Scanning {data_dir} for unscored {args.mode} articles...")
-    files_to_score = find_unscored_articles(data_dir, args.mode, args.month)
+    files_to_score = find_unscored_articles(data_dir, args.mode, args.model, args.month)
 
     if not files_to_score:
         logging.info("No unscored articles found!")
@@ -522,8 +551,7 @@ def main():
 
     # Count total unscored
     total_unscored = sum(
-        len(df[df["sentiment_deepseek" if args.mode == "sentiment" else "risk_deepseek"].isna() &
-               (df['content_length'] > 0)])
+        len(df[df[score_col].isna() & (df['content_length'] > 0)])
         for df in files_to_score.values()
     )
 
@@ -532,9 +560,8 @@ def main():
     if args.dry_run:
         logging.info("\n[DRY RUN] Would score:")
         for pf, df in files_to_score.items():
-            score_col = "sentiment_deepseek" if args.mode == "sentiment" else "risk_deepseek"
             unscored = len(df[df[score_col].isna() & (df['content_length'] > 0)])
-            logging.info(f"  {pf.name}: {unscored} articles")
+            logging.info(f"  {pf.name}: {unscored} articles → {score_col}")
         return
 
     # Score articles
