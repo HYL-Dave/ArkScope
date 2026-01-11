@@ -133,17 +133,55 @@ Moved from project root:
 
 ### score_ibkr_news.py: Dynamic Column Naming
 
-**Breaking Change**: Column names are now dynamically generated based on model.
+**Breaking Change**: Column names are now dynamically generated based on model AND reasoning effort.
 
-| Model | Sentiment Column | Risk Column |
-|-------|------------------|-------------|
-| gpt-5 | `sentiment_gpt_5` | `risk_gpt_5` |
-| gpt-5.2 | `sentiment_gpt_5_2` | `risk_gpt_5_2` |
-| o4-mini | `sentiment_o4_mini` | `risk_o4_mini` |
+**Column naming convention:**
+```
+{mode}_{model}_{reasoning_effort}
+```
+
+| Model | Reasoning Effort | Sentiment Column | Risk Column |
+|-------|------------------|------------------|-------------|
+| gpt-5 | high | `sentiment_gpt_5_high` | `risk_gpt_5_high` |
+| gpt-5.2 | high | `sentiment_gpt_5_2_high` | `risk_gpt_5_2_high` |
+| gpt-5.2 | xhigh | `sentiment_gpt_5_2_xhigh` | `risk_gpt_5_2_xhigh` |
+| o4-mini | medium | `sentiment_o4_mini_medium` | `risk_o4_mini_medium` |
 
 **Conversion rule**: `-` and `.` in model name → `_`
 
 Previously hardcoded as `sentiment_deepseek` / `risk_deepseek`.
+
+### Reasoning Effort Levels (GPT-5.x / o-series)
+
+Column naming includes `reasoning_effort` to distinguish different scoring configurations.
+
+> **Important**: `reasoning_effort` controls model thinking depth and affects scoring quality.
+> This is NOT the same as `verbosity`, which only affects output detail level.
+
+**Available levels:**
+
+| Level | Description | Models |
+|-------|-------------|--------|
+| `none` | No extended thinking (GPT-5.2 default) | gpt-5.2 |
+| `minimal` | Minimal reasoning | gpt-5.x |
+| `low` | Light reasoning | gpt-5.x, o-series |
+| `medium` | Balanced reasoning | gpt-5.x, o-series |
+| `high` | Deep reasoning (recommended) | gpt-5.x, o-series |
+| `xhigh` | Maximum reasoning (Pro only) | gpt-5.2 Pro |
+
+**Usage:**
+```bash
+# Default: high reasoning effort
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
+
+# Explicit reasoning effort
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --reasoning-effort high
+
+# Maximum reasoning (requires Pro subscription)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --reasoning-effort xhigh
+```
 
 ### score_ibkr_news.py: Feature Summary
 
