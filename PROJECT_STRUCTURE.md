@@ -125,10 +125,9 @@ MindfulRL-Intraday/
 ├── out/                             # 輸出目錄 (gitignored)
 │
 └── 根目錄腳本 (待整理)
-    ├── score_sentiment_openai.py   # OpenAI 情緒評分
-    ├── score_risk_openai.py        # OpenAI 風險評分
     ├── train_ppo_llm.py            # PPO 訓練
     └── env_stocktrading_llm.py     # RL 環境
+    # 評分腳本已移至 scripts/scoring/ (2026-01-12)
 ```
 
 ## 核心模組說明
@@ -201,11 +200,14 @@ python scripts/collection/collect_all_news.py --stats
 ### LLM 評分
 
 ```bash
-# OpenAI (gpt-5.x)
-python score_sentiment_openai.py --input data/news/merged/2024 --output data/news/scored/
+# OpenAI (gpt-5.x) - CSV 評分
+python scripts/scoring/score_sentiment_openai.py --input data/news/merged/2024 --output data/news/scored/
 
-# Anthropic (Claude)
-python score_sentiment_anthropic.py --input data/news/merged/2024 --output data/news/scored/
+# Anthropic (Claude) - CSV 評分
+python scripts/scoring/score_sentiment_anthropic.py --input data/news/merged/2024 --output data/news/scored/
+
+# IBKR Parquet 評分 (支援多 API key 輪換)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
 ```
 
 ## 目錄追蹤策略
@@ -250,11 +252,11 @@ python score_sentiment_anthropic.py --input data/news/merged/2024 --output data/
 
 | 檔案 | 建議位置 | 狀態 |
 |------|---------|------|
-| score_sentiment_openai.py | scripts/scoring/ | 待移動 |
-| score_risk_openai.py | scripts/scoring/ | 待移動 |
-| score_sentiment_anthropic.py | scripts/scoring/ | 待移動 |
-| score_risk_anthropic.py | scripts/scoring/ | 待移動 |
-| openai_summary.py | scripts/scoring/ | 待移動 |
+| score_sentiment_openai.py | scripts/scoring/ | ✅ 已移動 (2026-01-12) |
+| score_risk_openai.py | scripts/scoring/ | ✅ 已移動 (2026-01-12) |
+| score_sentiment_anthropic.py | scripts/scoring/ | ✅ 已移動 (2026-01-12) |
+| score_risk_anthropic.py | scripts/scoring/ | ✅ 已移動 (2026-01-12) |
+| openai_summary.py | scripts/scoring/ | ✅ 已移動 (2026-01-12) |
 
 ## 相關文檔
 
@@ -265,4 +267,4 @@ python score_sentiment_anthropic.py --input data/news/merged/2024 --output data/
 
 ---
 
-*最後更新: 2026-01-10*
+*最後更新: 2026-01-12*
