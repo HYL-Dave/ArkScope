@@ -1,8 +1,8 @@
 # Markdown 文檔審計報告
 
 > **生成日期**: 2026-01-06
-> **最後審核**: 2026-01-10
-> **總計**: 69 個 .md 檔案 (原 73，已刪除 7，新增 3)
+> **最後審核**: 2026-01-11
+> **總計**: 64 個 .md 檔案 (原 73，已刪除 12，gitignore 新增 12，新增 3)
 > **目的**: 分類整理，決定各檔案處理方式
 >
 > **審核紀錄**:
@@ -23,6 +23,13 @@
 > - [x] docs/analysis/SCORING_VALIDATION_METHODOLOGY.md - ✅ 新增評分驗證方法論
 > - [x] scripts/visualization/README.md - ✅ 新增視覺化工具指南
 > - [x] scripts/scoring/README.md - ✅ 新增評分工具指南
+> - [x] PROJECT_PROPOSAL.md - ✅ 已刪除 (完全過時)
+> - [x] research_note.md - ✅ 已刪除 (Section 9 prompts 已實作於評分腳本)
+> - [x] Claude-FinRL Contest 2025 Project Strategy.md - ✅ 已刪除 (過時策略)
+> - [x] NewsExtraction/project-improvements.md - ✅ 已刪除 (建議已實作)
+> - [x] docs/analysis/gpt5_summary_analysis_20250921.json - ✅ 已刪除 (結論已記錄於 SUMMARY_COMPARISON_REPORT.md)
+> - [x] docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md - ✅ 已提交 (b95b1df)
+> - [x] 多個內部文檔 - ✅ 已加入 .gitignore (2026-01-11)
 
 ---
 
@@ -60,11 +67,11 @@
 | `OPENAI_SCRIPTS.md` | OpenAI 腳本使用說明 | 🟢 PUBLIC | 📝 Modified |
 | `NEWS_STORAGE_DESIGN.md` | 新聞儲存設計 | 🟢 PUBLIC | 📝 Modified |
 | `ARCHITECTURE_VISION.md` | 三層智慧架構設計 | 🔵 INTERNAL | ✅ Tracked 🔒 git-crypt |
-| `PROJECT_PROPOSAL.md` | 專案提案文檔 | 🔵 INTERNAL | ❓ Untracked |
+| ~~`PROJECT_PROPOSAL.md`~~ | ~~專案提案文檔~~ | 🔴 DELETE | ✅ 已刪除 (完全過時) |
 | ~~`ANALYSIS_FINDINGS.md`~~ | ~~代碼分析發現~~ | 🔴 DELETE | ✅ 已刪除 |
 | ~~`note.md`~~ | ~~情緒版 vs 無情緒版筆記~~ | 🔴 DELETE | ✅ 已刪除 (數據與 notebook 差異過大) |
-| `research_note.md` | 30分鐘盤中評估 + OpenAI 模型建議 | 🔵 INTERNAL | ❓ Untracked |
-| `Claude-FinRL Contest 2025 Project Strategy.md` | 競賽策略 (Claude 對話導出) | 🔵 INTERNAL | ❓ Untracked |
+| ~~`research_note.md`~~ | ~~30分鐘盤中評估 + OpenAI 模型建議~~ | 🔴 DELETE | ✅ 已刪除 (prompts 已實作) |
+| ~~`Claude-FinRL Contest 2025 Project Strategy.md`~~ | ~~競賽策略 (Claude 對話導出)~~ | 🔴 DELETE | ✅ 已刪除 (過時策略) |
 | ~~`DYNAMIC_ANALYSIS_TOOLKIT.md`~~ | ~~動態模型比較工具~~ | 🔴 DELETE | ✅ 已刪除 (相關腳本已刪除) |
 | ~~`ENHANCED_TOKEN_ANALYSIS_GUIDE.md`~~ | ~~Token 分析指南~~ | 🔴 DELETE | ✅ 已刪除 (相關腳本已刪除) |
 | ~~`FLEX_MODE_EXTENSION.md`~~ | ~~Flex 模式擴展說明~~ | 🔴 DELETE | ✅ 已刪除 (功能已實作) |
@@ -106,12 +113,12 @@
 |------|----------|------|----------|
 | `DEEPSEEK_VS_CLAUDE_COMPARISON.md` | DeepSeek vs Claude 比較 | 🔵 INTERNAL | ✅ Tracked |
 | `OPENAI_VS_CLAUDE_COMPARISON.md` | OpenAI vs Claude 比較 | 🔵 INTERNAL | ✅ Tracked |
-| `HISTORICAL_ANALYSIS_LOG.md` | 歷史分析紀錄 | 🔵 INTERNAL | ❓ Untracked |
-| `NEWS_TIMING_ANALYSIS.md` | 新聞時效性分析 | 🔵 INTERNAL | ❓ Untracked |
+| `HISTORICAL_ANALYSIS_LOG.md` | 歷史分析紀錄 | 🔵 INTERNAL | 🚫 gitignore |
+| `NEWS_TIMING_ANALYSIS.md` | 新聞時效性分析 | 🔵 INTERNAL | 🚫 gitignore |
 | `RISK_SCORE_COMPARISON_REPORT.md` | 風險評分比較 (自動生成) | 🟡 TEMP | ✅ Tracked |
 | `SENTIMENT_SCORE_COMPARISON_REPORT.md` | 情緒評分比較 (自動生成) | 🟡 TEMP | ✅ Tracked |
 | `SUMMARY_COMPARISON_REPORT.md` | Summary 比較 (自動生成) | 🟡 TEMP | ✅ Tracked |
-| `SCORING_VALUE_VALIDATION_REPORT.md` | 評分價值驗證報告 | 🔵 INTERNAL | ❓ Untracked |
+| `SCORING_VALUE_VALIDATION_REPORT.md` | 評分價值驗證報告 | 🔵 INTERNAL | ✅ Tracked |
 
 ---
 
@@ -140,7 +147,7 @@
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
-| `sector_breakout_patterns.md` | 板塊爆發模式案例 | 🔵 INTERNAL | ❓ Untracked |
+| `sector_breakout_patterns.md` | 板塊爆發模式案例 | 🔵 INTERNAL | 🚫 gitignore (docs/insights/) |
 
 ---
 
@@ -149,8 +156,8 @@
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
 | `COMPARISON_TOOLS_UPGRADE.md` | 比較工具升級報告 | 🔵 INTERNAL | 📝 Modified |
-| `EXTENSIONS_REFERENCE.md` | Claude Code 擴展參考 | 🔵 INTERNAL | ❓ Untracked |
-| `FUNDAMENTALS_GUIDE.md` | 基本面分析指南 | 🟢 PUBLIC | ❓ Untracked |
+| `EXTENSIONS_REFERENCE.md` | Claude Code 擴展參考 | 🔵 INTERNAL | 🚫 gitignore |
+| `FUNDAMENTALS_GUIDE.md` | 基本面分析指南 | 🔵 INTERNAL | 🚫 gitignore |
 
 ---
 
@@ -180,16 +187,16 @@
 |------|----------|------|----------|
 | `CLAUDE.md` | 子模組 Claude 指示 | 🟢 PUBLIC | 🚫 gitignore |
 | `README.md` | 模組說明 | 🟢 PUBLIC | ✅ Tracked |
-| `finrl_news_pipeline_documentation.md` | Pipeline v2.0 說明 | 🟢 PUBLIC | ❓ Untracked |
-| `quality_analysis_script_documentation.md` | 品質分析腳本說明 | 🟢 PUBLIC | ❓ Untracked |
+| `finrl_news_pipeline_documentation.md` | Pipeline v2.0 說明 | 🔵 INTERNAL | 🚫 gitignore |
+| `quality_analysis_script_documentation.md` | 品質分析腳本說明 | 🔵 INTERNAL | 🚫 gitignore |
 | `download-checklist.md` | 下載檢查清單 | 🔵 INTERNAL | ✅ Tracked |
 | `model-selection-guide.md` | 模型選擇指南 | 🔵 INTERNAL | ✅ Tracked |
 | `o3-flex-guide.md` | o3 Flex 使用指南 | 🔵 INTERNAL | ✅ Tracked |
 | `readme_o3.md` | o3 版本說明 | 🔵 INTERNAL | ✅ Tracked |
 | `project-handover.md` | 專案交接文件 | 🔵 INTERNAL | ✅ Tracked |
-| `project-improvements.md` | 專案改進建議 | 🔵 INTERNAL | ❓ Untracked |
-| `quality-analysis-deep-dive.md` | 品質分析深度解析 | 🔵 INTERNAL | ❓ Untracked |
-| `usage-workflow.md` | 使用流程說明 | 🔵 INTERNAL | ❓ Untracked |
+| ~~`project-improvements.md`~~ | ~~專案改進建議~~ | 🔴 DELETE | ✅ 已刪除 (建議已實作) |
+| `quality-analysis-deep-dive.md` | 品質分析深度解析 | 🔵 INTERNAL | 🚫 gitignore |
+| `usage-workflow.md` | 使用流程說明 | 🔵 INTERNAL | 🚫 gitignore |
 
 ---
 
@@ -246,21 +253,21 @@
 
 | 類別 | 數量 | 處理 |
 |------|------|------|
-| 🟢 **PUBLIC** | 15 | 正常 commit |
-| 🔵 **INTERNAL** | 39 | `export-ignore` 或加密 |
+| 🟢 **PUBLIC** | 13 | 正常 commit |
+| 🔵 **INTERNAL** | 32 | `export-ignore` 或加密 |
 | 🟡 **TEMP** | 5 | 問題解決後可刪除 |
-| 🔴 **DELETE** | 0 | 無待刪除檔案 (8 個已刪除) |
-| ⚫ **GITIGNORE** | 7 | 不追蹤 |
+| 🔴 **DELETE** | 0 | 無待刪除檔案 (12 個已刪除) |
+| ⚫ **GITIGNORE** | 19 | 不追蹤 (含新增 12 個) |
 
 ### 按目前狀態分類
 
 | 狀態 | 數量 | 說明 |
 |------|------|------|
-| ✅ Tracked | 27 | 已追蹤且無變更 |
+| ✅ Tracked | 28 | 已追蹤且無變更 |
 | 📝 Modified | 10 | 有未提交修改 |
 | ➕ Staged | 0 | 無 (已提交) |
-| ❓ Untracked | 19 | 尚未追蹤 |
-| 🚫 gitignore | 7 | 已設定忽略 |
+| ❓ Untracked | 1 | 尚未追蹤 (src/) |
+| 🚫 gitignore | 19 | 已設定忽略 |
 | 🔒 git-crypt | 12 | 已設定加密 |
 
 ---
@@ -313,32 +320,44 @@ docs/strategy/** filter=git-crypt diff=git-crypt
 
 ### 3. 需要決定的 Untracked 檔案
 
-**建議追蹤 (PUBLIC)** - 已審核確認有價值:
+**已完成 (2026-01-11)**:
 - ~~`docs/data/NEWS_DATA_INVENTORY.md`~~ ✅ 已提交
 - ~~`docs/data/SCORING_DATA_INVENTORY.md`~~ ✅ 已提交
-- `docs/FUNDAMENTALS_GUIDE.md`
-- `NewsExtraction/finrl_news_pipeline_documentation.md`
-- `NewsExtraction/quality_analysis_script_documentation.md`
-- `src/signals/README.md`
+- ~~`docs/FUNDAMENTALS_GUIDE.md`~~ 🚫 已 gitignore (學習筆記)
+- ~~`NewsExtraction/finrl_news_pipeline_documentation.md`~~ 🚫 已 gitignore
+- ~~`NewsExtraction/quality_analysis_script_documentation.md`~~ 🚫 已 gitignore
+- ~~`PROJECT_PROPOSAL.md`~~ ✅ 已刪除 (完全過時)
+- ~~`research_note.md`~~ ✅ 已刪除 (prompts 已實作於評分腳本)
+- ~~`Claude-FinRL Contest 2025 Project Strategy.md`~~ ✅ 已刪除 (過時策略)
+- ~~`docs/analysis/HISTORICAL_ANALYSIS_LOG.md`~~ 🚫 已 gitignore
+- ~~`docs/analysis/NEWS_TIMING_ANALYSIS.md`~~ 🚫 已 gitignore
+- ~~`docs/insights/sector_breakout_patterns.md`~~ 🚫 已 gitignore (docs/insights/)
+- ~~`docs/EXTENSIONS_REFERENCE.md`~~ 🚫 已 gitignore
+- ~~`NewsExtraction/project-improvements.md`~~ ✅ 已刪除 (建議已實作)
+- ~~`NewsExtraction/quality-analysis-deep-dive.md`~~ 🚫 已 gitignore
+- ~~`NewsExtraction/usage-workflow.md`~~ 🚫 已 gitignore
 
-**建議追蹤並加密 (INTERNAL)** - 已審核確認保留:
-- `PROJECT_PROPOSAL.md` - 正式計畫書
-- `research_note.md` - 30-min bar 研究 + OpenAI 模型建議
-- `Claude-FinRL Contest 2025 Project Strategy.md`
-- `docs/analysis/HISTORICAL_ANALYSIS_LOG.md`
-- `docs/analysis/NEWS_TIMING_ANALYSIS.md`
-- `docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md`
-- `docs/insights/sector_breakout_patterns.md`
-- `docs/EXTENSIONS_REFERENCE.md`
-- `results/finrl_full_analysis/*.md`
-- `NewsExtraction/project-improvements.md`
-- `NewsExtraction/quality-analysis-deep-dive.md`
-- `NewsExtraction/usage-workflow.md`
+**待處理**:
+- `src/signals/README.md` - 稍後處理
 
-### 4. 建議加入 .gitignore
+**已完成但漏記**:
+- ~~`docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md`~~ ✅ 已提交 (b95b1df)
+
+### 4. 已加入 .gitignore ✅
 ```gitignore
 # Serena MCP memories
 .serena/
+
+# Internal Documentation (detailed docs, learning notes, exploration)
+NewsExtraction/finrl_news_pipeline_documentation.md
+NewsExtraction/quality_analysis_script_documentation.md
+NewsExtraction/quality-analysis-deep-dive.md
+NewsExtraction/usage-workflow.md
+docs/EXTENSIONS_REFERENCE.md
+docs/FUNDAMENTALS_GUIDE.md
+docs/analysis/HISTORICAL_ANALYSIS_LOG.md
+docs/analysis/NEWS_TIMING_ANALYSIS.md
+docs/insights/
 ```
 
 ### 5. 建議更新 .gitattributes (export-ignore)
