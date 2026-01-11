@@ -8,7 +8,7 @@
 
 set -e  # Exit on error
 
-# Navigate to project root (where score_risk_openai.py is located)
+# Navigate to project root (for API key files; Python scripts are in scripts/scoring/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
@@ -75,7 +75,7 @@ for i in "${!API_KEY_FILES[@]}"; do
     echo "Executing scoring script..."
 
     # Run the scoring script
-    python score_risk_openai.py \
+    python scripts/scoring/score_risk_openai.py \
         --input "$INPUT_CSV" \
         --output "$OUTPUT_CSV" \
         --model "$MODEL" \
