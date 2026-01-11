@@ -30,6 +30,7 @@
 > - [x] docs/analysis/gpt5_summary_analysis_20250921.json - ✅ 已刪除 (結論已記錄於 SUMMARY_COMPARISON_REPORT.md)
 > - [x] docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md - ✅ 已提交 (b95b1df)
 > - [x] 多個內部文檔 - ✅ 已加入 .gitignore (2026-01-11)
+> - [x] src/signals/ - ✅ 已追蹤 (多因子信號偵測模組，2026-01-11)
 
 ---
 
@@ -231,7 +232,7 @@
 
 | 檔案 | 內容摘要 | 建議 | 目前狀態 |
 |------|----------|------|----------|
-| `src/signals/README.md` | 信號模組使用指南 | 🟢 PUBLIC | ❓ Untracked |
+| `src/signals/README.md` | 信號模組使用指南 | 🟢 PUBLIC | ✅ Tracked |
 
 ---
 
@@ -263,10 +264,10 @@
 
 | 狀態 | 數量 | 說明 |
 |------|------|------|
-| ✅ Tracked | 28 | 已追蹤且無變更 |
+| ✅ Tracked | 29 | 已追蹤且無變更 |
 | 📝 Modified | 10 | 有未提交修改 |
 | ➕ Staged | 0 | 無 (已提交) |
-| ❓ Untracked | 1 | 尚未追蹤 (src/) |
+| ❓ Untracked | 0 | 全部已處理 |
 | 🚫 gitignore | 19 | 已設定忽略 |
 | 🔒 git-crypt | 12 | 已設定加密 |
 
@@ -338,7 +339,7 @@ docs/strategy/** filter=git-crypt diff=git-crypt
 - ~~`NewsExtraction/usage-workflow.md`~~ 🚫 已 gitignore
 
 **待處理**:
-- `src/signals/README.md` - 稍後處理
+- ~~`src/signals/README.md`~~ ✅ 已追蹤 (2026-01-11)
 
 **已完成但漏記**:
 - ~~`docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md`~~ ✅ 已提交 (b95b1df)
