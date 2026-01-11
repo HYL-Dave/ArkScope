@@ -16,7 +16,7 @@ For a fully standalone workflow, see `README.md` in this folder.
 
 ## Script: score_sentiment_openai.py
 
-Path: `score_sentiment_openai.py`
+Path: `scripts/scoring/score_sentiment_openai.py`
 
 ### Description
 Scores each news headline for sentiment using an OpenAI LLM.
@@ -32,7 +32,7 @@ Scores each news headline for sentiment using an OpenAI LLM.
 
 ### Usage
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input data/headlines.csv \
   --output data/sentiment_scored.csv \
   --model o4-mini
@@ -43,7 +43,7 @@ python score_sentiment_openai.py \
 
 ## Script: score_risk_openai.py
 
-Path: `score_risk_openai.py`
+Path: `scripts/scoring/score_risk_openai.py`
 
 ### Description
 Scores each news headline for downside risk using an OpenAI LLM.
@@ -53,7 +53,7 @@ Same as sentiment script.
 
 ### Usage
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input data/headlines.csv \
   --output data/risk_scored.csv \
   --model o4-mini
@@ -87,7 +87,7 @@ python score_risk_openai.py \
 Rather than duplicating full env/train scripts, follow this workflow:
 1. Score sentiment:
    ```bash
-   python score_sentiment_openai.py \
+   python scripts/scoring/score_sentiment_openai.py \
      --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
      --output sentiment_scored.csv \
      --model o4-mini \
@@ -102,7 +102,7 @@ Rather than duplicating full env/train scripts, follow this workflow:
    # Results are appended chunk by chunk; interrupt (Ctrl+C) anytime and re-run with the same arguments to resume.
 2. Score risk:
    ```bash
-   python score_risk_openai.py \
+   python scripts/scoring/score_risk_openai.py \
      --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
      --output risk_scored.csv \
      --model o4-mini \
@@ -146,7 +146,7 @@ Score financial news headlines for sentiment using OpenAI, with resumable chunke
 
 Usage:
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output sentiment_scored.csv \
   --model o4-mini \
@@ -163,7 +163,7 @@ python score_sentiment_openai.py \
 
 # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output sentiment_scored.csv \
   --model o4-mini \
@@ -209,7 +209,7 @@ python score_sentiment_openai.py \
 
 ##### 範例 1：使用 Flex 模式連續運行（不受 daily token limit 停止）
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
   --output /mnt/md0/finrl/gpt-5/sentiment/sentiment_gpt-5_R_medium_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv \
   --model gpt-5 \
@@ -231,7 +231,7 @@ python score_sentiment_openai.py \
 
 ##### 範例 2：受 daily token limit 控制的運行
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
   --output /mnt/md0/finrl/gpt-5-mini/sentiment/sentiment_gpt-5-mini_by_gpt-5_reason_high_verbosity_high_summary.csv \
   --model gpt-5-mini \
@@ -288,7 +288,7 @@ The output `audit_report.csv` will have columns `[file, issue, detail]`, capturi
 
 # Script: openai_summary.py
 
-Path: `openai_summary.py`
+Path: `scripts/scoring/openai_summary.py`
 
 ### Description
 Summarizes the full `Article` text of each news entry into a new `<model>_summary` column, skipping empty articles. Supports resumable chunked processing, API key rotation, and daily token limits.
@@ -321,7 +321,7 @@ Summarizes the full `Article` text of each news entry into a new `<model>_summar
 
 #### 基本用法
 ```bash
-python openai_summary.py \
+python scripts/scoring/openai_summary.py \
   --input sentiment_deepseek_new_cleaned_nasdaq_news_full.csv \
   --output news_with_summary.csv \
   --model o4-mini \
@@ -336,7 +336,7 @@ python openai_summary.py \
 
 #### 使用 GPT-5 模型與新參數
 ```bash
-python openai_summary.py \
+python scripts/scoring/openai_summary.py \
   --input /mnt/md0/finrl/news_data/full_articles.csv \
   --output /mnt/md0/finrl/gpt-5/summary/gpt-5_reason_high_verbosity_high_news_with_summary.csv \
   --model gpt-5 \
@@ -353,7 +353,7 @@ python openai_summary.py \
 
 #### Flex 模式範例
 ```bash
-python openai_summary.py \
+python scripts/scoring/openai_summary.py \
   --input large_dataset.csv \
   --output news_with_summary.csv \
   --model gpt-5-mini \
@@ -394,7 +394,7 @@ The output CSV will include all join key columns plus two score columns (`sentim
 
 Usage:
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output risk_scored.csv \
   --model o4-mini \
@@ -408,7 +408,7 @@ python score_risk_openai.py \
 
 # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output risk_scored.csv \
   --model o4-mini \
@@ -449,7 +449,7 @@ python score_risk_openai.py \
 
 ##### 基本風險評分
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output risk_scored.csv \
   --model o4-mini \
@@ -463,7 +463,7 @@ python score_risk_openai.py \
 
 ##### Flex 模式風險評分
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
   --output risk_scored.csv \
   --model o4-mini \
@@ -480,7 +480,7 @@ python score_risk_openai.py \
 
 ##### 使用 GPT-5 模型進行風險評分
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/gpt-5/summary/gpt-5_summaries.csv \
   --output /mnt/md0/finrl/gpt-5/risk/risk_gpt-5_analysis.csv \
   --model gpt-5 \
@@ -568,7 +568,7 @@ python backtest_openai.py \
 **高成本控制（使用 daily-token-limit）**：
 ```bash
 # 範例：嚴格控制成本，達到 2.48M tokens 後停止
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --model gpt-5-mini \
   --daily-token-limit 2480000 \
   --reasoning-effort high \
@@ -578,7 +578,7 @@ python score_sentiment_openai.py \
 **無限制運行（Flex 模式）**：
 ```bash
 # 範例：不受 token 限制，持續運行直到完成
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --model gpt-5 \
   --daily-token-limit 0 \
   --allow-flex \
@@ -613,7 +613,7 @@ python score_sentiment_openai.py \
 
 #### 場景1：研究級高質量情感分析
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/research_data/critical_news.csv \
   --output /mnt/md0/finrl/gpt-5/high_quality_sentiment.csv \
   --model gpt-5 \
@@ -628,7 +628,7 @@ python score_sentiment_openai.py \
 
 #### 場景2：生產環境批量處理
 ```bash
-python score_sentiment_openai.py \
+python scripts/scoring/score_sentiment_openai.py \
   --input /mnt/md0/finrl/production_data/daily_news.csv \
   --output /mnt/md0/finrl/gpt-5-mini/daily_sentiment.csv \
   --model gpt-5-mini \
@@ -642,7 +642,7 @@ python score_sentiment_openai.py \
 
 #### 場景3：成本敏感的試驗性分析
 ```bash
-python score_risk_openai.py \
+python scripts/scoring/score_risk_openai.py \
   --input /mnt/md0/finrl/test_data/sample_news.csv \
   --output /mnt/md0/finrl/gpt-5-mini/test_risk.csv \
   --model gpt-5-mini \
