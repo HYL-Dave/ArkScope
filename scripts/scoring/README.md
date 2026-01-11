@@ -107,7 +107,7 @@ IBKR news scoring integration (uses IBKR API news data).
 
 ## Related Files
 
-- Root scoring scripts: `score_sentiment_openai.py`, `score_risk_openai.py`
+- Scoring scripts (now in this directory): `score_sentiment_openai.py`, `score_risk_openai.py`, `score_sentiment_anthropic.py`, `score_risk_anthropic.py`
 - API key files: `api_keys_tier1.txt`, `api_keys_tier5.txt` (gitignored)
 - Documentation: `OPENAI_SCRIPTS.md`
 
@@ -120,3 +120,51 @@ Files moved from project root:
 - `check_sentiment_csv.py` -> `validate_scores.py`
 
 After moving, update shell script paths to call Python scripts from the new location.
+
+## Migration Notes (2026-01-12)
+
+### Scripts Consolidated to scripts/scoring/
+
+Moved from project root:
+- `score_sentiment_openai.py` - OpenAI sentiment scoring (CSV)
+- `score_risk_openai.py` - OpenAI risk scoring (CSV)
+- `score_sentiment_anthropic.py` - Anthropic sentiment scoring (CSV)
+- `score_risk_anthropic.py` - Anthropic risk scoring (CSV)
+
+### score_ibkr_news.py: Dynamic Column Naming
+
+**Breaking Change**: Column names are now dynamically generated based on model.
+
+| Model | Sentiment Column | Risk Column |
+|-------|------------------|-------------|
+| gpt-5 | `sentiment_gpt_5` | `risk_gpt_5` |
+| gpt-5.2 | `sentiment_gpt_5_2` | `risk_gpt_5_2` |
+| o4-mini | `sentiment_o4_mini` | `risk_o4_mini` |
+
+**Conversion rule**: `-` and `.` in model name → `_`
+
+Previously hardcoded as `sentiment_deepseek` / `risk_deepseek`.
+
+### score_ibkr_news.py: Feature Summary
+
+```bash
+# Preview (dry-run)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 --dry-run
+
+# Multiple API keys with rotation
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --api-keys-file ~/.openai_keys --daily-token-limit 1000000
+
+# Enable Flex mode fallback (50% cost reduction)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --daily-token-limit 1000000 --allow-flex
+```
+
+**Capabilities:**
+- ✅ Multiple API keys (`--api-keys-file`)
+- ✅ Token limit per key (`--daily-token-limit`)
+- ✅ Automatic key rotation when limit reached
+- ✅ Flex mode fallback (`--allow-flex`)
+- ✅ Incremental scoring (skips already-scored articles)
+- ✅ Progress checkpoints (`--save-every`)
+- ✅ Dry-run preview (`--dry-run`)
