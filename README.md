@@ -69,7 +69,7 @@ All scoring scripts now support advanced reasoning model parameters:
 
 #### Sentiment Scoring (resumable, chunked):
   ```bash
-  python score_sentiment_openai.py \
+  python scripts/scoring/score_sentiment_openai.py \
     --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
     --output sentiment_scored.csv \
     --model o4-mini \
@@ -87,7 +87,7 @@ All scoring scripts now support advanced reasoning model parameters:
     --verbose
 
   # Example with gpt-5 using minimal reasoning effort:
-  python score_sentiment_openai.py \
+  python scripts/scoring/score_sentiment_openai.py \
     --input data.csv \
     --output sentiment_o3_minimal.csv \
     --model gpt-5 \
@@ -95,7 +95,7 @@ All scoring scripts now support advanced reasoning model parameters:
     --verbosity high
 
   # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
-  python score_sentiment_openai.py \
+  python scripts/scoring/score_sentiment_openai.py \
     --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
     --output sentiment_scored.csv \
     --model o4-mini \
@@ -116,7 +116,7 @@ All scoring scripts now support advanced reasoning model parameters:
   * 当触发每日 token 限额时，会在当前 chunk 写入完成后自动退出，以便第二天继续执行并重用剩余行。
 #### Risk (resumable, chunked):
   ```bash
-  python score_risk_openai.py \
+  python scripts/scoring/score_risk_openai.py \
     --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
     --output risk_scored.csv \
     --model o4-mini \
@@ -131,7 +131,7 @@ All scoring scripts now support advanced reasoning model parameters:
     --verbose
 
   # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
-  python score_risk_openai.py \
+  python scripts/scoring/score_risk_openai.py \
     --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
     --output risk_scored.csv \
     --model o4-mini \
@@ -174,7 +174,7 @@ python backtest_openai.py --data merged_dataset.csv \
 ### 2. Content Summarization
 ```bash
 # Generate article summaries with configurable parameters
-python openai_summary.py \
+python scripts/scoring/openai_summary.py \
   --input data.csv \
   --output summarized.csv \
   --model o4-mini \
@@ -183,7 +183,7 @@ python openai_summary.py \
   --summary-column o4_summary
 
 # gpt-5 with custom verbosity
-python openai_summary.py \
+python scripts/scoring/openai_summary.py \
   --input data.csv \
   --output summarized.csv \
   --model gpt-5 \
@@ -255,10 +255,11 @@ python backtest_openai.py --data merged_dataset.csv \
   - **SEC EDGAR**: Official SEC filings, XBRL financial data (free, no API key)
 - **`NewsExtraction/`**: Historical news data processing and quality analysis
 
-### Scoring Scripts
+### Scoring Scripts (`scripts/scoring/`)
 - **`score_sentiment_openai.py`**: Sentiment analysis with configurable reasoning effort
 - **`score_risk_openai.py`**: Risk assessment with advanced parameter control
-- **`openai_summary.py`**: Article summarization with verbosity control
+- **`score_ibkr_news.py`**: IBKR parquet scoring with API key rotation
+- **`openai_summary.py`**: Article summarization (generates input for scoring)
 
 ### Analysis and Comparison (`scripts/comparison/`, `scripts/analysis/`)
 - **`scripts/comparison/compare_scores.py`**: Statistical comparison across multiple score files
