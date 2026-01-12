@@ -50,7 +50,17 @@ import pandas as pd
 import openai
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load environment variables from config/.env automatically
+try:
+    from dotenv import load_dotenv
+    env_path = PROJECT_ROOT / "config" / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass  # python-dotenv not installed, rely on environment variables
 
 # =============================================================================
 # API Key Management (shared with score_sentiment_openai.py)
@@ -510,7 +520,7 @@ def main():
     )
     parser.add_argument(
         "--daily-token-limit", type=int, default=None,
-        help="Token limit per API key"
+        help="Token limit PER API KEY (not total). E.g., 2 keys with 1000000 = 2M total"
     )
     parser.add_argument(
         "--allow-flex", action="store_true",
@@ -545,9 +555,16 @@ def main():
     elif args.api_key:
         keys = [args.api_key]
     else:
-        env_key = os.getenv("OPENAI_API_KEY")
-        if env_key:
-            keys = [env_key]
+        # Check OPENAI_API_KEYS first (comma-separated, for rotation)
+        env_keys = os.getenv("OPENAI_API_KEYS")
+        if env_keys:
+            keys = [k.strip() for k in env_keys.split(",") if k.strip()]
+            logging.info(f"Loaded {len(keys)} API keys from OPENAI_API_KEYS env var")
+        else:
+            # Fallback to single OPENAI_API_KEY
+            env_key = os.getenv("OPENAI_API_KEY")
+            if env_key:
+                keys = [env_key]
 
     if not keys and not args.dry_run:
         parser.error("No OpenAI API key provided")
