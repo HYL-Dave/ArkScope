@@ -432,10 +432,13 @@ def test_all_endpoints():
 
     # =========================================================================
     # 18. Earnings Press Releases (NEW - FREE $0.00)
+    # NOTE: This endpoint only supports specific tickers (NOT AAPL).
+    #       See /earnings/press-releases/tickers/ for supported list.
+    #       Using COST as test ticker (confirmed supported).
     # =========================================================================
     print(f"\n[18/{TOTAL_ENDPOINTS}] Testing getEarningsPressReleases (FREE)...")
     result = make_request(f"/earnings/press-releases", {
-        "ticker": TEST_TICKER,
+        "ticker": "COST",  # AAPL not supported; COST is on the supported list
     })
     save_result("18_earnings_press_releases", result)
     results_summary.append({
