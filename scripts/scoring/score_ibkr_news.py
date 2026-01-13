@@ -130,17 +130,30 @@ def rotate_key_if_needed(usage: int):
     global CURRENT_KEY_IDX, STOP_AFTER_CHUNK, USE_FLEX_MODE
     if DAILY_TOKEN_LIMIT is not None:
         if TOKENS_USED.get(API_KEYS[CURRENT_KEY_IDX], 0) + usage >= DAILY_TOKEN_LIMIT:
-            if ALLOW_FLEX:
-                logging.warning(
-                    f"API key {CURRENT_KEY_IDX} reached limit ({DAILY_TOKEN_LIMIT}); switching to Flex mode"
-                )
-                USE_FLEX_MODE = True
+            # Calculate next key index
+            next_idx = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
+
+            # Check if we've cycled through all keys (back to start)
+            if next_idx == 0:
+                # All keys exhausted
+                if ALLOW_FLEX:
+                    logging.warning(
+                        f"All {len(API_KEYS)} API keys exhausted; switching to Flex mode"
+                    )
+                    USE_FLEX_MODE = True
+                else:
+                    logging.warning(
+                        f"All {len(API_KEYS)} API keys exhausted; will stop after batch"
+                    )
+                    STOP_AFTER_CHUNK = True
             else:
-                logging.warning(
-                    f"API key {CURRENT_KEY_IDX} reached limit ({DAILY_TOKEN_LIMIT}); will stop after batch"
+                # Still have more keys - rotate without stopping
+                logging.info(
+                    f"API key {CURRENT_KEY_IDX+1}/{len(API_KEYS)} reached limit ({DAILY_TOKEN_LIMIT:,} tokens); "
+                    f"rotating to key {next_idx+1}/{len(API_KEYS)}"
                 )
-                STOP_AFTER_CHUNK = True
-            CURRENT_KEY_IDX = (CURRENT_KEY_IDX + 1) % len(API_KEYS)
+
+            CURRENT_KEY_IDX = next_idx
             openai.api_key = API_KEYS[CURRENT_KEY_IDX]
 
 
@@ -565,12 +578,15 @@ def main():
             env_key = os.getenv("OPENAI_API_KEY")
             if env_key:
                 keys = [env_key]
+                logging.info("Loaded 1 API key from OPENAI_API_KEY env var")
 
     if not keys and not args.dry_run:
         parser.error("No OpenAI API key provided")
 
     if keys:
         set_api_keys(keys, args.daily_token_limit)
+        if args.daily_token_limit:
+            logging.info(f"Token limit: {args.daily_token_limit:,} per key × {len(keys)} keys = {args.daily_token_limit * len(keys):,} total")
 
     # Find unscored articles
     data_dir = Path(args.data_dir)
