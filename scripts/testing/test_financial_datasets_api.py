@@ -28,7 +28,7 @@ API_KEY = os.getenv("FINANCIAL_DATASETS_API_KEY")
 BASE_URL = "https://api.financialdatasets.ai"
 OUTPUT_DIR = Path("comparison_results/financial_datasets")
 TEST_TICKER = "AAPL"
-TEST_CRYPTO = "BTC"
+TEST_CRYPTO = "BTC-USD"  # Crypto format requires exchange pair (e.g., BTC-USD, ETH-USD)
 
 # Ensure output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -127,6 +127,7 @@ def test_all_endpoints():
     result = make_request(f"/prices", {
         "ticker": TEST_TICKER,
         "interval": "day",
+        "interval_multiplier": 1,  # Required: 1 day intervals
         "start_date": start_date,
         "end_date": end_date,
     })
@@ -228,39 +229,39 @@ def test_all_endpoints():
     })
 
     # =========================================================================
-    # 9. Available Filing Items
+    # 9. Filing Items (Specific Section Extraction)
+    # NOTE: /filings/items/available endpoint does NOT exist in the API
+    # The API only provides /filings and /filings/items
+    # Using /filings/items with Item-1A (Risk Factors) as the standard test
     # =========================================================================
-    print("\n[9/16] Testing getAvailableFilingItems...")
-    result = make_request(f"/filings/items/available")
-    save_result("09_available_filing_items", result)
+    print("\n[9/16] Testing getFilingItems (Item-1A)...")
+    result = make_request(f"/filings/items", {
+        "ticker": TEST_TICKER,
+        "filing_type": "10-K",
+        "year": 2024,
+        "item": "Item-1A",  # Risk Factors section
+    })
+    save_result("09_filing_items_1a", result)
     results_summary.append({
-        "name": "getAvailableFilingItems",
-        "endpoint": "/filings/items/available",
+        "name": "getFilingItems",
+        "endpoint": "/filings/items",
         "status": result.get("status_code"),
         "elapsed": result.get("elapsed_seconds"),
     })
 
     # =========================================================================
-    # 10. Filing Items (Extract specific section)
+    # 10. Filing Items (Extract different section - MD&A)
     # =========================================================================
-    print("\n[10/16] Testing getFilingItems (risk_factors)...")
-    # Need to get a filing ID first from the filings list
-    if filings_data:
-        filing_id = filings_data[0].get("id") or filings_data[0].get("accession_number")
-        result = make_request(f"/filings/items", {
-            "ticker": TEST_TICKER,
-            "item": "risk_factors",
-            "limit": 1,
-        })
-    else:
-        result = make_request(f"/filings/items", {
-            "ticker": TEST_TICKER,
-            "item": "risk_factors",
-            "limit": 1,
-        })
-    save_result("10_filing_items_risk_factors", result)
+    print("\n[10/16] Testing getFilingItems (Item-7 MD&A)...")
+    result = make_request(f"/filings/items", {
+        "ticker": TEST_TICKER,
+        "filing_type": "10-K",
+        "year": 2024,
+        "item": "Item-7",  # Management Discussion & Analysis
+    })
+    save_result("10_filing_items_mda", result)
     results_summary.append({
-        "name": "getFilingItems",
+        "name": "getFilingItems_MDA",
         "endpoint": "/filings/items",
         "status": result.get("status_code"),
         "elapsed": result.get("elapsed_seconds"),
@@ -349,6 +350,7 @@ def test_all_endpoints():
     result = make_request(f"/crypto/prices", {
         "ticker": TEST_CRYPTO,
         "interval": "day",
+        "interval_multiplier": 1,  # Required: 1 day intervals
         "start_date": start_date,
         "end_date": end_date,
     })
