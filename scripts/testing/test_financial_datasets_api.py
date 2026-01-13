@@ -2,8 +2,13 @@
 """
 Financial Datasets API Comprehensive Test Script
 
-Tests all 16 API endpoints and saves raw responses for format analysis.
+Tests ALL API endpoints (Stocks, Crypto, Macroeconomics) and saves raw responses.
 Results saved to: comparison_results/financial_datasets/
+
+API Categories:
+    - Stocks: 17 endpoints (company facts, prices, news, financials, filings, etc.)
+    - Crypto: 3 endpoints (tickers, snapshot, prices)
+    - Macroeconomics: 3 endpoints (interest rates)
 
 Usage:
     python scripts/testing/test_financial_datasets_api.py
@@ -78,8 +83,44 @@ def save_result(name: str, result: dict):
     print(f"  Saved: {filepath}")
 
 
+def make_post_request(endpoint: str, json_data: dict = None) -> dict:
+    """Make POST API request and return response with metadata."""
+    url = f"{BASE_URL}{endpoint}"
+    headers = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
+
+    start_time = time.time()
+    try:
+        response = requests.post(url, headers=headers, json=json_data, timeout=30)
+        elapsed = time.time() - start_time
+
+        result = {
+            "endpoint": endpoint,
+            "json_data": json_data,
+            "status_code": response.status_code,
+            "elapsed_seconds": round(elapsed, 3),
+            "timestamp": datetime.now().isoformat(),
+            "headers": dict(response.headers),
+        }
+
+        try:
+            result["data"] = response.json()
+        except json.JSONDecodeError:
+            result["data"] = None
+            result["raw_text"] = response.text[:1000]
+
+        return result
+
+    except requests.RequestException as e:
+        return {
+            "endpoint": endpoint,
+            "json_data": json_data,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
 def test_all_endpoints():
-    """Test all 16 Financial Datasets API endpoints."""
+    """Test ALL Financial Datasets API endpoints (Stocks, Crypto, Macro)."""
 
     results_summary = []
 
@@ -88,16 +129,21 @@ def test_all_endpoints():
     start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     year_ago = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
 
+    # Total endpoints: 23 (17 Stocks + 3 Crypto + 3 Macro)
+    TOTAL_ENDPOINTS = 23
+
     print("=" * 60)
     print("Financial Datasets API Comprehensive Test")
     print(f"Test Ticker: {TEST_TICKER}")
+    print(f"Test Crypto: {TEST_CRYPTO}")
+    print(f"Total Endpoints: {TOTAL_ENDPOINTS}")
     print(f"Timestamp: {datetime.now().isoformat()}")
     print("=" * 60)
 
     # =========================================================================
     # 1. Company Facts
     # =========================================================================
-    print("\n[1/16] Testing getCompanyFacts...")
+    print(f"\n[1/{TOTAL_ENDPOINTS}] Testing getCompanyFacts (FREE)...")
     result = make_request(f"/company/facts", {"ticker": TEST_TICKER})
     save_result("01_company_facts", result)
     results_summary.append({
@@ -301,7 +347,7 @@ def test_all_endpoints():
     # =========================================================================
     # 13. Analyst Estimates
     # =========================================================================
-    print("\n[13/16] Testing getAnalystEstimates...")
+    print(f"\n[13/{TOTAL_ENDPOINTS}] Testing getAnalystEstimates...")
     result = make_request(f"/analyst-estimates", {
         "ticker": TEST_TICKER,
         "limit": 5,
@@ -316,12 +362,111 @@ def test_all_endpoints():
     })
 
     # =========================================================================
-    # 14. Available Crypto Tickers
+    # 14. Insider Trades (NEW)
     # =========================================================================
-    print("\n[14/16] Testing getAvailableCryptoTickers...")
+    print(f"\n[14/{TOTAL_ENDPOINTS}] Testing getInsiderTrades...")
+    result = make_request(f"/insider-trades", {
+        "ticker": TEST_TICKER,
+        "limit": 10,
+    })
+    save_result("14_insider_trades", result)
+    results_summary.append({
+        "name": "getInsiderTrades",
+        "endpoint": "/insider-trades",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("insider_trades", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 15. Institutional Ownership (NEW)
+    # =========================================================================
+    print(f"\n[15/{TOTAL_ENDPOINTS}] Testing getInstitutionalOwnership...")
+    result = make_request(f"/institutional-ownership", {
+        "ticker": TEST_TICKER,
+        "limit": 10,
+    })
+    save_result("15_institutional_ownership", result)
+    results_summary.append({
+        "name": "getInstitutionalOwnership",
+        "endpoint": "/institutional-ownership",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("institutional_ownership", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 16. Segmented Revenues (NEW)
+    # =========================================================================
+    print(f"\n[16/{TOTAL_ENDPOINTS}] Testing getSegmentedRevenues...")
+    result = make_request(f"/financials/segmented-revenues", {
+        "ticker": TEST_TICKER,
+        "period": "annual",
+        "limit": 5,
+    })
+    save_result("16_segmented_revenues", result)
+    results_summary.append({
+        "name": "getSegmentedRevenues",
+        "endpoint": "/financials/segmented-revenues",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("segmented_revenues", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 17. All Financial Statements Combined (NEW)
+    # =========================================================================
+    print(f"\n[17/{TOTAL_ENDPOINTS}] Testing getAllFinancials...")
+    result = make_request(f"/financials", {
+        "ticker": TEST_TICKER,
+        "period": "annual",
+        "limit": 2,
+    })
+    save_result("17_all_financials", result)
+    results_summary.append({
+        "name": "getAllFinancials",
+        "endpoint": "/financials",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+    })
+
+    # =========================================================================
+    # 18. Earnings Press Releases (NEW - FREE $0.00)
+    # =========================================================================
+    print(f"\n[18/{TOTAL_ENDPOINTS}] Testing getEarningsPressReleases (FREE)...")
+    result = make_request(f"/earnings/press-releases", {
+        "ticker": TEST_TICKER,
+    })
+    save_result("18_earnings_press_releases", result)
+    results_summary.append({
+        "name": "getEarningsPressReleases",
+        "endpoint": "/earnings/press-releases",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("press_releases", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 19. Available Stock Tickers (NEW)
+    # =========================================================================
+    print(f"\n[19/{TOTAL_ENDPOINTS}] Testing getAvailableStockTickers...")
+    result = make_request(f"/prices/snapshot/tickers/")
+    save_result("19_stock_tickers", result)
+    results_summary.append({
+        "name": "getAvailableStockTickers",
+        "endpoint": "/prices/snapshot/tickers/",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("tickers", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 20. Available Crypto Tickers
+    # =========================================================================
+    print(f"\n[20/{TOTAL_ENDPOINTS}] Testing getAvailableCryptoTickers...")
     # NOTE: Correct endpoint is /crypto/prices/tickers/ (with trailing slash)
     result = make_request(f"/crypto/prices/tickers/")
-    save_result("14_crypto_tickers", result)
+    save_result("20_crypto_tickers", result)
     results_summary.append({
         "name": "getAvailableCryptoTickers",
         "endpoint": "/crypto/prices/tickers/",
@@ -331,11 +476,11 @@ def test_all_endpoints():
     })
 
     # =========================================================================
-    # 15. Crypto Price Snapshot
+    # 21. Crypto Price Snapshot
     # =========================================================================
-    print("\n[15/16] Testing getCryptoPriceSnapshot...")
+    print(f"\n[21/{TOTAL_ENDPOINTS}] Testing getCryptoPriceSnapshot...")
     result = make_request(f"/crypto/prices/snapshot", {"ticker": TEST_CRYPTO})
-    save_result("15_crypto_price_snapshot", result)
+    save_result("21_crypto_price_snapshot", result)
     results_summary.append({
         "name": "getCryptoPriceSnapshot",
         "endpoint": "/crypto/prices/snapshot",
@@ -344,9 +489,9 @@ def test_all_endpoints():
     })
 
     # =========================================================================
-    # 16. Crypto Prices (Historical)
+    # 22. Crypto Prices (Historical)
     # =========================================================================
-    print("\n[16/16] Testing getCryptoPrices (30 days)...")
+    print(f"\n[22/{TOTAL_ENDPOINTS}] Testing getCryptoPrices (30 days)...")
     result = make_request(f"/crypto/prices", {
         "ticker": TEST_CRYPTO,
         "interval": "day",
@@ -354,13 +499,27 @@ def test_all_endpoints():
         "start_date": start_date,
         "end_date": end_date,
     })
-    save_result("16_crypto_prices_historical", result)
+    save_result("22_crypto_prices_historical", result)
     results_summary.append({
         "name": "getCryptoPrices",
         "endpoint": "/crypto/prices",
         "status": result.get("status_code"),
         "elapsed": result.get("elapsed_seconds"),
         "record_count": len(result.get("data", {}).get("prices", [])) if result.get("data") else 0,
+    })
+
+    # =========================================================================
+    # 23. Macro Interest Rates Snapshot (NEW)
+    # =========================================================================
+    print(f"\n[23/{TOTAL_ENDPOINTS}] Testing getMacroInterestRatesSnapshot...")
+    result = make_request(f"/macro/interest-rates/snapshot")
+    save_result("23_macro_interest_rates_snapshot", result)
+    results_summary.append({
+        "name": "getMacroInterestRatesSnapshot",
+        "endpoint": "/macro/interest-rates/snapshot",
+        "status": result.get("status_code"),
+        "elapsed": result.get("elapsed_seconds"),
+        "record_count": len(result.get("data", {}).get("interest_rates", [])) if result.get("data") else 0,
     })
 
     # =========================================================================
