@@ -93,7 +93,7 @@
 \rhead{MindfulRL-Intraday}
 \lhead{付費訂閱評估}
 \rfoot{Page \thepage}
-\lfoot{2025-12-26 更新}
+\lfoot{2026-01-14 更新}
 
 % ============================================================
 % Document
@@ -819,6 +819,77 @@ Enterprise & 洽詢 & 客製 & 專屬運算資源 \\
 \end{table}
 
 \textbf{結論}: 若 \textbf{PEAD 策略}是重點，Financial Datasets 的 Segmented Revenue API 是極高價值的差異化來源。建議先用 Pay-As-You-Go (\$20) 測試。
+
+\subsection{API 實測驗證 (2026-01-14)}
+
+使用 PAYG 方案 (\$20 儲值) 完成 \textbf{23 個端點}全面測試，驗證文檔準確性。
+
+\begin{table}[H]
+\centering
+\caption{測試統計}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{項目} & \textbf{結果} \\
+\midrule
+測試股票 & AAPL \\
+測試加密貨幣 & BTC-USD \\
+端點成功率 & \textbf{23/23} (100\%) \\
+總測試時間 & 38.6 秒 \\
+日期範圍 & 2025-12-15 $\sim$ 2026-01-14 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{關鍵驗證發現}
+
+\begin{enumerate}
+    \item \textbf{新聞內建情緒標籤} -- \texttt{/news} 端點直接回傳 \texttt{sentiment: "positive"/"neutral"/"negative"}，\textbf{無需 LLM 評分}
+    \item \textbf{Financial Metrics Snapshot} -- 單次 API 調用獲取 \textbf{40+ 財務指標} (market\_cap, pe\_ratio, roe, margins...)
+    \item \textbf{Crypto 覆蓋廣} -- 769 支加密貨幣
+    \item \textbf{Stock Tickers} -- 10,301 支股票
+    \item \textbf{Macro 數據} -- 10 國央行利率 (Fed, ECB, BOJ...)
+\end{enumerate}
+
+\subsubsection{端點測試結果}
+
+\begin{table}[H]
+\centering
+\caption{23 個 API 端點測試狀態}
+\small
+\begin{tabular}{@{}llcc@{}}
+\toprule
+\textbf{端點} & \textbf{說明} & \textbf{狀態} & \textbf{價值} \\
+\midrule
+\texttt{/company/facts} & 公司資料 (FREE) & \checkmark & \starmark\starmark\starmark \\
+\texttt{/prices/snapshot} & 即時股價 & \checkmark & \starmark\starmark \\
+\texttt{/prices} & 歷史股價 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/news} & 新聞 + 情緒標籤 & \checkmark & \starmark\starmark\starmark\starmark\starmark \\
+\texttt{/financials/*} & 財報三表 & \checkmark & \starmark\starmark\starmark\starmark \\
+\texttt{/filings} & SEC 文件清單 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/filings/items} & SEC 段落提取 & \checkmark & \starmark\starmark\starmark\starmark \\
+\texttt{/financial-metrics} & 歷史財務指標 & \checkmark & \starmark\starmark\starmark\starmark \\
+\texttt{/financial-metrics/snapshot} & 40+ 即時指標 & \checkmark & \starmark\starmark\starmark\starmark\starmark \\
+\texttt{/analyst-estimates} & EPS 預測 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/insider-trades} & 內部人交易 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/institutional-ownership} & 機構持股 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/financials/segmented-revenues} & 細分營收 & \checkmark & \starmark\starmark\starmark\starmark\starmark \\
+\texttt{/earnings/press-releases} & 財報新聞稿 (FREE) & \checkmark & \starmark\starmark\starmark \\
+\texttt{/crypto/prices/*} & 加密貨幣數據 & \checkmark & \starmark\starmark\starmark \\
+\texttt{/macro/interest-rates/*} & 央行利率 & \checkmark & \starmark\starmark\starmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{tcolorbox}[colback=successgreen!5,colframe=successgreen,title={API 參數注意事項}]
+\begin{itemize}[leftmargin=*]
+    \item \texttt{/prices}: \texttt{interval\_multiplier} 為\textbf{必填}參數
+    \item \texttt{/crypto/prices}: ticker 格式為 ``BTC-USD'' (非 ``BTC'')
+    \item \texttt{/filings/items}: 需要 \texttt{year} 和 \texttt{item} 參數 (如 ``Item-1A'')
+    \item \texttt{/earnings/press-releases}: 僅支援特定 ticker (AAPL 不支援，COST 支援)
+\end{itemize}
+\end{tcolorbox}
+
+\textbf{實測腳本}: \texttt{scripts/testing/test\_financial\_datasets\_api.py}
 
 % ============================================================
 \newpage
@@ -1663,6 +1734,7 @@ Josh Gottheimer & D & 10\%+ & 金融科技 \\
 \toprule
 \textbf{日期} & \textbf{更新內容} \\
 \midrule
+2026-01-14 & 加入 Financial Datasets API 實測驗證 (23/23 端點成功) \\
 2026-01-10 & 更新附錄 F: 移除 Quiver (需 Enterprise)，改推薦 Finnhub \\
 2025-12-26 & 加入國會議員交易數據來源附錄 F \\
 2025-12-24 & 更新 IBKR 市場數據訂閱費用詳細說明；完整 LaTeX 版本 \\
