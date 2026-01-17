@@ -377,81 +377,173 @@ Financial Datasets 值: 2.55
 
 ## 6. Efficiency Metrics (效率指標) - 6 個
 
+> **重要發現**: Financial Datasets 使用非標準計算方法！
+> 我們的計算器支援多種方法: `calc.get_efficiency_metrics(method='standard'|'fd_style'|'all')`
+
 ### 6.1 asset_turnover (資產周轉率)
+
+| 方法 | 公式 | 計算值 | FD值 | 差異 |
+|------|------|--------|------|------|
+| 標準 (期末) | Revenue / End Assets | 1.1584 | 1.2050 | 3.9% |
+| 平均資產 | Revenue / Avg Assets | 1.1493 | 1.2050 | 4.6% |
+
 ```
-公式: Revenue / Total Assets
 數據來源: Income Statement + Balance Sheet
 
 範例 (AAPL FY2025):
   Revenue = $416,161M
-  Total Assets = $359,241M
-  asset_turnover = 416,161 / 359,241 = 1.1584
+  Total Assets FY2025 = $359,241M
+  Total Assets FY2024 = $364,980M
+  Average Assets = ($359,241M + $364,980M) / 2 = $362,111M
 
-Financial Datasets 值: 1.2050
-差異: 3.9%
-可能原因: FD 可能使用平均資產 (期初+期末)/2
+  方法1 (期末): 416,161 / 359,241 = 1.1584
+  方法2 (平均): 416,161 / 362,111 = 1.1493
+
+結論: FD 可能使用 TTM Revenue 或不同時點的資產數據
 ```
 
 ### 6.2 inventory_turnover (存貨周轉率)
-```
-公式: Cost of Revenue / Average Inventory
-其中: Average Inventory = (Beginning Inventory + Ending Inventory) / 2
 
-數據來源: Income Statement + Balance Sheet (多年)
+| 方法 | 公式 | 計算值 | FD值 | 差異 |
+|------|------|--------|------|------|
+| **標準** | COGS / Avg Inventory | 33.98 | 71.49 | **52.5%** |
+| COGS/期末 | COGS / End Inventory | 38.64 | 71.49 | 45.9% |
+| Revenue/平均 | Revenue / Avg Inventory | 64.01 | 71.49 | 10.5% |
+| **FD風格** | **Revenue / End Inventory** | **72.78** | **71.49** | **1.8%** ✅ |
+
+```
+關鍵發現: FD 使用 Revenue / End Inventory 而非標準的 COGS / Avg Inventory！
+
+數據來源: Income Statement + Balance Sheet
 
 範例 (AAPL FY2025):
-  Cost of Revenue = $220,960M
-  Ending Inventory (FY2025) = $5,717M
-  Beginning Inventory (FY2024) = $6,128M (需查)
-  Average Inventory = (5,717 + 6,128) / 2 = $5,923M
-  inventory_turnover = 220,960 / 5,923 = 37.31
+  COGS = $220,960M
+  Revenue = $416,161M
+  End Inventory (FY2025) = $5,717M
+  Begin Inventory (FY2024) = $7,286M
+  Average Inventory = ($5,717M + $7,286M) / 2 = $6,502M
 
-Financial Datasets 值: 71.49
-差異: 48% - 需要調查 FD 使用的公式
+  標準方法: COGS / Avg Inventory = 220,960 / 6,502 = 33.98
+  FD 方法:  Revenue / End Inventory = 416,161 / 5,717 = 72.78
+
+結論: FD 的 71.49 與我們的 Revenue/End Inventory (72.78) 僅差 1.8%
+這是非標準計算方法，但我們已實現支援
 ```
 
 ### 6.3 receivables_turnover (應收帳款周轉率)
+
+| 方法 | 公式 | 計算值 | FD值 | 差異 |
+|------|------|--------|------|------|
+| 標準 (Trade AR) | Revenue / Avg Trade AR | 11.37 | 6.95 | 63.7% |
+| 期末 (Trade AR) | Revenue / End Trade AR | 10.46 | 6.95 | 50.6% |
+| Total Receivables | Revenue / Total Recv | 6.28 | 6.95 | **9.6%** ✅ |
+
 ```
-公式: Revenue / Average Receivables
+關鍵發現: FD 使用 Total Receivables (包含 Non-trade Receivables)！
 
-範例 (AAPL FY2025):
-  Revenue = $416,161M
-  Average Receivables = ~$39,000M (估計)
-  receivables_turnover = 416,161 / 39,000 = 10.67
+AAPL 的 Receivables 結構:
+  AccountsReceivableNetCurrent (Trade AR): $33.41B
+  NontradeReceivablesCurrent: $32.83B (供應商非貿易應收款)
+  Total Receivables: $66.24B
 
-Financial Datasets 值: 6.95
-差異: 54% - 需要調查
+計算:
+  標準 (Trade AR only): 416,161 / 36,595 = 11.37
+  FD 方法 (Total Recv): 416,161 / 66,240 = 6.28
+
+結論: FD 的 6.95 與 Revenue/Total Receivables (6.28) 差異約 10%
+剩餘差異可能來自 FD 使用 TTM 或不同時點數據
 ```
 
 ### 6.4 days_sales_outstanding (應收帳款周轉天數)
+
 ```
 公式: 365 / Receivables Turnover
-或: Average Receivables / (Revenue / 365)
+或: Receivables / (Revenue / 365)
 
-範例計算差異大，需要確認 FD 使用的公式
+我們的計算 (標準方法):
+  DSO = 365 / 11.37 = 32.09 天
+
+Financial Datasets 值: 0.14
+
+⚠️ 異常: FD 的 0.14 天是不可能的數值！
+可能原因:
+  1. FD 存的是比率 (Receivables / Revenue = 0.159) 而非天數
+  2. FD 有 bug 或使用完全不同的定義
+  3. 可能是某種標準化後的小數
+
+建議: 使用標準計算 (~32 天)，忽略 FD 的異常值
 ```
 
 ### 6.5 operating_cycle (營運週期)
+
 ```
 公式: Days Inventory Outstanding + Days Sales Outstanding
 
-需要先確認 inventory_turnover 和 receivables_turnover 的正確計算
+標準計算:
+  Days Inventory = 365 / Inventory Turnover (標準) = 365 / 33.98 = 10.74 天
+  Days Receivables = 365 / Receivables Turnover = 365 / 11.37 = 32.09 天
+  Operating Cycle = 10.74 + 32.09 = 42.84 天
+
+Financial Datasets 值: 78.43 天
+差異: 45%
+
+原因: FD 使用不同的 turnover 計算方法，導致 days 計算不同
 ```
 
 ### 6.6 working_capital_turnover (營運資金周轉率)
+
+| 方法 | 公式 | 計算值 | FD值 | 差異 |
+|------|------|--------|------|------|
+| 標準 | Revenue / WC | -23.55 | 17.28 | 236% |
+| 絕對值 | Revenue / \|WC\| | 23.55 | 17.28 | 36% |
+
 ```
-公式: Revenue / Working Capital
-其中: Working Capital = Current Assets - Current Liabilities
+⚠️ 特殊情況: AAPL 的 Working Capital 是負數！
 
-範例 (AAPL FY2025):
-  Revenue = $416,161M
-  Current Assets = $147,957M
-  Current Liabilities = $165,631M
-  Working Capital = 147,957 - 165,631 = -$17,674M (負值!)
-  working_capital_turnover = 416,161 / -17,674 = -23.55
+Working Capital = Current Assets - Current Liabilities
+             = $147,957M - $165,631M = -$17,674M
 
-Financial Datasets 值: +17.28
-差異: 符號相反! FD 可能使用 |Working Capital| 或不同定義
+這是因為 AAPL 有大量應付帳款和遞延收入，導致流動負債 > 流動資產
+這在科技公司很常見，不代表財務問題
+
+計算:
+  標準方法: 416,161 / -17,674 = -23.55
+  絕對值:  416,161 / 17,674 = 23.55
+
+Financial Datasets 值: 17.28
+反推 FD 使用的 WC: 416,161 / 17.28 = $24,082M
+
+可能解釋:
+  1. FD 使用 Operating Working Capital = CA - Cash - CL + Short-term Debt
+  2. FD 使用不同的 WC 定義
+  3. FD 有某種調整機制處理負 WC
+
+建議: 標註 WC 為負值，提供標準計算但說明限制
+```
+
+### 效率指標總結
+
+| 指標 | 標準值 | FD風格值 | FD值 | 最佳匹配 |
+|------|--------|---------|------|----------|
+| asset_turnover | 1.1584 | 1.1493 | 1.2050 | ~4% (可接受) |
+| inventory_turnover | 33.98 | **72.78** | 71.49 | **1.8%** ✅ |
+| receivables_turnover | 11.37 | 10.46 | 6.95 | ~10% (需Total Recv) |
+| days_sales_outstanding | 32.09 | 34.89 | 0.14 | **FD異常** |
+| operating_cycle | 42.84 | N/A | 78.43 | ~45% |
+| working_capital_turnover | -23.55 | 23.55 | 17.28 | ~36% |
+
+**使用建議**:
+```python
+calc = FinancialMetricsCalculator('AAPL')
+
+# 標準財務分析使用
+standard = calc.get_efficiency_metrics(method='standard')
+
+# 與 Financial Datasets 對比使用
+fd_style = calc.get_efficiency_metrics(method='fd_style')
+
+# 查看所有方法比較
+all_methods = calc.get_efficiency_metrics(method='all')
 ```
 
 ---
