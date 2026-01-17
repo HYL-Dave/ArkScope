@@ -41,35 +41,59 @@ from data_sources.sec_edgar_financials import SECEdgarFinancials
 logger = logging.getLogger(__name__)
 
 
-def _get_current_price_tiingo(ticker: str) -> Optional[float]:
-    """Get current stock price from Tiingo (fallback for market cap calculation)."""
-    try:
-        import os
-        from dotenv import load_dotenv
-        from data_sources.tiingo_source import TiingoDataSource
-        from datetime import date, timedelta
+def _get_current_price_ibkr(ticker: str) -> Optional[float]:
+    """
+    Get current stock price from IBKR price data in data/prices/.
 
-        # Load API key from .env
-        env_path = Path(__file__).parent.parent / "config" / ".env"
-        load_dotenv(env_path)
-        api_key = os.getenv("TIINGO_API_KEY")
+    Looks for price data in order of preference:
+    1. data/prices/15min/{ticker}_15min_*.csv (most recent)
+    2. data/prices/hourly/{ticker}_hourly_*.csv (fallback)
 
-        if not api_key:
-            logger.warning("TIINGO_API_KEY not found in environment")
-            return None
+    Returns the latest close price from the most recent file.
+    """
+    project_root = Path(__file__).parent.parent
+    price_dirs = [
+        project_root / "data" / "prices" / "15min",
+        project_root / "data" / "prices" / "hourly",
+    ]
 
-        tiingo = TiingoDataSource(api_key=api_key)
-        # Get most recent price (last 5 days to handle weekends)
-        end_date = date.today()
-        start_date = end_date - timedelta(days=5)
-        prices = tiingo.fetch_prices([ticker], start_date, end_date)
+    for price_dir in price_dirs:
+        if not price_dir.exists():
+            continue
 
-        if prices:
-            # Get most recent price
-            latest = max(prices, key=lambda p: p.date)
-            return latest.close
-    except Exception as e:
-        logger.warning(f"Could not fetch price from Tiingo: {e}")
+        # Find all files for this ticker
+        patterns = [f"{ticker}_15min_*.csv", f"{ticker}_hourly_*.csv"]
+        files = []
+        for pattern in patterns:
+            files.extend(sorted(price_dir.glob(pattern), reverse=True))
+
+        if files:
+            # Read the most recent file
+            latest_file = files[0]
+            try:
+                import pandas as pd
+                # Read CSV - try with header first, fallback to no header
+                try:
+                    df = pd.read_csv(latest_file)
+                    if 'close' in df.columns:
+                        latest_price = float(df['close'].iloc[-1])
+                    else:
+                        # No header, use positional index
+                        df = pd.read_csv(latest_file, header=None)
+                        latest_price = float(df.iloc[-1, 4])  # close is column 4
+                except:
+                    # Fallback: no header
+                    df = pd.read_csv(latest_file, header=None)
+                    latest_price = float(df.iloc[-1, 4])
+
+                if latest_price > 0:
+                    logger.info(f"Got price ${latest_price:.2f} for {ticker} from {latest_file.name}")
+                    return latest_price
+            except Exception as e:
+                logger.warning(f"Error reading price file {latest_file}: {e}")
+                continue
+
+    logger.warning(f"No IBKR price data found for {ticker} in data/prices/")
     return None
 
 
@@ -602,14 +626,14 @@ class FinancialMetricsCalculator:
                 except (ValueError, TypeError):
                     pass
 
-        # If no IBKR data, try to calculate from Tiingo price + shares outstanding
+        # If no IBKR fundamentals data, calculate from IBKR price data + shares outstanding
         if market_cap is None:
             shares = bal.get('outstanding_shares')
             if shares:
-                current_price = _get_current_price_tiingo(self.ticker)
+                current_price = _get_current_price_ibkr(self.ticker)
                 if current_price:
                     market_cap = current_price * shares
-                    logger.info(f"Calculated market cap from Tiingo: ${market_cap/1e9:.2f}B")
+                    logger.info(f"Calculated market cap from IBKR prices: ${market_cap/1e9:.2f}B")
 
         # Calculate EV if not from IBKR
         if enterprise_value is None and market_cap is not None:
@@ -740,16 +764,31 @@ def get_financial_metrics_snapshot(ticker: str) -> Dict[str, Any]:
     return calc.get_snapshot()
 
 
-def compare_with_financial_datasets(ticker: str, fd_metrics: Dict[str, Any]) -> Dict[str, Any]:
+def compare_with_financial_datasets(
+    ticker: str,
+    fd_metrics: Dict[str, Any],
+    tolerance_pct: float = 0.1,
+) -> Dict[str, Any]:
     """
     Compare calculated metrics with Financial Datasets API response.
 
     Args:
         ticker: Stock symbol
         fd_metrics: Financial Datasets API snapshot response
+        tolerance_pct: Tolerance percentage for exact match (default 0.1%)
 
     Returns:
         Comparison report with match status for each metric
+
+    Match Status:
+        - 'exact': Difference < tolerance_pct (default 0.1%)
+        - 'close': Difference between tolerance_pct and 1%
+        - 'near': Difference between 1% and 5%
+        - 'mismatch': Difference > 5%
+        - 'both_null': Both values are None
+        - 'fd_null': Only Financial Datasets value is None
+        - 'our_null': Only our value is None
+        - 'error': Comparison error
     """
     calc = FinancialMetricsCalculator(ticker)
     our_metrics = calc.get_snapshot()
@@ -775,7 +814,15 @@ def compare_with_financial_datasets(ticker: str, fd_metrics: Dict[str, Any]) -> 
         else:
             try:
                 diff_pct = abs(our_val - fd_val) / abs(fd_val) * 100 if fd_val != 0 else 0
-                status = 'match' if diff_pct < 5.0 else 'mismatch'
+                # Strict tolerance levels
+                if diff_pct < tolerance_pct:
+                    status = 'exact'
+                elif diff_pct < 1.0:
+                    status = 'close'  # Needs investigation
+                elif diff_pct < 5.0:
+                    status = 'near'  # Significant difference
+                else:
+                    status = 'mismatch'  # Major difference
             except (TypeError, ZeroDivisionError):
                 status = 'error'
                 diff_pct = None
@@ -787,15 +834,23 @@ def compare_with_financial_datasets(ticker: str, fd_metrics: Dict[str, Any]) -> 
             'status': status,
         }
 
-    # Summary
+    # Summary with detailed breakdown
     total = len([k for k in comparison.keys()])
-    matches = len([k for k, v in comparison.items() if v['status'] == 'match'])
+    exact = len([k for k, v in comparison.items() if v['status'] == 'exact'])
+    close = len([k for k, v in comparison.items() if v['status'] == 'close'])
+    near = len([k for k, v in comparison.items() if v['status'] == 'near'])
+    mismatch = len([k for k, v in comparison.items() if v['status'] == 'mismatch'])
+    our_null = len([k for k, v in comparison.items() if v['status'] == 'our_null'])
 
     return {
         'ticker': ticker,
         'total_metrics': total,
-        'matches': matches,
-        'match_rate': f"{matches}/{total} ({matches/total*100:.1f}%)",
+        'exact_match': exact,
+        'close_match': close,
+        'near_match': near,
+        'mismatch': mismatch,
+        'our_null': our_null,
+        'match_summary': f"Exact: {exact}, Close: {close}, Near: {near}, Mismatch: {mismatch}, Missing: {our_null}",
         'details': comparison,
     }
 
