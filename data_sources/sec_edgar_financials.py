@@ -309,6 +309,7 @@ BALANCE_SHEET_MAPPING = {
         'ShortTermBorrowings',
         'DebtCurrent',
         'LongTermDebtCurrent',
+        'CommercialPaper',  # Added: AAPL uses this for short-term borrowings ($7.98B)
     ],
     'trade_and_non_trade_payables': [
         'AccountsPayableCurrent',
@@ -522,7 +523,17 @@ class SECEdgarFinancials:
             )
 
             for field, concepts in BALANCE_SHEET_MAPPING.items():
-                value = self._extract_concept_value(facts, concepts, fy, form, 'FY')
+                # Special handling: current_debt should SUM all debt components
+                # (LongTermDebtCurrent + CommercialPaper, etc.)
+                if field == 'current_debt':
+                    total = 0
+                    for concept in concepts:
+                        val = self._extract_concept_value(facts, [concept], fy, form, 'FY')
+                        if val:
+                            total += val
+                    value = total if total > 0 else None
+                else:
+                    value = self._extract_concept_value(facts, concepts, fy, form, 'FY')
                 setattr(sheet, field, value)
 
             sheets.append(sheet)
