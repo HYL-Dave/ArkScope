@@ -329,20 +329,35 @@ class FinancialMetricsCalculator:
         }
 
     # =========================================================================
-    # Efficiency Metrics (6)
+    # Efficiency Metrics (6) - Multiple Calculation Methods
     # =========================================================================
 
-    def get_efficiency_metrics(self) -> Dict[str, Optional[float]]:
+    def get_efficiency_metrics(
+        self,
+        method: str = 'standard',
+    ) -> Dict[str, Optional[float]]:
         """
-        Calculate efficiency metrics.
+        Calculate efficiency metrics with selectable calculation method.
+
+        Args:
+            method: Calculation method to use
+                - 'standard': 標準方法 (COGS/Avg Inventory, Revenue/Avg Receivables)
+                - 'fd_style': Financial Datasets 風格 (Revenue/End Inventory, Revenue/Total Receivables)
+                - 'all': 返回所有方法的計算結果
 
         Metrics:
             - asset_turnover: Revenue / Total Assets
-            - inventory_turnover: COGS / Average Inventory
-            - receivables_turnover: Revenue / Average Receivables
+            - inventory_turnover: COGS / Average Inventory (standard) or Revenue / End Inventory (fd_style)
+            - receivables_turnover: Revenue / Average Receivables (standard) or Revenue / Total Receivables (fd_style)
             - days_sales_outstanding: 365 / Receivables Turnover
             - operating_cycle: Days Inventory + Days Receivables
             - working_capital_turnover: Revenue / Working Capital
+
+        Note on method differences:
+            - 'standard': 教科書標準方法，使用 COGS 和平均值
+            - 'fd_style': Financial Datasets 似乎使用的方法
+              - inventory_turnover: Revenue / End Inventory (非標準但接近 FD 值)
+              - receivables_turnover: 使用 Total Receivables (包含 Non-trade)
         """
         income = self._load_income_statements(years=2)
         balance = self._load_balance_sheets(years=2)
@@ -357,38 +372,58 @@ class FinancialMetricsCalculator:
         revenue = inc.get('revenue')
         cogs = inc.get('cost_of_revenue')
 
+        # Assets
         total_assets = bal.get('total_assets')
+        total_assets_prev = bal_prev.get('total_assets')
+        avg_assets = (total_assets + total_assets_prev) / 2 if total_assets_prev else total_assets
+
+        # Inventory
         inventory = bal.get('inventory') or 0
         inventory_prev = bal_prev.get('inventory') or 0
         avg_inventory = (inventory + inventory_prev) / 2 if inventory_prev else inventory
 
+        # Receivables - note: trade_and_non_trade_receivables includes Non-trade
         receivables = bal.get('trade_and_non_trade_receivables') or 0
         receivables_prev = bal_prev.get('trade_and_non_trade_receivables') or 0
         avg_receivables = (receivables + receivables_prev) / 2 if receivables_prev else receivables
 
+        # Working Capital
         current_assets = bal.get('current_assets') or 0
         current_liabilities = bal.get('current_liabilities') or 0
         working_capital = current_assets - current_liabilities
 
-        # Calculate turnover ratios
-        asset_turnover = self._safe_divide(revenue, total_assets)
-        inventory_turnover = self._safe_divide(cogs, avg_inventory) if avg_inventory > 0 else None
-        receivables_turnover = self._safe_divide(revenue, avg_receivables) if avg_receivables > 0 else None
+        if method == 'all':
+            # Return all calculation methods for comparison
+            return self._get_all_efficiency_methods(
+                revenue, cogs, total_assets, avg_assets,
+                inventory, avg_inventory,
+                receivables, avg_receivables,
+                working_capital
+            )
+
+        # Select method
+        if method == 'fd_style':
+            # FD-style: Revenue/End Inventory, uses Total Receivables
+            asset_turnover = self._safe_divide(revenue, avg_assets)  # FD uses ~avg
+            inventory_turnover = self._safe_divide(revenue, inventory) if inventory > 0 else None
+            receivables_turnover = self._safe_divide(revenue, receivables) if receivables > 0 else None
+        else:
+            # Standard: COGS/Avg Inventory
+            asset_turnover = self._safe_divide(revenue, total_assets)
+            inventory_turnover = self._safe_divide(cogs, avg_inventory) if avg_inventory > 0 else None
+            receivables_turnover = self._safe_divide(revenue, avg_receivables) if avg_receivables > 0 else None
 
         # Days calculations
         days_inventory = self._safe_divide(365, inventory_turnover) if inventory_turnover else None
         days_receivables = self._safe_divide(365, receivables_turnover) if receivables_turnover else None
-
-        # Note: Financial Datasets uses a different formula for days_sales_outstanding
-        # They use: Receivables / (Revenue / 365) which equals 365 / receivables_turnover
-        # But their actual value (0.144) suggests they may use a different calculation
-        days_sales_outstanding = self._safe_divide(avg_receivables, self._safe_divide(revenue, 365))
+        days_sales_outstanding = days_receivables  # Standard definition
 
         # Operating cycle = Days Inventory + Days Receivables
         operating_cycle = None
         if days_inventory is not None and days_receivables is not None:
             operating_cycle = days_inventory + days_receivables
 
+        # Working capital turnover
         working_capital_turnover = self._safe_divide(revenue, working_capital) if working_capital != 0 else None
 
         return {
@@ -398,6 +433,85 @@ class FinancialMetricsCalculator:
             'days_sales_outstanding': days_sales_outstanding,
             'operating_cycle': operating_cycle,
             'working_capital_turnover': working_capital_turnover,
+        }
+
+    def _get_all_efficiency_methods(
+        self,
+        revenue, cogs, total_assets, avg_assets,
+        inventory, avg_inventory,
+        receivables, avg_receivables,
+        working_capital,
+    ) -> Dict[str, Any]:
+        """
+        Calculate efficiency metrics using ALL methods for comparison.
+
+        Returns a nested dict with both 'standard' and 'fd_style' results,
+        plus individual method breakdowns.
+        """
+        # Asset Turnover variants
+        at_end = self._safe_divide(revenue, total_assets)
+        at_avg = self._safe_divide(revenue, avg_assets)
+
+        # Inventory Turnover variants
+        it_cogs_avg = self._safe_divide(cogs, avg_inventory) if avg_inventory > 0 else None
+        it_cogs_end = self._safe_divide(cogs, inventory) if inventory > 0 else None
+        it_rev_avg = self._safe_divide(revenue, avg_inventory) if avg_inventory > 0 else None
+        it_rev_end = self._safe_divide(revenue, inventory) if inventory > 0 else None
+
+        # Receivables Turnover variants
+        rt_avg = self._safe_divide(revenue, avg_receivables) if avg_receivables > 0 else None
+        rt_end = self._safe_divide(revenue, receivables) if receivables > 0 else None
+
+        # Days calculations (using standard inventory turnover)
+        days_inv_std = self._safe_divide(365, it_cogs_avg) if it_cogs_avg else None
+        days_recv_std = self._safe_divide(365, rt_avg) if rt_avg else None
+
+        # Working Capital Turnover
+        wc_standard = self._safe_divide(revenue, working_capital) if working_capital != 0 else None
+        wc_abs = self._safe_divide(revenue, abs(working_capital)) if working_capital != 0 else None
+
+        return {
+            # Standard method results
+            'standard': {
+                'asset_turnover': at_end,
+                'inventory_turnover': it_cogs_avg,
+                'receivables_turnover': rt_avg,
+                'days_sales_outstanding': days_recv_std,
+                'operating_cycle': (days_inv_std + days_recv_std) if days_inv_std and days_recv_std else None,
+                'working_capital_turnover': wc_standard,
+            },
+            # FD-style method results
+            'fd_style': {
+                'asset_turnover': at_avg,
+                'inventory_turnover': it_rev_end,  # Revenue / End Inventory
+                'receivables_turnover': rt_end,  # Revenue / End Total Receivables
+                'days_sales_outstanding': self._safe_divide(365, rt_end) if rt_end else None,
+                'operating_cycle': None,  # Not reliable with FD method
+                'working_capital_turnover': wc_abs if working_capital < 0 else wc_standard,
+            },
+            # All individual methods for detailed analysis
+            'methods': {
+                'asset_turnover': {
+                    'revenue_div_end_assets': at_end,
+                    'revenue_div_avg_assets': at_avg,
+                },
+                'inventory_turnover': {
+                    'cogs_div_avg_inventory': it_cogs_avg,
+                    'cogs_div_end_inventory': it_cogs_end,
+                    'revenue_div_avg_inventory': it_rev_avg,
+                    'revenue_div_end_inventory': it_rev_end,
+                },
+                'receivables_turnover': {
+                    'revenue_div_avg_receivables': rt_avg,
+                    'revenue_div_end_receivables': rt_end,
+                },
+                'working_capital_turnover': {
+                    'revenue_div_wc': wc_standard,
+                    'revenue_div_abs_wc': wc_abs,
+                    'working_capital_value': working_capital,
+                    'is_negative_wc': working_capital < 0,
+                },
+            },
         }
 
     # =========================================================================
@@ -478,22 +592,184 @@ class FinancialMetricsCalculator:
         }
 
     # =========================================================================
-    # Growth Metrics (7)
+    # Growth Metrics (7) - Multiple Calculation Methods
     # =========================================================================
 
-    def get_growth_metrics(self) -> Dict[str, Optional[float]]:
+    def _get_quarterly_values(
+        self,
+        concept_names: List[str],
+        unit: str = 'USD',
+        num_quarters: int = 8,
+    ) -> List[Dict[str, Any]]:
         """
-        Calculate growth metrics (YoY).
+        Get quarterly values from SEC EDGAR for TTM calculation.
+
+        This extracts individual quarter values (not YTD) by:
+        1. Getting all quarterly data points (10-Q)
+        2. For each period with multiple values, taking the smaller one (QTD vs YTD)
+        3. Calculating Q4 from: FY total - (Q1 + Q2 + Q3) for 10-K filings
+
+        Args:
+            concept_names: List of SEC EDGAR concept names to try
+            unit: Unit type ('USD', 'USD/shares', etc.)
+            num_quarters: Number of quarters to retrieve
+
+        Returns:
+            List of dicts with keys: end, val, fp, fy, form
+            Sorted by end date descending (newest first)
+        """
+        facts = self.sec._get_company_facts(self.ticker)
+        if not facts or 'facts' not in facts:
+            return []
+
+        gaap = facts['facts'].get('us-gaap', {})
+
+        for concept in concept_names:
+            if concept not in gaap:
+                continue
+
+            concept_data = gaap[concept]
+            if 'units' not in concept_data or unit not in concept_data['units']:
+                continue
+
+            entries = concept_data['units'][unit]
+
+            from collections import defaultdict
+
+            # Separate 10-K (FY) and 10-Q entries by fiscal year
+            fy_entries = {}  # {fy: {end, val}}
+            q_entries_by_fy = defaultdict(list)  # {fy: [{end, val, fp}]}
+
+            for e in entries:
+                form = e.get('form')
+                fp = e.get('fp')
+                fy = e.get('fy')
+                val = e.get('val')
+                end = e.get('end')
+
+                if val is None:
+                    continue
+
+                if form == '10-K' and fp == 'FY':
+                    # Full year value - keep only the one with matching fiscal year end
+                    if fy not in fy_entries:
+                        fy_entries[fy] = {'end': end, 'val': val, 'fy': fy}
+                elif form == '10-Q':
+                    q_entries_by_fy[fy].append({
+                        'end': end,
+                        'val': val,
+                        'fp': fp,
+                        'fy': fy,
+                        'form': form,
+                    })
+
+            # Build quarterly values list
+            quarters = []
+
+            # Process each fiscal year
+            for fy in sorted(fy_entries.keys(), reverse=True):
+                fy_data = fy_entries[fy]
+                q_data = q_entries_by_fy.get(fy, [])
+
+                # Group 10-Q by end date to get QTD values
+                q_by_end = defaultdict(list)
+                for q in q_data:
+                    q_by_end[q['end']].append(q)
+
+                # Get QTD values for Q1, Q2, Q3
+                q_values = {}  # {fp: val}
+                for end, entries_for_date in q_by_end.items():
+                    # QTD is the smaller value when multiple exist
+                    best = min(entries_for_date, key=lambda x: x['val'])
+                    fp = best['fp']
+                    if fp in ('Q1', 'Q2', 'Q3'):
+                        q_values[fp] = {'end': end, 'val': best['val'], 'fp': fp, 'fy': fy, 'form': '10-Q'}
+
+                # Calculate Q4 = FY - Q1 - Q2 - Q3
+                if 'Q1' in q_values and 'Q2' in q_values and 'Q3' in q_values:
+                    q4_val = fy_data['val'] - q_values['Q1']['val'] - q_values['Q2']['val'] - q_values['Q3']['val']
+                    q4 = {
+                        'end': fy_data['end'],
+                        'val': q4_val,
+                        'fp': 'Q4',
+                        'fy': fy,
+                        'form': '10-K (derived)',
+                    }
+                    # Add Q4, Q3, Q2, Q1 for this fiscal year
+                    quarters.append(q4)
+                    quarters.append(q_values['Q3'])
+                    quarters.append(q_values['Q2'])
+                    quarters.append(q_values['Q1'])
+                else:
+                    # Fallback: just use whatever we have
+                    for fp in ['Q3', 'Q2', 'Q1']:
+                        if fp in q_values:
+                            quarters.append(q_values[fp])
+
+            # Sort by end date descending and return
+            quarters = sorted(quarters, key=lambda x: x['end'], reverse=True)
+            if quarters:
+                return quarters[:num_quarters]
+
+        return []
+
+    def _calculate_ttm(self, quarterly_values: List[Dict], start_idx: int = 0) -> Optional[float]:
+        """
+        Calculate TTM (Trailing Twelve Months) by summing 4 quarters.
+
+        Args:
+            quarterly_values: List of quarterly data (newest first)
+            start_idx: Starting index (0 = most recent 4 quarters)
+
+        Returns:
+            Sum of 4 quarters or None if insufficient data
+        """
+        if len(quarterly_values) < start_idx + 4:
+            return None
+
+        quarters = quarterly_values[start_idx:start_idx + 4]
+        total = sum(q['val'] for q in quarters if q['val'] is not None)
+        return total if len(quarters) == 4 else None
+
+    def get_growth_metrics(
+        self,
+        method: str = 'fiscal_year',
+    ) -> Dict[str, Optional[float]]:
+        """
+        Calculate growth metrics with selectable calculation method.
+
+        Args:
+            method: Calculation method
+                - 'fiscal_year': YoY growth using annual 10-K data (default)
+                - 'ttm': TTM (Trailing Twelve Months) growth using quarterly data
+                - 'all': Return both methods for comparison
 
         Metrics:
-            - revenue_growth: (Revenue_t - Revenue_t-1) / Revenue_t-1
-            - earnings_growth: (Net Income_t - Net Income_t-1) / Net Income_t-1
-            - book_value_growth: (Equity_t - Equity_t-1) / Equity_t-1
-            - earnings_per_share_growth: (EPS_t - EPS_t-1) / EPS_t-1
-            - free_cash_flow_growth: (FCF_t - FCF_t-1) / FCF_t-1
-            - operating_income_growth: (Op Income_t - Op Income_t-1) / Op Income_t-1
-            - ebitda_growth: (EBITDA_t - EBITDA_t-1) / EBITDA_t-1
+            - revenue_growth: Revenue growth
+            - earnings_growth: Net Income growth
+            - book_value_growth: Shareholders' Equity growth
+            - earnings_per_share_growth: EPS growth
+            - free_cash_flow_growth: FCF growth
+            - operating_income_growth: Operating Income growth
+            - ebitda_growth: EBITDA growth
+
+        Note on TTM calculation:
+            TTM sums the most recent 4 quarters (regardless of fiscal year alignment)
+            and compares to the 4 quarters before that. This may differ from
+            Financial Datasets' proprietary methodology.
         """
+        if method == 'all':
+            return {
+                'fiscal_year': self._get_fiscal_year_growth(),
+                'ttm': self._get_ttm_growth(),
+            }
+        elif method == 'ttm':
+            return self._get_ttm_growth()
+        else:
+            return self._get_fiscal_year_growth()
+
+    def _get_fiscal_year_growth(self) -> Dict[str, Optional[float]]:
+        """Calculate growth metrics using fiscal year (10-K) data."""
         income = self._load_income_statements(years=self.years_for_growth)
         balance = self._load_balance_sheets(years=self.years_for_growth)
         cashflow = self._load_cash_flow_statements(years=self.years_for_growth)
@@ -528,6 +804,122 @@ class FinancialMetricsCalculator:
             'free_cash_flow_growth': self._calculate_growth(fcf_curr, fcf_prev),
             'operating_income_growth': self._calculate_growth(operating_income_curr, operating_income_prev),
             'ebitda_growth': self._calculate_growth(ebitda_curr, ebitda_prev),
+        }
+
+    def _get_ttm_growth(self) -> Dict[str, Optional[float]]:
+        """
+        Calculate growth metrics using TTM (Trailing Twelve Months).
+
+        TTM = sum of most recent 4 quarters
+        TTM Growth = (TTM_current - TTM_previous) / TTM_previous
+
+        Where:
+            - TTM_current = Q0 + Q1 + Q2 + Q3 (most recent 4 quarters)
+            - TTM_previous = Q4 + Q5 + Q6 + Q7 (4 quarters before that)
+        """
+        # Concept mappings for quarterly data
+        from data_sources.sec_edgar_financials import (
+            INCOME_STATEMENT_MAPPING,
+            CASH_FLOW_MAPPING,
+        )
+
+        results = {}
+
+        # Revenue TTM
+        revenue_q = self._get_quarterly_values(INCOME_STATEMENT_MAPPING.get('revenue', ['Revenues']), 'USD', 8)
+        if len(revenue_q) >= 8:
+            ttm_curr = self._calculate_ttm(revenue_q, 0)
+            ttm_prev = self._calculate_ttm(revenue_q, 4)
+            results['revenue_growth'] = self._calculate_growth(ttm_curr, ttm_prev)
+        else:
+            results['revenue_growth'] = None
+
+        # Net Income TTM
+        ni_q = self._get_quarterly_values(INCOME_STATEMENT_MAPPING.get('net_income', ['NetIncomeLoss']), 'USD', 8)
+        if len(ni_q) >= 8:
+            ttm_curr = self._calculate_ttm(ni_q, 0)
+            ttm_prev = self._calculate_ttm(ni_q, 4)
+            results['earnings_growth'] = self._calculate_growth(ttm_curr, ttm_prev)
+        else:
+            results['earnings_growth'] = None
+
+        # Operating Income TTM
+        oi_q = self._get_quarterly_values(INCOME_STATEMENT_MAPPING.get('operating_income', ['OperatingIncomeLoss']), 'USD', 8)
+        if len(oi_q) >= 8:
+            ttm_curr = self._calculate_ttm(oi_q, 0)
+            ttm_prev = self._calculate_ttm(oi_q, 4)
+            results['operating_income_growth'] = self._calculate_growth(ttm_curr, ttm_prev)
+        else:
+            results['operating_income_growth'] = None
+
+        # EPS TTM (uses USD/shares unit)
+        eps_concepts = INCOME_STATEMENT_MAPPING.get('earnings_per_share', ['EarningsPerShareBasic'])
+        eps_q = self._get_quarterly_values(eps_concepts, 'USD/shares', 8)
+        if len(eps_q) >= 8:
+            ttm_curr = self._calculate_ttm(eps_q, 0)
+            ttm_prev = self._calculate_ttm(eps_q, 4)
+            results['earnings_per_share_growth'] = self._calculate_growth(ttm_curr, ttm_prev)
+        else:
+            results['earnings_per_share_growth'] = None
+
+        # Free Cash Flow TTM
+        fcf_q = self._get_quarterly_values(CASH_FLOW_MAPPING.get('free_cash_flow', ['FreeCashFlow']), 'USD', 8)
+        if len(fcf_q) >= 8:
+            ttm_curr = self._calculate_ttm(fcf_q, 0)
+            ttm_prev = self._calculate_ttm(fcf_q, 4)
+            results['free_cash_flow_growth'] = self._calculate_growth(ttm_curr, ttm_prev)
+        else:
+            results['free_cash_flow_growth'] = None
+
+        # Book Value Growth - use balance sheet (instant values, not TTM)
+        # For balance sheet items, we compare current vs year-ago values
+        equity_q = self._get_quarterly_values(['StockholdersEquity'], 'USD', 8)
+        if len(equity_q) >= 5:
+            # Compare most recent to 4 quarters ago
+            results['book_value_growth'] = self._calculate_growth(
+                equity_q[0]['val'], equity_q[4]['val']
+            )
+        else:
+            results['book_value_growth'] = None
+
+        # EBITDA TTM = Operating Income TTM + D&A TTM
+        da_q = self._get_quarterly_values(CASH_FLOW_MAPPING.get('depreciation_and_amortization', ['DepreciationAndAmortization']), 'USD', 8)
+        if len(oi_q) >= 8 and len(da_q) >= 8:
+            ebitda_curr = self._calculate_ttm(oi_q, 0) + self._calculate_ttm(da_q, 0)
+            ebitda_prev = self._calculate_ttm(oi_q, 4) + self._calculate_ttm(da_q, 4)
+            results['ebitda_growth'] = self._calculate_growth(ebitda_curr, ebitda_prev)
+        else:
+            results['ebitda_growth'] = None
+
+        return results
+
+    def get_all_growth_methods(self) -> Dict[str, Any]:
+        """
+        Get growth metrics calculated using all available methods.
+
+        Returns a comprehensive comparison dict with:
+            - fiscal_year: Growth based on annual 10-K data
+            - ttm: Growth based on TTM (sum of 4 quarters)
+            - quarterly_data: Raw quarterly values for debugging
+        """
+        fy_growth = self._get_fiscal_year_growth()
+        ttm_growth = self._get_ttm_growth()
+
+        # Get quarterly data for debugging
+        from data_sources.sec_edgar_financials import INCOME_STATEMENT_MAPPING
+        ni_q = self._get_quarterly_values(INCOME_STATEMENT_MAPPING.get('net_income', ['NetIncomeLoss']), 'USD', 8)
+
+        return {
+            'fiscal_year': fy_growth,
+            'ttm': ttm_growth,
+            'methodology_notes': {
+                'fiscal_year': 'YoY growth using annual 10-K data (FY_t vs FY_t-1)',
+                'ttm': 'Rolling 4-quarter sum comparison (Q0-Q3 vs Q4-Q7)',
+            },
+            'quarterly_net_income': [
+                {'end': q['end'], 'val': q['val'], 'fp': q['fp'], 'fy': q['fy']}
+                for q in ni_q[:8]
+            ] if ni_q else [],
         }
 
     # =========================================================================
