@@ -550,23 +550,134 @@ all_methods = calc.get_efficiency_metrics(method='all')
 
 ## 7. Growth Metrics (成長指標) - 7 個
 
-**關鍵問題**: 我們使用 FY vs FY-1，Financial Datasets 可能使用 TTM vs TTM-1
+### 計算方法
+
+我們提供兩種計算方法：
+
+#### 方法 1: Fiscal Year (會計年度比較)
+```python
+growth = (FY_current - FY_previous) / |FY_previous|
+```
+- 使用年度 10-K 財報數據
+- 比較: FY2025 vs FY2024
+
+#### 方法 2: TTM (Trailing Twelve Months)
+```python
+TTM_current = Q4 + Q3 + Q2 + Q1 (最近4季)
+TTM_previous = Q4' + Q3' + Q2' + Q1' (前4季)
+growth = (TTM_current - TTM_previous) / |TTM_previous|
+```
+- 季度數據提取自 10-Q 財報
+- Q4 由 10-K 年度值減去 Q1+Q2+Q3 推導
+
+### 季度數據提取 (AAPL 範例)
+
+```
+Quarterly Net Income (Q4 從 FY - Q1 - Q2 - Q3 推導):
+
+FY2025:
+  Q4 (Jul-Sep 2025): $27.47B = $112.01B - $36.33B - $24.78B - $23.43B
+  Q3 (Apr-Jun 2025): $23.43B
+  Q2 (Jan-Mar 2025): $24.78B
+  Q1 (Oct-Dec 2024): $36.33B
+  TTM FY2025: $112.01B
+
+FY2024:
+  Q4 (Jul-Sep 2024): $14.74B = $93.74B - $33.92B - $23.64B - $21.45B
+  Q3 (Apr-Jun 2024): $21.45B
+  Q2 (Jan-Mar 2024): $23.64B
+  Q1 (Oct-Dec 2023): $33.92B
+  TTM FY2024: $93.74B
+```
 
 ### 7.1 revenue_growth (營收成長率)
 ```
 公式: (Revenue_t - Revenue_t-1) / Revenue_t-1
 
-我們的計算 (FY2025 vs FY2024):
+Fiscal Year 計算 (FY2025 vs FY2024):
   Revenue_2025 = $416,161M
   Revenue_2024 = $391,035M
   Growth = (416,161 - 391,035) / 391,035 = 6.43%
 
+TTM 計算 (同上，因季度對齊 FY):
+  TTM_current = $416,161M
+  TTM_previous = $391,035M
+  Growth = 6.43%
+
 Financial Datasets 值: 1.84%
-差異: 249% - 計算期間不同
+差異: 249% - FD 使用專有計算方法
 ```
 
-### 7.2-7.7 其他成長指標
-類似問題，需要確認 Financial Datasets 使用的是哪個期間的數據。
+### 7.2 earnings_growth (淨利成長率)
+```
+Fiscal Year/TTM 計算:
+  NI_2025 = $112,010M
+  NI_2024 = $93,736M
+  Growth = (112,010 - 93,736) / 93,736 = 19.50%
+
+Financial Datasets 值: 12.82%
+差異: 52%
+```
+
+### 7.3 book_value_growth (帳面價值成長率)
+```
+Fiscal Year 計算:
+  Equity_2025 = $73,733M
+  Equity_2024 = $56,950M
+  Growth = (73,733 - 56,950) / 56,950 = 29.47%
+
+TTM 計算 (Q4 vs Q4-4):
+  Growth = 20.50% (不同時點的 equity)
+
+Financial Datasets 值: 12.01%
+差異: 145% (FY) / 71% (TTM)
+```
+
+### 7.4-7.7 其他成長指標
+
+| 指標 | FY 計算 | TTM 計算 | FD 值 | 差異 |
+|------|---------|---------|-------|------|
+| earnings_per_share_growth | 22.59% | 22.59% | 13.55% | 67% |
+| free_cash_flow_growth | -9.23% | N/A* | 2.69% | 符號相反 |
+| operating_income_growth | 7.98% | 7.98% | 2.47% | 224% |
+| ebitda_growth | 7.49% | 7.49% | 2.42% | 210% |
+
+*FCF 季度數據提取失敗，需要額外的 XBRL 概念映射
+
+### Financial Datasets 方法論推測
+
+FD 的成長指標與我們計算有系統性差異，可能原因：
+
+1. **計算期間不同**
+   - FD 可能使用滾動 TTM，不對齊會計年度
+   - 例如：截至 2025-12-31 的 TTM vs 截至 2024-12-31 的 TTM
+
+2. **季度數據來源不同**
+   - FD 可能直接使用 QTD (Quarter-to-Date) 值
+   - 我們從 YTD 推導單季值
+
+3. **數據延遲**
+   - FD 快照日期: 2026-01-14
+   - 可能尚未包含最新 10-K 數據
+
+4. **專有調整**
+   - FD 可能有非公開的標準化調整
+   - 例如排除一次性項目
+
+### 使用建議
+
+```python
+# 使用 Fiscal Year 方法 (默認)
+growth = calc.get_growth_metrics(method='fiscal_year')
+
+# 使用 TTM 方法
+growth = calc.get_growth_metrics(method='ttm')
+
+# 比較所有方法
+all_methods = calc.get_all_growth_methods()
+```
+
+**結論**: 由於 FD 未公開具體方法論，建議使用我們的 Fiscal Year 計算，並在文檔中說明計算基準。
 
 ---
 
