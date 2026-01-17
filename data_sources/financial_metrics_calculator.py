@@ -605,8 +605,8 @@ class FinancialMetricsCalculator:
         Get quarterly values from SEC EDGAR for TTM calculation.
 
         This extracts individual quarter values (not YTD) by:
-        1. Getting all quarterly data points (10-Q)
-        2. For each period with multiple values, taking the smaller one (QTD vs YTD)
+        1. Identifying unique fiscal years from 10-K data (by end date)
+        2. Finding quarterly data by matching fiscal period dates
         3. Calculating Q4 from: FY total - (Q1 + Q2 + Q3) for 10-K filings
 
         Args:
@@ -636,75 +636,87 @@ class FinancialMetricsCalculator:
 
             from collections import defaultdict
 
-            # Separate 10-K (FY) and 10-Q entries by fiscal year
-            fy_entries = {}  # {fy: {end, val}}
-            q_entries_by_fy = defaultdict(list)  # {fy: [{end, val, fp}]}
-
+            # Step 1: Get unique fiscal years from 10-K data (by end date, not fy number)
+            # SEC EDGAR has duplicate fy assignments, so we use end date as the unique key
+            fy_by_end = {}  # {end_date: {val, fy}}
             for e in entries:
-                form = e.get('form')
-                fp = e.get('fp')
-                fy = e.get('fy')
-                val = e.get('val')
-                end = e.get('end')
+                if e.get('form') == '10-K' and e.get('fp') == 'FY' and e.get('val') is not None:
+                    end = e.get('end')
+                    fy = e.get('fy')
+                    # Only keep if the fiscal year matches the end date year
+                    # (e.g., FY2025 should end in 2025, not 2024)
+                    if end and end[:4] == str(fy):
+                        if end not in fy_by_end:
+                            fy_by_end[end] = {'end': end, 'val': e['val'], 'fy': fy}
 
-                if val is None:
-                    continue
-
-                if form == '10-K' and fp == 'FY':
-                    # Full year value - keep only the one with matching fiscal year end
-                    if fy not in fy_entries:
-                        fy_entries[fy] = {'end': end, 'val': val, 'fy': fy}
-                elif form == '10-Q':
-                    q_entries_by_fy[fy].append({
+            # Step 2: Get all 10-Q entries grouped by end date
+            q_by_end = defaultdict(list)  # {end_date: [entries]}
+            for e in entries:
+                if e.get('form') == '10-Q' and e.get('val') is not None:
+                    end = e.get('end')
+                    q_by_end[end].append({
                         'end': end,
-                        'val': val,
-                        'fp': fp,
-                        'fy': fy,
-                        'form': form,
+                        'val': e['val'],
+                        'fp': e.get('fp'),
+                        'fy': e.get('fy'),
+                        'form': '10-Q',
                     })
 
-            # Build quarterly values list
+            # Step 3: For each quarterly end date, get QTD value (min of duplicates)
+            qtd_values = {}  # {end_date: {end, val, fp, fy, form}}
+            for end, q_entries in q_by_end.items():
+                # Pick the smallest value (QTD vs YTD)
+                best = min(q_entries, key=lambda x: x['val'])
+                # Only keep Q1, Q2, Q3 entries
+                if best['fp'] in ('Q1', 'Q2', 'Q3'):
+                    qtd_values[end] = best
+
+            # Step 4: Build fiscal year data with Q4 derived from FY - Q1 - Q2 - Q3
             quarters = []
 
-            # Process each fiscal year
-            for fy in sorted(fy_entries.keys(), reverse=True):
-                fy_data = fy_entries[fy]
-                q_data = q_entries_by_fy.get(fy, [])
+            for fy_end in sorted(fy_by_end.keys(), reverse=True):
+                fy_data = fy_by_end[fy_end]
+                fy = fy_data['fy']
+                fy_val = fy_data['val']
 
-                # Group 10-Q by end date to get QTD values
-                q_by_end = defaultdict(list)
-                for q in q_data:
-                    q_by_end[q['end']].append(q)
+                # Find Q1, Q2, Q3 for this fiscal year
+                # Q3 ends ~3 months before FY end, Q2 ~6 months, Q1 ~9 months
+                fy_year = int(fy_end[:4])
 
-                # Get QTD values for Q1, Q2, Q3
-                q_values = {}  # {fp: val}
-                for end, entries_for_date in q_by_end.items():
-                    # QTD is the smaller value when multiple exist
-                    best = min(entries_for_date, key=lambda x: x['val'])
-                    fp = best['fp']
-                    if fp in ('Q1', 'Q2', 'Q3'):
-                        q_values[fp] = {'end': end, 'val': best['val'], 'fp': fp, 'fy': fy, 'form': '10-Q'}
+                # Find matching quarters by fiscal year number in the entries
+                q1_val = q2_val = q3_val = None
+                q1_end = q2_end = q3_end = None
 
-                # Calculate Q4 = FY - Q1 - Q2 - Q3
-                if 'Q1' in q_values and 'Q2' in q_values and 'Q3' in q_values:
-                    q4_val = fy_data['val'] - q_values['Q1']['val'] - q_values['Q2']['val'] - q_values['Q3']['val']
-                    q4 = {
-                        'end': fy_data['end'],
-                        'val': q4_val,
-                        'fp': 'Q4',
-                        'fy': fy,
-                        'form': '10-K (derived)',
-                    }
-                    # Add Q4, Q3, Q2, Q1 for this fiscal year
-                    quarters.append(q4)
-                    quarters.append(q_values['Q3'])
-                    quarters.append(q_values['Q2'])
-                    quarters.append(q_values['Q1'])
-                else:
-                    # Fallback: just use whatever we have
-                    for fp in ['Q3', 'Q2', 'Q1']:
-                        if fp in q_values:
-                            quarters.append(q_values[fp])
+                for end, q_data in qtd_values.items():
+                    q_fy = q_data['fy']
+                    fp = q_data['fp']
+                    # Match quarters that belong to this fiscal year
+                    if q_fy == fy:
+                        if fp == 'Q1':
+                            q1_val = q_data['val']
+                            q1_end = end
+                        elif fp == 'Q2':
+                            q2_val = q_data['val']
+                            q2_end = end
+                        elif fp == 'Q3':
+                            q3_val = q_data['val']
+                            q3_end = end
+
+                # Calculate Q4 if we have all three quarters
+                if q1_val is not None and q2_val is not None and q3_val is not None:
+                    q4_val = fy_val - q1_val - q2_val - q3_val
+                    quarters.append({
+                        'end': fy_end, 'val': q4_val, 'fp': 'Q4', 'fy': fy, 'form': '10-K (derived)'
+                    })
+                    quarters.append({
+                        'end': q3_end, 'val': q3_val, 'fp': 'Q3', 'fy': fy, 'form': '10-Q'
+                    })
+                    quarters.append({
+                        'end': q2_end, 'val': q2_val, 'fp': 'Q2', 'fy': fy, 'form': '10-Q'
+                    })
+                    quarters.append({
+                        'end': q1_end, 'val': q1_val, 'fp': 'Q1', 'fy': fy, 'form': '10-Q'
+                    })
 
             # Sort by end date descending and return
             quarters = sorted(quarters, key=lambda x: x['end'], reverse=True)
