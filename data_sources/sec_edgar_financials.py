@@ -759,6 +759,45 @@ class SECEdgarFinancials:
 
         return pd.DataFrame(comparison)
 
+    @staticmethod
+    def get_all_tickers() -> list[dict]:
+        """
+        Get all company tickers from SEC EDGAR.
+        
+        This is a FREE replacement for Financial Datasets API endpoint 19 (/prices/snapshot/tickers).
+        
+        Returns:
+            List of dicts with keys: ticker, cik, title (company name)
+            
+        Example:
+            >>> tickers = SECEdgarFinancials.get_all_tickers()
+            >>> len(tickers)  # ~10,000+ companies
+            10301
+            >>> tickers[0]
+            {'ticker': 'NVDA', 'cik': 1045810, 'title': 'NVIDIA CORP'}
+        """
+        import requests
+        
+        headers = {
+            'User-Agent': 'MindfulRL-Intraday contact@example.com',
+            'Accept': 'application/json'
+        }
+        
+        url = 'https://www.sec.gov/files/company_tickers.json'
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        
+        data = resp.json()
+        
+        return [
+            {
+                'ticker': v['ticker'],
+                'cik': v['cik_str'],
+                'title': v['title']
+            }
+            for v in data.values()
+        ]
+
 
 # Convenience functions
 def get_income_statement(ticker: str, years: int = 5) -> List[Dict]:
