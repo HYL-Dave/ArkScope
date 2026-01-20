@@ -9,11 +9,12 @@
 
 1. [目標：自主發現板塊爆發](#目標自主發現板塊爆發)
 2. [數據需求分析](#數據需求分析)
-3. [新聞數據深度分析](#新聞數據深度分析)
-4. [Options Flow 數據](#options-flow-數據)
-5. [完整數據堆疊](#完整數據堆疊)
-6. [成本總結](#成本總結)
-7. [常見問題](#常見問題)
+3. [IBKR 訂閱詳解](#ibkr-訂閱詳解)
+4. [新聞數據深度分析](#新聞數據深度分析)
+5. [Options Flow 數據](#options-flow-數據)
+6. [完整數據堆疊](#完整數據堆疊)
+7. [成本總結](#成本總結)
+8. [常見問題](#常見問題)
 
 ---
 
@@ -62,6 +63,116 @@
 | **IBKR 即時數據** | 即時報價 + OPRA | ~$10 | ⭐⭐⭐ 強烈建議 |
 | **Unusual Whales** | Options Flow + 國會交易 | $50 | ⭐⭐⭐ 強烈建議 |
 | **Benzinga (IBKR)** | 額外新聞來源 | $35 | ⭐ 可選 |
+
+---
+
+## IBKR 訂閱詳解
+
+由於 IBKR 是主要交易平台，充分利用其訂閱選項可以最大化價值。
+
+### 市場數據訂閱 (Client Portal → Settings → Market Data)
+
+| 訂閱項目 | 非專業月費 | 內容 | 建議 |
+|---------|----------:|------|:----:|
+| **US Equity & Options Bundle** | $4.50 | NYSE + NASDAQ + AMEX 即時串流 | ⭐⭐⭐ |
+| **OPRA (Top of Book)** | $1.50 | 期權即時報價 (bid/ask/last/vol/OI) | ⭐⭐⭐ |
+| **US Securities Snapshot Bundle** | $10.00 | 快照報價 (可用佣金抵免) | ⭐⭐ |
+
+```
+OPRA = Options Price Reporting Authority
+     = 美國選擇權即時報價的官方數據源
+     = 自建 Options Flow 的基礎數據
+```
+
+**費用抵免**: 如果月佣金 > $30，Snapshot Bundle 可抵免；佣金 > $5，Streaming Bundle 可抵免。
+
+### 免費已包含
+
+| 項目 | 說明 |
+|------|------|
+| **Cboe One + IEX** | 美股即時報價 (非整合) |
+| **延遲數據** | 所有產品 15 分鐘延遲 |
+| **100 快照/月** | 免費快照配額 |
+
+### 研究訂閱 (Client Portal → Settings → Research Subscriptions)
+
+```
+路徑: Client Portal → 右上角頭像 → Settings → Research Subscriptions
+```
+
+| 服務 | 月費 | 用途 | 建議 |
+|------|-----:|------|:----:|
+| **Trading Central** | 免費 | 技術分析、自動化信號 | ⭐⭐ |
+| **TipRanks** | 免費 | 分析師評級、目標價追蹤 | ⭐⭐ |
+| **Seeking Alpha** | 免費 | 社群研究、股票評級 | ⭐ |
+| **Morningstar** | 免費 | 基本面研究 | ⭐ |
+| **Argus Research** | 免費 | 分析師報告、期權策略 | ⭐ |
+| **Estimize** | 免費 | 眾包財報預估 (常優於華爾街共識) | ⭐⭐ |
+| **Context Analytics** | 免費 | 社交媒體情緒分析 | ⭐ |
+| **Market Chameleon** | 付費版可選 | 期權異常活動掃描 | ⭐⭐ |
+| **Benzinga API** | $35 | 新聞 API 存取 | 可選 |
+
+### 內建研究工具 (不需訂閱，直接使用)
+
+```
+路徑: Client Portal → Research → [工具名稱]
+```
+
+| 工具 | 用途 | 說明 |
+|------|------|------|
+| **Discover Tool** | 第三方內容整合 | 含 ORATS 回測、Trading Central 等 |
+| **ORATS Backtester** | 期權策略回測 | 180+ 百萬歷史回測，免費 |
+| **Fundamentals Explorer** | 財務比率、公司資料 | 基本面分析 |
+| **Why Is It Moving?** | 股價漲跌原因 | Benzinga 提供 |
+| **Events Calendar** | 財報、IPO、期權到期日 | 事件追蹤 |
+| **Market Scanners** | 股票/ETF 掃描 | 價量篩選 |
+
+### IBKR 推薦訂閱配置
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 IBKR 推薦訂閱配置                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  [市場數據 - ~$6/月]                                         │
+│  ├── US Equity & Options Bundle ─── $4.50 (可抵免)          │
+│  └── OPRA (期權即時) ─────────────── $1.50                  │
+│                                                             │
+│  [新聞 - 免費，已啟用]                                       │
+│  ├── Dow Jones Newswires ✓                                 │
+│  ├── The Fly ✓                                             │
+│  └── Briefing.com ✓                                        │
+│                                                             │
+│  [研究訂閱 - 免費，建議啟用]                                 │
+│  ├── Trading Central ────── 技術分析                        │
+│  ├── TipRanks ────────────── 分析師追蹤                     │
+│  ├── Estimize ────────────── 眾包預估                       │
+│  └── Context Analytics ──── 社交情緒                        │
+│                                                             │
+│  [內建工具 - 免費，直接使用]                                 │
+│  ├── ORATS Backtester ───── 期權回測                        │
+│  ├── Fundamentals Explorer ─ 基本面                         │
+│  └── Events Calendar ────── 事件追蹤                        │
+│                                                             │
+│  [可選付費]                                                  │
+│  ├── Benzinga API ────────── $35/月 (如需 API 新聞)         │
+│  └── Market Chameleon Pro ── 付費 (進階期權掃描)            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+IBKR 內訂閱總計: ~$6/月 (必要) + $35/月 (可選 Benzinga)
+```
+
+### 如何啟用研究訂閱
+
+1. 登入 [Client Portal](https://portal.interactivebrokers.com/)
+2. 點擊右上角**頭像圖示**
+3. 選擇 **Settings**
+4. 在 Trading Platform 區塊找到 **Research Subscriptions**
+5. 點擊**齒輪圖示**設定
+6. 勾選想要的服務 → Continue → 確認
+
+**注意**: 部分服務有 30 天免費試用，試用後自動終止。
 
 ---
 
