@@ -1,7 +1,7 @@
 # 數據訂閱完整指南
 
 > **目的**: 記錄 AI Agent 自主發現板塊爆發模式所需的數據訂閱策略
-> **最後更新**: 2026-01-19
+> **最後更新**: 2026-01-20
 
 ---
 
@@ -68,7 +68,7 @@
 
 ## IBKR 訂閱詳解
 
-由於 IBKR 是主要交易平台，充分利用其訂閱選項可以最大化價值。
+由於 IBKR 是主要交易平台，以下是根據實際 Client Portal 截圖整理的完整訂閱選項。
 
 ### ⚠️ 重要：API 可用性區分
 
@@ -77,143 +77,200 @@
 | 類別 | API 可用？ | 說明 |
 |------|:----------:|------|
 | **市場數據 (報價)** | ✅ | `reqMktData()`, `reqHistoricalData()` |
-| **新聞** | ✅ | `reqNewsArticle()`, `reqHistoricalNews()` |
+| **新聞 (IBIS)** | ✅ | `reqNewsArticle()`, `reqHistoricalNews()` |
 | **期權鏈 + Greeks** | ✅ | `reqSecDefOptParams()`, `reqMktData()` |
-| **基本面 (有限)** | ✅ | `reqFundamentalData()` - 只有 Reuters 財報摘要 |
-| **Research 訂閱** | ❌ | GUI 整合，無 API |
-| **內建工具** | ❌ | TWS/Portal 介面功能，無 API |
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              IBKR 數據的 API 可用性                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ✅ 可自動化 (via ib_async/TWS API):                        │
-│  ├── 即時/歷史報價 ─────── reqMktData(), reqHistoricalData()│
-│  ├── 新聞 ────────────────── reqNewsArticle() ← 已在用      │
-│  ├── 期權鏈 + Greeks ────── reqSecDefOptParams()           │
-│  ├── 基本面 (有限) ──────── reqFundamentalData()           │
-│  └── 帳戶/訂單 ────────────── 交易執行                      │
-│                                                             │
-│  ❌ 無法自動化 (GUI only，手動研究用):                       │
-│  ├── ORATS Backtester ───── Discover Tool 內功能           │
-│  ├── Trading Central ────── TWS 圖表技術分析               │
-│  ├── TipRanks ────────────── 研究標籤內顯示                │
-│  ├── Why Is It Moving? ──── Portal 內功能                  │
-│  └── Events Calendar ────── Portal 內功能                  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| **基本面 (有限)** | ✅ | `reqFundamentalData()` - Reuters 財報摘要 |
+| **Benzinga via API** | ✅ | 需訂閱 $35/月，明確標示 "via API" |
+| **Wall Street Horizon API** | ✅ | 需訂閱 $49/月，明確標示 "API" |
+| **其他 Research 訂閱** | ❌ | GUI 整合，無 API |
 
 ---
 
-### 市場數據訂閱 (Client Portal → Settings → Market Data)
+### 市場數據訂閱 (Settings → Market Data Subscriptions)
 
-| 訂閱項目 | 非專業月費 | 內容 | 建議 |
-|---------|----------:|------|:----:|
-| **US Equity & Options Bundle** | $4.50 | NYSE + NASDAQ + AMEX 即時串流 | ⭐⭐⭐ |
-| **OPRA (Top of Book)** | $1.50 | 期權即時報價 (bid/ask/last/vol/OI) | ⭐⭐⭐ |
-| **US Securities Snapshot Bundle** | $10.00 | 快照報價 (可用佣金抵免) | ⭐⭐ |
+#### Quote Bundles (套餐)
 
-```
-OPRA = Options Price Reporting Authority
-     = 美國選擇權即時報價的官方數據源
-     = 自建 Options Flow 的基礎數據
-```
+| 訂閱項目 | 月費 | 內容 | 抵免條件 |
+|---------|-----:|------|---------|
+| **US Equity & Options Add-On Streaming Bundle** | $4.50 | NYSE + AMEX + NASDAQ + OPRA 即時串流 | 需先訂閱 Snapshot Bundle |
+| **US Securities Snapshot and Futures Value Bundle** | $10.00 | 美股快照 + 期貨 L1 | 佣金 > $30 可抵免 |
+| **US Futures Value Bundle PLUS (L2)** | $5.00 | CBOT, CME, COMEX, NYMEX 深度 | 需先訂閱 Snapshot Bundle |
+| **Cboe One Add-On Bundle** | $1.00 | Cboe 四個交易所 | 佣金 > $5 可抵免 |
 
-**費用抵免**: 如果月佣金 > $30，Snapshot Bundle 可抵免；佣金 > $5，Streaming Bundle 可抵免。
+#### Level I (NBBO) - 美股相關
 
-### 免費已包含
+| 訂閱項目 | 月費 | 內容 | 抵免條件 |
+|---------|-----:|------|---------|
+| **NYSE (Network A/CTA)** | $1.50 | NYSE 上市股票 | - |
+| **NASDAQ (Network C/UTP)** | $1.50 | NASDAQ 上市股票 | - |
+| **NYSE American, BATS, ARCA, IEX (Network B)** | $1.50 | AMEX 等交易所 | - |
+| **OPRA (US Options Exchanges)** | $1.50 | 美國期權報價 ⭐ | 佣金 > $20 可抵免 |
+| **Cboe One** | $1.00 | Cboe 四個交易所 | - |
+| **OTC Markets** | $8.00 | 場外交易股票 | - |
+| **US Mutual Funds** | 免費 | 共同基金 | - |
+
+#### Level I (NBBO) - 期貨相關
+
+| 訂閱項目 | 月費 | 內容 | 抵免條件 |
+|---------|-----:|------|---------|
+| **CME Real-Time** | $1.55 | ES, NQ, HE 等 | 佣金 > $20 可抵免 |
+| **CBOT Real-Time** | $1.55 | YM, ZB, ZC 等 | 佣金 > $20 可抵免 |
+| **NYMEX Real-Time** | $1.55 | CL, RB, NG 等 | 佣金 > $20 可抵免 |
+| **COMEX Real-Time** | $1.55 | GC, SI, HG 等 | 佣金 > $20 可抵免 |
+
+#### Level II (Deep Book)
+
+| 訂閱項目 | 月費 | 內容 |
+|---------|-----:|------|
+| **NASDAQ TotalView-OpenView** | $16.50 | NASDAQ 深度 |
+| **NYSE OpenBook** | $25.00 | NYSE 深度 |
+| **NYSE ArcaBook** | $11.00 | NYSE Arca 深度 |
+| **CME Real-Time (L2)** | $12.10 | CME 期貨深度 (佣金 > $20 可抵免) |
+
+#### 免費已包含
 
 | 項目 | 說明 |
 |------|------|
-| **Cboe One + IEX** | 美股即時報價 (非整合) |
-| **延遲數據** | 所有產品 15 分鐘延遲 |
-| **100 快照/月** | 免費快照配額 |
+| **US Real-Time Non Consolidated (IBKR-PRO)** | BATS, BYX, EDGX 等五交易所即時報價 ✓ |
+| **US Mutual Funds** | 共同基金報價 ✓ |
+| **CME Event Contracts** | CME 事件合約 ✓ |
+| **US and EU Bond Quotes** | 債券報價 ✓ |
+| **ICE Futures US - Digital Asset / Gold Silver** | 比特幣、黃金白銀期貨 ✓ |
 
-### 研究訂閱 (GUI only - 手動研究用)
+---
 
-```
-路徑: Client Portal → 右上角頭像 → Settings → Research Subscriptions
-⚠️ 注意: 這些服務只在 TWS/Portal 介面顯示，無法透過 API 存取
-```
+### 研究訂閱 (Settings → Research Subscriptions)
 
-| 服務 | 月費 | 用途 | API | 建議 |
-|------|-----:|------|:---:|:----:|
-| **Trading Central** | 免費 | 技術分析信號 | ❌ | 手動參考 |
-| **TipRanks** | 免費 | 分析師評級 | ❌ | 手動參考 |
-| **Seeking Alpha** | 免費 | 社群研究 | ❌ | 手動參考 |
-| **Morningstar** | 免費 | 基本面研究 | ❌ | 手動參考 |
-| **Argus Research** | 免費 | 分析師報告 | ❌ | 手動參考 |
-| **Estimize** | 免費 | 眾包財報預估 | ❌ | 手動參考 |
-| **Context Analytics** | 免費 | 社交情緒 | ❌ | 手動參考 |
-| **Market Chameleon** | 付費 | 期權異常掃描 | ❌ | 手動參考 |
-
-**結論**: 這些免費研究訂閱對**手動交易研究**有幫助，但**無法整合到 LLM pipeline**。
-
-### 內建工具 (GUI only - TWS/Portal 介面功能)
+#### IBIS Research Platform (免費!) ⭐
 
 ```
-⚠️ 注意: 這些是 TWS/Portal 的介面功能，非獨立服務，無 API
+這是最重要的免費服務，已包含大量數據：
 ```
 
-| 工具 | 位置 | 用途 | API |
-|------|------|------|:---:|
-| **Discover Tool** | TWS | 第三方內容整合 (ORATS 等) | ❌ |
-| **ORATS Backtester** | TWS Discover | 期權策略回測 | ❌ |
-| **Fundamentals Explorer** | Portal | 財務比率、公司資料 | ❌ |
-| **Why Is It Moving?** | Portal | 股價漲跌原因 | ❌ |
-| **Events Calendar** | Portal | 財報、IPO 日期 | ❌ |
-| **Market Scanners** | TWS | 股票/ETF 掃描 | ❌ |
+| 包含內容 | 說明 |
+|----------|------|
+| **新聞** | Dow Jones, Reuters, Briefing.com, The Fly |
+| **基本面** | 財報、共識預估、比率、SEC 申報、內部人交易 |
+| **事件日曆** | 財報、經濟指標、IPO、拆股 |
+| **分析師研究** | Morningstar, Zacks 報告 |
+| **升降級公告** | 追蹤賣方研究活動 |
+| **市場評論** | 宏觀經濟、產業焦點、盤中更新 |
 
-**結論**: 這些工具適合**手動研究**時使用，但無法自動化。
+**注意**: IBIS 新聞可透過 TWS API 存取 (`reqNewsArticle`)，這就是你目前在用的！
+
+#### Premium Newswires (付費新聞)
+
+| 服務 | 月費 | API | 說明 |
+|------|-----:|:---:|------|
+| **Benzinga Breaking News via API (NP)** | $35 | ✅ | 明確標示 "via API" |
+| **Dow Jones Institutional News** | $78 | ❌ | 更全面的 DJ 新聞 |
+| **StreetInsider Premium** | $49 | ❌ | 市場動態新聞 |
+| **TipRanks Premium News** | $4.99 | ❌ | 分析師新聞 |
+
+#### Analyst Research (分析師研究)
+
+| 服務 | 月費 | 說明 |
+|------|-----:|------|
+| **Smartkarma Previews** | 免費 | 亞太研究摘要 |
+| **MacroRisk Analytics Previews** | 免費 | 經濟研究摘要 |
+| **TFI Securities** | 免費 | 港股、A股、美股研究 |
+| **MarketEdge NP** | $9.45 | 技術分析報告 |
+| **Morningstar Reports** | $15 | 股票、ETF、信用報告 |
+
+#### Technical Analysis (技術分析)
+
+| 服務 | 月費 | 說明 |
+|------|-----:|------|
+| **Trading Central Technical Insight** | 免費 | 技術分析信號 ⭐ |
+| **Simpler Trading (TTM Squeeze, Wave A/B/C 等)** | $50 各 | 進階技術指標 |
+
+#### Third Party Services (第三方服務)
+
+| 服務 | 月費 | API | 說明 |
+|------|-----:|:---:|------|
+| **Wall Street Horizon** | 免費 | ❌ | 企業事件日曆 |
+| **Wall Street Horizon (API)** | $49 | ✅ | 企業事件數據 API |
+| **TipRanks Basic** | 免費 | ❌ | 5 檔股票提醒 |
+| **TipRanks Premium** | $29.99 | ❌ | 完整分析師追蹤 |
+| **TipRanks Ultimate** | $49.99 | ❌ | 最完整版 |
+| **Market Chameleon Total Access** | $99 | ❌ | 期權異常掃描 |
+| **Reflexivity Basic** | 免費 | ❌ | AI 投資分析 |
+| **Capitalise** | 免費 | ❌ | 自然語言交易自動化 |
+| **Passiv Community** | 免費 | ❌ | 投資組合再平衡 |
+| **Zacks Rank Trading Tool** | $9 | ❌ | Zacks 評級工具 |
+
+#### Market Commentary (市場評論)
+
+| 服務 | 月費 | 說明 |
+|------|-----:|------|
+| **Crowdwisers Macro** | $10 | 宏觀分析 |
+| **Validea Guru Stock Reports** | $10.80 | 大師策略評級 |
+| **ValuEngine ETF** | $5 | ETF 評級 |
+| **InsiderInsights Pro Trader** | $54.45 | 內部人交易分析 |
+
+---
+
+### 有 API 的研究訂閱 (可整合 LLM)
+
+```
+只有這兩個 Research 訂閱明確標示有 API：
+```
+
+| 服務 | 月費 | 用途 |
+|------|-----:|------|
+| **Benzinga Breaking News via API** | $35 | 即時新聞 API |
+| **Wall Street Horizon Corporate Event Data (API)** | $49 | 企業事件日曆 API |
+
+**其他所有 Research 訂閱都是 GUI only，只能在 TWS/Portal 介面查看。**
 
 ### IBKR 推薦訂閱配置
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 IBKR 推薦訂閱配置                            │
+│              IBKR 推薦訂閱配置                               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  [市場數據 - ~$6/月]                                         │
-│  ├── US Equity & Options Bundle ─── $4.50 (可抵免)          │
-│  └── OPRA (期權即時) ─────────────── $1.50                  │
+│  ✅ 已有 (免費，API 可用)                                   │
+│  ─────────────────────────────────────────────────────────  │
+│  ├── IBIS Research Platform ────── DJ, Reuters, The Fly 新聞│
+│  ├── US Real-Time Non Consolidated ─ 基本美股即時報價       │
+│  └── 基本面數據 ──────────────────── reqFundamentalData()   │
 │                                                             │
-│  [新聞 - 免費，已啟用]                                       │
-│  ├── Dow Jones Newswires ✓                                 │
-│  ├── The Fly ✓                                             │
-│  └── Briefing.com ✓                                        │
+│  ⭐ 建議訂閱 (API 可用)                                     │
+│  ─────────────────────────────────────────────────────────  │
+│  ├── OPRA (期權 L1) ──────────────── $1.50/月 (佣金>$20免)  │
+│  ├── 或 US Equity & Options Bundle ─ $4.50/月 (含 OPRA)    │
+│  └── 可選: Benzinga API ────────────── $35/月 (如需更快新聞)│
 │                                                             │
-│  [研究訂閱 - 免費，建議啟用]                                 │
-│  ├── Trading Central ────── 技術分析                        │
-│  ├── TipRanks ────────────── 分析師追蹤                     │
-│  ├── Estimize ────────────── 眾包預估                       │
-│  └── Context Analytics ──── 社交情緒                        │
-│                                                             │
-│  [內建工具 - 免費，直接使用]                                 │
-│  ├── ORATS Backtester ───── 期權回測                        │
-│  ├── Fundamentals Explorer ─ 基本面                         │
-│  └── Events Calendar ────── 事件追蹤                        │
-│                                                             │
-│  [可選付費]                                                  │
-│  ├── Benzinga API ────────── $35/月 (如需 API 新聞)         │
-│  └── Market Chameleon Pro ── 付費 (進階期權掃描)            │
+│  📚 免費啟用 (GUI only，手動研究)                           │
+│  ─────────────────────────────────────────────────────────  │
+│  ├── Trading Central Technical Insight                     │
+│  ├── TipRanks Basic                                        │
+│  ├── Wall Street Horizon (事件日曆)                        │
+│  ├── Reflexivity Basic                                     │
+│  └── Capitalise (自然語言交易)                              │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 
-IBKR 內訂閱總計: ~$6/月 (必要) + $35/月 (可選 Benzinga)
+最小成本配置: OPRA $1.50/月 (佣金 > $20 可抵免，等於免費)
+建議配置: US Equity & Options Bundle $4.50/月 (更完整)
 ```
 
-### 如何啟用研究訂閱
+### 訂閱路徑
 
-1. 登入 [Client Portal](https://portal.interactivebrokers.com/)
-2. 點擊右上角**頭像圖示**
-3. 選擇 **Settings**
-4. 在 Trading Platform 區塊找到 **Research Subscriptions**
-5. 點擊**齒輪圖示**設定
-6. 勾選想要的服務 → Continue → 確認
+**Market Data Subscriptions:**
+1. Client Portal → 頭像 → Settings
+2. 找到 **Market Data Subscriptions**
+3. 選擇 North America → 勾選所需項目
 
-**注意**: 部分服務有 30 天免費試用，試用後自動終止。
+**Research Subscriptions:**
+1. Client Portal → 頭像 → Settings
+2. 找到 **Research Subscriptions**
+3. 勾選想要的服務 → Continue → 確認
+
+**注意**:
+- 大部分 Research 訂閱只在 TWS/Portal 介面顯示
+- 只有 **Benzinga via API** 和 **Wall Street Horizon API** 可程式化存取
 
 ---
 
@@ -334,29 +391,42 @@ IBKR 內訂閱總計: ~$6/月 (必要) + $35/月 (可選 Benzinga)
 
 ## 完整數據堆疊
 
-### 推薦配置
+### 推薦配置 (全部 API 可存取)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    完整數據堆疊                              │
+│            完整數據堆疊 (全部可自動化)                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  [付費訂閱 - $60/月]                                         │
-│  ├── IBKR 即時數據 ──── 報價 + OPRA ($10)                   │
-│  └── Unusual Whales ─── Options Flow + 國會交易 ($50)       │
+│  [IBKR 免費] API ✓                                          │
+│  ├── IBIS 新聞 ────────── Dow Jones + The Fly + Briefing    │
+│  ├── IBIS 基本面 ──────── 財報、SEC、內部人交易              │
+│  ├── 基本即時報價 ────── Cboe One + IEX (非整合)            │
+│  └── 期權鏈 + Greeks ─── reqSecDefOptParams()               │
 │                                                             │
-│  [免費 - 必須保留]                                           │
-│  ├── IBKR 新聞 ──────── Dow Jones + The Fly + Briefing.com  │
-│  ├── SEC EDGAR ──────── Form 4 (內部人) + Form 8-K (重大事件)│
-│  ├── Quiver Quant ───── 政府合約                            │
-│  └── Tiingo ─────────── 歷史股價 (備用)                     │
+│  [IBKR 付費 - $1.50~4.50/月] API ✓                          │
+│  ├── OPRA ──────────────── $1.50 (期權 L1，佣金>$20 免)     │
+│  └── US Equity Bundle ─── $4.50 (含 OPRA + 股票串流)        │
 │                                                             │
-│  [不需訂閱 - 用 LLM 增強]                                    │
-│  ├── 事件類型標籤 ───── 調整 LLM prompt                      │
-│  ├── 高管動態偵測 ───── 新聞關鍵詞 + LLM 分類                │
-│  └── 板塊情緒聚合 ───── 自建 sector_stocks 映射              │
+│  [外部付費 - $50/月] API ✓                                  │
+│  └── Unusual Whales ───── Options Flow + 國會交易           │
+│                                                             │
+│  [免費外部] API ✓                                           │
+│  ├── SEC EDGAR ────────── Form 4 + Form 8-K                │
+│  ├── Quiver Quant ────── 政府合約 (有限 API)                │
+│  └── Tiingo ──────────── 歷史股價                           │
+│                                                             │
+│  [可選 IBKR 付費] API ✓                                     │
+│  ├── Benzinga API ────── $35 (更快新聞)                     │
+│  └── WSH Event API ───── $49 (企業事件)                     │
+│                                                             │
+│  [手動參考 - GUI only]                                      │
+│  └── Trading Central, TipRanks Basic 等 ─── 免費啟用        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
+
+最小成本: $50-51.50/月 (IBIS免費 + OPRA$1.50 + UW$50)
+建議成本: $54.50/月 (IBIS免費 + Bundle$4.50 + UW$50)
 ```
 
 ### 信號覆蓋度
@@ -376,15 +446,34 @@ IBKR 內訂閱總計: ~$6/月 (必要) + $35/月 (可選 Benzinga)
 
 ## 成本總結
 
-### 月度成本
+### 月度成本 (可自動化的訂閱)
 
-| 項目 | 成本 | 必要性 |
-|------|-----:|:------:|
-| IBKR 即時數據 (NYSE + NASDAQ + OPRA) | $10 | ⭐⭐⭐ |
-| Unusual Whales | $50 | ⭐⭐⭐ |
-| Benzinga (IBKR) | $35 | ⭐ 可選 |
-| **推薦總計** | **$60** | |
-| 完整總計 (含 Benzinga) | $95 | |
+| 項目 | 成本 | API | 必要性 | 說明 |
+|------|-----:|:---:|:------:|------|
+| IBIS (新聞 + 基本面) | 免費 | ✅ | ⭐⭐⭐ | 已包含 DJ, The Fly |
+| OPRA (期權 L1) | $1.50 | ✅ | ⭐⭐⭐ | 佣金 > $20 可抵免 |
+| US Equity & Options Bundle | $4.50 | ✅ | ⭐⭐ | 含 OPRA + 股票串流 |
+| Unusual Whales | $50 | ✅ | ⭐⭐⭐ | Options Flow + 國會交易 |
+| **最小配置** | **$50-51.50** | | | IBIS + OPRA + UW |
+| **建議配置** | **$54.50** | | | IBIS + Bundle + UW |
+
+### 可選付費 (有 API)
+
+| 項目 | 成本 | API | 說明 |
+|------|-----:|:---:|------|
+| Benzinga via API | $35 | ✅ | 如需更快新聞 |
+| Wall Street Horizon API | $49 | ✅ | 企業事件日曆 API |
+
+### 免費可啟用 (GUI only，手動研究)
+
+| 項目 | 說明 |
+|------|------|
+| Trading Central | 技術分析信號 |
+| TipRanks Basic | 分析師追蹤 (5 檔) |
+| Reflexivity Basic | AI 投資分析 |
+| Wall Street Horizon | 事件日曆 (非 API) |
+| Capitalise | 自然語言交易 |
+| Smartkarma Previews | 亞太研究 |
 
 ### 與不訂閱的比較
 
@@ -428,12 +517,32 @@ IBKR 內訂閱總計: ~$6/月 (必要) + $35/月 (可選 Benzinga)
 
 ### Q: 什麼時候應該升級到 Benzinga？
 
+**更正**: IBKR 的 "Benzinga Breaking News via API (NP)" ($35/月) **確實有 API 存取**，這是在 Research Subscriptions 中明確標示的。
+
 考慮升級的情況：
 1. 做 L3a (1-5 分鐘) 策略，需要更快新聞
-2. 發現 IBKR 新聞漏掉重要突發消息
-3. 需要 Benzinga 獨家內容
+2. 發現 IBIS 免費新聞 (DJ, The Fly) 漏掉重要突發消息
+3. 需要 Benzinga 獨家的盤前/盤後摘要
 
-目前建議：先用現有配置，有明確痛點再升級。
+目前建議：先用現有 IBIS 免費新聞 (Dow Jones + The Fly + Briefing.com)，這些已經是頂級來源。
+
+### Q: IBKR 研究訂閱可以整合到 AI Agent 嗎？
+
+**大部分不能，但有例外。**
+
+**有 API 的研究訂閱 (可整合):**
+- **Benzinga Breaking News via API** ($35/月) - 明確標示 "via API"
+- **Wall Street Horizon Corporate Event Data (API)** ($49/月) - 明確標示 "API"
+
+**無 API 的研究訂閱 (GUI only):**
+- Trading Central, TipRanks, Market Chameleon 等都只在 TWS/Portal 介面顯示
+- 無法程式化存取，無法整合到 LLM pipeline
+
+**IBKR 免費且有 API 的數據:**
+- IBIS 新聞 (Dow Jones, The Fly, Briefing.com) - `reqNewsArticle()`
+- 市場數據 (報價、歷史價格) - `reqMktData()`, `reqHistoricalData()`
+- 期權鏈和 Greeks - `reqSecDefOptParams()`
+- 基本面數據 - `reqFundamentalData()`
 
 ### Q: 自建 Options Flow 值得嗎？
 
