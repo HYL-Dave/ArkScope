@@ -70,6 +70,43 @@
 
 由於 IBKR 是主要交易平台，充分利用其訂閱選項可以最大化價值。
 
+### ⚠️ 重要：API 可用性區分
+
+**對於 AI Agent 自動化整合，只有 API 可存取的數據才有意義。**
+
+| 類別 | API 可用？ | 說明 |
+|------|:----------:|------|
+| **市場數據 (報價)** | ✅ | `reqMktData()`, `reqHistoricalData()` |
+| **新聞** | ✅ | `reqNewsArticle()`, `reqHistoricalNews()` |
+| **期權鏈 + Greeks** | ✅ | `reqSecDefOptParams()`, `reqMktData()` |
+| **基本面 (有限)** | ✅ | `reqFundamentalData()` - 只有 Reuters 財報摘要 |
+| **Research 訂閱** | ❌ | GUI 整合，無 API |
+| **內建工具** | ❌ | TWS/Portal 介面功能，無 API |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              IBKR 數據的 API 可用性                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ✅ 可自動化 (via ib_async/TWS API):                        │
+│  ├── 即時/歷史報價 ─────── reqMktData(), reqHistoricalData()│
+│  ├── 新聞 ────────────────── reqNewsArticle() ← 已在用      │
+│  ├── 期權鏈 + Greeks ────── reqSecDefOptParams()           │
+│  ├── 基本面 (有限) ──────── reqFundamentalData()           │
+│  └── 帳戶/訂單 ────────────── 交易執行                      │
+│                                                             │
+│  ❌ 無法自動化 (GUI only，手動研究用):                       │
+│  ├── ORATS Backtester ───── Discover Tool 內功能           │
+│  ├── Trading Central ────── TWS 圖表技術分析               │
+│  ├── TipRanks ────────────── 研究標籤內顯示                │
+│  ├── Why Is It Moving? ──── Portal 內功能                  │
+│  └── Events Calendar ────── Portal 內功能                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ### 市場數據訂閱 (Client Portal → Settings → Market Data)
 
 | 訂閱項目 | 非專業月費 | 內容 | 建議 |
@@ -94,38 +131,42 @@ OPRA = Options Price Reporting Authority
 | **延遲數據** | 所有產品 15 分鐘延遲 |
 | **100 快照/月** | 免費快照配額 |
 
-### 研究訂閱 (Client Portal → Settings → Research Subscriptions)
+### 研究訂閱 (GUI only - 手動研究用)
 
 ```
 路徑: Client Portal → 右上角頭像 → Settings → Research Subscriptions
+⚠️ 注意: 這些服務只在 TWS/Portal 介面顯示，無法透過 API 存取
 ```
 
-| 服務 | 月費 | 用途 | 建議 |
-|------|-----:|------|:----:|
-| **Trading Central** | 免費 | 技術分析、自動化信號 | ⭐⭐ |
-| **TipRanks** | 免費 | 分析師評級、目標價追蹤 | ⭐⭐ |
-| **Seeking Alpha** | 免費 | 社群研究、股票評級 | ⭐ |
-| **Morningstar** | 免費 | 基本面研究 | ⭐ |
-| **Argus Research** | 免費 | 分析師報告、期權策略 | ⭐ |
-| **Estimize** | 免費 | 眾包財報預估 (常優於華爾街共識) | ⭐⭐ |
-| **Context Analytics** | 免費 | 社交媒體情緒分析 | ⭐ |
-| **Market Chameleon** | 付費版可選 | 期權異常活動掃描 | ⭐⭐ |
-| **Benzinga API** | $35 | 新聞 API 存取 | 可選 |
+| 服務 | 月費 | 用途 | API | 建議 |
+|------|-----:|------|:---:|:----:|
+| **Trading Central** | 免費 | 技術分析信號 | ❌ | 手動參考 |
+| **TipRanks** | 免費 | 分析師評級 | ❌ | 手動參考 |
+| **Seeking Alpha** | 免費 | 社群研究 | ❌ | 手動參考 |
+| **Morningstar** | 免費 | 基本面研究 | ❌ | 手動參考 |
+| **Argus Research** | 免費 | 分析師報告 | ❌ | 手動參考 |
+| **Estimize** | 免費 | 眾包財報預估 | ❌ | 手動參考 |
+| **Context Analytics** | 免費 | 社交情緒 | ❌ | 手動參考 |
+| **Market Chameleon** | 付費 | 期權異常掃描 | ❌ | 手動參考 |
 
-### 內建研究工具 (不需訂閱，直接使用)
+**結論**: 這些免費研究訂閱對**手動交易研究**有幫助，但**無法整合到 LLM pipeline**。
+
+### 內建工具 (GUI only - TWS/Portal 介面功能)
 
 ```
-路徑: Client Portal → Research → [工具名稱]
+⚠️ 注意: 這些是 TWS/Portal 的介面功能，非獨立服務，無 API
 ```
 
-| 工具 | 用途 | 說明 |
-|------|------|------|
-| **Discover Tool** | 第三方內容整合 | 含 ORATS 回測、Trading Central 等 |
-| **ORATS Backtester** | 期權策略回測 | 180+ 百萬歷史回測，免費 |
-| **Fundamentals Explorer** | 財務比率、公司資料 | 基本面分析 |
-| **Why Is It Moving?** | 股價漲跌原因 | Benzinga 提供 |
-| **Events Calendar** | 財報、IPO、期權到期日 | 事件追蹤 |
-| **Market Scanners** | 股票/ETF 掃描 | 價量篩選 |
+| 工具 | 位置 | 用途 | API |
+|------|------|------|:---:|
+| **Discover Tool** | TWS | 第三方內容整合 (ORATS 等) | ❌ |
+| **ORATS Backtester** | TWS Discover | 期權策略回測 | ❌ |
+| **Fundamentals Explorer** | Portal | 財務比率、公司資料 | ❌ |
+| **Why Is It Moving?** | Portal | 股價漲跌原因 | ❌ |
+| **Events Calendar** | Portal | 財報、IPO 日期 | ❌ |
+| **Market Scanners** | TWS | 股票/ETF 掃描 | ❌ |
+
+**結論**: 這些工具適合**手動研究**時使用，但無法自動化。
 
 ### IBKR 推薦訂閱配置
 
