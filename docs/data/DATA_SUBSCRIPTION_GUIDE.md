@@ -242,6 +242,73 @@
 
 **其他所有 Research 訂閱都是 GUI only，只能在 TWS/Portal 介面查看。**
 
+### IBKR API 實作狀態
+
+本專案已實作的 IBKR API：
+
+| 類別 | API 方法 | 狀態 | 對應函數 |
+|------|---------|:----:|---------|
+| **價格數據** | | | |
+| 日線 | `reqHistoricalData` | ✅ | `fetch_prices()` |
+| 分鐘線 | `reqHistoricalData` | ✅ | `fetch_intraday_prices()` |
+| 調整後股價 | `reqHistoricalData` ADJUSTED_LAST | ✅ | `fetch_adjusted_prices()` |
+| **新聞** | | | |
+| 新聞來源清單 | `reqNewsProviders` | ✅ | `get_news_providers()` |
+| 歷史新聞 | `reqHistoricalNews` | ✅ | `fetch_news()` |
+| 新聞內文 | `reqNewsArticle` | ✅ | `fetch_news_article_body()` |
+| **其他數據** | | | |
+| 歷史波動率 | `reqHistoricalData` HV | ✅ | `fetch_historical_volatility()` |
+| 做空費率 | `reqHistoricalData` FEE_RATE | ✅ | `fetch_short_borrow_rate()` |
+| 基本面比率 | `reqMktData` tick 258 | ✅ | `fetch_fundamental_ratios()` |
+| 股息 | `reqMktData` tick 456 | ✅ | `fetch_dividends()` |
+| 即時報價 | `reqMktData` | ✅ | `get_current_quote()` |
+| 合約詳情 | `reqContractDetails` | ✅ | `get_contract_details()` |
+
+**未實作但可用的 API（自建 Options Flow 需要）：**
+
+| API 方法 | 用途 | 需訂閱 |
+|---------|------|:------:|
+| `reqSecDefOptParams` | 取得期權鏈參數 | OPRA $1.50 |
+| `reqMktData` (options) | 期權報價 + Greeks | OPRA $1.50 |
+| `reqTickByTickData` | Tick-by-tick 數據 | OPRA $1.50 |
+| `reqScannerSubscription` | 市場掃描器 | 視掃描內容 |
+| `reqFundamentalData` | 詳細基本面 (Reuters) | 免費 |
+| `getWshMetaData` | WSH 事件日曆 | WSH API $49 |
+
+---
+
+### 什麼是「佣金」？費用抵免機制
+
+**佣金 (Commissions)** = 每次交易時 IBKR 收取的手續費
+
+```
+IBKR Pro 佣金範例：
+├── 美股: $0.005/股 (最低 $1，最高 1%)
+├── 美國期權: $0.65/合約
+└── 期貨: 依合約不同 ($0.25~$2.25)
+
+換算：
+├── $20 佣金 ≈ 交易 4,000 股美股
+├── $20 佣金 ≈ 交易 30 個期權合約
+└── 活躍交易者通常超過這個門檻
+```
+
+**費用抵免機制**：如果月佣金超過門檻，市場數據訂閱費會被抵免（等於免費）：
+
+| 訂閱 | 月費 | 抵免門檻 | 說明 |
+|------|-----:|:--------:|------|
+| **OPRA** | $1.50 | 佣金 > $20 | 期權報價 |
+| **US Snapshot Bundle** | $10.00 | 佣金 > $30 | 美股快照 |
+| **CME Real-Time** | $1.55 | 佣金 > $20 | CME 期貨 |
+| **CBOT Real-Time** | $1.55 | 佣金 > $20 | CBOT 期貨 |
+| **NYMEX Real-Time** | $1.55 | 佣金 > $20 | NYMEX 期貨 |
+| **COMEX Real-Time** | $1.55 | 佣金 > $20 | COMEX 期貨 |
+| **Cboe One Add-On** | $1.00 | 佣金 > $5 | Cboe 交易所 |
+
+**結論**：如果你是活躍交易者（月佣金 > $20），OPRA 和大部分期貨數據訂閱實際上是免費的。
+
+---
+
 ### IBKR 推薦訂閱配置
 
 ```
