@@ -1,7 +1,7 @@
 # 數據訂閱完整指南
 
 > **目的**: 記錄 AI Agent 自主發現板塊爆發模式所需的數據訂閱策略
-> **最後更新**: 2026-01-20
+> **最後更新**: 2026-01-21
 
 ---
 
@@ -15,6 +15,25 @@
 6. [完整數據堆疊](#完整數據堆疊)
 7. [成本總結](#成本總結)
 8. [常見問題](#常見問題)
+
+---
+
+## 現有訂閱狀態
+
+```
+已有訂閱：
+├── IBKR Pro 帳戶
+│   ├── IBIS Research Platform (免費) ← 含 DJ, The Fly, Briefing 新聞
+│   ├── US Real-Time Non Consolidated (免費) ← 基本即時報價
+│   └── US Mutual Funds (免費)
+├── Seeking Alpha (付費)
+│   └── Alpha Picks (付費)
+└── 外部：SEC EDGAR, Finnhub, Tiingo (免費)
+
+待訂閱評估：
+├── IBKR: OPRA $1.50/月 (期權報價，佣金>$20免)
+└── 外部: Unusual Whales $50/月 (Options Flow)
+```
 
 ---
 
@@ -274,6 +293,49 @@
 
 ---
 
+### IBIS 事件日曆的 API 可用性
+
+```
+IBIS Research Platform 包含 "Live Event Calendars"，但這是 GUI only：
+- 在 TWS/Portal 介面顯示財報日、IPO、拆股等
+- TWS API 沒有專門的事件日曆端點
+- 如需程式化存取事件日曆，需訂閱 Wall Street Horizon API ($49/月)
+
+目前實作狀態：
+├── reqHistoricalNews ──── ✅ 有實作 (新聞收集)
+├── reqNewsArticle ─────── ✅ 有實作 (完整內文)
+└── 事件日曆 API ────────── ❌ 不存在 (GUI only)
+```
+
+---
+
+### 已有 Seeking Alpha 訂閱的影響
+
+如果已訂閱 **Seeking Alpha + Alpha Picks**，大部分 IBKR Research Subscriptions 價值大幅降低：
+
+| IBKR 服務 | Seeking Alpha 重疊？ | 建議 |
+|-----------|:-------------------:|:----:|
+| **TipRanks** | ⚠️ 高度重疊 | ❌ 不需要 |
+| **Morningstar** | ⚠️ 高度重疊 | ❌ 不需要 |
+| **Reflexivity** | ⚠️ 部分重疊 | ❌ 不需要 |
+| **Smartkarma** | ⚠️ 部分重疊 | ❌ 不需要 |
+| **Trading Central** | ✅ 不重疊 (技術分析) | ⭐ 免費啟用 |
+| **Wall Street Horizon** | ✅ 不重疊 (事件日曆) | ⭐ 免費啟用 |
+| **Capitalise** | ✅ 不重疊 (交易自動化) | ⭐ 免費啟用 |
+
+**Seeking Alpha 已涵蓋：**
+- 分析師評級和目標價
+- 財報分析和預測
+- 社群研究和討論
+- 股票評分和推薦 (Alpha Picks)
+
+**仍有價值的 IBKR 免費服務：**
+- Trading Central - 技術分析信號 (SA 沒有)
+- Wall Street Horizon - 事件日曆 (SA 部分有)
+- Capitalise - 自然語言交易自動化 (SA 沒有)
+
+---
+
 ## 新聞數據深度分析
 
 ### 新聞速度層級
@@ -466,14 +528,14 @@
 
 ### 免費可啟用 (GUI only，手動研究)
 
-| 項目 | 說明 |
-|------|------|
-| Trading Central | 技術分析信號 |
-| TipRanks Basic | 分析師追蹤 (5 檔) |
-| Reflexivity Basic | AI 投資分析 |
-| Wall Street Horizon | 事件日曆 (非 API) |
-| Capitalise | 自然語言交易 |
-| Smartkarma Previews | 亞太研究 |
+| 項目 | 說明 | 有 Seeking Alpha 還需要？ |
+|------|------|:------------------------:|
+| Trading Central | 技術分析信號 | ⭐ 需要 (SA 沒有) |
+| Wall Street Horizon | 事件日曆 | ⭐ 需要 |
+| Capitalise | 自然語言交易 | ⭐ 需要 (SA 沒有) |
+| TipRanks Basic | 分析師追蹤 | ❌ SA 已有 |
+| Reflexivity Basic | AI 投資分析 | ❌ SA 已有類似 |
+| Smartkarma Previews | 亞太研究 | ❌ 重疊 |
 
 ### 與不訂閱的比較
 
