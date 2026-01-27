@@ -473,7 +473,7 @@ def update_ibkr_prices(dry_run: bool = False) -> bool:
         logger.error(f"Script not found: {script}")
         return False
 
-    cmd = [sys.executable, str(script), "--incremental", "--minute-only"]
+    cmd = [sys.executable, str(script), "--incremental", "--minute-only", "--tier", "all"]
 
     if dry_run:
         cmd.append("--dry-run")
