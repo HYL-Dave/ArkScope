@@ -27,7 +27,7 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
 try:
-    from ib_insync import IB, Stock, util
+    from ib_insync import IB, Stock, Option, util
     HAS_IB_INSYNC = True
 except ImportError:
     HAS_IB_INSYNC = False
@@ -54,6 +54,38 @@ class IntradayBar:
     volume: int
     wap: Optional[float] = None  # Volume-weighted average price
     bar_count: Optional[int] = None  # Number of trades
+
+
+@dataclass
+class OptionChainParams:
+    """Option chain parameters from OPRA."""
+    underlying: str
+    exchange: str
+    expirations: List[str]  # Format: YYYYMMDD
+    strikes: List[float]
+    multiplier: str
+
+
+@dataclass
+class OptionQuote:
+    """Option quote data structure."""
+    underlying: str
+    expiry: str
+    strike: float
+    right: str  # 'C' or 'P'
+    con_id: int
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    last: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    # Greeks (may be None if not available)
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    theta: Optional[float] = None
+    vega: Optional[float] = None
+    implied_vol: Optional[float] = None
 
 
 class IBKRDataSource(BaseDataSource):
@@ -1060,6 +1092,321 @@ class IBKRDataSource(BaseDataSource):
                 logger.error(f"Error fetching adjusted prices for {ticker}: {e}")
 
         return all_prices
+
+    # =========================================================================
+    # OPRA - Option Chain and Quote Methods (requires OPRA subscription $1.50/month)
+    # =========================================================================
+
+    def get_option_chain_params(
+        self,
+        ticker: str,
+        exchange: str = '',
+    ) -> List[OptionChainParams]:
+        """
+        Get option chain parameters (expirations, strikes) for a stock.
+
+        Requires OPRA subscription ($1.50/month, waived if commissions > $20).
+
+        Args:
+            ticker: Underlying stock symbol.
+            exchange: Exchange filter ('' for all exchanges).
+
+        Returns:
+            List of OptionChainParams for each exchange.
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> chains = ibkr.get_option_chain_params('AAPL')
+            >>> for c in chains[:3]:
+            ...     print(f"{c.exchange}: {len(c.expirations)} expirations, {len(c.strikes)} strikes")
+            CBOE: 21 expirations, 113 strikes
+            ISE: 21 expirations, 113 strikes
+            PHLX: 21 expirations, 113 strikes
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        try:
+            contract = self._create_contract(ticker)
+            self._ib.qualifyContracts(contract)
+
+            chains = self._ib.reqSecDefOptParams(
+                contract.symbol,
+                exchange,
+                contract.secType,
+                contract.conId,
+            )
+
+            result = []
+            for chain in chains:
+                result.append(OptionChainParams(
+                    underlying=ticker,
+                    exchange=chain.exchange,
+                    expirations=sorted(list(chain.expirations)),
+                    strikes=sorted(list(chain.strikes)),
+                    multiplier=chain.multiplier,
+                ))
+
+            logger.info(f"Got {len(result)} option chains for {ticker}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting option chain for {ticker}: {e}")
+            return []
+
+    def get_option_expirations(self, ticker: str) -> List[str]:
+        """
+        Get all available option expiration dates for a stock.
+
+        Args:
+            ticker: Underlying stock symbol.
+
+        Returns:
+            Sorted list of expiration dates in YYYYMMDD format.
+        """
+        chains = self.get_option_chain_params(ticker)
+        if not chains:
+            return []
+
+        # Use SMART exchange if available, otherwise first
+        chain = next((c for c in chains if c.exchange == 'SMART'), chains[0])
+        return chain.expirations
+
+    def get_option_strikes(
+        self,
+        ticker: str,
+        near_price: Optional[float] = None,
+        range_pct: float = 0.1,
+    ) -> List[float]:
+        """
+        Get available option strikes for a stock.
+
+        Args:
+            ticker: Underlying stock symbol.
+            near_price: Filter strikes near this price (e.g., current stock price).
+            range_pct: Range as percentage (default 10% above/below near_price).
+
+        Returns:
+            Sorted list of strike prices.
+        """
+        chains = self.get_option_chain_params(ticker)
+        if not chains:
+            return []
+
+        chain = next((c for c in chains if c.exchange == 'SMART'), chains[0])
+        strikes = chain.strikes
+
+        if near_price is not None:
+            low = near_price * (1 - range_pct)
+            high = near_price * (1 + range_pct)
+            strikes = [s for s in strikes if low <= s <= high]
+
+        return strikes
+
+    def _create_option_contract(
+        self,
+        ticker: str,
+        expiry: str,
+        strike: float,
+        right: str,
+        exchange: str = 'SMART',
+    ) -> Option:
+        """
+        Create an option contract.
+
+        Args:
+            ticker: Underlying stock symbol.
+            expiry: Expiration date (YYYYMMDD format).
+            strike: Strike price.
+            right: 'C' for Call, 'P' for Put.
+            exchange: Exchange (default SMART).
+
+        Returns:
+            Option contract object.
+        """
+        return Option(ticker, expiry, strike, right, exchange)
+
+    def get_option_quote(
+        self,
+        ticker: str,
+        expiry: str,
+        strike: float,
+        right: str,
+        delayed: bool = True,
+        include_greeks: bool = True,
+        timeout: float = 5.0,
+    ) -> Optional[OptionQuote]:
+        """
+        Get option quote (bid, ask, last) and optionally Greeks.
+
+        Requires OPRA subscription ($1.50/month).
+
+        Note on data types:
+        - delayed=True: Uses 15-minute delayed data (included with OPRA)
+        - delayed=False: Requires additional subscription (underlying stock data)
+
+        Args:
+            ticker: Underlying stock symbol.
+            expiry: Expiration date (YYYYMMDD format).
+            strike: Strike price.
+            right: 'C' for Call, 'P' for Put.
+            delayed: Use delayed data (True) or real-time (False).
+            include_greeks: Request Greeks (requires option pricing model).
+            timeout: Seconds to wait for data.
+
+        Returns:
+            OptionQuote object or None if contract not found.
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> quote = ibkr.get_option_quote('AAPL', '20260123', 230.0, 'C')
+            >>> print(f"Bid: {quote.bid}, Ask: {quote.ask}")
+            Bid: 15.5, Ask: 17.65
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        try:
+            # Set market data type (3 = delayed, 1 = real-time)
+            self._ib.reqMarketDataType(3 if delayed else 1)
+
+            # Create and qualify option contract
+            opt = self._create_option_contract(ticker, expiry, strike, right)
+            qualified = self._ib.qualifyContracts(opt)
+
+            if not qualified:
+                logger.warning(f"Could not qualify option: {ticker} {expiry} {strike} {right}")
+                return None
+
+            # Request market data with optional Greeks (tick 106)
+            generic_ticks = '106' if include_greeks else ''
+            ticker_data = self._ib.reqMktData(opt, generic_ticks, False, False)
+            self._ib.sleep(timeout)
+
+            # Build result
+            result = OptionQuote(
+                underlying=ticker,
+                expiry=expiry,
+                strike=strike,
+                right=right,
+                con_id=opt.conId,
+                bid=ticker_data.bid if not math.isnan(ticker_data.bid) else None,
+                ask=ticker_data.ask if not math.isnan(ticker_data.ask) else None,
+                last=ticker_data.last if not math.isnan(ticker_data.last) else None,
+                close=ticker_data.close if not math.isnan(ticker_data.close) else None,
+                volume=ticker_data.volume if ticker_data.volume and ticker_data.volume > 0 else None,
+            )
+
+            # Extract Greeks if available
+            if include_greeks and ticker_data.modelGreeks:
+                g = ticker_data.modelGreeks
+                result.delta = g.delta
+                result.gamma = g.gamma
+                result.theta = g.theta
+                result.vega = g.vega
+                result.implied_vol = g.impliedVol
+
+            # Cancel subscription
+            self._ib.cancelMktData(opt)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting option quote: {e}")
+            return None
+
+    def get_option_chain_quotes(
+        self,
+        ticker: str,
+        expiry: str,
+        strikes: Optional[List[float]] = None,
+        right: str = 'C',
+        delayed: bool = True,
+        max_strikes: int = 10,
+    ) -> List[OptionQuote]:
+        """
+        Get quotes for multiple strikes in an option chain.
+
+        Args:
+            ticker: Underlying stock symbol.
+            expiry: Expiration date (YYYYMMDD format).
+            strikes: List of strikes to quote. If None, uses ATM +/- range.
+            right: 'C' for Calls, 'P' for Puts.
+            delayed: Use delayed data.
+            max_strikes: Maximum number of strikes to quote.
+
+        Returns:
+            List of OptionQuote objects.
+        """
+        if strikes is None:
+            # Get current price and find nearby strikes
+            quote = self.get_current_quote(ticker)
+            if quote and quote.get('last'):
+                price = quote['last']
+                all_strikes = self.get_option_strikes(ticker, near_price=price)
+                strikes = all_strikes[:max_strikes]
+            else:
+                logger.warning(f"Could not get price for {ticker} to determine strikes")
+                return []
+
+        results = []
+        for strike in strikes[:max_strikes]:
+            quote = self.get_option_quote(ticker, expiry, strike, right, delayed)
+            if quote:
+                results.append(quote)
+            time.sleep(0.2)  # Small delay between requests
+
+        return results
+
+    def get_option_contract_details(
+        self,
+        ticker: str,
+        expiry: str,
+        strike: float,
+        right: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed contract information for an option.
+
+        Args:
+            ticker: Underlying stock symbol.
+            expiry: Expiration date (YYYYMMDD format).
+            strike: Strike price.
+            right: 'C' for Call, 'P' for Put.
+
+        Returns:
+            Dictionary with contract details or None.
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        try:
+            opt = self._create_option_contract(ticker, expiry, strike, right)
+            self._ib.qualifyContracts(opt)
+
+            details = self._ib.reqContractDetails(opt)
+
+            if details:
+                d = details[0]
+                return {
+                    'underlying': ticker,
+                    'expiry': expiry,
+                    'strike': strike,
+                    'right': right,
+                    'con_id': opt.conId,
+                    'local_symbol': opt.localSymbol,
+                    'multiplier': opt.multiplier,
+                    'trading_class': opt.tradingClass,
+                    'long_name': d.longName,
+                    'min_tick': d.minTick,
+                    'valid_exchanges': d.validExchanges,
+                    'market_name': d.marketName,
+                }
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting option contract details: {e}")
+            return None
 
     def __enter__(self):
         """Context manager entry."""
