@@ -101,8 +101,8 @@ def load_tickers_from_config(
     tickers = []
 
     if tier == "all":
-        # Load all tiers
-        for key in ["tier1_core", "tier2_expanded"]:
+        # Load all tiers (including user watchlist for complete coverage)
+        for key in ["tier1_core", "tier2_expanded", "tier3_user_watchlist"]:
             tier_data = config.get(key, {})
             for category, data in tier_data.items():
                 if isinstance(data, dict) and "tickers" in data:
