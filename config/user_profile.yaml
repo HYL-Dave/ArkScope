@@ -1,0 +1,227 @@
+# MindfulRL User Profile Configuration
+# 個人化設定檔 - 根據個人需求調整
+#
+# 使用方式:
+#   1. 複製此檔案為 user_profile.local.yaml
+#   2. 根據需求修改
+#   3. .local.yaml 不會被 git 追蹤
+
+# ============================================
+# 1. 基本資料
+# ============================================
+profile:
+  name: "default"
+  created: "2026-01-27"
+  timezone: "Asia/Taipei"
+
+# ============================================
+# 2. 投資偏好
+# ============================================
+investment_preferences:
+  # 風險承受度 (1-10, 1=極保守, 10=極激進)
+  risk_tolerance: 6
+
+  # 投資風格
+  style:
+    primary: "growth"        # growth | value | momentum | swing | day_trade
+    secondary: "momentum"
+
+  # 持倉時間偏好
+  holding_period:
+    min_days: 1              # 最短持有天數
+    target_days: 30          # 目標持有天數
+    max_days: 180            # 最長持有天數
+
+  # 部位大小偏好 (相對於投資組合)
+  position_sizing:
+    max_single_position_pct: 15    # 單一標的最大佔比
+    max_sector_exposure_pct: 30    # 單一板塊最大佔比
+
+# ============================================
+# 3. 自訂觀察清單
+# ============================================
+watchlists:
+  # 核心持倉 (優先監控)
+  core_holdings:
+    description: "目前持有的股票"
+    tickers: ["ZETA", "NVDA", "AMD"]
+    priority: "high"
+
+  # 關注清單
+  interested:
+    description: "有興趣但還沒買入"
+    tickers: ["RKLB", "PLTR", "COIN"]
+    priority: "medium"
+
+  # 板塊觀察
+  sector_watch:
+    description: "追蹤特定板塊"
+    sectors: ["SPACE", "AI_CHIPS", "FINTECH"]
+    priority: "medium"
+
+  # 自訂主題
+  custom_themes:
+    - name: "量子計算"
+      tickers: ["IONQ", "RGTI", "QBTS", "IBM", "GOOGL"]
+      reason: "長期看好量子計算發展"
+
+    - name: "AI 基礎設施"
+      tickers: ["NVDA", "AMD", "SMCI", "DELL", "ANET"]
+      reason: "AI 需要的硬體供應鏈"
+
+# ============================================
+# 4. 策略權重配置
+# ============================================
+strategy_weights:
+  # 決策時各因素的權重 (總和應為 100)
+
+  # 動量策略 (適合短線)
+  momentum:
+    price_trend: 35
+    volume_confirmation: 25
+    technical_indicators: 25
+    news_sentiment: 15
+
+  # 事件驅動策略 (適合財報季)
+  event_driven:
+    upcoming_events: 30
+    news_sentiment: 30
+    options_flow: 25
+    historical_reaction: 15
+
+  # 價值投資策略 (適合長線)
+  value:
+    fundamentals: 40
+    valuation: 30
+    insider_activity: 15
+    dividend_yield: 15
+
+  # 我的自訂混合策略
+  my_custom:
+    fundamentals: 25
+    price_trend: 25
+    news_sentiment: 25
+    options_flow: 25
+
+  # 預設使用的策略
+  default_strategy: "my_custom"
+
+# ============================================
+# 5. 警報設定
+# ============================================
+alerts:
+  # 價格警報
+  price_alerts:
+    enabled: true
+    # 單日漲跌幅警報
+    daily_change_threshold_pct: 5
+    # 週漲跌幅警報
+    weekly_change_threshold_pct: 10
+
+  # 新聞情緒警報
+  sentiment_alerts:
+    enabled: true
+    # 情緒分數突變 (24小時內變化)
+    sentiment_change_threshold: 1.5  # 1-5 scale
+    # 新聞數量激增
+    news_volume_spike_multiplier: 3  # 相比平均
+
+  # Options Flow 警報
+  options_alerts:
+    enabled: true
+    # 大單門檻
+    large_order_threshold_usd: 500000
+    # 異常 IV 變化
+    iv_change_threshold_pct: 20
+
+  # 板塊警報
+  sector_alerts:
+    enabled: true
+    # N 支股票同向異動觸發
+    sector_sync_threshold: 3
+    # 板塊內平均漲跌幅
+    sector_avg_change_threshold_pct: 3
+
+  # 通知方式
+  notification_channels:
+    - type: "log"          # 記錄到檔案
+      enabled: true
+    - type: "console"      # 終端輸出
+      enabled: true
+    - type: "telegram"     # Telegram 推送
+      enabled: false
+      bot_token: ""
+      chat_id: ""
+    - type: "email"        # Email 通知
+      enabled: false
+      smtp_server: ""
+      recipient: ""
+
+# ============================================
+# 6. 數據取得偏好
+# ============================================
+data_preferences:
+  # 新聞來源優先順序
+  news_sources:
+    - source: "supabase"    # 自建 DB (已評分)
+      priority: 1
+    - source: "ibkr"        # IBKR 即時
+      priority: 2
+    - source: "finnhub"     # Finnhub 免費
+      priority: 3
+    - source: "polygon"     # Polygon (歷史)
+      priority: 4
+
+  # 價格數據來源
+  price_sources:
+    realtime: "ibkr"        # 即時用 IBKR
+    historical: "local"     # 歷史用本地 Parquet
+    fallback: "tiingo"      # 備用
+
+  # 基本面數據來源
+  fundamentals_sources:
+    primary: "local_ibkr"   # 本地 IBKR JSON
+    secondary: "sec_edgar"  # SEC 官方
+    refresh_days: 7         # 超過 N 天重新抓取
+
+  # API 成本控制
+  cost_control:
+    daily_budget_usd: 1.0   # 每日 API 成本上限
+    prefer_cached: true     # 優先使用快取
+    cache_ttl_minutes: 60   # 快取有效時間
+
+# ============================================
+# 7. LLM 評分偏好
+# ============================================
+llm_preferences:
+  # 情緒評分模型
+  sentiment_model: "gpt-5.2"
+  # 風險評分模型
+  risk_model: "gpt-5.2"
+  # 使用 batch API (更便宜但較慢)
+  use_batch_api: true
+  # 每日 token 預算
+  daily_token_budget: 100000
+
+# ============================================
+# 8. 報告偏好
+# ============================================
+report_preferences:
+  # 每日摘要
+  daily_summary:
+    enabled: true
+    time: "08:00"           # 每日生成時間
+    include_holdings: true
+    include_watchlist: true
+    include_sector_performance: true
+
+  # 週報
+  weekly_report:
+    enabled: true
+    day: "sunday"
+    include_performance_review: true
+    include_upcoming_events: true
+
+  # 輸出格式
+  format: "markdown"        # markdown | html | json
+  save_to: "reports/"       # 儲存位置
