@@ -1,7 +1,7 @@
 {
   "_description": "MindfulRL-Intraday Core Stock Tickers Configuration",
-  "_version": "1.1.0",
-  "_last_updated": "2025-12-15",
+  "_version": "1.2.0",
+  "_last_updated": "2026-01-27",
   "_notes": "Tier 1 stocks are always fetched. Tier 2/3 are optional expansions.",
 
   "tier1_core": {
@@ -24,7 +24,8 @@
 
     "fintech_payments": {
       "_description": "Fintech and payment processors",
-      "tickers": ["PYPL", "V", "MA", "SQ"]
+      "_change_log": "2026-01-27: SQ renamed to XYZ (Block Inc. ticker change Jan 2025)",
+      "tickers": ["PYPL", "V", "MA", "XYZ"]
     },
 
     "healthcare_biotech": {
@@ -68,7 +69,8 @@
 
     "gaming_entertainment": {
       "_description": "Gaming and entertainment",
-      "tickers": ["EA", "TTWO", "RBLX", "ATVI", "DKNG"]
+      "_change_log": "2026-01-27: Removed ATVI (acquired by MSFT Oct 2023, delisted)",
+      "tickers": ["EA", "TTWO", "RBLX", "DKNG"]
     },
 
     "ev_clean_energy": {
@@ -88,12 +90,14 @@
 
     "seeking_picks_tech": {
       "_description": "Seeking Alpha picks - Technology",
-      "tickers": ["APP", "CLS", "CRDO", "TTMI", "COMM", "QTWO"]
+      "_change_log": "2026-01-27: COMM renamed to VISN (CommScope → Vistance Networks Jan 2026)",
+      "tickers": ["APP", "CLS", "CRDO", "TTMI", "VISN", "QTWO"]
     },
 
     "seeking_picks_financials": {
       "_description": "Seeking Alpha picks - Financials",
-      "tickers": ["WFC", "ALL", "SYF", "MFC", "LC", "EZPW", "BRK.B", "COIN", "IBKR"]
+      "_change_log": "2026-01-27: BRK.B → BRK B (IBKR uses space instead of dot)",
+      "tickers": ["WFC", "ALL", "SYF", "MFC", "LC", "EZPW", "BRK B", "COIN", "IBKR"]
     },
 
     "seeking_picks_industrials": {
