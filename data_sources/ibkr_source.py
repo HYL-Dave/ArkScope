@@ -88,6 +88,63 @@ class OptionQuote:
     implied_vol: Optional[float] = None
 
 
+@dataclass
+class OptionFilter:
+    """
+    Filter criteria for selecting "interesting" option contracts.
+
+    Use this to narrow down the option chain to manageable contracts
+    instead of fetching the entire chain (which can be hundreds of contracts).
+
+    Example:
+        # ATM options expiring in 7-45 days
+        filter = OptionFilter(
+            strike_range_pct=0.05,  # ±5% from current price
+            min_dte=7,
+            max_dte=45,
+            rights=['C', 'P'],
+        )
+    """
+    # Strike filtering (relative to current stock price)
+    strike_range_pct: float = 0.10  # ±10% from ATM
+    min_strike: Optional[float] = None  # Absolute min strike
+    max_strike: Optional[float] = None  # Absolute max strike
+
+    # Expiration filtering (days to expiration)
+    min_dte: int = 7  # Minimum days to expiration
+    max_dte: int = 60  # Maximum days to expiration
+    specific_expiries: Optional[List[str]] = None  # Specific dates (YYYYMMDD)
+
+    # Contract type
+    rights: List[str] = None  # ['C'], ['P'], or ['C', 'P'] for both
+
+    # Liquidity filtering (applied after fetching quotes)
+    min_open_interest: int = 0  # Minimum OI
+    min_volume: int = 0  # Minimum daily volume
+    max_bid_ask_spread_pct: float = 1.0  # Max spread as % of mid price
+
+    def __post_init__(self):
+        if self.rights is None:
+            self.rights = ['C', 'P']
+
+
+@dataclass
+class OptionHistoricalBar:
+    """Historical bar data for an option contract."""
+    underlying: str
+    expiry: str
+    strike: float
+    right: str
+    datetime: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    wap: Optional[float] = None
+    bar_count: Optional[int] = None
+
+
 class IBKRDataSource(BaseDataSource):
     """
     Interactive Brokers data source implementation.
@@ -1407,6 +1464,292 @@ class IBKRDataSource(BaseDataSource):
         except Exception as e:
             logger.error(f"Error getting option contract details: {e}")
             return None
+
+    # =========================================================================
+    # Option Historical Prices (requires OPRA subscription $1.50/month)
+    # =========================================================================
+
+    def filter_interesting_options(
+        self,
+        ticker: str,
+        filter_config: Optional[OptionFilter] = None,
+        current_price: Optional[float] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter option chain to find "interesting" contracts based on criteria.
+
+        This method helps reduce the number of contracts to fetch, since a full
+        option chain can have hundreds of strike/expiration combinations.
+
+        Args:
+            ticker: Underlying stock symbol.
+            filter_config: OptionFilter with criteria. Defaults to sensible values.
+            current_price: Current stock price. If None, will fetch automatically.
+
+        Returns:
+            List of contract specs: [{'expiry': 'YYYYMMDD', 'strike': float, 'right': 'C'/'P'}, ...]
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> # Get ATM options expiring in 2-4 weeks
+            >>> filter = OptionFilter(strike_range_pct=0.05, min_dte=14, max_dte=30)
+            >>> contracts = ibkr.filter_interesting_options('AAPL', filter)
+            >>> print(f"Found {len(contracts)} interesting contracts")
+            Found 24 interesting contracts
+        """
+        self._ensure_connected()
+
+        if filter_config is None:
+            filter_config = OptionFilter()
+
+        # Get current stock price if not provided
+        if current_price is None:
+            quote = self.get_current_quote(ticker)
+            if quote and quote.get('last'):
+                current_price = quote['last']
+            elif quote and quote.get('close'):
+                current_price = quote['close']
+            else:
+                logger.error(f"Cannot get current price for {ticker}")
+                return []
+
+        logger.info(f"Filtering options for {ticker} @ ${current_price:.2f}")
+
+        # Get option chain parameters
+        chains = self.get_option_chain_params(ticker)
+        if not chains:
+            return []
+
+        # Use SMART exchange
+        chain = next((c for c in chains if c.exchange == 'SMART'), chains[0])
+
+        # Filter expirations by DTE
+        today = date.today()
+        valid_expiries = []
+
+        if filter_config.specific_expiries:
+            # Use specific expiries if provided
+            valid_expiries = [e for e in filter_config.specific_expiries if e in chain.expirations]
+        else:
+            # Filter by DTE range
+            for exp_str in chain.expirations:
+                try:
+                    exp_date = datetime.strptime(exp_str, '%Y%m%d').date()
+                    dte = (exp_date - today).days
+                    if filter_config.min_dte <= dte <= filter_config.max_dte:
+                        valid_expiries.append(exp_str)
+                except ValueError:
+                    continue
+
+        logger.info(f"  Expirations in range: {len(valid_expiries)}")
+
+        # Filter strikes by range from current price
+        low_strike = current_price * (1 - filter_config.strike_range_pct)
+        high_strike = current_price * (1 + filter_config.strike_range_pct)
+
+        # Apply absolute limits if specified
+        if filter_config.min_strike:
+            low_strike = max(low_strike, filter_config.min_strike)
+        if filter_config.max_strike:
+            high_strike = min(high_strike, filter_config.max_strike)
+
+        valid_strikes = [s for s in chain.strikes if low_strike <= s <= high_strike]
+        logger.info(f"  Strikes in range (${low_strike:.2f}-${high_strike:.2f}): {len(valid_strikes)}")
+
+        # Build contract list
+        contracts = []
+        for expiry in valid_expiries:
+            for strike in valid_strikes:
+                for right in filter_config.rights:
+                    contracts.append({
+                        'underlying': ticker,
+                        'expiry': expiry,
+                        'strike': strike,
+                        'right': right,
+                    })
+
+        logger.info(f"  Total contracts to fetch: {len(contracts)}")
+        return contracts
+
+    def fetch_option_historical_prices(
+        self,
+        ticker: str,
+        expiry: str,
+        strike: float,
+        right: str,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        interval: str = '15 mins',
+        what_to_show: str = 'TRADES',
+    ) -> List[OptionHistoricalBar]:
+        """
+        Fetch historical price bars for a single option contract.
+
+        Args:
+            ticker: Underlying stock symbol.
+            expiry: Expiration date (YYYYMMDD format).
+            strike: Strike price.
+            right: 'C' for Call, 'P' for Put.
+            start_date: Start date (default: 30 days ago).
+            end_date: End date (default: today).
+            interval: Bar size ('1 min', '5 mins', '15 mins', '1 hour', '1 day').
+            what_to_show: Data type ('TRADES', 'MIDPOINT', 'BID', 'ASK').
+
+        Returns:
+            List of OptionHistoricalBar objects.
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> bars = ibkr.fetch_option_historical_prices(
+            ...     'AAPL', '20260220', 250.0, 'C',
+            ...     interval='15 mins'
+            ... )
+            >>> print(f"Got {len(bars)} bars")
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        if interval not in self.VALID_INTERVALS:
+            logger.error(f"Invalid interval: {interval}. Valid: {self.VALID_INTERVALS}")
+            return []
+
+        # Default date range
+        if end_date is None:
+            end_date = date.today()
+        if start_date is None:
+            start_date = end_date - timedelta(days=30)
+
+        try:
+            # Create and qualify option contract
+            opt = self._create_option_contract(ticker, expiry, strike, right)
+            qualified = self._ib.qualifyContracts(opt)
+
+            if not qualified:
+                logger.warning(f"Cannot qualify option: {ticker} {expiry} {strike} {right}")
+                return []
+
+            # Calculate duration string
+            days = (end_date - start_date).days + 1
+            if days <= 1:
+                duration = '1 D'
+            elif days <= 7:
+                duration = f'{days} D'
+            elif days <= 30:
+                duration = f'{math.ceil(days/7)} W'
+            elif days <= 365:
+                duration = f'{math.ceil(days/30)} M'
+            else:
+                duration = f'{math.ceil(days/365)} Y'
+
+            end_datetime = datetime.combine(end_date, datetime.max.time())
+
+            logger.debug(f"Fetching {ticker} {expiry} {strike}{right} from {start_date} to {end_date}")
+
+            bars = self._ib.reqHistoricalData(
+                opt,
+                endDateTime=end_datetime,
+                durationStr=duration,
+                barSizeSetting=interval,
+                whatToShow=what_to_show,
+                useRTH=True,
+                formatDate=1,
+            )
+
+            if not bars:
+                logger.warning(f"No data returned for {ticker} {expiry} {strike} {right}")
+                return []
+
+            # Convert to OptionHistoricalBar
+            result = []
+            for bar in bars:
+                bar_dt = bar.date if isinstance(bar.date, datetime) else datetime.strptime(str(bar.date), '%Y-%m-%d')
+                result.append(OptionHistoricalBar(
+                    underlying=ticker,
+                    expiry=expiry,
+                    strike=strike,
+                    right=right,
+                    datetime=bar_dt,
+                    open=bar.open,
+                    high=bar.high,
+                    low=bar.low,
+                    close=bar.close,
+                    volume=bar.volume,
+                    wap=getattr(bar, 'wap', None) or getattr(bar, 'average', None),
+                    bar_count=getattr(bar, 'barCount', None),
+                ))
+
+            logger.info(f"Fetched {len(result)} bars for {ticker} {expiry} {strike}{right}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error fetching option historical prices: {e}")
+            return []
+
+    def fetch_multiple_option_historical_prices(
+        self,
+        contracts: List[Dict[str, Any]],
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        interval: str = '15 mins',
+        what_to_show: str = 'TRADES',
+        delay_between_requests: float = 0.5,
+    ) -> Dict[str, List[OptionHistoricalBar]]:
+        """
+        Fetch historical prices for multiple option contracts.
+
+        Use filter_interesting_options() first to get the contract list.
+
+        Args:
+            contracts: List of contract specs from filter_interesting_options().
+            start_date: Start date.
+            end_date: End date.
+            interval: Bar size.
+            what_to_show: Data type.
+            delay_between_requests: Seconds between requests (rate limiting).
+
+        Returns:
+            Dict mapping contract key to list of bars.
+            Key format: "{ticker}_{expiry}_{strike}_{right}"
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> filter = OptionFilter(strike_range_pct=0.05, max_dte=30)
+            >>> contracts = ibkr.filter_interesting_options('AAPL', filter)
+            >>> data = ibkr.fetch_multiple_option_historical_prices(contracts[:10])
+            >>> print(f"Fetched data for {len(data)} contracts")
+        """
+        result = {}
+        total = len(contracts)
+
+        for i, contract in enumerate(contracts, 1):
+            ticker = contract['underlying']
+            expiry = contract['expiry']
+            strike = contract['strike']
+            right = contract['right']
+
+            key = f"{ticker}_{expiry}_{strike}_{right}"
+            logger.info(f"[{i}/{total}] Fetching {key}...")
+
+            bars = self.fetch_option_historical_prices(
+                ticker=ticker,
+                expiry=expiry,
+                strike=strike,
+                right=right,
+                start_date=start_date,
+                end_date=end_date,
+                interval=interval,
+                what_to_show=what_to_show,
+            )
+
+            if bars:
+                result[key] = bars
+
+            # Rate limiting
+            if i < total:
+                time.sleep(delay_between_requests)
+
+        logger.info(f"Fetched historical data for {len(result)}/{total} contracts")
+        return result
 
     def __enter__(self):
         """Context manager entry."""

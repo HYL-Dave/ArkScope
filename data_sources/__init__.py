@@ -27,12 +27,23 @@ from .source_factory import get_data_source, list_available_sources
 
 # IBKR requires ib_insync, import conditionally
 try:
-    from .ibkr_source import IBKRDataSource, IntradayBar
+    from .ibkr_source import (
+        IBKRDataSource,
+        IntradayBar,
+        OptionChainParams,
+        OptionQuote,
+        OptionFilter,
+        OptionHistoricalBar,
+    )
     _HAS_IBKR = True
 except ImportError:
     _HAS_IBKR = False
     IBKRDataSource = None
     IntradayBar = None
+    OptionChainParams = None
+    OptionQuote = None
+    OptionFilter = None
+    OptionHistoricalBar = None
 
 __all__ = [
     'BaseDataSource',
@@ -47,8 +58,12 @@ __all__ = [
     'EODHDDataSource',
     'IBKRDataSource',
     'IntradayBar',
+    'OptionChainParams',
+    'OptionQuote',
+    'OptionFilter',
+    'OptionHistoricalBar',
     'get_data_source',
     'list_available_sources',
 ]
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'  # Added OptionFilter, OptionHistoricalBar
