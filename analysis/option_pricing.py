@@ -497,7 +497,7 @@ def adjust_volatility_for_smile(
     S: float,
     K: float,
     T: float,
-    skew_factor: float = 0.1,
+    skew_factor: float = -0.1,
     curvature: float = 0.05,
 ) -> float:
     """
@@ -516,7 +516,7 @@ def adjust_volatility_for_smile(
         S: Spot price.
         K: Strike price.
         T: Time to expiry in years.
-        skew_factor: Strength of skew (negative = put skew).
+        skew_factor: Strength of skew (default -0.1 = equity put skew).
         curvature: Strength of smile curvature.
 
     Returns:
@@ -683,13 +683,22 @@ def scan_options_for_mispricing(
 
     for quote in quotes:
         try:
+            # Validate quote data
+            bid = quote.get('bid', 0)
+            ask = quote.get('ask', 0)
+
+            # Skip invalid quotes (bid/ask must be positive)
+            if bid <= 0 or ask <= 0:
+                logger.debug(f"Skipping invalid quote: bid={bid}, ask={ask}")
+                continue
+
             signal = analyze_option_mispricing(
                 underlying=quote.get('underlying', ''),
                 expiry=quote.get('expiry', ''),
                 strike=quote.get('strike', 0),
                 right=quote.get('right', 'C'),
-                market_bid=quote.get('bid', 0),
-                market_ask=quote.get('ask', 0),
+                market_bid=bid,
+                market_ask=ask,
                 spot_price=spot_price,
                 historical_vol=historical_vol,
                 risk_free_rate=risk_free_rate,
