@@ -23,6 +23,10 @@ from .option_pricing import (
     # Mispricing
     analyze_option_mispricing,
     scan_options_for_mispricing,
+    # IV Analysis
+    calculate_iv_rank,
+    calculate_iv_percentile,
+    analyze_iv_environment,
     # Utilities
     get_risk_free_rate,
     calculate_days_to_expiry,
@@ -30,6 +34,7 @@ from .option_pricing import (
     VolatilityEstimate,
     TheoreticalPrice,
     MispricingSignal,
+    IVAnalysis,
     OptionType,
 )
 
@@ -48,6 +53,10 @@ __all__ = [
     # Mispricing
     'analyze_option_mispricing',
     'scan_options_for_mispricing',
+    # IV Analysis
+    'calculate_iv_rank',
+    'calculate_iv_percentile',
+    'analyze_iv_environment',
     # Utilities
     'get_risk_free_rate',
     'calculate_days_to_expiry',
@@ -55,7 +64,8 @@ __all__ = [
     'VolatilityEstimate',
     'TheoreticalPrice',
     'MispricingSignal',
+    'IVAnalysis',
     'OptionType',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
