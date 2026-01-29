@@ -34,6 +34,7 @@ try:
         OptionQuote,
         OptionFilter,
         OptionHistoricalBar,
+        ScannerResult,
     )
     _HAS_IBKR = True
 except ImportError:
@@ -44,6 +45,7 @@ except ImportError:
     OptionQuote = None
     OptionFilter = None
     OptionHistoricalBar = None
+    ScannerResult = None
 
 __all__ = [
     'BaseDataSource',
@@ -62,8 +64,9 @@ __all__ = [
     'OptionQuote',
     'OptionFilter',
     'OptionHistoricalBar',
+    'ScannerResult',
     'get_data_source',
     'list_available_sources',
 ]
 
-__version__ = '1.1.0'  # Added OptionFilter, OptionHistoricalBar
+__version__ = '1.2.0'  # Added ScannerResult, market scanner methods

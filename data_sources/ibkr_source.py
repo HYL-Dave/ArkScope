@@ -27,7 +27,7 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
 try:
-    from ib_insync import IB, Stock, Option, util
+    from ib_insync import IB, Stock, Option, ScannerSubscription, TagValue, util
     HAS_IB_INSYNC = True
 except ImportError:
     HAS_IB_INSYNC = False
@@ -145,6 +145,32 @@ class OptionHistoricalBar:
     bar_count: Optional[int] = None
 
 
+@dataclass
+class ScannerResult:
+    """
+    Result from IBKR market scanner.
+
+    Contains contract information and ranking data from scanner.
+    """
+    symbol: str
+    sec_type: str  # STK, OPT, FUT, etc.
+    exchange: str
+    currency: str
+    rank: int  # Scanner ranking position
+    # Optional fields depending on scan type
+    distance: Optional[float] = None  # Distance from scan criteria
+    benchmark: Optional[str] = None
+    projection: Optional[str] = None
+    legs: Optional[str] = None
+    # For options
+    expiry: Optional[str] = None
+    strike: Optional[float] = None
+    right: Optional[str] = None  # C or P
+    # Additional data
+    con_id: Optional[int] = None
+    local_symbol: Optional[str] = None
+
+
 class IBKRDataSource(BaseDataSource):
     """
     Interactive Brokers data source implementation.
@@ -204,23 +230,30 @@ class IBKRDataSource(BaseDataSource):
 
     def __init__(
         self,
-        host: str = "127.0.0.1",
-        port: int = 7497,  # 7497 = TWS paper, 7496 = TWS live, 4002 = GW paper, 4001 = GW live
-        client_id: int = 1,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        client_id: Optional[int] = None,
         timeout: int = 60,
         readonly: bool = True,
     ):
         """
         Initialize IBKR data source.
 
+        Connection settings are read from environment variables if not provided:
+        - IBKR_HOST: TWS/Gateway hostname (default: 127.0.0.1)
+        - IBKR_PORT: TWS/Gateway port (default: 7497)
+        - IBKR_CLIENT_ID: Client ID (default: 1)
+
         Args:
-            host: TWS/Gateway hostname (default localhost).
+            host: TWS/Gateway hostname. If None, reads from IBKR_HOST env var.
             port: TWS/Gateway port:
                   - 7497: TWS Paper Trading
                   - 7496: TWS Live
                   - 4002: IB Gateway Paper
                   - 4001: IB Gateway Live
+                  If None, reads from IBKR_PORT env var.
             client_id: Client ID for connection (must be unique per connection).
+                       If None, reads from IBKR_CLIENT_ID env var.
             timeout: Connection timeout in seconds.
             readonly: If True, only allows data requests (no orders).
         """
@@ -232,11 +265,14 @@ class IBKRDataSource(BaseDataSource):
                 "Install with: pip install ib_insync"
             )
 
-        self.host = host
-        self.port = port
-        self.client_id = client_id
+        # Load from environment variables if not provided
+        self.host = host or os.getenv('IBKR_HOST', '127.0.0.1')
+        self.port = port or int(os.getenv('IBKR_PORT', '7497'))
+        self.client_id = client_id or int(os.getenv('IBKR_CLIENT_ID', '1'))
         self.timeout = timeout
         self.readonly = readonly
+
+        logger.info(f"IBKR config: {self.host}:{self.port} (client_id={self.client_id})")
 
         self._ib: Optional[IB] = None
         self._connected = False
@@ -1750,6 +1786,424 @@ class IBKRDataSource(BaseDataSource):
 
         logger.info(f"Fetched historical data for {len(result)}/{total} contracts")
         return result
+
+    # =========================================================================
+    # Market Scanner Methods (for unusual options activity detection)
+    # =========================================================================
+
+    # Available Option-related scan codes
+    OPTION_SCAN_CODES = {
+        # Implied Volatility
+        'TOP_OPT_IMP_VOLAT_GAIN': 'Top Option IV Gainers',
+        'TOP_OPT_IMP_VOLAT_LOSE': 'Top Option IV Losers',
+        'HIGH_OPT_IMP_VOLAT': 'High Option Implied Volatility',
+        'LOW_OPT_IMP_VOLAT': 'Low Option Implied Volatility',
+        'HIGH_OPT_IMP_VOLAT_OVER_HIST': 'High IV Over Historical',
+        'LOW_OPT_IMP_VOLAT_OVER_HIST': 'Low IV Over Historical',
+        # Volume
+        'TOP_OPT_VOLUME': 'Top Option Volume',
+        'OPT_VOLUME_MOST_ACTIVE': 'Most Active Options',
+        'HIGH_OPT_VOLUME_PUT_CALL_RATIO': 'High Option Volume P/C Ratio',
+        'LOW_OPT_VOLUME_PUT_CALL_RATIO': 'Low Option Volume P/C Ratio',
+        # Open Interest
+        'TOP_OPT_OPEN_INTEREST': 'Top Open Interest',
+        'OPT_OPEN_INTEREST_MOST_ACTIVE': 'Most Active by OI',
+        'HIGH_OPT_OPEN_INTEREST_PUT_CALL_RATIO': 'High OI P/C Ratio',
+        'LOW_OPT_OPEN_INTEREST_PUT_CALL_RATIO': 'Low OI P/C Ratio',
+        # Stock-related (useful for finding stocks with unusual option activity)
+        'HOT_BY_OPT_VOLUME': 'Stocks Hot by Option Volume',
+        'HIGH_VS_13W_HL': 'High vs 13-Week High/Low',
+    }
+
+    def get_scanner_parameters(self) -> Optional[str]:
+        """
+        Get all available scanner parameters as XML.
+
+        This returns the full list of available scan codes, instruments,
+        locations, and filter tags. Useful for discovering available options.
+
+        Returns:
+            XML string with all scanner parameters, or None on error.
+        """
+        self._ensure_connected()
+
+        try:
+            xml = self._ib.reqScannerParameters()
+            logger.info(f"Retrieved scanner parameters ({len(xml)} chars)")
+            return xml
+        except Exception as e:
+            logger.error(f"Error getting scanner parameters: {e}")
+            return None
+
+    def scan_market(
+        self,
+        scan_code: str,
+        instrument: str = 'STK',
+        location: str = 'STK.US.MAJOR',
+        above_price: Optional[float] = None,
+        below_price: Optional[float] = None,
+        above_volume: Optional[int] = None,
+        market_cap_above: Optional[float] = None,
+        market_cap_below: Optional[float] = None,
+        additional_filters: Optional[List[tuple]] = None,
+        max_results: int = 50,
+    ) -> List[ScannerResult]:
+        """
+        Run a market scanner and return results.
+
+        Args:
+            scan_code: Scanner code (e.g., 'TOP_OPT_VOLUME', 'HOT_BY_OPT_VOLUME').
+            instrument: Instrument type ('STK', 'OPT', 'FUT', etc.).
+            location: Market location ('STK.US.MAJOR', 'STK.US', 'STK.NASDAQ', etc.).
+            above_price: Minimum price filter.
+            below_price: Maximum price filter.
+            above_volume: Minimum volume filter.
+            market_cap_above: Minimum market cap (in millions).
+            market_cap_below: Maximum market cap (in millions).
+            additional_filters: List of (tag, value) tuples for TagValue filters.
+            max_results: Maximum results (capped at 50 by IBKR).
+
+        Returns:
+            List of ScannerResult objects.
+
+        Example:
+            >>> ibkr = IBKRDataSource()
+            >>> # Find stocks with high option volume
+            >>> results = ibkr.scan_market(
+            ...     scan_code='HOT_BY_OPT_VOLUME',
+            ...     above_price=10,
+            ...     above_volume=1000000
+            ... )
+            >>> for r in results[:5]:
+            ...     print(f"{r.rank}. {r.symbol}")
+        """
+        self._ensure_connected()
+        self._rate_limit_wait()
+
+        try:
+            # Create scanner subscription
+            sub = ScannerSubscription(
+                instrument=instrument,
+                locationCode=location,
+                scanCode=scan_code,
+                numberOfRows=min(max_results, 50),  # IBKR limit
+            )
+
+            # Apply built-in filters
+            if above_price is not None:
+                sub.abovePrice = above_price
+            if below_price is not None:
+                sub.belowPrice = below_price
+            if above_volume is not None:
+                sub.aboveVolume = above_volume
+            if market_cap_above is not None:
+                sub.marketCapAbove = market_cap_above
+            if market_cap_below is not None:
+                sub.marketCapBelow = market_cap_below
+
+            # Build TagValue filters
+            tag_values = []
+            if additional_filters:
+                for tag, value in additional_filters:
+                    tag_values.append(TagValue(tag, str(value)))
+
+            # Run scanner
+            logger.info(f"Running scanner: {scan_code} on {location}")
+            scan_data = self._ib.reqScannerData(sub, [], tag_values)
+
+            # Convert to ScannerResult objects
+            results = []
+            for i, sd in enumerate(scan_data):
+                contract = sd.contractDetails.contract
+                result = ScannerResult(
+                    symbol=contract.symbol,
+                    sec_type=contract.secType,
+                    exchange=contract.exchange,
+                    currency=contract.currency,
+                    rank=sd.rank,
+                    distance=sd.distance if hasattr(sd, 'distance') else None,
+                    benchmark=sd.benchmark if hasattr(sd, 'benchmark') else None,
+                    projection=sd.projection if hasattr(sd, 'projection') else None,
+                    legs=sd.legsStr if hasattr(sd, 'legsStr') else None,
+                    con_id=contract.conId,
+                    local_symbol=contract.localSymbol,
+                )
+
+                # Add option-specific fields if applicable
+                if contract.secType == 'OPT':
+                    result.expiry = contract.lastTradeDateOrContractMonth
+                    result.strike = contract.strike
+                    result.right = contract.right
+
+                results.append(result)
+
+            logger.info(f"Scanner returned {len(results)} results")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error running scanner {scan_code}: {e}")
+            return []
+
+    def scan_unusual_option_volume(
+        self,
+        above_price: float = 5.0,
+        above_volume: int = 500000,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks with unusually high option volume.
+
+        Similar to Unusual Whales' basic unusual activity detection.
+
+        Args:
+            above_price: Minimum stock price.
+            above_volume: Minimum average volume.
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by option volume activity.
+        """
+        return self.scan_market(
+            scan_code='HOT_BY_OPT_VOLUME',
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+            above_volume=above_volume,
+        )
+
+    def scan_high_iv_stocks(
+        self,
+        above_price: float = 5.0,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks with high implied volatility.
+
+        Args:
+            above_price: Minimum stock price.
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by IV.
+        """
+        return self.scan_market(
+            scan_code='HIGH_OPT_IMP_VOLAT',
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+        )
+
+    def scan_iv_gainers(
+        self,
+        above_price: float = 5.0,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks with biggest IV increases.
+
+        Useful for detecting upcoming events or unusual activity.
+
+        Args:
+            above_price: Minimum stock price.
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by IV change.
+        """
+        return self.scan_market(
+            scan_code='TOP_OPT_IMP_VOLAT_GAIN',
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+        )
+
+    def scan_iv_over_historical(
+        self,
+        above_price: float = 5.0,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks where IV is elevated vs historical volatility.
+
+        High IV/HV ratio often indicates expected moves (earnings, events).
+
+        Args:
+            above_price: Minimum stock price.
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by IV/HV ratio.
+        """
+        return self.scan_market(
+            scan_code='HIGH_OPT_IMP_VOLAT_OVER_HIST',
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+        )
+
+    def scan_high_put_call_ratio(
+        self,
+        above_price: float = 5.0,
+        by_volume: bool = True,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks with high put/call ratio.
+
+        High P/C ratio may indicate bearish sentiment or hedging.
+
+        Args:
+            above_price: Minimum stock price.
+            by_volume: Use volume (True) or open interest (False).
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by P/C ratio.
+        """
+        scan_code = ('HIGH_OPT_VOLUME_PUT_CALL_RATIO' if by_volume
+                     else 'HIGH_OPT_OPEN_INTEREST_PUT_CALL_RATIO')
+        return self.scan_market(
+            scan_code=scan_code,
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+        )
+
+    def scan_low_put_call_ratio(
+        self,
+        above_price: float = 5.0,
+        by_volume: bool = True,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[ScannerResult]:
+        """
+        Scan for stocks with low put/call ratio.
+
+        Low P/C ratio may indicate bullish sentiment.
+
+        Args:
+            above_price: Minimum stock price.
+            by_volume: Use volume (True) or open interest (False).
+            location: Market location.
+
+        Returns:
+            List of stocks sorted by P/C ratio (ascending).
+        """
+        scan_code = ('LOW_OPT_VOLUME_PUT_CALL_RATIO' if by_volume
+                     else 'LOW_OPT_OPEN_INTEREST_PUT_CALL_RATIO')
+        return self.scan_market(
+            scan_code=scan_code,
+            instrument='STK',
+            location=location,
+            above_price=above_price,
+        )
+
+    def run_multiple_scans(
+        self,
+        scan_codes: List[str],
+        above_price: float = 5.0,
+        location: str = 'STK.US.MAJOR',
+        delay_between_scans: float = 1.0,
+    ) -> Dict[str, List[ScannerResult]]:
+        """
+        Run multiple scanners and aggregate results.
+
+        Args:
+            scan_codes: List of scan codes to run.
+            above_price: Minimum stock price for all scans.
+            location: Market location for all scans.
+            delay_between_scans: Delay between scans (rate limiting).
+
+        Returns:
+            Dictionary mapping scan_code to results.
+        """
+        results = {}
+
+        for i, code in enumerate(scan_codes):
+            logger.info(f"Running scan {i+1}/{len(scan_codes)}: {code}")
+
+            results[code] = self.scan_market(
+                scan_code=code,
+                location=location,
+                above_price=above_price,
+            )
+
+            if i < len(scan_codes) - 1:
+                time.sleep(delay_between_scans)
+
+        return results
+
+    def find_unusual_activity_candidates(
+        self,
+        above_price: float = 5.0,
+        location: str = 'STK.US.MAJOR',
+    ) -> List[Dict[str, Any]]:
+        """
+        Find stocks with unusual options activity by combining multiple scans.
+
+        This is similar to what Unusual Whales provides, but using IBKR's
+        built-in scanners. Combines:
+        - High option volume
+        - IV gainers
+        - High IV vs historical
+        - Extreme P/C ratios
+
+        Args:
+            above_price: Minimum stock price.
+            location: Market location.
+
+        Returns:
+            List of candidates with combined scores.
+        """
+        logger.info("Running unusual activity scan suite...")
+
+        # Run multiple scans
+        scans = self.run_multiple_scans(
+            scan_codes=[
+                'HOT_BY_OPT_VOLUME',
+                'TOP_OPT_IMP_VOLAT_GAIN',
+                'HIGH_OPT_IMP_VOLAT_OVER_HIST',
+                'HIGH_OPT_VOLUME_PUT_CALL_RATIO',
+                'LOW_OPT_VOLUME_PUT_CALL_RATIO',
+            ],
+            above_price=above_price,
+            location=location,
+        )
+
+        # Count appearances across scans
+        appearance_count = {}
+        scan_details = {}
+
+        for scan_code, results in scans.items():
+            for result in results:
+                symbol = result.symbol
+                if symbol not in appearance_count:
+                    appearance_count[symbol] = 0
+                    scan_details[symbol] = {
+                        'symbol': symbol,
+                        'scans_appeared': [],
+                        'best_rank': 999,
+                    }
+
+                appearance_count[symbol] += 1
+                scan_details[symbol]['scans_appeared'].append(scan_code)
+                scan_details[symbol]['best_rank'] = min(
+                    scan_details[symbol]['best_rank'],
+                    result.rank
+                )
+
+        # Build sorted list
+        candidates = []
+        for symbol, count in appearance_count.items():
+            detail = scan_details[symbol]
+            detail['appearance_count'] = count
+            detail['score'] = count * 10 + (50 - detail['best_rank'])  # Simple scoring
+            candidates.append(detail)
+
+        # Sort by score (higher = more unusual)
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+
+        logger.info(f"Found {len(candidates)} unusual activity candidates")
+        return candidates
 
     def __enter__(self):
         """Context manager entry."""
