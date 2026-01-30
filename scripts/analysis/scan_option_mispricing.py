@@ -50,8 +50,10 @@ os.environ['IBKR_CLIENT_ID'] = str(random.randint(100, 999))
 from data_sources import IBKRDataSource, OptionFilter
 from analysis import (
     calculate_historical_volatility,
+    calculate_implied_volatility,
     analyze_option_mispricing,
     scan_options_for_mispricing,
+    analyze_iv_environment,
     get_risk_free_rate,
 )
 
@@ -166,7 +168,7 @@ def scan_ticker(
     mispricing_threshold: float = 10.0,
     risk_free_rate: float = 0.05,
     max_contracts: int = 50,
-) -> List[Dict]:
+) -> Dict:
     """
     Scan a single ticker for mispriced options.
 
@@ -181,7 +183,7 @@ def scan_ticker(
         max_contracts: Maximum contracts to fetch quotes for.
 
     Returns:
-        List of mispricing signals as dicts.
+        Dict with 'iv_analysis' (IVAnalysis or None) and 'signals' (list of dicts).
     """
     logger.info(f"Scanning {ticker}...")
 
@@ -189,7 +191,7 @@ def scan_ticker(
     spot_price = get_spot_price(ibkr, ticker)
     if not spot_price:
         logger.warning(f"Cannot get price for {ticker} (try adding market data subscription)")
-        return []
+        return {'iv_analysis': None, 'signals': []}
 
     logger.info(f"  Current price: ${spot_price:.2f}")
 
@@ -212,7 +214,7 @@ def scan_ticker(
 
     if not contracts:
         logger.warning(f"  No contracts found matching filter")
-        return []
+        return {'iv_analysis': None, 'signals': []}
 
     logger.info(f"  Found {len(contracts)} contracts matching filter")
 
@@ -250,9 +252,50 @@ def scan_ticker(
     logger.info(f"  Got {len(quotes)} valid quotes")
 
     if not quotes:
-        return []
+        return {'iv_analysis': None, 'signals': []}
 
-    # Scan for mispricing
+    # Calculate ATM IV from nearest-ATM quotes
+    atm_ivs = []
+    for q in quotes:
+        moneyness = abs(q['strike'] - spot_price) / spot_price
+        if moneyness < 0.03:  # Within 3% of ATM
+            mid = (q['bid'] + q['ask']) / 2
+            exp_date = datetime.strptime(q['expiry'], '%Y%m%d').date()
+            dte = (exp_date - date.today()).days
+            T = max(dte, 1) / 365.0
+            iv = calculate_implied_volatility(mid, spot_price, q['strike'], T, risk_free_rate, q['right'])
+            if iv and 0.01 < iv < 3.0:
+                atm_ivs.append(iv)
+
+    current_iv = sum(atm_ivs) / len(atm_ivs) if atm_ivs else None
+
+    # IV environment analysis
+    iv_analysis = None
+    if current_iv:
+        # Load historical IV data if available
+        iv_history_path = project_root / 'data' / 'options' / 'iv_history' / f'{ticker}.parquet'
+        iv_history = None
+        if iv_history_path.exists():
+            try:
+                iv_df = pd.read_parquet(iv_history_path)
+                iv_history = iv_df['atm_iv'].dropna().tolist()
+            except Exception:
+                pass
+
+        iv_analysis = analyze_iv_environment(
+            ticker=ticker,
+            current_iv=current_iv,
+            hv=hv,
+            iv_history=iv_history,
+        )
+        logger.info(f"  ATM IV: {current_iv:.1%}, HV: {hv:.1%}, VRP: {iv_analysis.vrp:.1%}")
+        if iv_analysis.iv_percentile is not None:
+            logger.info(f"  IV Percentile: {iv_analysis.iv_percentile:.0f}% ({iv_analysis.lookback_days}d)")
+        logger.info(f"  Signal: {iv_analysis.signal}")
+    else:
+        logger.warning(f"  Could not calculate ATM IV (no near-ATM quotes)")
+
+    # Scan for mispricing (still useful as supplementary data)
     signals = scan_options_for_mispricing(
         quotes=quotes,
         spot_price=spot_price,
@@ -285,38 +328,62 @@ def scan_ticker(
             'hv_used': round(sig.hv_used, 3) if sig.hv_used else None,
         })
 
-    return results
+    return {'iv_analysis': iv_analysis, 'signals': results}
 
 
-def print_results(results: List[Dict], ticker: str):
-    """Pretty print scan results."""
-    if not results:
-        print(f"\n{ticker}: No mispricing signals found")
-        return
+def print_results(scan_result: Dict, ticker: str):
+    """Pretty print scan results with IV analysis."""
+    iv_analysis = scan_result.get('iv_analysis')
+    results = scan_result.get('signals', [])
 
     print(f"\n{'='*80}")
-    print(f" {ticker} Mispricing Signals")
+    print(f" {ticker} Option Analysis")
     print(f"{'='*80}")
 
-    # Group by signal type
-    buys = [r for r in results if r['signal'] == 'BUY']
-    sells = [r for r in results if r['signal'] == 'SELL']
+    # IV Environment Summary (most important section)
+    if iv_analysis:
+        print(f"\n--- IV Environment ---")
+        print(f"  ATM Implied Vol:     {iv_analysis.current_iv:.1%}")
+        print(f"  Historical Vol:      {iv_analysis.hv:.1%}")
+        print(f"  Vol Risk Premium:    {iv_analysis.vrp:+.1%}")
 
-    for signal_type, items in [('BUY (Underpriced)', buys), ('SELL (Overpriced)', sells)]:
-        if not items:
-            continue
+        if iv_analysis.iv_percentile is not None:
+            print(f"  IV Rank:             {iv_analysis.iv_rank:.0f}%")
+            print(f"  IV Percentile:       {iv_analysis.iv_percentile:.0f}% ({iv_analysis.lookback_days}d lookback)")
+            print(f"  IV Range:            {iv_analysis.iv_min:.1%} - {iv_analysis.iv_max:.1%} (mean: {iv_analysis.iv_mean:.1%})")
+        else:
+            print(f"  IV History:          Not available (start collecting to enable IV percentile)")
 
-        print(f"\n{signal_type}:")
-        print("-" * 80)
-        print(f"{'Expiry':<10} {'Strike':>8} {'Type':<4} {'Theo':>8} {'Market':>8} "
-              f"{'Misprice':>10} {'Spread':>8} {'Conf':<6} {'Delta':>7}")
-        print("-" * 80)
+        signal_map = {
+            'IV_HIGH': 'IV HIGH - Options expensive, favor selling strategies',
+            'IV_LOW': 'IV LOW - Options cheap, favor buying strategies',
+            'NEUTRAL': 'NEUTRAL - IV in normal range',
+        }
+        print(f"  Signal:              {signal_map.get(iv_analysis.signal, iv_analysis.signal)}")
+    else:
+        print(f"\n  Could not calculate IV environment (no valid ATM quotes)")
 
-        for r in items:
-            print(f"{r['expiry']:<10} {r['strike']:>8.1f} {r['right']:<4} "
+    # Mispricing details (supplementary, with caveat)
+    if results:
+        print(f"\n--- HV-Based Mispricing Signals ({len(results)} found) ---")
+        print(f"  Note: These compare HV-based theoretical prices with market prices.")
+        print(f"  Market prices include VRP, so most options will appear 'overpriced'.")
+        print(f"  Focus on the IV Environment analysis above for actionable signals.")
+
+        # Show top 10 only
+        top_n = min(10, len(results))
+        print(f"\n  Top {top_n} by mispricing magnitude:")
+        print(f"  {'Expiry':<10} {'Strike':>8} {'Type':<4} {'Theo':>8} {'Market':>8} "
+              f"{'Misprice':>10} {'IV_mkt':>8}")
+        print(f"  {'-'*68}")
+
+        for r in results[:top_n]:
+            iv_str = f"{r['iv_market']:.1%}" if r.get('iv_market') else "  N/A"
+            print(f"  {r['expiry']:<10} {r['strike']:>8.1f} {r['right']:<4} "
                   f"${r['theoretical']:>7.2f} ${r['market_mid']:>7.2f} "
-                  f"{r['mispricing_pct']:>+9.1f}% {r['spread_pct']:>7.1f}% "
-                  f"{r['confidence']:<6} {r['delta']:>+7.3f}")
+                  f"{r['mispricing_pct']:>+9.1f}% {iv_str:>8}")
+    else:
+        print(f"\n  No HV-based mispricing signals found")
 
     print()
 
@@ -391,6 +458,28 @@ def main():
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Serialize: convert IVAnalysis dataclass to dict for JSON
+        serializable = {}
+        for tk, res in all_results.items():
+            iv = res.get('iv_analysis')
+            serializable[tk] = {
+                'iv_analysis': {
+                    'ticker': iv.ticker,
+                    'current_iv': round(iv.current_iv, 4),
+                    'hv': round(iv.hv, 4),
+                    'vrp': round(iv.vrp, 4),
+                    'iv_rank': round(iv.iv_rank, 1) if iv.iv_rank is not None else None,
+                    'iv_percentile': round(iv.iv_percentile, 1) if iv.iv_percentile is not None else None,
+                    'iv_min': round(iv.iv_min, 4) if iv.iv_min is not None else None,
+                    'iv_max': round(iv.iv_max, 4) if iv.iv_max is not None else None,
+                    'iv_mean': round(iv.iv_mean, 4) if iv.iv_mean is not None else None,
+                    'lookback_days': iv.lookback_days,
+                    'signal': iv.signal,
+                    'as_of_date': iv.as_of_date.isoformat(),
+                } if iv else None,
+                'signals': res.get('signals', []),
+            }
+
         with open(output_path, 'w') as f:
             json.dump({
                 'scan_time': datetime.now().isoformat(),
@@ -402,15 +491,18 @@ def main():
                     'hv_method': args.hv_method,
                     'hv_window': args.hv_window,
                 },
-                'results': all_results,
+                'results': serializable,
             }, f, indent=2)
 
         logger.info(f"Results saved to {output_path}")
 
     # Summary
-    total_signals = sum(len(r) for r in all_results.values())
+    total_signals = sum(len(r.get('signals', [])) for r in all_results.values())
+    tickers_with_iv = sum(1 for r in all_results.values() if r.get('iv_analysis'))
     print(f"\n{'='*80}")
-    print(f" Summary: {total_signals} total signals across {len(args.tickers)} tickers")
+    print(f" Summary: {len(args.tickers)} tickers scanned, "
+          f"{tickers_with_iv} with IV analysis, "
+          f"{total_signals} HV-based signals")
     print(f"{'='*80}")
 
 
