@@ -483,6 +483,23 @@ def update_ibkr_prices(dry_run: bool = False) -> bool:
     return success
 
 
+def update_iv_history(dry_run: bool = False) -> bool:
+    """Run IV history collection."""
+    logger.info("\n" + "=" * 50)
+    logger.info("COLLECTING IV HISTORY")
+    logger.info("=" * 50)
+
+    script = SCRIPT_DIR / "collect_iv_history.py"
+    if not script.exists():
+        logger.error(f"Script not found: {script}")
+        return False
+
+    cmd = [sys.executable, str(script)]
+    success, output = run_command(cmd, dry_run)
+
+    return success
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Daily Data Update - Unified scheduler for all data collection',
@@ -528,6 +545,8 @@ Note: IBKR sources require TWS/Gateway running.
                        help='Update IBKR news only (requires TWS/Gateway)')
     parser.add_argument('--ibkr-prices', action='store_true',
                        help='Update IBKR prices only (requires TWS/Gateway)')
+    parser.add_argument('--iv-history', action='store_true',
+                       help='Collect ATM IV history (requires TWS/Gateway)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Show what would be done without executing')
     parser.add_argument('--parallel', action='store_true',
@@ -540,10 +559,11 @@ Note: IBKR sources require TWS/Gateway running.
     # Handle hyphenated arguments
     args.ibkr_news = getattr(args, 'ibkr_news', False)
     args.ibkr_prices = getattr(args, 'ibkr_prices', False)
+    args.iv_history = getattr(args, 'iv_history', False)
 
     # Default to status if no action specified
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
-                args.ibkr_news, args.ibkr_prices]):
+                args.ibkr_news, args.ibkr_prices, args.iv_history]):
         args.status = True
 
     if args.status:
@@ -569,6 +589,7 @@ Note: IBKR sources require TWS/Gateway running.
     update_finnhub_flag = args.all or args.news or args.finnhub
     update_ibkr_news_flag = args.all or args.news or args.ibkr_news
     update_ibkr_prices_flag = args.all or args.ibkr_prices
+    update_iv_history_flag = args.all or args.iv_history
 
     # Parallel execution for news sources (Polygon + Finnhub only, IBKR needs dedicated connection)
     if args.parallel and (update_polygon_flag or update_finnhub_flag):
@@ -594,6 +615,8 @@ Note: IBKR sources require TWS/Gateway running.
             results['ibkr_news'] = update_ibkr_news(args.dry_run)
         if update_ibkr_prices_flag:
             results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
+        if update_iv_history_flag:
+            results['iv_history'] = update_iv_history(args.dry_run)
 
     else:
         # Sequential execution (default)
@@ -608,6 +631,9 @@ Note: IBKR sources require TWS/Gateway running.
 
         if update_ibkr_prices_flag:
             results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
+
+        if update_iv_history_flag:
+            results['iv_history'] = update_iv_history(args.dry_run)
 
     # Summary
     end_time = datetime.now()
