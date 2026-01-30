@@ -191,7 +191,51 @@ data_preferences:
     cache_ttl_minutes: 60   # 快取有效時間
 
 # ============================================
-# 7. LLM 評分偏好
+# 7. Options 數據偏好
+# ============================================
+options_preferences:
+  # 是否啟用 Options 數據收集
+  enabled: true
+
+  # 歷史數據收集頻率
+  historical_interval: "15 mins"  # 1 min, 5 mins, 15 mins, 1 hour, 1 day
+
+  # 數據類型
+  what_to_show: "TRADES"  # TRADES, MIDPOINT, BID, ASK
+
+  # 預設篩選條件 (用於 filter_interesting_options)
+  default_filter:
+    # Strike 篩選 (相對於現價的百分比範圍)
+    strike_range_pct: 0.10      # ±10% ATM
+
+    # 到期日篩選 (天數)
+    min_dte: 7                  # 最少 7 天到期
+    max_dte: 60                 # 最多 60 天到期
+
+    # 合約類型
+    rights: ["C", "P"]          # Call 和 Put 都收集
+
+    # 流動性篩選 (可選)
+    min_open_interest: 100      # 最小未平倉量
+    min_volume: 10              # 最小日成交量
+
+  # 特定感興趣的合約 (手動指定)
+  # 這些會額外收集，不受 default_filter 限制
+  specific_contracts:
+    # 範例：NVDA 的特定合約
+    # - underlying: "NVDA"
+    #   expiry: "20260220"
+    #   strike: 150.0
+    #   right: "C"
+
+  # 要收集 Options 數據的標的清單
+  # 如果為空，會使用 watchlists.core_holdings
+  tickers_for_options: []
+  # 或者指定：
+  # tickers_for_options: ["NVDA", "AMD", "AAPL"]
+
+# ============================================
+# 8. LLM 評分偏好
 # ============================================
 llm_preferences:
   # 情緒評分模型
@@ -204,7 +248,7 @@ llm_preferences:
   daily_token_budget: 100000
 
 # ============================================
-# 8. 報告偏好
+# 9. 報告偏好
 # ============================================
 report_preferences:
   # 每日摘要
