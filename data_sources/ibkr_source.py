@@ -311,6 +311,14 @@ class IBKRDataSource(BaseDataSource):
 
         try:
             self._ib = IB()
+
+            # Register error handler to suppress noisy non-critical errors
+            self._ib.errorEvent += self._on_ib_error
+
+            # Suppress ib_insync internal logger for subscription errors
+            ib_logger = logging.getLogger('ib_insync.wrapper')
+            ib_logger.addFilter(self._IbErrorFilter(self._SUPPRESSED_ERROR_CODES))
+
             self._ib.connect(
                 self.host,
                 self.port,
@@ -336,6 +344,45 @@ class IBKRDataSource(BaseDataSource):
             finally:
                 self._connected = False
                 logger.info("Disconnected from IBKR")
+
+    class _IbErrorFilter(logging.Filter):
+        """Filter to suppress non-critical ib_insync error messages."""
+
+        def __init__(self, suppressed_codes):
+            super().__init__()
+            self._patterns = [f'Error {code}' for code in suppressed_codes]
+
+        def filter(self, record):
+            msg = record.getMessage()
+            return not any(p in msg for p in self._patterns)
+
+    # Non-critical IBKR error codes that should be logged at debug level
+    _SUPPRESSED_ERROR_CODES = {
+        10091,  # Market data requires additional subscription
+        10089,  # Requested market data is not subscribed
+        10090,  # Part of requested market data is not subscribed
+        10167,  # Not subscribed, displaying delayed data
+        10168,  # Not subscribed, delayed data not enabled
+        354,    # Requested market data is not subscribed (older code)
+        2104,   # Market data farm connection is OK
+        2106,   # HMDS data farm connection is OK
+        2107,   # HMDS data farm connection inactive but available on demand
+        2108,   # Market data farm connection inactive but available on demand
+        2119,   # Market data farm is connecting
+        2158,   # Sec-def data farm connection is OK
+    }
+
+    def _on_ib_error(self, reqId, errorCode, errorString, contract):
+        """
+        Custom IBKR error handler.
+
+        Downgrades non-critical subscription errors to debug level
+        to reduce noise in scanner output.
+        """
+        if errorCode in self._SUPPRESSED_ERROR_CODES:
+            logger.debug(f"IBKR info {errorCode}, reqId {reqId}: {errorString}")
+        else:
+            logger.error(f"IBKR error {errorCode}, reqId {reqId}: {errorString}")
 
     def _ensure_connected(self):
         """Ensure we have an active connection."""
