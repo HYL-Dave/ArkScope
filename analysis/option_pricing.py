@@ -762,6 +762,150 @@ def calculate_days_to_expiry(expiry_str: str) -> int:
         return 30  # Default
 
 
+# =============================================================================
+# IV Percentile Rank Analysis
+# =============================================================================
+
+@dataclass
+class IVAnalysis:
+    """IV analysis result for a ticker."""
+    ticker: str
+    current_iv: float  # Current ATM IV
+    hv: float  # Historical volatility
+    vrp: float  # Volatility Risk Premium (IV - HV)
+    # IV Percentile (requires historical IV data)
+    iv_rank: Optional[float] = None  # (current - min) / (max - min) * 100
+    iv_percentile: Optional[float] = None  # % of days IV was lower
+    iv_min: Optional[float] = None  # Min IV in lookback
+    iv_max: Optional[float] = None  # Max IV in lookback
+    iv_mean: Optional[float] = None  # Mean IV in lookback
+    lookback_days: Optional[int] = None
+    # Interpretation
+    signal: str = 'NEUTRAL'  # 'IV_HIGH', 'IV_LOW', 'NEUTRAL'
+    as_of_date: date = field(default_factory=date.today)
+
+
+def calculate_iv_rank(
+    current_iv: float,
+    iv_history: List[float],
+) -> float:
+    """
+    Calculate IV Rank: where current IV sits relative to its range.
+
+    Formula: (current - min) / (max - min) * 100
+
+    Args:
+        current_iv: Current implied volatility.
+        iv_history: List of historical IV values.
+
+    Returns:
+        IV Rank as percentage (0-100).
+        0 = at historical low, 100 = at historical high.
+
+    Example:
+        >>> iv_history = [0.20, 0.25, 0.30, 0.35, 0.40]
+        >>> calculate_iv_rank(0.30, iv_history)
+        50.0
+    """
+    if not iv_history:
+        return 50.0  # No data, assume middle
+
+    iv_min = min(iv_history)
+    iv_max = max(iv_history)
+
+    if iv_max == iv_min:
+        return 50.0
+
+    return float((current_iv - iv_min) / (iv_max - iv_min) * 100)
+
+
+def calculate_iv_percentile(
+    current_iv: float,
+    iv_history: List[float],
+) -> float:
+    """
+    Calculate IV Percentile: what % of historical days had lower IV.
+
+    Args:
+        current_iv: Current implied volatility.
+        iv_history: List of historical IV values.
+
+    Returns:
+        IV Percentile as percentage (0-100).
+        90 means current IV is higher than 90% of historical values.
+
+    Example:
+        >>> iv_history = [0.20, 0.25, 0.30, 0.35, 0.40]
+        >>> calculate_iv_percentile(0.35, iv_history)
+        60.0
+    """
+    if not iv_history:
+        return 50.0
+
+    below_count = sum(1 for iv in iv_history if iv < current_iv)
+    return float(below_count / len(iv_history) * 100)
+
+
+def analyze_iv_environment(
+    ticker: str,
+    current_iv: float,
+    hv: float,
+    iv_history: Optional[List[float]] = None,
+    high_threshold: float = 80.0,
+    low_threshold: float = 20.0,
+) -> IVAnalysis:
+    """
+    Analyze the IV environment for a ticker.
+
+    Provides VRP measurement and, if historical IV data is available,
+    IV rank and percentile analysis.
+
+    Args:
+        ticker: Stock symbol.
+        current_iv: Current ATM implied volatility.
+        hv: Historical (realized) volatility.
+        iv_history: Optional list of historical daily ATM IV values.
+        high_threshold: IV percentile above this → IV_HIGH signal.
+        low_threshold: IV percentile below this → IV_LOW signal.
+
+    Returns:
+        IVAnalysis with signal and metrics.
+    """
+    vrp = current_iv - hv
+
+    result = IVAnalysis(
+        ticker=ticker,
+        current_iv=current_iv,
+        hv=hv,
+        vrp=vrp,
+    )
+
+    if iv_history and len(iv_history) >= 20:
+        result.iv_rank = calculate_iv_rank(current_iv, iv_history)
+        result.iv_percentile = calculate_iv_percentile(current_iv, iv_history)
+        result.iv_min = min(iv_history)
+        result.iv_max = max(iv_history)
+        result.iv_mean = sum(iv_history) / len(iv_history)
+        result.lookback_days = len(iv_history)
+
+        # Generate signal based on IV percentile
+        if result.iv_percentile >= high_threshold:
+            result.signal = 'IV_HIGH'  # Options expensive → favor selling
+        elif result.iv_percentile <= low_threshold:
+            result.signal = 'IV_LOW'  # Options cheap → favor buying
+        else:
+            result.signal = 'NEUTRAL'
+    else:
+        # Without IV history, use VRP as rough guide
+        # VRP > 1.5x typical → IV likely elevated
+        if vrp > hv * 0.8:  # IV > 1.8x HV
+            result.signal = 'IV_HIGH'
+        elif vrp < hv * 0.1:  # IV barely above HV
+            result.signal = 'IV_LOW'
+
+    return result
+
+
 if __name__ == '__main__':
     # Quick test
     print("Option Pricing Module Test")
