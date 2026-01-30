@@ -83,16 +83,28 @@ def get_watchlist_tickers() -> List[str]:
 
 def load_local_prices(ticker: str, days: int = 40) -> Optional[pd.DataFrame]:
     """Load local historical price data for HV calculation."""
-    daily_path = project_root / 'data' / 'prices' / 'daily' / f'{ticker}.parquet'
-    if daily_path.exists():
-        df = pd.read_parquet(daily_path)
-        return df.tail(days)
+    # Try daily data (parquet or csv)
+    daily_dir = project_root / 'data' / 'prices' / 'daily'
+    for ext, reader in [('.parquet', pd.read_parquet), ('.csv', pd.read_csv)]:
+        daily_path = daily_dir / f'{ticker}{ext}'
+        if daily_path.exists():
+            return reader(daily_path).tail(days)
 
-    intraday_path = project_root / 'data' / 'prices' / '15min' / f'{ticker}.parquet'
-    if intraday_path.exists():
-        df = pd.read_parquet(intraday_path)
-        df['date'] = pd.to_datetime(df['datetime']).dt.date
-        daily = df.groupby('date').agg({
+    # Try 15min data and resample
+    intraday_dir = project_root / 'data' / 'prices' / '15min'
+    intraday_df = None
+
+    parquet_path = intraday_dir / f'{ticker}.parquet'
+    if parquet_path.exists():
+        intraday_df = pd.read_parquet(parquet_path)
+    else:
+        csv_matches = sorted(intraday_dir.glob(f'{ticker}_*.csv'))
+        if csv_matches:
+            intraday_df = pd.read_csv(csv_matches[-1])
+
+    if intraday_df is not None:
+        intraday_df['date'] = pd.to_datetime(intraday_df['datetime']).dt.date
+        daily = intraday_df.groupby('date').agg({
             'open': 'first', 'high': 'max', 'low': 'min',
             'close': 'last', 'volume': 'sum',
         }).reset_index()
