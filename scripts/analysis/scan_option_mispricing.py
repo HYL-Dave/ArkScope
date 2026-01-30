@@ -331,7 +331,7 @@ def scan_ticker(
     return {'iv_analysis': iv_analysis, 'signals': results}
 
 
-def print_results(scan_result: Dict, ticker: str):
+def print_results(scan_result: Dict, ticker: str, show_hv_signals: bool = False):
     """Pretty print scan results with IV analysis."""
     iv_analysis = scan_result.get('iv_analysis')
     results = scan_result.get('signals', [])
@@ -340,7 +340,7 @@ def print_results(scan_result: Dict, ticker: str):
     print(f" {ticker} Option Analysis")
     print(f"{'='*80}")
 
-    # IV Environment Summary (most important section)
+    # IV Environment Summary (primary analysis)
     if iv_analysis:
         print(f"\n--- IV Environment ---")
         print(f"  ATM Implied Vol:     {iv_analysis.current_iv:.1%}")
@@ -352,7 +352,7 @@ def print_results(scan_result: Dict, ticker: str):
             print(f"  IV Percentile:       {iv_analysis.iv_percentile:.0f}% ({iv_analysis.lookback_days}d lookback)")
             print(f"  IV Range:            {iv_analysis.iv_min:.1%} - {iv_analysis.iv_max:.1%} (mean: {iv_analysis.iv_mean:.1%})")
         else:
-            print(f"  IV History:          Not available (start collecting to enable IV percentile)")
+            print(f"  IV History:          Not available (collect IV data to enable percentile ranking)")
 
         signal_map = {
             'IV_HIGH': 'IV HIGH - Options expensive, favor selling strategies',
@@ -363,27 +363,26 @@ def print_results(scan_result: Dict, ticker: str):
     else:
         print(f"\n  Could not calculate IV environment (no valid ATM quotes)")
 
-    # Mispricing details (supplementary, with caveat)
-    if results:
-        print(f"\n--- HV-Based Mispricing Signals ({len(results)} found) ---")
-        print(f"  Note: These compare HV-based theoretical prices with market prices.")
-        print(f"  Market prices include VRP, so most options will appear 'overpriced'.")
-        print(f"  Focus on the IV Environment analysis above for actionable signals.")
+    # HV-based mispricing details (only when explicitly requested)
+    if show_hv_signals:
+        if results:
+            print(f"\n--- HV-Based Mispricing Signals ({len(results)} found) ---")
+            print(f"  Note: These compare HV-based theoretical prices with market prices.")
+            print(f"  Market prices include VRP, so most options will appear 'overpriced'.")
 
-        # Show top 10 only
-        top_n = min(10, len(results))
-        print(f"\n  Top {top_n} by mispricing magnitude:")
-        print(f"  {'Expiry':<10} {'Strike':>8} {'Type':<4} {'Theo':>8} {'Market':>8} "
-              f"{'Misprice':>10} {'IV_mkt':>8}")
-        print(f"  {'-'*68}")
+            top_n = min(10, len(results))
+            print(f"\n  Top {top_n} by mispricing magnitude:")
+            print(f"  {'Expiry':<10} {'Strike':>8} {'Type':<4} {'Theo':>8} {'Market':>8} "
+                  f"{'Misprice':>10} {'IV_mkt':>8}")
+            print(f"  {'-'*68}")
 
-        for r in results[:top_n]:
-            iv_str = f"{r['iv_market']:.1%}" if r.get('iv_market') else "  N/A"
-            print(f"  {r['expiry']:<10} {r['strike']:>8.1f} {r['right']:<4} "
-                  f"${r['theoretical']:>7.2f} ${r['market_mid']:>7.2f} "
-                  f"{r['mispricing_pct']:>+9.1f}% {iv_str:>8}")
-    else:
-        print(f"\n  No HV-based mispricing signals found")
+            for r in results[:top_n]:
+                iv_str = f"{r['iv_market']:.1%}" if r.get('iv_market') else "  N/A"
+                print(f"  {r['expiry']:<10} {r['strike']:>8.1f} {r['right']:<4} "
+                      f"${r['theoretical']:>7.2f} ${r['market_mid']:>7.2f} "
+                      f"{r['mispricing_pct']:>+9.1f}% {iv_str:>8}")
+        else:
+            print(f"\n  No HV-based mispricing signals found")
 
     print()
 
@@ -409,6 +408,8 @@ def main():
                         help='Max contracts to fetch quotes for (default: 50)')
     parser.add_argument('--output', '-o', type=str,
                         help='Output file (JSON format)')
+    parser.add_argument('--show-hv-signals', action='store_true',
+                        help='Show HV-based mispricing signals (off by default)')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output')
 
@@ -447,7 +448,7 @@ def main():
                 )
 
                 all_results[ticker.upper()] = results
-                print_results(results, ticker.upper())
+                print_results(results, ticker.upper(), show_hv_signals=args.show_hv_signals)
 
     except Exception as e:
         logger.error(f"Error: {e}")
