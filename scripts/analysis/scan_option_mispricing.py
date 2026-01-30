@@ -75,19 +75,31 @@ def load_local_price_data(ticker: str, days: int = 60) -> Optional[pd.DataFrame]
     Returns:
         DataFrame with OHLCV data or None.
     """
-    # Try daily data first
-    daily_path = project_root / 'data' / 'prices' / 'daily' / f'{ticker}.parquet'
-    if daily_path.exists():
-        df = pd.read_parquet(daily_path)
-        return df.tail(days)
+    # Try daily data first (parquet or csv)
+    daily_dir = project_root / 'data' / 'prices' / 'daily'
+    for ext, reader in [('.parquet', pd.read_parquet), ('.csv', pd.read_csv)]:
+        daily_path = daily_dir / f'{ticker}{ext}'
+        if daily_path.exists():
+            df = reader(daily_path)
+            return df.tail(days)
 
-    # Try 15min data and resample
-    intraday_path = project_root / 'data' / 'prices' / '15min' / f'{ticker}.parquet'
-    if intraday_path.exists():
-        df = pd.read_parquet(intraday_path)
-        # Resample to daily
-        df['date'] = pd.to_datetime(df['datetime']).dt.date
-        daily = df.groupby('date').agg({
+    # Try 15min data and resample (parquet, then csv with glob for naming variants)
+    intraday_dir = project_root / 'data' / 'prices' / '15min'
+    intraday_df = None
+
+    parquet_path = intraday_dir / f'{ticker}.parquet'
+    if parquet_path.exists():
+        intraday_df = pd.read_parquet(parquet_path)
+    else:
+        # CSV files may have naming like AMD_15min_2024_2026.csv
+        csv_matches = sorted(intraday_dir.glob(f'{ticker}_*.csv'))
+        if csv_matches:
+            # Use the latest file (sorted by name, last is newest date range)
+            intraday_df = pd.read_csv(csv_matches[-1])
+
+    if intraday_df is not None:
+        intraday_df['date'] = pd.to_datetime(intraday_df['datetime']).dt.date
+        daily = intraday_df.groupby('date').agg({
             'open': 'first',
             'high': 'max',
             'low': 'min',
