@@ -984,6 +984,20 @@ Examples:
             logger.info("\n" + "=" * 60)
             logger.info(f"Incremental update complete: {collector.stats['total_articles']} new articles")
             logger.info("=" * 60)
+
+            # Save stats (same as full collection path)
+            stats_path = Path("data/news/metadata/collection_stats.json")
+            stats_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(stats_path, 'w') as f:
+                json.dump({
+                    'completed_at': datetime.now().isoformat(),
+                    'tickers': tickers,
+                    'start_date': start_date.isoformat(),
+                    'end_date': end_date.isoformat(),
+                    **collector.stats,
+                }, f, indent=2)
+            logger.info(f"Stats saved to: {stats_path}")
+
             return
         else:
             # No existing data, use default full history start
