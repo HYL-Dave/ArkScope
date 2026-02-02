@@ -12,3 +12,12 @@ stable-baselines3
 # Optional, for training wrappers
 torch
 requests
+
+# DAL + Tools layer
+pydantic>=2.0
+pyyaml
+
+# HTTP API
+fastapi>=0.110.0
+uvicorn[standard]
+httpx
