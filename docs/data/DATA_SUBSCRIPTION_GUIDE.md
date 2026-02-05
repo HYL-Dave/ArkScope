@@ -1,7 +1,7 @@
 # 數據訂閱完整指南
 
 > **目的**: 記錄 AI Agent 自主發現板塊爆發模式所需的數據訂閱策略
-> **最後更新**: 2026-01-21
+> **最後更新**: 2026-01-30
 
 ---
 
@@ -25,13 +25,13 @@
 ├── IBKR Pro 帳戶
 │   ├── IBIS Research Platform (免費) ← 含 DJ, The Fly, Briefing 新聞
 │   ├── US Real-Time Non Consolidated (免費) ← 基本即時報價
+│   ├── OPRA ($1.50/月) ← 期權延遲/即時報價 (2026-01 訂閱)
 │   └── US Mutual Funds (免費)
 ├── Seeking Alpha (付費)
 │   └── Alpha Picks (付費)
 └── 外部：SEC EDGAR, Finnhub, Tiingo (免費)
 
 待訂閱評估：
-├── IBKR: OPRA $1.50/月 (期權報價，佣金>$20免)
 └── 外部: Unusual Whales $50/月 (Options Flow)
 ```
 
@@ -264,16 +264,153 @@
 | 即時報價 | `reqMktData` | ✅ | `get_current_quote()` |
 | 合約詳情 | `reqContractDetails` | ✅ | `get_contract_details()` |
 
-**未實作但可用的 API（自建 Options Flow 需要）：**
+**期權相關 API（OPRA 訂閱後可用）：**
+
+| API 方法 | 用途 | 狀態 | 需訂閱 |
+|---------|------|:----:|:------:|
+| `reqSecDefOptParams` | 取得期權鏈參數 | ✅ 已實作 | OPRA $1.50 |
+| `reqMktData` (options, delayed) | 期權延遲報價 (15分鐘) | ✅ 已實作 | OPRA $1.50 |
+| `reqMktData` (options, realtime) | 期權即時報價 + Greeks | ⚠️ 需額外訂閱 | + 股票數據訂閱 |
+| `reqTickByTickData` (options) | 逐筆成交 | ❌ 不支援 | 期權不適用 |
+| `reqContractDetails` (options) | 期權合約詳情 | ✅ 已實作 | OPRA $1.50 |
+
+**其他未實作但可用的 API：**
 
 | API 方法 | 用途 | 需訂閱 |
 |---------|------|:------:|
-| `reqSecDefOptParams` | 取得期權鏈參數 | OPRA $1.50 |
-| `reqMktData` (options) | 期權報價 + Greeks | OPRA $1.50 |
-| `reqTickByTickData` | Tick-by-tick 數據 | OPRA $1.50 |
 | `reqScannerSubscription` | 市場掃描器 | 視掃描內容 |
 | `reqFundamentalData` | 詳細基本面 (Reuters) | 免費 |
 | `getWshMetaData` | WSH 事件日曆 | WSH API $49 |
+
+---
+
+### OPRA 實測結果 (2026-01-21)
+
+以下是 OPRA 訂閱後的實際測試結果，使用 `readonly=True` 連接 IB Gateway：
+
+#### ✅ OPRA 提供的數據
+
+| 功能 | API | 測試結果 | 範例 |
+|------|-----|---------|------|
+| **期權鏈參數** | `reqSecDefOptParams` | ✅ 成功 | AAPL: 39 交易所, 21 到期日, 113 行使價 |
+| **合約資訊** | `qualifyContracts` | ✅ 成功 | conId: 836416183, multiplier: 100 |
+| **合約詳情** | `reqContractDetails` | ✅ 成功 | minTick: 0.01, validExchanges: SMART,CBOE,... |
+| **延遲報價** | `reqMktData(type=3)` | ✅ 成功 | Bid: $15.50, Ask: $17.65, Last: $16.30 |
+
+```
+測試合約: AAPL 20260123 $230 Call
+期權鏈: CBOE 21到期日, ISE 21到期日, PHLX 21到期日...
+到期日: ['20260123', '20260130', '20260206', ...]
+行使價: [220.0, 225.0, 230.0, 232.5, 235.0, 237.5, 240.0]
+```
+
+#### ❌ OPRA 不提供 / 需額外訂閱
+
+| 功能 | API | 測試結果 | 錯誤訊息 |
+|------|-----|---------|---------|
+| **即時報價** | `reqMktData(type=1)` | ❌ 需額外訂閱 | Error 10091: 需要 AAPL NASDAQ.NMS/TOP/ALL |
+| **即時 Greeks** | `reqMktData('106')` | ❌ 需 underlying | 需要股票即時報價計算 |
+| **逐筆成交** | `reqTickByTickData` | ❌ 不支援 | Error 10189: 期權不適用此功能 |
+| **歷史 K 線** | `reqHistoricalData` | ❌ 有限 | Error 162: SMART 交易所無 EOD 數據 |
+
+#### 結論與建議
+
+**對於一般期權研究/交易**:
+- OPRA $1.50/月 **已經足夠**：查看期權鏈結構、延遲報價
+- **不需要額外訂閱** US Equity Bundle，除非需要：
+  - 即時報價 (做市商級別)
+  - 即時 Greeks 計算
+
+**對於 Options Flow 偵測**:
+- ❌ `reqTickByTickData` 不支援期權，無法自建 Sweep 偵測
+- ⭐ **建議使用 Unusual Whales ($50/月)**，已處理好的信號
+
+**OPRA 適合的場景**:
+- 查看期權鏈結構（哪些到期日、行使價可交易）
+- 延遲報價研究（15分鐘延遲，足夠做分析）
+- 合約資訊查詢（multiplier, trading class 等）
+
+**OPRA 不適合的場景**:
+- 即時交易決策（需要 US Equity Bundle）
+- Sweep/Block 偵測（需要 Unusual Whales）
+- 高頻期權策略（延遲 15 分鐘太長）
+
+---
+
+### 數據獲取優先順序與 Real-time 規劃
+
+> **最後更新**: 2026-01-30
+
+#### 現階段策略：延遲 + 本地優先
+
+目前的 Options 分析工具（scanner、IV history collector）都是**日頻分析**，不需要即時數據。
+
+```
+數據獲取優先順序:
+
+Spot Price (現價):
+├── 1. IBKR 即時/延遲報價 (reqMktData)
+├── 2. 本地歷史價格 (data/prices/15min/*.csv → resample daily)
+└── 3. IBKR 歷史 bars (reqHistoricalData，fallback)
+
+HV (歷史波動率):
+├── 1. 本地 daily parquet/csv
+├── 2. 本地 15min csv → resample 成 daily
+└── 3. Default 30% (最後手段，不可靠)
+
+Option Quotes (算 IV 用):
+└── 1. IBKR 延遲報價 (reqMktData, type=3, delayed=True)
+       └── 必須從市場取得，無本地 fallback
+           (IV 必須從當天 bid/ask 反推)
+
+IV History (IV percentile rank 用):
+└── 本地 data/options/iv_history/{TICKER}.parquet
+    └── 每日收集一次，逐日累積
+```
+
+**程式碼中 `delayed=True` 是刻意設計**——即使有 OPRA 即時訂閱，
+對日頻 IV 分析而言，15 分鐘延遲不影響結果。IBKR 回傳的 10167 warning
+（顯示延遲數據）是預期行為，非錯誤。
+
+#### 未來規劃：Real-time 需求場景
+
+以下場景需要切換為 `delayed=False`（real-time）：
+
+```
+需要 Real-time 的場景:
+├── AI Agent 盤中自動交易 options
+│   └── 即時 bid/ask → 即時下單，15 分鐘延遲不可接受
+├── Options Flow 即時監控
+│   └── 偵測 Sweep/Block → 快速反應（需 Unusual Whales 或類似服務）
+├── IV Spike 即時警報
+│   └── IV 突然飆升 → 觸發賣出 straddle 策略
+└── Gamma Exposure 盤中追蹤
+    └── 需要即時 Greeks 來調整 delta hedge
+
+不需要 Real-time 的場景:
+├── 每日 IV history 收集 ← 現在
+├── IV percentile rank 分析 ← 現在
+├── HV 計算 ← 永遠用歷史數據
+└── Options 教育/研究 ← 延遲即可
+```
+
+**切換到 Real-time 的前提條件**：
+1. 需要額外訂閱「US Securities Snapshot Bundle」($10/月) 才能拿到即時 Greeks
+2. 即時 option quotes 本身只需 OPRA ($1.50/月，已訂閱)
+3. 程式碼改動：將 `delayed=False` 傳給 `get_option_quote()`
+
+#### OPRA 訂閱的定位
+
+```
+OPRA $1.50/月 的價值：
+├── ✅ 開啟 option 報價的「大門」（沒有 OPRA → 連延遲都拿不到）
+├── ✅ 延遲報價：日頻 IV 分析足夠（現階段）
+├── ✅ 即時報價：未來 AI Agent 交易可用（需設 delayed=False）
+└── ✅ 佣金 > $20/月 → 自動抵免（等於免費）
+
+不需要為了「即時 vs 延遲」額外花錢。
+真正需要即時的是 underlying stock 的 Greeks 計算 → 那才需要 US Equity Bundle ($10/月)。
+```
 
 ---
 
@@ -675,15 +812,20 @@ IBIS Research Platform 包含 "Live Event Calendars"，但這是 GUI only：
 
 ### Q: 自建 Options Flow 值得嗎？
 
-| 自建 | 訂閱 Unusual Whales |
-|------|---------------------|
-| $1.50/月 | $50/月 |
-| 需要 2-3 天開發 | 即開即用 |
-| 完全可控 | 依賴第三方 |
-| 無歷史數據回測 | 有歷史數據 |
-| 無國會交易 | 含國會交易 |
+**2026-01-21 測試結論: ❌ 不建議自建**
 
-**結論**: 除非享受開發過程，否則訂閱更划算。
+| 項目 | IBKR OPRA 自建 | Unusual Whales |
+|------|----------------|----------------|
+| 成本 | $1.50/月 | $50/月 |
+| Sweep 偵測 | ❌ 無法實現 (`reqTickByTickData` 不支援期權) | ✅ 已處理 |
+| Block 偵測 | ⚠️ 只能用延遲數據 | ✅ 即時 |
+| 國會交易 | ❌ 無 | ✅ 包含 |
+| API | ✅ 有 | ✅ 有 |
+| 歷史回測 | ❌ 無 | ✅ 有 |
+
+**關鍵限制**: IBKR 的 `reqTickByTickData` 對期權返回 Error 10189，無法取得逐筆成交數據，這意味著無法精確偵測 Sweep（需要知道每筆成交的時間和交易所）。
+
+**結論**: 由於 IBKR API 限制，自建 Options Flow 系統無法實現核心的 Sweep 偵測功能，**強烈建議直接訂閱 Unusual Whales**。
 
 ---
 
