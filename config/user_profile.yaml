@@ -50,7 +50,7 @@ watchlists:
   # 關注清單
   interested:
     description: "有興趣但還沒買入"
-    tickers: ["RKLB", "PLTR", "COIN"]
+    tickers: ["RKLB", "PLTR", "COIN", "PYPL"]
     priority: "medium"
 
   # 板塊觀察
@@ -68,6 +68,10 @@ watchlists:
     - name: "AI 基礎設施"
       tickers: ["NVDA", "AMD", "SMCI", "DELL", "ANET"]
       reason: "AI 需要的硬體供應鏈"
+
+    - name: "Fintech"
+      tickers: ["PYPL", "SQ", "AFRM", "COIN"]
+      reason: "金融科技板塊追蹤"
 
 # ============================================
 # 4. 策略權重配置
@@ -230,7 +234,7 @@ options_preferences:
 
   # 要收集 Options 數據的標的清單
   # 如果為空，會使用 watchlists.core_holdings
-  tickers_for_options: []
+  tickers_for_options: ["NVDA", "AMD", "PLTR", "PYPL", "ZETA", "RKLB", "COIN"]
   # 或者指定：
   # tickers_for_options: ["NVDA", "AMD", "AAPL"]
 
