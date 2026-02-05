@@ -1,0 +1,502 @@
+"""
+Anthropic SDK tool definitions and execution.
+
+Provides tool schemas in Anthropic format and execute_tool() for dispatching.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.tools.data_access import DataAccessLayer
+
+logger = logging.getLogger(__name__)
+
+
+def get_anthropic_tools() -> List[Dict[str, Any]]:
+    """
+    Get tool definitions in Anthropic format.
+
+    Returns list of tool schemas for messages.create(tools=[...]).
+    """
+    return [
+        # News Tools
+        {
+            "name": "get_ticker_news",
+            "description": "Get recent news articles for a stock ticker with sentiment and risk scores.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol (e.g. NVDA, AMD)"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["auto", "ibkr", "polygon"],
+                        "description": "Data source (default: auto)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_news_sentiment_summary",
+            "description": "Get aggregated sentiment statistics (mean, bullish/bearish ratio) for a ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 7)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "search_news_by_keyword",
+            "description": "Search news articles by keyword in titles and descriptions.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "keyword": {
+                        "type": "string",
+                        "description": "Search keyword"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    },
+                    "ticker": {
+                        "type": "string",
+                        "description": "Optionally filter by ticker"
+                    }
+                },
+                "required": ["keyword"]
+            }
+        },
+        # Price Tools
+        {
+            "name": "get_ticker_prices",
+            "description": "Get OHLCV price bars for a stock ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "interval": {
+                        "type": "string",
+                        "enum": ["15min", "1h", "1d"],
+                        "description": "Bar interval (default: 15min)"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_price_change",
+            "description": "Calculate price change percentage and high/low range for a ticker over a period.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 7)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_sector_performance",
+            "description": "Calculate average performance of all tickers in a sector.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "sector": {
+                        "type": "string",
+                        "description": "Sector name (e.g. AI_CHIPS, FINTECH, EV, SPACE)"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 7)"
+                    }
+                },
+                "required": ["sector"]
+            }
+        },
+        # Options Tools
+        {
+            "name": "get_iv_analysis",
+            "description": "Full implied volatility analysis: IV rank, percentile, VRP, and trading signal.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_iv_history_data",
+            "description": "Get raw IV history data points (ATM IV, HV, VRP) for a ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "scan_mispricing",
+            "description": "Scan for mispriced options comparing theoretical vs market prices.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tickers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of ticker symbols to scan"
+                    },
+                    "mispricing_threshold_pct": {
+                        "type": "number",
+                        "description": "Minimum mispricing % to report (default: 10.0)"
+                    },
+                    "min_confidence": {
+                        "type": "string",
+                        "enum": ["HIGH", "MEDIUM", "LOW"],
+                        "description": "Minimum confidence level (default: MEDIUM)"
+                    }
+                },
+                "required": ["tickers"]
+            }
+        },
+        {
+            "name": "calculate_greeks",
+            "description": "Calculate Black-Scholes Greeks (delta, gamma, theta, vega, rho) for an option.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "S": {
+                        "type": "number",
+                        "description": "Spot price of the underlying"
+                    },
+                    "K": {
+                        "type": "number",
+                        "description": "Strike price"
+                    },
+                    "T": {
+                        "type": "number",
+                        "description": "Time to expiry in years (e.g. 0.25 for 3 months)"
+                    },
+                    "r": {
+                        "type": "number",
+                        "description": "Risk-free rate (e.g. 0.05 for 5%)"
+                    },
+                    "sigma": {
+                        "type": "number",
+                        "description": "Volatility (e.g. 0.30 for 30%)"
+                    },
+                    "option_type": {
+                        "type": "string",
+                        "enum": ["C", "P"],
+                        "description": "Option type: C for call, P for put (default: C)"
+                    }
+                },
+                "required": ["S", "K", "T", "r", "sigma"]
+            }
+        },
+        # Signal Tools
+        {
+            "name": "detect_anomalies",
+            "description": "Detect statistical anomalies in sentiment and news volume for a ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "detect_event_chains",
+            "description": "Detect event chain patterns (earnings -> guidance -> analyst reactions).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "synthesize_signal",
+            "description": "Synthesize a multi-factor trading signal combining sector momentum, events, and sentiment.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "description": "Strategy name for custom weights (from user_profile.yaml)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        # Analysis Tools
+        {
+            "name": "get_fundamentals_analysis",
+            "description": "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_sec_filings",
+            "description": "Get SEC filing metadata (10-K, 10-Q, 8-K) for a ticker.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "filing_types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by filing types (e.g. ['10-K', '10-Q'])"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_watchlist_overview",
+            "description": "Get a summary of all watchlist tickers' current status (price, sentiment, IV).",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        },
+        {
+            "name": "get_morning_brief",
+            "description": "Generate a personalized morning briefing with holdings, sector highlights, and notable news.",
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        },
+    ]
+
+
+def _serialize_result(result: Any) -> str:
+    """Serialize result to JSON string for LLM consumption."""
+    if hasattr(result, "model_dump"):
+        return json.dumps(result.model_dump(), default=str)
+    elif isinstance(result, list) and result and hasattr(result[0], "model_dump"):
+        return json.dumps([r.model_dump() for r in result], default=str)
+    elif isinstance(result, dict):
+        return json.dumps(result, default=str)
+    else:
+        return str(result)
+
+
+def execute_tool(
+    tool_name: str,
+    tool_input: Dict[str, Any],
+    dal: "DataAccessLayer"
+) -> str:
+    """
+    Execute a tool by name with given input.
+
+    Args:
+        tool_name: Name of the tool to execute
+        tool_input: Input parameters as dict
+        dal: DataAccessLayer instance
+
+    Returns:
+        JSON string result
+    """
+    from src.tools.news_tools import (
+        get_ticker_news,
+        get_news_sentiment_summary,
+        search_news_by_keyword,
+    )
+    from src.tools.price_tools import (
+        get_ticker_prices,
+        get_price_change,
+        get_sector_performance,
+    )
+    from src.tools.options_tools import (
+        get_iv_analysis,
+        get_iv_history_data,
+        scan_mispricing,
+        calculate_greeks,
+    )
+    from src.tools.signal_tools import (
+        detect_anomalies,
+        detect_event_chains,
+        synthesize_signal,
+    )
+    from src.tools.analysis_tools import (
+        get_fundamentals_analysis,
+        get_sec_filings,
+        get_watchlist_overview,
+        get_morning_brief,
+    )
+
+    # Tool dispatch map
+    tool_map = {
+        "get_ticker_news": lambda: get_ticker_news(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 30),
+            source=tool_input.get("source", "auto")
+        ),
+        "get_news_sentiment_summary": lambda: get_news_sentiment_summary(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 7)
+        ),
+        "search_news_by_keyword": lambda: search_news_by_keyword(
+            dal,
+            tool_input["keyword"],
+            days=tool_input.get("days", 30),
+            ticker=tool_input.get("ticker")
+        ),
+        "get_ticker_prices": lambda: get_ticker_prices(
+            dal,
+            tool_input["ticker"],
+            interval=tool_input.get("interval", "15min"),
+            days=tool_input.get("days", 30)
+        ),
+        "get_price_change": lambda: get_price_change(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 7)
+        ),
+        "get_sector_performance": lambda: get_sector_performance(
+            dal,
+            tool_input["sector"],
+            days=tool_input.get("days", 7)
+        ),
+        "get_iv_analysis": lambda: get_iv_analysis(
+            dal,
+            tool_input["ticker"]
+        ),
+        "get_iv_history_data": lambda: get_iv_history_data(
+            dal,
+            tool_input["ticker"]
+        ),
+        "scan_mispricing": lambda: scan_mispricing(
+            dal,
+            tool_input["tickers"],
+            mispricing_threshold_pct=tool_input.get("mispricing_threshold_pct", 10.0),
+            min_confidence=tool_input.get("min_confidence", "MEDIUM")
+        ),
+        "calculate_greeks": lambda: calculate_greeks(
+            S=tool_input["S"],
+            K=tool_input["K"],
+            T=tool_input["T"],
+            r=tool_input["r"],
+            sigma=tool_input["sigma"],
+            option_type=tool_input.get("option_type", "C")
+        ),
+        "detect_anomalies": lambda: detect_anomalies(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 30)
+        ),
+        "detect_event_chains": lambda: detect_event_chains(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 30)
+        ),
+        "synthesize_signal": lambda: synthesize_signal(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 30),
+            strategy=tool_input.get("strategy")
+        ),
+        "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
+            dal,
+            tool_input["ticker"]
+        ),
+        "get_sec_filings": lambda: get_sec_filings(
+            dal,
+            tool_input["ticker"],
+            filing_types=tool_input.get("filing_types")
+        ),
+        "get_watchlist_overview": lambda: get_watchlist_overview(dal),
+        "get_morning_brief": lambda: get_morning_brief(dal),
+    }
+
+    if tool_name not in tool_map:
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+
+    try:
+        result = tool_map[tool_name]()
+        return _serialize_result(result)
+    except Exception as e:
+        logger.error(f"Tool {tool_name} failed: {e}")
+        return json.dumps({"error": str(e)})

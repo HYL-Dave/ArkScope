@@ -19,6 +19,45 @@ from .schemas import PriceQueryResult
 logger = logging.getLogger(__name__)
 
 
+def _resample_to_daily_result(result_15m: PriceQueryResult) -> PriceQueryResult:
+    """Resample 15min bars to daily OHLCV."""
+    from collections import defaultdict
+    from .schemas import PriceBar
+
+    daily_data = defaultdict(lambda: {"bars": []})
+
+    for bar in result_15m.bars:
+        # Extract date portion
+        date = bar.datetime[:10]
+        daily_data[date]["bars"].append(bar)
+
+    daily_bars = []
+    for date in sorted(daily_data.keys()):
+        bars = daily_data[date]["bars"]
+        if not bars:
+            continue
+        daily_bars.append(PriceBar(
+            datetime=f"{date}T00:00:00+0000",
+            open=bars[0].open,
+            high=max(b.high for b in bars),
+            low=min(b.low for b in bars),
+            close=bars[-1].close,
+            volume=sum(b.volume for b in bars),
+        ))
+
+    date_range = None
+    if daily_bars:
+        date_range = f"{daily_bars[0].datetime[:10]} to {daily_bars[-1].datetime[:10]}"
+
+    return PriceQueryResult(
+        ticker=result_15m.ticker,
+        interval="1d",
+        count=len(daily_bars),
+        bars=daily_bars,
+        date_range=date_range,
+    )
+
+
 def get_ticker_prices(
     dal: DataAccessLayer,
     ticker: str,
@@ -59,7 +98,14 @@ def get_price_change(
             change_pct, period_high, period_low,
             high_low_range_pct, total_volume, bar_count
     """
+    # Try daily first, fall back to 15min resampled
     result = dal.get_prices(ticker=ticker, interval="1d", days=days)
+
+    if not result.bars:
+        # DatabaseBackend may not have daily data; use 15min and resample
+        result_15m = dal.get_prices(ticker=ticker, interval="15min", days=days)
+        if result_15m.bars:
+            result = _resample_to_daily_result(result_15m)
 
     if not result.bars:
         return {

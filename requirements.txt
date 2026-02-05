@@ -21,3 +21,10 @@ pyyaml
 fastapi>=0.110.0
 uvicorn[standard]
 httpx
+
+# Agent SDKs (optional - install for POST /query endpoint)
+openai-agents>=0.7.0
+anthropic>=0.40.0
+
+# Database Backend (optional - for Supabase)
+psycopg[binary]>=3.1

@@ -1,0 +1,94 @@
+"""
+Agent configuration with model selection.
+
+Models can be configured via:
+1. Default values in AgentConfig
+2. config/user_profile.yaml under llm_preferences
+3. Runtime override via model parameter in queries
+4. CLI flags (--model, --reasoning)
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal, Optional
+
+import yaml
+from pydantic import BaseModel
+
+# Valid reasoning effort levels for GPT-5.x / o-series
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+
+
+class AgentConfig(BaseModel):
+    """Agent model and behavior configuration."""
+
+    # OpenAI models
+    openai_model: str = "gpt-5.2"
+    openai_model_advanced: str = "gpt-5.2"
+
+    # Anthropic models
+    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    anthropic_model_advanced: str = "claude-opus-4-5-20251101"
+
+    # Reasoning (GPT-5.x / o-series)
+    reasoning_effort: ReasoningEffort = "xhigh"
+
+    # Limits
+    max_tool_calls: int = 20
+    max_tokens: int = 4096
+
+    # Behavior
+    temperature: float = 0.0  # Deterministic for tool calling
+
+
+def _load_user_profile() -> dict:
+    """Load user_profile.yaml if exists."""
+    paths = [
+        Path("config/user_profile.local.yaml"),
+        Path("config/user_profile.yaml"),
+    ]
+    for p in paths:
+        if p.exists():
+            with open(p) as f:
+                return yaml.safe_load(f) or {}
+    return {}
+
+
+@lru_cache(maxsize=1)
+def get_agent_config() -> AgentConfig:
+    """
+    Get agent configuration, merging defaults with user_profile.yaml.
+
+    user_profile.yaml can override under llm_preferences:
+        agent_model: "gpt-5.2"
+        agent_model_advanced: "gpt-5.2"
+        anthropic_model: "claude-sonnet-4-5-20250929"
+        anthropic_model_advanced: "claude-opus-4-5-20251101"
+        reasoning_effort: "xhigh"
+        max_tool_calls: 20
+        max_tokens: 4096
+    """
+    config = AgentConfig()
+
+    profile = _load_user_profile()
+    llm_prefs = profile.get("llm_preferences", {})
+
+    # Override from profile
+    if "agent_model" in llm_prefs:
+        config.openai_model = llm_prefs["agent_model"]
+    if "agent_model_advanced" in llm_prefs:
+        config.openai_model_advanced = llm_prefs["agent_model_advanced"]
+    if "anthropic_model" in llm_prefs:
+        config.anthropic_model = llm_prefs["anthropic_model"]
+    if "anthropic_model_advanced" in llm_prefs:
+        config.anthropic_model_advanced = llm_prefs["anthropic_model_advanced"]
+    if "reasoning_effort" in llm_prefs:
+        config.reasoning_effort = llm_prefs["reasoning_effort"]
+    if "max_tool_calls" in llm_prefs:
+        config.max_tool_calls = llm_prefs["max_tool_calls"]
+    if "max_tokens" in llm_prefs:
+        config.max_tokens = llm_prefs["max_tokens"]
+
+    return config

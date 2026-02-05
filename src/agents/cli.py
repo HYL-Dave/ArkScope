@@ -5,6 +5,15 @@ Run:
     python -m src.agents
     python -m src.agents --provider anthropic
     python -m src.agents --provider openai
+
+Slash commands (during chat):
+    /model          Show available models and switch
+    /model <name>   Switch to model by name or shorthand
+    /reasoning <n>  Set reasoning effort (OpenAI only)
+    /status         Show current session config
+    help            Show all commands
+    clear           Clear conversation history
+    quit            Exit
 """
 
 from __future__ import annotations
@@ -15,6 +24,7 @@ import logging
 import os
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -51,11 +61,110 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
-from .config import get_agent_config
+from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Model Catalog
+# ============================================================
+
+@dataclass
+class ModelEntry:
+    """A model available for selection."""
+    id: str
+    provider: str  # "anthropic" or "openai"
+    name: str
+    aliases: List[str] = field(default_factory=list)
+    description: str = ""
+
+
+# Canonical model list — update here when new models are available
+MODEL_CATALOG: List[ModelEntry] = [
+    ModelEntry(
+        id="claude-sonnet-4-5-20250929",
+        provider="anthropic",
+        name="Sonnet 4.5",
+        aliases=["sonnet", "sonnet4.5", "sonnet-4.5", "s45", "claude-sonnet"],
+        description="Fast, smart — best for agents & coding",
+    ),
+    ModelEntry(
+        id="claude-opus-4-5-20251101",
+        provider="anthropic",
+        name="Opus 4.5",
+        aliases=["opus", "opus4.5", "opus-4.5", "o45", "claude-opus"],
+        description="Most intelligent — deep analysis & reasoning",
+    ),
+    ModelEntry(
+        id="claude-haiku-4-5-20251001",
+        provider="anthropic",
+        name="Haiku 4.5",
+        aliases=["haiku", "haiku4.5", "haiku-4.5", "h45", "claude-haiku"],
+        description="Fastest & cheapest — quick tasks",
+    ),
+    ModelEntry(
+        id="gpt-5.2",
+        provider="openai",
+        name="GPT-5.2",
+        aliases=["gpt5", "gpt-5", "gpt5.2", "5.2"],
+        description="SOTA reasoning with configurable effort",
+    ),
+]
+
+
+def find_model(query: str) -> Optional[ModelEntry]:
+    """Find a model by ID, name, or alias (case-insensitive)."""
+    q = query.lower().strip()
+    for m in MODEL_CATALOG:
+        if q == m.id.lower() or q == m.name.lower():
+            return m
+        if q in [a.lower() for a in m.aliases]:
+            return m
+    # Partial match on id
+    for m in MODEL_CATALOG:
+        if q in m.id.lower():
+            return m
+    return None
+
+
+# ============================================================
+# Session State
+# ============================================================
+
+@dataclass
+class SessionState:
+    """Mutable state for the current chat session."""
+    provider: str  # "anthropic" or "openai"
+    model: Optional[str]  # None = use config default
+    reasoning_effort: Optional[str]
+    no_history: bool
+    verbose: bool
+    messages_history: Optional[List[dict]] = field(default=None)
+
+    def effective_model(self) -> str:
+        """Return the active model ID."""
+        config = get_agent_config()
+        if self.model:
+            return self.model
+        if self.provider == "openai":
+            return config.openai_model
+        return config.anthropic_model
+
+    def effective_reasoning(self) -> str:
+        config = get_agent_config()
+        return self.reasoning_effort or config.reasoning_effort
+
+    def status_line(self) -> str:
+        """One-line status string."""
+        parts = [f"Provider: {self.provider}", f"Model: {self.effective_model()}"]
+        if self.provider == "openai":
+            parts.append(f"Reasoning: {self.effective_reasoning()}")
+        history = "on" if not self.no_history else "off"
+        parts.append(f"History: {history}")
+        return " | ".join(parts)
 
 
 # ============================================================
@@ -68,13 +177,89 @@ def print_banner():
     console.print(
         Panel(
             "[bold cyan]MindfulRL[/bold cyan] [dim]Interactive Agent[/dim]\n"
-            "[dim]Type your question, or 'quit' to exit[/dim]",
+            "[dim]Type your question, or /help for commands[/dim]",
             border_style="cyan",
             box=box.ROUNDED,
             padding=(0, 2),
         )
     )
     console.print()
+
+
+def print_help():
+    """Print all available commands."""
+    console.print(
+        Panel(
+            "[bold]Slash Commands[/bold]\n"
+            "  [cyan]/model[/cyan]              Show models & switch interactively\n"
+            "  [cyan]/model <name>[/cyan]       Switch model (e.g. /model opus, /model gpt5)\n"
+            "  [cyan]/reasoning <n>[/cyan]      Set reasoning effort: none|minimal|low|medium|high|xhigh\n"
+            "  [cyan]/status[/cyan]             Show current session config\n"
+            "\n[bold]General[/bold]\n"
+            "  [cyan]clear[/cyan]               Clear conversation history\n"
+            "  [cyan]quit[/cyan]                Exit\n"
+            "\n[dim]Ask anything about your watchlist tickers, "
+            "news, prices, IV, signals, etc.[/dim]",
+            title="[bold]Help[/bold]",
+            title_align="left",
+            border_style="dim",
+            box=box.ROUNDED,
+            padding=(0, 2),
+        )
+    )
+    console.print()
+
+
+def print_model_picker(current_model: str) -> Optional[ModelEntry]:
+    """
+    Display the model catalog and prompt user to pick one.
+
+    Returns the selected ModelEntry, or None if cancelled.
+    """
+    table = Table(
+        box=box.SIMPLE_HEAVY,
+        show_header=True,
+        header_style="bold",
+        padding=(0, 1),
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Model", style="cyan")
+    table.add_column("Provider")
+    table.add_column("Description", style="dim")
+    table.add_column("", width=3)  # active marker
+
+    for i, m in enumerate(MODEL_CATALOG, 1):
+        marker = "[bold green]*[/bold green]" if m.id == current_model else ""
+        table.add_row(
+            str(i),
+            f"{m.name} [dim]({m.id})[/dim]",
+            m.provider,
+            m.description,
+            marker,
+        )
+
+    console.print()
+    console.print(table)
+    console.print("[dim]Enter number, name, or 'q' to cancel:[/dim]", end=" ")
+
+    try:
+        choice = console.input("").strip()
+    except (KeyboardInterrupt, EOFError):
+        return None
+
+    if not choice or choice.lower() in ("q", "cancel"):
+        return None
+
+    # Try numeric selection
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(MODEL_CATALOG):
+            return MODEL_CATALOG[idx]
+    except ValueError:
+        pass
+
+    # Try name/alias lookup
+    return find_model(choice)
 
 
 def print_tool_call(tool_name: str, tool_input: dict, index: int):
@@ -291,6 +476,76 @@ def run_openai_interactive(
 
 
 # ============================================================
+# Slash Command Handlers
+# ============================================================
+
+VALID_REASONING = ("none", "minimal", "low", "medium", "high", "xhigh")
+
+
+def handle_model_command(state: SessionState, arg: str) -> None:
+    """Handle /model [name] command."""
+    if arg:
+        # Direct switch: /model opus
+        entry = find_model(arg)
+        if entry is None:
+            console.print(f"[red]Unknown model: {arg}[/red]")
+            console.print(
+                "[dim]Try: "
+                + ", ".join(a for m in MODEL_CATALOG for a in m.aliases[:2])
+                + "[/dim]\n"
+            )
+            return
+    else:
+        # Interactive picker
+        entry = print_model_picker(state.effective_model())
+        if entry is None:
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+
+    old_provider = state.provider
+    state.provider = entry.provider
+    state.model = entry.id
+
+    # Clear history when switching providers (message formats differ)
+    if old_provider != entry.provider and state.messages_history is not None:
+        state.messages_history = []
+        console.print("[dim]Conversation cleared (provider changed).[/dim]")
+
+    console.print(
+        f"[green]Switched to[/green] [bold cyan]{entry.name}[/bold cyan] "
+        f"[dim]({entry.id})[/dim]\n"
+    )
+
+
+def handle_reasoning_command(state: SessionState, arg: str) -> None:
+    """Handle /reasoning <effort> command."""
+    if not arg:
+        console.print(
+            f"[dim]Current: {state.effective_reasoning()}  "
+            f"Options: {', '.join(VALID_REASONING)}[/dim]\n"
+        )
+        return
+
+    if arg.lower() not in VALID_REASONING:
+        console.print(
+            f"[red]Invalid reasoning effort: {arg}[/red]\n"
+            f"[dim]Valid: {', '.join(VALID_REASONING)}[/dim]\n"
+        )
+        return
+
+    state.reasoning_effort = arg.lower()
+    console.print(f"[green]Reasoning effort set to[/green] [bold]{arg.lower()}[/bold]\n")
+
+
+def handle_status_command(state: SessionState, backend_type: str, ticker_count: int) -> None:
+    """Handle /status command."""
+    console.print(
+        f"[dim]{state.status_line()} | Backend: {backend_type} | "
+        f"{ticker_count} tickers[/dim]\n"
+    )
+
+
+# ============================================================
 # Main Chat Loop
 # ============================================================
 
@@ -314,7 +569,7 @@ def main():
     )
     parser.add_argument(
         "--reasoning", "-r",
-        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        choices=list(VALID_REASONING),
         default=None,
         help="Reasoning effort for GPT-5.x (default: from config, typically xhigh)"
     )
@@ -338,26 +593,21 @@ def main():
     backend_type = dal.backend_type
     ticker_count = len(dal.get_available_tickers("prices"))
 
-    config = get_agent_config()
-    reasoning = args.reasoning or config.reasoning_effort
+    # Build mutable session state
+    state = SessionState(
+        provider=args.provider,
+        model=args.model,
+        reasoning_effort=args.reasoning,
+        no_history=args.no_history,
+        verbose=args.verbose,
+        messages_history=[] if not args.no_history else None,
+    )
 
     print_banner()
-
-    if args.provider == "openai":
-        model_display = args.model or config.openai_model
-        console.print(
-            f"[dim]Provider: openai | Model: {model_display} | "
-            f"Reasoning: {reasoning} | Backend: {backend_type} | "
-            f"{ticker_count} tickers[/dim]\n"
-        )
-    else:
-        model_display = args.model or config.anthropic_model
-        console.print(
-            f"[dim]Provider: anthropic | Model: {model_display} | "
-            f"Backend: {backend_type} | {ticker_count} tickers[/dim]\n"
-        )
-
-    messages_history: Optional[List[dict]] = [] if not args.no_history else None
+    console.print(
+        f"[dim]{state.status_line()} | Backend: {backend_type} | "
+        f"{ticker_count} tickers[/dim]\n"
+    )
 
     while True:
         try:
@@ -374,37 +624,50 @@ def main():
             break
 
         if question.lower() in ("clear", "reset"):
-            messages_history = [] if not args.no_history else None
+            state.messages_history = [] if not state.no_history else None
             console.print("[dim]Conversation cleared.[/dim]\n")
             continue
 
-        if question.lower() == "help":
-            console.print(
-                "[dim]Commands: quit, clear, help\n"
-                "Ask anything about your watchlist tickers, "
-                "news, prices, IV, signals, etc.[/dim]\n"
-            )
+        if question.lower() in ("help", "/help"):
+            print_help()
             continue
 
+        # --- Slash commands ---
+        if question.startswith("/"):
+            parts = question.split(None, 1)
+            cmd = parts[0].lower()
+            arg = parts[1].strip() if len(parts) > 1 else ""
+
+            if cmd in ("/model", "/m"):
+                handle_model_command(state, arg)
+            elif cmd in ("/reasoning", "/r"):
+                handle_reasoning_command(state, arg)
+            elif cmd in ("/status", "/s"):
+                handle_status_command(state, backend_type, ticker_count)
+            else:
+                console.print(f"[red]Unknown command: {cmd}[/red] [dim](try /help)[/dim]\n")
+            continue
+
+        # --- Run query ---
         start = time.time()
 
         try:
-            if args.provider == "anthropic":
+            if state.provider == "anthropic":
                 result = run_anthropic_interactive(
                     question=question,
                     dal=dal,
-                    model=args.model,
-                    messages_history=messages_history,
+                    model=state.model,
+                    messages_history=state.messages_history,
                 )
                 # Update history for next turn
-                if messages_history is not None and result.get("messages"):
-                    messages_history = result["messages"]
+                if state.messages_history is not None and result.get("messages"):
+                    state.messages_history = result["messages"]
             else:
                 result = run_openai_interactive(
                     question=question,
                     dal=dal,
-                    model=args.model,
-                    reasoning_effort=args.reasoning,
+                    model=state.model,
+                    reasoning_effort=state.reasoning_effort,
                 )
 
             elapsed = time.time() - start
@@ -417,7 +680,7 @@ def main():
             continue
         except Exception as e:
             console.print(f"\n[red]Error: {e}[/red]\n")
-            if args.verbose:
+            if state.verbose:
                 console.print_exception()
             continue
 
