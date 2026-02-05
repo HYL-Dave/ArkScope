@@ -38,6 +38,12 @@ Daily Data Update Script - 每日資料更新統一入口
 
     # 靜默模式 (適合 cron，不顯示進度)
     python daily_update.py --news --quiet
+
+    # 收集後自動同步到 Supabase DB
+    python daily_update.py --ibkr-prices --sync-db
+
+    # 更新所有新聞並同步到 DB
+    python daily_update.py --news --sync-db
 """
 
 import os
@@ -500,6 +506,67 @@ def update_iv_history(dry_run: bool = False) -> bool:
     return success
 
 
+def sync_to_db(
+    sync_news: bool = False,
+    sync_prices: bool = False,
+    sync_iv: bool = False,
+    dry_run: bool = False,
+) -> Dict[str, bool]:
+    """
+    Sync collected data to Supabase database.
+
+    Runs migrate_to_supabase.py with appropriate flags based on what was collected.
+
+    Args:
+        sync_news: Sync news data (polygon, finnhub, ibkr news)
+        sync_prices: Sync price data (ibkr prices)
+        sync_iv: Sync IV history data
+        dry_run: Show what would be done without executing
+
+    Returns:
+        Dict of {data_type: success} results.
+    """
+    logger.info("\n" + "=" * 50)
+    logger.info("SYNCING TO SUPABASE DATABASE")
+    logger.info("=" * 50)
+
+    # Locate the migration script
+    migrate_script = SCRIPT_DIR.parent / "migrate_to_supabase.py"
+    if not migrate_script.exists():
+        logger.error(f"Migration script not found: {migrate_script}")
+        return {}
+
+    results = {}
+
+    # Build command based on what needs to be synced
+    # We run each type separately for clearer logging and error handling
+    if sync_news:
+        logger.info("\nSyncing news to database...")
+        cmd = [sys.executable, str(migrate_script), "--news"]
+        if dry_run:
+            cmd.append("--dry-run")
+        success, _ = run_command(cmd, dry_run=False)  # Always run, script handles dry-run
+        results['db_sync_news'] = success
+
+    if sync_prices:
+        logger.info("\nSyncing prices to database...")
+        cmd = [sys.executable, str(migrate_script), "--prices"]
+        if dry_run:
+            cmd.append("--dry-run")
+        success, _ = run_command(cmd, dry_run=False)
+        results['db_sync_prices'] = success
+
+    if sync_iv:
+        logger.info("\nSyncing IV history to database...")
+        cmd = [sys.executable, str(migrate_script), "--iv"]
+        if dry_run:
+            cmd.append("--dry-run")
+        success, _ = run_command(cmd, dry_run=False)
+        results['db_sync_iv'] = success
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Daily Data Update - Unified scheduler for all data collection',
@@ -524,10 +591,13 @@ Examples:
     # Dry run (show what would be done)
     python daily_update.py --all --dry-run
 
-Cron example (daily at 6 AM):
-    0 6 * * * cd /path/to/project && python scripts/collection/daily_update.py --news
+    # Collect and sync to Supabase DB in one step
+    python daily_update.py --ibkr-prices --sync-db
+    python daily_update.py --news --sync-db
+    python daily_update.py --all --sync-db
 
 Note: IBKR sources require TWS/Gateway running.
+      --sync-db requires SUPABASE_DB_URL in config/.env
         """
     )
 
@@ -553,6 +623,8 @@ Note: IBKR sources require TWS/Gateway running.
                        help='Run news sources in parallel (faster but mixed output)')
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress subprocess output (for cron/background)')
+    parser.add_argument('--sync-db', action='store_true',
+                       help='Sync collected data to Supabase DB after collection')
 
     args = parser.parse_args()
 
@@ -560,6 +632,7 @@ Note: IBKR sources require TWS/Gateway running.
     args.ibkr_news = getattr(args, 'ibkr_news', False)
     args.ibkr_prices = getattr(args, 'ibkr_prices', False)
     args.iv_history = getattr(args, 'iv_history', False)
+    args.sync_db = getattr(args, 'sync_db', False)
 
     # Default to status if no action specified
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
@@ -634,6 +707,24 @@ Note: IBKR sources require TWS/Gateway running.
 
         if update_iv_history_flag:
             results['iv_history'] = update_iv_history(args.dry_run)
+
+    # Sync to database if requested
+    if args.sync_db:
+        # Determine what to sync based on what was collected
+        sync_news = update_polygon_flag or update_finnhub_flag or update_ibkr_news_flag
+        sync_prices = update_ibkr_prices_flag
+        sync_iv = update_iv_history_flag
+
+        if sync_news or sync_prices or sync_iv:
+            sync_results = sync_to_db(
+                sync_news=sync_news,
+                sync_prices=sync_prices,
+                sync_iv=sync_iv,
+                dry_run=args.dry_run,
+            )
+            results.update(sync_results)
+        else:
+            logger.info("No data types to sync (nothing was collected)")
 
     # Summary
     end_time = datetime.now()
