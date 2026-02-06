@@ -6,6 +6,8 @@ Features:
 - Scans IBKR news parquet files for unscored articles
 - Dynamic column naming based on model (e.g., sentiment_gpt_5_2, risk_o4_mini)
 - Updates parquet files in-place with scores
+- Supports model switching with --continue-from to pick up where another model left off
+- Supports --rescore to force re-scoring articles that already have scores
 - Supports multiple API keys with automatic rotation
 - Supports Flex mode fallback (--allow-flex)
 - Supports --dry-run to preview what would be scored
@@ -15,11 +17,16 @@ Column Naming Convention:
     sentiment_gpt_5_2, risk_gpt_5_2, sentiment_o4_mini, etc.
 
 Usage:
-    # Score sentiment with gpt-5.2
+    # Score sentiment with gpt-5.2 (only articles without gpt-5.2 scores)
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
 
-    # Score risk with o4-mini
-    python scripts/scoring/score_ibkr_news.py --mode risk --model o4-mini
+    # Switch model: continue from gpt-5.2, score remaining with gpt-6
+    # (only scores articles that gpt-5.2 hasn't scored yet)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 \\
+        --continue-from gpt-5.2 --reasoning-effort high
+
+    # Force re-score everything with gpt-6 (overwrite existing gpt-6 scores)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 --rescore
 
     # Preview what would be scored
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 --dry-run
@@ -328,24 +335,48 @@ def find_unscored_articles(
     model: str,
     reasoning_effort: str = "high",
     month: Optional[str] = None,
+    continue_from: Optional[str] = None,
+    continue_from_effort: Optional[str] = None,
+    rescore: bool = False,
 ) -> Dict[Path, pd.DataFrame]:
     """
-    Find parquet files with unscored articles.
+    Find parquet files with articles that need scoring.
+
+    Scoring modes:
+        Default: Score articles where the target column is empty.
+        --continue-from: Score articles where the *previous* model has a score
+            but the *new* model does not. This enables model switching without
+            re-scoring everything from scratch.
+        --rescore: Score all articles (overwrite existing scores in target column).
 
     Args:
-        data_dir: IBKR news data directory
+        data_dir: News data directory
         mode: "sentiment" or "risk"
-        model: Model name for dynamic column naming
+        model: Target model name for dynamic column naming
         reasoning_effort: Reasoning effort level for column naming
         month: Optional month filter (YYYY-MM)
+        continue_from: Previous model name to continue from (e.g. "gpt-5.2").
+            Only articles scored by this model but NOT yet scored by the new
+            model will be selected.
+        continue_from_effort: Reasoning effort of the previous model. If None,
+            auto-detects by scanning columns.
+        rescore: If True, re-score all articles (ignore existing scores).
 
     Returns:
-        Dict mapping parquet file paths to DataFrames with unscored articles
+        Dict mapping parquet file paths to DataFrames with articles to score
     """
     score_col = get_score_column(mode, model, reasoning_effort)
+
+    # Build the "previous model" column name for --continue-from
+    prev_col = None
+    if continue_from:
+        if continue_from_effort:
+            prev_col = get_score_column(mode, continue_from, continue_from_effort)
+        # else: auto-detect per file (see below)
+
     result = {}
 
-    for parquet_file in data_dir.rglob("*.parquet"):
+    for parquet_file in sorted(data_dir.rglob("*.parquet")):
         # Apply month filter if specified
         if month:
             file_month = parquet_file.stem  # e.g., "2025-01"
@@ -355,24 +386,77 @@ def find_unscored_articles(
         try:
             df = pd.read_parquet(parquet_file, engine='pyarrow')
 
-            # Check if score column exists
+            # Ensure target score column exists
             if score_col not in df.columns:
                 df[score_col] = None
 
-            # Filter unscored articles (only those with content)
-            unscored = df[
-                (df[score_col].isna()) &
-                (df['content_length'] > 0)  # Only score articles with content
-            ]
+            # Determine which rows to score
+            has_content = df['content_length'] > 0
+
+            if rescore:
+                # Re-score everything with content
+                to_score = has_content
+            elif continue_from:
+                # Auto-detect previous model column if effort not specified
+                effective_prev_col = prev_col
+                if effective_prev_col is None:
+                    effective_prev_col = _detect_prev_column(
+                        df, mode, continue_from
+                    )
+                if effective_prev_col is None or effective_prev_col not in df.columns:
+                    logging.warning(
+                        f"{parquet_file.name}: no column found for "
+                        f"previous model '{continue_from}' ({mode}), skipping"
+                    )
+                    continue
+
+                # Articles where previous model scored but new model hasn't
+                prev_scored = df[effective_prev_col].notna()
+                new_unscored = df[score_col].isna()
+                to_score = has_content & prev_scored & new_unscored
+            else:
+                # Default: only articles where target column is empty
+                to_score = has_content & df[score_col].isna()
+
+            unscored = df[to_score]
 
             if not unscored.empty:
-                result[parquet_file] = df  # Return full DataFrame for updating
-                logging.info(f"{parquet_file.name}: {len(unscored)}/{len(df)} unscored ({score_col})")
+                result[parquet_file] = df
+                extra = ""
+                if continue_from:
+                    extra = f" (continue from {continue_from})"
+                elif rescore:
+                    extra = " (rescore)"
+                logging.info(
+                    f"{parquet_file.name}: {len(unscored)}/{len(df)} "
+                    f"to score ({score_col}){extra}"
+                )
 
         except Exception as e:
             logging.warning(f"Error reading {parquet_file}: {e}")
 
     return result
+
+
+def _detect_prev_column(df: pd.DataFrame, mode: str, model: str) -> Optional[str]:
+    """Auto-detect the score column for a previous model.
+
+    Scans DataFrame columns for patterns like {mode}_{model_suffix}_{effort}
+    and returns the first match.
+    """
+    suffix = model_to_column_suffix(model)
+    prefix = f"{mode}_{suffix}"
+
+    # Exact match without effort (legacy columns like sentiment_haiku)
+    if prefix in df.columns:
+        return prefix
+
+    # Match with any effort suffix
+    for col in df.columns:
+        if col.startswith(prefix + "_"):
+            return col
+
+    return None
 
 
 def score_parquet_file(
@@ -385,9 +469,12 @@ def score_parquet_file(
     max_articles: Optional[int] = None,
     save_every: int = 20,
     text_column: str = "title",
+    continue_from: Optional[str] = None,
+    continue_from_effort: Optional[str] = None,
+    rescore: bool = False,
 ) -> Dict[str, int]:
     """
-    Score unscored articles in a parquet file.
+    Score articles in a parquet file.
 
     Args:
         parquet_file: Path to parquet file
@@ -399,6 +486,9 @@ def score_parquet_file(
         max_articles: Max articles to score
         save_every: Save progress every N articles
         text_column: Column to use for scoring text
+        continue_from: Previous model name (for continue mode)
+        continue_from_effort: Reasoning effort of previous model
+        rescore: If True, re-score all articles
 
     Returns:
         Stats dict with scored/failed counts
@@ -406,9 +496,25 @@ def score_parquet_file(
     score_col = get_score_column(mode, model, reasoning_effort)
     stats = {"scored": 0, "failed": 0, "skipped": 0}
 
-    # Find unscored rows
-    unscored_mask = df[score_col].isna() & (df['content_length'] > 0)
-    unscored_idx = df[unscored_mask].index.tolist()
+    # Determine which rows need scoring
+    has_content = df['content_length'] > 0
+
+    if rescore:
+        target_mask = has_content
+    elif continue_from:
+        # Find previous model column
+        if continue_from_effort:
+            prev_col = get_score_column(mode, continue_from, continue_from_effort)
+        else:
+            prev_col = _detect_prev_column(df, mode, continue_from)
+        if prev_col and prev_col in df.columns:
+            target_mask = has_content & df[prev_col].notna() & df[score_col].isna()
+        else:
+            target_mask = has_content & df[score_col].isna()
+    else:
+        target_mask = has_content & df[score_col].isna()
+
+    unscored_idx = df[target_mask].index.tolist()
 
     if max_articles:
         unscored_idx = unscored_idx[:max_articles]
@@ -539,6 +645,24 @@ def main():
         "--allow-flex", action="store_true",
         help="Switch to Flex mode after token limit"
     )
+    # --- Model switching ---
+    parser.add_argument(
+        "--continue-from", type=str, default=None, metavar="MODEL",
+        help="Continue scoring from where another model left off. "
+             "Only articles already scored by MODEL but not yet scored by "
+             "the target --model will be selected. "
+             "E.g.: --model gpt-6 --continue-from gpt-5.2"
+    )
+    parser.add_argument(
+        "--continue-from-effort", type=str, default=None,
+        choices=["none", "minimal", "low", "medium", "high", "xhigh"],
+        help="Reasoning effort of the --continue-from model (auto-detected if omitted)"
+    )
+    parser.add_argument(
+        "--rescore", action="store_true",
+        help="Force re-score all articles, overwriting existing scores for this model"
+    )
+
     parser.add_argument(
         "--dry-run", action="store_true",
         help="Preview what would be scored without calling API"
@@ -593,31 +717,49 @@ def main():
     if not data_dir.exists():
         parser.error(f"Data directory not found: {data_dir}")
 
+    # Validate: --continue-from and --rescore are mutually exclusive
+    if args.continue_from and args.rescore:
+        parser.error("--continue-from and --rescore are mutually exclusive")
+
     # Get dynamic column name based on model and reasoning effort
     score_col = get_score_column(args.mode, args.model, args.reasoning_effort)
     logging.info(f"Target column: {score_col}")
-    logging.info(f"Scanning {data_dir} for unscored {args.mode} articles...")
+    if args.continue_from:
+        logging.info(f"Mode: continue from {args.continue_from}")
+    elif args.rescore:
+        logging.info(f"Mode: rescore (overwrite existing)")
+    logging.info(f"Scanning {data_dir} for {args.mode} articles to score...")
     files_to_score = find_unscored_articles(
-        data_dir, args.mode, args.model, args.reasoning_effort, args.month
+        data_dir, args.mode, args.model, args.reasoning_effort, args.month,
+        continue_from=args.continue_from,
+        continue_from_effort=args.continue_from_effort,
+        rescore=args.rescore,
     )
 
     if not files_to_score:
         logging.info("No unscored articles found!")
         return
 
-    # Count total unscored
-    total_unscored = sum(
-        len(df[df[score_col].isna() & (df['content_length'] > 0)])
-        for df in files_to_score.values()
-    )
+    # Count articles to score (depends on mode)
+    def _count_to_score(df):
+        has_content = df['content_length'] > 0
+        if args.rescore:
+            return int(has_content.sum())
+        else:
+            return int((has_content & df[score_col].isna()).sum())
 
-    logging.info(f"\nFound {total_unscored} unscored articles in {len(files_to_score)} files")
+    total_to_score = sum(_count_to_score(df) for df in files_to_score.values())
+
+    mode_label = "rescore" if args.rescore else (
+        f"continue from {args.continue_from}" if args.continue_from else "default"
+    )
+    logging.info(f"\nFound {total_to_score} articles to score in {len(files_to_score)} files ({mode_label})")
 
     if args.dry_run:
         logging.info("\n[DRY RUN] Would score:")
         for pf, df in files_to_score.items():
-            unscored = len(df[df[score_col].isna() & (df['content_length'] > 0)])
-            logging.info(f"  {pf.name}: {unscored} articles → {score_col}")
+            count = _count_to_score(df)
+            logging.info(f"  {pf.name}: {count} articles → {score_col}")
         return
 
     # Score articles
@@ -645,6 +787,9 @@ def main():
             max_articles=int(max_for_file) if max_for_file else None,
             save_every=args.save_every,
             text_column=args.text_column,
+            continue_from=args.continue_from,
+            continue_from_effort=args.continue_from_effort,
+            rescore=args.rescore,
         )
 
         total_scored += stats["scored"]

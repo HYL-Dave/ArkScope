@@ -541,12 +541,20 @@ def sync_to_db(
     # Build command based on what needs to be synced
     # We run each type separately for clearer logging and error handling
     if sync_news:
-        logger.info("\nSyncing news to database...")
+        logger.info("\nSyncing news articles to database...")
         cmd = [sys.executable, str(migrate_script), "--news"]
         if dry_run:
             cmd.append("--dry-run")
         success, _ = run_command(cmd, dry_run=False)  # Always run, script handles dry-run
         results['db_sync_news'] = success
+
+        # Also sync multi-model scores (incremental upsert)
+        logger.info("\nSyncing news scores to database...")
+        cmd = [sys.executable, str(migrate_script), "--scores"]
+        if dry_run:
+            cmd.append("--dry-run")
+        success, _ = run_command(cmd, dry_run=False)
+        results['db_sync_scores'] = success
 
     if sync_prices:
         logger.info("\nSyncing prices to database...")

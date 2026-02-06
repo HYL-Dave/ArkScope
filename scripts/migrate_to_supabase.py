@@ -4,11 +4,16 @@ migrate_to_supabase.py — Import historical data files into Supabase PostgreSQL
 
 Usage:
     python scripts/migrate_to_supabase.py              # Import all data types
-    python scripts/migrate_to_supabase.py --news       # News only
+    python scripts/migrate_to_supabase.py --news       # News articles only
+    python scripts/migrate_to_supabase.py --scores     # News scores only (multi-model)
     python scripts/migrate_to_supabase.py --prices     # Prices only
     python scripts/migrate_to_supabase.py --iv         # IV history only
     python scripts/migrate_to_supabase.py --fundamentals  # Fundamentals only
     python scripts/migrate_to_supabase.py --dry-run    # Count rows without importing
+
+The --scores flag imports multi-model scores into the news_scores table.
+It auto-detects score columns (sentiment_haiku, risk_gpt_5_2_xhigh, etc.)
+from parquet/CSV files and upserts them incrementally.
 
 Reads SUPABASE_DB_URL from config/.env.
 """
@@ -17,6 +22,7 @@ import argparse
 import hashlib
 import json
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -206,6 +212,201 @@ def _insert_news_batch(conn, rows: list) -> int:
             logger.error(f"    Batch error at {i}: {e}")
     cur.close()
     return inserted
+
+
+# =============================================================================
+# News Scores Import (multi-model)
+# =============================================================================
+
+# Pattern to detect score columns: sentiment_haiku, risk_gpt_5_2_xhigh, etc.
+SCORE_COLUMN_PATTERN = re.compile(
+    r"^(sentiment|risk)_(.+?)(?:_(none|minimal|low|medium|high|xhigh))?$"
+)
+
+# Known non-model suffixes to exclude from detection (e.g. 'score' from 'sentiment_score')
+_NON_MODEL_SUFFIXES = {"score"}
+
+
+def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:
+    """Auto-detect score columns from a DataFrame.
+
+    Returns list of (score_type, model, reasoning_effort, column_name).
+    Example: [('sentiment', 'gpt_5_2', 'xhigh', 'sentiment_gpt_5_2_xhigh'),
+              ('risk', 'haiku', None, 'risk_haiku')]
+    """
+    results = []
+    for col in df.columns:
+        m = SCORE_COLUMN_PATTERN.match(col)
+        if m:
+            model = m.group(2)
+            if model in _NON_MODEL_SUFFIXES:
+                continue
+            score_type = m.group(1)
+            effort = m.group(3)  # None for legacy columns like sentiment_haiku
+            results.append((score_type, model, effort, col))
+    return results
+
+
+def load_article_hash_map(conn) -> dict[str, int]:
+    """Load article_hash → news.id mapping from the database."""
+    cur = conn.cursor()
+    cur.execute("SELECT article_hash, id FROM news")
+    result = {row[0]: row[1] for row in cur.fetchall()}
+    cur.close()
+    logger.info(f"  Loaded {len(result)} article hashes from DB")
+    return result
+
+
+def _upsert_scores_batch(conn, rows: list) -> int:
+    """Batch upsert score rows into news_scores.
+
+    Each row is (news_id, score_type, model, reasoning_effort, score).
+    Uses ON CONFLICT DO UPDATE to allow score corrections.
+    """
+    sql = """
+        INSERT INTO news_scores (news_id, score_type, model, reasoning_effort, score)
+        VALUES %s
+        ON CONFLICT (news_id, score_type, model, reasoning_effort)
+        DO UPDATE SET score = EXCLUDED.score, scored_at = NOW()
+    """
+    inserted = 0
+    cur = conn.cursor()
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i:i + BATCH_SIZE]
+        try:
+            psycopg2.extras.execute_values(cur, sql, batch, page_size=BATCH_SIZE)
+            conn.commit()
+            inserted += len(batch)
+            if (i // BATCH_SIZE) % 20 == 0 and i > 0:
+                logger.info(f"    Progress: {inserted}/{len(rows)} score rows")
+        except psycopg2.Error as e:
+            conn.rollback()
+            logger.error(f"    Score batch error at {i}: {e}")
+    cur.close()
+    return inserted
+
+
+def import_news_scores(conn: psycopg2.extensions.connection, dry_run: bool = False):
+    """Import multi-model news scores into news_scores table.
+
+    Scans scored files for all {sentiment|risk}_{model}_{effort} columns,
+    resolves article_hash to news_id, and upserts scores.
+    """
+    news_dir = PROJECT_ROOT / "data" / "news"
+    total_imported = 0
+
+    # Load hash → id mapping once
+    if not dry_run:
+        hash_to_id = load_article_hash_map(conn)
+    else:
+        hash_to_id = {}
+
+    # --- IBKR scored file ---
+    ibkr_path = news_dir / "ibkr_scored_final.parquet"
+    if ibkr_path.exists():
+        logger.info(f"Scanning IBKR scores from {ibkr_path}")
+        df = pd.read_parquet(ibkr_path)
+        score_cols = detect_score_columns(df)
+        logger.info(f"  Found {len(score_cols)} score columns: {[c[3] for c in score_cols]}")
+
+        if dry_run:
+            for st, model, effort, col in score_cols:
+                non_null = df[col].notna().sum()
+                logger.info(f"  [DRY RUN] {col}: {non_null} non-null scores")
+        else:
+            count = _import_scores_from_df(
+                conn, df, score_cols, hash_to_id,
+                ticker_col="ticker", title_col="title", date_col="published_at",
+            )
+            total_imported += count
+            logger.info(f"  Imported {count} IBKR score rows")
+
+    # --- Polygon scored file ---
+    polygon_path = news_dir / "polygon_scored_final.csv"
+    if polygon_path.exists():
+        logger.info(f"Scanning Polygon scores from {polygon_path}")
+        df = pd.read_csv(polygon_path)
+        score_cols = detect_score_columns(df)
+        logger.info(f"  Found {len(score_cols)} score columns: {[c[3] for c in score_cols]}")
+
+        if dry_run:
+            for st, model, effort, col in score_cols:
+                non_null = df[col].notna().sum()
+                logger.info(f"  [DRY RUN] {col}: {non_null} non-null scores")
+        else:
+            count = _import_scores_from_df(
+                conn, df, score_cols, hash_to_id,
+                ticker_col="Stock_symbol", title_col="Article_title",
+                date_col="published_at",
+            )
+            total_imported += count
+            logger.info(f"  Imported {count} Polygon score rows")
+
+    # --- Raw scored parquets (e.g. data/news/raw/polygon/*.parquet) ---
+    raw_polygon_dir = news_dir / "raw" / "polygon"
+    if raw_polygon_dir.exists():
+        parquet_files = sorted(raw_polygon_dir.glob("*.parquet"))
+        if parquet_files:
+            logger.info(f"Scanning {len(parquet_files)} raw Polygon parquets")
+            for pf in parquet_files:
+                df = pd.read_parquet(pf)
+                score_cols = detect_score_columns(df)
+                if not score_cols:
+                    continue
+                logger.info(f"  {pf.name}: {len(score_cols)} score cols")
+
+                if dry_run:
+                    for st, model, effort, col in score_cols:
+                        non_null = df[col].notna().sum()
+                        logger.info(f"    [DRY RUN] {col}: {non_null}")
+                else:
+                    # Determine column names (raw files may have different names)
+                    ticker_col = "Stock_symbol" if "Stock_symbol" in df.columns else "ticker"
+                    title_col = "Article_title" if "Article_title" in df.columns else "title"
+                    count = _import_scores_from_df(
+                        conn, df, score_cols, hash_to_id,
+                        ticker_col=ticker_col, title_col=title_col,
+                        date_col="published_at",
+                    )
+                    total_imported += count
+
+    logger.info(f"News scores import complete: {total_imported} total score rows")
+    return total_imported
+
+
+def _import_scores_from_df(
+    conn,
+    df: pd.DataFrame,
+    score_cols: list[tuple],
+    hash_to_id: dict[str, int],
+    ticker_col: str = "ticker",
+    title_col: str = "title",
+    date_col: str = "published_at",
+) -> int:
+    """Extract scores from a DataFrame and upsert into news_scores."""
+    total = 0
+    for score_type, model, effort, col_name in score_cols:
+        rows = []
+        for _, r in df.iterrows():
+            score = safe_int(r.get(col_name))
+            if score is None:
+                continue
+            ticker = str(r.get(ticker_col, ""))
+            title = str(r.get(title_col, ""))
+            date_str = pd.to_datetime(r.get(date_col), errors="coerce")
+            if pd.isna(date_str):
+                continue
+            h = article_hash(ticker, title, date_str.strftime("%Y-%m-%d"))
+            news_id = hash_to_id.get(h)
+            if news_id is None:
+                continue
+            rows.append((news_id, score_type, model, effort, score))
+
+        if rows:
+            count = _upsert_scores_batch(conn, rows)
+            total += count
+            logger.info(f"    {col_name}: upserted {count}/{len(rows)} rows")
+    return total
 
 
 # =============================================================================
@@ -414,7 +615,8 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
 
 def main():
     parser = argparse.ArgumentParser(description="Import data into Supabase")
-    parser.add_argument("--news", action="store_true", help="Import news only")
+    parser.add_argument("--news", action="store_true", help="Import news articles only")
+    parser.add_argument("--scores", action="store_true", help="Import news scores to news_scores table (multi-model)")
     parser.add_argument("--prices", action="store_true", help="Import prices only")
     parser.add_argument("--iv", action="store_true", help="Import IV history only")
     parser.add_argument("--fundamentals", action="store_true", help="Import fundamentals only")
@@ -422,7 +624,7 @@ def main():
     args = parser.parse_args()
 
     # If no specific flag, import all
-    import_all = not (args.news or args.prices or args.iv or args.fundamentals)
+    import_all = not (args.news or args.scores or args.prices or args.iv or args.fundamentals)
 
     try:
         db_url = load_db_url()
@@ -440,6 +642,9 @@ def main():
     try:
         if import_all or args.news:
             totals["news"] = import_news(conn, dry_run=args.dry_run)
+
+        if import_all or args.scores:
+            totals["news_scores"] = import_news_scores(conn, dry_run=args.dry_run)
 
         if import_all or args.iv:
             totals["iv_history"] = import_iv_history(conn, dry_run=args.dry_run)

@@ -258,10 +258,16 @@ class DataAccessLayer:
         days: int = 30,
         source: str = "auto",
         scored_only: bool = True,
+        model: Optional[str] = None,
     ) -> NewsQueryResult:
-        """Query news and return structured result."""
+        """Query news and return structured result.
+
+        Args:
+            model: Specific scoring model (e.g. 'gpt_5_2'). None = latest/best.
+        """
         df = self._backend.query_news(
-            ticker=ticker, days=days, source=source, scored_only=scored_only,
+            ticker=ticker, days=days, source=source,
+            scored_only=scored_only, model=model,
         )
 
         articles = []

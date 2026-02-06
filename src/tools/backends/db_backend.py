@@ -83,40 +83,97 @@ class DatabaseBackend:
         days: int = 30,
         source: str = "auto",
         scored_only: bool = True,
+        model: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Query news articles from the database."""
+        """Query news articles with scores from news_scores table.
+
+        Args:
+            ticker: Filter by ticker symbol.
+            days: Number of days to look back.
+            source: Data source filter ('ibkr', 'polygon', 'auto').
+            scored_only: Only return articles with at least one score.
+            model: Specific model to get scores from (e.g. 'gpt_5_2').
+                   If None, uses the latest score per article via
+                   the news_latest_scores view.
+        """
         cutoff = (date.today() - timedelta(days=days)).isoformat()
 
-        conditions = ["published_at >= %s"]
-        params: list = [cutoff]
+        # Build score JOIN — either specific model or latest
+        if model:
+            score_join = """
+                LEFT JOIN news_scores s_sent
+                    ON s_sent.news_id = n.id
+                    AND s_sent.score_type = 'sentiment'
+                    AND s_sent.model = %s
+                LEFT JOIN news_scores s_risk
+                    ON s_risk.news_id = n.id
+                    AND s_risk.score_type = 'risk'
+                    AND s_risk.model = %s
+            """
+            params: list = [model, model, cutoff]
+        else:
+            score_join = """
+                LEFT JOIN news_latest_scores s_sent
+                    ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
+                LEFT JOIN news_latest_scores s_risk
+                    ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
+            """
+            params = [cutoff]
+
+        conditions = ["n.published_at >= %s"]
 
         if ticker:
-            conditions.append("ticker = %s")
+            conditions.append("n.ticker = %s")
             params.append(ticker.upper())
 
         if source != "auto":
-            conditions.append("source = %s")
+            conditions.append("n.source = %s")
             params.append(source)
 
         if scored_only:
-            conditions.append("(sentiment_score IS NOT NULL OR risk_score IS NOT NULL)")
+            conditions.append("(s_sent.score IS NOT NULL OR s_risk.score IS NOT NULL)")
 
         where = " AND ".join(conditions)
         sql = f"""
             SELECT
-                TO_CHAR(published_at, 'YYYY-MM-DD') AS date,
-                ticker, title, source, url, publisher,
-                sentiment_score, risk_score, description
-            FROM news
+                TO_CHAR(n.published_at, 'YYYY-MM-DD') AS date,
+                n.ticker, n.title, n.source, n.url, n.publisher,
+                s_sent.score AS sentiment_score,
+                s_risk.score AS risk_score,
+                COALESCE(s_sent.model, s_risk.model) AS scored_model,
+                n.description
+            FROM news n
+            {score_join}
             WHERE {where}
-            ORDER BY published_at DESC
+            ORDER BY n.published_at DESC
         """
 
+        empty_cols = [
+            "date", "ticker", "title", "source", "url",
+            "publisher", "sentiment_score", "risk_score", "description",
+        ]
         df = self._query_df(sql, tuple(params))
         if df.empty:
+            return pd.DataFrame(columns=empty_cols)
+        return df
+
+    def query_news_scores(self, news_id: int) -> pd.DataFrame:
+        """Get all scores for a specific news article (multi-model comparison).
+
+        Returns:
+            DataFrame with columns: score_type, model, reasoning_effort, score, scored_at
+        """
+        sql = """
+            SELECT score_type, model, reasoning_effort, score,
+                   TO_CHAR(scored_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS scored_at
+            FROM news_scores
+            WHERE news_id = %s
+            ORDER BY scored_at DESC
+        """
+        df = self._query_df(sql, (news_id,))
+        if df.empty:
             return pd.DataFrame(columns=[
-                "date", "ticker", "title", "source", "url",
-                "publisher", "sentiment_score", "risk_score", "description",
+                "score_type", "model", "reasoning_effort", "score", "scored_at",
             ])
         return df
 

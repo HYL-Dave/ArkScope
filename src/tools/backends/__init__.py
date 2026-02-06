@@ -27,6 +27,7 @@ class DataBackend(Protocol):
         days: int = 30,
         source: str = "auto",
         scored_only: bool = True,
+        model: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Query news articles.
@@ -36,6 +37,8 @@ class DataBackend(Protocol):
             days: Lookback period in days
             source: Data source (ibkr, polygon, auto)
             scored_only: Only return articles with sentiment/risk scores
+            model: Specific scoring model to use (e.g. 'gpt_5_2', 'haiku').
+                   If None, uses the latest/best available score.
 
         Returns:
             DataFrame with columns:

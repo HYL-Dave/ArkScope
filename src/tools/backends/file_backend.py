@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -25,6 +26,66 @@ from typing import List, Optional
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Score column detection utilities
+# ---------------------------------------------------------------------------
+
+# Pattern: sentiment_haiku, risk_gpt_5_2_xhigh, etc.
+_SCORE_COL_PATTERN = re.compile(
+    r"^(sentiment|risk)_(.+?)(?:_(none|minimal|low|medium|high|xhigh))?$"
+)
+_NON_MODEL_SUFFIXES = {"score"}
+
+# Model priority: newest/best first. Used when no specific model is requested.
+MODEL_PRIORITY = ["gpt_6", "gpt_5_2", "gpt_5", "o4_mini", "haiku"]
+
+
+def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:
+    """Auto-detect score columns from a DataFrame.
+
+    Returns list of (score_type, model, reasoning_effort, column_name).
+    """
+    results = []
+    for col in df.columns:
+        m = _SCORE_COL_PATTERN.match(col)
+        if m:
+            model = m.group(2)
+            if model in _NON_MODEL_SUFFIXES:
+                continue
+            results.append((m.group(1), model, m.group(3), col))
+    return results
+
+
+def resolve_score_columns(
+    score_cols: list[tuple[str, str, str | None, str]],
+    preferred_model: str | None = None,
+) -> tuple[str | None, str | None]:
+    """Pick the best sentiment/risk column pair based on model preference or priority.
+
+    Args:
+        score_cols: Output of detect_score_columns().
+        preferred_model: Model column suffix to prefer (e.g. 'gpt_5_2').
+
+    Returns:
+        (sentiment_column_name, risk_column_name) — either may be None.
+    """
+    sentiment_map = {c[1]: c[3] for c in score_cols if c[0] == "sentiment"}
+    risk_map = {c[1]: c[3] for c in score_cols if c[0] == "risk"}
+
+    if preferred_model:
+        suffix = preferred_model.replace("-", "_").replace(".", "_")
+        return sentiment_map.get(suffix), risk_map.get(suffix)
+
+    # Auto-select by priority
+    for m in MODEL_PRIORITY:
+        if m in sentiment_map:
+            return sentiment_map[m], risk_map.get(m)
+
+    # Fallback: first available
+    s = next(iter(sentiment_map.values()), None) if sentiment_map else None
+    r = next(iter(risk_map.values()), None) if risk_map else None
+    return s, r
 
 
 class FileBackend:
@@ -59,65 +120,88 @@ class FileBackend:
         self._iv_dir = self._base / "data" / "options" / "iv_history"
         self._fundamentals_dir = self._base / "data_lake" / "raw" / "ibkr_fundamentals"
 
-        # Caches for scored news (loaded lazily, large files)
-        self._ibkr_news: Optional[pd.DataFrame] = None
-        self._polygon_news: Optional[pd.DataFrame] = None
+        # Caches for raw data (loaded lazily, large files)
+        self._ibkr_raw: Optional[pd.DataFrame] = None
+        self._polygon_raw: Optional[pd.DataFrame] = None
 
     # --------------------------------------------------------
     # News
     # --------------------------------------------------------
 
-    def _load_ibkr_news(self) -> pd.DataFrame:
-        """Load and normalize IBKR scored news (lazy, cached)."""
-        if self._ibkr_news is not None:
-            return self._ibkr_news
+    def _load_ibkr_news(self, model: Optional[str] = None) -> pd.DataFrame:
+        """Load and normalize IBKR scored news with flexible model selection.
 
-        path = self._news_dir / "ibkr_scored_final.parquet"
-        if not path.exists():
-            self._ibkr_news = pd.DataFrame()
-            return self._ibkr_news
+        Dynamically detects all score columns and picks the best pair
+        based on model preference or MODEL_PRIORITY.
+        """
+        if self._ibkr_raw is None:
+            path = self._news_dir / "ibkr_scored_final.parquet"
+            if not path.exists():
+                self._ibkr_raw = pd.DataFrame()
+            else:
+                self._ibkr_raw = pd.read_parquet(path)
+                logger.debug(f"Loaded IBKR news raw: {len(self._ibkr_raw)} rows")
 
-        df = pd.read_parquet(path, columns=[
-            "ticker", "title", "published_at", "source_api",
-            "url", "publisher", "sentiment_haiku", "risk_haiku", "description",
-        ])
-        # Normalize column names to our standard schema
-        df = df.rename(columns={
-            "source_api": "source",
-            "sentiment_haiku": "sentiment_score",
-            "risk_haiku": "risk_score",
-        })
+        if self._ibkr_raw.empty:
+            return pd.DataFrame()
+
+        df = self._ibkr_raw.copy()
+
+        # Detect and resolve score columns
+        score_cols = detect_score_columns(df)
+        sent_col, risk_col = resolve_score_columns(score_cols, model)
+
+        df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
+        df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
+
+        # Normalize other columns
+        if "source_api" in df.columns:
+            df = df.rename(columns={"source_api": "source"})
         df["source"] = "ibkr"
-        df["date"] = pd.to_datetime(df["published_at"], errors="coerce").dt.strftime("%Y-%m-%d")
-        self._ibkr_news = df
-        logger.debug(f"Loaded IBKR news: {len(df)} rows")
-        return self._ibkr_news
+        df["date"] = pd.to_datetime(df.get("published_at"), errors="coerce").dt.strftime("%Y-%m-%d")
 
-    def _load_polygon_news(self) -> pd.DataFrame:
-        """Load and normalize Polygon scored news (lazy, cached)."""
-        if self._polygon_news is not None:
-            return self._polygon_news
+        # Ensure standard column names exist
+        for col in ["ticker", "title", "url", "publisher", "description"]:
+            if col not in df.columns:
+                df[col] = None
 
-        path = self._news_dir / "polygon_scored_final.csv"
-        if not path.exists():
-            self._polygon_news = pd.DataFrame()
-            return self._polygon_news
+        return df
 
-        df = pd.read_csv(path, usecols=[
-            "Stock_symbol", "Article_title", "published_at",
-            "url", "publisher", "sentiment_haiku", "risk_haiku", "description",
-        ])
-        df = df.rename(columns={
-            "Stock_symbol": "ticker",
-            "Article_title": "title",
-            "sentiment_haiku": "sentiment_score",
-            "risk_haiku": "risk_score",
-        })
+    def _load_polygon_news(self, model: Optional[str] = None) -> pd.DataFrame:
+        """Load and normalize Polygon scored news with flexible model selection."""
+        if self._polygon_raw is None:
+            path = self._news_dir / "polygon_scored_final.csv"
+            if not path.exists():
+                self._polygon_raw = pd.DataFrame()
+            else:
+                self._polygon_raw = pd.read_csv(path)
+                logger.debug(f"Loaded Polygon news raw: {len(self._polygon_raw)} rows")
+
+        if self._polygon_raw.empty:
+            return pd.DataFrame()
+
+        df = self._polygon_raw.copy()
+
+        # Detect and resolve score columns
+        score_cols = detect_score_columns(df)
+        sent_col, risk_col = resolve_score_columns(score_cols, model)
+
+        df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
+        df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
+
+        # Normalize column names
+        if "Stock_symbol" in df.columns:
+            df = df.rename(columns={"Stock_symbol": "ticker"})
+        if "Article_title" in df.columns:
+            df = df.rename(columns={"Article_title": "title"})
         df["source"] = "polygon"
-        df["date"] = pd.to_datetime(df["published_at"], errors="coerce").dt.strftime("%Y-%m-%d")
-        self._polygon_news = df
-        logger.debug(f"Loaded Polygon news: {len(df)} rows")
-        return self._polygon_news
+        df["date"] = pd.to_datetime(df.get("published_at"), errors="coerce").dt.strftime("%Y-%m-%d")
+
+        for col in ["url", "publisher", "description"]:
+            if col not in df.columns:
+                df[col] = None
+
+        return df
 
     def query_news(
         self,
@@ -125,18 +209,28 @@ class FileBackend:
         days: int = 30,
         source: str = "auto",
         scored_only: bool = True,
+        model: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Query news articles from local scored files."""
+        """Query news articles from local scored files.
+
+        Args:
+            ticker: Filter by ticker symbol.
+            days: Number of days to look back.
+            source: Data source filter ('ibkr', 'polygon', 'auto').
+            scored_only: Only return articles with at least one score.
+            model: Specific model to get scores from (e.g. 'gpt-5.2' or 'gpt_5_2').
+                   If None, picks the best available by MODEL_PRIORITY.
+        """
         frames = []
         cutoff = (date.today() - timedelta(days=days)).isoformat()
 
         if source in ("ibkr", "auto"):
-            df = self._load_ibkr_news()
+            df = self._load_ibkr_news(model=model)
             if not df.empty:
                 frames.append(df)
 
         if source in ("polygon", "auto"):
-            df = self._load_polygon_news()
+            df = self._load_polygon_news(model=model)
             if not df.empty:
                 frames.append(df)
 
@@ -358,10 +452,10 @@ class FileBackend:
         tickers = set()
 
         if data_type == "news":
-            ibkr = self._load_ibkr_news()
+            ibkr = self._load_ibkr_news(model=None)
             if not ibkr.empty and "ticker" in ibkr.columns:
                 tickers.update(ibkr["ticker"].dropna().unique())
-            polygon = self._load_polygon_news()
+            polygon = self._load_polygon_news(model=None)
             if not polygon.empty and "ticker" in polygon.columns:
                 tickers.update(polygon["ticker"].dropna().unique())
 
