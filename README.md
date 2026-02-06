@@ -1,23 +1,28 @@
 # MindfulRL-Intraday: Comprehensive RL Trading System
-> A comprehensive reinforcement learning trading system integrating multiple data sources, advanced news processing, and sophisticated model comparison capabilities. Built upon FinRL foundations with extensive OpenAI LLM integration for sentiment analysis, risk assessment, and content summarization.
+> A comprehensive reinforcement learning trading system integrating multiple data sources, advanced news processing, and sophisticated model comparison capabilities. Built upon FinRL foundations with extensive OpenAI/Anthropic LLM integration for sentiment analysis, risk assessment, and content summarization.
 
 ## Project Overview
 
 MindfulRL-Intraday is a comprehensive financial trading system that combines:
 - **Multi-source news data processing** via `data_sources/` and `NewsExtraction/` modules
 - **Advanced LLM integration** with configurable reasoning effort and verbosity parameters
+- **AI Agent Interface** for natural language queries about your portfolio and market data
+- **HTTP API** with RESTful endpoints for all data and analysis functions
 - **Sophisticated model comparison** capabilities for analyzing different LLM outputs
 - **Enterprise-grade cost control** and monitoring systems
 - **Flexible RL training** pipelines with sentiment and risk enhancement
 
 ### Key Features:
 1. **News Data Pipeline**: Extract and process news from 10+ sources (Finnhub, Alpha Vantage, Yahoo, etc.)
-2. **LLM Scoring**: Score financial news headlines for sentiment and risk using OpenAI models
-3. **Content Summarization**: Generate intelligent summaries with configurable parameters
-4. **Advanced Model Comparison**: Compare outputs across different models with statistical analysis
-5. **Dynamic Analysis Toolkit**: Interactive tools for large-scale model comparison and visualization
-6. **RL Training**: Train PPO/CPPO agents on sentiment and risk-enhanced data
-7. **Backtesting**: Comprehensive backtesting with performance visualization
+2. **LLM Scoring**: Score financial news headlines for sentiment and risk using OpenAI/Anthropic models
+3. **AI Agent CLI**: Interactive natural language interface with model switching (`/model` commands)
+4. **HTTP API**: RESTful API with Swagger UI for programmatic access
+5. **Content Summarization**: Generate intelligent summaries with configurable parameters
+6. **Advanced Model Comparison**: Compare outputs across different models with statistical analysis
+7. **Dynamic Analysis Toolkit**: Interactive tools for large-scale model comparison and visualization
+8. **RL Training**: Train PPO/CPPO agents on sentiment and risk-enhanced data
+9. **Backtesting**: Comprehensive backtesting with performance visualization
+10. **Database Integration**: Supabase PostgreSQL for centralized data storage
 
 ## Setup
 1. Ensure you are in this directory (project root).
@@ -25,10 +30,204 @@ MindfulRL-Intraday is a comprehensive financial trading system that combines:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set your OpenAI API key:
+3. Configure API keys:
    ```bash
-   export OPENAI_API_KEY="your_api_key"
+   cp config/.env.template config/.env
+   # Edit config/.env with your API keys:
+   # OPENAI_API_KEY, ANTHROPIC_API_KEY, POLYGON_API_KEY, etc.
    ```
+
+---
+
+## AI Agent CLI (New)
+
+Interactive CLI for natural language queries about your data:
+
+```bash
+python -m src.agents
+```
+
+**Example Session:**
+
+```
+╭─────────────────────────────────────────────────────────────────╮
+│  MindfulRL AI Agent                                             │
+│  Model: claude-sonnet-4-5-20250929 (Anthropic)                  │
+│  Type /help for commands, /quit to exit                         │
+╰─────────────────────────────────────────────────────────────────╯
+
+You: NVDA 最近的新聞情緒如何？
+
+Agent: 我來查詢 NVDA 最近的新聞數據。
+
+[Tool: get_ticker_news] Getting news for NVDA...
+[Tool: get_news_sentiment_summary] Analyzing sentiment...
+
+根據最近 30 天的數據分析：
+
+**NVDA 新聞情緒摘要**
+- 文章數量: 847 篇
+- 平均情緒分數: 3.42 / 5.0 (略偏多)
+- 看多/看空比例: 58% / 22%
+- 主要來源: Dow Jones (312), Benzinga (245), The Fly (180)
+```
+
+### Slash Commands
+
+| 命令 | 說明 | 範例 |
+|------|------|------|
+| `/model` | 顯示模型選擇器 | `/model` |
+| `/model <name>` | 切換到指定模型 | `/model opus`, `/model gpt5` |
+| `/reasoning <level>` | 調整推理強度 (OpenAI) | `/reasoning xhigh` |
+| `/status` | 顯示當前狀態 | `/status` |
+| `/help` | 顯示幫助 | `/help` |
+
+**Model Picker Example:**
+
+```
+You: /model
+
+Available Models:
+╭────────────────────────────────────────────────────────────────────╮
+│  #  │ Provider  │ Model          │ Aliases              │ Info    │
+├─────┼───────────┼────────────────┼──────────────────────┼─────────┤
+│  1  │ anthropic │ Sonnet 4.5     │ sonnet, s45          │ Fast    │
+│  2  │ anthropic │ Opus 4.5       │ opus, o45            │ Smart   │
+│  3  │ anthropic │ Haiku 4.5      │ haiku, h45           │ Cheap   │
+│  4  │ openai    │ GPT-5.2        │ gpt5, 5.2            │ SOTA    │
+╰────────────────────────────────────────────────────────────────────╯
+
+Enter number, name, or alias: opus
+
+✓ Switched to Opus 4.5 (anthropic)
+  Note: Provider changed, conversation history cleared.
+```
+
+### Available Tools (17 functions)
+
+| Category | Tool | Description |
+|----------|------|-------------|
+| **News** | `get_ticker_news` | 取得特定股票的新聞 |
+| | `get_news_sentiment_summary` | 新聞情緒摘要統計 |
+| | `search_news_by_keyword` | 關鍵字搜尋新聞 |
+| **Prices** | `get_ticker_prices` | 取得價格數據 |
+| | `get_price_change` | 計算漲跌幅 |
+| | `get_sector_performance` | 板塊表現 |
+| **Options** | `get_iv_analysis` | IV 分析 (IV Rank, VRP) |
+| | `get_iv_history_data` | IV 歷史數據 |
+| | `scan_mispricing` | 期權定價偏差掃描 |
+| | `calculate_greeks` | Greeks 計算 |
+| **Signals** | `detect_anomalies` | 異常檢測 |
+| | `detect_event_chains` | 事件鏈檢測 |
+| | `synthesize_signal` | 合成交易信號 |
+| **Analysis** | `get_fundamentals_analysis` | 基本面分析 |
+| | `get_sec_filings` | SEC 文件查詢 |
+| | `get_watchlist_overview` | 觀察清單概覽 |
+| | `get_morning_brief` | 個人化晨報 |
+
+---
+
+## HTTP API (New)
+
+Start the API server:
+
+```bash
+python -m src.api
+# Server: http://localhost:8420
+# Swagger UI: http://localhost:8420/docs
+```
+
+**Example Requests:**
+
+```bash
+# Get news
+curl "http://localhost:8420/news/NVDA?days=7"
+
+# Get prices
+curl "http://localhost:8420/prices/AMD?interval=15min&days=30"
+
+# IV analysis
+curl "http://localhost:8420/options/PLTR"
+
+# Synthesize trading signal
+curl "http://localhost:8420/signals?ticker=NVDA"
+
+# AI Agent query
+curl -X POST "http://localhost:8420/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "比較 AMD 和 NVDA 的近期表現", "provider": "anthropic"}'
+```
+
+---
+
+## Data Collection (New)
+
+### Daily Update (Recommended)
+
+One-command update with optional database sync:
+
+```bash
+# Check data status
+python scripts/collection/daily_update.py --status
+
+# Update all news sources
+python scripts/collection/daily_update.py --news
+
+# Update prices + sync to DB
+python scripts/collection/daily_update.py --ibkr-prices --sync-db
+
+# Update everything + sync to DB
+python scripts/collection/daily_update.py --all --sync-db
+```
+
+### Individual Collection Scripts
+
+```bash
+# Polygon news (3+ years history)
+python scripts/collection/collect_polygon_news.py --incremental
+
+# Finnhub news (last 7 days)
+python scripts/collection/collect_finnhub_news.py --incremental
+
+# IBKR news (requires TWS/Gateway)
+python scripts/collection/collect_ibkr_news.py --incremental
+
+# IBKR prices (requires TWS/Gateway)
+python scripts/collection/collect_ibkr_prices.py --incremental --minute-only
+
+# IV history
+python scripts/collection/collect_iv_history.py
+```
+
+---
+
+## Database Setup (Supabase)
+
+### Configure Connection
+
+Edit `config/.env`:
+
+```bash
+SUPABASE_DB_URL=postgresql://postgres:your-password@db.xxx.supabase.co:5432/postgres
+```
+
+### Migrate Data to DB
+
+```bash
+# Import all data
+python scripts/migrate_to_supabase.py
+
+# Import prices only
+python scripts/migrate_to_supabase.py --prices
+
+# Import news only
+python scripts/migrate_to_supabase.py --news
+
+# Dry run (count only)
+python scripts/migrate_to_supabase.py --dry-run
+```
+
+---
 
 ## Workflow
 
@@ -248,12 +447,39 @@ python backtest_openai.py --data merged_dataset.csv \
 
 ## Project Structure
 
+### New: Passive Query Layer (`src/`)
+- **`src/api/`**: HTTP API (FastAPI)
+  - `app.py`: Application factory
+  - `routes/`: API endpoints (news, prices, options, signals, query)
+  - `dependencies.py`: Dependency injection (DAL singleton)
+- **`src/agents/`**: AI Agent implementations
+  - `cli.py`: Interactive CLI with `/model` commands
+  - `config.py`: Model configuration
+  - `openai_agent/`: OpenAI Agents SDK integration
+  - `anthropic_agent/`: Anthropic SDK integration
+- **`src/tools/`**: Data Access Layer
+  - `data_access.py`: DataAccessLayer class
+  - `schemas.py`: Pydantic models (shared across layers)
+  - `registry.py`: Tool registry for agent frameworks
+  - `backends/`: File and database backends
+  - `*_tools.py`: 17 tool functions (news, prices, options, signals, analysis)
+- **`src/signals/`**: Signal detection modules
+  - `anomaly_detector.py`, `event_chain_detector.py`, `signal_synthesizer.py`
+
 ### Core Modules
 - **`data_sources/`**: Unified data source interface
   - **Finnhub**: News, real-time quotes, company profiles (free tier: 60 calls/min)
   - **Tiingo**: Historical stock prices (free tier: 30+ years EOD data)
   - **SEC EDGAR**: Official SEC filings, XBRL financial data (free, no API key)
 - **`NewsExtraction/`**: Historical news data processing and quality analysis
+
+### Data Collection (`scripts/collection/`)
+- **`daily_update.py`**: Unified daily update with `--sync-db` option
+- **`collect_polygon_news.py`**: Polygon news (3+ years history)
+- **`collect_finnhub_news.py`**: Finnhub news (7 days)
+- **`collect_ibkr_news.py`**: IBKR news (Dow Jones, Briefing, The Fly)
+- **`collect_ibkr_prices.py`**: IBKR intraday prices
+- **`collect_iv_history.py`**: ATM IV history
 
 ### Scoring Scripts (`scripts/scoring/`)
 - **`score_sentiment_openai.py`**: Sentiment analysis with configurable reasoning effort
@@ -288,13 +514,48 @@ python backtest_openai.py --data merged_dataset.csv \
 ### Configuration
 - **`config/tickers_core.json`**: Core stock ticker list (tiered: Tier 1 must-have, Tier 2 expanded, Tier 3 custom)
 - **`config/.env.template`**: API credentials template (copy to `.env` and fill in your keys)
+- **`config/user_profile.yaml`**: Personal settings (watchlists, strategy weights, alerts)
+- **`config/sectors.yaml`**: Sector definitions and ticker mappings
+
+### User Profile Example (`config/user_profile.yaml`)
+```yaml
+watchlists:
+  core_holdings:
+    tickers: ["NVDA", "AMD", "ZETA"]
+    priority: "high"
+  interested:
+    tickers: ["RKLB", "PLTR", "COIN", "PYPL"]
+    priority: "medium"
+
+tickers_for_options: ["NVDA", "AMD", "PLTR", "PYPL", "ZETA", "RKLB", "COIN"]
+
+strategy_weights:
+  my_custom:
+    fundamentals: 25
+    price_trend: 25
+    news_sentiment: 25
+    options_flow: 25
+  default_strategy: "my_custom"
+```
 
 ## Documentation
+
+### Design Documents
+- **`docs/design/MINDFULRL_ARCHITECTURE.md`**: System architecture design
+- **`docs/design/SERVICE_ARCHITECTURE.md`**: Service-oriented architecture plan
+- **`docs/design/DATA_STORAGE_ACCESS.md`**: Data access layer design
+
+### Data Guides
+- **`docs/data/DATA_SUBSCRIPTION_GUIDE.md`**: Data subscription guide
+- **`docs/data/OPTIONS_FLOW_GUIDE.md`**: Options flow analysis guide
+- **`docs/data/OPTIONS_PRICING_THEORY.md`**: Options pricing theory
+- **`docs/analysis/SCORING_VALIDATION_METHODOLOGY.md`**: LLM scoring validation methodology
+
+### Module Documentation
 - **`PROJECT_STRUCTURE.md`**: Detailed project structure and directory organization
 - **`OPENAI_SCRIPTS.md`**: OpenAI scoring scripts usage guide
 - **`data_sources/`**: Unified data source module documentation
 - **`NewsExtraction/README.md`**: Historical news processing documentation
-- **`docs/analysis/SCORING_VALIDATION_METHODOLOGY.md`**: LLM scoring validation methodology
 - **`scripts/visualization/README.md`**: Visualization tools guide
 - **`scripts/scoring/README.md`**: Batch scoring scripts guide
 
@@ -334,3 +595,36 @@ python scripts/visualization/fundamentals_query.py
 > top roe                 # ROE ranking (high→low)
 > pe<20 roe>15            # Filter by conditions
 ```
+
+---
+
+## Development
+
+### Run Tests
+
+```bash
+# All tests (98 tests)
+pytest tests/
+
+# Specific test files
+pytest tests/test_data_access.py -v  # DAL tests
+pytest tests/test_tools.py -v        # Tool function tests
+pytest tests/test_api.py -v          # API endpoint tests
+pytest tests/test_agents.py -v       # Agent integration tests
+
+# With coverage
+pytest tests/ --cov=src --cov-report=html
+```
+
+### Start Development Server
+
+```bash
+# API with auto-reload
+uvicorn src.api.app:create_app --factory --reload --port 8420
+```
+
+---
+
+## License
+
+MIT License - see LICENSE file for details.
