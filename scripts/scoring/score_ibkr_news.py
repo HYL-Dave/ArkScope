@@ -344,9 +344,10 @@ def find_unscored_articles(
 
     Scoring modes:
         Default: Score articles where the target column is empty.
-        --continue-from: Score articles where the *previous* model has a score
-            but the *new* model does not. This enables model switching without
-            re-scoring everything from scratch.
+        --continue-from: Score articles where the *previous* model has NO score
+            (i.e. unscored territory) and the new model also has no score.
+            This lets a newer model pick up where the old one left off,
+            saving cost by not re-scoring articles the old model already covered.
         --rescore: Score all articles (overwrite existing scores in target column).
 
     Args:
@@ -356,8 +357,9 @@ def find_unscored_articles(
         reasoning_effort: Reasoning effort level for column naming
         month: Optional month filter (YYYY-MM)
         continue_from: Previous model name to continue from (e.g. "gpt-5.2").
-            Only articles scored by this model but NOT yet scored by the new
-            model will be selected.
+            Only articles NOT scored by this model (and also not yet scored by
+            the new model) will be selected — i.e. the unscored tail beyond
+            what the previous model covered.
         continue_from_effort: Reasoning effort of the previous model. If None,
             auto-detects by scanning columns.
         rescore: If True, re-score all articles (ignore existing scores).
@@ -404,16 +406,19 @@ def find_unscored_articles(
                         df, mode, continue_from
                     )
                 if effective_prev_col is None or effective_prev_col not in df.columns:
-                    logging.warning(
-                        f"{parquet_file.name}: no column found for "
-                        f"previous model '{continue_from}' ({mode}), skipping"
+                    # Previous model never scored this file → all articles
+                    # are in the "unscored tail", same as default behavior
+                    logging.debug(
+                        f"{parquet_file.name}: no column for "
+                        f"'{continue_from}' ({mode}), treating all as unscored"
                     )
-                    continue
-
-                # Articles where previous model scored but new model hasn't
-                prev_scored = df[effective_prev_col].notna()
-                new_unscored = df[score_col].isna()
-                to_score = has_content & prev_scored & new_unscored
+                    to_score = has_content & df[score_col].isna()
+                else:
+                    # Articles where previous model did NOT score (unscored tail)
+                    # and new model also hasn't scored yet
+                    prev_unscored = df[effective_prev_col].isna()
+                    new_unscored = df[score_col].isna()
+                    to_score = has_content & prev_unscored & new_unscored
             else:
                 # Default: only articles where target column is empty
                 to_score = has_content & df[score_col].isna()
@@ -508,7 +513,7 @@ def score_parquet_file(
         else:
             prev_col = _detect_prev_column(df, mode, continue_from)
         if prev_col and prev_col in df.columns:
-            target_mask = has_content & df[prev_col].notna() & df[score_col].isna()
+            target_mask = has_content & df[prev_col].isna() & df[score_col].isna()
         else:
             target_mask = has_content & df[score_col].isna()
     else:
@@ -649,8 +654,9 @@ def main():
     parser.add_argument(
         "--continue-from", type=str, default=None, metavar="MODEL",
         help="Continue scoring from where another model left off. "
-             "Only articles already scored by MODEL but not yet scored by "
-             "the target --model will be selected. "
+             "Only articles NOT scored by MODEL (the unscored tail) "
+             "will be selected, saving cost by skipping articles "
+             "the previous model already covered. "
              "E.g.: --model gpt-6 --continue-from gpt-5.2"
     )
     parser.add_argument(
@@ -740,11 +746,21 @@ def main():
         logging.info("No unscored articles found!")
         return
 
-    # Count articles to score (depends on mode)
+    # Count articles to score (must mirror find_unscored_articles logic)
     def _count_to_score(df):
         has_content = df['content_length'] > 0
         if args.rescore:
             return int(has_content.sum())
+        elif args.continue_from:
+            prev_col_eff = None
+            if args.continue_from_effort:
+                prev_col_eff = get_score_column(args.mode, args.continue_from, args.continue_from_effort)
+            else:
+                prev_col_eff = _detect_prev_column(df, args.mode, args.continue_from)
+            if prev_col_eff and prev_col_eff in df.columns:
+                return int((has_content & df[prev_col_eff].isna() & df[score_col].isna()).sum())
+            else:
+                return int((has_content & df[score_col].isna()).sum())
         else:
             return int((has_content & df[score_col].isna()).sum())
 
