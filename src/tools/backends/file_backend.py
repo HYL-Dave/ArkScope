@@ -38,7 +38,8 @@ _SCORE_COL_PATTERN = re.compile(
 _NON_MODEL_SUFFIXES = {"score", "title", "content", "source", "description"}
 
 # Model priority: newest/best first. Used when no specific model is requested.
-MODEL_PRIORITY = ["gpt_6", "gpt_5_2", "gpt_5", "o4_mini", "haiku"]
+# Fallback if config/user_profile.yaml doesn't define model_priority
+_DEFAULT_MODEL_PRIORITY = ["gpt_5_2", "gpt_5", "o4_mini", "haiku"]
 
 
 def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:
@@ -60,12 +61,15 @@ def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, s
 def resolve_score_columns(
     score_cols: list[tuple[str, str, str | None, str]],
     preferred_model: str | None = None,
+    model_priority: list[str] | None = None,
 ) -> tuple[str | None, str | None]:
     """Pick the best sentiment/risk column pair based on model preference or priority.
 
     Args:
         score_cols: Output of detect_score_columns().
         preferred_model: Model column suffix to prefer (e.g. 'gpt_5_2').
+        model_priority: Ordered list of model suffixes (highest priority first).
+            Falls back to _DEFAULT_MODEL_PRIORITY if None.
 
     Returns:
         (sentiment_column_name, risk_column_name) — either may be None.
@@ -78,7 +82,8 @@ def resolve_score_columns(
         return sentiment_map.get(suffix), risk_map.get(suffix)
 
     # Auto-select by priority
-    for m in MODEL_PRIORITY:
+    priority = model_priority or _DEFAULT_MODEL_PRIORITY
+    for m in priority:
         if m in sentiment_map:
             return sentiment_map[m], risk_map.get(m)
 
@@ -120,9 +125,28 @@ class FileBackend:
         self._iv_dir = self._base / "data" / "options" / "iv_history"
         self._fundamentals_dir = self._base / "data_lake" / "raw" / "ibkr_fundamentals"
 
+        # Load model priority from config (fallback to default)
+        self._model_priority = self._load_model_priority()
+
         # Caches for raw data (loaded lazily, large files)
         self._ibkr_raw: Optional[pd.DataFrame] = None
         self._polygon_raw: Optional[pd.DataFrame] = None
+
+    def _load_model_priority(self) -> list[str]:
+        """Load model_priority from config/user_profile.yaml."""
+        cfg_path = self._base / "config" / "user_profile.yaml"
+        if not cfg_path.exists():
+            return _DEFAULT_MODEL_PRIORITY
+        try:
+            import yaml
+            with open(cfg_path) as f:
+                cfg = yaml.safe_load(f) or {}
+            priority = cfg.get("llm_preferences", {}).get("model_priority")
+            if isinstance(priority, list) and priority:
+                return priority
+        except Exception:
+            pass
+        return _DEFAULT_MODEL_PRIORITY
 
     # --------------------------------------------------------
     # News
@@ -132,7 +156,7 @@ class FileBackend:
         """Load and normalize IBKR scored news with flexible model selection.
 
         Dynamically detects all score columns and picks the best pair
-        based on model preference or MODEL_PRIORITY.
+        based on model preference or config model_priority.
         """
         if self._ibkr_raw is None:
             path = self._news_dir / "ibkr_scored_final.parquet"
@@ -149,7 +173,9 @@ class FileBackend:
 
         # Detect and resolve score columns
         score_cols = detect_score_columns(df)
-        sent_col, risk_col = resolve_score_columns(score_cols, model)
+        sent_col, risk_col = resolve_score_columns(
+            score_cols, model, self._model_priority,
+        )
 
         df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
         df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
@@ -184,7 +210,9 @@ class FileBackend:
 
         # Detect and resolve score columns
         score_cols = detect_score_columns(df)
-        sent_col, risk_col = resolve_score_columns(score_cols, model)
+        sent_col, risk_col = resolve_score_columns(
+            score_cols, model, self._model_priority,
+        )
 
         df["sentiment_score"] = df[sent_col] if sent_col and sent_col in df.columns else None
         df["risk_score"] = df[risk_col] if risk_col and risk_col in df.columns else None
@@ -219,7 +247,7 @@ class FileBackend:
             source: Data source filter ('ibkr', 'polygon', 'auto').
             scored_only: Only return articles with at least one score.
             model: Specific model to get scores from (e.g. 'gpt-5.2' or 'gpt_5_2').
-                   If None, picks the best available by MODEL_PRIORITY.
+                   If None, picks the best available by config model_priority.
         """
         frames = []
         cutoff = (date.today() - timedelta(days=days)).isoformat()
