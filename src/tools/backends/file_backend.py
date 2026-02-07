@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 _SCORE_COL_PATTERN = re.compile(
     r"^(sentiment|risk)_(.+?)(?:_(none|minimal|low|medium|high|xhigh))?$"
 )
-_NON_MODEL_SUFFIXES = {"score"}
+_NON_MODEL_SUFFIXES = {"score", "title", "content", "source", "description"}
 
 # Model priority: newest/best first. Used when no specific model is requested.
 MODEL_PRIORITY = ["gpt_6", "gpt_5_2", "gpt_5", "o4_mini", "haiku"]

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS news_scores (
     news_id          BIGINT       NOT NULL REFERENCES news(id) ON DELETE CASCADE,
     score_type       VARCHAR(20)  NOT NULL,   -- 'sentiment' or 'risk'
     model            VARCHAR(50)  NOT NULL,   -- 'haiku', 'gpt_5_2', 'gpt_6', etc.
-    reasoning_effort VARCHAR(20),             -- 'xhigh', 'high', 'medium', NULL for legacy
+    reasoning_effort VARCHAR(20)  NOT NULL DEFAULT '',  -- 'xhigh', 'high', 'medium', '' for legacy
     score            SMALLINT     NOT NULL CHECK (score BETWEEN 1 AND 5),
     scored_at        TIMESTAMPTZ  DEFAULT NOW(),
 
@@ -62,14 +62,14 @@ FROM ranked WHERE rn = 1;
 
 -- Sentiment scores
 INSERT INTO news_scores (news_id, score_type, model, reasoning_effort, score, scored_at)
-SELECT id, 'sentiment', COALESCE(scored_model, 'unknown'), NULL, sentiment_score, created_at
+SELECT id, 'sentiment', COALESCE(scored_model, 'unknown'), '', sentiment_score, created_at
 FROM news
 WHERE sentiment_score IS NOT NULL
 ON CONFLICT (news_id, score_type, model, reasoning_effort) DO NOTHING;
 
 -- Risk scores
 INSERT INTO news_scores (news_id, score_type, model, reasoning_effort, score, scored_at)
-SELECT id, 'risk', COALESCE(scored_model, 'unknown'), NULL, risk_score, created_at
+SELECT id, 'risk', COALESCE(scored_model, 'unknown'), '', risk_score, created_at
 FROM news
 WHERE risk_score IS NOT NULL
 ON CONFLICT (news_id, score_type, model, reasoning_effort) DO NOTHING;
@@ -77,6 +77,9 @@ ON CONFLICT (news_id, score_type, model, reasoning_effort) DO NOTHING;
 -- =============================================================================
 -- Updated helper function: news_sentiment_summary (with optional model filter)
 -- =============================================================================
+
+-- Drop old 2-param version to avoid ambiguous function error
+DROP FUNCTION IF EXISTS news_sentiment_summary(VARCHAR, INTEGER);
 
 CREATE OR REPLACE FUNCTION news_sentiment_summary(
     p_ticker VARCHAR(10),

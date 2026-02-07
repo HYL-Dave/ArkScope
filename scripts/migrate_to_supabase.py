@@ -224,7 +224,7 @@ SCORE_COLUMN_PATTERN = re.compile(
 )
 
 # Known non-model suffixes to exclude from detection (e.g. 'score' from 'sentiment_score')
-_NON_MODEL_SUFFIXES = {"score"}
+_NON_MODEL_SUFFIXES = {"score", "title", "content", "source", "description"}
 
 
 def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:
@@ -262,6 +262,8 @@ def _upsert_scores_batch(conn, rows: list) -> int:
 
     Each row is (news_id, score_type, model, reasoning_effort, score).
     Uses ON CONFLICT DO UPDATE to allow score corrections.
+    Deduplicates within each batch to avoid PostgreSQL's limitation on
+    affecting the same row twice in a single statement.
     """
     sql = """
         INSERT INTO news_scores (news_id, score_type, model, reasoning_effort, score)
@@ -273,10 +275,16 @@ def _upsert_scores_batch(conn, rows: list) -> int:
     cur = conn.cursor()
     for i in range(0, len(rows), BATCH_SIZE):
         batch = rows[i:i + BATCH_SIZE]
+        # Deduplicate: keep last occurrence per (news_id, score_type, model, effort)
+        seen = {}
+        for row in batch:
+            key = row[:4]  # (news_id, score_type, model, reasoning_effort)
+            seen[key] = row
+        deduped = list(seen.values())
         try:
-            psycopg2.extras.execute_values(cur, sql, batch, page_size=BATCH_SIZE)
+            psycopg2.extras.execute_values(cur, sql, deduped, page_size=BATCH_SIZE)
             conn.commit()
-            inserted += len(batch)
+            inserted += len(deduped)
             if (i // BATCH_SIZE) % 20 == 0 and i > 0:
                 logger.info(f"    Progress: {inserted}/{len(rows)} score rows")
         except psycopg2.Error as e:
@@ -400,7 +408,7 @@ def _import_scores_from_df(
             news_id = hash_to_id.get(h)
             if news_id is None:
                 continue
-            rows.append((news_id, score_type, model, effort, score))
+            rows.append((news_id, score_type, model, effort or '', score))
 
         if rows:
             count = _upsert_scores_batch(conn, rows)
