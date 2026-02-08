@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import get_agent_config
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def run_query(
     # Initial message
     messages = [{"role": "user", "content": question}]
     tools_used: List[str] = []
+    tracker = TokenTracker()
 
     logger.info(f"Running Anthropic agent query: {question[:50]}...")
 
@@ -76,7 +78,11 @@ def run_query(
             messages=messages,
         )
 
-        logger.debug(f"Turn {turn + 1}: stop_reason={response.stop_reason}")
+        tracker.record_anthropic(response, model=model_name)
+        logger.debug(
+            f"Turn {turn + 1}: stop_reason={response.stop_reason} "
+            f"tokens={tracker.last_input_tokens}+{tracker.turns[-1].output_tokens}"
+        )
 
         # Check if we're done
         if response.stop_reason != "tool_use":
@@ -90,6 +96,7 @@ def run_query(
                 "tools_used": list(set(tools_used)),
                 "provider": "anthropic",
                 "model": model_name,
+                "token_usage": tracker.summary(),
             }
 
         # Process tool calls
@@ -132,4 +139,5 @@ def run_query(
         "tools_used": list(set(tools_used)),
         "provider": "anthropic",
         "model": model_name,
+        "token_usage": tracker.summary(),
     }

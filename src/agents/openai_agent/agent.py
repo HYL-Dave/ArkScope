@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -95,20 +96,25 @@ async def run_query(
         max_turns=config.max_tool_calls,
     )
 
-    # Extract tools used from result
+    # Extract tools used and token usage from result
+    tracker = TokenTracker()
     tools_used = []
     if hasattr(result, "raw_responses"):
+        tracker.record_openai_result(result, model=model_name)
         for response in result.raw_responses:
             if hasattr(response, "output"):
                 for item in response.output:
                     if hasattr(item, "name"):
                         tools_used.append(item.name)
 
+    logger.info(f"OpenAI agent done: {tracker}")
+
     return {
         "answer": str(result.final_output) if result.final_output else "",
         "tools_used": list(set(tools_used)),
         "provider": "openai",
         "model": model_name,
+        "token_usage": tracker.summary(),
     }
 
 
@@ -167,18 +173,23 @@ def run_query_sync(
         max_turns=config.max_tool_calls,
     )
 
-    # Extract tools used
+    # Extract tools used and token usage
+    tracker = TokenTracker()
     tools_used = []
     if hasattr(result, "raw_responses"):
+        tracker.record_openai_result(result, model=model_name)
         for response in result.raw_responses:
             if hasattr(response, "output"):
                 for item in response.output:
                     if hasattr(item, "name"):
                         tools_used.append(item.name)
 
+    logger.info(f"OpenAI agent done (sync): {tracker}")
+
     return {
         "answer": str(result.final_output) if result.final_output else "",
         "tools_used": list(set(tools_used)),
         "provider": "openai",
         "model": model_name,
+        "token_usage": tracker.summary(),
     }
