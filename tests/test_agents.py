@@ -33,6 +33,13 @@ class TestAgentConfig:
         assert config.max_tool_calls > 0
         assert config.max_tokens > 0
 
+    def test_context_management_defaults(self):
+        """Context management config has sensible defaults."""
+        config = AgentConfig()
+        assert 0 < config.context_threshold_ratio <= 1.0
+        assert config.context_keep_recent_turns >= 1
+        assert config.context_preview_chars > 0
+
     def test_get_agent_config(self):
         """get_agent_config returns cached config."""
         config1 = get_agent_config()

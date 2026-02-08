@@ -261,7 +261,44 @@ llm_preferences:
     - "haiku"
 
 # ============================================
-# 9. 報告偏好
+# 9. Agent Context Management
+# ============================================
+context_management:
+  # 觸發 context 壓縮的閾值比例
+  # 當 input_tokens > 模型上下文極限 * threshold_ratio 時觸發
+  # 較高的值 = 更晚觸發，保留更完整的上下文供分析
+  # 較低的值 = 更早壓縮，更保守地使用上下文空間
+  threshold_ratio: 0.7
+
+  # 永遠保留最近 N 輪完整內容（每輪 = 1 assistant + 1 tool_result）
+  # 只有超過此輪數的舊 tool_result 才可能被壓縮
+  keep_recent_turns: 2
+
+  # 壓縮後保留的內容預覽字元數
+  preview_chars: 200
+
+  # 參考：各模型上下文極限
+  # ┌─────────────────────────────────┬──────────┬────────────┐
+  # │ 模型                           │ Context  │ Max Output │
+  # ├─────────────────────────────────┼──────────┼────────────┤
+  # │ claude-opus-4-6                 │ 1,000K   │ 128K       │
+  # │ claude-sonnet-4-5 / opus-4-5   │ 200K     │ 64K        │
+  # │ gpt-5.2 / gpt-5                │ 400K     │ 128K       │
+  # └─────────────────────────────────┴──────────┴────────────┘
+  #
+  # 觸發閾值範例 (threshold_ratio=0.7):
+  #   claude-opus-4-6:  700K tokens 時觸發
+  #   claude-sonnet-4-5: 140K tokens 時觸發
+  #   gpt-5.2:          280K tokens 時觸發
+  #
+  # 壓縮邏輯：
+  #   1. 條件: turn_count > keep_recent_turns AND input_tokens > threshold
+  #   2. 對象: 只壓縮舊的 tool_result (ephemeral)
+  #   3. 保留: user question + assistant text + 最近 N 輪 (persistent)
+  #   4. 格式: [Compacted] tool_name(params) → N chars. Preview: ...
+
+# ============================================
+# 10. 報告偏好
 # ============================================
 report_preferences:
   # 每日摘要

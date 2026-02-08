@@ -23,17 +23,22 @@ from .token_tracker import TokenTracker
 logger = logging.getLogger(__name__)
 
 # Model context window sizes (input tokens)
+# Order matters: more specific prefixes first (prefix match)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
-    "claude-sonnet-4-5": 200_000,
-    "claude-opus-4-5": 200_000,
+    # Anthropic — https://docs.anthropic.com/en/docs/about-claude/models
+    "claude-opus-4-6": 1_000_000,   # 2026-02, 1M context / 128K output
+    "claude-opus-4-5": 200_000,     # 200K context / 64K output
+    "claude-sonnet-4-5": 200_000,   # 200K context / 64K output
     "claude-sonnet-4": 200_000,
     "claude-opus-4": 200_000,
     "claude-haiku": 200_000,
-    "gpt-5": 128_000,
+    # OpenAI — https://platform.openai.com/docs/models
+    "gpt-5.2": 400_000,             # 400K context / 128K output
+    "gpt-5": 400_000,               # 400K context / 128K output
     "gpt-4": 128_000,
 }
 
-_DEFAULT_CONTEXT_LIMIT = 128_000
+_DEFAULT_CONTEXT_LIMIT = 200_000
 
 _COMPACT_MARKER = "[Compacted]"
 
@@ -70,7 +75,7 @@ class ContextManager:
     def __init__(
         self,
         model: str = "",
-        threshold_ratio: float = 0.4,
+        threshold_ratio: float = 0.7,
         keep_recent_turns: int = 2,
         preview_chars: int = 200,
     ) -> None:

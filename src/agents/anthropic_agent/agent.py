@@ -68,7 +68,12 @@ def run_query(
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
-    ctx = ContextManager(model=model_name)
+    ctx = ContextManager(
+        model=model_name,
+        threshold_ratio=config.context_threshold_ratio,
+        keep_recent_turns=config.context_keep_recent_turns,
+        preview_chars=config.context_preview_chars,
+    )
 
     logger.info(f"Running Anthropic agent query: {question[:50]}...")
 

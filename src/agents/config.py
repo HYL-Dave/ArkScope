@@ -39,6 +39,14 @@ class AgentConfig(BaseModel):
     max_tool_calls: int = 20
     max_tokens: int = 4096
 
+    # Context management (Phase 3)
+    # Compact old tool results when input_tokens > model_context_limit * ratio
+    context_threshold_ratio: float = 0.7
+    # Number of recent turns to always preserve fully (each turn = assistant + tool_result)
+    context_keep_recent_turns: int = 2
+    # Characters to keep as preview in compacted results
+    context_preview_chars: int = 200
+
     # Behavior
     temperature: float = 0.0  # Deterministic for tool calling
 
@@ -90,5 +98,14 @@ def get_agent_config() -> AgentConfig:
         config.max_tool_calls = llm_prefs["max_tool_calls"]
     if "max_tokens" in llm_prefs:
         config.max_tokens = llm_prefs["max_tokens"]
+
+    # Context management overrides
+    ctx_prefs = profile.get("context_management", {})
+    if "threshold_ratio" in ctx_prefs:
+        config.context_threshold_ratio = ctx_prefs["threshold_ratio"]
+    if "keep_recent_turns" in ctx_prefs:
+        config.context_keep_recent_turns = ctx_prefs["keep_recent_turns"]
+    if "preview_chars" in ctx_prefs:
+        config.context_preview_chars = ctx_prefs["preview_chars"]
 
     return config

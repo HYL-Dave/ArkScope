@@ -90,10 +90,13 @@ class TestModelContextLimit:
         assert get_model_context_limit("claude-opus-4-5-20251101") == 200_000
 
     def test_gpt5(self):
-        assert get_model_context_limit("gpt-5.2") == 128_000
+        assert get_model_context_limit("gpt-5.2") == 400_000
+
+    def test_claude_opus_46(self):
+        assert get_model_context_limit("claude-opus-4-6") == 1_000_000
 
     def test_unknown_model(self):
-        assert get_model_context_limit("some-unknown-model") == 128_000
+        assert get_model_context_limit("some-unknown-model") == 200_000
 
     def test_claude_haiku(self):
         assert get_model_context_limit("claude-haiku-3.5") == 200_000
@@ -234,8 +237,8 @@ class TestShouldCompact:
 
     def test_custom_threshold(self):
         ctx = ContextManager(model="gpt-5.2", threshold_ratio=0.2)
-        # 128K * 0.2 = 25.6K
-        tracker = _make_tracker(5, last_input_tokens=30_000)
+        # 400K * 0.2 = 80K
+        tracker = _make_tracker(5, last_input_tokens=90_000)
         assert ctx.should_compact(tracker)
 
 
@@ -249,11 +252,11 @@ class TestTokenThreshold:
 
     def test_gpt_custom(self):
         ctx = ContextManager(model="gpt-5.2", threshold_ratio=0.5)
-        assert ctx.token_threshold == 64_000
+        assert ctx.token_threshold == 200_000  # 400K * 0.5
 
     def test_unknown_model(self):
         ctx = ContextManager(model="unknown", threshold_ratio=0.4)
-        assert ctx.token_threshold == 51_200  # 128K * 0.4
+        assert ctx.token_threshold == 80_000  # 200K * 0.4
 
 
 # ── ContextManager.compact_messages ───────────────────────────
@@ -425,7 +428,7 @@ class TestContextManagerMeta:
         s = ctx.summary()
         assert s["compaction_count"] == 0
         assert s["model"] == "claude-sonnet-4-5-20250929"
-        assert s["threshold_tokens"] == 80_000
+        assert s["threshold_tokens"] == 140_000  # 200K * 0.7
 
     def test_repr(self):
         ctx = ContextManager(model="gpt-5.2")
