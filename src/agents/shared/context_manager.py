@@ -23,13 +23,13 @@ from .token_tracker import TokenTracker
 logger = logging.getLogger(__name__)
 
 # Model context window sizes (input tokens)
+# Standard context limits — 1M beta requires header "context-1m-2025-08-07"
 # Order matters: more specific prefixes first (prefix match)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # Anthropic — https://docs.anthropic.com/en/docs/about-claude/models
-    "claude-opus-4-6": 1_000_000,   # 2026-02, 1M context / 128K output
-    "claude-opus-4-5": 200_000,     # 200K context / 64K output
-    "claude-sonnet-4-5": 200_000,   # 200K context / 64K output
-    "claude-sonnet-4": 200_000,
+    "claude-opus-4-6": 200_000,     # 200K standard (1M beta) / 128K output
+    "claude-sonnet-4-5": 200_000,   # 200K standard (1M beta) / 64K output
+    "claude-sonnet-4": 200_000,     # 200K standard (1M beta) / 64K output
     "claude-opus-4": 200_000,
     "claude-haiku": 200_000,
     # OpenAI — https://platform.openai.com/docs/models

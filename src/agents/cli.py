@@ -92,10 +92,10 @@ MODEL_CATALOG: List[ModelEntry] = [
         description="Fast, smart — best for agents & coding",
     ),
     ModelEntry(
-        id="claude-opus-4-5-20251101",
+        id="claude-opus-4-6",
         provider="anthropic",
-        name="Opus 4.5",
-        aliases=["opus", "opus4.5", "opus-4.5", "o45", "claude-opus"],
+        name="Opus 4.6",
+        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus"],
         description="Most intelligent — deep analysis & reasoning",
     ),
     ModelEntry(

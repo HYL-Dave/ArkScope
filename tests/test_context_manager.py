@@ -87,13 +87,11 @@ class TestModelContextLimit:
         assert get_model_context_limit("claude-sonnet-4-5-20250929") == 200_000
 
     def test_claude_opus(self):
-        assert get_model_context_limit("claude-opus-4-5-20251101") == 200_000
+        assert get_model_context_limit("claude-opus-4-6") == 200_000
 
     def test_gpt5(self):
         assert get_model_context_limit("gpt-5.2") == 400_000
 
-    def test_claude_opus_46(self):
-        assert get_model_context_limit("claude-opus-4-6") == 1_000_000
 
     def test_unknown_model(self):
         assert get_model_context_limit("some-unknown-model") == 200_000
