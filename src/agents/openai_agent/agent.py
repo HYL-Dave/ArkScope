@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,8 @@ async def run_query(
         f"question={question[:50]}..."
     )
 
+    pad = Scratchpad(query=question, provider="openai", model=model_name)
+
     result = await Runner.run(
         agent,
         input=question,
@@ -106,11 +109,16 @@ async def run_query(
                 for item in response.output:
                     if hasattr(item, "name"):
                         tools_used.append(item.name)
+                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+
+    answer = str(result.final_output) if result.final_output else ""
+    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+    pad.close()
 
     logger.info(f"OpenAI agent done: {tracker}")
 
     return {
-        "answer": str(result.final_output) if result.final_output else "",
+        "answer": answer,
         "tools_used": list(set(tools_used)),
         "provider": "openai",
         "model": model_name,
@@ -167,6 +175,8 @@ def run_query_sync(
         f"question={question[:50]}..."
     )
 
+    pad = Scratchpad(query=question, provider="openai", model=model_name)
+
     result = Runner.run_sync(
         agent,
         input=question,
@@ -183,11 +193,16 @@ def run_query_sync(
                 for item in response.output:
                     if hasattr(item, "name"):
                         tools_used.append(item.name)
+                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+
+    answer = str(result.final_output) if result.final_output else ""
+    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+    pad.close()
 
     logger.info(f"OpenAI agent done (sync): {tracker}")
 
     return {
-        "answer": str(result.final_output) if result.final_output else "",
+        "answer": answer,
         "tools_used": list(set(tools_used)),
         "provider": "openai",
         "model": model_name,

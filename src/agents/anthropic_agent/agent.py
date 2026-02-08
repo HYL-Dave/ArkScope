@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import get_agent_config
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ def run_query(
     messages = [{"role": "user", "content": question}]
     tools_used: List[str] = []
     tracker = TokenTracker()
+    pad = Scratchpad(query=question, provider="anthropic", model=model_name)
 
     logger.info(f"Running Anthropic agent query: {question[:50]}...")
 
@@ -91,6 +93,12 @@ def run_query(
             for block in response.content:
                 if hasattr(block, "text"):
                     final_text += block.text
+            pad.log_final_answer(
+                final_text,
+                token_usage=tracker.summary(),
+                tools_used=list(set(tools_used)),
+            )
+            pad.close()
             return {
                 "answer": final_text,
                 "tools_used": list(set(tools_used)),
@@ -118,9 +126,11 @@ def run_query(
 
             logger.info(f"Executing tool: {tool_name}")
             tools_used.append(tool_name)
+            pad.log_tool_call(tool_name, tool_input, token_usage=tracker.summary())
 
             # Execute the tool
             result = execute_tool(tool_name, tool_input, dal)
+            pad.log_tool_result(tool_name, result_summary=str(result)[:200], chars=len(str(result)))
 
             tool_results.append({
                 "type": "tool_result",
@@ -134,6 +144,8 @@ def run_query(
 
     # Max turns reached
     logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
+    pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+    pad.close()
     return {
         "answer": "Maximum tool calls reached. Please try a simpler query.",
         "tools_used": list(set(tools_used)),
