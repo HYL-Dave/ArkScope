@@ -11,6 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ..config import get_agent_config
+from ..shared.context_manager import ContextManager
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
@@ -67,6 +68,7 @@ def run_query(
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
+    ctx = ContextManager(model=model_name)
 
     logger.info(f"Running Anthropic agent query: {question[:50]}...")
 
@@ -141,6 +143,11 @@ def run_query(
         # Add assistant response and tool results to messages
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
+
+        # Compact old tool results if context is growing too large
+        if ctx.should_compact(tracker):
+            messages, compact_stats = ctx.compact_messages(messages)
+            logger.info(f"Context compacted: {compact_stats}")
 
     # Max turns reached
     logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
