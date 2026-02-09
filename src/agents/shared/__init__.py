@@ -6,11 +6,21 @@ Contains:
 - token_tracker.py: Per-turn and cumulative token usage tracking
 - scratchpad.py: JSONL-based decision logging for agent sessions
 - context_manager.py: Smart context compaction for long sessions
+- events.py: Agent event types for streaming progress
 """
 
 from .context_manager import ContextManager
+from .events import AgentEvent, EventType
 from .prompts import SYSTEM_PROMPT
 from .scratchpad import Scratchpad
 from .token_tracker import TokenTracker, TurnUsage
 
-__all__ = ["ContextManager", "SYSTEM_PROMPT", "Scratchpad", "TokenTracker", "TurnUsage"]
+__all__ = [
+    "AgentEvent",
+    "ContextManager",
+    "EventType",
+    "SYSTEM_PROMPT",
+    "Scratchpad",
+    "TokenTracker",
+    "TurnUsage",
+]

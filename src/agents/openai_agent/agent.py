@@ -2,15 +2,17 @@
 OpenAI Agents SDK agent implementation.
 
 Uses GPT-5.2 with configurable reasoning effort for tool calling.
+Provides run_query(), run_query_sync(), and run_query_stream().
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from ..config import get_agent_config, ReasoningEffort
+from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
@@ -208,3 +210,93 @@ def run_query_sync(
         "model": model_name,
         "token_usage": tracker.summary(),
     }
+
+
+async def run_query_stream(
+    question: str,
+    model: Optional[str] = None,
+    dal: Optional[Any] = None,
+    reasoning_effort: Optional[ReasoningEffort] = None,
+) -> AsyncGenerator[AgentEvent, None]:
+    """
+    Run a query yielding events for progress tracking.
+
+    OpenAI Agents SDK handles the tool loop internally (black box),
+    so we can only emit events before and after the run. Tool events
+    are extracted post-run from raw_responses.
+
+    Args:
+        question: The user's question
+        model: Override model (default: gpt-5.2 from AgentConfig)
+        dal: DataAccessLayer instance (auto-created if None)
+        reasoning_effort: Override reasoning effort (default from AgentConfig)
+
+    Yields:
+        AgentEvent for thinking, tool_end (post-run), and done
+    """
+    try:
+        from agents import Runner
+    except ImportError:
+        raise ImportError(
+            "OpenAI Agents SDK not installed. Run: pip install openai-agents"
+        )
+
+    from .tools import create_openai_tools
+
+    # Get or create DAL
+    if dal is None:
+        from src.tools.data_access import DataAccessLayer
+        dal = DataAccessLayer(db_dsn="auto")
+
+    # Get config
+    config = get_agent_config()
+    model_name = model or config.openai_model
+    effort = reasoning_effort or config.reasoning_effort
+
+    # Create tools bound to DAL
+    tools = create_openai_tools(dal)
+
+    # Create agent with reasoning settings
+    agent = _build_agent(model_name, tools, reasoning_effort=effort)
+
+    logger.info(
+        f"Running OpenAI agent (stream): model={model_name} reasoning={effort} "
+        f"question={question[:50]}..."
+    )
+
+    yield AgentEvent(EventType.thinking, {"turn": 1, "model": model_name})
+
+    pad = Scratchpad(query=question, provider="openai", model=model_name)
+
+    result = await Runner.run(
+        agent,
+        input=question,
+        max_turns=config.max_tool_calls,
+    )
+
+    # Extract tools used and token usage from result
+    tracker = TokenTracker()
+    tools_used: List[str] = []
+    if hasattr(result, "raw_responses"):
+        tracker.record_openai_result(result, model=model_name)
+        for response in result.raw_responses:
+            if hasattr(response, "output"):
+                for item in response.output:
+                    if hasattr(item, "name"):
+                        tools_used.append(item.name)
+                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+                        yield AgentEvent(EventType.tool_end, {"tool": item.name})
+
+    answer = str(result.final_output) if result.final_output else ""
+    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+    pad.close()
+
+    logger.info(f"OpenAI agent done (stream): {tracker}")
+
+    yield AgentEvent(EventType.done, {
+        "answer": answer,
+        "tools_used": list(set(tools_used)),
+        "provider": "openai",
+        "model": model_name,
+        "token_usage": tracker.summary(),
+    })

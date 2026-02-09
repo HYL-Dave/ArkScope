@@ -10,6 +10,7 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..dependencies import get_dal
@@ -99,6 +100,64 @@ async def query_agent(
         )
 
     return QueryResponse(**result)
+
+
+@router.post("/query/stream")
+async def query_agent_stream(
+    request: QueryRequest,
+    dal=Depends(get_dal),
+):
+    """
+    Execute a query with Server-Sent Events for live progress.
+
+    Returns a stream of SSE events as the agent processes the query.
+    Each event has ``data: {"type": "...", "data": {...}}`` format.
+
+    Event types:
+        - thinking: API call started
+        - text: Intermediate text from model
+        - tool_start: Tool execution begins
+        - tool_end: Tool execution finished
+        - error: Error occurred
+        - done: Final answer with full result
+    """
+    provider = request.provider.lower()
+
+    async def event_generator():
+        try:
+            if provider == "openai":
+                from src.agents.openai_agent.agent import run_query_stream
+                stream = run_query_stream(
+                    question=request.question,
+                    model=request.model,
+                    dal=dal,
+                )
+            elif provider == "anthropic":
+                from src.agents.anthropic_agent.agent import run_query_stream
+                stream = run_query_stream(
+                    question=request.question,
+                    model=request.model,
+                    dal=dal,
+                )
+            else:
+                from src.agents.shared.events import AgentEvent, EventType
+                yield AgentEvent(EventType.error, {
+                    "message": f"Unknown provider: {provider}",
+                }).to_sse()
+                return
+
+            async for event in stream:
+                yield event.to_sse()
+        except Exception as e:
+            from src.agents.shared.events import AgentEvent, EventType
+            logger.error(f"Stream error: {e}")
+            yield AgentEvent(EventType.error, {"message": str(e)}).to_sse()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/query/providers")
