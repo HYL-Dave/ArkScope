@@ -14,8 +14,12 @@ from src.agents.shared.events import AgentEvent, EventType
 
 class TestEventType:
     def test_all_types_defined(self):
-        expected = {"thinking", "text", "tool_start", "tool_end", "error", "done"}
+        expected = {"thinking", "thinking_content", "text", "tool_start", "tool_end", "error", "done"}
         assert {e.value for e in EventType} == expected
+
+    def test_thinking_content_type(self):
+        assert EventType.thinking_content == "thinking_content"
+        assert EventType("thinking_content") is EventType.thinking_content
 
     def test_str_enum(self):
         assert EventType.thinking == "thinking"
@@ -113,11 +117,13 @@ class TestAnthropicStream:
             # Config
             config = MagicMock()
             config.anthropic_model = "claude-sonnet-4-5-20250929"
-            config.max_tokens = 4096
+            config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7
             config.context_keep_recent_turns = 2
             config.context_preview_chars = 200
+            config.anthropic_effort = None
+            config.anthropic_thinking = False
             mock_config.return_value = config
 
             # Tools
@@ -242,6 +248,92 @@ class TestAnthropicStream:
         done_event = next(e for e in events if e.type == EventType.done)
         assert "Maximum tool calls" in done_event.data["answer"]
 
+    def test_with_thinking_blocks(self, mock_deps):
+        """Response with thinking blocks emits thinking_content events."""
+        thinking_block = MagicMock()
+        thinking_block.type = "thinking"
+        thinking_block.thinking = "Let me analyze NVDA stock..."
+        del thinking_block.text  # thinking blocks don't have .text
+
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = "NVDA is doing well."
+
+        response = _make_mock_response(
+            stop_reason="end_turn",
+            content_blocks=[thinking_block, text_block],
+        )
+        mock_deps["client"].messages.create.return_value = response
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        events = self._collect_events(
+            run_query_stream("NVDA?", dal=MagicMock())
+        )
+
+        types = [e.type for e in events]
+        assert EventType.thinking_content in types
+        tc_event = next(e for e in events if e.type == EventType.thinking_content)
+        assert tc_event.data["thinking"] == "Let me analyze NVDA stock..."
+
+    def test_effort_kwarg_passed(self, mock_deps):
+        """Effort override is passed to API as output_config."""
+        mock_deps["client"].messages.create.return_value = _make_mock_response()
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        # Pass model directly — Opus 4.6 supports effort
+        self._collect_events(
+            run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), effort="medium")
+        )
+
+        call_kwargs = mock_deps["client"].messages.create.call_args
+        assert call_kwargs.kwargs.get("output_config") == {"effort": "medium"}
+
+    def test_thinking_kwarg_adaptive(self, mock_deps):
+        """Thinking override with Opus 4.6 uses adaptive mode + model max output."""
+        mock_deps["client"].messages.create.return_value = _make_mock_response()
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        # Pass model directly — Opus 4.6 uses adaptive thinking
+        self._collect_events(
+            run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), thinking=True)
+        )
+
+        call_kwargs = mock_deps["client"].messages.create.call_args
+        assert call_kwargs.kwargs.get("thinking") == {"type": "adaptive"}
+        # max_tokens = Opus 4.6 max output
+        assert call_kwargs.kwargs.get("max_tokens") == 128000
+
+    def test_thinking_kwarg_enabled_for_sonnet(self, mock_deps):
+        """Thinking override with Sonnet uses enabled + auto-derived budget."""
+        mock_deps["client"].messages.create.return_value = _make_mock_response()
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        # Sonnet 4.5: max_output=64000, budget = 64000 - 16384 = 47616
+        self._collect_events(
+            run_query_stream("Test", dal=MagicMock(), thinking=True)
+        )
+
+        call_kwargs = mock_deps["client"].messages.create.call_args
+        thinking_param = call_kwargs.kwargs.get("thinking")
+        assert thinking_param["type"] == "enabled"
+        # budget = model_max_output (64000) - config.max_tokens (16384) = 47616
+        assert thinking_param["budget_tokens"] == 64000 - 16384
+        # max_tokens = model max output
+        assert call_kwargs.kwargs.get("max_tokens") == 64000
+
+    def test_no_effort_for_unsupported_model(self, mock_deps):
+        """Effort is not sent for models that don't support it (Sonnet 4.5)."""
+        mock_deps["client"].messages.create.return_value = _make_mock_response()
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+        # Sonnet 4.5 doesn't support effort
+        self._collect_events(
+            run_query_stream("Test", dal=MagicMock(), effort="medium")
+        )
+
+        call_kwargs = mock_deps["client"].messages.create.call_args
+        assert "output_config" not in call_kwargs.kwargs
+
 
 # ── run_query backward compatibility ──────────────────────────
 
@@ -257,11 +349,13 @@ class TestRunQueryBackwardCompat:
 
             config = MagicMock()
             config.anthropic_model = "claude-sonnet-4-5-20250929"
-            config.max_tokens = 4096
+            config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7
             config.context_keep_recent_turns = 2
             config.context_preview_chars = 200
+            config.anthropic_effort = None
+            config.anthropic_thinking = False
             mock_config.return_value = config
             mock_tools.return_value = []
 

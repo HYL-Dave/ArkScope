@@ -35,9 +35,23 @@ class AgentConfig(BaseModel):
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
 
+    # Anthropic effort (Opus 4.5+, no beta header needed)
+    # None = don't send (server default "high")
+    anthropic_effort: Optional[str] = None
+
+    # Anthropic extended thinking (Phase 8)
+    # 開啟後根據模型自動選擇模式：
+    #   Opus 4.6: adaptive (Claude 自動判斷思考深度，不需 budget)
+    #   其他模型: enabled + budget_tokens (自動推導)
+    # max_tokens 和 budget_tokens 全自動：
+    #   effective_max_tokens = 模型最大 output (128K/64K)
+    #   budget_tokens = effective_max_tokens - config.max_tokens (留 max_tokens 給 response)
+    # 這樣不需手動配置，且效果最好
+    anthropic_thinking: bool = False
+
     # Limits
     max_tool_calls: int = 20
-    max_tokens: int = 4096
+    max_tokens: int = 16384
 
     # Context management (Phase 3)
     # Compact old tool results when input_tokens > model_context_limit * ratio
@@ -76,7 +90,9 @@ def get_agent_config() -> AgentConfig:
         anthropic_model_advanced: "claude-opus-4-6"
         reasoning_effort: "xhigh"
         max_tool_calls: 20
-        max_tokens: 4096
+        max_tokens: 16384
+        anthropic_effort: "high"
+        anthropic_thinking: false
     """
     config = AgentConfig()
 
@@ -98,6 +114,12 @@ def get_agent_config() -> AgentConfig:
         config.max_tool_calls = llm_prefs["max_tool_calls"]
     if "max_tokens" in llm_prefs:
         config.max_tokens = llm_prefs["max_tokens"]
+
+    # Anthropic effort/thinking overrides
+    if "anthropic_effort" in llm_prefs:
+        config.anthropic_effort = llm_prefs["anthropic_effort"]
+    if "anthropic_thinking" in llm_prefs:
+        config.anthropic_thinking = llm_prefs["anthropic_thinking"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})

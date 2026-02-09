@@ -9,7 +9,9 @@ Run:
 Slash commands (during chat):
     /model          Show available models and switch
     /model <name>   Switch to model by name or shorthand
-    /reasoning <n>  Set reasoning effort (OpenAI only)
+    /reasoning <n>  Set reasoning effort (OpenAI): none|minimal|low|medium|high|xhigh
+    /effort <n>     Set effort level (Anthropic): max|high|medium|low
+    /thinking       Toggle extended thinking (Anthropic): on|off
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -143,6 +145,8 @@ class SessionState:
     no_history: bool
     verbose: bool
     messages_history: Optional[List[dict]] = field(default=None)
+    anthropic_effort: Optional[str] = None
+    anthropic_thinking: bool = False
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -162,6 +166,11 @@ class SessionState:
         parts = [f"Provider: {self.provider}", f"Model: {self.effective_model()}"]
         if self.provider == "openai":
             parts.append(f"Reasoning: {self.effective_reasoning()}")
+        elif self.provider == "anthropic":
+            effort = self.anthropic_effort or get_agent_config().anthropic_effort or "default"
+            parts.append(f"Effort: {effort}")
+            if self.anthropic_thinking:
+                parts.append("Thinking: ON")
         history = "on" if not self.no_history else "off"
         parts.append(f"History: {history}")
         return " | ".join(parts)
@@ -193,7 +202,9 @@ def print_help():
             "[bold]Slash Commands[/bold]\n"
             "  [cyan]/model[/cyan]              Show models & switch interactively\n"
             "  [cyan]/model <name>[/cyan]       Switch model (e.g. /model opus, /model gpt5)\n"
-            "  [cyan]/reasoning <n>[/cyan]      Set reasoning effort: none|minimal|low|medium|high|xhigh\n"
+            "  [cyan]/reasoning <n>[/cyan]      Set reasoning effort (OpenAI): none|minimal|low|medium|high|xhigh\n"
+            "  [cyan]/effort <n>[/cyan]         Set effort level (Anthropic): max|high|medium|low\n"
+            "  [cyan]/thinking[/cyan]           Toggle extended thinking (Anthropic): on|off\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -341,6 +352,8 @@ def run_anthropic_interactive(
     dal: Any,
     model: Optional[str] = None,
     messages_history: Optional[List[dict]] = None,
+    effort: Optional[str] = None,
+    thinking: bool = False,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -349,6 +362,7 @@ def run_anthropic_interactive(
     """
     from anthropic import Anthropic
     from .anthropic_agent.tools import get_anthropic_tools, execute_tool
+    from .anthropic_agent.agent import _supports_effort, _build_thinking_param
 
     config = get_agent_config()
     model_name = model or config.anthropic_model
@@ -357,23 +371,53 @@ def run_anthropic_interactive(
     tools_used: List[str] = []
     tool_index = 0
 
+    # Build optional API params (effort + thinking)
+    api_kwargs: Dict[str, Any] = {}
+
+    effective_effort = effort or config.anthropic_effort
+    if effective_effort and _supports_effort(model_name):
+        api_kwargs["output_config"] = {"effort": effective_effort}
+
+    thinking_param, effective_max_tokens = _build_thinking_param(
+        model_name, thinking or config.anthropic_thinking, config,
+    )
+    if thinking_param:
+        api_kwargs["thinking"] = thinking_param
+
     # Build messages
     if messages_history is not None:
         messages = messages_history + [{"role": "user", "content": question}]
     else:
         messages = [{"role": "user", "content": question}]
 
-    console.print(f"[dim]Model: {model_name}[/dim]")
+    status_parts = [f"Model: {model_name}"]
+    if effective_effort:
+        status_parts.append(f"effort: {effective_effort}")
+    if thinking or config.anthropic_thinking:
+        status_parts.append("thinking: ON")
+    console.print(f"[dim]{' | '.join(status_parts)}[/dim]")
 
     for turn in range(config.max_tool_calls):
         with console.status("[cyan]Thinking...", spinner="dots"):
             response = client.messages.create(
                 model=model_name,
-                max_tokens=config.max_tokens,
+                max_tokens=effective_max_tokens,
                 system=SYSTEM_PROMPT,
                 tools=tools,
                 messages=messages,
+                **api_kwargs,
             )
+
+        # Display thinking blocks (extended thinking)
+        for block in response.content:
+            if block.type == "thinking":
+                console.print(Panel(
+                    Markdown(block.thinking),
+                    title="[dim]Thinking[/dim]",
+                    border_style="dim",
+                    box=box.ROUNDED,
+                    padding=(0, 1),
+                ))
 
         # Done - no more tool calls
         if response.stop_reason != "tool_use":
@@ -480,6 +524,7 @@ def run_openai_interactive(
 # ============================================================
 
 VALID_REASONING = ("none", "minimal", "low", "medium", "high", "xhigh")
+VALID_ANTHROPIC_EFFORT = ("max", "high", "medium", "low")
 
 
 def handle_model_command(state: SessionState, arg: str) -> None:
@@ -545,6 +590,47 @@ def handle_status_command(state: SessionState, backend_type: str, ticker_count: 
     )
 
 
+def handle_effort_command(state: SessionState, arg: str) -> None:
+    """Handle /effort <level> command (Anthropic only)."""
+    if state.provider != "anthropic":
+        console.print("[yellow]Effort only applies to Anthropic models.[/yellow]\n")
+        return
+    if not arg:
+        current = state.anthropic_effort or get_agent_config().anthropic_effort or "default"
+        console.print(
+            f"[dim]Current: {current}  "
+            f"Options: {', '.join(VALID_ANTHROPIC_EFFORT)}[/dim]\n"
+        )
+        return
+    if arg.lower() not in VALID_ANTHROPIC_EFFORT:
+        console.print(
+            f"[red]Invalid effort: {arg}[/red]\n"
+            f"[dim]Valid: {', '.join(VALID_ANTHROPIC_EFFORT)}[/dim]\n"
+        )
+        return
+    state.anthropic_effort = arg.lower()
+    console.print(f"[green]Effort set to[/green] [bold]{arg.lower()}[/bold]\n")
+
+
+def handle_thinking_command(state: SessionState, arg: str) -> None:
+    """Handle /thinking [on|off] command (Anthropic only)."""
+    if state.provider != "anthropic":
+        console.print("[yellow]Thinking only applies to Anthropic models.[/yellow]\n")
+        return
+    if not arg:
+        status = "ON" if state.anthropic_thinking else "OFF"
+        console.print(f"[dim]Thinking: {status}[/dim]\n")
+        return
+    if arg.lower() in ("on", "true", "1"):
+        state.anthropic_thinking = True
+        console.print("[green]Thinking:[/green] [bold]ON[/bold]\n")
+    elif arg.lower() in ("off", "false", "0"):
+        state.anthropic_thinking = False
+        console.print("[green]Thinking:[/green] [bold]OFF[/bold]\n")
+    else:
+        console.print("[red]Usage: /thinking [on|off][/red]\n")
+
+
 # ============================================================
 # Main Chat Loop
 # ============================================================
@@ -574,6 +660,17 @@ def main():
         help="Reasoning effort for GPT-5.x (default: from config, typically xhigh)"
     )
     parser.add_argument(
+        "--effort",
+        choices=list(VALID_ANTHROPIC_EFFORT),
+        default=None,
+        help="Anthropic effort level (Opus 4.5+)"
+    )
+    parser.add_argument(
+        "--thinking",
+        action="store_true",
+        help="Enable Anthropic extended thinking"
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable debug logging"
@@ -601,6 +698,8 @@ def main():
         no_history=args.no_history,
         verbose=args.verbose,
         messages_history=[] if not args.no_history else None,
+        anthropic_effort=args.effort,
+        anthropic_thinking=args.thinking,
     )
 
     print_banner()
@@ -642,6 +741,10 @@ def main():
                 handle_model_command(state, arg)
             elif cmd in ("/reasoning", "/r"):
                 handle_reasoning_command(state, arg)
+            elif cmd in ("/effort", "/e"):
+                handle_effort_command(state, arg)
+            elif cmd in ("/thinking", "/t"):
+                handle_thinking_command(state, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
@@ -658,6 +761,8 @@ def main():
                     dal=dal,
                     model=state.model,
                     messages_history=state.messages_history,
+                    effort=state.anthropic_effort,
+                    thinking=state.anthropic_thinking,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):

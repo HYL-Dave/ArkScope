@@ -33,6 +33,16 @@ class TestAgentConfig:
         assert config.max_tool_calls > 0
         assert config.max_tokens > 0
 
+    def test_anthropic_effort_default(self):
+        """Anthropic effort is None by default (don't send)."""
+        config = AgentConfig()
+        assert config.anthropic_effort is None
+
+    def test_anthropic_thinking_default(self):
+        """Anthropic thinking is off by default."""
+        config = AgentConfig()
+        assert config.anthropic_thinking is False
+
     def test_context_management_defaults(self):
         """Context management config has sensible defaults."""
         config = AgentConfig()

@@ -19,12 +19,13 @@ from typing import Any, Dict
 class EventType(str, Enum):
     """Event types emitted during agent execution."""
 
-    thinking = "thinking"        # API call started, model is processing
-    text = "text"                # Intermediate text from model (before tool calls)
-    tool_start = "tool_start"    # Tool execution begins
-    tool_end = "tool_end"        # Tool execution finished (with result summary)
-    error = "error"              # Error during execution
-    done = "done"                # Final answer + session summary
+    thinking = "thinking"                  # API call started, model is processing
+    thinking_content = "thinking_content"  # Model's thinking text (extended thinking)
+    text = "text"                          # Intermediate text from model (before tool calls)
+    tool_start = "tool_start"              # Tool execution begins
+    tool_end = "tool_end"                  # Tool execution finished (with result summary)
+    error = "error"                        # Error during execution
+    done = "done"                          # Final answer + session summary
 
 
 @dataclass

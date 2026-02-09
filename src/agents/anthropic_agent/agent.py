@@ -20,11 +20,84 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
+# ── Model capability detection ──────────────────────────────────
+
+_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6"}
+_EFFORT_MODELS = {"claude-opus-4-6", "claude-opus-4-5"}
+
+# 各模型最大 output tokens（API 硬限制）
+# 用於 thinking 模式自動設定 max_tokens
+_MODEL_MAX_OUTPUT = {
+    "claude-opus-4-6": 128000,
+    "claude-opus-4-5": 64000,
+    "claude-sonnet-4-5": 64000,
+    "claude-haiku-4-5": 64000,
+}
+
+
+def _get_model_max_output(model: str) -> int:
+    """Return the model's maximum output token limit."""
+    for prefix, limit in _MODEL_MAX_OUTPUT.items():
+        if model.startswith(prefix):
+            return limit
+    return 64000  # safe fallback
+
+
+def _supports_adaptive_thinking(model: str) -> bool:
+    """Opus 4.6 supports adaptive thinking (no budget_tokens needed)."""
+    return any(model.startswith(m) for m in _ADAPTIVE_THINKING_MODELS)
+
+
+def _supports_effort(model: str) -> bool:
+    """Opus 4.5+ supports output_config.effort."""
+    return any(model.startswith(m) for m in _EFFORT_MODELS)
+
+
+def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
+    """Return (thinking_param, effective_max_tokens) based on model and config.
+
+    設計決策 (Phase 8)：
+    - max_tokens 和 budget_tokens 全自動推導，不需手動配置
+    - effective_max_tokens = 模型最大 output (128K for Opus 4.6, 64K for others)
+    - budget_tokens = effective_max_tokens - config.max_tokens
+      (留 config.max_tokens 給 response，其餘全給 thinking，效果最好)
+    - Adaptive 模式 (Opus 4.6) 不需要 budget_tokens，Claude 自動調配
+
+    Args:
+        model: Model ID string
+        thinking_enabled: Whether thinking is enabled (runtime or config)
+        config: AgentConfig instance
+
+    Returns:
+        (thinking_dict_or_None, effective_max_tokens)
+    """
+    if not thinking_enabled:
+        return None, config.max_tokens
+
+    # Thinking 開啟 → 用模型最大 output 作為 max_tokens
+    effective_max_tokens = _get_model_max_output(model)
+
+    if _supports_adaptive_thinking(model):
+        # Opus 4.6: Claude 自動判斷思考深度，不需 budget
+        return {"type": "adaptive"}, effective_max_tokens
+    else:
+        # 其他模型: 留 config.max_tokens 給 response，其餘全給 thinking
+        budget = effective_max_tokens - config.max_tokens
+        # 確保 budget 合理（至少 1024，且 < effective_max_tokens）
+        budget = max(budget, 1024)
+        budget = min(budget, effective_max_tokens - 1)
+        return {
+            "type": "enabled",
+            "budget_tokens": budget,
+        }, effective_max_tokens
+
 
 async def run_query_stream(
     question: str,
     model: Optional[str] = None,
     dal: Optional[Any] = None,
+    effort: Optional[str] = None,
+    thinking: Optional[bool] = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a natural language query, yielding events as the agent progresses.
@@ -37,6 +110,8 @@ async def run_query_stream(
         question: The user's question
         model: Override model (default from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
+        effort: Override Anthropic effort level (Opus 4.5+)
+        thinking: Override thinking toggle (None = use config)
 
     Yields:
         AgentEvent for each step of the agent loop
@@ -77,7 +152,24 @@ async def run_query_stream(
         preview_chars=config.context_preview_chars,
     )
 
-    logger.info(f"Running Anthropic agent query: {question[:50]}...")
+    # Build optional API params (effort + thinking)
+    api_kwargs: Dict[str, Any] = {}
+
+    effective_effort = effort if effort is not None else config.anthropic_effort
+    if effective_effort and _supports_effort(model_name):
+        api_kwargs["output_config"] = {"effort": effective_effort}
+
+    thinking_on = thinking if thinking is not None else config.anthropic_thinking
+    thinking_param, effective_max_tokens = _build_thinking_param(
+        model_name, thinking_on, config,
+    )
+    if thinking_param:
+        api_kwargs["thinking"] = thinking_param
+
+    logger.info(
+        f"Running Anthropic agent query: {question[:50]}... "
+        f"effort={effective_effort} thinking={thinking_on}"
+    )
 
     # Tool use loop
     for turn in range(config.max_tool_calls):
@@ -85,10 +177,11 @@ async def run_query_stream(
 
         response = client.messages.create(
             model=model_name,
-            max_tokens=config.max_tokens,
+            max_tokens=effective_max_tokens,
             system=SYSTEM_PROMPT,
             tools=tools,
             messages=messages,
+            **api_kwargs,
         )
 
         tracker.record_anthropic(response, model=model_name)
@@ -96,6 +189,13 @@ async def run_query_stream(
             f"Turn {turn + 1}: stop_reason={response.stop_reason} "
             f"tokens={tracker.last_input_tokens}+{tracker.turns[-1].output_tokens}"
         )
+
+        # Emit thinking content events (extended thinking blocks)
+        for block in response.content:
+            if block.type == "thinking":
+                yield AgentEvent(EventType.thinking_content, {
+                    "thinking": block.thinking,
+                })
 
         # Check if we're done
         if response.stop_reason != "tool_use":
@@ -192,6 +292,8 @@ def run_query(
     question: str,
     model: Optional[str] = None,
     dal: Optional[Any] = None,
+    effort: Optional[str] = None,
+    thinking: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Run a natural language query using Anthropic SDK with tool use.
@@ -203,6 +305,8 @@ def run_query(
         question: The user's question
         model: Override model (default from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
+        effort: Override Anthropic effort level (Opus 4.5+)
+        thinking: Override thinking toggle (None = use config)
 
     Returns:
         Dict with:
@@ -214,7 +318,9 @@ def run_query(
     """
     async def _collect() -> Dict[str, Any]:
         result: Dict[str, Any] = {}
-        async for event in run_query_stream(question, model, dal):
+        async for event in run_query_stream(
+            question, model, dal, effort=effort, thinking=thinking,
+        ):
             if event.type == EventType.done:
                 result = event.data
         return result
