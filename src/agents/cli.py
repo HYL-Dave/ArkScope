@@ -9,9 +9,11 @@ Run:
 Slash commands (during chat):
     /model          Show available models and switch
     /model <name>   Switch to model by name or shorthand
-    /reasoning <n>  Set reasoning effort (OpenAI): none|minimal|low|medium|high|xhigh
-    /effort <n>     Set effort level (Anthropic): max|high|medium|low
-    /thinking       Toggle extended thinking (Anthropic): on|off
+    /reasoning      Pick reasoning effort interactively (OpenAI)
+    /reasoning <n>  Set: none|minimal|low|medium|high|xhigh
+    /effort         Pick effort level interactively (Anthropic, model-aware)
+    /effort <n>     Set: max|high|medium|low
+    /thinking       Toggle extended thinking on/off (Anthropic)
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -202,9 +204,11 @@ def print_help():
             "[bold]Slash Commands[/bold]\n"
             "  [cyan]/model[/cyan]              Show models & switch interactively\n"
             "  [cyan]/model <name>[/cyan]       Switch model (e.g. /model opus, /model gpt5)\n"
-            "  [cyan]/reasoning <n>[/cyan]      Set reasoning effort (OpenAI): none|minimal|low|medium|high|xhigh\n"
-            "  [cyan]/effort <n>[/cyan]         Set effort level (Anthropic): max|high|medium|low\n"
-            "  [cyan]/thinking[/cyan]           Toggle extended thinking (Anthropic): on|off\n"
+            "  [cyan]/reasoning[/cyan]          Pick reasoning effort interactively (OpenAI)\n"
+            "  [cyan]/reasoning <n>[/cyan]      Set: none|minimal|low|medium|high|xhigh\n"
+            "  [cyan]/effort[/cyan]             Pick effort level interactively (Anthropic, model-aware)\n"
+            "  [cyan]/effort <n>[/cyan]         Set: max|high|medium|low\n"
+            "  [cyan]/thinking[/cyan]           Toggle extended thinking on/off (Anthropic)\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -526,6 +530,107 @@ def run_openai_interactive(
 VALID_REASONING = ("none", "minimal", "low", "medium", "high", "xhigh")
 VALID_ANTHROPIC_EFFORT = ("max", "high", "medium", "low")
 
+# 每個 Anthropic 模型支援的 effort 選項（prefix match）
+_EFFORT_OPTIONS_BY_MODEL = {
+    "claude-opus-4-6": ("max", "high", "medium", "low"),
+    "claude-opus-4-5": ("high", "medium", "low"),
+}
+
+
+def _get_effort_options_for_model(model: str):
+    """Return valid effort options for the given model, or None if unsupported."""
+    for prefix, options in _EFFORT_OPTIONS_BY_MODEL.items():
+        if model.startswith(prefix):
+            return options
+    return None
+
+
+def print_reasoning_picker(current: str):
+    """Display reasoning effort options and prompt user to pick one."""
+    options = VALID_REASONING
+
+    table = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold", padding=(0, 1))
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Reasoning Effort", style="cyan")
+    table.add_column("", width=3)
+
+    for i, opt in enumerate(options, 1):
+        marker = "[bold green]*[/bold green]" if opt == current else ""
+        table.add_row(str(i), opt, marker)
+
+    console.print()
+    console.print(table)
+    console.print("[dim]Enter number, name, or 'q' to cancel:[/dim]", end=" ")
+
+    try:
+        choice = console.input("").strip()
+    except (KeyboardInterrupt, EOFError):
+        return None
+
+    if not choice or choice.lower() in ("q", "cancel"):
+        return None
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(options):
+            return options[idx]
+    except ValueError:
+        pass
+
+    if choice.lower() in options:
+        return choice.lower()
+
+    return None
+
+
+def print_effort_picker(current: str, model: str):
+    """Display model-aware effort options and prompt user to pick one."""
+    options = _get_effort_options_for_model(model)
+
+    if options is None:
+        supported = ", ".join(
+            f"{prefix} ({', '.join(opts)})"
+            for prefix, opts in _EFFORT_OPTIONS_BY_MODEL.items()
+        )
+        console.print(
+            f"[yellow]Effort is not supported for {model}.[/yellow]\n"
+            f"[dim]Supported models: {supported}[/dim]\n"
+        )
+        return None
+
+    table = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold", padding=(0, 1))
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Effort Level", style="cyan")
+    table.add_column("", width=3)
+
+    for i, opt in enumerate(options, 1):
+        marker = "[bold green]*[/bold green]" if opt == current else ""
+        table.add_row(str(i), opt, marker)
+
+    console.print()
+    console.print(table)
+    console.print("[dim]Enter number, name, or 'q' to cancel:[/dim]", end=" ")
+
+    try:
+        choice = console.input("").strip()
+    except (KeyboardInterrupt, EOFError):
+        return None
+
+    if not choice or choice.lower() in ("q", "cancel"):
+        return None
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(options):
+            return options[idx]
+    except ValueError:
+        pass
+
+    if choice.lower() in options:
+        return choice.lower()
+
+    return None
+
 
 def handle_model_command(state: SessionState, arg: str) -> None:
     """Handle /model [name] command."""
@@ -563,12 +668,14 @@ def handle_model_command(state: SessionState, arg: str) -> None:
 
 
 def handle_reasoning_command(state: SessionState, arg: str) -> None:
-    """Handle /reasoning <effort> command."""
+    """Handle /reasoning [effort] command."""
     if not arg:
-        console.print(
-            f"[dim]Current: {state.effective_reasoning()}  "
-            f"Options: {', '.join(VALID_REASONING)}[/dim]\n"
-        )
+        selected = print_reasoning_picker(state.effective_reasoning())
+        if selected is None:
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+        state.reasoning_effort = selected
+        console.print(f"[green]Reasoning effort set to[/green] [bold]{selected}[/bold]\n")
         return
 
     if arg.lower() not in VALID_REASONING:
@@ -591,35 +698,59 @@ def handle_status_command(state: SessionState, backend_type: str, ticker_count: 
 
 
 def handle_effort_command(state: SessionState, arg: str) -> None:
-    """Handle /effort <level> command (Anthropic only)."""
+    """Handle /effort [level] command (Anthropic only, model-aware)."""
     if state.provider != "anthropic":
         console.print("[yellow]Effort only applies to Anthropic models.[/yellow]\n")
         return
+
+    current_model = state.effective_model()
+
     if not arg:
         current = state.anthropic_effort or get_agent_config().anthropic_effort or "default"
+        selected = print_effort_picker(current, current_model)
+        if selected is None:
+            # print_effort_picker already prints unsupported message if needed
+            if _get_effort_options_for_model(current_model) is not None:
+                console.print("[dim]Cancelled.[/dim]\n")
+            return
+        state.anthropic_effort = selected
+        console.print(f"[green]Effort set to[/green] [bold]{selected}[/bold]\n")
+        return
+
+    # Direct argument — validate against model-specific options
+    model_options = _get_effort_options_for_model(current_model)
+    if model_options is None:
+        supported = ", ".join(
+            f"{prefix} ({', '.join(opts)})"
+            for prefix, opts in _EFFORT_OPTIONS_BY_MODEL.items()
+        )
         console.print(
-            f"[dim]Current: {current}  "
-            f"Options: {', '.join(VALID_ANTHROPIC_EFFORT)}[/dim]\n"
+            f"[yellow]Effort is not supported for {current_model}.[/yellow]\n"
+            f"[dim]Supported models: {supported}[/dim]\n"
         )
         return
-    if arg.lower() not in VALID_ANTHROPIC_EFFORT:
+
+    if arg.lower() not in model_options:
         console.print(
-            f"[red]Invalid effort: {arg}[/red]\n"
-            f"[dim]Valid: {', '.join(VALID_ANTHROPIC_EFFORT)}[/dim]\n"
+            f"[red]Invalid effort for {current_model}: {arg}[/red]\n"
+            f"[dim]Valid: {', '.join(model_options)}[/dim]\n"
         )
         return
+
     state.anthropic_effort = arg.lower()
     console.print(f"[green]Effort set to[/green] [bold]{arg.lower()}[/bold]\n")
 
 
 def handle_thinking_command(state: SessionState, arg: str) -> None:
-    """Handle /thinking [on|off] command (Anthropic only)."""
+    """Handle /thinking [on|off] command (Anthropic only). No arg = toggle."""
     if state.provider != "anthropic":
         console.print("[yellow]Thinking only applies to Anthropic models.[/yellow]\n")
         return
     if not arg:
-        status = "ON" if state.anthropic_thinking else "OFF"
-        console.print(f"[dim]Thinking: {status}[/dim]\n")
+        # Toggle
+        state.anthropic_thinking = not state.anthropic_thinking
+        new_status = "ON" if state.anthropic_thinking else "OFF"
+        console.print(f"[green]Thinking:[/green] [bold]{new_status}[/bold]\n")
         return
     if arg.lower() in ("on", "true", "1"):
         state.anthropic_thinking = True
