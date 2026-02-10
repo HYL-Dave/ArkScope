@@ -65,6 +65,10 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
+from prompt_toolkit import prompt as pt_prompt
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.formatted_text import ANSI
+
 from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
 
@@ -176,6 +180,97 @@ class SessionState:
         history = "on" if not self.no_history else "off"
         parts.append(f"History: {history}")
         return " | ".join(parts)
+
+
+# ============================================================
+# Slash Command Autocomplete
+# ============================================================
+
+# Command definitions: (name, aliases, description, sub_options_fn or None)
+# sub_options_fn receives SessionState and returns list of (value, description) tuples
+_SLASH_COMMANDS = [
+    ("/model", "/m", "Show models & switch"),
+    ("/reasoning", "/r", "Set reasoning effort (OpenAI)"),
+    ("/effort", "/e", "Set effort level (Anthropic)"),
+    ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
+    ("/status", "/s", "Show session config"),
+    ("/help", "", "Show all commands"),
+]
+
+_REASONING_OPTIONS = [
+    ("none", "No reasoning"),
+    ("minimal", "Minimal reasoning"),
+    ("low", "Low effort"),
+    ("medium", "Medium effort"),
+    ("high", "High effort"),
+    ("xhigh", "Extra high effort"),
+]
+
+_THINKING_OPTIONS = [
+    ("on", "Enable extended thinking"),
+    ("off", "Disable extended thinking"),
+]
+
+
+def _get_effort_completions(state: SessionState):
+    """Return effort options as (value, description) tuples for the current model."""
+    options = _get_effort_options_for_model(state.effective_model())
+    if options is None:
+        return []
+    descs = {"max": "Maximum (Opus 4.6 only)", "high": "High", "medium": "Medium", "low": "Low"}
+    return [(opt, descs.get(opt, "")) for opt in options]
+
+
+def _get_model_completions():
+    """Return model names/aliases for /model completion."""
+    results = []
+    for m in MODEL_CATALOG:
+        results.append((m.id, f"{m.name} ({m.provider})"))
+        for alias in m.aliases[:3]:
+            results.append((alias, f"→ {m.name}"))
+    return results
+
+
+class SlashCompleter(Completer):
+    """Autocomplete for slash commands with context-aware sub-options."""
+
+    def __init__(self, state: SessionState):
+        self.state = state
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        # Only complete if starts with /
+        if not text.startswith("/"):
+            return
+
+        parts = text.split(None, 1)
+        cmd_text = parts[0].lower()
+
+        if len(parts) == 1 and not text.endswith(" "):
+            # Completing command name: /rea... → /reasoning
+            for name, alias, desc in _SLASH_COMMANDS:
+                if name.startswith(cmd_text):
+                    yield Completion(name, start_position=-len(cmd_text), display_meta=desc)
+                elif alias and alias.startswith(cmd_text):
+                    yield Completion(alias, start_position=-len(cmd_text), display_meta=f"→ {name}")
+        else:
+            # Completing sub-options: /reasoning x... → xhigh
+            sub_text = parts[1].strip().lower() if len(parts) > 1 else ""
+            options = self._get_sub_options(cmd_text)
+            for value, desc in options:
+                if value.startswith(sub_text):
+                    yield Completion(value, start_position=-len(sub_text), display_meta=desc)
+
+    def _get_sub_options(self, cmd: str):
+        if cmd in ("/reasoning", "/r"):
+            return _REASONING_OPTIONS
+        elif cmd in ("/effort", "/e"):
+            return _get_effort_completions(self.state)
+        elif cmd in ("/thinking", "/t"):
+            return _THINKING_OPTIONS
+        elif cmd in ("/model", "/m"):
+            return _get_model_completions()
+        return []
 
 
 # ============================================================
@@ -839,9 +934,15 @@ def main():
         f"{ticker_count} tickers[/dim]\n"
     )
 
+    completer = SlashCompleter(state)
+
     while True:
         try:
-            question = console.input("[bold cyan]>[/bold cyan] ").strip()
+            question = pt_prompt(
+                ANSI("\033[1;36m>\033[0m "),
+                completer=completer,
+                complete_while_typing=False,
+            ).strip()
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Bye![/dim]")
             break
