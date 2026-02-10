@@ -19,15 +19,50 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
+# ── Model output limits ────────────────────────────────────────
+# GPT-5.x 全系列 max output tokens = 128K
+# max_output_tokens 包含 reasoning tokens + visible output（跟 Anthropic max_tokens 相同概念）
+# 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠
+_OPENAI_MODEL_MAX_OUTPUT = {
+    "gpt-5": 128000,
+    "gpt-5.1": 128000,
+    "gpt-5.2": 128000,
+    "gpt-5-mini": 128000,
+    "gpt-5-nano": 128000,
+}
+_OPENAI_DEFAULT_MAX_OUTPUT = 128000
+
+
+def _get_openai_max_output(model: str) -> int:
+    """Return the model's maximum output token limit."""
+    for prefix, limit in _OPENAI_MODEL_MAX_OUTPUT.items():
+        if model.startswith(prefix):
+            return limit
+    return _OPENAI_DEFAULT_MAX_OUTPUT
+
 
 def _build_agent(
     model_name: str,
     tools: list,
     reasoning_effort: ReasoningEffort = "high",
+    max_tokens: int = 16384,
 ):
-    """Build an Agent with ModelSettings including reasoning config."""
+    """Build an Agent with ModelSettings including reasoning config.
+
+    設計決策（與 Anthropic thinking 模式一致）：
+    - reasoning_effort != "none" → max_tokens = 模型 max output (128K)
+      reasoning tokens 從 max_output_tokens 扣，需要足夠空間
+    - reasoning_effort == "none" → max_tokens = config.max_tokens (16384)
+      不消耗 reasoning tokens，只需 visible output 空間
+    """
     from agents import Agent, ModelSettings
     from openai.types.shared import Reasoning
+
+    # 自動決定 effective_max_tokens
+    if reasoning_effort == "none":
+        effective_max_tokens = max_tokens
+    else:
+        effective_max_tokens = _get_openai_max_output(model_name)
 
     return Agent(
         name="MindfulRL Assistant",
@@ -36,6 +71,7 @@ def _build_agent(
         tools=tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=reasoning_effort),
+            max_tokens=effective_max_tokens,
         ),
     )
 
@@ -85,7 +121,7 @@ async def run_query(
     tools = create_openai_tools(dal)
 
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort)
+    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
 
     # Run query
     logger.info(
@@ -169,7 +205,7 @@ def run_query_sync(
     tools = create_openai_tools(dal)
 
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort)
+    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
 
     # Run query synchronously
     logger.info(
@@ -257,7 +293,7 @@ async def run_query_stream(
     tools = create_openai_tools(dal)
 
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort)
+    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
 
     logger.info(
         f"Running OpenAI agent (stream): model={model_name} reasoning={effort} "

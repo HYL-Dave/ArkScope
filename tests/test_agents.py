@@ -214,6 +214,34 @@ class TestOpenAIToolCreation:
 
 
 # ============================================================
+# OpenAI max_tokens Tests
+# ============================================================
+
+class TestOpenAIMaxTokens:
+    def test_reasoning_effort_uses_model_max(self):
+        """With reasoning effort != 'none', max_tokens = model max output."""
+        from src.agents.openai_agent.agent import _build_agent
+        agent = _build_agent("gpt-5.2", [], reasoning_effort="xhigh")
+        assert agent.model_settings.max_tokens == 128000
+
+    def test_reasoning_none_uses_config_max(self):
+        """With reasoning effort == 'none', max_tokens = config.max_tokens."""
+        from src.agents.openai_agent.agent import _build_agent
+        agent = _build_agent("gpt-5.2", [], reasoning_effort="none", max_tokens=16384)
+        assert agent.model_settings.max_tokens == 16384
+
+    def test_model_max_output_lookup(self):
+        """All GPT-5.x models map to 128K."""
+        from src.agents.openai_agent.agent import _get_openai_max_output
+        assert _get_openai_max_output("gpt-5.2") == 128000
+        assert _get_openai_max_output("gpt-5") == 128000
+        assert _get_openai_max_output("gpt-5-mini") == 128000
+        assert _get_openai_max_output("gpt-5-nano") == 128000
+        # Unknown model gets default
+        assert _get_openai_max_output("gpt-4.1") == 128000
+
+
+# ============================================================
 # API Endpoint Tests (without actual LLM calls)
 # ============================================================
 
