@@ -1,7 +1,7 @@
 """
 OpenAI Agents SDK tool wrappers.
 
-Wraps the 17 tool functions with @function_tool decorator for use with
+Wraps the 18 tool functions with @function_tool decorator for use with
 the OpenAI Agents SDK.
 """
 
@@ -72,6 +72,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_watchlist_overview,
         get_morning_brief,
     )
+    from src.tools.code_executor import execute_python_code
 
     # ================================================================
     # News Tools
@@ -338,6 +339,39 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = get_morning_brief(dal)
         return _serialize_result(result)
 
+    # ================================================================
+    # Execution Tools
+    # ================================================================
+
+    @function_tool
+    def tool_execute_python_analysis(
+        code: str = "",
+        task: str = "",
+        data_json: str = "",
+        timeout: int = 120,
+        background: bool = False,
+    ) -> str:
+        """Execute Python code for custom financial calculations and data analysis.
+
+        Provide `code` for direct execution, or `task` for auto code generation
+        using a coding model with error-correcting retry.
+        Code runs in isolated subprocess with numpy, pandas, scipy available.
+        Pass data via data_json parameter (accessible as `data` variable in code).
+        Set background=True for long-running tasks (results written to temp file).
+
+        Args:
+            code: Python code to execute (direct mode)
+            task: Task description for auto code generation with error correction (alternative to code)
+            data_json: JSON string of data to inject (accessible as `data` variable)
+            timeout: Execution timeout in seconds (default: 120)
+            background: Run in background, write results to temp file (default: False)
+        """
+        result = execute_python_code(
+            code=code, task=task, data_json=data_json,
+            timeout=timeout, background=background,
+        )
+        return _serialize_result(result)
+
     # Return all tools as a list
     return [
         tool_get_ticker_news,
@@ -357,4 +391,5 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sec_filings,
         tool_get_watchlist_overview,
         tool_get_morning_brief,
+        tool_execute_python_analysis,
     ]

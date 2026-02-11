@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 # max_output_tokens 包含 reasoning tokens + visible output（跟 Anthropic max_tokens 相同概念）
 # 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠
 _OPENAI_MODEL_MAX_OUTPUT = {
-    "gpt-5": 128000,
-    "gpt-5.1": 128000,
     "gpt-5.2": 128000,
     "gpt-5-mini": 128000,
-    "gpt-5-nano": 128000,
+    # Codex series (agentic coding optimized, same output limits)
+    "gpt-5.2-codex": 128000,
+    "gpt-5.3-codex": 128000,
 }
 _OPENAI_DEFAULT_MAX_OUTPUT = 128000
 

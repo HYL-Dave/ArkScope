@@ -82,10 +82,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All 17 tools are defined."""
+        """All 18 tools are defined."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 17
+        assert len(tools) == 18
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -122,6 +122,7 @@ class TestAnthropicToolSchemas:
             "get_sec_filings",
             "get_watchlist_overview",
             "get_morning_brief",
+            "execute_python_analysis",
         }
         assert tool_names == expected
 
@@ -197,10 +198,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """Creates 17 tools."""
+        """Creates 18 tools."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 17
+        assert len(tools) == 18
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -284,7 +285,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 17
+        assert len(schemas) == 18
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -298,7 +299,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 17
+        assert len(schemas) == 18
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

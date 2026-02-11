@@ -154,12 +154,13 @@ class ToolRegistry:
     # ============================================================
 
     def register_all(self) -> None:
-        """Register all 17 built-in tool functions."""
+        """Register all 18 built-in tool functions."""
         self._register_news_tools()
         self._register_price_tools()
         self._register_options_tools()
         self._register_signal_tools()
         self._register_analysis_tools()
+        self._register_execution_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -399,8 +400,43 @@ class ToolRegistry:
         ))
 
 
+    def _register_execution_tools(self) -> None:
+        from .code_executor import execute_python_code
+
+        self.register(ToolDefinition(
+            name="execute_python_analysis",
+            description=(
+                "Execute Python code for custom financial calculations and data analysis. "
+                "Provide `code` for direct execution, or `task` for auto code generation "
+                "using a coding model with error-correcting retry. "
+                "Code runs in isolated subprocess with numpy, pandas, scipy available. "
+                "Pass data via data_json (accessible as `data` variable)."
+            ),
+            function=execute_python_code,
+            category="execution",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("code", "string", "Python code to execute (direct mode)",
+                              required=False, default=""),
+                ToolParameter("task", "string",
+                              "Task description for auto code generation with error correction "
+                              "(alternative to code)",
+                              required=False, default=""),
+                ToolParameter("data_json", "string",
+                              "JSON string of data to inject (accessible as `data` variable)",
+                              required=False, default=""),
+                ToolParameter("timeout", "integer",
+                              "Execution timeout in seconds (default: 120)",
+                              required=False, default=120),
+                ToolParameter("background", "boolean",
+                              "Run in background, write results to temp file (default: false)",
+                              required=False, default=False),
+            ],
+        ))
+
+
 def create_default_registry() -> ToolRegistry:
-    """Create and return a registry with all 17 tools registered."""
+    """Create and return a registry with all 18 tools registered."""
     registry = ToolRegistry()
     registry.register_all()
     return registry

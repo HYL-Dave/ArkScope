@@ -346,6 +346,47 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": []
             }
         },
+        # Execution Tools
+        {
+            "name": "execute_python_analysis",
+            "description": (
+                "Execute Python code for custom financial calculations and data analysis. "
+                "Provide `code` for direct execution, or `task` for auto code generation "
+                "using a coding model with error-correcting retry. "
+                "Code runs in isolated subprocess with numpy, pandas, scipy available. "
+                "Pass data via data_json (accessible as `data` variable). "
+                "Set background=true for long-running tasks (results written to temp file)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute (direct mode)"
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": (
+                            "Task description for auto code generation with error correction "
+                            "(alternative to code)"
+                        )
+                    },
+                    "data_json": {
+                        "type": "string",
+                        "description": "JSON string of data to inject (accessible as `data` variable)"
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Execution timeout in seconds (default: 120)"
+                    },
+                    "background": {
+                        "type": "boolean",
+                        "description": "Run in background, write results to temp file (default: false)"
+                    }
+                },
+                "required": []
+            }
+        },
     ]
 
 
@@ -404,6 +445,7 @@ def execute_tool(
         get_watchlist_overview,
         get_morning_brief,
     )
+    from src.tools.code_executor import execute_python_code
 
     # Tool dispatch map
     tool_map = {
@@ -489,6 +531,13 @@ def execute_tool(
         ),
         "get_watchlist_overview": lambda: get_watchlist_overview(dal),
         "get_morning_brief": lambda: get_morning_brief(dal),
+        "execute_python_analysis": lambda: execute_python_code(
+            code=tool_input.get("code", ""),
+            task=tool_input.get("task", ""),
+            data_json=tool_input.get("data_json", ""),
+            timeout=tool_input.get("timeout", 120),
+            background=tool_input.get("background", False),
+        ),
     }
 
     if tool_name not in tool_map:

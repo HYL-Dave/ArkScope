@@ -61,6 +61,10 @@ class AgentConfig(BaseModel):
     # Characters to keep as preview in compacted results
     context_preview_chars: int = 200
 
+    # Code generation model (empty = auto, uses anthropic_model_advanced)
+    code_model: str = ""
+    code_max_retries: int = 3
+
     # Behavior
     temperature: float = 0.0  # Deterministic for tool calling
 
@@ -120,6 +124,12 @@ def get_agent_config() -> AgentConfig:
         config.anthropic_effort = llm_prefs["anthropic_effort"]
     if "anthropic_thinking" in llm_prefs:
         config.anthropic_thinking = llm_prefs["anthropic_thinking"]
+
+    # Code generation overrides
+    if "code_model" in llm_prefs:
+        config.code_model = llm_prefs["code_model"]
+    if "code_max_retries" in llm_prefs:
+        config.code_max_retries = llm_prefs["code_max_retries"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})

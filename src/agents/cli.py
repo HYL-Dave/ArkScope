@@ -120,6 +120,21 @@ MODEL_CATALOG: List[ModelEntry] = [
         aliases=["gpt5", "gpt-5", "gpt5.2", "5.2"],
         description="SOTA reasoning with configurable effort",
     ),
+    # Codex series — optimized for agentic coding
+    ModelEntry(
+        id="gpt-5.2-codex",
+        provider="openai",
+        name="GPT-5.2 Codex",
+        aliases=["codex", "codex5.2", "5.2-codex"],
+        description="Agentic coding — long-horizon, refactors, migrations",
+    ),
+    ModelEntry(
+        id="gpt-5.3-codex",
+        provider="openai",
+        name="GPT-5.3 Codex",
+        aliases=["codex5.3", "5.3-codex", "codex-latest"],
+        description="Latest codex — API phased rollout (coming soon)",
+    ),
 ]
 
 
@@ -153,6 +168,7 @@ class SessionState:
     messages_history: Optional[List[dict]] = field(default=None)
     anthropic_effort: Optional[str] = None
     anthropic_thinking: bool = False
+    code_model: str = ""  # Code generation model (empty = auto)
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -177,6 +193,8 @@ class SessionState:
             parts.append(f"Effort: {effort}")
             if self.anthropic_thinking:
                 parts.append("Thinking: ON")
+        if self.code_model:
+            parts.append(f"CodeModel: {self.code_model}")
         history = "on" if not self.no_history else "off"
         parts.append(f"History: {history}")
         return " | ".join(parts)
@@ -190,6 +208,7 @@ class SessionState:
 # sub_options_fn receives SessionState and returns list of (value, description) tuples
 _SLASH_COMMANDS = [
     ("/model", "/m", "Show models & switch"),
+    ("/code-model", "/cm", "Set code generation model"),
     ("/reasoning", "/r", "Set reasoning effort (OpenAI)"),
     ("/effort", "/e", "Set effort level (Anthropic)"),
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
@@ -270,6 +289,8 @@ class SlashCompleter(Completer):
             return _THINKING_OPTIONS
         elif cmd in ("/model", "/m"):
             return _get_model_completions()
+        elif cmd in ("/code-model", "/cm"):
+            return [("auto", "Use default model")] + _get_model_completions()
         return []
 
 
@@ -299,6 +320,8 @@ def print_help():
             "[bold]Slash Commands[/bold]\n"
             "  [cyan]/model[/cyan]              Show models & switch interactively\n"
             "  [cyan]/model <name>[/cyan]       Switch model (e.g. /model opus, /model gpt5)\n"
+            "  [cyan]/code-model[/cyan]         Pick code generation model interactively\n"
+            "  [cyan]/code-model <n>[/cyan]     Set code model (e.g. /code-model opus, /cm auto)\n"
             "  [cyan]/reasoning[/cyan]          Pick reasoning effort interactively (OpenAI)\n"
             "  [cyan]/reasoning <n>[/cyan]      Set: none|minimal|low|medium|high|xhigh\n"
             "  [cyan]/effort[/cyan]             Pick effort level interactively (Anthropic, model-aware)\n"
@@ -857,6 +880,25 @@ def handle_thinking_command(state: SessionState, arg: str) -> None:
         console.print("[red]Usage: /thinking [on|off][/red]\n")
 
 
+def handle_code_model_command(state: SessionState, arg: str) -> None:
+    """Handle /code-model [model] command. No arg = interactive picker."""
+    if not arg:
+        # Interactive picker
+        current = state.code_model or "(auto)"
+        selected = print_model_picker(current)
+        if selected is None:
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+        state.code_model = selected.id
+        console.print(f"[green]Code model:[/green] [bold]{selected.id}[/bold]\n")
+    elif arg.lower() in ("auto", "none", "reset"):
+        state.code_model = ""
+        console.print("[green]Code model:[/green] [bold](auto)[/bold]\n")
+    else:
+        state.code_model = arg
+        console.print(f"[green]Code model:[/green] [bold]{arg}[/bold]\n")
+
+
 # ============================================================
 # Main Chat Loop
 # ============================================================
@@ -971,6 +1013,8 @@ def main():
 
             if cmd in ("/model", "/m"):
                 handle_model_command(state, arg)
+            elif cmd in ("/code-model", "/cm"):
+                handle_code_model_command(state, arg)
             elif cmd in ("/reasoning", "/r"):
                 handle_reasoning_command(state, arg)
             elif cmd in ("/effort", "/e"):

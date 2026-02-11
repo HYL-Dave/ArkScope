@@ -11,6 +11,7 @@ You have access to tools that query:
 - Trading signals (anomaly detection, event chains)
 - Fundamentals and SEC filings
 - Watchlist and portfolio overview
+- Code execution (run custom Python for calculations, correlations, backtests)
 
 Guidelines:
 1. Use the appropriate tool(s) to answer user questions
@@ -25,6 +26,7 @@ Example interactions:
 - "How has AMD performed this week?" → Use get_price_change
 - "Is NVDA IV high right now?" → Use get_iv_analysis
 - "Give me a morning brief" → Use get_morning_brief
+- "Calculate correlation between NVDA and AMD" → Use tools to get data, then execute_python_analysis
 """
 
 # Variant for multi-tool synthesis
