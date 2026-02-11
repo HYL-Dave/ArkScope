@@ -59,36 +59,91 @@ def _detect_provider(model: str) -> str:
 
 
 # ── LLM API calls ───────────────────────────────────────────
+# 各 provider 讀取對應的 config 設定：
+#   OpenAI  → config.reasoning_effort + model max output
+#   Anthropic → config.anthropic_effort + config.anthropic_thinking + model max output
+# 設計決策：code gen 一律給模型最大 output 空間（不受主 agent 的 reasoning off 限制）
+# 因為 (1) reasoning tokens 從中扣，空間不足會截斷推理
+#       (2) 按實際用量計費，設高不多花錢
+#       (3) code gen 有 retry 機制，但 token 截斷無法修正
 
 def _call_openai(messages: List[dict], model: str, system: str) -> str:
-    """Call OpenAI chat completion API."""
+    """Call OpenAI chat completion API with reasoning from config.
+
+    Code generation 一律給模型最大 output 空間 — reasoning tokens + visible output
+    都從 max_completion_tokens 扣，設高不多花錢（按實際用量計費）。
+    """
     from openai import OpenAI
+    from ..agents.config import get_agent_config
+    from ..agents.openai_agent.agent import _get_openai_max_output
+
+    config = get_agent_config()
+    effort = config.reasoning_effort
+
+    kwargs: dict = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}] + messages,
+        "max_completion_tokens": _get_openai_max_output(model),
+    }
+
+    # reasoning 參數 (Codex 模型要求必設)
+    if effort != "none":
+        from openai.types.shared import Reasoning
+        kwargs["reasoning"] = Reasoning(effort=effort)
+    else:
+        kwargs["temperature"] = 0.0
 
     client = OpenAI()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": system}] + messages,
-        temperature=0.0,
-        max_completion_tokens=16384,
-    )
+    response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content or ""
 
 
 def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
-    """Call Anthropic messages API."""
+    """Call Anthropic messages API with effort + thinking from config.
+
+    Code generation 一律給模型最大 output 空間 — thinking 開啟時 budget 從中扣，
+    關閉時也直接給 model max（code 長度不可預測，不限制自由度）。
+    """
     from anthropic import Anthropic
+    from ..agents.config import get_agent_config
+    from ..agents.anthropic_agent.agent import (
+        _get_model_max_output,
+        _supports_effort,
+        _build_thinking_param,
+    )
+
+    config = get_agent_config()
+
+    # thinking 開啟: _build_thinking_param 自動推導 (已用 model max)
+    # thinking 關閉: 也用 model max，給 code gen 最大自由度
+    thinking_param, _ = _build_thinking_param(
+        model, config.anthropic_thinking, config
+    )
+    effective_max_tokens = _get_model_max_output(model)
+
+    kwargs: dict = {
+        "model": model,
+        "system": system,
+        "messages": messages,
+        "max_tokens": effective_max_tokens,
+    }
+
+    # effort (Opus 4.5+ only)
+    if config.anthropic_effort and _supports_effort(model):
+        kwargs["output_config"] = {"effort": config.anthropic_effort}
+
+    # thinking
+    if thinking_param:
+        kwargs["thinking"] = thinking_param
+    else:
+        kwargs["temperature"] = 0.0  # thinking 模式不支援 temperature
 
     client = Anthropic()
-    response = client.messages.create(
-        model=model,
-        system=system,
-        messages=messages,
-        max_tokens=16384,
-        temperature=0.0,
-    )
-    # Extract text from content blocks
+    response = client.messages.create(**kwargs)
+
+    # Extract text from content blocks (skip thinking blocks)
     for block in response.content:
-        if hasattr(block, "text"):
+        if hasattr(block, "text") and getattr(block, "type", None) != "thinking":
             return block.text
     return ""
 

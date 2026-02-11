@@ -65,9 +65,6 @@ class AgentConfig(BaseModel):
     code_model: str = ""
     code_max_retries: int = 3
 
-    # Behavior
-    temperature: float = 0.0  # Deterministic for tool calling
-
 
 def _load_user_profile() -> dict:
     """Load user_profile.yaml if exists."""
