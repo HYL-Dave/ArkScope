@@ -139,7 +139,8 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
         kwargs["temperature"] = 0.0  # thinking 模式不支援 temperature
 
     client = Anthropic()
-    response = client.messages.create(**kwargs)
+    with client.messages.stream(**kwargs) as stream:
+        response = stream.get_final_message()
 
     # Extract text from content blocks (skip thinking blocks)
     for block in response.content:

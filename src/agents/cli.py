@@ -521,14 +521,15 @@ def run_anthropic_interactive(
 
     for turn in range(config.max_tool_calls):
         with console.status("[cyan]Thinking...", spinner="dots"):
-            response = client.messages.create(
+            with client.messages.stream(
                 model=model_name,
                 max_tokens=effective_max_tokens,
                 system=SYSTEM_PROMPT,
                 tools=tools,
                 messages=messages,
                 **api_kwargs,
-            )
+            ) as stream:
+                response = stream.get_final_message()
 
         # Display thinking blocks (extended thinking)
         for block in response.content:

@@ -175,14 +175,15 @@ async def run_query_stream(
     for turn in range(config.max_tool_calls):
         yield AgentEvent(EventType.thinking, {"turn": turn + 1, "model": model_name})
 
-        response = client.messages.create(
+        with client.messages.stream(
             model=model_name,
             max_tokens=effective_max_tokens,
             system=SYSTEM_PROMPT,
             tools=tools,
             messages=messages,
             **api_kwargs,
-        )
+        ) as stream:
+            response = stream.get_final_message()
 
         tracker.record_anthropic(response, model=model_name)
         logger.debug(

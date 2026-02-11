@@ -103,6 +103,20 @@ def _make_tool_use_block(tool_name, tool_input, tool_id="tool_123"):
     return block
 
 
+def _make_stream_cm(response):
+    """Create a mock context manager for client.messages.stream().
+
+    Usage: client.messages.stream.return_value = _make_stream_cm(response)
+    Simulates: with client.messages.stream(...) as s: s.get_final_message() → response
+    """
+    stream = MagicMock()
+    stream.get_final_message.return_value = response
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=stream)
+    cm.__exit__ = MagicMock(return_value=False)
+    return cm
+
+
 class TestAnthropicStream:
     """Test event sequence from run_query_stream (Anthropic)."""
 
@@ -154,7 +168,7 @@ class TestAnthropicStream:
 
     def test_no_tool_calls(self, mock_deps):
         """Direct answer: thinking → done."""
-        mock_deps["client"].messages.create.return_value = _make_mock_response()
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
         events = self._collect_events(
@@ -181,7 +195,7 @@ class TestAnthropicStream:
         # Second call: final answer
         final_response = _make_mock_response()
 
-        mock_deps["client"].messages.create.side_effect = [tool_response, final_response]
+        mock_deps["client"].messages.stream.side_effect = [_make_stream_cm(tool_response), _make_stream_cm(final_response)]
 
         from src.agents.anthropic_agent.agent import run_query_stream
         events = self._collect_events(
@@ -216,7 +230,7 @@ class TestAnthropicStream:
             content_blocks=[tool_block],
         )
         final_response = _make_mock_response()
-        mock_deps["client"].messages.create.side_effect = [tool_response, final_response]
+        mock_deps["client"].messages.stream.side_effect = [_make_stream_cm(tool_response), _make_stream_cm(final_response)]
 
         from src.agents.anthropic_agent.agent import run_query_stream
         events = self._collect_events(
@@ -236,7 +250,7 @@ class TestAnthropicStream:
             stop_reason="tool_use",
             content_blocks=[tool_block],
         )
-        mock_deps["client"].messages.create.return_value = tool_response
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(tool_response)
 
         from src.agents.anthropic_agent.agent import run_query_stream
         events = self._collect_events(
@@ -263,7 +277,7 @@ class TestAnthropicStream:
             stop_reason="end_turn",
             content_blocks=[thinking_block, text_block],
         )
-        mock_deps["client"].messages.create.return_value = response
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(response)
 
         from src.agents.anthropic_agent.agent import run_query_stream
         events = self._collect_events(
@@ -277,7 +291,7 @@ class TestAnthropicStream:
 
     def test_effort_kwarg_passed(self, mock_deps):
         """Effort override is passed to API as output_config."""
-        mock_deps["client"].messages.create.return_value = _make_mock_response()
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
         # Pass model directly — Opus 4.6 supports effort
@@ -285,12 +299,12 @@ class TestAnthropicStream:
             run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), effort="medium")
         )
 
-        call_kwargs = mock_deps["client"].messages.create.call_args
+        call_kwargs = mock_deps["client"].messages.stream.call_args
         assert call_kwargs.kwargs.get("output_config") == {"effort": "medium"}
 
     def test_thinking_kwarg_adaptive(self, mock_deps):
         """Thinking override with Opus 4.6 uses adaptive mode + model max output."""
-        mock_deps["client"].messages.create.return_value = _make_mock_response()
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
         # Pass model directly — Opus 4.6 uses adaptive thinking
@@ -298,14 +312,14 @@ class TestAnthropicStream:
             run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), thinking=True)
         )
 
-        call_kwargs = mock_deps["client"].messages.create.call_args
+        call_kwargs = mock_deps["client"].messages.stream.call_args
         assert call_kwargs.kwargs.get("thinking") == {"type": "adaptive"}
         # max_tokens = Opus 4.6 max output
         assert call_kwargs.kwargs.get("max_tokens") == 128000
 
     def test_thinking_kwarg_enabled_for_sonnet(self, mock_deps):
         """Thinking override with Sonnet uses enabled + auto-derived budget."""
-        mock_deps["client"].messages.create.return_value = _make_mock_response()
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
         # Sonnet 4.5: max_output=64000, budget = 64000 - 16384 = 47616
@@ -313,7 +327,7 @@ class TestAnthropicStream:
             run_query_stream("Test", dal=MagicMock(), thinking=True)
         )
 
-        call_kwargs = mock_deps["client"].messages.create.call_args
+        call_kwargs = mock_deps["client"].messages.stream.call_args
         thinking_param = call_kwargs.kwargs.get("thinking")
         assert thinking_param["type"] == "enabled"
         # budget = model_max_output (64000) - config.max_tokens (16384) = 47616
@@ -323,7 +337,7 @@ class TestAnthropicStream:
 
     def test_no_effort_for_unsupported_model(self, mock_deps):
         """Effort is not sent for models that don't support it (Sonnet 4.5)."""
-        mock_deps["client"].messages.create.return_value = _make_mock_response()
+        mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
         # Sonnet 4.5 doesn't support effort
@@ -331,7 +345,7 @@ class TestAnthropicStream:
             run_query_stream("Test", dal=MagicMock(), effort="medium")
         )
 
-        call_kwargs = mock_deps["client"].messages.create.call_args
+        call_kwargs = mock_deps["client"].messages.stream.call_args
         assert "output_config" not in call_kwargs.kwargs
 
 
@@ -361,7 +375,7 @@ class TestRunQueryBackwardCompat:
 
             client = MagicMock()
             mock_cls.return_value = client
-            client.messages.create.return_value = _make_mock_response()
+            client.messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
             from src.agents.anthropic_agent.agent import run_query
             result = run_query("Test question", dal=MagicMock())
