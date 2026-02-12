@@ -34,7 +34,7 @@ def get_ticker_news(
     Returns:
         NewsQueryResult with articles, count, and source breakdown
     """
-    return dal.get_news(ticker=ticker, days=days, source=source, scored_only=True)
+    return dal.get_news(ticker=ticker, days=days, source=source, scored_only=False)
 
 
 def get_news_sentiment_summary(

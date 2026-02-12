@@ -231,6 +231,72 @@ class FileBackend:
 
         return df
 
+    def _load_raw_news(self, days: int = 30) -> pd.DataFrame:
+        """Load unscored news from data/news/raw/ parquet files.
+
+        Only loads files from year-months overlapping the requested date
+        range to avoid scanning all historical data.  Returns a DataFrame
+        with the standard news columns; sentiment/risk scores are NaN.
+        """
+        raw_dir = self._news_dir / "raw"
+        if not raw_dir.exists():
+            return pd.DataFrame()
+
+        cutoff_date = date.today() - timedelta(days=days)
+
+        # Build set of YYYY-MM strings we need (cutoff month through today)
+        target_months: set[str] = set()
+        d = cutoff_date.replace(day=1)
+        while d <= date.today():
+            target_months.add(d.strftime("%Y-%m"))
+            # Advance to next month
+            d = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+        frames: list[pd.DataFrame] = []
+        for source_dir in sorted(raw_dir.iterdir()):
+            if not source_dir.is_dir():
+                continue
+            source_name = source_dir.name  # 'polygon', 'finnhub', 'ibkr'
+
+            for pq in source_dir.rglob("*.parquet"):
+                # Only load files whose name contains a target year-month
+                # e.g. stem = "2026-02" or "finnhub_news_2026-02"
+                if not any(m in pq.stem for m in target_months):
+                    continue
+
+                try:
+                    df = pd.read_parquet(pq)
+                except Exception as e:
+                    logger.warning(f"Could not read {pq}: {e}")
+                    continue
+
+                if df.empty:
+                    continue
+
+                # Standardise columns to match scored-file output
+                df["source"] = source_name
+                df["date"] = pd.to_datetime(
+                    df.get("published_at"), errors="coerce",
+                ).dt.strftime("%Y-%m-%d")
+                df["sentiment_score"] = None
+                df["risk_score"] = None
+
+                for col in ["ticker", "title", "url", "publisher", "description"]:
+                    if col not in df.columns:
+                        df[col] = None
+
+                frames.append(df)
+
+        if not frames:
+            return pd.DataFrame()
+
+        combined = pd.concat(frames, ignore_index=True)
+        logger.debug(
+            f"Loaded {len(combined)} raw news rows from "
+            f"{len(frames)} files (months: {sorted(target_months)})"
+        )
+        return combined
+
     def query_news(
         self,
         ticker: Optional[str] = None,
@@ -239,7 +305,12 @@ class FileBackend:
         scored_only: bool = True,
         model: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Query news articles from local scored files.
+        """Query news articles from local scored + raw files.
+
+        Scored articles (with sentiment/risk scores) are loaded first.
+        Raw articles from data/news/raw/ are merged in to fill gaps
+        (e.g. recently collected but not yet scored).  When an article
+        exists in both scored and raw, the scored version is kept.
 
         Args:
             ticker: Filter by ticker symbol.
@@ -262,6 +333,15 @@ class FileBackend:
             if not df.empty:
                 frames.append(df)
 
+        # Also load raw (unscored) articles to fill gaps
+        raw_df = self._load_raw_news(days=days)
+        if not raw_df.empty:
+            if source not in ("auto",):
+                # Filter raw to requested source
+                raw_df = raw_df[raw_df["source"] == source]
+            if not raw_df.empty:
+                frames.append(raw_df)
+
         if not frames:
             return pd.DataFrame(columns=[
                 "date", "ticker", "title", "source", "url",
@@ -269,6 +349,14 @@ class FileBackend:
             ])
 
         combined = pd.concat(frames, ignore_index=True)
+
+        # Deduplicate: scored articles (loaded first) take priority
+        if "dedup_hash" in combined.columns:
+            combined = combined.drop_duplicates(subset="dedup_hash", keep="first")
+        else:
+            combined = combined.drop_duplicates(
+                subset=["ticker", "date", "title"], keep="first",
+            )
 
         # Date filter
         combined = combined[combined["date"] >= cutoff]
