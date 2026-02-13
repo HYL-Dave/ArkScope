@@ -16,6 +16,7 @@ from ..shared.context_manager import ContextManager
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.scratchpad import Scratchpad
+from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
@@ -171,18 +172,33 @@ async def run_query_stream(
         f"effort={effective_effort} thinking={thinking_on}"
     )
 
+    # 1M context beta: use beta.messages.stream for supported models
+    use_beta = _use_extended_context(model_name, config.extended_context)
+    if use_beta:
+        logger.info(f"Using 1M context beta for {model_name}")
+
     # Tool use loop
     for turn in range(config.max_tool_calls):
         yield AgentEvent(EventType.thinking, {"turn": turn + 1, "model": model_name})
 
-        with client.messages.stream(
+        stream_kwargs = dict(
             model=model_name,
             max_tokens=effective_max_tokens,
             system=SYSTEM_PROMPT,
             tools=tools,
             messages=messages,
             **api_kwargs,
-        ) as stream:
+        )
+
+        if use_beta:
+            stream_ctx = client.beta.messages.stream(
+                betas=[_EXTENDED_CONTEXT_BETA],
+                **stream_kwargs,
+            )
+        else:
+            stream_ctx = client.messages.stream(**stream_kwargs)
+
+        with stream_ctx as stream:
             response = stream.get_final_message()
 
         tracker.record_anthropic(response, model=model_name)

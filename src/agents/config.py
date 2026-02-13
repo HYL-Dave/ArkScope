@@ -65,6 +65,9 @@ class AgentConfig(BaseModel):
     code_model: str = ""
     code_max_retries: int = 3
 
+    # 1M extended context beta (Anthropic only, Opus 4.6 + Sonnet 4.5)
+    extended_context: bool = False
+
 
 def _load_user_profile() -> dict:
     """Load user_profile.yaml if exists."""
@@ -127,6 +130,10 @@ def get_agent_config() -> AgentConfig:
         config.code_model = llm_prefs["code_model"]
     if "code_max_retries" in llm_prefs:
         config.code_max_retries = llm_prefs["code_max_retries"]
+
+    # 1M extended context beta
+    if "extended_context" in llm_prefs:
+        config.extended_context = llm_prefs["extended_context"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})

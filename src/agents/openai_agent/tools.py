@@ -376,6 +376,37 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result)
 
+    # ================================================================
+    # Subagent Delegation
+    # ================================================================
+
+    @function_tool
+    def tool_delegate_to_subagent(
+        subagent: str,
+        task: str,
+        context_json: str = "",
+    ) -> str:
+        """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results.
+
+        Available subagents:
+        - code_analyst: Quantitative Python analysis (Sharpe ratios, correlations, regressions)
+        - deep_researcher: Thorough multi-source investigation (news, prices, fundamentals, options, signals)
+        - data_summarizer: Fast bulk data retrieval and concise summarization
+
+        Args:
+            subagent: Subagent name - code_analyst, deep_researcher, or data_summarizer
+            task: Natural language task description for the subagent
+            context_json: Optional JSON data context from earlier tool calls (max 5000 chars)
+        """
+        from src.agents.shared.subagent import dispatch_subagent
+        result = dispatch_subagent(
+            subagent_name=subagent,
+            task=task,
+            context_json=context_json,
+            dal=dal,
+        )
+        return _serialize_result(result)
+
     # Return all tools as a list
     return [
         tool_get_ticker_news,
@@ -396,4 +427,5 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_watchlist_overview,
         tool_get_morning_brief,
         tool_execute_python_analysis,
+        tool_delegate_to_subagent,
     ]

@@ -395,6 +395,40 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": []
             }
         },
+        # Subagent Delegation
+        {
+            "name": "delegate_to_subagent",
+            "description": (
+                "Delegate a subtask to a specialized subagent. Each subagent has its own "
+                "model, system prompt, and tool subset. Returns structured JSON results. "
+                "Use for complex calculations (code_analyst), deep multi-source investigation "
+                "(deep_researcher), or fast bulk summarization (data_summarizer)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "subagent": {
+                        "type": "string",
+                        "enum": ["code_analyst", "deep_researcher", "data_summarizer"],
+                        "description": (
+                            "Subagent to delegate to: "
+                            "code_analyst (quantitative Python analysis), "
+                            "deep_researcher (multi-source investigation), "
+                            "data_summarizer (fast bulk summarization)"
+                        )
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "Natural language task description for the subagent"
+                    },
+                    "context_json": {
+                        "type": "string",
+                        "description": "Optional JSON data context from earlier tool calls (max 5000 chars)"
+                    }
+                },
+                "required": ["subagent", "task"]
+            }
+        },
     ]
 
 
@@ -408,6 +442,17 @@ def _serialize_result(result: Any) -> str:
         return json.dumps(result, default=str)
     else:
         return str(result)
+
+
+def _dispatch_subagent(tool_input: Dict[str, Any], dal: "DataAccessLayer") -> Dict:
+    """Dispatch to a specialized subagent (Phase 6)."""
+    from src.agents.shared.subagent import dispatch_subagent
+    return dispatch_subagent(
+        subagent_name=tool_input["subagent"],
+        task=tool_input["task"],
+        context_json=tool_input.get("context_json", ""),
+        dal=dal,
+    )
 
 
 def execute_tool(
@@ -548,6 +593,7 @@ def execute_tool(
             timeout=tool_input.get("timeout", 120),
             background=tool_input.get("background", False),
         ),
+        "delegate_to_subagent": lambda: _dispatch_subagent(tool_input, dal),
     }
 
     if tool_name not in tool_map:

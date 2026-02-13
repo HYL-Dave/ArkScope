@@ -14,6 +14,7 @@ Slash commands (during chat):
     /effort         Pick effort level interactively (Anthropic, model-aware)
     /effort <n>     Set: max|high|medium|low
     /thinking       Toggle extended thinking on/off (Anthropic)
+    /context        Toggle 1M context beta on/off (Anthropic)
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -71,6 +72,7 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
+from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -168,6 +170,7 @@ class SessionState:
     messages_history: Optional[List[dict]] = field(default=None)
     anthropic_effort: Optional[str] = None
     anthropic_thinking: bool = False
+    extended_context: bool = False  # 1M context beta (Anthropic only)
     code_model: str = ""  # Code generation model (empty = auto)
 
     def effective_model(self) -> str:
@@ -193,6 +196,8 @@ class SessionState:
             parts.append(f"Effort: {effort}")
             if self.anthropic_thinking:
                 parts.append("Thinking: ON")
+            if self.extended_context:
+                parts.append("Context: 1M")
         if self.code_model:
             parts.append(f"CodeModel: {self.code_model}")
         history = "on" if not self.no_history else "off"
@@ -212,6 +217,7 @@ _SLASH_COMMANDS = [
     ("/reasoning", "/r", "Set reasoning effort (OpenAI)"),
     ("/effort", "/e", "Set effort level (Anthropic)"),
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
+    ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -228,6 +234,11 @@ _REASONING_OPTIONS = [
 _THINKING_OPTIONS = [
     ("on", "Enable extended thinking"),
     ("off", "Disable extended thinking"),
+]
+
+_CONTEXT_OPTIONS = [
+    ("on", "Enable 1M context beta"),
+    ("off", "Disable 1M context (standard 200K)"),
 ]
 
 
@@ -287,6 +298,8 @@ class SlashCompleter(Completer):
             return _get_effort_completions(self.state)
         elif cmd in ("/thinking", "/t"):
             return _THINKING_OPTIONS
+        elif cmd in ("/context", "/ctx"):
+            return _CONTEXT_OPTIONS
         elif cmd in ("/model", "/m"):
             return _get_model_completions()
         elif cmd in ("/code-model", "/cm"):
@@ -327,6 +340,7 @@ def print_help():
             "  [cyan]/effort[/cyan]             Pick effort level interactively (Anthropic, model-aware)\n"
             "  [cyan]/effort <n>[/cyan]         Set: max|high|medium|low\n"
             "  [cyan]/thinking[/cyan]           Toggle extended thinking on/off (Anthropic)\n"
+            "  [cyan]/context[/cyan]            Toggle 1M context beta on/off (Anthropic)\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -476,6 +490,7 @@ def run_anthropic_interactive(
     messages_history: Optional[List[dict]] = None,
     effort: Optional[str] = None,
     thinking: bool = False,
+    extended_context: bool = False,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -512,23 +527,38 @@ def run_anthropic_interactive(
     else:
         messages = [{"role": "user", "content": question}]
 
+    # 1M context beta
+    use_beta = _use_extended_context(model_name, extended_context)
+
     status_parts = [f"Model: {model_name}"]
     if effective_effort:
         status_parts.append(f"effort: {effective_effort}")
     if thinking or config.anthropic_thinking:
         status_parts.append("thinking: ON")
+    if use_beta:
+        status_parts.append("context: 1M")
     console.print(f"[dim]{' | '.join(status_parts)}[/dim]")
 
     for turn in range(config.max_tool_calls):
+        stream_kwargs = dict(
+            model=model_name,
+            max_tokens=effective_max_tokens,
+            system=SYSTEM_PROMPT,
+            tools=tools,
+            messages=messages,
+            **api_kwargs,
+        )
+
         with console.status("[cyan]Thinking...", spinner="dots"):
-            with client.messages.stream(
-                model=model_name,
-                max_tokens=effective_max_tokens,
-                system=SYSTEM_PROMPT,
-                tools=tools,
-                messages=messages,
-                **api_kwargs,
-            ) as stream:
+            if use_beta:
+                stream_ctx = client.beta.messages.stream(
+                    betas=[_EXTENDED_CONTEXT_BETA],
+                    **stream_kwargs,
+                )
+            else:
+                stream_ctx = client.messages.stream(**stream_kwargs)
+
+            with stream_ctx as stream:
                 response = stream.get_final_message()
 
         # Display thinking blocks (extended thinking)
@@ -881,6 +911,37 @@ def handle_thinking_command(state: SessionState, arg: str) -> None:
         console.print("[red]Usage: /thinking [on|off][/red]\n")
 
 
+def handle_context_command(state: SessionState, arg: str) -> None:
+    """Handle /context [on|off] command (Anthropic only). No arg = toggle."""
+    if state.provider != "anthropic":
+        console.print("[yellow]1M context beta only applies to Anthropic models.[/yellow]\n")
+        return
+
+    model = state.effective_model()
+    supported = _use_extended_context(model, True)
+
+    if not supported:
+        console.print(
+            f"[yellow]1M context beta is not supported for {model}.[/yellow]\n"
+            "[dim]Supported: Opus 4.6, Sonnet 4.5[/dim]\n"
+        )
+        return
+
+    if not arg:
+        state.extended_context = not state.extended_context
+        new_status = "ON (1M)" if state.extended_context else "OFF (200K)"
+        console.print(f"[green]Context:[/green] [bold]{new_status}[/bold]\n")
+        return
+    if arg.lower() in ("on", "true", "1", "1m"):
+        state.extended_context = True
+        console.print("[green]Context:[/green] [bold]ON (1M)[/bold]\n")
+    elif arg.lower() in ("off", "false", "0", "200k"):
+        state.extended_context = False
+        console.print("[green]Context:[/green] [bold]OFF (200K)[/bold]\n")
+    else:
+        console.print("[red]Usage: /context [on|off][/red]\n")
+
+
 def handle_code_model_command(state: SessionState, arg: str) -> None:
     """Handle /code-model [model] command. No arg = interactive picker."""
     if not arg:
@@ -1022,6 +1083,8 @@ def main():
                 handle_effort_command(state, arg)
             elif cmd in ("/thinking", "/t"):
                 handle_thinking_command(state, arg)
+            elif cmd in ("/context", "/ctx"):
+                handle_context_command(state, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
@@ -1040,6 +1103,7 @@ def main():
                     messages_history=state.messages_history,
                     effort=state.anthropic_effort,
                     thinking=state.anthropic_thinking,
+                    extended_context=state.extended_context,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):
