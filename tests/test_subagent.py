@@ -541,3 +541,148 @@ class TestConfigExtendedContext:
         from src.agents.config import AgentConfig
         config = AgentConfig(extended_context=True)
         assert config.extended_context is True
+
+
+# ============================================================
+# Config Override & Persistence Tests
+# ============================================================
+
+class TestConfigSubagentModels:
+    def test_config_subagent_models_default_empty(self):
+        from src.agents.config import AgentConfig
+        config = AgentConfig()
+        assert config.subagent_models == {}
+
+    def test_config_subagent_models_settable(self):
+        from src.agents.config import AgentConfig
+        config = AgentConfig(subagent_models={"code_analyst": "claude-opus-4-6"})
+        assert config.subagent_models["code_analyst"] == "claude-opus-4-6"
+
+    @patch("src.agents.config.get_agent_config")
+    def test_model_override_applied(self, mock_config):
+        """_apply_model_override should swap the model."""
+        mock_config.return_value = MagicMock(
+            subagent_models={"code_analyst": "claude-opus-4-6"}
+        )
+        from src.agents.shared.subagent import _apply_model_override
+        original = SubagentConfig(
+            name="code_analyst", description="", model="gpt-5.2-codex",
+            system_prompt="test",
+        )
+        result = _apply_model_override(original)
+        assert result.model == "claude-opus-4-6"
+        # Original should be unchanged
+        assert original.model == "gpt-5.2-codex"
+
+    @patch("src.agents.config.get_agent_config")
+    def test_model_override_not_applied_when_empty(self, mock_config):
+        mock_config.return_value = MagicMock(subagent_models={})
+        from src.agents.shared.subagent import _apply_model_override
+        original = SubagentConfig(
+            name="code_analyst", description="", model="gpt-5.2-codex",
+            system_prompt="test",
+        )
+        result = _apply_model_override(original)
+        assert result.model == "gpt-5.2-codex"
+        assert result is original  # no copy needed
+
+    @patch("src.agents.config.get_agent_config")
+    def test_model_override_same_model_no_copy(self, mock_config):
+        """If override is same as default, return original."""
+        mock_config.return_value = MagicMock(
+            subagent_models={"code_analyst": "gpt-5.2-codex"}
+        )
+        from src.agents.shared.subagent import _apply_model_override
+        original = SubagentConfig(
+            name="code_analyst", description="", model="gpt-5.2-codex",
+            system_prompt="test",
+        )
+        result = _apply_model_override(original)
+        assert result is original
+
+
+class TestDeepMerge:
+    def test_basic_merge(self):
+        from src.agents.config import _deep_merge
+        base = {"a": 1, "b": 2}
+        override = {"b": 3, "c": 4}
+        result = _deep_merge(base, override)
+        assert result == {"a": 1, "b": 3, "c": 4}
+
+    def test_nested_merge(self):
+        from src.agents.config import _deep_merge
+        base = {"llm": {"model": "gpt-5", "effort": "high"}}
+        override = {"llm": {"model": "opus"}}
+        result = _deep_merge(base, override)
+        assert result == {"llm": {"model": "opus", "effort": "high"}}
+
+    def test_override_replaces_non_dict(self):
+        from src.agents.config import _deep_merge
+        base = {"a": [1, 2]}
+        override = {"a": [3]}
+        result = _deep_merge(base, override)
+        assert result == {"a": [3]}
+
+    def test_original_unchanged(self):
+        from src.agents.config import _deep_merge
+        base = {"a": {"x": 1}}
+        override = {"a": {"y": 2}}
+        result = _deep_merge(base, override)
+        assert "y" not in base["a"]  # base unchanged
+
+
+class TestSaveLocalOverride:
+    def test_save_and_load(self, tmp_path):
+        """Integration test: save override, then load it."""
+        import src.agents.config as cfg_mod
+        local_file = tmp_path / "user_profile.local.yaml"
+        original_path = cfg_mod._LOCAL_CONFIG_PATH
+
+        try:
+            cfg_mod._LOCAL_CONFIG_PATH = local_file
+            cfg_mod.get_agent_config.cache_clear()
+
+            cfg_mod.save_local_override(
+                "llm_preferences", "subagent_models",
+                {"code_analyst": "claude-opus-4-6"},
+            )
+
+            assert local_file.exists()
+            import yaml
+            with open(local_file) as f:
+                data = yaml.safe_load(f)
+            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-6"
+        finally:
+            cfg_mod._LOCAL_CONFIG_PATH = original_path
+            cfg_mod.get_agent_config.cache_clear()
+
+    def test_save_merges_existing(self, tmp_path):
+        """Saving should merge with existing local file, not overwrite."""
+        import yaml
+        import src.agents.config as cfg_mod
+        local_file = tmp_path / "user_profile.local.yaml"
+        original_path = cfg_mod._LOCAL_CONFIG_PATH
+
+        try:
+            cfg_mod._LOCAL_CONFIG_PATH = local_file
+            cfg_mod.get_agent_config.cache_clear()
+
+            # Write initial content
+            with open(local_file, "w") as f:
+                yaml.dump({"llm_preferences": {"anthropic_thinking": True}}, f)
+
+            # Save subagent override
+            cfg_mod.save_local_override(
+                "llm_preferences", "subagent_models",
+                {"code_analyst": "claude-opus-4-6"},
+            )
+
+            with open(local_file) as f:
+                data = yaml.safe_load(f)
+
+            # Both settings should exist
+            assert data["llm_preferences"]["anthropic_thinking"] is True
+            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-6"
+        finally:
+            cfg_mod._LOCAL_CONFIG_PATH = original_path
+            cfg_mod.get_agent_config.cache_clear()

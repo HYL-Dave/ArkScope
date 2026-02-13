@@ -272,6 +272,22 @@ llm_preferences:
   #   - 其他模型: budget = max_output - max_tokens (留 max_tokens 給 response)
   # anthropic_thinking: false
 
+  # ── 1M Context Beta (Anthropic only, Opus 4.6 + Sonnet 4.5) ──
+  # 需要 Tier 4 organization，context 超過 200K 時加價
+  # extended_context: false
+
+  # ── Subagent 模型覆寫 (Phase 6) ──
+  # 可覆寫每個 subagent 的預設模型。不設定的 subagent 使用內建預設值。
+  # 也可用 CLI: /subagent code_analyst opus（會自動存到 user_profile.local.yaml）
+  # 預設值：
+  #   code_analyst:    gpt-5.2-codex  (reasoning=xhigh)
+  #   deep_researcher: gpt-5.2        (reasoning=xhigh)
+  #   data_summarizer: claude-sonnet-4-5-20250929
+  #
+  # subagent_models:
+  #   code_analyst: "claude-opus-4-6"
+  #   deep_researcher: "claude-opus-4-6"
+
 # ============================================
 # 9. Agent Context Management
 # ============================================

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+from copy import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -191,6 +192,27 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
 _MAX_CONTEXT_CHARS = 5000
 
 
+# ── Model override ─────────────────────────────────────────────
+
+def _apply_model_override(config: SubagentConfig) -> SubagentConfig:
+    """Apply model override from AgentConfig.subagent_models if present.
+
+    Returns a copy with the overridden model (original registry unchanged).
+    """
+    from ..config import get_agent_config
+    agent_config = get_agent_config()
+    override_model = agent_config.subagent_models.get(config.name)
+    if override_model and override_model != config.model:
+        overridden = copy(config)
+        overridden.model = override_model
+        logger.info(
+            f"Subagent '{config.name}' model overridden: "
+            f"{config.model} → {override_model}"
+        )
+        return overridden
+    return config
+
+
 # ── Dispatch ───────────────────────────────────────────────────
 
 def dispatch_subagent(
@@ -228,6 +250,10 @@ def dispatch_subagent(
         }
 
     config = SUBAGENT_REGISTRY[subagent_name]
+
+    # Apply model override from AgentConfig (user_profile.yaml or CLI runtime)
+    config = _apply_model_override(config)
+
     provider = _detect_provider(config.model)
 
     # Build subagent input

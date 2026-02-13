@@ -10,6 +10,7 @@
 .env.*
 !.env.template
 config/.env
+config/user_profile.local.yaml
 api_keys*.txt
 *_credentials.json
 secrets/

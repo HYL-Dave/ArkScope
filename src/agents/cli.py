@@ -15,6 +15,7 @@ Slash commands (during chat):
     /effort <n>     Set: max|high|medium|low
     /thinking       Toggle extended thinking on/off (Anthropic)
     /context        Toggle 1M context beta on/off (Anthropic)
+    /subagent       View/change subagent models (persisted to local config)
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -218,6 +219,7 @@ _SLASH_COMMANDS = [
     ("/effort", "/e", "Set effort level (Anthropic)"),
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
     ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
+    ("/subagent", "/sa", "View/change subagent models"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -239,6 +241,12 @@ _THINKING_OPTIONS = [
 _CONTEXT_OPTIONS = [
     ("on", "Enable 1M context beta"),
     ("off", "Disable 1M context (standard 200K)"),
+]
+
+_SUBAGENT_NAMES = [
+    ("code_analyst", "Quantitative Python analysis"),
+    ("deep_researcher", "Multi-source investigation"),
+    ("data_summarizer", "Fast bulk summarization"),
 ]
 
 
@@ -300,6 +308,8 @@ class SlashCompleter(Completer):
             return _THINKING_OPTIONS
         elif cmd in ("/context", "/ctx"):
             return _CONTEXT_OPTIONS
+        elif cmd in ("/subagent", "/sa"):
+            return _SUBAGENT_NAMES
         elif cmd in ("/model", "/m"):
             return _get_model_completions()
         elif cmd in ("/code-model", "/cm"):
@@ -341,6 +351,8 @@ def print_help():
             "  [cyan]/effort <n>[/cyan]         Set: max|high|medium|low\n"
             "  [cyan]/thinking[/cyan]           Toggle extended thinking on/off (Anthropic)\n"
             "  [cyan]/context[/cyan]            Toggle 1M context beta on/off (Anthropic)\n"
+            "  [cyan]/subagent[/cyan]           View/change subagent models\n"
+            "  [cyan]/subagent <name>[/cyan]    Change a subagent's model (e.g. /subagent code_analyst opus)\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -942,6 +954,109 @@ def handle_context_command(state: SessionState, arg: str) -> None:
         console.print("[red]Usage: /context [on|off][/red]\n")
 
 
+def handle_subagent_command(state: SessionState, arg: str) -> None:
+    """Handle /subagent [name [model]] command.
+
+    No arg: show all subagent models.
+    /subagent code_analyst: show + pick model for code_analyst.
+    /subagent code_analyst opus: set code_analyst to opus.
+    /subagent reset: clear all overrides back to defaults.
+
+    Changes are saved to config/user_profile.local.yaml for persistence.
+    """
+    from .shared.subagent import SUBAGENT_REGISTRY, _detect_provider
+    from .config import get_agent_config, save_local_override
+
+    config = get_agent_config()
+    overrides = dict(config.subagent_models)
+
+    if arg.lower() == "reset":
+        save_local_override("llm_preferences", "subagent_models", {})
+        console.print("[green]Subagent models reset to defaults.[/green]\n")
+        return
+
+    if not arg:
+        # Show all subagent models
+        table = Table(
+            box=box.SIMPLE_HEAVY, show_header=True,
+            header_style="bold", padding=(0, 1),
+        )
+        table.add_column("Subagent", style="cyan")
+        table.add_column("Default Model", style="dim")
+        table.add_column("Active Model", style="bold")
+        table.add_column("Provider")
+
+        for name, sa_config in SUBAGENT_REGISTRY.items():
+            active = overrides.get(name, sa_config.model)
+            is_overridden = name in overrides and overrides[name] != sa_config.model
+            active_style = "[yellow]" if is_overridden else ""
+            active_end = "[/yellow]" if is_overridden else ""
+            provider = _detect_provider(active)
+            table.add_row(
+                name,
+                sa_config.model,
+                f"{active_style}{active}{active_end}",
+                provider,
+            )
+
+        console.print()
+        console.print(table)
+        console.print(
+            "\n[dim]Usage: /subagent <name> <model>  (e.g. /subagent code_analyst opus)\n"
+            "       /subagent reset            (clear all overrides)[/dim]\n"
+        )
+        return
+
+    # Parse: /subagent <name> [model]
+    parts = arg.split(None, 1)
+    sa_name = parts[0].lower()
+
+    if sa_name not in SUBAGENT_REGISTRY:
+        available = ", ".join(sorted(SUBAGENT_REGISTRY.keys()))
+        console.print(f"[red]Unknown subagent: {sa_name}[/red]\n[dim]Available: {available}[/dim]\n")
+        return
+
+    if len(parts) == 1:
+        # Show current + interactive picker
+        sa_config = SUBAGENT_REGISTRY[sa_name]
+        current = overrides.get(sa_name, sa_config.model)
+        console.print(f"[dim]{sa_name}: default={sa_config.model}, active={current}[/dim]")
+        entry = print_model_picker(current)
+        if entry is None:
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+        new_model = entry.id
+    else:
+        # Direct: /subagent code_analyst opus
+        model_query = parts[1].strip()
+        if model_query.lower() in ("default", "reset"):
+            # Reset this specific subagent
+            if sa_name in overrides:
+                del overrides[sa_name]
+            save_local_override("llm_preferences", "subagent_models", overrides)
+            default_model = SUBAGENT_REGISTRY[sa_name].model
+            console.print(
+                f"[green]{sa_name}[/green] reset to default "
+                f"[bold]{default_model}[/bold]\n"
+            )
+            return
+
+        entry = find_model(model_query)
+        if entry is None:
+            console.print(f"[red]Unknown model: {model_query}[/red]\n")
+            return
+        new_model = entry.id
+
+    # Apply and persist
+    overrides[sa_name] = new_model
+    save_local_override("llm_preferences", "subagent_models", overrides)
+    provider = _detect_provider(new_model)
+    console.print(
+        f"[green]{sa_name}[/green] → [bold cyan]{new_model}[/bold cyan] "
+        f"[dim]({provider}, saved)[/dim]\n"
+    )
+
+
 def handle_code_model_command(state: SessionState, arg: str) -> None:
     """Handle /code-model [model] command. No arg = interactive picker."""
     if not arg:
@@ -1085,6 +1200,8 @@ def main():
                 handle_thinking_command(state, arg)
             elif cmd in ("/context", "/ctx"):
                 handle_context_command(state, arg)
+            elif cmd in ("/subagent", "/sa"):
+                handle_subagent_command(state, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:

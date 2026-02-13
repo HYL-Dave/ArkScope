@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional
 
 import yaml
 from pydantic import BaseModel
@@ -68,18 +68,68 @@ class AgentConfig(BaseModel):
     # 1M extended context beta (Anthropic only, Opus 4.6 + Sonnet 4.5)
     extended_context: bool = False
 
+    # Subagent model overrides (Phase 6)
+    # Keys: subagent names (code_analyst, deep_researcher, data_summarizer)
+    # Values: model IDs to override the default
+    subagent_models: Dict[str, str] = {}
+
+
+_LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
+_MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Deep merge override into base (override wins). Returns new dict."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
 
 def _load_user_profile() -> dict:
-    """Load user_profile.yaml if exists."""
-    paths = [
-        Path("config/user_profile.local.yaml"),
-        Path("config/user_profile.yaml"),
-    ]
-    for p in paths:
-        if p.exists():
-            with open(p) as f:
-                return yaml.safe_load(f) or {}
-    return {}
+    """Load user_profile.yaml, then deep-merge user_profile.local.yaml on top."""
+    base = {}
+    if _MAIN_CONFIG_PATH.exists():
+        with open(_MAIN_CONFIG_PATH) as f:
+            base = yaml.safe_load(f) or {}
+
+    if _LOCAL_CONFIG_PATH.exists():
+        with open(_LOCAL_CONFIG_PATH) as f:
+            local = yaml.safe_load(f) or {}
+        base = _deep_merge(base, local)
+
+    return base
+
+
+def save_local_override(section: str, key: str, value) -> None:
+    """Save a single setting to user_profile.local.yaml (persists across sessions).
+
+    Args:
+        section: Top-level YAML key (e.g. "llm_preferences")
+        key: Setting key within section (e.g. "subagent_models")
+        value: Setting value
+
+    The local file is deep-merged on top of the main config, so only
+    overridden settings need to be stored here.
+    """
+    local = {}
+    if _LOCAL_CONFIG_PATH.exists():
+        with open(_LOCAL_CONFIG_PATH) as f:
+            local = yaml.safe_load(f) or {}
+
+    if section not in local:
+        local[section] = {}
+    local[section][key] = value
+
+    _LOCAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(_LOCAL_CONFIG_PATH, "w") as f:
+        yaml.dump(local, f, default_flow_style=False, allow_unicode=True)
+
+    # Clear cached config so next call picks up the change
+    get_agent_config.cache_clear()
 
 
 @lru_cache(maxsize=1)
@@ -134,6 +184,10 @@ def get_agent_config() -> AgentConfig:
     # 1M extended context beta
     if "extended_context" in llm_prefs:
         config.extended_context = llm_prefs["extended_context"]
+
+    # Subagent model overrides
+    if "subagent_models" in llm_prefs:
+        config.subagent_models = llm_prefs["subagent_models"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})
