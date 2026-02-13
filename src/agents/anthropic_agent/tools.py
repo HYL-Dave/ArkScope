@@ -26,7 +26,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         # News Tools
         {
             "name": "get_ticker_news",
-            "description": "Get recent news articles for a stock ticker with sentiment and risk scores.",
+            "description": "Get recent news articles for a stock ticker. Returns up to `limit` most recent articles (default 20). The response includes `count` (total available) so you know if more exist.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -42,6 +42,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                         "type": "string",
                         "enum": ["auto", "ibkr", "polygon"],
                         "description": "Data source (default: auto)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max articles to return, 1-500 (default: 50)"
                     }
                 },
                 "required": ["ticker"]
@@ -67,7 +71,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "search_news_by_keyword",
-            "description": "Search news articles by keyword in titles and descriptions.",
+            "description": "Search news articles by keyword in titles and descriptions. Returns up to `limit` most recent matches (default 20).",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -82,6 +86,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "ticker": {
                         "type": "string",
                         "description": "Optionally filter by ticker"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max articles to return, 1-500 (default: 50)"
                     }
                 },
                 "required": ["keyword"]
@@ -453,7 +461,8 @@ def execute_tool(
             dal,
             tool_input["ticker"],
             days=tool_input.get("days", 30),
-            source=tool_input.get("source", "auto")
+            source=tool_input.get("source", "auto"),
+            limit=tool_input.get("limit", 20),
         ),
         "get_news_sentiment_summary": lambda: get_news_sentiment_summary(
             dal,
@@ -464,7 +473,8 @@ def execute_tool(
             dal,
             tool_input["keyword"],
             days=tool_input.get("days", 30),
-            ticker=tool_input.get("ticker")
+            ticker=tool_input.get("ticker"),
+            limit=tool_input.get("limit", 20),
         ),
         "get_ticker_prices": lambda: get_ticker_prices(
             dal,

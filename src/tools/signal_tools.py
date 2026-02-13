@@ -26,6 +26,7 @@ def _prepare_news_df_for_signals(
     dal: DataAccessLayer,
     ticker: Optional[str],
     days: int,
+    scored_only: bool = True,
 ) -> pd.DataFrame:
     """
     Prepare news DataFrame with column names expected by signals module.
@@ -35,7 +36,7 @@ def _prepare_news_df_for_signals(
     """
     from src.signals.event_tagger import EventTagger
 
-    result = dal.get_news(ticker=ticker, days=days, scored_only=True)
+    result = dal.get_news(ticker=ticker, days=days, scored_only=scored_only)
     if not result.articles:
         return pd.DataFrame()
 
@@ -51,7 +52,8 @@ def _prepare_news_df_for_signals(
         })
 
     df = pd.DataFrame(rows)
-    df = df.dropna(subset=["llm_sentiment"])
+    if scored_only:
+        df = df.dropna(subset=["llm_sentiment"])
 
     # Add event_type via EventTagger
     if not df.empty:
@@ -83,12 +85,16 @@ def detect_anomalies(
     """
     from src.signals.anomaly_detector import AnomalyDetector
 
-    df = _prepare_news_df_for_signals(dal, ticker=None, days=days)
+    df = _prepare_news_df_for_signals(dal, ticker=None, days=days, scored_only=True)
     if df.empty:
         return {
             "ticker": ticker.upper(),
             "date": date.today().isoformat(),
-            "error": "Insufficient news data for anomaly detection",
+            "error": (
+                "No scored news articles available. "
+                "Anomaly detection requires sentiment scores from LLM scoring pipeline. "
+                "Raw (unscored) articles exist but cannot be used for statistical anomaly analysis."
+            ),
         }
 
     detector = AnomalyDetector()
@@ -156,9 +162,12 @@ def detect_event_chains(
     """
     from src.signals.event_chain import EventChainDetector
 
-    df = _prepare_news_df_for_signals(dal, ticker=ticker, days=days)
+    # Event chains work with unscored data — tagging is title-based
+    df = _prepare_news_df_for_signals(dal, ticker=ticker, days=days, scored_only=False)
     if df.empty or "event_type" not in df.columns:
         return []
+    # Fill missing sentiment with neutral (3) so chain impact calc doesn't break
+    df["llm_sentiment"] = df["llm_sentiment"].fillna(3.0)
 
     detector = EventChainDetector()
 

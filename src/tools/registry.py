@@ -171,7 +171,11 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_ticker_news",
-            description="Get recent news articles for a stock ticker with sentiment and risk scores.",
+            description=(
+                "Get recent news articles for a stock ticker. "
+                "Returns up to `limit` most recent articles (default 20). "
+                "The response includes `count` (total available) so you know if more exist."
+            ),
             function=get_ticker_news,
             category="news",
             parameters=[
@@ -179,6 +183,7 @@ class ToolRegistry:
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
                 ToolParameter("source", "string", "Data source", required=False, default="auto",
                               enum=["auto", "ibkr", "polygon"]),
+                ToolParameter("limit", "integer", "Max articles to return (1-500, default 50)", required=False, default=50),
             ],
         ))
 
@@ -195,13 +200,17 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="search_news_by_keyword",
-            description="Search news articles by keyword in titles and descriptions.",
+            description=(
+                "Search news articles by keyword in titles and descriptions. "
+                "Returns up to `limit` most recent matches (default 20)."
+            ),
             function=search_news_by_keyword,
             category="news",
             parameters=[
                 ToolParameter("keyword", "string", "Search keyword"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
                 ToolParameter("ticker", "string", "Optionally filter by ticker", required=False),
+                ToolParameter("limit", "integer", "Max articles to return (1-500, default 50)", required=False, default=50),
             ],
         ))
 

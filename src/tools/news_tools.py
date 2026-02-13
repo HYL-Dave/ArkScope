@@ -15,12 +15,28 @@ if TYPE_CHECKING:
 
 from .schemas import NewsArticle, NewsQueryResult
 
+# Maximum characters for article descriptions in tool output.
+# Long descriptions bloat the LLM context; callers can fetch full text via URL.
+_MAX_DESC_CHARS = 200
+
+
+def _trim_articles(articles: list[NewsArticle], limit: int) -> list[NewsArticle]:
+    """Sort by date descending, take top *limit*, truncate descriptions."""
+    # Sort newest first
+    articles.sort(key=lambda a: a.date, reverse=True)
+    trimmed = articles[:limit]
+    for a in trimmed:
+        if a.description and len(a.description) > _MAX_DESC_CHARS:
+            a.description = a.description[:_MAX_DESC_CHARS] + "..."
+    return trimmed
+
 
 def get_ticker_news(
     dal: DataAccessLayer,
     ticker: str,
     days: int = 30,
     source: str = "auto",
+    limit: int = 50,
 ) -> NewsQueryResult:
     """
     Get recent news articles for a ticker.
@@ -30,11 +46,16 @@ def get_ticker_news(
         ticker: Stock ticker symbol
         days: Lookback period in days
         source: Data source (ibkr, polygon, auto)
+        limit: Maximum number of articles to return (default 20, max 50)
 
     Returns:
         NewsQueryResult with articles, count, and source breakdown
     """
-    return dal.get_news(ticker=ticker, days=days, source=source, scored_only=False)
+    limit = min(max(limit, 1), 500)
+    result = dal.get_news(ticker=ticker, days=days, source=source, scored_only=False)
+    result.articles = _trim_articles(result.articles, limit)
+    # count reflects total available; articles is the trimmed subset
+    return result
 
 
 def get_news_sentiment_summary(
@@ -97,6 +118,7 @@ def search_news_by_keyword(
     keyword: str,
     days: int = 30,
     ticker: Optional[str] = None,
+    limit: int = 50,
 ) -> NewsQueryResult:
     """
     Search news articles by keyword in titles.
@@ -106,10 +128,12 @@ def search_news_by_keyword(
         keyword: Search keyword (case-insensitive)
         days: Lookback period in days
         ticker: Optionally filter by ticker first
+        limit: Maximum number of articles to return (default 20, max 50)
 
     Returns:
         NewsQueryResult with matching articles
     """
+    limit = min(max(limit, 1), 500)
     result = dal.get_news(ticker=ticker, days=days, scored_only=False)
     keyword_lower = keyword.lower()
 
@@ -123,10 +147,12 @@ def search_news_by_keyword(
     for a in matched:
         source_counts[a.source] = source_counts.get(a.source, 0) + 1
 
+    trimmed = _trim_articles(matched, limit)
+
     return NewsQueryResult(
         ticker=ticker or "ALL",
         count=len(matched),
-        articles=matched,
+        articles=trimmed,
         source_breakdown=source_counts,
         query_days=days,
     )

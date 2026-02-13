@@ -278,8 +278,8 @@ class FileBackend:
                 df["date"] = pd.to_datetime(
                     df.get("published_at"), errors="coerce",
                 ).dt.strftime("%Y-%m-%d")
-                df["sentiment_score"] = None
-                df["risk_score"] = None
+                df["sentiment_score"] = float("nan")
+                df["risk_score"] = float("nan")
 
                 for col in ["ticker", "title", "url", "publisher", "description"]:
                     if col not in df.columns:

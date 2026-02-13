@@ -82,16 +82,18 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_ticker_news(
         ticker: str,
         days: int = 30,
-        source: str = "auto"
+        source: str = "auto",
+        limit: int = 50,
     ) -> str:
-        """Get recent news articles for a stock ticker with sentiment and risk scores.
+        """Get recent news articles for a stock ticker. Returns up to `limit` most recent articles. The response includes `count` (total available) so you know if more exist.
 
         Args:
             ticker: Stock ticker symbol (e.g. NVDA, AMD)
             days: Lookback period in days (default: 30)
             source: Data source - auto, ibkr, or polygon (default: auto)
+            limit: Max articles to return, 1-500 (default: 50)
         """
-        result = get_ticker_news(dal, ticker, days=days, source=source)
+        result = get_ticker_news(dal, ticker, days=days, source=source, limit=limit)
         return _serialize_result(result)
 
     @function_tool
@@ -111,16 +113,18 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_search_news_by_keyword(
         keyword: str,
         days: int = 30,
-        ticker: Optional[str] = None
+        ticker: Optional[str] = None,
+        limit: int = 50,
     ) -> str:
-        """Search news articles by keyword in titles and descriptions.
+        """Search news articles by keyword in titles and descriptions. Returns up to `limit` most recent matches.
 
         Args:
             keyword: Search keyword
             days: Lookback period in days (default: 30)
             ticker: Optionally filter by ticker
+            limit: Max articles to return, 1-500 (default: 50)
         """
-        result = search_news_by_keyword(dal, keyword, days=days, ticker=ticker)
+        result = search_news_by_keyword(dal, keyword, days=days, ticker=ticker, limit=limit)
         return _serialize_result(result)
 
     # ================================================================
