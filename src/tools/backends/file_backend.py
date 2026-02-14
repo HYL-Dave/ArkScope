@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import warnings
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -290,7 +291,9 @@ class FileBackend:
         if not frames:
             return pd.DataFrame()
 
-        combined = pd.concat(frames, ignore_index=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            combined = pd.concat(frames, ignore_index=True)
         logger.debug(
             f"Loaded {len(combined)} raw news rows from "
             f"{len(frames)} files (months: {sorted(target_months)})"
@@ -348,7 +351,9 @@ class FileBackend:
                 "publisher", "sentiment_score", "risk_score", "description",
             ])
 
-        combined = pd.concat(frames, ignore_index=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            combined = pd.concat(frames, ignore_index=True)
 
         # Deduplicate: scored articles (loaded first) take priority
         if "dedup_hash" in combined.columns:
@@ -441,7 +446,11 @@ class FileBackend:
                 frames.append(df)
             except Exception as e:
                 logger.warning(f"Error reading {f}: {e}")
-        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        if not frames:
+            return pd.DataFrame()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            return pd.concat(frames, ignore_index=True)
 
     def _load_daily_prices(self, ticker: str) -> pd.DataFrame:
         """Load daily prices from Parquet or CSV."""

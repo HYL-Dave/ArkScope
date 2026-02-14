@@ -50,7 +50,7 @@ class AgentConfig(BaseModel):
     anthropic_thinking: bool = False
 
     # Limits
-    max_tool_calls: int = 20
+    max_tool_calls: int = 30
     max_tokens: int = 16384
 
     # Context management (Phase 3)

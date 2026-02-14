@@ -16,6 +16,8 @@ Slash commands (during chat):
     /thinking       Toggle extended thinking on/off (Anthropic)
     /context        Toggle 1M context beta on/off (Anthropic)
     /subagent       View/change subagent models (persisted to local config)
+    /scratchpad     List recent agent session logs (JSONL)
+    /turns          Show/set max tool calls per query
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -73,6 +75,7 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
+from .shared.scratchpad import Scratchpad
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 
 console = Console()
@@ -173,6 +176,7 @@ class SessionState:
     anthropic_thinking: bool = False
     extended_context: bool = False  # 1M context beta (Anthropic only)
     code_model: str = ""  # Code generation model (empty = auto)
+    max_tool_calls: Optional[int] = None  # None = use config default
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -201,6 +205,8 @@ class SessionState:
                 parts.append("Context: 1M")
         if self.code_model:
             parts.append(f"CodeModel: {self.code_model}")
+        if self.max_tool_calls:
+            parts.append(f"MaxTurns: {self.max_tool_calls}")
         history = "on" if not self.no_history else "off"
         parts.append(f"History: {history}")
         return " | ".join(parts)
@@ -220,6 +226,8 @@ _SLASH_COMMANDS = [
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
     ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
     ("/subagent", "/sa", "View/change subagent models"),
+    ("/scratchpad", "/pad", "List recent scratchpad sessions"),
+    ("/turns", "", "Set max tool calls per query"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -353,6 +361,9 @@ def print_help():
             "  [cyan]/context[/cyan]            Toggle 1M context beta on/off (Anthropic)\n"
             "  [cyan]/subagent[/cyan]           View/change subagent models\n"
             "  [cyan]/subagent <name>[/cyan]    Change a subagent's model (e.g. /subagent code_analyst opus)\n"
+            "  [cyan]/scratchpad[/cyan]         List recent agent session logs\n"
+            "  [cyan]/scratchpad <id>[/cyan]    View details of a session log\n"
+            "  [cyan]/turns[/cyan]              Show/set max tool calls per query (e.g. /turns 30)\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -480,15 +491,20 @@ def print_answer(answer: str):
     console.print()
 
 
-def print_summary(tools_used: List[str], elapsed: float):
+def print_summary(
+    tools_used: List[str],
+    elapsed: float,
+    scratchpad_path: Optional[str] = None,
+):
     """Print query summary."""
+    parts = []
     if tools_used:
         tool_str = ", ".join(sorted(set(tools_used)))
-        console.print(
-            f"[dim]Tools: {tool_str} | {elapsed:.1f}s[/dim]"
-        )
-    else:
-        console.print(f"[dim]{elapsed:.1f}s[/dim]")
+        parts.append(f"Tools: {tool_str}")
+    parts.append(f"{elapsed:.1f}s")
+    if scratchpad_path:
+        parts.append(f"Log: {scratchpad_path}")
+    console.print(f"[dim]{' | '.join(parts)}[/dim]")
 
 
 # ============================================================
@@ -503,6 +519,7 @@ def run_anthropic_interactive(
     effort: Optional[str] = None,
     thinking: bool = False,
     extended_context: bool = False,
+    max_tool_calls: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -519,6 +536,7 @@ def run_anthropic_interactive(
     tools = get_anthropic_tools()
     tools_used: List[str] = []
     tool_index = 0
+    pad = Scratchpad(query=question, provider="anthropic", model=model_name)
 
     # Build optional API params (effort + thinking)
     api_kwargs: Dict[str, Any] = {}
@@ -551,7 +569,8 @@ def run_anthropic_interactive(
         status_parts.append("context: 1M")
     console.print(f"[dim]{' | '.join(status_parts)}[/dim]")
 
-    for turn in range(config.max_tool_calls):
+    effective_max_turns = max_tool_calls or config.max_tool_calls
+    for turn in range(effective_max_turns):
         stream_kwargs = dict(
             model=model_name,
             max_tokens=effective_max_tokens,
@@ -591,6 +610,9 @@ def run_anthropic_interactive(
                 if hasattr(block, "text"):
                     final_text += block.text
 
+            pad.log_final_answer(final_text, tools_used=list(set(tools_used)))
+            pad.close()
+
             # Update messages for conversation continuity
             messages.append({"role": "assistant", "content": response.content})
 
@@ -598,6 +620,7 @@ def run_anthropic_interactive(
                 "answer": final_text,
                 "tools_used": tools_used,
                 "messages": messages,
+                "scratchpad_path": str(pad.filepath) if pad.filepath else None,
             }
 
         # Process tool calls
@@ -620,12 +643,14 @@ def run_anthropic_interactive(
             tool_input = tool_use.input
 
             tools_used.append(tool_name)
+            pad.log_tool_call(tool_name, tool_input)
             print_tool_call(tool_name, tool_input, tool_index)
 
             # Execute with spinner
             with console.status("", spinner="dots"):
                 result = execute_tool(tool_name, tool_input, dal)
 
+            pad.log_tool_result(tool_name, result_summary=result[:200], chars=len(result))
             print_tool_result_summary(tool_name, result)
 
             tool_results.append({
@@ -638,10 +663,19 @@ def run_anthropic_interactive(
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
 
+    partial_text = (
+        f"Reached maximum tool calls ({effective_max_turns}). "
+        f"Used {len(set(tools_used))} unique tools across {tool_index} calls. "
+        "Try /turns to increase the limit, or ask a more focused question."
+    )
+
+    pad.log_max_turns(tools_used=list(set(tools_used)))
+    pad.close()
     return {
-        "answer": "Reached maximum tool calls.",
+        "answer": partial_text,
         "tools_used": tools_used,
         "messages": messages,
+        "scratchpad_path": str(pad.filepath) if pad.filepath else None,
     }
 
 
@@ -681,6 +715,7 @@ def run_openai_interactive(
         "answer": result["answer"],
         "tools_used": result["tools_used"],
         "messages": None,  # OpenAI SDK doesn't expose message history
+        "scratchpad_path": None,  # Created inside run_query()
     }
 
 
@@ -1057,6 +1092,132 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
     )
 
 
+def handle_turns_command(state: SessionState, arg: str) -> None:
+    """Handle /turns [N] command. Set max tool calls per query.
+
+    /turns      — show current setting
+    /turns 30   — set to 30
+    /turns reset — reset to config default
+    """
+    config = get_agent_config()
+    current = state.max_tool_calls or config.max_tool_calls
+
+    if not arg:
+        default = config.max_tool_calls
+        if state.max_tool_calls:
+            console.print(
+                f"[dim]Max turns: {current} (config default: {default})[/dim]\n"
+            )
+        else:
+            console.print(f"[dim]Max turns: {current} (config default)[/dim]\n")
+        return
+
+    if arg.lower() in ("reset", "default"):
+        state.max_tool_calls = None
+        console.print(
+            f"[green]Max turns reset to config default[/green] "
+            f"[dim]({config.max_tool_calls})[/dim]\n"
+        )
+        return
+
+    try:
+        n = int(arg)
+        if n < 1 or n > 100:
+            console.print("[red]Max turns must be 1-100.[/red]\n")
+            return
+        state.max_tool_calls = n
+        console.print(f"[green]Max turns set to[/green] [bold]{n}[/bold]\n")
+    except ValueError:
+        console.print("[red]Usage: /turns <number> or /turns reset[/red]\n")
+
+
+def handle_scratchpad_command(arg: str) -> None:
+    """Handle /scratchpad [N] command. List recent scratchpad sessions.
+
+    /scratchpad      — list last 10 sessions
+    /scratchpad 20   — list last 20 sessions
+    /scratchpad <id> — show contents of a specific session file
+    """
+    from .shared.scratchpad import read_scratchpad
+
+    pad_dir = Path("data/agent_scratchpad")
+    if not pad_dir.exists():
+        console.print("[dim]No scratchpad directory found.[/dim]\n")
+        return
+
+    files = sorted(pad_dir.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True)
+    if not files:
+        console.print("[dim]No scratchpad files found.[/dim]\n")
+        return
+
+    # Check if arg is a session ID (hash fragment)
+    if arg and not arg.isdigit():
+        matches = [f for f in files if arg in f.stem]
+        if matches:
+            filepath = matches[0]
+            events = read_scratchpad(filepath)
+            console.print(f"\n[bold]{filepath.name}[/bold] ({len(events)} events)")
+            for ev in events:
+                ev_type = ev.get("type", "?")
+                data = ev.get("data", {})
+                if ev_type == "init":
+                    console.print(f"  [cyan]init[/cyan] query={data.get('query', '')[:80]}")
+                elif ev_type == "tool_call":
+                    console.print(f"  [yellow]tool_call[/yellow] {data.get('tool', '?')}({str(data.get('input', ''))[:60]})")
+                elif ev_type == "tool_result":
+                    console.print(f"  [dim]tool_result[/dim] {data.get('tool', '?')} → {data.get('result_chars', 0)} chars")
+                elif ev_type == "final_answer":
+                    preview = data.get("answer_preview", "")[:100]
+                    elapsed = data.get("elapsed_seconds", "?")
+                    console.print(f"  [green]final[/green] {elapsed}s | {preview}")
+                elif ev_type == "max_turns":
+                    elapsed = data.get("elapsed_seconds", "?")
+                    console.print(f"  [red]max_turns[/red] {elapsed}s | tools: {data.get('tools_used', [])}")
+            console.print()
+            return
+        console.print(f"[red]No scratchpad matching '{arg}'[/red]\n")
+        return
+
+    # List recent sessions
+    limit = int(arg) if arg and arg.isdigit() else 10
+    shown = files[:limit]
+
+    table = Table(
+        box=box.SIMPLE_HEAVY, show_header=True,
+        header_style="bold", padding=(0, 1),
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Session", style="cyan")
+    table.add_column("Size")
+    table.add_column("Events", style="dim")
+    table.add_column("Query", style="dim", max_width=40)
+
+    for i, f in enumerate(shown, 1):
+        size = f.stat().st_size
+        size_str = f"{size:,}" if size < 10000 else f"{size / 1024:.1f}K"
+        # Read just init event for query
+        query = ""
+        event_count = 0
+        try:
+            events = read_scratchpad(f)
+            event_count = len(events)
+            for ev in events:
+                if ev.get("type") == "init":
+                    query = ev.get("data", {}).get("query", "")[:40]
+                    break
+        except Exception:
+            pass
+        session_id = f.stem.split("_", 1)[-1] if "_" in f.stem else f.stem
+        table.add_row(str(i), session_id, size_str, str(event_count), query)
+
+    console.print()
+    console.print(table)
+    console.print(
+        f"\n[dim]Showing {len(shown)}/{len(files)} sessions from {pad_dir}/\n"
+        "Use /scratchpad <session_id> to view details[/dim]\n"
+    )
+
+
 def handle_code_model_command(state: SessionState, arg: str) -> None:
     """Handle /code-model [model] command. No arg = interactive picker."""
     if not arg:
@@ -1202,6 +1363,10 @@ def main():
                 handle_context_command(state, arg)
             elif cmd in ("/subagent", "/sa"):
                 handle_subagent_command(state, arg)
+            elif cmd in ("/scratchpad", "/pad"):
+                handle_scratchpad_command(arg)
+            elif cmd == "/turns":
+                handle_turns_command(state, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
@@ -1221,6 +1386,7 @@ def main():
                     effort=state.anthropic_effort,
                     thinking=state.anthropic_thinking,
                     extended_context=state.extended_context,
+                    max_tool_calls=state.max_tool_calls,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):
@@ -1235,7 +1401,7 @@ def main():
 
             elapsed = time.time() - start
             print_answer(result["answer"])
-            print_summary(result["tools_used"], elapsed)
+            print_summary(result["tools_used"], elapsed, result.get("scratchpad_path"))
             console.print()
 
         except KeyboardInterrupt:

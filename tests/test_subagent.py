@@ -17,6 +17,12 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
+# Pre-import agent modules so they capture the real get_agent_config
+# BEFORE any tests mock it. Without this, _run_anthropic_subagent's
+# dynamic import of agent.py during a mocked test would make agent.py
+# permanently capture the mock reference (test isolation bug).
+import src.agents.anthropic_agent.agent  # noqa: F401
+
 from src.agents.shared.subagent import (
     SubagentConfig,
     SUBAGENT_REGISTRY,
