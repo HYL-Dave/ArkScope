@@ -1,4 +1,4 @@
-"""Tests for Scratchpad (Phase 2 of agent evolution)."""
+"""Tests for Scratchpad + ChatHistory."""
 
 import json
 import time
@@ -7,10 +7,11 @@ from pathlib import Path
 import pytest
 
 from src.agents.shared.scratchpad import (
+    ChatHistory,
     Scratchpad,
     _make_session_id,
     _safe_serialize,
-    _truncate,
+    _try_parse_json,
     read_scratchpad,
 )
 
@@ -38,23 +39,26 @@ class TestMakeSessionId:
         assert all(c in "0123456789abcdef" for c in sid)
 
 
-class TestTruncate:
-    def test_short_text(self):
-        assert _truncate("hello", 10) == "hello"
+class TestTryParseJson:
+    def test_valid_json_dict(self):
+        result = _try_parse_json('{"key": "value"}')
+        assert result == {"key": "value"}
 
-    def test_exact_length(self):
-        assert _truncate("12345", 5) == "12345"
+    def test_valid_json_list(self):
+        result = _try_parse_json('[1, 2, 3]')
+        assert result == [1, 2, 3]
 
-    def test_long_text(self):
-        result = _truncate("abcdefghij", 5)
-        assert result.startswith("abcde")
-        assert "5 chars truncated" in result
+    def test_invalid_json_returns_string(self):
+        result = _try_parse_json("not json at all")
+        assert result == "not json at all"
 
-    def test_default_max(self):
-        short = "x" * 500
-        assert _truncate(short) == short
-        long = "x" * 600
-        assert "100 chars truncated" in _truncate(long)
+    def test_empty_string(self):
+        result = _try_parse_json("")
+        assert result == ""
+
+    def test_none_returns_none(self):
+        result = _try_parse_json(None)
+        assert result is None
 
 
 class TestSafeSerialize:
@@ -130,6 +134,7 @@ class TestScratchpadInit:
         assert not pad.enabled
         # Should not crash when logging
         pad.log_tool_call("some_tool", {"key": "value"})
+        pad.log_tool_result("get_news", result_data="data")
         pad.log_final_answer("answer")
         pad.close()
 
@@ -166,33 +171,64 @@ class TestScratchpadLogging:
         events = read_scratchpad(pad.filepath)
         assert events[1]["token_usage"] == usage
 
-    def test_log_tool_result(self, tmp_path):
+    def test_log_tool_result_full_data(self, tmp_path):
+        """tool_result stores full result data (not truncated)."""
         pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
-        pad.log_tool_result("get_news", result_summary="5 articles found", chars=2400)
+        full_result = '{"articles": [{"title": "NVDA surges"}], "count": 5}'
+        pad.log_tool_result("get_news", result_data=full_result)
         pad.close()
 
         events = read_scratchpad(pad.filepath)
         tr = events[1]
         assert tr["type"] == "tool_result"
         assert tr["data"]["tool"] == "get_news"
-        assert tr["data"]["summary"] == "5 articles found"
-        assert tr["data"]["result_chars"] == 2400
+        # Result is parsed as JSON object (not string)
+        assert tr["data"]["result"]["count"] == 5
+        assert tr["data"]["result_chars"] == len(full_result)
 
-    def test_log_tool_result_truncates_summary(self, tmp_path):
+    def test_log_tool_result_with_args(self, tmp_path):
+        """tool_result can include tool_input for combined event (like Dexter)."""
         pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
-        long_summary = "x" * 500
-        pad.log_tool_result("tool", result_summary=long_summary, chars=500)
+        pad.log_tool_result(
+            "get_news",
+            result_data='{"count": 3}',
+            tool_input={"ticker": "NVDA", "days": 7},
+        )
         pad.close()
 
         events = read_scratchpad(pad.filepath)
-        assert len(events[1]["data"]["summary"]) < 500
-        assert "truncated" in events[1]["data"]["summary"]
+        tr = events[1]
+        assert tr["data"]["args"]["ticker"] == "NVDA"
+        assert tr["data"]["result"]["count"] == 3
 
-    def test_log_final_answer(self, tmp_path):
+    def test_log_tool_result_non_json_string(self, tmp_path):
+        """Non-JSON result is stored as plain string."""
         pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        pad.log_tool_result("tool", result_data="plain text result")
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert events[1]["data"]["result"] == "plain text result"
+
+    def test_log_tool_result_large_data_not_truncated(self, tmp_path):
+        """Full result is stored even for large data."""
+        pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        large_result = json.dumps({"data": "x" * 5000})
+        pad.log_tool_result("tool", result_data=large_result)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        # Should NOT be truncated
+        assert "truncated" not in str(events[1]["data"]["result"])
+        assert events[1]["data"]["result"]["data"] == "x" * 5000
+
+    def test_log_final_answer_full(self, tmp_path):
+        """Final answer stores full text (not truncated)."""
+        pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        full_answer = "NVDA shows bullish momentum " * 50  # ~1400 chars
         usage = {"total_tokens": 5000}
         pad.log_final_answer(
-            "NVDA shows bullish momentum",
+            full_answer,
             token_usage=usage,
             tools_used=["get_news", "get_price"],
         )
@@ -201,8 +237,8 @@ class TestScratchpadLogging:
         events = read_scratchpad(pad.filepath)
         fa = events[1]
         assert fa["type"] == "final_answer"
-        assert fa["data"]["answer_preview"] == "NVDA shows bullish momentum"
-        assert fa["data"]["answer_chars"] == len("NVDA shows bullish momentum")
+        # Full answer preserved, not truncated
+        assert fa["data"]["answer"] == full_answer
         assert fa["data"]["tools_used"] == ["get_news", "get_price"]
         assert fa["data"]["elapsed_seconds"] >= 0
         assert fa["token_usage"] == usage
@@ -223,16 +259,20 @@ class TestScratchpadLogging:
 
 
 class TestScratchpadSession:
-    def test_full_session(self, tmp_path):
-        """Simulate a complete agent session with multiple tool calls."""
+    def test_full_session_combined_events(self, tmp_path):
+        """Simulate session using combined tool_result events (Dexter-style)."""
         pad = Scratchpad("分析 NVDA", "anthropic", "claude-sonnet-4", base_dir=tmp_path)
 
-        pad.log_tool_call("get_ticker_news", {"ticker": "NVDA", "days": 7})
-        pad.log_tool_result("get_ticker_news", result_summary="3 articles", chars=1500)
-
-        pad.log_tool_call("get_price_history", {"ticker": "NVDA", "period": "1mo"})
-        pad.log_tool_result("get_price_history", result_summary="22 rows", chars=800)
-
+        pad.log_tool_result(
+            "get_ticker_news",
+            result_data='{"articles": [{"title": "NVDA up"}], "count": 3}',
+            tool_input={"ticker": "NVDA", "days": 7},
+        )
+        pad.log_tool_result(
+            "get_price_history",
+            result_data='{"rows": 22, "data": []}',
+            tool_input={"ticker": "NVDA", "period": "1mo"},
+        )
         pad.log_final_answer(
             "NVDA 近期表現強勁...",
             token_usage={"total_tokens": 8000},
@@ -241,16 +281,16 @@ class TestScratchpadSession:
         pad.close()
 
         events = read_scratchpad(pad.filepath)
-        assert len(events) == 6  # init + 2*(call+result) + final
+        assert len(events) == 4  # init + 2*tool_result + final
         types = [e["type"] for e in events]
-        assert types == [
-            "init", "tool_call", "tool_result",
-            "tool_call", "tool_result", "final_answer",
-        ]
+        assert types == ["init", "tool_result", "tool_result", "final_answer"]
         # Sequential numbering
-        assert [e["seq"] for e in events] == [1, 2, 3, 4, 5, 6]
+        assert [e["seq"] for e in events] == [1, 2, 3, 4]
         # All same session
         assert len(set(e["session"] for e in events)) == 1
+        # Full results preserved
+        assert events[1]["data"]["result"]["count"] == 3
+        assert events[1]["data"]["args"]["ticker"] == "NVDA"
 
     def test_context_manager(self, tmp_path):
         with Scratchpad("test", "openai", "gpt", base_dir=tmp_path) as pad:
@@ -263,13 +303,17 @@ class TestScratchpadSession:
 
     def test_unicode_content(self, tmp_path):
         pad = Scratchpad("分析台積電走勢", "anthropic", "claude", base_dir=tmp_path)
-        pad.log_tool_call("get_news", {"ticker": "TSM", "query": "台積電"})
+        pad.log_tool_result(
+            "get_news",
+            result_data='{"articles": [{"title": "台積電營收創新高"}]}',
+            tool_input={"ticker": "TSM", "query": "台積電"},
+        )
         pad.log_final_answer("台積電近期營收創新高，AI 需求持續推升...")
         pad.close()
 
         events = read_scratchpad(pad.filepath)
         assert events[0]["data"]["query"] == "分析台積電走勢"
-        assert "台積電" in events[2]["data"]["answer_preview"]
+        assert "台積電" in events[2]["data"]["answer"]
 
     def test_non_serializable_input(self, tmp_path):
         """Tool input with non-JSON-safe types should be handled gracefully."""
@@ -279,6 +323,116 @@ class TestScratchpadSession:
 
         events = read_scratchpad(pad.filepath)
         assert len(events) == 2  # Should not crash
+
+
+# ── ChatHistory ───────────────────────────────────────────────
+
+
+class TestChatHistory:
+    def test_append_and_read(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        history = ChatHistory(path=path)
+        history.append(
+            user_message="分析 NVDA",
+            agent_response="NVDA 近期表現強勁...",
+            provider="anthropic",
+            model="claude-sonnet-4",
+            tools_used=["get_news"],
+            elapsed_seconds=12.5,
+        )
+
+        entries = ChatHistory.read_recent(path=path)
+        assert len(entries) == 1
+        e = entries[0]
+        assert e["userMessage"] == "分析 NVDA"
+        assert e["agentResponse"] == "NVDA 近期表現強勁..."
+        assert e["provider"] == "anthropic"
+        assert e["model"] == "claude-sonnet-4"
+        assert e["tools_used"] == ["get_news"]
+        assert e["elapsed_seconds"] == 12.5
+        assert "timestamp" in e
+
+    def test_multiple_entries(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        history = ChatHistory(path=path)
+        for i in range(5):
+            history.append(
+                user_message=f"Question {i}",
+                agent_response=f"Answer {i}",
+                provider="openai",
+                model="gpt-5.2",
+            )
+
+        entries = ChatHistory.read_recent(path=path)
+        assert len(entries) == 5
+        assert entries[0]["userMessage"] == "Question 0"
+        assert entries[4]["userMessage"] == "Question 4"
+
+    def test_read_recent_limit(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        history = ChatHistory(path=path)
+        for i in range(20):
+            history.append(
+                user_message=f"Q{i}",
+                agent_response=f"A{i}",
+                provider="anthropic",
+                model="claude",
+            )
+
+        entries = ChatHistory.read_recent(path=path, limit=5)
+        assert len(entries) == 5
+        # Should be the LAST 5
+        assert entries[0]["userMessage"] == "Q15"
+        assert entries[4]["userMessage"] == "Q19"
+
+    def test_read_empty_file(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        path.write_text("")
+        entries = ChatHistory.read_recent(path=path)
+        assert entries == []
+
+    def test_read_nonexistent_file(self, tmp_path):
+        path = tmp_path / "does_not_exist.jsonl"
+        entries = ChatHistory.read_recent(path=path)
+        assert entries == []
+
+    def test_optional_fields_omitted(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        history = ChatHistory(path=path)
+        history.append(
+            user_message="Hello",
+            agent_response="Hi",
+            provider="anthropic",
+            model="claude",
+            # No tools_used, no elapsed_seconds
+        )
+
+        entries = ChatHistory.read_recent(path=path)
+        assert "tools_used" not in entries[0]
+        assert "elapsed_seconds" not in entries[0]
+
+    def test_creates_parent_dir(self, tmp_path):
+        path = tmp_path / "a" / "b" / "chat.jsonl"
+        history = ChatHistory(path=path)
+        history.append(
+            user_message="test",
+            agent_response="ok",
+            provider="openai",
+            model="gpt",
+        )
+        assert path.exists()
+
+    def test_unicode_content(self, tmp_path):
+        path = tmp_path / "chat.jsonl"
+        history = ChatHistory(path=path)
+        history.append(
+            user_message="台積電走勢如何？",
+            agent_response="台積電近期表現強勁",
+            provider="anthropic",
+            model="claude",
+        )
+        entries = ChatHistory.read_recent(path=path)
+        assert entries[0]["userMessage"] == "台積電走勢如何？"
 
 
 # ── read_scratchpad ───────────────────────────────────────────

@@ -259,7 +259,6 @@ async def run_query_stream(
 
             logger.info(f"Executing tool: {tool_name}")
             tools_used.append(tool_name)
-            pad.log_tool_call(tool_name, tool_input, token_usage=tracker.summary())
 
             yield AgentEvent(EventType.tool_start, {
                 "tool": tool_name,
@@ -269,7 +268,7 @@ async def run_query_stream(
             # Execute the tool
             result = execute_tool(tool_name, tool_input, dal)
             result_str = str(result)
-            pad.log_tool_result(tool_name, result_summary=result_str[:200], chars=len(result_str))
+            pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
 
             yield AgentEvent(EventType.tool_end, {
                 "tool": tool_name,

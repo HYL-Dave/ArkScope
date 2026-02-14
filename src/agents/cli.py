@@ -17,6 +17,7 @@ Slash commands (during chat):
     /context        Toggle 1M context beta on/off (Anthropic)
     /subagent       View/change subagent models (persisted to local config)
     /scratchpad     List recent agent session logs (JSONL)
+    /history        Show recent chat history (Q&A pairs)
     /turns          Show/set max tool calls per query
     /status         Show current session config
     help            Show all commands
@@ -75,7 +76,7 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
-from .shared.scratchpad import Scratchpad
+from .shared.scratchpad import ChatHistory, Scratchpad
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 
 console = Console()
@@ -227,6 +228,7 @@ _SLASH_COMMANDS = [
     ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
     ("/subagent", "/sa", "View/change subagent models"),
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
+    ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
@@ -363,6 +365,8 @@ def print_help():
             "  [cyan]/subagent <name>[/cyan]    Change a subagent's model (e.g. /subagent code_analyst opus)\n"
             "  [cyan]/scratchpad[/cyan]         List recent agent session logs\n"
             "  [cyan]/scratchpad <id>[/cyan]    View details of a session log\n"
+            "  [cyan]/history[/cyan]            Show recent chat history (Q&A pairs)\n"
+            "  [cyan]/history <N>[/cyan]        Show last N conversations\n"
             "  [cyan]/turns[/cyan]              Show/set max tool calls per query (e.g. /turns 30)\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
@@ -536,6 +540,7 @@ def run_anthropic_interactive(
     tools = get_anthropic_tools()
     tools_used: List[str] = []
     tool_index = 0
+    _query_start = time.time()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
 
     # Build optional API params (effort + thinking)
@@ -610,8 +615,19 @@ def run_anthropic_interactive(
                 if hasattr(block, "text"):
                     final_text += block.text
 
+            elapsed = time.time() - _query_start
             pad.log_final_answer(final_text, tools_used=list(set(tools_used)))
             pad.close()
+
+            # Record Q&A pair in chat history
+            ChatHistory().append(
+                user_message=question,
+                agent_response=final_text,
+                provider="anthropic",
+                model=model_name,
+                tools_used=list(set(tools_used)),
+                elapsed_seconds=elapsed,
+            )
 
             # Update messages for conversation continuity
             messages.append({"role": "assistant", "content": response.content})
@@ -643,14 +659,13 @@ def run_anthropic_interactive(
             tool_input = tool_use.input
 
             tools_used.append(tool_name)
-            pad.log_tool_call(tool_name, tool_input)
             print_tool_call(tool_name, tool_input, tool_index)
 
             # Execute with spinner
             with console.status("", spinner="dots"):
                 result = execute_tool(tool_name, tool_input, dal)
 
-            pad.log_tool_result(tool_name, result_summary=result[:200], chars=len(result))
+            pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
             print_tool_result_summary(tool_name, result)
 
             tool_results.append({
@@ -671,6 +686,17 @@ def run_anthropic_interactive(
 
     pad.log_max_turns(tools_used=list(set(tools_used)))
     pad.close()
+
+    # Record Q&A pair in chat history (even for max turns)
+    ChatHistory().append(
+        user_message=question,
+        agent_response=partial_text,
+        provider="anthropic",
+        model=model_name,
+        tools_used=list(set(tools_used)),
+        elapsed_seconds=time.time() - _query_start,
+    )
+
     return {
         "answer": partial_text,
         "tools_used": tools_used,
@@ -703,6 +729,7 @@ def run_openai_interactive(
     effort = reasoning_effort or config.reasoning_effort
     console.print(f"[dim]Model: {model_name} | reasoning: {effort}[/dim]")
 
+    _query_start = time.time()
     with console.status("[cyan]Running agent...", spinner="dots"):
         result = asyncio.run(run_query(
             question=question,
@@ -710,6 +737,16 @@ def run_openai_interactive(
             dal=dal,
             reasoning_effort=effort,
         ))
+
+    # Record Q&A pair in chat history
+    ChatHistory().append(
+        user_message=question,
+        agent_response=result["answer"],
+        provider="openai",
+        model=model_name,
+        tools_used=result.get("tools_used", []),
+        elapsed_seconds=time.time() - _query_start,
+    )
 
     return {
         "answer": result["answer"],
@@ -1165,9 +1202,16 @@ def handle_scratchpad_command(arg: str) -> None:
                 elif ev_type == "tool_call":
                     console.print(f"  [yellow]tool_call[/yellow] {data.get('tool', '?')}({str(data.get('input', ''))[:60]})")
                 elif ev_type == "tool_result":
-                    console.print(f"  [dim]tool_result[/dim] {data.get('tool', '?')} → {data.get('result_chars', 0)} chars")
+                    tool = data.get("tool", "?")
+                    chars = data.get("result_chars", 0)
+                    args_str = str(data.get("args", ""))[:60] if "args" in data else ""
+                    result_preview = str(data.get("result", ""))[:120]
+                    console.print(f"  [yellow]tool[/yellow] {tool}({args_str}) → {chars} chars")
+                    if result_preview:
+                        console.print(f"    [dim]{result_preview}[/dim]")
                 elif ev_type == "final_answer":
-                    preview = data.get("answer_preview", "")[:100]
+                    answer = data.get("answer", data.get("answer_preview", ""))
+                    preview = answer[:120] if answer else ""
                     elapsed = data.get("elapsed_seconds", "?")
                     console.print(f"  [green]final[/green] {elapsed}s | {preview}")
                 elif ev_type == "max_turns":
@@ -1216,6 +1260,44 @@ def handle_scratchpad_command(arg: str) -> None:
         f"\n[dim]Showing {len(shown)}/{len(files)} sessions from {pad_dir}/\n"
         "Use /scratchpad <session_id> to view details[/dim]\n"
     )
+
+
+def handle_history_command(arg: str) -> None:
+    """Handle /history [N] command. Show recent chat history (Q&A pairs).
+
+    /history      — show last 10 conversations
+    /history 20   — show last 20 conversations
+    """
+    limit = int(arg) if arg and arg.isdigit() else 10
+    entries = ChatHistory.read_recent(limit=limit)
+
+    if not entries:
+        console.print("[dim]No chat history found.[/dim]\n")
+        return
+
+    console.print()
+    for i, entry in enumerate(entries, 1):
+        ts = entry.get("timestamp", "?")[:19].replace("T", " ")
+        provider = entry.get("provider", "?")
+        model = entry.get("model", "?")
+        elapsed = entry.get("elapsed_seconds", "")
+        elapsed_str = f" {elapsed}s" if elapsed else ""
+        tools = entry.get("tools_used", [])
+        tools_str = f" | {len(tools)} tools" if tools else ""
+
+        question = entry.get("userMessage", "")
+        answer = entry.get("agentResponse", "")
+
+        console.print(
+            f"[bold]#{i}[/bold] [dim]{ts}[/dim] "
+            f"{provider}/{model}{elapsed_str}{tools_str}"
+        )
+        console.print(f"  [cyan]Q:[/cyan] {question[:80]}")
+        console.print(f"  [green]A:[/green] {answer[:120]}...")
+        console.print()
+
+    total_path = ChatHistory()._path
+    console.print(f"[dim]File: {total_path}[/dim]\n")
 
 
 def handle_code_model_command(state: SessionState, arg: str) -> None:
@@ -1365,6 +1447,8 @@ def main():
                 handle_subagent_command(state, arg)
             elif cmd in ("/scratchpad", "/pad"):
                 handle_scratchpad_command(arg)
+            elif cmd in ("/history", "/h"):
+                handle_history_command(arg)
             elif cmd == "/turns":
                 handle_turns_command(state, arg)
             elif cmd in ("/status", "/s"):

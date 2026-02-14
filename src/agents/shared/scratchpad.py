@@ -1,11 +1,11 @@
 """
-JSONL-based decision logging for agent sessions (Scratchpad).
+JSONL-based decision logging for agent sessions (Scratchpad + ChatHistory).
 
-Records every step of an agent execution — init, tool calls, tool results,
-and final answer — as append-only JSONL for crash-safety and audit trails.
+Scratchpad: per-session JSONL with full tool results (like Dexter's scratchpad).
+ChatHistory: append-only JSONL of Q&A pairs (like Dexter's messages).
 
-This is Phase 2 of the agent evolution roadmap.
-Design borrows from Beads project: hash-based IDs, JSONL format.
+Design borrows from Dexter (.dexter/scratchpad + .dexter/messages) and
+Beads project (hash-based IDs, JSONL format).
 """
 
 from __future__ import annotations
@@ -20,8 +20,9 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Default base directory for scratchpad files
+# Default directories
 _DEFAULT_BASE_DIR = Path("data/agent_scratchpad")
+_DEFAULT_CHAT_HISTORY_PATH = Path("data/chat_history.jsonl")
 
 
 def _make_session_id(query: str, timestamp: float) -> str:
@@ -30,26 +31,29 @@ def _make_session_id(query: str, timestamp: float) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:8]
 
 
-def _truncate(text: str, max_len: int = 500) -> str:
-    """Truncate text for logging, preserving useful prefix."""
-    if len(text) <= max_len:
+def _try_parse_json(text: str) -> Any:
+    """Try to parse a string as JSON; return original string on failure."""
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
         return text
-    return text[:max_len] + f"... [{len(text) - max_len} chars truncated]"
 
 
 class Scratchpad:
     """
     Append-only JSONL logger for one agent session.
 
+    Stores full tool results (not truncated) for debugging and audit.
+
     Usage::
 
         pad = Scratchpad(query="分析 NVDA 近期走勢", provider="anthropic", model="claude-sonnet-4")
 
-        # During agent loop
-        pad.log_tool_call("get_ticker_news", {"ticker": "NVDA", "days": 30}, token_usage={...})
-        pad.log_tool_result("get_ticker_news", result_summary="5 articles found", chars=2400)
-        pad.log_final_answer("NVDA shows...", token_usage={...})
+        # During agent loop — one event per tool execution (args + result)
+        result = execute_tool(tool_name, tool_input)
+        pad.log_tool_result("get_ticker_news", result_data=result, tool_input=tool_input)
 
+        pad.log_final_answer("NVDA shows...", token_usage={...})
         pad.close()
 
     File format: one JSON object per line in
@@ -106,7 +110,13 @@ class Scratchpad:
         tool_input: Dict[str, Any],
         token_usage: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Record that the agent decided to call a tool."""
+        """Record that the agent decided to call a tool (before execution).
+
+        For providers where tool results are not available (e.g. OpenAI SDK),
+        use this to at least record the tool invocation.
+        For Anthropic, prefer log_tool_result() with tool_input for a
+        combined event after execution.
+        """
         self._write_event("tool_call", {
             "tool": tool_name,
             "input": _safe_serialize(tool_input),
@@ -115,15 +125,20 @@ class Scratchpad:
     def log_tool_result(
         self,
         tool_name: str,
-        result_summary: str = "",
-        chars: int = 0,
+        result_data: str = "",
+        tool_input: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Record a tool result (summary only, not full content)."""
-        self._write_event("tool_result", {
-            "tool": tool_name,
-            "summary": _truncate(result_summary, 200),
-            "result_chars": chars,
-        })
+        """Record a tool execution with full result (like Dexter's scratchpad).
+
+        Stores complete result data for debugging. If tool_input is provided,
+        creates a combined event with both args and result.
+        """
+        data: Dict[str, Any] = {"tool": tool_name}
+        if tool_input is not None:
+            data["args"] = _safe_serialize(tool_input)
+        data["result"] = _try_parse_json(result_data)
+        data["result_chars"] = len(result_data) if isinstance(result_data, str) else 0
+        self._write_event("tool_result", data)
 
     def log_final_answer(
         self,
@@ -131,11 +146,10 @@ class Scratchpad:
         token_usage: Optional[Dict[str, Any]] = None,
         tools_used: Optional[List[str]] = None,
     ) -> None:
-        """Record the agent's final answer and session summary."""
+        """Record the agent's final answer (full, not truncated)."""
         elapsed = time.time() - self._start_time
         self._write_event("final_answer", {
-            "answer_preview": _truncate(answer, 300),
-            "answer_chars": len(answer),
+            "answer": answer,
             "tools_used": tools_used or [],
             "elapsed_seconds": round(elapsed, 2),
         }, token_usage=token_usage)
@@ -198,6 +212,89 @@ class Scratchpad:
 
     def __repr__(self) -> str:
         return f"Scratchpad(session={self.session_id}, events={self._event_seq})"
+
+
+# ── ChatHistory ────────────────────────────────────────────────
+
+
+class ChatHistory:
+    """Append-only JSONL log of Q&A pairs (like Dexter's messages/chat_history.json).
+
+    Each entry is one complete user question + agent response pair.
+
+    Usage::
+
+        history = ChatHistory()
+        history.append(
+            user_message="分析 NVDA",
+            agent_response="NVDA 近期表現強勁...",
+            provider="anthropic",
+            model="claude-sonnet-4",
+            tools_used=["get_ticker_news"],
+            elapsed_seconds=12.5,
+        )
+
+        recent = ChatHistory.read_recent(limit=10)
+    """
+
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self._path = path or _DEFAULT_CHAT_HISTORY_PATH
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def append(
+        self,
+        user_message: str,
+        agent_response: str,
+        provider: str,
+        model: str,
+        tools_used: Optional[List[str]] = None,
+        elapsed_seconds: Optional[float] = None,
+    ) -> None:
+        """Append a Q&A pair to the chat history."""
+        entry: Dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "userMessage": user_message,
+            "agentResponse": agent_response,
+            "provider": provider,
+            "model": model,
+        }
+        if tools_used:
+            entry["tools_used"] = tools_used
+        if elapsed_seconds is not None:
+            entry["elapsed_seconds"] = round(elapsed_seconds, 2)
+
+        try:
+            with open(self._path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except OSError as e:
+            logger.warning(f"ChatHistory write error: {e}")
+
+    @classmethod
+    def read_recent(cls, path: Optional[Path] = None, limit: int = 20) -> List[Dict[str, Any]]:
+        """Read the most recent N entries from chat history."""
+        p = path or _DEFAULT_CHAT_HISTORY_PATH
+        if not p.exists():
+            return []
+        entries: List[Dict[str, Any]] = []
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            entries.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        except OSError:
+            return []
+        return entries[-limit:]
+
+
+# ── Utility functions ──────────────────────────────────────────
 
 
 def _safe_serialize(obj: Any) -> Any:
