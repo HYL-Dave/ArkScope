@@ -154,12 +154,13 @@ class ToolRegistry:
     # ============================================================
 
     def register_all(self) -> None:
-        """Register all 18 built-in tool functions."""
+        """Register all built-in tool functions."""
         self._register_news_tools()
         self._register_price_tools()
         self._register_options_tools()
         self._register_signal_tools()
         self._register_analysis_tools()
+        self._register_web_tools()
         self._register_execution_tools()
 
     def _register_news_tools(self) -> None:
@@ -408,6 +409,68 @@ class ToolRegistry:
             parameters=[],
         ))
 
+
+    def _register_web_tools(self) -> None:
+        from .web_tools import web_search, web_fetch, web_browse
+
+        self.register(ToolDefinition(
+            name="tavily_search",
+            description=(
+                "Search the web for real-time information using Tavily. "
+                "Returns AI summary and ranked results with relevance scores. "
+                "Use topic='finance' for financial queries, topic='news' for current events."
+            ),
+            function=web_search,
+            category="web",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("query", "string", "Search query string", required=True),
+                ToolParameter("max_results", "integer", "Max results 1-10 (default: 5)", required=False, default=5),
+                ToolParameter("search_depth", "string", "Search depth", required=False,
+                              default="basic", enum=["basic", "advanced"]),
+                ToolParameter("topic", "string", "Search topic category", required=False,
+                              default="general", enum=["general", "news", "finance"]),
+                ToolParameter("days", "integer", "Limit to results from last N days (0=no limit)", required=False, default=0),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="tavily_fetch",
+            description=(
+                "Fetch and extract content from a specific URL using Tavily. "
+                "Supports pagination via offset/max_chars for long pages."
+            ),
+            function=web_fetch,
+            category="web",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("url", "string", "URL to fetch content from", required=True),
+                ToolParameter("extract_depth", "string", "Extraction depth", required=False,
+                              default="basic", enum=["basic", "advanced"]),
+                ToolParameter("offset", "integer", "Start position in chars for pagination (default: 0)", required=False, default=0),
+                ToolParameter("max_chars", "integer", "Max chars to return per call (default: 3000)", required=False, default=3000),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="web_browse",
+            description=(
+                "Browse a URL with headless Chromium browser (Playwright). "
+                "Handles JavaScript-rendered pages that Tavily cannot extract. "
+                "Supports pagination via offset/max_chars."
+            ),
+            function=web_browse,
+            category="web",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("url", "string", "URL to browse", required=True),
+                ToolParameter("wait_for", "string", "Page load wait strategy", required=False,
+                              default="networkidle", enum=["networkidle", "load", "domcontentloaded"]),
+                ToolParameter("extract_links", "boolean", "Also extract page links", required=False, default=False),
+                ToolParameter("offset", "integer", "Start position in chars for pagination (default: 0)", required=False, default=0),
+                ToolParameter("max_chars", "integer", "Max chars to return per call (default: 5000)", required=False, default=5000),
+            ],
+        ))
 
     def _register_execution_tools(self) -> None:
         from .code_executor import execute_python_code

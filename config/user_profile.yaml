@@ -348,3 +348,30 @@ report_preferences:
   # 輸出格式
   format: "markdown"        # markdown | html | json
   save_to: "reports/"       # 儲存位置
+
+# ============================================
+# 11. Web Search 設定 (Phase 10)
+# ============================================
+web_search:
+  # Tavily（免費 1000 credits/月，API key from TAVILY_API_KEY env）
+  tavily: true
+
+  # Claude 原生 web search（$10/1K searches，只對 Anthropic agent 有效）
+  # 預設關閉，需要時手動開啟或用 CLI toggle
+  claude_search: false
+  claude_search_max_uses: 5    # 每次對話上限
+
+  # OpenAI SDK WebSearchTool（包含在 API 費用，只對 OpenAI agent 有效）
+  openai_search: true
+
+  # Playwright headless browser（免費，需要 playwright install chromium）
+  playwright: true
+
+  # 信任的金融來源（可選，agent 會優先考慮這些來源）
+  # trusted_domains:
+  #   - "sec.gov"
+  #   - "reuters.com"
+  #   - "bloomberg.com"
+  #   - "wsj.com"
+  #   - "seekingalpha.com"
+  #   - "finance.yahoo.com"

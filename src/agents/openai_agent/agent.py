@@ -58,6 +58,16 @@ def _build_agent(
     from agents import Agent, ModelSettings
     from openai.types.shared import Reasoning
 
+    # Conditionally add OpenAI WebSearchTool (Phase 10)
+    config = get_agent_config()
+    all_tools = list(tools)
+    if config.web_openai_search:
+        try:
+            from agents import WebSearchTool
+            all_tools.append(WebSearchTool())
+        except ImportError:
+            logger.warning("WebSearchTool not available in this agents SDK version")
+
     # 自動決定 effective_max_tokens
     if reasoning_effort == "none":
         effective_max_tokens = max_tokens
@@ -68,7 +78,7 @@ def _build_agent(
         name="MindfulRL Assistant",
         instructions=SYSTEM_PROMPT,
         model=model_name,
-        tools=tools,
+        tools=all_tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=reasoning_effort),
             max_tokens=effective_max_tokens,

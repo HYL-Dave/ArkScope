@@ -162,6 +162,8 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "synthesize_signal",
             "get_fundamentals_analysis",
             "get_sec_filings",
+            "tavily_search",
+            "web_browse",
         ],
         max_turns=10,
         reasoning_effort="xhigh",
@@ -319,6 +321,14 @@ def _run_anthropic_subagent(
     all_tools = get_anthropic_tools()
     tools = _filter_anthropic_tools(all_tools, config.tool_names)
 
+    # Conditionally add Claude web search server tool (Phase 10)
+    if agent_config.web_claude_search:
+        from ..anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
+        tools.append({
+            **_CLAUDE_WEB_SEARCH_TOOL,
+            "max_uses": agent_config.web_claude_max_uses,
+        })
+
     messages: List[dict] = [{"role": "user", "content": question}]
     tools_used: List[str] = []
     tracker = TokenTracker()
@@ -363,6 +373,11 @@ def _run_anthropic_subagent(
             response = stream.get_final_message()
 
         tracker.record_anthropic(response, model=config.model)
+
+        # Handle pause_turn (Claude web search server tool mid-turn pause)
+        if response.stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": response.content})
+            continue
 
         if response.stop_reason != "tool_use":
             final_text = ""

@@ -407,8 +407,80 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result)
 
+    # ================================================================
+    # Web Tools (Phase 10) — conditional on config
+    # ================================================================
+
+    from ..config import get_agent_config
+    from src.tools.web_tools import web_search, web_fetch, web_browse
+    web_config = get_agent_config()
+
+    @function_tool
+    def tool_tavily_search(
+        query: str,
+        max_results: int = 5,
+        search_depth: str = "basic",
+        topic: str = "general",
+        days: int = 0,
+    ) -> str:
+        """Search the web for real-time information using Tavily. Returns AI summary and ranked results with relevance scores. Use topic='finance' for financial queries, topic='news' for current events.
+
+        Args:
+            query: Search query string
+            max_results: Max results 1-10 (default: 5)
+            search_depth: basic (1 credit) or advanced (2 credits)
+            topic: general, news, or finance (default: general)
+            days: Limit to results from last N days (0=no limit)
+        """
+        result = web_search(
+            query=query, max_results=max_results,
+            search_depth=search_depth, topic=topic, days=days,
+        )
+        return _serialize_result(result)
+
+    @function_tool
+    def tool_tavily_fetch(
+        url: str,
+        extract_depth: str = "basic",
+        offset: int = 0,
+        max_chars: int = 3000,
+    ) -> str:
+        """Fetch and extract content from a specific URL using Tavily. Supports pagination via offset/max_chars for long pages. Check was_truncated and use offset to read more.
+
+        Args:
+            url: URL to fetch content from
+            extract_depth: basic or advanced (default: basic)
+            offset: Start position in chars for pagination (default: 0)
+            max_chars: Max chars to return per call (default: 3000)
+        """
+        result = web_fetch(url=url, extract_depth=extract_depth, offset=offset, max_chars=max_chars)
+        return _serialize_result(result)
+
+    @function_tool
+    def tool_web_browse(
+        url: str,
+        wait_for: str = "networkidle",
+        extract_links: bool = False,
+        offset: int = 0,
+        max_chars: int = 5000,
+    ) -> str:
+        """Browse a URL with headless Chromium browser (Playwright). Handles JavaScript-rendered pages that Tavily cannot extract. Supports pagination via offset/max_chars.
+
+        Args:
+            url: URL to browse
+            wait_for: Page load wait strategy - networkidle, load, or domcontentloaded (default: networkidle)
+            extract_links: Also extract page links (default: false)
+            offset: Start position in chars for pagination (default: 0)
+            max_chars: Max chars to return per call (default: 5000)
+        """
+        result = web_browse(
+            url=url, wait_for=wait_for, extract_links=extract_links,
+            offset=offset, max_chars=max_chars,
+        )
+        return _serialize_result(result)
+
     # Return all tools as a list
-    return [
+    tools = [
         tool_get_ticker_news,
         tool_get_news_sentiment_summary,
         tool_search_news_by_keyword,
@@ -429,3 +501,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_execute_python_analysis,
         tool_delegate_to_subagent,
     ]
+
+    # Conditionally add web tools
+    if web_config.web_tavily:
+        tools.extend([tool_tavily_search, tool_tavily_fetch])
+    if web_config.web_playwright:
+        tools.append(tool_web_browse)
+
+    return tools

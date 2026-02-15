@@ -82,10 +82,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All 19 tools are defined (18 base + delegate_to_subagent)."""
+        """All 22 tools are defined (18 base + 3 web + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 19
+        assert len(tools) == 22
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -124,6 +124,9 @@ class TestAnthropicToolSchemas:
             "get_morning_brief",
             "execute_python_analysis",
             "delegate_to_subagent",
+            "tavily_search",
+            "tavily_fetch",
+            "web_browse",
         }
         assert tool_names == expected
 
@@ -199,10 +202,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """Creates 19 tools (18 base + delegate_to_subagent)."""
+        """Creates 22 tools (18 base + 3 web + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 19
+        assert len(tools) == 22
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -286,7 +289,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 18
+        assert len(schemas) == 21
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -300,7 +303,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 18
+        assert len(schemas) == 21
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

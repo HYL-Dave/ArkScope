@@ -21,6 +21,13 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
+# ── Claude Web Search server tool (Phase 10) ────────────────────
+
+_CLAUDE_WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+}
+
 # ── Model capability detection ──────────────────────────────────
 
 _ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6"}
@@ -141,6 +148,13 @@ async def run_query_stream(
     # Get tool definitions
     tools = get_anthropic_tools()
 
+    # Conditionally add Claude web search server tool (Phase 10)
+    if config.web_claude_search:
+        tools.append({
+            **_CLAUDE_WEB_SEARCH_TOOL,
+            "max_uses": config.web_claude_max_uses,
+        })
+
     # Initial message
     messages: List[dict] = [{"role": "user", "content": question}]
     tools_used: List[str] = []
@@ -213,6 +227,12 @@ async def run_query_stream(
                 yield AgentEvent(EventType.thinking_content, {
                     "thinking": block.thinking,
                 })
+
+        # Handle pause_turn (Claude web search server tool mid-turn pause)
+        if response.stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": response.content})
+            logger.debug("pause_turn: Claude web search in progress, continuing...")
+            continue
 
         # Check if we're done
         if response.stop_reason != "tool_use":

@@ -21,8 +21,13 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
     Get tool definitions in Anthropic format.
 
     Returns list of tool schemas for messages.create(tools=[...]).
+    Web tools (tavily_search, tavily_fetch, web_browse) are conditionally
+    included based on AgentConfig flags.
     """
-    return [
+    from ..config import get_agent_config
+    config = get_agent_config()
+
+    tools = [
         # News Tools
         {
             "name": "get_ticker_news",
@@ -431,6 +436,81 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ]
 
+    # ── Conditional web tools (Phase 10) ─────────────────────────
+    if config.web_tavily:
+        tools.extend([
+            {
+                "name": "tavily_search",
+                "description": (
+                    "Search the web for real-time information using Tavily. "
+                    "Returns AI summary and ranked results with relevance scores. "
+                    "Use topic='finance' for financial queries, topic='news' for current events."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                        "max_results": {"type": "integer", "description": "Max results 1-10 (default: 5)"},
+                        "search_depth": {"type": "string", "enum": ["basic", "advanced"],
+                                         "description": "basic (1 credit) or advanced (2 credits)"},
+                        "topic": {"type": "string", "enum": ["general", "news", "finance"],
+                                  "description": "Search topic category (default: general)"},
+                        "days": {"type": "integer",
+                                 "description": "Limit to results from last N days (0=no limit)"},
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "tavily_fetch",
+                "description": (
+                    "Fetch and extract content from a specific URL using Tavily. "
+                    "Supports pagination via offset/max_chars for long pages. "
+                    "Check was_truncated and use offset to read more."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to fetch content from"},
+                        "extract_depth": {"type": "string", "enum": ["basic", "advanced"],
+                                          "description": "Extraction depth (default: basic)"},
+                        "offset": {"type": "integer",
+                                   "description": "Start position in chars for pagination (default: 0)"},
+                        "max_chars": {"type": "integer",
+                                      "description": "Max chars to return per call (default: 3000)"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        ])
+    if config.web_playwright:
+        tools.append({
+            "name": "web_browse",
+            "description": (
+                "Browse a URL with headless Chromium browser (Playwright). "
+                "Handles JavaScript-rendered pages that Tavily cannot extract. "
+                "Supports pagination via offset/max_chars."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL to browse"},
+                    "wait_for": {"type": "string",
+                                 "enum": ["networkidle", "load", "domcontentloaded"],
+                                 "description": "Page load wait strategy (default: networkidle)"},
+                    "extract_links": {"type": "boolean",
+                                      "description": "Also extract page links (default: false)"},
+                    "offset": {"type": "integer",
+                               "description": "Start position in chars for pagination (default: 0)"},
+                    "max_chars": {"type": "integer",
+                                  "description": "Max chars to return per call (default: 5000)"},
+                },
+                "required": ["url"],
+            },
+        })
+
+    return tools
+
 
 def _serialize_result(result: Any) -> str:
     """Serialize result to JSON string for LLM consumption."""
@@ -499,6 +579,7 @@ def execute_tool(
         get_morning_brief,
     )
     from src.tools.code_executor import execute_python_code
+    from src.tools.web_tools import web_search, web_fetch, web_browse
 
     # Tool dispatch map
     tool_map = {
@@ -594,6 +675,27 @@ def execute_tool(
             background=tool_input.get("background", False),
         ),
         "delegate_to_subagent": lambda: _dispatch_subagent(tool_input, dal),
+        # Web tools (Phase 10) — no DAL needed
+        "tavily_search": lambda: web_search(
+            query=tool_input["query"],
+            max_results=tool_input.get("max_results", 5),
+            search_depth=tool_input.get("search_depth", "basic"),
+            topic=tool_input.get("topic", "general"),
+            days=tool_input.get("days", 0),
+        ),
+        "tavily_fetch": lambda: web_fetch(
+            url=tool_input["url"],
+            extract_depth=tool_input.get("extract_depth", "basic"),
+            offset=tool_input.get("offset", 0),
+            max_chars=tool_input.get("max_chars", 3000),
+        ),
+        "web_browse": lambda: web_browse(
+            url=tool_input["url"],
+            wait_for=tool_input.get("wait_for", "networkidle"),
+            extract_links=tool_input.get("extract_links", False),
+            offset=tool_input.get("offset", 0),
+            max_chars=tool_input.get("max_chars", 5000),
+        ),
     }
 
     if tool_name not in tool_map:

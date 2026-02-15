@@ -73,6 +73,14 @@ class AgentConfig(BaseModel):
     # Values: model IDs to override the default
     subagent_models: Dict[str, str] = {}
 
+    # Web search providers (Phase 10)
+    # Each can be independently enabled/disabled for cost control
+    web_tavily: bool = True           # Tavily search + fetch (free 1000 credits/month)
+    web_claude_search: bool = False   # Claude server-side web search ($10/1K, off by default)
+    web_openai_search: bool = True    # OpenAI SDK WebSearchTool (included in API cost)
+    web_playwright: bool = True       # Playwright headless browser (free, local)
+    web_claude_max_uses: int = 5      # Max web searches per conversation (Claude only)
+
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
 _MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
@@ -188,6 +196,19 @@ def get_agent_config() -> AgentConfig:
     # Subagent model overrides
     if "subagent_models" in llm_prefs:
         config.subagent_models = llm_prefs["subagent_models"]
+
+    # Web search overrides (Phase 10)
+    web_prefs = profile.get("web_search", {})
+    if "tavily" in web_prefs:
+        config.web_tavily = web_prefs["tavily"]
+    if "claude_search" in web_prefs:
+        config.web_claude_search = web_prefs["claude_search"]
+    if "claude_search_max_uses" in web_prefs:
+        config.web_claude_max_uses = web_prefs["claude_search_max_uses"]
+    if "openai_search" in web_prefs:
+        config.web_openai_search = web_prefs["openai_search"]
+    if "playwright" in web_prefs:
+        config.web_playwright = web_prefs["playwright"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})
