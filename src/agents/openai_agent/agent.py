@@ -81,6 +81,7 @@ async def run_query(
     model: Optional[str] = None,
     dal: Optional[Any] = None,
     reasoning_effort: Optional[ReasoningEffort] = None,
+    max_tool_calls: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run a natural language query using OpenAI Agents SDK.
@@ -90,6 +91,7 @@ async def run_query(
         model: Override model (default: gpt-5.2 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
+        max_tool_calls: Override max tool calls (default from AgentConfig)
 
     Returns:
         Dict with:
@@ -131,10 +133,11 @@ async def run_query(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
+    effective_max_turns = max_tool_calls or config.max_tool_calls
     result = await Runner.run(
         agent,
         input=question,
-        max_turns=config.max_tool_calls,
+        max_turns=effective_max_turns,
     )
 
     # Extract tools used and token usage from result
@@ -169,6 +172,7 @@ def run_query_sync(
     model: Optional[str] = None,
     dal: Optional[Any] = None,
     reasoning_effort: Optional[ReasoningEffort] = None,
+    max_tool_calls: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper for run_query().
@@ -178,6 +182,7 @@ def run_query_sync(
         model: Override model (default: gpt-5.2 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
+        max_tool_calls: Override max tool calls (default from AgentConfig)
 
     Returns:
         Dict with answer, tools_used, provider, model
@@ -215,10 +220,11 @@ def run_query_sync(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
+    effective_max_turns = max_tool_calls or config.max_tool_calls
     result = Runner.run_sync(
         agent,
         input=question,
-        max_turns=config.max_tool_calls,
+        max_turns=effective_max_turns,
     )
 
     # Extract tools used and token usage

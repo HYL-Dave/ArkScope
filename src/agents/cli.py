@@ -714,6 +714,7 @@ def run_openai_interactive(
     dal: Any,
     model: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
+    max_tool_calls: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Run OpenAI agent query with status display.
@@ -736,6 +737,7 @@ def run_openai_interactive(
             model=model_name,
             dal=dal,
             reasoning_effort=effort,
+            max_tool_calls=max_tool_calls,
         ))
 
     # Record Q&A pair in chat history
@@ -1481,6 +1483,7 @@ def main():
                     dal=dal,
                     model=state.model,
                     reasoning_effort=state.reasoning_effort,
+                    max_tool_calls=state.max_tool_calls,
                 )
 
             elapsed = time.time() - start
