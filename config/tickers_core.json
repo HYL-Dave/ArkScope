@@ -1,7 +1,7 @@
 {
   "_description": "MindfulRL-Intraday Core Stock Tickers Configuration",
-  "_version": "1.2.0",
-  "_last_updated": "2026-01-27",
+  "_version": "1.3.0",
+  "_last_updated": "2026-02-15",
   "_notes": "Tier 1 stocks are always fetched. Tier 2/3 are optional expansions.",
 
   "tier1_core": {
@@ -128,6 +128,24 @@
     "user_portfolio": {
       "_description": "User's current holdings",
       "tickers": ["ZETA"]
+    },
+
+    "quantum_computing": {
+      "_description": "Quantum computing sector (from user watchlist)",
+      "_added_date": "2026-02-15",
+      "tickers": ["IONQ", "RGTI", "QBTS"]
+    },
+
+    "ai_infrastructure": {
+      "_description": "AI infrastructure hardware (from user watchlist)",
+      "_added_date": "2026-02-15",
+      "tickers": ["DELL", "ANET"]
+    },
+
+    "fintech_extended": {
+      "_description": "Extended fintech coverage (from user watchlist)",
+      "_added_date": "2026-02-15",
+      "tickers": ["AFRM"]
     },
 
     "other_watchlist": {

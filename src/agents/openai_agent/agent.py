@@ -134,11 +134,18 @@ async def run_query(
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
     effective_max_turns = max_tool_calls or config.max_tool_calls
-    result = await Runner.run(
-        agent,
-        input=question,
-        max_turns=effective_max_turns,
-    )
+    try:
+        result = await Runner.run(
+            agent,
+            input=question,
+            max_turns=effective_max_turns,
+            auto_previous_response_id=True,
+        )
+    except Exception as e:
+        # Log overflow or other errors with context for debugging
+        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
+        pad.close()
+        raise
 
     # Extract tools used and token usage from result
     tracker = TokenTracker()
@@ -221,11 +228,17 @@ def run_query_sync(
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
     effective_max_turns = max_tool_calls or config.max_tool_calls
-    result = Runner.run_sync(
-        agent,
-        input=question,
-        max_turns=effective_max_turns,
-    )
+    try:
+        result = Runner.run_sync(
+            agent,
+            input=question,
+            max_turns=effective_max_turns,
+            auto_previous_response_id=True,
+        )
+    except Exception as e:
+        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
+        pad.close()
+        raise
 
     # Extract tools used and token usage
     tracker = TokenTracker()
@@ -310,11 +323,18 @@ async def run_query_stream(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
-    result = await Runner.run(
-        agent,
-        input=question,
-        max_turns=config.max_tool_calls,
-    )
+    try:
+        result = await Runner.run(
+            agent,
+            input=question,
+            max_turns=config.max_tool_calls,
+            auto_previous_response_id=True,
+        )
+    except Exception as e:
+        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
+        pad.close()
+        yield AgentEvent(EventType.error, {"error": str(e)})
+        return
 
     # Extract tools used and token usage from result
     tracker = TokenTracker()

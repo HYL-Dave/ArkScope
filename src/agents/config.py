@@ -50,7 +50,7 @@ class AgentConfig(BaseModel):
     anthropic_thinking: bool = False
 
     # Limits
-    max_tool_calls: int = 30
+    max_tool_calls: int = 60
     max_tokens: int = 16384
 
     # Context management (Phase 3)
@@ -143,7 +143,7 @@ def get_agent_config() -> AgentConfig:
         anthropic_model: "claude-sonnet-4-5-20250929"
         anthropic_model_advanced: "claude-opus-4-6"
         reasoning_effort: "xhigh"
-        max_tool_calls: 20
+        max_tool_calls: 60
         max_tokens: 16384
         anthropic_effort: "high"
         anthropic_thinking: false

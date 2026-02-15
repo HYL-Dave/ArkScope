@@ -70,7 +70,7 @@ watchlists:
       reason: "AI 需要的硬體供應鏈"
 
     - name: "Fintech"
-      tickers: ["PYPL", "SQ", "AFRM", "COIN"]
+      tickers: ["PYPL", "XYZ", "AFRM", "COIN"]
       reason: "金融科技板塊追蹤"
 
 # ============================================

@@ -442,6 +442,7 @@ def _run_openai_subagent(
         agent,
         input=question,
         max_turns=config.max_turns,
+        auto_previous_response_id=True,
     )
 
     # Extract tools used and token usage
