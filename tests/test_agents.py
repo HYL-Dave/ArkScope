@@ -82,10 +82,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All 22 tools are defined (18 base + 3 web + delegate_to_subagent)."""
+        """All 23 tools are defined (18 base + 3 web + 1 analyst + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 22
+        assert len(tools) == 23
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -122,6 +122,7 @@ class TestAnthropicToolSchemas:
             "get_sec_filings",
             "get_watchlist_overview",
             "get_morning_brief",
+            "get_analyst_consensus",
             "execute_python_analysis",
             "delegate_to_subagent",
             "tavily_search",
@@ -202,10 +203,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """Creates 22 tools (18 base + 3 web + delegate_to_subagent)."""
+        """Creates 23 tools (18 base + 3 web + 1 analyst + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 22
+        assert len(tools) == 23
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -289,7 +290,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 21
+        assert len(schemas) == 22
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -303,7 +304,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 21
+        assert len(schemas) == 22
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

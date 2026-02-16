@@ -359,6 +359,26 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": []
             }
         },
+        # Analyst Tools (Phase 11b)
+        {
+            "name": "get_analyst_consensus",
+            "description": (
+                "Get analyst consensus for a ticker: recommendation distribution "
+                "(buy/hold/sell trend), last 4 quarters earnings (actual vs estimate with "
+                "surprise %), upcoming earnings date and estimates, and analyst price "
+                "target (if available). Uses Finnhub free API."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
         # Execution Tools
         {
             "name": "execute_python_analysis",
@@ -580,6 +600,7 @@ def execute_tool(
     )
     from src.tools.code_executor import execute_python_code
     from src.tools.web_tools import web_search, web_fetch, web_browse
+    from src.tools.analyst_tools import get_analyst_consensus
 
     # Tool dispatch map
     tool_map = {
@@ -675,6 +696,10 @@ def execute_tool(
             background=tool_input.get("background", False),
         ),
         "delegate_to_subagent": lambda: _dispatch_subagent(tool_input, dal),
+        # Analyst tools (Phase 11b) — no DAL needed
+        "get_analyst_consensus": lambda: get_analyst_consensus(
+            ticker=tool_input["ticker"],
+        ),
         # Web tools (Phase 10) — no DAL needed
         "tavily_search": lambda: web_search(
             query=tool_input["query"],

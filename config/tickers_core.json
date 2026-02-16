@@ -133,7 +133,7 @@
     "quantum_computing": {
       "_description": "Quantum computing sector (from user watchlist)",
       "_added_date": "2026-02-15",
-      "tickers": ["IONQ", "RGTI", "QBTS"]
+      "tickers": ["IONQ", "RGTI", "QBTS", "IBM"]
     },
 
     "ai_infrastructure": {

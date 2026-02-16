@@ -73,6 +73,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_morning_brief,
     )
     from src.tools.code_executor import execute_python_code
+    from src.tools.analyst_tools import get_analyst_consensus
 
     # ================================================================
     # News Tools
@@ -344,6 +345,16 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result)
 
     # ================================================================
+    # Analyst Tools (Phase 11b)
+    # ================================================================
+
+    @function_tool
+    def tool_get_analyst_consensus(ticker: str) -> str:
+        """Get analyst consensus for a ticker: recommendation distribution (buy/hold/sell trend), last 4 quarters earnings (actual vs estimate with surprise %), upcoming earnings date and estimates, and analyst price target (if available). Uses Finnhub free API."""
+        result = get_analyst_consensus(ticker=ticker)
+        return _serialize_result(result)
+
+    # ================================================================
     # Execution Tools
     # ================================================================
 
@@ -498,6 +509,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sec_filings,
         tool_get_watchlist_overview,
         tool_get_morning_brief,
+        tool_get_analyst_consensus,
         tool_execute_python_analysis,
         tool_delegate_to_subagent,
     ]

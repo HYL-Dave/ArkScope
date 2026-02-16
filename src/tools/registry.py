@@ -410,6 +410,24 @@ class ToolRegistry:
         ))
 
 
+        # Analyst consensus (Finnhub free API — Phase 11b)
+        from .analyst_tools import get_analyst_consensus
+
+        self.register(ToolDefinition(
+            name="get_analyst_consensus",
+            description=(
+                "Get analyst consensus for a ticker: recommendation distribution "
+                "(buy/hold/sell), earnings history (last 4 quarters actual vs estimate), "
+                "upcoming earnings date, and price target (if available)."
+            ),
+            function=get_analyst_consensus,
+            category="analysis",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+            ],
+        ))
+
     def _register_web_tools(self) -> None:
         from .web_tools import web_search, web_fetch, web_browse
 
