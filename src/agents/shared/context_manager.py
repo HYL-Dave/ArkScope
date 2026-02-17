@@ -28,14 +28,13 @@ logger = logging.getLogger(__name__)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # Anthropic — https://docs.anthropic.com/en/docs/about-claude/models
     "claude-opus-4-6": 200_000,     # 200K standard (1M beta) / 128K output
-    "claude-sonnet-4-5": 200_000,   # 200K standard (1M beta) / 64K output
-    "claude-sonnet-4": 200_000,     # 200K standard (1M beta) / 64K output
-    "claude-opus-4": 200_000,
-    "claude-haiku": 200_000,
+    "claude-opus-5": 200_000,       # Future Opus models
+    "claude-sonnet": 200_000,       # Future Sonnet models (e.g. Sonnet 5)
+    "claude-haiku": 200_000,        # Future Haiku models
+    "claude": 200_000,              # Catch-all for any Claude model
     # OpenAI — https://platform.openai.com/docs/models
     "gpt-5.2": 400_000,             # 400K context / 128K output
     "gpt-5": 400_000,               # 400K context / 128K output
-    "gpt-4": 128_000,
 }
 
 _DEFAULT_CONTEXT_LIMIT = 200_000
@@ -60,7 +59,7 @@ class ContextManager:
 
     Usage::
 
-        ctx = ContextManager(model="claude-sonnet-4-5-20250929")
+        ctx = ContextManager(model="claude-opus-4-6")
 
         for turn in range(max_turns):
             response = client.messages.create(model=..., messages=messages)

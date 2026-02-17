@@ -281,7 +281,7 @@ llm_preferences:
   # 預設值：
   #   code_analyst:    gpt-5.2-codex  (reasoning=xhigh)
   #   deep_researcher: gpt-5.2        (reasoning=xhigh)
-  #   data_summarizer: claude-sonnet-4-5-20250929
+  #   data_summarizer: claude-opus-4-6
   #
   # subagent_models:
   #   code_analyst: "claude-opus-4-6"
@@ -309,14 +309,11 @@ context_management:
   # │ 模型                           │ Context          │ Max Output │
   # ├─────────────────────────────────┼─────────────────┼────────────┤
   # │ claude-opus-4-6                 │ 200K (1M beta)  │ 128K       │
-  # │ claude-sonnet-4-5               │ 200K (1M beta)  │ 64K        │
-  # │ claude-haiku-4-5                │ 200K            │ 64K        │
-  # │ gpt-5.2 / gpt-5                │ 400K            │ 128K       │
+  # │ gpt-5.2 / gpt-5.2-codex        │ 400K            │ 128K       │
   # └─────────────────────────────────┴─────────────────┴────────────┘
   #
   # 觸發閾值範例 (threshold_ratio=0.7):
   #   claude-opus-4-6:  140K tokens 時觸發 (200K standard)
-  #   claude-sonnet-4-5: 140K tokens 時觸發
   #   gpt-5.2:          280K tokens 時觸發
   #
   # 壓縮邏輯：

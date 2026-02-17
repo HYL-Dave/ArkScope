@@ -41,15 +41,12 @@ _CLAUDE_WEB_SEARCH_TOOL = {
 # ── Model capability detection ──────────────────────────────────
 
 _ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6"}
-_EFFORT_MODELS = {"claude-opus-4-6", "claude-opus-4-5"}
+_EFFORT_MODELS = {"claude-opus-4-6"}
 
 # 各模型最大 output tokens（API 硬限制）
 # 用於 thinking 模式自動設定 max_tokens
 _MODEL_MAX_OUTPUT = {
     "claude-opus-4-6": 128000,
-    "claude-opus-4-5": 64000,
-    "claude-sonnet-4-5": 64000,
-    "claude-haiku-4-5": 64000,
 }
 
 

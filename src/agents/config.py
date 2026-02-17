@@ -29,7 +29,7 @@ class AgentConfig(BaseModel):
     openai_model_advanced: str = "gpt-5.2"
 
     # Anthropic models
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    anthropic_model: str = "claude-opus-4-6"
     anthropic_model_advanced: str = "claude-opus-4-6"
 
     # Reasoning (GPT-5.x / o-series)
@@ -154,7 +154,7 @@ def get_agent_config() -> AgentConfig:
     user_profile.yaml can override under llm_preferences:
         agent_model: "gpt-5.2"
         agent_model_advanced: "gpt-5.2"
-        anthropic_model: "claude-sonnet-4-5-20250929"
+        anthropic_model: "claude-opus-4-6"
         anthropic_model_advanced: "claude-opus-4-6"
         reasoning_effort: "xhigh"
         max_tool_calls: 60

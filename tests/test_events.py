@@ -86,7 +86,7 @@ def _make_mock_response(stop_reason="end_turn", content_blocks=None):
     response.usage = MagicMock()
     response.usage.input_tokens = 100
     response.usage.output_tokens = 50
-    response.model = "claude-sonnet-4-5-20250929"
+    response.model = "claude-opus-4-6"
 
     return response
 
@@ -130,7 +130,7 @@ class TestAnthropicStream:
 
             # Config
             config = MagicMock()
-            config.anthropic_model = "claude-sonnet-4-5-20250929"
+            config.anthropic_model = "claude-opus-4-6"
             config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7
@@ -317,32 +317,38 @@ class TestAnthropicStream:
         # max_tokens = Opus 4.6 max output
         assert call_kwargs.kwargs.get("max_tokens") == 128000
 
-    def test_thinking_kwarg_enabled_for_sonnet(self, mock_deps):
-        """Thinking override with Sonnet uses enabled + auto-derived budget."""
+    def test_thinking_kwarg_enabled_for_non_opus(self, mock_deps):
+        """Thinking override with non-Opus model uses enabled + auto-derived budget."""
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
-        # Sonnet 4.5: max_output=64000, budget = 64000 - 16384 = 47616
+        # Non-Opus model: fallback max_output=64000, budget = 64000 - 16384 = 47616
         self._collect_events(
-            run_query_stream("Test", dal=MagicMock(), thinking=True)
+            run_query_stream(
+                "Test", model="claude-sonnet-5-20260501",
+                dal=MagicMock(), thinking=True,
+            )
         )
 
         call_kwargs = mock_deps["client"].messages.stream.call_args
         thinking_param = call_kwargs.kwargs.get("thinking")
         assert thinking_param["type"] == "enabled"
-        # budget = model_max_output (64000) - config.max_tokens (16384) = 47616
+        # budget = model_max_output (64000 fallback) - config.max_tokens (16384) = 47616
         assert thinking_param["budget_tokens"] == 64000 - 16384
-        # max_tokens = model max output
+        # max_tokens = model max output (fallback)
         assert call_kwargs.kwargs.get("max_tokens") == 64000
 
     def test_no_effort_for_unsupported_model(self, mock_deps):
-        """Effort is not sent for models that don't support it (Sonnet 4.5)."""
+        """Effort is not sent for models that don't support it."""
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
-        # Sonnet 4.5 doesn't support effort
+        # Non-Opus model doesn't support effort
         self._collect_events(
-            run_query_stream("Test", dal=MagicMock(), effort="medium")
+            run_query_stream(
+                "Test", model="claude-sonnet-5-20260501",
+                dal=MagicMock(), effort="medium",
+            )
         )
 
         call_kwargs = mock_deps["client"].messages.stream.call_args
@@ -362,7 +368,7 @@ class TestRunQueryBackwardCompat:
              patch("src.agents.config.get_agent_config") as mock_config:
 
             config = MagicMock()
-            config.anthropic_model = "claude-sonnet-4-5-20250929"
+            config.anthropic_model = "claude-opus-4-6"
             config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7

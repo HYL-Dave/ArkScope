@@ -29,11 +29,11 @@ class TestDetectProvider:
     def test_gpt_detected_as_openai(self):
         assert _detect_provider("gpt-5.2") == "openai"
 
-    def test_gpt_mini_detected_as_openai(self):
-        assert _detect_provider("gpt-5-mini") == "openai"
+    def test_gpt_codex_detected_as_openai(self):
+        assert _detect_provider("gpt-5.2-codex") == "openai"
 
     def test_claude_detected_as_anthropic(self):
-        assert _detect_provider("claude-sonnet-4-5-20250929") == "anthropic"
+        assert _detect_provider("claude-opus-4-6") == "anthropic"
 
     def test_claude_opus_detected_as_anthropic(self):
         assert _detect_provider("claude-opus-4-6") == "anthropic"
@@ -218,7 +218,7 @@ class TestGenerateAndExecute:
     @patch("src.tools.code_generator._resolve_code_model")
     def test_config_code_model_used(self, mock_resolve, mock_llm):
         """Uses config code_model when not specified."""
-        mock_resolve.return_value = "claude-sonnet-4-5-20250929"
+        mock_resolve.return_value = "claude-opus-4-6"
         mock_llm.return_value = 'print("from config model")'
 
         result = generate_and_execute(

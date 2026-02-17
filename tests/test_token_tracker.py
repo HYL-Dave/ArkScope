@@ -109,12 +109,12 @@ def _mock_anthropic_response(input_tokens: int, output_tokens: int, model: str =
 class TestAnthropicRecording:
     def test_record_anthropic(self):
         tracker = TokenTracker()
-        resp = _mock_anthropic_response(1500, 300, "claude-sonnet-4-5-20250929")
+        resp = _mock_anthropic_response(1500, 300, "claude-opus-4-6")
         usage = tracker.record_anthropic(resp)
 
         assert usage is not None
         assert usage.provider == "anthropic"
-        assert usage.model == "claude-sonnet-4-5-20250929"
+        assert usage.model == "claude-opus-4-6"
         assert usage.input_tokens == 1500
         assert usage.output_tokens == 300
         assert tracker.total_tokens == 1800

@@ -25,10 +25,9 @@ logger = logging.getLogger(__name__)
 # 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠
 _OPENAI_MODEL_MAX_OUTPUT = {
     "gpt-5.2": 128000,
-    "gpt-5-mini": 128000,
     # Codex series (agentic coding optimized, same output limits)
     "gpt-5.2-codex": 128000,
-    "gpt-5.3-codex": 128000,
+    # gpt-5.3-codex: API not yet available (Codex CLI only), add when released
 }
 _OPENAI_DEFAULT_MAX_OUTPUT = 128000
 

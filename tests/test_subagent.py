@@ -120,7 +120,7 @@ class TestDetectProvider:
 
     def test_detect_claude_as_anthropic(self):
         assert _detect_provider("claude-opus-4-6") == "anthropic"
-        assert _detect_provider("claude-sonnet-4-5-20250929") == "anthropic"
+        assert _detect_provider("claude-sonnet-5-20260501") == "anthropic"
 
     def test_unknown_defaults_to_anthropic(self):
         assert _detect_provider("some-model") == "anthropic"
@@ -283,7 +283,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-sonnet-4-5-20250929",
+            name="test", description="", model="claude-opus-4-6",
             system_prompt="test",
         )
         result = _run_anthropic_subagent(config, "test question", dal=None)
@@ -323,7 +323,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-sonnet-4-5-20250929",
+            name="test", description="", model="claude-opus-4-6",
             system_prompt="test", max_turns=5,
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
@@ -356,7 +356,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-sonnet-4-5-20250929",
+            name="test", description="", model="claude-opus-4-6",
             system_prompt="test", max_turns=2,
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
@@ -464,8 +464,9 @@ class TestExtendedContext:
     def test_opus_enabled(self):
         assert _use_extended_context("claude-opus-4-6", True) is True
 
-    def test_sonnet_enabled(self):
-        assert _use_extended_context("claude-sonnet-4-5-20250929", True) is True
+    def test_sonnet_not_in_current_list(self):
+        # Sonnet 4.5 removed; Sonnet 5 will be added when released
+        assert _use_extended_context("claude-sonnet-4-5-20250929", True) is False
 
     def test_disabled(self):
         assert _use_extended_context("claude-opus-4-6", False) is False

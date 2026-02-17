@@ -100,25 +100,11 @@ class ModelEntry:
 # Canonical model list — update here when new models are available
 MODEL_CATALOG: List[ModelEntry] = [
     ModelEntry(
-        id="claude-sonnet-4-5-20250929",
-        provider="anthropic",
-        name="Sonnet 4.5",
-        aliases=["sonnet", "sonnet4.5", "sonnet-4.5", "s45", "claude-sonnet"],
-        description="Fast, smart — best for agents & coding",
-    ),
-    ModelEntry(
         id="claude-opus-4-6",
         provider="anthropic",
         name="Opus 4.6",
-        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus"],
-        description="Most intelligent — deep analysis & reasoning",
-    ),
-    ModelEntry(
-        id="claude-haiku-4-5-20251001",
-        provider="anthropic",
-        name="Haiku 4.5",
-        aliases=["haiku", "haiku4.5", "haiku-4.5", "h45", "claude-haiku"],
-        description="Fastest & cheapest — quick tasks",
+        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus", "claude"],
+        description="Most intelligent — deep analysis & reasoning (128K output)",
     ),
     ModelEntry(
         id="gpt-5.2",
@@ -135,13 +121,7 @@ MODEL_CATALOG: List[ModelEntry] = [
         aliases=["codex", "codex5.2", "5.2-codex"],
         description="Agentic coding — long-horizon, refactors, migrations",
     ),
-    ModelEntry(
-        id="gpt-5.3-codex",
-        provider="openai",
-        name="GPT-5.3 Codex",
-        aliases=["codex5.3", "5.3-codex", "codex-latest"],
-        description="Latest codex — API phased rollout (coming soon)",
-    ),
+    # gpt-5.3-codex: API not yet available (Codex CLI only), add when released
 ]
 
 
@@ -779,7 +759,6 @@ VALID_ANTHROPIC_EFFORT = ("max", "high", "medium", "low")
 # 每個 Anthropic 模型支援的 effort 選項（prefix match）
 _EFFORT_OPTIONS_BY_MODEL = {
     "claude-opus-4-6": ("max", "high", "medium", "low"),
-    "claude-opus-4-5": ("high", "medium", "low"),
 }
 
 

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ── 1M context beta ────────────────────────────────────────────
 
-_EXTENDED_CONTEXT_MODELS = {"claude-opus-4-6", "claude-sonnet-4-5"}
+_EXTENDED_CONTEXT_MODELS = {"claude-opus-4-6"}
 _EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
 
 
@@ -175,7 +175,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "sector comparisons, multi-ticker screening, and news digests. "
             "Optimized for speed and conciseness."
         ),
-        model="claude-sonnet-4-5-20250929",
+        model="claude-opus-4-6",
         system_prompt=_DATA_SUMMARIZER_PROMPT,
         tool_names=[
             "get_ticker_news",
