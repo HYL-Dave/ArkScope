@@ -41,6 +41,22 @@ def _get_openai_max_output(model: str) -> int:
     return _OPENAI_DEFAULT_MAX_OUTPUT
 
 
+def _make_compaction_session():
+    """Create a CompactionSession for within-run context compaction (Phase 7a).
+
+    Returns None if CompactionSession is not available or import fails.
+    Uses an in-memory session (no persistence across runs).
+    """
+    try:
+        from agents.memory import OpenAIResponsesCompactionSession
+        session = OpenAIResponsesCompactionSession()
+        logger.info("Using OpenAI CompactionSession for server-side compaction")
+        return session
+    except (ImportError, Exception) as e:
+        logger.warning(f"CompactionSession not available: {e}")
+        return None
+
+
 def _build_agent(
     model_name: str,
     tools: list,
@@ -143,14 +159,20 @@ async def run_query(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
+    # Server-side compaction (Phase 7a)
+    session = _make_compaction_session() if config.server_compaction else None
+
     effective_max_turns = max_tool_calls or config.max_tool_calls
+    runner_kwargs = dict(
+        input=question,
+        max_turns=effective_max_turns,
+        auto_previous_response_id=True,
+    )
+    if session:
+        runner_kwargs["session"] = session
+
     try:
-        result = await Runner.run(
-            agent,
-            input=question,
-            max_turns=effective_max_turns,
-            auto_previous_response_id=True,
-        )
+        result = await Runner.run(agent, **runner_kwargs)
     except Exception as e:
         # Log overflow or other errors with context for debugging
         pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
@@ -237,14 +259,20 @@ def run_query_sync(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
+    # Server-side compaction (Phase 7a)
+    session = _make_compaction_session() if config.server_compaction else None
+
     effective_max_turns = max_tool_calls or config.max_tool_calls
+    runner_kwargs = dict(
+        input=question,
+        max_turns=effective_max_turns,
+        auto_previous_response_id=True,
+    )
+    if session:
+        runner_kwargs["session"] = session
+
     try:
-        result = Runner.run_sync(
-            agent,
-            input=question,
-            max_turns=effective_max_turns,
-            auto_previous_response_id=True,
-        )
+        result = Runner.run_sync(agent, **runner_kwargs)
     except Exception as e:
         pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
         pad.close()
@@ -333,12 +361,19 @@ async def run_query_stream(
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
 
+    # Server-side compaction (Phase 7a)
+    session = _make_compaction_session() if config.server_compaction else None
+
+    runner_kwargs = dict(
+        input=question,
+        max_turns=config.max_tool_calls,
+        auto_previous_response_id=True,
+    )
+    if session:
+        runner_kwargs["session"] = session
+
     try:
-        result = await Runner.run(
-            agent,
-            input=question,
-            max_turns=config.max_tool_calls,
-            auto_previous_response_id=True,
+        result = await Runner.run(agent, **runner_kwargs
         )
     except Exception as e:
         pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])

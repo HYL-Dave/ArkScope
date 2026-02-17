@@ -12,7 +12,15 @@ Use integration tests or manual testing for full agent flows.
 """
 
 import json
+import re
+
 import pytest
+
+
+def _unwrap(result: str) -> str:
+    """Strip <tool_output> wrapping (Phase 15) to get raw JSON."""
+    m = re.search(r"<tool_output[^>]*>\n(.*)\n</tool_output>", result, re.DOTALL)
+    return m.group(1) if m else result
 
 from src.agents.config import AgentConfig, get_agent_config
 from src.agents.shared.prompts import SYSTEM_PROMPT
@@ -82,10 +90,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All 23 tools are defined (18 base + 3 web + 1 analyst + delegate_to_subagent)."""
+        """All 24 tools are defined (18 base + 3 web + 1 analyst + 1 insider + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 23
+        assert len(tools) == 24
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -122,6 +130,7 @@ class TestAnthropicToolSchemas:
             "get_sec_filings",
             "get_watchlist_overview",
             "get_morning_brief",
+            "get_insider_trades",
             "get_analyst_consensus",
             "execute_python_analysis",
             "delegate_to_subagent",
@@ -151,7 +160,7 @@ class TestAnthropicToolExecution:
             dal
         )
 
-        data = json.loads(result)
+        data = json.loads(_unwrap(result))
         assert data["ticker"] == "NVDA"
         assert data["count"] > 0
 
@@ -165,7 +174,7 @@ class TestAnthropicToolExecution:
             dal
         )
 
-        data = json.loads(result)
+        data = json.loads(_unwrap(result))
         assert data["ticker"] == "NVDA"
         assert "change_pct" in data
 
@@ -179,7 +188,7 @@ class TestAnthropicToolExecution:
             dal
         )
 
-        data = json.loads(result)
+        data = json.loads(_unwrap(result))
         assert "delta" in data
         assert "gamma" in data
         assert 0 <= data["delta"] <= 1
@@ -203,10 +212,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """Creates 23 tools (18 base + 3 web + 1 analyst + delegate_to_subagent)."""
+        """Creates 24 tools (18 base + 3 web + 1 analyst + 1 insider + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 23
+        assert len(tools) == 24
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -290,7 +299,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 22
+        assert len(schemas) == 23
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -304,7 +313,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 22
+        assert len(schemas) == 23
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

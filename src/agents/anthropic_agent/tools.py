@@ -324,7 +324,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "get_sec_filings",
-            "description": "Get SEC filing metadata (10-K, 10-Q, 8-K) for a ticker.",
+            "description": (
+                "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
+                "Returns filing type, date, and URL — metadata only, not content."
+            ),
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -336,6 +339,32 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Filter by filing types (e.g. ['10-K', '10-Q'])"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of filings to return (default: 10)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_insider_trades",
+            "description": (
+                "Get recent insider trades (SEC Form 4) for a ticker. Fully parsed: "
+                "insider name, title, transaction date, shares (negative=sale), "
+                "price, and holdings before/after."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of trades to return (default: 10)"
                     }
                 },
                 "required": ["ticker"]
@@ -532,16 +561,25 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
     return tools
 
 
-def _serialize_result(result: Any) -> str:
-    """Serialize result to JSON string for LLM consumption."""
+def _serialize_result(result: Any, tool_name: str = "") -> str:
+    """Serialize result to JSON string for LLM consumption.
+
+    Wraps output in <tool_output> boundary tags when tool_name is provided
+    to prevent prompt injection from external data sources.
+    """
     if hasattr(result, "model_dump"):
-        return json.dumps(result.model_dump(), default=str)
+        content = json.dumps(result.model_dump(), default=str)
     elif isinstance(result, list) and result and hasattr(result[0], "model_dump"):
-        return json.dumps([r.model_dump() for r in result], default=str)
+        content = json.dumps([r.model_dump() for r in result], default=str)
     elif isinstance(result, dict):
-        return json.dumps(result, default=str)
+        content = json.dumps(result, default=str)
     else:
-        return str(result)
+        content = str(result)
+
+    if tool_name:
+        from src.agents.shared.security import wrap_tool_result
+        return wrap_tool_result(content, tool_name)
+    return content
 
 
 def _dispatch_subagent(tool_input: Dict[str, Any], dal: "DataAccessLayer") -> Dict:
@@ -594,9 +632,12 @@ def execute_tool(
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
-        get_sec_filings,
         get_watchlist_overview,
         get_morning_brief,
+    )
+    from src.tools.sec_tools import (
+        get_sec_filings,
+        get_insider_trades,
     )
     from src.tools.code_executor import execute_python_code
     from src.tools.web_tools import web_search, web_fetch, web_browse
@@ -682,9 +723,13 @@ def execute_tool(
             tool_input["ticker"]
         ),
         "get_sec_filings": lambda: get_sec_filings(
-            dal,
-            tool_input["ticker"],
-            filing_types=tool_input.get("filing_types")
+            ticker=tool_input["ticker"],
+            filing_types=tool_input.get("filing_types"),
+            limit=tool_input.get("limit", 10),
+        ),
+        "get_insider_trades": lambda: get_insider_trades(
+            ticker=tool_input["ticker"],
+            limit=tool_input.get("limit", 10),
         ),
         "get_watchlist_overview": lambda: get_watchlist_overview(dal),
         "get_morning_brief": lambda: get_morning_brief(dal),
@@ -728,7 +773,7 @@ def execute_tool(
 
     try:
         result = tool_map[tool_name]()
-        return _serialize_result(result)
+        return _serialize_result(result, tool_name=tool_name)
     except Exception as e:
         logger.error(f"Tool {tool_name} failed: {e}")
         return json.dumps({"error": str(e)})

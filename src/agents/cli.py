@@ -176,6 +176,7 @@ class SessionState:
     anthropic_effort: Optional[str] = None
     anthropic_thinking: bool = False
     extended_context: bool = False  # 1M context beta (Anthropic only)
+    server_compaction: bool = False  # Server-side compaction L2 (Anthropic + OpenAI)
     code_model: str = ""  # Code generation model (empty = auto)
     max_tool_calls: Optional[int] = None  # None = use config default
 
@@ -204,6 +205,8 @@ class SessionState:
                 parts.append("Thinking: ON")
             if self.extended_context:
                 parts.append("Context: 1M")
+        if self.server_compaction:
+            parts.append("Compaction: L2")
         if self.code_model:
             parts.append(f"CodeModel: {self.code_model}")
         if self.max_tool_calls:
@@ -226,6 +229,7 @@ _SLASH_COMMANDS = [
     ("/effort", "/e", "Set effort level (Anthropic)"),
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
     ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
+    ("/compaction", "/cmp", "Toggle server-side compaction L2"),
     ("/subagent", "/sa", "View/change subagent models"),
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
@@ -251,6 +255,11 @@ _THINKING_OPTIONS = [
 _CONTEXT_OPTIONS = [
     ("on", "Enable 1M context beta"),
     ("off", "Disable 1M context (standard 200K)"),
+]
+
+_COMPACTION_OPTIONS = [
+    ("on", "Enable server-side compaction L2 (Anthropic + OpenAI)"),
+    ("off", "Disable server-side compaction"),
 ]
 
 _SUBAGENT_NAMES = [
@@ -318,6 +327,8 @@ class SlashCompleter(Completer):
             return _THINKING_OPTIONS
         elif cmd in ("/context", "/ctx"):
             return _CONTEXT_OPTIONS
+        elif cmd in ("/compaction", "/cmp"):
+            return _COMPACTION_OPTIONS
         elif cmd in ("/subagent", "/sa"):
             return _SUBAGENT_NAMES
         elif cmd in ("/model", "/m"):
@@ -1028,6 +1039,33 @@ def handle_context_command(state: SessionState, arg: str) -> None:
         console.print("[red]Usage: /context [on|off][/red]\n")
 
 
+def handle_compaction_command(state: SessionState, arg: str) -> None:
+    """Handle /compaction [on|off] command. No arg = toggle.
+
+    Server-side compaction (L2):
+    - Anthropic: beta compact-2026-01-12, Opus 4.6 only
+    - OpenAI: CompactionSession
+    Both work on top of L1 client-side compaction.
+    """
+    if not arg:
+        state.server_compaction = not state.server_compaction
+        new_status = "ON" if state.server_compaction else "OFF"
+        console.print(f"[green]Server compaction (L2):[/green] [bold]{new_status}[/bold]")
+        if state.server_compaction:
+            console.print("[dim]Anthropic: Opus 4.6 only | OpenAI: CompactionSession[/dim]")
+        console.print()
+        return
+    if arg.lower() in ("on", "true", "1"):
+        state.server_compaction = True
+        console.print("[green]Server compaction (L2):[/green] [bold]ON[/bold]")
+        console.print("[dim]Anthropic: Opus 4.6 only | OpenAI: CompactionSession[/dim]\n")
+    elif arg.lower() in ("off", "false", "0"):
+        state.server_compaction = False
+        console.print("[green]Server compaction (L2):[/green] [bold]OFF[/bold]\n")
+    else:
+        console.print("[red]Usage: /compaction [on|off][/red]\n")
+
+
 def handle_subagent_command(state: SessionState, arg: str) -> None:
     """Handle /subagent [name [model]] command.
 
@@ -1390,6 +1428,7 @@ def main():
         messages_history=[] if not args.no_history else None,
         anthropic_effort=args.effort,
         anthropic_thinking=args.thinking,
+        server_compaction=config.server_compaction,
     )
 
     print_banner()
@@ -1445,6 +1484,8 @@ def main():
                 handle_thinking_command(state, arg)
             elif cmd in ("/context", "/ctx"):
                 handle_context_command(state, arg)
+            elif cmd in ("/compaction", "/cmp"):
+                handle_compaction_command(state, arg)
             elif cmd in ("/subagent", "/sa"):
                 handle_subagent_command(state, arg)
             elif cmd in ("/scratchpad", "/pad"):
@@ -1463,6 +1504,9 @@ def main():
         start = time.time()
 
         try:
+            # Propagate server_compaction toggle to config (Phase 7a)
+            get_agent_config().server_compaction = state.server_compaction
+
             if state.provider == "anthropic":
                 result = run_anthropic_interactive(
                     question=question,

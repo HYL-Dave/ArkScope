@@ -25,18 +25,25 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _serialize_result(result: Any) -> str:
-    """Serialize result to JSON string for LLM consumption."""
+def _serialize_result(result: Any, tool_name: str = "") -> str:
+    """Serialize result to JSON string for LLM consumption.
+
+    Wraps output in <tool_output> boundary tags when tool_name is provided
+    to prevent prompt injection from external data sources.
+    """
     if hasattr(result, "model_dump"):
-        # Pydantic model
-        return json.dumps(result.model_dump(), default=str)
+        content = json.dumps(result.model_dump(), default=str)
     elif isinstance(result, list) and result and hasattr(result[0], "model_dump"):
-        # List of Pydantic models
-        return json.dumps([r.model_dump() for r in result], default=str)
+        content = json.dumps([r.model_dump() for r in result], default=str)
     elif isinstance(result, dict):
-        return json.dumps(result, default=str)
+        content = json.dumps(result, default=str)
     else:
-        return str(result)
+        content = str(result)
+
+    if tool_name:
+        from src.agents.shared.security import wrap_tool_result
+        return wrap_tool_result(content, tool_name)
+    return content
 
 
 def create_openai_tools(dal: "DataAccessLayer") -> List:
@@ -68,9 +75,12 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
-        get_sec_filings,
         get_watchlist_overview,
         get_morning_brief,
+    )
+    from src.tools.sec_tools import (
+        get_sec_filings,
+        get_insider_trades,
     )
     from src.tools.code_executor import execute_python_code
     from src.tools.analyst_tools import get_analyst_consensus
@@ -95,7 +105,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             limit: Max articles to return, 1-500 (default: 50)
         """
         result = get_ticker_news(dal, ticker, days=days, source=source, limit=limit)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_ticker_news")
 
     @function_tool
     def tool_get_news_sentiment_summary(ticker: str, days: int = 7) -> str:
@@ -108,7 +118,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns mean sentiment, bullish/bearish ratio, and scored article count.
         """
         result = get_news_sentiment_summary(dal, ticker, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_news_sentiment_summary")
 
     @function_tool
     def tool_search_news_by_keyword(
@@ -126,7 +136,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             limit: Max articles to return, 1-500 (default: 50)
         """
         result = search_news_by_keyword(dal, keyword, days=days, ticker=ticker, limit=limit)
-        return _serialize_result(result)
+        return _serialize_result(result, "search_news_by_keyword")
 
     # ================================================================
     # Price Tools
@@ -146,7 +156,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             days: Lookback period in days (default: 30)
         """
         result = get_ticker_prices(dal, ticker, interval=interval, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_ticker_prices")
 
     @function_tool
     def tool_get_price_change(ticker: str, days: int = 7) -> str:
@@ -159,7 +169,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns change_pct, period_high, period_low, and total_volume.
         """
         result = get_price_change(dal, ticker, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_price_change")
 
     @function_tool
     def tool_get_sector_performance(sector: str, days: int = 7) -> str:
@@ -172,7 +182,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns avg_change_pct, best/worst ticker, and per-ticker details.
         """
         result = get_sector_performance(dal, sector, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_sector_performance")
 
     # ================================================================
     # Options Tools
@@ -188,7 +198,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns current_iv, hv, vrp, iv_rank, iv_percentile, and trading signal.
         """
         result = get_iv_analysis(dal, ticker)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_iv_analysis")
 
     @function_tool
     def tool_get_iv_history_data(ticker: str) -> str:
@@ -200,7 +210,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns list of historical IV data points with dates.
         """
         result = get_iv_history_data(dal, ticker)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_iv_history_data")
 
     @function_tool
     def tool_scan_mispricing(
@@ -220,7 +230,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             mispricing_threshold_pct=mispricing_threshold_pct,
             min_confidence=min_confidence
         )
-        return _serialize_result(result)
+        return _serialize_result(result, "scan_mispricing")
 
     @function_tool
     def tool_calculate_greeks(
@@ -244,7 +254,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns delta, gamma, theta, vega, and rho.
         """
         result = calculate_greeks(S=S, K=K, T=T, r=r, sigma=sigma, option_type=option_type)
-        return _serialize_result(result)
+        return _serialize_result(result, "calculate_greeks")
 
     # ================================================================
     # Signal Tools
@@ -261,7 +271,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns sentiment_anomaly, volume_anomaly, and their z-scores.
         """
         result = detect_anomalies(dal, ticker, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "detect_anomalies")
 
     @function_tool
     def tool_detect_event_chains(ticker: str, days: int = 30) -> str:
@@ -274,7 +284,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns list of detected event chains with confidence scores.
         """
         result = detect_event_chains(dal, ticker, days=days)
-        return _serialize_result(result)
+        return _serialize_result(result, "detect_event_chains")
 
     @function_tool
     def tool_synthesize_signal(
@@ -292,7 +302,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns action (BUY/SELL/HOLD), confidence, composite_score, and reasoning.
         """
         result = synthesize_signal(dal, ticker, days=days, strategy=strategy)
-        return _serialize_result(result)
+        return _serialize_result(result, "synthesize_signal")
 
     # ================================================================
     # Analysis Tools
@@ -308,23 +318,37 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns market_cap, pe_ratio, roe, profit_margin, etc.
         """
         result = get_fundamentals_analysis(dal, ticker)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_fundamentals_analysis")
 
     @function_tool
     def tool_get_sec_filings(
         ticker: str,
-        filing_types: Optional[List[str]] = None
+        filing_types: Optional[List[str]] = None,
+        limit: int = 10,
     ) -> str:
-        """Get SEC filing metadata (10-K, 10-Q, 8-K) for a ticker.
+        """Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. Returns filing type, date, and URL — metadata only, not content.
 
         Args:
             ticker: Stock ticker symbol
             filing_types: Filter by filing types (e.g. ['10-K', '10-Q'])
-
-        Returns list of filings with type, date, and URL.
+            limit: Maximum number of filings to return (default: 10)
         """
-        result = get_sec_filings(dal, ticker, filing_types=filing_types)
-        return _serialize_result(result)
+        result = get_sec_filings(ticker, filing_types=filing_types, limit=limit)
+        return _serialize_result(result, "get_sec_filings")
+
+    @function_tool
+    def tool_get_insider_trades(
+        ticker: str,
+        limit: int = 10,
+    ) -> str:
+        """Get recent insider trades (SEC Form 4) for a ticker. Fully parsed: insider name, title, transaction date, shares (negative=sale), price, and holdings before/after.
+
+        Args:
+            ticker: Stock ticker symbol
+            limit: Maximum number of trades to return (default: 10)
+        """
+        result = get_insider_trades(ticker=ticker, limit=limit)
+        return _serialize_result(result, "get_insider_trades")
 
     @function_tool
     def tool_get_watchlist_overview() -> str:
@@ -333,7 +357,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns ticker_count, sector breakdown, and top movers.
         """
         result = get_watchlist_overview(dal)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_watchlist_overview")
 
     @function_tool
     def tool_get_morning_brief() -> str:
@@ -342,7 +366,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns date, holdings status, sector performance, and news highlights.
         """
         result = get_morning_brief(dal)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_morning_brief")
 
     # ================================================================
     # Analyst Tools (Phase 11b)
@@ -352,7 +376,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_analyst_consensus(ticker: str) -> str:
         """Get analyst consensus for a ticker: recommendation distribution (buy/hold/sell trend), last 4 quarters earnings (actual vs estimate with surprise %), upcoming earnings date and estimates, and analyst price target (if available). Uses Finnhub free API."""
         result = get_analyst_consensus(ticker=ticker)
-        return _serialize_result(result)
+        return _serialize_result(result, "get_analyst_consensus")
 
     # ================================================================
     # Execution Tools
@@ -385,7 +409,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             code=code, task=task, data_json=data_json,
             timeout=timeout, background=background,
         )
-        return _serialize_result(result)
+        return _serialize_result(result, "execute_python_code")
 
     # ================================================================
     # Subagent Delegation
@@ -416,7 +440,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             context_json=context_json,
             dal=dal,
         )
-        return _serialize_result(result)
+        return _serialize_result(result, "delegate_to_subagent")
 
     # ================================================================
     # Web Tools (Phase 10) — conditional on config
@@ -447,7 +471,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             query=query, max_results=max_results,
             search_depth=search_depth, topic=topic, days=days,
         )
-        return _serialize_result(result)
+        return _serialize_result(result, "tavily_search")
 
     @function_tool
     def tool_tavily_fetch(
@@ -465,7 +489,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             max_chars: Max chars to return per call (default: 3000)
         """
         result = web_fetch(url=url, extract_depth=extract_depth, offset=offset, max_chars=max_chars)
-        return _serialize_result(result)
+        return _serialize_result(result, "tavily_fetch")
 
     @function_tool
     def tool_web_browse(
@@ -488,7 +512,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             url=url, wait_for=wait_for, extract_links=extract_links,
             offset=offset, max_chars=max_chars,
         )
-        return _serialize_result(result)
+        return _serialize_result(result, "web_browse")
 
     # Return all tools as a list
     tools = [
@@ -507,6 +531,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_synthesize_signal,
         tool_get_fundamentals_analysis,
         tool_get_sec_filings,
+        tool_get_insider_trades,
         tool_get_watchlist_overview,
         tool_get_morning_brief,
         tool_get_analyst_consensus,

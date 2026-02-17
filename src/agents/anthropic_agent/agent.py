@@ -17,6 +17,16 @@ from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
+
+# ── Server-side compaction beta (Phase 7a) ─────────────────────
+_COMPACTION_BETA = "compact-2026-01-12"
+_COMPACTION_MODELS = {"claude-opus-4-6"}  # Only Opus 4.6 supports compaction
+
+
+def _supports_compaction(model: str) -> bool:
+    """Check if the model supports server-side compaction."""
+    return any(model.startswith(m) for m in _COMPACTION_MODELS)
+
 from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
@@ -191,6 +201,12 @@ async def run_query_stream(
     if use_beta:
         logger.info(f"Using 1M context beta for {model_name}")
 
+    # Server-side compaction (Phase 7a): Opus 4.6 only
+    use_compaction = config.server_compaction and _supports_compaction(model_name)
+    if use_compaction:
+        use_beta = True  # compaction requires beta endpoint
+        logger.info("Using server-side compaction (L2)")
+
     # Tool use loop
     for turn in range(config.max_tool_calls):
         yield AgentEvent(EventType.thinking, {"turn": turn + 1, "model": model_name})
@@ -204,9 +220,21 @@ async def run_query_stream(
             **api_kwargs,
         )
 
+        # Add compaction context_management param
+        if use_compaction:
+            stream_kwargs["context_management"] = {
+                "edits": [{"type": "compact_20260112"}]
+            }
+
         if use_beta:
+            # Build betas list (may include both extended context and compaction)
+            betas = []
+            if _use_extended_context(model_name, config.extended_context):
+                betas.append(_EXTENDED_CONTEXT_BETA)
+            if use_compaction:
+                betas.append(_COMPACTION_BETA)
             stream_ctx = client.beta.messages.stream(
-                betas=[_EXTENDED_CONTEXT_BETA],
+                betas=betas,
                 **stream_kwargs,
             )
         else:
@@ -232,6 +260,12 @@ async def run_query_stream(
         if response.stop_reason == "pause_turn":
             messages.append({"role": "assistant", "content": response.content})
             logger.debug("pause_turn: Claude web search in progress, continuing...")
+            continue
+
+        # Handle compaction (server-side context compaction, Phase 7a)
+        if response.stop_reason == "compaction":
+            messages.append({"role": "assistant", "content": response.content})
+            logger.info("Server compaction triggered — context summarized, continuing...")
             continue
 
         # Check if we're done

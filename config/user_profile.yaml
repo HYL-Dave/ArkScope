@@ -257,7 +257,6 @@ llm_preferences:
   model_priority:
     - "gpt_5_2"
     - "gpt_5"
-    - "o4_mini"
     - "haiku"
 
   # ── Anthropic agent 設定 (Phase 8) ──

@@ -258,17 +258,17 @@ class TestConsensus:
 # ============================================================
 
 class TestBridgeIntegration:
-    def test_registry_22(self):
-        """Registry now has 22 tools (18 base + 3 web + 1 analyst)."""
+    def test_registry_23(self):
+        """Registry now has 23 tools (18 base + 3 web + 1 analyst + 1 insider)."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 22
+        assert len(registry.list_all()) == 23
 
-    def test_analysis_category_5(self):
-        """Analysis category has 5 tools."""
+    def test_analysis_category_6(self):
+        """Analysis category has 6 tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_by_category("analysis")) == 5
+        assert len(registry.list_by_category("analysis")) == 6
 
     def test_anthropic_includes(self):
         """Anthropic bridge includes get_analyst_consensus."""

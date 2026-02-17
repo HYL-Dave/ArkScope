@@ -73,6 +73,12 @@ class AgentConfig(BaseModel):
     # Values: model IDs to override the default
     subagent_models: Dict[str, str] = {}
 
+    # Server-side compaction L2 (Phase 7a)
+    # Anthropic: beta compact-2026-01-12, Opus 4.6 only, context_management param
+    # OpenAI: CompactionSession for within-run context compaction
+    # Both work on top of L1 client-side compaction (ContextManager)
+    server_compaction: bool = False
+
     # Web search providers (Phase 10)
     # Each can be independently enabled/disabled for cost control
     web_tavily: bool = True           # Tavily search + fetch (free 1000 credits/month)
@@ -209,6 +215,10 @@ def get_agent_config() -> AgentConfig:
         config.web_openai_search = web_prefs["openai_search"]
     if "playwright" in web_prefs:
         config.web_playwright = web_prefs["playwright"]
+
+    # Server-side compaction (Phase 7a)
+    if "server_compaction" in llm_prefs:
+        config.server_compaction = llm_prefs["server_compaction"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})

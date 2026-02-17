@@ -6,9 +6,16 @@ All external calls (Tavily, Playwright) are mocked — no live API needed.
 
 import json
 import os
+import re
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+def _unwrap(result: str) -> str:
+    """Strip <tool_output> wrapping (Phase 15) to get raw JSON."""
+    m = re.search(r"<tool_output[^>]*>\n(.*)\n</tool_output>", result, re.DOTALL)
+    return m.group(1) if m else result
 
 
 # ── _days_to_time_range ──────────────────────────────────────────
@@ -337,7 +344,7 @@ class TestBridgeIntegration:
             mock_client = MagicMock()
             mock_client.search.return_value = {"answer": "test", "results": []}
             mock_get.return_value = mock_client
-            result = json.loads(execute_tool("tavily_search", {"query": "test"}, None))
+            result = json.loads(_unwrap(execute_tool("tavily_search", {"query": "test"}, None)))
             assert result["query"] == "test"
 
     def test_execute_tool_web_browse(self):
@@ -356,7 +363,7 @@ class TestBridgeIntegration:
             mock_ctx.__exit__ = MagicMock(return_value=False)
             mock_pw.return_value = mock_ctx
 
-            result = json.loads(execute_tool("web_browse", {"url": "https://x.com"}, None))
+            result = json.loads(_unwrap(execute_tool("web_browse", {"url": "https://x.com"}, None)))
             assert result["success"] is True
 
     def test_openai_tools_include_web(self):

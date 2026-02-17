@@ -363,9 +363,12 @@ class ToolRegistry:
     def _register_analysis_tools(self) -> None:
         from .analysis_tools import (
             get_fundamentals_analysis,
-            get_sec_filings,
             get_watchlist_overview,
             get_morning_brief,
+        )
+        from .sec_tools import (
+            get_sec_filings,
+            get_insider_trades,
         )
 
         self.register(ToolDefinition(
@@ -380,13 +383,38 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sec_filings",
-            description="Get SEC filing metadata (10-K, 10-Q, 8-K) for a ticker.",
+            description=(
+                "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
+                "Returns filing type, date, and URL — metadata only, not content."
+            ),
             function=get_sec_filings,
             category="analysis",
+            requires_dal=False,
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("filing_types", "array",
                               "Filter by filing types (e.g. ['10-K', '10-Q'])",
+                              required=False),
+                ToolParameter("limit", "integer",
+                              "Maximum number of filings to return (default: 10)",
+                              required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_insider_trades",
+            description=(
+                "Get recent insider trades (SEC Form 4) for a ticker. Fully parsed: "
+                "insider name, title, transaction date, shares (negative=sale), "
+                "price, and holdings before/after."
+            ),
+            function=get_insider_trades,
+            category="analysis",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("limit", "integer",
+                              "Maximum number of trades to return (default: 10)",
                               required=False),
             ],
         ))
