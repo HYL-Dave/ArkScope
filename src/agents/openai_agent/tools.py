@@ -84,6 +84,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     )
     from src.tools.code_executor import execute_python_code
     from src.tools.analyst_tools import get_analyst_consensus
+    from src.tools.report_tools import (
+        save_report as _save_report,
+        list_reports as _list_reports,
+        get_report as _get_report,
+    )
 
     # ================================================================
     # News Tools
@@ -514,6 +519,70 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result, "web_browse")
 
+    # ================================================================
+    # Report Tools (Phase B)
+    # ================================================================
+
+    @function_tool
+    def tool_save_report(
+        title: str,
+        tickers: List[str],
+        report_type: str,
+        summary: str,
+        content: str,
+        conclusion: Optional[str] = None,
+        confidence: Optional[float] = None,
+    ) -> str:
+        """Save a research report after completing a thorough analysis. Persists full Markdown to data/reports/ and metadata to DB.
+
+        Args:
+            title: Report title (e.g. "AFRM Entry Analysis")
+            tickers: List of analyzed ticker symbols
+            report_type: Category - entry_analysis, sector_review, earnings_review, comparison, thesis, morning_brief, custom
+            summary: 1-2 sentence conclusion
+            content: Full Markdown report with analysis details
+            conclusion: Trading conclusion - BUY, HOLD, SELL, WATCH, or NEUTRAL
+            confidence: Confidence score 0-1
+        """
+        result = _save_report(
+            dal, title=title, tickers=tickers, report_type=report_type,
+            summary=summary, content=content, conclusion=conclusion,
+            confidence=confidence,
+        )
+        return _serialize_result(result, "save_report")
+
+    @function_tool
+    def tool_list_reports(
+        ticker: Optional[str] = None,
+        days: int = 30,
+        report_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> str:
+        """List saved research reports, optionally filtered by ticker or type.
+
+        Args:
+            ticker: Filter by ticker symbol
+            days: Lookback period in days (default: 30)
+            report_type: Filter by report type
+            limit: Max reports to return (default: 20)
+        """
+        result = _list_reports(dal, ticker=ticker, days=days, report_type=report_type, limit=limit)
+        return _serialize_result(result, "list_reports")
+
+    @function_tool
+    def tool_get_report(
+        report_id: Optional[int] = None,
+        file_path: Optional[str] = None,
+    ) -> str:
+        """Retrieve a saved research report by ID or file path.
+
+        Args:
+            report_id: Report ID from database
+            file_path: Relative path to Markdown file
+        """
+        result = _get_report(dal, report_id=report_id, file_path=file_path)
+        return _serialize_result(result, "get_report")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -537,6 +606,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_analyst_consensus,
         tool_execute_python_analysis,
         tool_delegate_to_subagent,
+        tool_save_report,
+        tool_list_reports,
+        tool_get_report,
     ]
 
     # Conditionally add web tools

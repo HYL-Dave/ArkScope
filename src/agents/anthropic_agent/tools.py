@@ -558,6 +558,65 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             },
         })
 
+    # Report tools (Phase B)
+    tools.extend([
+        {
+            "name": "save_report",
+            "description": (
+                "Save a research report after completing a thorough analysis. "
+                "Persists full Markdown content to data/reports/ and metadata to DB. "
+                "Call this at the end of any detailed analysis to preserve results for review."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Report title (e.g. 'AFRM Entry Analysis')"},
+                    "tickers": {"type": "array", "items": {"type": "string"},
+                                "description": "List of analyzed ticker symbols"},
+                    "report_type": {"type": "string",
+                                    "enum": ["entry_analysis", "sector_review", "earnings_review",
+                                             "comparison", "thesis", "morning_brief", "custom"],
+                                    "description": "Report category"},
+                    "summary": {"type": "string", "description": "1-2 sentence conclusion"},
+                    "content": {"type": "string",
+                                "description": "Full Markdown report content with analysis details"},
+                    "conclusion": {"type": "string",
+                                   "enum": ["BUY", "HOLD", "SELL", "WATCH", "NEUTRAL"],
+                                   "description": "Trading conclusion"},
+                    "confidence": {"type": "number",
+                                   "description": "Confidence score 0-1"},
+                },
+                "required": ["title", "tickers", "report_type", "summary", "content"],
+            },
+        },
+        {
+            "name": "list_reports",
+            "description": "List saved research reports, optionally filtered by ticker or type.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {"type": "string", "description": "Filter by ticker symbol"},
+                    "days": {"type": "integer", "description": "Lookback period in days (default: 30)"},
+                    "report_type": {"type": "string", "description": "Filter by report type"},
+                    "limit": {"type": "integer", "description": "Max reports to return (default: 20)"},
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "get_report",
+            "description": "Retrieve a saved research report by ID or file path.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "report_id": {"type": "integer", "description": "Report ID from database"},
+                    "file_path": {"type": "string", "description": "Relative path to Markdown file"},
+                },
+                "required": [],
+            },
+        },
+    ])
+
     return tools
 
 
@@ -642,6 +701,7 @@ def execute_tool(
     from src.tools.code_executor import execute_python_code
     from src.tools.web_tools import web_search, web_fetch, web_browse
     from src.tools.analyst_tools import get_analyst_consensus
+    from src.tools.report_tools import save_report, list_reports, get_report
 
     # Tool dispatch map
     tool_map = {
@@ -765,6 +825,29 @@ def execute_tool(
             extract_links=tool_input.get("extract_links", False),
             offset=tool_input.get("offset", 0),
             max_chars=tool_input.get("max_chars", 5000),
+        ),
+        # Report tools (Phase B)
+        "save_report": lambda: save_report(
+            dal,
+            title=tool_input["title"],
+            tickers=tool_input["tickers"],
+            report_type=tool_input["report_type"],
+            summary=tool_input["summary"],
+            content=tool_input["content"],
+            conclusion=tool_input.get("conclusion"),
+            confidence=tool_input.get("confidence"),
+        ),
+        "list_reports": lambda: list_reports(
+            dal,
+            ticker=tool_input.get("ticker"),
+            days=tool_input.get("days", 30),
+            report_type=tool_input.get("report_type"),
+            limit=tool_input.get("limit", 20),
+        ),
+        "get_report": lambda: get_report(
+            dal,
+            report_id=tool_input.get("report_id"),
+            file_path=tool_input.get("file_path"),
         ),
     }
 

@@ -341,3 +341,152 @@ class DatabaseBackend:
         if df.empty:
             return []
         return df["ticker"].tolist()
+
+    # --------------------------------------------------------
+    # Research Reports
+    # --------------------------------------------------------
+
+    def insert_report(
+        self,
+        title: str,
+        tickers: List[str],
+        report_type: str,
+        summary: str,
+        conclusion: Optional[str] = None,
+        confidence: Optional[float] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        file_path: Optional[str] = None,
+        tools_used: Optional[List[str]] = None,
+        tool_calls: Optional[int] = None,
+        duration_seconds: Optional[float] = None,
+        tokens_in: Optional[int] = None,
+        tokens_out: Optional[int] = None,
+    ) -> Optional[int]:
+        """Insert a research report and return its ID."""
+        conn = self._get_conn()
+        sql = """
+            INSERT INTO research_reports (
+                title, tickers, report_type, summary, conclusion,
+                confidence, provider, model, file_path,
+                tools_used, tool_calls, duration_seconds,
+                tokens_in, tokens_out
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s
+            ) RETURNING id
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (
+                    title, tickers, report_type, summary, conclusion,
+                    confidence, provider, model, file_path,
+                    json.dumps(tools_used) if tools_used else None,
+                    tool_calls, duration_seconds,
+                    tokens_in, tokens_out,
+                ))
+                row = cur.fetchone()
+                return row[0] if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to insert report: {e}")
+            self._conn = None
+            return None
+
+    def query_reports(
+        self,
+        ticker: Optional[str] = None,
+        days: int = 30,
+        report_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> pd.DataFrame:
+        """Query research reports metadata."""
+        from datetime import timedelta
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+
+        conditions = ["created_at >= %s"]
+        params: list = [cutoff]
+
+        if ticker:
+            conditions.append("%s = ANY(tickers)")
+            params.append(ticker.upper())
+
+        if report_type:
+            conditions.append("report_type = %s")
+            params.append(report_type)
+
+        where = " AND ".join(conditions)
+        sql = f"""
+            SELECT id, title, tickers, report_type, summary, conclusion,
+                   confidence, model, file_path, tool_calls, duration_seconds,
+                   TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+            FROM research_reports
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT %s
+        """
+        params.append(limit)
+
+        df = self._query_df(sql, tuple(params))
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "id", "title", "tickers", "report_type", "summary",
+                "conclusion", "confidence", "model", "file_path",
+                "tool_calls", "duration_seconds", "created_at",
+            ])
+        return df
+
+    def get_report_metadata(self, report_id: int) -> Optional[dict]:
+        """Get full metadata for a single report."""
+        sql = """
+            SELECT id, title, tickers, report_type, summary, conclusion,
+                   confidence, provider, model, file_path,
+                   tools_used, tool_calls, duration_seconds,
+                   tokens_in, tokens_out,
+                   TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+            FROM research_reports
+            WHERE id = %s
+        """
+        df = self._query_df(sql, (report_id,))
+        if df.empty:
+            return None
+        return df.iloc[0].to_dict()
+
+    # --------------------------------------------------------
+    # Agent Queries
+    # --------------------------------------------------------
+
+    def insert_agent_query(
+        self,
+        question: str,
+        answer: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        tools_used: Optional[List[str]] = None,
+        duration_ms: Optional[int] = None,
+        tokens_in: Optional[int] = None,
+        tokens_out: Optional[int] = None,
+    ) -> Optional[int]:
+        """Insert an agent query log and return its ID."""
+        conn = self._get_conn()
+        sql = """
+            INSERT INTO agent_queries (
+                question, answer, provider, model,
+                tools_used, duration_ms, tokens_in, tokens_out
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (
+                    question, answer, provider, model,
+                    json.dumps(tools_used) if tools_used else None,
+                    duration_ms, tokens_in, tokens_out,
+                ))
+                row = cur.fetchone()
+                return row[0] if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to insert agent query: {e}")
+            self._conn = None
+            return None

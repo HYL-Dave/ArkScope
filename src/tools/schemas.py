@@ -162,10 +162,21 @@ class TradingSignal(BaseModel):
 # Fundamentals
 # ============================================================
 
+class FinancialStatement(BaseModel):
+    """Single period financial statement (income, balance sheet, or cash flow)."""
+    report_period: str = Field(description="Period end date YYYY-MM-DD")
+    fiscal_period: Optional[str] = Field(None, description="e.g. 2025-Q3")
+    period_type: str = Field(description="annual or quarterly")
+    data: Dict[str, Optional[float]] = Field(
+        description="Metric name → value (e.g. revenue, net_income)"
+    )
+
+
 class FundamentalsResult(BaseModel):
     """Fundamental analysis result for a ticker."""
     ticker: str
     snapshot_date: Optional[str] = None
+    data_source: str = Field(default="none", description="ibkr, sec_edgar, or none")
     # Key metrics (derived from IBKR snapshot or SEC)
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
@@ -180,9 +191,27 @@ class FundamentalsResult(BaseModel):
     earnings_growth: Optional[float] = None
     dividend_yield: Optional[float] = None
     beta: Optional[float] = None
+    # Margins
+    gross_margin: Optional[float] = Field(None, description="Gross profit / revenue")
+    operating_margin: Optional[float] = Field(None, description="Operating income / revenue")
+    net_margin: Optional[float] = Field(None, description="Net income / revenue")
+    # Cash
+    free_cash_flow: Optional[float] = None
+    cash_and_equivalents: Optional[float] = None
+    total_debt: Optional[float] = None
+    # SEC EDGAR structured financial statements
+    income_statements: Optional[List[FinancialStatement]] = Field(
+        None, description="Recent income statements (newest first)"
+    )
+    balance_sheet: Optional[List[FinancialStatement]] = Field(
+        None, description="Recent balance sheets (newest first)"
+    )
+    cash_flow_statements: Optional[List[FinancialStatement]] = Field(
+        None, description="Recent cash flow statements (newest first)"
+    )
     # Raw snapshot for detailed access
     snapshot: Optional[dict] = Field(
-        None, description="Full raw snapshot data"
+        None, description="Full raw snapshot data (IBKR)"
     )
 
 

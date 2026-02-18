@@ -19,6 +19,7 @@ Slash commands (during chat):
     /scratchpad     List recent agent session logs (JSONL)
     /history        Show recent chat history (Q&A pairs)
     /turns          Show/set max tool calls per query
+    /reports        List saved research reports
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -221,6 +222,7 @@ _SLASH_COMMANDS = [
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
+    ("/reports", "/rp", "List saved research reports"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -366,6 +368,9 @@ def print_help():
             "  [cyan]/history[/cyan]            Show recent chat history (Q&A pairs)\n"
             "  [cyan]/history <N>[/cyan]        Show last N conversations\n"
             "  [cyan]/turns[/cyan]              Show/set max tool calls per query (e.g. /turns 30)\n"
+            "  [cyan]/reports[/cyan]            List saved research reports\n"
+            "  [cyan]/reports <id>[/cyan]       View a specific report\n"
+            "  [cyan]/reports <TICKER>[/cyan]   Filter reports by ticker\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -507,6 +512,32 @@ def print_summary(
     if scratchpad_path:
         parts.append(f"Log: {scratchpad_path}")
     console.print(f"[dim]{' | '.join(parts)}[/dim]")
+
+
+def _log_agent_query(
+    dal: Any,
+    question: str,
+    result: dict,
+    state: "SessionState",
+    elapsed: float,
+) -> None:
+    """Log a completed query to agent_queries table (best-effort, no errors)."""
+    try:
+        if not hasattr(dal, '_backend') or not hasattr(dal._backend, 'insert_agent_query'):
+            return
+        usage = result.get("token_usage", {})
+        dal._backend.insert_agent_query(
+            question=question,
+            answer=result.get("answer", "")[:2000],  # Truncate for DB
+            provider=state.provider,
+            model=state.model,
+            tools_used=result.get("tools_used"),
+            duration_ms=int(elapsed * 1000),
+            tokens_in=usage.get("input_tokens") or usage.get("prompt_tokens"),
+            tokens_out=usage.get("output_tokens") or usage.get("completion_tokens"),
+        )
+    except Exception:
+        pass  # Best-effort logging, never fail the query
 
 
 # ============================================================
@@ -920,6 +951,42 @@ def handle_reasoning_command(state: SessionState, arg: str) -> None:
 
     state.reasoning_effort = arg.lower()
     console.print(f"[green]Reasoning effort set to[/green] [bold]{arg.lower()}[/bold]\n")
+
+
+def handle_reports_command(dal, arg: str) -> None:
+    """Handle /reports [ticker] command."""
+    from src.tools.report_tools import list_reports, get_report
+
+    # /reports <id> — show specific report
+    if arg.isdigit():
+        report = get_report(dal, report_id=int(arg))
+        if "error" in report:
+            console.print(f"[red]{report['error']}[/red]\n")
+        else:
+            console.print(report["content"])
+            console.print()
+        return
+
+    # /reports [ticker] — list reports
+    ticker = arg.upper() if arg and arg.isalpha() else None
+    reports = list_reports(dal, ticker=ticker)
+
+    if not reports:
+        console.print("[dim]No reports found.[/dim]\n")
+        return
+
+    console.print(f"[bold]Research Reports[/bold] ({len(reports)} found)\n")
+    for r in reports:
+        rid = r.get("id", "-")
+        title = r.get("title", "Untitled")
+        dt = r.get("created_at", r.get("date", ""))
+        conclusion = r.get("conclusion", "")
+        tickers = r.get("tickers", [])
+        if isinstance(tickers, list):
+            tickers = ", ".join(tickers)
+        tag = f" [{conclusion}]" if conclusion else ""
+        console.print(f"  [cyan]#{rid}[/cyan] {title}{tag} [dim]({tickers}) {dt}[/dim]")
+    console.print(f"\n[dim]Use /reports <id> to view a report[/dim]\n")
 
 
 def handle_status_command(state: SessionState, backend_type: str, ticker_count: int) -> None:
@@ -1482,6 +1549,8 @@ def main():
                 handle_history_command(arg)
             elif cmd == "/turns":
                 handle_turns_command(state, arg)
+            elif cmd in ("/reports", "/rp"):
+                handle_reports_command(dal, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
@@ -1522,6 +1591,11 @@ def main():
             print_answer(result["answer"])
             print_summary(result["tools_used"], elapsed, result.get("scratchpad_path"))
             console.print()
+
+            # Log to agent_queries table (Phase C)
+            _log_agent_query(
+                dal, question, result, state, elapsed,
+            )
 
         except KeyboardInterrupt:
             console.print("\n[dim]Cancelled.[/dim]\n")

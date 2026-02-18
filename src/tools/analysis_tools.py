@@ -16,9 +16,96 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
-from .schemas import FundamentalsResult, SECFiling
+from .schemas import FinancialStatement, FundamentalsResult, SECFiling
 
 logger = logging.getLogger(__name__)
+
+
+def _dataclass_to_dict(obj) -> dict:
+    """Convert a dataclass to dict, dropping None values."""
+    from dataclasses import asdict
+    return {k: v for k, v in asdict(obj).items()
+            if v is not None and k not in ("ticker", "report_period", "fiscal_period",
+                                            "period", "currency")}
+
+
+def _sec_to_financial_statement(obj) -> FinancialStatement:
+    """Convert SEC EDGAR dataclass to FinancialStatement schema."""
+    return FinancialStatement(
+        report_period=obj.report_period,
+        fiscal_period=getattr(obj, "fiscal_period", None),
+        period_type=getattr(obj, "period", "quarterly"),
+        data=_dataclass_to_dict(obj),
+    )
+
+
+def _derive_metrics_from_sec(
+    income_stmts, balance_sheets, cashflow_stmts,
+) -> dict:
+    """Calculate key financial ratios from SEC EDGAR statements."""
+    metrics: dict = {}
+
+    if income_stmts:
+        latest = income_stmts[0]
+        rev = latest.revenue
+        if rev and rev > 0:
+            if latest.gross_profit is not None:
+                metrics["gross_margin"] = round(latest.gross_profit / rev, 4)
+            if latest.operating_income is not None:
+                metrics["operating_margin"] = round(latest.operating_income / rev, 4)
+            if latest.net_income is not None:
+                metrics["net_margin"] = round(latest.net_income / rev, 4)
+
+        # Revenue growth (YoY)
+        if len(income_stmts) >= 2:
+            prev = income_stmts[1]
+            if prev.revenue and prev.revenue > 0 and rev:
+                metrics["revenue_growth"] = round(
+                    (rev - prev.revenue) / abs(prev.revenue), 4
+                )
+        # Earnings growth
+        if len(income_stmts) >= 2:
+            curr_ni = latest.net_income
+            prev_ni = income_stmts[1].net_income
+            if curr_ni is not None and prev_ni is not None and prev_ni != 0:
+                metrics["earnings_growth"] = round(
+                    (curr_ni - prev_ni) / abs(prev_ni), 4
+                )
+
+    if balance_sheets:
+        bs = balance_sheets[0]
+        metrics["cash_and_equivalents"] = bs.cash_and_equivalents
+        metrics["total_debt"] = bs.total_debt
+        # Current ratio
+        if bs.current_assets and bs.current_liabilities and bs.current_liabilities > 0:
+            metrics["current_ratio"] = round(
+                bs.current_assets / bs.current_liabilities, 2
+            )
+        # Debt to equity
+        if bs.total_liabilities and bs.shareholders_equity and bs.shareholders_equity > 0:
+            metrics["debt_to_equity"] = round(
+                bs.total_liabilities / bs.shareholders_equity, 2
+            )
+        # ROE (annualized from latest quarter)
+        if income_stmts and bs.shareholders_equity and bs.shareholders_equity > 0:
+            ni = income_stmts[0].net_income
+            period = income_stmts[0].period
+            if ni is not None:
+                annualized = ni * 4 if period == "quarterly" else ni
+                metrics["roe"] = round(annualized / bs.shareholders_equity, 4)
+        # ROA
+        if income_stmts and bs.total_assets and bs.total_assets > 0:
+            ni = income_stmts[0].net_income
+            period = income_stmts[0].period
+            if ni is not None:
+                annualized = ni * 4 if period == "quarterly" else ni
+                metrics["roa"] = round(annualized / bs.total_assets, 4)
+
+    if cashflow_stmts:
+        cf = cashflow_stmts[0]
+        metrics["free_cash_flow"] = cf.free_cash_flow
+
+    return metrics
 
 
 def get_fundamentals_analysis(
@@ -28,16 +115,66 @@ def get_fundamentals_analysis(
     """
     Get fundamental analysis for a ticker.
 
-    Returns key financial metrics from IBKR snapshot data.
+    Data source priority:
+    1. DB/File backend (IBKR snapshot) — fast, pre-computed metrics
+    2. SEC EDGAR XBRL API (free, real-time) — structured financial statements
 
     Args:
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
 
     Returns:
-        FundamentalsResult with market_cap, pe_ratio, roe, etc.
+        FundamentalsResult with financial metrics and statements
     """
-    return dal.get_fundamentals(ticker)
+    # 1. Try DB/File backend (IBKR snapshot)
+    result = dal.get_fundamentals(ticker)
+    if result.snapshot_date:
+        result.data_source = "ibkr"
+        return result
+
+    # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies)
+    try:
+        from data_sources.sec_edgar_financials import SECEdgarFinancials
+        sec = SECEdgarFinancials()
+
+        income_stmts = sec.get_income_statement(ticker, years=2, period="annual")[:2]
+        balance_sheets = sec.get_balance_sheet(ticker, years=1, period="annual")[:1]
+        cashflow_stmts = sec.get_cash_flow_statement(ticker, years=2, period="annual")[:2]
+    except Exception as e:
+        logger.warning(f"SEC EDGAR fallback failed for {ticker}: {e}")
+        return result  # Return empty result
+
+    if not income_stmts and not balance_sheets:
+        return result
+
+    # 3. Build result from SEC data
+    snapshot_date = income_stmts[0].report_period if income_stmts else (
+        balance_sheets[0].report_period if balance_sheets else None
+    )
+
+    # Derive key metrics
+    metrics = _derive_metrics_from_sec(income_stmts, balance_sheets, cashflow_stmts)
+
+    return FundamentalsResult(
+        ticker=ticker.upper(),
+        snapshot_date=snapshot_date,
+        data_source="sec_edgar",
+        roe=metrics.get("roe"),
+        roa=metrics.get("roa"),
+        debt_to_equity=metrics.get("debt_to_equity"),
+        current_ratio=metrics.get("current_ratio"),
+        revenue_growth=metrics.get("revenue_growth"),
+        earnings_growth=metrics.get("earnings_growth"),
+        gross_margin=metrics.get("gross_margin"),
+        operating_margin=metrics.get("operating_margin"),
+        net_margin=metrics.get("net_margin"),
+        free_cash_flow=metrics.get("free_cash_flow"),
+        cash_and_equivalents=metrics.get("cash_and_equivalents"),
+        total_debt=metrics.get("total_debt"),
+        income_statements=[_sec_to_financial_statement(s) for s in income_stmts],
+        balance_sheet=[_sec_to_financial_statement(s) for s in balance_sheets],
+        cash_flow_statements=[_sec_to_financial_statement(s) for s in cashflow_stmts],
+    )
 
 
 def get_sec_filings(

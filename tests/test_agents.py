@@ -90,10 +90,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All 24 tools are defined (18 base + 3 web + 1 analyst + 1 insider + delegate_to_subagent)."""
+        """All 27 tools are defined (18 base + 3 web + 1 analyst + 1 insider + delegate + 3 report)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 24
+        assert len(tools) == 27
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -137,6 +137,9 @@ class TestAnthropicToolSchemas:
             "tavily_search",
             "tavily_fetch",
             "web_browse",
+            "save_report",
+            "list_reports",
+            "get_report",
         }
         assert tool_names == expected
 
@@ -212,10 +215,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """Creates 24 tools (18 base + 3 web + 1 analyst + 1 insider + delegate_to_subagent)."""
+        """Creates 27 tools (18 base + 3 web + 1 analyst + 1 insider + delegate + 3 report)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 24
+        assert len(tools) == 27
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -299,7 +302,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 23
+        assert len(schemas) == 26
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -313,7 +316,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 23
+        assert len(schemas) == 26
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

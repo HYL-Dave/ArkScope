@@ -160,6 +160,7 @@ class ToolRegistry:
         self._register_options_tools()
         self._register_signal_tools()
         self._register_analysis_tools()
+        self._register_report_tools()
         self._register_web_tools()
         self._register_execution_tools()
 
@@ -453,6 +454,55 @@ class ToolRegistry:
             requires_dal=False,
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
+            ],
+        ))
+
+    def _register_report_tools(self) -> None:
+        from .report_tools import save_report, list_reports, get_report
+
+        self.register(ToolDefinition(
+            name="save_report",
+            description=(
+                "Save a research report (Markdown + DB metadata). "
+                "Call this after completing a thorough analysis to persist results."
+            ),
+            function=save_report,
+            category="reports",
+            parameters=[
+                ToolParameter("title", "string", "Report title"),
+                ToolParameter("tickers", "array", "List of analyzed ticker symbols"),
+                ToolParameter("report_type", "string",
+                              "Report type (entry_analysis, sector_review, earnings_review, comparison, thesis)"),
+                ToolParameter("summary", "string", "1-2 sentence conclusion"),
+                ToolParameter("content", "string", "Full Markdown report content"),
+                ToolParameter("conclusion", "string",
+                              "Trading conclusion: BUY, HOLD, SELL, WATCH, NEUTRAL",
+                              required=False),
+                ToolParameter("confidence", "number", "Confidence score 0-1", required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="list_reports",
+            description="List saved research reports, optionally filtered by ticker or type.",
+            function=list_reports,
+            category="reports",
+            parameters=[
+                ToolParameter("ticker", "string", "Filter by ticker symbol", required=False),
+                ToolParameter("days", "integer", "Lookback period in days (default: 30)", required=False),
+                ToolParameter("report_type", "string", "Filter by report type", required=False),
+                ToolParameter("limit", "integer", "Max reports to return (default: 20)", required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_report",
+            description="Retrieve a saved research report by ID or file path.",
+            function=get_report,
+            category="reports",
+            parameters=[
+                ToolParameter("report_id", "integer", "Report ID from database", required=False),
+                ToolParameter("file_path", "string", "Relative path to Markdown file", required=False),
             ],
         ))
 

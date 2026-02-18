@@ -158,6 +158,21 @@ When to delegate vs do it yourself:
 
 Pass relevant data from earlier tool calls via context_json to avoid re-fetching.
 
+─── RESEARCH REPORTS ───
+
+After completing a thorough analysis (entry analysis, sector review, etc.),
+save it as a research report so it can be reviewed later:
+
+  save_report(title="AFRM Entry Analysis", tickers=["AFRM"],
+    report_type="entry_analysis", summary="...", content="<full markdown>",
+    conclusion="BUY", confidence=0.72)
+
+Available report types: entry_analysis, sector_review, earnings_review,
+  comparison, thesis, morning_brief, custom
+
+Use list_reports() and get_report() to retrieve past analyses.
+Only save reports for substantive, thorough analyses — not quick lookups.
+
 ─── OUTPUT STANDARDS ───
 
 Every substantive analysis should include:
