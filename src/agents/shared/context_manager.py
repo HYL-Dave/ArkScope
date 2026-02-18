@@ -28,8 +28,9 @@ logger = logging.getLogger(__name__)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # Anthropic — https://docs.anthropic.com/en/docs/about-claude/models
     "claude-opus-4-6": 200_000,     # 200K standard (1M beta) / 128K output
+    "claude-sonnet-4-6": 200_000,   # 200K standard (1M beta) / 64K output
     "claude-opus-5": 200_000,       # Future Opus models
-    "claude-sonnet": 200_000,       # Future Sonnet models (e.g. Sonnet 5)
+    "claude-sonnet": 200_000,       # Future Sonnet models
     "claude-haiku": 200_000,        # Future Haiku models
     "claude": 200_000,              # Catch-all for any Claude model
     # OpenAI — https://platform.openai.com/docs/models

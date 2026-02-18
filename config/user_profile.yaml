@@ -260,7 +260,7 @@ llm_preferences:
     - "haiku"
 
   # ── Anthropic agent 設定 (Phase 8) ──
-  # Effort (Opus 4.5+, 不需 beta header)
+  # Effort (Opus 4.6 / Sonnet 4.6, 不需 beta header)
   # "max" (Opus 4.6 only) | "high" (default) | "medium" | "low"
   # anthropic_effort: "high"
 
@@ -271,7 +271,7 @@ llm_preferences:
   #   - 其他模型: budget = max_output - max_tokens (留 max_tokens 給 response)
   # anthropic_thinking: false
 
-  # ── 1M Context Beta (Anthropic only, Opus 4.6 + Sonnet 4.5) ──
+  # ── 1M Context Beta (Anthropic only, Opus 4.6 + Sonnet 4.6) ──
   # 需要 Tier 4 organization，context 超過 200K 時加價
   # extended_context: false
 

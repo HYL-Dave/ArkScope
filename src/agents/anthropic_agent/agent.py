@@ -40,13 +40,14 @@ _CLAUDE_WEB_SEARCH_TOOL = {
 
 # ── Model capability detection ──────────────────────────────────
 
-_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6"}
-_EFFORT_MODELS = {"claude-opus-4-6"}
+_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_EFFORT_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
 
 # 各模型最大 output tokens（API 硬限制）
 # 用於 thinking 模式自動設定 max_tokens
 _MODEL_MAX_OUTPUT = {
     "claude-opus-4-6": 128000,
+    "claude-sonnet-4-6": 64000,
 }
 
 
@@ -59,12 +60,12 @@ def _get_model_max_output(model: str) -> int:
 
 
 def _supports_adaptive_thinking(model: str) -> bool:
-    """Opus 4.6 supports adaptive thinking (no budget_tokens needed)."""
+    """Opus 4.6 / Sonnet 4.6 support adaptive thinking (no budget_tokens needed)."""
     return any(model.startswith(m) for m in _ADAPTIVE_THINKING_MODELS)
 
 
 def _supports_effort(model: str) -> bool:
-    """Opus 4.5+ supports output_config.effort."""
+    """Opus 4.6 / Sonnet 4.6 support output_config.effort."""
     return any(model.startswith(m) for m in _EFFORT_MODELS)
 
 
@@ -73,10 +74,10 @@ def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
 
     設計決策 (Phase 8)：
     - max_tokens 和 budget_tokens 全自動推導，不需手動配置
-    - effective_max_tokens = 模型最大 output (128K for Opus 4.6, 64K for others)
+    - effective_max_tokens = 模型最大 output (Opus 4.6: 128K, Sonnet 4.6: 64K)
     - budget_tokens = effective_max_tokens - config.max_tokens
       (留 config.max_tokens 給 response，其餘全給 thinking，效果最好)
-    - Adaptive 模式 (Opus 4.6) 不需要 budget_tokens，Claude 自動調配
+    - Adaptive 模式 (Opus 4.6 / Sonnet 4.6) 不需要 budget_tokens，Claude 自動調配
 
     Args:
         model: Model ID string

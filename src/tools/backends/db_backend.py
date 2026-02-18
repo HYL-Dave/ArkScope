@@ -187,7 +187,11 @@ class DatabaseBackend:
         interval: str = "15min",
         days: int = 30,
     ) -> pd.DataFrame:
-        """Query OHLCV price bars from the database."""
+        """Query OHLCV price bars from the database.
+
+        For daily/hourly intervals, falls back to server-side aggregation
+        from 15min bars if no native rows exist at that interval.
+        """
         ticker = ticker.upper()
 
         # Normalize interval names
@@ -195,6 +199,7 @@ class DatabaseBackend:
         db_interval = interval_map.get(interval, interval)
 
         cutoff = (date.today() - timedelta(days=days)).isoformat()
+        empty = pd.DataFrame(columns=["datetime", "open", "high", "low", "close", "volume"])
 
         sql = """
             SELECT
@@ -206,9 +211,31 @@ class DatabaseBackend:
         """
 
         df = self._query_df(sql, (ticker, db_interval, cutoff))
-        if df.empty:
-            return pd.DataFrame(columns=["datetime", "open", "high", "low", "close", "volume"])
-        return df
+        if not df.empty:
+            return df
+
+        # Fallback: aggregate from 15min bars if requesting daily or hourly
+        if db_interval in ("1d", "1h") and db_interval != "15min":
+            trunc = "day" if db_interval == "1d" else "hour"
+            agg_sql = f"""
+                SELECT
+                    TO_CHAR(date_trunc('{trunc}', datetime AT TIME ZONE 'UTC'),
+                            'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
+                    (array_agg(open ORDER BY datetime ASC))[1] AS open,
+                    MAX(high) AS high,
+                    MIN(low) AS low,
+                    (array_agg(close ORDER BY datetime DESC))[1] AS close,
+                    SUM(volume) AS volume
+                FROM prices
+                WHERE ticker = %s AND interval = '15min' AND datetime >= %s
+                GROUP BY date_trunc('{trunc}', datetime AT TIME ZONE 'UTC')
+                ORDER BY 1 ASC
+            """
+            df = self._query_df(agg_sql, (ticker, cutoff))
+            if not df.empty:
+                return df
+
+        return empty
 
     # --------------------------------------------------------
     # IV History

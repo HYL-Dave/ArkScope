@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ── 1M context beta ────────────────────────────────────────────
 
-_EXTENDED_CONTEXT_MODELS = {"claude-opus-4-6"}
+_EXTENDED_CONTEXT_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
 _EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
 
 

@@ -19,7 +19,9 @@ from .alpha_vantage_source import AlphaVantageDataSource
 try:
     from .ibkr_source import IBKRDataSource
     _HAS_IBKR = True
-except ImportError:
+except (ImportError, RuntimeError):
+    # RuntimeError: ib_insync/eventkit needs an event loop at import time;
+    # fails after asyncio.run() closes the MainThread loop (Python 3.10+)
     IBKRDataSource = None
     _HAS_IBKR = False
 

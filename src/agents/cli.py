@@ -103,8 +103,15 @@ MODEL_CATALOG: List[ModelEntry] = [
         id="claude-opus-4-6",
         provider="anthropic",
         name="Opus 4.6",
-        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus", "claude"],
-        description="Most intelligent — deep analysis & reasoning (128K output)",
+        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus"],
+        description="Most intelligent — deep analysis & reasoning (128K output, $5/$25)",
+    ),
+    ModelEntry(
+        id="claude-sonnet-4-6",
+        provider="anthropic",
+        name="Sonnet 4.6",
+        aliases=["sonnet", "sonnet4.6", "sonnet-4.6", "s46", "claude-sonnet", "claude"],
+        description="Fast + intelligent — financial analysis (64K output, $3/$15)",
     ),
     ModelEntry(
         id="gpt-5.2",
@@ -759,6 +766,7 @@ VALID_ANTHROPIC_EFFORT = ("max", "high", "medium", "low")
 # 每個 Anthropic 模型支援的 effort 選項（prefix match）
 _EFFORT_OPTIONS_BY_MODEL = {
     "claude-opus-4-6": ("max", "high", "medium", "low"),
+    "claude-sonnet-4-6": ("high", "medium", "low"),
 }
 
 
@@ -999,7 +1007,7 @@ def handle_context_command(state: SessionState, arg: str) -> None:
     if not supported:
         console.print(
             f"[yellow]1M context beta is not supported for {model}.[/yellow]\n"
-            "[dim]Supported: Opus 4.6, Sonnet 4.5[/dim]\n"
+            "[dim]Supported: Opus 4.6, Sonnet 4.6[/dim]\n"
         )
         return
 
@@ -1398,6 +1406,7 @@ def main():
     ticker_count = len(dal.get_available_tickers("prices"))
 
     # Build mutable session state
+    config = get_agent_config()
     state = SessionState(
         provider=args.provider,
         model=args.model,

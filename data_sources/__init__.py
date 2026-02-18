@@ -37,7 +37,7 @@ try:
         ScannerResult,
     )
     _HAS_IBKR = True
-except ImportError:
+except (ImportError, RuntimeError):
     _HAS_IBKR = False
     IBKRDataSource = None
     IntradayBar = None
