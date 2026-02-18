@@ -4,7 +4,7 @@
 -- Separates scoring from news articles so each article can have multiple
 -- scores from different models (haiku, gpt-5.2, gpt-6, ...).
 --
--- Run: psql "$SUPABASE_DB_URL" -f sql/002_add_news_scores.sql
+-- Run: psql "$DATABASE_URL" -f sql/002_add_news_scores.sql
 -- =============================================================================
 
 -- =============================================================================

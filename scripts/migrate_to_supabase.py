@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-migrate_to_supabase.py — Import historical data files into Supabase PostgreSQL.
+migrate_to_supabase.py — Import historical data files into PostgreSQL.
 
 Usage:
     python scripts/migrate_to_supabase.py              # Import all data types
@@ -15,7 +15,7 @@ The --scores flag imports multi-model scores into the news_scores table.
 It auto-detects score columns (sentiment_haiku, risk_gpt_5_2_xhigh, etc.)
 from parquet/CSV files and upserts them incrementally.
 
-Reads SUPABASE_DB_URL from config/.env.
+Reads DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env.
 """
 
 import argparse
@@ -38,28 +38,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 BATCH_SIZE = 1000
 
 
 def load_db_url() -> str:
-    """Load SUPABASE_DB_URL from config/.env."""
+    """Load DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env."""
+    from src.tools.db_config import load_database_url
+
     env_path = PROJECT_ROOT / "config" / ".env"
     if not env_path.exists():
         raise FileNotFoundError(f"config/.env not found at {env_path}")
 
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("SUPABASE_DB_URL=") and not line.startswith("#"):
-                val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                if val and val.startswith("postgresql"):
-                    return val
-    raise ValueError("SUPABASE_DB_URL not found or empty in config/.env")
+    dsn = load_database_url(env_path)
+    if not dsn:
+        raise ValueError("DATABASE_URL not found or empty in config/.env")
+    return dsn
 
 
 def get_connection(db_url: str) -> psycopg2.extensions.connection:
-    """Create a database connection."""
-    conn = psycopg2.connect(db_url, sslmode="require", connect_timeout=15)
+    """Create a database connection with auto-detected sslmode."""
+    from src.tools.db_config import load_sslmode
+
+    env_path = PROJECT_ROOT / "config" / ".env"
+    sslmode = load_sslmode(env_path, db_url)
+    logger.info(f"Connecting with sslmode={sslmode}")
+    conn = psycopg2.connect(db_url, sslmode=sslmode, connect_timeout=15)
     conn.autocommit = False
     return conn
 
@@ -586,6 +590,9 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
     for jf in json_files:
         # Extract ticker from filename: AAPL_fundamentals_20250101.json -> AAPL
         ticker = jf.stem.split("_")[0].upper()
+        if len(ticker) > 10:
+            logger.warning(f"  Skipping {jf.name}: extracted ticker '{ticker}' too long (batch export file?)")
+            continue
         try:
             with open(jf) as f:
                 data = json.load(f)
@@ -622,7 +629,7 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
 # =============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Import data into Supabase")
+    parser = argparse.ArgumentParser(description="Import data into PostgreSQL")
     parser.add_argument("--news", action="store_true", help="Import news articles only")
     parser.add_argument("--scores", action="store_true", help="Import news scores to news_scores table (multi-model)")
     parser.add_argument("--prices", action="store_true", help="Import prices only")
@@ -640,7 +647,7 @@ def main():
         logger.error(str(e))
         sys.exit(1)
 
-    logger.info("Connecting to Supabase...")
+    logger.info("Connecting to database...")
     conn = get_connection(db_url)
     logger.info("Connected")
 

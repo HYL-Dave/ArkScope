@@ -1,8 +1,8 @@
 -- =============================================================================
--- MindfulRL-Intraday: Supabase Schema Initialization
+-- MindfulRL-Intraday: PostgreSQL Schema Initialization
 -- =============================================================================
--- Run this in Supabase Dashboard > SQL Editor
--- Or via: psql "$SUPABASE_DB_URL" -f sql/001_init_schema.sql
+-- Run via: psql "$DATABASE_URL" -f sql/001_init_schema.sql
+-- Or auto-executed by Docker on first startup via /docker-entrypoint-initdb.d
 -- =============================================================================
 
 -- Enable extensions
@@ -131,10 +131,10 @@ CREATE INDEX IF NOT EXISTS idx_queries_date
     ON agent_queries(created_at DESC);
 
 -- =============================================================================
--- Row Level Security (optional, enable if exposing via Supabase client)
+-- Row Level Security (optional, enable if exposing via REST API)
 -- =============================================================================
--- By default, tables are accessible with service_role key.
--- Enable RLS only if you need anon/authenticated access control.
+-- By default, tables are accessible with the database user.
+-- Enable RLS only if you need fine-grained access control.
 
 -- ALTER TABLE news ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE prices ENABLE ROW LEVEL SECURITY;

@@ -1,11 +1,11 @@
 """
-DatabaseBackend — reads data from Supabase/PostgreSQL.
+DatabaseBackend — reads data from PostgreSQL.
 
 Implements the DataBackend protocol using psycopg2 with direct SQL queries.
-Designed for both Supabase Cloud and self-hosted PostgreSQL.
+Designed for both self-hosted PostgreSQL (Docker) and cloud services.
 
 Connection string format:
-    postgresql://postgres:password@host:port/postgres
+    postgresql://postgres:password@host:port/dbname
 """
 
 from __future__ import annotations
@@ -24,17 +24,17 @@ logger = logging.getLogger(__name__)
 
 class DatabaseBackend:
     """
-    PostgreSQL/Supabase data backend.
+    PostgreSQL data backend.
 
     Uses psycopg2 for direct SQL queries. Connection pooling is handled
     by creating connections on demand with a simple single-connection cache.
     """
 
-    def __init__(self, dsn: str, sslmode: str = "require"):
+    def __init__(self, dsn: str, sslmode: str = "prefer"):
         """
         Args:
             dsn: PostgreSQL connection string.
-            sslmode: SSL mode (require for Supabase Cloud, prefer for local).
+            sslmode: SSL mode (disable for local Docker, require for cloud).
         """
         self._dsn = dsn
         self._sslmode = sslmode

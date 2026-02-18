@@ -39,7 +39,7 @@ Daily Data Update Script - 每日資料更新統一入口
     # 靜默模式 (適合 cron，不顯示進度)
     python daily_update.py --news --quiet
 
-    # 收集後自動同步到 Supabase DB
+    # 收集後自動同步到 DB
     python daily_update.py --ibkr-prices --sync-db
 
     # 更新所有新聞並同步到 DB
@@ -513,7 +513,7 @@ def sync_to_db(
     dry_run: bool = False,
 ) -> Dict[str, bool]:
     """
-    Sync collected data to Supabase database.
+    Sync collected data to database.
 
     Runs migrate_to_supabase.py with appropriate flags based on what was collected.
 
@@ -527,7 +527,7 @@ def sync_to_db(
         Dict of {data_type: success} results.
     """
     logger.info("\n" + "=" * 50)
-    logger.info("SYNCING TO SUPABASE DATABASE")
+    logger.info("SYNCING TO DATABASE")
     logger.info("=" * 50)
 
     # Locate the migration script
@@ -599,13 +599,13 @@ Examples:
     # Dry run (show what would be done)
     python daily_update.py --all --dry-run
 
-    # Collect and sync to Supabase DB in one step
+    # Collect and sync to DB in one step
     python daily_update.py --ibkr-prices --sync-db
     python daily_update.py --news --sync-db
     python daily_update.py --all --sync-db
 
 Note: IBKR sources require TWS/Gateway running.
-      --sync-db requires SUPABASE_DB_URL in config/.env
+      --sync-db requires DATABASE_URL in config/.env
         """
     )
 
@@ -632,7 +632,7 @@ Note: IBKR sources require TWS/Gateway running.
     parser.add_argument('--quiet', action='store_true',
                        help='Suppress subprocess output (for cron/background)')
     parser.add_argument('--sync-db', action='store_true',
-                       help='Sync collected data to Supabase DB after collection')
+                       help='Sync collected data to database after collection')
 
     args = parser.parse_args()
 

@@ -78,8 +78,10 @@ class DataAccessLayer:
             # Auto-detect from config/.env
             env_dsn = self._load_env_db_dsn()
             if env_dsn:
-                self._backend = DatabaseBackend(dsn=env_dsn)
-                logger.info("Using DatabaseBackend (Supabase) from .env")
+                from src.tools.db_config import load_sslmode
+                sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
+                self._backend = DatabaseBackend(dsn=env_dsn, sslmode=sslmode)
+                logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
             else:
                 self._backend = FileBackend(base_path=self._base)
         elif db_dsn:
@@ -100,24 +102,11 @@ class DataAccessLayer:
         return type(self._backend).__name__
 
     def _load_env_db_dsn(self) -> Optional[str]:
-        """Try to load SUPABASE_DB_URL from config/.env."""
+        """Try to load DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env."""
         if self._base is None:
             return None
-        env_path = self._base / "config" / ".env"
-        if not env_path.exists():
-            return None
-        try:
-            # Simple .env parser (avoid requiring python-dotenv at this level)
-            with open(env_path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("SUPABASE_DB_URL=") and not line.startswith("#"):
-                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        if val and val.startswith("postgresql"):
-                            return val
-        except Exception as e:
-            logger.debug(f"Could not read .env: {e}")
-        return None
+        from src.tools.db_config import load_database_url
+        return load_database_url(self._base / "config" / ".env")
 
     # ============================================================
     # Config Access

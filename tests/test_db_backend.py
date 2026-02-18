@@ -1,8 +1,8 @@
 """
-Tests for DatabaseBackend against Supabase.
+Tests for DatabaseBackend against PostgreSQL.
 
 These tests require:
-1. SUPABASE_DB_URL configured in config/.env
+1. DATABASE_URL configured in config/.env
 2. Schema created via sql/001_init_schema.sql
 3. Data imported via scripts/migrate_to_supabase.py
 
@@ -13,41 +13,31 @@ Run:
 """
 
 import pytest
+from pathlib import Path
 
 from src.tools.backends import DataBackend
 from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.data_access import DataAccessLayer
+from src.tools.db_config import load_database_url, load_sslmode
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-def _load_dsn():
-    """Load SUPABASE_DB_URL from config/.env."""
-    try:
-        with open("config/.env") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("SUPABASE_DB_URL=") and not line.startswith("#"):
-                    val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if val and val.startswith("postgresql"):
-                        return val
-    except FileNotFoundError:
-        pass
-    return None
+_ENV_PATH = Path("config/.env")
+_DSN = load_database_url(_ENV_PATH)
+_SSLMODE = load_sslmode(_ENV_PATH, _DSN) if _DSN else "disable"
 
-
-_DSN = _load_dsn()
 requires_db = pytest.mark.skipif(
     _DSN is None,
-    reason="SUPABASE_DB_URL not configured in config/.env"
+    reason="DATABASE_URL not configured in config/.env"
 )
 
 
 @pytest.fixture(scope="module")
 def backend():
-    """Create a DatabaseBackend connected to Supabase."""
-    b = DatabaseBackend(dsn=_DSN)
+    """Create a DatabaseBackend connected to PostgreSQL."""
+    b = DatabaseBackend(dsn=_DSN, sslmode=_SSLMODE)
     yield b
     b.close()
 
