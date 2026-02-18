@@ -112,7 +112,7 @@ def safe_float(val) -> float | None:
 # =============================================================================
 
 def import_news(conn: psycopg2.extensions.connection, dry_run: bool = False):
-    """Import scored news from IBKR and Polygon files."""
+    """Import news from scored final files + raw parquets (all sources)."""
     news_dir = PROJECT_ROOT / "data" / "news"
     total_imported = 0
 
@@ -187,6 +187,57 @@ def import_news(conn: psycopg2.extensions.connection, dry_run: bool = False):
             count = _insert_news_batch(conn, rows)
             total_imported += count
             logger.info(f"  Imported {count}/{len(rows)} Polygon news rows")
+
+    # --- Raw parquets (all sources: polygon, finnhub, ibkr) ---
+    raw_base = news_dir / "raw"
+    for source_name in ("polygon", "finnhub", "ibkr"):
+        source_dir = raw_base / source_name
+        if not source_dir.exists():
+            continue
+        parquet_files = sorted(source_dir.glob("**/*.parquet"))
+        if not parquet_files:
+            continue
+
+        logger.info(f"Loading {len(parquet_files)} raw {source_name} parquets")
+        source_rows = 0
+        for pf in parquet_files:
+            df = pd.read_parquet(pf)
+            if dry_run:
+                source_rows += len(df)
+                continue
+
+            rows = []
+            ticker_col = "Stock_symbol" if "Stock_symbol" in df.columns else "ticker"
+            title_col = "Article_title" if "Article_title" in df.columns else "title"
+            for _, r in df.iterrows():
+                date_str = pd.to_datetime(r.get("published_at"), errors="coerce")
+                date_str = date_str.isoformat() if pd.notna(date_str) else None
+                if date_str is None:
+                    continue
+                ticker = str(r.get(ticker_col, ""))
+                title = str(r.get(title_col, ""))
+                rows.append((
+                    ticker,
+                    title,
+                    safe_str(r.get("description")),
+                    safe_str(r.get("url")),
+                    safe_str(r.get("publisher")),
+                    source_name,
+                    date_str,
+                    None,  # sentiment_score (legacy column, scores go to news_scores)
+                    None,  # risk_score
+                    None,  # scored_model
+                    article_hash(ticker, title, date_str[:10]),
+                ))
+
+            count = _insert_news_batch(conn, rows)
+            total_imported += count
+            source_rows += count
+
+        if dry_run:
+            logger.info(f"  [DRY RUN] Would import {source_rows} raw {source_name} news rows")
+        else:
+            logger.info(f"  Imported {source_rows} raw {source_name} news rows (new articles)")
 
     logger.info(f"News import complete: {total_imported} total rows")
     return total_imported
@@ -354,33 +405,42 @@ def import_news_scores(conn: psycopg2.extensions.connection, dry_run: bool = Fal
             total_imported += count
             logger.info(f"  Imported {count} Polygon score rows")
 
-    # --- Raw scored parquets (e.g. data/news/raw/polygon/*.parquet) ---
-    raw_polygon_dir = news_dir / "raw" / "polygon"
-    if raw_polygon_dir.exists():
-        parquet_files = sorted(raw_polygon_dir.glob("*.parquet"))
-        if parquet_files:
-            logger.info(f"Scanning {len(parquet_files)} raw Polygon parquets")
-            for pf in parquet_files:
-                df = pd.read_parquet(pf)
-                score_cols = detect_score_columns(df)
-                if not score_cols:
-                    continue
-                logger.info(f"  {pf.name}: {len(score_cols)} score cols")
+    # --- Raw scored parquets (all sources: polygon, finnhub, ibkr) ---
+    raw_base = news_dir / "raw"
+    for source_name in ("polygon", "finnhub", "ibkr"):
+        source_dir = raw_base / source_name
+        if not source_dir.exists():
+            continue
+        parquet_files = sorted(source_dir.glob("**/*.parquet"))
+        if not parquet_files:
+            continue
 
-                if dry_run:
-                    for st, model, effort, col in score_cols:
-                        non_null = df[col].notna().sum()
-                        logger.info(f"    [DRY RUN] {col}: {non_null}")
-                else:
-                    # Determine column names (raw files may have different names)
-                    ticker_col = "Stock_symbol" if "Stock_symbol" in df.columns else "ticker"
-                    title_col = "Article_title" if "Article_title" in df.columns else "title"
-                    count = _import_scores_from_df(
-                        conn, df, score_cols, hash_to_id,
-                        ticker_col=ticker_col, title_col=title_col,
-                        date_col="published_at",
-                    )
-                    total_imported += count
+        logger.info(f"Scanning {len(parquet_files)} raw {source_name} parquets for scores")
+        source_score_count = 0
+        for pf in parquet_files:
+            df = pd.read_parquet(pf)
+            score_cols = detect_score_columns(df)
+            if not score_cols:
+                continue
+            logger.info(f"  {pf.relative_to(raw_base)}: {len(score_cols)} score cols")
+
+            if dry_run:
+                for st, model, effort, col in score_cols:
+                    non_null = df[col].notna().sum()
+                    logger.info(f"    [DRY RUN] {col}: {non_null}")
+            else:
+                ticker_col = "Stock_symbol" if "Stock_symbol" in df.columns else "ticker"
+                title_col = "Article_title" if "Article_title" in df.columns else "title"
+                count = _import_scores_from_df(
+                    conn, df, score_cols, hash_to_id,
+                    ticker_col=ticker_col, title_col=title_col,
+                    date_col="published_at",
+                )
+                total_imported += count
+                source_score_count += count
+
+        if not dry_run and source_score_count:
+            logger.info(f"  Imported {source_score_count} raw {source_name} score rows")
 
     logger.info(f"News scores import complete: {total_imported} total score rows")
     return total_imported
