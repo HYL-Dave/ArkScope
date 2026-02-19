@@ -1,135 +1,138 @@
-# MindfulRL-Intraday: Comprehensive RL Trading System
-> A comprehensive reinforcement learning trading system integrating multiple data sources, advanced news processing, and sophisticated model comparison capabilities. Built upon FinRL foundations with extensive OpenAI/Anthropic LLM integration for sentiment analysis, risk assessment, and content summarization.
+# MindfulRL-Intraday
 
-## Project Overview
+> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 26 financial tools, and multi-source news/price/options data pipeline.
 
-MindfulRL-Intraday is a comprehensive financial trading system that combines:
-- **Multi-source news data processing** via `data_sources/` and `NewsExtraction/` modules
-- **Advanced LLM integration** with configurable reasoning effort and verbosity parameters
-- **AI Agent Interface** for natural language queries about your portfolio and market data
-- **HTTP API** with RESTful endpoints for all data and analysis functions
-- **Sophisticated model comparison** capabilities for analyzing different LLM outputs
-- **Enterprise-grade cost control** and monitoring systems
-- **Flexible RL training** pipelines with sentiment and risk enhancement
+## Overview
 
-### Key Features:
-1. **News Data Pipeline**: Extract and process news from 10+ sources (Finnhub, Alpha Vantage, Yahoo, etc.)
-2. **LLM Scoring**: Score financial news headlines for sentiment and risk using OpenAI/Anthropic models
-3. **AI Agent CLI**: Interactive natural language interface with model switching (`/model` commands)
-4. **HTTP API**: RESTful API with Swagger UI for programmatic access
-5. **Content Summarization**: Generate intelligent summaries with configurable parameters
-6. **Advanced Model Comparison**: Compare outputs across different models with statistical analysis
-7. **Dynamic Analysis Toolkit**: Interactive tools for large-scale model comparison and visualization
-8. **RL Training**: Train PPO/CPPO agents on sentiment and risk-enhanced data
-9. **Backtesting**: Comprehensive backtesting with performance visualization
-10. **Database Integration**: Supabase PostgreSQL for centralized data storage
+MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-## Setup
-1. Ensure you are in this directory (project root).
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Configure API keys:
-   ```bash
-   cp config/.env.template config/.env
-   # Edit config/.env with your API keys:
-   # OPENAI_API_KEY, ANTHROPIC_API_KEY, POLYGON_API_KEY, etc.
-   ```
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 26 tools, 4 skills, 4 subagents
+- **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
+- **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
+- **Analysis Toolkit** — Fundamentals (SEC EDGAR), options (IV/Greeks), signals, web search
+- **RL Training** — PPO/CPPO agents with sentiment and risk-enhanced data
+- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure API keys
+cp config/.env.template config/.env
+# Edit config/.env: OPENAI_API_KEY, ANTHROPIC_API_KEY, POLYGON_API_KEY, etc.
+
+# 3. Start database
+docker compose up -d
+
+# 4. Launch AI Agent CLI
+python -m src.agents
+
+# 5. (Optional) Start HTTP API
+python -m src.api
+```
 
 ---
 
-## AI Agent CLI (New)
-
-Interactive CLI for natural language queries about your data:
+## AI Agent CLI
 
 ```bash
-python -m src.agents
+python -m src.agents                                    # Default: Anthropic Opus 4.6
+python -m src.agents --provider openai                  # Use GPT-5.2
+python -m src.agents --model sonnet                     # Use Sonnet 4.6
+python -m src.agents --thinking                         # Enable extended thinking
+python -m src.agents --effort medium                    # Anthropic effort level
+python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasoning
 ```
 
-**Example Session:**
+### Available Models
 
-```
-╭─────────────────────────────────────────────────────────────────╮
-│  MindfulRL AI Agent                                             │
-│  Model: claude-sonnet-4-5-20250929 (Anthropic)                  │
-│  Type /help for commands, /quit to exit                         │
-╰─────────────────────────────────────────────────────────────────╯
-
-You: NVDA 最近的新聞情緒如何？
-
-Agent: 我來查詢 NVDA 最近的新聞數據。
-
-[Tool: get_ticker_news] Getting news for NVDA...
-[Tool: get_news_sentiment_summary] Analyzing sentiment...
-
-根據最近 30 天的數據分析：
-
-**NVDA 新聞情緒摘要**
-- 文章數量: 847 篇
-- 平均情緒分數: 3.42 / 5.0 (略偏多)
-- 看多/看空比例: 58% / 22%
-- 主要來源: Dow Jones (312), Benzinga (245), The Fly (180)
-```
+| # | Provider | Model | Aliases | Context | Output | Features |
+|---|----------|-------|---------|---------|--------|----------|
+| 1 | Anthropic | Claude Opus 4.6 | opus, o46 | 200K (1M beta) | 128K | Effort, thinking, compaction |
+| 2 | Anthropic | Claude Sonnet 4.6 | sonnet, s46 | 200K (1M beta) | 64K | Effort, thinking |
+| 3 | OpenAI | GPT-5.2 | gpt5, 5.2 | 400K | 128K | Reasoning effort |
+| 4 | OpenAI | GPT-5.2 Codex | codex, 5.2-codex | 400K | 128K | Agentic coding |
 
 ### Slash Commands
 
-| 命令 | 說明 | 範例 |
-|------|------|------|
-| `/model` | 顯示模型選擇器 | `/model` |
-| `/model <name>` | 切換到指定模型 | `/model opus`, `/model gpt5` |
-| `/reasoning <level>` | 調整推理強度 (OpenAI) | `/reasoning xhigh` |
-| `/status` | 顯示當前狀態 | `/status` |
-| `/help` | 顯示幫助 | `/help` |
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `/model [name]` | `/m` | Show model picker / switch model |
+| `/skill <name> [args]` | `/sk` | Run a skill workflow (e.g. `/sk fa NVDA`) |
+| `/subagent [name] [model]` | `/sa` | View/change subagent models |
+| `/reasoning <level>` | `/r` | Set OpenAI reasoning (none/minimal/low/medium/high/xhigh) |
+| `/effort <level>` | `/e` | Set Anthropic effort (max/high/medium/low) |
+| `/thinking` | `/t` | Toggle extended thinking (Anthropic) |
+| `/context` | `/ctx` | Toggle 1M context beta (Anthropic) |
+| `/compaction` | `/cmp` | Toggle server-side compaction (Opus 4.6) |
+| `/code-model [name]` | `/cm` | Set code generation model |
+| `/turns <n>` | | Set max tool calls per query |
+| `/reports [ticker]` | `/rp` | List/view saved research reports |
+| `/scratchpad` | `/pad` | List recent scratchpad sessions |
+| `/history` | `/h` | Show recent Q&A history |
+| `/status` | `/s` | Show session config |
+| `/help` | | Show all commands |
 
-**Model Picker Example:**
-
-```
-You: /model
-
-Available Models:
-╭────────────────────────────────────────────────────────────────────╮
-│  #  │ Provider  │ Model          │ Aliases              │ Info    │
-├─────┼───────────┼────────────────┼──────────────────────┼─────────┤
-│  1  │ anthropic │ Sonnet 4.5     │ sonnet, s45          │ Fast    │
-│  2  │ anthropic │ Opus 4.5       │ opus, o45            │ Smart   │
-│  3  │ anthropic │ Haiku 4.5      │ haiku, h45           │ Cheap   │
-│  4  │ openai    │ GPT-5.2        │ gpt5, 5.2            │ SOTA    │
-╰────────────────────────────────────────────────────────────────────╯
-
-Enter number, name, or alias: opus
-
-✓ Switched to Opus 4.5 (anthropic)
-  Note: Provider changed, conversation history cleared.
-```
-
-### Available Tools (17 functions)
+### Tools (26)
 
 | Category | Tool | Description |
 |----------|------|-------------|
-| **News** | `get_ticker_news` | 取得特定股票的新聞 |
-| | `get_news_sentiment_summary` | 新聞情緒摘要統計 |
-| | `search_news_by_keyword` | 關鍵字搜尋新聞 |
-| **Prices** | `get_ticker_prices` | 取得價格數據 |
-| | `get_price_change` | 計算漲跌幅 |
-| | `get_sector_performance` | 板塊表現 |
-| **Options** | `get_iv_analysis` | IV 分析 (IV Rank, VRP) |
-| | `get_iv_history_data` | IV 歷史數據 |
-| | `scan_mispricing` | 期權定價偏差掃描 |
-| | `calculate_greeks` | Greeks 計算 |
-| **Signals** | `detect_anomalies` | 異常檢測 |
-| | `detect_event_chains` | 事件鏈檢測 |
-| | `synthesize_signal` | 合成交易信號 |
-| **Analysis** | `get_fundamentals_analysis` | 基本面分析 |
-| | `get_sec_filings` | SEC 文件查詢 |
-| | `get_watchlist_overview` | 觀察清單概覽 |
-| | `get_morning_brief` | 個人化晨報 |
+| **News** | `get_ticker_news` | Recent articles for a ticker |
+| | `get_news_sentiment_summary` | Aggregated sentiment statistics |
+| | `search_news_by_keyword` | Keyword search across news |
+| **Prices** | `get_ticker_prices` | OHLCV bars (15min/1h/1d) |
+| | `get_price_change` | Price change %, high/low range |
+| | `get_sector_performance` | Sector-level average performance |
+| **Options** | `get_iv_analysis` | IV rank, percentile, VRP, signal |
+| | `get_iv_history_data` | Raw IV/HV history points |
+| | `scan_mispricing` | Options mispricing vs theoretical |
+| | `calculate_greeks` | Black-Scholes Greeks |
+| **Signals** | `detect_anomalies` | Sentiment/volume anomaly detection |
+| | `detect_event_chains` | Event sequence patterns |
+| | `synthesize_signal` | Multi-factor trading signal |
+| **Analysis** | `get_fundamentals_analysis` | P/E, ROE, margins (Finnhub + SEC EDGAR) |
+| | `get_sec_filings` | 10-K, 10-Q, 8-K metadata |
+| | `get_insider_trades` | SEC Form 4 insider transactions |
+| | `get_analyst_consensus` | Analyst recommendations, price targets |
+| | `get_watchlist_overview` | Watchlist status overview |
+| | `get_morning_brief` | Personalized morning briefing |
+| **Reports** | `save_report` | Save research report (Markdown + DB) |
+| | `list_reports` | List reports by ticker/type |
+| | `get_report` | Retrieve report by ID |
+| **Web** | `tavily_search` | AI-powered web search |
+| | `tavily_fetch` | URL content extraction |
+| | `web_browse` | Headless browser (Playwright) |
+| **Code** | `execute_python_analysis` | Python code execution with auto code gen |
+
+### Skills
+
+Goal-oriented prompt templates that orchestrate multi-tool analysis:
+
+| Skill | Aliases | Usage | Description |
+|-------|---------|-------|-------------|
+| `full_analysis` | fa, analyze | `/sk fa NVDA` | Comprehensive entry analysis with adversarial check |
+| `portfolio_scan` | scan, ps | `/sk scan` | Watchlist screening with drill-down on movers |
+| `earnings_prep` | ep, earnings | `/sk ep TSLA` | Pre-earnings risk/reward assessment |
+| `sector_rotation` | sr, sectors | `/sk sr` | Cross-sector relative strength analysis |
+
+Custom skills can be added via YAML files in `config/skills/`.
+
+### Subagents
+
+Specialized agents delegated for specific tasks:
+
+| Subagent | Default Model | Purpose |
+|----------|---------------|---------|
+| `code_analyst` | GPT-5.2 Codex | Quantitative Python analysis, calculations |
+| `deep_researcher` | GPT-5.2 | Multi-source investigation across 14 tools |
+| `data_summarizer` | Sonnet 4.6 | Fast data retrieval and summarization |
+| `reviewer` | Opus 4.6 | Critical analysis review (adversarial) |
 
 ---
 
-## HTTP API (New)
-
-Start the API server:
+## HTTP API
 
 ```bash
 python -m src.api
@@ -140,460 +143,249 @@ python -m src.api
 **Example Requests:**
 
 ```bash
-# Get news
+# News
 curl "http://localhost:8420/news/NVDA?days=7"
+curl "http://localhost:8420/news/NVDA/sentiment?days=30"
 
-# Get prices
+# Prices
 curl "http://localhost:8420/prices/AMD?interval=15min&days=30"
 
-# IV analysis
+# Options
 curl "http://localhost:8420/options/PLTR"
 
-# Synthesize trading signal
-curl "http://localhost:8420/signals?ticker=NVDA"
+# Fundamentals
+curl "http://localhost:8420/fundamentals/AAPL"
 
 # AI Agent query
 curl -X POST "http://localhost:8420/query" \
   -H "Content-Type: application/json" \
-  -d '{"question": "比較 AMD 和 NVDA 的近期表現", "provider": "anthropic"}'
+  -d '{"question": "Compare AMD and NVDA recent performance", "provider": "anthropic"}'
 ```
 
 ---
 
-## Data Collection (New)
+## Database Setup (Self-Hosted PostgreSQL)
 
-### Daily Update (Recommended)
-
-One-command update with optional database sync:
+### Docker Deployment
 
 ```bash
-# Check data status
-python scripts/collection/daily_update.py --status
+# Start with default port (15432)
+docker compose up -d
 
-# Update all news sources
-python scripts/collection/daily_update.py --news
-
-# Update prices + sync to DB
-python scripts/collection/daily_update.py --ibkr-prices --sync-db
-
-# Update everything + sync to DB
-python scripts/collection/daily_update.py --all --sync-db
+# Custom port
+POSTGRES_PORT=25432 docker compose up -d
 ```
 
-### Individual Collection Scripts
-
-```bash
-# Polygon news (3+ years history)
-python scripts/collection/collect_polygon_news.py --incremental
-
-# Finnhub news (last 7 days)
-python scripts/collection/collect_finnhub_news.py --incremental
-
-# IBKR news (requires TWS/Gateway)
-python scripts/collection/collect_ibkr_news.py --incremental
-
-# IBKR prices (requires TWS/Gateway)
-python scripts/collection/collect_ibkr_prices.py --incremental --minute-only
-
-# IV history
-python scripts/collection/collect_iv_history.py
-```
-
----
-
-## Database Setup (Supabase)
+Default connection: `postgresql://postgres:mindfulrl_dev_2026@localhost:15432/mindfulrl`
 
 ### Configure Connection
 
 Edit `config/.env`:
 
 ```bash
-SUPABASE_DB_URL=postgresql://postgres:your-password@db.xxx.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:mindfulrl_dev_2026@localhost:15432/mindfulrl
 ```
 
-### Migrate Data to DB
+### Schema Migrations
+
+Applied automatically on first Docker startup, or manually:
+
+```sql
+-- sql/001_init_schema.sql    — Core tables (news, prices, iv_history, fundamentals, signals, agent_queries)
+-- sql/002_add_news_scores.sql — Multi-model news scoring
+-- sql/003_add_reports.sql     — Research reports
+```
+
+### Migrate Data from Parquet Files
 
 ```bash
-# Import all data
-python scripts/migrate_to_supabase.py
-
-# Import prices only
-python scripts/migrate_to_supabase.py --prices
-
-# Import news only
-python scripts/migrate_to_supabase.py --news
-
-# Dry run (count only)
-python scripts/migrate_to_supabase.py --dry-run
+python scripts/migrate_to_supabase.py              # Import all data
+python scripts/migrate_to_supabase.py --prices      # Prices only
+python scripts/migrate_to_supabase.py --news        # News only
+python scripts/migrate_to_supabase.py --dry-run     # Count only
 ```
 
 ---
 
-## Workflow
+## Data Collection
 
-### 1. Score News Headlines
+### Daily Update
 
-#### Recommended Models
+```bash
+python scripts/collection/daily_update.py --status       # Check data status
+python scripts/collection/daily_update.py --news          # Update all news
+python scripts/collection/daily_update.py --all --sync-db # Everything + DB sync
+```
 
-**Current Strategy:** Use latest reasoning models only, continuously upgrade as new versions release.
+### Individual Scripts
 
-| Model | Usage | Best For |
-|-------|-------|----------|
-| **gpt-5.1** | Latest | All tasks (when available) |
-| **gpt-5** | Primary | Sentiment/risk scoring |
-| **gpt-5-mini** | Primary | Summary generation (cost-effective) |
+```bash
+python scripts/collection/collect_polygon_news.py --incremental    # Polygon (3+ years)
+python scripts/collection/collect_finnhub_news.py --incremental    # Finnhub (7 days)
+python scripts/collection/collect_ibkr_news.py --incremental       # IBKR (requires TWS)
+python scripts/collection/collect_ibkr_prices.py --incremental     # IBKR prices
+python scripts/collection/collect_iv_history.py                    # IV history
+```
 
-> **Note:** Non-reasoning models (gpt-4.1-mini, etc.) and o-series (o3, o4-mini) are deprecated. Historical data retained for comparison only.
->
-> **Upgrade Path:** gpt-5 → gpt-5.1 → gpt-5.2 (upcoming) → ...
+---
 
-**Typical Workflow:**
-1. Generate summaries with **gpt-5-mini** (cost-effective, quality sufficient for summarization)
-2. Score sentiment/risk with **gpt-5** (higher quality for scoring tasks)
-3. Use `--reasoning-effort high --verbosity high` for best quality
+## LLM Scoring Pipeline
 
-**Model Parameters:**
-- `--reasoning-effort`: "minimal", "low", "medium", "high"
-- `--verbosity`: "low", "medium", "high" (gpt-5 family)
-- `--allow-flex`: Enable Flex mode for 50% cost savings (longer wait times)
+### Current Models
 
-#### Advanced Parameter Configuration
+| Model | Usage |
+|-------|-------|
+| **gpt-5.2** | Sentiment/risk scoring (primary) |
+| **gpt-5.2** | Summary generation |
 
-All scoring scripts now support advanced reasoning model parameters:
+> **Strategy:** Use latest reasoning models only. Upgrade path: gpt-5 → gpt-5.1 → gpt-5.2 → ...
 
-- `--reasoning-effort`: Reasoning effort level ("low", "medium", "high"; gpt-5 also supports "minimal")
-- `--verbosity`: Verbosity level for gpt-5 models only ("low", "medium", "high")
-- `--symbol-column`: Stock symbol column name (default: `Stock_symbol`)
-- `--text-column`: Text/summary column to score (choices: `Article_title`, `Article`, `Lsa_summary`, `Luhn_summary`, `Textrank_summary`, `Lexrank_summary`, `o3_summary`, `gpt_5_summary`)
+### Sentiment Scoring
 
-#### Sentiment Scoring (resumable, chunked):
-  ```bash
-  python scripts/scoring/score_sentiment_openai.py \
-    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
-    --output sentiment_scored.csv \
-    --model o4-mini \
-    --reasoning-effort high \
-    --verbosity low \
-    --chunk-size 5000 \
-    --symbol-column Stock_symbol \
-    --text-column Lsa_summary \
-    --date-column Date \
-    --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 1000000 \
-    --retry 3 \
-    --retry-missing 3 \
-    --max-runtime 3600 \
-    --verbose
+```bash
+python scripts/scoring/score_sentiment_openai.py \
+  --input data.csv --output sentiment_scored.csv \
+  --model gpt-5.2 --reasoning-effort high \
+  --chunk-size 5000 --retry 3 --verbose
+```
 
-  # Example with gpt-5 using minimal reasoning effort:
-  python scripts/scoring/score_sentiment_openai.py \
-    --input data.csv \
-    --output sentiment_o3_minimal.csv \
-    --model gpt-5 \
-    --reasoning-effort minimal \
-    --verbosity high
+### Risk Scoring
 
-  # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
-  python scripts/scoring/score_sentiment_openai.py \
-    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
-    --output sentiment_scored.csv \
-    --model o4-mini \
-    --chunk-size 5000 \
-    --symbol-column Stock_symbol \
-    --text-column Lsa_summary \
-    --date-column Date \
-    --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 1000000 \
-    --retry 3 \
-    --retry-missing 3 \
-    --max-runtime 3600 \
-    --allow-flex --flex-timeout 900 --flex-retries 1
-  ```
-  * The script will auto-create the output directory if needed.
-  * The output CSV will include all original columns from the input plus a new column `sentiment_{model}` (e.g., `sentiment_gpt_5`, `sentiment_o4_mini`).
-  * Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
-  * 当触发每日 token 限额时，会在当前 chunk 写入完成后自动退出，以便第二天继续执行并重用剩余行。
-#### Risk (resumable, chunked):
-  ```bash
-  python scripts/scoring/score_risk_openai.py \
-    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
-    --output risk_scored.csv \
-    --model o4-mini \
-    --reasoning-effort high \
-    --verbosity low \
-    --chunk-size 5000 \
-    --symbol-column Stock_symbol \
-    --text-column Lsa_summary \
-    --date-column Date \
-    --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 250000 \
-    --verbose
+```bash
+python scripts/scoring/score_risk_openai.py \
+  --input data.csv --output risk_scored.csv \
+  --model gpt-5.2 --reasoning-effort high \
+  --chunk-size 5000 --retry 3
+```
 
-  # Flex mode: after daily token limit, switch to flex service_tier with longer timeout and retry
-  python scripts/scoring/score_risk_openai.py \
-    --input /mnt/md0/finrl/huggingface_datasets/FNSPID_raw_news/Stock_news/nasdaq_exteral_data.csv \
-    --output risk_scored.csv \
-    --model o4-mini \
-    --chunk-size 5000 \
-    --symbol-column Stock_symbol \
-    --text-column Lsa_summary \
-    --date-column Date \
-    --api-keys-file api_keys_tier5.txt \
-    --daily-token-limit 250000 \
-    --allow-flex --flex-timeout 900 --flex-retries 1
-  ```
-* The script will auto-create the output directory if needed.
-* The output CSV will include all original columns from the input plus a new column `risk_{model}` (e.g., `risk_gpt_5`, `risk_o4_mini`).
-* Runs in chunks and writes each chunk immediately, so you can interrupt (Ctrl+C) and re-run to resume.
+### IBKR News Scoring (Parquet → DB)
 
-### 2. Prepare Dataset
+```bash
+python scripts/scoring/score_ibkr_news.py --continue-from   # Score unscored articles
+python scripts/scoring/score_ibkr_news.py --rescore          # Re-score all
+```
+
+### Parameters
+
+- `--reasoning-effort`: minimal, low, medium, high (gpt-5.x)
+- `--chunk-size`: Rows per batch (default 5000, auto-resume on interrupt)
+- `--allow-flex`: Flex mode for 50% cost savings (longer latency)
+- `--daily-token-limit`: Auto-stop after budget (resume next day)
+
+---
+
+## RL Training Pipeline
+
+### Prepare Dataset
+
 ```bash
 python prepare_dataset_openai.py \
   --price-data data/intraday.csv \
   --sentiment sentiment_scored.csv \
   --risk risk_scored.csv \
-  --date-col Date \
-  --symbol-col Stock_symbol \
   --output merged_dataset.csv
 ```
 
-### 3. Train Agents
+### Train
+
 ```bash
 bash train_openai.sh merged_dataset.csv ppo sentiment
 bash train_openai.sh merged_dataset.csv cppo risk
 ```
 
-### 4. Backtest
+### Backtest
+
 ```bash
 python backtest_openai.py --data merged_dataset.csv \
   --model trained_models/agent_ppo_llm_100_epochs_sentiment.pth \
   --env sentiment --output-plot equity.png
 ```
 
-### 2. Content Summarization
-```bash
-# Generate article summaries with configurable parameters
-python scripts/scoring/openai_summary.py \
-  --input data.csv \
-  --output summarized.csv \
-  --model o4-mini \
-  --reasoning-effort medium \
-  --text-column Article \
-  --summary-column o4_summary
-
-# gpt-5 with custom verbosity
-python scripts/scoring/openai_summary.py \
-  --input data.csv \
-  --output summarized.csv \
-  --model gpt-5 \
-  --reasoning-effort high \
-  --verbosity medium
-```
-
-### 3. Model Comparison and Analysis
-
-#### Score Comparison
-```bash
-# Compare scores across multiple CSV files from different models
-python scripts/comparison/compare_scores.py \
-  --files sentiment_o3_high.csv,sentiment_o4_mini.csv,sentiment_gpt4o.csv \
-  --column sentiment_gpt_5 \
-  --display-count 10
-
-# Enhanced comparison with automatic directory scanning
-python scripts/comparison/compare_scores_enhanced.py \
-  --root-dir /mnt/md0/finrl \
-  --score-type sentiment \
-  --output sentiment_comparison.csv
-
-# A/B score comparison between two models
-python scripts/comparison/ab_score_comparison.py \
-  --file-a model_a_scores.csv \
-  --file-b model_b_scores.csv \
-  --column sentiment_gpt_5
-```
-
-#### Summary Comparison
-```bash
-# Compare text summaries across models
-python scripts/comparison/compare_summaries.py \
-  --files summaries_o3.csv,summaries_gpt5.csv \
-  --column gpt_5_summary
-```
-
-### 4. Prepare Dataset
-```bash
-python prepare_dataset_openai.py \
-  --price-data data/intraday.csv \
-  --sentiment sentiment_scored.csv \
-  --risk risk_scored.csv \
-  --date-col Date \
-  --symbol-col Stock_symbol \
-  --output merged_dataset.csv
-```
-
-### 5. Train Agents
-```bash
-bash train_openai.sh merged_dataset.csv ppo sentiment
-bash train_openai.sh merged_dataset.csv cppo risk
-```
-
-### 6. Backtest
-```bash
-python backtest_openai.py --data merged_dataset.csv \
-  --model trained_models/agent_ppo_llm_100_epochs_sentiment.pth \
-  --env sentiment --output-plot equity.png
-```
+---
 
 ## Project Structure
 
-### New: Passive Query Layer (`src/`)
-- **`src/api/`**: HTTP API (FastAPI)
-  - `app.py`: Application factory
-  - `routes/`: API endpoints (news, prices, options, signals, query)
-  - `dependencies.py`: Dependency injection (DAL singleton)
-- **`src/agents/`**: AI Agent implementations
-  - `cli.py`: Interactive CLI with `/model` commands
-  - `config.py`: Model configuration
-  - `openai_agent/`: OpenAI Agents SDK integration
-  - `anthropic_agent/`: Anthropic SDK integration
-- **`src/tools/`**: Data Access Layer
-  - `data_access.py`: DataAccessLayer class
-  - `schemas.py`: Pydantic models (shared across layers)
-  - `registry.py`: Tool registry for agent frameworks
-  - `backends/`: File and database backends
-  - `*_tools.py`: 17 tool functions (news, prices, options, signals, analysis)
-- **`src/signals/`**: Signal detection modules
-  - `anomaly_detector.py`, `event_chain_detector.py`, `signal_synthesizer.py`
+### Agent Layer (`src/agents/`)
 
-### Core Modules
-- **`data_sources/`**: Unified data source interface
-  - **Finnhub**: News, real-time quotes, company profiles (free tier: 60 calls/min)
-  - **Tiingo**: Historical stock prices (free tier: 30+ years EOD data)
-  - **SEC EDGAR**: Official SEC filings, XBRL financial data (free, no API key)
-- **`NewsExtraction/`**: Historical news data processing and quality analysis
+| Module | Description |
+|--------|-------------|
+| `cli.py` | Interactive CLI (15 slash commands, prompt caching, token tracking) |
+| `config.py` | Model configuration, defaults, aliases |
+| `anthropic_agent/agent.py` | Anthropic messages loop (streaming, thinking, effort) |
+| `openai_agent/agent.py` | OpenAI Agents SDK wrapper (Responses API) |
+| `shared/prompts.py` | System prompts shared across providers |
+| `shared/skills.py` | Skill registry + custom YAML loading |
+| `shared/subagent.py` | Subagent registry + dispatch |
+| `shared/token_tracker.py` | Per-turn token + cache tracking |
+| `shared/context_manager.py` | Context compaction for long sessions |
+| `shared/scratchpad.py` | JSONL session logging + chat history |
+| `shared/security.py` | Tool result wrapping for input safety |
 
-### Data Collection (`scripts/collection/`)
-- **`daily_update.py`**: Unified daily update with `--sync-db` option
-- **`collect_polygon_news.py`**: Polygon news (3+ years history)
-- **`collect_finnhub_news.py`**: Finnhub news (7 days)
-- **`collect_ibkr_news.py`**: IBKR news (Dow Jones, Briefing, The Fly)
-- **`collect_ibkr_prices.py`**: IBKR intraday prices
-- **`collect_iv_history.py`**: ATM IV history
+### Tool Layer (`src/tools/`)
 
-### Scoring Scripts (`scripts/scoring/`)
-- **`score_sentiment_openai.py`**: Sentiment analysis with configurable reasoning effort
-- **`score_risk_openai.py`**: Risk assessment with advanced parameter control
-- **`score_ibkr_news.py`**: IBKR parquet scoring with API key rotation
-- **`openai_summary.py`**: Article summarization (generates input for scoring)
+| Module | Description |
+|--------|-------------|
+| `registry.py` | ToolRegistry (26 tools, dual-format for Anthropic + OpenAI) |
+| `data_access.py` | DataAccessLayer with backend abstraction |
+| `backends/file_backend.py` | Parquet file backend |
+| `backends/db_backend.py` | PostgreSQL backend (psycopg3) |
+| `news_tools.py`, `price_tools.py`, etc. | Individual tool implementations |
+| `report_tools.py` | Research report save/list/get |
+| `web_tools.py` | Tavily search + Playwright browser |
+| `code_tools.py` | Python code execution + auto code gen |
 
-### Analysis and Comparison (`scripts/comparison/`, `scripts/analysis/`)
-- **`scripts/comparison/compare_scores.py`**: Statistical comparison across multiple score files
-- **`scripts/comparison/compare_scores_enhanced.py`**: Enhanced comparison with auto-scanning and caching
-- **`scripts/comparison/compare_summaries.py`**: Text similarity analysis for summary comparison
-- **`scripts/comparison/ab_score_comparison.py`**: A/B score comparison between two models
-- **`scripts/analysis/sentiment_backtest.py`**: Sentiment-based trading strategy backtest
-- **`scripts/analysis/validate_scoring_value.py`**: Validate LLM score predictive power (IC, Hit Rate)
-- **`scripts/analysis/detailed_factor_comparison.py`**: Factor comparison with distribution analysis
+### Data Sources (`data_sources/`)
 
-### Visualization (`scripts/visualization/`)
-- **`scripts/visualization/news_dashboard.py`**: Streamlit news dashboard (Polygon, Finnhub, IBKR)
-- **`scripts/visualization/fundamentals_query.py`**: CLI for querying stock fundamentals
+| Source | Data | Tier |
+|--------|------|------|
+| **Finnhub** | News, quotes, company profiles, analyst consensus | Free |
+| **Tiingo** | Historical stock prices (30+ years) | Free |
+| **SEC EDGAR** | XBRL financial data (income, balance, cashflow) | Free |
+| **Polygon** | News (3+ years), reference data | Free/Paid |
+| **IBKR** | Real-time news, intraday prices, options | Requires TWS |
 
-### Utility Scripts
-- **`filter_fns_data_by_date.py`**: Filter news data by date ranges
-- **`audit_stock_news.py`**: Data quality auditing and validation
+### Configuration (`config/`)
 
-### Training and Backtesting
-- **`prepare_dataset_openai.py`**: Feature merging and dataset preparation
-- **`train_openai.sh`**: Training pipeline wrapper
-- **`backtest_openai.py`**: Backtesting with performance visualization
-- **`train_ppo_llm.py`, `train_cppo_llm_risk.py`**: Core training implementations
-- **`env_stocktrading_llm.py`, `env_stocktrading_llm_risk.py`**: Trading environment definitions
+| File | Description |
+|------|-------------|
+| `.env` | API keys (from `.env.template`) |
+| `user_profile.yaml` | Watchlists, strategy weights, model priority |
+| `sectors.yaml` | Sector definitions and ticker mappings |
+| `tickers_core.json` | Core ticker list (Tier 1/2/3) |
+| `skills/*.yaml` | Custom skill definitions |
 
-### Configuration
-- **`config/tickers_core.json`**: Core stock ticker list (tiered: Tier 1 must-have, Tier 2 expanded, Tier 3 custom)
-- **`config/.env.template`**: API credentials template (copy to `.env` and fill in your keys)
-- **`config/user_profile.yaml`**: Personal settings (watchlists, strategy weights, alerts)
-- **`config/sectors.yaml`**: Sector definitions and ticker mappings
-
-### User Profile Example (`config/user_profile.yaml`)
-```yaml
-watchlists:
-  core_holdings:
-    tickers: ["NVDA", "AMD", "ZETA"]
-    priority: "high"
-  interested:
-    tickers: ["RKLB", "PLTR", "COIN", "PYPL"]
-    priority: "medium"
-
-tickers_for_options: ["NVDA", "AMD", "PLTR", "PYPL", "ZETA", "RKLB", "COIN"]
-
-strategy_weights:
-  my_custom:
-    fundamentals: 25
-    price_trend: 25
-    news_sentiment: 25
-    options_flow: 25
-  default_strategy: "my_custom"
-```
-
-## Documentation
-
-### Design Documents
-- **`docs/design/MINDFULRL_ARCHITECTURE.md`**: System architecture design
-- **`docs/design/SERVICE_ARCHITECTURE.md`**: Service-oriented architecture plan
-- **`docs/design/DATA_STORAGE_ACCESS.md`**: Data access layer design
-
-### Data Guides
-- **`docs/data/DATA_SUBSCRIPTION_GUIDE.md`**: Data subscription guide
-- **`docs/data/OPTIONS_FLOW_GUIDE.md`**: Options flow analysis guide
-- **`docs/data/OPTIONS_PRICING_THEORY.md`**: Options pricing theory
-- **`docs/analysis/SCORING_VALIDATION_METHODOLOGY.md`**: LLM scoring validation methodology
-
-### Module Documentation
-- **`PROJECT_STRUCTURE.md`**: Detailed project structure and directory organization
-- **`OPENAI_SCRIPTS.md`**: OpenAI scoring scripts usage guide
-- **`data_sources/`**: Unified data source module documentation
-- **`NewsExtraction/README.md`**: Historical news processing documentation
-- **`scripts/visualization/README.md`**: Visualization tools guide
-- **`scripts/scoring/README.md`**: Batch scoring scripts guide
+---
 
 ## Advanced Features
 
-### Score Validation and Backtesting
-Validate LLM scoring effectiveness with quantitative finance methods:
+### Score Validation
 
 ```bash
-# Validate score predictive power (IC, Hit Rate, Quintile Analysis)
-python scripts/analysis/validate_scoring_value.py \
-  --file scored_data.csv \
-  --score-col sentiment_gpt_5
-
-# Backtest sentiment-based trading strategies
-python scripts/analysis/sentiment_backtest.py \
-  --file scored_data.csv \
-  --score-col sentiment_gpt_5
+python scripts/analysis/validate_scoring_value.py --file scored_data.csv --score-col sentiment_gpt_5
+python scripts/analysis/sentiment_backtest.py --file scored_data.csv --score-col sentiment_gpt_5
 ```
 
-### News Dashboard
-Interactive Streamlit dashboard for exploring news data:
+### News Dashboard (Streamlit)
 
 ```bash
 streamlit run scripts/visualization/news_dashboard.py
 ```
 
-### Fundamentals Query CLI
-Interactive command-line tool for stock fundamentals:
+### Fundamentals CLI
 
 ```bash
 python scripts/visualization/fundamentals_query.py
-
-# Example commands:
-> AAPL                    # Query single stock
-> AAPL MSFT GOOGL         # Compare multiple stocks
-> top roe                 # ROE ranking (high→low)
+> AAPL                    # Single stock
+> AAPL MSFT GOOGL         # Compare multiple
+> top roe                 # ROE ranking
 > pe<20 roe>15            # Filter by conditions
+```
+
+### Model Comparison
+
+```bash
+python scripts/comparison/compare_scores.py --files a.csv,b.csv --column sentiment_gpt_5
+python scripts/comparison/ab_score_comparison.py --file-a a.csv --file-b b.csv
 ```
 
 ---
@@ -603,25 +395,30 @@ python scripts/visualization/fundamentals_query.py
 ### Run Tests
 
 ```bash
-# All tests (98 tests)
-pytest tests/
-
-# Specific test files
-pytest tests/test_data_access.py -v  # DAL tests
-pytest tests/test_tools.py -v        # Tool function tests
-pytest tests/test_api.py -v          # API endpoint tests
-pytest tests/test_agents.py -v       # Agent integration tests
-
-# With coverage
-pytest tests/ --cov=src --cov-report=html
+pytest tests/                        # All tests (~560 tests)
+pytest tests/test_agents.py -v       # Agent tests
+pytest tests/test_subagent.py -v     # Subagent tests
+pytest tests/test_tools.py -v        # Tool tests
+pytest tests/test_skills.py -v       # Skills tests
+pytest tests/test_api.py -v          # API tests
+pytest tests/ --cov=src --cov-report=html  # With coverage
 ```
 
-### Start Development Server
+### Development Server
 
 ```bash
-# API with auto-reload
 uvicorn src.api.app:create_app --factory --reload --port 8420
 ```
+
+### Documentation
+
+| Category | Files |
+|----------|-------|
+| **Architecture** | `docs/design/MINDFULRL_ARCHITECTURE.md`, `SERVICE_ARCHITECTURE.md`, `DATA_STORAGE_ACCESS.md` |
+| **Agent Evolution** | `docs/design/AGENT_EVOLUTION_TRACKER.md` (detailed changelog) |
+| **Data** | `docs/data/DATA_SUBSCRIPTION_GUIDE.md`, `OPTIONS_FLOW_GUIDE.md`, `OPTIONS_PRICING_THEORY.md` |
+| **Analysis** | `docs/analysis/SCORING_VALIDATION_METHODOLOGY.md` |
+| **Scripts** | `scripts/scoring/README.md`, `scripts/visualization/README.md` |
 
 ---
 
