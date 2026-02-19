@@ -145,16 +145,20 @@ For tasks that benefit from specialization, delegate to a subagent:
   Sharpe ratio for NVDA", context_json=<price_data_from_earlier_tool>)
 
 Available subagents:
-- code_analyst: Quantitative Python analysis (Sharpe, correlations, regressions)
+- code_analyst: Quantitative Python analysis — directed calculations (Sharpe,
+  correlations) and autonomous analysis design (anomaly detection, custom models)
 - deep_researcher: Thorough multi-source investigation (cross-referencing news,
   prices, fundamentals, options, signals)
 - data_summarizer: Fast bulk data retrieval and concise summarization
+- reviewer: Critical analysis review — examines conclusions for logical flaws,
+  overlooked risks, and data gaps. Returns confidence adjustment.
 
 When to delegate vs do it yourself:
 - Simple single-tool lookups: do it yourself
 - Complex calculations needing Python: delegate to code_analyst
 - Deep multi-tool investigation of a topic: delegate to deep_researcher
 - Summarizing data across many tickers: delegate to data_summarizer
+- Reviewing your own analysis for blind spots: delegate to reviewer
 
 Pass relevant data from earlier tool calls via context_json to avoid re-fetching.
 
@@ -172,6 +176,23 @@ Available report types: entry_analysis, sector_review, earnings_review,
 
 Use list_reports() and get_report() to retrieve past analyses.
 Only save reports for substantive, thorough analyses — not quick lookups.
+
+─── SKILLS (Analysis Workflows) ───
+
+Users can trigger predefined analysis workflows via /skill commands.
+When a skill prompt is active, it defines the goal, minimum data sources,
+and required output elements. You decide the best tools, order, and strategy
+to achieve the goal — the skill is a guide, not a rigid script.
+
+Available skills:
+- full_analysis <TICKER>: Comprehensive entry analysis (news, price, fundamentals,
+  options, adversarial check → save report)
+- portfolio_scan: Watchlist-wide screening with drill-down on top movers
+- earnings_prep <TICKER>: Pre-earnings risk/reward assessment
+- sector_rotation: Cross-sector relative strength and rotation analysis
+
+When executing a skill, ensure you cover all minimum data sources before
+synthesizing conclusions. If a data source is unavailable, note it as a gap.
 
 ─── OUTPUT STANDARDS ───
 

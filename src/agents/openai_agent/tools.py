@@ -429,12 +429,13 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results.
 
         Available subagents:
-        - code_analyst: Quantitative Python analysis (Sharpe ratios, correlations, regressions)
+        - code_analyst: Quantitative Python analysis (Sharpe, correlations, anomaly detection, autonomous analysis design)
         - deep_researcher: Thorough multi-source investigation (news, prices, fundamentals, options, signals)
         - data_summarizer: Fast bulk data retrieval and concise summarization
+        - reviewer: Critical analysis review — finds logical flaws, overlooked risks, confidence adjustment
 
         Args:
-            subagent: Subagent name - code_analyst, deep_researcher, or data_summarizer
+            subagent: Subagent name - code_analyst, deep_researcher, data_summarizer, or reviewer
             task: Natural language task description for the subagent
             context_json: Optional JSON data context from earlier tool calls (max 5000 chars)
         """

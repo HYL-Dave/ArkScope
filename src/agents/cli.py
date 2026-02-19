@@ -15,6 +15,7 @@ Slash commands (during chat):
     /effort <n>     Set: max|high|medium|low
     /thinking       Toggle extended thinking on/off (Anthropic)
     /context        Toggle 1M context beta on/off (Anthropic)
+    /skill          Run a predefined skill workflow (e.g. /skill full_analysis NVDA)
     /subagent       View/change subagent models (persisted to local config)
     /scratchpad     List recent agent session logs (JSONL)
     /history        Show recent chat history (Q&A pairs)
@@ -218,6 +219,7 @@ _SLASH_COMMANDS = [
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
     ("/context", "/ctx", "Toggle 1M context beta (Anthropic)"),
     ("/compaction", "/cmp", "Toggle server-side compaction L2"),
+    ("/skill", "/sk", "Run a predefined skill workflow"),
     ("/subagent", "/sa", "View/change subagent models"),
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
@@ -251,10 +253,18 @@ _COMPACTION_OPTIONS = [
     ("off", "Disable server-side compaction"),
 ]
 
+_SKILL_NAMES = [
+    ("full_analysis", "Comprehensive single-ticker entry analysis"),
+    ("portfolio_scan", "Watchlist-wide screening"),
+    ("earnings_prep", "Pre-earnings risk assessment"),
+    ("sector_rotation", "Cross-sector rotation analysis"),
+]
+
 _SUBAGENT_NAMES = [
     ("code_analyst", "Quantitative Python analysis"),
     ("deep_researcher", "Multi-source investigation"),
     ("data_summarizer", "Fast bulk summarization"),
+    ("reviewer", "Critical analysis review"),
 ]
 
 
@@ -318,6 +328,8 @@ class SlashCompleter(Completer):
             return _CONTEXT_OPTIONS
         elif cmd in ("/compaction", "/cmp"):
             return _COMPACTION_OPTIONS
+        elif cmd in ("/skill", "/sk"):
+            return _SKILL_NAMES
         elif cmd in ("/subagent", "/sa"):
             return _SUBAGENT_NAMES
         elif cmd in ("/model", "/m"):
@@ -361,6 +373,8 @@ def print_help():
             "  [cyan]/effort <n>[/cyan]         Set: max|high|medium|low\n"
             "  [cyan]/thinking[/cyan]           Toggle extended thinking on/off (Anthropic)\n"
             "  [cyan]/context[/cyan]            Toggle 1M context beta on/off (Anthropic)\n"
+            "  [cyan]/skill[/cyan]              List available analysis skills\n"
+            "  [cyan]/skill <name> [args][/cyan] Run a skill (e.g. /skill full_analysis NVDA)\n"
             "  [cyan]/subagent[/cyan]           View/change subagent models\n"
             "  [cyan]/subagent <name>[/cyan]    Change a subagent's model (e.g. /subagent code_analyst opus)\n"
             "  [cyan]/scratchpad[/cyan]         List recent agent session logs\n"
@@ -953,6 +967,58 @@ def handle_reasoning_command(state: SessionState, arg: str) -> None:
     console.print(f"[green]Reasoning effort set to[/green] [bold]{arg.lower()}[/bold]\n")
 
 
+def handle_skill_command(state: SessionState, arg: str) -> Optional[str]:
+    """Handle /skill [name] [params] command.
+
+    Returns expanded prompt string if a skill should be executed (caller
+    should feed it to the agent). Returns None if the command was fully
+    handled (listed skills or showed an error).
+    """
+    from .shared.skills import SKILL_REGISTRY, expand_skill, list_skills, parse_skill_command
+
+    if not arg:
+        # List all skills
+        skills = list_skills()
+        table = Table(title="Available Skills", box=box.SIMPLE_HEAVY)
+        table.add_column("Name", style="cyan")
+        table.add_column("Description")
+        table.add_column("Params", style="dim")
+        table.add_column("Aliases", style="dim")
+        for s in skills:
+            table.add_row(s["name"], s["description"], s["required_params"], s["aliases"])
+        console.print(table)
+        console.print("[dim]Usage: /skill <name> [args]  (e.g. /skill full_analysis NVDA)[/dim]\n")
+        return None
+
+    skill_name, params = parse_skill_command(arg)
+    if skill_name is None:
+        return None
+
+    if skill_name not in SKILL_REGISTRY:
+        # Check if it was an unresolved alias
+        console.print(
+            f"[red]Unknown skill: {skill_name}[/red] [dim](try /skill to list)[/dim]\n"
+        )
+        return None
+
+    expanded = expand_skill(skill_name, params)
+    if expanded is None:
+        skill = SKILL_REGISTRY[skill_name]
+        console.print(
+            f"[red]Missing required params for '{skill_name}': "
+            f"{', '.join(skill.required_params)}[/red]\n"
+            f"[dim]Usage: /skill {skill_name} "
+            f"{' '.join(f'<{p}>' for p in skill.required_params)}[/dim]\n"
+        )
+        return None
+
+    console.print(
+        f"[bold cyan]Running skill:[/bold cyan] {skill_name} "
+        f"{' '.join(params.values())}\n"
+    )
+    return expanded
+
+
 def handle_reports_command(dal, arg: str) -> None:
     """Handle /reports [ticker] command."""
     from src.tools.report_tools import list_reports, get_report
@@ -1520,6 +1586,18 @@ def main():
         if question.lower() in ("help", "/help"):
             print_help()
             continue
+
+        # --- Skill dispatch (before general slash commands — needs fall-through) ---
+        if question.startswith("/"):
+            _sk_cmd = question.split(None, 1)[0].lower()
+            if _sk_cmd in ("/skill", "/sk"):
+                _sk_arg = question.split(None, 1)[1].strip() if " " in question else ""
+                _expanded = handle_skill_command(state, _sk_arg)
+                if _expanded is not None:
+                    question = _expanded
+                    # Fall through to query execution below
+                else:
+                    continue
 
         # --- Slash commands ---
         if question.startswith("/"):

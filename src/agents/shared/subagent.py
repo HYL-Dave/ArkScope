@@ -88,11 +88,20 @@ _CODE_ANALYST_PROMPT = """\
 You are a quantitative code analyst in the MindfulRL trading system.
 Your job is to write and execute Python code for financial data analysis.
 
-You receive a task description and optional data context. Use execute_python_analysis
-with the `task` parameter for auto code generation, or provide direct `code`.
+You handle two types of tasks:
+1. Directed calculations: "Calculate 30-day Sharpe ratio for NVDA" — execute specific formulas
+2. Autonomous analysis: "Find anomalies in this price data" — design the analytical \
+approach yourself, choose appropriate statistical methods, and implement them
+
+You can retrieve data with available tools (prices, fundamentals, web search for
+methodology references) and then analyze it with execute_python_analysis.
+
+Use execute_python_analysis with the `task` parameter for auto code generation,
+or provide direct `code` for precise control.
 
 Available packages: numpy, pandas, scipy, json, math, statistics, datetime.
-Always print results clearly to stdout. Handle edge cases gracefully.
+Always print results clearly to stdout. Handle edge cases (NaN, missing data,
+insufficient samples) gracefully.
 """
 
 _DEEP_RESEARCHER_PROMPT = """\
@@ -120,15 +129,38 @@ Given a summarization task:
 Prioritize speed and conciseness. Focus on actionable insights.
 """
 
+_REVIEWER_PROMPT = """\
+You are a critical analysis reviewer in the MindfulRL trading system.
+Your job is to find flaws, gaps, and risks in analysis conclusions.
+
+You receive analysis conclusions and supporting data via context. Your task:
+1. Identify logical jumps or unsupported inferences in the conclusions
+2. Point out risk factors that were overlooked or underweighted
+3. Question data sufficiency: sample size, time range, missing sources
+4. Check for common analytical traps: value trap, recency bias,
+   survivorship bias, confirmation bias
+5. Suggest a confidence adjustment based on your findings
+
+You may use web search to fact-check specific claims or find counter-evidence.
+
+Return structured JSON:
+{
+  "issues": [{"description": "...", "severity": "high|medium|low"}],
+  "confidence_adjustment": -0.15,  // float between -0.3 and +0.1
+  "recommendation": "proceed|revise|reject",
+  "reasoning": "Brief overall assessment"
+}
+"""
+
 # ── Predefined subagent registry ───────────────────────────────
 
 SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
     "code_analyst": SubagentConfig(
         name="code_analyst",
         description=(
-            "Specialized in writing and executing Python code for quantitative "
-            "financial analysis: correlations, regressions, risk metrics, "
-            "statistical tests, data transformations, and custom calculations."
+            "Quantitative Python analysis: directed calculations (Sharpe, "
+            "correlations, regressions) and autonomous analysis design "
+            "(anomaly detection, pattern recognition, custom models)."
         ),
         model="gpt-5.2-codex",
         system_prompt=_CODE_ANALYST_PROMPT,
@@ -136,8 +168,10 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "execute_python_analysis",
             "get_ticker_prices",
             "get_price_change",
+            "get_fundamentals_analysis",
+            "tavily_search",
         ],
-        max_turns=6,
+        max_turns=8,
         reasoning_effort="xhigh",
     ),
     "deep_researcher": SubagentConfig(
@@ -175,7 +209,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "sector comparisons, multi-ticker screening, and news digests. "
             "Optimized for speed and conciseness."
         ),
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         system_prompt=_DATA_SUMMARIZER_PROMPT,
         tool_names=[
             "get_ticker_news",
@@ -187,6 +221,24 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_fundamentals_analysis",
         ],
         max_turns=6,
+        anthropic_thinking=True,  # adaptive — model decides when to think
+    ),
+    "reviewer": SubagentConfig(
+        name="reviewer",
+        description=(
+            "Critical analysis reviewer: examines conclusions for logical "
+            "flaws, overlooked risks, data gaps, and common analytical biases. "
+            "Returns structured confidence adjustment."
+        ),
+        model="claude-opus-4-6",
+        system_prompt=_REVIEWER_PROMPT,
+        tool_names=[
+            "tavily_search",
+            "get_ticker_news",
+        ],
+        max_turns=4,
+        anthropic_thinking=True,
+        anthropic_effort="max",
     ),
 }
 

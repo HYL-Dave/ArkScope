@@ -455,20 +455,22 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "description": (
                 "Delegate a subtask to a specialized subagent. Each subagent has its own "
                 "model, system prompt, and tool subset. Returns structured JSON results. "
-                "Use for complex calculations (code_analyst), deep multi-source investigation "
-                "(deep_researcher), or fast bulk summarization (data_summarizer)."
+                "Use for complex calculations (code_analyst), deep investigation "
+                "(deep_researcher), fast summarization (data_summarizer), or "
+                "adversarial review of conclusions (reviewer)."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "subagent": {
                         "type": "string",
-                        "enum": ["code_analyst", "deep_researcher", "data_summarizer"],
+                        "enum": ["code_analyst", "deep_researcher", "data_summarizer", "reviewer"],
                         "description": (
                             "Subagent to delegate to: "
-                            "code_analyst (quantitative Python analysis), "
+                            "code_analyst (quantitative Python analysis + autonomous design), "
                             "deep_researcher (multi-source investigation), "
-                            "data_summarizer (fast bulk summarization)"
+                            "data_summarizer (fast bulk summarization), "
+                            "reviewer (critical analysis review, finds flaws/risks)"
                         )
                     },
                     "task": {

@@ -73,11 +73,12 @@ class TestSubagentConfig:
 # ============================================================
 
 class TestSubagentRegistry:
-    def test_registry_has_3_subagents(self):
-        assert len(SUBAGENT_REGISTRY) == 3
+    def test_registry_has_4_subagents(self):
+        assert len(SUBAGENT_REGISTRY) == 4
         assert "code_analyst" in SUBAGENT_REGISTRY
         assert "deep_researcher" in SUBAGENT_REGISTRY
         assert "data_summarizer" in SUBAGENT_REGISTRY
+        assert "reviewer" in SUBAGENT_REGISTRY
 
     def test_no_delegate_in_any_subagent(self):
         """Recursion prevention: no subagent should have delegate_to_subagent."""
@@ -102,6 +103,27 @@ class TestSubagentRegistry:
     def test_data_summarizer_uses_anthropic(self):
         cfg = SUBAGENT_REGISTRY["data_summarizer"]
         assert _detect_provider(cfg.model) == "anthropic"
+        assert cfg.anthropic_thinking is True  # adaptive thinking
+
+    def test_data_summarizer_uses_sonnet(self):
+        """data_summarizer should use Sonnet 4.6 (cost-optimized)."""
+        cfg = SUBAGENT_REGISTRY["data_summarizer"]
+        assert "sonnet" in cfg.model
+
+    def test_reviewer_config(self):
+        cfg = SUBAGENT_REGISTRY["reviewer"]
+        assert _detect_provider(cfg.model) == "anthropic"
+        assert cfg.anthropic_thinking is True
+        assert cfg.anthropic_effort == "max"
+        assert len(cfg.tool_names) <= 3  # reviewer relies on reasoning
+        assert "delegate_to_subagent" not in cfg.tool_names
+
+    def test_code_analyst_has_enhanced_tools(self):
+        """code_analyst should have fundamentals and web search tools."""
+        cfg = SUBAGENT_REGISTRY["code_analyst"]
+        assert "execute_python_analysis" in cfg.tool_names
+        assert "get_fundamentals_analysis" in cfg.tool_names
+        assert "tavily_search" in cfg.tool_names
 
 
 # ============================================================
@@ -492,18 +514,18 @@ class TestAnthropicBridgeIntegration:
         names = {t["name"] for t in tools}
         assert "delegate_to_subagent" in names
 
-    def test_anthropic_tools_count_24(self):
-        """18 original + 3 web + 1 analyst + 1 insider + delegate_to_subagent = 24."""
+    def test_anthropic_tools_count_27(self):
+        """18 original + 3 web + 1 analyst + 1 insider + delegate + 3 report = 27."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 24
+        assert len(tools) == 27
 
     def test_delegate_schema_has_enum(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
         delegate = [t for t in tools if t["name"] == "delegate_to_subagent"][0]
         enum = delegate["input_schema"]["properties"]["subagent"]["enum"]
-        assert set(enum) == {"code_analyst", "deep_researcher", "data_summarizer"}
+        assert set(enum) == {"code_analyst", "deep_researcher", "data_summarizer", "reviewer"}
 
     @patch("src.agents.anthropic_agent.tools._dispatch_subagent")
     def test_execute_tool_dispatches_delegate(self, mock_dispatch):
@@ -519,12 +541,12 @@ class TestAnthropicBridgeIntegration:
 
 
 class TestOpenAiBridgeIntegration:
-    def test_openai_tools_count_24(self):
-        """18 original + 3 web + 1 analyst + 1 insider + delegate_to_subagent = 24."""
+    def test_openai_tools_count_27(self):
+        """18 original + 3 web + 1 analyst + 1 insider + delegate + 3 report = 27."""
         from src.agents.openai_agent.tools import create_openai_tools
         mock_dal = MagicMock()
         tools = create_openai_tools(mock_dal)
-        assert len(tools) == 24
+        assert len(tools) == 27
 
     def test_openai_tools_includes_delegate(self):
         from src.agents.openai_agent.tools import create_openai_tools
