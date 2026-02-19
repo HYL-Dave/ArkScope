@@ -361,7 +361,12 @@ def _run_anthropic_subagent(
     """Run a subagent using the Anthropic SDK (simplified messages loop)."""
     from anthropic import Anthropic
 
-    from ..anthropic_agent.agent import _build_thinking_param, _supports_effort
+    from ..anthropic_agent.agent import (
+        _build_thinking_param,
+        _prepare_cached_system,
+        _prepare_cached_tools,
+        _supports_effort,
+    )
     from ..anthropic_agent.tools import execute_tool, get_anthropic_tools
     from ..config import get_agent_config
     from ..shared.token_tracker import TokenTracker
@@ -380,6 +385,10 @@ def _run_anthropic_subagent(
             **_CLAUDE_WEB_SEARCH_TOOL,
             "max_uses": agent_config.web_claude_max_uses,
         })
+
+    # Apply prompt caching: cache_control on tools (last) + system prompt
+    tools = _prepare_cached_tools(tools)
+    cached_system = _prepare_cached_system(config.system_prompt)
 
     messages: List[dict] = [{"role": "user", "content": question}]
     tools_used: List[str] = []
@@ -405,7 +414,7 @@ def _run_anthropic_subagent(
             stream_ctx = client.beta.messages.stream(
                 model=config.model,
                 max_tokens=effective_max_tokens,
-                system=config.system_prompt,
+                system=cached_system,
                 tools=tools,
                 messages=messages,
                 betas=[_EXTENDED_CONTEXT_BETA],
@@ -415,7 +424,7 @@ def _run_anthropic_subagent(
             stream_ctx = client.messages.stream(
                 model=config.model,
                 max_tokens=effective_max_tokens,
-                system=config.system_prompt,
+                system=cached_system,
                 tools=tools,
                 messages=messages,
                 **api_kwargs,

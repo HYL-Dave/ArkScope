@@ -12,8 +12,14 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+import yaml
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -185,6 +191,66 @@ _ALIAS_MAP: Dict[str, str] = {}
 for _skill in SKILL_REGISTRY.values():
     for _alias in _skill.aliases:
         _ALIAS_MAP[_alias] = _skill.name
+
+# Built-in skill names (protected from override by custom skills)
+_BUILTIN_SKILL_NAMES = frozenset(SKILL_REGISTRY.keys())
+
+
+# ── Custom skills loader ─────────────────────────────────────
+
+_CUSTOM_SKILLS_DIR = Path("config/skills")
+
+
+def load_custom_skills() -> int:
+    """Load custom skills from config/skills/*.yaml into SKILL_REGISTRY.
+
+    Each YAML file defines one skill with fields:
+        name, description, prompt_template, required_params, aliases
+
+    Built-in skills cannot be overridden. Returns count of loaded skills.
+    Bad YAML files are skipped with a warning (never interrupt startup).
+    """
+    if not _CUSTOM_SKILLS_DIR.exists():
+        return 0
+
+    count = 0
+    for path in sorted(_CUSTOM_SKILLS_DIR.glob("*.yaml")):
+        try:
+            with open(path) as f:
+                data = yaml.safe_load(f)
+            if not data or not isinstance(data, dict):
+                continue
+
+            name = data.get("name", path.stem)
+            if name in _BUILTIN_SKILL_NAMES:
+                logger.warning(
+                    f"Cannot override built-in skill '{name}', skipping {path}"
+                )
+                continue
+
+            skill = SkillDefinition(
+                name=name,
+                description=data.get("description", ""),
+                prompt_template=data.get("prompt_template", ""),
+                required_params=data.get("required_params", []),
+                aliases=data.get("aliases", []),
+            )
+
+            SKILL_REGISTRY[name] = skill
+            for alias in skill.aliases:
+                _ALIAS_MAP[alias] = name
+            count += 1
+            logger.debug(f"Loaded custom skill '{name}' from {path}")
+        except Exception as e:
+            logger.warning(f"Failed to load skill from {path}: {e}")
+
+    if count:
+        logger.info(f"Loaded {count} custom skill(s) from {_CUSTOM_SKILLS_DIR}")
+    return count
+
+
+# Auto-load custom skills at import time
+load_custom_skills()
 
 
 # ── Public API ────────────────────────────────────────────────

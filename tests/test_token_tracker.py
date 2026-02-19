@@ -249,3 +249,185 @@ class TestMixedProviderSession:
         assert tracker.total_tokens == 1800
         assert tracker.turns[0].provider == "anthropic"
         assert tracker.turns[1].provider == "openai"
+
+
+# ── Cache token tracking ──────────────────────────────────────
+
+
+class TestCacheTokenFields:
+    """Tests for prompt caching token tracking (Anthropic + OpenAI)."""
+
+    def test_turn_usage_default_cache_zero(self):
+        usage = TurnUsage(
+            turn=1, provider="anthropic", model="claude-opus-4-6",
+            input_tokens=100, output_tokens=50,
+        )
+        assert usage.cache_creation_tokens == 0
+        assert usage.cache_read_tokens == 0
+
+    def test_turn_usage_explicit_cache(self):
+        usage = TurnUsage(
+            turn=1, provider="anthropic", model="claude-opus-4-6",
+            input_tokens=100, output_tokens=50,
+            cache_creation_tokens=5000, cache_read_tokens=3000,
+        )
+        assert usage.cache_creation_tokens == 5000
+        assert usage.cache_read_tokens == 3000
+
+    def test_record_with_cache_tokens(self):
+        tracker = TokenTracker()
+        usage = tracker.record(
+            provider="anthropic", model="test",
+            input_tokens=100, output_tokens=50,
+            cache_creation_tokens=6000,
+        )
+        assert usage.cache_creation_tokens == 6000
+        assert usage.cache_read_tokens == 0
+
+    def test_record_defaults_cache_to_zero(self):
+        tracker = TokenTracker()
+        usage = tracker.record(
+            provider="openai", model="test",
+            input_tokens=100, output_tokens=50,
+        )
+        assert usage.cache_creation_tokens == 0
+        assert usage.cache_read_tokens == 0
+
+
+class TestAnthropicCacheRecording:
+    """Anthropic API returns cache_creation_input_tokens + cache_read_input_tokens."""
+
+    def _mock_response(self, cache_create=0, cache_read=0):
+        return SimpleNamespace(
+            model="claude-opus-4-6",
+            usage=SimpleNamespace(
+                input_tokens=100, output_tokens=50,
+                cache_creation_input_tokens=cache_create,
+                cache_read_input_tokens=cache_read,
+            ),
+        )
+
+    def test_cache_creation(self):
+        tracker = TokenTracker()
+        usage = tracker.record_anthropic(self._mock_response(cache_create=6500))
+        assert usage.cache_creation_tokens == 6500
+        assert usage.cache_read_tokens == 0
+
+    def test_cache_read(self):
+        tracker = TokenTracker()
+        usage = tracker.record_anthropic(self._mock_response(cache_read=6500))
+        assert usage.cache_creation_tokens == 0
+        assert usage.cache_read_tokens == 6500
+
+    def test_both_cache_fields(self):
+        tracker = TokenTracker()
+        usage = tracker.record_anthropic(
+            self._mock_response(cache_create=1000, cache_read=5000)
+        )
+        assert usage.cache_creation_tokens == 1000
+        assert usage.cache_read_tokens == 5000
+
+    def test_missing_cache_attrs(self):
+        """Old API responses without cache fields."""
+        tracker = TokenTracker()
+        resp = SimpleNamespace(
+            model="claude-opus-4-6",
+            usage=SimpleNamespace(input_tokens=100, output_tokens=50),
+        )
+        usage = tracker.record_anthropic(resp)
+        assert usage.cache_creation_tokens == 0
+        assert usage.cache_read_tokens == 0
+
+    def test_none_cache_attrs(self):
+        """Explicit None values treated as 0."""
+        tracker = TokenTracker()
+        resp = SimpleNamespace(
+            model="claude-opus-4-6",
+            usage=SimpleNamespace(
+                input_tokens=100, output_tokens=50,
+                cache_creation_input_tokens=None,
+                cache_read_input_tokens=None,
+            ),
+        )
+        usage = tracker.record_anthropic(resp)
+        assert usage.cache_creation_tokens == 0
+        assert usage.cache_read_tokens == 0
+
+
+class TestOpenAICacheRecording:
+    """OpenAI auto-caching: usage.prompt_tokens_details.cached_tokens."""
+
+    def _mock_result(self, cached_tokens=0):
+        details = SimpleNamespace(cached_tokens=cached_tokens) if cached_tokens else None
+        resp = SimpleNamespace(
+            model="gpt-5.2",
+            usage=SimpleNamespace(
+                input_tokens=200, output_tokens=100,
+                prompt_tokens=0, completion_tokens=0,
+                prompt_tokens_details=details,
+            ),
+        )
+        return SimpleNamespace(raw_responses=[resp])
+
+    def test_cached_tokens_recorded(self):
+        tracker = TokenTracker()
+        turns = tracker.record_openai_result(self._mock_result(8000), model="gpt-5.2")
+        assert turns[0].cache_read_tokens == 8000
+        assert turns[0].cache_creation_tokens == 0
+
+    def test_no_cache_details(self):
+        tracker = TokenTracker()
+        turns = tracker.record_openai_result(self._mock_result(0), model="gpt-5.2")
+        assert turns[0].cache_read_tokens == 0
+
+    def test_missing_details_attr(self):
+        tracker = TokenTracker()
+        resp = SimpleNamespace(
+            model="gpt-5.2",
+            usage=SimpleNamespace(
+                input_tokens=200, output_tokens=100,
+                prompt_tokens=0, completion_tokens=0,
+            ),
+        )
+        result = SimpleNamespace(raw_responses=[resp])
+        turns = tracker.record_openai_result(result, model="gpt-5.2")
+        assert turns[0].cache_read_tokens == 0
+
+
+class TestSummaryCacheFields:
+    def test_summary_no_cache_omits_keys(self):
+        tracker = TokenTracker()
+        tracker.record("anthropic", "test", 100, 50)
+        s = tracker.summary()
+        assert "cache_creation_tokens" not in s
+        assert "cache_read_tokens" not in s
+
+    def test_summary_with_cache_creation(self):
+        tracker = TokenTracker()
+        tracker.record("anthropic", "test", 100, 50, cache_creation_tokens=6500)
+        s = tracker.summary()
+        assert s["cache_creation_tokens"] == 6500
+        assert s["cache_read_tokens"] == 0
+
+    def test_summary_with_cache_read(self):
+        tracker = TokenTracker()
+        tracker.record("anthropic", "test", 100, 50, cache_read_tokens=6500)
+        s = tracker.summary()
+        assert s["cache_read_tokens"] == 6500
+
+    def test_summary_multi_turn_aggregation(self):
+        tracker = TokenTracker()
+        tracker.record("anthropic", "test", 100, 50, cache_creation_tokens=6500)
+        tracker.record("anthropic", "test", 100, 50, cache_read_tokens=6500)
+        tracker.record("anthropic", "test", 100, 50, cache_read_tokens=6500)
+        s = tracker.summary()
+        assert s["cache_creation_tokens"] == 6500
+        assert s["cache_read_tokens"] == 13000
+
+    def test_summary_mixed_providers(self):
+        tracker = TokenTracker()
+        tracker.record("anthropic", "claude", 100, 50, cache_creation_tokens=5000)
+        tracker.record("openai", "gpt", 200, 100, cache_read_tokens=8000)
+        s = tracker.summary()
+        assert s["cache_creation_tokens"] == 5000
+        assert s["cache_read_tokens"] == 8000

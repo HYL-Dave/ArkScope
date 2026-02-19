@@ -31,6 +31,38 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
+
+# ── Prompt caching helpers ─────────────────────────────────────
+# Anthropic prompt caching: cache_control on system + tools reduces
+# input token costs by 90% on cache hits (0.1x base price).
+# Cache prefix order: tools → system → messages.
+
+def _prepare_cached_system(system_prompt: str) -> list:
+    """Convert system prompt string to array format with cache_control.
+
+    Anthropic requires system to be an array (not string) to support
+    cache_control. The entire system prompt becomes one cached block.
+    """
+    return [{
+        "type": "text",
+        "text": system_prompt,
+        "cache_control": {"type": "ephemeral"},
+    }]
+
+
+def _prepare_cached_tools(tools: list) -> list:
+    """Add cache_control to the last tool definition for prefix caching.
+
+    All tools up to and including the last one are cached as a single
+    prefix block. Shallow-copies to avoid mutating the source list.
+    """
+    if not tools:
+        return tools
+    cached = [t.copy() if isinstance(t, dict) else t for t in tools]
+    if isinstance(cached[-1], dict):
+        cached[-1]["cache_control"] = {"type": "ephemeral"}
+    return cached
+
 # ── Claude Web Search server tool (Phase 10) ────────────────────
 
 _CLAUDE_WEB_SEARCH_TOOL = {
@@ -163,6 +195,10 @@ async def run_query_stream(
             "max_uses": config.web_claude_max_uses,
         })
 
+    # Apply prompt caching: cache_control on tools (last) + system prompt
+    tools = _prepare_cached_tools(tools)
+    cached_system = _prepare_cached_system(SYSTEM_PROMPT)
+
     # Initial message
     messages: List[dict] = [{"role": "user", "content": question}]
     tools_used: List[str] = []
@@ -212,7 +248,7 @@ async def run_query_stream(
         stream_kwargs = dict(
             model=model_name,
             max_tokens=effective_max_tokens,
-            system=SYSTEM_PROMPT,
+            system=cached_system,
             tools=tools,
             messages=messages,
             **api_kwargs,

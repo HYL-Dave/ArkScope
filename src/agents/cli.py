@@ -80,6 +80,7 @@ from .config import get_agent_config, ReasoningEffort
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
+from .shared.token_tracker import TokenTracker
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -516,6 +517,7 @@ def print_summary(
     tools_used: List[str],
     elapsed: float,
     scratchpad_path: Optional[str] = None,
+    token_usage: Optional[Dict[str, Any]] = None,
 ):
     """Print query summary."""
     parts = []
@@ -523,6 +525,16 @@ def print_summary(
         tool_str = ", ".join(sorted(set(tools_used)))
         parts.append(f"Tools: {tool_str}")
     parts.append(f"{elapsed:.1f}s")
+    if token_usage:
+        tin = token_usage.get("total_input_tokens", 0)
+        tout = token_usage.get("total_output_tokens", 0)
+        turns = token_usage.get("turn_count", 0)
+        parts.append(f"Tokens: {tin:,}in/{tout:,}out ({turns} turns)")
+        # Cache stats
+        cc = token_usage.get("cache_creation_tokens", 0)
+        cr = token_usage.get("cache_read_tokens", 0)
+        if cc or cr:
+            parts.append(f"Cache: {cr:,}read/{cc:,}write")
     if scratchpad_path:
         parts.append(f"Log: {scratchpad_path}")
     console.print(f"[dim]{' | '.join(parts)}[/dim]")
@@ -575,7 +587,10 @@ def run_anthropic_interactive(
     """
     from anthropic import Anthropic
     from .anthropic_agent.tools import get_anthropic_tools, execute_tool
-    from .anthropic_agent.agent import _supports_effort, _build_thinking_param
+    from .anthropic_agent.agent import (
+        _supports_effort, _build_thinking_param,
+        _prepare_cached_system, _prepare_cached_tools,
+    )
 
     config = get_agent_config()
     model_name = model or config.anthropic_model
@@ -583,6 +598,7 @@ def run_anthropic_interactive(
     tools = get_anthropic_tools()
     tools_used: List[str] = []
     tool_index = 0
+    tracker = TokenTracker()
     _query_start = time.time()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
 
@@ -598,6 +614,10 @@ def run_anthropic_interactive(
     )
     if thinking_param:
         api_kwargs["thinking"] = thinking_param
+
+    # Apply prompt caching: cache_control on tools (last) + system prompt
+    tools = _prepare_cached_tools(tools)
+    cached_system = _prepare_cached_system(SYSTEM_PROMPT)
 
     # Build messages
     if messages_history is not None:
@@ -622,7 +642,7 @@ def run_anthropic_interactive(
         stream_kwargs = dict(
             model=model_name,
             max_tokens=effective_max_tokens,
-            system=SYSTEM_PROMPT,
+            system=cached_system,
             tools=tools,
             messages=messages,
             **api_kwargs,
@@ -639,6 +659,8 @@ def run_anthropic_interactive(
 
             with stream_ctx as stream:
                 response = stream.get_final_message()
+
+        tracker.record_anthropic(response, model=model_name)
 
         # Display thinking blocks (extended thinking)
         for block in response.content:
@@ -680,6 +702,7 @@ def run_anthropic_interactive(
                 "tools_used": tools_used,
                 "messages": messages,
                 "scratchpad_path": str(pad.filepath) if pad.filepath else None,
+                "token_usage": tracker.summary(),
             }
 
         # Process tool calls
@@ -745,6 +768,7 @@ def run_anthropic_interactive(
         "tools_used": tools_used,
         "messages": messages,
         "scratchpad_path": str(pad.filepath) if pad.filepath else None,
+        "token_usage": tracker.summary(),
     }
 
 
@@ -798,6 +822,7 @@ def run_openai_interactive(
         "tools_used": result["tools_used"],
         "messages": None,  # OpenAI SDK doesn't expose message history
         "scratchpad_path": None,  # Created inside run_query()
+        "token_usage": result.get("token_usage", {}),
     }
 
 
@@ -1667,7 +1692,11 @@ def main():
 
             elapsed = time.time() - start
             print_answer(result["answer"])
-            print_summary(result["tools_used"], elapsed, result.get("scratchpad_path"))
+            print_summary(
+                result["tools_used"], elapsed,
+                result.get("scratchpad_path"),
+                result.get("token_usage"),
+            )
             console.print()
 
             # Log to agent_queries table (Phase C)
