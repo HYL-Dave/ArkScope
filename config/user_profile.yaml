@@ -287,6 +287,15 @@ llm_preferences:
   #   code_analyst: "claude-opus-4-6"
   #   deep_researcher: "claude-opus-4-6"
 
+  # ── Code Generation Backend ──
+  # 選擇代碼生成的執行路徑。CLI backends 失敗時自動 fallback 到 API。
+  #   api          — 直接 API 呼叫 (預設，按 token 計費)
+  #   codex        — Codex CLI + OAuth 訂閱 (ChatGPT Pro/Plus 額度)
+  #   codex-apikey — Codex CLI + API key (品質提升，API 計費)
+  #   claude       — Claude Code CLI + OAuth 訂閱 (Max Plan 額度)
+  #   claude-apikey— Claude Code CLI + API key (品質提升，API 計費)
+  # code_backend: api
+
 # ============================================
 # 9. Agent Context Management
 # ============================================

@@ -16,6 +16,10 @@ import pytest
 from src.tools.code_generator import (
     _detect_provider,
     _extract_code,
+    _build_cli_prompt,
+    _call_codex_cli,
+    _call_claude_cli,
+    VALID_BACKENDS,
     generate_and_execute,
 )
 from src.tools.code_executor import CodeExecutionResult
@@ -309,3 +313,179 @@ class TestTaskMode:
         )
         assert result.success is True
         assert "code mode" in result.output
+
+
+# ============================================================
+# CLI Backend Tests
+# ============================================================
+
+class TestCLIBackend:
+    """Tests for CLI code generation backends (Codex CLI, Claude Code CLI)."""
+
+    def test_valid_backend_values(self):
+        """All 5 backend values are defined."""
+        assert VALID_BACKENDS == {"api", "codex", "codex-apikey", "claude", "claude-apikey"}
+
+    def test_build_cli_prompt_basic(self):
+        """Constructs prompt from messages."""
+        messages = [{"role": "user", "content": "Task: calculate Sharpe"}]
+        prompt = _build_cli_prompt(messages, "System: code only")
+        assert "System: code only" in prompt
+        assert "calculate Sharpe" in prompt
+
+    def test_build_cli_prompt_retry(self):
+        """Includes error context for retries."""
+        messages = [
+            {"role": "user", "content": "Task: analyze"},
+            {"role": "assistant", "content": "import pandas\ndf = ..."},
+            {"role": "user", "content": "Error: NameError on line 2"},
+        ]
+        prompt = _build_cli_prompt(messages)
+        assert "import pandas" in prompt
+        assert "NameError" in prompt
+        assert "Previous code attempt" in prompt
+
+    def test_build_cli_prompt_no_system(self):
+        """Works without system prompt."""
+        messages = [{"role": "user", "content": "Task: hello"}]
+        prompt = _build_cli_prompt(messages)
+        assert prompt == "Task: hello"
+
+    @patch("shutil.which", return_value=None)
+    def test_codex_not_installed(self, mock_which):
+        """Raises error when codex not installed."""
+        with pytest.raises(RuntimeError, match="not installed"):
+            _call_codex_cli([], "", "", False)
+
+    @patch("shutil.which", return_value=None)
+    def test_claude_not_installed(self, mock_which):
+        """Raises error when claude not installed."""
+        with pytest.raises(RuntimeError, match="not installed"):
+            _call_claude_cli([], "", "", False)
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/codex")
+    def test_codex_cli_success(self, mock_which, mock_run):
+        """Codex CLI returns stdout on success."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="print('hello')", stderr="")
+        result = _call_codex_cli(
+            [{"role": "user", "content": "Task: hello"}], "", "", False
+        )
+        assert "print('hello')" in result
+        # Verify key flags
+        cmd = mock_run.call_args[0][0]
+        assert "--full-auto" in cmd
+        assert "--sandbox" in cmd
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/codex")
+    def test_codex_cli_with_model(self, mock_which, mock_run):
+        """Codex CLI passes --model flag."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="code", stderr="")
+        _call_codex_cli(
+            [{"role": "user", "content": "Task: x"}], "gpt-5.3-codex", "", False
+        )
+        cmd = mock_run.call_args[0][0]
+        assert "--model" in cmd
+        model_idx = cmd.index("--model")
+        assert cmd[model_idx + 1] == "gpt-5.3-codex"
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/codex")
+    def test_codex_cli_env_no_apikey(self, mock_which, mock_run):
+        """OAuth mode: CODEX_API_KEY not in env."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="code", stderr="")
+        _call_codex_cli([], "", "", use_api_key=False)
+        env = mock_run.call_args[1].get("env", {})
+        assert "CODEX_API_KEY" not in env
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/codex")
+    def test_codex_cli_env_with_apikey(self, mock_which, mock_run):
+        """API key mode: CODEX_API_KEY set from OPENAI_API_KEY."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="code", stderr="")
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}):
+            _call_codex_cli([], "", "", use_api_key=True)
+        env = mock_run.call_args[1].get("env", {})
+        assert env.get("CODEX_API_KEY") == "sk-test"
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/codex")
+    def test_codex_cli_error(self, mock_which, mock_run):
+        """Non-zero returncode raises RuntimeError."""
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="Error msg")
+        with pytest.raises(RuntimeError, match="Codex CLI error"):
+            _call_codex_cli([], "", "", False)
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/claude")
+    def test_claude_cli_success(self, mock_which, mock_run):
+        """Claude CLI returns stdout on success."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="print('hello')", stderr="")
+        result = _call_claude_cli(
+            [{"role": "user", "content": "Task: hello"}], "", "", False
+        )
+        assert "print('hello')" in result
+        cmd = mock_run.call_args[0][0]
+        assert "-p" in cmd
+        assert "--output-format" in cmd
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/claude")
+    def test_claude_cli_env_unsets_apikey(self, mock_which, mock_run):
+        """OAuth mode: ANTHROPIC_API_KEY removed from env."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="code", stderr="")
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            _call_claude_cli([], "", "", use_api_key=False)
+        env = mock_run.call_args[1].get("env", {})
+        assert "ANTHROPIC_API_KEY" not in env
+
+    @patch("subprocess.run")
+    @patch("shutil.which", return_value="/usr/bin/claude")
+    def test_claude_cli_env_keeps_apikey(self, mock_which, mock_run):
+        """API key mode: ANTHROPIC_API_KEY preserved."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="code", stderr="")
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            _call_claude_cli([], "", "", use_api_key=True)
+        env = mock_run.call_args[1].get("env", {})
+        assert env.get("ANTHROPIC_API_KEY") == "sk-ant-test"
+
+    @patch("src.tools.code_generator._call_openai")
+    @patch("src.tools.code_generator._call_codex_cli")
+    def test_call_llm_codex_fallback(self, mock_codex, mock_openai):
+        """Codex CLI failure falls back to API."""
+        mock_codex.side_effect = RuntimeError("codex not installed")
+        mock_openai.return_value = "print('fallback')"
+
+        from src.tools.code_generator import _call_llm
+        with patch("src.agents.config.get_agent_config") as mock_config:
+            cfg = MagicMock()
+            cfg.code_backend = "codex"
+            mock_config.return_value = cfg
+            result = _call_llm(
+                [{"role": "user", "content": "Task: test"}],
+                "gpt-5.2",
+            )
+        assert result == "print('fallback')"
+        mock_codex.assert_called_once()
+        mock_openai.assert_called_once()
+
+    @patch("src.tools.code_generator._call_anthropic")
+    @patch("src.tools.code_generator._call_claude_cli")
+    def test_call_llm_claude_fallback(self, mock_claude_cli, mock_anthropic):
+        """Claude CLI failure falls back to API."""
+        mock_claude_cli.side_effect = RuntimeError("claude not installed")
+        mock_anthropic.return_value = "print('fallback')"
+
+        from src.tools.code_generator import _call_llm
+        with patch("src.agents.config.get_agent_config") as mock_config:
+            cfg = MagicMock()
+            cfg.code_backend = "claude"
+            mock_config.return_value = cfg
+            result = _call_llm(
+                [{"role": "user", "content": "Task: test"}],
+                "claude-opus-4-6",
+            )
+        assert result == "print('fallback')"
+        mock_claude_cli.assert_called_once()
+        mock_anthropic.assert_called_once()

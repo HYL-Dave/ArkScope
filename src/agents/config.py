@@ -64,6 +64,8 @@ class AgentConfig(BaseModel):
     # Code generation model (empty = auto, uses anthropic_model_advanced)
     code_model: str = ""
     code_max_retries: int = 3
+    # Code generation backend: api | codex | codex-apikey | claude | claude-apikey
+    code_backend: str = "api"
 
     # 1M extended context beta (Anthropic only, Opus 4.6 + Sonnet 4.5)
     extended_context: bool = False
@@ -194,6 +196,8 @@ def get_agent_config() -> AgentConfig:
         config.code_model = llm_prefs["code_model"]
     if "code_max_retries" in llm_prefs:
         config.code_max_retries = llm_prefs["code_max_retries"]
+    if "code_backend" in llm_prefs:
+        config.code_backend = llm_prefs["code_backend"]
 
     # 1M extended context beta
     if "extended_context" in llm_prefs:

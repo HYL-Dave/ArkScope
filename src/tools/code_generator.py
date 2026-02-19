@@ -13,6 +13,7 @@ handles code generation + error correction transparently.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from typing import List, Optional
@@ -149,8 +150,173 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
     return ""
 
 
+# ── CLI code generation backends ─────────────────────────────
+# Codex CLI (codex exec) and Claude Code CLI (claude -p) can be
+# used as code gen backends. They are full coding agents with
+# multi-turn reasoning, project file access, and self-testing.
+# Benefits: subscription billing (saves API cost), better code
+# quality (agent loop), access to API-unreleased models.
+
+CLI_CODE_GEN_PROMPT = """\
+Write a standalone Python analysis script. Output ONLY the Python code.
+
+Constraints:
+- Print results to stdout using print()
+- Available packages: numpy, pandas, scipy, json, math, statistics, datetime, collections
+- DO NOT import: os, sys, subprocess, socket, http, urllib, requests, shutil, pathlib
+- Handle edge cases (empty data, missing keys) gracefully
+- If input data is provided, it will be available as a `data` variable (pre-loaded from JSON)
+"""
+
+# Valid code_backend values
+VALID_BACKENDS = frozenset({"api", "codex", "codex-apikey", "claude", "claude-apikey"})
+
+
+def _build_cli_prompt(messages: List[dict], system: str = "") -> str:
+    """Convert messages list to a single prompt string for CLI tools."""
+    parts = []
+    if system:
+        parts.append(system)
+    for msg in messages:
+        if msg["role"] == "user":
+            parts.append(msg["content"])
+        elif msg["role"] == "assistant":
+            parts.append(
+                f"Previous code attempt:\n```python\n{msg['content']}\n```"
+            )
+    return "\n\n".join(parts)
+
+
+def _call_codex_cli(
+    messages: List[dict],
+    model: str,
+    system: str,
+    use_api_key: bool = False,
+) -> str:
+    """Generate code using Codex CLI (codex exec).
+
+    Args:
+        use_api_key: If True, set CODEX_API_KEY from OPENAI_API_KEY (API billing).
+                     If False, don't set CODEX_API_KEY (uses OAuth/subscription).
+    """
+    import shutil
+    import subprocess
+
+    if not shutil.which("codex"):
+        raise RuntimeError(
+            "Codex CLI not installed. Install: npm install -g @openai/codex"
+        )
+
+    prompt = _build_cli_prompt(messages, system or CLI_CODE_GEN_PROMPT)
+
+    cmd = [
+        "codex", "exec",
+        "--full-auto",
+        "--sandbox", "read-only",
+        "--skip-git-repo-check",
+        "--ephemeral",
+    ]
+    if model:
+        cmd.extend(["--model", model])
+    cmd.append(prompt)
+
+    env = os.environ.copy()
+    if use_api_key:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            env["CODEX_API_KEY"] = api_key
+    else:
+        env.pop("CODEX_API_KEY", None)
+
+    logger.info(f"Codex CLI: model={model or '(default)'} api_key={use_api_key}")
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, env=env, timeout=300,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Codex CLI error (rc={result.returncode}): "
+            f"{result.stderr[:500]}"
+        )
+
+    return result.stdout
+
+
+def _call_claude_cli(
+    messages: List[dict],
+    model: str,
+    system: str,
+    use_api_key: bool = False,
+) -> str:
+    """Generate code using Claude Code CLI (claude -p).
+
+    Args:
+        use_api_key: If True, keep ANTHROPIC_API_KEY (API billing).
+                     If False, unset ANTHROPIC_API_KEY (uses OAuth/subscription).
+    """
+    import shutil
+    import subprocess
+
+    if not shutil.which("claude"):
+        raise RuntimeError(
+            "Claude Code not installed. Install: npm install -g @anthropic-ai/claude-code"
+        )
+
+    prompt = _build_cli_prompt(messages, system or CLI_CODE_GEN_PROMPT)
+
+    cmd = [
+        "claude", "-p",
+        "--output-format", "text",
+        "--max-turns", "3",
+    ]
+    if model:
+        cmd.extend(["--model", model])
+    cmd.append(prompt)
+
+    env = os.environ.copy()
+    if not use_api_key:
+        env.pop("ANTHROPIC_API_KEY", None)
+
+    logger.info(f"Claude CLI: model={model or '(default)'} api_key={use_api_key}")
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, env=env, timeout=300,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Claude Code error (rc={result.returncode}): "
+            f"{result.stderr[:500]}"
+        )
+
+    return result.stdout
+
+
 def _call_llm(messages: List[dict], model: str, system: str = "") -> str:
-    """Single-shot LLM call. Auto-detects provider from model name."""
+    """Single-shot LLM call. Dispatches based on code_backend config.
+
+    CLI backends (codex/claude) auto-fallback to API on failure.
+    """
+    from ..agents.config import get_agent_config
+    backend = get_agent_config().code_backend
+
+    # CLI backends: try CLI first, fallback to API on error
+    if backend.startswith("codex"):
+        try:
+            return _call_codex_cli(
+                messages, model, system,
+                use_api_key=(backend == "codex-apikey"),
+            )
+        except Exception as e:
+            logger.warning(f"Codex CLI failed, falling back to API: {e}")
+
+    elif backend.startswith("claude"):
+        try:
+            return _call_claude_cli(
+                messages, model, system,
+                use_api_key=(backend == "claude-apikey"),
+            )
+        except Exception as e:
+            logger.warning(f"Claude Code CLI failed, falling back to API: {e}")
+
+    # API backend (default + fallback)
     system = system or CODE_GEN_SYSTEM_PROMPT
     provider = _detect_provider(model)
     if provider == "openai":

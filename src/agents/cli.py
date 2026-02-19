@@ -17,6 +17,7 @@ Slash commands (during chat):
     /context        Toggle 1M context beta on/off (Anthropic)
     /skill          Run a predefined skill workflow (e.g. /skill full_analysis NVDA)
     /subagent       View/change subagent models (persisted to local config)
+    /code-backend   Show/set code gen backend (api/codex/claude)
     /scratchpad     List recent agent session logs (JSONL)
     /history        Show recent chat history (Q&A pairs)
     /turns          Show/set max tool calls per query
@@ -169,6 +170,7 @@ class SessionState:
     extended_context: bool = False  # 1M context beta (Anthropic only)
     server_compaction: bool = False  # Server-side compaction L2 (Anthropic + OpenAI)
     code_model: str = ""  # Code generation model (empty = auto)
+    code_backend: str = "api"  # api | codex | codex-apikey | claude | claude-apikey
     max_tool_calls: Optional[int] = None  # None = use config default
     attachments: List[Attachment] = field(default_factory=list)
 
@@ -201,6 +203,8 @@ class SessionState:
             parts.append("Compaction: L2")
         if self.code_model:
             parts.append(f"CodeModel: {self.code_model}")
+        if self.code_backend != "api":
+            parts.append(f"CodeBackend: {self.code_backend}")
         if self.max_tool_calls:
             parts.append(f"MaxTurns: {self.max_tool_calls}")
         history = "on" if not self.no_history else "off"
@@ -217,6 +221,7 @@ class SessionState:
 _SLASH_COMMANDS = [
     ("/model", "/m", "Show models & switch"),
     ("/code-model", "/cm", "Set code generation model"),
+    ("/code-backend", "/cb", "Set code generation backend"),
     ("/reasoning", "/r", "Set reasoning effort (OpenAI)"),
     ("/effort", "/e", "Set effort level (Anthropic)"),
     ("/thinking", "/t", "Toggle extended thinking (Anthropic)"),
@@ -256,6 +261,14 @@ _CONTEXT_OPTIONS = [
 _COMPACTION_OPTIONS = [
     ("on", "Enable server-side compaction L2 (Anthropic + OpenAI)"),
     ("off", "Disable server-side compaction"),
+]
+
+_CODE_BACKEND_OPTIONS = [
+    ("api", "Direct API call (default)"),
+    ("codex", "Codex CLI (subscription)"),
+    ("codex-apikey", "Codex CLI (API key)"),
+    ("claude", "Claude Code (subscription)"),
+    ("claude-apikey", "Claude Code (API key)"),
 ]
 
 _SKILL_NAMES = [
@@ -341,6 +354,8 @@ class SlashCompleter(Completer):
             return _get_model_completions()
         elif cmd in ("/code-model", "/cm"):
             return [("auto", "Use default model")] + _get_model_completions()
+        elif cmd in ("/code-backend", "/cb"):
+            return _CODE_BACKEND_OPTIONS
         return []
 
 
@@ -372,6 +387,8 @@ def print_help():
             "  [cyan]/model <name>[/cyan]       Switch model (e.g. /model opus, /model gpt5)\n"
             "  [cyan]/code-model[/cyan]         Pick code generation model interactively\n"
             "  [cyan]/code-model <n>[/cyan]     Set code model (e.g. /code-model opus, /cm auto)\n"
+            "  [cyan]/code-backend[/cyan]       Show/set code gen backend (api/codex/claude)\n"
+            "  [cyan]/code-backend <n>[/cyan]   Set: api|codex|codex-apikey|claude|claude-apikey\n"
             "  [cyan]/reasoning[/cyan]          Pick reasoning effort interactively (OpenAI)\n"
             "  [cyan]/reasoning <n>[/cyan]      Set: none|minimal|low|medium|high|xhigh\n"
             "  [cyan]/effort[/cyan]             Pick effort level interactively (Anthropic, model-aware)\n"
@@ -1700,6 +1717,36 @@ def handle_code_model_command(state: SessionState, arg: str) -> None:
         console.print(f"[green]Code model:[/green] [bold]{arg}[/bold]\n")
 
 
+def handle_code_backend_command(state: SessionState, arg: str) -> None:
+    """Handle /code-backend [backend] command."""
+    from src.tools.code_generator import VALID_BACKENDS
+
+    if not arg:
+        # Show current
+        current = state.code_backend or "api"
+        console.print(f"[bold]Code backend:[/bold] {current}")
+        console.print("[dim]Options: api, codex, codex-apikey, claude, claude-apikey[/dim]")
+        console.print("[dim]  api          — Direct API call (default)[/dim]")
+        console.print("[dim]  codex        — Codex CLI with subscription[/dim]")
+        console.print("[dim]  codex-apikey — Codex CLI with API key[/dim]")
+        console.print("[dim]  claude       — Claude Code with subscription[/dim]")
+        console.print("[dim]  claude-apikey— Claude Code with API key[/dim]\n")
+        return
+
+    val = arg.lower().strip()
+    if val not in VALID_BACKENDS:
+        console.print(f"[red]Unknown backend: {val}[/red]")
+        console.print(f"[dim]Valid: {', '.join(sorted(VALID_BACKENDS))}[/dim]\n")
+        return
+
+    state.code_backend = val
+    # Update config so code_generator picks it up
+    get_agent_config.cache_clear()
+    config = get_agent_config()
+    config.code_backend = val
+    console.print(f"[green]Code backend:[/green] [bold]{val}[/bold]\n")
+
+
 # ============================================================
 # Main Chat Loop
 # ============================================================
@@ -1834,6 +1881,8 @@ def main():
                 handle_model_command(state, arg)
             elif cmd in ("/code-model", "/cm"):
                 handle_code_model_command(state, arg)
+            elif cmd in ("/code-backend", "/cb"):
+                handle_code_backend_command(state, arg)
             elif cmd in ("/reasoning", "/r"):
                 handle_reasoning_command(state, arg)
             elif cmd in ("/effort", "/e"):
