@@ -161,6 +161,7 @@ class ToolRegistry:
         self._register_signal_tools()
         self._register_analysis_tools()
         self._register_report_tools()
+        self._register_memory_tools()
         self._register_web_tools()
         self._register_execution_tools()
 
@@ -506,6 +507,83 @@ class ToolRegistry:
             ],
         ))
 
+    def _register_memory_tools(self) -> None:
+        from .memory_tools import save_memory, recall_memories, list_memories, delete_memory
+
+        self.register(ToolDefinition(
+            name="save_memory",
+            description=(
+                "Save a piece of knowledge to long-term memory for future recall. "
+                "Use after completing analyses, discovering insights, or when the user "
+                "asks to remember something. Memories persist across sessions."
+            ),
+            function=save_memory,
+            category="memory",
+            parameters=[
+                ToolParameter("title", "string", "Short descriptive title for this memory"),
+                ToolParameter("content", "string", "Full content to remember (Markdown supported)"),
+                ToolParameter("category", "string", "Memory category",
+                              required=False, default="note",
+                              enum=["analysis", "insight", "preference", "fact", "note"]),
+                ToolParameter("tickers", "array", "Related ticker symbols", required=False),
+                ToolParameter("tags", "array", "Free-form tags for categorization", required=False),
+                ToolParameter("importance", "integer",
+                              "Importance 1-10 (10=critical, 5=normal, 1=trivial)",
+                              required=False, default=5),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="recall_memories",
+            description=(
+                "Search long-term memory for relevant past knowledge. "
+                "Use when the user references past analyses, asks 'what did we discuss about X', "
+                "or when you need context from previous sessions."
+            ),
+            function=recall_memories,
+            category="memory",
+            parameters=[
+                ToolParameter("query", "string",
+                              "Search query (keywords or natural language)",
+                              required=False, default=""),
+                ToolParameter("category", "string", "Filter by category",
+                              required=False,
+                              enum=["analysis", "insight", "preference", "fact", "note"]),
+                ToolParameter("tickers", "array", "Filter by related tickers", required=False),
+                ToolParameter("tags", "array", "Filter by tags", required=False),
+                ToolParameter("days", "integer",
+                              "Lookback period in days (default: 90)", required=False),
+                ToolParameter("limit", "integer",
+                              "Max memories to return (default: 10)", required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="list_memories",
+            description="List saved memories (metadata only, no full content).",
+            function=list_memories,
+            category="memory",
+            parameters=[
+                ToolParameter("category", "string", "Filter by category",
+                              required=False,
+                              enum=["analysis", "insight", "preference", "fact", "note"]),
+                ToolParameter("days", "integer",
+                              "Lookback period in days (default: 90)", required=False),
+                ToolParameter("limit", "integer",
+                              "Max memories to return (default: 20)", required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="delete_memory",
+            description="Delete a memory by its ID.",
+            function=delete_memory,
+            category="memory",
+            parameters=[
+                ToolParameter("memory_id", "integer", "Memory ID to delete"),
+            ],
+        ))
+
     def _register_web_tools(self) -> None:
         from .web_tools import web_search, web_fetch, web_browse
 
@@ -604,7 +682,7 @@ class ToolRegistry:
 
 
 def create_default_registry() -> ToolRegistry:
-    """Create and return a registry with all 18 tools registered."""
+    """Create and return a registry with all built-in tools registered."""
     registry = ToolRegistry()
     registry.register_all()
     return registry

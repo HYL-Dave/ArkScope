@@ -107,6 +107,7 @@ async def run_query(
     dal: Optional[Any] = None,
     reasoning_effort: Optional[ReasoningEffort] = None,
     max_tool_calls: Optional[int] = None,
+    attachments: list | None = None,
 ) -> Dict[str, Any]:
     """
     Run a natural language query using OpenAI Agents SDK.
@@ -161,9 +162,18 @@ async def run_query(
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
+    # Build input (with optional attachment content blocks)
+    if attachments:
+        from ..shared.attachments import AttachmentManager
+        content_blocks = AttachmentManager.to_openai_blocks(attachments)
+        content_blocks.append({"type": "input_text", "text": question})
+        input_data = [{"role": "user", "content": content_blocks}]
+    else:
+        input_data = question
+
     effective_max_turns = max_tool_calls or config.max_tool_calls
     runner_kwargs = dict(
-        input=question,
+        input=input_data,
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
     )

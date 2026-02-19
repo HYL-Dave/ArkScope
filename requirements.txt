@@ -32,3 +32,6 @@ psycopg[binary]>=3.1
 # Web Search (Phase 10)
 tavily-python>=0.5.0
 playwright>=1.40.0
+
+# File Attachment (Phase D) — PDF/image processing
+pymupdf>=1.24.0

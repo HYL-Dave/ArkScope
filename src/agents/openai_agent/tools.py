@@ -89,6 +89,12 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         list_reports as _list_reports,
         get_report as _get_report,
     )
+    from src.tools.memory_tools import (
+        save_memory as _save_memory,
+        recall_memories as _recall_memories,
+        list_memories as _list_memories,
+        delete_memory as _delete_memory,
+    )
 
     # ================================================================
     # News Tools
@@ -584,6 +590,87 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _get_report(dal, report_id=report_id, file_path=file_path)
         return _serialize_result(result, "get_report")
 
+    # ================================================================
+    # Memory Tools (Phase 15)
+    # ================================================================
+
+    @function_tool
+    def tool_save_memory(
+        title: str,
+        content: str,
+        category: str = "note",
+        tickers: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        importance: int = 5,
+    ) -> str:
+        """Save a piece of knowledge to long-term memory for future recall. Use after completing analyses, discovering insights, or when the user asks to remember something. Memories persist across sessions.
+
+        Args:
+            title: Short descriptive title for this memory
+            content: Full content to remember (Markdown supported)
+            category: Memory category - analysis, insight, preference, fact, or note (default: note)
+            tickers: Related ticker symbols
+            tags: Free-form tags for categorization
+            importance: Importance 1-10 (10=critical, 5=normal, 1=trivial)
+        """
+        result = _save_memory(
+            dal, title=title, content=content, category=category,
+            tickers=tickers, tags=tags, importance=importance,
+            source="agent_auto",
+        )
+        return _serialize_result(result, "save_memory")
+
+    @function_tool
+    def tool_recall_memories(
+        query: str = "",
+        category: Optional[str] = None,
+        tickers: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        days: int = 90,
+        limit: int = 10,
+    ) -> str:
+        """Search long-term memory for relevant past knowledge. Use when the user references past analyses, asks 'what did we discuss about X', or when you need context from previous sessions.
+
+        Args:
+            query: Search query (keywords or natural language)
+            category: Filter by category - analysis, insight, preference, fact, or note
+            tickers: Filter by related tickers
+            tags: Filter by tags
+            days: Lookback period in days (default: 90)
+            limit: Max memories to return (default: 10)
+        """
+        result = _recall_memories(
+            dal, query=query, category=category,
+            tickers=tickers, tags=tags, days=days, limit=limit,
+        )
+        return _serialize_result(result, "recall_memories")
+
+    @function_tool
+    def tool_list_memories(
+        category: Optional[str] = None,
+        days: int = 90,
+        limit: int = 20,
+    ) -> str:
+        """List saved memories (metadata only, no full content).
+
+        Args:
+            category: Filter by category - analysis, insight, preference, fact, or note
+            days: Lookback period in days (default: 90)
+            limit: Max memories to return (default: 20)
+        """
+        result = _list_memories(dal, category=category, days=days, limit=limit)
+        return _serialize_result(result, "list_memories")
+
+    @function_tool
+    def tool_delete_memory(memory_id: int) -> str:
+        """Delete a memory by its ID.
+
+        Args:
+            memory_id: Memory ID to delete
+        """
+        result = _delete_memory(dal, memory_id=memory_id)
+        return _serialize_result(result, "delete_memory")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -610,6 +697,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_save_report,
         tool_list_reports,
         tool_get_report,
+        tool_save_memory,
+        tool_recall_memories,
+        tool_list_memories,
+        tool_delete_memory,
     ]
 
     # Conditionally add web tools

@@ -146,6 +146,7 @@ async def run_query_stream(
     dal: Optional[Any] = None,
     effort: Optional[str] = None,
     thinking: Optional[bool] = None,
+    attachments: list | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a natural language query, yielding events as the agent progresses.
@@ -199,8 +200,14 @@ async def run_query_stream(
     tools = _prepare_cached_tools(tools)
     cached_system = _prepare_cached_system(SYSTEM_PROMPT)
 
-    # Initial message
-    messages: List[dict] = [{"role": "user", "content": question}]
+    # Initial message (with optional attachment content blocks)
+    if attachments:
+        from ..shared.attachments import AttachmentManager
+        content_blocks = AttachmentManager.to_anthropic_blocks(attachments)
+        content_blocks.append({"type": "text", "text": question})
+        messages: List[dict] = [{"role": "user", "content": content_blocks}]
+    else:
+        messages: List[dict] = [{"role": "user", "content": question}]
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)

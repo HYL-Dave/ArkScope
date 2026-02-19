@@ -619,6 +619,85 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ])
 
+    # Memory tools (Phase 15)
+    tools.extend([
+        {
+            "name": "save_memory",
+            "description": (
+                "Save a piece of knowledge to long-term memory for future recall. "
+                "Use after completing analyses, discovering insights, or when the user "
+                "asks to remember something. Memories persist across sessions."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Short descriptive title"},
+                    "content": {"type": "string", "description": "Full content to remember (Markdown supported)"},
+                    "category": {"type": "string",
+                                 "enum": ["analysis", "insight", "preference", "fact", "note"],
+                                 "description": "Memory category (default: note)"},
+                    "tickers": {"type": "array", "items": {"type": "string"},
+                                "description": "Related ticker symbols"},
+                    "tags": {"type": "array", "items": {"type": "string"},
+                             "description": "Free-form tags for categorization"},
+                    "importance": {"type": "integer",
+                                   "description": "Importance 1-10 (10=critical, 5=normal, 1=trivial)"},
+                },
+                "required": ["title", "content"],
+            },
+        },
+        {
+            "name": "recall_memories",
+            "description": (
+                "Search long-term memory for relevant past knowledge. "
+                "Use when the user references past analyses, asks 'what did we discuss about X', "
+                "or when you need context from previous sessions."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query (keywords or natural language)"},
+                    "category": {"type": "string",
+                                 "enum": ["analysis", "insight", "preference", "fact", "note"],
+                                 "description": "Filter by category"},
+                    "tickers": {"type": "array", "items": {"type": "string"},
+                                "description": "Filter by related tickers"},
+                    "tags": {"type": "array", "items": {"type": "string"},
+                             "description": "Filter by tags"},
+                    "days": {"type": "integer", "description": "Lookback period in days (default: 90)"},
+                    "limit": {"type": "integer", "description": "Max memories to return (default: 10)"},
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "list_memories",
+            "description": "List saved memories (metadata only, no full content).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string",
+                                 "enum": ["analysis", "insight", "preference", "fact", "note"],
+                                 "description": "Filter by category"},
+                    "days": {"type": "integer", "description": "Lookback period in days (default: 90)"},
+                    "limit": {"type": "integer", "description": "Max memories to return (default: 20)"},
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "delete_memory",
+            "description": "Delete a memory by its ID.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "memory_id": {"type": "integer", "description": "Memory ID to delete"},
+                },
+                "required": ["memory_id"],
+            },
+        },
+    ])
+
     return tools
 
 
@@ -704,6 +783,9 @@ def execute_tool(
     from src.tools.web_tools import web_search, web_fetch, web_browse
     from src.tools.analyst_tools import get_analyst_consensus
     from src.tools.report_tools import save_report, list_reports, get_report
+    from src.tools.memory_tools import (
+        save_memory, recall_memories, list_memories, delete_memory,
+    )
 
     # Tool dispatch map
     tool_map = {
@@ -850,6 +932,36 @@ def execute_tool(
             dal,
             report_id=tool_input.get("report_id"),
             file_path=tool_input.get("file_path"),
+        ),
+        # Memory tools (Phase 15)
+        "save_memory": lambda: save_memory(
+            dal,
+            title=tool_input["title"],
+            content=tool_input["content"],
+            category=tool_input.get("category", "note"),
+            tickers=tool_input.get("tickers"),
+            tags=tool_input.get("tags"),
+            importance=tool_input.get("importance", 5),
+            source="agent_auto",
+        ),
+        "recall_memories": lambda: recall_memories(
+            dal,
+            query=tool_input.get("query", ""),
+            category=tool_input.get("category"),
+            tickers=tool_input.get("tickers"),
+            tags=tool_input.get("tags"),
+            days=tool_input.get("days", 90),
+            limit=tool_input.get("limit", 10),
+        ),
+        "list_memories": lambda: list_memories(
+            dal,
+            category=tool_input.get("category"),
+            days=tool_input.get("days", 90),
+            limit=tool_input.get("limit", 20),
+        ),
+        "delete_memory": lambda: delete_memory(
+            dal,
+            memory_id=tool_input["memory_id"],
         ),
     }
 

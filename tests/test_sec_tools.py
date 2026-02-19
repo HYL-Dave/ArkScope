@@ -144,10 +144,10 @@ class TestGetInsiderTrades:
 
 class TestBridgeIntegration:
     def test_registry_23(self):
-        """Registry now has 23 tools (18 base + 3 web + 1 analyst + 1 insider)."""
+        """Registry has 30 tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 23
+        assert len(registry.list_all()) == 30
 
     def test_analysis_category_6(self):
         """Analysis category has 6 tools."""

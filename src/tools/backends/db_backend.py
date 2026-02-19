@@ -454,6 +454,150 @@ class DatabaseBackend:
         return df.iloc[0].to_dict()
 
     # --------------------------------------------------------
+    # Agent Memory (Episodic Memory — Phase 15)
+    # --------------------------------------------------------
+
+    def insert_memory(
+        self,
+        title: str,
+        content: str,
+        category: str = "note",
+        tickers: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        importance: int = 5,
+        source: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        file_path: Optional[str] = None,
+    ) -> Optional[int]:
+        """Insert a memory and return its ID."""
+        conn = self._get_conn()
+        sql = """
+            INSERT INTO agent_memories (
+                title, content, category, tickers, tags,
+                importance, source, provider, model, file_path
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
+            ) RETURNING id
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (
+                    title, content, category, tickers, tags,
+                    importance, source, provider, model, file_path,
+                ))
+                row = cur.fetchone()
+                return row[0] if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to insert memory: {e}")
+            self._conn = None
+            return None
+
+    def query_memories(
+        self,
+        query: str = "",
+        category: Optional[str] = None,
+        tickers: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        days: int = 90,
+        limit: int = 10,
+    ) -> pd.DataFrame:
+        """Query memories with optional full-text search."""
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+
+        conditions = ["created_at >= %s"]
+        params: list = [cutoff]
+
+        # Full-text search
+        if query.strip():
+            conditions.append(
+                "to_tsvector('english', title || ' ' || content) "
+                "@@ plainto_tsquery('english', %s)"
+            )
+            params.append(query)
+
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+
+        if tickers:
+            conditions.append("tickers && %s")
+            params.append([t.upper() for t in tickers])
+
+        if tags:
+            conditions.append("tags && %s")
+            params.append(tags)
+
+        where = " AND ".join(conditions)
+
+        # Order by relevance if searching, otherwise by importance + date
+        if query.strip():
+            order = (
+                "ts_rank(to_tsvector('english', title || ' ' || content), "
+                "plainto_tsquery('english', %s)) DESC, importance DESC"
+            )
+            params.append(query)
+        else:
+            order = "importance DESC, created_at DESC"
+
+        sql = f"""
+            SELECT id, title, content, category, tickers, tags,
+                   importance, source,
+                   TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+            FROM agent_memories
+            WHERE {where}
+            ORDER BY {order}
+            LIMIT %s
+        """
+        params.append(limit)
+
+        return self._query_df(sql, tuple(params))
+
+    def list_memories_meta(
+        self,
+        category: Optional[str] = None,
+        days: int = 90,
+        limit: int = 20,
+    ) -> pd.DataFrame:
+        """List memory metadata (no full content body)."""
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+
+        conditions = ["created_at >= %s"]
+        params: list = [cutoff]
+
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+
+        where = " AND ".join(conditions)
+        sql = f"""
+            SELECT id, title, category, tickers, tags, importance,
+                   TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+            FROM agent_memories
+            WHERE {where}
+            ORDER BY importance DESC, created_at DESC
+            LIMIT %s
+        """
+        params.append(limit)
+
+        return self._query_df(sql, tuple(params))
+
+    def delete_memory(self, memory_id: int) -> Optional[str]:
+        """Delete a memory. Returns its file_path (or None if not found)."""
+        conn = self._get_conn()
+        sql = "DELETE FROM agent_memories WHERE id = %s RETURNING file_path"
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (memory_id,))
+                row = cur.fetchone()
+                return row[0] if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to delete memory: {e}")
+            self._conn = None
+            return None
+
+    # --------------------------------------------------------
     # Agent Queries
     # --------------------------------------------------------
 

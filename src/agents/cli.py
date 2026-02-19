@@ -77,6 +77,7 @@ from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
+from .shared.attachments import Attachment, AttachmentManager
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
@@ -169,6 +170,7 @@ class SessionState:
     server_compaction: bool = False  # Server-side compaction L2 (Anthropic + OpenAI)
     code_model: str = ""  # Code generation model (empty = auto)
     max_tool_calls: Optional[int] = None  # None = use config default
+    attachments: List[Attachment] = field(default_factory=list)
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -225,7 +227,9 @@ _SLASH_COMMANDS = [
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
+    ("/attach", "/at", "Attach file (PDF/image/text) to next query"),
     ("/reports", "/rp", "List saved research reports"),
+    ("/memory", "/mem", "Manage long-term memories"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -383,9 +387,18 @@ def print_help():
             "  [cyan]/history[/cyan]            Show recent chat history (Q&A pairs)\n"
             "  [cyan]/history <N>[/cyan]        Show last N conversations\n"
             "  [cyan]/turns[/cyan]              Show/set max tool calls per query (e.g. /turns 30)\n"
+            "  [cyan]/attach <path>[/cyan]       Attach file (PDF/image/text) to next query\n"
+            "  [cyan]/attach <path> <pages>[/cyan] Attach PDF pages (e.g. /attach report.pdf 1-5)\n"
+            "  [cyan]/attach list[/cyan]        List pending attachments\n"
+            "  [cyan]/attach clear[/cyan]       Clear all attachments\n"
             "  [cyan]/reports[/cyan]            List saved research reports\n"
             "  [cyan]/reports <id>[/cyan]       View a specific report\n"
             "  [cyan]/reports <TICKER>[/cyan]   Filter reports by ticker\n"
+            "  [cyan]/memory[/cyan]             List recent memories\n"
+            "  [cyan]/memory save[/cyan]        Save a new memory manually\n"
+            "  [cyan]/memory search <q>[/cyan]  Search memories\n"
+            "  [cyan]/memory <id>[/cyan]        View a specific memory\n"
+            "  [cyan]/memory delete <id>[/cyan] Delete a memory\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -579,6 +592,7 @@ def run_anthropic_interactive(
     thinking: bool = False,
     extended_context: bool = False,
     max_tool_calls: Optional[int] = None,
+    attachments: Optional[List[Attachment]] = None,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -619,11 +633,18 @@ def run_anthropic_interactive(
     tools = _prepare_cached_tools(tools)
     cached_system = _prepare_cached_system(SYSTEM_PROMPT)
 
-    # Build messages
-    if messages_history is not None:
-        messages = messages_history + [{"role": "user", "content": question}]
+    # Build user message (with optional attachment content blocks)
+    if attachments:
+        content_blocks = AttachmentManager.to_anthropic_blocks(attachments)
+        content_blocks.append({"type": "text", "text": question})
+        user_msg = {"role": "user", "content": content_blocks}
     else:
-        messages = [{"role": "user", "content": question}]
+        user_msg = {"role": "user", "content": question}
+
+    if messages_history is not None:
+        messages = messages_history + [user_msg]
+    else:
+        messages = [user_msg]
 
     # 1M context beta
     use_beta = _use_extended_context(model_name, extended_context)
@@ -782,6 +803,7 @@ def run_openai_interactive(
     model: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
     max_tool_calls: Optional[int] = None,
+    attachments: Optional[List[Attachment]] = None,
 ) -> Dict[str, Any]:
     """
     Run OpenAI agent query with status display.
@@ -805,6 +827,7 @@ def run_openai_interactive(
             dal=dal,
             reasoning_effort=effort,
             max_tool_calls=max_tool_calls,
+            attachments=attachments,
         ))
 
     # Record Q&A pair in chat history
@@ -1080,6 +1103,143 @@ def handle_reports_command(dal, arg: str) -> None:
     console.print(f"\n[dim]Use /reports <id> to view a report[/dim]\n")
 
 
+def handle_memory_command(dal, arg: str) -> None:
+    """Handle /memory [subcommand] [args]."""
+    from src.tools.memory_tools import (
+        save_memory, recall_memories, list_memories, delete_memory,
+    )
+
+    parts = arg.split(None, 1) if arg else []
+    subcmd = parts[0].lower() if parts else ""
+    subarg = parts[1] if len(parts) > 1 else ""
+
+    # /memory (no args) or /memory list → list recent
+    if not subcmd or subcmd == "list":
+        memories = list_memories(dal)
+        if not memories:
+            console.print("[dim]No memories found.[/dim]\n")
+            return
+        console.print(f"[bold]Memories[/bold] ({len(memories)} found)\n")
+        for m in memories:
+            mid = m.get("id", "-")
+            title = m.get("title", "Untitled")
+            cat = m.get("category", "")
+            dt = m.get("created_at", m.get("date", ""))
+            imp = m.get("importance", 5)
+            tickers = m.get("tickers", [])
+            if isinstance(tickers, list):
+                tickers = ", ".join(tickers) if tickers else ""
+            console.print(
+                f"  [cyan]#{mid}[/cyan] [{cat}] {title} "
+                f"[dim]({tickers}) {dt}[/dim]"
+            )
+        console.print(f"\n[dim]Use /memory <id> to view, /memory search <query> to search[/dim]\n")
+        return
+
+    # /memory <id> → view specific memory
+    if subcmd.isdigit():
+        results = recall_memories(dal, query="", limit=100)
+        target = next(
+            (m for m in results if str(m.get("id")) == subcmd), None
+        )
+        if not target:
+            console.print(f"[red]Memory #{subcmd} not found.[/red]\n")
+            return
+        console.print(f"[bold]#{subcmd}: {target.get('title', '')}[/bold]")
+        console.print(
+            f"[dim]Category: {target.get('category', '')} | "
+            f"Importance: {target.get('importance', 5)} | "
+            f"Created: {target.get('created_at', target.get('date', ''))}[/dim]"
+        )
+        mem_tickers = target.get("tickers")
+        if mem_tickers and isinstance(mem_tickers, list):
+            console.print(f"[dim]Tickers: {', '.join(mem_tickers)}[/dim]")
+        mem_tags = target.get("tags")
+        if mem_tags and isinstance(mem_tags, list):
+            console.print(f"[dim]Tags: {', '.join(mem_tags)}[/dim]")
+        console.print()
+        console.print(target.get("content", ""))
+        console.print()
+        return
+
+    # /memory search <query> → full-text search
+    if subcmd == "search":
+        if not subarg:
+            console.print("[yellow]Usage: /memory search <query>[/yellow]\n")
+            return
+        results = recall_memories(dal, query=subarg)
+        if not results:
+            console.print(f"[dim]No memories matching '{subarg}'.[/dim]\n")
+            return
+        console.print(f"[bold]Memory Search: '{subarg}'[/bold] ({len(results)} found)\n")
+        for m in results:
+            mid = m.get("id", "-")
+            title = m.get("title", "Untitled")
+            cat = m.get("category", "")
+            preview = (m.get("content", ""))[:100].replace("\n", " ")
+            console.print(f"  [cyan]#{mid}[/cyan] [{cat}] {title}")
+            console.print(f"      [dim]{preview}...[/dim]")
+        console.print()
+        return
+
+    # /memory save → interactive manual save
+    if subcmd == "save":
+        try:
+            title = console.input("[bold]Title:[/bold] ").strip()
+            if not title:
+                console.print("[dim]Cancelled.[/dim]\n")
+                return
+            content = console.input("[bold]Content:[/bold] ").strip()
+            if not content:
+                console.print("[dim]Cancelled.[/dim]\n")
+                return
+            cat = (
+                console.input(
+                    "[bold]Category[/bold] (analysis/insight/preference/fact/note) [note]: "
+                ).strip()
+                or "note"
+            )
+            tickers_str = console.input(
+                "[bold]Tickers[/bold] (comma-separated, optional): "
+            ).strip()
+            tickers = (
+                [t.strip().upper() for t in tickers_str.split(",") if t.strip()]
+                if tickers_str else None
+            )
+            tags_str = console.input(
+                "[bold]Tags[/bold] (comma-separated, optional): "
+            ).strip()
+            tags = (
+                [t.strip() for t in tags_str.split(",") if t.strip()]
+                if tags_str else None
+            )
+
+            result = save_memory(
+                dal, title=title, content=content, category=cat,
+                tickers=tickers, tags=tags, source="user_manual",
+            )
+            console.print(
+                f"[green]Memory saved: #{result.get('id', '?')} — {title}[/green]\n"
+            )
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Cancelled.[/dim]\n")
+        return
+
+    # /memory delete <id>
+    if subcmd == "delete":
+        if not subarg or not subarg.isdigit():
+            console.print("[yellow]Usage: /memory delete <id>[/yellow]\n")
+            return
+        result = delete_memory(dal, memory_id=int(subarg))
+        if result.get("deleted"):
+            console.print(f"[green]Memory #{subarg} deleted.[/green]\n")
+        else:
+            console.print(f"[red]{result.get('error', 'Delete failed')}[/red]\n")
+        return
+
+    console.print(f"[red]Unknown memory subcommand: {subcmd}[/red]\n")
+
+
 def handle_status_command(state: SessionState, backend_type: str, ticker_count: int) -> None:
     """Handle /status command."""
     console.print(
@@ -1312,6 +1472,42 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
         f"[green]{sa_name}[/green] → [bold cyan]{new_model}[/bold cyan] "
         f"[dim]({provider}, saved)[/dim]\n"
     )
+
+
+def handle_attach_command(state: SessionState, arg: str) -> None:
+    """Handle /attach <path> [pages] | list | clear command."""
+    if not arg or arg == "list":
+        if not state.attachments:
+            console.print("[dim]No attachments.[/dim]\n")
+        else:
+            for i, att in enumerate(state.attachments, 1):
+                info = f"{att.filename} ({att.media_type}, {att.size_kb:.1f} KB)"
+                if att.pages:
+                    info += f" pages={att.pages}"
+                console.print(f"  {i}. {info}")
+            console.print()
+        return
+
+    if arg == "clear":
+        count = len(state.attachments)
+        state.attachments.clear()
+        console.print(f"[green]Cleared {count} attachment(s).[/green]\n")
+        return
+
+    # Parse: /attach <path> [pages]
+    parts = arg.split(None, 1)
+    file_path = parts[0]
+    pages = parts[1] if len(parts) > 1 else ""
+
+    try:
+        att = AttachmentManager.load(file_path, pages=pages)
+        state.attachments.append(att)
+        info = f"{att.filename} ({att.media_type}, {att.size_kb:.1f} KB)"
+        if att.pages:
+            info += f" pages={att.pages}"
+        console.print(f"[green]Attached: {info}[/green]\n")
+    except Exception as e:
+        console.print(f"[red]Failed to attach: {e}[/red]\n")
 
 
 def handle_turns_command(state: SessionState, arg: str) -> None:
@@ -1586,6 +1782,10 @@ def main():
     completer = SlashCompleter(state)
 
     while True:
+        # Show pending attachments indicator
+        if state.attachments:
+            att_names = ", ".join(a.filename for a in state.attachments)
+            console.print(f"[dim]  Pending: {att_names}[/dim]")
         try:
             question = pt_prompt(
                 ANSI("\033[1;36m>\033[0m "),
@@ -1652,8 +1852,12 @@ def main():
                 handle_history_command(arg)
             elif cmd == "/turns":
                 handle_turns_command(state, arg)
+            elif cmd in ("/attach", "/at"):
+                handle_attach_command(state, arg)
             elif cmd in ("/reports", "/rp"):
                 handle_reports_command(dal, arg)
+            elif cmd in ("/memory", "/mem"):
+                handle_memory_command(dal, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
@@ -1661,6 +1865,14 @@ def main():
             continue
 
         # --- Run query ---
+        # Show attachment indicator
+        if state.attachments:
+            att_names = ", ".join(a.filename for a in state.attachments)
+            console.print(f"[dim]Attached: {att_names}[/dim]")
+
+        # Snapshot attachments for this query (cleared after dispatch)
+        query_attachments = list(state.attachments) if state.attachments else None
+
         start = time.time()
 
         try:
@@ -1677,6 +1889,7 @@ def main():
                     thinking=state.anthropic_thinking,
                     extended_context=state.extended_context,
                     max_tool_calls=state.max_tool_calls,
+                    attachments=query_attachments,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):
@@ -1688,7 +1901,12 @@ def main():
                     model=state.model,
                     reasoning_effort=state.reasoning_effort,
                     max_tool_calls=state.max_tool_calls,
+                    attachments=query_attachments,
                 )
+
+            # Auto-clear attachments after sending
+            if state.attachments:
+                state.attachments.clear()
 
             elapsed = time.time() - start
             print_answer(result["answer"])
