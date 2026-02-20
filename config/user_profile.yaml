@@ -184,9 +184,17 @@ data_preferences:
 
   # 基本面數據來源
   fundamentals_sources:
-    primary: "local_ibkr"   # 本地 IBKR JSON
-    secondary: "sec_edgar"  # SEC 官方
-    refresh_days: 7         # 超過 N 天重新抓取
+    primary: "local_ibkr"          # 本地 IBKR JSON
+    secondary: "sec_edgar"         # SEC 官方 (免費)
+    tertiary: "financial_datasets" # 付費 fallback (有快取)
+    refresh_days: 7                # 超過 N 天重新抓取
+
+  # 付費數據源控制
+  paid_sources:
+    financial_datasets:
+      enabled: true                # false = 完全不呼叫
+      cache_days_annual: 180       # 年報快取天數
+      cache_days_quarterly: 90     # 季報快取天數
 
   # API 成本控制
   cost_control:
