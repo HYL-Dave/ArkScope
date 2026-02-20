@@ -358,6 +358,22 @@ class SECEdgarFinancials:
             self._cache[ticker] = self._sec.fetch_company_facts(ticker)
         return self._cache[ticker]
 
+    @staticmethod
+    def _is_single_quarter(entry: Dict) -> bool:
+        """Check if an entry covers a single quarter (~90 days) vs cumulative."""
+        start = entry.get('start', '')
+        end = entry.get('end', '')
+        if not start or not end:
+            return False
+        try:
+            from datetime import date
+            s = date.fromisoformat(start)
+            e = date.fromisoformat(end)
+            duration = (e - s).days
+            return duration <= 105  # single quarter ≈ 90 days, allow margin
+        except (ValueError, TypeError):
+            return False
+
     def _extract_concept_value(
         self,
         facts: Dict,
@@ -368,6 +384,9 @@ class SECEdgarFinancials:
     ) -> Optional[float]:
         """
         Extract a value from SEC EDGAR facts for a specific fiscal year.
+
+        For quarterly data (Q1-Q4), prefers single-quarter entries over
+        cumulative YTD entries when both exist in the XBRL data.
 
         Args:
             facts: Company facts from SEC EDGAR
@@ -383,6 +402,7 @@ class SECEdgarFinancials:
             return None
 
         gaap = facts['facts'].get('us-gaap', {})
+        is_quarterly = period_type in ('Q1', 'Q2', 'Q3', 'Q4')
 
         for concept in concept_names:
             if concept not in gaap:
@@ -403,8 +423,13 @@ class SECEdgarFinancials:
                 if not matching:
                     continue
 
-                # If multiple matches, pick the one with the latest end date
-                # (this is the actual fiscal year, not comparison periods)
+                if is_quarterly and len(matching) > 1:
+                    # Prefer single-quarter entries over cumulative YTD
+                    single_q = [e for e in matching if self._is_single_quarter(e)]
+                    if single_q:
+                        matching = single_q
+
+                # Pick the one with the latest end date
                 best = max(matching, key=lambda x: x.get('end', ''))
                 return best.get('val')
 
@@ -440,6 +465,94 @@ class SECEdgarFinancials:
 
         return []
 
+    def _get_quarterly_periods(
+        self,
+        facts: Dict,
+        quarters: int = 8,
+    ) -> List[tuple]:
+        """Get available (fy, fp) pairs for quarterly filings, newest first.
+
+        Scans ALL us-gaap concepts to find quarterly periods, since companies
+        use different concept names (e.g. Apple uses
+        RevenueFromContractWithCustomerExcludingAssessedTax, not Revenues).
+
+        Args:
+            facts: Company facts from SEC EDGAR
+            quarters: Max number of quarters to return (default 8 = 2 years)
+
+        Returns:
+            [(2024, 'Q3'), (2024, 'Q2'), ...] sorted by end_date descending
+        """
+        if not facts or 'facts' not in facts:
+            return []
+
+        gaap = facts['facts'].get('us-gaap', {})
+        _QUARTER_FPS = {'Q1', 'Q2', 'Q3', 'Q4'}
+
+        seen = {}  # (fy, fp) -> end_date
+
+        for concept, concept_data in gaap.items():
+            if 'units' not in concept_data:
+                continue
+            for entries in concept_data['units'].values():
+                for e in entries:
+                    fp = e.get('fp')
+                    fy = e.get('fy')
+                    end = e.get('end', '')
+                    form = e.get('form')
+
+                    # Only include actual 10-Q quarterly filings
+                    # (10-K FY is annual total, NOT Q4 — using it as Q4
+                    #  would give cumulative values for income/cash flow)
+                    if form == '10-Q' and fp in _QUARTER_FPS:
+                        key = (fy, fp)
+                        if key not in seen or end > seen[key]:
+                            seen[key] = end
+
+            # Stop scanning once we have enough data
+            if len(seen) >= quarters:
+                break
+
+        if not seen:
+            return []
+
+        # Sort by end_date descending
+        sorted_pairs = sorted(seen.items(), key=lambda x: x[1], reverse=True)
+        return [pair for pair, _ in sorted_pairs[:quarters]]
+
+    def _get_report_end_date(
+        self,
+        facts: Dict,
+        fiscal_year: int,
+        form: str,
+        period_type: str,
+    ) -> Optional[str]:
+        """Get actual period end date from XBRL entries.
+
+        Returns the 'end' field (e.g. '2024-09-28') for the given period.
+        """
+        if not facts or 'facts' not in facts:
+            return None
+
+        gaap = facts['facts'].get('us-gaap', {})
+
+        # Scan concepts to find the end date (different companies use different names)
+        for concept, concept_data in gaap.items():
+            if 'units' not in concept_data:
+                continue
+            for entries in concept_data['units'].values():
+                matching = [
+                    e for e in entries
+                    if e.get('form') == form
+                    and e.get('fp') == period_type
+                    and e.get('fy') == fiscal_year
+                ]
+                if matching:
+                    best = max(matching, key=lambda x: x.get('end', ''))
+                    return best.get('end')
+
+        return None
+
     def get_income_statement(
         self,
         ticker: str,
@@ -462,24 +575,30 @@ class SECEdgarFinancials:
             logger.warning(f"No SEC data found for {ticker}")
             return []
 
-        form = '10-K' if period == 'annual' else '10-Q'
-        fp = 'FY' if period == 'annual' else None  # TODO: handle quarters
-
-        fiscal_years = self._get_fiscal_years(facts, years, form)
+        if period == 'annual':
+            form = '10-K'
+            periods = [(fy, 'FY') for fy in self._get_fiscal_years(facts, years)]
+        else:
+            form = '10-Q'
+            periods = self._get_quarterly_periods(facts, years * 4)
 
         statements = []
-        for fy in fiscal_years:
+        for fy, fp in periods:
+            end_date = self._get_report_end_date(facts, fy, form, fp)
+            # For Q4 from 10-K, use 10-K form for extraction
+            extract_form = form
+            extract_fp = fp
+
             stmt = IncomeStatement(
                 ticker=ticker,
-                report_period=f"{fy}-12-31",  # Approximate, actual varies by company
-                fiscal_period=f"{fy}-FY",
+                report_period=end_date or f"{fy}-12-31",
+                fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
             )
 
-            # Extract each field
             for field, concepts in INCOME_STATEMENT_MAPPING.items():
-                value = self._extract_concept_value(facts, concepts, fy, form, 'FY')
+                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
                 setattr(stmt, field, value)
 
             statements.append(stmt)
@@ -508,32 +627,37 @@ class SECEdgarFinancials:
             logger.warning(f"No SEC data found for {ticker}")
             return []
 
-        form = '10-K' if period == 'annual' else '10-Q'
-
-        fiscal_years = self._get_fiscal_years(facts, years, form)
+        if period == 'annual':
+            form = '10-K'
+            periods = [(fy, 'FY') for fy in self._get_fiscal_years(facts, years)]
+        else:
+            form = '10-Q'
+            periods = self._get_quarterly_periods(facts, years * 4)
 
         sheets = []
-        for fy in fiscal_years:
+        for fy, fp in periods:
+            end_date = self._get_report_end_date(facts, fy, form, fp)
+            extract_form = form
+            extract_fp = fp
+
             sheet = BalanceSheet(
                 ticker=ticker,
-                report_period=f"{fy}-12-31",
-                fiscal_period=f"{fy}-FY",
+                report_period=end_date or f"{fy}-12-31",
+                fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
             )
 
             for field, concepts in BALANCE_SHEET_MAPPING.items():
-                # Special handling: current_debt should SUM all debt components
-                # (LongTermDebtCurrent + CommercialPaper, etc.)
                 if field == 'current_debt':
                     total = 0
                     for concept in concepts:
-                        val = self._extract_concept_value(facts, [concept], fy, form, 'FY')
+                        val = self._extract_concept_value(facts, [concept], fy, extract_form, extract_fp)
                         if val:
                             total += val
                     value = total if total > 0 else None
                 else:
-                    value = self._extract_concept_value(facts, concepts, fy, form, 'FY')
+                    value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
                 setattr(sheet, field, value)
 
             sheets.append(sheet)
@@ -562,22 +686,29 @@ class SECEdgarFinancials:
             logger.warning(f"No SEC data found for {ticker}")
             return []
 
-        form = '10-K' if period == 'annual' else '10-Q'
-
-        fiscal_years = self._get_fiscal_years(facts, years, form)
+        if period == 'annual':
+            form = '10-K'
+            periods = [(fy, 'FY') for fy in self._get_fiscal_years(facts, years)]
+        else:
+            form = '10-Q'
+            periods = self._get_quarterly_periods(facts, years * 4)
 
         statements = []
-        for fy in fiscal_years:
+        for fy, fp in periods:
+            end_date = self._get_report_end_date(facts, fy, form, fp)
+            extract_form = form
+            extract_fp = fp
+
             stmt = CashFlowStatement(
                 ticker=ticker,
-                report_period=f"{fy}-12-31",
-                fiscal_period=f"{fy}-FY",
+                report_period=end_date or f"{fy}-12-31",
+                fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
             )
 
             for field, concepts in CASH_FLOW_MAPPING.items():
-                value = self._extract_concept_value(facts, concepts, fy, form, 'FY')
+                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
                 setattr(stmt, field, value)
 
             # Apply sign conventions to match Financial Datasets format

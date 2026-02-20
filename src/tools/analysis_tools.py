@@ -111,35 +111,44 @@ def _derive_metrics_from_sec(
 def get_fundamentals_analysis(
     dal: DataAccessLayer,
     ticker: str,
+    period: str = "annual",
 ) -> FundamentalsResult:
     """
     Get fundamental analysis for a ticker.
 
     Data source priority:
-    1. DB/File backend (IBKR snapshot) — fast, pre-computed metrics
+    1. DB/File backend (IBKR snapshot) — fast, pre-computed metrics (annual only)
     2. SEC EDGAR XBRL API (free, real-time) — structured financial statements
 
     Args:
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
+        period: 'annual' or 'quarterly'
 
     Returns:
         FundamentalsResult with financial metrics and statements
     """
-    # 1. Try DB/File backend (IBKR snapshot)
-    result = dal.get_fundamentals(ticker)
-    if result.snapshot_date:
-        result.data_source = "ibkr"
-        return result
+    # 1. Try DB/File backend (IBKR snapshot) — only for annual
+    if period == "annual":
+        result = dal.get_fundamentals(ticker)
+        if result.snapshot_date:
+            result.data_source = "ibkr"
+            return result
+    else:
+        result = FundamentalsResult(ticker=ticker.upper())
 
     # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies)
     try:
         from data_sources.sec_edgar_financials import SECEdgarFinancials
         sec = SECEdgarFinancials()
 
-        income_stmts = sec.get_income_statement(ticker, years=2, period="annual")[:2]
-        balance_sheets = sec.get_balance_sheet(ticker, years=1, period="annual")[:1]
-        cashflow_stmts = sec.get_cash_flow_statement(ticker, years=2, period="annual")[:2]
+        if period == "quarterly":
+            n = 4  # 4 most recent quarters
+        else:
+            n = 2  # 2 most recent years
+        income_stmts = sec.get_income_statement(ticker, years=n, period=period)[:n]
+        balance_sheets = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
+        cashflow_stmts = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
     except Exception as e:
         logger.warning(f"SEC EDGAR fallback failed for {ticker}: {e}")
         return result  # Return empty result

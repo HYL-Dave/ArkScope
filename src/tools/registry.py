@@ -375,11 +375,17 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_fundamentals_analysis",
-            description="Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.",
+            description=(
+                "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
+                "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth)."
+            ),
             function=get_fundamentals_analysis,
             category="analysis",
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("period", "string", "Report period type",
+                              required=False, default="annual",
+                              enum=["annual", "quarterly"]),
             ],
         ))
 
