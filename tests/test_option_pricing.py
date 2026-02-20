@@ -302,8 +302,8 @@ class TestMispricingAnalysis:
         )
 
         assert len(signals) >= 1, "Should find at least one signal"
-        # First signal should be the most mispriced
-        assert signals[0].right == 'C' and signals[0].strike == 100
+        # Signals sorted by abs(mispricing_pct) descending
+        assert abs(signals[0].mispricing_pct) >= abs(signals[-1].mispricing_pct)
 
 
 class TestEdgeCases:

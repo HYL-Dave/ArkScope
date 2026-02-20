@@ -82,10 +82,15 @@ def _make_mock_response(stop_reason="end_turn", content_blocks=None):
 
     response.content = content_blocks
 
-    # Mock usage for TokenTracker
-    response.usage = MagicMock()
-    response.usage.input_tokens = 100
-    response.usage.output_tokens = 50
+    # Mock usage for TokenTracker — use SimpleNamespace so unknown attrs raise
+    # (MagicMock returns MagicMock for any attr, breaking JSON serialization)
+    from types import SimpleNamespace
+    response.usage = SimpleNamespace(
+        input_tokens=100,
+        output_tokens=50,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0,
+    )
     response.model = "claude-opus-4-6"
 
     return response
