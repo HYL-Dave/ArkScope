@@ -54,7 +54,7 @@ import logging
 import argparse
 from datetime import datetime, date
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Set
 
 # Setup logging
 logging.basicConfig(
@@ -65,6 +65,112 @@ logger = logging.getLogger(__name__)
 
 # Script directory
 SCRIPT_DIR = Path(__file__).parent
+CONFIG_DIR = SCRIPT_DIR.parent.parent / "config"
+
+
+def _extract_watchlist_tickers(profile: dict) -> Set[str]:
+    """Extract all unique tickers from user_profile.yaml watchlists."""
+    tickers: Set[str] = set()
+    watchlists = profile.get("watchlists", {})
+
+    # core_holdings, interested
+    for group in ("core_holdings", "interested"):
+        group_data = watchlists.get(group, {})
+        tickers.update(group_data.get("tickers", []))
+
+    # custom_themes
+    for theme in watchlists.get("custom_themes", []):
+        tickers.update(theme.get("tickers", []))
+
+    # options_preferences.tickers_for_options
+    options = profile.get("options_preferences", {})
+    tickers.update(options.get("tickers_for_options", []))
+
+    return tickers
+
+
+def _get_all_tickers_core(config: dict) -> Set[str]:
+    """Get all tickers already in tickers_core.json."""
+    all_tickers: Set[str] = set()
+    for tier_key in ("tier1_core", "tier2_expanded", "tier3_user_watchlist"):
+        tier = config.get(tier_key, {})
+        for category in tier.values():
+            if isinstance(category, dict) and "tickers" in category:
+                all_tickers.update(category["tickers"])
+    return all_tickers
+
+
+def sync_watchlist_tickers(dry_run: bool = False) -> List[str]:
+    """
+    Sync tickers from user_profile.yaml watchlists into tickers_core.json.
+
+    Reads all watchlist tickers from user_profile.yaml (and .local.yaml if exists),
+    checks which ones are missing from tickers_core.json, and adds them to
+    tier3_user_watchlist.watchlist_auto_sync.
+
+    Returns:
+        List of newly added tickers.
+    """
+    try:
+        import yaml
+    except ImportError:
+        logger.warning("PyYAML not installed, skipping watchlist sync")
+        return []
+
+    # Load user profile (local override first)
+    profile = {}
+    for filename in ("user_profile.local.yaml", "user_profile.yaml"):
+        path = CONFIG_DIR / filename
+        if path.exists():
+            with open(path) as f:
+                profile = yaml.safe_load(f) or {}
+            break
+
+    if not profile:
+        return []
+
+    watchlist_tickers = _extract_watchlist_tickers(profile)
+    if not watchlist_tickers:
+        return []
+
+    # Load tickers_core.json
+    core_path = CONFIG_DIR / "tickers_core.json"
+    if not core_path.exists():
+        logger.warning(f"tickers_core.json not found: {core_path}")
+        return []
+
+    with open(core_path) as f:
+        config = json.load(f)
+
+    existing = _get_all_tickers_core(config)
+    missing = sorted(watchlist_tickers - existing)
+
+    if not missing:
+        return []
+
+    if dry_run:
+        logger.info(f"[DRY RUN] Would add {len(missing)} tickers from watchlist: {missing}")
+        return missing
+
+    # Add to tier3_user_watchlist.watchlist_auto_sync
+    tier3 = config.setdefault("tier3_user_watchlist", {})
+    auto_sync = tier3.get("watchlist_auto_sync", {})
+
+    existing_auto = set(auto_sync.get("tickers", []))
+    merged = sorted(existing_auto | set(missing))
+
+    tier3["watchlist_auto_sync"] = {
+        "_description": "Auto-synced from user_profile.yaml watchlists",
+        "_last_synced": date.today().isoformat(),
+        "tickers": merged,
+    }
+
+    with open(core_path, "w") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+    logger.info(f"Synced {len(missing)} new tickers from watchlist: {missing}")
+    return missing
 
 
 def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) -> tuple:
@@ -664,6 +770,9 @@ Note: IBKR sources require TWS/Gateway running.
 
     if args.parallel:
         logger.info("*** PARALLEL MODE - Running sources concurrently ***")
+
+    # Sync watchlist tickers into tickers_core.json before collection
+    sync_watchlist_tickers(dry_run=args.dry_run)
 
     # Determine which sources to update
     update_polygon_flag = args.all or args.news or args.polygon

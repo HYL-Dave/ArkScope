@@ -158,26 +158,29 @@ class TestFinancialDatasetsClient:
         finally:
             cache_file.unlink(missing_ok=True)
 
+    @patch("data_sources.financial_datasets_client._FILE_CACHE_DIR",
+           Path("/tmp/_fd_test_nonexistent_cache"))
     def test_no_api_key_returns_empty(self):
-        """Without API key, should return empty list (no error)."""
-        client = FinancialDatasetsClient(api_key=None)
-        client._db_url = None
-        # Ensure no env var
+        """Without API key and no cache, should return empty list."""
+        # config/.env may have the key loaded into os.environ — must patch it out
         with patch.dict("os.environ", {}, clear=False):
-            if "FINANCIAL_DATASETS_API_KEY" in os.environ:
-                del os.environ["FINANCIAL_DATASETS_API_KEY"]
-            client_no_key = FinancialDatasetsClient(api_key=None)
-            client_no_key._db_url = None
-            stmts = client_no_key.get_income_statements("AAPL")
+            os.environ.pop("FINANCIAL_DATASETS_API_KEY", None)
+            client = FinancialDatasetsClient(api_key=None)
+            client._db_url = None
+            stmts = client.get_income_statements("AAPL")
             assert stmts == []
 
+    @patch("data_sources.financial_datasets_client._FILE_CACHE_DIR",
+           Path("/tmp/_fd_test_nonexistent_cache"))
     @patch("data_sources.financial_datasets_client.requests.get")
     def test_api_error_returns_empty(self, mock_get):
-        """API errors should return empty list, not raise."""
+        """API errors with no cache should return empty list, not raise."""
         import requests as req
         mock_get.side_effect = req.RequestException("Connection error")
 
-        stmts = self.client.get_income_statements("AAPL")
+        client = FinancialDatasetsClient(api_key="test-key")
+        client._db_url = None
+        stmts = client.get_income_statements("AAPL")
         assert stmts == []
 
     @patch("data_sources.financial_datasets_client.requests.get")
