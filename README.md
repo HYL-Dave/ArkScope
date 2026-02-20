@@ -1,15 +1,15 @@
 # MindfulRL-Intraday
 
-> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 26 financial tools, and multi-source news/price/options data pipeline.
+> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 30 financial tools, and multi-source news/price/options data pipeline.
 
 ## Overview
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 26 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 30 tools, 4 skills, 4 subagents
 - **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
-- **Analysis Toolkit** — Fundamentals (SEC EDGAR), options (IV/Greeks), signals, web search
+- **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks), signals, web search
 - **RL Training** — PPO/CPPO agents with sentiment and risk-enhanced data
 - **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment
 
@@ -69,13 +69,16 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | `/compaction` | `/cmp` | Toggle server-side compaction (Opus 4.6) |
 | `/code-model [name]` | `/cm` | Set code generation model |
 | `/turns <n>` | | Set max tool calls per query |
+| `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
+| `/attach <path> [pages]` | `/at` | Attach PDF/image/text to next query |
 | `/reports [ticker]` | `/rp` | List/view saved research reports |
+| `/code-backend [name]` | `/cb` | Set code generation backend (api/codex/claude) |
 | `/scratchpad` | `/pad` | List recent scratchpad sessions |
 | `/history` | `/h` | Show recent Q&A history |
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (26)
+### Tools (30)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -92,7 +95,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | **Signals** | `detect_anomalies` | Sentiment/volume anomaly detection |
 | | `detect_event_chains` | Event sequence patterns |
 | | `synthesize_signal` | Multi-factor trading signal |
-| **Analysis** | `get_fundamentals_analysis` | P/E, ROE, margins (Finnhub + SEC EDGAR) |
+| **Analysis** | `get_fundamentals_analysis` | Fundamentals with 3-tier fallback (IBKR → SEC EDGAR → Financial Datasets) |
 | | `get_sec_filings` | 10-K, 10-Q, 8-K metadata |
 | | `get_insider_trades` | SEC Form 4 insider transactions |
 | | `get_analyst_consensus` | Analyst recommendations, price targets |
@@ -101,6 +104,10 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
 | | `get_report` | Retrieve report by ID |
+| **Memory** | `save_memory` | Store analysis/insight for cross-session recall |
+| | `recall_memories` | Search memories by keyword (full-text) |
+| | `list_memories` | List recent memories by category |
+| | `delete_memory` | Remove a memory entry |
 | **Web** | `tavily_search` | AI-powered web search |
 | | `tavily_fetch` | URL content extraction |
 | | `web_browse` | Headless browser (Playwright) |
@@ -191,9 +198,11 @@ DATABASE_URL=postgresql://postgres:mindfulrl_dev_2026@localhost:15432/mindfulrl
 Applied automatically on first Docker startup, or manually:
 
 ```sql
--- sql/001_init_schema.sql    — Core tables (news, prices, iv_history, fundamentals, signals, agent_queries)
--- sql/002_add_news_scores.sql — Multi-model news scoring
--- sql/003_add_reports.sql     — Research reports
+-- sql/001_init_schema.sql         — Core tables (news, prices, iv_history, fundamentals, signals, agent_queries)
+-- sql/002_add_news_scores.sql     — Multi-model news scoring
+-- sql/003_add_reports.sql         — Research reports
+-- sql/004_add_memories.sql        — Episodic memory (full-text search, GIN + tsvector)
+-- sql/005_add_financial_cache.sql — Financial data cache (paid API responses)
 ```
 
 ### Migrate Data from Parquet Files
@@ -309,7 +318,7 @@ python backtest_openai.py --data merged_dataset.csv \
 
 | Module | Description |
 |--------|-------------|
-| `cli.py` | Interactive CLI (15 slash commands, prompt caching, token tracking) |
+| `cli.py` | Interactive CLI (18 slash commands, prompt caching, token tracking) |
 | `config.py` | Model configuration, defaults, aliases |
 | `anthropic_agent/agent.py` | Anthropic messages loop (streaming, thinking, effort) |
 | `openai_agent/agent.py` | OpenAI Agents SDK wrapper (Responses API) |
@@ -319,18 +328,20 @@ python backtest_openai.py --data merged_dataset.csv \
 | `shared/token_tracker.py` | Per-turn token + cache tracking |
 | `shared/context_manager.py` | Context compaction for long sessions |
 | `shared/scratchpad.py` | JSONL session logging + chat history |
+| `shared/attachments.py` | PDF/image/text file attachment processing |
 | `shared/security.py` | Tool result wrapping for input safety |
 
 ### Tool Layer (`src/tools/`)
 
 | Module | Description |
 |--------|-------------|
-| `registry.py` | ToolRegistry (26 tools, dual-format for Anthropic + OpenAI) |
+| `registry.py` | ToolRegistry (30 tools, dual-format for Anthropic + OpenAI) |
 | `data_access.py` | DataAccessLayer with backend abstraction |
 | `backends/file_backend.py` | Parquet file backend |
 | `backends/db_backend.py` | PostgreSQL backend (psycopg3) |
 | `news_tools.py`, `price_tools.py`, etc. | Individual tool implementations |
 | `report_tools.py` | Research report save/list/get |
+| `memory_tools.py` | Episodic memory CRUD + full-text search |
 | `web_tools.py` | Tavily search + Playwright browser |
 | `code_tools.py` | Python code execution + auto code gen |
 
@@ -341,6 +352,7 @@ python backtest_openai.py --data merged_dataset.csv \
 | **Finnhub** | News, quotes, company profiles, analyst consensus | Free |
 | **Tiingo** | Historical stock prices (30+ years) | Free |
 | **SEC EDGAR** | XBRL financial data (income, balance, cashflow) | Free |
+| **Financial Datasets** | Structured financials (Q4, TTM, segmented) | PAYG $0.01/req |
 | **Polygon** | News (3+ years), reference data | Free/Paid |
 | **IBKR** | Real-time news, intraday prices, options | Requires TWS |
 
