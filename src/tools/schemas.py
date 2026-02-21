@@ -134,6 +134,7 @@ class MispricingResult(BaseModel):
     mispricing_pct: float = Field(description="(theo - market) / market * 100")
     signal: str = Field(description="UNDERPRICED, OVERPRICED, or FAIR")
     confidence: float = Field(description="Signal confidence 0-1")
+    model: str = Field(default="american", description="Pricing model used")
     delta: Optional[float] = None
     gamma: Optional[float] = None
     theta: Optional[float] = None

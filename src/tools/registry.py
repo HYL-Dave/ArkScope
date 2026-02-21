@@ -304,7 +304,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="calculate_greeks",
-            description="Calculate Black-Scholes Greeks (delta, gamma, theta, vega, rho) for an option.",
+            description="Calculate option Greeks (delta, gamma, theta, vega, rho). Supports American (Bjerksund-Stensland 2002) and European (Black-Scholes) pricing models.",
             function=calculate_greeks,
             category="options",
             requires_dal=False,
@@ -316,6 +316,13 @@ class ToolRegistry:
                 ToolParameter("sigma", "number", "Volatility (e.g. 0.30 for 30%)"),
                 ToolParameter("option_type", "string", "Option type", required=False, default="C",
                               enum=["C", "P"]),
+                ToolParameter("model", "string",
+                              "Pricing model: 'american' (BS2002) or 'black_scholes' (European)",
+                              required=False, default="american",
+                              enum=["american", "black_scholes"]),
+                ToolParameter("dividend_yield", "number",
+                              "Continuous dividend yield (e.g. 0.02 for 2%)",
+                              required=False, default=0.0),
             ],
         ))
 

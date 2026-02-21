@@ -5,7 +5,7 @@ This module provides analytical tools for options pricing, volatility analysis,
 and trading signal generation.
 
 Modules:
-    option_pricing: Black-Scholes pricing, Greeks, HV, IV, mispricing detection
+    option_pricing: BS/BS2002 pricing, Greeks, HV, IV, mispricing detection
 """
 
 from .option_pricing import (
@@ -16,9 +16,14 @@ from .option_pricing import (
     calculate_garman_klass_volatility,
     calculate_implied_volatility,
     adjust_volatility_for_smile,
-    # Pricing
+    # Pricing — European (Black-Scholes)
     black_scholes_price,
     black_scholes_greeks,
+    # Pricing — American (Bjerksund-Stensland 2002)
+    bjerksund_stensland_2002,
+    american_greeks,
+    calculate_american_iv,
+    # Pricing — Unified
     calculate_theoretical_price,
     # Mispricing
     analyze_option_mispricing,
@@ -46,9 +51,14 @@ __all__ = [
     'calculate_garman_klass_volatility',
     'calculate_implied_volatility',
     'adjust_volatility_for_smile',
-    # Pricing
+    # Pricing — European (Black-Scholes)
     'black_scholes_price',
     'black_scholes_greeks',
+    # Pricing — American (Bjerksund-Stensland 2002)
+    'bjerksund_stensland_2002',
+    'american_greeks',
+    'calculate_american_iv',
+    # Pricing — Unified
     'calculate_theoretical_price',
     # Mispricing
     'analyze_option_mispricing',
@@ -68,4 +78,4 @@ __all__ = [
     'OptionType',
 ]
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'

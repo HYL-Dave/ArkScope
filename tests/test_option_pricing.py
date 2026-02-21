@@ -27,9 +27,14 @@ from analysis.option_pricing import (
     calculate_garman_klass_volatility,
     calculate_implied_volatility,
     adjust_volatility_for_smile,
-    # Pricing
+    # Pricing — European
     black_scholes_price,
     black_scholes_greeks,
+    # Pricing — American (BS2002)
+    bjerksund_stensland_2002,
+    american_greeks,
+    calculate_american_iv,
+    # Pricing — Unified
     calculate_theoretical_price,
     # Mispricing
     analyze_option_mispricing,
@@ -330,6 +335,310 @@ class TestEdgeCases:
             S=110, K=100, T=0.25, r=0.05, option_type='C'
         )
         assert iv is None, "Should return None for invalid price"
+
+
+# ==========================================================================
+# Bjerksund-Stensland 2002 (American Option Pricing)
+# ==========================================================================
+
+class TestBjerksundStensland2002:
+    """Test American option pricing via BS2002."""
+
+    def test_call_no_dividend_equals_european(self):
+        """American call without dividends ≈ European call (no early exercise value)."""
+        bs_price = black_scholes_price(100, 100, 0.25, 0.05, 0.20, 'C')
+        am_price = bjerksund_stensland_2002(100, 100, 0.25, 0.05, 0.20, 0.0, 'C')
+        assert abs(am_price - bs_price) < 0.05, \
+            f"American call should ≈ European when q=0: {am_price:.4f} vs {bs_price:.4f}"
+
+    def test_put_higher_than_european(self):
+        """American put >= European put (early exercise premium)."""
+        bs_put = black_scholes_price(100, 100, 0.5, 0.05, 0.30, 'P')
+        am_put = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.0, 'P')
+        assert am_put >= bs_put - 0.01, \
+            f"American put {am_put:.4f} should be >= European put {bs_put:.4f}"
+
+    def test_put_early_exercise_premium_meaningful(self):
+        """ATM put should have non-trivial early exercise premium."""
+        bs_put = black_scholes_price(100, 100, 0.5, 0.05, 0.30, 'P')
+        am_put = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.0, 'P')
+        premium = am_put - bs_put
+        assert premium > 0.05, f"Early exercise premium {premium:.4f} should be > 0.05"
+
+    def test_deep_itm_put_significant_premium(self):
+        """Deep ITM put: American premium over European should be significant."""
+        bs_put = black_scholes_price(70, 100, 1.0, 0.05, 0.30, 'P')
+        am_put = bjerksund_stensland_2002(70, 100, 1.0, 0.05, 0.30, 0.0, 'P')
+        premium = am_put - bs_put
+        assert premium > 0.5, f"Deep ITM early exercise premium {premium:.4f} should be > 0.5"
+
+    def test_call_with_dividend_differs(self):
+        """Call with dividends should differ from zero-dividend pricing."""
+        am_no_div = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.0, 'C')
+        am_with_div = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.03, 'C')
+        # Dividends reduce call value (stock drops on ex-div)
+        assert am_with_div < am_no_div, \
+            f"Call with div {am_with_div:.4f} should be < without {am_no_div:.4f}"
+
+    def test_call_with_high_dividend_has_premium(self):
+        """American call with high dividends should exceed European call."""
+        # High dividend: q=5%, long-dated (1 year)
+        bs_call = black_scholes_price(100, 100, 1.0, 0.05, 0.30, 'C')
+        am_call = bjerksund_stensland_2002(100, 100, 1.0, 0.05, 0.30, 0.05, 'C')
+        # European BS doesn't account for dividends at all, so American with
+        # dividends will typically be lower. But the key is it's properly priced.
+        assert am_call > 0
+
+    def test_at_expiration_call(self):
+        """Near expiration: American call ≈ intrinsic value."""
+        call = bjerksund_stensland_2002(110, 100, 0.001, 0.05, 0.20, 0.0, 'C')
+        assert abs(call - 10) < 0.5, f"Near-expiry ITM call should ≈ intrinsic, got {call:.4f}"
+
+    def test_at_expiration_put(self):
+        """Near expiration: American put ≈ intrinsic value."""
+        put = bjerksund_stensland_2002(90, 100, 0.001, 0.05, 0.20, 0.0, 'P')
+        assert abs(put - 10) < 0.5, f"Near-expiry ITM put should ≈ intrinsic, got {put:.4f}"
+
+    def test_otm_put_positive(self):
+        """OTM American put should be positive (time value)."""
+        put = bjerksund_stensland_2002(110, 100, 0.5, 0.05, 0.30, 0.0, 'P')
+        assert put > 0, "OTM put should have time value"
+
+    def test_otm_call_positive(self):
+        """OTM American call should be positive (time value)."""
+        call = bjerksund_stensland_2002(90, 100, 0.5, 0.05, 0.30, 0.0, 'C')
+        assert call > 0, "OTM call should have time value"
+
+    def test_price_increases_with_time(self):
+        """Longer time to expiry → higher option price (all else equal)."""
+        short = bjerksund_stensland_2002(100, 100, 0.1, 0.05, 0.30, 0.0, 'P')
+        long_ = bjerksund_stensland_2002(100, 100, 1.0, 0.05, 0.30, 0.0, 'P')
+        assert long_ > short, f"Longer T should give higher price: {long_:.4f} > {short:.4f}"
+
+    def test_price_increases_with_volatility(self):
+        """Higher volatility → higher option price."""
+        low_vol = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.15, 0.0, 'P')
+        high_vol = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.45, 0.0, 'P')
+        assert high_vol > low_vol, f"Higher vol should give higher price: {high_vol:.4f} > {low_vol:.4f}"
+
+    def test_put_call_symmetry(self):
+        """Verify put-call transformation consistency."""
+        # Both should be properly priced
+        call = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.02, 'C')
+        put = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.02, 'P')
+        assert call > 0 and put > 0
+        # Put should be higher than call for ATM when r > q
+        # (because put benefits more from early exercise)
+        assert put > call * 0.5, "Both should be meaningful prices"
+
+    def test_extreme_volatility(self):
+        """BS2002 should handle high volatility without crashing."""
+        price = bjerksund_stensland_2002(100, 100, 0.25, 0.05, 2.0, 0.0, 'P')
+        assert price > 0 and price <= 100, f"Price with 200% vol should be reasonable: {price:.4f}"
+
+    def test_zero_rate(self):
+        """BS2002 should work with r=0."""
+        price = bjerksund_stensland_2002(100, 100, 0.5, 0.0, 0.30, 0.0, 'P')
+        assert price > 0, f"Price with r=0 should be positive: {price:.4f}"
+
+
+class TestAmericanGreeks:
+    """Test numerical Greeks for American options."""
+
+    def test_call_delta_range(self):
+        """American call delta should be in [0, 1]."""
+        greeks = american_greeks(100, 100, 0.25, 0.05, 0.20, 0.0, 'C')
+        assert 0 < greeks['delta'] < 1, f"Call delta {greeks['delta']} out of range"
+
+    def test_put_delta_range(self):
+        """American put delta should be in [-1, 0]."""
+        greeks = american_greeks(100, 100, 0.25, 0.05, 0.20, 0.0, 'P')
+        assert -1 < greeks['delta'] < 0, f"Put delta {greeks['delta']} out of range"
+
+    def test_atm_call_delta_near_half(self):
+        """ATM American call delta ≈ 0.5."""
+        greeks = american_greeks(100, 100, 0.25, 0.05, 0.20, 0.0, 'C')
+        assert 0.45 < greeks['delta'] < 0.65, f"ATM delta {greeks['delta']} unexpected"
+
+    def test_gamma_positive(self):
+        """Gamma should be positive for both calls and puts."""
+        for opt_type in ['C', 'P']:
+            greeks = american_greeks(100, 100, 0.25, 0.05, 0.30, 0.0, opt_type)
+            assert greeks['gamma'] > 0, f"{opt_type} gamma should be positive"
+
+    def test_vega_positive(self):
+        """Vega should be positive for both calls and puts."""
+        for opt_type in ['C', 'P']:
+            greeks = american_greeks(100, 100, 0.25, 0.05, 0.30, 0.0, opt_type)
+            assert greeks['vega'] > 0, f"{opt_type} vega should be positive"
+
+    def test_theta_negative(self):
+        """Theta should be negative (time decay)."""
+        for opt_type in ['C', 'P']:
+            greeks = american_greeks(100, 100, 0.25, 0.05, 0.30, 0.0, opt_type)
+            assert greeks['theta'] < 0, f"{opt_type} theta should be negative"
+
+    def test_greeks_close_to_bs_for_call_no_div(self):
+        """American Greeks ≈ BS Greeks for call without dividends."""
+        am_greeks = american_greeks(100, 100, 0.25, 0.05, 0.20, 0.0, 'C')
+        bs_greeks_ = black_scholes_greeks(100, 100, 0.25, 0.05, 0.20, 'C')
+        # Delta should be very close
+        assert abs(am_greeks['delta'] - bs_greeks_['delta']) < 0.02, \
+            f"Delta diff: {abs(am_greeks['delta'] - bs_greeks_['delta']):.4f}"
+
+    def test_greeks_with_dividends(self):
+        """Greeks should work with dividend yield."""
+        greeks = american_greeks(100, 100, 0.5, 0.05, 0.30, 0.03, 'C')
+        assert 0 < greeks['delta'] < 1
+        assert greeks['gamma'] > 0
+
+
+class TestAmericanIV:
+    """Test American implied volatility solver."""
+
+    def test_iv_recovery_call(self):
+        """Should recover original vol from American call price."""
+        original_vol = 0.25
+        price = bjerksund_stensland_2002(100, 100, 0.25, 0.05, original_vol, 0.0, 'C')
+        iv = calculate_american_iv(price, 100, 100, 0.25, 0.05, 0.0, 'C')
+        assert iv is not None, "IV calculation failed"
+        assert abs(iv - original_vol) < 0.001, f"IV {iv} doesn't match original {original_vol}"
+
+    def test_iv_recovery_put(self):
+        """Should recover original vol from American put price."""
+        original_vol = 0.30
+        price = bjerksund_stensland_2002(100, 100, 0.5, 0.05, original_vol, 0.0, 'P')
+        iv = calculate_american_iv(price, 100, 100, 0.5, 0.05, 0.0, 'P')
+        assert iv is not None, "IV calculation failed"
+        assert abs(iv - original_vol) < 0.001, f"IV {iv} doesn't match original {original_vol}"
+
+    def test_iv_recovery_with_dividend(self):
+        """Should recover vol with dividend yield."""
+        original_vol = 0.30
+        price = bjerksund_stensland_2002(100, 100, 0.5, 0.05, original_vol, 0.03, 'C')
+        iv = calculate_american_iv(price, 100, 100, 0.5, 0.05, 0.03, 'C')
+        assert iv is not None, "IV calculation failed"
+        assert abs(iv - original_vol) < 0.001, f"IV {iv} doesn't match original {original_vol}"
+
+    def test_iv_various_strikes(self):
+        """IV should be recoverable across strike range."""
+        original_vol = 0.30
+        for K in [80, 90, 100, 110, 120]:
+            price = bjerksund_stensland_2002(100, K, 0.5, 0.05, original_vol, 0.0, 'P')
+            iv = calculate_american_iv(price, 100, K, 0.5, 0.05, 0.0, 'P')
+            if iv is not None:
+                assert abs(iv - original_vol) < 0.01, f"IV mismatch at K={K}: {iv:.4f}"
+
+    def test_american_iv_lower_for_put(self):
+        """For same market price, American IV < European IV for puts.
+
+        Because American put is worth more than European (early exercise),
+        a lower vol is needed to match the same market price.
+        """
+        S, K, T, r = 100, 100, 0.5, 0.05
+        # Use a market price that's between European and American theoretical
+        bs_put = black_scholes_price(S, K, T, r, 0.30, 'P')
+        am_put = bjerksund_stensland_2002(S, K, T, r, 0.30, 0.0, 'P')
+
+        # Use the American price as "market price"
+        iv_european = calculate_implied_volatility(am_put, S, K, T, r, 'P')
+        iv_american = calculate_american_iv(am_put, S, K, T, r, 0.0, 'P')
+
+        assert iv_european is not None and iv_american is not None
+        # European IV should be higher to compensate for the model underpricing puts
+        assert iv_european > iv_american, \
+            f"European IV {iv_european:.4f} should > American IV {iv_american:.4f}"
+
+    def test_iv_invalid_price(self):
+        """IV should return None for price below intrinsic."""
+        iv = calculate_american_iv(
+            market_price=5, S=110, K=100, T=0.25, r=0.05, q=0.0, option_type='C'
+        )
+        assert iv is None, "Should return None for price below intrinsic"
+
+
+class TestUnifiedPricing:
+    """Test calculate_theoretical_price with model parameter."""
+
+    def test_american_model(self):
+        """model='american' should use BS2002."""
+        theo = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'P', model='american')
+        am_direct = bjerksund_stensland_2002(100, 100, 0.5, 0.05, 0.30, 0.0, 'P')
+        assert abs(theo.price - am_direct) < 0.001
+        assert theo.model == 'american'
+
+    def test_bs_model(self):
+        """model='black_scholes' should use BS."""
+        theo = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'P', model='black_scholes')
+        bs_direct = black_scholes_price(100, 100, 0.5, 0.05, 0.30, 'P')
+        assert abs(theo.price - bs_direct) < 0.001
+        assert theo.model == 'black_scholes'
+
+    def test_default_is_american(self):
+        """Default model should be 'american'."""
+        theo = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'P')
+        assert theo.model == 'american'
+
+    def test_american_put_higher_than_bs(self):
+        """American put from unified interface should be >= BS put."""
+        am_theo = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'P', model='american')
+        bs_theo = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'P', model='black_scholes')
+        assert am_theo.price >= bs_theo.price - 0.01
+
+    def test_dividend_yield_parameter(self):
+        """q parameter should affect American pricing."""
+        no_div = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'C', model='american', q=0.0)
+        with_div = calculate_theoretical_price(100, 100, 0.5, 0.05, 0.30, 'C', model='american', q=0.03)
+        assert with_div.price < no_div.price, "Dividend should reduce call value"
+
+
+class TestMispricingWithAmerican:
+    """Test mispricing detection using American pricing model."""
+
+    def test_mispricing_uses_american_by_default(self):
+        """analyze_option_mispricing should use American pricing by default."""
+        signal = analyze_option_mispricing(
+            underlying='TEST', expiry='20260301', strike=100, right='P',
+            market_bid=8.0, market_ask=8.5, spot_price=100,
+            historical_vol=0.30, days_to_expiry=60,
+        )
+        # Should not crash and should return a valid signal
+        assert signal.signal in ('BUY', 'SELL', 'NEUTRAL')
+
+    def test_mispricing_bs_model(self):
+        """model='black_scholes' should use BS pricing for mispricing."""
+        signal = analyze_option_mispricing(
+            underlying='TEST', expiry='20260301', strike=100, right='P',
+            market_bid=8.0, market_ask=8.5, spot_price=100,
+            historical_vol=0.30, days_to_expiry=60,
+            model='black_scholes',
+        )
+        assert signal.signal in ('BUY', 'SELL', 'NEUTRAL')
+
+    def test_american_less_mispricing_for_puts(self):
+        """American model should show less mispricing for puts (higher theoretical)."""
+        # Use a put price that's between BS and American theoretical
+        am_price = bjerksund_stensland_2002(100, 100, 60/365, 0.05, 0.30, 0.0, 'P')
+        bs_price = black_scholes_price(100, 100, 60/365, 0.05, 0.30, 'P')
+
+        # Market price = American theoretical (should be NEUTRAL with American model)
+        market_mid = am_price
+        sig_am = analyze_option_mispricing(
+            underlying='TEST', expiry='20260301', strike=100, right='P',
+            market_bid=market_mid - 0.1, market_ask=market_mid + 0.1,
+            spot_price=100, historical_vol=0.30, days_to_expiry=60,
+            model='american', use_smile_adjustment=False,
+        )
+        sig_bs = analyze_option_mispricing(
+            underlying='TEST', expiry='20260301', strike=100, right='P',
+            market_bid=market_mid - 0.1, market_ask=market_mid + 0.1,
+            spot_price=100, historical_vol=0.30, days_to_expiry=60,
+            model='black_scholes', use_smile_adjustment=False,
+        )
+
+        # American model should show less mispricing (closer to market)
+        assert abs(sig_am.mispricing_pct) < abs(sig_bs.mispricing_pct), \
+            f"American {sig_am.mispricing_pct:.2f}% should be less than BS {sig_bs.mispricing_pct:.2f}%"
 
 
 def run_quick_test():

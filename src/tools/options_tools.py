@@ -4,7 +4,7 @@ Options / IV tool functions (4 tools).
 7.  get_iv_analysis     — Full IV environment analysis (rank, percentile, signal)
 8.  get_iv_history_data — Raw IV history data points
 9.  scan_mispricing     — Option mispricing scanner (requires IBKR quotes)
-10. calculate_greeks    — Black-Scholes Greeks calculator (pure math)
+10. calculate_greeks    — Option Greeks calculator (American BS2002 / European BS)
 """
 
 from __future__ import annotations
@@ -213,9 +213,11 @@ def calculate_greeks(
     r: float,
     sigma: float,
     option_type: str = "C",
+    model: str = "american",
+    dividend_yield: float = 0.0,
 ) -> Dict[str, float]:
     """
-    Calculate Black-Scholes Greeks for an option.
+    Calculate option Greeks.
 
     Pure calculation — no data access needed.
 
@@ -226,13 +228,18 @@ def calculate_greeks(
         r: Risk-free rate (e.g. 0.05 for 5%)
         sigma: Volatility (e.g. 0.30 for 30%)
         option_type: 'C' for call, 'P' for put
+        model: 'american' (Bjerksund-Stensland 2002) or 'black_scholes'
+        dividend_yield: Continuous dividend yield (for 'american' model)
 
     Returns:
-        Dict with delta, gamma, theta, vega, rho
+        Dict with delta, gamma, theta, vega, rho, model
     """
-    from analysis import black_scholes_greeks
-
-    greeks = black_scholes_greeks(S, K, T, r, sigma, option_type)
+    if model == "american":
+        from analysis import american_greeks
+        greeks = american_greeks(S, K, T, r, sigma, dividend_yield, option_type)
+    else:
+        from analysis import black_scholes_greeks
+        greeks = black_scholes_greeks(S, K, T, r, sigma, option_type)
 
     return {
         "spot": S,
@@ -241,6 +248,8 @@ def calculate_greeks(
         "risk_free_rate": r,
         "volatility": sigma,
         "option_type": option_type,
+        "model": model,
+        "dividend_yield": dividend_yield,
         "delta": round(greeks["delta"], 6),
         "gamma": round(greeks["gamma"], 6),
         "theta": round(greeks["theta"], 6),
