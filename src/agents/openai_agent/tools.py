@@ -68,6 +68,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         scan_mispricing,
         calculate_greeks,
     )
+    from src.tools.option_chain_tools import get_option_chain as _get_option_chain
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
@@ -76,6 +77,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
         get_detailed_financials,
+        get_peer_comparison,
         get_watchlist_overview,
         get_morning_brief,
     )
@@ -268,6 +270,28 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = calculate_greeks(S=S, K=K, T=T, r=r, sigma=sigma, option_type=option_type)
         return _serialize_result(result, "calculate_greeks")
 
+    @function_tool
+    def tool_get_option_chain(
+        ticker: str,
+        expiry: Optional[str] = None,
+        num_strikes: int = 10,
+        max_expirations_for_term_structure: int = 6,
+    ) -> str:
+        """Get live option chain from IBKR: P/C ratio, max pain, OI concentration, IV term structure. Takes ~30 seconds.
+
+        Args:
+            ticker: Stock ticker symbol
+            expiry: Target expiration YYYYMMDD (default: nearest with >=7 DTE)
+            num_strikes: Strikes above/below ATM (default: 10)
+            max_expirations_for_term_structure: Expirations for IV term structure (default: 6)
+        """
+        result = _get_option_chain(
+            ticker=ticker, expiry=expiry,
+            num_strikes=num_strikes,
+            max_expirations_for_term_structure=max_expirations_for_term_structure,
+        )
+        return _serialize_result(result, "get_option_chain")
+
     # ================================================================
     # Signal Tools
     # ================================================================
@@ -341,6 +365,22 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """
         result = get_detailed_financials(dal, ticker)
         return _serialize_result(result, "get_detailed_financials")
+
+    @function_tool
+    def tool_get_peer_comparison(
+        ticker: Optional[str] = None,
+        tickers: Optional[List[str]] = None,
+        sector: Optional[str] = None,
+    ) -> str:
+        """Compare a ticker vs sector peers: PE, EV/EBITDA, margins, growth, ROE, ROIC, Rule of 40. Returns matrix, rankings, medians.
+
+        Args:
+            ticker: Target ticker to rank vs peers (auto-detects sector)
+            tickers: Explicit peer list (overrides sector)
+            sector: Sector from sectors.yaml (e.g. AI_CHIPS, FINTECH)
+        """
+        result = get_peer_comparison(dal, ticker=ticker, tickers=tickers, sector=sector)
+        return _serialize_result(result, "get_peer_comparison")
 
     @function_tool
     def tool_get_sec_filings(
@@ -694,11 +734,13 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_iv_history_data,
         tool_scan_mispricing,
         tool_calculate_greeks,
+        tool_get_option_chain,
         tool_detect_anomalies,
         tool_detect_event_chains,
         tool_synthesize_signal,
         tool_get_fundamentals_analysis,
         tool_get_detailed_financials,
+        tool_get_peer_comparison,
         tool_get_sec_filings,
         tool_get_insider_trades,
         tool_get_watchlist_overview,

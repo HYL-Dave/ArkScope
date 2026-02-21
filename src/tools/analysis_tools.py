@@ -1,11 +1,12 @@
 """
-Analysis tool functions (5 tools).
+Analysis tool functions (6 tools).
 
 14. get_fundamentals_analysis — Fundamental data with derived metrics
 15. get_sec_filings           — SEC filing metadata
 16. get_watchlist_overview    — Summary of all watchlist tickers
 17. get_morning_brief         — Personalized morning briefing
 18. get_detailed_financials   — Comprehensive valuation + tech metrics
+19. get_peer_comparison       — Peer comparison with sector rankings
 """
 
 from __future__ import annotations
@@ -571,3 +572,201 @@ def get_detailed_financials(
         earnings_surprises=earnings_history,
         upcoming_earnings=upcoming,
     )
+
+
+# ============================================================
+# 19. get_peer_comparison
+# ============================================================
+
+# Metrics to compare: (field_name, display_name, higher_is_better)
+# None = neutral (no "better" direction)
+_COMPARISON_METRICS = [
+    ("pe_ratio", "P/E", False),
+    ("ev_to_ebitda", "EV/EBITDA", False),
+    ("ev_to_revenue", "EV/Revenue", False),
+    ("ps_ratio", "P/S", False),
+    ("pb_ratio", "P/B", False),
+    ("peg_ratio", "PEG", False),
+    ("fcf_yield", "FCF Yield", True),
+    ("gross_margin", "Gross Margin", True),
+    ("operating_margin", "Op Margin", True),
+    ("net_margin", "Net Margin", True),
+    ("roe", "ROE", True),
+    ("roic", "ROIC", True),
+    ("revenue_growth", "Rev Growth", True),
+    ("earnings_growth", "EPS Growth", True),
+    ("debt_to_equity", "D/E", False),
+    ("current_ratio", "Current Ratio", True),
+    ("rule_of_40", "Rule of 40", True),
+    ("rd_to_revenue", "R&D/Rev", None),
+]
+
+
+def _percentile_rank(value: float, values: List[float]) -> float:
+    """Calculate percentile rank of value among values (0-100)."""
+    if not values or len(values) < 2:
+        return 50.0
+    below = sum(1 for v in values if v < value)
+    equal = sum(1 for v in values if v == value)
+    return round((below + equal * 0.5) / len(values) * 100, 1)
+
+
+def get_peer_comparison(
+    dal,
+    ticker: Optional[str] = None,
+    tickers: Optional[List[str]] = None,
+    sector: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Compare a ticker against sector peers on key financial metrics.
+
+    Three input modes:
+    1. ticker only — auto-detect sector from sectors.yaml
+    2. sector only — compare all tickers in that sector
+    3. tickers — explicit custom peer group
+
+    Uses get_detailed_financials() internally (SEC EDGAR cached 90 days).
+
+    Args:
+        dal: DataAccessLayer instance.
+        ticker: Target ticker to rank vs peers.
+        tickers: Explicit list of peer tickers.
+        sector: Sector name from sectors.yaml.
+
+    Returns:
+        Dict with comparison matrix, rankings, and sector statistics.
+    """
+    from statistics import mean, median
+
+    # ── Step 1: Resolve peer list ──────────────────────────
+    target = None
+    resolved_sector = "custom"
+
+    if tickers:
+        peer_list = [t.upper() for t in tickers]
+        if ticker:
+            target = ticker.upper()
+    elif sector:
+        peer_list = dal.get_sector_tickers(sector)
+        resolved_sector = sector
+        if ticker:
+            target = ticker.upper()
+    elif ticker:
+        target = ticker.upper()
+        all_sectors = dal.get_all_sectors()
+        matching = [s for s, ticks in all_sectors.items() if target in ticks]
+        if not matching:
+            return {
+                "error": f"{target} not found in any sector in sectors.yaml",
+                "ticker": target,
+            }
+        resolved_sector = matching[0]
+        peer_list = dal.get_sector_tickers(resolved_sector)
+    else:
+        return {"error": "Must provide ticker, tickers, or sector"}
+
+    if not peer_list:
+        return {"error": f"No tickers found for sector '{sector}'"}
+
+    # Ensure target is in peer list
+    if target and target not in peer_list:
+        peer_list.append(target)
+
+    # ── Step 2: Fetch financials for all peers ─────────────
+    financials: Dict[str, Any] = {}
+    errors = []
+
+    for t in peer_list:
+        try:
+            result = get_detailed_financials(dal, t)
+            financials[t] = result
+        except Exception as e:
+            logger.warning(f"Failed to get financials for {t}: {e}")
+            errors.append({"ticker": t, "error": str(e)})
+
+    if not financials:
+        return {"error": "Could not fetch financials for any peer"}
+
+    # ── Step 3: Build comparison matrix ────────────────────
+    comparison_matrix = {}
+    for t, fin in financials.items():
+        row = {}
+        for field, _, _ in _COMPARISON_METRICS:
+            val = getattr(fin, field, None)
+            if val is not None:
+                row[field] = round(val, 4) if isinstance(val, float) else val
+            else:
+                row[field] = None
+        comparison_matrix[t] = row
+
+    # ── Step 4: Compute sector statistics ──────────────────
+    sector_stats = {}
+    for field, display, _ in _COMPARISON_METRICS:
+        values = [
+            comparison_matrix[t][field]
+            for t in comparison_matrix
+            if comparison_matrix[t][field] is not None
+        ]
+        if values:
+            sector_stats[field] = {
+                "median": round(median(values), 4),
+                "mean": round(mean(values), 4),
+                "count": len(values),
+            }
+        else:
+            sector_stats[field] = {"median": None, "mean": None, "count": 0}
+
+    # ── Step 5: Compute rankings for target ────────────────
+    rankings = None
+    if target and target in comparison_matrix:
+        rankings = {}
+        for field, _, higher_is_better in _COMPARISON_METRICS:
+            target_val = comparison_matrix[target][field]
+            if target_val is None:
+                continue
+            values = [
+                comparison_matrix[t][field]
+                for t in comparison_matrix
+                if comparison_matrix[t][field] is not None
+            ]
+            if not values:
+                continue
+
+            # Rank (1 = best)
+            if higher_is_better is True:
+                sorted_vals = sorted(values, reverse=True)
+                direction = "higher_better"
+            elif higher_is_better is False:
+                sorted_vals = sorted(values)
+                direction = "lower_better"
+            else:
+                sorted_vals = sorted(values)
+                direction = "neutral"
+
+            rank = sorted_vals.index(target_val) + 1 if target_val in sorted_vals else len(values)
+            pct = _percentile_rank(target_val, values)
+            # For "lower is better", invert percentile for intuition
+            if higher_is_better is False:
+                pct = round(100 - pct, 1)
+
+            rankings[field] = {
+                "value": target_val,
+                "rank": rank,
+                "of": len(values),
+                "percentile": pct,
+                "direction": direction,
+            }
+
+    return {
+        "target_ticker": target,
+        "sector": resolved_sector,
+        "peer_count": len(financials),
+        "comparison_matrix": comparison_matrix,
+        "rankings": rankings,
+        "sector_stats": sector_stats,
+        "data_quality": {
+            "peers_with_data": len(financials),
+            "peers_failed": [e["ticker"] for e in errors],
+            "data_source": "sec_edgar",
+        },
+    }

@@ -248,6 +248,37 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["S", "K", "T", "r", "sigma"]
             }
         },
+        {
+            "name": "get_option_chain",
+            "description": (
+                "Get live option chain from IBKR with analysis: "
+                "call/put quotes around ATM, P/C ratio (volume + OI), max pain, "
+                "OI concentration, IV term structure, and bid-ask quality. "
+                "Requires IBKR gateway running. Takes ~30 seconds."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "expiry": {
+                        "type": "string",
+                        "description": "Target expiration YYYYMMDD (default: nearest with >=7 DTE)"
+                    },
+                    "num_strikes": {
+                        "type": "integer",
+                        "description": "Strikes above/below ATM (default: 10)"
+                    },
+                    "max_expirations_for_term_structure": {
+                        "type": "integer",
+                        "description": "Expirations for IV term structure (default: 6)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
         # Signal Tools
         {
             "name": "detect_anomalies",
@@ -339,6 +370,34 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     }
                 },
                 "required": ["ticker"]
+            }
+        },
+        {
+            "name": "get_peer_comparison",
+            "description": (
+                "Compare a ticker vs sector peers on key metrics: PE, EV/EBITDA, "
+                "margins, growth, ROE, ROIC, Rule of 40. Returns comparison matrix, "
+                "percentile rankings, and sector medians. Provide ticker (auto-detect "
+                "sector), sector name, or explicit tickers list."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Target ticker to rank vs peers"
+                    },
+                    "tickers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Explicit peer list (overrides sector)"
+                    },
+                    "sector": {
+                        "type": "string",
+                        "description": "Sector from sectors.yaml (e.g. AI_CHIPS)"
+                    }
+                },
+                "required": []
             }
         },
         {
@@ -784,6 +843,7 @@ def execute_tool(
         scan_mispricing,
         calculate_greeks,
     )
+    from src.tools.option_chain_tools import get_option_chain
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
@@ -792,6 +852,7 @@ def execute_tool(
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
         get_detailed_financials,
+        get_peer_comparison,
         get_watchlist_overview,
         get_morning_brief,
     )
@@ -866,6 +927,13 @@ def execute_tool(
             sigma=tool_input["sigma"],
             option_type=tool_input.get("option_type", "C")
         ),
+        "get_option_chain": lambda: get_option_chain(
+            ticker=tool_input["ticker"],
+            expiry=tool_input.get("expiry"),
+            num_strikes=tool_input.get("num_strikes", 10),
+            max_expirations_for_term_structure=tool_input.get(
+                "max_expirations_for_term_structure", 6),
+        ),
         "detect_anomalies": lambda: detect_anomalies(
             dal,
             tool_input["ticker"],
@@ -889,6 +957,12 @@ def execute_tool(
         "get_detailed_financials": lambda: get_detailed_financials(
             dal,
             tool_input["ticker"]
+        ),
+        "get_peer_comparison": lambda: get_peer_comparison(
+            dal,
+            ticker=tool_input.get("ticker"),
+            tickers=tool_input.get("tickers"),
+            sector=tool_input.get("sector"),
         ),
         "get_sec_filings": lambda: get_sec_filings(
             ticker=tool_input["ticker"],

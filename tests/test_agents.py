@@ -93,7 +93,7 @@ class TestAnthropicToolSchemas:
         """All 31 tools are defined (base + web + analyst + insider + delegate + report + memory)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 32
+        assert len(tools) == 34
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -145,6 +145,8 @@ class TestAnthropicToolSchemas:
             "list_memories",
             "delete_memory",
             "get_detailed_financials",
+            "get_option_chain",
+            "get_peer_comparison",
         }
         assert tool_names == expected
 
@@ -223,7 +225,7 @@ class TestOpenAIToolCreation:
         """Creates 31 tools (base + web + analyst + insider + delegate + report + memory)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 32
+        assert len(tools) == 34
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -307,7 +309,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 31
+        assert len(schemas) == 33
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -321,7 +323,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 31
+        assert len(schemas) == 33
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

@@ -266,6 +266,7 @@ class ToolRegistry:
             scan_mispricing,
             calculate_greeks,
         )
+        from .option_chain_tools import get_option_chain
 
         self.register(ToolDefinition(
             name="get_iv_analysis",
@@ -326,6 +327,31 @@ class ToolRegistry:
             ],
         ))
 
+        self.register(ToolDefinition(
+            name="get_option_chain",
+            description=(
+                "Get live option chain from IBKR with analysis: "
+                "call/put quotes around ATM, P/C ratio (volume + OI), max pain, "
+                "OI concentration, IV term structure, and bid-ask quality. "
+                "Requires IBKR gateway running. Takes ~30 seconds."
+            ),
+            function=get_option_chain,
+            category="options",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("expiry", "string",
+                              "Target expiration YYYYMMDD (default: nearest with >=7 DTE)",
+                              required=False),
+                ToolParameter("num_strikes", "integer",
+                              "Strikes above/below ATM to fetch (default: 10)",
+                              required=False),
+                ToolParameter("max_expirations_for_term_structure", "integer",
+                              "Expirations for IV term structure (default: 6)",
+                              required=False),
+            ],
+        ))
+
     def _register_signal_tools(self) -> None:
         from .signal_tools import (
             detect_anomalies,
@@ -373,6 +399,7 @@ class ToolRegistry:
         from .analysis_tools import (
             get_fundamentals_analysis,
             get_detailed_financials,
+            get_peer_comparison,
             get_watchlist_overview,
             get_morning_brief,
         )
@@ -466,6 +493,30 @@ class ToolRegistry:
             category="analysis",
             requires_dal=True,
             parameters=[],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_peer_comparison",
+            description=(
+                "Compare a ticker vs sector peers on key metrics: "
+                "PE, EV/EBITDA, margins, growth, ROE, ROIC, Rule of 40. "
+                "Returns comparison matrix, percentile rankings, and sector medians. "
+                "Auto-detects sector from sectors.yaml, or accepts explicit peer list."
+            ),
+            function=get_peer_comparison,
+            category="analysis",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("ticker", "string",
+                              "Target ticker to rank vs peers (auto-detects sector)",
+                              required=False),
+                ToolParameter("tickers", "array",
+                              "Explicit list of tickers for custom peer group",
+                              required=False),
+                ToolParameter("sector", "string",
+                              "Sector name from sectors.yaml (e.g. AI_CHIPS, FINTECH)",
+                              required=False),
+            ],
         ))
 
 
