@@ -11,6 +11,9 @@ SEC Filings 整合模組測試
 import sys
 from pathlib import Path
 
+import pytest
+pytestmark = pytest.mark.skip("manual test script — run directly with python")
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data_sources.sec_filings import SECFilingsClient

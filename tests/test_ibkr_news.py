@@ -12,6 +12,9 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+pytestmark = pytest.mark.skip("manual test script — requires IBKR TWS")
+
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

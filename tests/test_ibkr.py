@@ -30,6 +30,9 @@ Usage:
 import os
 import sys
 import time
+
+import pytest
+pytestmark = pytest.mark.skip("manual test script — requires IBKR TWS")
 import argparse
 from datetime import date, datetime, timedelta
 from pathlib import Path

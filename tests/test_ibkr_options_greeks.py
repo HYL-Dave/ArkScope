@@ -20,6 +20,9 @@ import sys
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
+import pytest
+pytestmark = pytest.mark.skip("manual test script — requires IBKR TWS")
+
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

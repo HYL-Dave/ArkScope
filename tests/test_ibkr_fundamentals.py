@@ -23,6 +23,9 @@ Requirements:
 import os
 import sys
 from datetime import datetime
+
+import pytest
+pytestmark = pytest.mark.skip("manual test script — requires IBKR TWS")
 from typing import Optional, Dict, Any, List
 
 # Add parent directory to path

@@ -20,6 +20,9 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+import pytest
+pytestmark = pytest.mark.skip("manual test script — requires IBKR TWS")
+
 # Add project root
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
