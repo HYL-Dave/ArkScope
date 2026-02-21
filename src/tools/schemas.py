@@ -253,6 +253,73 @@ class WatchlistResult(BaseModel):
 # Agent Query (for POST /query)
 # ============================================================
 
+# ============================================================
+# Detailed Financials (valuation + tech metrics)
+# ============================================================
+
+class DetailedFinancials(BaseModel):
+    """Comprehensive financial metrics for valuation analysis."""
+    ticker: str
+    report_date: Optional[str] = None
+    data_source: str = Field(default="sec_edgar")
+
+    # Valuation (EV-based — SEC EDGAR cached quarterly)
+    market_cap: Optional[float] = None
+    enterprise_value: Optional[float] = None
+    ev_to_ebitda: Optional[float] = Field(None, description="EV / EBITDA")
+    ev_to_revenue: Optional[float] = Field(None, description="EV / Revenue")
+    fcf_yield: Optional[float] = Field(None, description="FCF / Market Cap")
+    peg_ratio: Optional[float] = Field(None, description="PE / Earnings Growth")
+
+    # Valuation (price-based — IBKR real-time preferred, SEC fallback)
+    pe_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+    ps_ratio: Optional[float] = None
+
+    # Profitability
+    gross_margin: Optional[float] = None
+    operating_margin: Optional[float] = None
+    net_margin: Optional[float] = None
+    roe: Optional[float] = None
+    roa: Optional[float] = None
+    roic: Optional[float] = Field(None, description="Return on invested capital")
+
+    # Tech-specific (SEC EDGAR)
+    sbc_to_revenue: Optional[float] = Field(None, description="Stock-based compensation / revenue")
+    rd_to_revenue: Optional[float] = Field(None, description="R&D expense / revenue")
+    rule_of_40: Optional[float] = Field(None, description="Revenue growth% + FCF margin%")
+    sbc_absolute: Optional[float] = Field(None, description="SBC expense (absolute)")
+    rd_absolute: Optional[float] = Field(None, description="R&D expense (absolute)")
+
+    # Growth
+    revenue_growth: Optional[float] = None
+    earnings_growth: Optional[float] = None
+    fcf_growth: Optional[float] = Field(None, description="Free cash flow growth")
+    ebitda_growth: Optional[float] = None
+
+    # Leverage & Liquidity
+    debt_to_equity: Optional[float] = None
+    current_ratio: Optional[float] = None
+    interest_coverage: Optional[float] = None
+
+    # Cash
+    free_cash_flow: Optional[float] = None
+    cash_and_equivalents: Optional[float] = None
+    total_debt: Optional[float] = None
+
+    # Per-share
+    eps: Optional[float] = None
+    fcf_per_share: Optional[float] = None
+
+    # Earnings surprise (Finnhub)
+    earnings_surprises: Optional[List[Dict]] = Field(
+        None, description="Last 4 quarters: period, actual, estimate, surprisePercent"
+    )
+    upcoming_earnings: Optional[Dict] = Field(
+        None, description="Next earnings: date, hour, epsEstimate"
+    )
+
+
 class QueryRequest(BaseModel):
     """Agent query request."""
     question: str

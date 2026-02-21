@@ -1,10 +1,11 @@
 """
-Analysis tool functions (4 tools).
+Analysis tool functions (5 tools).
 
 14. get_fundamentals_analysis — Fundamental data with derived metrics
 15. get_sec_filings           — SEC filing metadata
 16. get_watchlist_overview    — Summary of all watchlist tickers
 17. get_morning_brief         — Personalized morning briefing
+18. get_detailed_financials   — Comprehensive valuation + tech metrics
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
-from .schemas import FinancialStatement, FundamentalsResult, SECFiling
+from .schemas import DetailedFinancials, FinancialStatement, FundamentalsResult, SECFiling
 
 logger = logging.getLogger(__name__)
 
@@ -432,3 +433,141 @@ def get_morning_brief(
         "sector_highlights": sector_highlights,
         "notable_news": notable_news[:5],
     }
+
+
+def get_detailed_financials(
+    dal: DataAccessLayer,
+    ticker: str,
+) -> DetailedFinancials:
+    """
+    Comprehensive financial metrics with layered data sources.
+
+    Layer 1: SEC EDGAR cached metrics (quarterly, stored in financial_data_cache)
+             — EV/EBITDA, EV/Revenue, margins, growth, SBC, R&D, Rule of 40
+    Layer 2: IBKR real-time (optional, requires TWS)
+             — PE, PB, PS, market_cap override with live prices
+    Layer 3: Finnhub earnings surprise (last 4 quarters + upcoming)
+
+    Args:
+        dal: DataAccessLayer instance
+        ticker: Stock ticker symbol
+
+    Returns:
+        DetailedFinancials with all available metrics
+    """
+    ticker = ticker.upper()
+    cache_key = f"metrics_{ticker}_annual"
+
+    # --- Layer 1: SEC EDGAR metrics (cached) ---
+    cached = None
+    try:
+        if hasattr(dal._backend, "get_financial_cache"):
+            cached = dal._backend.get_financial_cache(cache_key)
+    except Exception as e:
+        logger.debug(f"Cache read failed for {ticker}: {e}")
+
+    if cached:
+        metrics = cached.get("standard", {})
+        tech = cached.get("tech", {})
+        logger.info(f"{ticker}: Using cached financial metrics")
+    else:
+        # Calculate fresh from SEC EDGAR
+        try:
+            from data_sources.financial_metrics_calculator import FinancialMetricsCalculator
+
+            calc = FinancialMetricsCalculator(ticker)
+            metrics = calc.get_metrics_dict()
+            tech = calc.get_tech_metrics()
+
+            # Cache to DB
+            try:
+                if hasattr(dal._backend, "set_financial_cache"):
+                    dal._backend.set_financial_cache(
+                        cache_key, ticker,
+                        {"standard": metrics, "tech": tech},
+                        ttl_days=90, source="sec_edgar",
+                    )
+            except Exception as e:
+                logger.debug(f"Cache write failed for {ticker}: {e}")
+
+        except Exception as e:
+            logger.warning(f"SEC EDGAR metrics failed for {ticker}: {e}")
+            metrics = {}
+            tech = {}
+
+    # --- Layer 2: IBKR real-time enrichment (optional) ---
+    ibkr_pe = None
+    ibkr_pb = None
+    ibkr_ps = None
+    ibkr_mktcap = None
+
+    try:
+        fundamentals = dal.get_fundamentals(ticker)
+        if fundamentals and fundamentals.snapshot:
+            snap = fundamentals.snapshot
+            ibkr_pe = snap.get("pe_ratio")
+            ibkr_pb = snap.get("price_to_book")
+            ibkr_ps = snap.get("price_to_sales")
+            ibkr_mktcap = snap.get("market_cap")
+    except Exception as e:
+        logger.debug(f"IBKR enrichment failed for {ticker}: {e}")
+
+    # --- Layer 3: Finnhub earnings surprise ---
+    earnings_history = None
+    upcoming = None
+    try:
+        from .analyst_tools import _fetch_earnings_history, _fetch_upcoming_earnings
+        earnings_history = _fetch_earnings_history(ticker) or None
+        upcoming = _fetch_upcoming_earnings(ticker)
+    except Exception as e:
+        logger.debug(f"Finnhub earnings failed for {ticker}: {e}")
+
+    # --- Build result (IBKR overrides SEC for price-based metrics) ---
+    return DetailedFinancials(
+        ticker=ticker,
+        report_date=metrics.get("report_date"),
+        data_source="ibkr+sec_edgar" if ibkr_pe else "sec_edgar",
+        # Valuation — EV-based (SEC)
+        market_cap=ibkr_mktcap or metrics.get("market_cap"),
+        enterprise_value=metrics.get("enterprise_value"),
+        ev_to_ebitda=metrics.get("enterprise_value_to_ebitda_ratio"),
+        ev_to_revenue=metrics.get("enterprise_value_to_revenue_ratio"),
+        fcf_yield=metrics.get("free_cash_flow_yield"),
+        peg_ratio=metrics.get("peg_ratio"),
+        # Valuation — price-based (IBKR preferred)
+        pe_ratio=ibkr_pe or metrics.get("price_to_earnings_ratio"),
+        pb_ratio=ibkr_pb or metrics.get("price_to_book_ratio"),
+        ps_ratio=ibkr_ps or metrics.get("price_to_sales_ratio"),
+        # Profitability
+        gross_margin=metrics.get("gross_margin"),
+        operating_margin=metrics.get("operating_margin"),
+        net_margin=metrics.get("net_margin"),
+        roe=metrics.get("return_on_equity"),
+        roa=metrics.get("return_on_assets"),
+        roic=metrics.get("return_on_invested_capital"),
+        # Tech-specific
+        sbc_to_revenue=tech.get("sbc_to_revenue"),
+        rd_to_revenue=tech.get("rd_to_revenue"),
+        rule_of_40=tech.get("rule_of_40"),
+        sbc_absolute=tech.get("sbc_absolute"),
+        rd_absolute=tech.get("rd_absolute"),
+        # Growth
+        revenue_growth=metrics.get("revenue_growth"),
+        earnings_growth=metrics.get("earnings_growth"),
+        fcf_growth=metrics.get("free_cash_flow_growth"),
+        ebitda_growth=metrics.get("ebitda_growth"),
+        # Leverage & Liquidity
+        debt_to_equity=metrics.get("debt_to_equity"),
+        current_ratio=metrics.get("current_ratio"),
+        interest_coverage=metrics.get("interest_coverage"),
+        # Cash (from balance sheet / cash flow in metrics calculator)
+        free_cash_flow=None,
+        cash_and_equivalents=None,
+        total_debt=None,
+        # Per-share
+        eps=metrics.get("earnings_per_share"),
+        fcf_per_share=metrics.get("free_cash_flow_per_share"),
+        # Earnings surprise
+        earnings_surprises=earnings_history,
+        upcoming_earnings=upcoming,
+    )

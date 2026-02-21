@@ -634,3 +634,55 @@ class DatabaseBackend:
             logger.error(f"Failed to insert agent query: {e}")
             self._conn = None
             return None
+
+    # --------------------------------------------------------
+    # Financial Data Cache
+    # --------------------------------------------------------
+
+    def get_financial_cache(self, cache_key: str) -> Optional[dict]:
+        """Read from financial_data_cache if not expired."""
+        conn = self._get_conn()
+        sql = """
+            SELECT data FROM financial_data_cache
+            WHERE cache_key = %s AND expires_at > NOW()
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (cache_key,))
+                row = cur.fetchone()
+                return row[0] if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to read financial cache: {e}")
+            self._conn = None
+            return None
+
+    def set_financial_cache(
+        self,
+        cache_key: str,
+        ticker: str,
+        data: dict,
+        ttl_days: int = 90,
+        source: str = "sec_edgar",
+    ) -> bool:
+        """Write to financial_data_cache with TTL."""
+        conn = self._get_conn()
+        sql = """
+            INSERT INTO financial_data_cache (cache_key, source, ticker, data, expires_at)
+            VALUES (%s, %s, %s, %s, NOW() + INTERVAL '%s days')
+            ON CONFLICT (cache_key) DO UPDATE SET
+                data = EXCLUDED.data,
+                source = EXCLUDED.source,
+                fetched_at = NOW(),
+                expires_at = NOW() + INTERVAL '%s days'
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (
+                    cache_key, source, ticker.upper(),
+                    json.dumps(data), ttl_days, ttl_days,
+                ))
+            return True
+        except psycopg2.Error as e:
+            logger.error(f"Failed to write financial cache: {e}")
+            self._conn = None
+            return False

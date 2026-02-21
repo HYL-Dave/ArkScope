@@ -75,6 +75,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
+        get_detailed_financials,
         get_watchlist_overview,
         get_morning_brief,
     )
@@ -330,6 +331,16 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """
         result = get_fundamentals_analysis(dal, ticker)
         return _serialize_result(result, "get_fundamentals_analysis")
+
+    @function_tool
+    def tool_get_detailed_financials(ticker: str) -> str:
+        """Get comprehensive financial metrics: EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), and earnings surprise.
+
+        Args:
+            ticker: Stock ticker symbol
+        """
+        result = get_detailed_financials(dal, ticker)
+        return _serialize_result(result, "get_detailed_financials")
 
     @function_tool
     def tool_get_sec_filings(
@@ -687,6 +698,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_detect_event_chains,
         tool_synthesize_signal,
         tool_get_fundamentals_analysis,
+        tool_get_detailed_financials,
         tool_get_sec_filings,
         tool_get_insider_trades,
         tool_get_watchlist_overview,

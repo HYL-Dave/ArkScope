@@ -1078,6 +1078,60 @@ class FinancialMetricsCalculator:
         }
 
     # =========================================================================
+    # Tech-Specific Metrics
+    # =========================================================================
+
+    def get_tech_metrics(self) -> Dict[str, Optional[float]]:
+        """
+        Tech-specific metrics: SBC/Revenue, R&D/Revenue, Rule of 40.
+
+        Data sources:
+        - SBC: SEC EDGAR CashFlowStatement.share_based_compensation
+        - R&D: SEC EDGAR IncomeStatement.research_and_development
+        - Rule of 40: revenue_growth(%) + FCF_margin(%)
+
+        Returns:
+            Dict with sbc_to_revenue, rd_to_revenue, rule_of_40,
+            sbc_absolute, rd_absolute
+        """
+        income = self._load_income_statements(years=2)
+        cashflow = self._load_cash_flow_statements(years=2)
+
+        result: Dict[str, Optional[float]] = {
+            "sbc_to_revenue": None,
+            "rd_to_revenue": None,
+            "rule_of_40": None,
+            "sbc_absolute": None,
+            "rd_absolute": None,
+        }
+
+        revenue = income[0].get("revenue") if income else None
+        sbc = cashflow[0].get("share_based_compensation") if cashflow else None
+        rd = income[0].get("research_and_development") if income else None
+        fcf = cashflow[0].get("free_cash_flow") if cashflow else None
+
+        if revenue and revenue > 0:
+            if sbc is not None:
+                result["sbc_absolute"] = sbc
+                result["sbc_to_revenue"] = round(abs(sbc) / revenue, 4)
+            if rd is not None:
+                result["rd_absolute"] = rd
+                result["rd_to_revenue"] = round(abs(rd) / revenue, 4)
+
+        # Rule of 40 = revenue_growth(%) + FCF_margin(%)
+        growth = self.get_growth_metrics()
+        rev_growth = growth.get("revenue_growth")  # decimal, e.g. 0.15
+
+        fcf_margin = None
+        if revenue and revenue > 0 and fcf is not None:
+            fcf_margin = fcf / revenue
+
+        if rev_growth is not None and fcf_margin is not None:
+            result["rule_of_40"] = round((rev_growth + fcf_margin) * 100, 1)
+
+        return result
+
+    # =========================================================================
     # Get All Metrics
     # =========================================================================
 

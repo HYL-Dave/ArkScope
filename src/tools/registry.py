@@ -372,6 +372,7 @@ class ToolRegistry:
     def _register_analysis_tools(self) -> None:
         from .analysis_tools import (
             get_fundamentals_analysis,
+            get_detailed_financials,
             get_watchlist_overview,
             get_morning_brief,
         )
@@ -393,6 +394,21 @@ class ToolRegistry:
                 ToolParameter("period", "string", "Report period type",
                               required=False, default="annual",
                               enum=["annual", "quarterly"]),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_detailed_financials",
+            description=(
+                "Get comprehensive financial metrics for valuation: "
+                "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
+                "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
+                "and earnings surprise. IBKR real-time + SEC EDGAR cached."
+            ),
+            function=get_detailed_financials,
+            category="analysis",
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
             ],
         ))
 

@@ -323,6 +323,25 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             }
         },
         {
+            "name": "get_detailed_financials",
+            "description": (
+                "Get comprehensive financial metrics for valuation: "
+                "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
+                "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
+                "and earnings surprise. IBKR real-time + SEC EDGAR cached."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
             "name": "get_sec_filings",
             "description": (
                 "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
@@ -772,6 +791,7 @@ def execute_tool(
     )
     from src.tools.analysis_tools import (
         get_fundamentals_analysis,
+        get_detailed_financials,
         get_watchlist_overview,
         get_morning_brief,
     )
@@ -863,6 +883,10 @@ def execute_tool(
             strategy=tool_input.get("strategy")
         ),
         "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
+            dal,
+            tool_input["ticker"]
+        ),
+        "get_detailed_financials": lambda: get_detailed_financials(
             dal,
             tool_input["ticker"]
         ),
