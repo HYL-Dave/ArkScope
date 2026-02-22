@@ -90,6 +90,7 @@ class AgentConfig(BaseModel):
     web_claude_search: bool = False   # Claude server-side web search ($10/1K, off by default)
     web_openai_search: bool = True    # OpenAI SDK WebSearchTool (included in API cost)
     web_playwright: bool = True       # Playwright headless browser (free, local)
+    web_codex_research: bool = True   # Codex CLI deep research (--search, uses API key)
     web_claude_max_uses: int = 5      # Max web searches per conversation (Claude only)
 
 
@@ -224,6 +225,8 @@ def get_agent_config() -> AgentConfig:
         config.web_openai_search = web_prefs["openai_search"]
     if "playwright" in web_prefs:
         config.web_playwright = web_prefs["playwright"]
+    if "codex_research" in web_prefs:
+        config.web_codex_research = web_prefs["codex_research"]
 
     # Server-side compaction (Phase 7a)
     if "server_compaction" in llm_prefs:

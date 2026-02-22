@@ -781,6 +781,30 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             },
         })
 
+    if config.web_codex_research:
+        tools.append({
+            "name": "codex_web_research",
+            "description": (
+                "Deep web research using Codex CLI with live web browsing. "
+                "An autonomous AI research agent that searches multiple sources, "
+                "cross-references information, and produces a structured report. "
+                "Use for deep investigation (earnings analysis, event research, "
+                "competitive landscape). Takes 1-5 minutes."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string",
+                              "description": "Research question or topic to investigate"},
+                    "context": {"type": "string",
+                                "description": "Optional context from earlier tool calls to inform research"},
+                    "timeout": {"type": "integer",
+                                "description": "Max seconds for research (default: 300)"},
+                },
+                "required": ["query"],
+            },
+        })
+
     # Report tools (Phase B)
     tools.extend([
         {
@@ -1009,7 +1033,7 @@ def execute_tool(
         get_insider_trades,
     )
     from src.tools.code_executor import execute_python_code
-    from src.tools.web_tools import web_search, web_fetch, web_browse
+    from src.tools.web_tools import web_search, web_fetch, web_browse, codex_web_research
     from src.tools.analyst_tools import get_analyst_consensus
     from src.tools.report_tools import save_report, list_reports, get_report
     from src.tools.memory_tools import (
@@ -1188,6 +1212,11 @@ def execute_tool(
             extract_links=tool_input.get("extract_links", False),
             offset=tool_input.get("offset", 0),
             max_chars=tool_input.get("max_chars", 5000),
+        ),
+        "codex_web_research": lambda: codex_web_research(
+            query=tool_input["query"],
+            context=tool_input.get("context", ""),
+            timeout=tool_input.get("timeout", 300),
         ),
         # Report tools (Phase B)
         "save_report": lambda: save_report(

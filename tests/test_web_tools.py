@@ -378,7 +378,7 @@ class TestBridgeIntegration:
         assert "tool_web_browse" in names
 
     def test_registry_web_tools(self):
-        """ToolRegistry should register 3 web tools."""
+        """ToolRegistry should register 4 web tools."""
         from src.tools.registry import create_default_registry
         reg = create_default_registry()
         web = reg.list_by_category("web")
@@ -386,7 +386,8 @@ class TestBridgeIntegration:
         assert "tavily_search" in names
         assert "tavily_fetch" in names
         assert "web_browse" in names
-        assert len(web) == 3
+        assert "codex_web_research" in names
+        assert len(web) == 4
 
 
 # ── Config Integration ───────────────────────────────────────────
@@ -399,6 +400,7 @@ class TestConfigIntegration:
         assert c.web_claude_search is False
         assert c.web_openai_search is True
         assert c.web_playwright is True
+        assert c.web_codex_research is True
         assert c.web_claude_max_uses == 5
 
     def test_config_disabling_tavily(self):

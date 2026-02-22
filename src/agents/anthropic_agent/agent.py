@@ -66,7 +66,7 @@ def _prepare_cached_tools(tools: list) -> list:
 # ── Claude Web Search server tool (Phase 10) ────────────────────
 
 _CLAUDE_WEB_SEARCH_TOOL = {
-    "type": "web_search_20250305",
+    "type": "web_search_20260209",
     "name": "web_search",
 }
 

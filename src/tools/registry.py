@@ -772,7 +772,7 @@ class ToolRegistry:
         ))
 
     def _register_web_tools(self) -> None:
-        from .web_tools import web_search, web_fetch, web_browse
+        from .web_tools import web_search, web_fetch, web_browse, codex_web_research
 
         self.register(ToolDefinition(
             name="tavily_search",
@@ -830,6 +830,26 @@ class ToolRegistry:
                 ToolParameter("extract_links", "boolean", "Also extract page links", required=False, default=False),
                 ToolParameter("offset", "integer", "Start position in chars for pagination (default: 0)", required=False, default=0),
                 ToolParameter("max_chars", "integer", "Max chars to return per call (default: 5000)", required=False, default=5000),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="codex_web_research",
+            description=(
+                "Deep web research using Codex CLI with live web browsing. "
+                "An autonomous AI research agent that searches multiple sources, "
+                "cross-references information, and produces a structured report. "
+                "Use for deep investigation (earnings analysis, event research, "
+                "competitive landscape). Takes 1-5 minutes. For quick lookups "
+                "use tavily_search instead."
+            ),
+            function=codex_web_research,
+            category="web",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("query", "string", "Research question or topic to investigate", required=True),
+                ToolParameter("context", "string", "Optional context from earlier tool calls to inform research", required=False, default=""),
+                ToolParameter("timeout", "integer", "Max seconds for research (default: 300, increase for complex topics)", required=False, default=300),
             ],
         ))
 

@@ -23,6 +23,7 @@ class TurnUsage:
     output_tokens: int
     cache_creation_tokens: int = 0
     cache_read_tokens: int = 0
+    web_search_requests: int = 0
     timestamp: float = field(default_factory=time.time)
 
     @property
@@ -63,6 +64,7 @@ class TokenTracker:
         output_tokens: int,
         cache_creation_tokens: int = 0,
         cache_read_tokens: int = 0,
+        web_search_requests: int = 0,
     ) -> TurnUsage:
         """Record token usage for one API call."""
         usage = TurnUsage(
@@ -73,6 +75,7 @@ class TokenTracker:
             output_tokens=output_tokens,
             cache_creation_tokens=cache_creation_tokens,
             cache_read_tokens=cache_read_tokens,
+            web_search_requests=web_search_requests,
         )
         self._turns.append(usage)
         return usage
@@ -82,11 +85,14 @@ class TokenTracker:
         Record usage from an Anthropic messages.create() response.
 
         The response object has .usage with .input_tokens, .output_tokens,
-        and cache fields: .cache_creation_input_tokens, .cache_read_input_tokens.
+        cache fields, and server_tool_use for web search tracking.
         """
         usage = getattr(response, "usage", None)
         if usage is None:
             return None
+        # Extract web search usage from server_tool_use
+        server_use = getattr(usage, "server_tool_use", None)
+        web_requests = getattr(server_use, "web_search_requests", 0) if server_use else 0
         return self.record(
             provider="anthropic",
             model=model or getattr(response, "model", "unknown"),
@@ -94,6 +100,7 @@ class TokenTracker:
             output_tokens=getattr(usage, "output_tokens", 0),
             cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
             cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            web_search_requests=web_requests or 0,
         )
 
     def record_openai_result(self, result: Any, model: str = "") -> List[TurnUsage]:
@@ -172,6 +179,10 @@ class TokenTracker:
         if cc or cr:
             s["cache_creation_tokens"] = cc
             s["cache_read_tokens"] = cr
+        # Include web search stats only when present
+        ws = sum(t.web_search_requests for t in self._turns)
+        if ws:
+            s["web_search_requests"] = ws
         return s
 
     def __repr__(self) -> str:

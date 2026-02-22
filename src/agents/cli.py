@@ -572,6 +572,10 @@ def print_summary(
         cr = token_usage.get("cache_read_tokens", 0)
         if cc or cr:
             parts.append(f"Cache: {cr:,}read/{cc:,}write")
+        # Web search stats
+        ws = token_usage.get("web_search_requests", 0)
+        if ws:
+            parts.append(f"WebSearch: {ws}")
     if scratchpad_path:
         parts.append(f"Log: {scratchpad_path}")
     console.print(f"[dim]{' | '.join(parts)}[/dim]")
@@ -635,6 +639,12 @@ def run_anthropic_interactive(
     model_name = model or config.anthropic_model
     client = Anthropic()
     tools = get_anthropic_tools()
+
+    # Conditionally add Claude web search server tool
+    if config.web_claude_search:
+        from .anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
+        tools.append({**_CLAUDE_WEB_SEARCH_TOOL, "max_uses": config.web_claude_max_uses})
+
     tools_used: List[str] = []
     _tool_calls_detail: List[Dict[str, Any]] = []
     _tickers: set = set()
@@ -720,6 +730,11 @@ def run_anthropic_interactive(
                     box=box.ROUNDED,
                     padding=(0, 1),
                 ))
+
+        # Handle pause_turn (Claude web search mid-turn pause)
+        if response.stop_reason == "pause_turn":
+            messages.append({"role": "assistant", "content": response.content})
+            continue
 
         # Done - no more tool calls
         if response.stop_reason != "tool_use":

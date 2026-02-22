@@ -1,10 +1,11 @@
 """
 Web search and browsing tools (Phase 10).
 
-Provides three tools:
+Provides four tools:
 - web_search(): Tavily keyword search with AI summary
 - web_fetch(): Tavily URL content extraction with pagination
 - web_browse(): Playwright headless browser for JS-rendered pages
+- codex_web_research(): Codex CLI deep research with live web browsing
 """
 
 from __future__ import annotations
@@ -245,4 +246,142 @@ def web_browse(
             "content": "",
             "success": False,
             "error": str(e),
+        }
+
+
+# ── Codex CLI deep research ────────────────────────────────
+
+_CODEX_RESEARCH_PROMPT = """\
+You are a financial research analyst. Use web search to deeply investigate:
+
+{query}
+
+{context}
+
+Instructions:
+- Search multiple sources to cross-reference information
+- Focus on authoritative sources: SEC.gov, Reuters, Bloomberg, WSJ, earnings reports
+- Synthesize findings into a structured report
+- Include specific data points, dates, and numbers
+- Note any conflicting information between sources
+- List all sources consulted
+
+Output format:
+## Key Findings
+- [bullet points with specific data]
+
+## Detailed Analysis
+[comprehensive analysis]
+
+## Sources
+- [list of URLs and source names]
+
+## Confidence & Gaps
+- Confidence: High/Medium/Low
+- Data gaps: [what couldn't be found]
+"""
+
+
+def codex_web_research(
+    query: str,
+    context: str = "",
+    timeout: int = 300,
+) -> Dict[str, Any]:
+    """Deep web research using Codex CLI with live web browsing.
+
+    Runs Codex CLI as an autonomous research agent with --search enabled.
+    Uses workspace-write sandbox with network access for web browsing,
+    isolated in a temp directory (no access to project files).
+
+    Args:
+        query: Research question or topic to investigate.
+        context: Optional context from earlier tool calls to inform research.
+        timeout: Max seconds for research (default 300, increase for complex topics).
+
+    Returns:
+        dict with: success, report, query, error (if failed)
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("codex"):
+        return {
+            "success": False,
+            "query": query,
+            "report": "",
+            "error": "Codex CLI not installed. Install: npm install -g @openai/codex",
+        }
+
+    # Build research prompt
+    context_section = f"Additional context:\n{context}" if context else ""
+    prompt = _CODEX_RESEARCH_PROMPT.format(query=query, context=context_section)
+
+    # Run in isolated temp directory
+    with tempfile.TemporaryDirectory(prefix="codex_research_") as tmpdir:
+        output_file = os.path.join(tmpdir, "report.md")
+
+        cmd = [
+            "codex", "exec",
+            "--full-auto",
+            "--sandbox", "workspace-write",
+            "--search",
+            "-c", "sandbox_workspace_write.network_access=true",
+            "--model", "gpt-5.2",
+            "--skip-git-repo-check",
+            "--ephemeral",
+            "-o", output_file,
+            prompt,
+        ]
+
+        env = os.environ.copy()
+        # Use OPENAI_API_KEY for Codex
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            env["CODEX_API_KEY"] = api_key
+
+        logger.info(f"Codex web research: query={query[:80]}... timeout={timeout}s")
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout,
+                cwd=tmpdir,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "query": query,
+                "report": "",
+                "error": f"Research timed out after {timeout}s. Try increasing timeout or narrowing the query.",
+            }
+
+        # Collect output from stdout and/or output file
+        report = result.stdout.strip()
+
+        # Also check if -o file was written
+        if os.path.exists(output_file):
+            try:
+                with open(output_file) as f:
+                    file_report = f.read().strip()
+                if file_report and len(file_report) > len(report):
+                    report = file_report
+            except Exception:
+                pass
+
+        if result.returncode != 0 and not report:
+            return {
+                "success": False,
+                "query": query,
+                "report": "",
+                "error": f"Codex CLI error (rc={result.returncode}): {result.stderr[:500]}",
+            }
+
+        return {
+            "success": True,
+            "query": query,
+            "report": report,
         }

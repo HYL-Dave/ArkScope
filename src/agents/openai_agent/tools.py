@@ -619,7 +619,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
 
     from ..config import get_agent_config
-    from src.tools.web_tools import web_search, web_fetch, web_browse
+    from src.tools.web_tools import web_search, web_fetch, web_browse, codex_web_research as _codex_web_research
     web_config = get_agent_config()
 
     @function_tool
@@ -685,6 +685,26 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             offset=offset, max_chars=max_chars,
         )
         return _serialize_result(result, "web_browse")
+
+    # ================================================================
+    # Codex Deep Research (Phase 10+)
+    # ================================================================
+
+    @function_tool
+    def tool_codex_web_research(
+        query: str,
+        context: str = "",
+        timeout: int = 300,
+    ) -> str:
+        """Deep web research using Codex CLI with live web browsing. An autonomous AI research agent that searches multiple sources, cross-references information, and produces a structured report. Use for deep investigation (earnings analysis, event research, competitive landscape). Takes 1-5 minutes.
+
+        Args:
+            query: Research question or topic to investigate
+            context: Optional context from earlier tool calls to inform research
+            timeout: Max seconds for research (default: 300, increase for complex topics)
+        """
+        result = _codex_web_research(query=query, context=context, timeout=timeout)
+        return _serialize_result(result, "codex_web_research")
 
     # ================================================================
     # Report Tools (Phase B)
@@ -876,5 +896,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tools.extend([tool_tavily_search, tool_tavily_fetch])
     if web_config.web_playwright:
         tools.append(tool_web_browse)
+    if web_config.web_codex_research:
+        tools.append(tool_codex_web_research)
 
     return tools
