@@ -71,14 +71,15 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | `/turns <n>` | | Set max tool calls per query |
 | `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
 | `/attach <path> [pages]` | `/at` | Attach PDF/image/text to next query |
+| `/save [N\|N-M] ["title"]` | `/sv` | Save session exchanges as report |
 | `/reports [ticker]` | `/rp` | List/view saved research reports |
 | `/code-backend [name]` | `/cb` | Set code generation backend (api/codex/claude) |
 | `/scratchpad` | `/pad` | List recent scratchpad sessions |
-| `/history` | `/h` | Show recent Q&A history |
+| `/history [N]` | `/h` | Show current session Q&A history |
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (30)
+### Tools (36)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -91,16 +92,22 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | **Options** | `get_iv_analysis` | IV rank, percentile, VRP, signal |
 | | `get_iv_history_data` | Raw IV/HV history points |
 | | `scan_mispricing` | Options mispricing vs theoretical |
-| | `calculate_greeks` | Black-Scholes Greeks |
+| | `calculate_greeks` | BS2002 American option Greeks |
+| | `get_option_chain` | Live option chain (IBKR), P/C ratio, max pain, IV term structure |
+| | `get_iv_skew_analysis` | IV skew shape, 25d skew, gradient, term structure |
 | **Signals** | `detect_anomalies` | Sentiment/volume anomaly detection |
 | | `detect_event_chains` | Event sequence patterns |
 | | `synthesize_signal` | Multi-factor trading signal |
 | **Analysis** | `get_fundamentals_analysis` | Fundamentals with 3-tier fallback (IBKR → SEC EDGAR → Financial Datasets) |
+| | `get_detailed_financials` | EV/EBITDA, ROIC, tech metrics (SEC cached + IBKR real-time) |
 | | `get_sec_filings` | 10-K, 10-Q, 8-K metadata |
 | | `get_insider_trades` | SEC Form 4 insider transactions |
 | | `get_analyst_consensus` | Analyst recommendations, price targets |
+| | `get_peer_comparison` | Cross-ticker valuation & growth ranking |
+| | `get_earnings_impact` | Historical earnings-day moves, drift, surprise correlation |
 | | `get_watchlist_overview` | Watchlist status overview |
 | | `get_morning_brief` | Personalized morning briefing |
+| **Portfolio** | `get_portfolio_analysis` | P&L, beta vs SPY, correlation matrix, HHI |
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
 | | `get_report` | Retrieve report by ID |
