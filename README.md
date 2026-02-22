@@ -7,7 +7,7 @@
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
 - **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 39 tools, 4 skills, 4 subagents
-- **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
+- **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
 - **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks), signals, web search
 - **RL Training** — PPO/CPPO agents with sentiment and risk-enhanced data
@@ -474,7 +474,7 @@ python scripts/comparison/ab_score_comparison.py --file-a a.csv --file-b b.csv
 ### Run Tests
 
 ```bash
-pytest tests/                        # All tests (~805 tests)
+pytest tests/                        # All tests (~860 tests)
 pytest tests/test_agents.py -v       # Agent tests
 pytest tests/test_subagent.py -v     # Subagent tests
 pytest tests/test_tools.py -v        # Tool tests
