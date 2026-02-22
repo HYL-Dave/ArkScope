@@ -295,6 +295,12 @@ llm_preferences:
   #   code_analyst: "claude-opus-4-6"
   #   deep_researcher: "claude-opus-4-6"
 
+  # Subagent max_turns 覆蓋（每個 role 的工具呼叫次數上限）
+  # 預設值: code_analyst=8, deep_researcher=10, data_summarizer=6, reviewer=4
+  # subagent_max_turns:
+  #   deep_researcher: 15
+  #   code_analyst: 12
+
   # ── Code Generation Backend ──
   # 選擇代碼生成的執行路徑。CLI backends 失敗時自動 fallback 到 API。
   #   api          — 直接 API 呼叫 (預設，按 token 計費)

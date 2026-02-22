@@ -589,29 +589,32 @@ class TestConfigSubagentModels:
 
     @patch("src.agents.config.get_agent_config")
     def test_model_override_applied(self, mock_config):
-        """_apply_model_override should swap the model."""
+        """_apply_config_overrides should swap the model."""
         mock_config.return_value = MagicMock(
-            subagent_models={"code_analyst": "claude-opus-4-6"}
+            subagent_models={"code_analyst": "claude-opus-4-6"},
+            subagent_max_turns={},
         )
-        from src.agents.shared.subagent import _apply_model_override
+        from src.agents.shared.subagent import _apply_config_overrides
         original = SubagentConfig(
             name="code_analyst", description="", model="gpt-5.2-codex",
             system_prompt="test",
         )
-        result = _apply_model_override(original)
+        result = _apply_config_overrides(original)
         assert result.model == "claude-opus-4-6"
         # Original should be unchanged
         assert original.model == "gpt-5.2-codex"
 
     @patch("src.agents.config.get_agent_config")
     def test_model_override_not_applied_when_empty(self, mock_config):
-        mock_config.return_value = MagicMock(subagent_models={})
-        from src.agents.shared.subagent import _apply_model_override
+        mock_config.return_value = MagicMock(
+            subagent_models={}, subagent_max_turns={},
+        )
+        from src.agents.shared.subagent import _apply_config_overrides
         original = SubagentConfig(
             name="code_analyst", description="", model="gpt-5.2-codex",
             system_prompt="test",
         )
-        result = _apply_model_override(original)
+        result = _apply_config_overrides(original)
         assert result.model == "gpt-5.2-codex"
         assert result is original  # no copy needed
 
@@ -619,15 +622,50 @@ class TestConfigSubagentModels:
     def test_model_override_same_model_no_copy(self, mock_config):
         """If override is same as default, return original."""
         mock_config.return_value = MagicMock(
-            subagent_models={"code_analyst": "gpt-5.2-codex"}
+            subagent_models={"code_analyst": "gpt-5.2-codex"},
+            subagent_max_turns={},
         )
-        from src.agents.shared.subagent import _apply_model_override
+        from src.agents.shared.subagent import _apply_config_overrides
         original = SubagentConfig(
             name="code_analyst", description="", model="gpt-5.2-codex",
             system_prompt="test",
         )
-        result = _apply_model_override(original)
+        result = _apply_config_overrides(original)
         assert result is original
+
+    @patch("src.agents.config.get_agent_config")
+    def test_max_turns_override_applied(self, mock_config):
+        """_apply_config_overrides should override max_turns."""
+        mock_config.return_value = MagicMock(
+            subagent_models={},
+            subagent_max_turns={"deep_researcher": 15},
+        )
+        from src.agents.shared.subagent import _apply_config_overrides
+        original = SubagentConfig(
+            name="deep_researcher", description="", model="gpt-5.2",
+            system_prompt="test", max_turns=10,
+        )
+        result = _apply_config_overrides(original)
+        assert result.max_turns == 15
+        assert original.max_turns == 10  # unchanged
+
+    @patch("src.agents.config.get_agent_config")
+    def test_both_overrides_applied(self, mock_config):
+        """Both model and max_turns overrides at once."""
+        mock_config.return_value = MagicMock(
+            subagent_models={"code_analyst": "claude-opus-4-6"},
+            subagent_max_turns={"code_analyst": 12},
+        )
+        from src.agents.shared.subagent import _apply_config_overrides
+        original = SubagentConfig(
+            name="code_analyst", description="", model="gpt-5.2-codex",
+            system_prompt="test", max_turns=8,
+        )
+        result = _apply_config_overrides(original)
+        assert result.model == "claude-opus-4-6"
+        assert result.max_turns == 12
+        assert original.model == "gpt-5.2-codex"
+        assert original.max_turns == 8
 
 
 class TestDeepMerge:

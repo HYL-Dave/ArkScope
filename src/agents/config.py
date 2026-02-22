@@ -71,9 +71,12 @@ class AgentConfig(BaseModel):
     extended_context: bool = False
 
     # Subagent model overrides (Phase 6)
-    # Keys: subagent names (code_analyst, deep_researcher, data_summarizer)
+    # Keys: subagent names (code_analyst, deep_researcher, data_summarizer, reviewer)
     # Values: model IDs to override the default
     subagent_models: Dict[str, str] = {}
+    # Subagent max_turns overrides
+    # Keys: subagent names, Values: max tool call turns
+    subagent_max_turns: Dict[str, int] = {}
 
     # Server-side compaction L2 (Phase 7a)
     # Anthropic: beta compact-2026-01-12, Opus 4.6 only, context_management param
@@ -206,6 +209,8 @@ def get_agent_config() -> AgentConfig:
     # Subagent model overrides
     if "subagent_models" in llm_prefs:
         config.subagent_models = llm_prefs["subagent_models"]
+    if "subagent_max_turns" in llm_prefs:
+        config.subagent_max_turns = llm_prefs["subagent_max_turns"]
 
     # Web search overrides (Phase 10)
     web_prefs = profile.get("web_search", {})

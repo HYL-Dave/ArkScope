@@ -248,23 +248,38 @@ _MAX_CONTEXT_CHARS = 5000
 
 # ── Model override ─────────────────────────────────────────────
 
-def _apply_model_override(config: SubagentConfig) -> SubagentConfig:
-    """Apply model override from AgentConfig.subagent_models if present.
+def _apply_config_overrides(config: SubagentConfig) -> SubagentConfig:
+    """Apply model and max_turns overrides from AgentConfig if present.
 
-    Returns a copy with the overridden model (original registry unchanged).
+    Returns a copy with overrides applied (original registry unchanged).
     """
     from ..config import get_agent_config
     agent_config = get_agent_config()
+
     override_model = agent_config.subagent_models.get(config.name)
-    if override_model and override_model != config.model:
-        overridden = copy(config)
+    override_turns = agent_config.subagent_max_turns.get(config.name)
+
+    # Check if any override actually changes a value
+    model_changed = override_model and override_model != config.model
+    turns_changed = override_turns and override_turns != config.max_turns
+
+    if not model_changed and not turns_changed:
+        return config
+
+    overridden = copy(config)
+    if model_changed:
         overridden.model = override_model
         logger.info(
             f"Subagent '{config.name}' model overridden: "
             f"{config.model} → {override_model}"
         )
-        return overridden
-    return config
+    if turns_changed:
+        overridden.max_turns = override_turns
+        logger.info(
+            f"Subagent '{config.name}' max_turns overridden: "
+            f"{config.max_turns} → {override_turns}"
+        )
+    return overridden
 
 
 # ── Dispatch ───────────────────────────────────────────────────
@@ -306,7 +321,7 @@ def dispatch_subagent(
     config = SUBAGENT_REGISTRY[subagent_name]
 
     # Apply model override from AgentConfig (user_profile.yaml or CLI runtime)
-    config = _apply_model_override(config)
+    config = _apply_config_overrides(config)
 
     provider = _detect_provider(config.model)
 

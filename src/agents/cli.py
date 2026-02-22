@@ -1389,11 +1389,12 @@ def handle_compaction_command(state: SessionState, arg: str) -> None:
 
 
 def handle_subagent_command(state: SessionState, arg: str) -> None:
-    """Handle /subagent [name [model]] command.
+    """Handle /subagent [name [model | turns N]] command.
 
-    No arg: show all subagent models.
+    No arg: show all subagent models and max_turns.
     /subagent code_analyst: show + pick model for code_analyst.
     /subagent code_analyst opus: set code_analyst to opus.
+    /subagent code_analyst turns 12: set code_analyst max_turns to 12.
     /subagent reset: clear all overrides back to defaults.
 
     Changes are saved to config/user_profile.local.yaml for persistence.
@@ -1403,14 +1404,16 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
 
     config = get_agent_config()
     overrides = dict(config.subagent_models)
+    turns_overrides = dict(config.subagent_max_turns)
 
     if arg.lower() == "reset":
         save_local_override("llm_preferences", "subagent_models", {})
-        console.print("[green]Subagent models reset to defaults.[/green]\n")
+        save_local_override("llm_preferences", "subagent_max_turns", {})
+        console.print("[green]Subagent overrides reset to defaults.[/green]\n")
         return
 
     if not arg:
-        # Show all subagent models
+        # Show all subagent models + max_turns
         table = Table(
             box=box.SIMPLE_HEAVY, show_header=True,
             header_style="bold", padding=(0, 1),
@@ -1419,6 +1422,7 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
         table.add_column("Default Model", style="dim")
         table.add_column("Active Model", style="bold")
         table.add_column("Provider")
+        table.add_column("Max Turns", justify="right")
 
         for name, sa_config in SUBAGENT_REGISTRY.items():
             active = overrides.get(name, sa_config.model)
@@ -1426,18 +1430,28 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
             active_style = "[yellow]" if is_overridden else ""
             active_end = "[/yellow]" if is_overridden else ""
             provider = _detect_provider(active)
+
+            active_turns = turns_overrides.get(name, sa_config.max_turns)
+            turns_overridden = name in turns_overrides and turns_overrides[name] != sa_config.max_turns
+            turns_str = (
+                f"[yellow]{active_turns}[/yellow]" if turns_overridden
+                else str(active_turns)
+            )
+
             table.add_row(
                 name,
                 sa_config.model,
                 f"{active_style}{active}{active_end}",
                 provider,
+                turns_str,
             )
 
         console.print()
         console.print(table)
         console.print(
-            "\n[dim]Usage: /subagent <name> <model>  (e.g. /subagent code_analyst opus)\n"
-            "       /subagent reset            (clear all overrides)[/dim]\n"
+            "\n[dim]Usage: /subagent <name> <model>    (e.g. /subagent code_analyst opus)\n"
+            "       /subagent <name> turns <N>  (e.g. /subagent deep_researcher turns 15)\n"
+            "       /subagent reset              (clear all overrides)[/dim]\n"
         )
         return
 
@@ -1454,20 +1468,55 @@ def handle_subagent_command(state: SessionState, arg: str) -> None:
         # Show current + interactive picker
         sa_config = SUBAGENT_REGISTRY[sa_name]
         current = overrides.get(sa_name, sa_config.model)
-        console.print(f"[dim]{sa_name}: default={sa_config.model}, active={current}[/dim]")
+        active_turns = turns_overrides.get(sa_name, sa_config.max_turns)
+        console.print(
+            f"[dim]{sa_name}: model={current}, max_turns={active_turns}[/dim]"
+        )
         entry = print_model_picker(current)
         if entry is None:
             console.print("[dim]Cancelled.[/dim]\n")
             return
         new_model = entry.id
     else:
-        # Direct: /subagent code_analyst opus
-        model_query = parts[1].strip()
+        # Direct: /subagent code_analyst opus  OR  /subagent code_analyst turns 12
+        rest = parts[1].strip()
+
+        # Handle "turns N"
+        rest_parts = rest.split(None, 1)
+        if rest_parts[0].lower() == "turns":
+            if len(rest_parts) < 2:
+                sa_config = SUBAGENT_REGISTRY[sa_name]
+                active_turns = turns_overrides.get(sa_name, sa_config.max_turns)
+                console.print(
+                    f"[dim]{sa_name}: max_turns={active_turns} "
+                    f"(default={sa_config.max_turns})[/dim]\n"
+                )
+                return
+            try:
+                n = int(rest_parts[1])
+                if n < 1 or n > 100:
+                    console.print("[red]max_turns must be 1-100[/red]\n")
+                    return
+            except ValueError:
+                console.print(f"[red]Invalid number: {rest_parts[1]}[/red]\n")
+                return
+            turns_overrides[sa_name] = n
+            save_local_override("llm_preferences", "subagent_max_turns", turns_overrides)
+            console.print(
+                f"[green]{sa_name}[/green] max_turns → [bold]{n}[/bold] "
+                f"[dim](saved)[/dim]\n"
+            )
+            return
+
+        model_query = rest
         if model_query.lower() in ("default", "reset"):
             # Reset this specific subagent
             if sa_name in overrides:
                 del overrides[sa_name]
+            if sa_name in turns_overrides:
+                del turns_overrides[sa_name]
             save_local_override("llm_preferences", "subagent_models", overrides)
+            save_local_override("llm_preferences", "subagent_max_turns", turns_overrides)
             default_model = SUBAGENT_REGISTRY[sa_name].model
             console.print(
                 f"[green]{sa_name}[/green] reset to default "
