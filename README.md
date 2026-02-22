@@ -1,12 +1,12 @@
 # MindfulRL-Intraday
 
-> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 30 financial tools, and multi-source news/price/options data pipeline.
+> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 39 financial tools, and multi-source news/price/options data pipeline.
 
 ## Overview
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 30 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 39 tools, 4 skills, 4 subagents
 - **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
 - **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks), signals, web search
@@ -79,13 +79,15 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (36)
+### Tools (39)
 
 | Category | Tool | Description |
 |----------|------|-------------|
 | **News** | `get_ticker_news` | Recent articles for a ticker |
 | | `get_news_sentiment_summary` | Aggregated sentiment statistics |
 | | `search_news_by_keyword` | Keyword search across news |
+| | `get_news_brief` | Lightweight news stats per ticker (scout phase) |
+| | `search_news_advanced` | Multi-filter full-text search with DB-level FTS |
 | **Prices** | `get_ticker_prices` | OHLCV bars (15min/1h/1d) |
 | | `get_price_change` | Price change %, high/low range |
 | | `get_sector_performance` | Sector-level average performance |
@@ -118,6 +120,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | **Web** | `tavily_search` | AI-powered web search |
 | | `tavily_fetch` | URL content extraction |
 | | `web_browse` | Headless browser (Playwright) |
+| | `codex_web_research` | Deep research via Codex CLI (OAuth, --search) |
 | **Code** | `execute_python_analysis` | Python code execution with auto code gen |
 
 ### Skills
@@ -342,14 +345,14 @@ python backtest_openai.py --data merged_dataset.csv \
 
 | Module | Description |
 |--------|-------------|
-| `registry.py` | ToolRegistry (30 tools, dual-format for Anthropic + OpenAI) |
+| `registry.py` | ToolRegistry (39 tools, dual-format for Anthropic + OpenAI) |
 | `data_access.py` | DataAccessLayer with backend abstraction |
 | `backends/file_backend.py` | Parquet file backend |
 | `backends/db_backend.py` | PostgreSQL backend (psycopg3) |
 | `news_tools.py`, `price_tools.py`, etc. | Individual tool implementations |
 | `report_tools.py` | Research report save/list/get |
 | `memory_tools.py` | Episodic memory CRUD + full-text search |
-| `web_tools.py` | Tavily search + Playwright browser |
+| `web_tools.py` | Tavily search + Playwright browser + Codex deep research |
 | `code_tools.py` | Python code execution + auto code gen |
 
 ### Data Sources (`data_sources/`)
@@ -372,6 +375,63 @@ python backtest_openai.py --data merged_dataset.csv \
 | `sectors.yaml` | Sector definitions and ticker mappings |
 | `tickers_core.json` | Core ticker list (Tier 1/2/3) |
 | `skills/*.yaml` | Custom skill definitions |
+
+---
+
+## Web Search Configuration
+
+The system has 6 web search capabilities across 3 layers:
+
+| # | Tool | Type | Config Key | Default | Cost | Notes |
+|---|------|------|-----------|---------|------|-------|
+| 1 | `tavily_search` | Agent tool | `web_search.tavily` | ON | Free 1000/mo | AI-summarized results |
+| 2 | `tavily_fetch` | Agent tool | `web_search.tavily` | ON | (same quota) | URL content extraction |
+| 3 | `web_browse` | Agent tool | `web_search.playwright` | ON | Free (local) | Headless browser, JS pages |
+| 4 | `codex_web_research` | Agent tool | `web_search.codex_research` | ON | OAuth quota | Deep research via Codex CLI |
+| 5 | Claude `web_search` | Server tool | `web_search.claude_search` | OFF | $10/1K | Anthropic agent only |
+| 6 | OpenAI `WebSearchTool` | SDK built-in | `web_search.openai_search` | ON | Included | OpenAI agent only |
+
+**Tools 1-4** are registered in the tool registry (available to both agents).
+**Tools 5-6** are SDK server-side tools (only active in their respective agent).
+
+### Setup
+
+```bash
+# Tavily (tools 1-2): set API key in config/.env
+TAVILY_API_KEY=tvly-...
+
+# Playwright (tool 3): install browsers
+playwright install chromium
+
+# Codex CLI (tool 4): install + OAuth login (uses subscription quota, not API billing)
+npm install -g @openai/codex
+codex login
+
+# Claude web search (tool 5): no setup, just enable in config
+# OpenAI web search (tool 6): no setup, uses existing OPENAI_API_KEY
+```
+
+### Toggle in `config/user_profile.yaml`
+
+```yaml
+web_search:
+  tavily: true
+  playwright: true
+  codex_research: true
+  claude_search: false          # $10/1K searches, enable when needed
+  claude_search_max_uses: 5     # per-conversation limit
+  openai_search: true
+```
+
+### When to use which
+
+| Scenario | Recommended Tool |
+|----------|-----------------|
+| Quick fact check, latest news | `tavily_search` |
+| Read specific URL content | `tavily_fetch` or `web_browse` |
+| JS-heavy page, interactive site | `web_browse` |
+| Deep investigation (earnings, events, trends) | `codex_web_research` |
+| Agent auto-decides during analysis | Claude/OpenAI native search |
 
 ---
 
@@ -414,7 +474,7 @@ python scripts/comparison/ab_score_comparison.py --file-a a.csv --file-b b.csv
 ### Run Tests
 
 ```bash
-pytest tests/                        # All tests (~560 tests)
+pytest tests/                        # All tests (~805 tests)
 pytest tests/test_agents.py -v       # Agent tests
 pytest tests/test_subagent.py -v     # Subagent tests
 pytest tests/test_tools.py -v        # Tool tests
