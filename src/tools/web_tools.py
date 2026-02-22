@@ -334,11 +334,11 @@ def codex_web_research(
             prompt,
         ]
 
+        # Use OAuth login (codex login) — subscription quota, not API billing.
+        # Strip API keys so Codex CLI falls back to OAuth session token.
         env = os.environ.copy()
-        # Use OPENAI_API_KEY for Codex
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            env["CODEX_API_KEY"] = api_key
+        env.pop("CODEX_API_KEY", None)
+        env.pop("OPENAI_API_KEY", None)
 
         logger.info(f"Codex web research: query={query[:80]}... timeout={timeout}s")
 
