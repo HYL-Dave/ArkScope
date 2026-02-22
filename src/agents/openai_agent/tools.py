@@ -69,6 +69,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         calculate_greeks,
     )
     from src.tools.option_chain_tools import get_option_chain as _get_option_chain
+    from src.tools.iv_skew_tools import get_iv_skew_analysis as _get_iv_skew_analysis
+    from src.tools.portfolio_tools import get_portfolio_analysis as _get_portfolio_analysis
+    from src.tools.earnings_tools import get_earnings_impact as _get_earnings_impact
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
@@ -292,6 +295,22 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result, "get_option_chain")
 
+    @function_tool
+    def tool_get_iv_skew_analysis(
+        ticker: str,
+        expiry: Optional[str] = None,
+        num_strikes: int = 10,
+    ) -> str:
+        """Analyze IV skew: shape classification (put_skew/smile/call_skew/flat), 25-delta skew, gradient, term structure skew. Requires IBKR.
+
+        Args:
+            ticker: Stock ticker symbol
+            expiry: Target expiration YYYYMMDD (default: nearest with >=7 DTE)
+            num_strikes: Strikes above/below ATM (default: 10)
+        """
+        result = _get_iv_skew_analysis(ticker=ticker, expiry=expiry, num_strikes=num_strikes)
+        return _serialize_result(result, "get_iv_skew_analysis")
+
     # ================================================================
     # Signal Tools
     # ================================================================
@@ -439,6 +458,48 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """Get analyst consensus for a ticker: recommendation distribution (buy/hold/sell trend), last 4 quarters earnings (actual vs estimate with surprise %), upcoming earnings date and estimates, and analyst price target (if available). Uses Finnhub free API."""
         result = get_analyst_consensus(ticker=ticker)
         return _serialize_result(result, "get_analyst_consensus")
+
+    # ================================================================
+    # Portfolio Tools (Batch 3a)
+    # ================================================================
+
+    @function_tool
+    def tool_get_portfolio_analysis(
+        tickers: Optional[List[str]] = None,
+        holdings_json: str = "",
+    ) -> str:
+        """Analyze portfolio or watchlist: P&L, beta vs SPY, correlation matrix, portfolio metrics (weighted beta, HHI, sector diversification).
+
+        Args:
+            tickers: List of ticker symbols (default: watchlist from config)
+            holdings_json: Holdings as JSON string, e.g. '{"NVDA": {"qty": 100, "entry_price": 120.50}}'
+        """
+        holdings = None
+        if holdings_json:
+            try:
+                holdings = json.loads(holdings_json)
+            except (json.JSONDecodeError, TypeError):
+                return json.dumps({"error": f"Invalid holdings_json: {holdings_json}"})
+        result = _get_portfolio_analysis(dal, tickers=tickers, holdings=holdings)
+        return _serialize_result(result, "get_portfolio_analysis")
+
+    # ================================================================
+    # Earnings Impact (Batch 3c)
+    # ================================================================
+
+    @function_tool
+    def tool_get_earnings_impact(
+        ticker: str,
+        quarters: int = 4,
+    ) -> str:
+        """Analyze historical earnings price reactions: earnings-day moves, directional bias, surprise correlation, expected move, and pre/post drift.
+
+        Args:
+            ticker: Stock ticker symbol
+            quarters: Past quarters to analyze (default: 4)
+        """
+        result = _get_earnings_impact(dal, ticker=ticker, quarters=quarters)
+        return _serialize_result(result, "get_earnings_impact")
 
     # ================================================================
     # Execution Tools
@@ -735,6 +796,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_scan_mispricing,
         tool_calculate_greeks,
         tool_get_option_chain,
+        tool_get_iv_skew_analysis,
         tool_detect_anomalies,
         tool_detect_event_chains,
         tool_synthesize_signal,
@@ -746,6 +808,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_watchlist_overview,
         tool_get_morning_brief,
         tool_get_analyst_consensus,
+        tool_get_portfolio_analysis,
+        tool_get_earnings_impact,
         tool_execute_python_analysis,
         tool_delegate_to_subagent,
         tool_save_report,

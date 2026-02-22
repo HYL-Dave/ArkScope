@@ -43,7 +43,7 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All 30 tools should be registered."""
-        assert len(registry.list_all()) == 33
+        assert len(registry.list_all()) == 36
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
@@ -64,15 +64,16 @@ class TestRegistry:
         """Tools should be properly categorized."""
         assert len(registry.list_by_category("news")) == 3
         assert len(registry.list_by_category("prices")) == 3
-        assert len(registry.list_by_category("options")) == 5
+        assert len(registry.list_by_category("options")) == 6
         assert len(registry.list_by_category("signals")) == 3
-        assert len(registry.list_by_category("analysis")) == 8
+        assert len(registry.list_by_category("analysis")) == 9
+        assert len(registry.list_by_category("portfolio")) == 1
         assert len(registry.list_by_category("execution")) == 1
 
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 33
+        assert len(schema) == 36
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -83,7 +84,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 33
+        assert len(schema) == 36
         for tool in schema:
             assert "name" in tool
             assert "description" in tool

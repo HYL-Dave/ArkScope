@@ -279,6 +279,32 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["ticker"]
             }
         },
+        {
+            "name": "get_iv_skew_analysis",
+            "description": (
+                "Analyze IV skew from live option chain: call-put skew, "
+                "smile/smirk shape classification, 25-delta skew, skew gradient, "
+                "and term structure skew across expirations. Requires IBKR gateway."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "expiry": {
+                        "type": "string",
+                        "description": "Target expiration YYYYMMDD (default: nearest with >=7 DTE)"
+                    },
+                    "num_strikes": {
+                        "type": "integer",
+                        "description": "Strikes above/below ATM (default: 10)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
         # Signal Tools
         {
             "name": "detect_anomalies",
@@ -481,6 +507,55 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "ticker": {
                         "type": "string",
                         "description": "Stock ticker symbol"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        # Portfolio Tools (Batch 3a)
+        {
+            "name": "get_portfolio_analysis",
+            "description": (
+                "Analyze portfolio or watchlist: P&L (if holdings provided), "
+                "beta vs SPY, pairwise correlation matrix, and portfolio metrics "
+                "(weighted beta, HHI concentration, sector diversification). "
+                "Pass holdings dict for full P&L, or tickers for beta/correlation only."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tickers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of ticker symbols (default: watchlist)"
+                    },
+                    "holdings": {
+                        "type": "object",
+                        "description": 'Holdings: {"NVDA": {"qty": 100, "entry_price": 120.50}, ...}'
+                    }
+                },
+                "required": []
+            }
+        },
+        # Earnings Impact (Batch 3c)
+        {
+            "name": "get_earnings_impact",
+            "description": (
+                "Analyze historical earnings price reactions: earnings-day moves, "
+                "average absolute move, directional bias, surprise correlation, "
+                "expected move estimation, and pre/post earnings drift. "
+                "Combines Finnhub earnings history with price data."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "quarters": {
+                        "type": "integer",
+                        "description": "Past quarters to analyze (default: 4)"
                     }
                 },
                 "required": ["ticker"]
@@ -844,6 +919,9 @@ def execute_tool(
         calculate_greeks,
     )
     from src.tools.option_chain_tools import get_option_chain
+    from src.tools.iv_skew_tools import get_iv_skew_analysis
+    from src.tools.portfolio_tools import get_portfolio_analysis
+    from src.tools.earnings_tools import get_earnings_impact
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
@@ -986,6 +1064,24 @@ def execute_tool(
         # Analyst tools (Phase 11b) — no DAL needed
         "get_analyst_consensus": lambda: get_analyst_consensus(
             ticker=tool_input["ticker"],
+        ),
+        # IV Skew (Batch 3b) — no DAL needed
+        "get_iv_skew_analysis": lambda: get_iv_skew_analysis(
+            ticker=tool_input["ticker"],
+            expiry=tool_input.get("expiry"),
+            num_strikes=tool_input.get("num_strikes", 10),
+        ),
+        # Portfolio (Batch 3a)
+        "get_portfolio_analysis": lambda: get_portfolio_analysis(
+            dal,
+            tickers=tool_input.get("tickers"),
+            holdings=tool_input.get("holdings"),
+        ),
+        # Earnings Impact (Batch 3c)
+        "get_earnings_impact": lambda: get_earnings_impact(
+            dal,
+            ticker=tool_input["ticker"],
+            quarters=tool_input.get("quarters", 4),
         ),
         # Web tools (Phase 10) — no DAL needed
         "tavily_search": lambda: web_search(

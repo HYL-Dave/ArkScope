@@ -160,6 +160,7 @@ class ToolRegistry:
         self._register_options_tools()
         self._register_signal_tools()
         self._register_analysis_tools()
+        self._register_portfolio_tools()
         self._register_report_tools()
         self._register_memory_tools()
         self._register_web_tools()
@@ -267,6 +268,7 @@ class ToolRegistry:
             calculate_greeks,
         )
         from .option_chain_tools import get_option_chain
+        from .iv_skew_tools import get_iv_skew_analysis
 
         self.register(ToolDefinition(
             name="get_iv_analysis",
@@ -348,6 +350,27 @@ class ToolRegistry:
                               required=False),
                 ToolParameter("max_expirations_for_term_structure", "integer",
                               "Expirations for IV term structure (default: 6)",
+                              required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_iv_skew_analysis",
+            description=(
+                "Analyze IV skew from live option chain: call-put skew, "
+                "smile/smirk shape classification, 25-delta skew, skew gradient, "
+                "and term structure skew across expirations. Requires IBKR gateway."
+            ),
+            function=get_iv_skew_analysis,
+            category="options",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("expiry", "string",
+                              "Target expiration YYYYMMDD (default: nearest with >=7 DTE)",
+                              required=False),
+                ToolParameter("num_strikes", "integer",
+                              "Strikes above/below ATM (default: 10)",
                               required=False),
             ],
         ))
@@ -520,6 +543,28 @@ class ToolRegistry:
         ))
 
 
+        # Earnings impact analysis (Batch 3c)
+        from .earnings_tools import get_earnings_impact
+
+        self.register(ToolDefinition(
+            name="get_earnings_impact",
+            description=(
+                "Analyze historical earnings price reactions: earnings-day moves, "
+                "average absolute move, directional bias, surprise correlation, "
+                "expected move estimation, and pre/post earnings drift. "
+                "Combines Finnhub earnings history with price data."
+            ),
+            function=get_earnings_impact,
+            category="analysis",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("quarters", "integer",
+                              "Past quarters to analyze (default: 4, max: 4 on free tier)",
+                              required=False),
+            ],
+        ))
+
         # Analyst consensus (Finnhub free API — Phase 11b)
         from .analyst_tools import get_analyst_consensus
 
@@ -535,6 +580,30 @@ class ToolRegistry:
             requires_dal=False,
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
+            ],
+        ))
+
+    def _register_portfolio_tools(self) -> None:
+        from .portfolio_tools import get_portfolio_analysis
+
+        self.register(ToolDefinition(
+            name="get_portfolio_analysis",
+            description=(
+                "Analyze portfolio or watchlist: P&L (if holdings provided), "
+                "beta vs SPY, pairwise correlation matrix, and portfolio-level "
+                "metrics (weighted beta, HHI concentration, sector diversification). "
+                "Pass holdings dict for full P&L, or tickers list for beta/correlation only."
+            ),
+            function=get_portfolio_analysis,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("tickers", "array",
+                              "List of ticker symbols (default: watchlist from config)",
+                              required=False),
+                ToolParameter("holdings", "object",
+                              'Holdings dict: {"NVDA": {"qty": 100, "entry_price": 120.50}, ...}',
+                              required=False),
             ],
         ))
 
