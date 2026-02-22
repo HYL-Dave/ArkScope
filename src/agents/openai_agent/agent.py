@@ -188,9 +188,11 @@ async def run_query(
         pad.close()
         raise
 
-    # Extract tools used and token usage from result
+    # Extract tools used, tool details, tickers, and token usage from result
     tracker = TokenTracker()
     tools_used = []
+    tool_calls_detail = []
+    tickers_set: set = set()
     if hasattr(result, "raw_responses"):
         tracker.record_openai_result(result, model=model_name)
         for response in result.raw_responses:
@@ -198,7 +200,32 @@ async def run_query(
                 for item in response.output:
                     if hasattr(item, "name"):
                         tools_used.append(item.name)
-                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+                        args = getattr(item, "arguments", {})
+                        pad.log_tool_call(item.name, args)
+                        # Parse arguments for detail
+                        if isinstance(args, str):
+                            try:
+                                import json as _json
+                                args_dict = _json.loads(args)
+                            except (ValueError, TypeError):
+                                args_dict = {"raw": args}
+                        else:
+                            args_dict = args or {}
+                        # Extract tickers from params
+                        for k in ("ticker", "tickers"):
+                            v = args_dict.get(k)
+                            if isinstance(v, str) and v:
+                                tickers_set.add(v.upper())
+                            elif isinstance(v, list):
+                                tickers_set.update(t.upper() for t in v if isinstance(t, str))
+                        tool_calls_detail.append({
+                            "name": item.name,
+                            "params": args_dict,
+                        })
+                    # Capture tool output preview
+                    elif hasattr(item, "output") and tool_calls_detail:
+                        output_str = str(item.output) if item.output else ""
+                        tool_calls_detail[-1]["result_preview"] = output_str[:200]
 
     answer = str(result.final_output) if result.final_output else ""
     pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
@@ -212,6 +239,8 @@ async def run_query(
         "provider": "openai",
         "model": model_name,
         "token_usage": tracker.summary(),
+        "tickers": sorted(tickers_set) if tickers_set else [],
+        "tool_calls_detail": tool_calls_detail if tool_calls_detail else [],
     }
 
 

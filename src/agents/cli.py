@@ -21,6 +21,7 @@ Slash commands (during chat):
     /scratchpad     List recent agent session logs (JSONL)
     /history        Show recent chat history (Q&A pairs)
     /turns          Show/set max tool calls per query
+    /save           Save session exchanges as report
     /reports        List saved research reports
     /status         Show current session config
     help            Show all commands
@@ -80,7 +81,7 @@ from prompt_toolkit.formatted_text import ANSI
 from .config import get_agent_config, ReasoningEffort
 from .shared.attachments import Attachment, AttachmentManager
 from .shared.prompts import SYSTEM_PROMPT
-from .shared.scratchpad import ChatHistory, Scratchpad
+from .shared.scratchpad import ChatHistory, Scratchpad, _safe_serialize
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 from .shared.token_tracker import TokenTracker
 
@@ -173,6 +174,7 @@ class SessionState:
     code_backend: str = "api"  # api | codex | codex-apikey | claude | claude-apikey
     max_tool_calls: Optional[int] = None  # None = use config default
     attachments: List[Attachment] = field(default_factory=list)
+    chat_history: Optional["ChatHistory"] = None  # Per-session chat history
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -233,6 +235,7 @@ _SLASH_COMMANDS = [
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
     ("/attach", "/at", "Attach file (PDF/image/text) to next query"),
+    ("/save", "/sv", "Save chat exchanges as report"),
     ("/reports", "/rp", "List saved research reports"),
     ("/memory", "/mem", "Manage long-term memories"),
     ("/status", "/s", "Show session config"),
@@ -408,6 +411,10 @@ def print_help():
             "  [cyan]/attach <path> <pages>[/cyan] Attach PDF pages (e.g. /attach report.pdf 1-5)\n"
             "  [cyan]/attach list[/cyan]        List pending attachments\n"
             "  [cyan]/attach clear[/cyan]       Clear all attachments\n"
+            "  [cyan]/save[/cyan]               Save session exchanges as report\n"
+            "  [cyan]/save <N>[/cyan]           Save last N exchanges\n"
+            "  [cyan]/save <N-M>[/cyan]         Save exchanges #N to #M\n"
+            "  [cyan]/save <N> \"title\"[/cyan]   Save with custom title\n"
             "  [cyan]/reports[/cyan]            List saved research reports\n"
             "  [cyan]/reports <id>[/cyan]       View a specific report\n"
             "  [cyan]/reports <TICKER>[/cyan]   Filter reports by ticker\n"
@@ -610,6 +617,7 @@ def run_anthropic_interactive(
     extended_context: bool = False,
     max_tool_calls: Optional[int] = None,
     attachments: Optional[List[Attachment]] = None,
+    chat_history: Optional["ChatHistory"] = None,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -628,6 +636,8 @@ def run_anthropic_interactive(
     client = Anthropic()
     tools = get_anthropic_tools()
     tools_used: List[str] = []
+    _tool_calls_detail: List[Dict[str, Any]] = []
+    _tickers: set = set()
     tool_index = 0
     tracker = TokenTracker()
     _query_start = time.time()
@@ -722,15 +732,19 @@ def run_anthropic_interactive(
             pad.log_final_answer(final_text, tools_used=list(set(tools_used)))
             pad.close()
 
-            # Record Q&A pair in chat history
-            ChatHistory().append(
-                user_message=question,
-                agent_response=final_text,
-                provider="anthropic",
-                model=model_name,
-                tools_used=list(set(tools_used)),
-                elapsed_seconds=elapsed,
-            )
+            # Record Q&A pair in chat history (per-session)
+            if chat_history:
+                chat_history.append(
+                    user_message=question,
+                    agent_response=final_text,
+                    provider="anthropic",
+                    model=model_name,
+                    tools_used=list(set(tools_used)),
+                    elapsed_seconds=elapsed,
+                    tickers=sorted(_tickers) if _tickers else None,
+                    tool_calls_detail=_tool_calls_detail or None,
+                    token_usage=tracker.summary() or None,
+                )
 
             # Update messages for conversation continuity
             messages.append({"role": "assistant", "content": response.content})
@@ -765,12 +779,28 @@ def run_anthropic_interactive(
             tools_used.append(tool_name)
             print_tool_call(tool_name, tool_input, tool_index)
 
+            # Extract tickers from tool params
+            if isinstance(tool_input, dict):
+                for k in ("ticker", "tickers"):
+                    v = tool_input.get(k)
+                    if isinstance(v, str) and v:
+                        _tickers.add(v.upper())
+                    elif isinstance(v, list):
+                        _tickers.update(t.upper() for t in v if isinstance(t, str))
+
             # Execute with spinner
             with console.status("", spinner="dots"):
                 result = execute_tool(tool_name, tool_input, dal)
 
             pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
             print_tool_result_summary(tool_name, result)
+
+            # Collect tool call detail for ChatHistory
+            _tool_calls_detail.append({
+                "name": tool_name,
+                "params": _safe_serialize(tool_input) if isinstance(tool_input, dict) else {},
+                "result_preview": result[:200] if isinstance(result, str) else str(result)[:200],
+            })
 
             tool_results.append({
                 "type": "tool_result",
@@ -792,14 +822,18 @@ def run_anthropic_interactive(
     pad.close()
 
     # Record Q&A pair in chat history (even for max turns)
-    ChatHistory().append(
-        user_message=question,
-        agent_response=partial_text,
-        provider="anthropic",
-        model=model_name,
-        tools_used=list(set(tools_used)),
-        elapsed_seconds=time.time() - _query_start,
-    )
+    if chat_history:
+        chat_history.append(
+            user_message=question,
+            agent_response=partial_text,
+            provider="anthropic",
+            model=model_name,
+            tools_used=list(set(tools_used)),
+            elapsed_seconds=time.time() - _query_start,
+            tickers=sorted(_tickers) if _tickers else None,
+            tool_calls_detail=_tool_calls_detail or None,
+            token_usage=tracker.summary() or None,
+        )
 
     return {
         "answer": partial_text,
@@ -821,6 +855,7 @@ def run_openai_interactive(
     reasoning_effort: Optional[str] = None,
     max_tool_calls: Optional[int] = None,
     attachments: Optional[List[Attachment]] = None,
+    chat_history: Optional["ChatHistory"] = None,
 ) -> Dict[str, Any]:
     """
     Run OpenAI agent query with status display.
@@ -847,15 +882,19 @@ def run_openai_interactive(
             attachments=attachments,
         ))
 
-    # Record Q&A pair in chat history
-    ChatHistory().append(
-        user_message=question,
-        agent_response=result["answer"],
-        provider="openai",
-        model=model_name,
-        tools_used=result.get("tools_used", []),
-        elapsed_seconds=time.time() - _query_start,
-    )
+    # Record Q&A pair in chat history (per-session)
+    if chat_history:
+        chat_history.append(
+            user_message=question,
+            agent_response=result["answer"],
+            provider="openai",
+            model=model_name,
+            tools_used=result.get("tools_used", []),
+            elapsed_seconds=time.time() - _query_start,
+            tickers=result.get("tickers") or None,
+            tool_calls_detail=result.get("tool_calls_detail") or None,
+            token_usage=result.get("token_usage") or None,
+        )
 
     return {
         "answer": result["answer"],
@@ -1082,6 +1121,223 @@ def handle_skill_command(state: SessionState, arg: str) -> Optional[str]:
         f"{' '.join(params.values())}\n"
     )
     return expanded
+
+
+def handle_save_command(state: "SessionState", arg: str) -> None:
+    """Handle /save command — save session exchanges as a report.
+
+    /save              Show preview, ask for range + title
+    /save 3            Save last 3 exchanges
+    /save 2-5          Save exchanges #2 to #5
+    /save "title"      Save last 1 with title
+    /save 3 "title"    Save last 3 with title
+    """
+    import re as _re
+    import hashlib as _hashlib
+
+    if not state.chat_history:
+        console.print("[red]No chat history available.[/red]\n")
+        return
+
+    entries = state.chat_history.read_session()
+    if not entries:
+        console.print("[dim]No exchanges in this session yet.[/dim]\n")
+        return
+
+    # Parse arg: optional range + optional quoted title
+    range_str = None
+    title = None
+    if arg:
+        # Extract quoted title
+        title_match = _re.search(r'["\u201c](.+?)["\u201d]', arg)
+        if title_match:
+            title = title_match.group(1)
+            arg_rest = arg[:title_match.start()].strip()
+        else:
+            arg_rest = arg.strip()
+        # Parse range from remaining
+        range_match = _re.match(r'^(\d+)-(\d+)$', arg_rest)
+        if range_match:
+            range_str = arg_rest
+        elif arg_rest.isdigit():
+            range_str = arg_rest
+
+    # Determine which entries to save
+    selected = None
+    if range_str:
+        if "-" in range_str:
+            parts = range_str.split("-")
+            start_idx = int(parts[0]) - 1  # 1-based → 0-based
+            end_idx = int(parts[1])
+            selected = entries[max(0, start_idx):min(len(entries), end_idx)]
+        else:
+            n = int(range_str)
+            selected = entries[-n:] if n <= len(entries) else entries
+    else:
+        # Interactive: show preview and ask
+        show_n = min(len(entries), 10)
+        console.print(f"\n[bold]Session exchanges ({len(entries)} total):[/bold]\n")
+        for i, entry in enumerate(entries[-show_n:], len(entries) - show_n + 1):
+            _print_history_entry(i, entry)
+
+        try:
+            choice = input("\n  Save which? [range e.g. 1-3 / N for last N / Enter=last 1]: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+
+        if not choice:
+            selected = entries[-1:]
+        elif "-" in choice:
+            parts = choice.split("-")
+            try:
+                start_idx = int(parts[0]) - 1
+                end_idx = int(parts[1])
+                selected = entries[max(0, start_idx):min(len(entries), end_idx)]
+            except ValueError:
+                console.print("[red]Invalid range format.[/red]\n")
+                return
+        elif choice.isdigit():
+            n = int(choice)
+            selected = entries[-n:] if n <= len(entries) else entries
+        else:
+            console.print("[red]Invalid input.[/red]\n")
+            return
+
+    if not selected:
+        console.print("[red]No exchanges selected.[/red]\n")
+        return
+
+    # Show preview of selected
+    console.print(f"\n[bold]Selected {len(selected)} exchange(s):[/bold]")
+    for i, entry in enumerate(selected, 1):
+        q = entry.get("userMessage", "")[:80]
+        console.print(f"  [cyan]#{i}[/cyan] Q: {q}")
+    console.print()
+
+    # Get title if not provided
+    if not title:
+        try:
+            default_title = selected[0].get("userMessage", "Untitled")[:40]
+            title = input(f"  Title [{default_title}]: ").strip()
+            if not title:
+                title = default_title
+        except (KeyboardInterrupt, EOFError):
+            console.print("[dim]Cancelled.[/dim]\n")
+            return
+
+    # Collect all tickers from selected entries
+    all_tickers: set = set()
+    for entry in selected:
+        for t in entry.get("tickers", []):
+            all_tickers.add(t)
+
+    # Build Markdown content
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    tickers_str = ", ".join(sorted(all_tickers)) if all_tickers else "N/A"
+
+    md_lines = [
+        f"# {title}",
+        "",
+        f"**Date**: {today}",
+        f"**Exchanges**: {len(selected)}",
+        f"**Tickers**: {tickers_str}",
+        "**Source**: manual (/save)",
+        "",
+        "---",
+    ]
+
+    for idx, entry in enumerate(selected, 1):
+        ts = entry.get("timestamp", "?")[:19].replace("T", " ")
+        provider = entry.get("provider", "?")
+        model = entry.get("model", "?")
+        elapsed = entry.get("elapsed_seconds", "")
+        elapsed_str = f" | {elapsed}s" if elapsed else ""
+        tools = entry.get("tools_used", [])
+        tools_str = f" | {len(tools)} tools" if tools else ""
+        entry_tickers = entry.get("tickers", [])
+        tickers_line = f" | {', '.join(entry_tickers)}" if entry_tickers else ""
+
+        md_lines.extend([
+            "",
+            f"## Exchange {idx}",
+            f"> **{ts}** | {provider}/{model}{elapsed_str}{tools_str}{tickers_line}",
+            "",
+            "### Question",
+            entry.get("userMessage", ""),
+            "",
+            "### Answer",
+            entry.get("agentResponse", ""),
+            "",
+            "---",
+        ])
+
+    content = "\n".join(md_lines)
+
+    # Generate filename and write
+    from pathlib import Path as _Path
+    reports_dir = _Path("data/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    ticker_part = "_".join(sorted(all_tickers)[:3]) if all_tickers else "MISC"
+    content_hash = _hashlib.md5(
+        f"{title}{datetime.now().isoformat()}".encode()
+    ).hexdigest()[:8]
+    filename = f"{today}_{ticker_part}_{content_hash}.md"
+    file_path = reports_dir / filename
+
+    file_path.write_text(content, encoding="utf-8")
+
+    # Try DB insert if available
+    report_id = None
+    try:
+        if hasattr(state, 'chat_history') and state.chat_history:
+            # Access DAL through lazy import for DB insert
+            from src.tools.data_access import DataAccessLayer
+            dal = DataAccessLayer()
+            if hasattr(dal, '_backend') and hasattr(dal._backend, 'insert_report'):
+                report_id = dal._backend.insert_report(
+                    title=title,
+                    tickers=sorted(all_tickers),
+                    report_type="chat_save",
+                    summary=f"Manual save of {len(selected)} exchange(s) from session",
+                    file_path=f"data/reports/{filename}",
+                )
+    except Exception as e:
+        logger.debug(f"DB insert for /save report skipped: {e}")
+
+    id_str = f" (id={report_id})" if report_id else ""
+    console.print(
+        f"[green]✓ Report saved:[/green] data/reports/{filename} "
+        f"({len(selected)} exchanges){id_str}\n"
+    )
+
+
+def _print_history_entry(index: int, entry: Dict[str, Any]) -> None:
+    """Print a single history entry in compact format."""
+    ts = entry.get("timestamp", "?")[:19].replace("T", " ")
+    model = entry.get("model", "?")
+    # Shorten model name
+    if "/" in model:
+        model = model.split("/")[-1]
+    elapsed = entry.get("elapsed_seconds", "")
+    elapsed_str = f" {elapsed}s" if elapsed else ""
+    tools = entry.get("tools_used", [])
+    tools_str = f" | {len(tools)} tools" if tools else ""
+    tickers = entry.get("tickers", [])
+    tickers_str = f" | {', '.join(tickers)}" if tickers else ""
+
+    question = entry.get("userMessage", "")
+    answer = entry.get("agentResponse", "")
+
+    console.print(
+        f"  [bold]#{index}[/bold] [dim]{ts}[/dim] "
+        f"{model}{elapsed_str}{tools_str}{tickers_str}"
+    )
+    console.print(f"    [cyan]Q:[/cyan] {question[:80]}")
+    console.print(f"    [green]A:[/green] {answer[:120]}...")
+    console.print()
 
 
 def handle_reports_command(dal, arg: str) -> None:
@@ -1709,42 +1965,30 @@ def handle_scratchpad_command(arg: str) -> None:
     )
 
 
-def handle_history_command(arg: str) -> None:
-    """Handle /history [N] command. Show recent chat history (Q&A pairs).
+def handle_history_command(state: "SessionState", arg: str) -> None:
+    """Handle /history [N] command. Show current session chat history.
 
-    /history      — show last 10 conversations
-    /history 20   — show last 20 conversations
+    /history      — show all exchanges in this session
+    /history 5    — show last 5 exchanges
     """
-    limit = int(arg) if arg and arg.isdigit() else 10
-    entries = ChatHistory.read_recent(limit=limit)
-
-    if not entries:
-        console.print("[dim]No chat history found.[/dim]\n")
+    if not state.chat_history:
+        console.print("[dim]No chat history available.[/dim]\n")
         return
 
-    console.print()
-    for i, entry in enumerate(entries, 1):
-        ts = entry.get("timestamp", "?")[:19].replace("T", " ")
-        provider = entry.get("provider", "?")
-        model = entry.get("model", "?")
-        elapsed = entry.get("elapsed_seconds", "")
-        elapsed_str = f" {elapsed}s" if elapsed else ""
-        tools = entry.get("tools_used", [])
-        tools_str = f" | {len(tools)} tools" if tools else ""
+    entries = state.chat_history.read_session()
+    if not entries:
+        console.print("[dim]No exchanges in this session yet.[/dim]\n")
+        return
 
-        question = entry.get("userMessage", "")
-        answer = entry.get("agentResponse", "")
+    limit = int(arg) if arg and arg.isdigit() else len(entries)
+    show_entries = entries[-limit:]
+    start_idx = len(entries) - len(show_entries) + 1
 
-        console.print(
-            f"[bold]#{i}[/bold] [dim]{ts}[/dim] "
-            f"{provider}/{model}{elapsed_str}{tools_str}"
-        )
-        console.print(f"  [cyan]Q:[/cyan] {question[:80]}")
-        console.print(f"  [green]A:[/green] {answer[:120]}...")
-        console.print()
+    console.print(f"\n[bold]Session history[/bold] ({len(entries)} exchanges)\n")
+    for i, entry in enumerate(show_entries, start_idx):
+        _print_history_entry(i, entry)
 
-    total_path = ChatHistory()._path
-    console.print(f"[dim]File: {total_path}[/dim]\n")
+    console.print(f"[dim]File: {state.chat_history.path}[/dim]\n")
 
 
 def handle_code_model_command(state: SessionState, arg: str) -> None:
@@ -1867,6 +2111,7 @@ def main():
         anthropic_effort=args.effort,
         anthropic_thinking=args.thinking,
         server_compaction=config.server_compaction,
+        chat_history=ChatHistory.create_session(),
     )
 
     print_banner()
@@ -1947,11 +2192,13 @@ def main():
             elif cmd in ("/scratchpad", "/pad"):
                 handle_scratchpad_command(arg)
             elif cmd in ("/history", "/h"):
-                handle_history_command(arg)
+                handle_history_command(state, arg)
             elif cmd == "/turns":
                 handle_turns_command(state, arg)
             elif cmd in ("/attach", "/at"):
                 handle_attach_command(state, arg)
+            elif cmd in ("/save", "/sv"):
+                handle_save_command(state, arg)
             elif cmd in ("/reports", "/rp"):
                 handle_reports_command(dal, arg)
             elif cmd in ("/memory", "/mem"):
@@ -1988,6 +2235,7 @@ def main():
                     extended_context=state.extended_context,
                     max_tool_calls=state.max_tool_calls,
                     attachments=query_attachments,
+                    chat_history=state.chat_history,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):
@@ -2000,6 +2248,7 @@ def main():
                     reasoning_effort=state.reasoning_effort,
                     max_tool_calls=state.max_tool_calls,
                     attachments=query_attachments,
+                    chat_history=state.chat_history,
                 )
 
             # Auto-clear attachments after sending

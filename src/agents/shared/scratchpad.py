@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 # Default directories
 _DEFAULT_BASE_DIR = Path("data/agent_scratchpad")
-_DEFAULT_CHAT_HISTORY_PATH = Path("data/chat_history.jsonl")
+_DEFAULT_CHAT_HISTORY_PATH = Path("data/chat_history.jsonl")  # legacy single-file
+_CHAT_HISTORY_DIR = Path("data/chat_history")
 
 
 def _make_session_id(query: str, timestamp: float) -> str:
@@ -218,32 +219,54 @@ class Scratchpad:
 
 
 class ChatHistory:
-    """Append-only JSONL log of Q&A pairs (like Dexter's messages/chat_history.json).
+    """Per-session JSONL log of Q&A pairs with tool detail.
 
-    Each entry is one complete user question + agent response pair.
+    Each session creates a separate file in ``data/chat_history/``.
+    Each entry is one complete user question + agent response pair,
+    including tool call details, tickers, and token usage.
 
     Usage::
 
-        history = ChatHistory()
+        history = ChatHistory.create_session()
         history.append(
             user_message="分析 NVDA",
             agent_response="NVDA 近期表現強勁...",
             provider="anthropic",
-            model="claude-sonnet-4",
+            model="claude-opus-4-6",
             tools_used=["get_ticker_news"],
             elapsed_seconds=12.5,
+            tickers=["NVDA"],
+            tool_calls_detail=[{"name": "get_ticker_news", "params": {"ticker": "NVDA"}, "result_preview": "..."}],
+            token_usage={"input": 1000, "output": 500},
         )
 
-        recent = ChatHistory.read_recent(limit=10)
+        entries = history.read_session()
     """
 
-    def __init__(self, path: Optional[Path] = None) -> None:
-        self._path = path or _DEFAULT_CHAT_HISTORY_PATH
+    def __init__(self, path: Optional[Path] = None, session_id: Optional[str] = None) -> None:
+        if path is not None:
+            self._path = path
+        elif session_id is not None:
+            self._path = _CHAT_HISTORY_DIR / f"{session_id}.jsonl"
+        else:
+            # Legacy fallback — single file
+            self._path = _DEFAULT_CHAT_HISTORY_PATH
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._session_id = session_id
+
+    @classmethod
+    def create_session(cls) -> "ChatHistory":
+        """Create a new per-session ChatHistory with timestamp-based ID."""
+        session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        return cls(session_id=session_id)
 
     @property
     def path(self) -> Path:
         return self._path
+
+    @property
+    def session_id(self) -> Optional[str]:
+        return self._session_id
 
     def append(
         self,
@@ -253,6 +276,9 @@ class ChatHistory:
         model: str,
         tools_used: Optional[List[str]] = None,
         elapsed_seconds: Optional[float] = None,
+        tickers: Optional[List[str]] = None,
+        tool_calls_detail: Optional[List[Dict[str, Any]]] = None,
+        token_usage: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Append a Q&A pair to the chat history."""
         entry: Dict[str, Any] = {
@@ -266,6 +292,12 @@ class ChatHistory:
             entry["tools_used"] = tools_used
         if elapsed_seconds is not None:
             entry["elapsed_seconds"] = round(elapsed_seconds, 2)
+        if tickers:
+            entry["tickers"] = sorted(set(tickers))
+        if tool_calls_detail:
+            entry["tool_calls_detail"] = tool_calls_detail
+        if token_usage:
+            entry["token_usage"] = token_usage
 
         try:
             with open(self._path, "a", encoding="utf-8") as f:
@@ -273,10 +305,18 @@ class ChatHistory:
         except OSError as e:
             logger.warning(f"ChatHistory write error: {e}")
 
+    def read_session(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Read entries from this session's file."""
+        return self._read_file(self._path, limit)
+
     @classmethod
     def read_recent(cls, path: Optional[Path] = None, limit: int = 20) -> List[Dict[str, Any]]:
-        """Read the most recent N entries from chat history."""
+        """Read the most recent N entries (legacy single-file compat)."""
         p = path or _DEFAULT_CHAT_HISTORY_PATH
+        return cls._read_file(p, limit)
+
+    @staticmethod
+    def _read_file(p: Path, limit: int) -> List[Dict[str, Any]]:
         if not p.exists():
             return []
         entries: List[Dict[str, Any]] = []
