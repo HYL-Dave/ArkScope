@@ -167,7 +167,7 @@ def detect_event_chains(
     if df.empty or "event_type" not in df.columns:
         return []
     # Fill missing sentiment with neutral (3) so chain impact calc doesn't break
-    df["llm_sentiment"] = df["llm_sentiment"].fillna(3.0)
+    df["llm_sentiment"] = df["llm_sentiment"].fillna(3.0).infer_objects(copy=False)
 
     detector = EventChainDetector()
 

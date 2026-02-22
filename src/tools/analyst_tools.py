@@ -37,7 +37,9 @@ def _get_finnhub_session() -> tuple[requests.Session, str]:
                 "FINNHUB_API_KEY not set in environment. "
                 "Get a free key at https://finnhub.io/"
             )
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=20)
         _session = requests.Session()
+        _session.mount("https://", adapter)
         _session.headers.update({"X-Finnhub-Token": _api_key})
     return _session, _api_key
 
