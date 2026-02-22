@@ -165,8 +165,9 @@ Pass relevant data from earlier tool calls via context_json to avoid re-fetching
 
 ─── RESEARCH REPORTS ───
 
-After completing a thorough analysis (entry analysis, sector review, etc.),
-save it as a research report so it can be reviewed later:
+IMPORTANT: You MUST call save_report() at the end of any substantive analysis.
+This includes: entry analyses, sector reviews, earnings reviews, comparisons,
+multi-tool investigations, and any analysis that uses 3+ tools.
 
   save_report(title="AFRM Entry Analysis", tickers=["AFRM"],
     report_type="entry_analysis", summary="...", content="<full markdown>",
@@ -175,8 +176,9 @@ save it as a research report so it can be reviewed later:
 Available report types: entry_analysis, sector_review, earnings_review,
   comparison, thesis, morning_brief, custom
 
+The content field should be your complete analysis in Markdown format.
+Do NOT skip this step — reports are the primary way analyses are preserved.
 Use list_reports() and get_report() to retrieve past analyses.
-Only save reports for substantive, thorough analyses — not quick lookups.
 
 ─── LONG-TERM MEMORY ───
 

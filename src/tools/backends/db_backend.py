@@ -41,7 +41,20 @@ class DatabaseBackend:
         self._conn: Optional[psycopg2.extensions.connection] = None
 
     def _get_conn(self) -> psycopg2.extensions.connection:
-        """Get or create a database connection."""
+        """Get or create a database connection, with stale-connection detection."""
+        if self._conn is not None and not self._conn.closed:
+            # Ping to detect server-side disconnects (idle timeout etc.)
+            try:
+                with self._conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+            except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                logger.info("Stale DB connection detected, reconnecting...")
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+                self._conn = None
+
         if self._conn is None or self._conn.closed:
             self._conn = psycopg2.connect(
                 self._dsn,
