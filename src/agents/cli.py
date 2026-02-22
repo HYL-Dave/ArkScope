@@ -2091,6 +2091,18 @@ def main():
     else:
         logging.basicConfig(level=logging.WARNING)
 
+    # Truncate excessively long log messages from OpenAI Agents SDK
+    # (SDK dumps entire tool outputs on error, can be 100K+ chars)
+    class _TruncateFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            msg = record.getMessage()
+            if len(msg) > 2000:
+                record.msg = msg[:2000] + f"\n... [truncated, total {len(msg):,} chars]"
+                record.args = None
+            return True
+
+    logging.getLogger("openai.agents").addFilter(_TruncateFilter())
+
     # Initialize DAL
     from src.tools.data_access import DataAccessLayer
     with console.status("[cyan]Loading data...", spinner="dots"):

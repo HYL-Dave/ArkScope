@@ -50,7 +50,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Max articles to return, 1-500 (default: 50)"
+                        "description": "Max articles to return, 1-500 (default: 20)"
                     }
                 },
                 "required": ["ticker"]
@@ -76,7 +76,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "search_news_by_keyword",
-            "description": "Search news articles by keyword in titles and descriptions. Returns up to `limit` most recent matches (default 20).",
+            "description": "Search news articles by keyword using full-text search. Returns up to `limit` most recent matches.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -94,10 +94,78 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Max articles to return, 1-500 (default: 50)"
+                        "description": "Max articles to return, 1-500 (default: 20)"
                     }
                 },
                 "required": ["keyword"]
+            }
+        },
+        # News Tools — Smart Data Retrieval
+        {
+            "name": "get_news_brief",
+            "description": (
+                "Get a lightweight news overview for multiple tickers: "
+                "article count, avg sentiment, avg risk, date range. "
+                "Call this FIRST before get_ticker_news() to decide which "
+                "tickers need detailed investigation. Very fast, minimal output."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tickers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of ticker symbols (default: watchlist)"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 7)"
+                    }
+                },
+                "required": []
+            }
+        },
+        {
+            "name": "search_news_advanced",
+            "description": (
+                "Advanced news search combining full-text search + multi-ticker + "
+                "date range + score filters. Use for cross-ticker theme searches "
+                "(e.g. 'tariff impact' across AI_CHIPS sector). All filtering at DB level."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Full-text search query"
+                    },
+                    "tickers": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by multiple tickers"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    },
+                    "scored_only": {
+                        "type": "boolean",
+                        "description": "Only return scored articles (default: false)"
+                    },
+                    "min_sentiment": {
+                        "type": "integer",
+                        "description": "Minimum sentiment score (1-5)"
+                    },
+                    "max_risk": {
+                        "type": "integer",
+                        "description": "Maximum risk score (1-5)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max articles to return (default: 20)"
+                    }
+                },
+                "required": []
             }
         },
         # Price Tools
@@ -906,6 +974,8 @@ def execute_tool(
         get_ticker_news,
         get_news_sentiment_summary,
         search_news_by_keyword,
+        get_news_brief,
+        search_news_advanced,
     )
     from src.tools.price_tools import (
         get_ticker_prices,
@@ -965,6 +1035,21 @@ def execute_tool(
             tool_input["keyword"],
             days=tool_input.get("days", 30),
             ticker=tool_input.get("ticker"),
+            limit=tool_input.get("limit", 20),
+        ),
+        "get_news_brief": lambda: get_news_brief(
+            dal,
+            tickers=tool_input.get("tickers"),
+            days=tool_input.get("days", 7),
+        ),
+        "search_news_advanced": lambda: search_news_advanced(
+            dal,
+            query=tool_input.get("query", ""),
+            tickers=tool_input.get("tickers"),
+            days=tool_input.get("days", 30),
+            scored_only=tool_input.get("scored_only", False),
+            min_sentiment=tool_input.get("min_sentiment"),
+            max_risk=tool_input.get("max_risk"),
             limit=tool_input.get("limit", 20),
         ),
         "get_ticker_prices": lambda: get_ticker_prices(

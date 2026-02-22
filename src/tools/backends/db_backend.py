@@ -80,6 +80,16 @@ class DatabaseBackend:
             self._conn = None
             return pd.DataFrame()
 
+    def _has_search_vector(self) -> bool:
+        """Check if news.search_vector column exists (migration 006)."""
+        if not hasattr(self, "_search_vector_ok"):
+            df = self._query_df(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'news' AND column_name = 'search_vector'"
+            )
+            self._search_vector_ok = not df.empty
+        return self._search_vector_ok
+
     def close(self):
         """Close the database connection."""
         if self._conn and not self._conn.closed:
@@ -168,6 +178,136 @@ class DatabaseBackend:
         df = self._query_df(sql, tuple(params))
         if df.empty:
             return pd.DataFrame(columns=empty_cols)
+        return df
+
+    def query_news_search(
+        self,
+        query: str = "",
+        ticker: Optional[str] = None,
+        days: int = 30,
+        limit: int = 20,
+        scored_only: bool = True,
+    ) -> pd.DataFrame:
+        """Search news with full-text search or trigram matching.
+
+        Uses PostgreSQL tsvector/GIN for multi-word queries and
+        pg_trgm ILIKE for short/partial matches. All filtering at DB level.
+        """
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conditions = ["n.published_at >= %s"]
+        params: list = [cutoff]
+
+        # Score joins (latest scores)
+        score_join = """
+            LEFT JOIN news_latest_scores s_sent
+                ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
+            LEFT JOIN news_latest_scores s_risk
+                ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
+        """
+
+        if ticker:
+            conditions.append("n.ticker = %s")
+            params.append(ticker.upper())
+
+        if scored_only:
+            conditions.append("(s_sent.score IS NOT NULL OR s_risk.score IS NOT NULL)")
+
+        # Full-text search vs ILIKE fallback
+        use_fts = bool(query.strip()) and len(query.strip()) >= 3 and self._has_search_vector()
+        if use_fts:
+            conditions.append("n.search_vector @@ plainto_tsquery('english', %s)")
+            params.append(query)
+
+        where = " AND ".join(conditions)
+
+        if use_fts:
+            order = (
+                "ts_rank(n.search_vector, plainto_tsquery('english', %s)) DESC, "
+                "n.published_at DESC"
+            )
+            params.append(query)
+        else:
+            order = "n.published_at DESC"
+
+        # ILIKE fallback when FTS unavailable or short query
+        if query.strip() and not use_fts:
+            conditions.append("(n.title ILIKE %s OR n.description ILIKE %s)")
+            pattern = f"%{query.strip()}%"
+            params.append(pattern)
+            params.append(pattern)
+            where = " AND ".join(conditions)
+
+        sql = f"""
+            SELECT
+                TO_CHAR(n.published_at, 'YYYY-MM-DD') AS date,
+                n.ticker, n.title, n.source, n.url, n.publisher,
+                s_sent.score AS sentiment_score,
+                s_risk.score AS risk_score,
+                n.description
+            FROM news n
+            {score_join}
+            WHERE {where}
+            ORDER BY {order}
+            LIMIT %s
+        """
+        params.append(limit)
+
+        df = self._query_df(sql, tuple(params))
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "date", "ticker", "title", "source", "url",
+                "publisher", "sentiment_score", "risk_score", "description",
+            ])
+        return df
+
+    def query_news_stats(
+        self,
+        ticker: Optional[str] = None,
+        days: int = 30,
+    ) -> pd.DataFrame:
+        """Get lightweight per-ticker news statistics.
+
+        Returns one row per ticker with article_count, scored_count,
+        date_range, avg_sentiment, avg_risk. Single GROUP BY query — very fast.
+        """
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conditions = ["n.published_at >= %s"]
+        params: list = [cutoff]
+
+        if ticker:
+            conditions.append("n.ticker = %s")
+            params.append(ticker.upper())
+
+        where = " AND ".join(conditions)
+        sql = f"""
+            SELECT
+                n.ticker,
+                COUNT(*) AS article_count,
+                COUNT(s_sent.score) AS scored_count,
+                TO_CHAR(MIN(n.published_at), 'YYYY-MM-DD') AS earliest_date,
+                TO_CHAR(MAX(n.published_at), 'YYYY-MM-DD') AS latest_date,
+                ROUND(AVG(s_sent.score)::numeric, 2) AS avg_sentiment,
+                ROUND(AVG(s_risk.score)::numeric, 2) AS avg_risk,
+                COUNT(*) FILTER (WHERE s_sent.score >= 4) AS bullish_count,
+                COUNT(*) FILTER (WHERE s_sent.score <= 2) AS bearish_count
+            FROM news n
+            LEFT JOIN news_latest_scores s_sent
+                ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
+            LEFT JOIN news_latest_scores s_risk
+                ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
+            WHERE {where}
+            GROUP BY n.ticker
+            ORDER BY article_count DESC
+        """
+
+        df = self._query_df(sql, tuple(params))
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "ticker", "article_count", "scored_count",
+                "earliest_date", "latest_date",
+                "avg_sentiment", "avg_risk",
+                "bullish_count", "bearish_count",
+            ])
         return df
 
     def query_news_scores(self, news_id: int) -> pd.DataFrame:

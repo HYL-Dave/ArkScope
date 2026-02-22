@@ -171,6 +171,8 @@ class ToolRegistry:
             get_ticker_news,
             get_news_sentiment_summary,
             search_news_by_keyword,
+            get_news_brief,
+            search_news_advanced,
         )
 
         self.register(ToolDefinition(
@@ -187,7 +189,7 @@ class ToolRegistry:
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
                 ToolParameter("source", "string", "Data source", required=False, default="auto",
                               enum=["auto", "ibkr", "polygon"]),
-                ToolParameter("limit", "integer", "Max articles to return (1-500, default 50)", required=False, default=50),
+                ToolParameter("limit", "integer", "Max articles to return (1-500, default 20)", required=False, default=20),
             ],
         ))
 
@@ -205,16 +207,52 @@ class ToolRegistry:
         self.register(ToolDefinition(
             name="search_news_by_keyword",
             description=(
-                "Search news articles by keyword in titles and descriptions. "
-                "Returns up to `limit` most recent matches (default 20)."
+                "Search news articles by keyword in titles and descriptions using "
+                "full-text search. Returns up to `limit` most recent matches."
             ),
             function=search_news_by_keyword,
             category="news",
             parameters=[
-                ToolParameter("keyword", "string", "Search keyword"),
+                ToolParameter("keyword", "string", "Search keyword (supports multi-word)"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
                 ToolParameter("ticker", "string", "Optionally filter by ticker", required=False),
-                ToolParameter("limit", "integer", "Max articles to return (1-500, default 50)", required=False, default=50),
+                ToolParameter("limit", "integer", "Max articles to return (1-500, default 20)", required=False, default=20),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_news_brief",
+            description=(
+                "Get a lightweight news overview for multiple tickers: "
+                "article count, avg sentiment, avg risk, date range. "
+                "Call this FIRST before get_ticker_news() to decide which "
+                "tickers need detailed investigation. Very fast, minimal output."
+            ),
+            function=get_news_brief,
+            category="news",
+            parameters=[
+                ToolParameter("tickers", "array", "List of ticker symbols (default: watchlist)", required=False),
+                ToolParameter("days", "integer", "Lookback period in days (default: 7)", required=False, default=7),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="search_news_advanced",
+            description=(
+                "Advanced news search combining full-text search + multi-ticker + "
+                "date range + score filters. Use for cross-ticker theme searches "
+                "(e.g. 'tariff impact' across AI_CHIPS sector). All filtering at DB level."
+            ),
+            function=search_news_advanced,
+            category="news",
+            parameters=[
+                ToolParameter("query", "string", "Full-text search query", required=False, default=""),
+                ToolParameter("tickers", "array", "Filter by multiple tickers", required=False),
+                ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
+                ToolParameter("scored_only", "boolean", "Only return scored articles", required=False, default=False),
+                ToolParameter("min_sentiment", "integer", "Minimum sentiment score (1-5)", required=False),
+                ToolParameter("max_risk", "integer", "Maximum risk score (1-5)", required=False),
+                ToolParameter("limit", "integer", "Max articles to return (default: 20)", required=False, default=20),
             ],
         ))
 

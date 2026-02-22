@@ -68,6 +68,19 @@ class NewsQueryResult(BaseModel):
     query_days: int = Field(description="Number of days queried")
 
 
+class NewsBrief(BaseModel):
+    """Lightweight per-ticker news summary (scout tool output)."""
+    ticker: str
+    article_count: int = 0
+    scored_count: int = 0
+    earliest_date: Optional[str] = None
+    latest_date: Optional[str] = None
+    avg_sentiment: Optional[float] = None
+    avg_risk: Optional[float] = None
+    bullish_count: int = 0
+    bearish_count: int = 0
+
+
 # ============================================================
 # Prices
 # ============================================================

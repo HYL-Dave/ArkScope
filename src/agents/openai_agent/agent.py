@@ -180,13 +180,25 @@ async def run_query(
     if session:
         runner_kwargs["session"] = session
 
-    try:
-        result = await Runner.run(agent, **runner_kwargs)
-    except Exception as e:
-        # Log overflow or other errors with context for debugging
-        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
-        pad.close()
-        raise
+    # Retry on transient SDK errors (e.g. "No tool output found" race condition)
+    _max_retries = 2
+    for _attempt in range(_max_retries):
+        try:
+            result = await Runner.run(agent, **runner_kwargs)
+            break
+        except Exception as e:
+            err_str = str(e)
+            is_retryable = "No tool output found" in err_str
+            if is_retryable and _attempt < _max_retries - 1:
+                logger.warning(
+                    "Retryable SDK error (attempt %d/%d): %s",
+                    _attempt + 1, _max_retries, err_str[:200],
+                )
+                continue
+            # Non-retryable or exhausted retries
+            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            pad.close()
+            raise
 
     # Extract tools used, tool details, tickers, and token usage from result
     tracker = TokenTracker()
@@ -309,12 +321,24 @@ def run_query_sync(
     if session:
         runner_kwargs["session"] = session
 
-    try:
-        result = Runner.run_sync(agent, **runner_kwargs)
-    except Exception as e:
-        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
-        pad.close()
-        raise
+    # Retry on transient SDK errors
+    _max_retries = 2
+    for _attempt in range(_max_retries):
+        try:
+            result = Runner.run_sync(agent, **runner_kwargs)
+            break
+        except Exception as e:
+            err_str = str(e)
+            is_retryable = "No tool output found" in err_str
+            if is_retryable and _attempt < _max_retries - 1:
+                logger.warning(
+                    "Retryable SDK error (attempt %d/%d): %s",
+                    _attempt + 1, _max_retries, err_str[:200],
+                )
+                continue
+            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            pad.close()
+            raise
 
     # Extract tools used and token usage
     tracker = TokenTracker()
@@ -410,14 +434,26 @@ async def run_query_stream(
     if session:
         runner_kwargs["session"] = session
 
-    try:
-        result = await Runner.run(agent, **runner_kwargs
-        )
-    except Exception as e:
-        pad.log_final_answer(f"[ERROR] {type(e).__name__}: {e}", tools_used=[])
-        pad.close()
-        yield AgentEvent(EventType.error, {"error": str(e)})
-        return
+    # Retry on transient SDK errors
+    _max_retries = 2
+    result = None
+    for _attempt in range(_max_retries):
+        try:
+            result = await Runner.run(agent, **runner_kwargs)
+            break
+        except Exception as e:
+            err_str = str(e)
+            is_retryable = "No tool output found" in err_str
+            if is_retryable and _attempt < _max_retries - 1:
+                logger.warning(
+                    "Retryable SDK error (attempt %d/%d): %s",
+                    _attempt + 1, _max_retries, err_str[:200],
+                )
+                continue
+            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            pad.close()
+            yield AgentEvent(EventType.error, {"error": err_str[:500]})
+            return
 
     # Extract tools used and token usage from result
     tracker = TokenTracker()

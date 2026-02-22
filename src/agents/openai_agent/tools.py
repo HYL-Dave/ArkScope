@@ -56,6 +56,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_ticker_news,
         get_news_sentiment_summary,
         search_news_by_keyword,
+        get_news_brief,
+        search_news_advanced,
     )
     from src.tools.price_tools import (
         get_ticker_prices,
@@ -111,7 +113,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         ticker: str,
         days: int = 30,
         source: str = "auto",
-        limit: int = 50,
+        limit: int = 20,
     ) -> str:
         """Get recent news articles for a stock ticker. Returns up to `limit` most recent articles. The response includes `count` (total available) so you know if more exist.
 
@@ -119,7 +121,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             ticker: Stock ticker symbol (e.g. NVDA, AMD)
             days: Lookback period in days (default: 30)
             source: Data source - auto, ibkr, or polygon (default: auto)
-            limit: Max articles to return, 1-500 (default: 50)
+            limit: Max articles to return, 1-500 (default: 20)
         """
         result = get_ticker_news(dal, ticker, days=days, source=source, limit=limit)
         return _serialize_result(result, "get_ticker_news")
@@ -142,18 +144,64 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         keyword: str,
         days: int = 30,
         ticker: Optional[str] = None,
-        limit: int = 50,
+        limit: int = 20,
     ) -> str:
-        """Search news articles by keyword in titles and descriptions. Returns up to `limit` most recent matches.
+        """Search news articles by keyword using full-text search. Returns up to `limit` most recent matches.
 
         Args:
-            keyword: Search keyword
+            keyword: Search keyword (supports multi-word)
             days: Lookback period in days (default: 30)
             ticker: Optionally filter by ticker
-            limit: Max articles to return, 1-500 (default: 50)
+            limit: Max articles to return, 1-500 (default: 20)
         """
         result = search_news_by_keyword(dal, keyword, days=days, ticker=ticker, limit=limit)
         return _serialize_result(result, "search_news_by_keyword")
+
+    # ================================================================
+    # News Tools — Smart Data Retrieval
+    # ================================================================
+
+    @function_tool
+    def tool_get_news_brief(
+        tickers: Optional[List[str]] = None,
+        days: int = 7,
+    ) -> str:
+        """Get a lightweight news overview for multiple tickers: article count, avg sentiment, avg risk, date range. Call this FIRST before get_ticker_news() to decide which tickers need detailed investigation. Very fast, minimal output.
+
+        Args:
+            tickers: List of ticker symbols (default: watchlist from config)
+            days: Lookback period in days (default: 7)
+        """
+        result = get_news_brief(dal, tickers=tickers, days=days)
+        return _serialize_result(result, "get_news_brief")
+
+    @function_tool
+    def tool_search_news_advanced(
+        query: str = "",
+        tickers: Optional[List[str]] = None,
+        days: int = 30,
+        scored_only: bool = False,
+        min_sentiment: Optional[int] = None,
+        max_risk: Optional[int] = None,
+        limit: int = 20,
+    ) -> str:
+        """Advanced news search combining full-text search + multi-ticker + date range + score filters. Use for cross-ticker theme searches (e.g. 'tariff impact' across AI_CHIPS sector).
+
+        Args:
+            query: Full-text search query
+            tickers: Filter by multiple tickers
+            days: Lookback period in days (default: 30)
+            scored_only: Only return scored articles (default: false)
+            min_sentiment: Minimum sentiment score (1-5)
+            max_risk: Maximum risk score (1-5)
+            limit: Max articles to return (default: 20)
+        """
+        result = search_news_advanced(
+            dal, query=query, tickers=tickers, days=days,
+            scored_only=scored_only, min_sentiment=min_sentiment,
+            max_risk=max_risk, limit=limit,
+        )
+        return _serialize_result(result, "search_news_advanced")
 
     # ================================================================
     # Price Tools
@@ -788,6 +836,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_ticker_news,
         tool_get_news_sentiment_summary,
         tool_search_news_by_keyword,
+        tool_get_news_brief,
+        tool_search_news_advanced,
         tool_get_ticker_prices,
         tool_get_price_change,
         tool_get_sector_performance,

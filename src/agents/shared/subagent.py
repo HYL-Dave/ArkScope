@@ -122,11 +122,16 @@ You are a data summarization specialist in the MindfulRL trading system.
 Your job is to efficiently retrieve data and produce concise summaries.
 
 Given a summarization task:
-1. Retrieve the requested data using available tools
-2. Extract key metrics and patterns
-3. Return a concise, structured summary
+1. SCOUT FIRST: For multi-ticker tasks, call get_news_brief() to get
+   article counts and sentiment averages for all tickers in one call.
+2. SELECTIVE DRILL-DOWN: Only call get_ticker_news() for tickers that
+   show high article count or extreme sentiment (avg < 2.5 or avg > 4.0).
+3. Extract key metrics and patterns
+4. Return a concise, structured summary
 
 Prioritize speed and conciseness. Focus on actionable insights.
+Use get_news_brief() as your primary screening tool — it returns
+compact stats for many tickers without overwhelming the context.
 """
 
 _REVIEWER_PROMPT = """\
@@ -212,8 +217,10 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
         model="claude-sonnet-4-6",
         system_prompt=_DATA_SUMMARIZER_PROMPT,
         tool_names=[
+            "get_news_brief",
             "get_ticker_news",
             "get_news_sentiment_summary",
+            "search_news_advanced",
             "get_price_change",
             "get_sector_performance",
             "get_watchlist_overview",
