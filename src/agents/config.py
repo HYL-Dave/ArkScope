@@ -79,7 +79,7 @@ class AgentConfig(BaseModel):
     subagent_max_turns: Dict[str, int] = {}
 
     # Server-side compaction L2 (Phase 7a)
-    # Anthropic: beta compact-2026-01-12, Opus 4.6 only, context_management param
+    # Anthropic: beta compact-2026-01-12, Opus 4.6 + Sonnet 4.6, context_management param
     # OpenAI: CompactionSession for within-run context compaction
     # Both work on top of L1 client-side compaction (ContextManager)
     server_compaction: bool = False

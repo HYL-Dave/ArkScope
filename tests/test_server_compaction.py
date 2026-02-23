@@ -36,7 +36,10 @@ class TestAnthropicCompaction:
     def test_opus_45_not_supported(self):
         assert _supports_compaction("claude-opus-4-5-20251101") is False
 
-    def test_sonnet_not_supported(self):
+    def test_sonnet_46_supported(self):
+        assert _supports_compaction("claude-sonnet-4-6") is True
+
+    def test_sonnet_45_not_supported(self):
         assert _supports_compaction("claude-sonnet-4-5-20250929") is False
 
     def test_haiku_not_supported(self):
@@ -50,6 +53,7 @@ class TestAnthropicCompaction:
 
     def test_compaction_models_set(self):
         assert "claude-opus-4-6" in _COMPACTION_MODELS
+        assert "claude-sonnet-4-6" in _COMPACTION_MODELS
 
 
 # ── OpenAI CompactionSession ────────────────────────────────

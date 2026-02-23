@@ -20,7 +20,7 @@ from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
 _COMPACTION_BETA = "compact-2026-01-12"
-_COMPACTION_MODELS = {"claude-opus-4-6"}  # Only Opus 4.6 supports compaction
+_COMPACTION_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
 
 
 def _supports_compaction(model: str) -> bool:
@@ -242,7 +242,7 @@ async def run_query_stream(
     if use_beta:
         logger.info(f"Using 1M context beta for {model_name}")
 
-    # Server-side compaction (Phase 7a): Opus 4.6 only
+    # Server-side compaction (Phase 7a): Opus 4.6 + Sonnet 4.6
     use_compaction = config.server_compaction and _supports_compaction(model_name)
     if use_compaction:
         use_beta = True  # compaction requires beta endpoint

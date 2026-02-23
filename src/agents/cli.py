@@ -83,6 +83,7 @@ from .shared.attachments import Attachment, AttachmentManager
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad, _safe_serialize
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
+from .shared.context_manager import ContextManager
 from .shared.token_tracker import TokenTracker
 
 console = Console()
@@ -652,6 +653,12 @@ def run_anthropic_interactive(
     tracker = TokenTracker()
     _query_start = time.time()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
+    ctx = ContextManager(
+        model=model_name,
+        threshold_ratio=config.context_threshold_ratio,
+        keep_recent_turns=config.context_keep_recent_turns,
+        preview_chars=config.context_preview_chars,
+    )
 
     # Build optional API params (effort + thinking)
     api_kwargs: Dict[str, Any] = {}
@@ -826,6 +833,11 @@ def run_anthropic_interactive(
         # Append to message history
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
+
+        # L1: Compact old tool results if context is growing too large
+        if ctx.should_compact(tracker):
+            messages, compact_stats = ctx.compact_messages(messages)
+            logger.info(f"CLI context compacted: {compact_stats}")
 
     partial_text = (
         f"Reached maximum tool calls ({effective_max_turns}). "
@@ -1636,7 +1648,7 @@ def handle_compaction_command(state: SessionState, arg: str) -> None:
     """Handle /compaction [on|off] command. No arg = toggle.
 
     Server-side compaction (L2):
-    - Anthropic: beta compact-2026-01-12, Opus 4.6 only
+    - Anthropic: beta compact-2026-01-12, Opus 4.6 + Sonnet 4.6
     - OpenAI: CompactionSession
     Both work on top of L1 client-side compaction.
     """
@@ -1645,13 +1657,13 @@ def handle_compaction_command(state: SessionState, arg: str) -> None:
         new_status = "ON" if state.server_compaction else "OFF"
         console.print(f"[green]Server compaction (L2):[/green] [bold]{new_status}[/bold]")
         if state.server_compaction:
-            console.print("[dim]Anthropic: Opus 4.6 only | OpenAI: CompactionSession[/dim]")
+            console.print("[dim]Anthropic: Opus 4.6 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]")
         console.print()
         return
     if arg.lower() in ("on", "true", "1"):
         state.server_compaction = True
         console.print("[green]Server compaction (L2):[/green] [bold]ON[/bold]")
-        console.print("[dim]Anthropic: Opus 4.6 only | OpenAI: CompactionSession[/dim]\n")
+        console.print("[dim]Anthropic: Opus 4.6 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]\n")
     elif arg.lower() in ("off", "false", "0"):
         state.server_compaction = False
         console.print("[green]Server compaction (L2):[/green] [bold]OFF[/bold]\n")
