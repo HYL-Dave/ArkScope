@@ -35,3 +35,6 @@ playwright>=1.40.0
 
 # File Attachment (Phase D) — PDF/image processing
 pymupdf>=1.24.0
+
+# Discord Bot (Phase E) — Monitor notifications + Gateway
+discord.py>=2.6.0

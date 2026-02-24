@@ -165,6 +165,7 @@ class ToolRegistry:
         self._register_memory_tools()
         self._register_web_tools()
         self._register_execution_tools()
+        self._register_monitor_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -884,6 +885,28 @@ class ToolRegistry:
                 ToolParameter("background", "boolean",
                               "Run in background, write results to temp file (default: false)",
                               required=False, default=False),
+            ],
+        ))
+
+
+    def _register_monitor_tools(self) -> None:
+        from .monitor_tools import scan_alerts
+
+        self.register(ToolDefinition(
+            name="scan_alerts",
+            description=(
+                "Scan watchlist or specific tickers for price, sentiment, signal, "
+                "and sector alerts based on configured thresholds. "
+                "Returns a summary of all triggered alerts."
+            ),
+            function=scan_alerts,
+            category="monitor",
+            parameters=[
+                ToolParameter(
+                    "tickers", "string",
+                    "Comma-separated ticker symbols to scan (empty = scan full watchlist from config)",
+                    required=False, default="",
+                ),
             ],
         ))
 

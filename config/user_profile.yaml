@@ -152,6 +152,8 @@ alerts:
       enabled: true
     - type: "console"      # 終端輸出
       enabled: true
+    - type: "discord"       # Discord Bot 推送 (Phase E2)
+      enabled: false       # 啟用前確保 DISCORD_BOT_TOKEN 已設定
     - type: "telegram"     # Telegram 推送
       enabled: false
       bot_token: ""

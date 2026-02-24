@@ -191,4 +191,4 @@ class TestPortfolioToolRegistration:
         assert tool is not None
         assert tool.category == "portfolio"
         assert tool.requires_dal is True
-        assert len(registry.list_all()) == 39
+        assert len(registry.list_all()) == 40

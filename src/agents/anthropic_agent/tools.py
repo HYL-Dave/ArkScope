@@ -943,6 +943,28 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ])
 
+    # Monitor tools (Phase E1)
+    tools.extend([
+        {
+            "name": "scan_alerts",
+            "description": (
+                "Scan watchlist or specific tickers for price, sentiment, signal, "
+                "and sector alerts based on configured thresholds. "
+                "Returns a summary of all triggered alerts."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tickers": {
+                        "type": "string",
+                        "description": "Comma-separated ticker symbols (empty = scan full watchlist from config)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    ])
+
     return tools
 
 
@@ -1039,6 +1061,7 @@ def execute_tool(
     from src.tools.memory_tools import (
         save_memory, recall_memories, list_memories, delete_memory,
     )
+    from src.tools.monitor_tools import scan_alerts
 
     # Tool dispatch map
     tool_map = {
@@ -1270,6 +1293,11 @@ def execute_tool(
         "delete_memory": lambda: delete_memory(
             dal,
             memory_id=tool_input["memory_id"],
+        ),
+        # Monitor tools (Phase E1)
+        "scan_alerts": lambda: scan_alerts(
+            dal,
+            tickers=tool_input.get("tickers", ""),
         ),
     }
 

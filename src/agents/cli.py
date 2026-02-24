@@ -239,6 +239,7 @@ _SLASH_COMMANDS = [
     ("/save", "/sv", "Save chat exchanges as report"),
     ("/reports", "/rp", "List saved research reports"),
     ("/memory", "/mem", "Manage long-term memories"),
+    ("/monitor", "/mon", "Scan watchlist for alerts"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -1403,6 +1404,41 @@ def handle_reports_command(dal, arg: str) -> None:
     console.print(f"\n[dim]Use /reports <id> to view a report[/dim]\n")
 
 
+def _handle_monitor_command(dal, arg: str) -> None:
+    """Handle /monitor [scan [TICKERS] | status]."""
+    import asyncio
+    from src.monitor.engine import MonitorEngine
+
+    parts = arg.split() if arg else []
+    subcmd = parts[0].lower() if parts else "scan"
+
+    engine = MonitorEngine(dal=dal)
+
+    if subcmd == "status":
+        console.print("[bold]Monitor Configuration[/bold]")
+        console.print(f"  Default tickers: {', '.join(engine.default_tickers)}")
+        console.print(f"  Active channels: {engine._router.active_channels}")
+        console.print(f"  Watchers: {len(engine._watchers)}")
+        console.print()
+        return
+
+    # Default: scan
+    tickers = None
+    if subcmd == "scan" and len(parts) > 1:
+        tickers = [t.upper() for t in parts[1:]]
+    elif subcmd != "scan":
+        # User typed /monitor NVDA TSLA (no "scan" keyword)
+        tickers = [t.upper() for t in parts]
+
+    scan_tickers = tickers or engine.default_tickers
+    console.print(f"[dim]Scanning {len(scan_tickers)} tickers...[/dim]")
+
+    alerts = asyncio.run(engine.scan_once(tickers=tickers, notify=True))
+    summary = engine.format_scan_summary(alerts)
+    console.print(summary)
+    console.print()
+
+
 def handle_memory_command(dal, arg: str) -> None:
     """Handle /memory [subcommand] [args]."""
     from src.tools.memory_tools import (
@@ -2242,6 +2278,8 @@ def main():
                 handle_reports_command(dal, arg)
             elif cmd in ("/memory", "/mem"):
                 handle_memory_command(dal, arg)
+            elif cmd in ("/monitor", "/mon"):
+                _handle_monitor_command(dal, arg)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:

@@ -103,6 +103,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         list_memories as _list_memories,
         delete_memory as _delete_memory,
     )
+    from src.tools.monitor_tools import scan_alerts as _scan_alerts
 
     # ================================================================
     # News Tools
@@ -851,6 +852,20 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _delete_memory(dal, memory_id=memory_id)
         return _serialize_result(result, "delete_memory")
 
+    # ================================================================
+    # Monitor Tools (Phase E1)
+    # ================================================================
+
+    @function_tool
+    def tool_scan_alerts(tickers: str = "") -> str:
+        """Scan watchlist or specific tickers for price, sentiment, signal, and sector alerts.
+
+        Args:
+            tickers: Comma-separated ticker symbols (empty = scan full watchlist from config)
+        """
+        result = _scan_alerts(dal, tickers=tickers)
+        return _serialize_result(result, "scan_alerts")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -889,6 +904,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_recall_memories,
         tool_list_memories,
         tool_delete_memory,
+        tool_scan_alerts,
     ]
 
     # Conditionally add web tools
