@@ -122,9 +122,15 @@ class NotificationRouter:
                 logger.debug("Skipping unimplemented channel type: %s", ch_type)
 
     def set_discord_bot(self, bot) -> None:
-        """Inject Discord bot into the DiscordNotifier (if enabled)."""
-        if self._discord_notifier:
-            self._discord_notifier.set_bot(bot)
+        """Inject Discord bot into the DiscordNotifier.
+
+        If no DiscordNotifier was created from config (e.g. enabled=false),
+        this creates one on-the-fly so --discord CLI flag always works.
+        """
+        if not self._discord_notifier:
+            self._discord_notifier = DiscordNotifier()
+            self._notifiers.append(self._discord_notifier)
+        self._discord_notifier.set_bot(bot)
 
     @property
     def active_channels(self) -> int:
