@@ -49,14 +49,21 @@ async def run_service(
 
     bot = None
     if discord:
-        from src.monitor.discord_bot import MindfulDiscordBot, _load_channel_id
+        from src.monitor.discord_bot import (
+            MindfulDiscordBot, _load_channel_id,
+            _load_alert_channel_id, _load_agent_channel_id,
+        )
 
-        channel_id = _load_channel_id()
-        bot = MindfulDiscordBot(channel_id=channel_id)
+        bot = MindfulDiscordBot(
+            channel_id=_load_channel_id(),
+            alert_channel_id=_load_alert_channel_id(),
+            agent_channel_id=_load_agent_channel_id(),
+            dal=dal,
+        )
 
         # Inject bot into notification router
         engine._router.set_discord_bot(bot)
-        logger.info("Discord notifications enabled")
+        logger.info("Discord notifications enabled (with slash commands + free chat)")
 
     scheduler = MonitorScheduler(
         engine=engine,

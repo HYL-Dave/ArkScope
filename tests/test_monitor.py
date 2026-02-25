@@ -1,4 +1,4 @@
-"""Tests for the monitor system (Phase E1 + E2)."""
+"""Tests for the monitor system (Phase E1 + E2 + E3)."""
 
 from __future__ import annotations
 
@@ -487,3 +487,220 @@ class TestMonitorScheduler:
             assert not scheduler.is_running
 
         asyncio.run(_test())
+
+
+# ── Phase 3: Slash Commands + Buttons + Free Chat ─────────────
+
+
+class TestBotInit:
+    """Test MindfulDiscordBot construction and config."""
+
+    def test_bot_has_command_tree(self):
+        from src.monitor.discord_bot import MindfulDiscordBot
+        bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
+        # Verify the class has the tree setup logic
+        assert hasattr(MindfulDiscordBot, "_setup_commands")
+
+    def test_load_env_helpers(self):
+        from src.monitor.discord_bot import (
+            _load_alert_channel_id, _load_agent_channel_id, _load_env_int,
+        )
+        # With no env var set and no config file, should return None
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("src.monitor.discord_bot.Path.exists", return_value=False):
+                assert _load_env_int("NONEXISTENT_KEY") is None
+
+    def test_load_env_int_from_environ(self):
+        from src.monitor.discord_bot import _load_env_int
+        with patch.dict("os.environ", {"TEST_CHANNEL": "12345"}):
+            assert _load_env_int("TEST_CHANNEL") == 12345
+
+    def test_load_env_int_invalid(self):
+        from src.monitor.discord_bot import _load_env_int
+        with patch.dict("os.environ", {"TEST_CHANNEL": "not_a_number"}):
+            assert _load_env_int("TEST_CHANNEL") is None
+
+
+class TestAlertActionView:
+    """Test AlertActionView button creation."""
+
+    def test_view_has_buttons(self):
+        from src.monitor.discord_bot import AlertActionView
+
+        async def _test():
+            dal = MagicMock()
+            view = AlertActionView(ticker="NVDA", dal=dal)
+            assert view.ticker == "NVDA"
+            assert len(view.children) == 2
+
+        asyncio.run(_test())
+
+    def test_view_timeout(self):
+        from src.monitor.discord_bot import AlertActionView
+
+        async def _test():
+            view = AlertActionView(ticker="NVDA", dal=MagicMock())
+            assert view.timeout == 300
+
+        asyncio.run(_test())
+
+
+class TestSkillSelectView:
+    """Test SkillSelectView dropdown creation."""
+
+    def test_view_has_select(self):
+        from src.monitor.discord_bot import SkillSelectView
+
+        async def _test():
+            view = SkillSelectView(dal=MagicMock())
+            assert len(view.children) == 1
+            select = view.children[0]
+            assert len(select.options) == 4
+
+        asyncio.run(_test())
+
+
+class TestTickerModal:
+    """Test TickerModal creation."""
+
+    def test_modal_has_input(self):
+        from src.monitor.discord_bot import TickerModal
+
+        async def _test():
+            modal = TickerModal(skill_name="full_analysis", dal=MagicMock())
+            assert modal._skill_name == "full_analysis"
+            assert modal.title == "Enter Ticker"
+
+        asyncio.run(_test())
+
+
+class TestRunAgentQuery:
+    """Test _run_agent_query helper."""
+
+    def test_successful_query(self):
+        from src.monitor.discord_bot import _run_agent_query
+        from src.agents.shared.events import AgentEvent, EventType
+
+        async def mock_stream(question, dal):
+            yield AgentEvent(type=EventType.done, data={"answer": "Test answer"})
+
+        with patch(
+            "src.agents.anthropic_agent.agent.run_query_stream",
+            side_effect=mock_stream,
+        ):
+            result = asyncio.run(_run_agent_query("test", MagicMock()))
+
+        assert result == "Test answer"
+
+    def test_query_exception(self):
+        from src.monitor.discord_bot import _run_agent_query
+
+        with patch(
+            "src.agents.anthropic_agent.agent.run_query_stream",
+            side_effect=RuntimeError("fail"),
+        ):
+            result = asyncio.run(_run_agent_query("test", MagicMock()))
+
+        assert "failed" in result.lower()
+
+
+class TestLongResponse:
+    """Test response splitting helpers."""
+
+    def test_send_long_followup_single(self):
+        from src.monitor.discord_bot import _send_long_followup
+
+        interaction = MagicMock()
+        interaction.followup.send = AsyncMock()
+
+        asyncio.run(_send_long_followup(interaction, "short text"))
+        interaction.followup.send.assert_called_once_with("short text")
+
+    def test_send_long_followup_split(self):
+        from src.monitor.discord_bot import _send_long_followup
+
+        interaction = MagicMock()
+        interaction.followup.send = AsyncMock()
+
+        # Create text that needs splitting (> 1900 chars)
+        long_text = "A" * 3000
+        asyncio.run(_send_long_followup(interaction, long_text))
+        assert interaction.followup.send.call_count == 2
+
+    def test_send_long_message_with_reference(self):
+        from src.monitor.discord_bot import _send_long_message
+
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        ref = MagicMock()
+
+        asyncio.run(_send_long_message(channel, "hello", reference=ref))
+        channel.send.assert_called_once_with("hello", reference=ref)
+
+    def test_send_long_message_empty(self):
+        from src.monitor.discord_bot import _send_long_message
+
+        channel = MagicMock()
+        channel.send = AsyncMock()
+
+        asyncio.run(_send_long_message(channel, ""))
+        channel.send.assert_called_once_with("No response.", reference=None)
+
+
+class TestSeverityRouting:
+    """Test that send_alert routes by severity."""
+
+    def test_critical_routes_to_alert_channel(self):
+        from src.monitor.discord_bot import MindfulDiscordBot
+
+        bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
+        bot._channel = MagicMock()
+        bot._channel.send = AsyncMock()
+        bot._alert_channel = MagicMock()
+        bot._alert_channel.send = AsyncMock()
+        bot._dal = MagicMock()
+
+        alert = Alert(
+            alert_type="signal", severity="critical",
+            title="STRONG_BUY", message="High conf", ticker="NVDA",
+        )
+
+        asyncio.run(bot.send_alert(alert))
+        bot._alert_channel.send.assert_called_once()
+        bot._channel.send.assert_not_called()
+
+    def test_info_routes_to_main_channel(self):
+        from src.monitor.discord_bot import MindfulDiscordBot
+
+        bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
+        bot._channel = MagicMock()
+        bot._channel.send = AsyncMock()
+        bot._alert_channel = MagicMock()
+        bot._alert_channel.send = AsyncMock()
+        bot._dal = MagicMock()
+
+        alert = Alert(
+            alert_type="price", severity="info",
+            title="Price stable", message="Minor move",
+        )
+
+        asyncio.run(bot.send_alert(alert))
+        bot._channel.send.assert_called_once()
+        bot._alert_channel.send.assert_not_called()
+
+    def test_critical_fallback_to_main_if_no_alert_channel(self):
+        from src.monitor.discord_bot import MindfulDiscordBot
+
+        bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
+        bot._channel = MagicMock()
+        bot._channel.send = AsyncMock()
+        bot._alert_channel = None
+        bot._dal = None
+
+        alert = Alert(
+            alert_type="signal", severity="critical",
+            title="STRONG_SELL", message="Drop",
+        )
+
+        asyncio.run(bot.send_alert(alert))
+        bot._channel.send.assert_called_once()

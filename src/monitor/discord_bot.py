@@ -1,9 +1,8 @@
 """
-Discord Bot for monitor notifications.
+Discord Bot for monitor notifications + two-way interaction.
 
-Sends Alert embeds to configured Discord channels.
 Phase 2: one-way notifications (alerts → Discord).
-Phase 3 will add slash commands for two-way interaction.
+Phase 3: slash commands, buttons, select menus, free chat (@mention + #agent channel).
 """
 
 from __future__ import annotations
@@ -12,11 +11,15 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import discord
+from discord import app_commands
 
 from .notifiers import Alert
+
+if TYPE_CHECKING:
+    from src.tools.data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +39,16 @@ _TYPE_EMOJI = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Config loaders
+# ---------------------------------------------------------------------------
+
 def _load_token() -> str:
     """Load Discord bot token from config/.env or environment."""
-    # Try environment first
     token = os.environ.get("DISCORD_BOT_TOKEN", "")
     if token:
         return token
 
-    # Try config/.env
     env_path = Path("config/.env")
     if env_path.exists():
         from dotenv import dotenv_values
@@ -55,21 +60,40 @@ def _load_token() -> str:
 
 def _load_channel_id() -> Optional[int]:
     """Load Discord channel ID from config/.env or environment."""
-    raw = os.environ.get("DISCORD_CHANNEL_ID", "")
+    return _load_env_int("DISCORD_CHANNEL_ID")
+
+
+def _load_alert_channel_id() -> Optional[int]:
+    """Load alert channel ID from config/.env or environment."""
+    return _load_env_int("DISCORD_ALERT_CHANNEL_ID")
+
+
+def _load_agent_channel_id() -> Optional[int]:
+    """Load agent channel ID from config/.env or environment."""
+    return _load_env_int("DISCORD_AGENT_CHANNEL_ID")
+
+
+def _load_env_int(key: str) -> Optional[int]:
+    """Load an integer value from env or config/.env."""
+    raw = os.environ.get(key, "")
     if not raw:
         env_path = Path("config/.env")
         if env_path.exists():
             from dotenv import dotenv_values
             values = dotenv_values(env_path)
-            raw = values.get("DISCORD_CHANNEL_ID", "")
+            raw = values.get(key, "")
 
     if raw and raw.strip():
         try:
             return int(raw.strip())
         except ValueError:
-            logger.warning("Invalid DISCORD_CHANNEL_ID: %s", raw)
+            logger.warning("Invalid %s: %s", key, raw)
     return None
 
+
+# ---------------------------------------------------------------------------
+# Embed helpers
+# ---------------------------------------------------------------------------
 
 def alert_to_embed(alert: Alert) -> discord.Embed:
     """Convert an Alert to a Discord Embed."""
@@ -100,51 +124,254 @@ def alert_to_embed(alert: Alert) -> discord.Embed:
     return embed
 
 
-class MindfulDiscordBot(discord.Client):
-    """Discord bot for sending monitor alerts.
+# ---------------------------------------------------------------------------
+# Interactive Views (Buttons + Select Menus)
+# ---------------------------------------------------------------------------
 
-    Usage:
-        bot = MindfulDiscordBot()
-        await bot.start_bot()  # connects and stays ready
-        await bot.send_alert(alert)  # send individual alert
-        await bot.send_alerts(alerts)  # send batch
-        await bot.close()
+class AlertActionView(discord.ui.View):
+    """Buttons attached to alert embeds — analyze or view news for the ticker."""
+
+    def __init__(self, ticker: str, dal: DataAccessLayer) -> None:
+        super().__init__(timeout=300)  # 5 minutes
+        self.ticker = ticker
+        self._dal = dal
+
+    @discord.ui.button(label="Analyze", style=discord.ButtonStyle.primary, emoji="\U0001F50D")
+    async def analyze_btn(
+        self, interaction: discord.Interaction, button: discord.ui.Button,
+    ) -> None:
+        await interaction.response.defer(thinking=True)
+        answer = await _run_agent_query(
+            f"Run a full analysis on {self.ticker}. Cover technicals, fundamentals, "
+            f"recent news sentiment, and provide an actionable recommendation.",
+            self._dal,
+        )
+        await _send_long_followup(interaction, answer)
+
+    @discord.ui.button(label="News", style=discord.ButtonStyle.secondary, emoji="\U0001F4F0")
+    async def news_btn(
+        self, interaction: discord.Interaction, button: discord.ui.Button,
+    ) -> None:
+        await interaction.response.defer(thinking=True)
+        answer = await _run_agent_query(
+            f"Get recent news for {self.ticker} with sentiment analysis. "
+            f"Summarize the key headlines and overall sentiment trend.",
+            self._dal,
+        )
+        await _send_long_followup(interaction, answer)
+
+
+class SkillSelectView(discord.ui.View):
+    """Dropdown to pick a skill when /skill is called without arguments."""
+
+    def __init__(self, dal: DataAccessLayer) -> None:
+        super().__init__(timeout=120)
+        self._dal = dal
+
+    @discord.ui.select(
+        placeholder="Select a skill...",
+        options=[
+            discord.SelectOption(
+                label="Full Analysis", value="full_analysis",
+                description="Complete ticker analysis", emoji="\U0001F4CA",
+            ),
+            discord.SelectOption(
+                label="Portfolio Scan", value="portfolio_scan",
+                description="Scan entire watchlist", emoji="\U0001F4CB",
+            ),
+            discord.SelectOption(
+                label="Earnings Prep", value="earnings_prep",
+                description="Prepare for earnings report", emoji="\U0001F4C5",
+            ),
+            discord.SelectOption(
+                label="Sector Rotation", value="sector_rotation",
+                description="Analyze sector trends", emoji="\U0001F310",
+            ),
+        ],
+    )
+    async def skill_select(
+        self, interaction: discord.Interaction, select: discord.ui.Select,
+    ) -> None:
+        selected = select.values[0]
+        from src.agents.shared.skills import expand_skill, SKILL_REGISTRY
+
+        skill_def = SKILL_REGISTRY.get(selected)
+        if skill_def and skill_def.required_params:
+            # Need ticker — ask via modal
+            modal = TickerModal(skill_name=selected, dal=self._dal)
+            await interaction.response.send_modal(modal)
+        else:
+            await interaction.response.defer(thinking=True)
+            expanded = expand_skill(selected, {})
+            if expanded:
+                answer = await _run_agent_query(expanded, self._dal)
+                await _send_long_followup(interaction, answer)
+            else:
+                await interaction.followup.send("Failed to expand skill.")
+
+
+class TickerModal(discord.ui.Modal, title="Enter Ticker"):
+    """Modal to collect ticker input for skills that need it."""
+
+    ticker_input = discord.ui.TextInput(
+        label="Ticker Symbol",
+        placeholder="e.g. NVDA",
+        max_length=10,
+        required=True,
+    )
+
+    def __init__(self, skill_name: str, dal: DataAccessLayer) -> None:
+        super().__init__()
+        self._skill_name = skill_name
+        self._dal = dal
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        from src.agents.shared.skills import expand_skill
+
+        ticker = self.ticker_input.value.strip().upper()
+        await interaction.response.defer(thinking=True)
+        expanded = expand_skill(self._skill_name, {"ticker": ticker})
+        if expanded:
+            answer = await _run_agent_query(expanded, self._dal)
+            await _send_long_followup(interaction, answer)
+        else:
+            await interaction.followup.send(f"Failed to expand skill '{self._skill_name}' for {ticker}.")
+
+
+# ---------------------------------------------------------------------------
+# Agent query helper
+# ---------------------------------------------------------------------------
+
+async def _run_agent_query(question: str, dal: DataAccessLayer) -> str:
+    """Run an agent query via Anthropic run_query_stream(). Returns answer text."""
+    try:
+        from src.agents.anthropic_agent.agent import run_query_stream
+        from src.agents.shared.events import EventType
+
+        answer = ""
+        async for event in run_query_stream(question=question, dal=dal):
+            if event.type == EventType.done:
+                answer = event.data.get("answer", "No response.")
+        return answer or "No response from agent."
+    except Exception:
+        logger.exception("Agent query failed")
+        return "Agent query failed. Check logs for details."
+
+
+# ---------------------------------------------------------------------------
+# Response splitters
+# ---------------------------------------------------------------------------
+
+async def _send_long_followup(interaction: discord.Interaction, text: str) -> None:
+    """Send a long response as interaction followup, splitting at 1900 chars."""
+    if not text:
+        text = "No response."
+    chunks = [text[i:i + 1900] for i in range(0, len(text), 1900)]
+    await interaction.followup.send(chunks[0])
+    for chunk in chunks[1:]:
+        await interaction.followup.send(chunk)
+
+
+async def _send_long_message(
+    channel: discord.abc.Messageable,
+    text: str,
+    reference: Optional[discord.Message] = None,
+) -> None:
+    """Send a long message to a channel, splitting at 1900 chars."""
+    if not text:
+        text = "No response."
+    chunks = [text[i:i + 1900] for i in range(0, len(text), 1900)]
+    await channel.send(chunks[0], reference=reference)
+    for chunk in chunks[1:]:
+        await channel.send(chunk)
+
+
+# ---------------------------------------------------------------------------
+# Main Bot
+# ---------------------------------------------------------------------------
+
+class MindfulDiscordBot(discord.Client):
+    """Discord bot for monitor alerts + two-way agent interaction.
+
+    Features:
+    - One-way alert notifications with severity-based channel routing
+    - Slash commands: /ask, /analyze, /news, /scan, /skill
+    - Buttons on alert embeds (Analyze, News)
+    - Skill select dropdown menu
+    - Free chat via @mention or dedicated #agent channel
     """
 
-    def __init__(self, channel_id: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        channel_id: Optional[int] = None,
+        alert_channel_id: Optional[int] = None,
+        agent_channel_id: Optional[int] = None,
+        dal: Optional[DataAccessLayer] = None,
+    ) -> None:
         intents = discord.Intents.default()
-        intents.message_content = False  # Phase 2: no need to read messages
+        intents.message_content = True  # Phase 3: needed for free chat
         super().__init__(intents=intents)
 
         self._channel_id = channel_id or _load_channel_id()
+        self._alert_channel_id = alert_channel_id or _load_alert_channel_id()
+        self._agent_channel_id = agent_channel_id or _load_agent_channel_id()
+
         self._ready_event = asyncio.Event()
         self._channel: Optional[discord.TextChannel] = None
+        self._alert_channel: Optional[discord.TextChannel] = None
+        self._agent_channel: Optional[discord.TextChannel] = None
+
+        self._dal = dal
+        self.tree = app_commands.CommandTree(self)
+        self._setup_commands()
+
+    # ── Lifecycle ──────────────────────────────────────────────────────
 
     async def on_ready(self) -> None:
         logger.info("Discord bot connected as %s", self.user)
 
-        if self._channel_id:
-            self._channel = self.get_channel(self._channel_id)
-            if self._channel:
-                logger.info("Target channel: #%s", self._channel.name)
-            else:
-                logger.warning("Channel ID %d not found", self._channel_id)
-        else:
-            # Auto-detect first text channel
-            for guild in self.guilds:
-                for ch in guild.text_channels:
-                    if ch.permissions_for(guild.me).send_messages:
-                        self._channel = ch
-                        self._channel_id = ch.id
-                        logger.info(
-                            "Auto-detected channel: #%s (guild: %s)",
-                            ch.name, guild.name,
-                        )
-                        break
-                if self._channel:
-                    break
+        # Resolve main channel
+        self._channel = self._resolve_channel(self._channel_id, "main")
+        if not self._channel:
+            self._channel = self._auto_detect_channel()
+
+        # Resolve alert channel (fallback to main)
+        self._alert_channel = self._resolve_channel(self._alert_channel_id, "alert")
+
+        # Resolve agent channel
+        self._agent_channel = self._resolve_channel(self._agent_channel_id, "agent")
+
+        # Sync slash commands with Discord
+        try:
+            synced = await self.tree.sync()
+            logger.info("Synced %d slash command(s)", len(synced))
+        except Exception:
+            logger.exception("Failed to sync slash commands")
 
         self._ready_event.set()
+
+    def _resolve_channel(
+        self, channel_id: Optional[int], label: str,
+    ) -> Optional[discord.TextChannel]:
+        """Resolve a channel by ID, logging the result."""
+        if not channel_id:
+            return None
+        ch = self.get_channel(channel_id)
+        if ch:
+            logger.info("Resolved %s channel: #%s", label, ch.name)
+        else:
+            logger.warning("%s channel ID %d not found", label.title(), channel_id)
+        return ch
+
+    def _auto_detect_channel(self) -> Optional[discord.TextChannel]:
+        """Auto-detect first text channel with send permissions."""
+        for guild in self.guilds:
+            for ch in guild.text_channels:
+                if ch.permissions_for(guild.me).send_messages:
+                    self._channel_id = ch.id
+                    logger.info("Auto-detected channel: #%s (guild: %s)", ch.name, guild.name)
+                    return ch
+        return None
 
     async def wait_until_ready_custom(self, timeout: float = 30) -> bool:
         """Wait until the bot is connected and channel is resolved."""
@@ -155,15 +382,63 @@ class MindfulDiscordBot(discord.Client):
             logger.error("Discord bot connection timed out")
             return False
 
+    # ── Free chat (on_message) ────────────────────────────────────────
+
+    async def on_message(self, message: discord.Message) -> None:
+        # Ignore own messages and bot messages
+        if message.author == self.user or message.author.bot:
+            return
+
+        # Dedicated #agent channel — all messages trigger agent
+        if self._agent_channel and message.channel.id == self._agent_channel.id:
+            await self._handle_agent_query(message)
+            return
+
+        # @MindfulRL mention in any channel
+        if self.user and self.user.mentioned_in(message):
+            await self._handle_agent_query(message)
+            return
+
+    async def _handle_agent_query(self, message: discord.Message) -> None:
+        """Process a free-chat message through the agent."""
+        if not self._dal:
+            await message.reply("Agent not configured (no DAL).")
+            return
+
+        # Strip @mention to get clean question
+        question = message.content
+        if self.user:
+            question = question.replace(f"<@{self.user.id}>", "").strip()
+            question = question.replace(f"<@!{self.user.id}>", "").strip()
+        if not question:
+            await message.reply("Please provide a question.")
+            return
+
+        async with message.channel.typing():
+            answer = await _run_agent_query(question, self._dal)
+
+        await _send_long_message(message.channel, answer, reference=message)
+
+    # ── Alert sending (with severity routing) ─────────────────────────
+
     async def send_alert(self, alert: Alert) -> bool:
-        """Send a single alert as an embed to the configured channel."""
-        if not self._channel:
+        """Send a single alert, routing by severity if alert channel is configured."""
+        # Route critical/warning to alert channel if available
+        channel = self._channel
+        if alert.severity in ("critical", "warning") and self._alert_channel:
+            channel = self._alert_channel
+
+        if not channel:
             logger.warning("No Discord channel available")
             return False
 
         try:
             embed = alert_to_embed(alert)
-            await self._channel.send(embed=embed)
+            # Attach buttons if alert has a ticker and DAL is available
+            view = None
+            if alert.ticker and self._dal:
+                view = AlertActionView(alert.ticker, self._dal)
+            await channel.send(embed=embed, view=view)
             return True
         except Exception:
             logger.exception("Failed to send Discord alert")
@@ -183,7 +458,6 @@ class MindfulDiscordBot(discord.Client):
             return False
 
         try:
-            # Discord message limit is 2000 chars
             if len(summary) > 1900:
                 summary = summary[:1900] + "\n... (truncated)"
             await self._channel.send(f"```\n{summary}\n```")
@@ -191,6 +465,110 @@ class MindfulDiscordBot(discord.Client):
         except Exception:
             logger.exception("Failed to send Discord summary")
             return False
+
+    # ── Slash commands setup ──────────────────────────────────────────
+
+    def _setup_commands(self) -> None:
+        """Register all slash commands on the CommandTree."""
+        bot = self  # capture for closures
+
+        @self.tree.command(name="ask", description="Ask the AI agent a question")
+        @app_commands.describe(question="Your question")
+        async def ask_cmd(interaction: discord.Interaction, question: str) -> None:
+            if not bot._dal:
+                await interaction.response.send_message("Agent not configured.")
+                return
+            await interaction.response.defer(thinking=True)
+            answer = await _run_agent_query(question, bot._dal)
+            await _send_long_followup(interaction, answer)
+
+        @self.tree.command(name="analyze", description="Run full analysis on a ticker")
+        @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
+        async def analyze_cmd(interaction: discord.Interaction, ticker: str) -> None:
+            if not bot._dal:
+                await interaction.response.send_message("Agent not configured.")
+                return
+            await interaction.response.defer(thinking=True)
+            from src.agents.shared.skills import expand_skill
+            expanded = expand_skill("full_analysis", {"ticker": ticker.upper()})
+            if expanded:
+                answer = await _run_agent_query(expanded, bot._dal)
+            else:
+                answer = await _run_agent_query(
+                    f"Run a full analysis on {ticker.upper()}.", bot._dal,
+                )
+            await _send_long_followup(interaction, answer)
+
+        @self.tree.command(name="news", description="Get recent news and sentiment for a ticker")
+        @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
+        async def news_cmd(interaction: discord.Interaction, ticker: str) -> None:
+            if not bot._dal:
+                await interaction.response.send_message("Agent not configured.")
+                return
+            await interaction.response.defer(thinking=True)
+            answer = await _run_agent_query(
+                f"Get recent news for {ticker.upper()} with sentiment analysis. "
+                f"Summarize the key headlines and overall sentiment trend.",
+                bot._dal,
+            )
+            await _send_long_followup(interaction, answer)
+
+        @self.tree.command(name="scan", description="Scan watchlist for alerts")
+        async def scan_cmd(interaction: discord.Interaction) -> None:
+            if not bot._dal:
+                await interaction.response.send_message("Agent not configured.")
+                return
+            await interaction.response.defer(thinking=True)
+            from .engine import MonitorEngine
+            engine = MonitorEngine(dal=bot._dal)
+            alerts = await engine.scan_once(notify=False)
+            summary = engine.format_scan_summary(alerts)
+            if len(summary) > 1900:
+                summary = summary[:1900] + "\n... (truncated)"
+            await interaction.followup.send(f"```\n{summary}\n```")
+
+        @self.tree.command(name="skill", description="Run a predefined analysis skill")
+        @app_commands.describe(
+            name="Skill name or alias (leave empty for menu)",
+            ticker="Ticker symbol (if required by skill)",
+        )
+        async def skill_cmd(
+            interaction: discord.Interaction,
+            name: str = "",
+            ticker: str = "",
+        ) -> None:
+            if not bot._dal:
+                await interaction.response.send_message("Agent not configured.")
+                return
+
+            # No skill specified → show dropdown
+            if not name:
+                view = SkillSelectView(bot._dal)
+                await interaction.response.send_message(
+                    "Select a skill:", view=view, ephemeral=True,
+                )
+                return
+
+            from src.agents.shared.skills import parse_skill_command, expand_skill
+            skill_name, params = parse_skill_command(
+                f"{name} {ticker}".strip(),
+            )
+            if not skill_name:
+                await interaction.response.send_message(
+                    f"Unknown skill: `{name}`. Available: full_analysis, "
+                    f"portfolio_scan, earnings_prep, sector_rotation",
+                )
+                return
+
+            await interaction.response.defer(thinking=True)
+            expanded = expand_skill(skill_name, params)
+            if expanded:
+                answer = await _run_agent_query(expanded, bot._dal)
+            else:
+                answer = f"Failed to expand skill '{skill_name}'. Missing required parameters?"
+            await _send_long_followup(interaction, answer)
+
+    # ── Bot start ─────────────────────────────────────────────────────
 
     async def start_bot(self) -> None:
         """Start the bot (call from an existing event loop)."""
