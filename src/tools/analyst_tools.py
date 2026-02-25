@@ -6,12 +6,21 @@ Provides get_analyst_consensus() using Finnhub free API endpoints:
 - /stock/earnings        (last 4 quarters actual vs estimate)
 - /calendar/earnings     (upcoming earnings date + estimates)
 - /stock/price-target    (premium — graceful fallback to null)
+
+Rate-limit note (Finnhub free tier):
+    免費方案限制 60 calls/min。當 Agent 一次掃描多支 tickers（例如 17 支 × 4 endpoints
+    = 68 calls），容易超限導致 read timeout（Finnhub 被 throttle 時不回 429，而是掛住）。
+    我們用 module-level throttle（每秒最多 1 call）確保不超限。
+    如果需要更快速度，可考慮 Finnhub 付費方案（$25-99/mo）。
+    注意：IBKR 不提供分析師數據（recommendations/price targets），Finnhub 是唯一來源。
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +34,26 @@ _session: Optional[requests.Session] = None
 _api_key: Optional[str] = None
 
 _FINNHUB_BASE = "https://finnhub.io/api/v1"
+
+# ── Rate limiter ─────────────────────────────────────────────
+# Finnhub free tier: 60 calls/min. We throttle to 1 call/sec (= 60/min max)
+# to avoid hitting the limit when scanning many tickers at once.
+# The agent can do other analysis (price, sentiment, signals) in parallel
+# while Finnhub calls are paced.
+_FINNHUB_MIN_INTERVAL = 1.0  # seconds between calls
+_last_call_time = 0.0
+_throttle_lock = threading.Lock()
+
+
+def _throttle() -> None:
+    """Sleep if needed to maintain ≤60 calls/min to Finnhub."""
+    global _last_call_time
+    with _throttle_lock:
+        now = time.monotonic()
+        elapsed = now - _last_call_time
+        if elapsed < _FINNHUB_MIN_INTERVAL:
+            time.sleep(_FINNHUB_MIN_INTERVAL - elapsed)
+        _last_call_time = time.monotonic()
 
 
 def _get_finnhub_session() -> tuple[requests.Session, str]:
@@ -49,13 +78,19 @@ def _finnhub_get(endpoint: str, params: Optional[Dict] = None) -> Optional[Any]:
     GET https://finnhub.io/api/v1{endpoint}.
 
     Returns parsed JSON on success, None on 403 (premium endpoint) or error.
+    Automatically throttled to 1 call/sec to stay within free-tier rate limits.
     """
+    _throttle()
     session, api_key = _get_finnhub_session()
     url = f"{_FINNHUB_BASE}{endpoint}"
     try:
-        resp = session.get(url, params=params or {}, timeout=10)
+        resp = session.get(url, params=params or {}, timeout=15)
         if resp.status_code == 403:
             logger.debug("Finnhub %s returned 403 (premium), skipping", endpoint)
+            return None
+        if resp.status_code == 429:
+            logger.warning("Finnhub %s rate limited (429), backing off", endpoint)
+            time.sleep(5)
             return None
         resp.raise_for_status()
         return resp.json()

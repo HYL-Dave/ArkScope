@@ -19,6 +19,17 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
+# ── WebSocket transport (Phase 3 — persistent connections) ─────
+# Keeps a wss:// connection open for tool-call round trips instead of
+# re-establishing HTTP per turn.  ~30-40% faster for 10+ tool-call runs.
+# Falls back silently to HTTP if the SDK version doesn't support it.
+try:
+    from agents import set_default_openai_responses_transport
+    set_default_openai_responses_transport("websocket")
+    logger.info("OpenAI Responses API: WebSocket transport enabled")
+except (ImportError, Exception) as _ws_err:
+    logger.debug("WebSocket transport not available, using HTTP: %s", _ws_err)
+
 # ── Model output limits ────────────────────────────────────────
 # GPT-5.x 全系列 max output tokens = 128K
 # max_output_tokens 包含 reasoning tokens + visible output（跟 Anthropic max_tokens 相同概念）

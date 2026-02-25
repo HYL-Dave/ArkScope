@@ -1261,7 +1261,7 @@ def handle_save_command(state: "SessionState", arg: str) -> None:
             all_tickers.add(t)
 
     # Build Markdown content
-    from datetime import date as _date
+    from datetime import date as _date, datetime as _datetime
     today = _date.today().isoformat()
     tickers_str = ", ".join(sorted(all_tickers)) if all_tickers else "N/A"
 
@@ -1310,7 +1310,7 @@ def handle_save_command(state: "SessionState", arg: str) -> None:
 
     ticker_part = "_".join(sorted(all_tickers)[:3]) if all_tickers else "MISC"
     content_hash = _hashlib.md5(
-        f"{title}{datetime.now().isoformat()}".encode()
+        f"{title}{_datetime.now().isoformat()}".encode()
     ).hexdigest()[:8]
     filename = f"{today}_{ticker_part}_{content_hash}.md"
     file_path = reports_dir / filename
