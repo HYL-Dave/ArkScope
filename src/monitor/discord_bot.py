@@ -73,6 +73,11 @@ def _load_agent_channel_id() -> Optional[int]:
     return _load_env_int("DISCORD_AGENT_CHANNEL_ID")
 
 
+def _load_report_channel_id() -> Optional[int]:
+    """Load report channel ID from config/.env or environment."""
+    return _load_env_int("DISCORD_REPORT_CHANNEL_ID")
+
+
 def _load_env_int(key: str) -> Optional[int]:
     """Load an integer value from env or config/.env."""
     raw = os.environ.get(key, "")
@@ -131,10 +136,14 @@ def alert_to_embed(alert: Alert) -> discord.Embed:
 class AlertActionView(discord.ui.View):
     """Buttons attached to alert embeds — analyze or view news for the ticker."""
 
-    def __init__(self, ticker: str, dal: DataAccessLayer) -> None:
+    def __init__(
+        self, ticker: str, dal: DataAccessLayer,
+        report_channel: Optional[discord.TextChannel] = None,
+    ) -> None:
         super().__init__(timeout=300)  # 5 minutes
         self.ticker = ticker
         self._dal = dal
+        self._report_channel = report_channel
 
     @discord.ui.button(label="Analyze", style=discord.ButtonStyle.primary, emoji="\U0001F50D")
     async def analyze_btn(
@@ -146,7 +155,7 @@ class AlertActionView(discord.ui.View):
             f"recent news sentiment, and provide an actionable recommendation.",
             self._dal,
         )
-        await _send_long_followup(interaction, answer)
+        await _send_long_followup(interaction, answer, self._report_channel)
 
     @discord.ui.button(label="News", style=discord.ButtonStyle.secondary, emoji="\U0001F4F0")
     async def news_btn(
@@ -158,15 +167,19 @@ class AlertActionView(discord.ui.View):
             f"Summarize the key headlines and overall sentiment trend.",
             self._dal,
         )
-        await _send_long_followup(interaction, answer)
+        await _send_long_followup(interaction, answer, self._report_channel)
 
 
 class SkillSelectView(discord.ui.View):
     """Dropdown to pick a skill when /skill is called without arguments."""
 
-    def __init__(self, dal: DataAccessLayer) -> None:
+    def __init__(
+        self, dal: DataAccessLayer,
+        report_channel: Optional[discord.TextChannel] = None,
+    ) -> None:
         super().__init__(timeout=120)
         self._dal = dal
+        self._report_channel = report_channel
 
     @discord.ui.select(
         placeholder="Select a skill...",
@@ -198,14 +211,17 @@ class SkillSelectView(discord.ui.View):
         skill_def = SKILL_REGISTRY.get(selected)
         if skill_def and skill_def.required_params:
             # Need ticker — ask via modal
-            modal = TickerModal(skill_name=selected, dal=self._dal)
+            modal = TickerModal(
+                skill_name=selected, dal=self._dal,
+                report_channel=self._report_channel,
+            )
             await interaction.response.send_modal(modal)
         else:
             await interaction.response.defer(thinking=True)
             expanded = expand_skill(selected, {})
             if expanded:
                 answer = await _run_agent_query(expanded, self._dal)
-                await _send_long_followup(interaction, answer)
+                await _send_long_followup(interaction, answer, self._report_channel)
             else:
                 await interaction.followup.send("Failed to expand skill.")
 
@@ -220,10 +236,14 @@ class TickerModal(discord.ui.Modal, title="Enter Ticker"):
         required=True,
     )
 
-    def __init__(self, skill_name: str, dal: DataAccessLayer) -> None:
+    def __init__(
+        self, skill_name: str, dal: DataAccessLayer,
+        report_channel: Optional[discord.TextChannel] = None,
+    ) -> None:
         super().__init__()
         self._skill_name = skill_name
         self._dal = dal
+        self._report_channel = report_channel
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         from src.agents.shared.skills import expand_skill
@@ -233,7 +253,7 @@ class TickerModal(discord.ui.Modal, title="Enter Ticker"):
         expanded = expand_skill(self._skill_name, {"ticker": ticker})
         if expanded:
             answer = await _run_agent_query(expanded, self._dal)
-            await _send_long_followup(interaction, answer)
+            await _send_long_followup(interaction, answer, self._report_channel)
         else:
             await interaction.followup.send(f"Failed to expand skill '{self._skill_name}' for {ticker}.")
 
@@ -243,32 +263,168 @@ class TickerModal(discord.ui.Modal, title="Enter Ticker"):
 # ---------------------------------------------------------------------------
 
 async def _run_agent_query(question: str, dal: DataAccessLayer) -> str:
-    """Run an agent query via Anthropic run_query_stream(). Returns answer text."""
-    try:
+    """Run an agent query in a separate thread to avoid blocking Discord heartbeat.
+
+    The Anthropic agent's tool execution (HTTP calls to Finnhub, IBKR, etc.)
+    is synchronous and can block for 10-15+ seconds per tool.  Running the
+    entire query on the Discord event-loop thread causes gateway heartbeat
+    timeouts.  We solve this by running the async generator in a *new* event
+    loop on a background thread via ``asyncio.to_thread``.
+    """
+    import asyncio
+
+    def _sync_agent_call() -> str:
+        """Blocking wrapper executed in a thread-pool thread."""
         from src.agents.anthropic_agent.agent import run_query_stream
         from src.agents.shared.events import EventType
 
-        answer = ""
-        async for event in run_query_stream(question=question, dal=dal):
-            if event.type == EventType.done:
-                answer = event.data.get("answer", "No response.")
-        return answer or "No response from agent."
+        async def _consume() -> str:
+            answer = ""
+            async for event in run_query_stream(question=question, dal=dal):
+                if event.type == EventType.done:
+                    answer = event.data.get("answer", "No response.")
+            return answer or "No response from agent."
+
+        return asyncio.run(_consume())
+
+    try:
+        return await asyncio.to_thread(_sync_agent_call)
     except Exception:
         logger.exception("Agent query failed")
         return "Agent query failed. Check logs for details."
 
 
 # ---------------------------------------------------------------------------
-# Response splitters
+# Markdown → Discord formatting
 # ---------------------------------------------------------------------------
 
-async def _send_long_followup(interaction: discord.Interaction, text: str) -> None:
-    """Send a long response as interaction followup, splitting at 1900 chars."""
+import re as _re
+
+def _format_for_discord(text: str) -> str:
+    """Convert standard Markdown to Discord-compatible format.
+
+    Discord natively supports: # ## ### headings, bold, italic, code
+    blocks, block quotes, lists, masked links.
+
+    Discord does NOT support: tables (| col | syntax), H4-H6, ---
+    horizontal rules (renders as text, not a line).
+    """
+    # 1. Convert markdown tables to monospace code blocks.
+    text = _convert_tables(text)
+
+    # 2. H4-H6 → H3 (Discord only supports H1-H3).
+    text = _re.sub(r"^#{4,6}\s+", "### ", text, flags=_re.MULTILINE)
+
+    # 3. Horizontal rules → Unicode separator.
+    text = _re.sub(
+        r"^[ \t]*[-*_]{3,}[ \t]*$",
+        "\u2501" * 20,  # ━━━━━━━━━━━━━━━━━━━━
+        text,
+        flags=_re.MULTILINE,
+    )
+
+    return text
+
+
+def _convert_tables(text: str) -> str:
+    """Wrap Markdown tables in ``` code blocks for monospace rendering."""
+    lines = text.split("\n")
+    result: List[str] = []
+    table_lines: List[str] = []
+    in_table = False
+
+    for line in lines:
+        stripped = line.strip()
+        # Detect table rows: starts and ends with |, or is a separator row
+        is_table_row = (
+            stripped.startswith("|") and stripped.endswith("|")
+        )
+
+        if is_table_row:
+            if not in_table:
+                in_table = True
+                result.append("```")
+            # Skip separator rows like |---|---|
+            if _re.match(r"^\|[\s\-:| ]+\|$", stripped):
+                # Emit a separator using dashes
+                result.append(stripped)
+            else:
+                result.append(line)
+        else:
+            if in_table:
+                result.append("```")
+                in_table = False
+            result.append(line)
+
+    if in_table:
+        result.append("```")
+
+    return "\n".join(result)
+
+
+# ---------------------------------------------------------------------------
+# Smart message splitting
+# ---------------------------------------------------------------------------
+
+def _split_message(text: str, limit: int = 1900) -> List[str]:
+    """Split text at paragraph/line boundaries, respecting Discord limits."""
+    if len(text) <= limit:
+        return [text]
+
+    chunks: List[str] = []
+    remaining = text
+
+    while remaining:
+        if len(remaining) <= limit:
+            chunks.append(remaining)
+            break
+
+        # Try to break at: paragraph → newline → space
+        cut = -1
+        for sep in ("\n\n", "\n", " "):
+            idx = remaining.rfind(sep, 0, limit)
+            if idx > 0:
+                cut = idx
+                break
+
+        if cut <= 0:
+            # Hard break as last resort
+            cut = limit
+
+        chunks.append(remaining[:cut])
+        remaining = remaining[cut:].lstrip("\n")
+
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Response senders
+# ---------------------------------------------------------------------------
+
+async def _send_long_followup(
+    interaction: discord.Interaction,
+    text: str,
+    report_channel: Optional[discord.TextChannel] = None,
+) -> None:
+    """Send a formatted response as interaction followup.
+
+    If *report_channel* is given, the full response goes there and only
+    a short notice is sent back to the interaction.
+    """
     if not text:
         text = "No response."
-    chunks = [text[i:i + 1900] for i in range(0, len(text), 1900)]
-    await interaction.followup.send(chunks[0])
-    for chunk in chunks[1:]:
+    text = _format_for_discord(text)
+
+    if report_channel:
+        # Send full response to #report as embeds
+        await _send_as_embeds(report_channel, text)
+        await interaction.followup.send(
+            f"Analysis posted to <#{report_channel.id}>",
+        )
+        return
+
+    # Send inline
+    for chunk in _split_message(text):
         await interaction.followup.send(chunk)
 
 
@@ -276,14 +432,57 @@ async def _send_long_message(
     channel: discord.abc.Messageable,
     text: str,
     reference: Optional[discord.Message] = None,
+    report_channel: Optional[discord.TextChannel] = None,
 ) -> None:
-    """Send a long message to a channel, splitting at 1900 chars."""
+    """Send a formatted message to a channel.
+
+    If *report_channel* is given, the full response goes there.
+    """
     if not text:
         text = "No response."
-    chunks = [text[i:i + 1900] for i in range(0, len(text), 1900)]
+    text = _format_for_discord(text)
+
+    if report_channel:
+        await _send_as_embeds(report_channel, text)
+        await channel.send(
+            f"Analysis posted to <#{report_channel.id}>",
+            reference=reference,
+        )
+        return
+
+    chunks = _split_message(text)
     await channel.send(chunks[0], reference=reference)
     for chunk in chunks[1:]:
         await channel.send(chunk)
+
+
+async def _send_as_embeds(
+    channel: discord.TextChannel,
+    text: str,
+    color: discord.Color = discord.Color.teal(),
+) -> None:
+    """Send long text as a sequence of Discord Embeds (max 4096 chars each).
+
+    Up to 10 embeds per message, continuing in a new message if needed.
+    """
+    from datetime import datetime as _dt
+
+    chunks = _split_message(text, limit=4000)
+    embeds: List[discord.Embed] = []
+
+    for i, chunk in enumerate(chunks):
+        embed = discord.Embed(description=chunk, color=color)
+        if i == 0:
+            embed.set_author(name="MindfulRL Analysis")
+        if i == len(chunks) - 1:
+            embed.set_footer(text="MindfulRL Agent")
+            embed.timestamp = _dt.now()
+        embeds.append(embed)
+
+    # Discord allows max 10 embeds per message
+    for batch_start in range(0, len(embeds), 10):
+        batch = embeds[batch_start:batch_start + 10]
+        await channel.send(embeds=batch)
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +505,7 @@ class MindfulDiscordBot(discord.Client):
         channel_id: Optional[int] = None,
         alert_channel_id: Optional[int] = None,
         agent_channel_id: Optional[int] = None,
+        report_channel_id: Optional[int] = None,
         dal: Optional[DataAccessLayer] = None,
     ) -> None:
         intents = discord.Intents.default()
@@ -315,11 +515,13 @@ class MindfulDiscordBot(discord.Client):
         self._channel_id = channel_id or _load_channel_id()
         self._alert_channel_id = alert_channel_id or _load_alert_channel_id()
         self._agent_channel_id = agent_channel_id or _load_agent_channel_id()
+        self._report_channel_id = report_channel_id or _load_report_channel_id()
 
         self._ready_event = asyncio.Event()
         self._channel: Optional[discord.TextChannel] = None
         self._alert_channel: Optional[discord.TextChannel] = None
         self._agent_channel: Optional[discord.TextChannel] = None
+        self._report_channel: Optional[discord.TextChannel] = None
 
         self._dal = dal
         self.tree = app_commands.CommandTree(self)
@@ -341,10 +543,15 @@ class MindfulDiscordBot(discord.Client):
         # Resolve agent channel
         self._agent_channel = self._resolve_channel(self._agent_channel_id, "agent")
 
-        # Sync slash commands with Discord
+        # Resolve report channel (analysis results go here)
+        self._report_channel = self._resolve_channel(self._report_channel_id, "report")
+
+        # Sync slash commands per guild (instant) instead of global (up to 1h delay)
         try:
-            synced = await self.tree.sync()
-            logger.info("Synced %d slash command(s)", len(synced))
+            for guild in self.guilds:
+                self.tree.copy_global_to(guild=guild)
+                synced = await self.tree.sync(guild=guild)
+                logger.info("Synced %d slash command(s) to guild %s", len(synced), guild.name)
         except Exception:
             logger.exception("Failed to sync slash commands")
 
@@ -417,7 +624,10 @@ class MindfulDiscordBot(discord.Client):
         async with message.channel.typing():
             answer = await _run_agent_query(question, self._dal)
 
-        await _send_long_message(message.channel, answer, reference=message)
+        await _send_long_message(
+            message.channel, answer, reference=message,
+            report_channel=self._report_channel,
+        )
 
     # ── Alert sending (with severity routing) ─────────────────────────
 
@@ -437,7 +647,10 @@ class MindfulDiscordBot(discord.Client):
             # Attach buttons if alert has a ticker and DAL is available
             view = None
             if alert.ticker and self._dal:
-                view = AlertActionView(alert.ticker, self._dal)
+                view = AlertActionView(
+                    alert.ticker, self._dal,
+                    report_channel=self._report_channel,
+                )
             await channel.send(embed=embed, view=view)
             return True
         except Exception:
@@ -480,7 +693,7 @@ class MindfulDiscordBot(discord.Client):
                 return
             await interaction.response.defer(thinking=True)
             answer = await _run_agent_query(question, bot._dal)
-            await _send_long_followup(interaction, answer)
+            await _send_long_followup(interaction, answer, bot._report_channel)
 
         @self.tree.command(name="analyze", description="Run full analysis on a ticker")
         @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
@@ -497,7 +710,7 @@ class MindfulDiscordBot(discord.Client):
                 answer = await _run_agent_query(
                     f"Run a full analysis on {ticker.upper()}.", bot._dal,
                 )
-            await _send_long_followup(interaction, answer)
+            await _send_long_followup(interaction, answer, bot._report_channel)
 
         @self.tree.command(name="news", description="Get recent news and sentiment for a ticker")
         @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
@@ -511,7 +724,7 @@ class MindfulDiscordBot(discord.Client):
                 f"Summarize the key headlines and overall sentiment trend.",
                 bot._dal,
             )
-            await _send_long_followup(interaction, answer)
+            await _send_long_followup(interaction, answer, bot._report_channel)
 
         @self.tree.command(name="scan", description="Scan watchlist for alerts")
         async def scan_cmd(interaction: discord.Interaction) -> None:
@@ -543,7 +756,7 @@ class MindfulDiscordBot(discord.Client):
 
             # No skill specified → show dropdown
             if not name:
-                view = SkillSelectView(bot._dal)
+                view = SkillSelectView(bot._dal, report_channel=bot._report_channel)
                 await interaction.response.send_message(
                     "Select a skill:", view=view, ephemeral=True,
                 )
@@ -566,7 +779,7 @@ class MindfulDiscordBot(discord.Client):
                 answer = await _run_agent_query(expanded, bot._dal)
             else:
                 answer = f"Failed to expand skill '{skill_name}'. Missing required parameters?"
-            await _send_long_followup(interaction, answer)
+            await _send_long_followup(interaction, answer, bot._report_channel)
 
     # ── Bot start ─────────────────────────────────────────────────────
 

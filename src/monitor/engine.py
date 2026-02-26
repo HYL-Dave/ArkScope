@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import yaml
 
+from .dedup import AlertDeduplicator
 from .notifiers import Alert, NotificationRouter
 from .watchers import (
     BaseWatcher,
@@ -94,6 +95,13 @@ class MonitorEngine:
             SectorWatcher(alerts_cfg),
         ]
 
+        # Deduplicator: suppress repeated alerts within 30 min
+        # unless the key value changed by ≥ 1.5 percentage points.
+        self._dedup = AlertDeduplicator(
+            cooldown_minutes=30,
+            value_threshold=1.5,
+        )
+
         # Default tickers from config
         self._default_tickers = _extract_tickers(self._config)
 
@@ -139,6 +147,9 @@ class MonitorEngine:
         severity_order = {"critical": 0, "warning": 1, "info": 2}
         all_alerts.sort(key=lambda a: severity_order.get(a.severity, 9))
 
+        # Dedup: suppress alerts whose value hasn't changed significantly
+        all_alerts = self._dedup.filter(all_alerts)
+
         if notify and all_alerts:
             await self._router.dispatch_many(all_alerts)
 
@@ -148,6 +159,16 @@ class MonitorEngine:
             len(scan_tickers),
         )
         return all_alerts
+
+    async def notify(self, alerts: List[Alert]) -> int:
+        """Dispatch alerts via notification channels.
+
+        Separated from scan_once() so the scheduler can run the scan in a
+        background thread (to avoid blocking Discord heartbeat) and then
+        dispatch notifications on the main event loop where the Discord
+        bot lives.
+        """
+        return await self._router.dispatch_many(alerts)
 
     async def run_loop(
         self,

@@ -52,12 +52,14 @@ async def run_service(
         from src.monitor.discord_bot import (
             MindfulDiscordBot, _load_channel_id,
             _load_alert_channel_id, _load_agent_channel_id,
+            _load_report_channel_id,
         )
 
         bot = MindfulDiscordBot(
             channel_id=_load_channel_id(),
             alert_channel_id=_load_alert_channel_id(),
             agent_channel_id=_load_agent_channel_id(),
+            report_channel_id=_load_report_channel_id(),
             dal=dal,
         )
 

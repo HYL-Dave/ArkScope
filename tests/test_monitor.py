@@ -1,9 +1,9 @@
-"""Tests for the monitor system (Phase E1 + E2 + E3)."""
+"""Tests for the monitor system (Phase E1 + E2 + E3 + Batch A)."""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -658,6 +658,7 @@ class TestSeverityRouting:
         bot._channel.send = AsyncMock()
         bot._alert_channel = MagicMock()
         bot._alert_channel.send = AsyncMock()
+        bot._report_channel = None
         bot._dal = MagicMock()
 
         alert = Alert(
@@ -677,6 +678,7 @@ class TestSeverityRouting:
         bot._channel.send = AsyncMock()
         bot._alert_channel = MagicMock()
         bot._alert_channel.send = AsyncMock()
+        bot._report_channel = None
         bot._dal = MagicMock()
 
         alert = Alert(
@@ -695,6 +697,7 @@ class TestSeverityRouting:
         bot._channel = MagicMock()
         bot._channel.send = AsyncMock()
         bot._alert_channel = None
+        bot._report_channel = None
         bot._dal = None
 
         alert = Alert(
@@ -704,3 +707,318 @@ class TestSeverityRouting:
 
         asyncio.run(bot.send_alert(alert))
         bot._channel.send.assert_called_once()
+
+
+# ===================================================================
+# Batch A: Dedup tests
+# ===================================================================
+
+class TestAlertDeduplicator:
+    """Test alert deduplication logic."""
+
+    def test_first_alert_always_sent(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5.2%", message="NVDA moved",
+            ticker="NVDA", data={"daily_change_pct": 5.2},
+        )
+        assert dedup.should_send(alert) is True
+
+    def test_same_value_suppressed(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5.2%", message="NVDA moved",
+            ticker="NVDA", data={"daily_change_pct": 5.2},
+        )
+        assert dedup.should_send(alert) is True
+        assert dedup.should_send(alert) is False  # Same value → suppressed
+
+    def test_value_change_triggers_resend(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert1 = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 8%", message="AMD moved",
+            ticker="AMD", data={"daily_change_pct": 8.0},
+        )
+        alert2 = Alert(
+            alert_type="price", severity="critical",
+            title="Price up 10%", message="AMD moved",
+            ticker="AMD", data={"daily_change_pct": 10.0},
+        )
+        assert dedup.should_send(alert1) is True
+        assert dedup.should_send(alert2) is True  # 2.0 > 1.5 threshold
+
+    def test_small_value_change_suppressed(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert1 = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 8%", message="AMD moved",
+            ticker="AMD", data={"daily_change_pct": 8.0},
+        )
+        alert2 = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 8.5%", message="AMD moved",
+            ticker="AMD", data={"daily_change_pct": 8.5},
+        )
+        assert dedup.should_send(alert1) is True
+        assert dedup.should_send(alert2) is False  # 0.5 < 1.5 threshold
+
+    def test_cooldown_expired_resends(self):
+        from src.monitor.dedup import AlertDeduplicator, _SentRecord
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5%", message="NVDA",
+            ticker="NVDA", data={"daily_change_pct": 5.0},
+        )
+        # Manually inject an old record
+        key = dedup._dedup_key(alert)
+        dedup._sent[key] = _SentRecord(
+            last_value=5.0,
+            last_sent=datetime.now() - timedelta(minutes=31),
+        )
+        assert dedup.should_send(alert) is True  # Cooldown expired
+
+    def test_different_tickers_independent(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert_nvda = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5%", message="NVDA",
+            ticker="NVDA", data={"daily_change_pct": 5.0},
+        )
+        alert_amd = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5%", message="AMD",
+            ticker="AMD", data={"daily_change_pct": 5.0},
+        )
+        assert dedup.should_send(alert_nvda) is True
+        assert dedup.should_send(alert_amd) is True  # Different ticker
+
+    def test_different_types_independent(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        price_alert = Alert(
+            alert_type="price", severity="warning",
+            title="Price up 5%", message="NVDA",
+            ticker="NVDA", data={"daily_change_pct": 5.0},
+        )
+        sentiment_alert = Alert(
+            alert_type="sentiment", severity="warning",
+            title="Sentiment improved", message="NVDA",
+            ticker="NVDA", data={"delta": 1.0},
+        )
+        assert dedup.should_send(price_alert) is True
+        assert dedup.should_send(sentiment_alert) is True  # Different type
+
+    def test_filter_returns_unique_only(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alerts = [
+            Alert(
+                alert_type="price", severity="warning",
+                title="Price up 5%", message="NVDA",
+                ticker="NVDA", data={"daily_change_pct": 5.0},
+            ),
+            Alert(
+                alert_type="price", severity="warning",
+                title="Price up 5.1%", message="NVDA",
+                ticker="NVDA", data={"daily_change_pct": 5.1},
+            ),
+            Alert(
+                alert_type="price", severity="critical",
+                title="Price up 15%", message="PYPL",
+                ticker="PYPL", data={"daily_change_pct": 15.0},
+            ),
+        ]
+        result = dedup.filter(alerts)
+        assert len(result) == 2  # NVDA second suppressed, PYPL passes
+
+    def test_sector_alert_dedup(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator(cooldown_minutes=30, value_threshold=1.5)
+        alert1 = Alert(
+            alert_type="sector", severity="warning",
+            title="Sector sync: 10 stocks bullish", message="...",
+            data={"avg_change_pct": 4.4, "count": 10},
+        )
+        alert2 = Alert(
+            alert_type="sector", severity="warning",
+            title="Sector sync: 10 stocks bullish", message="...",
+            data={"avg_change_pct": 4.5, "count": 10},
+        )
+        assert dedup.should_send(alert1) is True
+        assert dedup.should_send(alert2) is False  # 0.1 < 1.5
+
+    def test_reset(self):
+        from src.monitor.dedup import AlertDeduplicator
+
+        dedup = AlertDeduplicator()
+        alert = Alert(
+            alert_type="price", severity="warning",
+            title="Price up", message="...",
+            ticker="NVDA", data={"daily_change_pct": 5.0},
+        )
+        dedup.should_send(alert)
+        assert dedup.should_send(alert) is False
+        dedup.reset()
+        assert dedup.should_send(alert) is True
+
+
+# ===================================================================
+# Batch A: Formatting tests
+# ===================================================================
+
+class TestFormatForDiscord:
+    """Test markdown → Discord conversion."""
+
+    def test_table_to_code_block(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "| Col1 | Col2 |\n|------|------|\n| A    | B    |"
+        result = _format_for_discord(md)
+        assert "```" in result
+        assert "| Col1 | Col2 |" in result
+
+    def test_h4_downgraded_to_h3(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "#### Deep heading\nSome text"
+        result = _format_for_discord(md)
+        assert result.startswith("### Deep heading")
+
+    def test_h5_downgraded_to_h3(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "##### Very deep\nText"
+        result = _format_for_discord(md)
+        assert result.startswith("### Very deep")
+
+    def test_horizontal_rule_converted(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "Above\n---\nBelow"
+        result = _format_for_discord(md)
+        assert "---" not in result
+        assert "\u2501" in result  # Unicode separator
+
+    def test_normal_markdown_preserved(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "# Title\n**bold** and *italic*\n- list item\n> quote"
+        result = _format_for_discord(md)
+        assert "# Title" in result
+        assert "**bold**" in result
+        assert "- list item" in result
+
+    def test_code_blocks_preserved(self):
+        from src.monitor.discord_bot import _format_for_discord
+
+        md = "```python\nprint('hello')\n```"
+        result = _format_for_discord(md)
+        assert result == md
+
+
+class TestSplitMessage:
+    """Test smart message splitting."""
+
+    def test_short_message_not_split(self):
+        from src.monitor.discord_bot import _split_message
+
+        result = _split_message("Hello world", limit=100)
+        assert result == ["Hello world"]
+
+    def test_splits_at_paragraph(self):
+        from src.monitor.discord_bot import _split_message
+
+        text = "A" * 50 + "\n\n" + "B" * 50
+        result = _split_message(text, limit=60)
+        assert len(result) == 2
+        assert result[0] == "A" * 50
+        assert "B" in result[1]
+
+    def test_splits_at_newline(self):
+        from src.monitor.discord_bot import _split_message
+
+        text = "A" * 50 + "\n" + "B" * 50
+        result = _split_message(text, limit=60)
+        assert len(result) == 2
+
+    def test_hard_split_as_last_resort(self):
+        from src.monitor.discord_bot import _split_message
+
+        text = "A" * 200  # No natural break points
+        result = _split_message(text, limit=100)
+        assert len(result) == 2
+        assert len(result[0]) == 100
+
+
+# ===================================================================
+# Batch A: Scheduler thread safety tests
+# ===================================================================
+
+class TestSchedulerThreadSafety:
+    """Test scheduler's _scan_and_notify pattern."""
+
+    def test_scan_blocking_creates_new_loop(self):
+        """_scan_blocking should work in a thread (new event loop)."""
+        from src.monitor.scheduler import MonitorScheduler
+
+        mock_engine = MagicMock()
+        mock_engine.scan_once = AsyncMock(return_value=[])
+        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
+        scheduler._tickers = ["NVDA"]
+
+        # _scan_blocking runs asyncio.run() → should succeed
+        result = scheduler._scan_blocking()
+        assert result == []
+        mock_engine.scan_once.assert_called_once_with(
+            tickers=["NVDA"], notify=False,
+        )
+
+    def test_scan_and_notify_calls_engine_notify(self):
+        """_scan_and_notify should dispatch alerts on main loop."""
+        from src.monitor.scheduler import MonitorScheduler
+
+        fake_alert = Alert(
+            alert_type="price", severity="warning",
+            title="Test", message="Test",
+        )
+        mock_engine = MagicMock()
+        mock_engine.scan_once = AsyncMock(return_value=[fake_alert])
+        mock_engine.notify = AsyncMock(return_value=1)
+
+        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
+        scheduler._tickers = ["NVDA"]
+
+        asyncio.run(scheduler._scan_and_notify())
+        mock_engine.notify.assert_called_once_with([fake_alert])
+
+    def test_scan_and_notify_no_alerts_skips_notify(self):
+        """No alerts → don't call engine.notify()."""
+        from src.monitor.scheduler import MonitorScheduler
+
+        mock_engine = MagicMock()
+        mock_engine.scan_once = AsyncMock(return_value=[])
+        mock_engine.notify = AsyncMock()
+
+        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
+        scheduler._tickers = ["NVDA"]
+
+        asyncio.run(scheduler._scan_and_notify())
+        mock_engine.notify.assert_not_called()
