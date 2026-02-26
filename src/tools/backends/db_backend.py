@@ -123,15 +123,22 @@ class DatabaseBackend:
 
         # Build score JOIN — either specific model or latest
         if model:
+            # Use LATERAL subqueries to pick the latest score per
+            # (news_id, score_type, model) — the UNIQUE key includes
+            # reasoning_effort, so a plain JOIN can produce duplicates.
             score_join = """
-                LEFT JOIN news_scores s_sent
-                    ON s_sent.news_id = n.id
-                    AND s_sent.score_type = 'sentiment'
-                    AND s_sent.model = %s
-                LEFT JOIN news_scores s_risk
-                    ON s_risk.news_id = n.id
-                    AND s_risk.score_type = 'risk'
-                    AND s_risk.model = %s
+                LEFT JOIN LATERAL (
+                    SELECT score, model FROM news_scores
+                    WHERE news_id = n.id AND score_type = 'sentiment'
+                      AND model = %s
+                    ORDER BY scored_at DESC LIMIT 1
+                ) s_sent ON true
+                LEFT JOIN LATERAL (
+                    SELECT score, model FROM news_scores
+                    WHERE news_id = n.id AND score_type = 'risk'
+                      AND model = %s
+                    ORDER BY scored_at DESC LIMIT 1
+                ) s_risk ON true
             """
             params: list = [model, model, cutoff]
         else:

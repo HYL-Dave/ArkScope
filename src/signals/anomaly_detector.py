@@ -167,9 +167,10 @@ class AnomalyDetector:
                 reason='INSUFFICIENT_DATA'
             )
 
-        # Calculate rolling statistics
-        rolling_mean = daily_counts.rolling(rolling_window, min_periods=1).mean()
-        rolling_std = daily_counts.rolling(rolling_window, min_periods=1).std()
+        # Calculate rolling statistics (shifted by 1 to exclude current date,
+        # otherwise the current value leaks into its own baseline)
+        rolling_mean = daily_counts.rolling(rolling_window, min_periods=1).mean().shift(1)
+        rolling_std = daily_counts.rolling(rolling_window, min_periods=1).std().shift(1)
 
         if date not in daily_counts.index:
             return VolumeAnomaly(
@@ -184,6 +185,17 @@ class AnomalyDetector:
         current = daily_counts[date]
         mean = rolling_mean[date]
         std = rolling_std[date]
+
+        # After shift(1), the first date has NaN stats (no prior history)
+        if pd.isna(mean):
+            return VolumeAnomaly(
+                is_anomaly=False,
+                z_score=0,
+                current_count=int(current),
+                historical_mean=0,
+                historical_std=0,
+                reason='NO_HISTORICAL_DATA'
+            )
 
         if std == 0 or pd.isna(std):
             std = 1  # Avoid division by zero

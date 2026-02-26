@@ -9,6 +9,7 @@ Price tool functions (3 tools).
 from __future__ import annotations
 
 import logging
+from statistics import median
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
@@ -201,7 +202,7 @@ def get_sector_performance(
         "days": days,
         "ticker_count": len(ticker_details),
         "avg_change_pct": round(avg_change, 2),
-        "median_change_pct": round(sorted(changes)[len(changes) // 2], 2),
+        "median_change_pct": round(median(changes), 2),
         "best_ticker": best["ticker"],
         "best_change_pct": best["change_pct"],
         "worst_ticker": worst["ticker"],

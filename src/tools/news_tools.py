@@ -10,6 +10,7 @@ News tool functions (5 tools).
 
 from __future__ import annotations
 
+from statistics import median
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
@@ -104,9 +105,9 @@ def get_news_sentiment_summary(
         "article_count": result.count,
         "scored_count": total,
         "sentiment_mean": round(sum(sentiments) / total, 2) if total else None,
-        "sentiment_median": round(sorted(sentiments)[total // 2], 2) if total else None,
+        "sentiment_median": round(median(sentiments), 2) if total else None,
         "risk_mean": round(sum(risks) / len(risks), 2) if risks else None,
-        "risk_median": round(sorted(risks)[len(risks) // 2], 2) if risks else None,
+        "risk_median": round(median(risks), 2) if risks else None,
         "bullish_count": bullish,
         "bearish_count": bearish,
         "neutral_count": neutral,

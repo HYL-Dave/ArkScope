@@ -280,7 +280,7 @@ def synthesize_signal(
                     title_col="title",
                 )
                 chains = chain_detector.detect_chains(events) if events else []
-                signals_input["event_chain"] = chains
+                signals_input["event_chains"] = chains
     except Exception as e:
         logger.debug(f"Event chain detection failed for {ticker}: {e}")
 

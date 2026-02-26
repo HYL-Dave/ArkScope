@@ -202,7 +202,7 @@ class EventChainDetector:
             # Only count as chain if 2+ events
             if len(chain_events) >= 2:
                 chain = self._create_chain(chain_events)
-                if chain.impact_score > 0.3:  # Minimum impact threshold
+                if abs(chain.impact_score) > 0.3:  # Minimum impact threshold
                     chains.append(chain)
 
         return chains
@@ -278,21 +278,22 @@ class EventChainDetector:
         return seq_idx == len(sequence)
 
     def _calculate_chain_impact(self, events: List[Event], pattern: str) -> float:
-        """Calculate cumulative impact of event chain."""
+        """Calculate cumulative impact of event chain.
+
+        Sign is determined naturally from event sentiment values:
+        bullish events (positive sentiment) → positive impact,
+        bearish events (negative sentiment) → negative impact.
+        """
         base_impact = 0
 
         for i, event in enumerate(events):
             # Later events have multiplier effect
             position_multiplier = 1 + (i * 0.2)
-            base_impact += abs(event.sentiment_impact) * position_multiplier
+            base_impact += event.sentiment_impact * position_multiplier
 
-        # Apply pattern multiplier
+        # Apply pattern multiplier (preserves sign)
         pattern_config = self.patterns.get(pattern, {})
         pattern_multiplier = pattern_config.get('multiplier', 1.0)
-
-        # Adjust sign for bearish patterns
-        if pattern_config.get('is_bearish', False):
-            base_impact = -base_impact
 
         return base_impact * pattern_multiplier
 
