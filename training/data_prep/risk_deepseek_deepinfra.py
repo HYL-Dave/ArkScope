@@ -6,7 +6,7 @@ from openai import OpenAI
 
 # Set your OpenAI API key and base URL
 openai = OpenAI(
-    api_key=  # Replace with your actual DeepInfra token
+    api_key=os.environ.get("DEEPINFRA_API_KEY", ""),  # Set via env or config/.env
     base_url="https://api.deepinfra.com/v1/openai",
 )
 stream = False  # Set to True if you want to stream the response

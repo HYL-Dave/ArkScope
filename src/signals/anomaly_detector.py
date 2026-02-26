@@ -92,7 +92,20 @@ class AnomalyDetector:
         # Get historical statistics (excluding current date)
         historical = ticker_df[ticker_df[date_col] < date][sentiment_col]
         if len(historical) < self.min_history:
-            historical = ticker_df[sentiment_col]
+            # Not enough pre-date history — return LOW_CONFIDENCE instead of
+            # mixing current data into the baseline (which inflates accuracy).
+            current_rows = ticker_df[ticker_df[date_col] == date]
+            current_val = current_rows[sentiment_col].mean() if len(current_rows) else 3.0
+            return SentimentAnomaly(
+                is_anomaly=False,
+                z_score=0,
+                direction='NEUTRAL',
+                percentile=0.5,
+                historical_mean=ticker_df[sentiment_col].mean(),
+                historical_std=ticker_df[sentiment_col].std(),
+                current_value=current_val,
+                reason='LOW_CONFIDENCE'
+            )
 
         mean = historical.mean()
         std = historical.std()

@@ -365,16 +365,19 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
 
     @function_tool
-    def tool_detect_anomalies(ticker: str, days: int = 30) -> str:
+    def tool_detect_anomalies(
+        ticker: str, days: int = 30, as_of_date: Optional[str] = None
+    ) -> str:
         """Detect statistical anomalies in sentiment and news volume for a ticker.
 
         Args:
             ticker: Stock ticker symbol
             days: Lookback period in days (default: 30)
+            as_of_date: Anchor date YYYY-MM-DD (default: latest date in data)
 
         Returns sentiment_anomaly, volume_anomaly, and their z-scores.
         """
-        result = detect_anomalies(dal, ticker, days=days)
+        result = detect_anomalies(dal, ticker, days=days, as_of_date=as_of_date)
         return _serialize_result(result, "detect_anomalies")
 
     @function_tool
@@ -394,7 +397,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_synthesize_signal(
         ticker: str,
         days: int = 30,
-        strategy: Optional[str] = None
+        strategy: Optional[str] = None,
+        as_of_date: Optional[str] = None,
     ) -> str:
         """Synthesize a multi-factor trading signal combining sector momentum, events, and sentiment.
 
@@ -402,10 +406,13 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             ticker: Stock ticker symbol
             days: Lookback period in days (default: 30)
             strategy: Strategy name for custom weights (from user_profile.yaml)
+            as_of_date: Anchor date YYYY-MM-DD (default: latest date in data)
 
         Returns action (BUY/SELL/HOLD), confidence, composite_score, and reasoning.
         """
-        result = synthesize_signal(dal, ticker, days=days, strategy=strategy)
+        result = synthesize_signal(
+            dal, ticker, days=days, strategy=strategy, as_of_date=as_of_date,
+        )
         return _serialize_result(result, "synthesize_signal")
 
     # ================================================================

@@ -387,6 +387,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "days": {
                         "type": "integer",
                         "description": "Lookback period in days (default: 30)"
+                    },
+                    "as_of_date": {
+                        "type": "string",
+                        "description": "Anchor date YYYY-MM-DD (default: latest date in data)"
                     }
                 },
                 "required": ["ticker"]
@@ -427,6 +431,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "strategy": {
                         "type": "string",
                         "description": "Strategy name for custom weights (from user_profile.yaml)"
+                    },
+                    "as_of_date": {
+                        "type": "string",
+                        "description": "Anchor date YYYY-MM-DD (default: latest date in data)"
                     }
                 },
                 "required": ["ticker"]
@@ -1147,7 +1155,8 @@ def execute_tool(
         "detect_anomalies": lambda: detect_anomalies(
             dal,
             tool_input["ticker"],
-            days=tool_input.get("days", 30)
+            days=tool_input.get("days", 30),
+            as_of_date=tool_input.get("as_of_date"),
         ),
         "detect_event_chains": lambda: detect_event_chains(
             dal,
@@ -1158,7 +1167,8 @@ def execute_tool(
             dal,
             tool_input["ticker"],
             days=tool_input.get("days", 30),
-            strategy=tool_input.get("strategy")
+            strategy=tool_input.get("strategy"),
+            as_of_date=tool_input.get("as_of_date"),
         ),
         "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
             dal,

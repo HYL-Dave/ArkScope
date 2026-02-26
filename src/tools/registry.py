@@ -429,6 +429,7 @@ class ToolRegistry:
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
+                ToolParameter("as_of_date", "string", "Anchor date YYYY-MM-DD (default: latest in data)", required=False),
             ],
         ))
 
@@ -453,6 +454,9 @@ class ToolRegistry:
                 ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
                 ToolParameter("strategy", "string",
                               "Strategy name for custom weights (from user_profile.yaml)",
+                              required=False),
+                ToolParameter("as_of_date", "string",
+                              "Anchor date YYYY-MM-DD (default: latest in data)",
                               required=False),
             ],
         ))

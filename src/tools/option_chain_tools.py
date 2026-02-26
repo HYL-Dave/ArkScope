@@ -345,6 +345,9 @@ def get_option_chain(
             "puts": put_quotes,
         },
         "metrics": {
+            "scope": "atm_subset",
+            "strikes_included": len(strikes),
+            "strikes_total": len(all_strikes),
             "pc_ratio_volume": pc_ratio_volume,
             "pc_ratio_oi": pc_ratio_oi,
             "max_pain_strike": max_pain_strike,

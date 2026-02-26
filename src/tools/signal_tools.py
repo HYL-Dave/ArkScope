@@ -69,6 +69,7 @@ def detect_anomalies(
     dal: DataAccessLayer,
     ticker: str,
     days: int = 30,
+    as_of_date: Optional[str] = None,
 ) -> dict:
     """
     Detect statistical anomalies in sentiment and news volume for a ticker.
@@ -77,6 +78,8 @@ def detect_anomalies(
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
         days: Lookback period for historical baseline
+        as_of_date: Anchor date (YYYY-MM-DD). Defaults to the latest date
+                    in the data, ensuring reproducible offline analysis.
 
     Returns:
         Dict with:
@@ -89,7 +92,7 @@ def detect_anomalies(
     if df.empty:
         return {
             "ticker": ticker.upper(),
-            "date": date.today().isoformat(),
+            "date": as_of_date or date.today().isoformat(),
             "error": (
                 "No scored news articles available. "
                 "Anomaly detection requires sentiment scores from LLM scoring pipeline. "
@@ -98,21 +101,21 @@ def detect_anomalies(
         }
 
     detector = AnomalyDetector()
-    today = date.today().isoformat()
+    anchor = as_of_date or str(df["date"].max())
 
     # Sentiment anomaly
     try:
         sent_anomaly = detector.detect_sentiment_anomaly(
-            df, ticker=ticker.upper(), date=today,
+            df, ticker=ticker.upper(), date=anchor,
             ticker_col="ticker", sentiment_col="llm_sentiment", date_col="date",
         )
         sentiment_result = {
-            "is_anomaly": sent_anomaly.is_anomaly,
-            "z_score": round(sent_anomaly.z_score, 3),
+            "is_anomaly": bool(sent_anomaly.is_anomaly),
+            "z_score": float(round(sent_anomaly.z_score, 3)),
             "direction": sent_anomaly.direction,
-            "percentile": round(sent_anomaly.percentile, 1),
-            "current_value": round(sent_anomaly.current_value, 2),
-            "historical_mean": round(sent_anomaly.historical_mean, 2),
+            "percentile": float(round(sent_anomaly.percentile, 1)),
+            "current_value": float(round(sent_anomaly.current_value, 2)),
+            "historical_mean": float(round(sent_anomaly.historical_mean, 2)),
             "reason": sent_anomaly.reason,
         }
     except Exception as e:
@@ -121,14 +124,14 @@ def detect_anomalies(
     # Volume anomaly
     try:
         vol_anomaly = detector.detect_volume_anomaly(
-            df, ticker=ticker.upper(), date=today,
+            df, ticker=ticker.upper(), date=anchor,
             ticker_col="ticker", date_col="date",
         )
         volume_result = {
-            "is_anomaly": vol_anomaly.is_anomaly,
-            "z_score": round(vol_anomaly.z_score, 3),
-            "current_count": vol_anomaly.current_count,
-            "historical_mean": round(vol_anomaly.historical_mean, 2),
+            "is_anomaly": bool(vol_anomaly.is_anomaly),
+            "z_score": float(round(vol_anomaly.z_score, 3)),
+            "current_count": int(vol_anomaly.current_count),
+            "historical_mean": float(round(vol_anomaly.historical_mean, 2)),
             "reason": vol_anomaly.reason,
         }
     except Exception as e:
@@ -136,7 +139,7 @@ def detect_anomalies(
 
     return {
         "ticker": ticker.upper(),
-        "date": today,
+        "date": anchor,
         "sentiment_anomaly": sentiment_result,
         "volume_anomaly": volume_result,
     }
@@ -214,6 +217,7 @@ def synthesize_signal(
     ticker: str,
     days: int = 30,
     strategy: Optional[str] = None,
+    as_of_date: Optional[str] = None,
 ) -> TradingSignal:
     """
     Synthesize a multi-factor trading signal for a ticker.
@@ -229,6 +233,8 @@ def synthesize_signal(
         ticker: Stock ticker symbol
         days: Lookback period in days
         strategy: Strategy name for custom weights (from user_profile.yaml)
+        as_of_date: Anchor date (YYYY-MM-DD). Defaults to the latest date
+                    in the data, ensuring reproducible offline analysis.
 
     Returns:
         TradingSignal with action, confidence, composite_score,
@@ -252,7 +258,7 @@ def synthesize_signal(
     df = _prepare_news_df_for_signals(dal, ticker=None, days=days)
 
     signals_input: Dict = {}
-    today = date.today().isoformat()
+    anchor = as_of_date or (str(df["date"].max()) if not df.empty else date.today().isoformat())
 
     # 1. Sector momentum
     try:
@@ -289,7 +295,7 @@ def synthesize_signal(
         if not df.empty:
             detector = AnomalyDetector()
             sent_anomaly = detector.detect_sentiment_anomaly(
-                df, ticker=ticker, date=today,
+                df, ticker=ticker, date=anchor,
                 ticker_col="ticker", sentiment_col="llm_sentiment", date_col="date",
             )
             signals_input["sentiment_anomaly"] = sent_anomaly
@@ -301,7 +307,7 @@ def synthesize_signal(
         if not df.empty:
             detector = AnomalyDetector()
             vol_anomaly = detector.detect_volume_anomaly(
-                df, ticker=ticker, date=today,
+                df, ticker=ticker, date=anchor,
                 ticker_col="ticker", date_col="date",
             )
             signals_input["volume_anomaly"] = vol_anomaly
