@@ -1175,25 +1175,49 @@ def scan_options_for_mispricing(
 # Utility Functions
 # =============================================================================
 
+_rfr_cache: Dict[str, Tuple[float, datetime]] = {}
+
+
 def get_risk_free_rate(fallback: float = 0.05) -> float:
     """
-    Get current risk-free rate.
+    Get current risk-free rate from 13-week T-bill (^IRX via Yahoo Finance).
 
-    In production, this should fetch from Treasury rates (e.g., 3-month T-bill).
-    For now, returns a reasonable default.
+    Caches the result for 24 hours.  Falls back to *fallback* if the fetch
+    fails (network error, market holiday, etc.).
 
     Args:
         fallback: Default rate if cannot fetch.
 
     Returns:
-        Risk-free rate as decimal.
+        Risk-free rate as decimal (e.g. 0.043 for 4.3%).
     """
-    # TODO: Implement Treasury rate fetching
-    # Options:
-    # 1. FRED API (Federal Reserve Economic Data)
-    # 2. Treasury.gov direct
-    # 3. Yahoo Finance ^IRX (13-week T-bill)
-    return fallback
+    cache_key = "irx"
+    now = datetime.now()
+
+    # Return cached value if fresh (< 24 h)
+    if cache_key in _rfr_cache:
+        cached_rate, cached_at = _rfr_cache[cache_key]
+        if (now - cached_at).total_seconds() < 86_400:
+            return cached_rate
+
+    try:
+        import yfinance as yf
+
+        ticker = yf.Ticker("^IRX")
+        hist = ticker.history(period="5d")
+        if hist.empty:
+            logger.warning("^IRX history empty, using fallback rate %.2f%%", fallback * 100)
+            return fallback
+
+        # ^IRX quotes the annualised discount rate in percent (e.g. 4.3)
+        latest_close = float(hist["Close"].dropna().iloc[-1])
+        rate = latest_close / 100.0  # convert to decimal
+        _rfr_cache[cache_key] = (rate, now)
+        logger.info("Risk-free rate (13-week T-bill): %.3f%%", rate * 100)
+        return rate
+    except Exception as e:
+        logger.warning("Failed to fetch ^IRX: %s — using fallback %.2f%%", e, fallback * 100)
+        return fallback
 
 
 def calculate_days_to_expiry(expiry_str: str) -> int:

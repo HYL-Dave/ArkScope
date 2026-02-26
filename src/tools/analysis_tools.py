@@ -457,7 +457,8 @@ def get_detailed_financials(
         DetailedFinancials with all available metrics
     """
     ticker = ticker.upper()
-    cache_key = f"metrics_{ticker}_annual"
+    years_for_growth = 2  # YoY growth window
+    cache_key = f"metrics_{ticker}_annual_y{years_for_growth}"
 
     # --- Layer 1: SEC EDGAR metrics (cached) ---
     cached = None
@@ -476,7 +477,7 @@ def get_detailed_financials(
         try:
             from data_sources.financial_metrics_calculator import FinancialMetricsCalculator
 
-            calc = FinancialMetricsCalculator(ticker)
+            calc = FinancialMetricsCalculator(ticker, years_for_growth=years_for_growth)
             metrics = calc.get_metrics_dict()
             tech = calc.get_tech_metrics()
 
