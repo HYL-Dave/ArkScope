@@ -575,22 +575,23 @@ class TestTickerModal:
 
 
 class TestRunAgentQuery:
-    """Test _run_agent_query helper."""
+    """Test _run_agent_query helper (returns (answer, model_name) tuple)."""
 
     def test_successful_query(self):
         from src.monitor.discord_bot import _run_agent_query
         from src.agents.shared.events import AgentEvent, EventType
 
-        async def mock_stream(question, dal):
+        async def mock_stream(question, dal, **kwargs):
             yield AgentEvent(type=EventType.done, data={"answer": "Test answer"})
 
         with patch(
             "src.agents.anthropic_agent.agent.run_query_stream",
             side_effect=mock_stream,
         ):
-            result = asyncio.run(_run_agent_query("test", MagicMock()))
+            answer, model_name = asyncio.run(_run_agent_query("test", MagicMock()))
 
-        assert result == "Test answer"
+        assert answer == "Test answer"
+        assert "claude" in model_name  # default is anthropic
 
     def test_query_exception(self):
         from src.monitor.discord_bot import _run_agent_query
@@ -599,9 +600,43 @@ class TestRunAgentQuery:
             "src.agents.anthropic_agent.agent.run_query_stream",
             side_effect=RuntimeError("fail"),
         ):
-            result = asyncio.run(_run_agent_query("test", MagicMock()))
+            answer, model_name = asyncio.run(_run_agent_query("test", MagicMock()))
 
-        assert "failed" in result.lower()
+        assert "failed" in answer.lower()
+
+    def test_openai_provider(self):
+        from src.monitor.discord_bot import _run_agent_query, BotSessionState
+        from src.agents.shared.events import AgentEvent, EventType
+
+        state = BotSessionState(provider="openai", model="gpt-5.2")
+
+        async def mock_stream(question, dal, **kwargs):
+            yield AgentEvent(type=EventType.done, data={"answer": "OpenAI answer"})
+
+        with patch(
+            "src.agents.openai_agent.agent.run_query_stream",
+            side_effect=mock_stream,
+        ):
+            answer, model_name = asyncio.run(
+                _run_agent_query("test", MagicMock(), state=state),
+            )
+
+        assert answer == "OpenAI answer"
+        assert model_name == "gpt-5.2"
+
+    def test_snapshot_isolation(self):
+        """Changing state after snapshot should not affect in-flight query."""
+        from src.monitor.discord_bot import BotSessionState
+
+        state = BotSessionState(provider="anthropic", model="claude-opus-4-6")
+        snap = state.snapshot()
+
+        # Mutate original after snapshot
+        state.provider = "openai"
+        state.model = "gpt-5.2"
+
+        assert snap.provider == "anthropic"
+        assert snap.model == "claude-opus-4-6"
 
 
 class TestLongResponse:
@@ -651,7 +686,7 @@ class TestSeverityRouting:
     """Test that send_alert routes by severity."""
 
     def test_critical_routes_to_alert_channel(self):
-        from src.monitor.discord_bot import MindfulDiscordBot
+        from src.monitor.discord_bot import MindfulDiscordBot, BotSessionState
 
         bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
         bot._channel = MagicMock()
@@ -660,6 +695,7 @@ class TestSeverityRouting:
         bot._alert_channel.send = AsyncMock()
         bot._report_channel = None
         bot._dal = MagicMock()
+        bot._state = BotSessionState()
 
         alert = Alert(
             alert_type="signal", severity="critical",
@@ -671,7 +707,7 @@ class TestSeverityRouting:
         bot._channel.send.assert_not_called()
 
     def test_info_routes_to_main_channel(self):
-        from src.monitor.discord_bot import MindfulDiscordBot
+        from src.monitor.discord_bot import MindfulDiscordBot, BotSessionState
 
         bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
         bot._channel = MagicMock()
@@ -680,6 +716,7 @@ class TestSeverityRouting:
         bot._alert_channel.send = AsyncMock()
         bot._report_channel = None
         bot._dal = MagicMock()
+        bot._state = BotSessionState()
 
         alert = Alert(
             alert_type="price", severity="info",
@@ -691,7 +728,7 @@ class TestSeverityRouting:
         bot._alert_channel.send.assert_not_called()
 
     def test_critical_fallback_to_main_if_no_alert_channel(self):
-        from src.monitor.discord_bot import MindfulDiscordBot
+        from src.monitor.discord_bot import MindfulDiscordBot, BotSessionState
 
         bot = MindfulDiscordBot.__new__(MindfulDiscordBot)
         bot._channel = MagicMock()
@@ -699,6 +736,7 @@ class TestSeverityRouting:
         bot._alert_channel = None
         bot._report_channel = None
         bot._dal = None
+        bot._state = BotSessionState()
 
         alert = Alert(
             alert_type="signal", severity="critical",
@@ -1022,3 +1060,120 @@ class TestSchedulerThreadSafety:
 
         asyncio.run(scheduler._scan_and_notify())
         mock_engine.notify.assert_not_called()
+
+
+# ===================================================================
+# Batch B: Model selection tests
+# ===================================================================
+
+class TestBotSessionState:
+    """Test BotSessionState snapshot and effective_model."""
+
+    def test_default_state(self):
+        from src.monitor.discord_bot import BotSessionState
+        state = BotSessionState()
+        assert state.provider == "anthropic"
+        assert state.model is None
+        assert state.anthropic_effort is None
+        assert state.reasoning_effort is None
+
+    def test_effective_model_default(self):
+        from src.monitor.discord_bot import BotSessionState
+        state = BotSessionState()
+        model = state.effective_model()
+        assert "claude" in model  # config default is anthropic
+
+    def test_effective_model_explicit(self):
+        from src.monitor.discord_bot import BotSessionState
+        state = BotSessionState(provider="openai", model="gpt-5.2")
+        assert state.effective_model() == "gpt-5.2"
+
+    def test_snapshot_is_independent_copy(self):
+        from src.monitor.discord_bot import BotSessionState
+        state = BotSessionState(provider="anthropic", model="claude-opus-4-6")
+        snap = state.snapshot()
+
+        state.provider = "openai"
+        state.model = "gpt-5.2"
+        state.anthropic_effort = "max"
+
+        assert snap.provider == "anthropic"
+        assert snap.model == "claude-opus-4-6"
+        assert snap.anthropic_effort is None
+
+
+class TestModelCatalogShared:
+    """Test shared model catalog (extracted from cli.py)."""
+
+    def test_find_by_id(self):
+        from src.agents.shared.model_catalog import find_model
+        entry = find_model("claude-opus-4-6")
+        assert entry is not None
+        assert entry.provider == "anthropic"
+
+    def test_find_by_alias(self):
+        from src.agents.shared.model_catalog import find_model
+        entry = find_model("opus")
+        assert entry is not None
+        assert entry.id == "claude-opus-4-6"
+
+    def test_find_openai(self):
+        from src.agents.shared.model_catalog import find_model
+        entry = find_model("gpt5")
+        assert entry is not None
+        assert entry.provider == "openai"
+
+    def test_find_unknown(self):
+        from src.agents.shared.model_catalog import find_model
+        assert find_model("nonexistent-model") is None
+
+    def test_effort_options_opus(self):
+        from src.agents.shared.model_catalog import get_effort_options
+        opts = get_effort_options("claude-opus-4-6")
+        assert "max" in opts
+        assert "low" in opts
+
+    def test_effort_options_sonnet(self):
+        from src.agents.shared.model_catalog import get_effort_options
+        opts = get_effort_options("claude-sonnet-4-6")
+        assert "max" not in opts  # Sonnet doesn't support max
+        assert "high" in opts
+
+    def test_effort_options_openai_none(self):
+        from src.agents.shared.model_catalog import get_effort_options
+        assert get_effort_options("gpt-5.2") is None
+
+    def test_cli_reexports(self):
+        """CLI re-exports should still work."""
+        from src.agents.cli import (
+            ModelEntry, MODEL_CATALOG, find_model,
+            VALID_REASONING, VALID_ANTHROPIC_EFFORT,
+        )
+        assert len(MODEL_CATALOG) >= 4
+        assert find_model("sonnet") is not None
+        assert "xhigh" in VALID_REASONING
+        assert "max" in VALID_ANTHROPIC_EFFORT
+
+
+class TestIsAdmin:
+    """Test _is_admin permission check."""
+
+    def test_dm_is_not_admin(self):
+        from src.monitor.discord_bot import _is_admin
+        interaction = MagicMock()
+        interaction.guild = None  # DM — no guild context, reject
+        assert _is_admin(interaction) is False
+
+    def test_manage_guild_is_admin(self):
+        from src.monitor.discord_bot import _is_admin
+        interaction = MagicMock()
+        interaction.guild = MagicMock()
+        interaction.user.guild_permissions.manage_guild = True
+        assert _is_admin(interaction) is True
+
+    def test_no_manage_guild_is_not_admin(self):
+        from src.monitor.discord_bot import _is_admin
+        interaction = MagicMock()
+        interaction.guild = MagicMock()
+        interaction.user.guild_permissions.manage_guild = False
+        assert _is_admin(interaction) is False

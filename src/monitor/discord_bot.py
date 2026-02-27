@@ -10,8 +10,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from copy import copy
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import discord
 from discord import app_commands
@@ -22,6 +24,43 @@ if TYPE_CHECKING:
     from src.tools.data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Bot session state (model/provider/effort) — global singleton
+# ---------------------------------------------------------------------------
+
+@dataclass
+class BotSessionState:
+    """Model/provider state for the Discord bot (global singleton)."""
+    provider: str = "anthropic"
+    model: Optional[str] = None  # None = config default
+    anthropic_effort: Optional[str] = None
+    anthropic_thinking: Optional[bool] = None  # None = follow config, True/False = override
+    reasoning_effort: Optional[str] = None  # OpenAI
+
+    def snapshot(self) -> BotSessionState:
+        """Return an immutable copy for use during a query."""
+        return copy(self)
+
+    def effective_model(self) -> str:
+        """Return the actual model ID (resolves None → config default)."""
+        if self.model:
+            return self.model
+        from src.agents.config import get_agent_config
+        cfg = get_agent_config()
+        return cfg.anthropic_model if self.provider == "anthropic" else cfg.openai_model
+
+
+def _is_admin(interaction: discord.Interaction) -> bool:
+    """Check if user has manage_guild permission (admin-like).
+
+    DMs are rejected — model switching only works in a guild context
+    where permissions can be verified.
+    """
+    if not interaction.guild:
+        return False
+    return interaction.user.guild_permissions.manage_guild
 
 # Severity → embed color mapping
 _SEVERITY_COLORS = {
@@ -139,35 +178,37 @@ class AlertActionView(discord.ui.View):
     def __init__(
         self, ticker: str, dal: DataAccessLayer,
         report_channel: Optional[discord.TextChannel] = None,
+        state: Optional[BotSessionState] = None,
     ) -> None:
         super().__init__(timeout=300)  # 5 minutes
         self.ticker = ticker
         self._dal = dal
         self._report_channel = report_channel
+        self._state = state
 
     @discord.ui.button(label="Analyze", style=discord.ButtonStyle.primary, emoji="\U0001F50D")
     async def analyze_btn(
         self, interaction: discord.Interaction, button: discord.ui.Button,
     ) -> None:
         await interaction.response.defer(thinking=True)
-        answer = await _run_agent_query(
+        answer, model_used = await _run_agent_query(
             f"Run a full analysis on {self.ticker}. Cover technicals, fundamentals, "
             f"recent news sentiment, and provide an actionable recommendation.",
-            self._dal,
+            self._dal, self._state,
         )
-        await _send_long_followup(interaction, answer, self._report_channel)
+        await _send_long_followup(interaction, answer, self._report_channel, model_name=model_used)
 
     @discord.ui.button(label="News", style=discord.ButtonStyle.secondary, emoji="\U0001F4F0")
     async def news_btn(
         self, interaction: discord.Interaction, button: discord.ui.Button,
     ) -> None:
         await interaction.response.defer(thinking=True)
-        answer = await _run_agent_query(
+        answer, model_used = await _run_agent_query(
             f"Get recent news for {self.ticker} with sentiment analysis. "
             f"Summarize the key headlines and overall sentiment trend.",
-            self._dal,
+            self._dal, self._state,
         )
-        await _send_long_followup(interaction, answer, self._report_channel)
+        await _send_long_followup(interaction, answer, self._report_channel, model_name=model_used)
 
 
 class SkillSelectView(discord.ui.View):
@@ -176,10 +217,12 @@ class SkillSelectView(discord.ui.View):
     def __init__(
         self, dal: DataAccessLayer,
         report_channel: Optional[discord.TextChannel] = None,
+        state: Optional[BotSessionState] = None,
     ) -> None:
         super().__init__(timeout=120)
         self._dal = dal
         self._report_channel = report_channel
+        self._state = state
 
     @discord.ui.select(
         placeholder="Select a skill...",
@@ -214,14 +257,15 @@ class SkillSelectView(discord.ui.View):
             modal = TickerModal(
                 skill_name=selected, dal=self._dal,
                 report_channel=self._report_channel,
+                state=self._state,
             )
             await interaction.response.send_modal(modal)
         else:
             await interaction.response.defer(thinking=True)
             expanded = expand_skill(selected, {})
             if expanded:
-                answer = await _run_agent_query(expanded, self._dal)
-                await _send_long_followup(interaction, answer, self._report_channel)
+                answer, model_used = await _run_agent_query(expanded, self._dal, self._state)
+                await _send_long_followup(interaction, answer, self._report_channel, model_name=model_used)
             else:
                 await interaction.followup.send("Failed to expand skill.")
 
@@ -239,11 +283,13 @@ class TickerModal(discord.ui.Modal, title="Enter Ticker"):
     def __init__(
         self, skill_name: str, dal: DataAccessLayer,
         report_channel: Optional[discord.TextChannel] = None,
+        state: Optional[BotSessionState] = None,
     ) -> None:
         super().__init__()
         self._skill_name = skill_name
         self._dal = dal
         self._report_channel = report_channel
+        self._state = state
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         from src.agents.shared.skills import expand_skill
@@ -252,46 +298,117 @@ class TickerModal(discord.ui.Modal, title="Enter Ticker"):
         await interaction.response.defer(thinking=True)
         expanded = expand_skill(self._skill_name, {"ticker": ticker})
         if expanded:
-            answer = await _run_agent_query(expanded, self._dal)
-            await _send_long_followup(interaction, answer, self._report_channel)
+            answer, model_used = await _run_agent_query(expanded, self._dal, self._state)
+            await _send_long_followup(interaction, answer, self._report_channel, model_name=model_used)
         else:
             await interaction.followup.send(f"Failed to expand skill '{self._skill_name}' for {ticker}.")
+
+
+class ModelSelectView(discord.ui.View):
+    """Dropdown to pick a model when /model is called without arguments.
+
+    Options are generated dynamically from MODEL_CATALOG so they stay
+    in sync with the CLI.
+    """
+
+    def __init__(self, state: BotSessionState, lock: asyncio.Lock) -> None:
+        super().__init__(timeout=120)
+        self._state = state
+        self._lock = lock
+
+        from src.agents.shared.model_catalog import MODEL_CATALOG
+
+        options = [
+            discord.SelectOption(
+                label=m.name, value=m.id,
+                description=m.description[:100],
+            )
+            for m in MODEL_CATALOG
+        ]
+        select = discord.ui.Select(
+            placeholder="Select a model...",
+            options=options,
+        )
+        select.callback = self._on_select
+        self.add_item(select)
+
+    async def _on_select(self, interaction: discord.Interaction) -> None:
+        from src.agents.shared.model_catalog import find_model as _find
+        # interaction.data["values"] contains selected option values
+        selected = interaction.data["values"][0]
+        entry = _find(selected)
+        if entry:
+            async with self._lock:
+                self._state.provider = entry.provider
+                self._state.model = entry.id
+            await interaction.response.send_message(
+                f"Switched to **{entry.name}** ({entry.provider})",
+            )
 
 
 # ---------------------------------------------------------------------------
 # Agent query helper
 # ---------------------------------------------------------------------------
 
-async def _run_agent_query(question: str, dal: DataAccessLayer) -> str:
-    """Run an agent query in a separate thread to avoid blocking Discord heartbeat.
+async def _run_agent_query(
+    question: str,
+    dal: DataAccessLayer,
+    state: Optional[BotSessionState] = None,
+) -> Tuple[str, str]:
+    """Run an agent query in a separate thread.  Returns ``(answer, model_name)``.
 
-    The Anthropic agent's tool execution (HTTP calls to Finnhub, IBKR, etc.)
-    is synchronous and can block for 10-15+ seconds per tool.  Running the
+    Takes a state *snapshot* before dispatching to the thread, ensuring
+    parameter consistency even if the global state is changed mid-query.
+
+    The agent's tool execution (HTTP calls to Finnhub, IBKR, etc.) is
+    synchronous and can block for 10-15+ seconds per tool.  Running the
     entire query on the Discord event-loop thread causes gateway heartbeat
-    timeouts.  We solve this by running the async generator in a *new* event
-    loop on a background thread via ``asyncio.to_thread``.
+    timeouts.  We solve this by running the async generator in a *new*
+    event loop on a background thread via ``asyncio.to_thread``.
     """
-    import asyncio
+    snap = state.snapshot() if state else BotSessionState()
+    model_name = snap.effective_model()
 
     def _sync_agent_call() -> str:
         """Blocking wrapper executed in a thread-pool thread."""
-        from src.agents.anthropic_agent.agent import run_query_stream
         from src.agents.shared.events import EventType
 
-        async def _consume() -> str:
-            answer = ""
-            async for event in run_query_stream(question=question, dal=dal):
-                if event.type == EventType.done:
-                    answer = event.data.get("answer", "No response.")
-            return answer or "No response from agent."
+        if snap.provider == "openai":
+            from src.agents.openai_agent.agent import run_query_stream
+
+            async def _consume() -> str:
+                answer = ""
+                async for event in run_query_stream(
+                    question=question, dal=dal,
+                    model=snap.model,
+                    reasoning_effort=snap.reasoning_effort,
+                ):
+                    if event.type == EventType.done:
+                        answer = event.data.get("answer", "No response.")
+                return answer or "No response from agent."
+        else:
+            from src.agents.anthropic_agent.agent import run_query_stream
+
+            async def _consume() -> str:
+                answer = ""
+                async for event in run_query_stream(
+                    question=question, dal=dal,
+                    model=snap.model,
+                    effort=snap.anthropic_effort,
+                    thinking=snap.anthropic_thinking,
+                ):
+                    if event.type == EventType.done:
+                        answer = event.data.get("answer", "No response.")
+                return answer or "No response from agent."
 
         return asyncio.run(_consume())
 
     try:
-        return await asyncio.to_thread(_sync_agent_call)
+        answer = await asyncio.to_thread(_sync_agent_call)
+        return answer, model_name
     except Exception:
         logger.exception("Agent query failed")
-        return "Agent query failed. Check logs for details."
+        return "Agent query failed. Check logs for details.", model_name
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +522,7 @@ async def _send_long_followup(
     interaction: discord.Interaction,
     text: str,
     report_channel: Optional[discord.TextChannel] = None,
+    model_name: str = "",
 ) -> None:
     """Send a formatted response as interaction followup.
 
@@ -417,7 +535,7 @@ async def _send_long_followup(
 
     if report_channel:
         # Send full response to #report as embeds
-        await _send_as_embeds(report_channel, text)
+        await _send_as_embeds(report_channel, text, model_name=model_name)
         await interaction.followup.send(
             f"Analysis posted to <#{report_channel.id}>",
         )
@@ -433,6 +551,7 @@ async def _send_long_message(
     text: str,
     reference: Optional[discord.Message] = None,
     report_channel: Optional[discord.TextChannel] = None,
+    model_name: str = "",
 ) -> None:
     """Send a formatted message to a channel.
 
@@ -443,7 +562,7 @@ async def _send_long_message(
     text = _format_for_discord(text)
 
     if report_channel:
-        await _send_as_embeds(report_channel, text)
+        await _send_as_embeds(report_channel, text, model_name=model_name)
         await channel.send(
             f"Analysis posted to <#{report_channel.id}>",
             reference=reference,
@@ -460,12 +579,15 @@ async def _send_as_embeds(
     channel: discord.TextChannel,
     text: str,
     color: discord.Color = discord.Color.teal(),
+    model_name: str = "",
 ) -> None:
     """Send long text as a sequence of Discord Embeds (max 4096 chars each).
 
     Up to 10 embeds per message, continuing in a new message if needed.
     """
     from datetime import datetime as _dt
+
+    footer_text = f"MindfulRL Agent \u00b7 {model_name}" if model_name else "MindfulRL Agent"
 
     chunks = _split_message(text, limit=4000)
     embeds: List[discord.Embed] = []
@@ -475,7 +597,7 @@ async def _send_as_embeds(
         if i == 0:
             embed.set_author(name="MindfulRL Analysis")
         if i == len(chunks) - 1:
-            embed.set_footer(text="MindfulRL Agent")
+            embed.set_footer(text=footer_text)
             embed.timestamp = _dt.now()
         embeds.append(embed)
 
@@ -524,6 +646,8 @@ class MindfulDiscordBot(discord.Client):
         self._report_channel: Optional[discord.TextChannel] = None
 
         self._dal = dal
+        self._state = BotSessionState()
+        self._state_lock = asyncio.Lock()
         self.tree = app_commands.CommandTree(self)
         self._setup_commands()
 
@@ -622,11 +746,12 @@ class MindfulDiscordBot(discord.Client):
             return
 
         async with message.channel.typing():
-            answer = await _run_agent_query(question, self._dal)
+            answer, model_used = await _run_agent_query(question, self._dal, self._state)
 
         await _send_long_message(
             message.channel, answer, reference=message,
             report_channel=self._report_channel,
+            model_name=model_used,
         )
 
     # ── Alert sending (with severity routing) ─────────────────────────
@@ -650,6 +775,7 @@ class MindfulDiscordBot(discord.Client):
                 view = AlertActionView(
                     alert.ticker, self._dal,
                     report_channel=self._report_channel,
+                    state=self._state,
                 )
             await channel.send(embed=embed, view=view)
             return True
@@ -685,6 +811,8 @@ class MindfulDiscordBot(discord.Client):
         """Register all slash commands on the CommandTree."""
         bot = self  # capture for closures
 
+        # ── Agent query commands ──────────────────────────────────────
+
         @self.tree.command(name="ask", description="Ask the AI agent a question")
         @app_commands.describe(question="Your question")
         async def ask_cmd(interaction: discord.Interaction, question: str) -> None:
@@ -692,8 +820,8 @@ class MindfulDiscordBot(discord.Client):
                 await interaction.response.send_message("Agent not configured.")
                 return
             await interaction.response.defer(thinking=True)
-            answer = await _run_agent_query(question, bot._dal)
-            await _send_long_followup(interaction, answer, bot._report_channel)
+            answer, model_used = await _run_agent_query(question, bot._dal, bot._state)
+            await _send_long_followup(interaction, answer, bot._report_channel, model_name=model_used)
 
         @self.tree.command(name="analyze", description="Run full analysis on a ticker")
         @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
@@ -704,13 +832,9 @@ class MindfulDiscordBot(discord.Client):
             await interaction.response.defer(thinking=True)
             from src.agents.shared.skills import expand_skill
             expanded = expand_skill("full_analysis", {"ticker": ticker.upper()})
-            if expanded:
-                answer = await _run_agent_query(expanded, bot._dal)
-            else:
-                answer = await _run_agent_query(
-                    f"Run a full analysis on {ticker.upper()}.", bot._dal,
-                )
-            await _send_long_followup(interaction, answer, bot._report_channel)
+            question = expanded or f"Run a full analysis on {ticker.upper()}."
+            answer, model_used = await _run_agent_query(question, bot._dal, bot._state)
+            await _send_long_followup(interaction, answer, bot._report_channel, model_name=model_used)
 
         @self.tree.command(name="news", description="Get recent news and sentiment for a ticker")
         @app_commands.describe(ticker="Stock ticker symbol (e.g. NVDA)")
@@ -719,12 +843,12 @@ class MindfulDiscordBot(discord.Client):
                 await interaction.response.send_message("Agent not configured.")
                 return
             await interaction.response.defer(thinking=True)
-            answer = await _run_agent_query(
+            answer, model_used = await _run_agent_query(
                 f"Get recent news for {ticker.upper()} with sentiment analysis. "
                 f"Summarize the key headlines and overall sentiment trend.",
-                bot._dal,
+                bot._dal, bot._state,
             )
-            await _send_long_followup(interaction, answer, bot._report_channel)
+            await _send_long_followup(interaction, answer, bot._report_channel, model_name=model_used)
 
         @self.tree.command(name="scan", description="Scan watchlist for alerts")
         async def scan_cmd(interaction: discord.Interaction) -> None:
@@ -756,7 +880,9 @@ class MindfulDiscordBot(discord.Client):
 
             # No skill specified → show dropdown
             if not name:
-                view = SkillSelectView(bot._dal, report_channel=bot._report_channel)
+                view = SkillSelectView(
+                    bot._dal, report_channel=bot._report_channel, state=bot._state,
+                )
                 await interaction.response.send_message(
                     "Select a skill:", view=view, ephemeral=True,
                 )
@@ -776,10 +902,127 @@ class MindfulDiscordBot(discord.Client):
             await interaction.response.defer(thinking=True)
             expanded = expand_skill(skill_name, params)
             if expanded:
-                answer = await _run_agent_query(expanded, bot._dal)
+                answer, model_used = await _run_agent_query(expanded, bot._dal, bot._state)
             else:
                 answer = f"Failed to expand skill '{skill_name}'. Missing required parameters?"
-            await _send_long_followup(interaction, answer, bot._report_channel)
+                model_used = bot._state.effective_model()
+            await _send_long_followup(interaction, answer, bot._report_channel, model_name=model_used)
+
+        # ── Model / effort commands ───────────────────────────────────
+
+        @self.tree.command(name="model", description="Show or switch the AI model")
+        @app_commands.describe(name="Model name or alias (leave empty for menu)")
+        async def model_cmd(interaction: discord.Interaction, name: str = "") -> None:
+            if not _is_admin(interaction):
+                await interaction.response.send_message(
+                    "Only server admins can switch models.", ephemeral=True,
+                )
+                return
+
+            if not name:
+                current = bot._state.effective_model()
+                view = ModelSelectView(bot._state, bot._state_lock)
+                await interaction.response.send_message(
+                    f"Current model: **{current}** ({bot._state.provider})",
+                    view=view, ephemeral=True,
+                )
+                return
+
+            from src.agents.shared.model_catalog import find_model as _find
+            entry = _find(name)
+            if not entry:
+                await interaction.response.send_message(
+                    f"Unknown model: `{name}`", ephemeral=True,
+                )
+                return
+
+            async with bot._state_lock:
+                bot._state.provider = entry.provider
+                bot._state.model = entry.id
+            await interaction.response.send_message(
+                f"Switched to **{entry.name}** ({entry.provider})",
+            )
+
+        @self.tree.command(
+            name="effort",
+            description="Set Anthropic effort level (max/high/medium/low)",
+        )
+        @app_commands.describe(level="Effort level")
+        @app_commands.choices(level=[
+            app_commands.Choice(name="Max (Opus only)", value="max"),
+            app_commands.Choice(name="High", value="high"),
+            app_commands.Choice(name="Medium", value="medium"),
+            app_commands.Choice(name="Low", value="low"),
+        ])
+        async def effort_cmd(interaction: discord.Interaction, level: str = "") -> None:
+            if not _is_admin(interaction):
+                await interaction.response.send_message(
+                    "Only server admins can change effort.", ephemeral=True,
+                )
+                return
+            if bot._state.provider != "anthropic":
+                await interaction.response.send_message(
+                    "Use `/reasoning` for OpenAI models.", ephemeral=True,
+                )
+                return
+            if not level:
+                current = bot._state.anthropic_effort or "default"
+                await interaction.response.send_message(
+                    f"Current effort: **{current}**", ephemeral=True,
+                )
+                return
+
+            from src.agents.shared.model_catalog import get_effort_options
+            valid = get_effort_options(bot._state.effective_model())
+            if valid and level not in valid:
+                await interaction.response.send_message(
+                    f"Invalid for current model. Options: {', '.join(valid)}",
+                    ephemeral=True,
+                )
+                return
+
+            async with bot._state_lock:
+                bot._state.anthropic_effort = level
+            await interaction.response.send_message(
+                f"Anthropic effort set to **{level}**",
+            )
+
+        @self.tree.command(
+            name="reasoning",
+            description="Set OpenAI reasoning effort level",
+        )
+        @app_commands.describe(level="Reasoning effort level")
+        @app_commands.choices(level=[
+            app_commands.Choice(name="XHigh", value="xhigh"),
+            app_commands.Choice(name="High", value="high"),
+            app_commands.Choice(name="Medium", value="medium"),
+            app_commands.Choice(name="Low", value="low"),
+            app_commands.Choice(name="Minimal", value="minimal"),
+            app_commands.Choice(name="None", value="none"),
+        ])
+        async def reasoning_cmd(interaction: discord.Interaction, level: str = "") -> None:
+            if not _is_admin(interaction):
+                await interaction.response.send_message(
+                    "Only server admins can change reasoning effort.", ephemeral=True,
+                )
+                return
+            if bot._state.provider != "openai":
+                await interaction.response.send_message(
+                    "Use `/effort` for Anthropic models.", ephemeral=True,
+                )
+                return
+            if not level:
+                current = bot._state.reasoning_effort or "default"
+                await interaction.response.send_message(
+                    f"Current reasoning effort: **{current}**", ephemeral=True,
+                )
+                return
+
+            async with bot._state_lock:
+                bot._state.reasoning_effort = level
+            await interaction.response.send_message(
+                f"OpenAI reasoning effort set to **{level}**",
+            )
 
     # ── Bot start ─────────────────────────────────────────────────────
 
