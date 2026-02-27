@@ -1202,20 +1202,14 @@ def get_risk_free_rate(fallback: float = 0.05) -> float:
 
     try:
         import yfinance as yf
+        import tempfile
 
-        # Suppress yfinance's sqlite cache errors on read-only filesystems
-        import os
-        old_cache = os.environ.get("YF_CACHE_DIR")
-        try:
-            import tempfile
-            os.environ["YF_CACHE_DIR"] = tempfile.gettempdir()
-            ticker = yf.Ticker("^IRX")
-            hist = ticker.history(period="5d")
-        finally:
-            if old_cache is not None:
-                os.environ["YF_CACHE_DIR"] = old_cache
-            else:
-                os.environ.pop("YF_CACHE_DIR", None)
+        # Redirect yfinance's timezone SQLite cache to a writable directory.
+        # The default location may be read-only in containerised / CI envs.
+        yf.set_tz_cache_location(tempfile.gettempdir())
+
+        ticker = yf.Ticker("^IRX")
+        hist = ticker.history(period="5d")
 
         if hist.empty:
             logger.warning("^IRX history empty, using fallback rate %.2f%%", fallback * 100)
