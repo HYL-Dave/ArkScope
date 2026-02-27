@@ -10,9 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from datasets import load_dataset
 import pandas as pd
-#from finrl.agents.stablebaselines3.models import DRLAgent
-from finrl.config import INDICATORS, TRAINED_MODEL_DIR, RESULTS_DIR
-from finrl.main import check_and_make_directories
+from training.config import INDICATORS, TRAINED_MODEL_DIR, RESULTS_DIR, check_and_make_directories
 from training.envs.stocktrading_llm_risk import StockTradingEnv
 
 check_and_make_directories([TRAINED_MODEL_DIR])

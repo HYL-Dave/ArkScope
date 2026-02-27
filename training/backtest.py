@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from finrl.config import INDICATORS
+from training.config import INDICATORS
 from training.train_ppo_llm import MLPActorCritic
 
 def main():
@@ -37,7 +37,8 @@ def main():
 
     # Select environment
     if args.env == "baseline":
-        from env_stocktrading import StockTradingEnv
+        # Baseline uses sentiment env without LLM signal columns
+        from training.envs.stocktrading_llm import StockTradingEnv
     elif args.env == "sentiment":
         from training.envs.stocktrading_llm import StockTradingEnv
     else:

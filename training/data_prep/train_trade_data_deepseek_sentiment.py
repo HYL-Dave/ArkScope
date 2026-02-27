@@ -6,9 +6,8 @@ import numpy as np
 import datetime
 import yfinance as yf
 
-from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
-from finrl.meta.preprocessor.preprocessors import FeatureEngineer, data_split
-from finrl.config import INDICATORS
+from training.preprocessor import YahooDownloader, FeatureEngineer, data_split
+from training.config import INDICATORS
 
 import itertools
 
