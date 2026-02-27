@@ -42,6 +42,12 @@ from .option_pricing import (
     IVAnalysis,
     OptionType,
 )
+from .rate_curve import (
+    RateCurve,
+    get_rate_for_dte,
+    get_yield_curve,
+    make_flat_curve,
+)
 
 __all__ = [
     # Volatility
@@ -70,6 +76,11 @@ __all__ = [
     # Utilities
     'get_risk_free_rate',
     'calculate_days_to_expiry',
+    # Rate Curve (B1)
+    'RateCurve',
+    'get_rate_for_dte',
+    'get_yield_curve',
+    'make_flat_curve',
     # Data classes
     'VolatilityEstimate',
     'TheoreticalPrice',

@@ -148,9 +148,10 @@ def scan_mispricing(
     Returns:
         List of MispricingResult for options exceeding the threshold
     """
-    from analysis import scan_options_for_mispricing, get_risk_free_rate
+    from analysis import scan_options_for_mispricing
+    from analysis.rate_curve import get_yield_curve, get_rate_for_dte
 
-    rfr = get_risk_free_rate()
+    curve = get_yield_curve()
     results: List[MispricingResult] = []
 
     for ticker in tickers:
@@ -178,6 +179,28 @@ def scan_mispricing(
         if not quotes:
             logger.debug(f"{ticker}: No cached option quotes for mispricing scan")
             continue
+
+        # Use DTE-aware rate: pick rate matching the expiry bucket midpoint
+        # (scan_options_for_mispricing passes a single rate to all quotes;
+        #  for mixed-expiry sets, group by expiry for best accuracy)
+        try:
+            from analysis.option_pricing import calculate_days_to_expiry
+            # Approximate median DTE for this set of quotes
+            dtes = []
+            for q in quotes:
+                exp = q.get("expiry", "")
+                if exp:
+                    try:
+                        dtes.append(calculate_days_to_expiry(exp))
+                    except Exception:
+                        pass
+            if dtes:
+                median_dte = sorted(dtes)[len(dtes) // 2]
+                rfr = get_rate_for_dte(median_dte, curve)
+            else:
+                rfr = curve.short_rate
+        except Exception:
+            rfr = curve.short_rate
 
         try:
             signals = scan_options_for_mispricing(
