@@ -385,6 +385,9 @@ async def _run_agent_query(
                 ):
                     if event.type == EventType.done:
                         answer = event.data.get("answer", "No response.")
+                    elif event.type == EventType.error:
+                        err = event.data.get("error", "Unknown error")
+                        answer = f"**Agent error:** {err}"
                 return answer or "No response from agent."
         else:
             from src.agents.anthropic_agent.agent import run_query_stream
@@ -399,6 +402,9 @@ async def _run_agent_query(
                 ):
                     if event.type == EventType.done:
                         answer = event.data.get("answer", "No response.")
+                    elif event.type == EventType.error:
+                        err = event.data.get("error", "Unknown error")
+                        answer = f"**Agent error:** {err}"
                 return answer or "No response from agent."
 
         return asyncio.run(_consume())

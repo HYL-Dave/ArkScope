@@ -13,6 +13,7 @@ Usage:
 import logging
 import os
 import re
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -297,12 +298,15 @@ def get_earnings_press_releases(ticker: str, limit: int = 5) -> list[dict]:
 
 # Module-level singleton — keeps CIK cache + requests.Session across calls
 _singleton: Optional[SECEarningsReleases] = None
+_singleton_lock = threading.Lock()
 
 
 def _get_singleton() -> SECEarningsReleases:
     global _singleton
     if _singleton is None:
-        _singleton = SECEarningsReleases()
+        with _singleton_lock:
+            if _singleton is None:  # double-checked locking
+                _singleton = SECEarningsReleases()
     return _singleton
 
 

@@ -12,6 +12,7 @@ Usage:
 
 import logging
 import os
+import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
@@ -372,12 +373,15 @@ def get_insider_trades(ticker: str, limit: int = 10) -> list[dict]:
 
 # Module-level singleton — keeps CIK cache + requests.Session across calls
 _singleton: Optional[SECInsiderTrades] = None
+_singleton_lock = threading.Lock()
 
 
 def _get_singleton() -> SECInsiderTrades:
     global _singleton
     if _singleton is None:
-        _singleton = SECInsiderTrades()
+        with _singleton_lock:
+            if _singleton is None:  # double-checked locking
+                _singleton = SECInsiderTrades()
     return _singleton
 
 

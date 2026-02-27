@@ -114,10 +114,16 @@ class SECEdgarDataSource(BaseDataSource):
             if contact:
                 self.user_agent = f'MindfulRL-Intraday {contact}'
             else:
-                self.user_agent = os.environ.get(
-                    'SEC_USER_AGENT',
-                    'MindfulRL-Intraday research@example.com',
-                )
+                legacy = os.environ.get('SEC_USER_AGENT', '').strip()
+                if legacy:
+                    self.user_agent = legacy
+                else:
+                    logger.warning(
+                        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
+                        "SEC may rate-limit or reject requests. "
+                        "Set SEC_CONTACT_EMAIL in config/.env"
+                    )
+                    self.user_agent = 'MindfulRL-Intraday research@example.com'
 
         self._session = requests.Session()
         self._session.headers.update({

@@ -462,6 +462,10 @@ def run_query(
         ):
             if event.type == EventType.done:
                 result = event.data
+            elif event.type == EventType.error:
+                # Re-raise so callers (API, CLI) see the error
+                err_msg = event.data.get("error", "Unknown agent error")
+                raise RuntimeError(err_msg)
         return result
 
     return asyncio.run(_collect())
