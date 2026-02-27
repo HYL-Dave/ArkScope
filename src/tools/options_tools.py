@@ -195,7 +195,8 @@ def scan_mispricing(
                     except Exception:
                         pass
             if dtes:
-                median_dte = sorted(dtes)[len(dtes) // 2]
+                from statistics import median
+                median_dte = int(median(dtes))
                 rfr = get_rate_for_dte(median_dte, curve)
             else:
                 rfr = curve.short_rate

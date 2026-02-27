@@ -135,9 +135,10 @@ def make_flat_curve(rate: float, source: str = "flat") -> RateCurve:
 
 # ── Yield curve fetching ──────────────────────────────────────
 
-# In-memory cache: (curve, fetched_datetime)
-_curve_cache: dict[str, Tuple[RateCurve, datetime]] = {}
-_CACHE_TTL_SECONDS = 86_400  # 24 hours
+# In-memory cache: (curve, fetched_datetime, ttl_seconds)
+_curve_cache: dict[str, Tuple[RateCurve, datetime, int]] = {}
+_CACHE_TTL_SECONDS = 86_400         # 24 hours (live curve)
+_FALLBACK_CACHE_TTL_SECONDS = 600   # 10 minutes (fallback / degraded curve)
 
 # Treasury tickers available on yfinance:
 #   ^IRX  = 13-week T-bill  (~91 DTE)
@@ -175,31 +176,33 @@ def get_yield_curve(fallback_rate: float = 0.05) -> RateCurve:
     cache_key = "treasury_curve"
     now = datetime.now()
 
-    # 1. In-memory cache
+    # 1. In-memory cache (TTL varies: live curve = 24h, fallback = 10min)
     if cache_key in _curve_cache:
-        cached_curve, cached_at = _curve_cache[cache_key]
-        if (now - cached_at).total_seconds() < _CACHE_TTL_SECONDS:
+        cached_curve, cached_at, ttl = _curve_cache[cache_key]
+        if (now - cached_at).total_seconds() < ttl:
             return cached_curve
 
     # 2. Live fetch from yfinance
     curve = _fetch_treasury_curve()
     if curve is not None:
-        _curve_cache[cache_key] = (curve, now)
+        _curve_cache[cache_key] = (curve, now, _CACHE_TTL_SECONDS)
         return curve
 
-    # 3. Fallback to existing single-rate fetcher
+    # 3. Fallback to existing single-rate fetcher (short TTL so we retry soon)
     try:
         from .option_pricing import get_risk_free_rate
         rate = get_risk_free_rate(fallback=fallback_rate)
         flat = make_flat_curve(rate, source="irx_fallback")
-        _curve_cache[cache_key] = (flat, now)
+        _curve_cache[cache_key] = (flat, now, _FALLBACK_CACHE_TTL_SECONDS)
         return flat
     except Exception:
         pass
 
-    # 4. Hardcoded fallback
+    # 4. Hardcoded fallback (short TTL)
     logger.warning("No curve source available — using flat %.2f%%", fallback_rate * 100)
-    return make_flat_curve(fallback_rate, source="hardcoded_fallback")
+    flat = make_flat_curve(fallback_rate, source="hardcoded_fallback")
+    _curve_cache[cache_key] = (flat, now, _FALLBACK_CACHE_TTL_SECONDS)
+    return flat
 
 
 def _fetch_treasury_curve() -> Optional[RateCurve]:

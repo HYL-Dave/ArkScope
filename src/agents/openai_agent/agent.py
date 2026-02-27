@@ -192,84 +192,88 @@ async def run_query(
     if session:
         runner_kwargs["session"] = session
 
-    # Retry on transient SDK errors (e.g. "No tool output found" race condition)
-    _max_retries = 2
-    for _attempt in range(_max_retries):
-        try:
-            result = await Runner.run(agent, **runner_kwargs)
-            break
-        except Exception as e:
-            err_str = str(e)
-            is_retryable = "No tool output found" in err_str
-            if is_retryable and _attempt < _max_retries - 1:
-                logger.warning(
-                    "Retryable SDK error (attempt %d/%d): %s",
-                    _attempt + 1, _max_retries, err_str[:200],
-                )
-                continue
-            # Non-retryable or exhausted retries — log structured error
-            pad.log_error(
-                error_type=type(e).__name__,
-                message=err_str,
-                traceback_str=_traceback_mod.format_exc(),
-            )
-            pad.close()
-            raise
+    # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
+    try:
+        # Retry on transient SDK errors (e.g. "No tool output found" race condition)
+        _max_retries = 2
+        for _attempt in range(_max_retries):
+            try:
+                result = await Runner.run(agent, **runner_kwargs)
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_retryable = "No tool output found" in err_str
+                if is_retryable and _attempt < _max_retries - 1:
+                    logger.warning(
+                        "Retryable SDK error (attempt %d/%d): %s",
+                        _attempt + 1, _max_retries, err_str[:200],
+                    )
+                    continue
+                raise  # let outer try handle logging
 
-    # Extract tools used, tool details, tickers, and token usage from result
-    tracker = TokenTracker()
-    tools_used = []
-    tool_calls_detail = []
-    tickers_set: set = set()
-    if hasattr(result, "raw_responses"):
-        tracker.record_openai_result(result, model=model_name)
-        for response in result.raw_responses:
-            if hasattr(response, "output"):
-                for item in response.output:
-                    if hasattr(item, "name"):
-                        tools_used.append(item.name)
-                        args = getattr(item, "arguments", {})
-                        pad.log_tool_call(item.name, args)
-                        # Parse arguments for detail
-                        if isinstance(args, str):
-                            try:
-                                import json as _json
-                                args_dict = _json.loads(args)
-                            except (ValueError, TypeError):
-                                args_dict = {"raw": args}
-                        else:
-                            args_dict = args or {}
-                        # Extract tickers from params
-                        for k in ("ticker", "tickers"):
-                            v = args_dict.get(k)
-                            if isinstance(v, str) and v:
-                                tickers_set.add(v.upper())
-                            elif isinstance(v, list):
-                                tickers_set.update(t.upper() for t in v if isinstance(t, str))
-                        tool_calls_detail.append({
-                            "name": item.name,
-                            "params": args_dict,
-                        })
-                    # Capture tool output preview
-                    elif hasattr(item, "output") and tool_calls_detail:
-                        output_str = str(item.output) if item.output else ""
-                        tool_calls_detail[-1]["result_preview"] = output_str[:200]
+        # Extract tools used, tool details, tickers, and token usage from result
+        tracker = TokenTracker()
+        tools_used = []
+        tool_calls_detail = []
+        tickers_set: set = set()
+        if hasattr(result, "raw_responses"):
+            tracker.record_openai_result(result, model=model_name)
+            for response in result.raw_responses:
+                if hasattr(response, "output"):
+                    for item in response.output:
+                        if hasattr(item, "name"):
+                            tools_used.append(item.name)
+                            args = getattr(item, "arguments", {})
+                            pad.log_tool_call(item.name, args)
+                            # Parse arguments for detail
+                            if isinstance(args, str):
+                                try:
+                                    import json as _json
+                                    args_dict = _json.loads(args)
+                                except (ValueError, TypeError):
+                                    args_dict = {"raw": args}
+                            else:
+                                args_dict = args or {}
+                            # Extract tickers from params
+                            for k in ("ticker", "tickers"):
+                                v = args_dict.get(k)
+                                if isinstance(v, str) and v:
+                                    tickers_set.add(v.upper())
+                                elif isinstance(v, list):
+                                    tickers_set.update(t.upper() for t in v if isinstance(t, str))
+                            tool_calls_detail.append({
+                                "name": item.name,
+                                "params": args_dict,
+                            })
+                        # Capture tool output preview
+                        elif hasattr(item, "output") and tool_calls_detail:
+                            output_str = str(item.output) if item.output else ""
+                            tool_calls_detail[-1]["result_preview"] = output_str[:200]
 
-    answer = str(result.final_output) if result.final_output else ""
-    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
-    pad.close()
+        answer = str(result.final_output) if result.final_output else ""
+        pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+        pad.close()
 
-    logger.info(f"OpenAI agent done: {tracker}")
+        logger.info(f"OpenAI agent done: {tracker}")
 
-    return {
-        "answer": answer,
-        "tools_used": list(set(tools_used)),
-        "provider": "openai",
-        "model": model_name,
-        "token_usage": tracker.summary(),
-        "tickers": sorted(tickers_set) if tickers_set else [],
-        "tool_calls_detail": tool_calls_detail if tool_calls_detail else [],
-    }
+        return {
+            "answer": answer,
+            "tools_used": list(set(tools_used)),
+            "provider": "openai",
+            "model": model_name,
+            "token_usage": tracker.summary(),
+            "tickers": sorted(tickers_set) if tickers_set else [],
+            "tool_calls_detail": tool_calls_detail if tool_calls_detail else [],
+        }
+
+    except Exception as exc:
+        pad.log_error(
+            error_type=type(exc).__name__,
+            message=str(exc),
+            traceback_str=_traceback_mod.format_exc(),
+        )
+        pad.close()
+        raise
 
 
 def run_query_sync(
@@ -337,55 +341,59 @@ def run_query_sync(
     if session:
         runner_kwargs["session"] = session
 
-    # Retry on transient SDK errors
-    _max_retries = 2
-    for _attempt in range(_max_retries):
-        try:
-            result = Runner.run_sync(agent, **runner_kwargs)
-            break
-        except Exception as e:
-            err_str = str(e)
-            is_retryable = "No tool output found" in err_str
-            if is_retryable and _attempt < _max_retries - 1:
-                logger.warning(
-                    "Retryable SDK error (attempt %d/%d): %s",
-                    _attempt + 1, _max_retries, err_str[:200],
-                )
-                continue
-            # Non-retryable or exhausted retries — log structured error
-            pad.log_error(
-                error_type=type(e).__name__,
-                message=err_str,
-                traceback_str=_traceback_mod.format_exc(),
-            )
-            pad.close()
-            raise
+    # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
+    try:
+        # Retry on transient SDK errors
+        _max_retries = 2
+        for _attempt in range(_max_retries):
+            try:
+                result = Runner.run_sync(agent, **runner_kwargs)
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_retryable = "No tool output found" in err_str
+                if is_retryable and _attempt < _max_retries - 1:
+                    logger.warning(
+                        "Retryable SDK error (attempt %d/%d): %s",
+                        _attempt + 1, _max_retries, err_str[:200],
+                    )
+                    continue
+                raise  # let outer try handle logging
 
-    # Extract tools used and token usage
-    tracker = TokenTracker()
-    tools_used = []
-    if hasattr(result, "raw_responses"):
-        tracker.record_openai_result(result, model=model_name)
-        for response in result.raw_responses:
-            if hasattr(response, "output"):
-                for item in response.output:
-                    if hasattr(item, "name"):
-                        tools_used.append(item.name)
-                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+        # Extract tools used and token usage
+        tracker = TokenTracker()
+        tools_used = []
+        if hasattr(result, "raw_responses"):
+            tracker.record_openai_result(result, model=model_name)
+            for response in result.raw_responses:
+                if hasattr(response, "output"):
+                    for item in response.output:
+                        if hasattr(item, "name"):
+                            tools_used.append(item.name)
+                            pad.log_tool_call(item.name, getattr(item, "arguments", {}))
 
-    answer = str(result.final_output) if result.final_output else ""
-    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
-    pad.close()
+        answer = str(result.final_output) if result.final_output else ""
+        pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+        pad.close()
 
-    logger.info(f"OpenAI agent done (sync): {tracker}")
+        logger.info(f"OpenAI agent done (sync): {tracker}")
 
-    return {
-        "answer": answer,
-        "tools_used": list(set(tools_used)),
-        "provider": "openai",
-        "model": model_name,
-        "token_usage": tracker.summary(),
-    }
+        return {
+            "answer": answer,
+            "tools_used": list(set(tools_used)),
+            "provider": "openai",
+            "model": model_name,
+            "token_usage": tracker.summary(),
+        }
+
+    except Exception as exc:
+        pad.log_error(
+            error_type=type(exc).__name__,
+            message=str(exc),
+            traceback_str=_traceback_mod.format_exc(),
+        )
+        pad.close()
+        raise
 
 
 async def run_query_stream(
@@ -455,58 +463,61 @@ async def run_query_stream(
     if session:
         runner_kwargs["session"] = session
 
-    # Retry on transient SDK errors
-    _max_retries = 2
-    result = None
-    for _attempt in range(_max_retries):
-        try:
-            result = await Runner.run(agent, **runner_kwargs)
-            break
-        except Exception as e:
-            err_str = str(e)
-            is_retryable = "No tool output found" in err_str
-            if is_retryable and _attempt < _max_retries - 1:
-                logger.warning(
-                    "Retryable SDK error (attempt %d/%d): %s",
-                    _attempt + 1, _max_retries, err_str[:200],
-                )
-                continue
-            # Non-retryable or exhausted retries — log structured error
-            pad.log_error(
-                error_type=type(e).__name__,
-                message=err_str,
-                traceback_str=_traceback_mod.format_exc(),
-            )
-            pad.close()
-            yield AgentEvent(EventType.error, {
-                "error": f"{type(e).__name__}: {err_str[:500]}",
-                "scratchpad": str(pad.filepath) if pad.filepath else None,
-            })
-            return
+    # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
+    try:
+        # Retry on transient SDK errors
+        _max_retries = 2
+        result = None
+        for _attempt in range(_max_retries):
+            try:
+                result = await Runner.run(agent, **runner_kwargs)
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_retryable = "No tool output found" in err_str
+                if is_retryable and _attempt < _max_retries - 1:
+                    logger.warning(
+                        "Retryable SDK error (attempt %d/%d): %s",
+                        _attempt + 1, _max_retries, err_str[:200],
+                    )
+                    continue
+                raise  # let outer try handle logging
 
-    # Extract tools used and token usage from result
-    tracker = TokenTracker()
-    tools_used: List[str] = []
-    if hasattr(result, "raw_responses"):
-        tracker.record_openai_result(result, model=model_name)
-        for response in result.raw_responses:
-            if hasattr(response, "output"):
-                for item in response.output:
-                    if hasattr(item, "name"):
-                        tools_used.append(item.name)
-                        pad.log_tool_call(item.name, getattr(item, "arguments", {}))
-                        yield AgentEvent(EventType.tool_end, {"tool": item.name})
+        # Extract tools used and token usage from result
+        tracker = TokenTracker()
+        tools_used: List[str] = []
+        if hasattr(result, "raw_responses"):
+            tracker.record_openai_result(result, model=model_name)
+            for response in result.raw_responses:
+                if hasattr(response, "output"):
+                    for item in response.output:
+                        if hasattr(item, "name"):
+                            tools_used.append(item.name)
+                            pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+                            yield AgentEvent(EventType.tool_end, {"tool": item.name})
 
-    answer = str(result.final_output) if result.final_output else ""
-    pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
-    pad.close()
+        answer = str(result.final_output) if result.final_output else ""
+        pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+        pad.close()
 
-    logger.info(f"OpenAI agent done (stream): {tracker}")
+        logger.info(f"OpenAI agent done (stream): {tracker}")
 
-    yield AgentEvent(EventType.done, {
-        "answer": answer,
-        "tools_used": list(set(tools_used)),
-        "provider": "openai",
-        "model": model_name,
-        "token_usage": tracker.summary(),
-    })
+        yield AgentEvent(EventType.done, {
+            "answer": answer,
+            "tools_used": list(set(tools_used)),
+            "provider": "openai",
+            "model": model_name,
+            "token_usage": tracker.summary(),
+        })
+
+    except Exception as exc:
+        pad.log_error(
+            error_type=type(exc).__name__,
+            message=str(exc),
+            traceback_str=_traceback_mod.format_exc(),
+        )
+        pad.close()
+        yield AgentEvent(EventType.error, {
+            "error": f"{type(exc).__name__}: {str(exc)[:500]}",
+            "scratchpad": str(pad.filepath) if pad.filepath else None,
+        })

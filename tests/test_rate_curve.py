@@ -235,6 +235,31 @@ class TestGetYieldCurve:
         assert isinstance(c1, RateCurve)
         assert isinstance(c2, RateCurve)
 
+    def test_fallback_uses_short_ttl(self):
+        """Fallback curves should be cached with short TTL, not 24h."""
+        from unittest.mock import patch
+        from analysis.rate_curve import (
+            _curve_cache,
+            _FALLBACK_CACHE_TTL_SECONDS,
+            _CACHE_TTL_SECONDS,
+        )
+
+        # Clear cache to force fresh fetch
+        _curve_cache.pop("treasury_curve", None)
+
+        # Mock _fetch_treasury_curve to fail, forcing fallback path
+        with patch("analysis.rate_curve._fetch_treasury_curve", return_value=None):
+            curve = get_yield_curve(fallback_rate=0.05)
+            assert isinstance(curve, RateCurve)
+            assert curve.source in ("irx_fallback", "hardcoded_fallback")
+
+            # Verify cache entry uses short TTL
+            entry = _curve_cache.get("treasury_curve")
+            assert entry is not None
+            _cached_curve, _cached_at, ttl = entry
+            assert ttl == _FALLBACK_CACHE_TTL_SECONDS
+            assert ttl < _CACHE_TTL_SECONDS  # short TTL < 24h
+
 
 # ── Realistic scenario tests ─────────────────────────────────
 
