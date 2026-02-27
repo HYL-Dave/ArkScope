@@ -569,20 +569,22 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         timeout: int = 120,
         background: bool = False,
     ) -> str:
-        """Execute Python code for custom financial calculations and data analysis.
+        """Run Python for ANY numerical calculation or data analysis.
 
-        Provide `code` for direct execution, or `task` for auto code generation
-        using a coding model with error-correcting retry.
-        Code runs in isolated subprocess with numpy, pandas, scipy available.
-        Pass data via data_json parameter (accessible as `data` variable in code).
-        Set background=True for long-running tasks (results written to temp file).
+        IMPORTANT: Always use this tool instead of calculating mentally.
+        Results are reproducible, auditable, and auto-corrected on errors.
+
+        PREFERRED: Pass `task` (natural language description). The system
+        auto-generates Python code and retries up to 3 times on errors.
+        Only use `code` for precise, hand-crafted implementations.
 
         Args:
-            code: Python code to execute (direct mode)
-            task: Task description for auto code generation with error correction (alternative to code)
-            data_json: JSON string of data to inject (accessible as `data` variable)
+            task: Natural language task description (PREFERRED). Example:
+                "Calculate 30-day Sharpe ratio from the provided OHLCV data"
+            code: Python code to execute directly (alternative to task)
+            data_json: JSON data passed as `data` variable in code
             timeout: Execution timeout in seconds (default: 120)
-            background: Run in background, write results to temp file (default: False)
+            background: Run in background for long tasks (default: False)
         """
         result = execute_python_code(
             code=code, task=task, data_json=data_json,

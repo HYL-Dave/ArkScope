@@ -641,12 +641,11 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "execute_python_analysis",
             "description": (
-                "Execute Python code for custom financial calculations and data analysis. "
-                "Provide `code` for direct execution, or `task` for auto code generation "
-                "using a coding model with error-correcting retry. "
-                "Code runs in isolated subprocess with numpy, pandas, scipy available. "
-                "Pass data via data_json (accessible as `data` variable). "
-                "Set background=true for long-running tasks (results written to temp file)."
+                "Run Python for ANY numerical calculation or data analysis. "
+                "PREFERRED: pass `task` (natural language) — the system auto-generates "
+                "code and retries on errors. Only use `code` for precise hand-crafted "
+                "implementations. Do not calculate mentally; always use this tool. "
+                "Sandbox with numpy, pandas, scipy. Pass data via data_json."
             ),
             "input_schema": {
                 "type": "object",
@@ -658,8 +657,8 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "task": {
                         "type": "string",
                         "description": (
-                            "Task description for auto code generation with error correction "
-                            "(alternative to code)"
+                            "Natural language task description (PREFERRED over code). "
+                            "System auto-generates Python and retries on errors."
                         )
                     },
                     "data_json": {

@@ -864,11 +864,11 @@ class ToolRegistry:
         self.register(ToolDefinition(
             name="execute_python_analysis",
             description=(
-                "Execute Python code for custom financial calculations and data analysis. "
-                "Provide `code` for direct execution, or `task` for auto code generation "
-                "using a coding model with error-correcting retry. "
-                "Code runs in isolated subprocess with numpy, pandas, scipy available. "
-                "Pass data via data_json (accessible as `data` variable)."
+                "Run Python for ANY numerical calculation or data analysis. "
+                "PREFERRED: pass `task` (natural language) — the system auto-generates "
+                "code and retries on errors. Only use `code` for precise hand-crafted "
+                "implementations. Do not calculate mentally; always use this tool. "
+                "Sandbox with numpy, pandas, scipy. Pass data via data_json."
             ),
             function=execute_python_code,
             category="execution",
@@ -877,8 +877,8 @@ class ToolRegistry:
                 ToolParameter("code", "string", "Python code to execute (direct mode)",
                               required=False, default=""),
                 ToolParameter("task", "string",
-                              "Task description for auto code generation with error correction "
-                              "(alternative to code)",
+                              "Natural language task description (PREFERRED over code). "
+                              "System auto-generates Python and retries on errors.",
                               required=False, default=""),
                 ToolParameter("data_json", "string",
                               "JSON string of data to inject (accessible as `data` variable)",
