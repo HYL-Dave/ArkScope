@@ -303,33 +303,25 @@ class StockTradingEnv(gym.Env):
 
         else:
             # Apply LLM sentiment to influence actions
-            #llm_sentiments = self.data[self.llm_sentiment_col].values  # Get LLM sentiment for all stocks
-            #actions = np.where(llm_sentiments > 0, actions, 0)  # Example: Only execute actions where sentiment > 0
-        #RESUME HERE
-
-#            print("actions before: " + str(actions))
-            # Fetch LLM sentiments for the current day
             llm_sentiments = self.data[self.llm_sentiment_col].values  # values: [1, 2, 3, 4, 5]
 
-            # Create masks for action types
             buy_mask = (actions > 0)
             sell_mask = (actions < 0)
 
-            # Create masks based on LLM sentiments
             strong_sell_mask = (llm_sentiments == 1)
             moderate_sell_mask = (llm_sentiments == 2)
             hold_mask = (llm_sentiments == 3)
             moderate_buy_mask = (llm_sentiments == 4)
             strong_buy_mask = (llm_sentiments == 5)
 
-            # Adjust actions based on combined conditions
-            actions[(strong_sell_mask & buy_mask) | (strong_buy_mask & sell_mask)] *= 0.9  # Reduce mismatched strong actions
-            actions[(moderate_sell_mask & buy_mask) | (moderate_buy_mask & sell_mask)] *= 0.95  # Reduce mismatched moderate actions
-            actions[hold_mask] *= 0.98  # Reduce all actions for neutral sentiment
+            # Reduce mismatched actions (sentiment disagrees with trade direction)
+            actions[(strong_sell_mask & buy_mask) | (strong_buy_mask & sell_mask)] *= 0.9
+            actions[(moderate_sell_mask & buy_mask) | (moderate_buy_mask & sell_mask)] *= 0.95
+            actions[hold_mask] *= 0.98
 
-            actions[(strong_sell_mask & sell_mask) | (strong_buy_mask & buy_mask)] *= 1.1  # Amplify matched strong actions
-            actions[(moderate_sell_mask & sell_mask) | (moderate_buy_mask & buy_mask)] *= 1.05  # Amplify matched moderate actions
- #           print("actions after: " + str(actions))
+            # Amplify matched actions (sentiment agrees with trade direction)
+            actions[(strong_sell_mask & sell_mask) | (strong_buy_mask & buy_mask)] *= 1.1
+            actions[(moderate_sell_mask & sell_mask) | (moderate_buy_mask & buy_mask)] *= 1.05
 
             actions = actions * self.hmax  # actions initially is scaled between 0 to 1
             actions = actions.astype(
@@ -435,15 +427,16 @@ class StockTradingEnv(gym.Env):
             # For Initial State
             if len(self.df.tic.unique()) > 1:
                 # for multiple stock
-         #       print("the type of self data is:  " type(self.data.close))
-            #    print("the llm sentiment is " + str(self.data[self.llm_sentiment_col].tolist()))
-
-#                print(' the closing vals are ' + str(self.data.close))
-
-                state = ([self.initial_amount]+ self.data.close.values.tolist()+ self.num_stock_shares+ sum(
-                        (self.data[tech].values.tolist() for tech in self.tech_indicator_list),[],)
-                    +  self.data[self.llm_sentiment_col].values.tolist()  #add llm sentiment
-                )  # append initial stocks_share to initial state, instead of all zero
+                state = (
+                    [self.initial_amount]
+                    + self.data.close.values.tolist()
+                    + self.num_stock_shares
+                    + sum(
+                        (self.data[tech].values.tolist() for tech in self.tech_indicator_list),
+                        [],
+                    )
+                    + self.data[self.llm_sentiment_col].values.tolist()
+                )
             else:
                 # for single stock
                 state = (
@@ -470,6 +463,7 @@ class StockTradingEnv(gym.Env):
                         ),
                         [],
                     )
+                    + self.data[self.llm_sentiment_col].values.tolist()
                 )
             else:
                 # for single stock
@@ -480,6 +474,7 @@ class StockTradingEnv(gym.Env):
                         (self.stock_dim + 1) : (self.stock_dim * 2 + 1)
                     ]
                     + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
+                    + [self.data[self.llm_sentiment_col]]
                 )
 
         return state
@@ -498,7 +493,7 @@ class StockTradingEnv(gym.Env):
                     ),
                     [],
                 )
-                + self.data[self.llm_sentiment_col].values.tolist() # add LLM sentiment
+                + self.data[self.llm_sentiment_col].values.tolist()
             )
 
         else:
@@ -508,7 +503,7 @@ class StockTradingEnv(gym.Env):
                 + [self.data.close]
                 + list(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
                 + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
-                + [self.data[self.llm_sentiment_col]] #add LLM sentiment
+                + [self.data[self.llm_sentiment_col]]
             )
 
         return state
