@@ -162,12 +162,13 @@ combination = list(itertools.product(list_date,list_ticker))
 
 processed_full = pd.DataFrame(combination,columns=["date","tic"]).merge(processed,on=["date","tic"],how="left")
 processed_full = processed_full[processed_full['date'].isin(processed['date'])]
-processed_full = processed_full.sort_values(['date','tic'])
+processed_full = processed_full.sort_values(['tic','date'])
 
-#processed_full = processed_full.fillna(0)
-#processed_full = processed_full.fillna(method='ffill')
-
-processed_full = processed_full.ffill()
+# Forward-fill within each ticker to avoid cross-ticker leakage
+# (global ffill on date-sorted data would bleed Ticker A's values into Ticker B)
+non_key_cols = [c for c in processed_full.columns if c not in ('date', 'tic')]
+processed_full[non_key_cols] = processed_full.groupby('tic')[non_key_cols].ffill()
+processed_full = processed_full.sort_values(['date','tic']).reset_index(drop=True)
 
 
 # In[16]:
