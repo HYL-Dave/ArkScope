@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback as _traceback_mod
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from ..config import get_agent_config, ReasoningEffort
@@ -206,8 +207,12 @@ async def run_query(
                     _attempt + 1, _max_retries, err_str[:200],
                 )
                 continue
-            # Non-retryable or exhausted retries
-            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            # Non-retryable or exhausted retries — log structured error
+            pad.log_error(
+                error_type=type(e).__name__,
+                message=err_str,
+                traceback_str=_traceback_mod.format_exc(),
+            )
             pad.close()
             raise
 
@@ -347,7 +352,12 @@ def run_query_sync(
                     _attempt + 1, _max_retries, err_str[:200],
                 )
                 continue
-            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            # Non-retryable or exhausted retries — log structured error
+            pad.log_error(
+                error_type=type(e).__name__,
+                message=err_str,
+                traceback_str=_traceback_mod.format_exc(),
+            )
             pad.close()
             raise
 
@@ -461,9 +471,17 @@ async def run_query_stream(
                     _attempt + 1, _max_retries, err_str[:200],
                 )
                 continue
-            pad.log_final_answer(f"[ERROR] {type(e).__name__}: {err_str[:500]}", tools_used=[])
+            # Non-retryable or exhausted retries — log structured error
+            pad.log_error(
+                error_type=type(e).__name__,
+                message=err_str,
+                traceback_str=_traceback_mod.format_exc(),
+            )
             pad.close()
-            yield AgentEvent(EventType.error, {"error": err_str[:500]})
+            yield AgentEvent(EventType.error, {
+                "error": f"{type(e).__name__}: {err_str[:500]}",
+                "scratchpad": str(pad.filepath) if pad.filepath else None,
+            })
             return
 
     # Extract tools used and token usage from result

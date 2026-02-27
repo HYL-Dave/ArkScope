@@ -167,6 +167,34 @@ class Scratchpad:
             "elapsed_seconds": round(elapsed, 2),
         }, token_usage=token_usage)
 
+    def log_error(
+        self,
+        error_type: str,
+        message: str,
+        traceback_str: Optional[str] = None,
+        turn: Optional[int] = None,
+        tools_used: Optional[List[str]] = None,
+        token_usage: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record an error that terminated the agent session.
+
+        This provides structured error logging so failures are traceable
+        ("失敗也可追"). Captures exception type, message, optional traceback,
+        which turn failed, tools used so far, and cumulative token usage.
+        """
+        elapsed = time.time() - self._start_time
+        data: Dict[str, Any] = {
+            "error_type": error_type,
+            "message": message[:2000],
+            "tools_used": tools_used or [],
+            "elapsed_seconds": round(elapsed, 2),
+        }
+        if traceback_str:
+            data["traceback"] = traceback_str[:5000]
+        if turn is not None:
+            data["turn"] = turn
+        self._write_event("error", data, token_usage=token_usage)
+
     def close(self) -> None:
         """Flush and close the JSONL file."""
         if self._file and not self._file.closed:

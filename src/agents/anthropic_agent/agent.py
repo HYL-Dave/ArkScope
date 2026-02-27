@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from ..config import get_agent_config
@@ -248,155 +249,182 @@ async def run_query_stream(
         use_beta = True  # compaction requires beta endpoint
         logger.info("Using server-side compaction (L2)")
 
-    # Tool use loop
-    for turn in range(config.max_tool_calls):
-        yield AgentEvent(EventType.thinking, {"turn": turn + 1, "model": model_name})
+    # Tool use loop — wrapped in try/except for fault tolerance (Item G)
+    _current_turn = 0
+    try:
+        for turn in range(config.max_tool_calls):
+            _current_turn = turn + 1
+            yield AgentEvent(EventType.thinking, {"turn": _current_turn, "model": model_name})
 
-        stream_kwargs = dict(
-            model=model_name,
-            max_tokens=effective_max_tokens,
-            system=cached_system,
-            tools=tools,
-            messages=messages,
-            **api_kwargs,
-        )
-
-        # Add compaction context_management param
-        if use_compaction:
-            stream_kwargs["context_management"] = {
-                "edits": [{"type": "compact_20260112"}]
-            }
-
-        if use_beta:
-            # Build betas list (may include both extended context and compaction)
-            betas = []
-            if _use_extended_context(model_name, config.extended_context):
-                betas.append(_EXTENDED_CONTEXT_BETA)
-            if use_compaction:
-                betas.append(_COMPACTION_BETA)
-            stream_ctx = client.beta.messages.stream(
-                betas=betas,
-                **stream_kwargs,
+            stream_kwargs = dict(
+                model=model_name,
+                max_tokens=effective_max_tokens,
+                system=cached_system,
+                tools=tools,
+                messages=messages,
+                **api_kwargs,
             )
-        else:
-            stream_ctx = client.messages.stream(**stream_kwargs)
 
-        with stream_ctx as stream:
-            response = stream.get_final_message()
+            # Add compaction context_management param
+            if use_compaction:
+                stream_kwargs["context_management"] = {
+                    "edits": [{"type": "compact_20260112"}]
+                }
 
-        tracker.record_anthropic(response, model=model_name)
-        logger.debug(
-            f"Turn {turn + 1}: stop_reason={response.stop_reason} "
-            f"tokens={tracker.last_input_tokens}+{tracker.turns[-1].output_tokens}"
-        )
+            if use_beta:
+                # Build betas list (may include both extended context and compaction)
+                betas = []
+                if _use_extended_context(model_name, config.extended_context):
+                    betas.append(_EXTENDED_CONTEXT_BETA)
+                if use_compaction:
+                    betas.append(_COMPACTION_BETA)
+                stream_ctx = client.beta.messages.stream(
+                    betas=betas,
+                    **stream_kwargs,
+                )
+            else:
+                stream_ctx = client.messages.stream(**stream_kwargs)
 
-        # Emit thinking content events (extended thinking blocks)
-        for block in response.content:
-            if block.type == "thinking":
-                yield AgentEvent(EventType.thinking_content, {
-                    "thinking": block.thinking,
+            with stream_ctx as stream:
+                response = stream.get_final_message()
+
+            tracker.record_anthropic(response, model=model_name)
+            logger.debug(
+                f"Turn {_current_turn}: stop_reason={response.stop_reason} "
+                f"tokens={tracker.last_input_tokens}+{tracker.turns[-1].output_tokens}"
+            )
+
+            # Emit thinking content events (extended thinking blocks)
+            for block in response.content:
+                if block.type == "thinking":
+                    yield AgentEvent(EventType.thinking_content, {
+                        "thinking": block.thinking,
+                    })
+
+            # Handle pause_turn (Claude web search server tool mid-turn pause)
+            if response.stop_reason == "pause_turn":
+                messages.append({"role": "assistant", "content": response.content})
+                logger.debug("pause_turn: Claude web search in progress, continuing...")
+                continue
+
+            # Handle compaction (server-side context compaction, Phase 7a)
+            if response.stop_reason == "compaction":
+                messages.append({"role": "assistant", "content": response.content})
+                logger.info("Server compaction triggered — context summarized, continuing...")
+                continue
+
+            # Check if we're done
+            if response.stop_reason != "tool_use":
+                # Extract final text response
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+                pad.log_final_answer(
+                    final_text,
+                    token_usage=tracker.summary(),
+                    tools_used=list(set(tools_used)),
+                )
+                pad.close()
+                yield AgentEvent(EventType.done, {
+                    "answer": final_text,
+                    "tools_used": list(set(tools_used)),
+                    "provider": "anthropic",
+                    "model": model_name,
+                    "token_usage": tracker.summary(),
+                })
+                return
+
+            # Process tool calls
+            tool_use_blocks = [
+                block for block in response.content
+                if block.type == "tool_use"
+            ]
+
+            if not tool_use_blocks:
+                break
+
+            # Emit intermediate text (model thinking before tool calls)
+            for block in response.content:
+                if hasattr(block, "text") and block.text.strip():
+                    yield AgentEvent(EventType.text, {"content": block.text.strip()})
+
+            # Execute tools and collect results
+            tool_results = []
+            for tool_use in tool_use_blocks:
+                tool_name = tool_use.name
+                tool_input = tool_use.input
+                tool_id = tool_use.id
+
+                logger.info(f"Executing tool: {tool_name}")
+                tools_used.append(tool_name)
+
+                yield AgentEvent(EventType.tool_start, {
+                    "tool": tool_name,
+                    "input": tool_input,
                 })
 
-        # Handle pause_turn (Claude web search server tool mid-turn pause)
-        if response.stop_reason == "pause_turn":
+                # Execute the tool
+                result = execute_tool(tool_name, tool_input, dal)
+                result_str = str(result)
+                pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
+
+                yield AgentEvent(EventType.tool_end, {
+                    "tool": tool_name,
+                    "summary": result_str[:200],
+                    "chars": len(result_str),
+                })
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_id,
+                    "content": result,
+                })
+
+            # Add assistant response and tool results to messages
             messages.append({"role": "assistant", "content": response.content})
-            logger.debug("pause_turn: Claude web search in progress, continuing...")
-            continue
+            messages.append({"role": "user", "content": tool_results})
 
-        # Handle compaction (server-side context compaction, Phase 7a)
-        if response.stop_reason == "compaction":
-            messages.append({"role": "assistant", "content": response.content})
-            logger.info("Server compaction triggered — context summarized, continuing...")
-            continue
+            # Compact old tool results if context is growing too large
+            if ctx.should_compact(tracker):
+                messages, compact_stats = ctx.compact_messages(messages)
+                logger.info(f"Context compacted: {compact_stats}")
 
-        # Check if we're done
-        if response.stop_reason != "tool_use":
-            # Extract final text response
-            final_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-            pad.log_final_answer(
-                final_text,
-                token_usage=tracker.summary(),
-                tools_used=list(set(tools_used)),
-            )
-            pad.close()
-            yield AgentEvent(EventType.done, {
-                "answer": final_text,
-                "tools_used": list(set(tools_used)),
-                "provider": "anthropic",
-                "model": model_name,
-                "token_usage": tracker.summary(),
-            })
-            return
+        # Max turns reached
+        logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
+        pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
+        pad.close()
+        yield AgentEvent(EventType.done, {
+            "answer": "Maximum tool calls reached. Please try a simpler query.",
+            "tools_used": list(set(tools_used)),
+            "provider": "anthropic",
+            "model": model_name,
+            "token_usage": tracker.summary(),
+        })
 
-        # Process tool calls
-        tool_use_blocks = [
-            block for block in response.content
-            if block.type == "tool_use"
-        ]
-
-        if not tool_use_blocks:
-            break
-
-        # Emit intermediate text (model thinking before tool calls)
-        for block in response.content:
-            if hasattr(block, "text") and block.text.strip():
-                yield AgentEvent(EventType.text, {"content": block.text.strip()})
-
-        # Execute tools and collect results
-        tool_results = []
-        for tool_use in tool_use_blocks:
-            tool_name = tool_use.name
-            tool_input = tool_use.input
-            tool_id = tool_use.id
-
-            logger.info(f"Executing tool: {tool_name}")
-            tools_used.append(tool_name)
-
-            yield AgentEvent(EventType.tool_start, {
-                "tool": tool_name,
-                "input": tool_input,
-            })
-
-            # Execute the tool
-            result = execute_tool(tool_name, tool_input, dal)
-            result_str = str(result)
-            pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
-
-            yield AgentEvent(EventType.tool_end, {
-                "tool": tool_name,
-                "summary": result_str[:200],
-                "chars": len(result_str),
-            })
-
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_id,
-                "content": result,
-            })
-
-        # Add assistant response and tool results to messages
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-        # Compact old tool results if context is growing too large
-        if ctx.should_compact(tracker):
-            messages, compact_stats = ctx.compact_messages(messages)
-            logger.info(f"Context compacted: {compact_stats}")
-
-    # Max turns reached
-    logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
-    pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
-    pad.close()
-    yield AgentEvent(EventType.done, {
-        "answer": "Maximum tool calls reached. Please try a simpler query.",
-        "tools_used": list(set(tools_used)),
-        "provider": "anthropic",
-        "model": model_name,
-        "token_usage": tracker.summary(),
-    })
+    except Exception as exc:
+        # Fault tolerance: log error to scratchpad so failures are traceable
+        tb = traceback.format_exc()
+        logger.error(
+            "Anthropic agent error on turn %d: %s: %s",
+            _current_turn, type(exc).__name__, exc,
+        )
+        pad.log_error(
+            error_type=type(exc).__name__,
+            message=str(exc),
+            traceback_str=tb,
+            turn=_current_turn,
+            tools_used=list(set(tools_used)),
+            token_usage=tracker.summary(),
+        )
+        pad.close()
+        yield AgentEvent(EventType.error, {
+            "error": f"{type(exc).__name__}: {str(exc)[:500]}",
+            "turn": _current_turn,
+            "tools_used": list(set(tools_used)),
+            "scratchpad": str(pad.filepath) if pad.filepath else None,
+        })
+        return
 
 
 def run_query(

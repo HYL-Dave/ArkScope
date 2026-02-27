@@ -454,6 +454,99 @@ class TestReadScratchpad:
 # ── repr ──────────────────────────────────────────────────────
 
 
+# ── Error logging (Item G: fault tolerance) ─────────────────
+
+
+class TestScratchpadLogError:
+    def test_log_error_basic(self, tmp_path):
+        """log_error writes structured error event to scratchpad."""
+        pad = Scratchpad("test", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad.log_error(
+            error_type="APIError",
+            message="context_length_exceeded: max 200000 tokens",
+        )
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events) == 2  # init + error
+        err = events[1]
+        assert err["type"] == "error"
+        assert err["data"]["error_type"] == "APIError"
+        assert "context_length_exceeded" in err["data"]["message"]
+        assert err["data"]["elapsed_seconds"] >= 0
+        assert err["data"]["tools_used"] == []
+
+    def test_log_error_with_full_context(self, tmp_path):
+        """log_error captures turn, tools_used, traceback, token_usage."""
+        pad = Scratchpad("分析 NVDA", "openai", "gpt-5.2", base_dir=tmp_path)
+        pad.log_error(
+            error_type="ContextLengthExceeded",
+            message="max tokens exceeded",
+            traceback_str="Traceback (most recent call last):\n  File ...\nError",
+            turn=5,
+            tools_used=["get_ticker_news", "get_price_history"],
+            token_usage={"total_tokens": 150000},
+        )
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        err = events[1]
+        assert err["data"]["turn"] == 5
+        assert err["data"]["tools_used"] == ["get_ticker_news", "get_price_history"]
+        assert "Traceback" in err["data"]["traceback"]
+        assert err["token_usage"] == {"total_tokens": 150000}
+
+    def test_log_error_message_truncated(self, tmp_path):
+        """Long error messages are truncated to 2000 chars."""
+        pad = Scratchpad("test", "anthropic", "claude", base_dir=tmp_path)
+        long_msg = "x" * 5000
+        pad.log_error(error_type="RuntimeError", message=long_msg)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events[1]["data"]["message"]) <= 2000
+
+    def test_log_error_traceback_truncated(self, tmp_path):
+        """Long tracebacks are truncated to 5000 chars."""
+        pad = Scratchpad("test", "anthropic", "claude", base_dir=tmp_path)
+        long_tb = "frame\n" * 2000
+        pad.log_error(error_type="Error", message="boom", traceback_str=long_tb)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events[1]["data"]["traceback"]) <= 5000
+
+    def test_log_error_disabled(self, tmp_path):
+        """log_error is a no-op when scratchpad is disabled."""
+        pad = Scratchpad("test", "anthropic", "claude", base_dir=tmp_path, enabled=False)
+        pad.log_error(error_type="Error", message="should not crash")
+        pad.close()
+        # No file created, no error — just silently ignored
+
+    def test_error_after_tool_results(self, tmp_path):
+        """Full session: init → tool_result → tool_result → error."""
+        pad = Scratchpad("分析 TSLA", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad.log_tool_result("get_ticker_news", result_data='{"count": 5}',
+                            tool_input={"ticker": "TSLA"})
+        pad.log_tool_result("get_price_history", result_data='{"rows": 10}',
+                            tool_input={"ticker": "TSLA"})
+        pad.log_error(
+            error_type="BadRequestError",
+            message="context_length_exceeded",
+            turn=3,
+            tools_used=["get_ticker_news", "get_price_history"],
+        )
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        types = [e["type"] for e in events]
+        assert types == ["init", "tool_result", "tool_result", "error"]
+        assert [e["seq"] for e in events] == [1, 2, 3, 4]
+        # Error event has the tool state at failure
+        assert events[3]["data"]["tools_used"] == ["get_ticker_news", "get_price_history"]
+        assert events[3]["data"]["turn"] == 3
+
+
 class TestScratchpadRepr:
     def test_repr(self, tmp_path):
         pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)

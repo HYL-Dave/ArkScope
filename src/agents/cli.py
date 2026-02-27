@@ -37,6 +37,7 @@ import logging
 import os
 import sys
 import time
+import traceback as _traceback_mod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -651,172 +652,193 @@ def run_anthropic_interactive(
     console.print(f"[dim]{' | '.join(status_parts)}[/dim]")
 
     effective_max_turns = max_tool_calls or config.max_tool_calls
-    for turn in range(effective_max_turns):
-        stream_kwargs = dict(
-            model=model_name,
-            max_tokens=effective_max_tokens,
-            system=cached_system,
-            tools=tools,
-            messages=messages,
-            **api_kwargs,
-        )
+    _current_turn = 0
+    try:
+        for turn in range(effective_max_turns):
+            _current_turn = turn + 1
+            stream_kwargs = dict(
+                model=model_name,
+                max_tokens=effective_max_tokens,
+                system=cached_system,
+                tools=tools,
+                messages=messages,
+                **api_kwargs,
+            )
 
-        with console.status("[cyan]Thinking...", spinner="dots"):
-            if use_beta:
-                stream_ctx = client.beta.messages.stream(
-                    betas=[_EXTENDED_CONTEXT_BETA],
-                    **stream_kwargs,
-                )
-            else:
-                stream_ctx = client.messages.stream(**stream_kwargs)
+            with console.status("[cyan]Thinking...", spinner="dots"):
+                if use_beta:
+                    stream_ctx = client.beta.messages.stream(
+                        betas=[_EXTENDED_CONTEXT_BETA],
+                        **stream_kwargs,
+                    )
+                else:
+                    stream_ctx = client.messages.stream(**stream_kwargs)
 
-            with stream_ctx as stream:
-                response = stream.get_final_message()
+                with stream_ctx as stream:
+                    response = stream.get_final_message()
 
-        tracker.record_anthropic(response, model=model_name)
+            tracker.record_anthropic(response, model=model_name)
 
-        # Display thinking blocks (extended thinking)
-        for block in response.content:
-            if block.type == "thinking":
-                console.print(Panel(
-                    Markdown(block.thinking),
-                    title="[dim]Thinking[/dim]",
-                    border_style="dim",
-                    box=box.ROUNDED,
-                    padding=(0, 1),
-                ))
-
-        # Handle pause_turn (Claude web search mid-turn pause)
-        if response.stop_reason == "pause_turn":
-            messages.append({"role": "assistant", "content": response.content})
-            continue
-
-        # Done - no more tool calls
-        if response.stop_reason != "tool_use":
-            final_text = ""
+            # Display thinking blocks (extended thinking)
             for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
+                if block.type == "thinking":
+                    console.print(Panel(
+                        Markdown(block.thinking),
+                        title="[dim]Thinking[/dim]",
+                        border_style="dim",
+                        box=box.ROUNDED,
+                        padding=(0, 1),
+                    ))
 
-            elapsed = time.time() - _query_start
-            pad.log_final_answer(final_text, tools_used=list(set(tools_used)))
-            pad.close()
+            # Handle pause_turn (Claude web search mid-turn pause)
+            if response.stop_reason == "pause_turn":
+                messages.append({"role": "assistant", "content": response.content})
+                continue
 
-            # Record Q&A pair in chat history (per-session)
-            if chat_history:
-                chat_history.append(
-                    user_message=question,
-                    agent_response=final_text,
-                    provider="anthropic",
-                    model=model_name,
-                    tools_used=list(set(tools_used)),
-                    elapsed_seconds=elapsed,
-                    tickers=sorted(_tickers) if _tickers else None,
-                    tool_calls_detail=_tool_calls_detail or None,
-                    token_usage=tracker.summary() or None,
-                )
+            # Done - no more tool calls
+            if response.stop_reason != "tool_use":
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
 
-            # Update messages for conversation continuity
+                elapsed = time.time() - _query_start
+                pad.log_final_answer(final_text, tools_used=list(set(tools_used)))
+                pad.close()
+
+                # Record Q&A pair in chat history (per-session)
+                if chat_history:
+                    chat_history.append(
+                        user_message=question,
+                        agent_response=final_text,
+                        provider="anthropic",
+                        model=model_name,
+                        tools_used=list(set(tools_used)),
+                        elapsed_seconds=elapsed,
+                        tickers=sorted(_tickers) if _tickers else None,
+                        tool_calls_detail=_tool_calls_detail or None,
+                        token_usage=tracker.summary() or None,
+                    )
+
+                # Update messages for conversation continuity
+                messages.append({"role": "assistant", "content": response.content})
+
+                return {
+                    "answer": final_text,
+                    "tools_used": tools_used,
+                    "messages": messages,
+                    "scratchpad_path": str(pad.filepath) if pad.filepath else None,
+                    "token_usage": tracker.summary(),
+                }
+
+            # Process tool calls
+            tool_use_blocks = [
+                b for b in response.content if b.type == "tool_use"
+            ]
+
+            # Show any text before tool calls
+            for block in response.content:
+                if hasattr(block, "text") and block.text.strip():
+                    console.print(f"[dim italic]{block.text.strip()}[/dim italic]")
+
+            if tool_use_blocks:
+                console.print("[bold]Tools:[/bold]")
+
+            tool_results = []
+            for tool_use in tool_use_blocks:
+                tool_index += 1
+                tool_name = tool_use.name
+                tool_input = tool_use.input
+
+                tools_used.append(tool_name)
+                print_tool_call(tool_name, tool_input, tool_index)
+
+                # Extract tickers from tool params
+                if isinstance(tool_input, dict):
+                    for k in ("ticker", "tickers"):
+                        v = tool_input.get(k)
+                        if isinstance(v, str) and v:
+                            _tickers.add(v.upper())
+                        elif isinstance(v, list):
+                            _tickers.update(t.upper() for t in v if isinstance(t, str))
+
+                # Execute with spinner
+                with console.status("", spinner="dots"):
+                    result = execute_tool(tool_name, tool_input, dal)
+
+                pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
+                print_tool_result_summary(tool_name, result)
+
+                # Collect tool call detail for ChatHistory
+                _tool_calls_detail.append({
+                    "name": tool_name,
+                    "params": _safe_serialize(tool_input) if isinstance(tool_input, dict) else {},
+                    "result_preview": result[:200] if isinstance(result, str) else str(result)[:200],
+                })
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result,
+                })
+
+            # Append to message history
             messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
 
-            return {
-                "answer": final_text,
-                "tools_used": tools_used,
-                "messages": messages,
-                "scratchpad_path": str(pad.filepath) if pad.filepath else None,
-                "token_usage": tracker.summary(),
-            }
+            # L1: Compact old tool results if context is growing too large
+            if ctx.should_compact(tracker):
+                messages, compact_stats = ctx.compact_messages(messages)
+                logger.info(f"CLI context compacted: {compact_stats}")
 
-        # Process tool calls
-        tool_use_blocks = [
-            b for b in response.content if b.type == "tool_use"
-        ]
-
-        # Show any text before tool calls
-        for block in response.content:
-            if hasattr(block, "text") and block.text.strip():
-                console.print(f"[dim italic]{block.text.strip()}[/dim italic]")
-
-        if tool_use_blocks:
-            console.print("[bold]Tools:[/bold]")
-
-        tool_results = []
-        for tool_use in tool_use_blocks:
-            tool_index += 1
-            tool_name = tool_use.name
-            tool_input = tool_use.input
-
-            tools_used.append(tool_name)
-            print_tool_call(tool_name, tool_input, tool_index)
-
-            # Extract tickers from tool params
-            if isinstance(tool_input, dict):
-                for k in ("ticker", "tickers"):
-                    v = tool_input.get(k)
-                    if isinstance(v, str) and v:
-                        _tickers.add(v.upper())
-                    elif isinstance(v, list):
-                        _tickers.update(t.upper() for t in v if isinstance(t, str))
-
-            # Execute with spinner
-            with console.status("", spinner="dots"):
-                result = execute_tool(tool_name, tool_input, dal)
-
-            pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
-            print_tool_result_summary(tool_name, result)
-
-            # Collect tool call detail for ChatHistory
-            _tool_calls_detail.append({
-                "name": tool_name,
-                "params": _safe_serialize(tool_input) if isinstance(tool_input, dict) else {},
-                "result_preview": result[:200] if isinstance(result, str) else str(result)[:200],
-            })
-
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": result,
-            })
-
-        # Append to message history
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-        # L1: Compact old tool results if context is growing too large
-        if ctx.should_compact(tracker):
-            messages, compact_stats = ctx.compact_messages(messages)
-            logger.info(f"CLI context compacted: {compact_stats}")
-
-    partial_text = (
-        f"Reached maximum tool calls ({effective_max_turns}). "
-        f"Used {len(set(tools_used))} unique tools across {tool_index} calls. "
-        "Try /turns to increase the limit, or ask a more focused question."
-    )
-
-    pad.log_max_turns(tools_used=list(set(tools_used)))
-    pad.close()
-
-    # Record Q&A pair in chat history (even for max turns)
-    if chat_history:
-        chat_history.append(
-            user_message=question,
-            agent_response=partial_text,
-            provider="anthropic",
-            model=model_name,
-            tools_used=list(set(tools_used)),
-            elapsed_seconds=time.time() - _query_start,
-            tickers=sorted(_tickers) if _tickers else None,
-            tool_calls_detail=_tool_calls_detail or None,
-            token_usage=tracker.summary() or None,
+        partial_text = (
+            f"Reached maximum tool calls ({effective_max_turns}). "
+            f"Used {len(set(tools_used))} unique tools across {tool_index} calls. "
+            "Try /turns to increase the limit, or ask a more focused question."
         )
 
-    return {
-        "answer": partial_text,
-        "tools_used": tools_used,
-        "messages": messages,
-        "scratchpad_path": str(pad.filepath) if pad.filepath else None,
-        "token_usage": tracker.summary(),
-    }
+        pad.log_max_turns(tools_used=list(set(tools_used)))
+        pad.close()
+
+        # Record Q&A pair in chat history (even for max turns)
+        if chat_history:
+            chat_history.append(
+                user_message=question,
+                agent_response=partial_text,
+                provider="anthropic",
+                model=model_name,
+                tools_used=list(set(tools_used)),
+                elapsed_seconds=time.time() - _query_start,
+                tickers=sorted(_tickers) if _tickers else None,
+                tool_calls_detail=_tool_calls_detail or None,
+                token_usage=tracker.summary() or None,
+            )
+
+        return {
+            "answer": partial_text,
+            "tools_used": tools_used,
+            "messages": messages,
+            "scratchpad_path": str(pad.filepath) if pad.filepath else None,
+            "token_usage": tracker.summary(),
+        }
+
+    except Exception as exc:
+        # Fault tolerance: log error to scratchpad so failures are traceable
+        tb = _traceback_mod.format_exc()
+        logger.error(
+            "Anthropic CLI error on turn %d: %s: %s",
+            _current_turn, type(exc).__name__, exc,
+        )
+        pad.log_error(
+            error_type=type(exc).__name__,
+            message=str(exc),
+            traceback_str=tb,
+            turn=_current_turn,
+            tools_used=list(set(tools_used)),
+            token_usage=tracker.summary(),
+        )
+        pad.close()
+        raise
 
 
 # ============================================================
