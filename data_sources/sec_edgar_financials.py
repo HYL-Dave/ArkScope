@@ -48,14 +48,20 @@ from .sec_edgar_source import SECEdgarDataSource
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday contact@example.com'
+_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday research@example.com'
 
 
 def _get_sec_user_agent() -> str:
-    """Build SEC User-Agent from env var or default (with warning)."""
+    """Build SEC User-Agent from env var or default (with warning).
+
+    Reads at call time (not import time) so config/.env can be loaded first.
+    """
     contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
     if contact:
         return f'MindfulRL-Intraday {contact}'
+    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
+    if legacy:
+        return legacy
     logger.warning(
         "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
         "Set SEC_CONTACT_EMAIL in config/.env"

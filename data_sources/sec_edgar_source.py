@@ -106,10 +106,18 @@ class SECEdgarDataSource(BaseDataSource):
         """
         super().__init__(api_key=None)  # No API key needed
 
-        self.user_agent = user_agent or os.environ.get(
-            'SEC_USER_AGENT',
-            'MindfulRL-Intraday research@example.com'
-        )
+        if user_agent:
+            self.user_agent = user_agent
+        else:
+            # Prefer SEC_CONTACT_EMAIL (new), fallback to SEC_USER_AGENT (legacy)
+            contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
+            if contact:
+                self.user_agent = f'MindfulRL-Intraday {contact}'
+            else:
+                self.user_agent = os.environ.get(
+                    'SEC_USER_AGENT',
+                    'MindfulRL-Intraday research@example.com',
+                )
 
         self._session = requests.Session()
         self._session.headers.update({

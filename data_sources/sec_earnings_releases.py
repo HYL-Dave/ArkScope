@@ -11,6 +11,7 @@ Usage:
 """
 
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,11 +22,25 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-# SEC requires a User-Agent header
-SEC_HEADERS = {
-    'User-Agent': 'MindfulRL-Intraday research@example.com',
-    'Accept': 'application/json, application/xml, text/html',
-}
+_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday research@example.com'
+
+
+def _get_sec_user_agent() -> str:
+    """Build SEC User-Agent from env var or default (with warning).
+
+    Reads at call time (not import time) so config/.env can be loaded first.
+    """
+    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
+    if contact:
+        return f'MindfulRL-Intraday {contact}'
+    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
+    if legacy:
+        return legacy
+    logger.warning(
+        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
+        "SEC may rate-limit or reject requests. Set SEC_CONTACT_EMAIL in config/.env"
+    )
+    return _DEFAULT_SEC_CONTACT
 
 
 @dataclass
@@ -52,7 +67,10 @@ class SECEarningsReleases:
 
     def __init__(self):
         self._session = requests.Session()
-        self._session.headers.update(SEC_HEADERS)
+        self._session.headers.update({
+            'User-Agent': _get_sec_user_agent(),
+            'Accept': 'application/json, application/xml, text/html',
+        })
         self._cik_cache: dict[str, str] = {}
 
     def _get_cik(self, ticker: str) -> Optional[str]:
@@ -274,8 +292,18 @@ def get_earnings_press_releases(ticker: str, limit: int = 5) -> list[dict]:
         >>> releases[0]
         {'ticker': 'COST', 'title': 'Costco Reports First Quarter...', ...}
     """
-    parser = SECEarningsReleases()
-    return parser.get_earnings_press_releases(ticker, limit)
+    return _get_singleton().get_earnings_press_releases(ticker, limit)
+
+
+# Module-level singleton — keeps CIK cache + requests.Session across calls
+_singleton: Optional[SECEarningsReleases] = None
+
+
+def _get_singleton() -> SECEarningsReleases:
+    global _singleton
+    if _singleton is None:
+        _singleton = SECEarningsReleases()
+    return _singleton
 
 
 if __name__ == '__main__':

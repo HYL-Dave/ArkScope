@@ -26,22 +26,21 @@ _DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday research@example.com'
 
 
 def _get_sec_user_agent() -> str:
-    """Build SEC User-Agent from env var or default (with warning)."""
+    """Build SEC User-Agent from env var or default (with warning).
+
+    Reads at call time (not import time) so config/.env can be loaded first.
+    """
     contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
     if contact:
         return f'MindfulRL-Intraday {contact}'
+    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
+    if legacy:
+        return legacy
     logger.warning(
         "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
         "SEC may rate-limit or reject requests. Set SEC_CONTACT_EMAIL in config/.env"
     )
     return _DEFAULT_SEC_CONTACT
-
-
-# SEC requires a User-Agent header
-SEC_HEADERS = {
-    'User-Agent': _get_sec_user_agent(),
-    'Accept': 'application/json, application/xml, text/html',
-}
 
 # Transaction codes mapping
 TRANSACTION_CODES = {
@@ -104,7 +103,10 @@ class SECInsiderTrades:
 
     def __init__(self):
         self._session = requests.Session()
-        self._session.headers.update(SEC_HEADERS)
+        self._session.headers.update({
+            'User-Agent': _get_sec_user_agent(),
+            'Accept': 'application/json, application/xml, text/html',
+        })
         self._cik_cache: dict[str, str] = {}
 
     def _get_cik(self, ticker: str) -> Optional[str]:
