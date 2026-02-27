@@ -29,6 +29,7 @@ import math
 import logging
 from datetime import date, datetime, timedelta
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Union
 from enum import Enum
 
@@ -1176,17 +1177,46 @@ def scan_options_for_mispricing(
 # =============================================================================
 
 _rfr_cache: Dict[str, Tuple[float, datetime]] = {}
+_RFR_PERSIST_PATH = Path(__file__).resolve().parent.parent / "data" / "cache" / "risk_free_rate.json"
+
+
+def _load_persisted_rfr() -> Optional[Tuple[float, str]]:
+    """Load last-known-good rate from disk (rate, iso-timestamp)."""
+    try:
+        if _RFR_PERSIST_PATH.exists():
+            import json
+            data = json.loads(_RFR_PERSIST_PATH.read_text())
+            return float(data["rate"]), data["fetched_at"]
+    except Exception:
+        pass
+    return None
+
+
+def _persist_rfr(rate: float) -> None:
+    """Save rate to disk so offline restarts don't fall back to hardcoded 5%."""
+    try:
+        _RFR_PERSIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+        import json
+        _RFR_PERSIST_PATH.write_text(json.dumps({
+            "rate": rate,
+            "fetched_at": datetime.now().isoformat(),
+        }))
+    except Exception:
+        pass  # best-effort
 
 
 def get_risk_free_rate(fallback: float = 0.05) -> float:
     """
     Get current risk-free rate from 13-week T-bill (^IRX via Yahoo Finance).
 
-    Caches the result for 24 hours.  Falls back to *fallback* if the fetch
-    fails (network error, market holiday, etc.).
+    Resolution order:
+        1. In-memory cache (< 24 h)
+        2. Live fetch from ^IRX via yfinance
+        3. Persisted last-known-good value on disk
+        4. Hardcoded *fallback*
 
     Args:
-        fallback: Default rate if cannot fetch.
+        fallback: Default rate if all sources fail.
 
     Returns:
         Risk-free rate as decimal (e.g. 0.043 for 4.3%).
@@ -1194,12 +1224,13 @@ def get_risk_free_rate(fallback: float = 0.05) -> float:
     cache_key = "irx"
     now = datetime.now()
 
-    # Return cached value if fresh (< 24 h)
+    # 1. In-memory cache
     if cache_key in _rfr_cache:
         cached_rate, cached_at = _rfr_cache[cache_key]
         if (now - cached_at).total_seconds() < 86_400:
             return cached_rate
 
+    # 2. Live fetch
     try:
         import yfinance as yf
         import tempfile
@@ -1211,22 +1242,31 @@ def get_risk_free_rate(fallback: float = 0.05) -> float:
         ticker = yf.Ticker("^IRX")
         hist = ticker.history(period="5d")
 
-        if hist.empty:
-            logger.warning("^IRX history empty, using fallback rate %.2f%%", fallback * 100)
-            return fallback
-
-        # ^IRX quotes the annualised discount rate in percent (e.g. 4.3)
-        latest_close = float(hist["Close"].dropna().iloc[-1])
-        rate = latest_close / 100.0  # convert to decimal
-        _rfr_cache[cache_key] = (rate, now)
-        logger.info("Risk-free rate (13-week T-bill): %.3f%%", rate * 100)
-        return rate
+        if not hist.empty:
+            latest_close = float(hist["Close"].dropna().iloc[-1])
+            rate = latest_close / 100.0  # ^IRX quotes in percent
+            _rfr_cache[cache_key] = (rate, now)
+            _persist_rfr(rate)
+            logger.info("Risk-free rate (13-week T-bill): %.3f%%", rate * 100)
+            return rate
+        else:
+            logger.warning("^IRX history empty")
     except ImportError:
-        logger.warning("yfinance not installed — using fallback rate %.2f%%", fallback * 100)
-        return fallback
+        logger.warning("yfinance not installed")
     except Exception as e:
-        logger.warning("Failed to fetch ^IRX: %s — using fallback %.2f%%", e, fallback * 100)
-        return fallback
+        logger.warning("Failed to fetch ^IRX: %s", e)
+
+    # 3. Persisted last-known-good
+    persisted = _load_persisted_rfr()
+    if persisted:
+        rate, fetched_at = persisted
+        _rfr_cache[cache_key] = (rate, now)  # promote to memory cache
+        logger.info("Using persisted risk-free rate %.3f%% (from %s)", rate * 100, fetched_at)
+        return rate
+
+    # 4. Hardcoded fallback
+    logger.warning("No rate source available — using fallback %.2f%%", fallback * 100)
+    return fallback
 
 
 def calculate_days_to_expiry(expiry_str: str) -> int:

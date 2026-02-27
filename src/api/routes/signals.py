@@ -1,6 +1,9 @@
 """Signal detection routes."""
 
-from fastapi import APIRouter, Depends, Query
+import re
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
 from src.api.dependencies import get_dal
@@ -13,6 +16,21 @@ from src.tools.signal_tools import (
 
 router = APIRouter(prefix="/signals", tags=["signals"])
 
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _validate_as_of_date(raw: Optional[str]) -> Optional[str]:
+    """Validate YYYY-MM-DD format and that it parses to a real date."""
+    if raw is None:
+        return None
+    if not _DATE_RE.match(raw):
+        raise HTTPException(422, f"as_of_date must be YYYY-MM-DD, got: {raw!r}")
+    try:
+        date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPException(422, f"as_of_date is not a valid date: {raw!r}")
+    return raw
+
 
 @router.get("/{ticker}")
 def signal_for_ticker(
@@ -24,7 +42,8 @@ def signal_for_ticker(
 ):
     """Synthesize a multi-factor trading signal for a ticker."""
     result = synthesize_signal(
-        dal, ticker=ticker, days=days, strategy=strategy, as_of_date=as_of_date,
+        dal, ticker=ticker, days=days, strategy=strategy,
+        as_of_date=_validate_as_of_date(as_of_date),
     )
     return result.model_dump()
 
@@ -37,7 +56,9 @@ def anomalies_for_ticker(
     dal: DataAccessLayer = Depends(get_dal),
 ):
     """Detect sentiment and volume anomalies for a ticker."""
-    return detect_anomalies(dal, ticker=ticker, days=days, as_of_date=as_of_date)
+    return detect_anomalies(
+        dal, ticker=ticker, days=days, as_of_date=_validate_as_of_date(as_of_date),
+    )
 
 
 @router.get("/{ticker}/event-chains")
