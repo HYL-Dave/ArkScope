@@ -38,6 +38,7 @@ Convenience functions:
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -46,6 +47,20 @@ import pandas as pd
 from .sec_edgar_source import SECEdgarDataSource
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday contact@example.com'
+
+
+def _get_sec_user_agent() -> str:
+    """Build SEC User-Agent from env var or default (with warning)."""
+    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
+    if contact:
+        return f'MindfulRL-Intraday {contact}'
+    logger.warning(
+        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
+        "Set SEC_CONTACT_EMAIL in config/.env"
+    )
+    return _DEFAULT_SEC_CONTACT
 
 
 @dataclass
@@ -910,7 +925,7 @@ class SECEdgarFinancials:
         import requests
         
         headers = {
-            'User-Agent': 'MindfulRL-Intraday contact@example.com',
+            'User-Agent': _get_sec_user_agent(),
             'Accept': 'application/json'
         }
         

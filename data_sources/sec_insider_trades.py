@@ -11,6 +11,7 @@ Usage:
 """
 
 import logging
+import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,9 +22,24 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday research@example.com'
+
+
+def _get_sec_user_agent() -> str:
+    """Build SEC User-Agent from env var or default (with warning)."""
+    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
+    if contact:
+        return f'MindfulRL-Intraday {contact}'
+    logger.warning(
+        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
+        "SEC may rate-limit or reject requests. Set SEC_CONTACT_EMAIL in config/.env"
+    )
+    return _DEFAULT_SEC_CONTACT
+
+
 # SEC requires a User-Agent header
 SEC_HEADERS = {
-    'User-Agent': 'MindfulRL-Intraday research@example.com',
+    'User-Agent': _get_sec_user_agent(),
     'Accept': 'application/json, application/xml, text/html',
 }
 
@@ -349,8 +365,18 @@ def get_insider_trades(ticker: str, limit: int = 10) -> list[dict]:
         >>> trades[0]
         {'ticker': 'AAPL', 'name': 'Chris Kondo', 'transaction_shares': -3752, ...}
     """
-    parser = SECInsiderTrades()
-    return parser.get_insider_trades(ticker, limit)
+    return _get_singleton().get_insider_trades(ticker, limit)
+
+
+# Module-level singleton — keeps CIK cache + requests.Session across calls
+_singleton: Optional[SECInsiderTrades] = None
+
+
+def _get_singleton() -> SECInsiderTrades:
+    global _singleton
+    if _singleton is None:
+        _singleton = SECInsiderTrades()
+    return _singleton
 
 
 if __name__ == '__main__':

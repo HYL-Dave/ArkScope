@@ -590,7 +590,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             code=code, task=task, data_json=data_json,
             timeout=timeout, background=background,
         )
-        return _serialize_result(result, "execute_python_code")
+        return _serialize_result(result, "execute_python_analysis")
 
     # ================================================================
     # Subagent Delegation
@@ -602,10 +602,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         task: str,
         context_json: str = "",
     ) -> str:
-        """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results.
+        """Delegate a subtask to a specialized subagent. Each subagent has its own model, system prompt, and tool subset. Returns structured JSON results. For single calculations with data you already have, use execute_python_analysis directly instead.
 
         Available subagents:
-        - code_analyst: Quantitative Python analysis (Sharpe, correlations, anomaly detection, autonomous analysis design)
+        - code_analyst: Multi-step quantitative research — fetches data AND computes (anomaly detection, custom models)
         - deep_researcher: Thorough multi-source investigation (news, prices, fundamentals, options, signals)
         - data_summarizer: Fast bulk data retrieval and concise summarization
         - reviewer: Critical analysis review — finds logical flaws, overlooked risks, confidence adjustment

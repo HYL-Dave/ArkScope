@@ -683,9 +683,11 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "description": (
                 "Delegate a subtask to a specialized subagent. Each subagent has its own "
                 "model, system prompt, and tool subset. Returns structured JSON results. "
-                "Use for complex calculations (code_analyst), deep investigation "
+                "Use for multi-step research+compute (code_analyst), deep investigation "
                 "(deep_researcher), fast summarization (data_summarizer), or "
-                "adversarial review of conclusions (reviewer)."
+                "adversarial review of conclusions (reviewer). "
+                "For single calculations with data you already have, use "
+                "execute_python_analysis directly instead."
             ),
             "input_schema": {
                 "type": "object",
