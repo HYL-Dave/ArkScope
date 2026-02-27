@@ -38,3 +38,6 @@ pymupdf>=1.24.0
 
 # Discord Bot (Phase E) — Monitor notifications + Gateway
 discord.py>=2.6.0
+
+# Option pricing — dynamic risk-free rate via ^IRX
+yfinance>=0.2.0

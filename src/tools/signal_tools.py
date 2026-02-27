@@ -101,7 +101,13 @@ def detect_anomalies(
         }
 
     detector = AnomalyDetector()
-    anchor = as_of_date or str(df["date"].max())
+    # Use ticker-specific max date to avoid NO_DATA_FOR_DATE for tickers
+    # with different news update schedules.
+    ticker_df = df[df["ticker"].str.upper() == ticker.upper()]
+    anchor = as_of_date or (
+        str(ticker_df["date"].max()) if not ticker_df.empty
+        else str(df["date"].max())
+    )
 
     # Sentiment anomaly
     try:
@@ -258,7 +264,14 @@ def synthesize_signal(
     df = _prepare_news_df_for_signals(dal, ticker=None, days=days)
 
     signals_input: Dict = {}
-    anchor = as_of_date or (str(df["date"].max()) if not df.empty else date.today().isoformat())
+    # Use ticker-specific max date as anchor
+    if as_of_date:
+        anchor = as_of_date
+    elif not df.empty:
+        ticker_df = df[df["ticker"].str.upper() == ticker.upper()]
+        anchor = str(ticker_df["date"].max()) if not ticker_df.empty else str(df["date"].max())
+    else:
+        anchor = date.today().isoformat()
 
     # 1. Sector momentum
     try:

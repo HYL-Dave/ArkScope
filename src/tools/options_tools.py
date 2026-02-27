@@ -148,8 +148,9 @@ def scan_mispricing(
     Returns:
         List of MispricingResult for options exceeding the threshold
     """
-    from analysis import scan_options_for_mispricing
+    from analysis import scan_options_for_mispricing, get_risk_free_rate
 
+    rfr = get_risk_free_rate()
     results: List[MispricingResult] = []
 
     for ticker in tickers:
@@ -183,6 +184,7 @@ def scan_mispricing(
                 quotes=quotes,
                 spot_price=spot,
                 historical_vol=hv,
+                risk_free_rate=rfr,
                 mispricing_threshold_pct=mispricing_threshold_pct,
                 min_confidence=min_confidence,
             )
