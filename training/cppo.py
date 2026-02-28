@@ -4,11 +4,10 @@ CPPO (CVaR-constrained PPO) — extracted from train_cppo_llm_risk.py.
 Based on SpinningUp PPO with CVaR risk constraints and LLM risk score
 integration for risk-sensitive stock trading.
 
-Known upstream bug (preserved for baseline compatibility):
-    CPPOBuffer.finish_path() applies valupdate_buf subtraction to the entire
-    adv_buf instead of just the current path_slice. This causes cumulative
-    double-deduction on previously finished trajectories. Will be fixed in
-    a separate commit.
+Upstream bug fixed: CPPOBuffer.finish_path() now applies valupdate_buf
+subtraction only to the current path_slice (was incorrectly applied to
+the entire buffer, causing cumulative double-deduction on previously
+finished trajectories).
 """
 
 import numpy as np
@@ -73,10 +72,10 @@ class CPPOBuffer:
         deltas = rews[:-1] + self.gamma * vals[1:] - vals[:-1]
         self.adv_buf[path_slice] = core.discount_cumsum(deltas, self.gamma * self.lam)
 
-        # UPSTREAM BUG: subtracts valupdate from entire buffer, not just path_slice.
-        # This double-deducts on previously finished trajectories within the epoch.
-        # Preserved for baseline compatibility; fix tracked separately.
-        self.adv_buf = self.adv_buf - self.valupdate_buf
+        # Apply CVaR valupdate adjustment to current path only.
+        # (Upstream bug: was `self.adv_buf = self.adv_buf - self.valupdate_buf`
+        # which double-deducted on previously finished trajectories.)
+        self.adv_buf[path_slice] = self.adv_buf[path_slice] - self.valupdate_buf[path_slice]
 
         # rewards-to-go, targets for value function
         self.ret_buf[path_slice] = core.discount_cumsum(rews, self.gamma)[:-1]
