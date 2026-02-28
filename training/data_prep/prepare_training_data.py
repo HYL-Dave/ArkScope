@@ -217,7 +217,13 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
     # Round to nearest integer (scores are 1-5)
     daily[target_col] = daily[target_col].round().astype(int)
 
-    print(f"  Polygon: {len(scores)} articles → {len(daily)} daily ticker-scores")
+    n_tickers = daily["tic"].nunique()
+    n_dates = daily["Date"].nunique()
+    print(f"  Polygon: {len(scores)} articles → {len(daily)} daily ticker-scores "
+          f"({n_tickers} tickers, {n_dates} dates)")
+    if n_tickers < 10 or n_dates < 30:
+        print(f"  ⚠ Low coverage: only {n_tickers} tickers / {n_dates} dates. "
+              f"Scoring may still be in progress.")
     return daily[["Date", "tic", target_col]]
 
 
