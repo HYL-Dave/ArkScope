@@ -47,7 +47,7 @@ workon FinRL
 python -c "import torch; print(torch.__version__)"
 
 # 2. 安裝訓練核心依賴
-pip install gymnasium stable-baselines3 mpi4py scipy datasets matplotlib
+pip install gymnasium stable-baselines3 mpi4py scipy datasets matplotlib yfinance stockstats
 
 # 3. 安裝 SpinningUp（需要特殊處理，見下文）
 ```

@@ -25,7 +25,7 @@ class YahooDownloader:
         self.end_date = end_date
         self.ticker_list = ticker_list
 
-    def fetch_data(self, proxy=None, auto_adjust: bool = False) -> pd.DataFrame:
+    def fetch_data(self, auto_adjust: bool = True) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
         failures = 0
 
@@ -34,8 +34,8 @@ class YahooDownloader:
                 tic,
                 start=self.start_date,
                 end=self.end_date,
-                proxy=proxy,
                 auto_adjust=auto_adjust,
+                progress=False,
             )
             if temp.columns.nlevels != 1:
                 temp.columns = temp.columns.droplevel(1)
@@ -62,6 +62,7 @@ class YahooDownloader:
             inplace=True,
         )
 
+        # When auto_adjust=False, manually adjust using Adj Close
         if not auto_adjust and "adjcp" in data.columns:
             adj = data["adjcp"] / data["close"]
             for col in ("open", "high", "low", "close"):
