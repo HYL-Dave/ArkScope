@@ -44,7 +44,7 @@ class StockTradingEnv(gym.Env):
         print_verbosity=10,
         day=0,
         initial=True,
-        previous_state=[],
+        previous_state=None,
         model_name="",
         mode="",
         iteration="",

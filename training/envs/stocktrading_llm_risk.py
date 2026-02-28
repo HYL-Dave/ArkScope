@@ -45,7 +45,7 @@ class StockTradingEnv(gym.Env):
         print_verbosity=10,
         day=0,
         initial=True,
-        previous_state=[],
+        previous_state=None,
         model_name="",
         mode="",
         iteration="",
@@ -327,6 +327,7 @@ class StockTradingEnv(gym.Env):
             # Reduce mismatched actions (sentiment disagrees with trade direction)
             actions[(strong_sell_mask & buy_mask) | (strong_buy_mask & sell_mask)] *= self._scale["strong_mismatch"]
             actions[(moderate_sell_mask & buy_mask) | (moderate_buy_mask & sell_mask)] *= self._scale["moderate_mismatch"]
+            actions[hold_mask] *= self._scale["hold_dampen"]
 
             # Amplify matched actions (sentiment agrees with trade direction)
             actions[(strong_sell_mask & sell_mask) | (strong_buy_mask & buy_mask)] *= self._scale["strong_match"]

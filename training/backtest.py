@@ -26,6 +26,8 @@ def main():
         help="Environment type: baseline, sentiment, or risk"
     )
     parser.add_argument("--output-plot", default="equity_curve.png", help="Path to save equity curve plot")
+    parser.add_argument("--hid", type=int, default=512, help="Hidden layer size (must match training)")
+    parser.add_argument("--l", type=int, default=2, help="Number of hidden layers (must match training)")
     parser.add_argument(
         "--sentiment-scale", type=str, default="strong",
         choices=["strong", "weak"],
@@ -35,22 +37,22 @@ def main():
 
     # Load dataset
     df = pd.read_csv(args.data)
-    # Determine symbol column
-    symbol_col = "tic" if "tic" in df.columns else "symbol"
-    stock_dim = int(df[symbol_col].nunique())
+    # Normalize symbol column to 'tic' (env expects df.tic)
+    if "tic" not in df.columns and "symbol" in df.columns:
+        df = df.rename(columns={"symbol": "tic"})
+    stock_dim = int(df["tic"].nunique())
 
     # Select environment and compute state_dim
-    # Base: 1 (cash) + 2*stock_dim (price + shares) + (1 + n_indicators)*stock_dim (OHLCV + tech)
-    base_dim = 1 + 2*stock_dim + (1 + len(INDICATORS))*stock_dim
-    if args.env == "baseline":
+    # stocktrading_llm state:      cash + close*N + shares*N + indicators*N + sentiment*N
+    # stocktrading_llm_risk state: cash + close*N + shares*N + indicators*N + sentiment*N + risk*N
+    n_ind = len(INDICATORS)
+    if args.env in ("baseline", "sentiment"):
         from training.envs.stocktrading_llm import StockTradingEnv
-        state_dim = base_dim
-    elif args.env == "sentiment":
-        from training.envs.stocktrading_llm import StockTradingEnv
-        state_dim = base_dim + stock_dim  # + llm_sentiment per stock
+        # Both baseline and sentiment use the same env (always includes sentiment in state)
+        state_dim = 1 + 2*stock_dim + (1 + n_ind)*stock_dim
     else:
         from training.envs.stocktrading_llm_risk import StockTradingEnv
-        state_dim = base_dim + 2*stock_dim  # + llm_sentiment + llm_risk per stock
+        state_dim = 1 + 2*stock_dim + (2 + n_ind)*stock_dim
 
     env = StockTradingEnv(
         df=df, stock_dim=stock_dim,
@@ -65,7 +67,7 @@ def main():
     )
 
     # Load trained agent
-    ac = MLPActorCritic(env.observation_space, env.action_space, hidden_sizes=[256,128])
+    ac = MLPActorCritic(env.observation_space, env.action_space, hidden_sizes=[args.hid]*args.l)
     ac.load_state_dict(torch.load(args.model))
     ac.eval()
 
