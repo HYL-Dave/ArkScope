@@ -150,9 +150,15 @@ python -m training.data_prep.prepare_training_data --source gpt5 --model high --
 # HuggingFace DeepSeek sentiment + risk → CPPO
 python -m training.data_prep.prepare_training_data --source huggingface --score-type both
 
-# Polygon 現代資料（sentiment only → PPO; --score-type both → CPPO）
+# Polygon 現代資料 sentiment only → PPO
 python -m training.data_prep.prepare_training_data \
   --source polygon \
+  --train-start 2022-06-01 --train-end 2024-12-31 \
+  --trade-start 2025-01-01 --trade-end 2026-02-28
+
+# Polygon 現代資料 sentiment + risk → CPPO
+python -m training.data_prep.prepare_training_data \
+  --source polygon --score-type both \
   --train-start 2022-06-01 --train-end 2024-12-31 \
   --trade-start 2025-01-01 --trade-end 2026-02-28
 ```
