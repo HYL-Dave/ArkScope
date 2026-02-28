@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from training.config import INDICATORS
-from training.train_ppo_llm import MLPActorCritic
+from training.models import MLPActorCritic
 
 def main():
     parser = argparse.ArgumentParser(
@@ -33,16 +33,19 @@ def main():
     # Determine symbol column
     symbol_col = "tic" if "tic" in df.columns else "symbol"
     stock_dim = int(df[symbol_col].nunique())
-    state_dim = 1 + 2*stock_dim + (1 + len(INDICATORS))*stock_dim
 
-    # Select environment
+    # Select environment and compute state_dim
+    # Base: 1 (cash) + 2*stock_dim (price + shares) + (1 + n_indicators)*stock_dim (OHLCV + tech)
+    base_dim = 1 + 2*stock_dim + (1 + len(INDICATORS))*stock_dim
     if args.env == "baseline":
-        # Baseline uses sentiment env without LLM signal columns
         from training.envs.stocktrading_llm import StockTradingEnv
+        state_dim = base_dim
     elif args.env == "sentiment":
         from training.envs.stocktrading_llm import StockTradingEnv
+        state_dim = base_dim + stock_dim  # + llm_sentiment per stock
     else:
         from training.envs.stocktrading_llm_risk import StockTradingEnv
+        state_dim = base_dim + 2*stock_dim  # + llm_sentiment + llm_risk per stock
 
     env = StockTradingEnv(
         df=df, stock_dim=stock_dim,
@@ -66,7 +69,8 @@ def main():
     equity = [env.asset_memory[0]]
     while not done:
         action = ac.act(torch.tensor(obs, dtype=torch.float32))
-        obs, reward, done, _ = env.step(action)
+        obs, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
         equity.append(env.asset_memory[-1])
 
     # Performance metrics
