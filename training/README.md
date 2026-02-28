@@ -127,46 +127,154 @@ print('All training deps OK')
 "
 ```
 
-## 資料準備
+## 完整使用流程
 
-訓練前需先準備包含 LLM 評分 + 技術指標的 CSV。
-詳細格式規格見 [data_prep/README.md](data_prep/README.md)。
+以下是從原始新聞到回測結果的 end-to-end 流程。
 
-### 使用 `prepare_training_data.py`
+```
+┌─────────────────────────────────────────────────────┐
+│  Step 0: 新聞評分（上游，可選）                        │
+│  score_ibkr_news.py --mode sentiment/risk            │
+│  → Parquet 檔加入 sentiment_*/risk_* 欄位             │
+└──────────────────────┬──────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────┐
+│  Step 1: 資料準備                                     │
+│  prepare_training_data.py --source X --score-type Y  │
+│  → output/train_*.csv + trade_*.csv                  │
+└──────────────────────┬──────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────┐
+│  Step 2: 訓練                                        │
+│  train_ppo_llm.py --data train_*.csv (sentiment)     │
+│  train_cppo_llm_risk.py --data train_*.csv (+ risk)  │
+│  → trained_models/agent_*.pth                        │
+└──────────────────────┬──────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────┐
+│  Step 3: 回測                                        │
+│  backtest.py --data trade_*.csv --model agent_*.pth  │
+│  → equity_curve.png + 績效指標                        │
+└─────────────────────────────────────────────────────┘
+```
+
+### 範例 A: Claude Opus → PPO（最快上手）
 
 ```bash
 cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
 workon FinRL
 
-# Claude Opus 情緒 only → PPO
+# 1. 準備資料（sentiment only）
 python -m training.data_prep.prepare_training_data --source claude --model opus
 
-# Claude Opus 情緒 + 風險 → CPPO
-python -m training.data_prep.prepare_training_data --source claude --model opus --score-type both
+# 2. 訓練（快速測試 3 epochs）
+python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_claude_opus.csv \
+  --epochs 3 --seed 42
 
-# GPT-5 high effort 情緒 + 風險 → CPPO
-python -m training.data_prep.prepare_training_data --source gpt5 --model high --score-type both
+# 3. 回測
+python training/backtest.py \
+  --data training/data_prep/output/trade_claude_opus.csv \
+  --model trained_models/agent_ppo_claude_opus_3ep_s42.pth \
+  --env sentiment
+```
 
-# HuggingFace DeepSeek sentiment + risk → CPPO
-python -m training.data_prep.prepare_training_data --source huggingface --score-type both
+### 範例 B: Claude Opus → CPPO（sentiment + risk）
 
-# Polygon 現代資料 sentiment only → PPO
+```bash
+# 1. 準備資料（sentiment + risk）
+python -m training.data_prep.prepare_training_data \
+  --source claude --model opus --score-type both
+
+# 2. 訓練 CPPO
+python training/train_cppo_llm_risk.py \
+  --data training/data_prep/output/train_claude_opus_both.csv \
+  --epochs 3 --seed 42
+
+# 3. 回測
+python training/backtest.py \
+  --data training/data_prep/output/trade_claude_opus_both.csv \
+  --model trained_models/agent_cppo_claude_opus_both_3ep_s42.pth \
+  --env risk
+```
+
+### 範例 C: Polygon 現代資料 → PPO
+
+```bash
+# 1. 準備資料（自訂日期範圍）
 python -m training.data_prep.prepare_training_data \
   --source polygon \
   --train-start 2022-06-01 --train-end 2024-12-31 \
   --trade-start 2025-01-01 --trade-end 2026-02-28
 
-# Polygon 現代資料 sentiment + risk → CPPO
+# 2. 訓練
+python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_polygon_gpt52xhigh.csv \
+  --epochs 100
+
+# 3. 回測
+python training/backtest.py \
+  --data training/data_prep/output/trade_polygon_gpt52xhigh.csv \
+  --model trained_models/agent_ppo_polygon_gpt52xhigh_100ep_s42.pth \
+  --env sentiment
+```
+
+### 範例 D: Polygon → CPPO（需先完成 risk 評分）
+
+```bash
+# 0. 評分（如尚未完成 risk）
+python scripts/scoring/score_ibkr_news.py \
+  --mode risk --model gpt-5.2 --reasoning-effort xhigh \
+  --daily-token-limit 1000000 --save-every 10 \
+  --data-dir data/news/raw/polygon
+
+# 1. 準備資料
 python -m training.data_prep.prepare_training_data \
   --source polygon --score-type both \
   --train-start 2022-06-01 --train-end 2024-12-31 \
   --trade-start 2025-01-01 --trade-end 2026-02-28
+
+# 2. 訓練 CPPO
+python training/train_cppo_llm_risk.py \
+  --data training/data_prep/output/train_polygon_gpt52xhigh_both.csv \
+  --epochs 100
+
+# 3. 回測
+python training/backtest.py \
+  --data training/data_prep/output/trade_polygon_gpt52xhigh_both.csv \
+  --model trained_models/agent_cppo_polygon_gpt52xhigh_both_100ep_s0.pth \
+  --env risk
 ```
 
-產出檔案在 `training/data_prep/output/`，例如：
-- `train_claude_opus.csv` / `trade_claude_opus.csv`（sentiment only → PPO）
-- `train_claude_opus_both.csv` / `trade_claude_opus_both.csv`（sentiment + risk → CPPO）
-- `train_gpt5_high.csv` / `trade_gpt5_high.csv`
+### 範例 E: MPI 分散式正式訓練
+
+```bash
+# PPO 8 核心
+mpirun -np 8 python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_claude_opus.csv \
+  --epochs 100
+
+# CPPO 4 核心（root 需額外環境變數）
+OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+  mpirun -np 4 python training/train_cppo_llm_risk.py \
+  --data training/data_prep/output/train_claude_opus_both.csv \
+  --epochs 100
+```
+
+---
+
+## 參考：資料準備
+
+詳細格式規格見 [data_prep/README.md](data_prep/README.md)。
+
+### 資料來源
+
+| 來源 | `--source` | sentiment | risk | 日期範圍 |
+|------|-----------|-----------|------|----------|
+| HuggingFace DeepSeek | `huggingface` | `sentiment_deepseek` | `risk_deepseek` | 2009-2024 |
+| Claude（Opus/Sonnet/Haiku） | `claude` | `sentiment_opus` 等 | `risk_opus` 等 | 同上 |
+| GPT-5（high/medium/low/minimal） | `gpt5` | `sentiment_gpt_5` | `risk_gpt_5` | 同上 |
+| Polygon API | `polygon` | `sentiment_gpt_5_2_xhigh` | `risk_gpt_5_2_xhigh` | 2022-2026 |
 
 ### data_prep 參數
 
@@ -174,48 +282,17 @@ python -m training.data_prep.prepare_training_data \
 |------|------|------|
 | `--source` | **必填** | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
 | `--model` | 依 source | 模型/effort 選擇（claude: opus/sonnet/haiku, gpt5: high/medium/low/minimal） |
-| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（所有來源皆支援） |
+| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（Polygon risk 需先評分） |
 | `--train-start` | `2013-01-01` | 訓練集起始日 |
 | `--train-end` | `2018-12-31` | 訓練集結束日 |
 | `--trade-start` | `2019-01-01` | 回測集起始日 |
 | `--trade-end` | `2023-12-31` | 回測集結束日 |
 
-## 訓練指令
+產出檔案在 `training/data_prep/output/`：
+- `train_{tag}.csv` / `trade_{tag}.csv`
+- tag 範例：`claude_opus`, `claude_opus_both`, `gpt5_high`, `polygon_gpt52xhigh`
 
-### PPO 訓練（情緒信號）
-
-```bash
-cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
-workon FinRL
-
-# 單進程快速測試
-python training/train_ppo_llm.py --epochs 3 --seed 42
-
-# MPI 分散式訓練（正式）
-mpirun -np 8 python training/train_ppo_llm.py --epochs 100
-
-# 使用弱情緒縮放
-python training/train_ppo_llm.py --sentiment-scale weak --epochs 100
-
-# 使用本地 CSV（data_prep 產出的資料）
-python training/train_ppo_llm.py --data path/to/prepared_sentiment.csv
-```
-
-### CPPO 訓練（情緒+風險信號）
-
-```bash
-# 如果以 root 執行 MPI，需要額外環境變數
-OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
-  mpirun -np 4 python training/train_cppo_llm_risk.py --epochs 100
-
-# 快速測試
-python training/train_cppo_llm_risk.py --epochs 3 --seed 42
-
-# 使用本地 CSV
-python training/train_cppo_llm_risk.py --data path/to/prepared_risk.csv
-```
-
-### 命令列參數
+## 參考：訓練參數
 
 | 參數 | 預設 | 說明 |
 |------|------|------|
@@ -227,24 +304,31 @@ python training/train_cppo_llm_risk.py --data path/to/prepared_risk.csv
 | `--steps` | 20000 | 每輪步數（僅 PPO） |
 | `--gamma` | 0.995 | 折扣因子（僅 PPO） |
 | `--sentiment-scale` | strong | 情緒縮放: `strong` (±10%) / `weak` (±0.1%) |
-| `--cpu` | 4 | MPI 核心數（目前未被 script 使用） |
 
-## 回測
+模型輸出檔名格式：`agent_{algo}_{data_tag}_{epochs}ep_s{seed}.pth`
+
+## 參考：回測參數
 
 ```bash
 python training/backtest.py \
-  --data trade_data.csv \
-  --model trained_models/agent_ppo_deepseek_100_epochs_20k_steps_01.pth \
+  --data trade_*.csv \
+  --model trained_models/agent_*.pth \
   --env sentiment \
+  --hid 512 --l 2 \
   --sentiment-scale strong
 ```
 
-`--env` 選項：
-- `baseline` — 無 LLM 信號
-- `sentiment` — 情緒信號（使用 `stocktrading_llm.py`）
-- `risk` — 情緒+風險信號（使用 `stocktrading_llm_risk.py`）
+| 參數 | 預設 | 說明 |
+|------|------|------|
+| `--data` | **必填** | 回測資料 CSV（data_prep 的 trade_*.csv） |
+| `--model` | **必填** | 訓練產出的 .pth 模型檔 |
+| `--env` | `sentiment` | 環境類型: `baseline`, `sentiment`, `risk` |
+| `--hid` | 512 | 隱藏層大小（**必須與訓練一致**） |
+| `--l` | 2 | 隱藏層層數（**必須與訓練一致**） |
+| `--sentiment-scale` | `strong` | 情緒縮放（**必須與訓練一致**） |
+| `--output-plot` | `equity_curve.png` | 權益曲線圖輸出路徑 |
 
-`--sentiment-scale` 必須與訓練時使用的一致。
+輸出指標：Final Equity, Information Ratio, CVaR (95%)
 
 ## 回歸驗證（Regression Validation）
 
@@ -304,25 +388,6 @@ CPPO 的風險權重也跟隨：
 | cvar_clip_ratio | 0.05 | CVaR 裁剪比率 |
 | steps_per_epoch | 20000 | 每輪步數 |
 | gamma | 0.995 | 折扣因子 |
-
-## 資料流程
-
-```
-來源 A: HuggingFace (benstaf/nasdaq_2013_2023)
-來源 B: Claude/GPT-5/Polygon 評分 → prepare_training_data.py → CSV
-    ↓                                         ↓
-load_data()                          load_data(--data CSV)
-    ↓                                         ↓
-    └─────────────→ DataFrame ←──────────────┘
-                       ↓
-                 欄位: date, tic, close, 8 指標, llm_sentiment, [llm_risk]
-                       ↓
-              make_env() → StockTradingEnv → DummyVecEnv
-                       ↓
-              ppo() / cppo() — SpinningUp 演算法
-                       ↓
-              torch.save() → trained_models/agent_*.pth
-```
 
 ## 已知問題
 
