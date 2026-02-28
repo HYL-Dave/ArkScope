@@ -5,6 +5,7 @@ Train CPPO (CVaR-constrained PPO) agent with LLM risk-enhanced environment.
 Usage:
     python training/train_cppo_llm_risk.py [options]
     python training/train_cppo_llm_risk.py --epochs 3 --seed 42   # quick test
+    python training/train_cppo_llm_risk.py --data path/to/prepared.csv
 
 For MPI parallel training:
     OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
@@ -24,7 +25,6 @@ import argparse
 
 import pandas as pd
 import torch
-from datasets import load_dataset
 
 from training.config import (
     INDICATORS,
@@ -37,14 +37,28 @@ from training.models import MLPActorCritic
 from training.cppo import cppo
 
 
-def load_data():
-    """Load and prepare training dataset from HuggingFace."""
-    dataset = load_dataset(
-        "benstaf/nasdaq_2013_2023",
-        data_files="train_data_deepseek_risk_2013_2018.csv",
-    )
-    train = pd.DataFrame(dataset['train'])
-    train = train.drop('Unnamed: 0', axis=1)
+def load_data(data_path=None):
+    """Load and prepare training dataset.
+
+    Args:
+        data_path: Local CSV path. If None, downloads from HuggingFace.
+            The CSV must contain at minimum: date, tic, close,
+            8 tech indicators (see config.INDICATORS), llm_sentiment,
+            and llm_risk. See training/data_prep/README.md for the full
+            format spec.
+    """
+    if data_path is not None:
+        train = pd.read_csv(data_path)
+        if 'Unnamed: 0' in train.columns:
+            train = train.drop('Unnamed: 0', axis=1)
+    else:
+        from datasets import load_dataset
+        dataset = load_dataset(
+            "benstaf/nasdaq_2013_2023",
+            data_files="train_data_deepseek_risk_2013_2018.csv",
+        )
+        train = pd.DataFrame(dataset['train'])
+        train = train.drop('Unnamed: 0', axis=1)
 
     # Create a new index based on unique dates
     unique_dates = train['date'].unique()
@@ -101,13 +115,18 @@ def main():
         choices=['strong', 'weak'],
         help='Sentiment scaling preset: strong (±10%%) or weak (±0.1%%)',
     )
+    parser.add_argument(
+        '--data', type=str, default=None,
+        help='Local CSV path (skip HuggingFace download). '
+             'See training/data_prep/README.md for required format.',
+    )
     parser.add_argument('-f', '--file', type=str, help='Kernel connection file')
     parser.add_argument('extra_args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
     check_and_make_directories([TRAINED_MODEL_DIR])
 
-    train = load_data()
+    train = load_data(data_path=args.data)
     env_train, stock_dimension = make_env(train, sentiment_scale=args.sentiment_scale)
 
     from spinup.utils.run_utils import setup_logger_kwargs

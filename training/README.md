@@ -144,6 +144,9 @@ mpirun -np 8 python training/train_ppo_llm.py --epochs 100
 
 # 使用弱情緒縮放
 python training/train_ppo_llm.py --sentiment-scale weak --epochs 100
+
+# 使用本地 CSV（data_prep 產出的資料）
+python training/train_ppo_llm.py --data path/to/prepared_sentiment.csv
 ```
 
 ### CPPO 訓練（情緒+風險信號）
@@ -155,12 +158,16 @@ OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
 
 # 快速測試
 python training/train_cppo_llm_risk.py --epochs 3 --seed 42
+
+# 使用本地 CSV
+python training/train_cppo_llm_risk.py --data path/to/prepared_risk.csv
 ```
 
 ### 命令列參數
 
 | 參數 | 預設 | 說明 |
 |------|------|------|
+| `--data` | None | 本地 CSV 路徑（跳過 HuggingFace 下載） |
 | `--epochs` | 100 | 訓練輪數 |
 | `--seed` / `-s` | 42 (PPO) / 0 (CPPO) | 隨機種子 |
 | `--hid` | 512 | 隱藏層大小 |
