@@ -138,16 +138,19 @@ print('All training deps OK')
 cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
 workon FinRL
 
-# Claude Opus 情緒（預設日期 2013-2023）
+# Claude Opus 情緒 only → PPO
 python -m training.data_prep.prepare_training_data --source claude --model opus
 
-# GPT-5 high effort 情緒
-python -m training.data_prep.prepare_training_data --source gpt5 --model high
+# Claude Opus 情緒 + 風險 → CPPO
+python -m training.data_prep.prepare_training_data --source claude --model opus --score-type both
 
-# HuggingFace DeepSeek sentiment + risk（適用 CPPO）
+# GPT-5 high effort 情緒 + 風險 → CPPO
+python -m training.data_prep.prepare_training_data --source gpt5 --model high --score-type both
+
+# HuggingFace DeepSeek sentiment + risk → CPPO
 python -m training.data_prep.prepare_training_data --source huggingface --score-type both
 
-# Polygon 現代資料（自訂日期範圍）
+# Polygon 現代資料（僅 sentiment → PPO）
 python -m training.data_prep.prepare_training_data \
   --source polygon \
   --train-start 2022-06-01 --train-end 2024-12-31 \
@@ -155,7 +158,8 @@ python -m training.data_prep.prepare_training_data \
 ```
 
 產出檔案在 `training/data_prep/output/`，例如：
-- `train_claude_opus.csv` / `trade_claude_opus.csv`
+- `train_claude_opus.csv` / `trade_claude_opus.csv`（sentiment only → PPO）
+- `train_claude_opus_both.csv` / `trade_claude_opus_both.csv`（sentiment + risk → CPPO）
 - `train_gpt5_high.csv` / `trade_gpt5_high.csv`
 
 ### data_prep 參數
@@ -164,7 +168,7 @@ python -m training.data_prep.prepare_training_data \
 |------|------|------|
 | `--source` | **必填** | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
 | `--model` | 依 source | 模型/effort 選擇（claude: opus/sonnet/haiku, gpt5: high/medium/low/minimal） |
-| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（僅 HuggingFace 支援 risk） |
+| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（Polygon 僅支援 sentiment） |
 | `--train-start` | `2013-01-01` | 訓練集起始日 |
 | `--train-end` | `2018-12-31` | 訓練集結束日 |
 | `--trade-start` | `2019-01-01` | 回測集起始日 |

@@ -105,34 +105,37 @@ CPPO (stocktrading_llm_risk.py):
 
 ### 來源 2: Claude 模型（Opus/Sonnet/Haiku）
 
-- **路徑**: `/mnt/md0/finrl/claude/sentiment/`
-- **評分檔案**:
-  - `sentiment_opus_by_gpt5_summary.csv` (sentiment_opus)
-  - `sentiment_sonnet_by_gpt5_summary.csv` (sentiment_sonnet)
-  - `sentiment_haiku_by_gpt5_summary.csv` (sentiment_haiku)
-- **評分欄位**: `sentiment_opus` / `sentiment_sonnet` / `sentiment_haiku`
+- **路徑**: `/mnt/md0/finrl/claude/`
+- **情緒檔案** (`sentiment/`):
+  - `sentiment_opus_by_gpt5_summary.csv` (`sentiment_opus`)
+  - `sentiment_sonnet_by_gpt5_summary.csv` (`sentiment_sonnet`)
+  - `sentiment_haiku_by_gpt5_summary.csv` (`sentiment_haiku`)
+- **風險檔案** (`risk/`):
+  - `risk_opus_by_gpt5_summary.csv` (`risk_opus`)
+  - `risk_sonnet_by_gpt5_summary.csv` (`risk_sonnet`)
+  - `risk_haiku_by_gpt5_summary.csv` (`risk_haiku`)
 - **日期範圍**: 同 HuggingFace（同批文章重新評分）
 - **品質**: 比 DeepSeek 平衡（中性 30.6% vs 66.3%），但 38.7% 未評分
 - **欄位格式**: 與 HuggingFace 相同（`Date`, `Stock_symbol`, ...）
 - **價格來源**: 需 yfinance 下載（與來源 1 共用）
-- **僅有情緒分數** — 無 risk 評分，只能用於 PPO
-- **腳本**: `prepare_training_data.py --source claude --model opus`
+- **腳本**:
+  - PPO: `prepare_training_data.py --source claude --model opus`
+  - CPPO: `prepare_training_data.py --source claude --model opus --score-type both`
 
 ### 來源 3: GPT-5（多 effort 等級）
 
-- **路徑**: `/mnt/md0/finrl/gpt-5/sentiment/`
-- **評分檔案**:
-  - `sentiment_gpt-5_high_by_o3_summary.csv`
-  - `sentiment_gpt-5_medium_by_o3_summary.csv`
-  - `sentiment_gpt-5_low_by_o3_summary.csv`
-  - `sentiment_gpt-5_minimal_by_o3_summary.csv`
-- **評分欄位**: `sentiment_gpt_5`
+- **路徑**: `/mnt/md0/finrl/gpt-5/`
+- **情緒檔案** (`sentiment/`):
+  - `sentiment_gpt-5_{high,medium,low,minimal}_by_o3_summary.csv` (`sentiment_gpt_5`)
+- **風險檔案** (`risk/`):
+  - `risk_gpt-5_{high,medium,low,minimal}_by_o3_summary.csv` (`risk_gpt_5`)
 - **日期範圍**: 同 HuggingFace
 - **品質**: 與 Claude 相近（中性 33%），38.7% 未評分
 - **欄位格式**: 與 HuggingFace 相同
 - **價格來源**: 需 yfinance 下載（與來源 1 共用）
-- **僅有情緒分數** — 無 risk 評分，只能用於 PPO
-- **腳本**: `prepare_training_data.py --source gpt5 --model high`
+- **腳本**:
+  - PPO: `prepare_training_data.py --source gpt5 --model high`
+  - CPPO: `prepare_training_data.py --source gpt5 --model high --score-type both`
 
 ### 來源 4: Polygon API（現代資料）
 
@@ -178,13 +181,11 @@ Step 5: 分割 Train / Trade
 | 來源 | 日期欄位 | 股票欄位 | 情緒欄位 | 風險欄位 |
 |------|----------|----------|----------|----------|
 | HuggingFace | `Date` | `Stock_symbol` | `sentiment_deepseek` | `risk_deepseek` |
-| Claude | `Date` | `Stock_symbol` | `sentiment_opus` 等 | 無 |
-| GPT-5 | `Date` | `Stock_symbol` | `sentiment_gpt_5` | 無 |
+| Claude | `Date` | `Stock_symbol` | `sentiment_opus` 等 | `risk_opus` 等 |
+| GPT-5 | `Date` | `Stock_symbol` | `sentiment_gpt_5` | `risk_gpt_5` |
 | Polygon | `published_at` | `ticker` | `sentiment_gpt_5_2_xhigh` | 無 |
 
 所有來源最終都要 rename 為 `llm_sentiment`（和 `llm_risk`）才能被訓練環境使用。
-
----
 
 ---
 
@@ -253,26 +254,33 @@ data/prices/
 5. 輸出 CSV（格式符合訓練資料合約）
 
 ```bash
-# Claude Opus 情緒
+# Claude Opus 情緒 only → PPO
 python -m training.data_prep.prepare_training_data \
   --source claude --model opus
 
-# GPT-5 high effort
+# Claude Opus 情緒 + 風險 → CPPO
 python -m training.data_prep.prepare_training_data \
-  --source gpt5 --model high
+  --source claude --model opus --score-type both
 
-# HuggingFace DeepSeek (sentiment + risk, for CPPO)
+# GPT-5 high effort 情緒 + 風險 → CPPO
+python -m training.data_prep.prepare_training_data \
+  --source gpt5 --model high --score-type both
+
+# HuggingFace DeepSeek (sentiment + risk → CPPO)
 python -m training.data_prep.prepare_training_data \
   --source huggingface --score-type both
 
-# Polygon 現代資料（自訂日期範圍）
+# Polygon 現代資料（僅 sentiment → PPO）
 python -m training.data_prep.prepare_training_data \
   --source polygon \
   --train-start 2022-06-01 --train-end 2024-12-31 \
   --trade-start 2025-01-01 --trade-end 2026-02-28
 
-# 訓練
+# 訓練 PPO
 python training/train_ppo_llm.py --data training/data_prep/output/train_claude_opus.csv
+
+# 訓練 CPPO
+python training/train_cppo_llm_risk.py --data training/data_prep/output/train_claude_opus_both.csv
 ```
 
 輸出目錄：`training/data_prep/output/`

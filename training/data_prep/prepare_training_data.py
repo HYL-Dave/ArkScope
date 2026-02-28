@@ -13,9 +13,10 @@ Sources:
 
 Usage:
   python -m training.data_prep.prepare_training_data --source claude --model opus
-  python -m training.data_prep.prepare_training_data --source gpt5 --model high
+  python -m training.data_prep.prepare_training_data --source claude --model opus --score-type both
+  python -m training.data_prep.prepare_training_data --source gpt5 --model high --score-type both
+  python -m training.data_prep.prepare_training_data --source huggingface --score-type both
   python -m training.data_prep.prepare_training_data --source polygon
-  python -m training.data_prep.prepare_training_data --source huggingface --score-type risk
 
 Output format: see training/data_prep/README.md for the full contract.
 """
@@ -67,23 +68,34 @@ SCORE_SOURCES = {
         "symbol_col": "Stock_symbol",
     },
     "claude": {
-        "models": {
+        "sentiment": {
             "opus": ("sentiment_opus_by_gpt5_summary.csv", "sentiment_opus"),
             "sonnet": ("sentiment_sonnet_by_gpt5_summary.csv", "sentiment_sonnet"),
             "haiku": ("sentiment_haiku_by_gpt5_summary.csv", "sentiment_haiku"),
         },
-        "base_dir": "/mnt/md0/finrl/claude/sentiment",
+        "risk": {
+            "opus": ("risk_opus_by_gpt5_summary.csv", "risk_opus"),
+            "sonnet": ("risk_sonnet_by_gpt5_summary.csv", "risk_sonnet"),
+            "haiku": ("risk_haiku_by_gpt5_summary.csv", "risk_haiku"),
+        },
+        "base_dir": "/mnt/md0/finrl/claude",
         "date_col": "Date",
         "symbol_col": "Stock_symbol",
     },
     "gpt5": {
-        "models": {
+        "sentiment": {
             "high": ("sentiment_gpt-5_high_by_o3_summary.csv", "sentiment_gpt_5"),
             "medium": ("sentiment_gpt-5_medium_by_o3_summary.csv", "sentiment_gpt_5"),
             "low": ("sentiment_gpt-5_low_by_o3_summary.csv", "sentiment_gpt_5"),
             "minimal": ("sentiment_gpt-5_minimal_by_o3_summary.csv", "sentiment_gpt_5"),
         },
-        "base_dir": "/mnt/md0/finrl/gpt-5/sentiment",
+        "risk": {
+            "high": ("risk_gpt-5_high_by_o3_summary.csv", "risk_gpt_5"),
+            "medium": ("risk_gpt-5_medium_by_o3_summary.csv", "risk_gpt_5"),
+            "low": ("risk_gpt-5_low_by_o3_summary.csv", "risk_gpt_5"),
+            "minimal": ("risk_gpt-5_minimal_by_o3_summary.csv", "risk_gpt_5"),
+        },
+        "base_dir": "/mnt/md0/finrl/gpt-5",
         "date_col": "Date",
         "symbol_col": "Stock_symbol",
     },
@@ -119,46 +131,36 @@ def _load_huggingface_scores(score_type, target_col):
     return df[["Date", "tic", target_col]]
 
 
-def _load_claude_scores(model):
-    """Load Claude model sentiment scores."""
-    cfg = SCORE_SOURCES["claude"]
-    if model not in cfg["models"]:
-        raise ValueError(f"Unknown Claude model: {model}. Options: {list(cfg['models'].keys())}")
+def _load_model_scores(source, model, score_type, target_col):
+    """Load sentiment or risk scores for Claude / GPT-5.
 
-    filename, score_col = cfg["models"][model]
-    path = os.path.join(cfg["base_dir"], filename)
-    print(f"  Loading Claude {model}: {path}")
+    Args:
+        source: "claude" or "gpt5"
+        model: model variant (opus/sonnet/haiku for claude; high/medium/low/minimal for gpt5)
+        score_type: "sentiment" or "risk"
+        target_col: output column name (e.g. "llm_sentiment" or "llm_risk")
+    """
+    cfg = SCORE_SOURCES[source]
+    models = cfg[score_type]
+    if model not in models:
+        raise ValueError(
+            f"Unknown {source} model: {model}. Options: {list(models.keys())}"
+        )
 
-    cols = [cfg["date_col"], cfg["symbol_col"], score_col]
-    df = pd.read_csv(path, usecols=cols)
-    df = df.rename(columns={
-        cfg["date_col"]: "Date",
-        cfg["symbol_col"]: "tic",
-        score_col: "llm_sentiment",
-    })
-    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
-    return df[["Date", "tic", "llm_sentiment"]]
-
-
-def _load_gpt5_scores(model):
-    """Load GPT-5 sentiment scores at specified effort level."""
-    cfg = SCORE_SOURCES["gpt5"]
-    if model not in cfg["models"]:
-        raise ValueError(f"Unknown GPT-5 effort: {model}. Options: {list(cfg['models'].keys())}")
-
-    filename, score_col = cfg["models"][model]
-    path = os.path.join(cfg["base_dir"], filename)
-    print(f"  Loading GPT-5 {model}: {path}")
+    filename, score_col = models[model]
+    path = os.path.join(cfg["base_dir"], score_type, filename)
+    label = "Claude" if source == "claude" else "GPT-5"
+    print(f"  Loading {label} {model} {score_type}: {path}")
 
     cols = [cfg["date_col"], cfg["symbol_col"], score_col]
     df = pd.read_csv(path, usecols=cols)
     df = df.rename(columns={
         cfg["date_col"]: "Date",
         cfg["symbol_col"]: "tic",
-        score_col: "llm_sentiment",
+        score_col: target_col,
     })
     df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
-    return df[["Date", "tic", "llm_sentiment"]]
+    return df[["Date", "tic", target_col]]
 
 
 def _load_polygon_scores(base_dir):
@@ -275,21 +277,27 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Claude Opus sentiment only (for PPO)
+  %(prog)s --source claude --model opus
+
+  # Claude Opus sentiment + risk (for CPPO)
+  %(prog)s --source claude --model opus --score-type both
+
+  # GPT-5 high effort sentiment only
+  %(prog)s --source gpt5 --model high
+
+  # GPT-5 high effort sentiment + risk (for CPPO)
+  %(prog)s --source gpt5 --model high --score-type both
+
   # HuggingFace DeepSeek sentiment (original pipeline)
   %(prog)s --source huggingface --score-type sentiment
 
-  # Claude Opus sentiment
-  %(prog)s --source claude --model opus
+  # HuggingFace sentiment + risk (for CPPO)
+  %(prog)s --source huggingface --score-type both
 
-  # GPT-5 high effort
-  %(prog)s --source gpt5 --model high
-
-  # Polygon modern data (2022-2026)
+  # Polygon modern data (2022-2026, sentiment only)
   %(prog)s --source polygon --train-start 2022-06-01 --train-end 2024-12-31 \\
            --trade-start 2025-01-01 --trade-end 2026-02-28
-
-  # HuggingFace risk data (for CPPO)
-  %(prog)s --source huggingface --score-type risk
         """,
     )
     parser.add_argument(
@@ -304,7 +312,8 @@ Examples:
     parser.add_argument(
         "--score-type", default="sentiment",
         choices=["sentiment", "risk", "both"],
-        help="Score type (huggingface only, default: sentiment)",
+        help="Score type (default: sentiment). 'risk'/'both' include llm_risk for CPPO. "
+             "Not supported for polygon (sentiment only).",
     )
     parser.add_argument("--train-start", default="2013-01-01", help="Training period start")
     parser.add_argument("--train-end", default="2018-12-31", help="Training period end")
@@ -320,11 +329,11 @@ Examples:
     if args.source in ("claude", "gpt5") and not args.model:
         parser.error(f"--model is required for source={args.source}")
 
-    # --score-type only applies to HuggingFace
-    if args.source != "huggingface" and args.score_type != "sentiment":
+    # Polygon only has sentiment scores
+    if args.source == "polygon" and args.score_type != "sentiment":
         parser.error(
-            f"--score-type={args.score_type} is only supported for --source=huggingface. "
-            f"Source '{args.source}' only provides sentiment scores."
+            f"--score-type={args.score_type} is not supported for --source=polygon. "
+            "Polygon data only provides sentiment scores."
         )
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -335,7 +344,9 @@ Examples:
     elif args.source == "polygon":
         tag = "polygon_gpt52xhigh"
     else:
-        tag = f"{args.source}_{args.model}"
+        # Include score_type in tag when risk/both (default sentiment omitted for brevity)
+        suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
+        tag = f"{args.source}_{args.model}{suffix}"
 
     print(f"\n{'=' * 60}")
     print(f"  Preparing training data: {tag}")
@@ -346,15 +357,19 @@ Examples:
     # Step 1: Load scores
     print("\n[1/4] Loading scores...")
 
+    sentiment_scores = None
+    risk_scores = None
+
     if args.source == "huggingface":
         if args.score_type in ("sentiment", "both"):
             sentiment_scores = _load_huggingface_scores("sentiment", "llm_sentiment")
         if args.score_type in ("risk", "both"):
             risk_scores = _load_huggingface_scores("risk", "llm_risk")
-    elif args.source == "claude":
-        sentiment_scores = _load_claude_scores(args.model)
-    elif args.source == "gpt5":
-        sentiment_scores = _load_gpt5_scores(args.model)
+    elif args.source in ("claude", "gpt5"):
+        if args.score_type in ("sentiment", "both"):
+            sentiment_scores = _load_model_scores(args.source, args.model, "sentiment", "llm_sentiment")
+        if args.score_type in ("risk", "both"):
+            risk_scores = _load_model_scores(args.source, args.model, "risk", "llm_risk")
     elif args.source == "polygon":
         sentiment_scores = _load_polygon_scores(SCORE_SOURCES["polygon"]["base_dir"])
 
@@ -376,21 +391,26 @@ Examples:
     # Step 4: Merge scores and split
     print("\n[4/4] Merging scores and splitting...")
 
-    if args.source == "huggingface" and args.score_type == "risk":
-        # Risk-only: merge both sentiment and risk for CPPO
-        merged = merge_scores(price_data, _load_huggingface_scores("sentiment", "llm_sentiment"), "llm_sentiment")
+    merged = price_data
+
+    # score_type == "risk" implies CPPO, which needs both sentiment and risk.
+    # Load sentiment implicitly if only risk was requested.
+    if args.score_type == "risk" and sentiment_scores is None:
+        if args.source == "huggingface":
+            sentiment_scores = _load_huggingface_scores("sentiment", "llm_sentiment")
+        elif args.source in ("claude", "gpt5"):
+            sentiment_scores = _load_model_scores(
+                args.source, args.model, "sentiment", "llm_sentiment",
+            )
+
+    if sentiment_scores is not None:
+        merged = merge_scores(merged, sentiment_scores, "llm_sentiment")
+
+    if risk_scores is not None:
         merged = merge_scores(
             merged.assign(date=pd.to_datetime(merged["date"])),
             risk_scores, "llm_risk",
         )
-    elif args.source == "huggingface" and args.score_type == "both":
-        merged = merge_scores(price_data, sentiment_scores, "llm_sentiment")
-        merged = merge_scores(
-            merged.assign(date=pd.to_datetime(merged["date"])),
-            risk_scores, "llm_risk",
-        )
-    else:
-        merged = merge_scores(price_data, sentiment_scores, "llm_sentiment")
 
     # Split into train and trade
     train = data_split(merged, args.train_start, args.train_end)
