@@ -20,10 +20,9 @@ training/
 │   ├── stocktrading_llm.py          # 情緒增強交易環境
 │   └── stocktrading_llm_risk.py     # 情緒+風險增強交易環境
 ├── data_prep/                       # LLM 評分資料準備腳本
-│   ├── train_trade_data_deepseek_sentiment.py
-│   ├── train_trade_data_deepseek_risk.py
-│   ├── sentiment_deepseek_deepinfra.py
-│   └── risk_deepseek_deepinfra.py
+│   ├── prepare_training_data.py     # 統一入口（支援 4 種資料來源）
+│   ├── README.md                    # 資料格式規格 + 來源文件
+│   └── output/                      # 產出目錄（.gitignore）
 ├── scripts/
 │   ├── capture_baseline.py          # 回歸驗證：擷取訓練指標基線
 │   └── train.sh                     # Shell 包裝腳本
@@ -127,6 +126,49 @@ from training.config import INDICATORS, SENTIMENT_SCALES
 print('All training deps OK')
 "
 ```
+
+## 資料準備
+
+訓練前需先準備包含 LLM 評分 + 技術指標的 CSV。
+詳細格式規格見 [data_prep/README.md](data_prep/README.md)。
+
+### 使用 `prepare_training_data.py`
+
+```bash
+cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+workon FinRL
+
+# Claude Opus 情緒（預設日期 2013-2023）
+python -m training.data_prep.prepare_training_data --source claude --model opus
+
+# GPT-5 high effort 情緒
+python -m training.data_prep.prepare_training_data --source gpt5 --model high
+
+# HuggingFace DeepSeek sentiment + risk（適用 CPPO）
+python -m training.data_prep.prepare_training_data --source huggingface --score-type both
+
+# Polygon 現代資料（自訂日期範圍）
+python -m training.data_prep.prepare_training_data \
+  --source polygon \
+  --train-start 2022-06-01 --train-end 2024-12-31 \
+  --trade-start 2025-01-01 --trade-end 2026-02-28
+```
+
+產出檔案在 `training/data_prep/output/`，例如：
+- `train_claude_opus.csv` / `trade_claude_opus.csv`
+- `train_gpt5_high.csv` / `trade_gpt5_high.csv`
+
+### data_prep 參數
+
+| 參數 | 預設 | 說明 |
+|------|------|------|
+| `--source` | `huggingface` | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
+| `--model` | 依 source | 模型/effort 選擇（claude: opus/sonnet/haiku, gpt5: high/medium/low/minimal） |
+| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（僅 HuggingFace 支援 risk） |
+| `--train-start` | `2013-01-01` | 訓練集起始日 |
+| `--train-end` | `2018-12-31` | 訓練集結束日 |
+| `--trade-start` | `2019-01-01` | 回測集起始日 |
+| `--trade-end` | `2023-12-31` | 回測集結束日 |
 
 ## 訓練指令
 
@@ -256,16 +298,20 @@ CPPO 的風險權重也跟隨：
 ## 資料流程
 
 ```
-HuggingFace (benstaf/nasdaq_2013_2023)
-    ↓
-load_data() — train_ppo_llm.py / train_cppo_llm_risk.py
-    ↓  欄位: date, tic, close, volume, llm_sentiment, [llm_risk], 技術指標...
-    ↓
-make_env() → StockTradingEnv → DummyVecEnv
-    ↓
-ppo() / cppo() — SpinningUp 演算法
-    ↓
-torch.save() → trained_models/agent_*.pth
+來源 A: HuggingFace (benstaf/nasdaq_2013_2023)
+來源 B: Claude/GPT-5/Polygon 評分 → prepare_training_data.py → CSV
+    ↓                                         ↓
+load_data()                          load_data(--data CSV)
+    ↓                                         ↓
+    └─────────────→ DataFrame ←──────────────┘
+                       ↓
+                 欄位: date, tic, close, 8 指標, llm_sentiment, [llm_risk]
+                       ↓
+              make_env() → StockTradingEnv → DummyVecEnv
+                       ↓
+              ppo() / cppo() — SpinningUp 演算法
+                       ↓
+              torch.save() → trained_models/agent_*.pth
 ```
 
 ## 已知問題
@@ -295,4 +341,4 @@ SpinningUp 預期 Gymnasium 原生 API（`reset()` 回傳 `obs, info`），
 
 ---
 
-*最後更新: 2026-02-28*
+*最後更新: 2026-03-01*

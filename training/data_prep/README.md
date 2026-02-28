@@ -298,12 +298,6 @@ python training/train_ppo_llm.py --data training/data_prep/output/train_claude_o
 
 輸出目錄：`training/data_prep/output/`
 
-### 舊腳本（保留但不推薦）
-
-- `train_trade_data_deepseek_sentiment.py` — HuggingFace DeepSeek 情緒
-- `train_trade_data_deepseek_risk.py` — HuggingFace DeepSeek 風險
-- `sentiment_deepseek_deepinfra.py` / `risk_deepseek_deepinfra.py` — LLM 評分（上游步驟）
-
 ---
 
 *最後更新: 2026-03-01*
