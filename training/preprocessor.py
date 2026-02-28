@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import tempfile
 
 from .config import INDICATORS
 
@@ -28,6 +29,13 @@ class YahooDownloader:
     def fetch_data(self, auto_adjust: bool = True) -> pd.DataFrame:
         frames: list[pd.DataFrame] = []
         failures = 0
+
+        # Redirect yfinance timezone SQLite cache to a writable temp dir.
+        # Some environments have read-only default cache locations.
+        try:
+            yf.set_tz_cache_location(tempfile.gettempdir())
+        except Exception:
+            pass
 
         for tic in self.ticker_list:
             temp = yf.download(

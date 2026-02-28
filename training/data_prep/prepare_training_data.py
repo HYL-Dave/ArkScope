@@ -188,6 +188,12 @@ def _load_polygon_scores(base_dir):
     daily = scores.groupby([scores["Date"].dt.date, "tic"])["llm_sentiment"].mean().reset_index()
     daily.columns = ["Date", "tic", "llm_sentiment"]
     daily["Date"] = pd.to_datetime(daily["Date"])
+    # Some article rows can have missing sentiment; drop all-NaN daily groups.
+    missing_daily = int(daily["llm_sentiment"].isna().sum())
+    if missing_daily:
+        print(f"  Polygon: dropping {missing_daily} daily ticker rows with missing sentiment")
+        daily = daily.dropna(subset=["llm_sentiment"]).copy()
+
     # Round to nearest integer (scores are 1-5)
     daily["llm_sentiment"] = daily["llm_sentiment"].round().astype(int)
 
