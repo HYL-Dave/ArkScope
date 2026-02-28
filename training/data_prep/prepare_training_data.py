@@ -172,6 +172,8 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
         score_type: "sentiment" or "risk"
         target_col: output column name ("llm_sentiment" or "llm_risk")
     """
+    import pyarrow.parquet as pq
+
     cfg = SCORE_SOURCES["polygon"]
     src_col = cfg["sentiment_col"] if score_type == "sentiment" else cfg["risk_col"]
 
@@ -183,7 +185,6 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
                 path = os.path.join(root, f)
                 # Check parquet schema before reading — avoids ArrowInvalid
                 # when the score column hasn't been added yet (scoring in progress)
-                import pyarrow.parquet as pq
                 schema_cols = pq.read_schema(path).names
                 if src_col not in schema_cols:
                     continue
@@ -322,6 +323,11 @@ Examples:
 
   # Polygon modern data (2022-2026, sentiment only)
   %(prog)s --source polygon --train-start 2022-06-01 --train-end 2024-12-31 \\
+           --trade-start 2025-01-01 --trade-end 2026-02-28
+
+  # Polygon sentiment + risk (for CPPO, requires risk scoring done)
+  %(prog)s --source polygon --score-type both \\
+           --train-start 2022-06-01 --train-end 2024-12-31 \\
            --trade-start 2025-01-01 --trade-end 2026-02-28
         """,
     )

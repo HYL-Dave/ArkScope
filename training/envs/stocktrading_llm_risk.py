@@ -437,8 +437,9 @@ class StockTradingEnv(gym.Env):
         return self.state
 
     def _initiate_state(self):
-        if not self.initial and self.previous_state is None:
-            raise ValueError("previous_state is required when initial=False")
+        if not self.initial:
+            if self.previous_state is None or len(self.previous_state) == 0:
+                raise ValueError("previous_state is required when initial=False")
         if self.initial:
             # For Initial State
             if len(self.df.tic.unique()) > 1:
