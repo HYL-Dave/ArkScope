@@ -162,7 +162,7 @@ python -m training.data_prep.prepare_training_data \
 
 | 參數 | 預設 | 說明 |
 |------|------|------|
-| `--source` | `huggingface` | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
+| `--source` | **必填** | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
 | `--model` | 依 source | 模型/effort 選擇（claude: opus/sonnet/haiku, gpt5: high/medium/low/minimal） |
 | `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（僅 HuggingFace 支援 risk） |
 | `--train-start` | `2013-01-01` | 訓練集起始日 |

@@ -71,11 +71,12 @@ def load_data(data_path=None):
     train = train.set_index('new_idx')
 
     # Validate required columns
-    missing = [c for c in ('llm_sentiment', 'llm_risk') if c not in train.columns]
+    required = ['date', 'tic', 'close', 'llm_sentiment', 'llm_risk'] + list(INDICATORS)
+    missing = [c for c in required if c not in train.columns]
     if missing:
         raise ValueError(
             f"CSV missing required column(s): {missing}. "
-            "CPPO requires both llm_sentiment and llm_risk. "
+            "CPPO requires all technical indicators + llm_sentiment + llm_risk. "
             "See training/data_prep/README.md for format spec."
         )
 

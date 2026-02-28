@@ -102,7 +102,6 @@ CPPO (stocktrading_llm_risk.py):
 - **股票**: 89 支 NASDAQ
 - **品質問題**: 評分嚴重偏中性（sentiment 66.3%, risk 84.5% 為分數 3）
 - **價格來源**: yfinance 下載
-- **現有腳本**: `train_trade_data_deepseek_sentiment.py`, `train_trade_data_deepseek_risk.py`
 
 ### 來源 2: Claude 模型（Opus/Sonnet/Haiku）
 
@@ -184,28 +183,6 @@ Step 5: 分割 Train / Trade
 所有來源最終都要 rename 為 `llm_sentiment`（和 `llm_risk`）才能被訓練環境使用。
 
 ---
-
-## 現有腳本說明
-
-### `train_trade_data_deepseek_sentiment.py`
-
-HuggingFace DeepSeek 情緒 → 訓練 CSV。流程：
-1. 讀取 `sentiment_deepseek.csv`
-2. yfinance 下載 NASDAQ 100 價格（2013-2023）
-3. FeatureEngineer 計算技術指標
-4. `add_sentiment()` 合併評分（rename `sentiment_deepseek` → `llm_sentiment`）
-5. 輸出: `train_data_deepseek_sentiment_2013_2018.csv`, `trade_data_deepseek_sentiment_2019_2023.csv`
-
-### `train_trade_data_deepseek_risk.py`
-
-同上，但額外合併 risk 評分（rename `risk_deepseek` → `llm_risk`）。
-輸出: `train_data_deepseek_risk_2013_2018.csv`, `trade_data_deepseek_risk_2019_2023.csv`
-
-### `sentiment_deepseek_deepinfra.py` / `risk_deepseek_deepinfra.py`
-
-LLM 評分腳本（使用 DeepSeek V3 via DeepInfra API）。
-輸入文章 CSV → 批量 API 呼叫 → 輸出帶評分的 CSV。
-與訓練資料準備無直接關係，屬於上游評分步驟。
 
 ---
 

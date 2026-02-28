@@ -66,9 +66,11 @@ def load_data(data_path=None):
     train = train.set_index('new_idx')
 
     # Validate required columns
-    if 'llm_sentiment' not in train.columns:
+    required = ['date', 'tic', 'close', 'llm_sentiment'] + list(INDICATORS)
+    missing = [c for c in required if c not in train.columns]
+    if missing:
         raise ValueError(
-            "CSV missing required column 'llm_sentiment'. "
+            f"CSV missing required column(s): {missing}. "
             "See training/data_prep/README.md for format spec."
         )
 

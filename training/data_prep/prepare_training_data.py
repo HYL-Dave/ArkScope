@@ -320,6 +320,13 @@ Examples:
     if args.source in ("claude", "gpt5") and not args.model:
         parser.error(f"--model is required for source={args.source}")
 
+    # --score-type only applies to HuggingFace
+    if args.source != "huggingface" and args.score_type != "sentiment":
+        parser.error(
+            f"--score-type={args.score_type} is only supported for --source=huggingface. "
+            f"Source '{args.source}' only provides sentiment scores."
+        )
+
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Build output filename tag
