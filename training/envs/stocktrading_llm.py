@@ -11,6 +11,8 @@ from gymnasium import spaces
 from gymnasium.utils import seeding
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from training.config import SENTIMENT_SCALES
+
 matplotlib.use("Agg")
 
 # from stable_baselines3.common.logger import Logger, KVWriter, CSVOutputFormat
@@ -37,6 +39,7 @@ class StockTradingEnv(gym.Env):
         turbulence_threshold=None,
         risk_indicator_col="turbulence",
         llm_sentiment_col="llm_sentiment", #added llm_sentiment
+        sentiment_scale="strong",
         make_plots: bool = False,
         print_verbosity=10,
         day=0,
@@ -69,6 +72,10 @@ class StockTradingEnv(gym.Env):
         self.turbulence_threshold = turbulence_threshold
         self.risk_indicator_col = risk_indicator_col
         self.llm_sentiment_col=llm_sentiment_col
+        if isinstance(sentiment_scale, str):
+            self._scale = SENTIMENT_SCALES[sentiment_scale]
+        else:
+            self._scale = sentiment_scale  # allow dict override
         self.initial = initial
         self.previous_state = previous_state
         self.model_name = model_name
@@ -315,13 +322,13 @@ class StockTradingEnv(gym.Env):
             strong_buy_mask = (llm_sentiments == 5)
 
             # Reduce mismatched actions (sentiment disagrees with trade direction)
-            actions[(strong_sell_mask & buy_mask) | (strong_buy_mask & sell_mask)] *= 0.9
-            actions[(moderate_sell_mask & buy_mask) | (moderate_buy_mask & sell_mask)] *= 0.95
-            actions[hold_mask] *= 0.98
+            actions[(strong_sell_mask & buy_mask) | (strong_buy_mask & sell_mask)] *= self._scale["strong_mismatch"]
+            actions[(moderate_sell_mask & buy_mask) | (moderate_buy_mask & sell_mask)] *= self._scale["moderate_mismatch"]
+            actions[hold_mask] *= self._scale["hold_dampen"]
 
             # Amplify matched actions (sentiment agrees with trade direction)
-            actions[(strong_sell_mask & sell_mask) | (strong_buy_mask & buy_mask)] *= 1.1
-            actions[(moderate_sell_mask & sell_mask) | (moderate_buy_mask & buy_mask)] *= 1.05
+            actions[(strong_sell_mask & sell_mask) | (strong_buy_mask & buy_mask)] *= self._scale["strong_match"]
+            actions[(moderate_sell_mask & sell_mask) | (moderate_buy_mask & buy_mask)] *= self._scale["moderate_match"]
 
             actions = actions * self.hmax  # actions initially is scaled between 0 to 1
             actions = actions.astype(
