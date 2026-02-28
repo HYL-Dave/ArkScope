@@ -181,11 +181,13 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
         for f in sorted(files):
             if f.endswith(".parquet"):
                 path = os.path.join(root, f)
-                try:
-                    df = pd.read_parquet(path, columns=["published_at", "ticker", src_col])
-                except KeyError:
-                    # Column doesn't exist yet (risk scoring not done for this file)
+                # Check parquet schema before reading — avoids ArrowInvalid
+                # when the score column hasn't been added yet (scoring in progress)
+                import pyarrow.parquet as pq
+                schema_cols = pq.read_schema(path).names
+                if src_col not in schema_cols:
                     continue
+                df = pd.read_parquet(path, columns=["published_at", "ticker", src_col])
                 frames.append(df)
 
     if not frames:
@@ -336,7 +338,7 @@ Examples:
         "--score-type", default="sentiment",
         choices=["sentiment", "risk", "both"],
         help="Score type (default: sentiment). 'risk'/'both' include llm_risk for CPPO. "
-             "Not supported for polygon (sentiment only).",
+             "Polygon risk requires scoring with score_ibkr_news.py --mode risk first.",
     )
     parser.add_argument("--train-start", default="2013-01-01", help="Training period start")
     parser.add_argument("--train-end", default="2018-12-31", help="Training period end")
