@@ -60,13 +60,25 @@ def load_data(data_path=None):
         train = pd.DataFrame(dataset['train'])
         train = train.drop('Unnamed: 0', axis=1)
 
+    # Ensure correct time ordering before building date index
+    train['date'] = train['date'].astype(str)
+    train = train.sort_values(['date', 'tic']).reset_index(drop=True)
+
     # Create a new index based on unique dates
-    unique_dates = train['date'].unique()
+    unique_dates = train['date'].unique()  # already sorted
     date_to_idx = {date: idx for idx, date in enumerate(unique_dates)}
     train['new_idx'] = train['date'].map(date_to_idx)
     train = train.set_index('new_idx')
 
-    # Missing values
+    # Validate required columns
+    missing = [c for c in ('llm_sentiment', 'llm_risk') if c not in train.columns]
+    if missing:
+        raise ValueError(
+            f"CSV missing required column(s): {missing}. "
+            "CPPO requires both llm_sentiment and llm_risk. "
+            "See training/data_prep/README.md for format spec."
+        )
+
     train['llm_sentiment'].fillna(0, inplace=True)   # 0 is outside scope (min is 1)
     train['llm_risk'].fillna(3, inplace=True)         # neutral risk score is 3
 
@@ -144,11 +156,10 @@ def main():
         logger_kwargs=logger_kwargs,
     )
 
-    # Save the model
-    model_path = os.path.join(
-        TRAINED_MODEL_DIR,
-        "agent_cppo_deepseek_100_epochs_20k_steps_99_101.pth",
-    )
+    # Save the model — derive filename from data source + params
+    data_tag = os.path.splitext(os.path.basename(args.data))[0] if args.data else "huggingface"
+    model_name = f"agent_cppo_{data_tag}_{args.epochs}ep_s{args.seed}.pth"
+    model_path = os.path.join(TRAINED_MODEL_DIR, model_name)
     torch.save(trained_cppo.state_dict(), model_path)
     print("Training finished and saved in " + model_path)
 

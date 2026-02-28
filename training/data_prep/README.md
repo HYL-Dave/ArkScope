@@ -209,25 +209,100 @@ LLM 評分腳本（使用 DeepSeek V3 via DeepInfra API）。
 
 ---
 
-## 訓練腳本的資料載入
+## OHLCV 價格來源比較
 
-### 現狀（HuggingFace 固定路徑）
+### IBKR vs yfinance 實測比對（2026-03-01）
 
-```python
-# train_ppo_llm.py / train_cppo_llm_risk.py
-dataset = load_dataset("benstaf/nasdaq_2013_2023",
-    data_files="train_data_deepseek_sentiment_2013_2018.csv")
-train = pd.DataFrame(dataset['train'])
+以 AAPL 為測試標的，比較已收集的 IBKR 資料與 yfinance 日線。
+
+**收盤價差異**
+
+| 資料集 | 天數 | 平均差距 | 最大差距 | 原因 |
+|--------|------|----------|----------|------|
+| 2023 hourly | 250 | $2.20 | $2.57 | yfinance 自動調整股息（auto_adjust=True） |
+| 2026 15min | 39 | $0.57 | $6.52 | 調整累積較少；極端值為 IBKR 部分交易日 |
+
+**原因**：yfinance 預設 `auto_adjust=True`，會把歷史價格回溯調整股息。
+IBKR 回傳的是當時的實際交易價格（unadjusted）。兩者都正確，只是不同的表示方式。
+越久之前的資料差距越大（股息調整累積效應）。
+
+**成交量差異**
+
+| 資料集 | 平均差距 | 原因 |
+|--------|----------|------|
+| 2023 hourly | -32% | IBKR = RTH only (9:30-16:00)，yfinance = 含盤前盤後 |
+| 2026 15min | -58% | 同上，部分天數 IBKR 資料不完整（< 26 bars） |
+
+**結論：IBKR volume 始終低於 yfinance**，因為只涵蓋正常交易時段。
+
+### 訓練用價格來源建議
+
+| 場景 | 推薦來源 | 原因 |
+|------|----------|------|
+| 日線訓練（現有 pipeline） | **yfinance** | 歷史最長、免費、自動調整、已有 YahooDownloader 整合 |
+| Polygon 新聞→日線訓練 | **yfinance** | 只需日線，一次拉完最簡單 |
+| 日內交易策略（未來） | **IBKR** | 唯一有 15min/1hr 歷史資料的來源 |
+
+**重要**：同一次訓練中所有價格必須來自同一來源，不可混用 adjusted 和 unadjusted。
+
+### 已收集的 IBKR 資料
+
+```
+data/prices/
+├── 15min/          # 211 files, 135 tickers, 2024-present
+│   ├── AAPL_15min_2024_2026.csv  (853 bars)
+│   └── ...
+├── hourly/         # 75 files, 2023
+│   ├── AAPL_hourly_2023.csv  (1744 bars, ~7 bars/day)
+│   └── ...
+└── collection_summary.json
 ```
 
-### 目標（支援本地 CSV）
+格式：`datetime,open,high,low,close,volume,ticker`（datetime 含時區 offset）
 
-```python
-# --data 參數指定本地 CSV，跳過 HuggingFace 下載
-python training/train_ppo_llm.py --data path/to/prepared_data.csv
+---
+
+## 統一資料準備腳本
+
+### `prepare_training_data.py`
+
+統一入口，支援所有 4 種資料來源。流程：
+1. 載入 LLM 評分（根據 `--source` 選擇來源）
+2. yfinance 下載 OHLCV + 計算技術指標
+3. Left merge 評分到價格矩陣
+4. 分割 train / trade 時段
+5. 輸出 CSV（格式符合訓練資料合約）
+
+```bash
+# Claude Opus 情緒
+python -m training.data_prep.prepare_training_data \
+  --source claude --model opus
+
+# GPT-5 high effort
+python -m training.data_prep.prepare_training_data \
+  --source gpt5 --model high
+
+# HuggingFace DeepSeek (sentiment + risk, for CPPO)
+python -m training.data_prep.prepare_training_data \
+  --source huggingface --score-type both
+
+# Polygon 現代資料（自訂日期範圍）
+python -m training.data_prep.prepare_training_data \
+  --source polygon \
+  --train-start 2022-06-01 --train-end 2024-12-31 \
+  --trade-start 2025-01-01 --trade-end 2026-02-28
+
+# 訓練
+python training/train_ppo_llm.py --data training/data_prep/output/train_claude_opus.csv
 ```
 
-這樣 data_prep 產出的 CSV 可以直接被訓練腳本使用，不需要上傳 HuggingFace。
+輸出目錄：`training/data_prep/output/`
+
+### 舊腳本（保留但不推薦）
+
+- `train_trade_data_deepseek_sentiment.py` — HuggingFace DeepSeek 情緒
+- `train_trade_data_deepseek_risk.py` — HuggingFace DeepSeek 風險
+- `sentiment_deepseek_deepinfra.py` / `risk_deepseek_deepinfra.py` — LLM 評分（上游步驟）
 
 ---
 
