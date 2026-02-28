@@ -101,7 +101,8 @@ SCORE_SOURCES = {
     },
     "polygon": {
         "base_dir": "data/news/raw/polygon",
-        "score_col": "sentiment_gpt_5_2_xhigh",
+        "sentiment_col": "sentiment_gpt_5_2_xhigh",
+        "risk_col": "risk_gpt_5_2_xhigh",
         "date_col": "published_at",
         "symbol_col": "ticker",
     },
@@ -163,42 +164,58 @@ def _load_model_scores(source, model, score_type, target_col):
     return df[["Date", "tic", target_col]]
 
 
-def _load_polygon_scores(base_dir):
-    """Load Polygon news scores from monthly Parquet files."""
-    print(f"  Loading Polygon scores from {base_dir}")
+def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_sentiment"):
+    """Load Polygon news scores from monthly Parquet files.
+
+    Args:
+        base_dir: directory containing year/month parquet files
+        score_type: "sentiment" or "risk"
+        target_col: output column name ("llm_sentiment" or "llm_risk")
+    """
+    cfg = SCORE_SOURCES["polygon"]
+    src_col = cfg["sentiment_col"] if score_type == "sentiment" else cfg["risk_col"]
+
+    print(f"  Loading Polygon {score_type} scores from {base_dir} (column: {src_col})")
     frames = []
     for root, _dirs, files in os.walk(base_dir):
         for f in sorted(files):
             if f.endswith(".parquet"):
                 path = os.path.join(root, f)
-                df = pd.read_parquet(path, columns=["published_at", "ticker", "sentiment_gpt_5_2_xhigh"])
+                try:
+                    df = pd.read_parquet(path, columns=["published_at", "ticker", src_col])
+                except KeyError:
+                    # Column doesn't exist yet (risk scoring not done for this file)
+                    continue
                 frames.append(df)
 
     if not frames:
-        raise FileNotFoundError(f"No .parquet files found in {base_dir}")
+        raise FileNotFoundError(
+            f"No parquet files with column '{src_col}' found in {base_dir}. "
+            f"Run score_ibkr_news.py --mode {score_type} first."
+        )
 
     scores = pd.concat(frames, ignore_index=True)
     scores["Date"] = pd.to_datetime(scores["published_at"]).dt.tz_localize(None)
     scores = scores.rename(columns={
         "ticker": "tic",
-        "sentiment_gpt_5_2_xhigh": "llm_sentiment",
+        src_col: target_col,
     })
 
     # Aggregate: daily mean per ticker (multiple articles per day)
-    daily = scores.groupby([scores["Date"].dt.date, "tic"])["llm_sentiment"].mean().reset_index()
-    daily.columns = ["Date", "tic", "llm_sentiment"]
+    daily = scores.groupby([scores["Date"].dt.date, "tic"])[target_col].mean().reset_index()
+    daily.columns = ["Date", "tic", target_col]
     daily["Date"] = pd.to_datetime(daily["Date"])
-    # Some article rows can have missing sentiment; drop all-NaN daily groups.
-    missing_daily = int(daily["llm_sentiment"].isna().sum())
+    # Some article rows can have missing scores; drop all-NaN daily groups.
+    missing_daily = int(daily[target_col].isna().sum())
     if missing_daily:
-        print(f"  Polygon: dropping {missing_daily} daily ticker rows with missing sentiment")
-        daily = daily.dropna(subset=["llm_sentiment"]).copy()
+        print(f"  Polygon: dropping {missing_daily} daily ticker rows with missing {score_type}")
+        daily = daily.dropna(subset=[target_col]).copy()
 
     # Round to nearest integer (scores are 1-5)
-    daily["llm_sentiment"] = daily["llm_sentiment"].round().astype(int)
+    daily[target_col] = daily[target_col].round().astype(int)
 
     print(f"  Polygon: {len(scores)} articles → {len(daily)} daily ticker-scores")
-    return daily[["Date", "tic", "llm_sentiment"]]
+    return daily[["Date", "tic", target_col]]
 
 
 # ── Price + feature pipeline ────────────────────────────────────
@@ -335,20 +352,14 @@ Examples:
     if args.source in ("claude", "gpt5") and not args.model:
         parser.error(f"--model is required for source={args.source}")
 
-    # Polygon only has sentiment scores
-    if args.source == "polygon" and args.score_type != "sentiment":
-        parser.error(
-            f"--score-type={args.score_type} is not supported for --source=polygon. "
-            "Polygon data only provides sentiment scores."
-        )
-
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Build output filename tag
     if args.source == "huggingface":
         tag = f"deepseek_{args.score_type}"
     elif args.source == "polygon":
-        tag = "polygon_gpt52xhigh"
+        suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
+        tag = f"polygon_gpt52xhigh{suffix}"
     else:
         # Include score_type in tag when risk/both (default sentiment omitted for brevity)
         suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
@@ -377,14 +388,19 @@ Examples:
         if args.score_type in ("risk", "both"):
             risk_scores = _load_model_scores(args.source, args.model, "risk", "llm_risk")
     elif args.source == "polygon":
-        sentiment_scores = _load_polygon_scores(SCORE_SOURCES["polygon"]["base_dir"])
+        base = SCORE_SOURCES["polygon"]["base_dir"]
+        if args.score_type in ("sentiment", "both"):
+            sentiment_scores = _load_polygon_scores(base, "sentiment", "llm_sentiment")
+        if args.score_type in ("risk", "both"):
+            risk_scores = _load_polygon_scores(base, "risk", "llm_risk")
 
     # Step 2: Determine tickers from scores
     print("\n[2/4] Determining ticker universe...")
 
     if args.source == "polygon":
         # Use tickers that appear in Polygon data
-        score_tickers = sentiment_scores["tic"].unique().tolist()
+        ref_scores = sentiment_scores if sentiment_scores is not None else risk_scores
+        score_tickers = ref_scores["tic"].unique().tolist()
         tickers = sorted(score_tickers)
         print(f"  Polygon tickers: {len(tickers)}")
     else:
@@ -407,6 +423,10 @@ Examples:
         elif args.source in ("claude", "gpt5"):
             sentiment_scores = _load_model_scores(
                 args.source, args.model, "sentiment", "llm_sentiment",
+            )
+        elif args.source == "polygon":
+            sentiment_scores = _load_polygon_scores(
+                SCORE_SOURCES["polygon"]["base_dir"], "sentiment", "llm_sentiment",
             )
 
     if sentiment_scores is not None:

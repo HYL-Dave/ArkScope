@@ -150,7 +150,7 @@ python -m training.data_prep.prepare_training_data --source gpt5 --model high --
 # HuggingFace DeepSeek sentiment + risk → CPPO
 python -m training.data_prep.prepare_training_data --source huggingface --score-type both
 
-# Polygon 現代資料（僅 sentiment → PPO）
+# Polygon 現代資料（sentiment only → PPO; --score-type both → CPPO）
 python -m training.data_prep.prepare_training_data \
   --source polygon \
   --train-start 2022-06-01 --train-end 2024-12-31 \
@@ -168,7 +168,7 @@ python -m training.data_prep.prepare_training_data \
 |------|------|------|
 | `--source` | **必填** | 資料來源: `huggingface`, `claude`, `gpt5`, `polygon` |
 | `--model` | 依 source | 模型/effort 選擇（claude: opus/sonnet/haiku, gpt5: high/medium/low/minimal） |
-| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（Polygon 僅支援 sentiment） |
+| `--score-type` | `sentiment` | 評分類型: `sentiment`, `risk`, `both`（所有來源皆支援） |
 | `--train-start` | `2013-01-01` | 訓練集起始日 |
 | `--train-end` | `2018-12-31` | 訓練集結束日 |
 | `--trade-start` | `2019-01-01` | 回測集起始日 |

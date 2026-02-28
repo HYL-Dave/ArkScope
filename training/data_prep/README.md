@@ -141,7 +141,8 @@ CPPO (stocktrading_llm_risk.py):
 
 - **路徑**: `data/news/raw/polygon/` (本專案內)
 - **格式**: Parquet（月檔，如 `2025/2025-01.parquet`）
-- **評分欄位**: `sentiment_gpt_5_2_xhigh`
+- **情緒欄位**: `sentiment_gpt_5_2_xhigh`
+- **風險欄位**: `risk_gpt_5_2_xhigh`（需先跑 `score_ibkr_news.py --mode risk`）
 - **日期範圍**: 2022-01 至 2026-02（110K 筆，持續更新）
 - **股票**: ~97 支/月
 - **品質**: 評分分佈較歷史資料平衡
@@ -149,10 +150,11 @@ CPPO (stocktrading_llm_risk.py):
   - Parquet 格式（非 CSV）
   - 欄位名不同：`ticker`(非 `Stock_symbol`), `published_at`(非 `Date`)
   - **沒有 OHLCV 價格資料** — 需另外下載
-  - **沒有 risk 評分** — 僅能用於 PPO，無法用於 CPPO
   - 一篇文章可能對應多個 ticker（`related_tickers` 欄位）
 - **價格來源**: 需 yfinance 或 Tiingo 下載（日期範圍 2022-2026）
-- **腳本**: `prepare_training_data.py --source polygon`
+- **腳本**:
+  - PPO: `prepare_training_data.py --source polygon`
+  - CPPO: `prepare_training_data.py --source polygon --score-type both`
 
 ---
 
@@ -183,7 +185,7 @@ Step 5: 分割 Train / Trade
 | HuggingFace | `Date` | `Stock_symbol` | `sentiment_deepseek` | `risk_deepseek` |
 | Claude | `Date` | `Stock_symbol` | `sentiment_opus` 等 | `risk_opus` 等 |
 | GPT-5 | `Date` | `Stock_symbol` | `sentiment_gpt_5` | `risk_gpt_5` |
-| Polygon | `published_at` | `ticker` | `sentiment_gpt_5_2_xhigh` | 無 |
+| Polygon | `published_at` | `ticker` | `sentiment_gpt_5_2_xhigh` | `risk_gpt_5_2_xhigh` |
 
 所有來源最終都要 rename 為 `llm_sentiment`（和 `llm_risk`）才能被訓練環境使用。
 
