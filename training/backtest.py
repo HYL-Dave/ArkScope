@@ -26,6 +26,11 @@ def main():
         help="Environment type: baseline, sentiment, or risk"
     )
     parser.add_argument("--output-plot", default="equity_curve.png", help="Path to save equity curve plot")
+    parser.add_argument(
+        "--sentiment-scale", type=str, default="strong",
+        choices=["strong", "weak"],
+        help="Sentiment scaling preset (must match training config)",
+    )
     args = parser.parse_args()
 
     # Load dataset
@@ -55,7 +60,8 @@ def main():
         sell_cost_pct=[0.001]*stock_dim,
         state_space=state_dim, action_space=stock_dim,
         tech_indicator_list=INDICATORS,
-        reward_scaling=1e-4
+        reward_scaling=1e-4,
+        sentiment_scale=args.sentiment_scale,
     )
 
     # Load trained agent

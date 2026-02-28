@@ -52,6 +52,8 @@ SENTIMENT_SCALES = {
         "hold_dampen": 0.98,        # neutral sentiment dampens action
         "strong_match": 1.1,        # sentiment strongly agrees with action
         "moderate_match": 1.05,     # sentiment moderately agrees
+        # CPPO risk-score-to-weight mapping (±1%)
+        "risk_weights": {1: 0.99, 2: 0.995, 3: 1.0, 4: 1.005, 5: 1.01},
     },
     "weak": {
         # ±0.1% scaling (upstream _01 variant, used by original train_ppo_llm.py)
@@ -60,5 +62,7 @@ SENTIMENT_SCALES = {
         "hold_dampen": 1.0,         # no hold dampening in _01 variant
         "strong_match": 1.001,
         "moderate_match": 1.0005,
+        # CPPO risk-score-to-weight mapping (±0.1%)
+        "risk_weights": {1: 0.999, 2: 0.9995, 3: 1.0, 4: 1.0005, 5: 1.001},
     },
 }

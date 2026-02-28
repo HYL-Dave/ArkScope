@@ -28,6 +28,7 @@ from datasets import load_dataset
 
 from training.config import (
     INDICATORS,
+    SENTIMENT_SCALES,
     TRAINED_MODEL_DIR,
     check_and_make_directories,
 )
@@ -112,9 +113,11 @@ def main():
     from spinup.utils.run_utils import setup_logger_kwargs
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
+    scale = SENTIMENT_SCALES[args.sentiment_scale]
     trained_cppo = cppo(
         lambda: env_train,
         stock_dim=stock_dimension,
+        risk_weights=scale["risk_weights"],
         actor_critic=MLPActorCritic,
         ac_kwargs=dict(hidden_sizes=[args.hid] * args.l),
         seed=args.seed,

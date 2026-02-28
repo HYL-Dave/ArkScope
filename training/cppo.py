@@ -100,6 +100,7 @@ class CPPOBuffer:
 def cppo(
     env_fn,
     stock_dim,
+    risk_weights=None,
     actor_critic=MLPActorCritic,
     ac_kwargs=dict(hidden_sizes=[256, 128], activation=torch.nn.ReLU),
     seed=42,
@@ -138,6 +139,10 @@ def cppo(
         env_fn: A function which creates a copy of the environment.
         stock_dim: Number of stocks. Required for extracting risk scores
             from the observation vector (was a global variable in upstream).
+        risk_weights: Dict mapping risk score (1-5) to portfolio weight
+            multiplier. Defaults to SENTIMENT_SCALES["strong"]["risk_weights"].
+            Pass SENTIMENT_SCALES[scale]["risk_weights"] for consistency
+            with the env's sentiment_scale setting.
         actor_critic: Constructor for a PyTorch Module with step/act/pi/v.
         ac_kwargs: kwargs for the ActorCritic constructor.
         seed: Seed for random number generators.
@@ -165,6 +170,10 @@ def cppo(
         delay: Update delay for constraints.
         cvar_clip_ratio: CVaR clipping ratio.
     """
+
+    # Resolve risk_weights default from config
+    from training.config import SENTIMENT_SCALES
+    _risk_weights = risk_weights or SENTIMENT_SCALES["strong"]["risk_weights"]
 
     # Special function to avoid certain slowdowns from PyTorch + MPI combo.
     setup_pytorch_for_mpi()
@@ -292,8 +301,7 @@ def cppo(
             llm_risks = np.array(next_o[0, -stock_dim:])
 
             # Map LLM risk scores to weights
-            risk_to_weight = {1: 0.99, 2: 0.995, 3: 1.0, 4: 1.005, 5: 1.01}
-            llm_risks_weights = np.vectorize(risk_to_weight.get)(llm_risks)
+            llm_risks_weights = np.vectorize(_risk_weights.get)(llm_risks)
 
             # Extract portfolio weights from observation
             prices = np.array(next_o[0, 1:stock_dim + 1])

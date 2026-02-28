@@ -71,9 +71,10 @@ def parse_spinup_table(text):
     return epochs
 
 
-def run_training(script, seed, epochs):
+def run_training(script, seed, epochs, sentiment_scale='strong'):
     """Run training script as subprocess, returning stdout+stderr."""
-    cmd = [sys.executable, script, '--seed', str(seed), '--epochs', str(epochs)]
+    cmd = [sys.executable, script, '--seed', str(seed), '--epochs', str(epochs),
+           '--sentiment-scale', sentiment_scale]
     print(f"  Command: {' '.join(cmd)}")
 
     result = subprocess.run(
@@ -108,6 +109,11 @@ def main():
         '--seed', type=int, default=42,
         help="Random seed (default: 42)"
     )
+    parser.add_argument(
+        '--sentiment-scale', type=str, default='strong',
+        choices=['strong', 'weak'],
+        help="Sentiment scaling preset (default: strong)",
+    )
     args = parser.parse_args()
 
     baselines_dir = os.path.join('training', 'baselines')
@@ -124,7 +130,7 @@ def main():
               f"(epochs={args.epochs}, seed={args.seed})")
         print(f"{'=' * 60}")
 
-        stdout, rc = run_training(script, args.seed, args.epochs)
+        stdout, rc = run_training(script, args.seed, args.epochs, args.sentiment_scale)
 
         if rc != 0:
             print(f"  SKIP: {name} training failed (exit code {rc})")
@@ -146,6 +152,7 @@ def main():
             'script': script,
             'seed': args.seed,
             'epochs': args.epochs,
+            'sentiment_scale': args.sentiment_scale,
             'epochs_captured': len(metrics),
             'metrics': metrics,
         }
