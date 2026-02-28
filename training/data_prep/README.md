@@ -115,7 +115,8 @@ CPPO (stocktrading_llm_risk.py):
 - **品質**: 比 DeepSeek 平衡（中性 30.6% vs 66.3%），但 38.7% 未評分
 - **欄位格式**: 與 HuggingFace 相同（`Date`, `Stock_symbol`, ...）
 - **價格來源**: 需 yfinance 下載（與來源 1 共用）
-- **現有腳本**: 無 — 需新增
+- **僅有情緒分數** — 無 risk 評分，只能用於 PPO
+- **腳本**: `prepare_training_data.py --source claude --model opus`
 
 ### 來源 3: GPT-5（多 effort 等級）
 
@@ -130,7 +131,8 @@ CPPO (stocktrading_llm_risk.py):
 - **品質**: 與 Claude 相近（中性 33%），38.7% 未評分
 - **欄位格式**: 與 HuggingFace 相同
 - **價格來源**: 需 yfinance 下載（與來源 1 共用）
-- **現有腳本**: 無 — 需新增
+- **僅有情緒分數** — 無 risk 評分，只能用於 PPO
+- **腳本**: `prepare_training_data.py --source gpt5 --model high`
 
 ### 來源 4: Polygon API（現代資料）
 
@@ -147,7 +149,7 @@ CPPO (stocktrading_llm_risk.py):
   - **沒有 risk 評分** — 僅能用於 PPO，無法用於 CPPO
   - 一篇文章可能對應多個 ticker（`related_tickers` 欄位）
 - **價格來源**: 需 yfinance 或 Tiingo 下載（日期範圍 2022-2026）
-- **現有腳本**: 無 — 需新增
+- **腳本**: `prepare_training_data.py --source polygon`
 
 ---
 

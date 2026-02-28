@@ -60,6 +60,16 @@ def load_data(data_path=None):
         train = pd.DataFrame(dataset['train'])
         train = train.drop('Unnamed: 0', axis=1)
 
+    # Validate required columns before any processing
+    required = ['date', 'tic', 'close', 'llm_sentiment', 'llm_risk'] + list(INDICATORS)
+    missing = [c for c in required if c not in train.columns]
+    if missing:
+        raise ValueError(
+            f"CSV missing required column(s): {missing}. "
+            "CPPO requires all technical indicators + llm_sentiment + llm_risk. "
+            "See training/data_prep/README.md for format spec."
+        )
+
     # Ensure correct time ordering before building date index
     train['date'] = train['date'].astype(str)
     train = train.sort_values(['date', 'tic']).reset_index(drop=True)
@@ -69,16 +79,6 @@ def load_data(data_path=None):
     date_to_idx = {date: idx for idx, date in enumerate(unique_dates)}
     train['new_idx'] = train['date'].map(date_to_idx)
     train = train.set_index('new_idx')
-
-    # Validate required columns
-    required = ['date', 'tic', 'close', 'llm_sentiment', 'llm_risk'] + list(INDICATORS)
-    missing = [c for c in required if c not in train.columns]
-    if missing:
-        raise ValueError(
-            f"CSV missing required column(s): {missing}. "
-            "CPPO requires all technical indicators + llm_sentiment + llm_risk. "
-            "See training/data_prep/README.md for format spec."
-        )
 
     train['llm_sentiment'].fillna(0, inplace=True)   # 0 is outside scope (min is 1)
     train['llm_risk'].fillna(3, inplace=True)         # neutral risk score is 3
