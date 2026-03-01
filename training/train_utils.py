@@ -68,6 +68,7 @@ def save_training_artifacts(
     epochs: int,
     seed: int,
     hyperparams: Dict,
+    score_type: str = "sentiment",
     data_path: Optional[str] = None,
     scaler: Optional["FeatureScaler"] = None,
 ) -> str:
@@ -100,6 +101,7 @@ def save_training_artifacts(
         model_id=model_id,
         algorithm=algorithm.upper(),
         score_source=score_source,
+        score_type=score_type,
         feature_set=list(extra_cols),
         stock_dim=stock_dim,
         state_dim=state_dim,
@@ -125,6 +127,31 @@ def save_training_artifacts(
         print(f"  Scaler saved: {os.path.join(model_dir, 'feature_scaler.json')}")
 
     return abs_model_path
+
+
+def _find_scaler_path(data_path: str) -> str | None:
+    """Find the scaler JSON co-located with a CSV file.
+
+    Search order:
+      1. feature_scaler_{tag}.json  (tag derived from CSV filename)
+      2. feature_scaler.json        (legacy fallback)
+    Returns the first path that exists, or the tag-based path if neither exists.
+    """
+    import re
+
+    csv_dir = os.path.dirname(os.path.abspath(data_path))
+    csv_name = os.path.splitext(os.path.basename(data_path))[0]  # e.g. "train_claude_opus_both"
+    # Strip leading "train_" or "trade_" prefix to get the tag
+    tag = re.sub(r"^(train|trade)_", "", csv_name)
+    tagged_path = os.path.join(csv_dir, f"feature_scaler_{tag}.json")
+    legacy_path = os.path.join(csv_dir, "feature_scaler.json")
+
+    if os.path.exists(tagged_path):
+        return tagged_path
+    if os.path.exists(legacy_path):
+        return legacy_path
+    # Neither exists — return tagged path (for error messages / future creation)
+    return tagged_path
 
 
 def detect_and_load_features(
@@ -154,11 +181,7 @@ def detect_and_load_features(
 
     # Check if CSV already contains feature columns
     candidate_feat_cols = [c for c in df.columns if c in AVAILABLE_FEATURES]
-    scaler_path = (
-        os.path.join(os.path.dirname(os.path.abspath(data_path)), "feature_scaler.json")
-        if data_path
-        else None
-    )
+    scaler_path = _find_scaler_path(data_path) if data_path else None
 
     # Path A: CSV already has features + matching scaler
     if candidate_feat_cols and scaler_path and os.path.exists(scaler_path):
@@ -205,10 +228,7 @@ def detect_and_load_features(
 
         # Save scaler alongside data if we have a data_path
         if data_path:
-            out_scaler_path = os.path.join(
-                os.path.dirname(os.path.abspath(data_path)),
-                "feature_scaler.json",
-            )
+            out_scaler_path = _find_scaler_path(data_path)
             scaler.save(out_scaler_path)
             print(f"  Scaler fitted and saved: {out_scaler_path}")
 

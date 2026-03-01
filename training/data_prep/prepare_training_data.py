@@ -494,7 +494,7 @@ Examples:
         )
         scaler.transform(train, extra_cols)
         scaler.transform(trade, extra_cols)
-        scaler_path = os.path.join(args.output_dir, "feature_scaler.json")
+        scaler_path = os.path.join(args.output_dir, f"feature_scaler_{tag}.json")
         scaler.save(scaler_path)
         print(f"  Scaler fitted on train, saved: {scaler_path}")
 
@@ -509,7 +509,7 @@ Examples:
     print(f"  Trade: {trade_path} ({len(trade)} rows, {trade['tic'].nunique()} tickers)")
     if extra_cols:
         print(f"  Features: {extra_cols}")
-        print(f"  Scaler: {os.path.join(args.output_dir, 'feature_scaler.json')}")
+        print(f"  Scaler: {os.path.join(args.output_dir, f'feature_scaler_{tag}.json')}")
     print(f"{'=' * 60}")
     feat_flag = " --features" if extra_cols else ""
     print(f"\nTo train PPO:")

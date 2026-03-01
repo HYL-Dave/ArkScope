@@ -87,6 +87,45 @@ def _make_df(n_tickers=2, n_days=5, extra_cols=None):
     return pd.DataFrame(rows)
 
 
+class TestFindScalerPath:
+    def test_tagged_scaler_preferred(self, tmp_path):
+        """feature_scaler_{tag}.json is preferred over feature_scaler.json."""
+        from training.train_utils import _find_scaler_path
+
+        csv_path = str(tmp_path / "train_claude_opus.csv")
+        tagged = tmp_path / "feature_scaler_claude_opus.json"
+        legacy = tmp_path / "feature_scaler.json"
+        tagged.write_text("{}")
+        legacy.write_text("{}")
+        assert _find_scaler_path(csv_path) == str(tagged)
+
+    def test_legacy_fallback(self, tmp_path):
+        """Falls back to feature_scaler.json if tagged doesn't exist."""
+        from training.train_utils import _find_scaler_path
+
+        csv_path = str(tmp_path / "train_claude_opus.csv")
+        legacy = tmp_path / "feature_scaler.json"
+        legacy.write_text("{}")
+        assert _find_scaler_path(csv_path) == str(legacy)
+
+    def test_neither_exists_returns_tagged(self, tmp_path):
+        """If neither exists, return the tagged path (for error messages)."""
+        from training.train_utils import _find_scaler_path
+
+        csv_path = str(tmp_path / "train_test_data.csv")
+        result = _find_scaler_path(csv_path)
+        assert "feature_scaler_test_data.json" in result
+
+    def test_trade_prefix_stripped(self, tmp_path):
+        """trade_xxx.csv should find feature_scaler_xxx.json (not trade_xxx)."""
+        from training.train_utils import _find_scaler_path
+
+        csv_path = str(tmp_path / "trade_gpt5_high.csv")
+        tagged = tmp_path / "feature_scaler_gpt5_high.json"
+        tagged.write_text("{}")
+        assert _find_scaler_path(csv_path) == str(tagged)
+
+
 class TestDetectAndLoadFeatures:
     def test_no_features_returns_empty(self):
         """args.features=None → no features, no scaler."""
@@ -98,7 +137,7 @@ class TestDetectAndLoadFeatures:
     def test_path_b_computes_features(self, tmp_path):
         """args.features=[] → compute defaults on-the-fly."""
         df = _make_df(n_days=10)
-        csv_path = str(tmp_path / "train.csv")
+        csv_path = str(tmp_path / "train_test.csv")
         df.to_csv(csv_path, index=False)
 
         result_df, cols, scaler = detect_and_load_features(
@@ -107,8 +146,8 @@ class TestDetectAndLoadFeatures:
         assert len(cols) > 0
         assert scaler is not None
         assert scaler._fitted
-        # Scaler should be saved next to CSV
-        assert os.path.exists(tmp_path / "feature_scaler.json")
+        # Scaler should be saved next to CSV with tag-based name
+        assert os.path.exists(tmp_path / "feature_scaler_test.json")
 
     def test_path_b_specific_features(self, tmp_path):
         """args.features=['sentiment_7d_ma'] → compute only that one."""
@@ -153,7 +192,7 @@ class TestDetectAndLoadFeatures:
         csv_path = str(tmp_path / "train.csv")
         df.to_csv(csv_path, index=False)
 
-        with pytest.raises(FileNotFoundError, match="feature_scaler.json"):
+        with pytest.raises(FileNotFoundError, match="feature_scaler"):
             detect_and_load_features(pd.read_csv(csv_path), None, data_path=csv_path)
 
     def test_features_scaler_mismatch_raises(self, tmp_path):
@@ -209,6 +248,33 @@ class TestSaveTrainingArtifacts:
         assert meta["algorithm"] == "PPO"
         assert meta["stock_dim"] == 5
         assert meta["training_date"].endswith("Z")
+        assert meta["score_type"] == "sentiment"  # PPO default
+
+    def test_cppo_score_type_both(self, tmp_path, monkeypatch):
+        """CPPO should save score_type='both'."""
+        monkeypatch.setattr("training.train_utils.TRAINED_MODEL_DIR", str(tmp_path))
+
+        import torch.nn as nn
+        model = nn.Linear(4, 2)
+
+        save_training_artifacts(
+            model_id="cppo_score_type_test",
+            algorithm="CPPO",
+            model_state_dict=model.state_dict(),
+            score_source="test",
+            extra_cols=[],
+            stock_dim=2,
+            state_dim=30,
+            train_period="",
+            epochs=1,
+            seed=0,
+            score_type="both",
+            hyperparams={},
+        )
+
+        meta = json.loads((tmp_path / "cppo_score_type_test" / "metadata.json").read_text())
+        assert meta["score_type"] == "both"
+        assert meta["algorithm"] == "CPPO"
 
     def test_saves_scaler_when_provided(self, tmp_path, monkeypatch):
         """Scaler should be saved alongside model if provided."""

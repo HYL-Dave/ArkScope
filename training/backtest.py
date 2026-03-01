@@ -16,6 +16,7 @@ Usage:
 """
 import argparse
 import subprocess
+import warnings
 from datetime import datetime
 
 import matplotlib
@@ -184,11 +185,13 @@ def save_artifacts(env, equity, metrics, dates, output_dir: str) -> dict:
     # 3. Equity curve plot with dates
     fig, ax = plt.subplots(figsize=(10, 5))
     if dates and dates[0] != "initial":
-        try:
-            x = pd.to_datetime(dates[:len(equity_arr)])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            x = pd.to_datetime(dates[:len(equity_arr)], errors="coerce")
+        if x.notna().all():
             ax.plot(x, equity_arr)
             fig.autofmt_xdate()
-        except Exception:
+        else:
             ax.plot(equity_arr)
             ax.set_xlabel("Step")
     else:
@@ -377,7 +380,8 @@ def main():
     print(f"  Backtest Results: {derived_model_id}")
     print(f"{'=' * 60}")
     print(f"  Final Equity:      ${metrics['final_equity']:,.2f}")
-    print(f"  Total Return:      {metrics.get('total_return', 0) * 100:.2f}%")
+    tr = metrics.get("total_return")
+    print(f"  Total Return:      {tr * 100:.2f}%" if tr is not None else "  Total Return:      N/A")
     print(f"  Sharpe Ratio:      {metrics.get('sharpe_ratio', 'N/A')}")
     print(f"  Max Drawdown:      {metrics.get('max_drawdown', 'N/A')}")
     print(f"  Calmar Ratio:      {metrics.get('calmar_ratio', 'N/A')}")

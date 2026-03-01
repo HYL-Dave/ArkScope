@@ -122,6 +122,16 @@ class TestComputeMetrics:
 # ── save_artifacts ───────────────────────────────────────────
 
 
+class TestPrintSummaryEdgeCases:
+    def test_single_point_no_crash(self, capsys):
+        """Printing metrics with None total_return should not crash."""
+        metrics = compute_metrics([100])
+        # Simulate the print logic from main()
+        tr = metrics.get("total_return")
+        line = f"{tr * 100:.2f}%" if tr is not None else "N/A"
+        assert line == "N/A"
+
+
 class TestSaveArtifacts:
     def test_creates_daily_returns_csv(self, tmp_path):
         """daily_returns.csv should have date, equity, daily_return, drawdown."""
@@ -153,6 +163,21 @@ class TestSaveArtifacts:
         assert "equity_curve" in paths
         assert os.path.exists(paths["equity_curve"])
         assert paths["equity_curve"].endswith(".png")
+
+    def test_non_date_strings_no_warning(self, tmp_path):
+        """Non-date strings as dates should not produce pandas warnings."""
+        import warnings as w
+
+        class MockEnv:
+            pass
+
+        equity = [100, 101, 102]
+        metrics = compute_metrics(equity)
+        with w.catch_warnings():
+            w.simplefilter("error")  # turn warnings into errors
+            # "d1", "d2" are not dates — should fall back to step-based x-axis
+            paths = save_artifacts(MockEnv(), equity, metrics, ["d1", "d2", "d3"], str(tmp_path))
+        assert "equity_curve" in paths
 
     def test_handles_action_memory(self, tmp_path):
         """If env has save_action_memory(), it should create actions_log.csv."""

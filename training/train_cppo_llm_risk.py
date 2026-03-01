@@ -219,6 +219,7 @@ def main():
             train_period=train_period,
             epochs=args.epochs,
             seed=args.seed,
+            score_type="both",
             hyperparams={
                 "hid": args.hid,
                 "layers": args.l,
