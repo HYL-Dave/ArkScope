@@ -77,7 +77,7 @@ class ModelRegistry:
         """
         if not date_str:
             return datetime.min
-        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
             try:
                 return datetime.strptime(date_str.strip(), fmt)
             except ValueError:
