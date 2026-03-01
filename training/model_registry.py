@@ -37,7 +37,8 @@ class ModelMetadata:
     epochs: int = 0
     hyperparams: Dict = field(default_factory=dict)
     backtest_results: Dict = field(default_factory=dict)
-    training_date: str = ""          # ISO date
+    backtest_runs: List[Dict] = field(default_factory=list)  # append-only history
+    training_date: str = ""          # ISO date (UTC with Z suffix)
     model_path: str = ""             # relative path to .pth
     data_hash: str = ""              # MD5 of training CSV
 

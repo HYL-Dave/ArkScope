@@ -82,6 +82,40 @@ class TestModelMetadata:
         assert m2.feature_set == m.feature_set
         assert m2.backtest_results == m.backtest_results
 
+    def test_backtest_runs_default_empty(self):
+        from training.model_registry import ModelMetadata
+        m = ModelMetadata(model_id="test", algorithm="PPO", score_source="x")
+        assert m.backtest_runs == []
+
+    def test_backtest_runs_append(self):
+        from training.model_registry import ModelMetadata
+        m = ModelMetadata(model_id="test", algorithm="PPO", score_source="x")
+        run = {"timestamp": "2026-03-01", "metrics": {"sharpe_ratio": 1.5}}
+        m.backtest_runs.append(run)
+        assert len(m.backtest_runs) == 1
+        d = m.to_dict()
+        assert d["backtest_runs"][0]["metrics"]["sharpe_ratio"] == 1.5
+
+    def test_from_dict_without_backtest_runs(self):
+        """Old JSON without backtest_runs should still load (backward compat)."""
+        from training.model_registry import ModelMetadata
+        d = {
+            "model_id": "old_model",
+            "algorithm": "PPO",
+            "score_source": "claude",
+            "training_date": "2026-01-01",
+        }
+        m = ModelMetadata.from_dict(d)
+        assert m.backtest_runs == []
+
+    def test_utc_z_suffix_date_parsing(self):
+        """training_date with Z suffix should parse correctly."""
+        from training.model_registry import ModelRegistry
+        dt = ModelRegistry._parse_date("2026-03-01T12:30:45Z")
+        assert dt.year == 2026
+        assert dt.month == 3
+        assert dt.hour == 12
+
 
 # ============================================================
 # ModelRegistry Tests
