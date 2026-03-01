@@ -360,6 +360,12 @@ Examples:
         "--output-dir", default="training/data_prep/output",
         help="Output directory for CSV files",
     )
+    parser.add_argument(
+        "--features", nargs="*", default=None,
+        help="Enable derived features. No args = all defaults. "
+             "Specific features: --features sentiment_7d_ma sentiment_momentum. "
+             "Omit flag entirely to disable.",
+    )
     args = parser.parse_args()
 
     # Validate model argument
@@ -452,6 +458,17 @@ Examples:
             risk_scores, "llm_risk",
         )
 
+    # Feature engineering: compute on full merged df before split
+    # (so rolling windows can use train tail for trade head — no leakage)
+    extra_cols = []
+    scaler = None
+    if args.features is not None:
+        from training.data_prep.feature_engineering import engineer_features, FeatureScaler
+
+        feat_list = args.features if args.features else None  # [] → None = defaults
+        merged, extra_cols, feat_meta = engineer_features(merged, features=feat_list)
+        print(f"  Derived features: {extra_cols}")
+
     # Split into train and trade
     train = data_split(merged, args.train_start, args.train_end)
     trade = data_split(merged, args.trade_start, args.trade_end)
@@ -463,6 +480,24 @@ Examples:
         train["llm_risk"] = train["llm_risk"].fillna(3)
         trade["llm_risk"] = trade["llm_risk"].fillna(3)
 
+    # Fit scaler on train only, transform both
+    if extra_cols:
+        from training.data_prep.feature_engineering import FeatureScaler
+
+        fit_period = f"{args.train_start} ~ {args.train_end}"
+        scaler = FeatureScaler()
+        scaler.fit(
+            train, extra_cols,
+            shift=feat_meta.get("shift", 1),
+            imputation=feat_meta.get("imputation", {}),
+            fit_period=fit_period,
+        )
+        scaler.transform(train, extra_cols)
+        scaler.transform(trade, extra_cols)
+        scaler_path = os.path.join(args.output_dir, "feature_scaler.json")
+        scaler.save(scaler_path)
+        print(f"  Scaler fitted on train, saved: {scaler_path}")
+
     # Save
     train_path = os.path.join(args.output_dir, f"train_{tag}.csv")
     trade_path = os.path.join(args.output_dir, f"trade_{tag}.csv")
@@ -472,12 +507,16 @@ Examples:
     print(f"\n{'=' * 60}")
     print(f"  Train: {train_path} ({len(train)} rows, {train['tic'].nunique()} tickers)")
     print(f"  Trade: {trade_path} ({len(trade)} rows, {trade['tic'].nunique()} tickers)")
+    if extra_cols:
+        print(f"  Features: {extra_cols}")
+        print(f"  Scaler: {os.path.join(args.output_dir, 'feature_scaler.json')}")
     print(f"{'=' * 60}")
+    feat_flag = " --features" if extra_cols else ""
     print(f"\nTo train PPO:")
-    print(f"  python training/train_ppo_llm.py --data {train_path}")
+    print(f"  python training/train_ppo_llm.py --data {train_path}{feat_flag}")
     if "llm_risk" in train.columns:
         print(f"To train CPPO:")
-        print(f"  python training/train_cppo_llm_risk.py --data {train_path}")
+        print(f"  python training/train_cppo_llm_risk.py --data {train_path}{feat_flag}")
 
 
 if __name__ == "__main__":
