@@ -275,6 +275,154 @@ class TestOpenAIMaxTokens:
 
 
 # ============================================================
+# OpenAI _extract_tool_info Tests
+# ============================================================
+
+class TestExtractToolInfo:
+    """Tests for _extract_tool_info() item type dispatch and fallback paths."""
+
+    @pytest.fixture
+    def pad(self, tmp_path):
+        from src.agents.shared.scratchpad import Scratchpad
+        return Scratchpad(query="test", provider="openai", model="test",
+                          base_dir=tmp_path)
+
+    @pytest.fixture
+    def tracker(self):
+        from src.agents.shared.token_tracker import TokenTracker
+        return TokenTracker()
+
+    def _make_result(self, items_per_response):
+        """Build a mock Runner result with given output items per response."""
+        from unittest.mock import MagicMock
+        result = MagicMock()
+        result.raw_responses = []
+        for items in items_per_response:
+            resp = MagicMock()
+            resp.output = items
+            result.raw_responses.append(resp)
+        # Prevent record_openai_result from failing
+        del result.usage
+        return result
+
+    def _make_call(self, name="get_ticker_news", args='{"ticker":"NVDA"}',
+                   call_id="call_1", item_type="function_call"):
+        from unittest.mock import MagicMock
+        item = MagicMock()
+        item.type = item_type
+        item.name = name
+        item.arguments = args
+        item.call_id = call_id
+        return item
+
+    def _make_output(self, output="result_data", call_id="call_1",
+                     item_type="function_call_output"):
+        from unittest.mock import MagicMock
+        item = MagicMock()
+        item.type = item_type
+        item.output = output
+        item.call_id = call_id
+        # Ensure no 'name' attr for output items to mimic real SDK
+        del item.name
+        del item.arguments
+        return item
+
+    def test_typed_call_and_output(self, pad, tracker):
+        """Standard typed items: function_call + function_call_output."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        call = self._make_call()
+        out = self._make_output()
+        result = self._make_result([[call, out]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == ["get_ticker_news"]
+        assert len(ext.tool_calls_detail) == 1
+        assert ext.tool_calls_detail[0]["result_preview"] == "result_data"
+        assert "NVDA" in ext.tickers
+
+    def test_untyped_fallback_with_call_id(self, pad, tracker):
+        """Fallback: type=None, hasattr(output) + hasattr(call_id)."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        call = self._make_call(item_type=None)
+        out = self._make_output(item_type=None)
+        result = self._make_result([[call, out]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == ["get_ticker_news"]
+        assert ext.tool_calls_detail[0]["result_preview"] == "result_data"
+
+    def test_untyped_output_without_call_id(self, pad, tracker):
+        """Fallback: type=None, has output but NO call_id → positional fallback."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        from unittest.mock import MagicMock
+
+        call = self._make_call(item_type=None)
+        # Output item with no call_id
+        out = MagicMock()
+        out.type = None
+        out.output = "orphan_result"
+        del out.call_id
+        del out.name
+        del out.arguments
+        result = self._make_result([[call, out]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == ["get_ticker_news"]
+        # Should still be captured via positional fallback
+        assert ext.tool_calls_detail[0]["result_preview"] == "orphan_result"
+
+    def test_call_id_mapping(self, pad, tracker):
+        """Results matched to correct calls via call_id, not position."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        call_a = self._make_call(name="get_ticker_news", call_id="id_a",
+                                 args='{"ticker":"AAPL"}')
+        call_b = self._make_call(name="get_price_change", call_id="id_b",
+                                 args='{"ticker":"MSFT","days":30}')
+        # Results in reverse order
+        out_b = self._make_output(output="price_result", call_id="id_b")
+        out_a = self._make_output(output="news_result", call_id="id_a")
+        result = self._make_result([[call_a, call_b, out_b, out_a]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == ["get_ticker_news", "get_price_change"]
+        assert ext.tool_calls_detail[0]["result_preview"] == "news_result"
+        assert ext.tool_calls_detail[1]["result_preview"] == "price_result"
+        assert ext.tickers == {"AAPL", "MSFT"}
+
+    def test_tickers_from_list_param(self, pad, tracker):
+        """Tickers extracted from list-type 'tickers' parameter."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        call = self._make_call(name="get_news_brief",
+                               args='{"tickers":["NVDA","AMD","INTC"]}',
+                               call_id="call_1")
+        result = self._make_result([[call]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tickers == {"NVDA", "AMD", "INTC"}
+
+    def test_no_raw_responses(self, pad, tracker):
+        """Result without raw_responses returns empty extraction."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        from unittest.mock import MagicMock
+        result = MagicMock(spec=[])  # no raw_responses attr
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == []
+        assert ext.tool_calls_detail == []
+        assert ext.tickers == set()
+
+    def test_orphan_output_no_calls(self, pad, tracker):
+        """Output item with no preceding call → skipped, unmatched counter."""
+        from src.agents.openai_agent.agent import _extract_tool_info
+        out = self._make_output(output="orphan", call_id="no_match")
+        result = self._make_result([[out]])
+
+        ext = _extract_tool_info(result, pad, tracker, "test")
+        assert ext.tools_used == []
+        assert ext.tool_calls_detail == []
+
+
+# ============================================================
 # API Endpoint Tests (without actual LLM calls)
 # ============================================================
 
