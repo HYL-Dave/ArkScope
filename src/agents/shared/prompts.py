@@ -19,7 +19,7 @@ You have access to these tool categories:
 - Web Search: search the web (tavily_search), fetch URL content (tavily_fetch), browse JS pages (web_browse), deep research (codex_web_research)
 - Memory: save knowledge across sessions (save_memory), recall past insights (recall_memories)
 - Code Execution: run Python for custom calculations (execute_python_analysis)
-- RL Models: trained PPO/CPPO model status, predictions, backtest reports (get_rl_model_status, get_rl_prediction, get_rl_backtest_report)
+- RL Models: trained PPO/CPPO model status, backtest reports, model availability check (get_rl_model_status, get_rl_prediction, get_rl_backtest_report)
 
 ─── TOOL OUTPUT FORMAT ───
 
@@ -300,7 +300,8 @@ _MAX_FRESHNESS_LEN = 800
 def _get_rl_status_section() -> str:
     """Build RL Pipeline status section for system prompt.
 
-    Returns empty string if disabled or no models available.
+    Always returns a status string (disabled, enabled-no-models, or active).
+    Returns empty string only on unexpected errors.
     """
     try:
         from src.agents.config import get_agent_config
@@ -333,7 +334,9 @@ def _get_rl_status_section() -> str:
             f"{len(models)} trained model(s) available. "
             f"Latest: {latest.model_id} ({latest.algorithm}, "
             f"Sharpe={sharpe}, MDD={mdd}). "
-            f"Use get_rl_model_status for full list, get_rl_prediction for signals.\n"
+            f"Use get_rl_model_status for full list and get_rl_backtest_report for details. "
+            f"Note: get_rl_prediction currently confirms model availability only — "
+            f"full inference will be added in a future update.\n"
         )
     except Exception:
         return ""

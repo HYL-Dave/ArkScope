@@ -624,22 +624,21 @@ def run_anthropic_interactive(
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
-    # Freshness injection (only when feature flag is on)
-    effective_prompt = SYSTEM_PROMPT
+    # Build effective prompt: always includes RL status; freshness only when flag is on
+    from .shared.prompts import build_system_prompt
+    freshness_summary = ""
     if config.freshness_in_prompt and dal:
         try:
             from src.tools.backends.db_backend import DatabaseBackend
             if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
                 from src.tools.freshness import get_registry
-                from .shared.prompts import build_system_prompt
                 fr = get_registry(db_backend=dal._backend)
                 if fr:
                     fr.scan()
-                    summary = fr.format_summary()
-                    if summary:
-                        effective_prompt = build_system_prompt(summary)
+                    freshness_summary = fr.format_summary() or ""
         except Exception as e:
             logger.debug("CLI freshness injection failed: %s", e)
+    effective_prompt = build_system_prompt(freshness_summary)
     cached_system = _prepare_cached_system(effective_prompt)
 
     # Build user message (with optional attachment content blocks)

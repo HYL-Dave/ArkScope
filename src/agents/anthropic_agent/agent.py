@@ -199,13 +199,12 @@ async def run_query_stream(
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
-    # Freshness injection (only when feature flag is on)
-    effective_prompt = SYSTEM_PROMPT
+    # Build effective prompt: always includes RL status; freshness only when flag is on
+    from ..shared.prompts import build_system_prompt
+    freshness_summary = ""
     if config.freshness_in_prompt:
-        from ..shared.prompts import build_system_prompt
-        freshness_summary = _get_freshness_summary(dal)
-        if freshness_summary:
-            effective_prompt = build_system_prompt(freshness_summary)
+        freshness_summary = _get_freshness_summary(dal) or ""
+    effective_prompt = build_system_prompt(freshness_summary)
     cached_system = _prepare_cached_system(effective_prompt)
 
     # Initial message (with optional attachment content blocks)

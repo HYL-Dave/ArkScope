@@ -259,10 +259,8 @@ async def run_query(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
-    # Build effective system prompt (freshness injection when enabled)
-    effective_prompt = None
-    if config.freshness_in_prompt:
-        effective_prompt = _get_freshness_prompt(dal)
+    # Build effective prompt: always includes RL status; freshness only when flag is on
+    effective_prompt = _build_effective_prompt(dal, config)
 
     # Create agent with reasoning settings
     agent = _build_agent(
@@ -411,10 +409,8 @@ def run_query_sync(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
-    # Build effective system prompt (freshness injection when enabled)
-    effective_prompt = None
-    if config.freshness_in_prompt:
-        effective_prompt = _get_freshness_prompt(dal)
+    # Build effective prompt: always includes RL status; freshness only when flag is on
+    effective_prompt = _build_effective_prompt(dal, config)
 
     # Create agent with reasoning settings
     agent = _build_agent(
@@ -556,10 +552,8 @@ async def run_query_stream(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
-    # Build effective system prompt (freshness injection when enabled)
-    effective_prompt = None
-    if config.freshness_in_prompt:
-        effective_prompt = _get_freshness_prompt(dal)
+    # Build effective prompt: always includes RL status; freshness only when flag is on
+    effective_prompt = _build_effective_prompt(dal, config)
 
     # Create agent with reasoning settings
     agent = _build_agent(
@@ -682,3 +676,19 @@ def _get_freshness_prompt(dal) -> Optional[str]:
     except Exception as e:
         logger.debug("Freshness prompt build failed: %s", e)
     return None
+
+
+def _build_effective_prompt(dal, config) -> str:
+    """Build system prompt with dynamic sections (always includes RL status).
+
+    Freshness is only included when config.freshness_in_prompt is True.
+    RL status section is always included regardless of any flag.
+    """
+    from ..shared.prompts import build_system_prompt
+    freshness_summary = ""
+    if config.freshness_in_prompt:
+        prompt = _get_freshness_prompt(dal)
+        if prompt:
+            return prompt  # Already includes RL status via build_system_prompt
+        # Freshness unavailable but flag on — still build with RL status
+    return build_system_prompt(freshness_summary)

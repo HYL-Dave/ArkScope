@@ -408,7 +408,7 @@ web_search:
 rl_pipeline:
   # 是否啟用 RL 模型工具（需要先有已訓練的模型）
   # false = 工具回傳「尚未啟用」的提示訊息，不載入 PyTorch
-  # true  = 工具讀取 models_dir 的模型做推論和回測查詢
+  # true  = 工具讀取 models_dir 的模型狀態和回測結果（推論功能待 Phase 1b 實作）
   enabled: false
 
   # 已訓練模型的存放目錄（相對於專案根目錄）
