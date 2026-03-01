@@ -144,6 +144,38 @@ class TestModelRegistry:
         latest = registry.get_latest_model()
         assert latest.model_id == "new"
 
+    def test_sort_handles_inconsistent_date_formats(self, registry):
+        """training_date with mixed formats should still sort correctly."""
+        from training.model_registry import ModelMetadata
+        m1 = ModelMetadata(
+            model_id="oldest", algorithm="PPO", score_source="x",
+            training_date="2025-12-15",
+        )
+        m2 = ModelMetadata(
+            model_id="middle", algorithm="PPO", score_source="x",
+            training_date="2026-01-05T14:30:00",
+        )
+        m3 = ModelMetadata(
+            model_id="newest", algorithm="PPO", score_source="x",
+            training_date="2026-03-01",
+        )
+        m4 = ModelMetadata(
+            model_id="bad_date", algorithm="PPO", score_source="x",
+            training_date="not-a-date",
+        )
+        m5 = ModelMetadata(
+            model_id="empty_date", algorithm="PPO", score_source="x",
+            training_date="",
+        )
+        for m in (m3, m1, m5, m2, m4):  # insert out of order
+            registry.save_metadata(m)
+
+        models = registry.list_models()
+        ids = [m.model_id for m in models]
+        # newest first; unparseable dates sort to the end (mutual order undefined)
+        assert ids[:3] == ["newest", "middle", "oldest"]
+        assert set(ids[3:]) == {"bad_date", "empty_date"}
+
     def test_get_latest_model_by_algorithm(self, registry):
         from training.model_registry import ModelMetadata
         m1 = ModelMetadata(

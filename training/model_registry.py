@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -67,11 +68,27 @@ class ModelRegistry:
         self._dir = Path(models_dir)
         self._registry_path = self._dir / "registry.json"
 
+    @staticmethod
+    def _parse_date(date_str: str) -> datetime:
+        """Parse training_date string to datetime for reliable sorting.
+
+        Accepts ISO-8601 variants: 2026-03-01, 2026-03-01T12:00:00,
+        2026-3-1, etc.  Unparseable strings sort to epoch (oldest).
+        """
+        if not date_str:
+            return datetime.min
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(date_str.strip(), fmt)
+            except ValueError:
+                continue
+        return datetime.min
+
     def list_models(self) -> List[ModelMetadata]:
         """List all registered models, sorted by training_date descending."""
         index = self._load_index()
         models = [ModelMetadata.from_dict(m) for m in index]
-        models.sort(key=lambda m: m.training_date, reverse=True)
+        models.sort(key=lambda m: self._parse_date(m.training_date), reverse=True)
         return models
 
     def get_model(self, model_id: str) -> Optional[ModelMetadata]:
