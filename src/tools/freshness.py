@@ -221,13 +221,13 @@ class FreshnessRegistry:
             h.stale_reason = f"query failed: {stat['error']}"
             return h
 
-        row = stat.get("rows")
-        if not row or not row[0]:
+        rows = stat.get("rows", [])
+        if not rows or not rows[0] or not rows[0][0]:
             h.is_stale = True
             h.stale_reason = "no price data found"
             return h
 
-        latest = row[0]
+        latest = rows[0][0]
         ts = latest if isinstance(latest, datetime) else _parse_ts(latest)
         h.latest_data_at = ts
 
@@ -248,13 +248,13 @@ class FreshnessRegistry:
             h.stale_reason = f"query failed: {stat['error']}"
             return h
 
-        row = stat.get("rows")
-        if not row or not row[0]:
+        rows = stat.get("rows", [])
+        if not rows or not rows[0] or not rows[0][0]:
             h.is_stale = True
             h.stale_reason = "no IV data found"
             return h
 
-        latest = row[0]
+        latest = rows[0][0]
         ts = latest if isinstance(latest, datetime) else _parse_ts(latest)
         h.latest_data_at = ts
 
@@ -364,7 +364,7 @@ def get_registry(db_backend=None) -> Optional[FreshnessRegistry]:
 
 
 def reset_for_tests() -> None:
-    """Reset singleton + cache for test isolation."""
+    """Reset singleton + cache for test isolation. Test-only, do NOT call at runtime."""
     global _registry_instance, _registry_backend_id
     with _registry_lock:
         _registry_instance = None

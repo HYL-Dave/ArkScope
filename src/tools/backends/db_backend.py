@@ -882,17 +882,17 @@ class DatabaseBackend:
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT MAX(datetime) FROM prices WHERE interval='1d'")
-                stats["prices"] = {"rows": cur.fetchone(), "error": None}
+                stats["prices"] = {"rows": cur.fetchall(), "error": None}
         except Exception as e:
-            stats["prices"] = {"rows": None, "error": str(e)}
+            stats["prices"] = {"rows": [], "error": str(e)}
 
         # IV history: latest date
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT MAX(date) FROM iv_history")
-                stats["iv_history"] = {"rows": cur.fetchone(), "error": None}
+                stats["iv_history"] = {"rows": cur.fetchall(), "error": None}
         except Exception as e:
-            stats["iv_history"] = {"rows": None, "error": str(e)}
+            stats["iv_history"] = {"rows": [], "error": str(e)}
 
         # Financial cache: cached vs expired counts per source
         try:

@@ -56,11 +56,11 @@ class TestFreshnessRegistryScan:
                 "error": None,
             },
             "prices": {
-                "rows": (now - timedelta(hours=12),),
+                "rows": [(now - timedelta(hours=12),)],
                 "error": None,
             },
             "iv_history": {
-                "rows": (now - timedelta(hours=6),),
+                "rows": [(now - timedelta(hours=6),)],
                 "error": None,
             },
             "financial_cache": {
@@ -86,8 +86,8 @@ class TestFreshnessRegistryScan:
         old = datetime.now(timezone.utc) - timedelta(hours=30)
         stats = {
             "news": {"rows": [("finnhub", old, 0)], "error": None},
-            "prices": {"rows": None, "error": None},
-            "iv_history": {"rows": None, "error": None},
+            "prices": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -99,8 +99,8 @@ class TestFreshnessRegistryScan:
     def test_scan_query_error(self):
         stats = {
             "news": {"rows": [], "error": "connection refused"},
-            "prices": {"rows": None, "error": None},
-            "iv_history": {"rows": None, "error": None},
+            "prices": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -112,8 +112,8 @@ class TestFreshnessRegistryScan:
     def test_scan_no_data(self):
         stats = {
             "news": {"rows": [], "error": None},
-            "prices": {"rows": None, "error": None},
-            "iv_history": {"rows": None, "error": None},
+            "prices": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         fr = FreshnessRegistry(db_backend=self._make_backend(stats))
@@ -125,8 +125,8 @@ class TestFreshnessRegistryScan:
     def test_scan_cache_hit(self):
         stats = {
             "news": {"rows": [], "error": None},
-            "prices": {"rows": None, "error": None},
-            "iv_history": {"rows": None, "error": None},
+            "prices": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
@@ -141,8 +141,8 @@ class TestFreshnessRegistryScan:
     def test_scan_force_bypass_cache(self):
         stats = {
             "news": {"rows": [], "error": None},
-            "prices": {"rows": None, "error": None},
-            "iv_history": {"rows": None, "error": None},
+            "prices": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
         backend = self._make_backend(stats)
@@ -173,11 +173,11 @@ class TestFreshnessFormat:
                 "error": None,
             },
             "prices": {
-                "rows": (now - timedelta(hours=12),),
+                "rows": [(now - timedelta(hours=12),)],
                 "error": None,
             },
             "iv_history": {
-                "rows": (now - timedelta(hours=18),),
+                "rows": [(now - timedelta(hours=18),)],
                 "error": None,
             },
             "financial_cache": {
