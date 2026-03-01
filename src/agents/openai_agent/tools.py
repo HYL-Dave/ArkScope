@@ -104,6 +104,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         delete_memory as _delete_memory,
     )
     from src.tools.monitor_tools import scan_alerts as _scan_alerts
+    from src.tools.freshness import check_data_freshness as _check_data_freshness
 
     # ================================================================
     # News Tools
@@ -875,6 +876,20 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _scan_alerts(dal, tickers=tickers)
         return _serialize_result(result, "scan_alerts")
 
+    # ================================================================
+    # Data Freshness
+    # ================================================================
+
+    @function_tool
+    def tool_check_data_freshness() -> str:
+        """Check health and freshness of all data sources (news, prices, IV, fundamentals).
+
+        Returns staleness status, latest data timestamps, and record counts.
+        Use to verify data quality before analysis.
+        """
+        result = _check_data_freshness(dal)
+        return _serialize_result(result, "check_data_freshness")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -914,6 +929,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_list_memories,
         tool_delete_memory,
         tool_scan_alerts,
+        tool_check_data_freshness,
     ]
 
     # Conditionally add web tools

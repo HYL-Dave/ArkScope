@@ -8,9 +8,11 @@ Provides run_query(), run_query_sync(), and run_query_stream().
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import traceback as _traceback_mod
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.events import AgentEvent, EventType
@@ -68,11 +70,108 @@ def _make_compaction_session():
         return None
 
 
+@dataclass
+class ToolExtraction:
+    """Result of extracting tool info from Runner.run() result."""
+    tools_used: List[str] = field(default_factory=list)
+    tool_calls_detail: List[Dict[str, Any]] = field(default_factory=list)
+    tickers: Set[str] = field(default_factory=set)
+
+
+def _extract_tool_info(
+    result,
+    pad: Scratchpad,
+    tracker: TokenTracker,
+    model_name: str,
+) -> ToolExtraction:
+    """Extract tool calls, results, tickers from Runner result.
+
+    Shared by all 3 run functions to avoid logic drift.
+    Uses call_id mapping to correctly associate results with calls.
+    """
+    ext = ToolExtraction()
+    if not hasattr(result, "raw_responses"):
+        return ext
+
+    tracker.record_openai_result(result, model=model_name)
+
+    # Build call_id → detail index mapping for correct result association
+    call_id_map: Dict[str, int] = {}
+    unmatched_results = 0
+
+    for response in result.raw_responses:
+        if not hasattr(response, "output"):
+            continue
+        for item in response.output:
+            item_type = getattr(item, "type", None)
+
+            if item_type == "function_call" or (
+                item_type is None and hasattr(item, "name") and hasattr(item, "arguments")
+            ):
+                # Tool call item
+                call_id = getattr(item, "call_id", None) or getattr(item, "id", None)
+                args = getattr(item, "arguments", {})
+                ext.tools_used.append(item.name)
+                pad.log_tool_call(item.name, args if isinstance(args, dict) else {"raw": args})
+
+                # Parse arguments
+                if isinstance(args, str):
+                    try:
+                        args_dict = json.loads(args)
+                    except (ValueError, TypeError):
+                        args_dict = {"raw": args}
+                else:
+                    args_dict = args or {}
+
+                # Extract tickers from params
+                for k in ("ticker", "tickers"):
+                    v = args_dict.get(k)
+                    if isinstance(v, str) and v:
+                        ext.tickers.add(v.upper())
+                    elif isinstance(v, list):
+                        ext.tickers.update(t.upper() for t in v if isinstance(t, str))
+
+                detail: Dict[str, Any] = {"name": item.name, "params": args_dict}
+                ext.tool_calls_detail.append(detail)
+                if call_id:
+                    call_id_map[call_id] = len(ext.tool_calls_detail) - 1
+
+            elif item_type == "function_call_output" or (
+                item_type is None and hasattr(item, "output") and not hasattr(item, "name")
+            ):
+                # Tool result item — match by call_id, fallback to positional
+                output_str = str(item.output) if item.output else ""
+                result_call_id = getattr(item, "call_id", None)
+                target_idx = call_id_map.get(result_call_id) if result_call_id else None
+                if target_idx is not None:
+                    target_detail = ext.tool_calls_detail[target_idx]
+                elif ext.tool_calls_detail:
+                    target_detail = ext.tool_calls_detail[-1]
+                    unmatched_results += 1
+                else:
+                    unmatched_results += 1
+                    continue
+                target_detail["result_preview"] = output_str[:200]
+                pad.log_tool_result(
+                    target_detail["name"],
+                    result_data=output_str[:5000],
+                    tool_input=target_detail.get("params"),
+                )
+
+    if unmatched_results:
+        logger.debug(
+            "_extract_tool_info: %d tool results could not be matched by call_id",
+            unmatched_results,
+        )
+    return ext
+
+
 def _build_agent(
     model_name: str,
     tools: list,
     reasoning_effort: ReasoningEffort = "high",
     max_tokens: int = 16384,
+    system_prompt: Optional[str] = None,
 ):
     """Build an Agent with ModelSettings including reasoning config.
 
@@ -103,7 +202,7 @@ def _build_agent(
 
     return Agent(
         name="MindfulRL Assistant",
-        instructions=SYSTEM_PROMPT,
+        instructions=system_prompt or SYSTEM_PROMPT,
         model=model_name,
         tools=all_tools,
         model_settings=ModelSettings(
@@ -160,8 +259,16 @@ async def run_query(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
+    # Build effective system prompt (freshness injection when enabled)
+    effective_prompt = None
+    if config.freshness_in_prompt:
+        effective_prompt = _get_freshness_prompt(dal)
+
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
+    agent = _build_agent(
+        model_name, tools, reasoning_effort=effort,
+        max_tokens=config.max_tokens, system_prompt=effective_prompt,
+    )
 
     # Run query
     logger.info(
@@ -170,6 +277,8 @@ async def run_query(
     )
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
+    tracker = TokenTracker()
+    tools_used: List[str] = []
 
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
@@ -194,6 +303,11 @@ async def run_query(
 
     # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
     try:
+        logger.debug(
+            "Runner.run starting: model=%s effort=%s max_turns=%d compaction=%s",
+            model_name, effort, effective_max_turns, bool(session),
+        )
+
         # Retry on transient SDK errors (e.g. "No tool output found" race condition)
         _max_retries = 2
         for _attempt in range(_max_retries):
@@ -208,49 +322,26 @@ async def run_query(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
+                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    pad.log_retry(
+                        attempt=_attempt + 1, error_message=err_str[:200],
+                        retryable=True, reason_code=reason,
+                    )
                     continue
                 raise  # let outer try handle logging
 
+        raw_count = len(result.raw_responses) if hasattr(result, "raw_responses") else 0
+        logger.debug(
+            "Runner.run completed: %d raw_responses, final_output=%d chars",
+            raw_count, len(str(result.final_output)) if result.final_output else 0,
+        )
+
         # Extract tools used, tool details, tickers, and token usage from result
-        tracker = TokenTracker()
-        tools_used = []
-        tool_calls_detail = []
-        tickers_set: set = set()
-        if hasattr(result, "raw_responses"):
-            tracker.record_openai_result(result, model=model_name)
-            for response in result.raw_responses:
-                if hasattr(response, "output"):
-                    for item in response.output:
-                        if hasattr(item, "name"):
-                            tools_used.append(item.name)
-                            args = getattr(item, "arguments", {})
-                            pad.log_tool_call(item.name, args)
-                            # Parse arguments for detail
-                            if isinstance(args, str):
-                                try:
-                                    import json as _json
-                                    args_dict = _json.loads(args)
-                                except (ValueError, TypeError):
-                                    args_dict = {"raw": args}
-                            else:
-                                args_dict = args or {}
-                            # Extract tickers from params
-                            for k in ("ticker", "tickers"):
-                                v = args_dict.get(k)
-                                if isinstance(v, str) and v:
-                                    tickers_set.add(v.upper())
-                                elif isinstance(v, list):
-                                    tickers_set.update(t.upper() for t in v if isinstance(t, str))
-                            tool_calls_detail.append({
-                                "name": item.name,
-                                "params": args_dict,
-                            })
-                        # Capture tool output preview
-                        elif hasattr(item, "output") and tool_calls_detail:
-                            output_str = str(item.output) if item.output else ""
-                            tool_calls_detail[-1]["result_preview"] = output_str[:200]
+        ext = _extract_tool_info(result, pad, tracker, model_name)
+        tools_used = ext.tools_used
 
         answer = str(result.final_output) if result.final_output else ""
+        logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
 
@@ -262,8 +353,8 @@ async def run_query(
             "provider": "openai",
             "model": model_name,
             "token_usage": tracker.summary(),
-            "tickers": sorted(tickers_set) if tickers_set else [],
-            "tool_calls_detail": tool_calls_detail if tool_calls_detail else [],
+            "tickers": sorted(ext.tickers) if ext.tickers else [],
+            "tool_calls_detail": ext.tool_calls_detail if ext.tool_calls_detail else [],
         }
 
     except Exception as exc:
@@ -271,6 +362,8 @@ async def run_query(
             error_type=type(exc).__name__,
             message=str(exc),
             traceback_str=_traceback_mod.format_exc(),
+            tools_used=list(set(tools_used)) if tools_used else None,
+            token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
         raise
@@ -318,8 +411,16 @@ def run_query_sync(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
+    # Build effective system prompt (freshness injection when enabled)
+    effective_prompt = None
+    if config.freshness_in_prompt:
+        effective_prompt = _get_freshness_prompt(dal)
+
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
+    agent = _build_agent(
+        model_name, tools, reasoning_effort=effort,
+        max_tokens=config.max_tokens, system_prompt=effective_prompt,
+    )
 
     # Run query synchronously
     logger.info(
@@ -328,6 +429,8 @@ def run_query_sync(
     )
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
+    tracker = TokenTracker()
+    tools_used: List[str] = []
 
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
@@ -343,6 +446,11 @@ def run_query_sync(
 
     # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
     try:
+        logger.debug(
+            "Runner.run_sync starting: model=%s effort=%s max_turns=%d compaction=%s",
+            model_name, effort, effective_max_turns, bool(session),
+        )
+
         # Retry on transient SDK errors
         _max_retries = 2
         for _attempt in range(_max_retries):
@@ -357,22 +465,26 @@ def run_query_sync(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
+                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    pad.log_retry(
+                        attempt=_attempt + 1, error_message=err_str[:200],
+                        retryable=True, reason_code=reason,
+                    )
                     continue
                 raise  # let outer try handle logging
 
+        raw_count = len(result.raw_responses) if hasattr(result, "raw_responses") else 0
+        logger.debug(
+            "Runner.run_sync completed: %d raw_responses, final_output=%d chars",
+            raw_count, len(str(result.final_output)) if result.final_output else 0,
+        )
+
         # Extract tools used and token usage
-        tracker = TokenTracker()
-        tools_used = []
-        if hasattr(result, "raw_responses"):
-            tracker.record_openai_result(result, model=model_name)
-            for response in result.raw_responses:
-                if hasattr(response, "output"):
-                    for item in response.output:
-                        if hasattr(item, "name"):
-                            tools_used.append(item.name)
-                            pad.log_tool_call(item.name, getattr(item, "arguments", {}))
+        ext = _extract_tool_info(result, pad, tracker, model_name)
+        tools_used = ext.tools_used
 
         answer = str(result.final_output) if result.final_output else ""
+        logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
 
@@ -384,6 +496,8 @@ def run_query_sync(
             "provider": "openai",
             "model": model_name,
             "token_usage": tracker.summary(),
+            "tickers": sorted(ext.tickers) if ext.tickers else [],
+            "tool_calls_detail": ext.tool_calls_detail if ext.tool_calls_detail else [],
         }
 
     except Exception as exc:
@@ -391,6 +505,8 @@ def run_query_sync(
             error_type=type(exc).__name__,
             message=str(exc),
             traceback_str=_traceback_mod.format_exc(),
+            tools_used=list(set(tools_used)) if tools_used else None,
+            token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
         raise
@@ -440,8 +556,16 @@ async def run_query_stream(
     # Create tools bound to DAL
     tools = create_openai_tools(dal)
 
+    # Build effective system prompt (freshness injection when enabled)
+    effective_prompt = None
+    if config.freshness_in_prompt:
+        effective_prompt = _get_freshness_prompt(dal)
+
     # Create agent with reasoning settings
-    agent = _build_agent(model_name, tools, reasoning_effort=effort, max_tokens=config.max_tokens)
+    agent = _build_agent(
+        model_name, tools, reasoning_effort=effort,
+        max_tokens=config.max_tokens, system_prompt=effective_prompt,
+    )
 
     logger.info(
         f"Running OpenAI agent (stream): model={model_name} reasoning={effort} "
@@ -451,13 +575,16 @@ async def run_query_stream(
     yield AgentEvent(EventType.thinking, {"turn": 1, "model": model_name})
 
     pad = Scratchpad(query=question, provider="openai", model=model_name)
+    tracker = TokenTracker()
+    tools_used: List[str] = []
 
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
+    effective_max_turns = config.max_tool_calls
     runner_kwargs = dict(
         input=question,
-        max_turns=config.max_tool_calls,
+        max_turns=effective_max_turns,
         auto_previous_response_id=True,
     )
     if session:
@@ -465,6 +592,11 @@ async def run_query_stream(
 
     # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
     try:
+        logger.debug(
+            "Runner.run starting (stream): model=%s effort=%s max_turns=%d compaction=%s",
+            model_name, effort, effective_max_turns, bool(session),
+        )
+
         # Retry on transient SDK errors
         _max_retries = 2
         result = None
@@ -480,23 +612,30 @@ async def run_query_stream(
                         "Retryable SDK error (attempt %d/%d): %s",
                         _attempt + 1, _max_retries, err_str[:200],
                     )
+                    reason = "no_tool_output" if "No tool output found" in err_str else "unknown"
+                    pad.log_retry(
+                        attempt=_attempt + 1, error_message=err_str[:200],
+                        retryable=True, reason_code=reason,
+                    )
                     continue
                 raise  # let outer try handle logging
 
+        raw_count = len(result.raw_responses) if hasattr(result, "raw_responses") else 0
+        logger.debug(
+            "Runner.run completed (stream): %d raw_responses, final_output=%d chars",
+            raw_count, len(str(result.final_output)) if result.final_output else 0,
+        )
+
         # Extract tools used and token usage from result
-        tracker = TokenTracker()
-        tools_used: List[str] = []
-        if hasattr(result, "raw_responses"):
-            tracker.record_openai_result(result, model=model_name)
-            for response in result.raw_responses:
-                if hasattr(response, "output"):
-                    for item in response.output:
-                        if hasattr(item, "name"):
-                            tools_used.append(item.name)
-                            pad.log_tool_call(item.name, getattr(item, "arguments", {}))
-                            yield AgentEvent(EventType.tool_end, {"tool": item.name})
+        ext = _extract_tool_info(result, pad, tracker, model_name)
+        tools_used = ext.tools_used
+
+        # Emit tool_end events for stream consumers
+        for detail in ext.tool_calls_detail:
+            yield AgentEvent(EventType.tool_end, {"tool": detail["name"]})
 
         answer = str(result.final_output) if result.final_output else ""
+        logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
 
@@ -515,9 +654,31 @@ async def run_query_stream(
             error_type=type(exc).__name__,
             message=str(exc),
             traceback_str=_traceback_mod.format_exc(),
+            tools_used=list(set(tools_used)) if tools_used else None,
+            token_usage=tracker.summary() if tracker.turn_count > 0 else None,
         )
         pad.close()
         yield AgentEvent(EventType.error, {
             "error": f"{type(exc).__name__}: {str(exc)[:500]}",
             "scratchpad": str(pad.filepath) if pad.filepath else None,
         })
+
+
+# ── Freshness prompt helper ──────────────────────────────────
+
+def _get_freshness_prompt(dal) -> Optional[str]:
+    """Build system prompt with freshness summary if DB backend available."""
+    try:
+        from src.tools.backends.db_backend import DatabaseBackend
+        if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
+            from src.tools.freshness import get_registry
+            from ..shared.prompts import build_system_prompt
+            fr = get_registry(db_backend=dal._backend)
+            if fr:
+                fr.scan()
+                summary = fr.format_summary()
+                if summary:
+                    return build_system_prompt(summary)
+    except Exception as e:
+        logger.debug("Freshness prompt build failed: %s", e)
+    return None

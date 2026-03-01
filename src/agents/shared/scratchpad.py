@@ -195,6 +195,38 @@ class Scratchpad:
             data["turn"] = turn
         self._write_event("error", data, token_usage=token_usage)
 
+    def log_thinking(self, preview: str, full_length: int = 0) -> None:
+        """Record a thinking/reasoning block (e.g. Anthropic extended thinking)."""
+        self._write_event("thinking", {
+            "preview": preview[:500],
+            "full_length": full_length or len(preview),
+        })
+
+    def log_pause_turn(self) -> None:
+        """Record a pause_turn event (e.g. Claude web search in progress)."""
+        self._write_event("pause_turn", {})
+
+    def log_compaction(self, source: str = "server") -> None:
+        """Record a context compaction event."""
+        self._write_event("compaction", {"source": source})
+
+    def log_retry(
+        self,
+        attempt: int,
+        error_message: str,
+        max_retries: int = 2,
+        retryable: bool = True,
+        reason_code: str = "",
+    ) -> None:
+        """Record a retry attempt (e.g. OpenAI Runner.run() retry)."""
+        self._write_event("retry", {
+            "attempt": attempt,
+            "max_retries": max_retries,
+            "error": error_message[:500],
+            "retryable": retryable,
+            "reason_code": reason_code,
+        })
+
     def close(self) -> None:
         """Flush and close the JSONL file."""
         if self._file and not self._file.closed:

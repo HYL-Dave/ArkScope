@@ -166,6 +166,7 @@ class ToolRegistry:
         self._register_web_tools()
         self._register_execution_tools()
         self._register_monitor_tools()
+        self._register_freshness_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -912,6 +913,23 @@ class ToolRegistry:
                     required=False, default="",
                 ),
             ],
+        ))
+
+
+    def _register_freshness_tools(self) -> None:
+        from .freshness import check_data_freshness
+
+        self.register(ToolDefinition(
+            name="check_data_freshness",
+            description=(
+                "Check health and freshness of all data sources (news, prices, "
+                "IV history, fundamentals cache). Returns staleness status, "
+                "latest data timestamps, and record counts."
+            ),
+            function=check_data_freshness,
+            category="analysis",
+            parameters=[],
+            requires_dal=True,
         ))
 
 

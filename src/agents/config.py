@@ -84,6 +84,9 @@ class AgentConfig(BaseModel):
     # Both work on top of L1 client-side compaction (ContextManager)
     server_compaction: bool = False
 
+    # Data freshness in system prompt (default: off, preserves prompt cache hit rate)
+    freshness_in_prompt: bool = False
+
     # Web search providers (Phase 10)
     # Each can be independently enabled/disabled for cost control
     web_tavily: bool = True           # Tavily search + fetch (free 1000 credits/month)
@@ -194,6 +197,10 @@ def get_agent_config() -> AgentConfig:
         config.anthropic_effort = llm_prefs["anthropic_effort"]
     if "anthropic_thinking" in llm_prefs:
         config.anthropic_thinking = llm_prefs["anthropic_thinking"]
+
+    # Freshness in prompt
+    if "freshness_in_prompt" in llm_prefs:
+        config.freshness_in_prompt = llm_prefs["freshness_in_prompt"]
 
     # Code generation overrides
     if "code_model" in llm_prefs:

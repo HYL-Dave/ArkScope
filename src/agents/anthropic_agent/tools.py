@@ -972,6 +972,20 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": [],
             },
         },
+        # Data Freshness
+        {
+            "name": "check_data_freshness",
+            "description": (
+                "Check health and freshness of all data sources (news, prices, IV, fundamentals). "
+                "Returns staleness status, latest data timestamps, and record counts. "
+                "Use to verify data quality before analysis."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
     ])
 
     return tools
@@ -1071,6 +1085,7 @@ def execute_tool(
         save_memory, recall_memories, list_memories, delete_memory,
     )
     from src.tools.monitor_tools import scan_alerts
+    from src.tools.freshness import check_data_freshness
 
     # Tool dispatch map
     tool_map = {
@@ -1310,6 +1325,8 @@ def execute_tool(
             dal,
             tickers=tool_input.get("tickers", ""),
         ),
+        # Data Freshness
+        "check_data_freshness": lambda: check_data_freshness(dal),
     }
 
     if tool_name not in tool_map:

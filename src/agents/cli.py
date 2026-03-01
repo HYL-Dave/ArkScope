@@ -624,7 +624,23 @@ def run_anthropic_interactive(
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
-    cached_system = _prepare_cached_system(SYSTEM_PROMPT)
+    # Freshness injection (only when feature flag is on)
+    effective_prompt = SYSTEM_PROMPT
+    if config.freshness_in_prompt and dal:
+        try:
+            from src.tools.backends.db_backend import DatabaseBackend
+            if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
+                from src.tools.freshness import get_registry
+                from .shared.prompts import build_system_prompt
+                fr = get_registry(db_backend=dal._backend)
+                if fr:
+                    fr.scan()
+                    summary = fr.format_summary()
+                    if summary:
+                        effective_prompt = build_system_prompt(summary)
+        except Exception as e:
+            logger.debug("CLI freshness injection failed: %s", e)
+    cached_system = _prepare_cached_system(effective_prompt)
 
     # Build user message (with optional attachment content blocks)
     if attachments:
@@ -1942,6 +1958,29 @@ def handle_scratchpad_command(arg: str) -> None:
                 elif ev_type == "max_turns":
                     elapsed = data.get("elapsed_seconds", "?")
                     console.print(f"  [red]max_turns[/red] {elapsed}s | tools: {data.get('tools_used', [])}")
+                elif ev_type == "error":
+                    error_type = data.get("error_type", "?")
+                    msg = data.get("message", "")[:120]
+                    turn = data.get("turn")
+                    elapsed = data.get("elapsed_seconds", "?")
+                    console.print(f"  [red]error[/red] {error_type} turn={turn or '?'} | {elapsed}s | {msg}")
+                elif ev_type == "thinking":
+                    preview = data.get("preview", "")[:80]
+                    full_len = data.get("full_length", 0)
+                    console.print(f"  [magenta]thinking[/magenta] ({full_len} chars) {preview}")
+                elif ev_type == "pause_turn":
+                    console.print("  [blue]pause_turn[/blue] web search in progress")
+                elif ev_type == "compaction":
+                    console.print(f"  [blue]compaction[/blue] source={data.get('source', '?')}")
+                elif ev_type == "retry":
+                    retryable = "retryable" if data.get("retryable") else "non-retryable"
+                    reason = data.get("reason_code", "")
+                    reason_str = f" [{reason}]" if reason else ""
+                    console.print(f"  [yellow]retry[/yellow] {data.get('attempt')}/{data.get('max_retries')} {retryable}{reason_str} | {data.get('error', '')[:80]}")
+                # Token usage (shown for events that include it)
+                if ev.get("token_usage"):
+                    tu = ev["token_usage"]
+                    console.print(f"    [dim]tokens: in={tu.get('total_input_tokens', '?')} out={tu.get('total_output_tokens', '?')}[/dim]")
             console.print()
             return
         console.print(f"[red]No scratchpad matching '{arg}'[/red]\n")

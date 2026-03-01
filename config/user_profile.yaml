@@ -281,6 +281,11 @@ llm_preferences:
   #   - 其他模型: budget = max_output - max_tokens (留 max_tokens 給 response)
   # anthropic_thinking: false
 
+  # Data freshness in system prompt (default: false)
+  # false = freshness only via check_data_freshness tool (preserves prompt cache hit rate)
+  # true = inject freshness summary into system prompt (reduces cache hit rate)
+  # freshness_in_prompt: false
+
   # ── 1M Context Beta (Anthropic only, Opus 4.6 + Sonnet 4.6) ──
   # 需要 Tier 4 organization，context 超過 200K 時加價
   # extended_context: false

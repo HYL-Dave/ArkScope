@@ -515,10 +515,10 @@ class TestAnthropicBridgeIntegration:
         assert "delegate_to_subagent" in names
 
     def test_anthropic_tools_count_31(self):
-        """18 original + 3 web + 1 analyst + 1 insider + delegate + 3 report + 4 memory = 31."""
+        """All bridge tools including delegate + freshness."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 41
+        assert len(tools) == 42
 
     def test_delegate_schema_has_enum(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
@@ -542,11 +542,11 @@ class TestAnthropicBridgeIntegration:
 
 class TestOpenAiBridgeIntegration:
     def test_openai_tools_count_31(self):
-        """18 original + 3 web + 1 analyst + 1 insider + delegate + 3 report + 4 memory = 31."""
+        """All bridge tools including delegate + freshness."""
         from src.agents.openai_agent.tools import create_openai_tools
         mock_dal = MagicMock()
         tools = create_openai_tools(mock_dal)
-        assert len(tools) == 41
+        assert len(tools) == 42
 
     def test_openai_tools_includes_delegate(self):
         from src.agents.openai_agent.tools import create_openai_tools

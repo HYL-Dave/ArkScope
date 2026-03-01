@@ -547,6 +547,96 @@ class TestScratchpadLogError:
         assert events[3]["data"]["turn"] == 3
 
 
+# ── New event types (Phase: Scratchpad Enhancement) ──────────
+
+
+class TestScratchpadNewEvents:
+    def test_log_thinking(self, tmp_path):
+        pad = Scratchpad("q", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad.log_thinking(preview="Let me analyze...", full_length=2500)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events) == 2  # init + thinking
+        ev = events[1]
+        assert ev["type"] == "thinking"
+        assert ev["data"]["preview"] == "Let me analyze..."
+        assert ev["data"]["full_length"] == 2500
+
+    def test_log_thinking_preview_truncated(self, tmp_path):
+        pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        long_preview = "x" * 1000
+        pad.log_thinking(preview=long_preview)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events[1]["data"]["preview"]) <= 500
+
+    def test_log_pause_turn(self, tmp_path):
+        pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        pad.log_pause_turn()
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events) == 2
+        assert events[1]["type"] == "pause_turn"
+
+    def test_log_compaction(self, tmp_path):
+        pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)
+        pad.log_compaction(source="server")
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events) == 2
+        assert events[1]["type"] == "compaction"
+        assert events[1]["data"]["source"] == "server"
+
+    def test_log_retry(self, tmp_path):
+        pad = Scratchpad("q", "openai", "gpt-5.2", base_dir=tmp_path)
+        pad.log_retry(
+            attempt=1, error_message="No tool output found",
+            max_retries=2, retryable=True, reason_code="no_tool_output",
+        )
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events) == 2
+        ev = events[1]
+        assert ev["type"] == "retry"
+        assert ev["data"]["attempt"] == 1
+        assert ev["data"]["max_retries"] == 2
+        assert ev["data"]["retryable"] is True
+        assert ev["data"]["reason_code"] == "no_tool_output"
+        assert "No tool output" in ev["data"]["error"]
+
+    def test_log_retry_error_truncated(self, tmp_path):
+        pad = Scratchpad("q", "openai", "gpt", base_dir=tmp_path)
+        pad.log_retry(attempt=1, error_message="x" * 1000)
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        assert len(events[1]["data"]["error"]) <= 500
+
+    def test_full_session_with_new_events(self, tmp_path):
+        """Session with thinking + retry + tool + final."""
+        pad = Scratchpad("test", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad.log_thinking(preview="Analyzing...", full_length=800)
+        pad.log_tool_result("get_news", result_data='{"count": 5}')
+        pad.log_compaction(source="server")
+        pad.log_pause_turn()
+        pad.log_retry(attempt=1, error_message="transient error")
+        pad.log_final_answer("Done.", tools_used=["get_news"])
+        pad.close()
+
+        events = read_scratchpad(pad.filepath)
+        types = [e["type"] for e in events]
+        assert types == [
+            "init", "thinking", "tool_result", "compaction",
+            "pause_turn", "retry", "final_answer",
+        ]
+        assert [e["seq"] for e in events] == [1, 2, 3, 4, 5, 6, 7]
+
+
 class TestScratchpadRepr:
     def test_repr(self, tmp_path):
         pad = Scratchpad("q", "anthropic", "claude", base_dir=tmp_path)

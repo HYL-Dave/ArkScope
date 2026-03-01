@@ -199,7 +199,14 @@ async def run_query_stream(
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
-    cached_system = _prepare_cached_system(SYSTEM_PROMPT)
+    # Freshness injection (only when feature flag is on)
+    effective_prompt = SYSTEM_PROMPT
+    if config.freshness_in_prompt:
+        from ..shared.prompts import build_system_prompt
+        freshness_summary = _get_freshness_summary(dal)
+        if freshness_summary:
+            effective_prompt = build_system_prompt(freshness_summary)
+    cached_system = _prepare_cached_system(effective_prompt)
 
     # Initial message (with optional attachment content blocks)
     if attachments:
@@ -300,17 +307,23 @@ async def run_query_stream(
                     yield AgentEvent(EventType.thinking_content, {
                         "thinking": block.thinking,
                     })
+                    pad.log_thinking(
+                        preview=block.thinking[:500],
+                        full_length=len(block.thinking),
+                    )
 
             # Handle pause_turn (Claude web search server tool mid-turn pause)
             if response.stop_reason == "pause_turn":
                 messages.append({"role": "assistant", "content": response.content})
                 logger.debug("pause_turn: Claude web search in progress, continuing...")
+                pad.log_pause_turn()
                 continue
 
             # Handle compaction (server-side context compaction, Phase 7a)
             if response.stop_reason == "compaction":
                 messages.append({"role": "assistant", "content": response.content})
                 logger.info("Server compaction triggered — context summarized, continuing...")
+                pad.log_compaction(source="server")
                 continue
 
             # Check if we're done
@@ -469,3 +482,20 @@ def run_query(
         return result
 
     return asyncio.run(_collect())
+
+
+# ── Freshness helper ─────────────────────────────────────────
+
+def _get_freshness_summary(dal) -> str:
+    """Get freshness summary string from singleton registry."""
+    try:
+        from src.tools.backends.db_backend import DatabaseBackend
+        if hasattr(dal, "_backend") and isinstance(dal._backend, DatabaseBackend):
+            from src.tools.freshness import get_registry
+            fr = get_registry(db_backend=dal._backend)
+            if fr:
+                fr.scan()
+                return fr.format_summary()
+    except Exception as e:
+        logger.debug("Freshness scan failed: %s", e)
+    return ""

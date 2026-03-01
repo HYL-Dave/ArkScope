@@ -2,6 +2,8 @@
 Shared system prompts for agent implementations.
 """
 
+import re
+
 SYSTEM_PROMPT = """\
 You are a senior financial analyst embedded in the MindfulRL trading system.
 Your job is to deliver institutional-quality analysis, not surface-level summaries.
@@ -287,3 +289,24 @@ Every substantive analysis should include:
 For quick factual queries (e.g., "What is NVDA's price?"), a concise
 answer is fine — the full framework is for analytical questions.
 """
+
+# ── Dynamic system prompt builder ─────────────────────────────
+
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
+_MAX_FRESHNESS_LEN = 800
+
+
+def build_system_prompt(freshness_summary: str = "") -> str:
+    """Build system prompt with optional dynamic freshness section.
+
+    The static SYSTEM_PROMPT is always the base. When freshness_summary
+    is provided, it's sanitized and appended.
+    """
+    if not freshness_summary:
+        return SYSTEM_PROMPT
+    # Sanitize: strip control chars + enforce length cap
+    clean = _CONTROL_CHAR_RE.sub(" ", freshness_summary).strip()
+    clean = clean[:_MAX_FRESHNESS_LEN]
+    if not clean:
+        return SYSTEM_PROMPT
+    return SYSTEM_PROMPT + f"\n\n─── DATA FRESHNESS ───\n\n{clean}\n"

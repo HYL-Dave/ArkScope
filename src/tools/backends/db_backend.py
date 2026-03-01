@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import psycopg2
@@ -846,3 +846,65 @@ class DatabaseBackend:
             logger.error(f"Failed to write financial cache: {e}")
             self._conn = None
             return False
+
+    # --------------------------------------------------------
+    # Health / Freshness Statistics
+    # --------------------------------------------------------
+
+    def query_health_stats(self) -> Dict[str, Any]:
+        """Return freshness/health statistics for all data sources.
+
+        Public API for FreshnessRegistry — isolates health queries from
+        internal implementation details. Each source query is independent
+        with its own cursor: partial failure returns error detail without
+        blocking other sources.
+
+        Returns:
+            Dict with keys: news, prices, iv_history, financial_cache.
+            Each value is {"rows": ..., "error": str|None}.
+        """
+        conn = self._get_conn()
+        stats: Dict[str, Any] = {}
+
+        # News: global latest + recent 7d count per source
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source, MAX(published_at) AS latest, "
+                    "COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '7 days') AS recent_count "
+                    "FROM news GROUP BY source"
+                )
+                stats["news"] = {"rows": cur.fetchall(), "error": None}
+        except Exception as e:
+            stats["news"] = {"rows": [], "error": str(e)}
+
+        # Prices: latest 1d bar timestamp
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT MAX(datetime) FROM prices WHERE interval='1d'")
+                stats["prices"] = {"rows": cur.fetchone(), "error": None}
+        except Exception as e:
+            stats["prices"] = {"rows": None, "error": str(e)}
+
+        # IV history: latest date
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT MAX(date) FROM iv_history")
+                stats["iv_history"] = {"rows": cur.fetchone(), "error": None}
+        except Exception as e:
+            stats["iv_history"] = {"rows": None, "error": str(e)}
+
+        # Financial cache: cached vs expired counts per source
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT source, "
+                    "COUNT(*) FILTER (WHERE expires_at > NOW()) AS cached, "
+                    "COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired "
+                    "FROM financial_data_cache GROUP BY source"
+                )
+                stats["financial_cache"] = {"rows": cur.fetchall(), "error": None}
+        except Exception as e:
+            stats["financial_cache"] = {"rows": [], "error": str(e)}
+
+        return stats
