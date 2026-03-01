@@ -87,6 +87,12 @@ class AgentConfig(BaseModel):
     # Data freshness in system prompt (default: off, preserves prompt cache hit rate)
     freshness_in_prompt: bool = False
 
+    # RL Pipeline integration (Phase 1c)
+    # When enabled, rl_model_status / rl_prediction / rl_backtest_report tools
+    # return real model data. When disabled, they return informational messages.
+    rl_pipeline_enabled: bool = False
+    rl_models_dir: str = "trained_models"
+
     # Web search providers (Phase 10)
     # Each can be independently enabled/disabled for cost control
     web_tavily: bool = True           # Tavily search + fetch (free 1000 credits/month)
@@ -201,6 +207,13 @@ def get_agent_config() -> AgentConfig:
     # Freshness in prompt
     if "freshness_in_prompt" in llm_prefs:
         config.freshness_in_prompt = llm_prefs["freshness_in_prompt"]
+
+    # RL Pipeline
+    rl_prefs = profile.get("rl_pipeline", {})
+    if "enabled" in rl_prefs:
+        config.rl_pipeline_enabled = rl_prefs["enabled"]
+    if "models_dir" in rl_prefs:
+        config.rl_models_dir = rl_prefs["models_dir"]
 
     # Code generation overrides
     if "code_model" in llm_prefs:

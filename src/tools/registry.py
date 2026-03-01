@@ -167,6 +167,7 @@ class ToolRegistry:
         self._register_execution_tools()
         self._register_monitor_tools()
         self._register_freshness_tools()
+        self._register_rl_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -930,6 +931,57 @@ class ToolRegistry:
             category="analysis",
             parameters=[],
             requires_dal=True,
+        ))
+
+
+    def _register_rl_tools(self) -> None:
+        from .rl_tools import get_rl_model_status, get_rl_prediction, get_rl_backtest_report
+
+        self.register(ToolDefinition(
+            name="get_rl_model_status",
+            description=(
+                "List all trained RL models (PPO/CPPO) with backtest performance: "
+                "Sharpe ratio, information ratio, max drawdown, CVaR. "
+                "Shows which models are available for prediction queries."
+            ),
+            function=get_rl_model_status,
+            category="rl",
+            parameters=[],
+            requires_dal=True,
+        ))
+
+        self.register(ToolDefinition(
+            name="get_rl_prediction",
+            description=(
+                "Get RL model trading signal for a ticker. Uses PPO/CPPO model "
+                "trained on historical prices + LLM sentiment to produce a "
+                "daily-frequency buy/sell/hold signal. Not a trade instruction — "
+                "use as one input among many."
+            ),
+            function=get_rl_prediction,
+            category="rl",
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("model_id", "string",
+                              "Model ID to use (default: 'latest' = most recent)",
+                              required=False, default="latest"),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_rl_backtest_report",
+            description=(
+                "Get detailed backtest report for a trained RL model: "
+                "Sharpe, IR, CVaR, max drawdown, win rate, training parameters, "
+                "feature set, and train/test periods."
+            ),
+            function=get_rl_backtest_report,
+            category="rl",
+            parameters=[
+                ToolParameter("model_id", "string",
+                              "Model ID (default: 'latest' = most recent)",
+                              required=False, default="latest"),
+            ],
         ))
 
 

@@ -19,6 +19,7 @@ You have access to these tool categories:
 - Web Search: search the web (tavily_search), fetch URL content (tavily_fetch), browse JS pages (web_browse), deep research (codex_web_research)
 - Memory: save knowledge across sessions (save_memory), recall past insights (recall_memories)
 - Code Execution: run Python for custom calculations (execute_python_analysis)
+- RL Models: trained PPO/CPPO model status, predictions, backtest reports (get_rl_model_status, get_rl_prediction, get_rl_backtest_report)
 
 ─── TOOL OUTPUT FORMAT ───
 
@@ -296,17 +297,70 @@ _CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
 _MAX_FRESHNESS_LEN = 800
 
 
-def build_system_prompt(freshness_summary: str = "") -> str:
-    """Build system prompt with optional dynamic freshness section.
+def _get_rl_status_section() -> str:
+    """Build RL Pipeline status section for system prompt.
 
-    The static SYSTEM_PROMPT is always the base. When freshness_summary
-    is provided, it's sanitized and appended.
+    Returns empty string if disabled or no models available.
     """
-    if not freshness_summary:
-        return SYSTEM_PROMPT
-    # Sanitize: strip control chars + enforce length cap
-    clean = _CONTROL_CHAR_RE.sub(" ", freshness_summary).strip()
-    clean = clean[:_MAX_FRESHNESS_LEN]
-    if not clean:
-        return SYSTEM_PROMPT
-    return SYSTEM_PROMPT + f"\n\n─── DATA FRESHNESS ───\n\n{clean}\n"
+    try:
+        from src.agents.config import get_agent_config
+        config = get_agent_config()
+        if not config.rl_pipeline_enabled:
+            return (
+                "─── RL MODELS ───\n\n"
+                "RL Pipeline is not yet enabled (no trained models). "
+                "The get_rl_model_status, get_rl_prediction, and get_rl_backtest_report "
+                "tools are available but will return informational messages. "
+                "Do not offer RL-based predictions until the pipeline is enabled.\n"
+            )
+
+        from training.model_registry import ModelRegistry
+        registry = ModelRegistry(models_dir=config.rl_models_dir)
+        models = registry.list_models()
+        if not models:
+            return (
+                "─── RL MODELS ───\n\n"
+                "RL Pipeline is enabled but no trained models found yet. "
+                "Use get_rl_model_status to check status.\n"
+            )
+
+        latest = models[0]
+        bt = latest.backtest_results or {}
+        sharpe = bt.get("sharpe_ratio", "N/A")
+        mdd = bt.get("max_drawdown", "N/A")
+        return (
+            f"─── RL MODELS ───\n\n"
+            f"{len(models)} trained model(s) available. "
+            f"Latest: {latest.model_id} ({latest.algorithm}, "
+            f"Sharpe={sharpe}, MDD={mdd}). "
+            f"Use get_rl_model_status for full list, get_rl_prediction for signals.\n"
+        )
+    except Exception:
+        return ""
+
+
+def build_system_prompt(freshness_summary: str = "") -> str:
+    """Build system prompt with optional dynamic sections.
+
+    The static SYSTEM_PROMPT is always the base. Dynamic sections
+    (freshness, RL status) are appended when available.
+    """
+    result = SYSTEM_PROMPT
+    sections = []
+
+    # Freshness section
+    if freshness_summary:
+        clean = _CONTROL_CHAR_RE.sub(" ", freshness_summary).strip()
+        clean = clean[:_MAX_FRESHNESS_LEN]
+        if clean:
+            sections.append(f"─── DATA FRESHNESS ───\n\n{clean}")
+
+    # RL status section
+    rl_section = _get_rl_status_section()
+    if rl_section:
+        sections.append(rl_section)
+
+    if sections:
+        result += "\n\n" + "\n\n".join(sections) + "\n"
+
+    return result

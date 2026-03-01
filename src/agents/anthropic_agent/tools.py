@@ -986,6 +986,61 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": [],
             },
         },
+        # RL Pipeline Tools
+        {
+            "name": "get_rl_model_status",
+            "description": (
+                "List all trained RL models (PPO/CPPO) with backtest performance: "
+                "Sharpe ratio, information ratio, max drawdown, CVaR. "
+                "Shows which models are available for prediction queries."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+        {
+            "name": "get_rl_prediction",
+            "description": (
+                "Get RL model trading signal for a ticker. Uses PPO/CPPO model "
+                "trained on historical prices + LLM sentiment to produce a "
+                "daily-frequency buy/sell/hold signal. Not a trade instruction — "
+                "use as one input among many."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol",
+                    },
+                    "model_id": {
+                        "type": "string",
+                        "description": "Model ID to use (default: 'latest' = most recent)",
+                    },
+                },
+                "required": ["ticker"],
+            },
+        },
+        {
+            "name": "get_rl_backtest_report",
+            "description": (
+                "Get detailed backtest report for a trained RL model: "
+                "Sharpe, IR, CVaR, max drawdown, win rate, training parameters, "
+                "feature set, and train/test periods."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "Model ID (default: 'latest' = most recent)",
+                    },
+                },
+                "required": [],
+            },
+        },
     ])
 
     return tools
@@ -1086,6 +1141,7 @@ def execute_tool(
     )
     from src.tools.monitor_tools import scan_alerts
     from src.tools.freshness import check_data_freshness
+    from src.tools.rl_tools import get_rl_model_status, get_rl_prediction, get_rl_backtest_report
 
     # Tool dispatch map
     tool_map = {
@@ -1327,6 +1383,17 @@ def execute_tool(
         ),
         # Data Freshness
         "check_data_freshness": lambda: check_data_freshness(dal),
+        # RL Pipeline
+        "get_rl_model_status": lambda: get_rl_model_status(dal),
+        "get_rl_prediction": lambda: get_rl_prediction(
+            dal,
+            ticker=tool_input["ticker"],
+            model_id=tool_input.get("model_id", "latest"),
+        ),
+        "get_rl_backtest_report": lambda: get_rl_backtest_report(
+            dal,
+            model_id=tool_input.get("model_id", "latest"),
+        ),
     }
 
     if tool_name not in tool_map:
