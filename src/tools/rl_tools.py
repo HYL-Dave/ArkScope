@@ -75,7 +75,7 @@ def get_rl_model_status(dal: Any) -> str:
         }
         for m in models:
             bt = m.backtest_results or {}
-            result["models"].append({
+            entry = {
                 "model_id": m.model_id,
                 "algorithm": m.algorithm,
                 "score_source": m.score_source,
@@ -87,7 +87,11 @@ def get_rl_model_status(dal: Any) -> str:
                 "information_ratio": bt.get("information_ratio"),
                 "max_drawdown": bt.get("max_drawdown"),
                 "cvar_95": bt.get("cvar_95"),
-            })
+            }
+            # Propagate ir_note when IR is None
+            if entry["information_ratio"] is None and bt.get("ir_note"):
+                entry["ir_note"] = bt["ir_note"]
+            result["models"].append(entry)
 
         return json.dumps(result, default=str)
 
@@ -183,6 +187,7 @@ def get_rl_backtest_report(dal: Any, model_id: str = "latest") -> str:
                 "available_models": [m.model_id for m in registry.list_models()],
             })
 
+        bt = model.backtest_results or {}
         result = {
             "model_id": model.model_id,
             "algorithm": model.algorithm,
@@ -196,8 +201,11 @@ def get_rl_backtest_report(dal: Any, model_id: str = "latest") -> str:
             "epochs": model.epochs,
             "training_date": model.training_date,
             "hyperparams": model.hyperparams,
-            "backtest_results": model.backtest_results,
+            "backtest_results": bt,
         }
+        # Include ir_note at top level for easy Agent access
+        if bt.get("information_ratio") is None and bt.get("ir_note"):
+            result["ir_note"] = bt["ir_note"]
 
         return json.dumps(result, default=str)
 
