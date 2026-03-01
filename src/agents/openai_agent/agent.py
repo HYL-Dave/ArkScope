@@ -137,7 +137,7 @@ def _extract_tool_info(
                     call_id_map[call_id] = len(ext.tool_calls_detail) - 1
 
             elif item_type == "function_call_output" or (
-                item_type is None and hasattr(item, "output") and hasattr(item, "call_id")
+                item_type is None and hasattr(item, "output")
             ):
                 # Tool result item — match by call_id, fallback to positional
                 output_str = str(item.output) if item.output else ""

@@ -158,6 +158,25 @@ class TestFreshnessRegistryScan:
         result = fr.scan(force=True)
         assert result == {}
 
+    def test_scan_total_failure(self):
+        """When query_health_stats() itself raises, all sources marked stale."""
+        backend = MagicMock()
+        backend.query_health_stats.side_effect = RuntimeError("connection lost")
+        fr = FreshnessRegistry(db_backend=backend)
+        result = fr.scan(force=True)
+
+        # Should have all 4 sources, all stale
+        assert len(result) == 4
+        for key in ("news", "prices", "iv_history", "fundamentals_cache"):
+            assert key in result
+            assert result[key].is_stale is True
+            assert "connection lost" in result[key].stale_reason
+
+        # format_detailed should NOT say "No data sources scanned yet"
+        detailed = fr.format_detailed()
+        assert "No data sources" not in detailed
+        assert "STALE" in detailed
+
 
 # ── Format methods ──────────────────────────────────────────
 

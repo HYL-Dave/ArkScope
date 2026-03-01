@@ -84,6 +84,11 @@ class FreshnessRegistry:
                 stats = self._backend.query_health_stats()
             except Exception as e:
                 logger.warning("FreshnessRegistry.scan() failed: %s", e)
+                err_msg = f"query failed: {e}"
+                for src in ("news", "prices", "iv_history", "fundamentals_cache"):
+                    result[src] = SourceHealth(
+                        source=src, is_stale=True, stale_reason=err_msg,
+                    )
                 self._cache = result
                 self._cache_ts = time.time()
                 return result
