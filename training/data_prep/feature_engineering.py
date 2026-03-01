@@ -142,9 +142,10 @@ def engineer_features(
     if not has_sentiment:
         raise ValueError(f"DataFrame must have '{sentiment_col}' column")
 
-    # Ensure sorted for correct rolling
+    # Ensure sorted by (tic, date) for correct per-ticker rolling.
+    # Preserve original index (env uses duplicate day-indices like 0,0,1,1,...).
     if "date" in df.columns:
-        df = df.sort_values(["tic", "date"]).reset_index(drop=True)
+        df = df.sort_values(["tic", "date"])
 
     extra_cols = []
     imputation = {}
@@ -196,9 +197,9 @@ def engineer_features(
     for col in extra_cols:
         df[col] = df[col].fillna(imputation[col])
 
-    # Restore original sort order (date, tic)
+    # Restore original sort order (date, tic), preserve index
     if "date" in df.columns:
-        df = df.sort_values(["date", "tic"]).reset_index(drop=True)
+        df = df.sort_values(["date", "tic"])
 
     metadata = {
         "shift": shift,
