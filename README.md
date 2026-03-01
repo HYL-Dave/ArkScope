@@ -1,17 +1,19 @@
 # MindfulRL-Intraday
 
-> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 39 financial tools, and multi-source news/price/options data pipeline.
+> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 44 financial tools, Discord bot, and multi-source news/price/options data pipeline.
 
 ## Overview
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 39 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 44 tools, 4 skills, 4 subagents
+- **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
 - **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
-- **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks), signals, web search
-- **RL Training** — PPO/CPPO agents with sentiment and risk-enhanced data
-- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment
+- **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks/chain), signals, web search
+- **RL Pipeline** — PPO/CPPO agents with sentiment/risk-enhanced data, model registry, 3 agent tools
+- **Monitor System** — Watchlist alerts (price, sentiment, signal, sector) with Discord notifications
+- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment, 6 migrations
 
 ## Quick Start
 
@@ -31,6 +33,9 @@ python -m src.agents
 
 # 5. (Optional) Start HTTP API
 python -m src.api
+
+# 6. (Optional) Start Discord bot
+python scripts/monitor_service.py --discord
 ```
 
 ---
@@ -55,31 +60,32 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | 3 | OpenAI | GPT-5.2 | gpt5, 5.2 | 400K | 128K | Reasoning effort |
 | 4 | OpenAI | GPT-5.2 Codex | codex, 5.2-codex | 400K | 128K | Agentic coding |
 
-### Slash Commands
+### Slash Commands (20)
 
 | Command | Alias | Description |
 |---------|-------|-------------|
 | `/model [name]` | `/m` | Show model picker / switch model |
-| `/skill <name> [args]` | `/sk` | Run a skill workflow (e.g. `/sk fa NVDA`) |
-| `/subagent [name] [model]` | `/sa` | View/change subagent models |
+| `/code-model [name]` | `/cm` | Set code generation model |
+| `/code-backend [name]` | `/cb` | Set code generation backend (api/codex/claude) |
 | `/reasoning <level>` | `/r` | Set OpenAI reasoning (none/minimal/low/medium/high/xhigh) |
 | `/effort <level>` | `/e` | Set Anthropic effort (max/high/medium/low) |
 | `/thinking` | `/t` | Toggle extended thinking (Anthropic) |
 | `/context` | `/ctx` | Toggle 1M context beta (Anthropic) |
 | `/compaction` | `/cmp` | Toggle server-side compaction (Opus 4.6) |
-| `/code-model [name]` | `/cm` | Set code generation model |
+| `/skill <name> [args]` | `/sk` | Run a skill workflow (e.g. `/sk fa NVDA`) |
+| `/subagent [name] [model]` | `/sa` | View/change subagent models |
+| `/scratchpad` | `/pad` | List recent scratchpad sessions |
+| `/history [N]` | `/h` | Show current session Q&A history |
 | `/turns <n>` | | Set max tool calls per query |
-| `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
 | `/attach <path> [pages]` | `/at` | Attach PDF/image/text to next query |
 | `/save [N\|N-M] ["title"]` | `/sv` | Save session exchanges as report |
 | `/reports [ticker]` | `/rp` | List/view saved research reports |
-| `/code-backend [name]` | `/cb` | Set code generation backend (api/codex/claude) |
-| `/scratchpad` | `/pad` | List recent scratchpad sessions |
-| `/history [N]` | `/h` | Show current session Q&A history |
+| `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
+| `/monitor` | `/mon` | Scan watchlist for alerts |
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (39)
+### Tools (44)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -109,6 +115,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | | `get_earnings_impact` | Historical earnings-day moves, drift, surprise correlation |
 | | `get_watchlist_overview` | Watchlist status overview |
 | | `get_morning_brief` | Personalized morning briefing |
+| | `check_data_freshness` | Health & staleness check for all data sources |
 | **Portfolio** | `get_portfolio_analysis` | P&L, beta vs SPY, correlation matrix, HHI |
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
@@ -122,6 +129,10 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | | `web_browse` | Headless browser (Playwright) |
 | | `codex_web_research` | Deep research via Codex CLI (OAuth, --search) |
 | **Code** | `execute_python_analysis` | Python code execution with auto code gen |
+| **Monitor** | `scan_alerts` | Scan watchlist for price/sentiment/signal/sector alerts |
+| **RL Models** | `get_rl_model_status` | List trained PPO/CPPO models with backtest metrics |
+| | `get_rl_prediction` | Model availability check (live inference pending Phase 2) |
+| | `get_rl_backtest_report` | Detailed backtest report (Sharpe, Sortino, Calmar, CVaR) |
 
 ### Skills
 
@@ -146,6 +157,38 @@ Specialized agents delegated for specific tasks:
 | `deep_researcher` | GPT-5.2 | Multi-source investigation across 14 tools |
 | `data_summarizer` | Sonnet 4.6 | Fast data retrieval and summarization |
 | `reviewer` | Opus 4.6 | Critical analysis review (adversarial) |
+
+---
+
+## Discord Bot
+
+Interactive Discord gateway for trading analysis and alerts.
+
+```bash
+python scripts/monitor_service.py --discord
+```
+
+### Features
+
+- **8 Slash Commands** — `/analyze`, `/watchlist`, `/price`, `/news`, `/options`, `/fundamentals`, `/model`, `/status`
+- **Interactive Buttons** — Quick drill-down on analysis results
+- **Free Chat** — `@mention` or dedicated `#agent-channel` for natural language queries
+- **Model Selection** — `/model`, `/effort`, `/reasoning` with per-session state
+- **Alert Routing** — Severity-based color-coded embeds (critical/warning/info)
+- **Admin Controls** — Permission-gated commands via `manage_guild`
+
+### Monitor System
+
+4 watchers scan your watchlist on a configurable schedule (default 5 min):
+
+| Watcher | Trigger | Description |
+|---------|---------|-------------|
+| **PriceWatcher** | >3% move | Intraday price alert |
+| **SentimentWatcher** | Avg <2.5 or >4.0 | News sentiment shift |
+| **SignalWatcher** | Anomaly detected | Sentiment/volume anomaly |
+| **SectorWatcher** | Sector >2% divergence | Sector rotation signal |
+
+Alerts are deduplicated (30-min cooldown + value threshold) and routed to Discord/console/log.
 
 ---
 
@@ -213,6 +256,7 @@ Applied automatically on first Docker startup, or manually:
 -- sql/003_add_reports.sql         — Research reports
 -- sql/004_add_memories.sql        — Episodic memory (full-text search, GIN + tsvector)
 -- sql/005_add_financial_cache.sql — Financial data cache (paid API responses)
+-- sql/006_add_news_search.sql     — Full-text search on news (GIN index) + pgvector embedding column
 ```
 
 ### Migrate Data from Parquet Files
@@ -298,27 +342,84 @@ python scripts/scoring/score_ibkr_news.py --rescore          # Re-score all
 ### Prepare Dataset
 
 ```bash
-python prepare_dataset_openai.py \
+# Basic: merge price + sentiment + risk
+python training/data_prep/prepare_training_data.py \
   --price-data data/intraday.csv \
   --sentiment sentiment_scored.csv \
   --risk risk_scored.csv \
-  --output merged_dataset.csv
+  --output-dir data/rl_ready/
+
+# With derived features (MA, momentum, volatility)
+python training/data_prep/prepare_training_data.py \
+  --price-data data/intraday.csv \
+  --sentiment sentiment_scored.csv \
+  --risk risk_scored.csv \
+  --output-dir data/rl_ready/ \
+  --features                              # All defaults
+  # --features sentiment_7d_ma risk_7d_ma  # Or specific features
 ```
+
+Features are Z-score standardized; scaler saved as `feature_scaler_{tag}.json` alongside the CSV.
 
 ### Train
 
 ```bash
-bash train_openai.sh merged_dataset.csv ppo sentiment
-bash train_openai.sh merged_dataset.csv cppo risk
+# PPO with sentiment signals
+python training/train_ppo_llm.py --data data/rl_ready/train.csv --epochs 100 --seed 42
+
+# CPPO with sentiment + risk signals
+python training/train_cppo_llm_risk.py --data data/rl_ready/train.csv --epochs 100 --seed 42
+
+# On-the-fly feature engineering (skips prepare step)
+python training/train_ppo_llm.py --data raw.csv --epochs 50 --features
 ```
+
+Models are saved to `trained_models/<model_id>/` with metadata and scaler automatically registered.
 
 ### Backtest
 
 ```bash
-python backtest_openai.py --data merged_dataset.csv \
-  --model trained_models/agent_ppo_llm_100_epochs_sentiment.pth \
-  --env sentiment --output-plot equity.png
+# By model ID (auto-loads metadata + features)
+python training/backtest.py --data data/rl_ready/trade.csv --model-id latest
+
+# By specific model ID
+python training/backtest.py --data trade.csv --model-id ppo_claude_100ep_s42_20260301T120000Z_abc123
+
+# By model path (derives model_id from directory)
+python training/backtest.py --data trade.csv --model trained_models/xxx/model.pth
 ```
+
+Outputs: Sharpe, Sortino, Calmar, max drawdown, CVaR 95%, win rate, daily returns CSV, equity curve PNG.
+Results are appended to `backtest_runs[]` in the model registry for traceability.
+
+### Model Storage
+
+```
+trained_models/
+├── registry.json
+├── ppo_claude_100ep_s42_.../
+│   ├── model.pth
+│   ├── metadata.json
+│   ├── feature_scaler.json    # If --features was used
+│   ├── daily_returns.csv      # Backtest artifact
+│   ├── actions_log.csv        # Backtest artifact
+│   └── equity_curve.png       # Backtest artifact
+```
+
+### Agent Integration
+
+RL models are exposed to the agent via 3 tools (config-guarded, default off):
+
+```yaml
+# config/user_profile.yaml
+rl_pipeline:
+  enabled: false          # Set true when trained models exist
+  models_dir: "trained_models"
+```
+
+- `get_rl_model_status` — List all models with backtest metrics
+- `get_rl_backtest_report` — Detailed backtest report (Sharpe, Sortino, Calmar, CVaR, etc.)
+- `get_rl_prediction` — Model availability check (live inference pending Phase 2)
 
 ---
 
@@ -328,32 +429,62 @@ python backtest_openai.py --data merged_dataset.csv \
 
 | Module | Description |
 |--------|-------------|
-| `cli.py` | Interactive CLI (18 slash commands, prompt caching, token tracking) |
+| `cli.py` | Interactive CLI (20 slash commands, prompt caching, token tracking) |
 | `config.py` | Model configuration, defaults, aliases |
 | `anthropic_agent/agent.py` | Anthropic messages loop (streaming, thinking, effort) |
 | `openai_agent/agent.py` | OpenAI Agents SDK wrapper (Responses API) |
-| `shared/prompts.py` | System prompts shared across providers |
+| `shared/prompts.py` | System prompts with dynamic sections (freshness, RL status) |
 | `shared/skills.py` | Skill registry + custom YAML loading |
 | `shared/subagent.py` | Subagent registry + dispatch |
 | `shared/token_tracker.py` | Per-turn token + cache tracking |
-| `shared/context_manager.py` | Context compaction for long sessions |
-| `shared/scratchpad.py` | JSONL session logging + chat history |
+| `shared/context_manager.py` | Context compaction for long sessions (L1 client-side) |
+| `shared/scratchpad.py` | JSONL session logging (10 event types) |
 | `shared/attachments.py` | PDF/image/text file attachment processing |
 | `shared/security.py` | Tool result wrapping for input safety |
+| `shared/model_catalog.py` | Shared model catalog (CLI + Discord bot) |
+| `shared/events.py` | Event types for async streaming |
 
 ### Tool Layer (`src/tools/`)
 
 | Module | Description |
 |--------|-------------|
-| `registry.py` | ToolRegistry (39 tools, dual-format for Anthropic + OpenAI) |
+| `registry.py` | ToolRegistry (44 tools, dual-format for Anthropic + OpenAI) |
 | `data_access.py` | DataAccessLayer with backend abstraction |
 | `backends/file_backend.py` | Parquet file backend |
-| `backends/db_backend.py` | PostgreSQL backend (psycopg3) |
+| `backends/db_backend.py` | PostgreSQL backend (psycopg3) + `query_health_stats()` |
 | `news_tools.py`, `price_tools.py`, etc. | Individual tool implementations |
 | `report_tools.py` | Research report save/list/get |
 | `memory_tools.py` | Episodic memory CRUD + full-text search |
 | `web_tools.py` | Tavily search + Playwright browser + Codex deep research |
 | `code_tools.py` | Python code execution + auto code gen |
+| `freshness.py` | FreshnessRegistry singleton + data source health |
+| `rl_tools.py` | RL model status, prediction, backtest report |
+
+### Monitor Layer (`src/monitor/`)
+
+| Module | Description |
+|--------|-------------|
+| `discord_bot.py` | Discord gateway (slash commands, buttons, free chat) |
+| `engine.py` | MonitorEngine orchestrates watchers |
+| `watchers.py` | 4 watchers (Price, Sentiment, Signal, Sector) |
+| `scheduler.py` | MonitorScheduler (asyncio, configurable interval) |
+| `notifiers.py` | Console, Log, Discord notifiers |
+| `dedup.py` | AlertDeduplicator (cooldown + value threshold) |
+
+### Training Layer (`training/`)
+
+| Module | Description |
+|--------|-------------|
+| `train_ppo_llm.py` | PPO training with MPI, `--features` support, auto-registry |
+| `train_cppo_llm_risk.py` | CPPO training (sentiment + risk), `--features` support |
+| `backtest.py` | Full backtest metrics, artifact saving, registry integration |
+| `train_utils.py` | Shared utilities (model ID, artifact saving, feature detection) |
+| `data_prep/prepare_training_data.py` | Merge + split + optional feature engineering |
+| `data_prep/feature_engineering.py` | Derived features (MA, momentum, volatility) + FeatureScaler |
+| `envs/stocktrading_llm.py` | PPO trading env with `extra_feature_cols` + state invariants |
+| `envs/stocktrading_llm_risk.py` | CPPO trading env with risk tail invariant |
+| `model_registry.py` | ModelMetadata + ModelRegistry (JSON file-based, backtest_runs) |
+| `UPSTREAM.md` | Lineage documentation for FinRL_DeepSeek fork |
 
 ### Data Sources (`data_sources/`)
 
@@ -371,7 +502,7 @@ python backtest_openai.py --data merged_dataset.csv \
 | File | Description |
 |------|-------------|
 | `.env` | API keys (from `.env.template`) |
-| `user_profile.yaml` | Watchlists, strategy weights, model priority |
+| `user_profile.yaml` | 12 sections: watchlists, strategy, models, alerts, RL pipeline, etc. |
 | `sectors.yaml` | Sector definitions and ticker mappings |
 | `tickers_core.json` | Core ticker list (Tier 1/2/3) |
 | `skills/*.yaml` | Custom skill definitions |
@@ -474,13 +605,20 @@ python scripts/comparison/ab_score_comparison.py --file-a a.csv --file-b b.csv
 ### Run Tests
 
 ```bash
-pytest tests/                        # All tests (~860 tests)
-pytest tests/test_agents.py -v       # Agent tests
-pytest tests/test_subagent.py -v     # Subagent tests
-pytest tests/test_tools.py -v        # Tool tests
-pytest tests/test_skills.py -v       # Skills tests
-pytest tests/test_api.py -v          # API tests
-pytest tests/ --cov=src --cov-report=html  # With coverage
+pytest tests/                                # All tests
+pytest tests/test_agents.py -v               # Agent tests
+pytest tests/test_subagent.py -v             # Subagent tests
+pytest tests/test_tools.py -v                # Tool tests
+pytest tests/test_skills.py -v               # Skills tests
+pytest tests/test_api.py -v                  # API tests
+pytest tests/test_rl_tools.py -v             # RL pipeline agent tools
+pytest tests/test_feature_engineering.py -v  # Feature engineering + scaler
+pytest tests/test_env_extra_features.py -v   # Env state vector invariants
+pytest tests/test_train_utils.py -v          # Training utilities
+pytest tests/test_backtest_enhanced.py -v    # Backtest metrics + artifacts
+pytest tests/test_integration_pipeline.py -v # E2E features→train→backtest
+pytest tests/test_monitor.py -v              # Monitor tests
+pytest tests/ --cov=src --cov-report=html    # With coverage
 ```
 
 ### Development Server
@@ -494,10 +632,12 @@ uvicorn src.api.app:create_app --factory --reload --port 8420
 | Category | Files |
 |----------|-------|
 | **Architecture** | `docs/design/MINDFULRL_ARCHITECTURE.md`, `SERVICE_ARCHITECTURE.md`, `DATA_STORAGE_ACCESS.md` |
-| **Agent Evolution** | `docs/design/AGENT_EVOLUTION_TRACKER.md` (detailed changelog) |
+| **Agent Evolution** | `docs/design/AGENT_EVOLUTION_TRACKER.md` (detailed changelog, Phase 0-15 + A-F) |
+| **RL Pipeline** | `docs/design/RL_PIPELINE_DESIGN.md` (end-to-end integration design) |
 | **Data** | `docs/data/DATA_SUBSCRIPTION_GUIDE.md`, `OPTIONS_FLOW_GUIDE.md`, `OPTIONS_PRICING_THEORY.md` |
 | **Analysis** | `docs/analysis/SCORING_VALIDATION_METHODOLOGY.md` |
 | **Scripts** | `scripts/scoring/README.md`, `scripts/visualization/README.md` |
+| **Training** | `training/UPSTREAM.md` (FinRL_DeepSeek lineage) |
 
 ---
 
