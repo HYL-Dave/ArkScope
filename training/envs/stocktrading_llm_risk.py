@@ -40,6 +40,7 @@ class StockTradingEnv(gym.Env):
         risk_indicator_col="turbulence",
         llm_sentiment_col="llm_sentiment", #added llm_sentiment
         llm_risk_col="llm_risk",
+        extra_feature_cols: list[str] | None = None,
         sentiment_scale="strong",
         make_plots: bool = False,
         print_verbosity=10,
@@ -74,6 +75,7 @@ class StockTradingEnv(gym.Env):
         self.risk_indicator_col = risk_indicator_col
         self.llm_sentiment_col=llm_sentiment_col
         self.llm_risk_col=llm_risk_col
+        self.extra_feature_cols = extra_feature_cols or []
         if isinstance(sentiment_scale, str):
             self._scale = SENTIMENT_SCALES[sentiment_scale]
         else:
@@ -436,6 +438,32 @@ class StockTradingEnv(gym.Env):
     def render(self, mode="human", close=False):
         return self.state
 
+    def _validate_state(self, state):
+        """Validate state vector length and CPPO risk tail invariant."""
+        if len(state) != self.state_space:
+            raise ValueError(
+                f"State vector length mismatch: got {len(state)}, "
+                f"expected {self.state_space}. "
+                f"stock_dim={self.stock_dim}, "
+                f"indicators={len(self.tech_indicator_list)}, "
+                f"extra_features={len(self.extra_feature_cols)}"
+            )
+        # CPPO invariant: risk scores MUST be the last stock_dim elements
+        if len(self.df.tic.unique()) > 1:
+            expected_risk = self.data[self.llm_risk_col].values.tolist()
+        else:
+            expected_risk = [self.data[self.llm_risk_col]]
+        if not np.allclose(
+            np.asarray(state[-self.stock_dim:], dtype=float),
+            np.asarray(expected_risk, dtype=float),
+            atol=1e-6,
+        ):
+            raise ValueError(
+                f"CPPO invariant violated: risk scores not at tail. "
+                f"Expected {expected_risk[:3]}..., "
+                f"got {state[-self.stock_dim:][:3]}..."
+            )
+
     def _initiate_state(self):
         if not self.initial:
             if self.previous_state is None or len(self.previous_state) == 0:
@@ -452,6 +480,10 @@ class StockTradingEnv(gym.Env):
                         (self.data[tech].values.tolist() for tech in self.tech_indicator_list),
                         [],
                     )
+                    + sum(
+                        (self.data[col].values.tolist() for col in self.extra_feature_cols),
+                        [],
+                    )
                     + self.data[self.llm_sentiment_col].values.tolist()
                     + self.data[self.llm_risk_col].values.tolist()
                 )
@@ -462,6 +494,7 @@ class StockTradingEnv(gym.Env):
                     + [self.data.close]
                     + [0] * self.stock_dim
                     + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
+                    + sum(([self.data[col]] for col in self.extra_feature_cols), [])
                     + [self.data[self.llm_sentiment_col]]
                     + [self.data[self.llm_risk_col]]
                 )
@@ -482,6 +515,10 @@ class StockTradingEnv(gym.Env):
                         ),
                         [],
                     )
+                    + sum(
+                        (self.data[col].values.tolist() for col in self.extra_feature_cols),
+                        [],
+                    )
                     + self.data[self.llm_sentiment_col].values.tolist()
                     + self.data[self.llm_risk_col].values.tolist()
                 )
@@ -494,10 +531,12 @@ class StockTradingEnv(gym.Env):
                         (self.stock_dim + 1) : (self.stock_dim * 2 + 1)
                     ]
                     + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
+                    + sum(([self.data[col]] for col in self.extra_feature_cols), [])
                     + [self.data[self.llm_sentiment_col]]
                     + [self.data[self.llm_risk_col]]
                 )
 
+        self._validate_state(state)
         return state
 
     def _update_state(self):
@@ -514,6 +553,10 @@ class StockTradingEnv(gym.Env):
                     ),
                     [],
                 )
+                + sum(
+                    (self.data[col].values.tolist() for col in self.extra_feature_cols),
+                    [],
+                )
                 + self.data[self.llm_sentiment_col].values.tolist()
                 + self.data[self.llm_risk_col].values.tolist()
             )
@@ -525,10 +568,12 @@ class StockTradingEnv(gym.Env):
                 + [self.data.close]
                 + list(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
                 + sum(([self.data[tech]] for tech in self.tech_indicator_list), [])
+                + sum(([self.data[col]] for col in self.extra_feature_cols), [])
                 + [self.data[self.llm_sentiment_col]]
                 + [self.data[self.llm_risk_col]]
             )
 
+        self._validate_state(state)
         return state
 
     def _get_date(self):
