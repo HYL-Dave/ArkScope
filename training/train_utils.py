@@ -129,28 +129,37 @@ def save_training_artifacts(
     return abs_model_path
 
 
-def _find_scaler_path(data_path: str) -> str | None:
-    """Find the scaler JSON co-located with a CSV file.
+def _scaler_tag(data_path: str) -> tuple[str, str, str]:
+    """Derive scaler tag and paths from a CSV path.
 
-    Search order:
-      1. feature_scaler_{tag}.json  (tag derived from CSV filename)
-      2. feature_scaler.json        (legacy fallback)
-    Returns the first path that exists, or the tag-based path if neither exists.
+    Returns (tagged_path, legacy_path, tag).
     """
     import re
 
     csv_dir = os.path.dirname(os.path.abspath(data_path))
-    csv_name = os.path.splitext(os.path.basename(data_path))[0]  # e.g. "train_claude_opus_both"
-    # Strip leading "train_" or "trade_" prefix to get the tag
+    csv_name = os.path.splitext(os.path.basename(data_path))[0]
     tag = re.sub(r"^(train|trade)_", "", csv_name)
     tagged_path = os.path.join(csv_dir, f"feature_scaler_{tag}.json")
     legacy_path = os.path.join(csv_dir, "feature_scaler.json")
+    return tagged_path, legacy_path, tag
 
+
+def _find_scaler_path(data_path: str) -> str:
+    """Resolve scaler path for **reading** (tagged → legacy fallback).
+
+    Returns the first path that exists, or the tagged path if neither exists.
+    """
+    tagged_path, legacy_path, _ = _scaler_tag(data_path)
     if os.path.exists(tagged_path):
         return tagged_path
     if os.path.exists(legacy_path):
         return legacy_path
-    # Neither exists — return tagged path (for error messages / future creation)
+    return tagged_path
+
+
+def _build_scaler_write_path(data_path: str) -> str:
+    """Build scaler path for **writing** — always tagged, never legacy."""
+    tagged_path, _, _ = _scaler_tag(data_path)
     return tagged_path
 
 
@@ -191,7 +200,8 @@ def detect_and_load_features(
         except ValueError:
             raise ValueError(
                 f"CSV contains feature columns {candidate_feat_cols} but "
-                f"feature_scaler.json contract mismatch. Data may be corrupted."
+                f"scaler at {scaler_path} has contract mismatch. "
+                f"Data may be corrupted."
             )
         # Three conditions met — confirmed Path A product
         if args_features is not None:
@@ -228,7 +238,7 @@ def detect_and_load_features(
 
         # Save scaler alongside data if we have a data_path
         if data_path:
-            out_scaler_path = _find_scaler_path(data_path)
+            out_scaler_path = _build_scaler_write_path(data_path)
             scaler.save(out_scaler_path)
             print(f"  Scaler fitted and saved: {out_scaler_path}")
 

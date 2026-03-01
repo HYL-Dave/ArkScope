@@ -125,6 +125,17 @@ class TestFindScalerPath:
         tagged.write_text("{}")
         assert _find_scaler_path(csv_path) == str(tagged)
 
+    def test_write_path_always_tagged(self, tmp_path):
+        """Write path must always be tagged, even when legacy exists."""
+        from training.train_utils import _build_scaler_write_path
+
+        csv_path = str(tmp_path / "train_claude_opus.csv")
+        legacy = tmp_path / "feature_scaler.json"
+        legacy.write_text("{}")
+        result = _build_scaler_write_path(csv_path)
+        assert "feature_scaler_claude_opus.json" in result
+        assert result != str(legacy)
+
 
 class TestDetectAndLoadFeatures:
     def test_no_features_returns_empty(self):
