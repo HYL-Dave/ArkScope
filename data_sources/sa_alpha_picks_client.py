@@ -126,11 +126,49 @@ class SAAlphaPicksClient:
                 if age_days < self._detail_cache_days:
                     return cached
 
-        # TODO: Scrape detail page when needed (requires page navigation)
-        # For now, return whatever we have from cache
+        # Scrape detail page — need the pick's URL
+        pick_info = cached or self._dal.get_sa_pick_detail(symbol, picked_date)
+        if not pick_info:
+            return {"error": None, "detail": None, "symbol": symbol}
+
+        # Build detail URL from symbol (SA pattern: /alpha-picks/symbol/analysis)
+        detail_url = f"https://seekingalpha.com/symbol/{symbol}"
+
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            if cached:
+                return cached
+            return {"error": "playwright not installed", "symbol": symbol}
+
+        if not self._check_session_file():
+            if cached:
+                return cached
+            return {"error": "Session file not found", "symbol": symbol}
+
+        try:
+            with sync_playwright() as p:
+                context = self._create_context(p)
+                page = context.new_page()
+                content = self._scrape_detail(page, detail_url)
+                context.close()
+
+            if content:
+                pd = picked_date or pick_info.get("picked_date")
+                if pd:
+                    self._dal.save_sa_pick_detail(symbol, pd, content)
+                return {
+                    **pick_info,
+                    "detail_report": content,
+                    "detail_fetched_at": datetime.now(tz=timezone.utc).isoformat(),
+                }
+        except Exception as e:
+            logger.error("Detail scrape failed for %s: %s", symbol, e)
+
+        # Fall back to whatever we have
         if cached:
             return cached
-        return {"error": None, "detail": None, "symbol": symbol}
+        return {**pick_info, "detail_report": None}
 
     def refresh_portfolio(self, sync_tickers: bool = False) -> Dict[str, Any]:
         """Force refresh both tabs from SA website.
@@ -236,7 +274,9 @@ class SAAlphaPicksClient:
             except Exception as e:
                 logger.warning("Ticker sync failed: %s", e)
 
-        # Build response
+        # Build response — read back portfolio rows from DAL after refresh
+        current = self._dal.get_sa_portfolio(portfolio_status="current")
+        closed = self._dal.get_sa_portfolio(portfolio_status="closed")
         meta = self._dal.get_sa_refresh_meta()
         is_partial = not (
             meta.get("current", {}).get("ok", False)
@@ -244,6 +284,8 @@ class SAAlphaPicksClient:
         )
 
         return {
+            "current": current,
+            "closed": closed,
             "results": results,
             "freshness": meta,
             "is_partial": is_partial,

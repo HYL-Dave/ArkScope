@@ -31,12 +31,22 @@ def _resolve_session_path(path_str: str) -> Path:
     return Path(os.path.expanduser(path_str)).resolve()
 
 
+def _get_default_session_path() -> str:
+    """Read default session path from AgentConfig, fallback to hardcoded."""
+    try:
+        from src.agents.config import get_agent_config
+        return get_agent_config().sa_session_file
+    except Exception:
+        return "~/.config/mindfulrl/seeking_alpha/storage_state.json"
+
+
 def main():
+    default_path = _get_default_session_path()
     parser = argparse.ArgumentParser(description="Save Seeking Alpha browser session")
     parser.add_argument(
         "--session-file",
-        default="~/.config/mindfulrl/seeking_alpha/storage_state.json",
-        help="Path to save session state (default: ~/.config/mindfulrl/seeking_alpha/storage_state.json)",
+        default=default_path,
+        help=f"Path to save session state (default: {default_path})",
     )
     args = parser.parse_args()
 

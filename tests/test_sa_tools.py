@@ -146,6 +146,82 @@ class TestDOMParsing:
 
 
 # ============================================================
+# DOM fixture parsing
+# ============================================================
+
+_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "sa_portfolio_sample.html"
+
+
+class TestDOMFixture:
+    """Tests that parse the sa_portfolio_sample.html fixture."""
+
+    def test_fixture_parse_extracts_rows(self):
+        """Parse fixture HTML table rows into picks."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        html = _FIXTURE_PATH.read_text()
+
+        # Parse with BeautifulSoup (same data the Playwright DOM would give us)
+        from html.parser import HTMLParser
+
+        # Extract table rows manually from fixture
+        rows_data = []
+        import re
+        tbody_match = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL)
+        assert tbody_match, "Fixture should contain a <tbody>"
+
+        row_matches = re.findall(r"<tr>(.*?)</tr>", tbody_match.group(1), re.DOTALL)
+        assert len(row_matches) == 3, "Fixture should have 3 data rows"
+
+        for row_html in row_matches:
+            cells_text = re.findall(r"<td>(.*?)</td>", row_html)
+            # Create mock cells
+            mock_cells = []
+            for t in cells_text:
+                cell = MagicMock()
+                cell.inner_text.return_value = t.strip()
+                mock_cells.append(cell)
+
+            pick = client._parse_row(mock_cells, "current")
+            if pick and pick.get("symbol"):
+                rows_data.append(pick)
+
+        assert len(rows_data) == 3
+        symbols = [r["symbol"] for r in rows_data]
+        assert "ACME" in symbols
+        assert "BETA" in symbols
+        assert "GAMA" in symbols
+
+    def test_fixture_parse_field_values(self):
+        """Fixture parsing extracts correct field values."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+        import re
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        html = _FIXTURE_PATH.read_text()
+
+        tbody = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL).group(1)
+        first_row = re.findall(r"<tr>(.*?)</tr>", tbody, re.DOTALL)[0]
+        cells_text = re.findall(r"<td>(.*?)</td>", first_row)
+
+        mock_cells = []
+        for t in cells_text:
+            cell = MagicMock()
+            cell.inner_text.return_value = t.strip()
+            mock_cells.append(cell)
+
+        pick = client._parse_row(mock_cells, "current")
+        assert pick["symbol"] == "ACME"
+        assert pick["company"] == "Acme Corp"
+        assert pick["picked_date"] == "2025-01-15"
+        assert pick["sa_rating"] == "STRONG BUY"
+        assert pick["sector"] == "Technology"
+        assert pick["portfolio_status"] == "current"
+        assert pick["is_stale"] is False
+
+
+# ============================================================
 # Detail key resolution
 # ============================================================
 

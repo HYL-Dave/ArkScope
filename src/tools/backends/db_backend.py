@@ -998,12 +998,12 @@ class DatabaseBackend:
             conn.commit()
             return count
 
-        except Exception:
+        except Exception as e:
             conn.rollback()
             # Write failure meta (outside the failed transaction)
             try:
                 conn.autocommit = True
-                self.record_sa_refresh_failure(scope, attempt_ts, str(Exception))
+                self.record_sa_refresh_failure(scope, attempt_ts, str(e))
             except Exception:
                 pass
             raise
