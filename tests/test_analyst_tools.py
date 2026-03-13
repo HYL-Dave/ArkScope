@@ -262,7 +262,7 @@ class TestBridgeIntegration:
         """Registry has 44 tools (including check_data_freshness + 3 RL tools)."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 44
+        assert len(registry.list_all()) == 47
 
     def test_analysis_category_6(self):
         """Analysis category has 10 tools (including check_data_freshness)."""

@@ -187,6 +187,7 @@ _SLASH_COMMANDS = [
     ("/save", "/sv", "Save chat exchanges as report"),
     ("/reports", "/rp", "List saved research reports"),
     ("/memory", "/mem", "Manage long-term memories"),
+    ("/alpha-picks", "/ap", "Seeking Alpha Alpha Picks"),
     ("/monitor", "/mon", "Scan watchlist for alerts"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
@@ -373,6 +374,9 @@ def print_help():
             "  [cyan]/memory search <q>[/cyan]  Search memories\n"
             "  [cyan]/memory <id>[/cyan]        View a specific memory\n"
             "  [cyan]/memory delete <id>[/cyan] Delete a memory\n"
+            "  [cyan]/ap[/cyan]                 SA Alpha Picks (current)\n"
+            "  [cyan]/ap NVDA[/cyan]            Alpha Pick detail\n"
+            "  [cyan]/ap refresh[/cyan]         Force refresh from SA\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -1550,6 +1554,109 @@ def handle_memory_command(dal, arg: str) -> None:
     console.print(f"[red]Unknown memory subcommand: {subcmd}[/red]\n")
 
 
+def handle_alpha_picks_command(dal, arg: str) -> None:
+    """Handle /alpha-picks [subcommand] [args].
+
+    /ap           — current picks table
+    /ap closed    — closed picks
+    /ap all       — all picks
+    /ap NVDA      — detail for specific pick
+    /ap NVDA 2025-06-15 — detail with specific picked_date
+    /ap refresh   — force refresh from SA website
+    """
+    from src.tools.sa_tools import (
+        get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+    )
+
+    parts = arg.split(None, 1) if arg else []
+    subcmd = parts[0] if parts else ""
+    subarg = parts[1] if len(parts) > 1 else ""
+
+    # /ap refresh
+    if subcmd.lower() == "refresh":
+        console.print("[dim]Refreshing Alpha Picks from SA...[/dim]")
+        result = refresh_sa_alpha_picks(dal)
+        if "error" in result and result["error"]:
+            console.print(f"[red]{result['error']}[/red]\n")
+            return
+        results = result.get("results", {})
+        for scope, info in results.items():
+            status = "[green]OK[/green]" if info.get("ok") else f"[red]FAIL: {info.get('error', '?')}[/red]"
+            console.print(f"  {scope}: {status} ({info.get('count', 0)} picks)")
+        console.print()
+        return
+
+    # /ap NVDA [date] — detail for specific symbol
+    if subcmd and subcmd.upper().isalpha() and subcmd.lower() not in ("all", "current", "closed"):
+        symbol = subcmd.upper()
+        picked_date = subarg if subarg else None
+        result = get_sa_pick_detail(dal, symbol=symbol, picked_date=picked_date)
+        if isinstance(result, dict):
+            if result.get("message"):
+                console.print(f"[yellow]{result['message']}[/yellow]\n")
+                return
+            if result.get("error"):
+                console.print(f"[red]{result['error']}[/red]\n")
+                return
+            if result.get("hint"):
+                console.print(f"[yellow]{result['hint']}[/yellow]\n")
+                return
+
+            # Show detail
+            console.print(f"[bold]{result.get('company', symbol)} ({result.get('symbol', symbol)})[/bold]")
+            console.print(f"  Picked: {result.get('picked_date', '?')}")
+            console.print(f"  Status: {result.get('portfolio_status', '?')}")
+            console.print(f"  Return: {result.get('return_pct', '?')}%")
+            console.print(f"  Sector: {result.get('sector', '?')}")
+            console.print(f"  Rating: {result.get('sa_rating', '?')}")
+            if result.get("detail_report"):
+                console.print(f"\n{result['detail_report'][:500]}...")
+            console.print()
+        return
+
+    # /ap [all|current|closed] — list picks
+    status = subcmd.lower() if subcmd.lower() in ("all", "current", "closed") else "current"
+    result = get_sa_alpha_picks(dal, status=status)
+
+    if isinstance(result, dict) and result.get("message"):
+        console.print(f"[yellow]{result['message']}[/yellow]\n")
+        return
+
+    if isinstance(result, dict) and result.get("error"):
+        console.print(f"[red]{result['error']}[/red]\n")
+        return
+
+    for scope in ("current", "closed"):
+        picks = result.get(scope, [])
+        if not picks:
+            continue
+        console.print(f"\n[bold]{scope.title()} Picks[/bold] ({len(picks)})")
+        for p in picks:
+            sym = p.get("symbol", "?")
+            company = p.get("company", "")
+            ret = p.get("return_pct", "?")
+            rating = p.get("sa_rating", "")
+            sector = p.get("sector", "")
+            picked = p.get("picked_date", "")
+            ret_color = "green" if isinstance(ret, (int, float)) and ret >= 0 else "red"
+            console.print(
+                f"  [cyan]{sym:6s}[/cyan] [{ret_color}]{ret:>7}%[/{ret_color}] "
+                f"[dim]{rating:12s} {sector:15s} {picked}[/dim] {company}"
+            )
+
+    freshness = result.get("freshness", {})
+    if freshness:
+        parts = []
+        for scope_name in ("current", "closed"):
+            meta = freshness.get(scope_name, {})
+            ok = "[green]OK[/green]" if meta.get("ok") else "[red]STALE[/red]"
+            parts.append(f"{scope_name}={ok}")
+        console.print(f"\n[dim]Freshness: {', '.join(parts)}[/dim]")
+    if result.get("is_partial"):
+        console.print("[yellow]Warning: partial data (some tabs failed to refresh)[/yellow]")
+    console.print()
+
+
 def handle_status_command(state: SessionState, backend_type: str, ticker_count: int) -> None:
     """Handle /status command."""
     console.print(
@@ -2275,6 +2382,8 @@ def main():
                 handle_reports_command(dal, arg)
             elif cmd in ("/memory", "/mem"):
                 handle_memory_command(dal, arg)
+            elif cmd in ("/alpha-picks", "/ap"):
+                handle_alpha_picks_command(dal, arg)
             elif cmd in ("/monitor", "/mon"):
                 _handle_monitor_command(dal, arg)
             elif cmd in ("/status", "/s"):
