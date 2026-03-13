@@ -519,6 +519,322 @@ class DataAccessLayer:
             return None
         return data
 
+    # ================================================================
+    # Seeking Alpha Alpha Picks (Phase 11c)
+    # ================================================================
+
+    _SA_CACHE_DIR = Path("data/cache/seeking_alpha")
+
+    def get_sa_portfolio(
+        self,
+        portfolio_status: Optional[str] = None,
+        symbol: Optional[str] = None,
+        include_stale: bool = False,
+    ) -> List[Dict]:
+        """Get SA Alpha Picks portfolio data."""
+        if isinstance(self._backend, DatabaseBackend):
+            return self._backend.query_sa_picks(
+                portfolio_status=portfolio_status,
+                symbol=symbol,
+                include_stale=include_stale,
+            )
+        return self._load_sa_file_cache(portfolio_status, symbol, include_stale)
+
+    def apply_sa_refresh(
+        self,
+        scope: str,
+        picks: List[Dict],
+        attempt_ts,
+        snapshot_ts,
+    ) -> int:
+        """Atomic per-tab refresh: mark_stale + upsert + update_meta.
+
+        Success path: overwrites all meta fields.
+        """
+        if isinstance(self._backend, DatabaseBackend):
+            count = self._backend.apply_sa_refresh(scope, picks, attempt_ts, snapshot_ts)
+        else:
+            count = len(picks)
+
+        # File cache: always write (dual storage when DB available)
+        try:
+            old_picks = self._load_sa_file_cache(scope, include_stale=True)
+            reconciled = self._reconcile_sa_file_stale(old_picks, picks)
+            self._save_sa_file_cache(reconciled, scope)
+            self._save_sa_file_meta(
+                scope=scope,
+                attempt_ts=attempt_ts,
+                snapshot_ts=snapshot_ts,
+                row_count=count,
+                ok=True,
+                error=None,
+            )
+        except Exception as e:
+            logger.warning("File cache write failed for SA refresh: %s", e)
+
+        return count
+
+    def record_sa_refresh_failure(
+        self, scope: str, attempt_ts, error: str
+    ) -> None:
+        """Record refresh failure — only update meta, don't touch picks.
+
+        Failure path: only updates last_attempt_at, ok, last_error.
+        Preserves: last_success_at, snapshot_ts, row_count.
+        """
+        if isinstance(self._backend, DatabaseBackend):
+            self._backend.record_sa_refresh_failure(scope, attempt_ts, error)
+
+        # File cache meta
+        try:
+            self._save_sa_file_meta(
+                scope=scope,
+                attempt_ts=attempt_ts,
+                snapshot_ts=None,
+                row_count=None,
+                ok=False,
+                error=error,
+            )
+        except Exception as e:
+            logger.warning("File cache meta write failed: %s", e)
+
+    def get_sa_pick_detail(
+        self, symbol: str, picked_date: Optional[str] = None
+    ) -> Optional[Dict]:
+        """Get detail for a specific SA pick."""
+        if isinstance(self._backend, DatabaseBackend):
+            result = self._backend.get_sa_pick_detail(symbol, picked_date)
+            if result:
+                return result
+
+        # File fallback: check file cache
+        if picked_date:
+            return self._load_sa_file_detail(symbol, picked_date)
+
+        # Deterministic fallback for file mode
+        picks = self._load_sa_file_cache("current", symbol=symbol, include_stale=False)
+        if picks:
+            p = sorted(picks, key=lambda x: x.get("picked_date", ""), reverse=True)[0]
+            detail = self._load_sa_file_detail(symbol, p.get("picked_date", ""))
+            if detail:
+                return {**p, **detail}
+            return p
+
+        # Check stale
+        picks = self._load_sa_file_cache("current", symbol=symbol, include_stale=True)
+        if picks:
+            p = sorted(picks, key=lambda x: x.get("picked_date", ""), reverse=True)[0]
+            return p
+
+        return None
+
+    def save_sa_pick_detail(
+        self, symbol: str, picked_date: str, content: str
+    ) -> bool:
+        """Save detail report for a specific SA pick."""
+        if isinstance(self._backend, DatabaseBackend):
+            self._backend.update_sa_pick_detail(symbol, picked_date, content)
+
+        try:
+            self._save_sa_file_detail(symbol, picked_date, content)
+            return True
+        except Exception as e:
+            logger.warning("File detail save failed: %s", e)
+            return False
+
+    def get_sa_refresh_meta(self) -> Dict[str, Any]:
+        """Get per-tab refresh metadata."""
+        if isinstance(self._backend, DatabaseBackend):
+            return self._backend.get_sa_refresh_meta()
+        return self._load_sa_file_meta() or {}
+
+    # ── SA file I/O private methods ──
+
+    def _load_sa_file_cache(
+        self,
+        portfolio_status: Optional[str] = None,
+        symbol: Optional[str] = None,
+        include_stale: bool = False,
+    ) -> List[Dict]:
+        """Read portfolio_{status}.json, filter by is_stale + symbol."""
+        results = []
+        statuses = (
+            [portfolio_status]
+            if portfolio_status and portfolio_status != "all"
+            else ["current", "closed"]
+        )
+
+        for status in statuses:
+            path = self._SA_CACHE_DIR / f"portfolio_{status}.json"
+            if not path.exists():
+                continue
+            try:
+                import json as _json
+                with open(path) as f:
+                    rows = _json.load(f)
+                for row in rows:
+                    if not include_stale and row.get("is_stale", False):
+                        continue
+                    if symbol and row.get("symbol", "").upper() != symbol.upper():
+                        continue
+                    results.append(row)
+            except Exception as e:
+                logger.warning("Failed to read %s: %s", path, e)
+
+        return results
+
+    def _save_sa_file_cache(self, picks: List[Dict], portfolio_status: str) -> None:
+        """Write portfolio_{status}.json (includes stale rows)."""
+        import json as _json
+
+        self._SA_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path = self._SA_CACHE_DIR / f"portfolio_{portfolio_status}.json"
+        tmp_path = path.with_suffix(".json.tmp")
+
+        # Serialize datetime objects
+        serializable = []
+        for p in picks:
+            row = {}
+            for k, v in p.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+                elif isinstance(v, (int, float, str, bool, type(None), list, dict)):
+                    row[k] = v
+                else:
+                    row[k] = str(v)
+            serializable.append(row)
+
+        with open(tmp_path, "w") as f:
+            _json.dump(serializable, f, indent=2, ensure_ascii=False)
+        import os
+        os.replace(tmp_path, path)
+
+    def _reconcile_sa_file_stale(
+        self, old_picks: List[Dict], new_picks: List[Dict]
+    ) -> List[Dict]:
+        """Diff by (symbol, picked_date). Missing → is_stale=True. Returns merged list."""
+        new_keys = {
+            (p.get("symbol", ""), p.get("picked_date", ""))
+            for p in new_picks
+        }
+
+        stale = []
+        for p in old_picks:
+            key = (p.get("symbol", ""), p.get("picked_date", ""))
+            if key not in new_keys:
+                p = {**p, "is_stale": True}
+                stale.append(p)
+
+        # New picks (is_stale=False) + stale from old
+        result = [{**p, "is_stale": False} for p in new_picks]
+        result.extend(stale)
+        return result
+
+    def _load_sa_file_detail(
+        self, symbol: str, picked_date: str
+    ) -> Optional[Dict]:
+        """Read detail_{SYMBOL}_{YYYY-MM-DD}.json."""
+        import json as _json
+
+        path = self._SA_CACHE_DIR / "details" / f"{symbol.upper()}_{picked_date}.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path) as f:
+                return _json.load(f)
+        except Exception:
+            return None
+
+    def _save_sa_file_detail(
+        self, symbol: str, picked_date: str, content: str
+    ) -> None:
+        """Write detail_{SYMBOL}_{YYYY-MM-DD}.json."""
+        import json as _json
+        from datetime import datetime, timezone
+
+        details_dir = self._SA_CACHE_DIR / "details"
+        details_dir.mkdir(parents=True, exist_ok=True)
+
+        path = details_dir / f"{symbol.upper()}_{picked_date}.json"
+        data = {
+            "detail_report": content,
+            "detail_fetched_at": datetime.now(tz=timezone.utc).isoformat(),
+        }
+        with open(path, "w") as f:
+            _json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def _load_sa_file_meta(self) -> Optional[Dict]:
+        """Read meta.json."""
+        import json as _json
+
+        path = self._SA_CACHE_DIR / "meta.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path) as f:
+                return _json.load(f)
+        except Exception:
+            return None
+
+    def _save_sa_file_meta(
+        self,
+        scope: str,
+        attempt_ts,
+        snapshot_ts,
+        row_count,
+        ok: bool,
+        error: Optional[str] = None,
+    ) -> None:
+        """Update meta.json for a scope.
+
+        Success: overwrites all fields for scope.
+        Failure (ok=False): only updates last_attempt_at, ok, last_error.
+        Preserves: last_success_at, snapshot_ts, row_count on failure.
+        """
+        import json as _json
+
+        self._SA_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        meta_path = self._SA_CACHE_DIR / "meta.json"
+        tmp_path = meta_path.with_suffix(".json.tmp")
+
+        # Read existing meta
+        meta = {}
+        if meta_path.exists():
+            try:
+                with open(meta_path) as f:
+                    meta = _json.load(f)
+            except Exception:
+                pass
+
+        # Serialize timestamps
+        def _ts(v):
+            if v is None:
+                return None
+            return v.isoformat() if hasattr(v, "isoformat") else str(v)
+
+        if ok:
+            # Success: overwrite all fields
+            meta[scope] = {
+                "last_attempt_at": _ts(attempt_ts),
+                "last_success_at": _ts(snapshot_ts),
+                "snapshot_ts": _ts(snapshot_ts),
+                "row_count": row_count,
+                "ok": True,
+                "last_error": None,
+            }
+        else:
+            # Failure: only update attempt/ok/error, preserve success fields
+            existing = meta.get(scope, {})
+            existing["last_attempt_at"] = _ts(attempt_ts)
+            existing["ok"] = False
+            existing["last_error"] = error
+            meta[scope] = existing
+
+        with open(tmp_path, "w") as f:
+            _json.dump(meta, f, indent=2, ensure_ascii=False)
+        import os
+        os.replace(tmp_path, meta_path)
+
     def save_to_cache(self, key: str, data: Any) -> None:
         """Store data in cache with current timestamp."""
         self._cache[key] = (data, time.time())
