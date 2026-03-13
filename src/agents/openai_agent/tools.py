@@ -110,6 +110,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_rl_prediction as _get_rl_prediction,
         get_rl_backtest_report as _get_rl_backtest_report,
     )
+    from src.tools.sa_tools import (
+        get_sa_alpha_picks as _get_sa_alpha_picks,
+        get_sa_pick_detail as _get_sa_pick_detail,
+        refresh_sa_alpha_picks as _refresh_sa_alpha_picks,
+    )
 
     # ================================================================
     # News Tools
@@ -930,6 +935,42 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _get_rl_backtest_report(dal, model_id=model_id)
         return _serialize_result(result, "get_rl_backtest_report")
 
+    # ================================================================
+    # SA Alpha Picks (Phase 11c)
+    # ================================================================
+
+    @function_tool
+    def tool_get_sa_alpha_picks(status: str = "all", sector: str = "") -> str:
+        """Get Seeking Alpha Alpha Picks portfolio with return %, sector, rating, freshness.
+
+        Args:
+            status: Filter: 'all' (default), 'current', or 'closed'
+            sector: Filter by sector prefix (e.g. 'Tech')
+        """
+        result = _get_sa_alpha_picks(
+            dal, status=status, sector=sector or None,
+        )
+        return _serialize_result(result, "get_sa_alpha_picks")
+
+    @function_tool
+    def tool_get_sa_pick_detail(symbol: str, picked_date: str = "") -> str:
+        """Get detail report for a specific Alpha Pick.
+
+        Args:
+            symbol: Stock ticker symbol (e.g. NVDA)
+            picked_date: Specific pick date (YYYY-MM-DD). Omit for latest current.
+        """
+        result = _get_sa_pick_detail(
+            dal, symbol=symbol, picked_date=picked_date or None,
+        )
+        return _serialize_result(result, "get_sa_pick_detail")
+
+    @function_tool
+    def tool_refresh_sa_alpha_picks() -> str:
+        """Force refresh Alpha Picks from Seeking Alpha website. Syncs symbols to watchlist."""
+        result = _refresh_sa_alpha_picks(dal)
+        return _serialize_result(result, "refresh_sa_alpha_picks")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -973,6 +1014,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_rl_model_status,
         tool_get_rl_prediction,
         tool_get_rl_backtest_report,
+        tool_get_sa_alpha_picks,
+        tool_get_sa_pick_detail,
+        tool_refresh_sa_alpha_picks,
     ]
 
     # Conditionally add web tools

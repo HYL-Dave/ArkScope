@@ -1043,6 +1043,65 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ])
 
+    # SA Alpha Picks (Phase 11c)
+    tools.extend([
+        {
+            "name": "get_sa_alpha_picks",
+            "description": (
+                "Get Seeking Alpha Alpha Picks portfolio. Returns current and/or "
+                "closed picks with return %, sector, rating, and freshness metadata."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Filter: 'all' (default), 'current', or 'closed'",
+                        "enum": ["all", "current", "closed"],
+                    },
+                    "sector": {
+                        "type": "string",
+                        "description": "Filter by sector prefix (e.g. 'Tech')",
+                    },
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "get_sa_pick_detail",
+            "description": (
+                "Get detail report for a specific Alpha Pick. "
+                "If picked_date is omitted, returns the latest current (non-stale) pick."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Stock ticker symbol (e.g. NVDA)",
+                    },
+                    "picked_date": {
+                        "type": "string",
+                        "description": "Specific pick date (YYYY-MM-DD). Omit for latest.",
+                    },
+                },
+                "required": ["symbol"],
+            },
+        },
+        {
+            "name": "refresh_sa_alpha_picks",
+            "description": (
+                "Force refresh Alpha Picks from Seeking Alpha website. "
+                "Scrapes both tabs, updates cache, syncs symbols to watchlist."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    ])
+
     return tools
 
 
@@ -1142,6 +1201,7 @@ def execute_tool(
     from src.tools.monitor_tools import scan_alerts
     from src.tools.freshness import check_data_freshness
     from src.tools.rl_tools import get_rl_model_status, get_rl_prediction, get_rl_backtest_report
+    from src.tools.sa_tools import get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
 
     # Tool dispatch map
     tool_map = {
@@ -1394,6 +1454,18 @@ def execute_tool(
             dal,
             model_id=tool_input.get("model_id", "latest"),
         ),
+        # SA Alpha Picks (Phase 11c)
+        "get_sa_alpha_picks": lambda: get_sa_alpha_picks(
+            dal,
+            status=tool_input.get("status", "all"),
+            sector=tool_input.get("sector"),
+        ),
+        "get_sa_pick_detail": lambda: get_sa_pick_detail(
+            dal,
+            symbol=tool_input["symbol"],
+            picked_date=tool_input.get("picked_date"),
+        ),
+        "refresh_sa_alpha_picks": lambda: refresh_sa_alpha_picks(dal),
     }
 
     if tool_name not in tool_map:

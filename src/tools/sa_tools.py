@@ -1,0 +1,140 @@
+"""
+Seeking Alpha Alpha Picks tool functions.
+
+3 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
+All require DAL, category="portfolio".
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+_DISABLED_MSG = (
+    "Seeking Alpha Alpha Picks is not enabled. "
+    "To enable: set seeking_alpha.enabled: true in config/user_profile.yaml "
+    "and run: python scripts/sa_login.py"
+)
+
+
+def _is_sa_enabled() -> bool:
+    """Check if SA Alpha Picks is enabled in config."""
+    try:
+        from src.agents.config import get_agent_config
+        return get_agent_config().sa_enabled
+    except Exception:
+        return False
+
+
+def _get_client(dal):
+    """Create SAAlphaPicksClient with config values."""
+    from src.agents.config import get_agent_config
+    from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+    config = get_agent_config()
+    return SAAlphaPicksClient(
+        session_file=config.sa_session_file,
+        dal=dal,
+        cache_hours=config.sa_cache_hours,
+        detail_cache_days=config.sa_detail_cache_days,
+    )
+
+
+def get_sa_alpha_picks(
+    dal: Any, status: str = "all", sector: Optional[str] = None
+) -> Dict:
+    """Get SA Alpha Picks portfolio (cached, auto-refresh if stale).
+
+    Returns current and/or closed picks with freshness metadata.
+    is_partial = not (freshness.current.ok and freshness.closed.ok).
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        client = _get_client(dal)
+        result = client.get_portfolio()
+
+        if "error" in result and result["error"]:
+            return result
+
+        # Filter by status
+        response = {}
+        if status in ("all", "current"):
+            response["current"] = result.get("current", [])
+        if status in ("all", "closed"):
+            response["closed"] = result.get("closed", [])
+
+        # Filter by sector if specified
+        if sector:
+            sector_lower = sector.lower()
+            for key in ("current", "closed"):
+                if key in response:
+                    response[key] = [
+                        p for p in response[key]
+                        if (p.get("sector") or "").lower().startswith(sector_lower)
+                    ]
+
+        response["freshness"] = result.get("freshness", {})
+        response["is_partial"] = result.get("is_partial", False)
+        return response
+
+    except Exception as e:
+        logger.error("get_sa_alpha_picks error: %s", e)
+        return {"error": str(e)}
+
+
+def get_sa_pick_detail(
+    dal: Any, symbol: str, picked_date: Optional[str] = None
+) -> Dict:
+    """Get detail for a specific Alpha Pick.
+
+    picked_date=None: latest current (non-stale first), then stale, then hint.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        client = _get_client(dal)
+        result = client.get_pick_detail(symbol, picked_date)
+
+        if result is None:
+            # Check if symbol exists in closed
+            closed = dal.get_sa_portfolio(portfolio_status="closed", symbol=symbol)
+            if closed:
+                latest = sorted(closed, key=lambda x: x.get("picked_date", ""), reverse=True)[0]
+                return {
+                    "error": None,
+                    "detail": None,
+                    "hint": (
+                        f"{symbol} is not in current Alpha Picks. "
+                        f"It was picked on {latest.get('picked_date', '?')} (now closed). "
+                        f"Use: /ap {symbol} {latest.get('picked_date', '')}"
+                    ),
+                }
+            return {"error": f"{symbol} not found in Alpha Picks"}
+
+        return result
+
+    except Exception as e:
+        logger.error("get_sa_pick_detail error: %s", e)
+        return {"error": str(e)}
+
+
+def refresh_sa_alpha_picks(dal: Any) -> Dict:
+    """Force refresh from SA website. Returns per-tab success/failure counts.
+
+    Calls client.refresh_portfolio(sync_tickers=True) — only this path syncs tickers.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        client = _get_client(dal)
+        return client.refresh_portfolio(sync_tickers=True)
+    except Exception as e:
+        logger.error("refresh_sa_alpha_picks error: %s", e)
+        return {"error": str(e)}
