@@ -440,7 +440,11 @@ pip install playwright && playwright install chromium
 
 # 2. Save browser session (one-time) — connects to your running Chrome via CDP
 python scripts/sa_login.py --cdp --launch
-# → Launches Chrome with CDP, reuses your existing SA login, saves session
+# → Restarts Chrome with CDP (port 9222), reuses your existing SA login, saves session
+# → All windows/tabs auto-restore; debug port has no effect on normal browsing
+
+# Custom CDP port:
+#   python scripts/sa_login.py --cdp --launch --cdp-port 9333
 
 # Or manually: restart Chrome with CDP, then run:
 #   google-chrome --remote-debugging-port=9222
