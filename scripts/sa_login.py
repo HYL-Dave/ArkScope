@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import stat
 import sys
+import tempfile
 from pathlib import Path
 
 # Add project root to path
@@ -96,18 +98,36 @@ def main():
 
     with sync_playwright() as p:
         if use_profile:
-            # Persistent context: loads existing Chrome cookies/session
+            # Copy Chrome profile to temp dir (avoids lock when Chrome is running)
             profile_dir = os.path.expanduser(args.profile)
             if not os.path.isdir(profile_dir):
                 print(f"ERROR: Chrome profile directory not found: {profile_dir}")
                 sys.exit(1)
 
-            print(f"Loading Chrome profile from: {profile_dir}")
-            print("(Make sure Chrome is closed before running this)")
+            # Skip large cache dirs that aren't needed for cookies/session
+            skip_dirs = {
+                "Cache", "Code Cache", "GPUCache", "Service Worker",
+                "ShaderCache", "GrShaderCache", "component_crx_cache",
+                "blob_storage", "IndexedDB", "File System",
+            }
+
+            tmp_profile = tempfile.mkdtemp(prefix="sa_login_profile_")
+            print(f"Copying Chrome profile from: {profile_dir}")
+            print("(skipping caches, this may take a moment...)")
+            try:
+                shutil.copytree(
+                    profile_dir, tmp_profile,
+                    ignore=lambda _dir, entries: [e for e in entries if e in skip_dirs],
+                    dirs_exist_ok=True,
+                )
+            except Exception as e:
+                print(f"WARNING: Some profile files couldn't be copied: {e}")
+                print("Continuing anyway...")
+
             print()
 
             context = p.chromium.launch_persistent_context(
-                profile_dir,
+                tmp_profile,
                 headless=False,
                 channel=args.channel if args.channel != "chromium" else None,
                 viewport={"width": 1280, "height": 800},
@@ -131,6 +151,9 @@ def main():
 
             context.storage_state(path=str(session_path))
             context.close()
+
+            # Clean up temp profile
+            shutil.rmtree(tmp_profile, ignore_errors=True)
 
         else:
             # Fresh context: user needs to log in manually
