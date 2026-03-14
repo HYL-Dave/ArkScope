@@ -48,6 +48,11 @@ def main():
         default=default_path,
         help=f"Path to save session state (default: {default_path})",
     )
+    parser.add_argument(
+        "--channel",
+        default="chrome",
+        help="Browser channel: chrome (system Chrome, default), chromium (Playwright bundled)",
+    )
     args = parser.parse_args()
 
     session_path = _resolve_session_path(args.session_file)
@@ -74,7 +79,10 @@ def main():
     target_url = "https://seekingalpha.com/alpha-picks/portfolio"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        launch_kwargs = {"headless": False}
+        if args.channel != "chromium":
+            launch_kwargs["channel"] = args.channel
+        browser = p.chromium.launch(**launch_kwargs)
         context = browser.new_context(
             viewport={"width": 1280, "height": 800},
         )
