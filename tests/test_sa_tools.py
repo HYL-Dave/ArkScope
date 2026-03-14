@@ -152,73 +152,110 @@ class TestDOMParsing:
 _FIXTURE_PATH = Path(__file__).parent / "fixtures" / "sa_portfolio_sample.html"
 
 
-class TestDOMFixture:
-    """Tests that parse the sa_portfolio_sample.html fixture."""
+def _build_mock_page_from_fixture():
+    """Build a mock Playwright page from the HTML fixture.
 
-    def test_fixture_parse_extracts_rows(self):
-        """Parse fixture HTML table rows into picks."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+    Returns a mock page whose query_selector_all(_TABLE_ROW_SELECTOR)
+    returns mock row elements with td cells + anchor links matching the fixture.
+    """
+    import re
 
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        html = _FIXTURE_PATH.read_text()
+    html = _FIXTURE_PATH.read_text()
+    tbody = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL).group(1)
+    row_htmls = re.findall(r"<tr>(.*?)</tr>", tbody, re.DOTALL)
 
-        # Parse with BeautifulSoup (same data the Playwright DOM would give us)
-        from html.parser import HTMLParser
+    mock_rows = []
+    for row_html in row_htmls:
+        cells_text = re.findall(r"<td>([^<]*)</td>", row_html)
+        href_match = re.search(r'href="([^"]*)"', row_html)
 
-        # Extract table rows manually from fixture
-        rows_data = []
-        import re
-        tbody_match = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL)
-        assert tbody_match, "Fixture should contain a <tbody>"
-
-        row_matches = re.findall(r"<tr>(.*?)</tr>", tbody_match.group(1), re.DOTALL)
-        assert len(row_matches) == 3, "Fixture should have 3 data rows"
-
-        for row_html in row_matches:
-            cells_text = re.findall(r"<td>(.*?)</td>", row_html)
-            # Create mock cells
-            mock_cells = []
-            for t in cells_text:
-                cell = MagicMock()
-                cell.inner_text.return_value = t.strip()
-                mock_cells.append(cell)
-
-            pick = client._parse_row(mock_cells, "current")
-            if pick and pick.get("symbol"):
-                rows_data.append(pick)
-
-        assert len(rows_data) == 3
-        symbols = [r["symbol"] for r in rows_data]
-        assert "ACME" in symbols
-        assert "BETA" in symbols
-        assert "GAMA" in symbols
-
-    def test_fixture_parse_field_values(self):
-        """Fixture parsing extracts correct field values."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        import re
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        html = _FIXTURE_PATH.read_text()
-
-        tbody = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL).group(1)
-        first_row = re.findall(r"<tr>(.*?)</tr>", tbody, re.DOTALL)[0]
-        cells_text = re.findall(r"<td>(.*?)</td>", first_row)
-
+        # Build mock cells
         mock_cells = []
         for t in cells_text:
             cell = MagicMock()
             cell.inner_text.return_value = t.strip()
             mock_cells.append(cell)
 
-        pick = client._parse_row(mock_cells, "current")
-        assert pick["symbol"] == "ACME"
-        assert pick["company"] == "Acme Corp"
-        assert pick["picked_date"] == "2025-01-15"
-        assert pick["sa_rating"] == "STRONG BUY"
-        assert pick["sector"] == "Technology"
-        assert pick["portfolio_status"] == "current"
-        assert pick["is_stale"] is False
+        # Build mock link element
+        mock_link = None
+        if href_match:
+            mock_link = MagicMock()
+            mock_link.get_attribute.return_value = href_match.group(1)
+
+        # Build mock row
+        mock_row = MagicMock()
+        mock_row.query_selector_all.return_value = mock_cells
+        mock_row.query_selector.return_value = mock_link
+        mock_rows.append(mock_row)
+
+    # Build mock page
+    mock_page = MagicMock()
+    mock_page.query_selector_all.return_value = mock_rows
+    mock_page.query_selector.return_value = None  # No tab button to click
+    mock_page.inner_text.return_value = ""  # No paywall markers
+    return mock_page
+
+
+class TestDOMFixture:
+    """Tests that exercise _scrape_tab() with fixture-derived mock page."""
+
+    def test_scrape_tab_extracts_all_rows(self):
+        """_scrape_tab with fixture page returns 3 picks."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        mock_page = _build_mock_page_from_fixture()
+
+        picks = client._scrape_tab(mock_page, portfolio_status="current")
+        assert len(picks) == 3
+        symbols = [p["symbol"] for p in picks]
+        assert "ACME" in symbols
+        assert "BETA" in symbols
+        assert "GAMA" in symbols
+
+    def test_scrape_tab_captures_detail_urls(self):
+        """_scrape_tab extracts detail_url from row links."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        mock_page = _build_mock_page_from_fixture()
+
+        picks = client._scrape_tab(mock_page, portfolio_status="current")
+        # Every row in fixture has an <a href>
+        for pick in picks:
+            assert "detail_url" in pick, f"{pick['symbol']} missing detail_url"
+            assert pick["detail_url"].startswith("https://seekingalpha.com/")
+
+        # Check specific URL
+        acme = next(p for p in picks if p["symbol"] == "ACME")
+        assert "/alpha-picks/acme-analysis-12345" in acme["detail_url"]
+
+    def test_scrape_tab_field_values(self):
+        """_scrape_tab parses correct field values from fixture."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        mock_page = _build_mock_page_from_fixture()
+
+        picks = client._scrape_tab(mock_page, portfolio_status="current")
+        acme = next(p for p in picks if p["symbol"] == "ACME")
+        assert acme["company"] == "Acme Corp"
+        assert acme["picked_date"] == "2025-01-15"
+        assert acme["sa_rating"] == "STRONG BUY"
+        assert acme["sector"] == "Technology"
+        assert acme["portfolio_status"] == "current"
+        assert acme["is_stale"] is False
+
+    def test_scrape_tab_closed_status(self):
+        """_scrape_tab sets portfolio_status='closed' when scraping closed tab."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        mock_page = _build_mock_page_from_fixture()
+
+        picks = client._scrape_tab(mock_page, portfolio_status="closed")
+        for pick in picks:
+            assert pick["portfolio_status"] == "closed"
 
 
 # ============================================================

@@ -126,25 +126,34 @@ class SAAlphaPicksClient:
                 if age_days < self._detail_cache_days:
                     return cached
 
-        # Scrape detail page — need the pick's URL
+        # Look up the pick to get its detail_url
         pick_info = cached or self._dal.get_sa_pick_detail(symbol, picked_date)
         if not pick_info:
-            return {"error": None, "detail": None, "symbol": symbol}
+            return None  # Signal "not found" so tool layer can check closed + hint
 
-        # Build detail URL from symbol (SA pattern: /alpha-picks/symbol/analysis)
-        detail_url = f"https://seekingalpha.com/symbol/{symbol}"
+        # Resolve detail URL from stored pick data (captured by _scrape_tab)
+        detail_url = (
+            pick_info.get("detail_url")
+            or pick_info.get("raw_data", {}).get("detail_url")
+        )
+        if not detail_url:
+            # No detail link captured — return pick info without report
+            logger.info("No detail_url for %s; returning pick metadata only", symbol)
+            if cached:
+                return cached
+            return {**pick_info, "detail_report": None}
 
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
             if cached:
                 return cached
-            return {"error": "playwright not installed", "symbol": symbol}
+            return {**pick_info, "detail_report": None}
 
         if not self._check_session_file():
             if cached:
                 return cached
-            return {"error": "Session file not found", "symbol": symbol}
+            return {**pick_info, "detail_report": None}
 
         try:
             with sync_playwright() as p:
@@ -351,6 +360,14 @@ class SAAlphaPicksClient:
 
                 pick = self._parse_row(cells, portfolio_status)
                 if pick and pick.get("symbol"):
+                    # Extract detail link from row (the > arrow)
+                    link = row.query_selector("a[href]")
+                    if link:
+                        href = link.get_attribute("href") or ""
+                        if href:
+                            if not href.startswith("http"):
+                                href = f"https://seekingalpha.com{href}"
+                            pick["detail_url"] = href
                     picks.append(pick)
             except Exception as e:
                 logger.warning("Failed to parse row: %s", e)
