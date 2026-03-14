@@ -438,16 +438,22 @@ Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfo
 # 1. Install Playwright + browser
 pip install playwright && playwright install chromium
 
-# 2. Save browser session (one-time, headed browser)
-python scripts/sa_login.py
-# → Opens browser → log in to SA → press Enter → session saved to ~/.config/mindfulrl/seeking_alpha/
+# 2. Save browser session (one-time) — connects to your running Chrome via CDP
+python scripts/sa_login.py --cdp --launch
+# → Launches Chrome with CDP, reuses your existing SA login, saves session
+
+# Or manually: restart Chrome with CDP, then run:
+#   google-chrome --remote-debugging-port=9222
+#   python scripts/sa_login.py --cdp
 
 # 3. Enable in config/user_profile.yaml
 # seeking_alpha:
 #   enabled: true
 ```
 
-### Usage
+Session credentials are stored outside the repo (`~/.config/mindfulrl/seeking_alpha/storage_state.json`, 0600 permissions). Session validity is checked on each scrape (URL redirect + table selector + paywall marker).
+
+### CLI
 
 ```bash
 /ap                    # Current picks table (cached, auto-refresh if >24h stale)
@@ -457,8 +463,6 @@ python scripts/sa_login.py
 /ap NVDA 2025-06-15    # Specific pick date (disambiguates re-picks)
 /ap refresh            # Force refresh + sync tickers to collection watchlist
 ```
-
-Session credentials are stored outside the repo (`~/.config/mindfulrl/seeking_alpha/storage_state.json`, 0600 permissions). Triple session validation: URL redirect detection, table selector check, paywall marker scan.
 
 ---
 
