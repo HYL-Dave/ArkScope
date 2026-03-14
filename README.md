@@ -1,19 +1,19 @@
 # MindfulRL-Intraday
 
-> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 44 financial tools, Discord bot, and multi-source news/price/options data pipeline.
+> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 47 financial tools, Discord bot, and multi-source news/price/options data pipeline.
 
 ## Overview
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 44 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 47 tools, 4 skills, 4 subagents
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
 - **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
 - **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks/chain), signals, web search
 - **RL Pipeline** — PPO/CPPO agents with sentiment/risk-enhanced data, model registry, 3 agent tools
 - **Monitor System** — Watchlist alerts (price, sentiment, signal, sector) with Discord notifications
-- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment, 6 migrations
+- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment, 7 migrations
 
 ## Quick Start
 
@@ -60,7 +60,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | 3 | OpenAI | GPT-5.2 | gpt5, 5.2 | 400K | 128K | Reasoning effort |
 | 4 | OpenAI | GPT-5.2 Codex | codex, 5.2-codex | 400K | 128K | Agentic coding |
 
-### Slash Commands (20)
+### Slash Commands (21)
 
 | Command | Alias | Description |
 |---------|-------|-------------|
@@ -81,11 +81,12 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | `/save [N\|N-M] ["title"]` | `/sv` | Save session exchanges as report |
 | `/reports [ticker]` | `/rp` | List/view saved research reports |
 | `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
+| `/alpha-picks [symbol\|refresh]` | `/ap` | Seeking Alpha Alpha Picks portfolio & detail |
 | `/monitor` | `/mon` | Scan watchlist for alerts |
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (44)
+### Tools (47)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -117,6 +118,9 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | | `get_morning_brief` | Personalized morning briefing |
 | | `check_data_freshness` | Health & staleness check for all data sources |
 | **Portfolio** | `get_portfolio_analysis` | P&L, beta vs SPY, correlation matrix, HHI |
+| | `get_sa_alpha_picks` | Seeking Alpha Alpha Picks portfolio (cached, auto-refresh) |
+| | `get_sa_pick_detail` | Alpha Picks detail report for a specific pick |
+| | `refresh_sa_alpha_picks` | Force refresh from SA website + sync tickers |
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
 | | `get_report` | Retrieve report by ID |
@@ -257,6 +261,7 @@ Applied automatically on first Docker startup, or manually:
 -- sql/004_add_memories.sql        — Episodic memory (full-text search, GIN + tsvector)
 -- sql/005_add_financial_cache.sql — Financial data cache (paid API responses)
 -- sql/006_add_news_search.sql     — Full-text search on news (GIN index) + pgvector embedding column
+-- sql/007_add_sa_alpha_picks.sql  — Seeking Alpha Alpha Picks portfolio + refresh metadata
 ```
 
 ### Migrate Data from Parquet Files
@@ -423,13 +428,47 @@ rl_pipeline:
 
 ---
 
+## Seeking Alpha Alpha Picks (Optional)
+
+Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfolio page via Playwright with a saved browser session. Requires SA Premium + Alpha Picks subscription ($199/yr). Disabled by default.
+
+### Setup
+
+```bash
+# 1. Install Playwright + browser
+pip install playwright && playwright install chromium
+
+# 2. Save browser session (one-time, headed browser)
+python scripts/sa_login.py
+# → Opens browser → log in to SA → press Enter → session saved to ~/.config/mindfulrl/seeking_alpha/
+
+# 3. Enable in config/user_profile.yaml
+# seeking_alpha:
+#   enabled: true
+```
+
+### Usage
+
+```bash
+/ap                    # Current picks table (cached, auto-refresh if >24h stale)
+/ap closed             # Closed positions
+/ap all                # Both current + closed
+/ap NVDA               # Detail report for a specific pick
+/ap NVDA 2025-06-15    # Specific pick date (disambiguates re-picks)
+/ap refresh            # Force refresh + sync tickers to collection watchlist
+```
+
+Session credentials are stored outside the repo (`~/.config/mindfulrl/seeking_alpha/storage_state.json`, 0600 permissions). Triple session validation: URL redirect detection, table selector check, paywall marker scan.
+
+---
+
 ## Project Structure
 
 ### Agent Layer (`src/agents/`)
 
 | Module | Description |
 |--------|-------------|
-| `cli.py` | Interactive CLI (20 slash commands, prompt caching, token tracking) |
+| `cli.py` | Interactive CLI (21 slash commands, prompt caching, token tracking) |
 | `config.py` | Model configuration, defaults, aliases |
 | `anthropic_agent/agent.py` | Anthropic messages loop (streaming, thinking, effort) |
 | `openai_agent/agent.py` | OpenAI Agents SDK wrapper (Responses API) |
@@ -448,11 +487,11 @@ rl_pipeline:
 
 | Module | Description |
 |--------|-------------|
-| `registry.py` | ToolRegistry (44 tools, dual-format for Anthropic + OpenAI) |
+| `registry.py` | ToolRegistry (47 tools, dual-format for Anthropic + OpenAI) |
 | `data_access.py` | DataAccessLayer with backend abstraction |
 | `backends/file_backend.py` | Parquet file backend |
 | `backends/db_backend.py` | PostgreSQL backend (psycopg3) + `query_health_stats()` |
-| `news_tools.py`, `price_tools.py`, etc. | Individual tool implementations |
+| `news_tools.py`, `price_tools.py`, `sa_tools.py`, etc. | Individual tool implementations |
 | `report_tools.py` | Research report save/list/get |
 | `memory_tools.py` | Episodic memory CRUD + full-text search |
 | `web_tools.py` | Tavily search + Playwright browser + Codex deep research |
@@ -496,13 +535,14 @@ rl_pipeline:
 | **Financial Datasets** | Structured financials (Q4, TTM, segmented) | PAYG $0.01/req |
 | **Polygon** | News (3+ years), reference data | Free/Paid |
 | **IBKR** | Real-time news, intraday prices, options | Requires TWS |
+| **Seeking Alpha** | Alpha Picks portfolio & analysis reports | Premium + Alpha Picks ($199/yr) |
 
 ### Configuration (`config/`)
 
 | File | Description |
 |------|-------------|
 | `.env` | API keys (from `.env.template`) |
-| `user_profile.yaml` | 12 sections: watchlists, strategy, models, alerts, RL pipeline, etc. |
+| `user_profile.yaml` | 13 sections: watchlists, strategy, models, alerts, RL pipeline, Seeking Alpha, etc. |
 | `sectors.yaml` | Sector definitions and ticker mappings |
 | `tickers_core.json` | Core ticker list (Tier 1/2/3) |
 | `skills/*.yaml` | Custom skill definitions |
