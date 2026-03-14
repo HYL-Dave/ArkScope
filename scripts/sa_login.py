@@ -58,8 +58,8 @@ def _is_cdp_available(port: int) -> bool:
         return False
 
 
-def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
-    """Launch Chrome with remote debugging enabled. Returns the process."""
+def _find_chrome() -> str | None:
+    """Find a Chrome executable."""
     chrome_paths = [
         "google-chrome", "google-chrome-stable",
         "/opt/google/chrome/chrome",
@@ -67,18 +67,71 @@ def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
     ]
     for chrome in chrome_paths:
         try:
-            proc = subprocess.Popen(
-                [chrome, f"--remote-debugging-port={port}"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-            # Wait a bit for Chrome to start
-            for _ in range(10):
-                time.sleep(0.5)
-                if _is_cdp_available(port):
-                    return proc
-            proc.terminate()
-        except FileNotFoundError:
+            subprocess.run([chrome, "--version"], capture_output=True, timeout=5)
+            return chrome
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
+    return None
+
+
+def _is_chrome_running() -> bool:
+    """Check if Chrome is currently running."""
+    try:
+        result = subprocess.run(["pgrep", "-f", "chrome"], capture_output=True)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+def _graceful_close_chrome() -> bool:
+    """Gracefully close all Chrome instances. Returns True if Chrome exited."""
+    try:
+        subprocess.run(["pkill", "-TERM", "-f", "chrome"], capture_output=True)
+        # Wait for Chrome to exit
+        for _ in range(20):
+            time.sleep(0.5)
+            if not _is_chrome_running():
+                return True
+        return False
+    except FileNotFoundError:
+        return False
+
+
+def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
+    """Launch Chrome with remote debugging enabled. Returns the process."""
+    chrome = _find_chrome()
+    if not chrome:
+        return None
+
+    # If Chrome is running, close it first (can't add CDP to existing process)
+    if _is_chrome_running():
+        print("Chrome is currently running. It will be restarted with CDP enabled.")
+        print("(Your tabs and session will be restored automatically)")
+        print()
+        answer = input("Close Chrome and restart with CDP? [Y/n] ").strip().lower()
+        if answer and answer != "y":
+            print("Aborted.")
+            return None
+
+        print("Closing Chrome...")
+        if not _graceful_close_chrome():
+            print("WARNING: Chrome didn't close cleanly. Trying force close...")
+            subprocess.run(["pkill", "-KILL", "-f", "chrome"], capture_output=True)
+            time.sleep(1)
+
+    print(f"Launching: {chrome} --remote-debugging-port={port}")
+    proc = subprocess.Popen(
+        [chrome, f"--remote-debugging-port={port}"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+    # Wait for CDP to become available
+    for _ in range(20):
+        time.sleep(0.5)
+        if _is_cdp_available(port):
+            return proc
+
+    proc.terminate()
     return None
 
 
