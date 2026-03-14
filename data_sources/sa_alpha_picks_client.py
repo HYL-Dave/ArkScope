@@ -368,6 +368,10 @@ class SAAlphaPicksClient:
                             if not href.startswith("http"):
                                 href = f"https://seekingalpha.com{href}"
                             pick["detail_url"] = href
+                            # Also store in raw_data so it survives DB round-trip
+                            if pick.get("raw_data") is None:
+                                pick["raw_data"] = {}
+                            pick["raw_data"]["detail_url"] = href
                     picks.append(pick)
             except Exception as e:
                 logger.warning("Failed to parse row: %s", e)

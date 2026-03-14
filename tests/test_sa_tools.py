@@ -257,6 +257,29 @@ class TestDOMFixture:
         for pick in picks:
             assert pick["portfolio_status"] == "closed"
 
+    def test_detail_url_in_raw_data_for_db_roundtrip(self):
+        """detail_url is stored inside raw_data so it persists through DB write/read."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        mock_page = _build_mock_page_from_fixture()
+
+        picks = client._scrape_tab(mock_page, portfolio_status="current")
+        acme = next(p for p in picks if p["symbol"] == "ACME")
+
+        # Simulate DB round-trip: only raw_data survives as JSONB
+        raw_data = acme["raw_data"]
+        assert "detail_url" in raw_data, "detail_url must be in raw_data for DB persistence"
+
+        # After DB read, get_pick_detail resolves URL from raw_data
+        db_row = {"symbol": "ACME", "raw_data": raw_data}
+        resolved = (
+            db_row.get("detail_url")  # Not present after DB read
+            or db_row.get("raw_data", {}).get("detail_url")  # Fallback
+        )
+        assert resolved is not None
+        assert "/alpha-picks/acme-analysis-12345" in resolved
+
 
 # ============================================================
 # Detail key resolution
