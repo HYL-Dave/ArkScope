@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/hyl/.virtualenvs/llm_app/bin/python3
 """
 Native Messaging host for SA Alpha Picks Chrome extension.
 
