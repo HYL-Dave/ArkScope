@@ -192,6 +192,37 @@ class TestNativeHost:
             })
             assert result["status"] == "ok"
 
+    def test_detail_url_in_raw_data_survives_dal(self):
+        """Extension pick with raw_data.detail_url is passed through to DAL."""
+        from scripts.sa_native_host import handle_message
+
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
+             patch("scripts.sa_native_host._try_ticker_sync"):
+            mock_dal = MagicMock()
+            mock_dal.apply_sa_refresh.return_value = 1
+            MockDAL.return_value = mock_dal
+
+            # Simulates scrape.js output shape: detail_url in both top-level and raw_data
+            picks = [{
+                "symbol": "ACME",
+                "company": "Acme Corp",
+                "detail_url": "https://seekingalpha.com/alpha-picks/acme-123",
+                "raw_data": {
+                    "cells": ["Acme Corp", "ACME"],
+                    "detail_url": "https://seekingalpha.com/alpha-picks/acme-123",
+                },
+            }]
+            handle_message({
+                "action": "refresh",
+                "scope": "current",
+                "picks": picks,
+                "batch_ts": "2025-03-15T10:00:00Z",
+            })
+
+            # Verify the pick passed to DAL has raw_data.detail_url intact
+            call_picks = mock_dal.apply_sa_refresh.call_args[1].get("picks") or mock_dal.apply_sa_refresh.call_args[0][1]
+            assert call_picks[0]["raw_data"]["detail_url"] == "https://seekingalpha.com/alpha-picks/acme-123"
+
 
 # ============================================================
 # Tool stale_warning pass-through
