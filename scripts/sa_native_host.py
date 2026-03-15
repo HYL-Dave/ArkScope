@@ -68,7 +68,7 @@ def handle_message(msg):
     else:
         attempt_ts = datetime.now(tz=timezone.utc)
 
-    dal = DataAccessLayer()
+    dal = DataAccessLayer(db_dsn="auto")
 
     if action == "refresh":
         return _handle_refresh(dal, scope, msg.get("picks", []), attempt_ts)
