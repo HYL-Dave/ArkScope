@@ -3,9 +3,10 @@
 
 "use strict";
 
-const SA_URL = "https://seekingalpha.com/alpha-picks/portfolio";
+const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
+const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
-const TABLE_SELECTOR = '[data-testid="portfolio-table"] tbody tr';
+const TABLE_SELECTOR = "table tbody tr";
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
 
 // --- Message listener (from popup) ---
@@ -25,49 +26,36 @@ async function doRefresh() {
 
   let tabId = null;
   try {
-    // Open SA page in background tab
-    sendProgress("Opening SA Alpha Picks page...");
-    const tab = await chrome.tabs.create({ url: SA_URL, active: false });
+    // --- Scrape current picks ---
+    sendProgress("Opening current picks page...");
+    const tab = await chrome.tabs.create({ url: SA_CURRENT_URL, active: false });
     tabId = tab.id;
-
-    // Wait for initial page load
     await waitForTabLoad(tabId);
 
-    // Wait for table to be ready (current tab is default)
-    sendProgress("Waiting for portfolio table...");
+    sendProgress("Waiting for current picks table...");
     let ready = await waitForTableReady(tabId);
     if (!ready.ok) {
       results.current = await sendToNativeHost("refresh_failure", "current", [], ready.error, batchTs);
+    } else {
+      sendProgress("Scraping current picks...");
+      const currentPicks = await injectScraper(tabId);
+      results.current = await sendToNativeHost("refresh", "current", currentPicks, null, batchTs);
+    }
+
+    // --- Scrape closed (removed) picks ---
+    sendProgress("Opening closed picks page...");
+    await chrome.tabs.update(tabId, { url: SA_CLOSED_URL });
+    await waitForTabLoad(tabId);
+
+    sendProgress("Waiting for closed picks table...");
+    ready = await waitForTableReady(tabId);
+    if (!ready.ok) {
       results.closed = await sendToNativeHost("refresh_failure", "closed", [], ready.error, batchTs);
-      await saveRefreshState(batchTs, results);
-      return results;
+    } else {
+      sendProgress("Scraping closed picks...");
+      const closedPicks = await injectScraper(tabId);
+      results.closed = await sendToNativeHost("refresh", "closed", closedPicks, null, batchTs);
     }
-
-    // Scrape current tab
-    sendProgress("Scraping current picks...");
-    const currentPicks = await injectScraper(tabId);
-    results.current = await sendToNativeHost("refresh", "current", currentPicks, null, batchTs);
-
-    // Snapshot current table for change detection
-    const currentSnapshot = await getTableSnapshot(tabId);
-
-    // Click Closed tab
-    sendProgress("Switching to Closed tab...");
-    await clickClosedTab(tabId);
-
-    // Wait for closed tab to be ready (button active + content changed)
-    sendProgress("Waiting for closed picks...");
-    const tabSwitched = await waitForClosedTabReady(tabId, currentSnapshot);
-    if (!tabSwitched.ok) {
-      results.closed = await sendToNativeHost("refresh_failure", "closed", [], tabSwitched.error, batchTs);
-      await saveRefreshState(batchTs, results);
-      return results;
-    }
-
-    // Scrape closed tab
-    sendProgress("Scraping closed picks...");
-    const closedPicks = await injectScraper(tabId);
-    results.closed = await sendToNativeHost("refresh", "closed", closedPicks, null, batchTs);
 
     await saveRefreshState(batchTs, results);
     sendProgress("Done!");
@@ -140,78 +128,6 @@ async function waitForTableReady(tabId, timeoutMs = 30000) {
     await sleep(500);
   }
   return { ok: false, error: "Timeout waiting for table" };
-}
-
-// --- Closed tab switching + verification ---
-
-async function clickClosedTab(tabId) {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: () => {
-      const buttons = document.querySelectorAll("button");
-      for (const btn of buttons) {
-        if (btn.textContent.trim() === "Closed") {
-          btn.click();
-          return true;
-        }
-      }
-      return false;
-    },
-  });
-}
-
-async function getTableSnapshot(tabId) {
-  const results = await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (tableSelector) => {
-      const rows = document.querySelectorAll(tableSelector);
-      return Array.from(rows).slice(0, 3).map((r) => r.innerText.trim()).join("|");
-    },
-    args: [TABLE_SELECTOR],
-  });
-  return (results[0] && results[0].result) || "";
-}
-
-async function waitForClosedTabReady(tabId, currentSnapshot, timeoutMs = 15000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      args: [currentSnapshot, TABLE_SELECTOR],
-      func: (prevSnapshot, tableSelector) => {
-        // 1. Check Closed button is active
-        const buttons = document.querySelectorAll("button");
-        let closedActive = false;
-        for (const btn of buttons) {
-          if (btn.textContent.trim() === "Closed") {
-            closedActive =
-              btn.getAttribute("aria-selected") === "true" ||
-              btn.classList.contains("active") ||
-              btn.classList.contains("selected") ||
-              parseInt(window.getComputedStyle(btn).fontWeight, 10) >= 600;
-          }
-        }
-        if (!closedActive) return { status: "button_not_active" };
-
-        // 2. Check table rows exist
-        const rows = document.querySelectorAll(tableSelector);
-        if (!rows.length) return { status: "no_rows" };
-
-        // 3. Check content has changed (first 3 rows different from current snapshot)
-        const newHash = Array.from(rows)
-          .slice(0, 3)
-          .map((r) => r.innerText.trim())
-          .join("|");
-        if (newHash === prevSnapshot) return { status: "content_unchanged" };
-
-        return { status: "ready" };
-      },
-    });
-    const check = results[0] && results[0].result;
-    if (check && check.status === "ready") return { ok: true };
-    await sleep(500);
-  }
-  return { ok: false, error: "Timeout: Closed tab content did not update" };
 }
 
 // --- Scraper injection ---
