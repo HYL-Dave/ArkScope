@@ -406,11 +406,10 @@ web_search:
 # 12. Seeking Alpha Alpha Picks (Phase 11c)
 # ============================================
 seeking_alpha:
-  # 啟用 SA Alpha Picks 工具 (需先用 scripts/sa_login.py 登入)
-  enabled: false
+  # 啟用 SA Alpha Picks 工具 (需安裝 Chrome extension，見 extensions/sa_alpha_picks/)
+  enabled: true
 
-  # Session 檔案路徑 (由 scripts/sa_login.py 生成)
-  # 預設存在 repo 外面，避免誤提交
+  # deprecated: session_file 已由 Chrome extension 取代
   session_file: "~/.config/mindfulrl/seeking_alpha/storage_state.json"
 
   # Portfolio 快取有效小時數 (超過則自動 refresh)
