@@ -5,34 +5,41 @@
 // Real SA DOM structure (as of 2026-03):
 //
 // Current page (/alpha-picks/picks/current):
-//   Columns: Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
+//   Header: Company | Symbol | Picked | Return | Sector | Rating | Holding% | (link)
+//   Data:   Symbol  | Picked | Return%| Sector | Rating | Holding% | (link)
+//   Note: header has Company column but data rows do NOT have a company td
 //
 // Removed page (/alpha-picks/picks/removed):
-//   Columns: Company | Symbol | Picked | Closed | Return% | Sector | Rating | (link)
+//   Header: Company | Symbol | Picked | Closed | Return | Sector | Rating | (link)
+//   Data:   Company | Symbol | Picked | Closed | Return%| Sector | Rating | (link)
+//   Note: removed page data rows DO have company as first td
+//
+// Detection: URL path (most reliable)
 
 (function () {
   "use strict";
 
-  // Detect page type from table headers
-  const headers = Array.from(document.querySelectorAll("table thead th"))
-    .map((th) => th.innerText.trim().toLowerCase());
-  const hasCompanyCol = headers.length > 0 && headers[0].startsWith("company");
+  var isRemovedPage = location.pathname.includes("/removed");
 
-  const rows = document.querySelectorAll("table tbody tr");
-  const picks = [];
+  var rows = document.querySelectorAll("table tbody tr");
+  var picks = [];
 
-  rows.forEach((row) => {
-    const cells = row.querySelectorAll("td");
-    const texts = Array.from(cells).map((c) => c.innerText.trim());
-    const link = row.querySelector("a[href]");
-    const detailUrl = link ? link.href : null;
+  for (var i = 0; i < rows.length; i++) {
+    var cells = rows[i].querySelectorAll("td");
+    var texts = [];
+    for (var j = 0; j < cells.length; j++) {
+      texts.push(cells[j].innerText.trim());
+    }
 
+    var link = rows[i].querySelector("a[href]");
+    var detailUrl = link ? link.href : null;
     var pick;
-    if (hasCompanyCol) {
-      // Removed page: Company | Symbol | Picked | Closed | Return% | Sector | Rating | (link)
-      if (texts.length < 6) return;
+
+    if (isRemovedPage) {
+      // Removed: Company | Symbol | Picked | Closed | Return% | Sector | Rating | (link)
+      if (texts.length < 7) continue;
       var symbol = (texts[1] || "").toUpperCase();
-      if (!symbol || symbol.length > 10) return;
+      if (!symbol || symbol.length > 10) continue;
       pick = {
         company: texts[0] || "",
         symbol: symbol,
@@ -46,10 +53,10 @@
         raw_data: { cells: texts, detail_url: detailUrl },
       };
     } else {
-      // Current page: Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
-      if (texts.length < 5) return;
+      // Current: Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
+      if (texts.length < 5) continue;
       var symbol = (texts[0] || "").toUpperCase();
-      if (!symbol || symbol.length > 10) return;
+      if (!symbol || symbol.length > 10) continue;
       pick = {
         company: "",
         symbol: symbol,
@@ -64,7 +71,7 @@
     }
 
     picks.push(pick);
-  });
+  }
 
   return picks;
 
