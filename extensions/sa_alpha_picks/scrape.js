@@ -7,12 +7,12 @@
 // Current page (/alpha-picks/picks/current):
 //   Header: Company | Symbol | Picked | Return | Sector | Rating | Holding% | (link)
 //   Data:   Symbol  | Picked | Return%| Sector | Rating | Holding% | (link)
-//   Note: header has Company column but data rows do NOT have a company td
+//   Note: header has Company column but data rows do NOT
 //
 // Removed page (/alpha-picks/picks/removed):
 //   Header: Company | Symbol | Picked | Closed | Return | Sector | Rating | (link)
-//   Data:   Company | Symbol | Picked | Closed | Return%| Sector | Rating | (link)
-//   Note: removed page data rows DO have company as first td
+//   Data:   Symbol  | Picked | Closed | Return%| Sector | Rating | (link)
+//   Note: same quirk — header has Company but data rows do NOT
 //
 // Detection: URL path (most reliable)
 
@@ -36,24 +36,26 @@
     var pick;
 
     if (isRemovedPage) {
-      // Removed: Company | Symbol | Picked | Closed | Return% | Sector | Rating | (link)
-      if (texts.length < 7) continue;
-      var symbol = (texts[1] || "").toUpperCase();
+      // Removed data rows (no Company td despite header having it):
+      // Symbol | Picked | Closed | Return% | Sector | Rating | (link)
+      if (texts.length < 6) continue;
+      var symbol = (texts[0] || "").toUpperCase();
       if (!symbol || symbol.length > 10) continue;
       pick = {
-        company: texts[0] || "",
+        company: "",
         symbol: symbol,
-        picked_date: parseDate(texts[2]),
-        closed_date: parseDate(texts[3]),
-        return_pct: parsePct(texts[4]),
-        sector: texts[5] || null,
-        sa_rating: parseRating(texts[6]),
+        picked_date: parseDate(texts[1]),
+        closed_date: parseDate(texts[2]),
+        return_pct: parsePct(texts[3]),
+        sector: texts[4] || null,
+        sa_rating: parseRating(texts[5]),
         holding_pct: null,
         detail_url: detailUrl,
         raw_data: { cells: texts, detail_url: detailUrl },
       };
     } else {
-      // Current: Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
+      // Current data rows (no Company td despite header having it):
+      // Symbol | Picked | Return% | Sector | Rating | Holding% | (link)
       if (texts.length < 5) continue;
       var symbol = (texts[0] || "").toUpperCase();
       if (!symbol || symbol.length > 10) continue;
