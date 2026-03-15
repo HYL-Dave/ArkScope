@@ -17,6 +17,7 @@
     const texts = Array.from(cells).map((c) => c.innerText.trim());
     const link = row.querySelector("a[href]");
 
+    const detailUrl = link ? link.href : null;
     const pick = {
       company: texts[0] || "",
       symbol: extractSymbol(texts),
@@ -25,8 +26,8 @@
       sector: extractSector(texts),
       sa_rating: extractRating(texts),
       holding_pct: extractHoldingPct(texts),
-      detail_url: link ? link.href : null,
-      raw_data: { cells: texts },
+      detail_url: detailUrl,
+      raw_data: { cells: texts, detail_url: detailUrl },
     };
 
     if (pick.symbol) {

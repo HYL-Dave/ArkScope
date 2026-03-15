@@ -119,7 +119,8 @@ class TestNativeHost:
         sys.path.insert(0, str(project_root))
         from scripts.sa_native_host import handle_message
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
+             patch("scripts.sa_native_host._try_ticker_sync"):
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 3
             MockDAL.return_value = mock_dal
@@ -176,7 +177,8 @@ class TestNativeHost:
         """JS Date.toISOString() Z suffix is parsed correctly."""
         from scripts.sa_native_host import handle_message
 
-        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
+             patch("scripts.sa_native_host._try_ticker_sync"):
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 0
             MockDAL.return_value = mock_dal

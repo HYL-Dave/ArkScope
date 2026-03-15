@@ -23,8 +23,12 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, PROJECT_ROOT)
 
+# Ensure log directory exists BEFORE configuring logging
+_log_dir = os.path.join(PROJECT_ROOT, "data", "logs")
+os.makedirs(_log_dir, exist_ok=True)
+
 logging.basicConfig(
-    filename=os.path.join(PROJECT_ROOT, "data", "logs", "sa_native_host.log"),
+    filename=os.path.join(_log_dir, "sa_native_host.log"),
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
@@ -132,9 +136,6 @@ def _try_ticker_sync(dal, picks):
 
 
 def main():
-    # Ensure log directory exists
-    os.makedirs(os.path.join(PROJECT_ROOT, "data", "logs"), exist_ok=True)
-
     try:
         msg = read_message()
         if msg is None:
