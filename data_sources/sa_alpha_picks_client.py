@@ -163,16 +163,21 @@ class SAAlphaPicksClient:
 
         Public method — called by native host on refresh success and
         by refresh_portfolio() as fallback.
+
+        Behavior:
+        - Replaces (not appends) sa_alpha_picks_auto with current picks only.
+          When a pick moves to removed, it drops out of the auto bucket.
+        - Deduplicates: excludes tickers already present in tier1/tier2.
         """
-        symbols = sorted({
+        current_symbols = {
             p["symbol"]
             for p in picks
             if p.get("portfolio_status") == "current"
             and not p.get("is_stale", False)
             and p.get("symbol")
-        })
+        }
 
-        if not symbols:
+        if not current_symbols:
             return
 
         tickers_path = Path("config/tickers_core.json")
@@ -184,18 +189,25 @@ class SAAlphaPicksClient:
             with open(tickers_path) as f:
                 tickers_config = json.load(f)
 
+            # Collect tickers already in tier1 and tier2 (no need to duplicate)
+            existing_tickers = set()
+            for tier_key in ("tier1_core", "tier2_extended"):
+                tier = tickers_config.get(tier_key, {})
+                for group in tier.values():
+                    if isinstance(group, dict) and "tickers" in group:
+                        existing_tickers.update(group["tickers"])
+
+            # Only add tickers not already covered by higher tiers
+            new_symbols = sorted(current_symbols - existing_tickers)
+
             if "tier3_user_watchlist" not in tickers_config:
                 tickers_config["tier3_user_watchlist"] = {}
 
             tier3 = tickers_config["tier3_user_watchlist"]
-            existing = set(
-                tier3.get("sa_alpha_picks_auto", {}).get("tickers", [])
-            )
-            merged = sorted(existing | set(symbols))
 
             tier3["sa_alpha_picks_auto"] = {
-                "tickers": merged,
-                "description": "Auto-synced from SA Alpha Picks (current, non-stale)",
+                "tickers": new_symbols,
+                "description": "Auto-synced from SA Alpha Picks (current only, excludes tier1/tier2)",
             }
 
             tmp_path = tickers_path.with_suffix(".json.tmp")
