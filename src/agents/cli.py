@@ -1574,15 +1574,16 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
 
     # /ap refresh
     if subcmd.lower() == "refresh":
-        console.print("[dim]Refreshing Alpha Picks from SA...[/dim]")
         result = refresh_sa_alpha_picks(dal)
         if "error" in result and result["error"]:
             console.print(f"[red]{result['error']}[/red]\n")
             return
-        results = result.get("results", {})
-        for scope, info in results.items():
-            status = "[green]OK[/green]" if info.get("ok") else f"[red]FAIL: {info.get('error', '?')}[/red]"
-            console.print(f"  {scope}: {status} ({info.get('count', 0)} picks)")
+        if result.get("refresh_hint"):
+            console.print(f"[yellow]{result['refresh_hint']}[/yellow]")
+        current_count = len(result.get("current", []))
+        closed_count = len(result.get("closed", []))
+        if current_count or closed_count:
+            console.print(f"[dim]Cached: {current_count} current, {closed_count} closed[/dim]")
         console.print()
         return
 
@@ -1654,6 +1655,10 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
         console.print(f"\n[dim]Freshness: {', '.join(parts)}[/dim]")
     if result.get("is_partial"):
         console.print("[yellow]Warning: partial data (some tabs failed to refresh)[/yellow]")
+    if result.get("stale_warning"):
+        console.print(f"[yellow]{result['stale_warning']}[/yellow]")
+    if result.get("refresh_hint") and not result.get("current") and not result.get("closed"):
+        console.print(f"[yellow]{result['refresh_hint']}[/yellow]")
     console.print()
 
 

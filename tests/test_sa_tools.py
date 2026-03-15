@@ -57,228 +57,160 @@ class TestSAConfig:
 
 
 # ============================================================
-# Session check
+# Client extension-backed behavior
 # ============================================================
 
-class TestSessionCheck:
-    def test_missing_session_file(self):
-        """Client returns error when session file doesn't exist."""
+class TestClientNoSession:
+    def test_client_works_without_session_file(self):
+        """Client no longer requires session_file parameter."""
         from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(
-            session_file="/nonexistent/path.json",
-            dal=MagicMock(),
-        )
+        client = SAAlphaPicksClient(dal=MagicMock())
+        # Should not raise
+        assert client._dal is not None
+
+    def test_refresh_returns_hint(self):
+        """refresh_portfolio returns refresh_hint for extension."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+        dal = MagicMock()
+        dal.get_sa_refresh_meta.return_value = {}
+        dal.get_sa_portfolio.return_value = []
+        client = SAAlphaPicksClient(dal=dal)
         result = client.refresh_portfolio()
-        assert "error" in result
-        assert "Session file not found" in result["error"]
+        assert "refresh_hint" in result
+        assert "extension" in result["refresh_hint"].lower()
+
+    def test_stale_warning_when_cache_old(self):
+        """get_portfolio returns stale_warning when cache exceeds TTL."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+        dal = MagicMock()
+        old_time = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+        dal.get_sa_refresh_meta.return_value = {
+            "current": {"ok": True, "last_success_at": old_time},
+            "closed": {"ok": True, "last_success_at": old_time},
+        }
+        dal.get_sa_portfolio.return_value = []
+        client = SAAlphaPicksClient(dal=dal, cache_hours=24)
+        result = client.get_portfolio()
+        assert "stale_warning" in result
+        assert "48h" in result["stale_warning"]
+
+    def test_no_stale_warning_when_fresh(self):
+        """get_portfolio has no stale_warning when cache is fresh."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+        dal = MagicMock()
+        fresh_time = datetime.now(timezone.utc).isoformat()
+        dal.get_sa_refresh_meta.return_value = {
+            "current": {"ok": True, "last_success_at": fresh_time},
+            "closed": {"ok": True, "last_success_at": fresh_time},
+        }
+        dal.get_sa_portfolio.return_value = []
+        client = SAAlphaPicksClient(dal=dal, cache_hours=24)
+        result = client.get_portfolio()
+        assert "stale_warning" not in result
 
 
 # ============================================================
-# DOM parsing (unit: mock Playwright)
+# Native host message handling
 # ============================================================
 
-class TestDOMParsing:
-    def test_parse_row_extracts_symbol(self):
-        """Row parser extracts ticker symbol."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+class TestNativeHost:
+    def test_handle_refresh_calls_dal(self):
+        """Native host handle_message calls DAL.apply_sa_refresh."""
+        sys.path.insert(0, str(project_root))
+        from scripts.sa_native_host import handle_message
 
-        # Mock cells
-        mock_cells = []
-        texts = ["Acme Corp", "ACME", "Jan 15, 2025", "+25.3%", "Technology", "STRONG BUY", "3.5%"]
-        for t in texts:
-            cell = MagicMock()
-            cell.inner_text.return_value = t
-            mock_cells.append(cell)
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            mock_dal.apply_sa_refresh.return_value = 3
+            MockDAL.return_value = mock_dal
 
-        pick = client._parse_row(mock_cells, "current")
-        assert pick is not None
-        assert pick["symbol"] == "ACME"
-        assert pick["portfolio_status"] == "current"
-        assert pick["is_stale"] is False
+            picks = [
+                {"symbol": "ACME", "company": "Acme Corp"},
+                {"symbol": "BETA", "company": "Beta Inc"},
+                {"symbol": "GAMA", "company": "Gamma Sys"},
+            ]
+            result = handle_message({
+                "action": "refresh",
+                "scope": "current",
+                "picks": picks,
+                "batch_ts": "2025-03-15T10:00:00Z",
+            })
 
-    def test_parse_row_extracts_date(self):
-        """Row parser extracts and normalizes picked date."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+            assert result["status"] == "ok"
+            assert result["count"] == 3
+            mock_dal.apply_sa_refresh.assert_called_once()
+            # Verify portfolio_status was injected
+            call_picks = mock_dal.apply_sa_refresh.call_args[1].get("picks") or mock_dal.apply_sa_refresh.call_args[0][1]
+            for p in call_picks:
+                assert p["portfolio_status"] == "current"
+                assert p["is_stale"] is False
 
-        mock_cells = []
-        texts = ["Acme Corp", "ACME", "Jan 15, 2025", "+25.3%", "Technology", "STRONG BUY", "3.5%"]
-        for t in texts:
-            cell = MagicMock()
-            cell.inner_text.return_value = t
-            mock_cells.append(cell)
+    def test_handle_failure_records_meta(self):
+        """Native host records failure via DAL."""
+        from scripts.sa_native_host import handle_message
 
-        pick = client._parse_row(mock_cells, "current")
-        assert pick["picked_date"] == "2025-01-15"
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            MockDAL.return_value = mock_dal
 
-    def test_parse_row_extracts_rating(self):
-        """Row parser extracts SA rating."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+            result = handle_message({
+                "action": "refresh_failure",
+                "scope": "closed",
+                "error": "paywall detected",
+                "batch_ts": "2025-03-15T10:00:00Z",
+            })
 
-        mock_cells = []
-        texts = ["Beta Inc", "BETA", "Feb 20, 2025", "-5.1%", "Healthcare", "BUY", "2.8%"]
-        for t in texts:
-            cell = MagicMock()
-            cell.inner_text.return_value = t
-            mock_cells.append(cell)
+            assert result["status"] == "ok"
+            assert result["recorded_failure"] is True
+            mock_dal.record_sa_refresh_failure.assert_called_once()
 
-        pick = client._parse_row(mock_cells, "closed")
-        assert pick["sa_rating"] == "BUY"
-        assert pick["portfolio_status"] == "closed"
+    def test_handle_ping(self):
+        """Native host responds to ping."""
+        from scripts.sa_native_host import handle_message
 
-    def test_empty_cells_returns_none(self):
-        """Row parser returns None for insufficient cells."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        with patch("src.tools.data_access.DataAccessLayer"):
+            result = handle_message({"action": "ping"})
+            assert result["status"] == "ok"
 
-        # Only 3 cells (< 6 minimum)
-        mock_cells = [MagicMock() for _ in range(3)]
-        for c in mock_cells:
-            c.inner_text.return_value = ""
+    def test_batch_ts_z_suffix_parsed(self):
+        """JS Date.toISOString() Z suffix is parsed correctly."""
+        from scripts.sa_native_host import handle_message
 
-        # _parse_row is called only after len(cells) >= 6 check in _scrape_tab
-        # But if we call it directly with bad data, it should return something or None
-        pick = client._parse_row(mock_cells, "current")
-        # Symbol would be empty string
-        assert pick is None or pick.get("symbol") == ""
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            mock_dal.apply_sa_refresh.return_value = 0
+            MockDAL.return_value = mock_dal
+
+            # Should not raise ValueError on Z suffix
+            result = handle_message({
+                "action": "refresh",
+                "scope": "current",
+                "picks": [],
+                "batch_ts": "2025-03-15T10:00:00.000Z",
+            })
+            assert result["status"] == "ok"
 
 
 # ============================================================
-# DOM fixture parsing
+# Tool stale_warning pass-through
 # ============================================================
 
-_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "sa_portfolio_sample.html"
-
-
-def _build_mock_page_from_fixture():
-    """Build a mock Playwright page from the HTML fixture.
-
-    Returns a mock page whose query_selector_all(_TABLE_ROW_SELECTOR)
-    returns mock row elements with td cells + anchor links matching the fixture.
-    """
-    import re
-
-    html = _FIXTURE_PATH.read_text()
-    tbody = re.search(r"<tbody>(.*?)</tbody>", html, re.DOTALL).group(1)
-    row_htmls = re.findall(r"<tr>(.*?)</tr>", tbody, re.DOTALL)
-
-    mock_rows = []
-    for row_html in row_htmls:
-        cells_text = re.findall(r"<td>([^<]*)</td>", row_html)
-        href_match = re.search(r'href="([^"]*)"', row_html)
-
-        # Build mock cells
-        mock_cells = []
-        for t in cells_text:
-            cell = MagicMock()
-            cell.inner_text.return_value = t.strip()
-            mock_cells.append(cell)
-
-        # Build mock link element
-        mock_link = None
-        if href_match:
-            mock_link = MagicMock()
-            mock_link.get_attribute.return_value = href_match.group(1)
-
-        # Build mock row
-        mock_row = MagicMock()
-        mock_row.query_selector_all.return_value = mock_cells
-        mock_row.query_selector.return_value = mock_link
-        mock_rows.append(mock_row)
-
-    # Build mock page
-    mock_page = MagicMock()
-    mock_page.query_selector_all.return_value = mock_rows
-    mock_page.query_selector.return_value = None  # No tab button to click
-    mock_page.inner_text.return_value = ""  # No paywall markers
-    return mock_page
-
-
-class TestDOMFixture:
-    """Tests that exercise _scrape_tab() with fixture-derived mock page."""
-
-    def test_scrape_tab_extracts_all_rows(self):
-        """_scrape_tab with fixture page returns 3 picks."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        mock_page = _build_mock_page_from_fixture()
-
-        picks = client._scrape_tab(mock_page, portfolio_status="current")
-        assert len(picks) == 3
-        symbols = [p["symbol"] for p in picks]
-        assert "ACME" in symbols
-        assert "BETA" in symbols
-        assert "GAMA" in symbols
-
-    def test_scrape_tab_captures_detail_urls(self):
-        """_scrape_tab extracts detail_url from row links."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        mock_page = _build_mock_page_from_fixture()
-
-        picks = client._scrape_tab(mock_page, portfolio_status="current")
-        # Every row in fixture has an <a href>
-        for pick in picks:
-            assert "detail_url" in pick, f"{pick['symbol']} missing detail_url"
-            assert pick["detail_url"].startswith("https://seekingalpha.com/")
-
-        # Check specific URL
-        acme = next(p for p in picks if p["symbol"] == "ACME")
-        assert "/alpha-picks/acme-analysis-12345" in acme["detail_url"]
-
-    def test_scrape_tab_field_values(self):
-        """_scrape_tab parses correct field values from fixture."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        mock_page = _build_mock_page_from_fixture()
-
-        picks = client._scrape_tab(mock_page, portfolio_status="current")
-        acme = next(p for p in picks if p["symbol"] == "ACME")
-        assert acme["company"] == "Acme Corp"
-        assert acme["picked_date"] == "2025-01-15"
-        assert acme["sa_rating"] == "STRONG BUY"
-        assert acme["sector"] == "Technology"
-        assert acme["portfolio_status"] == "current"
-        assert acme["is_stale"] is False
-
-    def test_scrape_tab_closed_status(self):
-        """_scrape_tab sets portfolio_status='closed' when scraping closed tab."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        mock_page = _build_mock_page_from_fixture()
-
-        picks = client._scrape_tab(mock_page, portfolio_status="closed")
-        for pick in picks:
-            assert pick["portfolio_status"] == "closed"
-
-    def test_detail_url_in_raw_data_for_db_roundtrip(self):
-        """detail_url is stored inside raw_data so it persists through DB write/read."""
-        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
-        mock_page = _build_mock_page_from_fixture()
-
-        picks = client._scrape_tab(mock_page, portfolio_status="current")
-        acme = next(p for p in picks if p["symbol"] == "ACME")
-
-        # Simulate DB round-trip: only raw_data survives as JSONB
-        raw_data = acme["raw_data"]
-        assert "detail_url" in raw_data, "detail_url must be in raw_data for DB persistence"
-
-        # After DB read, get_pick_detail resolves URL from raw_data
-        db_row = {"symbol": "ACME", "raw_data": raw_data}
-        resolved = (
-            db_row.get("detail_url")  # Not present after DB read
-            or db_row.get("raw_data", {}).get("detail_url")  # Fallback
-        )
-        assert resolved is not None
-        assert "/alpha-picks/acme-analysis-12345" in resolved
+class TestToolStalePassThrough:
+    def test_stale_warning_passed_to_tool_response(self):
+        """get_sa_alpha_picks passes through stale_warning from client."""
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True), \
+             patch("src.tools.sa_tools._get_client") as mock_client:
+            mock_instance = MagicMock()
+            mock_instance.get_portfolio.return_value = {
+                "current": [], "closed": [],
+                "freshness": {"current": {"ok": True}, "closed": {"ok": True}},
+                "is_partial": False,
+                "stale_warning": "Data is 48h old. Click SA extension.",
+            }
+            mock_client.return_value = mock_instance
+            result = get_sa_alpha_picks(MagicMock())
+            assert "stale_warning" in result
+            assert "48h" in result["stale_warning"]
 
 
 # ============================================================
@@ -488,7 +420,7 @@ class TestTickerSync:
     def test_current_picks_synced_to_tickers_core(self):
         """Current non-stale picks are synced to tickers_core.json."""
         from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
-        client = SAAlphaPicksClient(session_file="/tmp/fake.json")
+        client = SAAlphaPicksClient(dal=MagicMock())
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tickers_path = Path(tmpdir) / "tickers_core.json"

@@ -436,19 +436,20 @@ Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfo
 
 ```bash
 # 1. Install Playwright + browser
-pip install playwright && playwright install chromium
+pip install playwright && playwright install chromium    # for other web tools
 
-# 2. Export SA session from Chrome (one-time, no need to close Chrome)
-python scripts/sa_login.py
-# → Auto-detects your Chrome profile, extracts SA cookies, saves session
-# → Requires: pip install pycookiecheat
+
+# 2. Install Chrome extension
+#   a. chrome://extensions → Developer mode → Load unpacked → select extensions/sa_alpha_picks/
+#   b. Copy extension ID from chrome://extensions
+#   c. bash extensions/sa_alpha_picks/install.sh   (registers native messaging host)
 
 # 3. Enable in config/user_profile.yaml
 # seeking_alpha:
 #   enabled: true
 ```
 
-Session credentials are stored outside the repo (`~/.config/mindfulrl/seeking_alpha/storage_state.json`, 0600 permissions). Session validity is checked on each scrape (URL redirect + table selector + paywall marker).
+The extension runs in your real Chrome browser (zero anti-bot detection risk). Data flows: Extension DOM scrape → Native Messaging → Python DAL → DB + file cache. Session validity checked per scrape (URL redirect + table selector + paywall marker).
 
 ### CLI
 

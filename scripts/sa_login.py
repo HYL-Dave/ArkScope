@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Seeking Alpha session export script.
+DEPRECATED: Use Chrome extension instead (extensions/sa_alpha_picks/).
+
+Seeking Alpha session export script (cookie extraction approach).
+Kept for reference — the Chrome extension approach is preferred because
+Playwright headless/headed browsers are detected by SA's PerimeterX anti-bot.
 
 Extracts SA cookies from your Chrome browser's cookie database and saves them
 in Playwright storage_state format. No need to close Chrome or launch a browser.

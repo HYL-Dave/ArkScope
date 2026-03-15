@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _DISABLED_MSG = (
     "Seeking Alpha Alpha Picks is not enabled. "
     "To enable: set seeking_alpha.enabled: true in config/user_profile.yaml "
-    "and run: python scripts/sa_login.py"
+    "and install the SA Alpha Picks Chrome extension (see extensions/sa_alpha_picks/)"
 )
 
 
@@ -36,7 +36,6 @@ def _get_client(dal):
 
     config = get_agent_config()
     return SAAlphaPicksClient(
-        session_file=config.sa_session_file,
         dal=dal,
         cache_hours=config.sa_cache_hours,
         detail_cache_days=config.sa_detail_cache_days,
@@ -80,6 +79,10 @@ def get_sa_alpha_picks(
 
         response["freshness"] = result.get("freshness", {})
         response["is_partial"] = result.get("is_partial", False)
+        if result.get("stale_warning"):
+            response["stale_warning"] = result["stale_warning"]
+        if result.get("refresh_hint"):
+            response["refresh_hint"] = result["refresh_hint"]
         return response
 
     except Exception as e:
@@ -125,9 +128,10 @@ def get_sa_pick_detail(
 
 
 def refresh_sa_alpha_picks(dal: Any) -> Dict:
-    """Force refresh from SA website. Returns per-tab success/failure counts.
+    """Return current SA data state + refresh instructions.
 
-    Calls client.refresh_portfolio(sync_tickers=True) — only this path syncs tickers.
+    Actual refresh is done by the Chrome extension. This returns cached data
+    with a refresh_hint directing the user to click the extension.
     """
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
