@@ -402,7 +402,7 @@ class TestRegistryRLTools:
         """Registry has base + rl tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 44  # 41 base + 3 rl
+        assert len(registry.list_all()) == 47  # 44 base + 3 rl
 
 
 # ============================================================
@@ -421,7 +421,7 @@ class TestAnthropicRLSchemas:
     def test_tool_count(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 45  # 42 base + 3 rl
+        assert len(tools) == 48  # 45 base + 3 rl
 
 
 # ============================================================
@@ -462,7 +462,7 @@ class TestOpenAIRLTools:
         from src.tools.data_access import DataAccessLayer
         dal = DataAccessLayer()
         tools = create_openai_tools(dal)
-        assert len(tools) == 45  # 42 base + 3 rl
+        assert len(tools) == 48  # 45 base + 3 rl
 
 
 # ============================================================

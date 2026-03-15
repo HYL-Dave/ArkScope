@@ -1,0 +1,60 @@
+<!--
+  De-sensitized Seeking Alpha Alpha Picks portfolio page fixture.
+  Structure matches real SA DOM; data is synthetic (fake companies/symbols).
+  Used for DOM parsing unit tests — no premium content.
+-->
+<html>
+<body>
+<div data-testid="portfolio-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Symbol</th>
+        <th>Picked</th>
+        <th>Return</th>
+        <th>Sector</th>
+        <th>Rating</th>
+        <th>Holding %</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Acme Corp</td>
+        <td>ACME</td>
+        <td>Jan 15, 2025</td>
+        <td>+25.3%</td>
+        <td>Technology</td>
+        <td>STRONG BUY</td>
+        <td>3.5%</td>
+        <td><a href="/alpha-picks/acme-analysis-12345">›</a></td>
+      </tr>
+      <tr>
+        <td>Beta Holdings Inc</td>
+        <td>BETA</td>
+        <td>Feb 20, 2025</td>
+        <td>-5.1%</td>
+        <td>Healthcare</td>
+        <td>BUY</td>
+        <td>2.8%</td>
+        <td><a href="/alpha-picks/beta-analysis-67890">›</a></td>
+      </tr>
+      <tr>
+        <td>Gamma Systems</td>
+        <td>GAMA</td>
+        <td>Mar 10, 2025</td>
+        <td>+12.7%</td>
+        <td>Technology</td>
+        <td>STRONG BUY</td>
+        <td>4.1%</td>
+        <td><a href="/alpha-picks/gamma-analysis-11111">›</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<div>
+  <button>Current</button>
+  <button>Closed</button>
+</div>
+</body>
+</html>

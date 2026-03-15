@@ -907,4 +907,244 @@ class DatabaseBackend:
         except Exception as e:
             stats["financial_cache"] = {"rows": [], "error": str(e)}
 
+    # ================================================================
+    # Seeking Alpha Alpha Picks (Phase 11c)
+    # ================================================================
+
+    def apply_sa_refresh(
+        self,
+        scope: str,
+        picks: list,
+        attempt_ts,
+        snapshot_ts,
+    ) -> int:
+        """Atomic per-tab refresh: mark_stale + upsert + update_meta in one transaction.
+
+        Meta update on success:
+            last_attempt_at=attempt_ts, last_success_at=snapshot_ts,
+            snapshot_ts=snapshot_ts, row_count=N, ok=TRUE, last_error=NULL
+
+        Returns count of upserted rows.
+        """
+        conn = self._get_conn()
+        old_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+
+            with conn.cursor() as cur:
+                # 1. Mark existing rows as stale if not seen in this snapshot
+                cur.execute(
+                    "UPDATE sa_alpha_picks SET is_stale = TRUE, updated_at = NOW() "
+                    "WHERE portfolio_status = %s AND last_seen_snapshot < %s",
+                    (scope, snapshot_ts),
+                )
+
+                # 2. Upsert new rows (don't touch detail_report/detail_fetched_at)
+                count = 0
+                for pick in picks:
+                    cur.execute(
+                        """
+                        INSERT INTO sa_alpha_picks
+                            (symbol, company, picked_date, portfolio_status,
+                             is_stale, return_pct, sector, sa_rating, holding_pct,
+                             raw_data, last_seen_snapshot, fetched_at, updated_at)
+                        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        ON CONFLICT (symbol, picked_date) DO UPDATE SET
+                            company = EXCLUDED.company,
+                            portfolio_status = EXCLUDED.portfolio_status,
+                            is_stale = FALSE,
+                            return_pct = EXCLUDED.return_pct,
+                            sector = EXCLUDED.sector,
+                            sa_rating = EXCLUDED.sa_rating,
+                            holding_pct = EXCLUDED.holding_pct,
+                            raw_data = EXCLUDED.raw_data,
+                            last_seen_snapshot = EXCLUDED.last_seen_snapshot,
+                            updated_at = NOW()
+                        """,
+                        (
+                            pick.get("symbol"),
+                            pick.get("company", ""),
+                            pick.get("picked_date"),
+                            scope,
+                            pick.get("return_pct"),
+                            pick.get("sector"),
+                            pick.get("sa_rating"),
+                            pick.get("holding_pct"),
+                            json.dumps(pick.get("raw_data")) if pick.get("raw_data") else None,
+                            snapshot_ts,
+                        ),
+                    )
+                    count += 1
+
+                # 3. Update refresh meta (success: overwrite all fields)
+                cur.execute(
+                    """
+                    INSERT INTO sa_refresh_meta
+                        (scope, last_attempt_at, last_success_at, snapshot_ts,
+                         row_count, ok, last_error, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, TRUE, NULL, NOW())
+                    ON CONFLICT (scope) DO UPDATE SET
+                        last_attempt_at = EXCLUDED.last_attempt_at,
+                        last_success_at = EXCLUDED.last_success_at,
+                        snapshot_ts = EXCLUDED.snapshot_ts,
+                        row_count = EXCLUDED.row_count,
+                        ok = TRUE,
+                        last_error = NULL,
+                        updated_at = NOW()
+                    """,
+                    (scope, attempt_ts, snapshot_ts, snapshot_ts, count),
+                )
+
+            conn.commit()
+            return count
+
+        except Exception as e:
+            conn.rollback()
+            # Write failure meta (outside the failed transaction)
+            try:
+                conn.autocommit = True
+                self.record_sa_refresh_failure(scope, attempt_ts, str(e))
+            except Exception:
+                pass
+            raise
+        finally:
+            conn.autocommit = old_autocommit
+
+    def record_sa_refresh_failure(self, scope: str, attempt_ts, error: str) -> None:
+        """Record refresh failure in meta table.
+
+        Only updates: last_attempt_at, ok=FALSE, last_error.
+        Preserves: last_success_at, snapshot_ts, row_count.
+        """
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO sa_refresh_meta
+                        (scope, last_attempt_at, ok, last_error, updated_at)
+                    VALUES (%s, %s, FALSE, %s, NOW())
+                    ON CONFLICT (scope) DO UPDATE SET
+                        last_attempt_at = EXCLUDED.last_attempt_at,
+                        ok = FALSE,
+                        last_error = EXCLUDED.last_error,
+                        updated_at = NOW()
+                    """,
+                    (scope, attempt_ts, error),
+                )
+        except Exception as e:
+            logger.error("Failed to record SA refresh failure: %s", e)
+
+    def query_sa_picks(
+        self,
+        portfolio_status: Optional[str] = None,
+        symbol: Optional[str] = None,
+        include_stale: bool = False,
+    ) -> list:
+        """Query SA Alpha Picks with optional filters."""
+        conn = self._get_conn()
+        conditions = []
+        params = []
+
+        if portfolio_status and portfolio_status != "all":
+            conditions.append("portfolio_status = %s")
+            params.append(portfolio_status)
+
+        if symbol:
+            conditions.append("symbol = %s")
+            params.append(symbol.upper())
+
+        if not include_stale:
+            conditions.append("is_stale = FALSE")
+
+        where = " AND ".join(conditions) if conditions else "TRUE"
+        sql = (
+            f"SELECT symbol, company, picked_date, portfolio_status, is_stale, "
+            f"return_pct, sector, sa_rating, holding_pct, "
+            f"detail_fetched_at IS NOT NULL AS has_detail, "
+            f"last_seen_snapshot, fetched_at, updated_at "
+            f"FROM sa_alpha_picks WHERE {where} "
+            f"ORDER BY portfolio_status, picked_date DESC"
+        )
+
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, tuple(params))
+                rows = cur.fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error("Failed to query SA picks: %s", e)
+            return []
+
+    def get_sa_pick_detail(
+        self, symbol: str, picked_date: Optional[str] = None
+    ) -> Optional[dict]:
+        """Get detail for a specific pick.
+
+        picked_date=None: deterministic fallback —
+            current + non-stale first, then stale, then any.
+        """
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if picked_date:
+                    cur.execute(
+                        "SELECT * FROM sa_alpha_picks "
+                        "WHERE symbol = %s AND picked_date = %s",
+                        (symbol.upper(), picked_date),
+                    )
+                else:
+                    # Deterministic fallback: current + non-stale first
+                    cur.execute(
+                        "SELECT * FROM sa_alpha_picks "
+                        "WHERE symbol = %s AND portfolio_status = 'current' "
+                        "ORDER BY is_stale ASC, picked_date DESC LIMIT 1",
+                        (symbol.upper(),),
+                    )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            logger.error("Failed to get SA pick detail: %s", e)
+            return None
+
+    def update_sa_pick_detail(
+        self, symbol: str, picked_date: str, content: str
+    ) -> bool:
+        """Update detail_report for a specific pick."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE sa_alpha_picks SET detail_report = %s, "
+                    "detail_fetched_at = NOW(), updated_at = NOW() "
+                    "WHERE symbol = %s AND picked_date = %s",
+                    (content, symbol.upper(), picked_date),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("Failed to update SA pick detail: %s", e)
+            return False
+
+    def get_sa_refresh_meta(self) -> dict:
+        """Get per-tab refresh metadata.
+
+        Returns: {"current": {...}, "closed": {...}}
+        """
+        conn = self._get_conn()
+        result = {}
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT * FROM sa_refresh_meta")
+                for row in cur.fetchall():
+                    scope = row["scope"]
+                    d = dict(row)
+                    # Convert datetime fields to ISO strings
+                    for k in ("last_attempt_at", "last_success_at", "snapshot_ts", "updated_at"):
+                        if d.get(k):
+                            d[k] = d[k].isoformat()
+                    result[scope] = d
+        except Exception as e:
+            logger.error("Failed to get SA refresh meta: %s", e)
+        return result
+
         return stats

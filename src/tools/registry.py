@@ -168,6 +168,7 @@ class ToolRegistry:
         self._register_monitor_tools()
         self._register_freshness_tools()
         self._register_rl_tools()
+        self._register_sa_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -982,6 +983,62 @@ class ToolRegistry:
                               "Model ID (default: 'latest' = most recent)",
                               required=False, default="latest"),
             ],
+        ))
+
+
+    def _register_sa_tools(self) -> None:
+        from .sa_tools import get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
+
+        self.register(ToolDefinition(
+            name="get_sa_alpha_picks",
+            description=(
+                "Get Seeking Alpha Alpha Picks portfolio. Returns current and/or "
+                "closed picks with return %, sector, rating, and freshness metadata. "
+                "Cached with auto-refresh when stale."
+            ),
+            function=get_sa_alpha_picks,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("status", "string",
+                              "Filter: 'all' (default), 'current', or 'closed'",
+                              required=False, default="all",
+                              enum=["all", "current", "closed"]),
+                ToolParameter("sector", "string",
+                              "Filter by sector prefix (e.g. 'Tech')",
+                              required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_pick_detail",
+            description=(
+                "Get detail report for a specific Alpha Pick. "
+                "If picked_date is omitted, returns the latest current (non-stale) pick. "
+                "Shows company analysis, thesis, and rating rationale."
+            ),
+            function=get_sa_pick_detail,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("symbol", "string", "Stock ticker symbol (e.g. NVDA)"),
+                ToolParameter("picked_date", "string",
+                              "Specific pick date (YYYY-MM-DD). Omit for latest current.",
+                              required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="refresh_sa_alpha_picks",
+            description=(
+                "Force refresh Alpha Picks from Seeking Alpha website. "
+                "Scrapes both current and closed tabs, updates cache, "
+                "and syncs new symbols to data collection watchlist."
+            ),
+            function=refresh_sa_alpha_picks,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[],
         ))
 
 

@@ -11,6 +11,7 @@
 !.env.template
 config/.env
 config/user_profile.local.yaml
+config/sa_session.json
 .mcp.json
 api_keys*.txt
 *_credentials.json

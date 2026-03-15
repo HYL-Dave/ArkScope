@@ -403,7 +403,23 @@ web_search:
   #   - "finance.yahoo.com"
 
 # ============================================
-# 12. RL Pipeline 設定
+# 12. Seeking Alpha Alpha Picks (Phase 11c)
+# ============================================
+seeking_alpha:
+  # 啟用 SA Alpha Picks 工具 (需安裝 Chrome extension，見 extensions/sa_alpha_picks/)
+  enabled: true
+
+  # deprecated: session_file 已由 Chrome extension 取代
+  session_file: "~/.config/mindfulrl/seeking_alpha/storage_state.json"
+
+  # Portfolio 快取有效小時數 (超過則自動 refresh)
+  cache_hours: 24
+
+  # Detail 報告快取天數
+  detail_cache_days: 7
+
+# ============================================
+# 13. RL Pipeline 設定
 # ============================================
 rl_pipeline:
   # 是否啟用 RL 模型工具（需要先有已訓練的模型）

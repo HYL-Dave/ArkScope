@@ -102,6 +102,12 @@ class AgentConfig(BaseModel):
     web_codex_research: bool = True   # Codex CLI deep research (--search, uses API key)
     web_claude_max_uses: int = 5      # Max web searches per conversation (Claude only)
 
+    # Seeking Alpha Alpha Picks (Phase 11c)
+    sa_enabled: bool = False
+    sa_session_file: str = "~/.config/mindfulrl/seeking_alpha/storage_state.json"
+    sa_cache_hours: int = 24
+    sa_detail_cache_days: int = 7
+
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
 _MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
@@ -251,6 +257,17 @@ def get_agent_config() -> AgentConfig:
     # Server-side compaction (Phase 7a)
     if "server_compaction" in llm_prefs:
         config.server_compaction = llm_prefs["server_compaction"]
+
+    # Seeking Alpha overrides (Phase 11c)
+    sa_prefs = profile.get("seeking_alpha", {})
+    if "enabled" in sa_prefs:
+        config.sa_enabled = sa_prefs["enabled"]
+    if "session_file" in sa_prefs:
+        config.sa_session_file = sa_prefs["session_file"]
+    if "cache_hours" in sa_prefs:
+        config.sa_cache_hours = sa_prefs["cache_hours"]
+    if "detail_cache_days" in sa_prefs:
+        config.sa_detail_cache_days = sa_prefs["detail_cache_days"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})
