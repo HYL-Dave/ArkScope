@@ -74,25 +74,48 @@ def _find_chrome() -> str | None:
     return None
 
 
+def _chrome_profile_dir() -> str:
+    """Get the Chrome user data directory."""
+    return os.path.expanduser("~/.config/google-chrome")
+
+
 def _is_chrome_running() -> bool:
-    """Check if Chrome is currently running."""
+    """Check if a real Chrome browser process is running (not just helpers)."""
     try:
-        result = subprocess.run(["pgrep", "-f", "chrome"], capture_output=True)
+        result = subprocess.run(
+            ["pgrep", "-f", r"/chrome/chrome\b"], capture_output=True, text=True,
+        )
         return result.returncode == 0
     except FileNotFoundError:
         return False
 
 
+def _remove_singleton_locks():
+    """Remove Chrome's singleton lock files so a new instance can start fresh."""
+    profile = _chrome_profile_dir()
+    for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        path = os.path.join(profile, name)
+        try:
+            os.unlink(path)
+        except (FileNotFoundError, OSError):
+            pass
+
+
 def _graceful_close_chrome() -> bool:
     """Gracefully close all Chrome instances. Returns True if Chrome exited."""
     try:
-        subprocess.run(["pkill", "-TERM", "-f", "chrome"], capture_output=True)
-        # Wait for Chrome to exit
+        subprocess.run(["pkill", "-TERM", "-f", r"/chrome/chrome"], capture_output=True)
         for _ in range(20):
             time.sleep(0.5)
             if not _is_chrome_running():
+                _remove_singleton_locks()
                 return True
-        return False
+        # Force kill remaining
+        subprocess.run(["pkill", "-KILL", "-f", r"/chrome/chrome"], capture_output=True)
+        subprocess.run(["pkill", "-KILL", "-f", "chrome_crashpad"], capture_output=True)
+        time.sleep(1)
+        _remove_singleton_locks()
+        return not _is_chrome_running()
     except FileNotFoundError:
         return False
 
@@ -115,9 +138,9 @@ def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
 
         print("Closing Chrome...")
         if not _graceful_close_chrome():
-            print("WARNING: Chrome didn't close cleanly. Trying force close...")
-            subprocess.run(["pkill", "-KILL", "-f", "chrome"], capture_output=True)
-            time.sleep(1)
+            print("ERROR: Could not close Chrome. Please close it manually and try again.")
+            return None
+        print("Chrome closed.")
 
     print(f"Launching: {chrome} --remote-debugging-port={port}")
     proc = subprocess.Popen(
