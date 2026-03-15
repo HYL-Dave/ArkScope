@@ -438,10 +438,10 @@ Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfo
 # 1. Install Playwright + browser
 pip install playwright && playwright install chromium
 
-# 2. Save browser session (one-time) — reuses your existing Chrome login
-python scripts/sa_login.py --launch
-# → Closes Chrome briefly, opens it via Playwright with your profile,
-#   exports SA session, then you reopen Chrome normally
+# 2. Export SA session from Chrome (one-time, no need to close Chrome)
+python scripts/sa_login.py
+# → Auto-detects your Chrome profile, extracts SA cookies, saves session
+# → Requires: pip install pycookiecheat
 
 # 3. Enable in config/user_profile.yaml
 # seeking_alpha:

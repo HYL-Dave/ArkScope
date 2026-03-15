@@ -1,32 +1,36 @@
 #!/usr/bin/env python3
 """
-Seeking Alpha session login script.
+Seeking Alpha session export script.
 
-WARNING: This script saves browser session credentials (cookies + localStorage)
-to a local file. Treat the output file as a sensitive credential — do NOT commit
-it to version control or share it.
+Extracts SA cookies from your Chrome browser's cookie database and saves them
+in Playwright storage_state format. No need to close Chrome or launch a browser.
+
+WARNING: The output file contains your login credentials — do NOT commit it
+to version control or share it.
 
 Usage:
-    # Recommended: reuse your Chrome login (closes Chrome briefly, then reopens)
-    python scripts/sa_login.py --launch
-
-    # Fresh browser (need to log in manually)
-    python scripts/sa_login.py
+    python scripts/sa_login.py                        # Auto-detect Chrome profile
+    python scripts/sa_login.py --profile "Profile 1"  # Specify Chrome profile name
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
+import sqlite3
 import stat
-import subprocess
 import sys
-import time
+import tempfile
 from pathlib import Path
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+_CHROME_USER_DATA = os.path.expanduser("~/.config/google-chrome")
+_SA_DOMAIN = "seekingalpha.com"
 
 
 def _resolve_session_path(path_str: str) -> Path:
@@ -43,211 +47,195 @@ def _get_default_session_path() -> str:
         return "~/.config/mindfulrl/seeking_alpha/storage_state.json"
 
 
-def _chrome_profile_dir() -> str:
-    """Get the Chrome user data directory."""
-    return os.path.expanduser("~/.config/google-chrome")
-
-
-def _is_chrome_running() -> bool:
-    """Check if a real Chrome browser process is running (not just helpers)."""
-    try:
-        result = subprocess.run(
-            ["pgrep", "-f", r"/chrome/chrome\b"], capture_output=True, text=True,
-        )
-        return result.returncode == 0
-    except FileNotFoundError:
-        return False
-
-
-def _remove_singleton_locks():
-    """Remove Chrome's singleton lock files so a new instance can start fresh."""
-    profile = _chrome_profile_dir()
-    for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
-        path = os.path.join(profile, name)
+def _find_sa_profile() -> str | None:
+    """Find which Chrome profile has SA cookies."""
+    for name in os.listdir(_CHROME_USER_DATA):
+        cookie_path = os.path.join(_CHROME_USER_DATA, name, "Cookies")
+        if not os.path.isfile(cookie_path):
+            continue
         try:
-            os.unlink(path)
-        except (FileNotFoundError, OSError):
-            pass
+            tmp = tempfile.mktemp(suffix=".db")
+            shutil.copy2(cookie_path, tmp)
+            conn = sqlite3.connect(tmp)
+            count = conn.execute(
+                f"SELECT count(*) FROM cookies WHERE host_key LIKE '%{_SA_DOMAIN}%'"
+            ).fetchone()[0]
+            conn.close()
+            os.unlink(tmp)
+            if count > 0:
+                return name
+        except Exception:
+            continue
+    return None
 
 
-def _close_chrome() -> bool:
-    """Close all Chrome instances and clean up locks. Returns True if successful."""
-    if not _is_chrome_running():
-        _remove_singleton_locks()
-        return True
+def _extract_cookies(profile_name: str) -> list[dict]:
+    """Extract and decrypt SA cookies from a Chrome profile.
 
-    print("Chrome is currently running. It needs to close briefly to export your session.")
-    print("(All windows and tabs will be restored automatically)")
-    print()
-    answer = input("Close Chrome? [Y/n] ").strip().lower()
-    if answer and answer != "y":
-        print("Aborted.")
-        return False
+    Uses pycookiecheat for GNOME keyring decryption, plus raw SQLite
+    for cookie metadata (domain, path, flags).
+    """
+    from pycookiecheat import chrome_cookies
 
-    print("Closing Chrome...")
+    cookie_file = os.path.join(_CHROME_USER_DATA, profile_name, "Cookies")
+    if not os.path.isfile(cookie_file):
+        raise FileNotFoundError(f"Cookies file not found: {cookie_file}")
 
-    # Graceful close
-    subprocess.run(["pkill", "-TERM", "-f", r"/chrome/chrome"], capture_output=True)
-    for _ in range(20):
-        time.sleep(0.5)
-        if not _is_chrome_running():
-            _remove_singleton_locks()
-            print("Chrome closed.")
-            return True
+    # Decrypt cookie values
+    decrypted = chrome_cookies(
+        f"https://{_SA_DOMAIN}",
+        cookie_file=cookie_file,
+    )
 
-    # Force kill
-    subprocess.run(["pkill", "-KILL", "-f", r"/chrome/chrome"], capture_output=True)
-    subprocess.run(["pkill", "-KILL", "-f", "chrome_crashpad"], capture_output=True)
-    time.sleep(1)
-    _remove_singleton_locks()
+    # Read metadata from raw DB (domain, path, flags)
+    tmp = tempfile.mktemp(suffix=".db")
+    shutil.copy2(cookie_file, tmp)
+    conn = sqlite3.connect(tmp)
+    rows = conn.execute(
+        "SELECT host_key, name, path, expires_utc, is_secure, is_httponly, samesite "
+        f"FROM cookies WHERE host_key LIKE '%{_SA_DOMAIN}%'"
+    ).fetchall()
+    conn.close()
+    os.unlink(tmp)
 
-    if _is_chrome_running():
-        print("ERROR: Could not close Chrome. Please close it manually and try again.")
-        return False
+    meta = {}
+    for r in rows:
+        meta[r[1]] = {
+            "domain": r[0],
+            "path": r[2],
+            "expires": r[3] / 1000000 - 11644473600 if r[3] > 0 else -1,
+            "secure": bool(r[4]),
+            "httpOnly": bool(r[5]),
+            "sameSite": ["None", "Lax", "Strict"][r[6]] if r[6] in (0, 1, 2) else "None",
+        }
 
-    print("Chrome closed.")
-    return True
+    # Build Playwright cookie format
+    cookies = []
+    for name, value in decrypted.items():
+        m = meta.get(name, {})
+        cookies.append({
+            "name": name,
+            "value": value,
+            "domain": m.get("domain", f".{_SA_DOMAIN}"),
+            "path": m.get("path", "/"),
+            "expires": m.get("expires", -1),
+            "httpOnly": m.get("httpOnly", False),
+            "secure": m.get("secure", False),
+            "sameSite": m.get("sameSite", "None"),
+        })
+
+    return cookies
 
 
 def main():
     default_path = _get_default_session_path()
     parser = argparse.ArgumentParser(
-        description="Save Seeking Alpha browser session",
+        description="Export Seeking Alpha session from Chrome cookies",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  # Reuse your Chrome login (recommended):\n"
-            "  python scripts/sa_login.py --launch\n\n"
-            "  # Fresh browser (manual login):\n"
-            "  python scripts/sa_login.py\n"
+            "  python scripts/sa_login.py                        # Auto-detect profile\n"
+            "  python scripts/sa_login.py --profile 'Profile 1'  # Specify profile\n"
         ),
     )
     parser.add_argument(
         "--session-file",
         default=default_path,
-        help=f"Path to save session state (default: {default_path})",
+        help=f"Output path (default: {default_path})",
     )
     parser.add_argument(
-        "--launch",
-        action="store_true",
-        help=(
-            "Use your existing Chrome profile (reuses SA login). "
-            "Closes Chrome briefly, opens with Playwright to export session, "
-            "then you can reopen Chrome normally."
-        ),
+        "--profile",
+        default=None,
+        help="Chrome profile name (e.g. 'Default', 'Profile 1'). Auto-detected if omitted.",
     )
     args = parser.parse_args()
 
     session_path = _resolve_session_path(args.session_file)
 
     print("=" * 60)
-    print("This script saves your Seeking Alpha login session")
-    print("(cookies + localStorage) to a local file.")
+    print("Seeking Alpha session export")
     print(f"  Output: {session_path}")
-    print("Treat this file as a sensitive credential.")
     print("=" * 60)
     print()
 
     try:
-        from playwright.sync_api import sync_playwright
+        from pycookiecheat import chrome_cookies  # noqa: F401
     except ImportError:
-        print("ERROR: playwright is not installed.")
-        print("  pip install playwright && playwright install chromium")
+        print("ERROR: pycookiecheat is not installed.")
+        print("  pip install pycookiecheat")
         sys.exit(1)
 
-    # Create directory with 0700 permissions
+    # Find or verify profile
+    profile = args.profile
+    if not profile:
+        print("Searching Chrome profiles for SA cookies...")
+        profile = _find_sa_profile()
+        if not profile:
+            print("ERROR: No Chrome profile found with Seeking Alpha cookies.")
+            print("Make sure you're logged in to seekingalpha.com in Chrome.")
+            sys.exit(1)
+        print(f"Found SA cookies in: {profile}")
+    else:
+        cookie_path = os.path.join(_CHROME_USER_DATA, profile, "Cookies")
+        if not os.path.isfile(cookie_path):
+            print(f"ERROR: Profile not found: {cookie_path}")
+            sys.exit(1)
+
+    # Extract cookies
+    print(f"Extracting cookies from {profile}...")
+    cookies = _extract_cookies(profile)
+
+    if not cookies:
+        print("ERROR: No SA cookies found. Make sure you're logged in to seekingalpha.com.")
+        sys.exit(1)
+
+    # Build storage_state
+    storage_state = {
+        "cookies": cookies,
+        "origins": [{
+            "origin": f"https://{_SA_DOMAIN}",
+            "localStorage": [],
+        }],
+    }
+
+    # Write with secure permissions
     session_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(session_path, "w") as f:
+        json.dump(storage_state, f, indent=2)
+    os.chmod(session_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
     os.chmod(session_path.parent, stat.S_IRWXU)  # 0700
 
-    target_url = "https://seekingalpha.com/alpha-picks/portfolio"
+    print()
+    print(f"Exported {len(cookies)} cookies to: {session_path}")
+    print(f"  File permissions: 0600 (owner read/write only)")
+    print()
 
-    with sync_playwright() as p:
-        if args.launch:
-            # --- Profile mode: use system Chrome profile via Playwright ---
-            profile_dir = _chrome_profile_dir()
-
-            if not os.path.isdir(profile_dir):
-                print(f"ERROR: Chrome profile not found: {profile_dir}")
-                sys.exit(1)
-
-            # Must close Chrome — can't share profile with running instance
-            if not _close_chrome():
-                sys.exit(1)
-
-            print()
-            print(f"Opening system Chrome with your profile...")
-            print(f"(Profile: {profile_dir})")
-
-            context = p.chromium.launch_persistent_context(
-                profile_dir,
-                headless=False,
-                channel="chrome",
+    # Verify with headless browser
+    print("Verifying session with headless browser...")
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                storage_state=str(session_path),
                 viewport={"width": 1280, "height": 800},
             )
-            page = context.new_page()
-            page.goto(target_url, wait_until="networkidle")
+            page = ctx.new_page()
+            page.goto(f"https://{_SA_DOMAIN}/alpha-picks/portfolio", wait_until="networkidle")
 
-            print(f"Navigated to: {target_url}")
-            print()
-
-            current_url = page.url
-            if "login" not in current_url and "sign_in" not in current_url:
-                print("Already logged in! Your SA session will be exported.")
+            url = page.url
+            if "login" in url or "sign_in" in url:
+                print("WARNING: Verification failed — redirected to login.")
+                print(f"  URL: {url}")
+                print("  The cookies may have expired or SA blocked headless access.")
             else:
-                print("Not logged in. Please log in in the browser window.")
+                print("Session verified — SA Alpha Picks page loaded successfully!")
 
-            print()
-            input("Press Enter to save session...")
-
-            context.storage_state(path=str(session_path))
-            context.close()
-
-            print()
-            print("Browser closed. You can reopen Chrome normally now.")
-
-        else:
-            # --- Fresh mode: new browser, manual login ---
-            browser = p.chromium.launch(headless=False, channel="chrome")
-            context = browser.new_context(
-                viewport={"width": 1280, "height": 800},
-            )
-            page = context.new_page()
-            page.goto(target_url)
-
-            print(f"Browser opened to: {target_url}")
-            print()
-            print("Please log in to your Seeking Alpha account.")
-            print("Once you see the Alpha Picks portfolio page, press Enter here.")
-            print()
-            input("Press Enter when ready...")
-
-            context.storage_state(path=str(session_path))
+            ctx.close()
             browser.close()
-
-        # Set file permissions to 0600 (owner read/write only)
-        os.chmod(session_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-
-        # Verify saved session with headless browser
-        print()
-        print("Verifying saved session...")
-        browser2 = p.chromium.launch(headless=True)
-        ctx2 = browser2.new_context(
-            storage_state=str(session_path),
-            viewport={"width": 1280, "height": 800},
-        )
-        page2 = ctx2.new_page()
-        page2.goto(target_url, wait_until="networkidle")
-
-        verify_url = page2.url
-        if "login" in verify_url or "sign_in" in verify_url:
-            print("WARNING: Session may not be valid — verification redirected to login.")
-            print(f"  URL: {verify_url}")
-        else:
-            print(f"Session saved and verified: {session_path}")
-            print(f"  File permissions: 0600 (owner read/write only)")
-
-        ctx2.close()
-        browser2.close()
+    except Exception as e:
+        print(f"Verification skipped: {e}")
+        print("(Cookies were exported; verification requires: pip install playwright && playwright install chromium)")
 
 
 if __name__ == "__main__":
