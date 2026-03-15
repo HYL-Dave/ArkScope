@@ -125,13 +125,21 @@ def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
-    # Wait for CDP to become available
-    for _ in range(20):
+    # Wait for CDP to become available (up to 30s — restoring many windows takes time)
+    print("Waiting for Chrome to start...", end="", flush=True)
+    for i in range(120):
         time.sleep(0.5)
         if _is_cdp_available(port):
+            print(" ready!")
             return proc
+        if i % 10 == 9:
+            print(".", end="", flush=True)
 
-    proc.terminate()
+    # Don't kill Chrome — user may still want it running
+    print()
+    print(f"WARNING: Chrome started but CDP not available on port {port} after 30s.")
+    print("Chrome is still running. You can connect manually:")
+    print(f"  python scripts/sa_login.py --cdp --cdp-port {port}")
     return None
 
 
