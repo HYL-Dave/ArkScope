@@ -1639,9 +1639,14 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
             rating = p.get("sa_rating") or ""
             sector = p.get("sector") or ""
             picked = p.get("picked_date") or ""
-            if isinstance(ret, (int, float)):
-                ret_str = f"{ret:>7.2f}%"
-                ret_color = "green" if ret >= 0 else "red"
+            if ret is not None:
+                try:
+                    ret_val = float(ret)
+                    ret_str = f"{ret_val:>7.2f}%"
+                    ret_color = "green" if ret_val >= 0 else "red"
+                except (ValueError, TypeError):
+                    ret_str = "    N/A "
+                    ret_color = "dim"
             else:
                 ret_str = "    N/A "
                 ret_color = "dim"
