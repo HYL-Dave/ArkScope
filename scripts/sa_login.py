@@ -7,13 +7,10 @@ to a local file. Treat the output file as a sensitive credential — do NOT comm
 it to version control or share it.
 
 Usage:
-    # Recommended: connect to your running Chrome via CDP (no re-login needed)
-    #   Step 1: Restart Chrome with remote debugging:
-    #     google-chrome --remote-debugging-port=9222
-    #   Step 2: Run this script:
-    python scripts/sa_login.py --cdp
+    # Recommended: reuse your Chrome login (closes Chrome briefly, then reopens)
+    python scripts/sa_login.py --launch
 
-    # Alternative: fresh browser (need to log in manually)
+    # Fresh browser (need to log in manually)
     python scripts/sa_login.py
 """
 
@@ -31,8 +28,6 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-_DEFAULT_CDP_PORT = 9222
-
 
 def _resolve_session_path(path_str: str) -> Path:
     """Expand ~ and resolve the session file path."""
@@ -46,32 +41,6 @@ def _get_default_session_path() -> str:
         return get_agent_config().sa_session_file
     except Exception:
         return "~/.config/mindfulrl/seeking_alpha/storage_state.json"
-
-
-def _is_cdp_available(port: int) -> bool:
-    """Check if a Chrome instance is listening on the CDP port."""
-    import urllib.request
-    try:
-        urllib.request.urlopen(f"http://localhost:{port}/json/version", timeout=2)
-        return True
-    except Exception:
-        return False
-
-
-def _find_chrome() -> str | None:
-    """Find a Chrome executable."""
-    chrome_paths = [
-        "google-chrome", "google-chrome-stable",
-        "/opt/google/chrome/chrome",
-        "/usr/bin/google-chrome",
-    ]
-    for chrome in chrome_paths:
-        try:
-            subprocess.run([chrome, "--version"], capture_output=True, timeout=5)
-            return chrome
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    return None
 
 
 def _chrome_profile_dir() -> str:
@@ -101,69 +70,43 @@ def _remove_singleton_locks():
             pass
 
 
-def _graceful_close_chrome() -> bool:
-    """Gracefully close all Chrome instances. Returns True if Chrome exited."""
-    try:
-        subprocess.run(["pkill", "-TERM", "-f", r"/chrome/chrome"], capture_output=True)
-        for _ in range(20):
-            time.sleep(0.5)
-            if not _is_chrome_running():
-                _remove_singleton_locks()
-                return True
-        # Force kill remaining
-        subprocess.run(["pkill", "-KILL", "-f", r"/chrome/chrome"], capture_output=True)
-        subprocess.run(["pkill", "-KILL", "-f", "chrome_crashpad"], capture_output=True)
-        time.sleep(1)
+def _close_chrome() -> bool:
+    """Close all Chrome instances and clean up locks. Returns True if successful."""
+    if not _is_chrome_running():
         _remove_singleton_locks()
-        return not _is_chrome_running()
-    except FileNotFoundError:
+        return True
+
+    print("Chrome is currently running. It needs to close briefly to export your session.")
+    print("(All windows and tabs will be restored automatically)")
+    print()
+    answer = input("Close Chrome? [Y/n] ").strip().lower()
+    if answer and answer != "y":
+        print("Aborted.")
         return False
 
+    print("Closing Chrome...")
 
-def _launch_chrome_with_cdp(port: int) -> subprocess.Popen | None:
-    """Launch Chrome with remote debugging enabled. Returns the process."""
-    chrome = _find_chrome()
-    if not chrome:
-        return None
-
-    # If Chrome is running, close it first (can't add CDP to existing process)
-    if _is_chrome_running():
-        print("Chrome is currently running. It will be restarted with CDP enabled.")
-        print("(Your tabs and session will be restored automatically)")
-        print()
-        answer = input("Close Chrome and restart with CDP? [Y/n] ").strip().lower()
-        if answer and answer != "y":
-            print("Aborted.")
-            return None
-
-        print("Closing Chrome...")
-        if not _graceful_close_chrome():
-            print("ERROR: Could not close Chrome. Please close it manually and try again.")
-            return None
-        print("Chrome closed.")
-
-    print(f"Launching: {chrome} --remote-debugging-port={port}")
-    proc = subprocess.Popen(
-        [chrome, f"--remote-debugging-port={port}"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-
-    # Wait for CDP to become available (up to 30s — restoring many windows takes time)
-    print("Waiting for Chrome to start...", end="", flush=True)
-    for i in range(120):
+    # Graceful close
+    subprocess.run(["pkill", "-TERM", "-f", r"/chrome/chrome"], capture_output=True)
+    for _ in range(20):
         time.sleep(0.5)
-        if _is_cdp_available(port):
-            print(" ready!")
-            return proc
-        if i % 10 == 9:
-            print(".", end="", flush=True)
+        if not _is_chrome_running():
+            _remove_singleton_locks()
+            print("Chrome closed.")
+            return True
 
-    # Don't kill Chrome — user may still want it running
-    print()
-    print(f"WARNING: Chrome started but CDP not available on port {port} after 30s.")
-    print("Chrome is still running. You can connect manually:")
-    print(f"  python scripts/sa_login.py --cdp --cdp-port {port}")
-    return None
+    # Force kill
+    subprocess.run(["pkill", "-KILL", "-f", r"/chrome/chrome"], capture_output=True)
+    subprocess.run(["pkill", "-KILL", "-f", "chrome_crashpad"], capture_output=True)
+    time.sleep(1)
+    _remove_singleton_locks()
+
+    if _is_chrome_running():
+        print("ERROR: Could not close Chrome. Please close it manually and try again.")
+        return False
+
+    print("Chrome closed.")
+    return True
 
 
 def main():
@@ -173,11 +116,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  # Connect to running Chrome (recommended):\n"
-            "  #   1. Restart Chrome: google-chrome --remote-debugging-port=9222\n"
-            "  #   2. Run: python scripts/sa_login.py --cdp\n\n"
-            "  # Auto-launch Chrome with CDP:\n"
-            "  python scripts/sa_login.py --cdp --launch\n\n"
+            "  # Reuse your Chrome login (recommended):\n"
+            "  python scripts/sa_login.py --launch\n\n"
             "  # Fresh browser (manual login):\n"
             "  python scripts/sa_login.py\n"
         ),
@@ -188,36 +128,20 @@ def main():
         help=f"Path to save session state (default: {default_path})",
     )
     parser.add_argument(
-        "--cdp",
-        action="store_true",
-        help=(
-            "Connect to running Chrome via CDP (Chrome DevTools Protocol). "
-            "Reuses your existing login session. "
-            f"Requires Chrome started with --remote-debugging-port={_DEFAULT_CDP_PORT}"
-        ),
-    )
-    parser.add_argument(
-        "--cdp-port",
-        type=int,
-        default=_DEFAULT_CDP_PORT,
-        help=f"CDP port (default: {_DEFAULT_CDP_PORT})",
-    )
-    parser.add_argument(
         "--launch",
         action="store_true",
-        help="With --cdp: auto-launch Chrome with CDP if not already running",
-    )
-    parser.add_argument(
-        "--channel",
-        default="chrome",
-        help="Browser channel for fresh mode: chrome (default), chromium (Playwright bundled)",
+        help=(
+            "Use your existing Chrome profile (reuses SA login). "
+            "Closes Chrome briefly, opens with Playwright to export session, "
+            "then you can reopen Chrome normally."
+        ),
     )
     args = parser.parse_args()
 
     session_path = _resolve_session_path(args.session_file)
 
     print("=" * 60)
-    print("WARNING: This script saves your Seeking Alpha login session")
+    print("This script saves your Seeking Alpha login session")
     print("(cookies + localStorage) to a local file.")
     print(f"  Output: {session_path}")
     print("Treat this file as a sensitive credential.")
@@ -236,36 +160,30 @@ def main():
     os.chmod(session_path.parent, stat.S_IRWXU)  # 0700
 
     target_url = "https://seekingalpha.com/alpha-picks/portfolio"
-    chrome_proc = None
 
     with sync_playwright() as p:
-        if args.cdp:
-            # --- CDP mode: connect to running Chrome ---
-            port = args.cdp_port
+        if args.launch:
+            # --- Profile mode: use system Chrome profile via Playwright ---
+            profile_dir = _chrome_profile_dir()
 
-            if not _is_cdp_available(port):
-                if args.launch:
-                    print(f"No Chrome on port {port}. Launching Chrome with CDP...")
-                    chrome_proc = _launch_chrome_with_cdp(port)
-                    if not chrome_proc:
-                        print("ERROR: Could not launch Chrome. Install google-chrome or start it manually:")
-                        print(f"  google-chrome --remote-debugging-port={port}")
-                        sys.exit(1)
-                    print(f"Chrome launched (pid={chrome_proc.pid})")
-                else:
-                    print(f"ERROR: No Chrome listening on port {port}.")
-                    print()
-                    print("Option A — restart Chrome with CDP enabled:")
-                    print(f"  google-chrome --remote-debugging-port={port}")
-                    print("  Then re-run: python scripts/sa_login.py --cdp")
-                    print()
-                    print("Option B — let this script launch Chrome:")
-                    print(f"  python scripts/sa_login.py --cdp --launch")
-                    sys.exit(1)
+            if not os.path.isdir(profile_dir):
+                print(f"ERROR: Chrome profile not found: {profile_dir}")
+                sys.exit(1)
 
-            print(f"Connecting to Chrome on port {port}...")
-            browser = p.chromium.connect_over_cdp(f"http://localhost:{port}")
-            context = browser.contexts[0]  # Use the default (existing) context
+            # Must close Chrome — can't share profile with running instance
+            if not _close_chrome():
+                sys.exit(1)
+
+            print()
+            print(f"Opening system Chrome with your profile...")
+            print(f"(Profile: {profile_dir})")
+
+            context = p.chromium.launch_persistent_context(
+                profile_dir,
+                headless=False,
+                channel="chrome",
+                viewport={"width": 1280, "height": 800},
+            )
             page = context.new_page()
             page.goto(target_url, wait_until="networkidle")
 
@@ -274,24 +192,22 @@ def main():
 
             current_url = page.url
             if "login" not in current_url and "sign_in" not in current_url:
-                print("Already logged in! Your existing session will be saved.")
+                print("Already logged in! Your SA session will be exported.")
             else:
                 print("Not logged in. Please log in in the browser window.")
-                print("(You can also log in via any other tab in this Chrome)")
 
             print()
             input("Press Enter to save session...")
 
             context.storage_state(path=str(session_path))
-            page.close()
-            browser.close()  # Disconnects CDP, does NOT close Chrome
+            context.close()
+
+            print()
+            print("Browser closed. You can reopen Chrome normally now.")
 
         else:
             # --- Fresh mode: new browser, manual login ---
-            launch_kwargs = {"headless": False}
-            if args.channel != "chromium":
-                launch_kwargs["channel"] = args.channel
-            browser = p.chromium.launch(**launch_kwargs)
+            browser = p.chromium.launch(headless=False, channel="chrome")
             context = browser.new_context(
                 viewport={"width": 1280, "height": 800},
             )

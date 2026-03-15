@@ -438,17 +438,10 @@ Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfo
 # 1. Install Playwright + browser
 pip install playwright && playwright install chromium
 
-# 2. Save browser session (one-time) — connects to your running Chrome via CDP
-python scripts/sa_login.py --cdp --launch
-# → Restarts Chrome with CDP (port 9222), reuses your existing SA login, saves session
-# → All windows/tabs auto-restore; debug port has no effect on normal browsing
-
-# Custom CDP port:
-#   python scripts/sa_login.py --cdp --launch --cdp-port 9333
-
-# Or manually: restart Chrome with CDP, then run:
-#   google-chrome --remote-debugging-port=9222
-#   python scripts/sa_login.py --cdp
+# 2. Save browser session (one-time) — reuses your existing Chrome login
+python scripts/sa_login.py --launch
+# → Closes Chrome briefly, opens it via Playwright with your profile,
+#   exports SA session, then you reopen Chrome normally
 
 # 3. Enable in config/user_profile.yaml
 # seeking_alpha:
