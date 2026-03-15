@@ -434,20 +434,25 @@ Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfo
 
 ### Setup
 
-```bash
-# 1. Install Playwright + browser
-pip install playwright && playwright install chromium    # for other web tools
+1. **Install Chrome extension**
+   - `chrome://extensions` → 開啟「開發者模式」
+   - 「載入未封裝項目」→ 選擇 `extensions/sa_alpha_picks/`
+   - 複製顯示的 Extension ID
 
+2. **Register Native Messaging host**
+   ```bash
+   bash extensions/sa_alpha_picks/install.sh
+   # Paste your Extension ID when prompted
+   ```
 
-# 2. Install Chrome extension
-#   a. chrome://extensions → Developer mode → Load unpacked → select extensions/sa_alpha_picks/
-#   b. Copy extension ID from chrome://extensions
-#   c. bash extensions/sa_alpha_picks/install.sh   (registers native messaging host)
+3. **Enable in config**
+   ```yaml
+   # config/user_profile.yaml
+   seeking_alpha:
+     enabled: true
+   ```
 
-# 3. Enable in config/user_profile.yaml
-# seeking_alpha:
-#   enabled: true
-```
+4. **First refresh**: Click the SA Alpha Picks extension icon in Chrome → "Refresh All"
 
 The extension runs in your real Chrome browser (zero anti-bot detection risk). Data flows: Extension DOM scrape → Native Messaging → Python DAL → DB + file cache. Session validity checked per scrape (URL redirect + table selector + paywall marker).
 
