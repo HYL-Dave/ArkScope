@@ -430,7 +430,7 @@ rl_pipeline:
 
 ## Seeking Alpha Alpha Picks (Optional)
 
-Scrapes the [Alpha Picks](https://seekingalpha.com/alpha-picks/portfolio) portfolio page via Playwright with a saved browser session. Requires SA Premium + Alpha Picks subscription ($199/yr). Disabled by default.
+Reads the [Alpha Picks](https://seekingalpha.com/alpha-picks/picks/current) portfolio via a Chrome Extension + Native Messaging architecture. Requires SA Premium + Alpha Picks subscription ($199/yr). Disabled by default.
 
 ### Setup
 

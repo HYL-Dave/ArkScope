@@ -609,7 +609,22 @@ class DataAccessLayer:
 
         # File fallback: check file cache
         if picked_date:
-            return self._load_sa_file_detail(symbol, picked_date)
+            detail = self._load_sa_file_detail(symbol, picked_date)
+            # Merge portfolio row metadata (company, return_pct, sector, etc.)
+            row = None
+            for status in ("current", "closed"):
+                picks = self._load_sa_file_cache(
+                    status, symbol=symbol, include_stale=True
+                )
+                for p in (picks or []):
+                    if p.get("picked_date") == picked_date:
+                        row = p
+                        break
+                if row:
+                    break
+            if row and detail:
+                return {**row, **detail}
+            return detail or row
 
         # Deterministic fallback for file mode
         picks = self._load_sa_file_cache("current", symbol=symbol, include_stale=False)
@@ -631,16 +646,40 @@ class DataAccessLayer:
     def save_sa_pick_detail(
         self, symbol: str, picked_date: str, content: str
     ) -> bool:
-        """Save detail report for a specific SA pick."""
-        if isinstance(self._backend, DatabaseBackend):
-            self._backend.update_sa_pick_detail(symbol, picked_date, content)
+        """Save detail report for a specific SA pick.
 
+        Returns True if the primary backend write succeeded:
+        - DB mode: DB update must succeed (file is best-effort backup)
+        - File-only mode: file write must succeed
+        """
+        db_ok = True  # default for file-only mode
+        if isinstance(self._backend, DatabaseBackend):
+            try:
+                db_ok = self._backend.update_sa_pick_detail(
+                    symbol, picked_date, content
+                )
+                if not db_ok:
+                    logger.warning(
+                        "No DB row found for %s/%s — detail not saved to DB",
+                        symbol, picked_date,
+                    )
+            except Exception as e:
+                logger.error(
+                    "DB detail save failed for %s/%s: %s", symbol, picked_date, e
+                )
+                db_ok = False
+
+        file_ok = False
         try:
             self._save_sa_file_detail(symbol, picked_date, content)
-            return True
+            file_ok = True
         except Exception as e:
             logger.warning("File detail save failed: %s", e)
-            return False
+
+        # DB mode: DB must succeed; file-only mode: file must succeed
+        if isinstance(self._backend, DatabaseBackend):
+            return db_ok
+        return file_ok
 
     def get_sa_refresh_meta(self) -> Dict[str, Any]:
         """Get per-tab refresh metadata."""
