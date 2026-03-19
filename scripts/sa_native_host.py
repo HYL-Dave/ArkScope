@@ -76,6 +76,17 @@ def handle_message(msg):
     elif action == "refresh_failure":
         return _handle_failure(dal, scope, attempt_ts, msg.get("error", "unknown"))
 
+    elif action == "check_detail_cache":
+        return _handle_check_detail_cache(
+            dal, msg.get("picks", []), msg.get("articles", [])
+        )
+
+    elif action == "save_detail":
+        return _handle_save_detail(dal, msg)
+
+    elif action == "save_detail_by_symbol":
+        return _handle_save_detail_by_symbol(dal, msg)
+
     elif action == "ping":
         return {"status": "ok", "project_root": PROJECT_ROOT}
 
@@ -122,6 +133,124 @@ def _handle_failure(dal, scope, attempt_ts, error):
     except Exception as e:
         logger.error("Failed to record failure for %s: %s", scope, e)
     return {"status": "ok", "scope": scope, "recorded_failure": True}
+
+
+def _handle_check_detail_cache(dal, picks, articles=None):
+    """Return list of picks that need detail fetching (null or expired).
+
+    If articles list is provided (from articles page scrape), matches
+    articles to picks by ticker symbol and returns article_url for each.
+    """
+    try:
+        from src.agents.config import get_agent_config
+
+        config = get_agent_config()
+        detail_cache_days = getattr(config, "sa_detail_cache_days", 7)
+    except Exception:
+        detail_cache_days = 7
+
+    # Build ticker → article URL mapping (most recent per ticker)
+    # Also build prefix index for cross-exchange matching (KGC → KGCK)
+    article_map = {}
+    if articles:
+        for a in articles:
+            ticker = a.get("ticker", "").upper()
+            if ticker and ticker not in article_map:
+                article_map[ticker] = a.get("url", "")
+
+    need_detail = []
+    no_article = []  # Picks needing detail but no matching article found
+    now = datetime.now(tz=timezone.utc)
+    for p in picks:
+        symbol = p.get("symbol", "").upper()
+        picked_date = p.get("picked_date")
+
+        cached = dal.get_sa_pick_detail(symbol, picked_date)
+        if cached and cached.get("detail_report"):
+            # Check expiry
+            fetched_at = cached.get("detail_fetched_at")
+            if fetched_at:
+                if isinstance(fetched_at, str):
+                    fetched_at = datetime.fromisoformat(
+                        fetched_at.replace("Z", "+00:00")
+                    )
+                age_days = (now - fetched_at).days
+                if age_days <= detail_cache_days:
+                    continue  # Has detail and not expired → skip
+
+        # Find matching article URL (exact match, then prefix match for cross-exchange)
+        article_url = article_map.get(symbol)
+        if not article_url:
+            # Prefix match: KGC→KGCK, CLS→CLSCLS, SSRM→SSRMSSRM (US+CA doubled)
+            for art_ticker, art_url in article_map.items():
+                if art_ticker.startswith(symbol) and len(art_ticker) <= len(symbol) * 2:
+                    article_url = art_url
+                    break
+        if not article_url:
+            no_article.append(symbol)
+            continue  # No article available for this pick
+
+        need_detail.append({
+            "symbol": symbol,
+            "picked_date": picked_date,
+            "article_url": article_url,
+        })
+
+    logger.info(
+        "check_detail_cache: %d/%d need detail, %d no article (%d articles available)",
+        len(need_detail), len(picks), len(no_article), len(article_map),
+    )
+    result = {"status": "ok", "need_detail": need_detail}
+    if no_article:
+        result["no_article"] = no_article
+    return result
+
+
+def _handle_save_detail(dal, msg):
+    """Save detail report for a pick."""
+    symbol = msg.get("symbol", "")
+    picked_date = msg.get("picked_date", "")
+    report = msg.get("detail_report", "")
+    try:
+        ok = dal.save_sa_pick_detail(symbol, picked_date, report)
+        if ok:
+            logger.info(
+                "Detail saved for %s/%s (%d chars)", symbol, picked_date, len(report)
+            )
+            return {"status": "ok", "symbol": symbol}
+        else:
+            logger.warning("Detail save returned False for %s/%s", symbol, picked_date)
+            return {"status": "error", "symbol": symbol, "error": "DB row not found"}
+    except Exception as e:
+        logger.error("Detail save failed for %s/%s: %s", symbol, picked_date, e)
+        return {"status": "error", "symbol": symbol, "error": str(e)}
+
+
+def _handle_save_detail_by_symbol(dal, msg):
+    """Save detail report, resolving picked_date from DB by symbol."""
+    symbol = msg.get("symbol", "").upper()
+    report = msg.get("detail_report", "")
+    try:
+        # Find the pick's picked_date from DB
+        cached = dal.get_sa_pick_detail(symbol)
+        if not cached:
+            return {"status": "error", "symbol": symbol, "error": "Pick not found in DB"}
+        picked_date = cached.get("picked_date")
+        if not picked_date:
+            return {"status": "error", "symbol": symbol, "error": "No picked_date found"}
+        # Convert date object to string if needed
+        if hasattr(picked_date, "isoformat"):
+            picked_date = picked_date.isoformat()
+
+        ok = dal.save_sa_pick_detail(symbol, picked_date, report)
+        if ok:
+            logger.info("Manual detail saved for %s/%s (%d chars)", symbol, picked_date, len(report))
+            return {"status": "ok", "symbol": symbol}
+        else:
+            return {"status": "error", "symbol": symbol, "error": "DB row not found"}
+    except Exception as e:
+        logger.error("Manual detail save failed for %s: %s", symbol, e)
+        return {"status": "error", "symbol": symbol, "error": str(e)}
 
 
 def _try_ticker_sync(dal, picks):

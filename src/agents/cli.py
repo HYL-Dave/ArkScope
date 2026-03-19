@@ -1610,8 +1610,11 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
             console.print(f"  Return: {result.get('return_pct', '?')}%")
             console.print(f"  Sector: {result.get('sector', '?')}")
             console.print(f"  Rating: {result.get('sa_rating', '?')}")
+            if result.get("detail_stale_warning"):
+                console.print(f"[yellow]{result['detail_stale_warning']}[/yellow]")
             if result.get("detail_report"):
-                console.print(f"\n{result['detail_report'][:500]}...")
+                console.print(f"\n[dim]── Analysis Report ──[/dim]")
+                console.print(result["detail_report"][:2000])
             console.print()
         return
 

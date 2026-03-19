@@ -595,3 +595,248 @@ class TestBridgeIntegration:
         assert "get_sa_alpha_picks" in names
         assert "get_sa_pick_detail" in names
         assert "refresh_sa_alpha_picks" in names
+
+
+# ============================================================
+# Phase 11c-v2: Detail report persistence contract
+# ============================================================
+
+class TestSaveDetailContract:
+    def test_db_success_returns_true(self):
+        """save_sa_pick_detail returns True when DB update succeeds."""
+        from src.tools.data_access import DataAccessLayer
+        from src.tools.backends.db_backend import DatabaseBackend
+
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.update_sa_pick_detail.return_value = True
+        dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
+
+        result = dal.save_sa_pick_detail("NVDA", "2025-11-15", "# Report\nContent")
+        assert result is True
+        dal._backend.update_sa_pick_detail.assert_called_once()
+
+    def test_db_failure_returns_false(self):
+        """save_sa_pick_detail returns False when DB row not found (not masked by file save)."""
+        from src.tools.data_access import DataAccessLayer
+        from src.tools.backends.db_backend import DatabaseBackend
+
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.update_sa_pick_detail.return_value = False  # No row found
+        dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
+
+        result = dal.save_sa_pick_detail("NVDA", "2025-11-15", "# Report")
+        assert result is False  # DB failure takes precedence over file success
+
+    def test_db_exception_returns_false(self):
+        """save_sa_pick_detail returns False when DB throws exception."""
+        from src.tools.data_access import DataAccessLayer
+        from src.tools.backends.db_backend import DatabaseBackend
+
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.update_sa_pick_detail.side_effect = RuntimeError("conn lost")
+        dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
+
+        result = dal.save_sa_pick_detail("NVDA", "2025-11-15", "# Report")
+        assert result is False
+
+
+class TestGetDetailFileMerge:
+    def test_file_detail_merged_with_portfolio_row(self):
+        """get_sa_pick_detail file-only + picked_date merges portfolio metadata."""
+        from src.tools.data_access import DataAccessLayer
+
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock()  # Not DatabaseBackend
+        dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
+
+        # Mock file loaders
+        dal._load_sa_file_detail = MagicMock(return_value={
+            "detail_report": "# Analysis\nContent here",
+            "detail_fetched_at": "2025-03-10T10:00:00+00:00",
+        })
+        dal._load_sa_file_cache = MagicMock(side_effect=lambda status, **kw: [
+            {"symbol": "NVDA", "picked_date": "2025-11-15",
+             "return_pct": 42.3, "sector": "Technology",
+             "sa_rating": "STRONG BUY", "portfolio_status": "current"},
+        ] if status == "current" else [])
+
+        result = dal.get_sa_pick_detail("NVDA", "2025-11-15")
+        assert result is not None
+        assert result.get("detail_report") == "# Analysis\nContent here"
+        assert result.get("return_pct") == 42.3
+        assert result.get("sector") == "Technology"
+        assert result.get("sa_rating") == "STRONG BUY"
+
+    def test_file_detail_only_when_no_portfolio_row(self):
+        """get_sa_pick_detail returns detail-only when portfolio row missing."""
+        from src.tools.data_access import DataAccessLayer
+
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock()  # Not DatabaseBackend
+        dal._SA_CACHE_DIR = Path(tempfile.mkdtemp()) / "sa"
+
+        dal._load_sa_file_detail = MagicMock(return_value={
+            "detail_report": "# Report",
+        })
+        dal._load_sa_file_cache = MagicMock(return_value=[])
+
+        result = dal.get_sa_pick_detail("NVDA", "2025-11-15")
+        assert result is not None
+        assert result.get("detail_report") == "# Report"
+
+
+# ============================================================
+# Phase 11c-v2: Native host detail actions
+# ============================================================
+
+class TestNativeHostDetailCache:
+    def test_null_detail_needs_fetch(self):
+        """Picks without detail_report are returned in need_detail."""
+        from scripts.sa_native_host import _handle_check_detail_cache
+
+        dal = MagicMock()
+        dal.get_sa_pick_detail.return_value = {"symbol": "NVDA", "detail_report": None}
+
+        articles = [{"ticker": "NVDA", "url": "https://sa.com/article/nvda"}]
+        result = _handle_check_detail_cache(dal, [
+            {"symbol": "NVDA", "picked_date": "2025-11-15"},
+        ], articles)
+        assert result["status"] == "ok"
+        assert len(result["need_detail"]) == 1
+        assert result["need_detail"][0]["article_url"] == "https://sa.com/article/nvda"
+
+    def test_fresh_detail_skipped(self):
+        """Picks with fresh detail_report are skipped."""
+        from scripts.sa_native_host import _handle_check_detail_cache
+
+        dal = MagicMock()
+        fresh = datetime.now(timezone.utc).isoformat()
+        dal.get_sa_pick_detail.return_value = {
+            "symbol": "NVDA", "detail_report": "# Report", "detail_fetched_at": fresh,
+        }
+
+        articles = [{"ticker": "NVDA", "url": "https://sa.com/article/nvda"}]
+        result = _handle_check_detail_cache(dal, [
+            {"symbol": "NVDA", "picked_date": "2025-11-15"},
+        ], articles)
+        assert result["status"] == "ok"
+        assert len(result["need_detail"]) == 0
+
+    def test_expired_detail_needs_refetch(self):
+        """Picks with expired detail are returned in need_detail."""
+        from scripts.sa_native_host import _handle_check_detail_cache
+
+        dal = MagicMock()
+        old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        dal.get_sa_pick_detail.return_value = {
+            "symbol": "NVDA", "detail_report": "# Old report", "detail_fetched_at": old,
+        }
+
+        articles = [{"ticker": "NVDA", "url": "https://sa.com/article/nvda"}]
+        result = _handle_check_detail_cache(dal, [
+            {"symbol": "NVDA", "picked_date": "2025-11-15"},
+        ], articles)
+        assert result["status"] == "ok"
+        assert len(result["need_detail"]) == 1
+
+    def test_no_article_for_pick_skipped(self):
+        """Pick without matching article is skipped (not failed)."""
+        from scripts.sa_native_host import _handle_check_detail_cache
+
+        dal = MagicMock()
+        dal.get_sa_pick_detail.return_value = {"symbol": "XYZ", "detail_report": None}
+
+        articles = [{"ticker": "NVDA", "url": "https://sa.com/article/nvda"}]
+        result = _handle_check_detail_cache(dal, [
+            {"symbol": "XYZ", "picked_date": "2025-11-15"},
+        ], articles)
+        assert result["status"] == "ok"
+        assert len(result["need_detail"]) == 0  # No matching article
+
+
+class TestNativeHostSaveDetail:
+    def test_save_success(self):
+        """save_detail calls DAL and returns ok."""
+        from scripts.sa_native_host import _handle_save_detail
+
+        dal = MagicMock()
+        dal.save_sa_pick_detail.return_value = True
+
+        result = _handle_save_detail(dal, {
+            "symbol": "NVDA", "picked_date": "2025-11-15",
+            "detail_report": "# Report\nContent",
+        })
+        assert result["status"] == "ok"
+        dal.save_sa_pick_detail.assert_called_once_with("NVDA", "2025-11-15", "# Report\nContent")
+
+    def test_save_failure_returns_error(self):
+        """save_detail returns error when DAL reports failure."""
+        from scripts.sa_native_host import _handle_save_detail
+
+        dal = MagicMock()
+        dal.save_sa_pick_detail.return_value = False
+
+        result = _handle_save_detail(dal, {
+            "symbol": "NVDA", "picked_date": "2025-11-15",
+            "detail_report": "# Report",
+        })
+        assert result["status"] == "error"
+        assert "not found" in result["error"].lower()
+
+
+# ============================================================
+# Phase 11c-v2: Detail staleness warning
+# ============================================================
+
+class TestDetailStaleness:
+    def test_stale_detail_has_warning(self):
+        """Client adds detail_stale_warning when detail is older than cache_days."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        dal = MagicMock()
+        old = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        dal.get_sa_pick_detail.return_value = {
+            "symbol": "NVDA", "detail_report": "# Report",
+            "detail_fetched_at": old,
+        }
+
+        client = SAAlphaPicksClient(dal=dal, detail_cache_days=7)
+        result = client.get_pick_detail("NVDA")
+        assert "detail_stale_warning" in result
+        assert "14d" in result["detail_stale_warning"]
+
+    def test_fresh_detail_no_warning(self):
+        """Client does not add warning for fresh detail."""
+        from data_sources.sa_alpha_picks_client import SAAlphaPicksClient
+
+        dal = MagicMock()
+        fresh = datetime.now(timezone.utc).isoformat()
+        dal.get_sa_pick_detail.return_value = {
+            "symbol": "NVDA", "detail_report": "# Report",
+            "detail_fetched_at": fresh,
+        }
+
+        client = SAAlphaPicksClient(dal=dal, detail_cache_days=7)
+        result = client.get_pick_detail("NVDA")
+        assert "detail_stale_warning" not in result
+
+
+class TestDetailStalePassThrough:
+    def test_tool_passes_through_stale_warning(self):
+        """sa_tools.get_sa_pick_detail passes through detail_stale_warning."""
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True), \
+             patch("src.tools.sa_tools._get_client") as mock_client:
+            mock_instance = MagicMock()
+            mock_instance.get_pick_detail.return_value = {
+                "symbol": "NVDA",
+                "detail_report": "# Report",
+                "detail_stale_warning": "Detail report is 14d old (limit: 7d).",
+            }
+            mock_client.return_value = mock_instance
+
+            result = get_sa_pick_detail(MagicMock(), "NVDA")
+            assert "detail_stale_warning" in result
+            assert "14d" in result["detail_stale_warning"]

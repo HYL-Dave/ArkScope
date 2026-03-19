@@ -91,6 +91,23 @@ class SAAlphaPicksClient:
         cached = self._dal.get_sa_pick_detail(symbol, picked_date)
         if not cached:
             return None  # Preserves None contract for sa_tools.py hint logic
+
+        # Check detail staleness
+        if cached.get("detail_report") and cached.get("detail_fetched_at"):
+            fetched_at = cached["detail_fetched_at"]
+            if isinstance(fetched_at, str):
+                fetched_at = datetime.fromisoformat(
+                    fetched_at.replace("Z", "+00:00")
+                )
+            now = datetime.now(tz=timezone.utc)
+            age_days = (now - fetched_at).days
+            if age_days > self._detail_cache_days:
+                cached["detail_stale_warning"] = (
+                    f"Detail report is {age_days}d old "
+                    f"(limit: {self._detail_cache_days}d). "
+                    "Click SA extension in Chrome to refresh."
+                )
+
         return cached
 
     def refresh_portfolio(self, sync_tickers: bool = False) -> Dict[str, Any]:
@@ -216,7 +233,7 @@ class SAAlphaPicksClient:
             os.replace(tmp_path, tickers_path)
 
             logger.info(
-                "Synced %d SA Alpha Picks symbols to tickers_core.json", len(merged)
+                "Synced %d SA Alpha Picks symbols to tickers_core.json", len(new_symbols)
             )
         except Exception as e:
             logger.error("Failed to sync tickers: %s", e)
