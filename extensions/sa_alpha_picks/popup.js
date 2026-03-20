@@ -148,30 +148,34 @@ function renderStatus(lastRefresh) {
     return;
   }
 
-  // Detail fetch results
+  // Articles + details results (v3 format)
   var details = lastRefresh.details;
   if (details) {
-    var detailLine = "";
     if (details.error) {
-      detailLine = "Details: error (" + details.error + ")";
+      statusEl.append(
+        document.createElement("br"),
+        document.createTextNode("Articles: error (" + details.error + ")")
+      );
     } else {
       var parts = [];
-      if (details.skipped > 0) parts.push(details.skipped + " cached");
-      if (details.fetched > 0) parts.push(details.fetched + " fetched");
+      if (details.articles_saved > 0) parts.push(details.articles_saved + " articles");
+      if (details.fetched > 0) parts.push(details.fetched + " content fetched");
+      if (details.comments_refreshed > 0) parts.push(details.comments_refreshed + " comments updated");
       if (details.failed > 0) parts.push(details.failed + " failed");
-      detailLine = "Details: " + (parts.length > 0 ? parts.join(", ") : "up to date");
+      var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "up to date");
+      statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
     }
-    statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
 
-    // Show tickers with no matching article + enable manual input
-    if (details.no_article && details.no_article.length > 0) {
-      var missingLine = "Missing article: " + details.no_article.join(", ");
-      statusEl.append(document.createElement("br"), document.createTextNode(missingLine));
-
-      // Show manual fetch section — only pre-fill if user hasn't started typing
+    // Show unresolved tickers + manual fetch section
+    var unresolved = details.unresolved_symbols || details.no_article || [];
+    if (unresolved.length > 0) {
+      statusEl.append(
+        document.createElement("br"),
+        document.createTextNode("Missing: " + unresolved.join(", "))
+      );
       manualSection.style.display = "block";
       if (!manualInput.value || !manualInput.value.includes("http")) {
-        manualInput.value = details.no_article.map(function (t) { return t + " "; }).join("\n");
+        manualInput.value = unresolved.map(function (t) { return t + " "; }).join("\n");
       }
     } else {
       manualSection.style.display = "none";

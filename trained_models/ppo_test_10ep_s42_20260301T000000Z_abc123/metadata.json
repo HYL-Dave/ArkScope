@@ -1,0 +1,19 @@
+{
+  "model_id": "ppo_test_10ep_s42_20260301T000000Z_abc123",
+  "algorithm": "PPO",
+  "score_source": "test",
+  "score_type": "sentiment",
+  "feature_set": [],
+  "stock_dim": 5,
+  "state_dim": 50,
+  "train_period": "2020-01-01 ~ 2023-12-31",
+  "test_period": "",
+  "epochs": 10,
+  "hyperparams": {
+    "hid": 512
+  },
+  "backtest_results": {},
+  "training_date": "2026-03-01T16:32:03Z",
+  "model_path": "ppo_test_10ep_s42_20260301T000000Z_abc123/model.pth",
+  "data_hash": ""
+}

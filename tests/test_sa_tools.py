@@ -551,24 +551,24 @@ class TestBridgeIntegration:
     def test_registry_47(self):
         """Registry should have 47 tools (44 + 3 SA)."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 47
+        assert len(registry.list_all()) == 49
 
-    def test_portfolio_category_4(self):
-        """Portfolio category should have 4 tools (1 + 3 SA)."""
+    def test_portfolio_category_6(self):
+        """Portfolio category should have 6 tools (1 + 3 SA picks + 2 SA articles)."""
         registry = create_default_registry()
-        assert len(registry.list_by_category("portfolio")) == 4
+        assert len(registry.list_by_category("portfolio")) == 6
 
     def test_openai_schema_47(self):
         """OpenAI schema should have 47 tools."""
         registry = create_default_registry()
         schema = registry.to_openai_schema()
-        assert len(schema) == 47
+        assert len(schema) == 49
 
     def test_anthropic_schema_47(self):
         """Anthropic schema should have 47 tools."""
         registry = create_default_registry()
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 47
+        assert len(schema) == 49
 
     def test_sa_tool_names_in_registry(self):
         """SA tool names should exist in registry."""
@@ -582,7 +582,7 @@ class TestBridgeIntegration:
         """Anthropic bridge should have 48 schemas (47 + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 48
+        assert len(tools) == 50
 
     def test_openai_bridge_48(self):
         """OpenAI bridge should have 48 tools (47 + delegate, before web conditional)."""
@@ -840,3 +840,111 @@ class TestDetailStalePassThrough:
             result = get_sa_pick_detail(MagicMock(), "NVDA")
             assert "detail_stale_warning" in result
             assert "14d" in result["detail_stale_warning"]
+
+
+# ============================================================
+# Phase 11c-v3: Articles + Comments
+# ============================================================
+
+class TestArticleTools:
+    def test_get_sa_articles_disabled(self):
+        """Disabled SA returns message for get_sa_articles."""
+        from src.tools.sa_tools import get_sa_articles
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=False):
+            result = get_sa_articles(MagicMock())
+            assert "message" in result
+
+    def test_get_sa_articles_returns_list(self):
+        """get_sa_articles returns article list."""
+        from src.tools.sa_tools import get_sa_articles
+        dal = MagicMock()
+        dal.get_sa_articles.return_value = [
+            {"article_id": "123", "title": "Test Article", "ticker": "NVDA"},
+        ]
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
+            result = get_sa_articles(dal, ticker="NVDA")
+            assert result["count"] == 1
+            assert result["articles"][0]["ticker"] == "NVDA"
+
+    def test_get_sa_article_detail_returns_content(self):
+        """get_sa_article_detail returns article + comments."""
+        from src.tools.sa_tools import get_sa_article_detail
+        dal = MagicMock()
+        dal.get_sa_article_detail.return_value = {
+            "article_id": "123",
+            "body_markdown": "# Test\nContent",
+            "comments": [{"comment_id": "c1", "comment_text": "Great!"}],
+        }
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
+            result = get_sa_article_detail(dal, "123")
+            assert result["body_markdown"] == "# Test\nContent"
+            assert len(result["comments"]) == 1
+
+    def test_get_sa_article_detail_not_found(self):
+        """get_sa_article_detail returns error for missing article."""
+        from src.tools.sa_tools import get_sa_article_detail
+        dal = MagicMock()
+        dal.get_sa_article_detail.return_value = None
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
+            result = get_sa_article_detail(dal, "999")
+            assert "error" in result
+
+
+class TestNativeHostArticles:
+    def test_save_articles_meta(self):
+        """save_articles_meta calls DAL and returns result."""
+        from scripts.sa_native_host import _handle_save_articles_meta
+        dal = MagicMock()
+        dal.save_sa_articles_meta.return_value = {
+            "status": "ok", "saved": 5, "need_content": [],
+            "need_comments": [], "unresolved_symbols": [], "auto_upgrade": False,
+        }
+        result = _handle_save_articles_meta(dal, {
+            "mode": "quick",
+            "articles": [{"article_id": "123", "title": "Test"}],
+        })
+        assert result["saved"] == 5
+
+    def test_save_article_content(self):
+        """save_article_content calls compound DAL method."""
+        from scripts.sa_native_host import _handle_save_article_content
+        dal = MagicMock()
+        dal.save_sa_article_with_comments.return_value = {"ok": True, "synced_picks": 1}
+        result = _handle_save_article_content(dal, {
+            "article_id": "123",
+            "body_markdown": "# Content",
+            "comments": [],
+        })
+        assert result["status"] == "ok"
+        dal.save_sa_article_with_comments.assert_called_once()
+
+    def test_audit_unresolved(self):
+        """audit_unresolved calls DAL and returns result."""
+        from scripts.sa_native_host import _handle_audit_unresolved
+        dal = MagicMock()
+        dal.audit_sa_unresolved_symbols.return_value = {
+            "unresolved_symbols": ["CVSA"],
+            "resolved_by_fulltext": 2,
+        }
+        result = _handle_audit_unresolved(dal)
+        assert result["status"] == "ok"
+        assert "CVSA" in result["unresolved_symbols"]
+
+
+class TestRegistryV3:
+    def test_registry_49(self):
+        """Registry should have 49 tools (47 + 2 SA articles)."""
+        registry = create_default_registry()
+        assert len(registry.list_all()) == 49
+
+    def test_portfolio_category_6(self):
+        """Portfolio category should have 6 tools (4 + 2 SA articles)."""
+        registry = create_default_registry()
+        assert len(registry.list_by_category("portfolio")) == 6
+
+    def test_new_tool_names_in_registry(self):
+        """New SA article tool names should exist in registry."""
+        registry = create_default_registry()
+        names = registry.list_names()
+        assert "get_sa_articles" in names
+        assert "get_sa_article_detail" in names
