@@ -104,9 +104,9 @@ class AgentConfig(BaseModel):
 
     # Seeking Alpha Alpha Picks (Phase 11c)
     sa_enabled: bool = False
-    sa_session_file: str = "~/.config/mindfulrl/seeking_alpha/storage_state.json"
     sa_cache_hours: int = 24
     sa_detail_cache_days: int = 7
+    sa_comments_cache_days: int = 7
 
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
@@ -262,8 +262,8 @@ def get_agent_config() -> AgentConfig:
     sa_prefs = profile.get("seeking_alpha", {})
     if "enabled" in sa_prefs:
         config.sa_enabled = sa_prefs["enabled"]
-    if "session_file" in sa_prefs:
-        config.sa_session_file = sa_prefs["session_file"]
+    if "comments_cache_days" in sa_prefs:
+        config.sa_comments_cache_days = sa_prefs["comments_cache_days"]
     if "cache_hours" in sa_prefs:
         config.sa_cache_hours = sa_prefs["cache_hours"]
     if "detail_cache_days" in sa_prefs:

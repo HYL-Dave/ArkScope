@@ -409,14 +409,14 @@ seeking_alpha:
   # 啟用 SA Alpha Picks 工具 (需安裝 Chrome extension，見 extensions/sa_alpha_picks/)
   enabled: true
 
-  # deprecated: session_file 已由 Chrome extension 取代
-  session_file: "~/.config/mindfulrl/seeking_alpha/storage_state.json"
-
   # Portfolio 快取有效小時數 (超過則自動 refresh)
   cache_hours: 24
 
   # Detail 報告快取天數
   detail_cache_days: 7
+
+  # 留言快取天數 (Full Scan 時 TTL 過期的留言會重抓)
+  comments_cache_days: 7
 
 # ============================================
 # 13. RL Pipeline 設定

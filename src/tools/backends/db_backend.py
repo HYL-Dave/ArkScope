@@ -1147,4 +1147,380 @@ class DatabaseBackend:
             logger.error("Failed to get SA refresh meta: %s", e)
         return result
 
-        return stats
+    # ============================================================
+    # SA Articles + Comments (Phase 11c-v3)
+    # ============================================================
+
+    def upsert_sa_articles_meta(self, articles: list) -> int:
+        """Batch upsert article metadata (no body_markdown)."""
+        conn = self._get_conn()
+        count = 0
+        try:
+            with conn.cursor() as cur:
+                for a in articles:
+                    cur.execute(
+                        """INSERT INTO sa_articles
+                        (article_id, url, title, ticker, published_date,
+                         article_type, comments_count, raw_data)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (article_id) DO UPDATE SET
+                            title = EXCLUDED.title,
+                            ticker = COALESCE(EXCLUDED.ticker, sa_articles.ticker),
+                            comments_count = EXCLUDED.comments_count,
+                            updated_at = NOW()
+                        """,
+                        (
+                            a.get("article_id"),
+                            a.get("url"),
+                            a.get("title"),
+                            a.get("ticker"),
+                            a.get("published_date"),
+                            a.get("article_type"),
+                            a.get("comments_count", 0),
+                            psycopg2.extras.Json(a.get("raw_data")),
+                        ),
+                    )
+                    count += 1
+        except Exception as e:
+            logger.error("Failed to upsert SA articles: %s", e)
+        return count
+
+    def save_article_with_comments(
+        self,
+        article_id: str,
+        body_markdown: str,
+        comments: list,
+        sync_picks: bool = True,
+    ) -> dict:
+        """Atomic: article content + comments + pick sync in single transaction."""
+        conn = self._get_conn()
+        old_autocommit = conn.autocommit
+        synced = 0
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cur:
+                # (a) Update article body
+                cur.execute(
+                    "UPDATE sa_articles SET body_markdown = %s, "
+                    "detail_fetched_at = NOW(), comments_fetched_at = NOW(), "
+                    "updated_at = NOW() WHERE article_id = %s",
+                    (body_markdown, article_id),
+                )
+                # (b) Upsert comments
+                for c in comments:
+                    cur.execute(
+                        """INSERT INTO sa_article_comments
+                        (article_id, comment_id, parent_comment_id,
+                         commenter, comment_text, upvotes, comment_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (article_id, comment_id) DO UPDATE SET
+                            comment_text = EXCLUDED.comment_text,
+                            upvotes = EXCLUDED.upvotes
+                        """,
+                        (
+                            article_id,
+                            c.get("comment_id"),
+                            c.get("parent_comment_id"),
+                            c.get("commenter"),
+                            c.get("comment_text"),
+                            c.get("upvotes", 0),
+                            c.get("comment_date"),
+                        ),
+                    )
+                # (c) Sync canonical article to matching picks
+                if sync_picks:
+                    synced = self._sync_canonical_to_picks(cur, article_id)
+            conn.commit()
+            return {"ok": True, "synced_picks": synced}
+        except Exception as e:
+            conn.rollback()
+            logger.error("save_article_with_comments failed: %s", e)
+            raise
+        finally:
+            conn.autocommit = old_autocommit
+
+    def update_article_comments(self, article_id: str, comments: list) -> int:
+        """Comments-only update (for TTL refresh). Returns count."""
+        conn = self._get_conn()
+        old_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cur:
+                for c in comments:
+                    cur.execute(
+                        """INSERT INTO sa_article_comments
+                        (article_id, comment_id, parent_comment_id,
+                         commenter, comment_text, upvotes, comment_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (article_id, comment_id) DO UPDATE SET
+                            comment_text = EXCLUDED.comment_text,
+                            upvotes = EXCLUDED.upvotes
+                        """,
+                        (
+                            article_id,
+                            c.get("comment_id"),
+                            c.get("parent_comment_id"),
+                            c.get("commenter"),
+                            c.get("comment_text"),
+                            c.get("upvotes", 0),
+                            c.get("comment_date"),
+                        ),
+                    )
+                cur.execute(
+                    "UPDATE sa_articles SET comments_fetched_at = NOW(), "
+                    "updated_at = NOW() WHERE article_id = %s",
+                    (article_id,),
+                )
+            conn.commit()
+            return len(comments)
+        except Exception as e:
+            conn.rollback()
+            logger.error("update_article_comments failed: %s", e)
+            raise
+        finally:
+            conn.autocommit = old_autocommit
+
+    def _sync_canonical_to_picks(self, cur, article_id: str) -> int:
+        """Sync article to matching picks. Must use the passed cursor (transaction)."""
+        # Get article info
+        cur.execute(
+            "SELECT article_id, ticker, article_type, published_date, body_markdown "
+            "FROM sa_articles WHERE article_id = %s",
+            (article_id,),
+        )
+        article = cur.fetchone()
+        if not article or not article[1]:  # no ticker
+            return 0
+        ticker = article[1]
+        article_type = article[2]
+        published_date = article[3]
+        body_md = article[4]
+
+        if article_type not in ("analysis", "removal"):
+            return 0
+        if not body_md:
+            return 0
+
+        # Find matching picks (current + closed) — exact then prefix
+        cur.execute(
+            "SELECT id, symbol, picked_date, canonical_article_id "
+            "FROM sa_alpha_picks "
+            "WHERE (symbol = %s OR (%s LIKE symbol || '%%' AND LENGTH(%s) <= LENGTH(symbol) * 2)) "
+            "AND article_type_eligible(symbol, %s)",
+            # Simplified: just use symbol match, type already filtered above
+            (),
+        )
+        # Actually, let's simplify the query
+        cur.execute(
+            "SELECT id, symbol, picked_date, canonical_article_id "
+            "FROM sa_alpha_picks WHERE symbol = %s",
+            (ticker,),
+        )
+        rows = cur.fetchall()
+
+        # Also try prefix match
+        if not rows:
+            cur.execute(
+                "SELECT id, symbol, picked_date, canonical_article_id "
+                "FROM sa_alpha_picks WHERE %s LIKE symbol || '%%' "
+                "AND LENGTH(%s) <= LENGTH(symbol) * 2",
+                (ticker, ticker),
+            )
+            rows = cur.fetchall()
+
+        synced = 0
+        for row in rows:
+            pick_id, symbol, picked_date, current_canonical = row
+            # Same article refresh: always allow
+            if current_canonical == article_id:
+                cur.execute(
+                    "UPDATE sa_alpha_picks SET detail_report = %s, "
+                    "detail_fetched_at = NOW(), canonical_article_id = %s, "
+                    "updated_at = NOW() WHERE id = %s",
+                    (body_md, article_id, pick_id),
+                )
+                synced += 1
+                continue
+
+            # Different article: only if closer to picked_date
+            if current_canonical and published_date and picked_date:
+                # Check if current canonical is closer
+                cur.execute(
+                    "SELECT published_date FROM sa_articles WHERE article_id = %s",
+                    (current_canonical,),
+                )
+                existing = cur.fetchone()
+                if existing and existing[0]:
+                    existing_dist = abs((existing[0] - picked_date).days)
+                    new_dist = abs((published_date - picked_date).days)
+                    if new_dist >= existing_dist:
+                        continue  # Existing canonical is closer
+
+            # No canonical yet, or new is closer
+            cur.execute(
+                "UPDATE sa_alpha_picks SET detail_report = %s, "
+                "detail_fetched_at = NOW(), canonical_article_id = %s, "
+                "updated_at = NOW() WHERE id = %s",
+                (body_md, article_id, pick_id),
+            )
+            synced += 1
+
+        return synced
+
+    def audit_unresolved_symbols(self) -> dict:
+        """Find current picks without canonical article, try full-text fallback."""
+        conn = self._get_conn()
+        unresolved = []
+        resolved = 0
+        old_autocommit = conn.autocommit
+        try:
+            conn.autocommit = False
+            with conn.cursor() as cur:
+                # Current picks without canonical article
+                cur.execute(
+                    "SELECT id, symbol, picked_date FROM sa_alpha_picks "
+                    "WHERE portfolio_status = 'current' AND is_stale = false "
+                    "AND canonical_article_id IS NULL"
+                )
+                picks = cur.fetchall()
+
+                for pick_id, symbol, picked_date in picks:
+                    # Try exact/prefix match first (analysis/removal only)
+                    cur.execute(
+                        "SELECT article_id, published_date FROM sa_articles "
+                        "WHERE (ticker = %s OR (ticker LIKE %s AND LENGTH(ticker) <= LENGTH(%s) * 2)) "
+                        "AND article_type IN ('analysis', 'removal') "
+                        "AND body_markdown IS NOT NULL "
+                        "ORDER BY ABS(EXTRACT(EPOCH FROM (published_date - %s::date))) "
+                        "LIMIT 1",
+                        (symbol, symbol + "%", symbol, str(picked_date)),
+                    )
+                    match = cur.fetchone()
+
+                    # Full-text fallback
+                    if not match:
+                        cur.execute(
+                            "SELECT article_id, published_date FROM sa_articles "
+                            "WHERE body_markdown IS NOT NULL "
+                            "AND article_type IN ('analysis', 'removal') "
+                            "AND to_tsvector('english', COALESCE(title, '') || ' ' || "
+                            "COALESCE(body_markdown, '')) "
+                            "@@ plainto_tsquery('english', %s) "
+                            "ORDER BY ABS(EXTRACT(EPOCH FROM (published_date - %s::date))) "
+                            "LIMIT 1",
+                            (symbol, str(picked_date)),
+                        )
+                        match = cur.fetchone()
+
+                    if match:
+                        art_id = match[0]
+                        # Get body for sync
+                        cur.execute(
+                            "SELECT body_markdown FROM sa_articles WHERE article_id = %s",
+                            (art_id,),
+                        )
+                        body_row = cur.fetchone()
+                        if body_row and body_row[0]:
+                            cur.execute(
+                                "UPDATE sa_alpha_picks SET detail_report = %s, "
+                                "detail_fetched_at = NOW(), canonical_article_id = %s, "
+                                "updated_at = NOW() WHERE id = %s",
+                                (body_row[0], art_id, pick_id),
+                            )
+                            resolved += 1
+                            continue
+
+                    unresolved.append(symbol)
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error("audit_unresolved_symbols failed: %s", e)
+            raise
+        finally:
+            conn.autocommit = old_autocommit
+
+        return {"unresolved_symbols": unresolved, "resolved_by_fulltext": resolved}
+
+    def query_sa_articles(
+        self,
+        ticker: str = None,
+        keyword: str = None,
+        article_type: str = None,
+        limit: int = 10,
+    ) -> list:
+        """Query SA articles with optional filters."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                conditions = []
+                params = []
+                if ticker:
+                    conditions.append(
+                        "(ticker = %s OR ticker LIKE %s)"
+                    )
+                    params.extend([ticker.upper(), ticker.upper() + "%"])
+                if keyword:
+                    conditions.append(
+                        "to_tsvector('english', COALESCE(title, '') || ' ' || "
+                        "COALESCE(body_markdown, '')) @@ plainto_tsquery('english', %s)"
+                    )
+                    params.append(keyword)
+                if article_type:
+                    conditions.append("article_type = %s")
+                    params.append(article_type)
+
+                where = " AND ".join(conditions) if conditions else "TRUE"
+                params.append(limit)
+                cur.execute(
+                    f"SELECT article_id, url, title, ticker, published_date, "
+                    f"article_type, comments_count, "
+                    f"CASE WHEN body_markdown IS NOT NULL THEN true ELSE false END as has_content, "
+                    f"detail_fetched_at, comments_fetched_at "
+                    f"FROM sa_articles WHERE {where} "
+                    f"ORDER BY published_date DESC NULLS LAST "
+                    f"LIMIT %s",
+                    params,
+                )
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as e:
+            logger.error("Failed to query SA articles: %s", e)
+            return []
+
+    def get_sa_article_with_comments(self, article_id: str) -> dict:
+        """Get full article + comments."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM sa_articles WHERE article_id = %s",
+                    (article_id,),
+                )
+                article = cur.fetchone()
+                if not article:
+                    return None
+
+                cur.execute(
+                    "SELECT comment_id, parent_comment_id, commenter, "
+                    "comment_text, upvotes, comment_date "
+                    "FROM sa_article_comments WHERE article_id = %s "
+                    "ORDER BY comment_date ASC NULLS LAST",
+                    (article_id,),
+                )
+                comments = [dict(r) for r in cur.fetchall()]
+
+                result = dict(article)
+                result["comments"] = comments
+                # Convert datetime fields
+                for k in ("published_date", "detail_fetched_at", "comments_fetched_at",
+                           "fetched_at", "updated_at"):
+                    if result.get(k) and hasattr(result[k], "isoformat"):
+                        result[k] = result[k].isoformat()
+                for c in comments:
+                    if c.get("comment_date") and hasattr(c["comment_date"], "isoformat"):
+                        c["comment_date"] = c["comment_date"].isoformat()
+
+                return result
+        except Exception as e:
+            logger.error("Failed to get SA article with comments: %s", e)
+            return None
