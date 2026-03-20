@@ -687,6 +687,142 @@ class DataAccessLayer:
             return self._backend.get_sa_refresh_meta()
         return self._load_sa_file_meta() or {}
 
+    # ── SA Articles + Comments (Phase 11c-v3, DB-only) ──
+
+    def save_sa_articles_meta(
+        self, articles: List[Dict], mode: str = "quick"
+    ) -> Dict[str, Any]:
+        """Batch upsert article metadata. Returns need_content + unresolved info.
+
+        DB-only — returns error in file-only mode.
+        """
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"error": "DB required for articles"}
+
+        # Auto-upgrade: check if first run (empty DB)
+        try:
+            existing = self._backend.query_sa_articles(limit=1)
+            if not existing and mode == "quick":
+                return {"status": "ok", "auto_upgrade": True, "saved": 0}
+        except Exception:
+            pass
+
+        # Upsert metadata
+        saved = self._backend.upsert_sa_articles_meta(articles)
+
+        # Determine need_content (body IS NULL)
+        need_content = self._backend.query_sa_articles(limit=9999)
+        need_content = [
+            {"article_id": a["article_id"], "url": a.get("url", "")}
+            for a in need_content
+            if not a.get("has_content")
+        ]
+
+        # Determine need_comments (TTL expired, body exists)
+        # Only for full mode
+        need_comments = []
+        if mode == "full":
+            from src.agents.config import get_agent_config
+            try:
+                config = get_agent_config()
+                ttl = getattr(config, "sa_comments_cache_days", 7)
+            except Exception:
+                ttl = 7
+            from datetime import datetime, timezone, timedelta
+            cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
+            all_articles = self._backend.query_sa_articles(limit=9999)
+            need_content_ids = {a["article_id"] for a in need_content}
+            for a in all_articles:
+                if a["article_id"] in need_content_ids:
+                    continue  # Mutual exclusion: need_content takes priority
+                if not a.get("has_content"):
+                    continue
+                fetched = a.get("comments_fetched_at")
+                if fetched:
+                    if isinstance(fetched, str):
+                        fetched = datetime.fromisoformat(
+                            fetched.replace("Z", "+00:00")
+                        )
+                    if fetched > cutoff:
+                        continue  # Comments still fresh
+                need_comments.append(
+                    {"article_id": a["article_id"], "url": a.get("url", "")}
+                )
+
+        # Unresolved symbols (current picks only, metadata-only matching)
+        unresolved = self._compute_unresolved_symbols()
+
+        return {
+            "status": "ok",
+            "saved": saved,
+            "need_content": need_content,
+            "need_comments": need_comments,
+            "unresolved_symbols": unresolved,
+            "auto_upgrade": False,
+        }
+
+    def save_sa_article_with_comments(
+        self, article_id: str, body_markdown: str, comments: List[Dict]
+    ) -> Dict:
+        """Compound atomic write: article body + comments + pick sync."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"error": "DB required"}
+        return self._backend.save_article_with_comments(
+            article_id, body_markdown, comments
+        )
+
+    def save_sa_comments_only(
+        self, article_id: str, comments: List[Dict]
+    ) -> int:
+        """Update comments only (TTL refresh). Returns count."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return 0
+        return self._backend.update_article_comments(article_id, comments)
+
+    def audit_sa_unresolved_symbols(self) -> Dict:
+        """Full-text fallback matching for current picks without canonical article."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"unresolved_symbols": [], "resolved_by_fulltext": 0}
+        return self._backend.audit_unresolved_symbols()
+
+    def get_sa_articles(
+        self,
+        ticker: str = None,
+        keyword: str = None,
+        article_type: str = None,
+        limit: int = 10,
+    ) -> List[Dict]:
+        """Query SA articles with filters."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return []
+        return self._backend.query_sa_articles(
+            ticker=ticker, keyword=keyword, article_type=article_type, limit=limit
+        )
+
+    def get_sa_article_detail(self, article_id: str) -> Optional[Dict]:
+        """Get full article content + comments."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return None
+        return self._backend.get_sa_article_with_comments(article_id)
+
+    def _compute_unresolved_symbols(self) -> List[str]:
+        """Current picks without canonical article (metadata-only matching)."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return []
+        conn = self._backend._get_conn()
+        try:
+            import psycopg2.extras
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT symbol FROM sa_alpha_picks "
+                    "WHERE portfolio_status = 'current' AND is_stale = false "
+                    "AND canonical_article_id IS NULL"
+                )
+                return [r[0] for r in cur.fetchall()]
+        except Exception as e:
+            logger.warning("_compute_unresolved_symbols failed: %s", e)
+            return []
+
     # ── SA file I/O private methods ──
 
     def _load_sa_file_cache(

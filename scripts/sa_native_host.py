@@ -87,6 +87,18 @@ def handle_message(msg):
     elif action == "save_detail_by_symbol":
         return _handle_save_detail_by_symbol(dal, msg)
 
+    elif action == "save_articles_meta":
+        return _handle_save_articles_meta(dal, msg)
+
+    elif action == "save_article_content":
+        return _handle_save_article_content(dal, msg)
+
+    elif action == "save_comments_only":
+        return _handle_save_comments_only(dal, msg)
+
+    elif action == "audit_unresolved":
+        return _handle_audit_unresolved(dal)
+
     elif action == "ping":
         return {"status": "ok", "project_root": PROJECT_ROOT}
 
@@ -251,6 +263,71 @@ def _handle_save_detail_by_symbol(dal, msg):
     except Exception as e:
         logger.error("Manual detail save failed for %s: %s", symbol, e)
         return {"status": "error", "symbol": symbol, "error": str(e)}
+
+
+def _handle_save_articles_meta(dal, msg):
+    """Batch upsert article metadata, return need_content + unresolved."""
+    mode = msg.get("mode", "quick")
+    articles = msg.get("articles", [])
+    try:
+        result = dal.save_sa_articles_meta(articles, mode=mode)
+        logger.info(
+            "save_articles_meta: saved=%s need_content=%s need_comments=%s unresolved=%s auto_upgrade=%s",
+            result.get("saved"), len(result.get("need_content", [])),
+            len(result.get("need_comments", [])),
+            len(result.get("unresolved_symbols", [])),
+            result.get("auto_upgrade"),
+        )
+        return result
+    except Exception as e:
+        logger.error("save_articles_meta failed: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
+def _handle_save_article_content(dal, msg):
+    """Compound atomic write: article body + comments + pick sync."""
+    article_id = msg.get("article_id", "")
+    body_markdown = msg.get("body_markdown", "")
+    comments = msg.get("comments", [])
+    try:
+        result = dal.save_sa_article_with_comments(article_id, body_markdown, comments)
+        logger.info(
+            "save_article_content: %s (%d chars, %d comments, synced=%s)",
+            article_id, len(body_markdown), len(comments),
+            result.get("synced_picks", 0),
+        )
+        return {"status": "ok", "article_id": article_id, **result}
+    except Exception as e:
+        logger.error("save_article_content failed for %s: %s", article_id, e)
+        return {"status": "error", "article_id": article_id, "error": str(e)}
+
+
+def _handle_save_comments_only(dal, msg):
+    """Comments-only update for TTL refresh."""
+    article_id = msg.get("article_id", "")
+    comments = msg.get("comments", [])
+    try:
+        count = dal.save_sa_comments_only(article_id, comments)
+        logger.info("save_comments_only: %s (%d comments)", article_id, count)
+        return {"status": "ok", "article_id": article_id, "comments_count": count}
+    except Exception as e:
+        logger.error("save_comments_only failed for %s: %s", article_id, e)
+        return {"status": "error", "article_id": article_id, "error": str(e)}
+
+
+def _handle_audit_unresolved(dal):
+    """Final audit: full-text fallback for unresolved current picks."""
+    try:
+        result = dal.audit_sa_unresolved_symbols()
+        logger.info(
+            "audit_unresolved: %d unresolved, %d resolved by fulltext",
+            len(result.get("unresolved_symbols", [])),
+            result.get("resolved_by_fulltext", 0),
+        )
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.error("audit_unresolved failed: %s", e)
+        return {"status": "error", "error": str(e)}
 
 
 def _try_ticker_sync(dal, picks):

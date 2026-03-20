@@ -987,7 +987,10 @@ class ToolRegistry:
 
 
     def _register_sa_tools(self) -> None:
-        from .sa_tools import get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
+        from .sa_tools import (
+            get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+            get_sa_articles, get_sa_article_detail,
+        )
 
         self.register(ToolDefinition(
             name="get_sa_alpha_picks",
@@ -1039,6 +1042,48 @@ class ToolRegistry:
             category="portfolio",
             requires_dal=True,
             parameters=[],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_articles",
+            description=(
+                "Search SA Alpha Picks articles. Returns article list with title, "
+                "date, ticker, type (analysis/recap/webinar/commentary/removal), "
+                "and comment count. Use get_sa_article_detail for full content."
+            ),
+            function=get_sa_articles,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("ticker", "string",
+                              "Filter by stock ticker (e.g. NVDA)",
+                              required=False),
+                ToolParameter("keyword", "string",
+                              "Full-text search in title and body",
+                              required=False),
+                ToolParameter("article_type", "string",
+                              "Filter by type",
+                              required=False,
+                              enum=["analysis", "recap", "webinar", "commentary", "removal"]),
+                ToolParameter("limit", "integer",
+                              "Max results (default 10)",
+                              required=False, default=10),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_article_detail",
+            description=(
+                "Get full SA Alpha Picks article content + comments. "
+                "Returns body as Markdown + nested comment tree."
+            ),
+            function=get_sa_article_detail,
+            category="portfolio",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("article_id", "string",
+                              "Article ID (from get_sa_articles results)"),
+            ],
         ))
 
 
