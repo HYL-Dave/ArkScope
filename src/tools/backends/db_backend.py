@@ -1391,7 +1391,7 @@ class DatabaseBackend:
                         "WHERE (ticker = %s OR (ticker LIKE %s AND LENGTH(ticker) <= LENGTH(%s) * 2)) "
                         "AND article_type IN ('analysis', 'removal') "
                         "AND body_markdown IS NOT NULL "
-                        "ORDER BY ABS(EXTRACT(EPOCH FROM (published_date - %s::date))) "
+                        "ORDER BY ABS(published_date - %s::date) "
                         "LIMIT 1",
                         (symbol, symbol + "%", symbol, str(picked_date)),
                     )
@@ -1406,7 +1406,7 @@ class DatabaseBackend:
                             "AND to_tsvector('english', COALESCE(title, '') || ' ' || "
                             "COALESCE(body_markdown, '')) "
                             "@@ plainto_tsquery('english', %s) "
-                            "ORDER BY ABS(EXTRACT(EPOCH FROM (published_date - %s::date))) "
+                            "ORDER BY ABS(published_date - %s::date) "
                             "LIMIT 1",
                             (symbol, str(picked_date)),
                         )

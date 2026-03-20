@@ -240,28 +240,27 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     articles: articleList,
   });
 
+  // Check auto_upgrade (first run, empty DB — status is "ok" but auto_upgrade=true)
+  if (metaResult && metaResult.auto_upgrade && mode === "quick") {
+    sendProgress("First run detected, switching to full scan...");
+    await chrome.tabs.update(tabId, { active: true });
+    await sleep(500);
+    await scrollToLoadAll(tabId, 200);
+    await chrome.tabs.update(tabId, { active: false });
+    // Re-scrape after full scroll
+    articleList = await injectArticlesListScraper(tabId);
+    if (Array.isArray(articleList) && articleList.length > 0) {
+      metaResult = await sendNativeMessage2({
+        action: "save_articles_meta",
+        mode: "full",
+        articles: articleList,
+      });
+    }
+  }
+
   if (!metaResult || metaResult.status !== "ok") {
-    // Check auto_upgrade (first run, empty DB)
-    if (metaResult && metaResult.auto_upgrade && mode === "quick") {
-      sendProgress("First run detected, switching to full scan...");
-      await chrome.tabs.update(tabId, { active: true });
-      await sleep(500);
-      await scrollToLoadAll(tabId, 200);
-      await chrome.tabs.update(tabId, { active: false });
-      // Re-scrape after full scroll
-      articleList = await injectArticlesListScraper(tabId);
-      if (Array.isArray(articleList) && articleList.length > 0) {
-        metaResult = await sendNativeMessage2({
-          action: "save_articles_meta",
-          mode: "full",
-          articles: articleList,
-        });
-      }
-    }
-    if (!metaResult || metaResult.status !== "ok") {
-      var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
-      return { fetched: 0, failed: 0, error: metaError };
-    }
+    var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
+    return { fetched: 0, failed: 0, error: metaError };
   }
 
   var needContent = metaResult.need_content || [];
