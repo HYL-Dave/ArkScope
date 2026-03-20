@@ -67,7 +67,7 @@ class TestRegistry:
         assert len(registry.list_by_category("options")) == 6
         assert len(registry.list_by_category("signals")) == 3
         assert len(registry.list_by_category("analysis")) == 10
-        assert len(registry.list_by_category("portfolio")) == 4
+        assert len(registry.list_by_category("portfolio")) == 6
         assert len(registry.list_by_category("execution")) == 1
 
     def test_openai_schema(self, registry):

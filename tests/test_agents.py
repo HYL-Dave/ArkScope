@@ -161,6 +161,8 @@ class TestAnthropicToolSchemas:
             "get_sa_alpha_picks",
             "get_sa_pick_detail",
             "refresh_sa_alpha_picks",
+            "get_sa_articles",
+            "get_sa_article_detail",
         }
         assert tool_names == expected
 
