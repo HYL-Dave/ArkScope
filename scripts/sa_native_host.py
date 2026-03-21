@@ -305,11 +305,28 @@ def _handle_save_articles_meta(dal, msg):
         return {"status": "error", "error": str(e)}
 
 
+def _normalize_comment_ids(article_id, comments):
+    """Ensure stable comment IDs using Python sha256 for synthetic keys."""
+    import hashlib
+    for c in comments:
+        cid = c.get("comment_id", "")
+        # Re-hash browser-side synthetic IDs (syn_*) with proper sha256
+        if not cid or cid.startswith("syn_"):
+            raw = "{}:{}:{}:{}".format(
+                article_id,
+                c.get("commenter", ""),
+                c.get("comment_date", ""),
+                (c.get("comment_text", "") or "")[:100],
+            )
+            c["comment_id"] = hashlib.sha256(raw.encode()).hexdigest()[:20]
+    return comments
+
+
 def _handle_save_article_content(dal, msg):
     """Compound atomic write: article body + comments + pick sync."""
     article_id = msg.get("article_id", "")
     body_markdown = msg.get("body_markdown", "")
-    comments = msg.get("comments", [])
+    comments = _normalize_comment_ids(article_id, msg.get("comments", []))
     try:
         result = dal.save_sa_article_with_comments(article_id, body_markdown, comments)
         logger.info(
@@ -326,7 +343,7 @@ def _handle_save_article_content(dal, msg):
 def _handle_save_comments_only(dal, msg):
     """Comments-only update for TTL refresh."""
     article_id = msg.get("article_id", "")
-    comments = msg.get("comments", [])
+    comments = _normalize_comment_ids(article_id, msg.get("comments", []))
     try:
         count = dal.save_sa_comments_only(article_id, comments)
         logger.info("save_comments_only: %s (%d comments)", article_id, count)

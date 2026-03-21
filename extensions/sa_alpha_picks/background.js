@@ -370,6 +370,7 @@ async function doManualFetch(items) {
 
   var tabId = null;
   var fetched = 0, failed = 0;
+  var succeededSymbols = [];
   try {
     // Create a tab for fetching
     var tab = await chrome.tabs.create({ url: items[0].url, active: false });
@@ -403,7 +404,9 @@ async function doManualFetch(items) {
 
         if (articleId) {
           // v3 path: save to sa_articles + auto-sync to picks
-          // First ensure article metadata exists
+          // Extract publish date from scraped_at or page (fallback to today)
+          var pubDate = detail.scraped_at ? detail.scraped_at.substring(0, 10) : null;
+          // First ensure article metadata exists (with date)
           await sendNativeMessage2({
             action: "save_articles_meta",
             mode: "full",
@@ -412,6 +415,7 @@ async function doManualFetch(items) {
               url: item.url,
               title: detail.title || item.symbol + " analysis",
               ticker: item.symbol,
+              date: pubDate,
               article_type: "analysis",
             }],
           });
@@ -423,6 +427,7 @@ async function doManualFetch(items) {
           });
           if (saveResult && saveResult.ok) {
             fetched++;
+            succeededSymbols.push(item.symbol);
           } else {
             failed++;
           }
@@ -435,6 +440,7 @@ async function doManualFetch(items) {
           });
           if (saveResult && saveResult.status === "ok") {
             fetched++;
+            succeededSymbols.push(item.symbol);
           } else {
             failed++;
           }
@@ -450,8 +456,8 @@ async function doManualFetch(items) {
     var storage = await chrome.storage.local.get("lastRefresh");
     if (storage.lastRefresh && storage.lastRefresh.details) {
       var unresolved = storage.lastRefresh.details.unresolved_symbols || storage.lastRefresh.details.no_article || [];
-      var fetchedSymbols = items.map(function (it) { return it.symbol; });
-      storage.lastRefresh.details.unresolved_symbols = unresolved.filter(function (s) { return fetchedSymbols.indexOf(s) < 0; });
+      // Only clear symbols that actually succeeded (not all attempted)
+      storage.lastRefresh.details.unresolved_symbols = unresolved.filter(function (s) { return succeededSymbols.indexOf(s) < 0; });
       storage.lastRefresh.details.fetched = (storage.lastRefresh.details.fetched || 0) + fetched;
       await chrome.storage.local.set({ lastRefresh: storage.lastRefresh });
     }
