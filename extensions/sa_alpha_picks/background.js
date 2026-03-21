@@ -280,7 +280,8 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     sendProgress("Article " + (i + 1) + "/" + needContent.length + ": " + item.article_id);
 
     try {
-      await chrome.tabs.update(tabId, { url: item.url });
+      // Navigate to article (tab must be active for comment scroll)
+      await chrome.tabs.update(tabId, { url: item.url, active: true });
       await waitForTabLoad(tabId);
       var ready = await waitForArticleReady(tabId);
       if (!ready.ok) { failed++; continue; }
@@ -288,6 +289,10 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       // Scrape body
       var detail = await injectDetailScraper(tabId);
       if (!detail || detail.error) { failed++; continue; }
+
+      // Scroll down to comments section + load all comments
+      // This naturally provides human-like dwell time (10-30s per page)
+      await scrollToComments(tabId);
 
       // Scrape comments
       var commentsResult = await injectCommentsScraper(tabId);
@@ -308,8 +313,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     } catch (err) {
       failed++;
     }
-
-    if (i < needContent.length - 1) await sleep(2000);
+    // No artificial delay — comment scroll provides natural dwell time
   }
 
   // ── Step 4: Refresh comments for TTL-expired articles (full scan only) ──
@@ -322,9 +326,12 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     sendProgress("Comments " + (j + 1) + "/" + needComments.length + ": " + cItem.article_id);
 
     try {
-      await chrome.tabs.update(tabId, { url: cItem.url });
+      await chrome.tabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId);
       await waitForArticleReady(tabId);
+
+      // Scroll to load comments (natural delay)
+      await scrollToComments(tabId);
 
       var cResult = await injectCommentsScraper(tabId);
       var cComments = (cResult && cResult.comments) || [];
@@ -338,8 +345,6 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     } catch (err) {
       // Best effort for comments refresh
     }
-
-    if (j < needComments.length - 1) await sleep(2000);
   }
 
   // ── Step 5: Audit unresolved (full-text fallback) ──
@@ -463,6 +468,52 @@ async function scrollToLoadAll(tabId, maxScrolls) {
     } else {
       staleCount = 0;
     }
+  }
+}
+
+async function scrollToComments(tabId) {
+  // Scroll down the article page to load the comments section.
+  // This serves dual purpose:
+  // 1. Triggers lazy-loaded comments (IntersectionObserver / "Show more")
+  // 2. Provides natural dwell time per page (human-like behavior)
+  var maxScrolls = 30;
+  for (var i = 0; i < maxScrolls; i++) {
+    var result = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        // Check if we've reached the comments section
+        var commentsSection =
+          document.querySelector('#comments') ||
+          document.querySelector('[data-testid="comments"]') ||
+          document.querySelector('section[id*="comment"]');
+        var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
+
+        // Click "Show more comments" / "Load more" buttons if present
+        var showMore = document.querySelector(
+          'button[data-testid="show-more-comments"], ' +
+          'button[class*="show-more"], ' +
+          'a[class*="load-more"]'
+        );
+        if (showMore && showMore.offsetParent !== null) {
+          showMore.click();
+          return { status: "expanding", hasComments: !!commentsSection };
+        }
+
+        window.scrollBy(0, window.innerHeight);
+        return {
+          status: atBottom ? "bottom" : "scrolling",
+          hasComments: !!commentsSection,
+          scrollY: window.scrollY,
+          maxY: document.body.scrollHeight,
+        };
+      },
+    });
+    var check = result[0] && result[0].result;
+
+    // If at bottom and no "show more" to click, we're done
+    if (check && check.status === "bottom") break;
+
+    await sleep(1500);
   }
 }
 
