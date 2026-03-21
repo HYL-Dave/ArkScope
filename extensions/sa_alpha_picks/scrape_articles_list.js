@@ -44,11 +44,13 @@
     var ticker = null;
     if (date) {
       var afterDate = cardText.substring(cardText.indexOf(date) + date.length);
+      // Ticker: only uppercase letters + dot (NO digits — digits are comment count)
+      // e.g. "LITE216 Comments" → ticker=LITE, "BRK.B34 Comments" → ticker=BRK.B
       var tickerMatch = afterDate.match(
-        /^\s*([A-Z][A-Z0-9.]*(?::[A-Z]{1,4})?)\s*\d+\s*Comments?/
+        /^\s*([A-Z][A-Z.]*(?::[A-Z]{1,4})?)\s*\d+\s*Comments?/
       );
       if (!tickerMatch) {
-        tickerMatch = afterDate.match(/^\s*([A-Z][A-Z0-9.]{0,9})\s*$/);
+        tickerMatch = afterDate.match(/^\s*([A-Z][A-Z.]{0,9})\s*$/);
       }
       if (tickerMatch) {
         ticker = tickerMatch[1];

@@ -806,17 +806,17 @@ class DataAccessLayer:
         return self._backend.get_sa_article_with_comments(article_id)
 
     def _compute_unresolved_symbols(self) -> List[str]:
-        """Current picks without canonical article (metadata-only matching)."""
+        """Current picks truly missing detail (no canonical AND no detail_report)."""
         if not isinstance(self._backend, DatabaseBackend):
             return []
         conn = self._backend._get_conn()
         try:
-            import psycopg2.extras
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT DISTINCT symbol FROM sa_alpha_picks "
                     "WHERE portfolio_status = 'current' AND is_stale = false "
-                    "AND canonical_article_id IS NULL"
+                    "AND canonical_article_id IS NULL "
+                    "AND detail_report IS NULL"
                 )
                 return [r[0] for r in cur.fetchall()]
         except Exception as e:

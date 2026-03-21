@@ -1380,7 +1380,8 @@ class DatabaseBackend:
                 cur.execute(
                     "SELECT id, symbol, picked_date FROM sa_alpha_picks "
                     "WHERE portfolio_status = 'current' AND is_stale = false "
-                    "AND canonical_article_id IS NULL"
+                    "AND canonical_article_id IS NULL "
+                    "AND detail_report IS NULL"
                 )
                 picks = cur.fetchall()
 
