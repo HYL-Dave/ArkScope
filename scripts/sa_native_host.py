@@ -266,15 +266,18 @@ def _handle_save_detail_by_symbol(dal, msg):
 
 
 def _parse_sa_date(date_str):
-    """Parse SA date format 'Mar. 16, 2026' → 'YYYY-MM-DD' or None."""
+    """Parse SA date → 'YYYY-MM-DD'. Accepts 'Mar. 16, 2026', 'Mar 16, 2026', or ISO 'YYYY-MM-DD'."""
     if not date_str:
         return None
+    date_str = date_str.strip()
     try:
+        # ISO format (from <time datetime>): "2026-03-16" or "2026-03-16T..."
+        if len(date_str) >= 10 and date_str[4] == "-" and date_str[7] == "-":
+            return date_str[:10]
         from datetime import datetime as _dt
-        # Try "Mar. 16, 2026" or "Mar 16, 2026"
         for fmt in ("%b. %d, %Y", "%b %d, %Y"):
             try:
-                return _dt.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
+                return _dt.strptime(date_str, fmt).strftime("%Y-%m-%d")
             except ValueError:
                 continue
         return None
