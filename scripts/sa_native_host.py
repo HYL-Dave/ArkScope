@@ -306,19 +306,34 @@ def _handle_save_articles_meta(dal, msg):
 
 
 def _normalize_comment_ids(article_id, comments):
-    """Ensure stable comment IDs using Python sha256 for synthetic keys."""
+    """Ensure stable comment IDs using Python sha256 for synthetic keys.
+
+    Also remaps parent_comment_id references so the tree stays connected.
+    """
     import hashlib
+
+    # Pass 1: build old→new ID mapping for synthetic keys
+    id_map = {}
     for c in comments:
-        cid = c.get("comment_id", "")
-        # Re-hash browser-side synthetic IDs (syn_*) with proper sha256
-        if not cid or cid.startswith("syn_"):
+        old_id = c.get("comment_id", "")
+        if not old_id or old_id.startswith("syn_"):
             raw = "{}:{}:{}:{}".format(
                 article_id,
                 c.get("commenter", ""),
                 c.get("comment_date", ""),
                 (c.get("comment_text", "") or "")[:100],
             )
-            c["comment_id"] = hashlib.sha256(raw.encode()).hexdigest()[:20]
+            new_id = hashlib.sha256(raw.encode()).hexdigest()[:20]
+            if old_id:
+                id_map[old_id] = new_id
+            c["comment_id"] = new_id
+
+    # Pass 2: remap parent_comment_id references
+    for c in comments:
+        parent = c.get("parent_comment_id")
+        if parent and parent in id_map:
+            c["parent_comment_id"] = id_map[parent]
+
     return comments
 
 

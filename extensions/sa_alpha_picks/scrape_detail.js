@@ -42,12 +42,29 @@
     document.querySelector('a[href*="/author/"]');
   if (authorEl) author = authorEl.innerText.trim();
 
+  // --- Publish date ---
+  var publishDate = null;
+  // Try <time> element (most reliable)
+  var timeEl = document.querySelector('time[datetime]');
+  if (timeEl) {
+    publishDate = timeEl.getAttribute('datetime').substring(0, 10);
+  }
+  if (!publishDate) {
+    // Try date pattern in page text near the title
+    var headerArea = document.querySelector('header') || container;
+    var dateMatch = (headerArea.innerText || '').match(
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},\s+\d{4}/
+    );
+    if (dateMatch) publishDate = dateMatch[0];
+  }
+
   // --- Body → Markdown (TreeWalker) ---
   var bodyMd = extractMarkdown(container);
 
   return {
     title: title,
     author: author,
+    publish_date: publishDate,
     body_markdown: bodyMd,
     url: location.href,
     scraped_at: new Date().toISOString(),

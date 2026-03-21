@@ -404,8 +404,8 @@ async function doManualFetch(items) {
 
         if (articleId) {
           // v3 path: save to sa_articles + auto-sync to picks
-          // Extract publish date from scraped_at or page (fallback to today)
-          var pubDate = detail.scraped_at ? detail.scraped_at.substring(0, 10) : null;
+          // Use publish date from article page (scrape_detail.js extracts it)
+          var pubDate = detail.publish_date || null;
           // First ensure article metadata exists (with date)
           await sendNativeMessage2({
             action: "save_articles_meta",
