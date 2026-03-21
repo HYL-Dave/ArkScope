@@ -265,10 +265,31 @@ def _handle_save_detail_by_symbol(dal, msg):
         return {"status": "error", "symbol": symbol, "error": str(e)}
 
 
+def _parse_sa_date(date_str):
+    """Parse SA date format 'Mar. 16, 2026' → 'YYYY-MM-DD' or None."""
+    if not date_str:
+        return None
+    try:
+        from datetime import datetime as _dt
+        # Try "Mar. 16, 2026" or "Mar 16, 2026"
+        for fmt in ("%b. %d, %Y", "%b %d, %Y"):
+            try:
+                return _dt.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return None
+    except Exception:
+        return None
+
+
 def _handle_save_articles_meta(dal, msg):
     """Batch upsert article metadata, return need_content + unresolved."""
     mode = msg.get("mode", "quick")
     articles = msg.get("articles", [])
+    # Map scraper fields to DB fields
+    for a in articles:
+        if "date" in a and "published_date" not in a:
+            a["published_date"] = _parse_sa_date(a.pop("date"))
     try:
         result = dal.save_sa_articles_meta(articles, mode=mode)
         logger.info(

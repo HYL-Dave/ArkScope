@@ -806,19 +806,38 @@ class DataAccessLayer:
         return self._backend.get_sa_article_with_comments(article_id)
 
     def _compute_unresolved_symbols(self) -> List[str]:
-        """Current picks truly missing detail (no canonical AND no detail_report)."""
+        """Current picks truly missing detail, after metadata-level article matching.
+
+        Checks: no canonical, no detail_report, AND no matching article in sa_articles
+        (exact/prefix ticker match on analysis/removal type).
+        """
         if not isinstance(self._backend, DatabaseBackend):
             return []
         conn = self._backend._get_conn()
         try:
             with conn.cursor() as cur:
+                # Get picks without canonical and without detail_report
                 cur.execute(
                     "SELECT DISTINCT symbol FROM sa_alpha_picks "
                     "WHERE portfolio_status = 'current' AND is_stale = false "
                     "AND canonical_article_id IS NULL "
                     "AND detail_report IS NULL"
                 )
-                return [r[0] for r in cur.fetchall()]
+                candidates = [r[0] for r in cur.fetchall()]
+
+                # Filter: only truly unresolved (no matching article exists)
+                unresolved = []
+                for symbol in candidates:
+                    cur.execute(
+                        "SELECT 1 FROM sa_articles "
+                        "WHERE (ticker = %s OR (ticker LIKE %s AND LENGTH(ticker) <= LENGTH(%s) * 2)) "
+                        "AND article_type IN ('analysis', 'removal') "
+                        "LIMIT 1",
+                        (symbol, symbol + "%", symbol),
+                    )
+                    if not cur.fetchone():
+                        unresolved.append(symbol)
+                return unresolved
         except Exception as e:
             logger.warning("_compute_unresolved_symbols failed: %s", e)
             return []

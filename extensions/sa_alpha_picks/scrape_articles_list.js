@@ -63,8 +63,8 @@
     var commentsMatch = cardText.match(/(\d+)\s*Comments?/);
     var commentsCount = commentsMatch ? parseInt(commentsMatch[1], 10) : 0;
 
-    // Auto-detect article_type from title
-    var articleType = detectArticleType(text);
+    // Auto-detect article_type from title + ticker presence
+    var articleType = detectArticleType(text, ticker);
 
     articles.push({
       article_id: articleId,
@@ -81,7 +81,7 @@
     ? articles
     : { error: "No articles found", total_links: links.length };
 
-  function detectArticleType(title) {
+  function detectArticleType(title, ticker) {
     var t = title.toLowerCase();
     if (t.indexOf("webinar") >= 0 || t.indexOf("transcript") >= 0) return "webinar";
     if (t.indexOf("market recap") >= 0 || t.indexOf("portfolio review") >= 0) return "recap";
@@ -93,8 +93,8 @@
     )
       return "removal";
     if (t.indexOf("stock buy") >= 0 || t.indexOf("stock sell") >= 0) return "analysis";
-    // Has ticker → likely analysis
-    // No ticker + no keywords → commentary
+    // Has ticker → likely analysis (stock-specific article)
+    if (ticker) return "analysis";
     return "commentary";
   }
 })();

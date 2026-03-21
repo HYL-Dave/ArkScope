@@ -1165,7 +1165,10 @@ class DatabaseBackend:
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (article_id) DO UPDATE SET
                             title = EXCLUDED.title,
+                            url = EXCLUDED.url,
                             ticker = COALESCE(EXCLUDED.ticker, sa_articles.ticker),
+                            published_date = COALESCE(EXCLUDED.published_date, sa_articles.published_date),
+                            article_type = COALESCE(EXCLUDED.article_type, sa_articles.article_type),
                             comments_count = EXCLUDED.comments_count,
                             updated_at = NOW()
                         """,
@@ -1301,16 +1304,7 @@ class DatabaseBackend:
         if not body_md:
             return 0
 
-        # Find matching picks (current + closed) — exact then prefix
-        cur.execute(
-            "SELECT id, symbol, picked_date, canonical_article_id "
-            "FROM sa_alpha_picks "
-            "WHERE (symbol = %s OR (%s LIKE symbol || '%%' AND LENGTH(%s) <= LENGTH(symbol) * 2)) "
-            "AND article_type_eligible(symbol, %s)",
-            # Simplified: just use symbol match, type already filtered above
-            (),
-        )
-        # Actually, let's simplify the query
+        # Find matching picks (current + closed) — exact match first
         cur.execute(
             "SELECT id, symbol, picked_date, canonical_article_id "
             "FROM sa_alpha_picks WHERE symbol = %s",

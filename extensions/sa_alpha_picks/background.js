@@ -381,43 +381,77 @@ async function doManualFetch(items) {
 
       try {
         if (i > 0) {
-          await chrome.tabs.update(tabId, { url: item.url });
+          await chrome.tabs.update(tabId, { url: item.url, active: true });
         }
         await waitForTabLoad(tabId);
         var ready = await waitForArticleReady(tabId);
         if (!ready.ok) { failed++; continue; }
 
+        // Extract article_id from URL
+        var idMatch = item.url.match(/\/articles\/(\d+)/);
+        var articleId = idMatch ? idMatch[1] : null;
+
         var detail = await injectDetailScraper(tabId);
         if (!detail || detail.error) { failed++; continue; }
 
+        // Scroll to load comments (v3 path)
+        await scrollToComments(tabId);
+        var commentsResult = await injectCommentsScraper(tabId);
+        var comments = (commentsResult && commentsResult.comments) || [];
+
         var report = formatDetailReport(detail);
 
-        // Ask native host to resolve picked_date and save
-        var saveResult = await sendNativeMessage2({
-          action: "save_detail_by_symbol",
-          symbol: item.symbol,
-          detail_report: report,
-        });
-        if (saveResult && saveResult.status === "ok") {
-          fetched++;
+        if (articleId) {
+          // v3 path: save to sa_articles + auto-sync to picks
+          // First ensure article metadata exists
+          await sendNativeMessage2({
+            action: "save_articles_meta",
+            mode: "full",
+            articles: [{
+              article_id: articleId,
+              url: item.url,
+              title: detail.title || item.symbol + " analysis",
+              ticker: item.symbol,
+              article_type: "analysis",
+            }],
+          });
+          var saveResult = await sendNativeMessage2({
+            action: "save_article_content",
+            article_id: articleId,
+            body_markdown: report,
+            comments: comments,
+          });
+          if (saveResult && saveResult.ok) {
+            fetched++;
+          } else {
+            failed++;
+          }
         } else {
-          failed++;
+          // Fallback: legacy save_detail_by_symbol
+          var saveResult = await sendNativeMessage2({
+            action: "save_detail_by_symbol",
+            symbol: item.symbol,
+            detail_report: report,
+          });
+          if (saveResult && saveResult.status === "ok") {
+            fetched++;
+          } else {
+            failed++;
+          }
         }
       } catch (err) {
         failed++;
       }
-
-      if (i < items.length - 1) await sleep(2000);
     }
 
     sendProgress("Manual fetch done: " + fetched + " saved");
 
-    // Update storage to clear the no_article list for fetched items
+    // Update storage to clear unresolved_symbols for fetched items
     var storage = await chrome.storage.local.get("lastRefresh");
     if (storage.lastRefresh && storage.lastRefresh.details) {
-      var noArt = storage.lastRefresh.details.no_article || [];
-      var fetchedSymbols = items.filter(function (_, idx) { return idx < fetched; }).map(function (it) { return it.symbol; });
-      storage.lastRefresh.details.no_article = noArt.filter(function (s) { return fetchedSymbols.indexOf(s) < 0; });
+      var unresolved = storage.lastRefresh.details.unresolved_symbols || storage.lastRefresh.details.no_article || [];
+      var fetchedSymbols = items.map(function (it) { return it.symbol; });
+      storage.lastRefresh.details.unresolved_symbols = unresolved.filter(function (s) { return fetchedSymbols.indexOf(s) < 0; });
       storage.lastRefresh.details.fetched = (storage.lastRefresh.details.fetched || 0) + fetched;
       await chrome.storage.local.set({ lastRefresh: storage.lastRefresh });
     }
