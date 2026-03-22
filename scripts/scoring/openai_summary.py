@@ -70,6 +70,18 @@ Respond with only the summary text in JSON format:
 ```
 If the article is too short or has insufficient content, still return a concise sentence describing that fact.
 """
+responses_tools = [{
+    "type": "function",
+    "name": "record_summary",
+    "parameters": {
+        "type": "object",
+        "properties": {"summary": {"type": "string"}},
+        "required": ["summary"],
+        "additionalProperties": False,
+    },
+    "strict": True,
+}]
+
 functions = [{
     "name": "record_summary",
     "parameters": {
@@ -79,11 +91,28 @@ functions = [{
     }
 }]
 
+
+def _extract_summary_from_responses(response) -> Optional[str]:
+    for item in getattr(response, "output", []) or []:
+        if getattr(item, "type", None) == "function_call" and getattr(item, "name", None) == "record_summary":
+            try:
+                return json.loads(getattr(item, "arguments", "")).get("summary")
+            except Exception:
+                return None
+
+    output_text = getattr(response, "output_text", "") or ""
+    if not output_text:
+        return None
+    try:
+        return json.loads(output_text)["summary"]
+    except Exception:
+        return output_text
+
 def summarize_article(text: str, symbol: str, model: str,
                       reasoning_effort: str = "high", verbosity: str = "low",
                       retry: int = 3, pause: float = 0.5) -> Tuple[Optional[str], Optional[int], Optional[int]]:
     """
-    Call OpenAI ChatCompletion to summarize one article.
+    Call OpenAI API to summarize one article.
     Returns summary string or None on failure.
     """
     messages = [
@@ -94,6 +123,8 @@ def summarize_article(text: str, symbol: str, model: str,
     max_attempts = FLEX_RETRIES if use_flex else retry
     for attempt in range(1, max_attempts + 1):
         try:
+            _is_gpt54_plus = model.startswith("gpt-5.4")
+
             if model.startswith("o"):
                 params = {
                     "model": model,
@@ -103,6 +134,18 @@ def summarize_article(text: str, symbol: str, model: str,
                     "functions": functions,
                     "function_call": {"name": "record_summary"},
                 }
+            elif _is_gpt54_plus:
+                params = {
+                    "model": model,
+                    "instructions": SYSTEM_PROMPT,
+                    "input": f"TICKER: {symbol}\nARTICLE:\n{text}",
+                    "max_output_tokens": 3600,
+                    "tools": responses_tools,
+                    "tool_choice": {"type": "function", "name": "record_summary"},
+                    "parallel_tool_calls": False,
+                }
+                if reasoning_effort != "none":
+                    params["reasoning"] = {"effort": reasoning_effort}
             elif model.startswith("gpt-5"):
                 params = {
                     "model": model,
@@ -129,11 +172,18 @@ def summarize_article(text: str, symbol: str, model: str,
             # perform API call and record token usage
             global TOTAL_PROMPT_TOKENS, TOTAL_COMPLETION_TOKENS, TOTAL_TOKENS, N_CALLS, MAX_COMPLETION_TOKENS
             N_CALLS += 1
-            response = openai.chat.completions.create(**params)
-            usage = response.usage
-            prompt_tokens = usage.prompt_tokens
-            completion_tokens = usage.completion_tokens
-            total_tokens = usage.total_tokens
+            if _is_gpt54_plus:
+                response = openai.responses.create(**params)
+                usage = response.usage
+                prompt_tokens = usage.input_tokens
+                completion_tokens = usage.output_tokens
+                total_tokens = usage.total_tokens
+            else:
+                response = openai.chat.completions.create(**params)
+                usage = response.usage
+                prompt_tokens = usage.prompt_tokens
+                completion_tokens = usage.completion_tokens
+                total_tokens = usage.total_tokens
             TOKENS_USED[API_KEYS[CURRENT_KEY_IDX]] += total_tokens
             rotate_key_if_needed(total_tokens)
             # accumulate statistics
@@ -145,20 +195,23 @@ def summarize_article(text: str, symbol: str, model: str,
                 f"Token usage (prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens})"
             )
 
-            msg = response.choices[0].message
-            if hasattr(msg, "function_call") and msg.function_call is not None:
-                try:
-                    args = json.loads(msg.function_call.arguments)
-                    summary = args.get("summary")
-                except Exception:
-                    logging.warning(f"Cannot parse summary from function_call arguments: {msg.function_call.arguments}")
-                    summary = None
+            if _is_gpt54_plus:
+                summary = _extract_summary_from_responses(response)
             else:
-                txt = msg.content.strip()
-                try:
-                    summary = json.loads(txt)["summary"]
-                except Exception:
-                    summary = txt
+                msg = response.choices[0].message
+                if hasattr(msg, "function_call") and msg.function_call is not None:
+                    try:
+                        args = json.loads(msg.function_call.arguments)
+                        summary = args.get("summary")
+                    except Exception:
+                        logging.warning(f"Cannot parse summary from function_call arguments: {msg.function_call.arguments}")
+                        summary = None
+                else:
+                    txt = (msg.content or "").strip()
+                    try:
+                        summary = json.loads(txt)["summary"]
+                    except Exception:
+                        summary = txt
             if summary:
                 return summary, prompt_tokens, completion_tokens
             logging.warning(f"Attempt {attempt}/{retry}: empty summary, retrying")

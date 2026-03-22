@@ -10,7 +10,7 @@ Works with ANY news source that uses the unified parquet schema
 
 Features:
 - Scans parquet files recursively for unscored articles
-- Dynamic column naming based on model (e.g., sentiment_gpt_5_2, risk_o4_mini)
+- Dynamic column naming based on model (e.g., sentiment_gpt_5_4, risk_gpt_5_4_mini)
 - Updates parquet files in-place with scores
 - Supports model switching with --continue-from to pick up where another model left off
 - Supports --rescore to force re-scoring articles that already have scores
@@ -215,20 +215,20 @@ Respond with only the integer risk score (1–5). **in JSON**:
 If information is insufficient, respond with {"score": 1}.
 """
 
-# Tools format (new) — used for gpt-5.4+ with reasoning_effort
-TOOLS = [{
+# Responses API function tool — used for gpt-5.4+ with reasoning
+RESPONSES_TOOLS = [{
     "type": "function",
-    "function": {
-        "name": "record_score",
-        "parameters": {
-            "type": "object",
-            "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}},
-            "required": ["score"]
-        }
-    }
+    "name": "record_score",
+    "parameters": {
+        "type": "object",
+        "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}},
+        "required": ["score"],
+        "additionalProperties": False,
+    },
+    "strict": True,
 }]
 
-# Legacy functions format — used for gpt-5/gpt-5.1/gpt-5.2 and o-series
+# Legacy Chat Completions functions format — used for gpt-5/gpt-5.1/gpt-5.2 and o-series
 FUNCTIONS = [{
     "name": "record_score",
     "parameters": {
@@ -237,6 +237,35 @@ FUNCTIONS = [{
         "required": ["score"]
     }
 }]
+
+
+def _parse_score_payload(payload: str) -> Optional[int]:
+    """Extract score from a JSON payload or plain-text fallback."""
+    try:
+        score = int(json.loads(payload)["score"])
+        if 1 <= score <= 5:
+            return score
+    except Exception:
+        pass
+
+    match = re.search(r"\b([1-5])\b", payload)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _extract_score_from_responses(response) -> Optional[int]:
+    """Parse score from a Responses API response."""
+    for item in getattr(response, "output", []) or []:
+        if getattr(item, "type", None) == "function_call" and getattr(item, "name", None) == "record_score":
+            score = _parse_score_payload(getattr(item, "arguments", ""))
+            if score is not None:
+                return score
+
+    output_text = getattr(response, "output_text", "") or ""
+    if output_text:
+        return _parse_score_payload(output_text)
+    return None
 
 
 def score_article(
@@ -293,15 +322,18 @@ def score_article(
                     "function_call": {"name": "record_score"},
                 }
             elif _is_gpt54_plus:
-                # gpt-5.4+: new tools format (required for reasoning_effort)
+                # gpt-5.4+: Responses API is required for reasoning + function tools
                 params = {
                     "model": model,
-                    "reasoning_effort": reasoning_effort,
-                    "messages": messages,
-                    "max_completion_tokens": 2400,
-                    "tools": TOOLS,
-                    "tool_choice": {"type": "function", "function": {"name": "record_score"}},
+                    "instructions": system_prompt,
+                    "input": f"TICKER: {symbol}\nHEADLINE:\n{text}",
+                    "max_output_tokens": 2400,
+                    "tools": RESPONSES_TOOLS,
+                    "tool_choice": {"type": "function", "name": "record_score"},
+                    "parallel_tool_calls": False,
                 }
+                if reasoning_effort != "none":
+                    params["reasoning"] = {"effort": reasoning_effort}
             elif model.startswith("gpt-5"):
                 # gpt-5/5.1/5.2: legacy functions format
                 params = {
@@ -328,11 +360,18 @@ def score_article(
                 params["timeout"] = FLEX_TIMEOUT
 
             N_CALLS += 1
-            response = openai.chat.completions.create(**params)
-            usage = response.usage
-            pt = usage.prompt_tokens
-            ct = usage.completion_tokens
-            tt = usage.total_tokens
+            if _is_gpt54_plus:
+                response = openai.responses.create(**params)
+                usage = response.usage
+                pt = usage.input_tokens
+                ct = usage.output_tokens
+                tt = usage.total_tokens
+            else:
+                response = openai.chat.completions.create(**params)
+                usage = response.usage
+                pt = usage.prompt_tokens
+                ct = usage.completion_tokens
+                tt = usage.total_tokens
 
             TOTAL_PROMPT_TOKENS += pt
             TOTAL_COMPLETION_TOKENS += ct
@@ -342,34 +381,33 @@ def score_article(
 
             logging.debug(f"Token usage: prompt={pt}, completion={ct}, total={tt}")
 
-            # Parse response — handle both tools format and legacy function_call
-            msg = response.choices[0].message
-            if hasattr(msg, "tool_calls") and msg.tool_calls:
-                try:
-                    args = json.loads(msg.tool_calls[0].function.arguments)
-                    score = int(args.get("score"))
-                    if 1 <= score <= 5:
-                        return score
-                except Exception:
-                    pass
-            elif hasattr(msg, "function_call") and msg.function_call is not None:
-                try:
-                    args = json.loads(msg.function_call.arguments)
-                    score = int(args.get("score"))
-                    if 1 <= score <= 5:
-                        return score
-                except Exception:
-                    pass
+            if _is_gpt54_plus:
+                score = _extract_score_from_responses(response)
+                if score is not None:
+                    return score
             else:
-                txt = msg.content.strip()
-                try:
-                    score = json.loads(txt)["score"]
-                    if 1 <= score <= 5:
+                # Parse response — handle both tools format and legacy function_call
+                msg = response.choices[0].message
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    try:
+                        args = json.loads(msg.tool_calls[0].function.arguments)
+                        score = int(args.get("score"))
+                        if 1 <= score <= 5:
+                            return score
+                    except Exception:
+                        pass
+                elif hasattr(msg, "function_call") and msg.function_call is not None:
+                    try:
+                        args = json.loads(msg.function_call.arguments)
+                        score = int(args.get("score"))
+                        if 1 <= score <= 5:
+                            return score
+                    except Exception:
+                        pass
+                else:
+                    score = _parse_score_payload((msg.content or "").strip())
+                    if score is not None:
                         return score
-                except Exception:
-                    m = re.search(r"\b([1-5])\b", txt)
-                    if m:
-                        return int(m.group(1))
 
             logging.warning(f"Attempt {attempt}/{retry}: no valid score parsed")
             time.sleep(pause * attempt)

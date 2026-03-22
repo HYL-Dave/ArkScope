@@ -7,9 +7,12 @@ when multiple generations of models have been used.
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+
+import scripts.scoring.score_ibkr_news as score_mod
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -19,6 +22,8 @@ from scripts.scoring.score_ibkr_news import (
     find_unscored_articles,
     get_score_column,
     model_to_column_suffix,
+    score_article,
+    set_api_keys,
 )
 
 
@@ -230,3 +235,97 @@ class TestColumnNaming:
     def test_suffix_conversion(self):
         assert model_to_column_suffix("gpt-5.4-mini") == "gpt_5_4_mini"
         assert model_to_column_suffix("o4-mini") == "o4_mini"
+
+# ============================================================
+# score_article API routing
+# ============================================================
+
+class TestScoreArticleApiRouting:
+    def setup_method(self):
+        set_api_keys(["test-key"], None)
+        score_mod.TOTAL_PROMPT_TOKENS = 0
+        score_mod.TOTAL_COMPLETION_TOKENS = 0
+        score_mod.TOTAL_TOKENS = 0
+        score_mod.N_CALLS = 0
+
+    def test_gpt54_uses_responses_api(self, monkeypatch):
+        calls = {}
+
+        def fake_responses_create(**kwargs):
+            calls["kwargs"] = kwargs
+            return SimpleNamespace(
+                usage=SimpleNamespace(input_tokens=11, output_tokens=7, total_tokens=18),
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="record_score",
+                        arguments='{"score": 4}',
+                    )
+                ],
+                output_text="",
+            )
+
+        def fail_chat(**kwargs):
+            raise AssertionError("gpt-5.4 should not use chat.completions")
+
+        monkeypatch.setattr(score_mod.openai.responses, "create", fake_responses_create)
+        monkeypatch.setattr(score_mod.openai.chat.completions, "create", fail_chat)
+
+        score = score_article(
+            text="NVIDIA beats earnings",
+            symbol="NVDA",
+            model="gpt-5.4",
+            mode="sentiment",
+            reasoning_effort="xhigh",
+            retry=1,
+            pause=0,
+        )
+
+        assert score == 4
+        assert calls["kwargs"]["model"] == "gpt-5.4"
+        assert calls["kwargs"]["tool_choice"] == {"type": "function", "name": "record_score"}
+        assert calls["kwargs"]["reasoning"] == {"effort": "xhigh"}
+        assert score_mod.TOTAL_PROMPT_TOKENS == 11
+        assert score_mod.TOTAL_COMPLETION_TOKENS == 7
+        assert score_mod.TOTAL_TOKENS == 18
+
+    def test_gpt52_still_uses_chat_completions(self, monkeypatch):
+        calls = {}
+
+        def fail_responses(**kwargs):
+            raise AssertionError("gpt-5.2 should not use responses.create")
+
+        def fake_chat_create(**kwargs):
+            calls["kwargs"] = kwargs
+            return SimpleNamespace(
+                usage=SimpleNamespace(prompt_tokens=9, completion_tokens=3, total_tokens=12),
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            function_call=SimpleNamespace(arguments='{"score": 2}'),
+                            content=None,
+                            tool_calls=None,
+                        )
+                    )
+                ],
+            )
+
+        monkeypatch.setattr(score_mod.openai.responses, "create", fail_responses)
+        monkeypatch.setattr(score_mod.openai.chat.completions, "create", fake_chat_create)
+
+        score = score_article(
+            text="NVIDIA beats earnings",
+            symbol="NVDA",
+            model="gpt-5.2",
+            mode="sentiment",
+            reasoning_effort="xhigh",
+            retry=1,
+            pause=0,
+        )
+
+        assert score == 2
+        assert calls["kwargs"]["model"] == "gpt-5.2"
+        assert calls["kwargs"]["function_call"] == {"name": "record_score"}
+        assert score_mod.TOTAL_PROMPT_TOKENS == 9
+        assert score_mod.TOTAL_COMPLETION_TOKENS == 3
+        assert score_mod.TOTAL_TOKENS == 12

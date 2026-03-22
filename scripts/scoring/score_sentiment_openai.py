@@ -73,6 +73,18 @@ Respond with only the integer sentiment score (1–5). **in JSON**:
 ```
 If information is insufficient, respond with {"score": 3}.
 """
+responses_tools = [{
+  "type": "function",
+  "name": "record_score",
+  "parameters": {
+     "type": "object",
+     "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}},
+     "required": ["score"],
+     "additionalProperties": False,
+  },
+  "strict": True,
+}]
+
 functions=[{
   "name":"record_score",
   "parameters":{
@@ -82,9 +94,30 @@ functions=[{
   }
 }]
 
+
+def _parse_score_payload(payload: str) -> Optional[int]:
+    try:
+        score = int(json.loads(payload)["score"])
+        if 1 <= score <= 5:
+            return score
+    except Exception:
+        pass
+
+    m = re.search(r"\b([1-5])\b", payload)
+    return int(m.group(1)) if m else None
+
+
+def _extract_score_from_responses(response) -> Optional[int]:
+    for item in getattr(response, "output", []) or []:
+        if getattr(item, "type", None) == "function_call" and getattr(item, "name", None) == "record_score":
+            return _parse_score_payload(getattr(item, "arguments", ""))
+
+    output_text = getattr(response, "output_text", "") or ""
+    return _parse_score_payload(output_text) if output_text else None
+
 def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str = "high", verbosity: str = "low", retry: int = 3, pause: float = 0.5) -> Optional[int]:
     """
-    Call OpenAI ChatCompletion to score one headline.
+    Call OpenAI API to score one headline.
     Returns integer score or None on failure.
     """
     messages = [
@@ -97,6 +130,8 @@ def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str
     for attempt in range(1, max_attempts + 1):
         try:
             # Prepare call parameters, with optional Flex settings
+            _is_gpt54_plus = model.startswith("gpt-5.4")
+
             if model.startswith("o"):
                 params = {
                     "model": model,
@@ -106,6 +141,18 @@ def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str
                     "functions": functions,
                     "function_call": {"name": "record_score"},
                 }
+            elif _is_gpt54_plus:
+                params = {
+                    "model": model,
+                    "instructions": SYSTEM_PROMPT,
+                    "input": f"TICKER: {symbol}\nHEADLINES:\n1. {headline}",
+                    "max_output_tokens": 2400,
+                    "tools": responses_tools,
+                    "tool_choice": {"type": "function", "name": "record_score"},
+                    "parallel_tool_calls": False,
+                }
+                if reasoning_effort != "none":
+                    params["reasoning"] = {"effort": reasoning_effort}
             elif model.startswith("gpt-5"):
                 params = {
                     "model": model,
@@ -130,11 +177,18 @@ def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str
             # call and track token usage
             global TOTAL_PROMPT_TOKENS, TOTAL_COMPLETION_TOKENS, TOTAL_TOKENS, N_CALLS
             N_CALLS += 1
-            response = openai.chat.completions.create(**params)
-            usage = response.usage
-            pt = usage.prompt_tokens
-            ct = usage.completion_tokens
-            tt = usage.total_tokens
+            if _is_gpt54_plus:
+                response = openai.responses.create(**params)
+                usage = response.usage
+                pt = usage.input_tokens
+                ct = usage.output_tokens
+                tt = usage.total_tokens
+            else:
+                response = openai.chat.completions.create(**params)
+                usage = response.usage
+                pt = usage.prompt_tokens
+                ct = usage.completion_tokens
+                tt = usage.total_tokens
             TOTAL_PROMPT_TOKENS += pt
             TOTAL_COMPLETION_TOKENS += ct
             TOTAL_TOKENS += tt
@@ -142,29 +196,32 @@ def score_headline(headline: str, symbol: str, model: str, reasoning_effort: str
             rotate_key_if_needed(tt)
             logging.info(f"Sentiment token usage: prompt={pt}, completion={ct}, total={tt}")
 
-            msg = response.choices[0].message
-            # parse score from function_call arguments or JSON/text content
-            if hasattr(msg, "function_call") and msg.function_call is not None:
-                try:
-                    args = json.loads(msg.function_call.arguments)
-                    score = int(args.get("score"))
-                except Exception:
-                    logging.warning(
-                        f"Cannot parse score from function_call arguments: {msg.function_call.arguments}"
-                    )
-                    score = None
+            if _is_gpt54_plus:
+                score = _extract_score_from_responses(response)
+                if score is not None:
+                    return score
+                bad_payload = getattr(response, "output_text", "") or "<function_call parse failed>"
             else:
-                txt = msg.content.strip()
-                try:
-                    score = json.loads(txt)["score"]
-                except Exception:
-                    m = re.search(r"\b([1-5])\b", txt)
-                    score = int(m.group(1)) if m else None
+                msg = response.choices[0].message
+                # parse score from function_call arguments or JSON/text content
+                if hasattr(msg, "function_call") and msg.function_call is not None:
+                    try:
+                        args = json.loads(msg.function_call.arguments)
+                        score = int(args.get("score"))
+                    except Exception:
+                        logging.warning(
+                            f"Cannot parse score from function_call arguments: {msg.function_call.arguments}"
+                        )
+                        score = None
+                else:
+                    txt = (msg.content or "").strip()
+                    score = _parse_score_payload(txt)
+                if score is not None:
+                    return score
+                bad_payload = (msg.content or "").strip()
             # retry on parsing failure
-            if score is not None:
-                return score
             logging.warning(
-                f"Attempt {attempt}/{retry}: no valid score parsed (got: '{msg.content.strip()}'), retrying"
+                f"Attempt {attempt}/{retry}: no valid score parsed (got: '{bad_payload}'), retrying"
             )
             time.sleep(pause * attempt)
         except Exception as e:
