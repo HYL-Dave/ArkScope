@@ -512,87 +512,31 @@ async function scrollToLoadAll(tabId, maxScrolls) {
 }
 
 async function scrollToComments(tabId) {
-  // SA comments require clicking a "Comments (N)" link to load.
-  // #comments section exists but is empty until clicked.
-  // This also provides natural dwell time (human-like behavior).
+  // SA comments are lazy-loaded by scrolling — they appear inside
+  // paywall-full-content as div.border-t-share-separator-thin elements.
+  // Scroll incrementally to trigger loading (natural dwell time).
+  var maxScrolls = 30;
+  var staleCount = 0;
 
-  // Step 1: Scroll down to find and click the Comments link
-  var clicked = false;
-  for (var s = 0; s < 15; s++) {
-    var clickResult = await chrome.scripting.executeScript({
+  for (var i = 0; i < maxScrolls; i++) {
+    var result = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
-        // Look for the article's own "Comments (N)" link
-        var links = document.querySelectorAll('a');
-        for (var i = 0; i < links.length; i++) {
-          var text = links[i].innerText.trim();
-          // Match "Comments\n(36)" or "Comments (36)" — skip sidebar/related links
-          if (/^Comments\s*\(\d/.test(text) || /^Comments\s*\n\s*\(\d/.test(text)) {
-            // Make sure it's the article's comment link (near #comments or in article area)
-            var href = links[i].getAttribute('href') || '';
-            if (href.indexOf('#comment') >= 0 || href.indexOf('scroll_comment') >= 0 || !href) {
-              links[i].click();
-              return { status: "clicked", text: text.substring(0, 30) };
-            }
-          }
-        }
-        // Also try scrolling down to find it
-        window.scrollBy(0, window.innerHeight);
-        return { status: "scrolling" };
-      },
-    });
-    var r = clickResult[0] && clickResult[0].result;
-    if (r && r.status === "clicked") {
-      clicked = true;
-      break;
-    }
-    await sleep(1500);
-  }
-
-  if (!clicked) return; // No comments link found
-
-  // Step 2: Wait for comments to load in #comments section
-  await sleep(2000); // Initial wait for comments API response
-  for (var w = 0; w < 10; w++) {
-    var loaded = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: function () {
-        var section = document.querySelector('#comments');
-        var textLen = section ? section.innerText.length : 0;
-        return { textLen: textLen };
-      },
-    });
-    var check = loaded[0] && loaded[0].result;
-    if (check && check.textLen > 200) break; // Comments loaded
-    await sleep(1500);
-  }
-
-  // Step 3: Scroll within comments section to load more (if lazy-loaded)
-  // Also click "Show more" buttons
-  for (var c = 0; c < 20; c++) {
-    var moreResult = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: function () {
-        // Click "Show more comments" or "Load more" type buttons
-        var buttons = document.querySelectorAll('#comments button, #comments a');
-        for (var i = 0; i < buttons.length; i++) {
-          var text = buttons[i].innerText.trim().toLowerCase();
-          if (text.indexOf('show') >= 0 || text.indexOf('load more') >= 0 || text.indexOf('more comments') >= 0) {
-            buttons[i].click();
-            return { status: "expanding" };
-          }
-        }
-        // Check if at bottom of comments
-        var section = document.querySelector('#comments');
-        if (section) {
-          section.scrollIntoView({ block: "end", behavior: "smooth" });
-        }
+        var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
         var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
-        return { status: atBottom ? "bottom" : "scrolling" };
+        window.scrollBy(0, window.innerHeight);
+        return { comments: commentEls.length, atBottom: atBottom };
       },
     });
-    var cr = moreResult[0] && moreResult[0].result;
-    if (cr && cr.status === "bottom") break;
+    var check = result[0] && result[0].result;
+
+    if (check && check.atBottom) {
+      staleCount++;
+      if (staleCount >= 2) break; // Confirmed at bottom
+    } else {
+      staleCount = 0;
+    }
+
     await sleep(1500);
   }
 }
