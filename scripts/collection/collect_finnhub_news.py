@@ -26,6 +26,14 @@ Finnhub 特點:
 
     # 增量更新 (每日執行)
     python collect_finnhub_news.py --incremental
+
+    # 補抓新加入的 ticker (incremental 不會補)
+    python collect_finnhub_news.py --tickers GM,NEM,AFRM
+
+重要限制:
+    --incremental 使用全域最新 timestamp 作為起始點，新加入 tickers_core.json
+    的 ticker 不會自動補抓歷史。但因 Finnhub 只提供 ~7 天歷史，影響有限。
+    補抓方式: --tickers <新ticker> (會抓最近 7 天)
 """
 
 import os
@@ -599,7 +607,8 @@ For historical news, use collect_polygon_news.py instead.
     parser.add_argument('--status', action='store_true',
                        help='Show current data status without collecting')
     parser.add_argument('--incremental', action='store_true',
-                       help='Incremental update: fetch last 7 days and merge with existing')
+                       help='Incremental update: fetch since last collected date (capped at 7 days). '
+                            'NOTE: new tickers without history will only get recent data.')
 
     args = parser.parse_args()
 

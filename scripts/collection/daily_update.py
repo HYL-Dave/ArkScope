@@ -44,6 +44,15 @@ Daily Data Update Script - 每日資料更新統一入口
 
     # 更新所有新聞並同步到 DB
     python daily_update.py --news --sync-db
+
+重要限制 — 新 Ticker 的歷史資料:
+    --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
+    新加入 tickers_core.json 的 ticker（如 SA Alpha Picks auto-sync 的新股）
+    不會被自動補抓歷史新聞，只會從「當前最新時間點之後」開始收集。
+
+    補抓方式 (Polygon 為例，Finnhub 只有 7 天歷史影響不大):
+        python scripts/collection/collect_polygon_news.py \\
+            --tickers GM,NEM,AFRM --start 2022-01-01
 """
 
 import os

@@ -28,6 +28,16 @@ Polygon.io 新聞收集腳本
 
     # 查看現有資料狀態
     python collect_polygon_news.py --status
+
+    # 補抓新加入的 ticker (incremental 不會補歷史)
+    python collect_polygon_news.py --tickers GM,NEM,AFRM --start 2022-01-01
+
+重要限制:
+    --incremental 使用「所有 ticker 中最新一篇文章的時間」作為起始點，
+    對每個 ticker 統一從該時間點開始查詢。這意味著：
+    - 新加入 tickers_core.json 的 ticker 不會被補抓歷史資料
+    - 只有「該時間點之後」發布的新聞才會被抓到
+    - 若需要補抓新 ticker 的歷史，必須用 --tickers + --start 手動指定
 """
 
 import os
@@ -877,7 +887,9 @@ Examples:
     parser.add_argument('--resume', action='store_true', help='Resume from last checkpoint')
     parser.add_argument('--estimate', action='store_true', help='Estimate time without collecting')
     parser.add_argument('--incremental', action='store_true',
-                       help='Incremental update: only fetch news since last collected date')
+                       help='Incremental update: only fetch news since last collected date. '
+                            'NOTE: uses global latest timestamp — new tickers without '
+                            'history will NOT be backfilled. Use --tickers + --start instead.')
     parser.add_argument('--status', action='store_true',
                        help='Show current data status without collecting')
 
