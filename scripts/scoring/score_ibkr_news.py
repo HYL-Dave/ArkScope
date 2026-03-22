@@ -215,6 +215,20 @@ Respond with only the integer risk score (1–5). **in JSON**:
 If information is insufficient, respond with {"score": 1}.
 """
 
+# Tools format (new) — used for gpt-5.4+ with reasoning_effort
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "record_score",
+        "parameters": {
+            "type": "object",
+            "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}},
+            "required": ["score"]
+        }
+    }
+}]
+
+# Legacy functions format — used for gpt-5/gpt-5.1/gpt-5.2 and o-series
 FUNCTIONS = [{
     "name": "record_score",
     "parameters": {
@@ -265,6 +279,10 @@ def score_article(
     for attempt in range(1, max_attempts + 1):
         try:
             # Build parameters based on model type
+            # gpt-5.4+ requires new tools format with reasoning_effort
+            # (legacy functions format not supported with reasoning_effort)
+            _is_gpt54_plus = model.startswith("gpt-5.4")
+
             if model.startswith("o"):
                 params = {
                     "model": model,
@@ -274,7 +292,18 @@ def score_article(
                     "functions": FUNCTIONS,
                     "function_call": {"name": "record_score"},
                 }
+            elif _is_gpt54_plus:
+                # gpt-5.4+: new tools format (required for reasoning_effort)
+                params = {
+                    "model": model,
+                    "reasoning_effort": reasoning_effort,
+                    "messages": messages,
+                    "max_completion_tokens": 2400,
+                    "tools": TOOLS,
+                    "tool_choice": {"type": "function", "function": {"name": "record_score"}},
+                }
             elif model.startswith("gpt-5"):
+                # gpt-5/5.1/5.2: legacy functions format
                 params = {
                     "model": model,
                     "reasoning_effort": reasoning_effort,
@@ -313,9 +342,17 @@ def score_article(
 
             logging.debug(f"Token usage: prompt={pt}, completion={ct}, total={tt}")
 
-            # Parse response
+            # Parse response — handle both tools format and legacy function_call
             msg = response.choices[0].message
-            if hasattr(msg, "function_call") and msg.function_call is not None:
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                try:
+                    args = json.loads(msg.tool_calls[0].function.arguments)
+                    score = int(args.get("score"))
+                    if 1 <= score <= 5:
+                        return score
+                except Exception:
+                    pass
+            elif hasattr(msg, "function_call") and msg.function_call is not None:
                 try:
                     args = json.loads(msg.function_call.arguments)
                     score = int(args.get("score"))
@@ -691,7 +728,9 @@ def main():
     parser.add_argument(
         "--continue-from-effort", type=str, default=None,
         choices=["none", "minimal", "low", "medium", "high", "xhigh"],
-        help="Reasoning effort of the --continue-from model (auto-detected if omitted)"
+        help="Restrict predecessor lookup to this effort column. "
+             "Usually omit — auto-detect finds ALL effort columns per model. "
+             "Only use to target a specific effort level."
     )
     parser.add_argument(
         "--rescore", action="store_true",

@@ -233,6 +233,19 @@ switch scoring models without re-scoring articles that previous models already c
 - Each model writes to its own column (e.g., `sentiment_gpt_5_2_xhigh`, `sentiment_gpt_5_4_xhigh`)
 - `--continue-from` skips articles where ANY listed predecessor model has a score
 - Multiple predecessors are comma-separated to support multi-generation chains
+- `--reasoning-effort` controls the **new model's** API reasoning depth
+- `--continue-from-effort` is for column name lookup only (usually not needed, see below)
+
+**About `--continue-from-effort` (usually omit it):**
+
+`--continue-from-effort` specifies which effort column to look for in the predecessor model.
+When **omitted**, the script auto-detects ALL effort columns for each predecessor
+(e.g., both `sentiment_gpt_5_2_high` and `sentiment_gpt_5_2_xhigh`) and skips articles
+scored by any of them. This is the **recommended usage** — it handles mixed-effort
+predecessors and multi-model chains without extra configuration.
+
+Only specify `--continue-from-effort` if you need to restrict to a specific effort column
+(rare edge case where you want to re-score articles from one effort level but keep another).
 
 **Example: Two-generation handoff**
 ```
@@ -246,9 +259,10 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
     --reasoning-effort xhigh --data-dir data/news/raw/polygon
 
 # Step 2: gpt-5.4 picks up new articles only (2026-04+)
+# No --continue-from-effort needed — auto-detects gpt-5.2's columns
 python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \
     --reasoning-effort xhigh --data-dir data/news/raw/polygon \
-    --continue-from gpt-5.2 --continue-from-effort xhigh
+    --continue-from gpt-5.2
 ```
 
 **Example: Three-generation chain**
@@ -259,9 +273,10 @@ Model:     ◄─ gpt-5.2 ─►       ◄─ gpt-5.4 ─►          ◄── 
 
 ```bash
 # Step 3: gpt-6 picks up new articles, skipping BOTH gpt-5.2 and gpt-5.4
+# Auto-detect handles different effort levels across predecessors
 python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 \
     --reasoning-effort high --data-dir data/news/raw/polygon \
-    --continue-from gpt-5.2,gpt-5.4 --continue-from-effort xhigh
+    --continue-from gpt-5.2,gpt-5.4
 ```
 
 **Important: Always list ALL predecessor models in the chain.** If you only list the
