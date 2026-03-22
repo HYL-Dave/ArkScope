@@ -1,7 +1,8 @@
 """
 Seeking Alpha Alpha Picks tool functions.
 
-3 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
+5 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+         get_sa_articles, get_sa_article_detail
 All require DAL, category="portfolio".
 """
 
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -141,4 +142,48 @@ def refresh_sa_alpha_picks(dal: Any) -> Dict:
         return client.refresh_portfolio(sync_tickers=True)
     except Exception as e:
         logger.error("refresh_sa_alpha_picks error: %s", e)
+        return {"error": str(e)}
+
+
+def get_sa_articles(
+    dal: Any,
+    ticker: Optional[str] = None,
+    keyword: Optional[str] = None,
+    article_type: Optional[str] = None,
+    limit: int = 10,
+) -> Dict:
+    """Search SA Alpha Picks articles.
+
+    Returns article list with title, date, ticker, type, comments_count.
+    Use get_sa_article_detail for full content + comments.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        articles = dal.get_sa_articles(
+            ticker=ticker, keyword=keyword,
+            article_type=article_type, limit=limit,
+        )
+        return {"articles": articles, "count": len(articles)}
+    except Exception as e:
+        logger.error("get_sa_articles error: %s", e)
+        return {"error": str(e)}
+
+
+def get_sa_article_detail(dal: Any, article_id: str) -> Dict:
+    """Get full SA article content + comments.
+
+    Returns body_markdown + comment tree for a specific article.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        result = dal.get_sa_article_detail(article_id)
+        if not result:
+            return {"error": f"Article {article_id} not found"}
+        return result
+    except Exception as e:
+        logger.error("get_sa_article_detail error: %s", e)
         return {"error": str(e)}

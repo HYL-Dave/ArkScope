@@ -199,91 +199,113 @@ function sendProgress(text) {
 // --- Detail fetch (incremental) ---
 
 async function doDetailFetch(tabId, currentPicks, mode) {
-  // Step 1: Navigate to articles page and scrape article list
+  // ── Step 1: Load articles page + scroll ──
   sendProgress("Loading articles page...");
   await chrome.tabs.update(tabId, { url: SA_ARTICLES_URL });
   await waitForTabLoad(tabId);
 
-  // Wait for article links to appear
   var articlesReady = await waitForArticlesReady(tabId);
   if (!articlesReady.ok) {
-    return { fetched: 0, skipped: 0, failed: 0, error: articlesReady.error };
+    return { fetched: 0, failed: 0, error: articlesReady.error };
   }
 
-  // Scroll to load more articles
-  // Quick: minimal scroll (2-3 pages, ~10s) — covers new picks from recent weeks
-  // Full: deep scroll (until bottom, minutes) — covers all historical picks
+  // Scroll: activate tab for IntersectionObserver
+  var scrollMode = mode;
+  await chrome.tabs.update(tabId, { active: true });
+  await sleep(500);
   if (mode === "full") {
     sendProgress("Full scan: loading all articles...");
-    await chrome.tabs.update(tabId, { active: true });
-    await sleep(500);
-    await scrollToLoadAll(tabId, 200); // Up to 200 scrolls (~8 min max)
-    await chrome.tabs.update(tabId, { active: false });
+    await scrollToLoadAll(tabId, 200);
   } else {
     sendProgress("Loading recent articles...");
-    await chrome.tabs.update(tabId, { active: true });
-    await sleep(500);
-    await scrollToLoadAll(tabId, 5); // Quick: just 5 scrolls (~15s)
-    await chrome.tabs.update(tabId, { active: false });
+    await scrollToLoadAll(tabId, 5);
   }
+  await chrome.tabs.update(tabId, { active: false });
 
+  // Scrape article list (ALL articles, not just ticker-tagged)
   sendProgress("Scraping article list...");
   var articleList = await injectArticlesListScraper(tabId);
   if (!articleList || articleList.error) {
-    return { fetched: 0, skipped: 0, failed: 0, error: articleList ? articleList.error : "No articles found" };
+    return { fetched: 0, failed: 0, error: articleList ? articleList.error : "No articles found" };
   }
   if (!Array.isArray(articleList) || articleList.length === 0) {
-    return { fetched: 0, skipped: 0, failed: 0, error: "Empty article list" };
+    return { fetched: 0, failed: 0, error: "Empty article list" };
   }
 
-  // Step 2: Send articles + current picks to native host for matching
-  var pickSymbols = currentPicks.map(function (p) {
-    return { symbol: p.symbol, picked_date: p.picked_date };
-  });
-
-  var cacheCheck = await sendNativeMessage2({
-    action: "check_detail_cache",
-    picks: pickSymbols,
+  // ── Step 2: Save articles metadata → get need_content + need_comments ──
+  sendProgress("Saving " + articleList.length + " articles metadata...");
+  var metaResult = await sendNativeMessage2({
+    action: "save_articles_meta",
+    mode: scrollMode,
     articles: articleList,
   });
 
-  if (!cacheCheck || cacheCheck.status !== "ok") {
-    var cacheError = (cacheCheck && cacheCheck.error) || "check_detail_cache failed";
-    return { fetched: 0, skipped: 0, failed: 0, error: cacheError };
+  // Check auto_upgrade (first run, empty DB — status is "ok" but auto_upgrade=true)
+  if (metaResult && metaResult.auto_upgrade && mode === "quick") {
+    sendProgress("First run detected, switching to full scan...");
+    await chrome.tabs.update(tabId, { active: true });
+    await sleep(500);
+    await scrollToLoadAll(tabId, 200);
+    await chrome.tabs.update(tabId, { active: false });
+    // Re-scrape after full scroll
+    articleList = await injectArticlesListScraper(tabId);
+    if (Array.isArray(articleList) && articleList.length > 0) {
+      metaResult = await sendNativeMessage2({
+        action: "save_articles_meta",
+        mode: "full",
+        articles: articleList,
+      });
+    }
   }
 
-  var needDetail = cacheCheck.need_detail || [];
-  var noArticle = cacheCheck.no_article || [];
-  var totalPicks = pickSymbols.length;
-  if (needDetail.length === 0) {
-    return { fetched: 0, skipped: totalPicks, failed: 0, no_article: noArticle };
+  if (!metaResult || metaResult.status !== "ok") {
+    var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
+    return { fetched: 0, failed: 0, error: metaError };
   }
 
-  // Step 3: Fetch each article
-  sendProgress("Fetching " + needDetail.length + " detail reports...");
+  var needContent = metaResult.need_content || [];
+  var needComments = metaResult.need_comments || [];
+  var unresolvedSymbols = metaResult.unresolved_symbols || [];
 
+  // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0;
-  for (var i = 0; i < needDetail.length; i++) {
-    var item = needDetail[i];
-    sendProgress("Detail " + (i + 1) + "/" + needDetail.length + ": " + item.symbol);
+  var total = needContent.length + needComments.length;
+
+  if (needContent.length > 0) {
+    sendProgress("Fetching " + needContent.length + " article(s)...");
+  }
+
+  for (var i = 0; i < needContent.length; i++) {
+    var item = needContent[i];
+    sendProgress("Article " + (i + 1) + "/" + needContent.length + ": " + item.article_id);
 
     try {
-      await chrome.tabs.update(tabId, { url: item.article_url });
+      // Navigate to article (tab must be active for comment scroll)
+      await chrome.tabs.update(tabId, { url: item.url, active: true });
       await waitForTabLoad(tabId);
       var ready = await waitForArticleReady(tabId);
       if (!ready.ok) { failed++; continue; }
 
+      // Scrape body
       var detail = await injectDetailScraper(tabId);
       if (!detail || detail.error) { failed++; continue; }
 
+      // Scroll down to comments section + load all comments
+      // This naturally provides human-like dwell time (10-30s per page)
+      await scrollToComments(tabId);
+
+      // Scrape comments
+      var commentsResult = await injectCommentsScraper(tabId);
+      var comments = (commentsResult && commentsResult.comments) || [];
+
       var report = formatDetailReport(detail);
       var saveResult = await sendNativeMessage2({
-        action: "save_detail",
-        symbol: item.symbol,
-        picked_date: item.picked_date,
-        detail_report: report,
+        action: "save_article_content",
+        article_id: item.article_id,
+        body_markdown: report,
+        comments: comments,
       });
-      if (saveResult && saveResult.status === "ok") {
+      if (saveResult && saveResult.ok) {
         fetched++;
       } else {
         failed++;
@@ -291,11 +313,54 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     } catch (err) {
       failed++;
     }
-
-    if (i < needDetail.length - 1) await sleep(2000);
+    // No artificial delay — comment scroll provides natural dwell time
   }
 
-  return { fetched: fetched, skipped: totalPicks - needDetail.length, failed: failed, no_article: noArticle };
+  // ── Step 4: Refresh comments for TTL-expired articles (full scan only) ──
+  var commentsRefreshed = 0;
+  if (needComments.length > 0) {
+    sendProgress("Refreshing comments for " + needComments.length + " article(s)...");
+  }
+  for (var j = 0; j < needComments.length; j++) {
+    var cItem = needComments[j];
+    sendProgress("Comments " + (j + 1) + "/" + needComments.length + ": " + cItem.article_id);
+
+    try {
+      await chrome.tabs.update(tabId, { url: cItem.url, active: true });
+      await waitForTabLoad(tabId);
+      await waitForArticleReady(tabId);
+
+      // Scroll to load comments (natural delay)
+      await scrollToComments(tabId);
+
+      var cResult = await injectCommentsScraper(tabId);
+      var cComments = (cResult && cResult.comments) || [];
+
+      await sendNativeMessage2({
+        action: "save_comments_only",
+        article_id: cItem.article_id,
+        comments: cComments,
+      });
+      commentsRefreshed++;
+    } catch (err) {
+      // Best effort for comments refresh
+    }
+  }
+
+  // ── Step 5: Audit unresolved (full-text fallback) ──
+  sendProgress("Auditing unresolved picks...");
+  var auditResult = await sendNativeMessage2({ action: "audit_unresolved" });
+  if (auditResult && auditResult.status === "ok") {
+    unresolvedSymbols = auditResult.unresolved_symbols || [];
+  }
+
+  return {
+    articles_saved: metaResult.saved || 0,
+    fetched: fetched,
+    failed: failed,
+    comments_refreshed: commentsRefreshed,
+    unresolved_symbols: unresolvedSymbols,
+  };
 }
 
 // --- Manual fetch (user-provided URLs for missing tickers) ---
@@ -305,6 +370,7 @@ async function doManualFetch(items) {
 
   var tabId = null;
   var fetched = 0, failed = 0;
+  var succeededSymbols = [];
   try {
     // Create a tab for fetching
     var tab = await chrome.tabs.create({ url: items[0].url, active: false });
@@ -316,43 +382,82 @@ async function doManualFetch(items) {
 
       try {
         if (i > 0) {
-          await chrome.tabs.update(tabId, { url: item.url });
+          await chrome.tabs.update(tabId, { url: item.url, active: true });
         }
         await waitForTabLoad(tabId);
         var ready = await waitForArticleReady(tabId);
         if (!ready.ok) { failed++; continue; }
 
+        // Extract article_id from URL
+        var idMatch = item.url.match(/\/articles\/(\d+)/);
+        var articleId = idMatch ? idMatch[1] : null;
+
         var detail = await injectDetailScraper(tabId);
         if (!detail || detail.error) { failed++; continue; }
 
+        // Scroll to load comments (v3 path)
+        await scrollToComments(tabId);
+        var commentsResult = await injectCommentsScraper(tabId);
+        var comments = (commentsResult && commentsResult.comments) || [];
+
         var report = formatDetailReport(detail);
 
-        // Ask native host to resolve picked_date and save
-        var saveResult = await sendNativeMessage2({
-          action: "save_detail_by_symbol",
-          symbol: item.symbol,
-          detail_report: report,
-        });
-        if (saveResult && saveResult.status === "ok") {
-          fetched++;
+        if (articleId) {
+          // v3 path: save to sa_articles + auto-sync to picks
+          // Use publish date from article page (scrape_detail.js extracts it)
+          var pubDate = detail.publish_date || null;
+          // First ensure article metadata exists (with date)
+          await sendNativeMessage2({
+            action: "save_articles_meta",
+            mode: "full",
+            articles: [{
+              article_id: articleId,
+              url: item.url,
+              title: detail.title || item.symbol + " analysis",
+              ticker: item.symbol,
+              date: pubDate,
+              article_type: "analysis",
+            }],
+          });
+          var saveResult = await sendNativeMessage2({
+            action: "save_article_content",
+            article_id: articleId,
+            body_markdown: report,
+            comments: comments,
+          });
+          if (saveResult && saveResult.ok) {
+            fetched++;
+            succeededSymbols.push(item.symbol);
+          } else {
+            failed++;
+          }
         } else {
-          failed++;
+          // Fallback: legacy save_detail_by_symbol
+          var saveResult = await sendNativeMessage2({
+            action: "save_detail_by_symbol",
+            symbol: item.symbol,
+            detail_report: report,
+          });
+          if (saveResult && saveResult.status === "ok") {
+            fetched++;
+            succeededSymbols.push(item.symbol);
+          } else {
+            failed++;
+          }
         }
       } catch (err) {
         failed++;
       }
-
-      if (i < items.length - 1) await sleep(2000);
     }
 
     sendProgress("Manual fetch done: " + fetched + " saved");
 
-    // Update storage to clear the no_article list for fetched items
+    // Update storage to clear unresolved_symbols for fetched items
     var storage = await chrome.storage.local.get("lastRefresh");
     if (storage.lastRefresh && storage.lastRefresh.details) {
-      var noArt = storage.lastRefresh.details.no_article || [];
-      var fetchedSymbols = items.filter(function (_, idx) { return idx < fetched; }).map(function (it) { return it.symbol; });
-      storage.lastRefresh.details.no_article = noArt.filter(function (s) { return fetchedSymbols.indexOf(s) < 0; });
+      var unresolved = storage.lastRefresh.details.unresolved_symbols || storage.lastRefresh.details.no_article || [];
+      // Only clear symbols that actually succeeded (not all attempted)
+      storage.lastRefresh.details.unresolved_symbols = unresolved.filter(function (s) { return succeededSymbols.indexOf(s) < 0; });
       storage.lastRefresh.details.fetched = (storage.lastRefresh.details.fetched || 0) + fetched;
       await chrome.storage.local.set({ lastRefresh: storage.lastRefresh });
     }
@@ -403,6 +508,54 @@ async function scrollToLoadAll(tabId, maxScrolls) {
     } else {
       staleCount = 0;
     }
+  }
+}
+
+async function scrollToComments(tabId) {
+  // SA comments are lazy-loaded by scrolling — they appear inside
+  // paywall-full-content as div.border-t-share-separator-thin elements.
+  // Scroll incrementally to trigger loading (natural dwell time).
+  var maxScrolls = 30;
+  var staleCount = 0;
+
+  for (var i = 0; i < maxScrolls; i++) {
+    var result = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
+        var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
+
+        // Click "Show more replies/comments" buttons — scoped to bottom half of page
+        var pageMiddle = document.body.scrollHeight / 2;
+        var buttons = document.querySelectorAll('button, a');
+        var clicked = false;
+        for (var b = 0; b < buttons.length; b++) {
+          var rect = buttons[b].getBoundingClientRect();
+          var absTop = rect.top + window.scrollY;
+          // Only click buttons in the bottom half (comments area)
+          if (absTop < pageMiddle) continue;
+          var bt = buttons[b].innerText.trim().toLowerCase();
+          if ((bt.indexOf('show') >= 0 || bt.indexOf('load more') >= 0 || bt.indexOf('more repl') >= 0)
+              && buttons[b].offsetParent !== null) {
+            buttons[b].click();
+            clicked = true;
+          }
+        }
+
+        window.scrollBy(0, window.innerHeight);
+        return { comments: commentEls.length, atBottom: atBottom, clicked: clicked };
+      },
+    });
+    var check = result[0] && result[0].result;
+
+    if (check && check.atBottom && !check.clicked) {
+      staleCount++;
+      if (staleCount >= 2) break;
+    } else {
+      staleCount = 0;
+    }
+
+    await sleep(1500);
   }
 }
 
@@ -473,6 +626,14 @@ function injectDetailScraper(tabId) {
     .executeScript({ target: { tabId }, files: ["scrape_detail.js"] })
     .then(function (results) {
       return (results[0] && results[0].result) || { error: "No result" };
+    });
+}
+
+function injectCommentsScraper(tabId) {
+  return chrome.scripting
+    .executeScript({ target: { tabId }, files: ["scrape_comments.js"] })
+    .then(function (results) {
+      return (results[0] && results[0].result) || { comments: [] };
     });
 }
 

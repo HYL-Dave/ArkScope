@@ -6,14 +6,14 @@
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 47 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 49 tools, 4 skills, 4 subagents
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
 - **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
 - **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks/chain), signals, web search
 - **RL Pipeline** — PPO/CPPO agents with sentiment/risk-enhanced data, model registry, 3 agent tools
 - **Monitor System** — Watchlist alerts (price, sentiment, signal, sector) with Discord notifications
-- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment, 7 migrations
+- **Self-hosted PostgreSQL** — pgvector-enabled, Docker deployment, 8 migrations
 
 ## Quick Start
 
@@ -121,6 +121,8 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasonin
 | | `get_sa_alpha_picks` | Seeking Alpha Alpha Picks portfolio (cached, auto-refresh) |
 | | `get_sa_pick_detail` | Alpha Picks detail report for a specific pick |
 | | `refresh_sa_alpha_picks` | Force refresh from SA website + sync tickers |
+| | `get_sa_articles` | Search Alpha Picks articles by ticker/keyword/type |
+| | `get_sa_article_detail` | Full article content + nested comment tree |
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
 | | `get_report` | Retrieve report by ID |
@@ -262,6 +264,7 @@ Applied automatically on first Docker startup, or manually:
 -- sql/005_add_financial_cache.sql — Financial data cache (paid API responses)
 -- sql/006_add_news_search.sql     — Full-text search on news (GIN index) + pgvector embedding column
 -- sql/007_add_sa_alpha_picks.sql  — Seeking Alpha Alpha Picks portfolio + refresh metadata
+-- sql/008_add_sa_articles.sql     — SA articles + comments tables + canonical_article_id
 ```
 
 ### Migrate Data from Parquet Files
@@ -494,7 +497,7 @@ The extension runs in your real Chrome browser (zero anti-bot detection risk). D
 
 | Module | Description |
 |--------|-------------|
-| `registry.py` | ToolRegistry (47 tools, dual-format for Anthropic + OpenAI) |
+| `registry.py` | ToolRegistry (49 tools, dual-format for Anthropic + OpenAI) |
 | `data_access.py` | DataAccessLayer with backend abstraction |
 | `backends/file_backend.py` | Parquet file backend |
 | `backends/db_backend.py` | PostgreSQL backend (psycopg3) + `query_health_stats()` |

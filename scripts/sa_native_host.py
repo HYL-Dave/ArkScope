@@ -87,6 +87,18 @@ def handle_message(msg):
     elif action == "save_detail_by_symbol":
         return _handle_save_detail_by_symbol(dal, msg)
 
+    elif action == "save_articles_meta":
+        return _handle_save_articles_meta(dal, msg)
+
+    elif action == "save_article_content":
+        return _handle_save_article_content(dal, msg)
+
+    elif action == "save_comments_only":
+        return _handle_save_comments_only(dal, msg)
+
+    elif action == "audit_unresolved":
+        return _handle_audit_unresolved(dal)
+
     elif action == "ping":
         return {"status": "ok", "project_root": PROJECT_ROOT}
 
@@ -251,6 +263,127 @@ def _handle_save_detail_by_symbol(dal, msg):
     except Exception as e:
         logger.error("Manual detail save failed for %s: %s", symbol, e)
         return {"status": "error", "symbol": symbol, "error": str(e)}
+
+
+def _parse_sa_date(date_str):
+    """Parse SA date → 'YYYY-MM-DD'. Accepts 'Mar. 16, 2026', 'Mar 16, 2026', or ISO 'YYYY-MM-DD'."""
+    if not date_str:
+        return None
+    date_str = date_str.strip()
+    try:
+        # ISO format (from <time datetime>): "2026-03-16" or "2026-03-16T..."
+        if len(date_str) >= 10 and date_str[4] == "-" and date_str[7] == "-":
+            return date_str[:10]
+        from datetime import datetime as _dt
+        for fmt in ("%b. %d, %Y", "%b %d, %Y"):
+            try:
+                return _dt.strptime(date_str, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return None
+    except Exception:
+        return None
+
+
+def _handle_save_articles_meta(dal, msg):
+    """Batch upsert article metadata, return need_content + unresolved."""
+    mode = msg.get("mode", "quick")
+    articles = msg.get("articles", [])
+    # Map scraper fields to DB fields
+    for a in articles:
+        if "date" in a and "published_date" not in a:
+            a["published_date"] = _parse_sa_date(a.pop("date"))
+    try:
+        result = dal.save_sa_articles_meta(articles, mode=mode)
+        logger.info(
+            "save_articles_meta: saved=%s need_content=%s need_comments=%s unresolved=%s auto_upgrade=%s",
+            result.get("saved"), len(result.get("need_content", [])),
+            len(result.get("need_comments", [])),
+            len(result.get("unresolved_symbols", [])),
+            result.get("auto_upgrade"),
+        )
+        return result
+    except Exception as e:
+        logger.error("save_articles_meta failed: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
+def _normalize_comment_ids(article_id, comments):
+    """Ensure stable comment IDs using Python sha256 for synthetic keys.
+
+    Also remaps parent_comment_id references so the tree stays connected.
+    """
+    import hashlib
+
+    # Pass 1: build old→new ID mapping for synthetic keys
+    id_map = {}
+    for c in comments:
+        old_id = c.get("comment_id", "")
+        if not old_id or old_id.startswith("syn_"):
+            raw = "{}:{}:{}:{}".format(
+                article_id,
+                c.get("commenter", ""),
+                c.get("comment_date", ""),
+                (c.get("comment_text", "") or "")[:100],
+            )
+            new_id = hashlib.sha256(raw.encode()).hexdigest()[:20]
+            if old_id:
+                id_map[old_id] = new_id
+            c["comment_id"] = new_id
+
+    # Pass 2: remap parent_comment_id references
+    for c in comments:
+        parent = c.get("parent_comment_id")
+        if parent and parent in id_map:
+            c["parent_comment_id"] = id_map[parent]
+
+    return comments
+
+
+def _handle_save_article_content(dal, msg):
+    """Compound atomic write: article body + comments + pick sync."""
+    article_id = msg.get("article_id", "")
+    body_markdown = msg.get("body_markdown", "")
+    comments = _normalize_comment_ids(article_id, msg.get("comments", []))
+    try:
+        result = dal.save_sa_article_with_comments(article_id, body_markdown, comments)
+        logger.info(
+            "save_article_content: %s (%d chars, %d comments, synced=%s)",
+            article_id, len(body_markdown), len(comments),
+            result.get("synced_picks", 0),
+        )
+        return {"status": "ok", "article_id": article_id, **result}
+    except Exception as e:
+        logger.error("save_article_content failed for %s: %s", article_id, e)
+        return {"status": "error", "article_id": article_id, "error": str(e)}
+
+
+def _handle_save_comments_only(dal, msg):
+    """Comments-only update for TTL refresh."""
+    article_id = msg.get("article_id", "")
+    comments = _normalize_comment_ids(article_id, msg.get("comments", []))
+    try:
+        count = dal.save_sa_comments_only(article_id, comments)
+        logger.info("save_comments_only: %s (%d comments)", article_id, count)
+        return {"status": "ok", "article_id": article_id, "comments_count": count}
+    except Exception as e:
+        logger.error("save_comments_only failed for %s: %s", article_id, e)
+        return {"status": "error", "article_id": article_id, "error": str(e)}
+
+
+def _handle_audit_unresolved(dal):
+    """Final audit: full-text fallback for unresolved current picks."""
+    try:
+        result = dal.audit_sa_unresolved_symbols()
+        logger.info(
+            "audit_unresolved: %d unresolved, %d resolved by fulltext",
+            len(result.get("unresolved_symbols", [])),
+            result.get("resolved_by_fulltext", 0),
+        )
+        return {"status": "ok", **result}
+    except Exception as e:
+        logger.error("audit_unresolved failed: %s", e)
+        return {"status": "error", "error": str(e)}
 
 
 def _try_ticker_sync(dal, picks):

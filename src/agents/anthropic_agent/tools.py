@@ -1100,6 +1100,39 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": [],
             },
         },
+        # SA Articles (Phase 11c-v3)
+        {
+            "name": "get_sa_articles",
+            "description": (
+                "Search SA Alpha Picks articles. Returns article list with title, "
+                "date, ticker, type (analysis/recap/webinar/commentary/removal), "
+                "and comment count. Use get_sa_article_detail for full content."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {"type": "string", "description": "Filter by stock ticker"},
+                    "keyword": {"type": "string", "description": "Full-text search in title and body"},
+                    "article_type": {"type": "string", "enum": ["analysis", "recap", "webinar", "commentary", "removal"]},
+                    "limit": {"type": "integer", "description": "Max results (default 10)"},
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "get_sa_article_detail",
+            "description": (
+                "Get full SA Alpha Picks article content + comments. "
+                "Returns body as Markdown + nested comment tree."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "article_id": {"type": "string", "description": "Article ID (from get_sa_articles)"},
+                },
+                "required": ["article_id"],
+            },
+        },
     ])
 
     return tools
@@ -1201,7 +1234,10 @@ def execute_tool(
     from src.tools.monitor_tools import scan_alerts
     from src.tools.freshness import check_data_freshness
     from src.tools.rl_tools import get_rl_model_status, get_rl_prediction, get_rl_backtest_report
-    from src.tools.sa_tools import get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks
+    from src.tools.sa_tools import (
+        get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+        get_sa_articles, get_sa_article_detail,
+    )
 
     # Tool dispatch map
     tool_map = {
@@ -1466,6 +1502,16 @@ def execute_tool(
             picked_date=tool_input.get("picked_date"),
         ),
         "refresh_sa_alpha_picks": lambda: refresh_sa_alpha_picks(dal),
+        "get_sa_articles": lambda: get_sa_articles(
+            dal,
+            ticker=tool_input.get("ticker"),
+            keyword=tool_input.get("keyword"),
+            article_type=tool_input.get("article_type"),
+            limit=tool_input.get("limit", 10),
+        ),
+        "get_sa_article_detail": lambda: get_sa_article_detail(
+            dal, tool_input["article_id"]
+        ),
     }
 
     if tool_name not in tool_map:

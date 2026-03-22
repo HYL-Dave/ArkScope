@@ -518,7 +518,7 @@ class TestAnthropicBridgeIntegration:
         """All bridge tools including delegate + freshness."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 48
+        assert len(tools) == 50
 
     def test_delegate_schema_has_enum(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
@@ -546,7 +546,7 @@ class TestOpenAiBridgeIntegration:
         from src.agents.openai_agent.tools import create_openai_tools
         mock_dal = MagicMock()
         tools = create_openai_tools(mock_dal)
-        assert len(tools) == 48
+        assert len(tools) == 50
 
     def test_openai_tools_includes_delegate(self):
         from src.agents.openai_agent.tools import create_openai_tools

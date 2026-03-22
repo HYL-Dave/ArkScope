@@ -114,6 +114,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sa_alpha_picks as _get_sa_alpha_picks,
         get_sa_pick_detail as _get_sa_pick_detail,
         refresh_sa_alpha_picks as _refresh_sa_alpha_picks,
+        get_sa_articles as _get_sa_articles,
+        get_sa_article_detail as _get_sa_article_detail,
     )
 
     # ================================================================
@@ -971,6 +973,26 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _refresh_sa_alpha_picks(dal)
         return _serialize_result(result, "refresh_sa_alpha_picks")
 
+    @function_tool
+    def tool_get_sa_articles(
+        ticker: str = "", keyword: str = "", article_type: str = "", limit: int = 10
+    ) -> str:
+        """Search SA Alpha Picks articles by ticker, keyword, or type."""
+        result = _get_sa_articles(
+            dal,
+            ticker=ticker or None,
+            keyword=keyword or None,
+            article_type=article_type or None,
+            limit=limit,
+        )
+        return _serialize_result(result, "get_sa_articles")
+
+    @function_tool
+    def tool_get_sa_article_detail(article_id: str) -> str:
+        """Get full SA article content + comments by article ID."""
+        result = _get_sa_article_detail(dal, article_id)
+        return _serialize_result(result, "get_sa_article_detail")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -1017,6 +1039,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_alpha_picks,
         tool_get_sa_pick_detail,
         tool_refresh_sa_alpha_picks,
+        tool_get_sa_articles,
+        tool_get_sa_article_detail,
     ]
 
     # Conditionally add web tools
