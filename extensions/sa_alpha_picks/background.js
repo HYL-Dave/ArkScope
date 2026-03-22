@@ -525,10 +525,15 @@ async function scrollToComments(tabId) {
         var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
         var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
 
-        // Click "Show more replies/comments" buttons if visible
+        // Click "Show more replies/comments" buttons — scoped to bottom half of page
+        var pageMiddle = document.body.scrollHeight / 2;
         var buttons = document.querySelectorAll('button, a');
         var clicked = false;
         for (var b = 0; b < buttons.length; b++) {
+          var rect = buttons[b].getBoundingClientRect();
+          var absTop = rect.top + window.scrollY;
+          // Only click buttons in the bottom half (comments area)
+          if (absTop < pageMiddle) continue;
           var bt = buttons[b].innerText.trim().toLowerCase();
           if ((bt.indexOf('show') >= 0 || bt.indexOf('load more') >= 0 || bt.indexOf('more repl') >= 0)
               && buttons[b].offsetParent !== null) {

@@ -30,22 +30,42 @@
     if (parsed) comments.push(parsed);
   }
 
-  // Pass 2: Resolve reply parents via @username mentions
-  // SA uses flat DOM — replies start with "@Username" in the text
-  var usernameToId = {};
+  // Pass 2: Resolve reply parents via @username mentions (best-effort heuristic)
+  // SA uses flat DOM with no explicit parent IDs. We detect replies by:
+  //   1. "@Username" at start of comment text → link to that user's nearest prior comment
+  // Limitation: same user with multiple comments may link to wrong parent;
+  //   replies without @mention stay as top-level. This is an inherent SA DOM limitation.
+  var usernameToIds = {}; // username → [comment_id, ...] (ordered by appearance)
   for (var j = 0; j < comments.length; j++) {
     if (comments[j].commenter) {
-      usernameToId[comments[j].commenter] = comments[j].comment_id;
+      if (!usernameToIds[comments[j].commenter]) {
+        usernameToIds[comments[j].commenter] = [];
+      }
+      usernameToIds[comments[j].commenter].push(comments[j].comment_id);
     }
   }
   for (var k = 0; k < comments.length; k++) {
     var text = comments[k].comment_text;
     if (text && text.charAt(0) === "@") {
-      // Extract mentioned username: "@Username rest of text"
       var spaceIdx = text.indexOf(" ");
       var mentioned = spaceIdx > 1 ? text.substring(1, spaceIdx) : text.substring(1);
-      if (usernameToId[mentioned]) {
-        comments[k].parent_comment_id = usernameToId[mentioned];
+      var candidates = usernameToIds[mentioned];
+      if (candidates) {
+        // Find the nearest prior comment by this user (most likely the actual parent)
+        var parentId = null;
+        for (var m = candidates.length - 1; m >= 0; m--) {
+          if (candidates[m] !== comments[k].comment_id) {
+            // Find the index of this candidate
+            for (var n = 0; n < k; n++) {
+              if (comments[n].comment_id === candidates[m]) {
+                parentId = candidates[m];
+                break;
+              }
+            }
+            if (parentId) break;
+          }
+        }
+        if (parentId) comments[k].parent_comment_id = parentId;
       }
     }
   }
