@@ -524,15 +524,28 @@ async function scrollToComments(tabId) {
       func: function () {
         var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
         var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
+
+        // Click "Show more replies/comments" buttons if visible
+        var buttons = document.querySelectorAll('button, a');
+        var clicked = false;
+        for (var b = 0; b < buttons.length; b++) {
+          var bt = buttons[b].innerText.trim().toLowerCase();
+          if ((bt.indexOf('show') >= 0 || bt.indexOf('load more') >= 0 || bt.indexOf('more repl') >= 0)
+              && buttons[b].offsetParent !== null) {
+            buttons[b].click();
+            clicked = true;
+          }
+        }
+
         window.scrollBy(0, window.innerHeight);
-        return { comments: commentEls.length, atBottom: atBottom };
+        return { comments: commentEls.length, atBottom: atBottom, clicked: clicked };
       },
     });
     var check = result[0] && result[0].result;
 
-    if (check && check.atBottom) {
+    if (check && check.atBottom && !check.clicked) {
       staleCount++;
-      if (staleCount >= 2) break; // Confirmed at bottom
+      if (staleCount >= 2) break;
     } else {
       staleCount = 0;
     }

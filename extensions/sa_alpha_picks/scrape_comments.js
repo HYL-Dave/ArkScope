@@ -22,12 +22,32 @@
     return { comments: [], info: "No comment elements found" };
   }
 
+  // Pass 1: Parse all comments
   var comments = [];
-
   for (var i = 0; i < commentEls.length; i++) {
     var el = commentEls[i];
     var parsed = parseComment(el);
     if (parsed) comments.push(parsed);
+  }
+
+  // Pass 2: Resolve reply parents via @username mentions
+  // SA uses flat DOM — replies start with "@Username" in the text
+  var usernameToId = {};
+  for (var j = 0; j < comments.length; j++) {
+    if (comments[j].commenter) {
+      usernameToId[comments[j].commenter] = comments[j].comment_id;
+    }
+  }
+  for (var k = 0; k < comments.length; k++) {
+    var text = comments[k].comment_text;
+    if (text && text.charAt(0) === "@") {
+      // Extract mentioned username: "@Username rest of text"
+      var spaceIdx = text.indexOf(" ");
+      var mentioned = spaceIdx > 1 ? text.substring(1, spaceIdx) : text.substring(1);
+      if (usernameToId[mentioned]) {
+        comments[k].parent_comment_id = usernameToId[mentioned];
+      }
+    }
   }
 
   return { comments: comments };
@@ -81,17 +101,8 @@
       }
     }
 
-    // Detect if this is a reply (nested/indented comment)
-    // Replies typically have additional left margin or are inside a nested container
+    // parent_comment_id resolved in Pass 2 via @username detection
     var parentId = null;
-    var parentEl = el.parentElement;
-    if (parentEl && parentEl.closest('[class*="border-t-share-separator-thin"]')) {
-      // This comment is nested inside another comment → it's a reply
-      var parentComment = parentEl.closest('[class*="border-t-share-separator-thin"]');
-      if (parentComment !== el) {
-        parentId = "pending"; // Will be resolved by ID assignment
-      }
-    }
 
     // Generate synthetic comment_id (will be re-hashed to sha256 in Python)
     var hash = 0;
