@@ -10,7 +10,7 @@ scripts/scoring/
 ├── batch_sentiment_scoring.sh   # Multi-API-key sentiment scoring pipeline
 ├── batch_scoring_template.sh    # Advanced configuration template (Flex mode, timeout)
 ├── validate_scores.py           # CSV validation tool
-├── score_ibkr_news.py          # IBKR news scoring integration
+├── score_ibkr_news.py          # Universal parquet news scoring (Polygon/Finnhub/IBKR)
 └── README.md
 ```
 
@@ -103,7 +103,20 @@ python scripts/scoring/validate_scores.py <csv_file>
 
 ### score_ibkr_news.py
 
-IBKR news scoring integration (uses IBKR API news data).
+Universal parquet news scoring. Works with **any** news source using the unified parquet schema
+(`ticker`, `title`, `content`, `content_length`), including Polygon, Finnhub, and IBKR.
+
+```bash
+# Score different data sources via --data-dir
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --data-dir data/news/raw/polygon
+
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --data-dir data/news/raw/finnhub
+
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --data-dir data/news/raw/ibkr  # default
+```
 
 ## Related Files
 
@@ -145,6 +158,9 @@ Moved from project root:
 | gpt-5 | high | `sentiment_gpt_5_high` | `risk_gpt_5_high` |
 | gpt-5.2 | high | `sentiment_gpt_5_2_high` | `risk_gpt_5_2_high` |
 | gpt-5.2 | xhigh | `sentiment_gpt_5_2_xhigh` | `risk_gpt_5_2_xhigh` |
+| gpt-5.4 | high | `sentiment_gpt_5_4_high` | `risk_gpt_5_4_high` |
+| gpt-5.4-mini | high | `sentiment_gpt_5_4_mini_high` | `risk_gpt_5_4_mini_high` |
+| gpt-5.4-nano | high | `sentiment_gpt_5_4_nano_high` | `risk_gpt_5_4_nano_high` |
 | o4-mini | medium | `sentiment_o4_mini_medium` | `risk_o4_mini_medium` |
 
 **Conversion rule**: `-` and `.` in model name → `_`
@@ -156,18 +172,18 @@ Previously hardcoded as `sentiment_deepseek` / `risk_deepseek`.
 Column naming includes `reasoning_effort` to distinguish different scoring configurations.
 
 > **Important**: `reasoning_effort` controls model thinking depth and affects scoring quality.
-> This is NOT the same as `verbosity`, which only affects output detail level.
+> `verbosity` is a legacy parameter only supported on gpt-5, gpt-5-mini, and gpt-5.1 (removed in gpt-5.2+).
 
 **Available levels:**
 
 | Level | Description | Models |
 |-------|-------------|--------|
-| `none` | No extended thinking (GPT-5.2 default) | gpt-5.2 |
+| `none` | No extended thinking | gpt-5.x |
 | `minimal` | Minimal reasoning | gpt-5.x |
 | `low` | Light reasoning | gpt-5.x, o-series |
 | `medium` | Balanced reasoning | gpt-5.x, o-series |
 | `high` | Deep reasoning (recommended) | gpt-5.x, o-series |
-| `xhigh` | Maximum reasoning (Pro only) | gpt-5.2 Pro |
+| `xhigh` | Maximum reasoning (Pro only) | gpt-5.x Pro |
 
 **Usage:**
 ```bash
@@ -204,5 +220,61 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
 - ✅ Automatic key rotation when limit reached
 - ✅ Flex mode fallback (`--allow-flex`)
 - ✅ Incremental scoring (skips already-scored articles)
+- ✅ Model chain switching (`--continue-from`)
 - ✅ Progress checkpoints (`--save-every`)
 - ✅ Dry-run preview (`--dry-run`)
+
+### Model Chain Switching (`--continue-from`)
+
+When new models are released and old models are retired, `--continue-from` lets you
+switch scoring models without re-scoring articles that previous models already covered.
+
+**How it works:**
+- Each model writes to its own column (e.g., `sentiment_gpt_5_2_xhigh`, `sentiment_gpt_5_4_xhigh`)
+- `--continue-from` skips articles where ANY listed predecessor model has a score
+- Multiple predecessors are comma-separated to support multi-generation chains
+
+**Example: Two-generation handoff**
+```
+Timeline:  2022 ────────────────── 2026-03 ── 2026-04 ──────────── 2026-12
+Model:     ◄── gpt-5.2 scored ──►           ◄── gpt-5.4 scores ──►
+```
+
+```bash
+# Step 1: gpt-5.2 scores everything available (2022 ~ 2026-03)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
+    --reasoning-effort xhigh --data-dir data/news/raw/polygon
+
+# Step 2: gpt-5.4 picks up new articles only (2026-04+)
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \
+    --reasoning-effort xhigh --data-dir data/news/raw/polygon \
+    --continue-from gpt-5.2 --continue-from-effort xhigh
+```
+
+**Example: Three-generation chain**
+```
+Timeline:  2022 ───── 2026-03 ── 2026-04 ─── 2026-09 ── 2026-10 ─── 2027
+Model:     ◄─ gpt-5.2 ─►       ◄─ gpt-5.4 ─►          ◄── gpt-6 ──►
+```
+
+```bash
+# Step 3: gpt-6 picks up new articles, skipping BOTH gpt-5.2 and gpt-5.4
+python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 \
+    --reasoning-effort high --data-dir data/news/raw/polygon \
+    --continue-from gpt-5.2,gpt-5.4 --continue-from-effort xhigh
+```
+
+**Important: Always list ALL predecessor models in the chain.** If you only list the
+most recent predecessor (e.g., `--continue-from gpt-5.4`), articles scored by earlier
+models (gpt-5.2) but not by gpt-5.4 will appear as "unscored" and get re-scored.
+
+**Resulting parquet columns:**
+```
+sentiment_gpt_5_2_xhigh | sentiment_gpt_5_4_xhigh | sentiment_gpt_6_high
+4                        | NULL                     | NULL         (old, gpt-5.2)
+NULL                     | 3                        | NULL         (mid, gpt-5.4)
+NULL                     | NULL                     | 5            (new, gpt-6)
+```
+
+**Downstream usage:** Training/analysis code should merge columns with coalesce logic
+(prefer newest model, fallback to older). See `training/data_prep/prepare_training_data.py`.

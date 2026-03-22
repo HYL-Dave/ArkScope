@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Incremental sentiment/risk scoring for IBKR news (parquet format).
+Incremental sentiment/risk scoring for news parquet files.
+
+Works with ANY news source that uses the unified parquet schema
+(ticker, title, content, content_length, etc.), including:
+- Polygon (data/news/raw/polygon/)
+- Finnhub (data/news/raw/finnhub/)
+- IBKR (data/news/raw/ibkr/)
 
 Features:
-- Scans IBKR news parquet files for unscored articles
+- Scans parquet files recursively for unscored articles
 - Dynamic column naming based on model (e.g., sentiment_gpt_5_2, risk_o4_mini)
 - Updates parquet files in-place with scores
 - Supports model switching with --continue-from to pick up where another model left off
@@ -17,13 +23,26 @@ Column Naming Convention:
     sentiment_gpt_5_2, risk_gpt_5_2, sentiment_o4_mini, etc.
 
 Usage:
-    # Score sentiment with gpt-5.2 (only articles without gpt-5.2 scores)
+    # Score Polygon news
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+        --data-dir data/news/raw/polygon
+
+    # Score Finnhub news
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+        --data-dir data/news/raw/finnhub
+
+    # Score IBKR news (default)
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
 
-    # Switch model: continue from gpt-5.2, score remaining with gpt-6
+    # Switch model: continue from gpt-5.2, score remaining with gpt-5.4
     # (only scores articles that gpt-5.2 hasn't scored yet)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
+        --continue-from gpt-5.2 --reasoning-effort xhigh
+
+    # Chain: continue from gpt-5.2 AND gpt-5.4 (comma-separated)
+    # Only scores articles that NEITHER model has scored
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 \\
-        --continue-from gpt-5.2 --reasoning-effort high
+        --continue-from gpt-5.2,gpt-5.4 --reasoning-effort high
 
     # Force re-score everything with gpt-6 (overwrite existing gpt-6 scores)
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 --rescore
@@ -107,8 +126,8 @@ def get_score_column(mode: str, model: str, reasoning_effort: str = "high") -> s
         e.g., sentiment_gpt_5_2_high, risk_o4_mini_medium
 
     Note: This includes reasoning_effort (not verbosity) to distinguish
-    different scoring configurations. Verbosity only affects output detail,
-    not the scoring quality.
+    different scoring configurations. Verbosity is a legacy parameter
+    only supported on gpt-5, gpt-5-mini, gpt-5.1 (removed in gpt-5.2+).
 
     Args:
         mode: "sentiment" or "risk"
@@ -227,7 +246,7 @@ def score_article(
         model: OpenAI model name
         mode: "sentiment" or "risk"
         reasoning_effort: Effort level for reasoning models
-        verbosity: Verbosity for gpt-5 models
+        verbosity: Verbosity for legacy gpt-5/gpt-5-mini only (ignored for gpt-5.2+)
         retry: Number of retries
         pause: Pause between retries
 
@@ -261,12 +280,14 @@ def score_article(
                 params = {
                     "model": model,
                     "reasoning_effort": reasoning_effort,
-                    "verbosity": verbosity,
                     "messages": messages,
                     "max_completion_tokens": 2400,
                     "functions": FUNCTIONS,
                     "function_call": {"name": "record_score"},
                 }
+                # verbosity only supported on gpt-5, gpt-5-mini, gpt-5.1 (removed in gpt-5.2+)
+                if model in ("gpt-5", "gpt-5-mini", "gpt-5.1"):
+                    params["verbosity"] = verbosity
             else:
                 params = {
                     "model": model,
@@ -344,10 +365,10 @@ def find_unscored_articles(
 
     Scoring modes:
         Default: Score articles where the target column is empty.
-        --continue-from: Score articles where the *previous* model has NO score
-            (i.e. unscored territory) and the new model also has no score.
-            This lets a newer model pick up where the old one left off,
-            saving cost by not re-scoring articles the old model already covered.
+        --continue-from: Score articles where ALL listed predecessor models
+            have NO score (i.e. truly new articles) and the new model also
+            has no score. Supports comma-separated model chains to prevent
+            re-scoring when multiple generations of models have been used.
         --rescore: Score all articles (overwrite existing scores in target column).
 
     Args:
@@ -356,12 +377,12 @@ def find_unscored_articles(
         model: Target model name for dynamic column naming
         reasoning_effort: Reasoning effort level for column naming
         month: Optional month filter (YYYY-MM)
-        continue_from: Previous model name to continue from (e.g. "gpt-5.2").
-            Only articles NOT scored by this model (and also not yet scored by
-            the new model) will be selected — i.e. the unscored tail beyond
-            what the previous model covered.
-        continue_from_effort: Reasoning effort of the previous model. If None,
-            auto-detects by scanning columns.
+        continue_from: Previous model name(s) to continue from.
+            Comma-separated for chains: "gpt-5.2,gpt-5.4"
+            Only articles NOT scored by ANY of these models (and also not yet
+            scored by the new model) will be selected.
+        continue_from_effort: Reasoning effort of the previous model(s). If None,
+            auto-detects by scanning columns. Applied to all models in the chain.
         rescore: If True, re-score all articles (ignore existing scores).
 
     Returns:
@@ -369,12 +390,10 @@ def find_unscored_articles(
     """
     score_col = get_score_column(mode, model, reasoning_effort)
 
-    # Build the "previous model" column name for --continue-from
-    prev_col = None
+    # Parse comma-separated model chain for --continue-from
+    prev_models = []
     if continue_from:
-        if continue_from_effort:
-            prev_col = get_score_column(mode, continue_from, continue_from_effort)
-        # else: auto-detect per file (see below)
+        prev_models = [m.strip() for m in continue_from.split(",") if m.strip()]
 
     result = {}
 
@@ -398,27 +417,26 @@ def find_unscored_articles(
             if rescore:
                 # Re-score everything with content
                 to_score = has_content
-            elif continue_from:
-                # Auto-detect previous model column if effort not specified
-                effective_prev_col = prev_col
-                if effective_prev_col is None:
-                    effective_prev_col = _detect_prev_column(
-                        df, mode, continue_from
-                    )
-                if effective_prev_col is None or effective_prev_col not in df.columns:
-                    # Previous model never scored this file → all articles
-                    # are in the "unscored tail", same as default behavior
-                    logging.debug(
-                        f"{parquet_file.name}: no column for "
-                        f"'{continue_from}' ({mode}), treating all as unscored"
-                    )
-                    to_score = has_content & df[score_col].isna()
-                else:
-                    # Articles where previous model did NOT score (unscored tail)
-                    # and new model also hasn't scored yet
-                    prev_unscored = df[effective_prev_col].isna()
-                    new_unscored = df[score_col].isna()
-                    to_score = has_content & prev_unscored & new_unscored
+            elif prev_models:
+                # Chain mode: skip articles scored by ANY predecessor column.
+                # Each model may have multiple effort columns; OR them all.
+                any_prev_scored = pd.Series(False, index=df.index)
+                for pm in prev_models:
+                    if continue_from_effort:
+                        cols = [get_score_column(mode, pm, continue_from_effort)]
+                        cols = [c for c in cols if c in df.columns]
+                    else:
+                        cols = _detect_prev_columns(df, mode, pm)
+                    if cols:
+                        for pc in cols:
+                            any_prev_scored = any_prev_scored | df[pc].notna()
+                    else:
+                        logging.debug(
+                            f"{parquet_file.name}: no column for "
+                            f"'{pm}' ({mode}), ignoring in chain"
+                        )
+                new_unscored = df[score_col].isna()
+                to_score = has_content & ~any_prev_scored & new_unscored
             else:
                 # Default: only articles where target column is empty
                 to_score = has_content & df[score_col].isna()
@@ -443,25 +461,27 @@ def find_unscored_articles(
     return result
 
 
-def _detect_prev_column(df: pd.DataFrame, mode: str, model: str) -> Optional[str]:
-    """Auto-detect the score column for a previous model.
+def _detect_prev_columns(df: pd.DataFrame, mode: str, model: str) -> List[str]:
+    """Auto-detect ALL score columns for a previous model.
 
     Scans DataFrame columns for patterns like {mode}_{model_suffix}_{effort}
-    and returns the first match.
+    and returns all matches. A model may have multiple effort columns
+    (e.g., sentiment_gpt_5_2_high AND sentiment_gpt_5_2_xhigh).
     """
     suffix = model_to_column_suffix(model)
     prefix = f"{mode}_{suffix}"
+    matches = []
 
     # Exact match without effort (legacy columns like sentiment_haiku)
     if prefix in df.columns:
-        return prefix
+        matches.append(prefix)
 
     # Match with any effort suffix
     for col in df.columns:
-        if col.startswith(prefix + "_"):
-            return col
+        if col.startswith(prefix + "_") and col not in matches:
+            matches.append(col)
 
-    return None
+    return matches
 
 
 def score_parquet_file(
@@ -487,12 +507,12 @@ def score_parquet_file(
         mode: "sentiment" or "risk"
         model: OpenAI model name (determines column name)
         reasoning_effort: Effort level
-        verbosity: Verbosity level
+        verbosity: Verbosity for legacy gpt-5/gpt-5-mini only
         max_articles: Max articles to score
         save_every: Save progress every N articles
         text_column: Column to use for scoring text
-        continue_from: Previous model name (for continue mode)
-        continue_from_effort: Reasoning effort of previous model
+        continue_from: Previous model name(s), comma-separated for chains
+        continue_from_effort: Reasoning effort of previous model(s)
         rescore: If True, re-score all articles
 
     Returns:
@@ -507,15 +527,18 @@ def score_parquet_file(
     if rescore:
         target_mask = has_content
     elif continue_from:
-        # Find previous model column
-        if continue_from_effort:
-            prev_col = get_score_column(mode, continue_from, continue_from_effort)
-        else:
-            prev_col = _detect_prev_column(df, mode, continue_from)
-        if prev_col and prev_col in df.columns:
-            target_mask = has_content & df[prev_col].isna() & df[score_col].isna()
-        else:
-            target_mask = has_content & df[score_col].isna()
+        # Chain mode: skip articles scored by ANY predecessor column
+        prev_models = [m.strip() for m in continue_from.split(",") if m.strip()]
+        any_prev_scored = pd.Series(False, index=df.index)
+        for pm in prev_models:
+            if continue_from_effort:
+                cols = [get_score_column(mode, pm, continue_from_effort)]
+                cols = [c for c in cols if c in df.columns]
+            else:
+                cols = _detect_prev_columns(df, mode, pm)
+            for pc in cols:
+                any_prev_scored = any_prev_scored | df[pc].notna()
+        target_mask = has_content & ~any_prev_scored & df[score_col].isna()
     else:
         target_mask = has_content & df[score_col].isna()
 
@@ -574,8 +597,15 @@ def score_parquet_file(
             logging.info("Token limit reached; stopping")
             break
 
-    # Final save
+    # Final save (covers any articles after the last checkpoint)
     df.to_parquet(parquet_file, index=False, compression='snappy')
+    saved_total = stats["scored"] + stats["failed"]
+    last_checkpoint = (saved_total // save_every) * save_every
+    remaining = saved_total - last_checkpoint
+    if remaining > 0:
+        logging.info(f"  [Final save] {remaining} articles since last checkpoint (total: {saved_total})")
+    else:
+        logging.info(f"  [Final save] All {saved_total} articles already checkpointed")
 
     return stats
 
@@ -596,7 +626,8 @@ def main():
     )
     parser.add_argument(
         "--data-dir", type=str, default="data/news/raw/ibkr",
-        help="IBKR news data directory (default: data/news/raw/ibkr)"
+        help="News data directory with parquet files (default: data/news/raw/ibkr). "
+             "Works with any source: polygon, finnhub, ibkr, etc."
     )
     parser.add_argument(
         "--model", default="gpt-5",
@@ -606,12 +637,12 @@ def main():
         "--reasoning-effort", default="high",
         choices=["none", "minimal", "low", "medium", "high", "xhigh"],
         help="Reasoning effort level: none/minimal/low/medium/high/xhigh (default: high). "
-             "Note: 'none' is GPT-5.2 default; 'xhigh' requires GPT-5.2 Pro."
+             "Note: 'xhigh' requires Pro subscription."
     )
     parser.add_argument(
         "--verbosity", default="low",
         choices=["low", "medium", "high"],
-        help="Verbosity for gpt-5 models (default: low)"
+        help="Verbosity for legacy gpt-5/gpt-5-mini/gpt-5.1 only (ignored for gpt-5.2+). Default: low"
     )
     parser.add_argument(
         "--text-column", default="title",
@@ -652,12 +683,12 @@ def main():
     )
     # --- Model switching ---
     parser.add_argument(
-        "--continue-from", type=str, default=None, metavar="MODEL",
-        help="Continue scoring from where another model left off. "
-             "Only articles NOT scored by MODEL (the unscored tail) "
-             "will be selected, saving cost by skipping articles "
-             "the previous model already covered. "
-             "E.g.: --model gpt-6 --continue-from gpt-5.2"
+        "--continue-from", type=str, default=None, metavar="MODEL[,MODEL,...]",
+        help="Continue scoring from where previous model(s) left off. "
+             "Comma-separated for model chains. Only articles NOT scored by "
+             "ANY listed model will be selected. "
+             "E.g.: --model gpt-5.4 --continue-from gpt-5.2 | "
+             "--model gpt-6 --continue-from gpt-5.2,gpt-5.4"
     )
     parser.add_argument(
         "--continue-from-effort", type=str, default=None,
@@ -752,15 +783,17 @@ def main():
         if args.rescore:
             return int(has_content.sum())
         elif args.continue_from:
-            prev_col_eff = None
-            if args.continue_from_effort:
-                prev_col_eff = get_score_column(args.mode, args.continue_from, args.continue_from_effort)
-            else:
-                prev_col_eff = _detect_prev_column(df, args.mode, args.continue_from)
-            if prev_col_eff and prev_col_eff in df.columns:
-                return int((has_content & df[prev_col_eff].isna() & df[score_col].isna()).sum())
-            else:
-                return int((has_content & df[score_col].isna()).sum())
+            prev_models = [m.strip() for m in args.continue_from.split(",") if m.strip()]
+            any_prev_scored = pd.Series(False, index=df.index)
+            for pm in prev_models:
+                if args.continue_from_effort:
+                    cols = [get_score_column(args.mode, pm, args.continue_from_effort)]
+                    cols = [c for c in cols if c in df.columns]
+                else:
+                    cols = _detect_prev_columns(df, args.mode, pm)
+                for pc in cols:
+                    any_prev_scored = any_prev_scored | df[pc].notna()
+            return int((has_content & ~any_prev_scored & df[score_col].isna()).sum())
         else:
             return int((has_content & df[score_col].isna()).sum())
 
