@@ -73,8 +73,8 @@
   return { comments: comments };
 
   function parseComment(el) {
-    // Extract comment text (div with break-words class)
-    var textEl = el.querySelector('[class*="break-words"]');
+    // Extract comment text (DIV with break-words — not <a> or <button> which also have it)
+    var textEl = el.querySelector('div[class*="break-words"]');
     var text = textEl ? textEl.innerText.trim() : "";
     if (!text || text.length < 3) return null;
 
