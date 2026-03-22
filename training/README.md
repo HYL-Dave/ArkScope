@@ -224,7 +224,7 @@ python training/backtest.py \
 ```bash
 # 0. 評分（如尚未完成 risk）
 python scripts/scoring/score_ibkr_news.py \
-  --mode risk --model gpt-5.2 --reasoning-effort xhigh \
+  --mode risk --model gpt-5.4 --reasoning-effort xhigh \
   --daily-token-limit 1000000 --save-every 10 \
   --data-dir data/news/raw/polygon
 

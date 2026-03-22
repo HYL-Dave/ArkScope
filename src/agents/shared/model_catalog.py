@@ -37,21 +37,41 @@ MODEL_CATALOG: List[ModelEntry] = [
         description="Fast + intelligent — financial analysis (64K output, $3/$15)",
     ),
     ModelEntry(
-        id="gpt-5.2",
+        id="gpt-5.4",
         provider="openai",
-        name="GPT-5.2",
-        aliases=["gpt5", "gpt-5", "gpt5.2", "5.2"],
+        name="GPT-5.4",
+        aliases=["gpt5", "gpt-5", "gpt5.4", "5.4"],
         description="SOTA reasoning with configurable effort",
     ),
-    # Codex series — optimized for agentic coding
+    ModelEntry(
+        id="gpt-5.4-mini",
+        provider="openai",
+        name="GPT-5.4 Mini",
+        aliases=["gpt5-mini", "gpt-5-mini", "5.4-mini", "mini"],
+        description="Fast + cost-efficient reasoning",
+    ),
+    ModelEntry(
+        id="gpt-5.4-nano",
+        provider="openai",
+        name="GPT-5.4 Nano",
+        aliases=["gpt5-nano", "gpt-5-nano", "5.4-nano", "nano"],
+        description="Fastest, cheapest — simple tasks",
+    ),
+    # Legacy models — kept for backward compatibility with existing configs
+    ModelEntry(
+        id="gpt-5.2",
+        provider="openai",
+        name="GPT-5.2 (legacy)",
+        aliases=["gpt5.2", "5.2"],
+        description="Legacy — consider upgrading to gpt-5.4",
+    ),
     ModelEntry(
         id="gpt-5.2-codex",
         provider="openai",
-        name="GPT-5.2 Codex",
+        name="GPT-5.2 Codex (legacy)",
         aliases=["codex", "codex5.2", "5.2-codex"],
-        description="Agentic coding — long-horizon, refactors, migrations",
+        description="Legacy — codex removed in 5.4 family, use gpt-5.4 instead",
     ),
-    # gpt-5.3-codex: API not yet available (Codex CLI only), add when released
 ]
 
 # Effort level constants

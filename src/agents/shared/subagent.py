@@ -18,15 +18,24 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# ── 1M context beta ────────────────────────────────────────────
+# ── 1M context ─────────────────────────────────────────────────
+# Opus 4.6 / Sonnet 4.6: 1M context is GA (2026-03), no beta header needed.
+# Legacy models (Sonnet 4.5, Sonnet 4): still require beta header for 1M.
 
-_EXTENDED_CONTEXT_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_1M_GA_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_1M_BETA_MODELS = {"claude-sonnet-4-5", "claude-opus-4-5"}
 _EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
 
 
-def _use_extended_context(model: str, enabled: bool) -> bool:
-    """Check if extended context (1M) should be used for this model."""
-    return enabled and any(model.startswith(m) for m in _EXTENDED_CONTEXT_MODELS)
+def _use_extended_context_beta(model: str, enabled: bool) -> bool:
+    """Check if the 1M beta header is needed for this model.
+
+    Returns True only for legacy models that still require the beta header.
+    Opus 4.6 / Sonnet 4.6 have 1M GA — no header needed.
+    """
+    if not enabled:
+        return False
+    return any(model.startswith(m) for m in _1M_BETA_MODELS)
 
 
 # ── Provider detection ─────────────────────────────────────────
@@ -167,7 +176,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "correlations, regressions) and autonomous analysis design "
             "(anomaly detection, pattern recognition, custom models)."
         ),
-        model="gpt-5.2-codex",
+        model="gpt-5.4",
         system_prompt=_CODE_ANALYST_PROMPT,
         tool_names=[
             "execute_python_analysis",
@@ -186,7 +195,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "news sentiment, price action, fundamentals, IV/options data, "
             "and event signals to produce comprehensive analysis."
         ),
-        model="gpt-5.2",
+        model="gpt-5.4",
         system_prompt=_DEEP_RESEARCHER_PROMPT,
         tool_names=[
             "get_ticker_news",
@@ -428,8 +437,8 @@ def _run_anthropic_subagent(
     if thinking_param:
         api_kwargs["thinking"] = thinking_param
 
-    # Determine stream function (standard vs 1M beta)
-    use_beta = _use_extended_context(config.model, config.extended_context)
+    # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
+    use_beta = _use_extended_context_beta(config.model, config.extended_context)
 
     for turn in range(config.max_turns):
         if use_beta:

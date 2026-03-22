@@ -84,15 +84,26 @@ def _make_tracker(turn_count, last_input_tokens):
 
 class TestModelContextLimit:
     def test_claude_opus(self):
-        assert get_model_context_limit("claude-opus-4-6") == 200_000
+        assert get_model_context_limit("claude-opus-4-6") == 1_000_000
+
+    def test_claude_sonnet(self):
+        assert get_model_context_limit("claude-sonnet-4-6") == 1_000_000
 
     def test_claude_future_model(self):
         """Future Claude models should match via prefix fallback."""
         assert get_model_context_limit("claude-sonnet-5-20260501") == 200_000
 
-    def test_gpt5(self):
-        assert get_model_context_limit("gpt-5.2") == 400_000
+    def test_gpt54(self):
+        assert get_model_context_limit("gpt-5.4") == 1_050_000
 
+    def test_gpt54_mini(self):
+        assert get_model_context_limit("gpt-5.4-mini") == 400_000
+
+    def test_gpt54_nano(self):
+        assert get_model_context_limit("gpt-5.4-nano") == 400_000
+
+    def test_gpt52_legacy(self):
+        assert get_model_context_limit("gpt-5.2") == 400_000
 
     def test_unknown_model(self):
         assert get_model_context_limit("some-unknown-model") == 200_000
@@ -209,29 +220,30 @@ class TestExtractToolInfo:
 class TestShouldCompact:
     def test_too_few_turns(self):
         ctx = ContextManager(model="claude-opus-4-6", keep_recent_turns=2)
-        tracker = _make_tracker(2, last_input_tokens=100_000)
+        tracker = _make_tracker(2, last_input_tokens=500_000)
         assert not ctx.should_compact(tracker)
 
     def test_below_threshold(self):
         ctx = ContextManager(model="claude-opus-4-6", threshold_ratio=0.4)
-        # 200K * 0.4 = 80K threshold
-        tracker = _make_tracker(5, last_input_tokens=50_000)
+        # 1M * 0.4 = 400K threshold
+        tracker = _make_tracker(5, last_input_tokens=300_000)
         assert not ctx.should_compact(tracker)
 
     def test_above_threshold(self):
         ctx = ContextManager(model="claude-opus-4-6", threshold_ratio=0.4)
-        tracker = _make_tracker(5, last_input_tokens=90_000)
+        # 1M * 0.4 = 400K threshold
+        tracker = _make_tracker(5, last_input_tokens=450_000)
         assert ctx.should_compact(tracker)
 
     def test_exactly_at_threshold(self):
         ctx = ContextManager(model="claude-opus-4-6", threshold_ratio=0.4)
-        # 200K * 0.4 = 80K — at threshold, not above
-        tracker = _make_tracker(5, last_input_tokens=80_000)
+        # 1M * 0.4 = 400K — at threshold, not above
+        tracker = _make_tracker(5, last_input_tokens=400_000)
         assert not ctx.should_compact(tracker)
 
     def test_single_turn_never_compacts(self):
         ctx = ContextManager(model="claude-opus-4-6", keep_recent_turns=2)
-        tracker = _make_tracker(1, last_input_tokens=200_000)
+        tracker = _make_tracker(1, last_input_tokens=800_000)
         assert not ctx.should_compact(tracker)
 
     def test_custom_threshold(self):
@@ -247,9 +259,13 @@ class TestShouldCompact:
 class TestTokenThreshold:
     def test_claude_default(self):
         ctx = ContextManager(model="claude-opus-4-6", threshold_ratio=0.4)
-        assert ctx.token_threshold == 80_000
+        assert ctx.token_threshold == 400_000  # 1M * 0.4
 
-    def test_gpt_custom(self):
+    def test_gpt54(self):
+        ctx = ContextManager(model="gpt-5.4", threshold_ratio=0.5)
+        assert ctx.token_threshold == 525_000  # 1.05M * 0.5
+
+    def test_gpt52_legacy(self):
         ctx = ContextManager(model="gpt-5.2", threshold_ratio=0.5)
         assert ctx.token_threshold == 200_000  # 400K * 0.5
 
@@ -427,7 +443,7 @@ class TestContextManagerMeta:
         s = ctx.summary()
         assert s["compaction_count"] == 0
         assert s["model"] == "claude-opus-4-6"
-        assert s["threshold_tokens"] == 140_000  # 200K * 0.7
+        assert s["threshold_tokens"] == 700_000  # 1M * 0.7
 
     def test_repr(self):
         ctx = ContextManager(model="gpt-5.2")
@@ -462,8 +478,8 @@ class TestIntegrationScenario:
         tracker = TokenTracker()
         messages = [{"role": "user", "content": "分析 NVDA"}]
 
-        # Simulate turns with growing context
-        input_tokens_per_turn = [800, 2_000, 5_000, 20_000, 85_000]
+        # Simulate turns with growing context (must exceed 1M * 0.4 = 400K)
+        input_tokens_per_turn = [10_000, 50_000, 150_000, 300_000, 450_000]
 
         for turn_idx, input_tokens in enumerate(input_tokens_per_turn):
             # Simulate API response
@@ -490,7 +506,7 @@ class TestIntegrationScenario:
             if ctx.should_compact(tracker):
                 messages, stats = ctx.compact_messages(messages)
 
-        # After 5 turns, the last one (85K) exceeded 80K threshold
+        # After 5 turns, the last one (450K) exceeded 400K threshold
         assert ctx._compaction_count >= 1
 
         # Recent 2 turns (turns 3, 4) should be preserved

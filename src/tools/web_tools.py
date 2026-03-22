@@ -327,7 +327,7 @@ def codex_web_research(
             "--sandbox", "workspace-write",
             "--search",
             "-c", "sandbox_workspace_write.network_access=true",
-            "--model", "gpt-5.2",
+            "--model", "gpt-5.4",
             "--skip-git-repo-check",
             "--ephemeral",
             "-o", output_file,

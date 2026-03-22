@@ -30,7 +30,7 @@ from src.agents.shared.subagent import (
     _detect_provider,
     _filter_anthropic_tools,
     _filter_openai_tools,
-    _use_extended_context,
+    _use_extended_context_beta,
     _MAX_CONTEXT_CHARS,
     _EXTENDED_CONTEXT_BETA,
 )
@@ -388,8 +388,8 @@ class TestAnthropicSubagentRunner:
     @patch("src.agents.anthropic_agent.tools.execute_tool")
     @patch("anthropic.Anthropic")
     @patch("src.agents.config.get_agent_config")
-    def test_anthropic_subagent_beta_stream(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
-        """When extended_context=True + supported model, should use beta.messages.stream."""
+    def test_anthropic_subagent_1m_context_ga(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
+        """1M context is GA for 4.6 — uses standard stream, no beta header needed."""
         mock_config.return_value = MagicMock(max_tokens=16384)
         mock_tools.return_value = []
 
@@ -399,7 +399,7 @@ class TestAnthropicSubagentRunner:
         mock_stream.__enter__ = MagicMock(return_value=mock_stream)
         mock_stream.__exit__ = MagicMock(return_value=False)
         mock_stream.get_final_message.return_value = response
-        mock_client.beta.messages.stream.return_value = mock_stream
+        mock_client.messages.stream.return_value = mock_stream
         mock_anthropic_cls.return_value = mock_client
 
         from src.agents.shared.subagent import _run_anthropic_subagent
@@ -409,9 +409,9 @@ class TestAnthropicSubagentRunner:
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
 
-        # Should have used beta.messages.stream, NOT messages.stream
-        mock_client.beta.messages.stream.assert_called_once()
-        mock_client.messages.stream.assert_not_called()
+        # 1M context GA: standard stream, not beta
+        mock_client.messages.stream.assert_called_once()
+        mock_client.beta.messages.stream.assert_not_called()
         assert result["answer"] == "done"
 
 
@@ -482,22 +482,29 @@ class TestOpenaiSubagentRunner:
 # 1M Context Beta Tests
 # ============================================================
 
-class TestExtendedContext:
-    def test_opus_enabled(self):
-        assert _use_extended_context("claude-opus-4-6", True) is True
+class TestExtendedContextBeta:
+    """1M context: GA for 4.6 (no beta), legacy models still need beta header."""
 
-    def test_sonnet_not_in_current_list(self):
-        # Sonnet 4.5 removed; Sonnet 5 will be added when released
-        assert _use_extended_context("claude-sonnet-4-5-20250929", True) is False
+    def test_opus_46_ga_no_beta(self):
+        # Opus 4.6: 1M is GA, no beta header needed
+        assert _use_extended_context_beta("claude-opus-4-6", True) is False
+
+    def test_sonnet_46_ga_no_beta(self):
+        # Sonnet 4.6: 1M is GA, no beta header needed
+        assert _use_extended_context_beta("claude-sonnet-4-6", True) is False
+
+    def test_sonnet_45_legacy_needs_beta(self):
+        # Sonnet 4.5: legacy, still needs beta header
+        assert _use_extended_context_beta("claude-sonnet-4-5-20250929", True) is True
 
     def test_disabled(self):
-        assert _use_extended_context("claude-opus-4-6", False) is False
+        assert _use_extended_context_beta("claude-sonnet-4-5-20250929", False) is False
 
     def test_unsupported_model(self):
-        assert _use_extended_context("claude-haiku-4-5-20251001", True) is False
+        assert _use_extended_context_beta("claude-haiku-4-5-20251001", True) is False
 
     def test_openai_model_unsupported(self):
-        assert _use_extended_context("gpt-5.2", True) is False
+        assert _use_extended_context_beta("gpt-5.4", True) is False
 
     def test_beta_constant(self):
         assert _EXTENDED_CONTEXT_BETA == "context-1m-2025-08-07"

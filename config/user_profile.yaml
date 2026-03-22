@@ -253,9 +253,9 @@ options_preferences:
 # ============================================
 llm_preferences:
   # 情緒評分模型
-  sentiment_model: "gpt-5.2"
+  sentiment_model: "gpt-5.4"
   # 風險評分模型
-  risk_model: "gpt-5.2"
+  risk_model: "gpt-5.4"
   # 使用 batch API (更便宜但較慢)
   use_batch_api: true
   # 每日 token 預算
@@ -265,9 +265,11 @@ llm_preferences:
   # 用於自動選擇最佳評分：如果文章有多個模型的分數，按此順序取第一個可用的
   # 模型名用 column suffix 格式 (gpt-5.2 → gpt_5_2)
   model_priority:
+    - "gpt_5_4"
+    - "gpt_5_4_mini"
+    - "gpt_5_4_nano"
     - "gpt_5_2"
     - "gpt_5"
-    - "haiku"
 
   # ── Anthropic agent 設定 (Phase 8) ──
   # Effort (Opus 4.6 / Sonnet 4.6, 不需 beta header)
@@ -286,16 +288,17 @@ llm_preferences:
   # true = inject freshness summary into system prompt (reduces cache hit rate)
   # freshness_in_prompt: false
 
-  # ── 1M Context Beta (Anthropic only, Opus 4.6 + Sonnet 4.6) ──
-  # 需要 Tier 4 organization，context 超過 200K 時加價
+  # ── 1M Context (Anthropic: Opus 4.6 + Sonnet 4.6) ──
+  # 2026-03 起 1M context 為 GA，標準定價，不加價，不需 beta header
+  # extended_context 設定僅影響舊模型（Sonnet 4.5 等），4.6 預設即為 1M
   # extended_context: false
 
   # ── Subagent 模型覆寫 (Phase 6) ──
   # 可覆寫每個 subagent 的預設模型。不設定的 subagent 使用內建預設值。
   # 也可用 CLI: /subagent code_analyst opus（會自動存到 user_profile.local.yaml）
   # 預設值：
-  #   code_analyst:    gpt-5.2-codex  (reasoning=xhigh)
-  #   deep_researcher: gpt-5.2        (reasoning=xhigh)
+  #   code_analyst:    gpt-5.4        (reasoning=xhigh)
+  #   deep_researcher: gpt-5.4        (reasoning=xhigh)
   #   data_summarizer: claude-opus-4-6
   #
   # subagent_models:
@@ -334,17 +337,20 @@ context_management:
   # 壓縮後保留的內容預覽字元數
   preview_chars: 200
 
-  # 參考：各模型上下文極限（標準 / 1M beta 需 header "context-1m-2025-08-07"）
+  # 參考：各模型上下文極限（2026-03 更新）
   # ┌─────────────────────────────────┬─────────────────┬────────────┐
   # │ 模型                           │ Context          │ Max Output │
   # ├─────────────────────────────────┼─────────────────┼────────────┤
-  # │ claude-opus-4-6                 │ 200K (1M beta)  │ 128K       │
-  # │ gpt-5.2 / gpt-5.2-codex        │ 400K            │ 128K       │
+  # │ claude-opus-4-6                 │ 1M (GA)         │ 128K       │
+  # │ claude-sonnet-4-6               │ 1M (GA)         │ 64K        │
+  # │ gpt-5.4                         │ 1M (>272K 加價) │ 128K       │
+  # │ gpt-5.4-mini                    │ 400K            │ 128K       │
+  # │ gpt-5.4-nano                    │ 400K            │ 128K       │
   # └─────────────────────────────────┴─────────────────┴────────────┘
   #
   # 觸發閾值範例 (threshold_ratio=0.7):
-  #   claude-opus-4-6:  140K tokens 時觸發 (200K standard)
-  #   gpt-5.2:          280K tokens 時觸發
+  #   claude-opus-4-6:  700K tokens 時觸發 (1M context)
+  #   gpt-5.4:          700K tokens 時觸發 (1M context)
   #
   # 壓縮邏輯：
   #   1. 條件: turn_count > keep_recent_turns AND input_tokens > threshold

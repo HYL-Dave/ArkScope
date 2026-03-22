@@ -1,7 +1,7 @@
 """
 OpenAI Agents SDK agent implementation.
 
-Uses GPT-5.2 with configurable reasoning effort for tool calling.
+Uses GPT-5.4 with configurable reasoning effort for tool calling.
 Provides run_query(), run_query_sync(), and run_query_stream().
 """
 
@@ -38,10 +38,11 @@ except (ImportError, Exception) as _ws_err:
 # max_output_tokens 包含 reasoning tokens + visible output（跟 Anthropic max_tokens 相同概念）
 # 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠
 _OPENAI_MODEL_MAX_OUTPUT = {
+    "gpt-5.4": 128000,
+    "gpt-5.4-mini": 128000,
+    "gpt-5.4-nano": 128000,
+    # Legacy (still works if user overrides model)
     "gpt-5.2": 128000,
-    # Codex series (agentic coding optimized, same output limits)
-    "gpt-5.2-codex": 128000,
-    # gpt-5.3-codex: API not yet available (Codex CLI only), add when released
 }
 _OPENAI_DEFAULT_MAX_OUTPUT = 128000
 
@@ -225,7 +226,7 @@ async def run_query(
 
     Args:
         question: The user's question
-        model: Override model (default: gpt-5.2 from AgentConfig)
+        model: Override model (default: gpt-5.4 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
         max_tool_calls: Override max tool calls (default from AgentConfig)
@@ -379,7 +380,7 @@ def run_query_sync(
 
     Args:
         question: The user's question
-        model: Override model (default: gpt-5.2 from AgentConfig)
+        model: Override model (default: gpt-5.4 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
         max_tool_calls: Override max tool calls (default from AgentConfig)
@@ -523,7 +524,7 @@ async def run_query_stream(
 
     Args:
         question: The user's question
-        model: Override model (default: gpt-5.2 from AgentConfig)
+        model: Override model (default: gpt-5.4 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
 

@@ -17,7 +17,7 @@ from ..shared.context_manager import ContextManager
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.scratchpad import Scratchpad
-from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
+from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
 _COMPACTION_BETA = "compact-2026-01-12"
@@ -244,10 +244,8 @@ async def run_query_stream(
         f"effort={effective_effort} thinking={thinking_on}"
     )
 
-    # 1M context beta: use beta.messages.stream for supported models
-    use_beta = _use_extended_context(model_name, config.extended_context)
-    if use_beta:
-        logger.info(f"Using 1M context beta for {model_name}")
+    # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
+    use_beta = _use_extended_context_beta(model_name, config.extended_context)
 
     # Server-side compaction (Phase 7a): Opus 4.6 + Sonnet 4.6
     use_compaction = config.server_compaction and _supports_compaction(model_name)
@@ -278,9 +276,9 @@ async def run_query_stream(
                 }
 
             if use_beta:
-                # Build betas list (may include both extended context and compaction)
+                # Build betas list (context beta for legacy models, compaction for supported)
                 betas = []
-                if _use_extended_context(model_name, config.extended_context):
+                if _use_extended_context_beta(model_name, config.extended_context):
                     betas.append(_EXTENDED_CONTEXT_BETA)
                 if use_compaction:
                     betas.append(_COMPACTION_BETA)

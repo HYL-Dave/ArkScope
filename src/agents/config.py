@@ -25,8 +25,8 @@ class AgentConfig(BaseModel):
     """Agent model and behavior configuration."""
 
     # OpenAI models
-    openai_model: str = "gpt-5.2"
-    openai_model_advanced: str = "gpt-5.2"
+    openai_model: str = "gpt-5.4"
+    openai_model_advanced: str = "gpt-5.4"
 
     # Anthropic models
     anthropic_model: str = "claude-opus-4-6"
@@ -173,8 +173,8 @@ def get_agent_config() -> AgentConfig:
     Get agent configuration, merging defaults with user_profile.yaml.
 
     user_profile.yaml can override under llm_preferences:
-        agent_model: "gpt-5.2"
-        agent_model_advanced: "gpt-5.2"
+        agent_model: "gpt-5.4"
+        agent_model_advanced: "gpt-5.4"
         anthropic_model: "claude-opus-4-6"
         anthropic_model_advanced: "claude-opus-4-6"
         reasoning_effort: "xhigh"

@@ -40,7 +40,7 @@ _NON_MODEL_SUFFIXES = {"score", "title", "content", "source", "description"}
 
 # Model priority: newest/best first. Used when no specific model is requested.
 # Fallback if config/user_profile.yaml doesn't define model_priority
-_DEFAULT_MODEL_PRIORITY = ["gpt_5_2", "gpt_5", "o4_mini", "haiku"]
+_DEFAULT_MODEL_PRIORITY = ["gpt_5_4", "gpt_5_4_mini", "gpt_5_4_nano", "gpt_5_2", "gpt_5"]
 
 
 def detect_score_columns(df: pd.DataFrame) -> list[tuple[str, str, str | None, str]]:

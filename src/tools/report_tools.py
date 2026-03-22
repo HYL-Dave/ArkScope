@@ -74,7 +74,7 @@ def save_report(
         conclusion: Trading conclusion (BUY, HOLD, SELL, WATCH, NEUTRAL)
         confidence: Confidence score 0-1
         provider: LLM provider (openai, anthropic)
-        model: Model used (claude-opus-4-6, gpt-5.2)
+        model: Model used (claude-opus-4-6, gpt-5.4)
         tools_used: List of tool names used during analysis
         tool_calls: Total number of tool calls
         duration_seconds: Analysis duration

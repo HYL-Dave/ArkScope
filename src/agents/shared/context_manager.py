@@ -23,19 +23,17 @@ from .token_tracker import TokenTracker
 logger = logging.getLogger(__name__)
 
 # Model context window sizes (input tokens)
-# Standard context limits — 1M beta requires header "context-1m-2025-08-07"
 # Order matters: more specific prefixes first (prefix match)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
-    # Anthropic — https://docs.anthropic.com/en/docs/about-claude/models
-    "claude-opus-4-6": 200_000,     # 200K standard (1M beta) / 128K output
-    "claude-sonnet-4-6": 200_000,   # 200K standard (1M beta) / 64K output
-    "claude-opus-5": 200_000,       # Future Opus models
-    "claude-sonnet": 200_000,       # Future Sonnet models
-    "claude-haiku": 200_000,        # Future Haiku models
-    "claude": 200_000,              # Catch-all for any Claude model
-    # OpenAI — https://platform.openai.com/docs/models
-    "gpt-5.2": 400_000,             # 400K context / 128K output
-    "gpt-5": 400_000,               # 400K context / 128K output
+    # Anthropic — 1M context GA (no beta header, standard pricing)
+    "claude-opus-4-6": 1_000_000,   # 1M context / 128K output ($5/$25)
+    "claude-sonnet-4-6": 1_000_000, # 1M context / 64K output ($3/$15)
+    "claude-haiku": 200_000,        # Haiku 4.5: 200K context / 64K output
+    # OpenAI — https://developers.openai.com/api/docs/models
+    "gpt-5.4-mini": 400_000,        # 400K context / 128K output ($0.75/$4.50)
+    "gpt-5.4-nano": 400_000,        # 400K context / 128K output ($0.20/$1.25)
+    "gpt-5.4": 1_050_000,           # 1M context / 128K output ($2.50/$15)
+    "gpt-5.2": 400_000,             # 400K context / 128K output (legacy)
 }
 
 _DEFAULT_CONTEXT_LIMIT = 200_000

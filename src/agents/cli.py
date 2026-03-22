@@ -83,7 +83,7 @@ from .config import get_agent_config, ReasoningEffort
 from .shared.attachments import Attachment, AttachmentManager
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad, _safe_serialize
-from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context
+from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from .shared.context_manager import ContextManager
 from .shared.token_tracker import TokenTracker
 
@@ -658,8 +658,8 @@ def run_anthropic_interactive(
     else:
         messages = [user_msg]
 
-    # 1M context beta
-    use_beta = _use_extended_context(model_name, extended_context)
+    # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
+    use_beta = _use_extended_context_beta(model_name, extended_context)
 
     status_parts = [f"Model: {model_name}"]
     if effective_effort:
@@ -1750,28 +1750,37 @@ def handle_thinking_command(state: SessionState, arg: str) -> None:
 
 def handle_context_command(state: SessionState, arg: str) -> None:
     """Handle /context [on|off] command (Anthropic only). No arg = toggle."""
+    from .shared.subagent import _1M_GA_MODELS, _1M_BETA_MODELS
+
     if state.provider != "anthropic":
-        console.print("[yellow]1M context beta only applies to Anthropic models.[/yellow]\n")
+        console.print("[yellow]1M context only applies to Anthropic models.[/yellow]\n")
         return
 
     model = state.effective_model()
-    supported = _use_extended_context(model, True)
 
-    if not supported:
+    # 4.6 models: 1M is GA, no toggle needed
+    if any(model.startswith(m) for m in _1M_GA_MODELS):
         console.print(
-            f"[yellow]1M context beta is not supported for {model}.[/yellow]\n"
-            "[dim]Supported: Opus 4.6, Sonnet 4.6[/dim]\n"
+            f"[green]{model}[/green] has 1M context by default (GA). "
+            "No toggle needed.\n"
+        )
+        return
+
+    # Legacy models: toggle beta header
+    if not any(model.startswith(m) for m in _1M_BETA_MODELS):
+        console.print(
+            f"[yellow]1M context is not available for {model}.[/yellow]\n"
         )
         return
 
     if not arg:
         state.extended_context = not state.extended_context
-        new_status = "ON (1M)" if state.extended_context else "OFF (200K)"
+        new_status = "ON (1M beta)" if state.extended_context else "OFF (200K)"
         console.print(f"[green]Context:[/green] [bold]{new_status}[/bold]\n")
         return
     if arg.lower() in ("on", "true", "1", "1m"):
         state.extended_context = True
-        console.print("[green]Context:[/green] [bold]ON (1M)[/bold]\n")
+        console.print("[green]Context:[/green] [bold]ON (1M beta)[/bold]\n")
     elif arg.lower() in ("off", "false", "0", "200k"):
         state.extended_context = False
         console.print("[green]Context:[/green] [bold]OFF (200K)[/bold]\n")

@@ -6,7 +6,7 @@
 
 MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.2) with 49 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.4) with 49 tools, 4 skills, 4 subagents
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
 - **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
@@ -44,21 +44,22 @@ python scripts/monitor_service.py --discord
 
 ```bash
 python -m src.agents                                    # Default: Anthropic Opus 4.6
-python -m src.agents --provider openai                  # Use GPT-5.2
+python -m src.agents --provider openai                  # Use GPT-5.4
 python -m src.agents --model sonnet                     # Use Sonnet 4.6
 python -m src.agents --thinking                         # Enable extended thinking
 python -m src.agents --effort medium                    # Anthropic effort level
-python -m src.agents --provider openai --reasoning xhigh  # GPT-5.2 max reasoning
+python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasoning
 ```
 
 ### Available Models
 
 | # | Provider | Model | Aliases | Context | Output | Features |
 |---|----------|-------|---------|---------|--------|----------|
-| 1 | Anthropic | Claude Opus 4.6 | opus, o46 | 200K (1M beta) | 128K | Effort, thinking, compaction |
-| 2 | Anthropic | Claude Sonnet 4.6 | sonnet, s46 | 200K (1M beta) | 64K | Effort, thinking |
-| 3 | OpenAI | GPT-5.2 | gpt5, 5.2 | 400K | 128K | Reasoning effort |
-| 4 | OpenAI | GPT-5.2 Codex | codex, 5.2-codex | 400K | 128K | Agentic coding |
+| 1 | Anthropic | Claude Opus 4.6 | opus, o46 | 1M | 128K | Effort, thinking, compaction |
+| 2 | Anthropic | Claude Sonnet 4.6 | sonnet, s46 | 1M | 64K | Effort, thinking |
+| 3 | OpenAI | GPT-5.4 | gpt5, 5.4 | 1M | 128K | Reasoning effort |
+| 4 | OpenAI | GPT-5.4 Mini | mini, 5.4-mini | 400K | 128K | Fast + cost-efficient |
+| 5 | OpenAI | GPT-5.4 Nano | nano, 5.4-nano | 400K | 128K | Fastest, cheapest |
 
 ### Slash Commands (21)
 
@@ -159,8 +160,8 @@ Specialized agents delegated for specific tasks:
 
 | Subagent | Default Model | Purpose |
 |----------|---------------|---------|
-| `code_analyst` | GPT-5.2 Codex | Quantitative Python analysis, calculations |
-| `deep_researcher` | GPT-5.2 | Multi-source investigation across 14 tools |
+| `code_analyst` | GPT-5.4 | Quantitative Python analysis, calculations |
+| `deep_researcher` | GPT-5.4 | Multi-source investigation across 14 tools |
 | `data_summarizer` | Sonnet 4.6 | Fast data retrieval and summarization |
 | `reviewer` | Opus 4.6 | Critical analysis review (adversarial) |
 
@@ -306,17 +307,18 @@ python scripts/collection/collect_iv_history.py                    # IV history
 
 | Model | Usage |
 |-------|-------|
-| **gpt-5.2** | Sentiment/risk scoring (primary) |
-| **gpt-5.2** | Summary generation |
+| **gpt-5.4** | Agent reasoning, sentiment/risk scoring (primary) |
+| **gpt-5.4-mini** | Fast scoring, cost-efficient tasks |
+| **gpt-5.4-nano** | Simple tasks, highest throughput |
 
-> **Strategy:** Use latest reasoning models only. Upgrade path: gpt-5 → gpt-5.1 → gpt-5.2 → ...
+> **Strategy:** Use latest reasoning models only. Upgrade path: gpt-5 → gpt-5.1 → gpt-5.2 → gpt-5.4 → ...
 
 ### Sentiment Scoring
 
 ```bash
 python scripts/scoring/score_sentiment_openai.py \
   --input data.csv --output sentiment_scored.csv \
-  --model gpt-5.2 --reasoning-effort high \
+  --model gpt-5.4 --reasoning-effort high \
   --chunk-size 5000 --retry 3 --verbose
 ```
 
@@ -325,7 +327,7 @@ python scripts/scoring/score_sentiment_openai.py \
 ```bash
 python scripts/scoring/score_risk_openai.py \
   --input data.csv --output risk_scored.csv \
-  --model gpt-5.2 --reasoning-effort high \
+  --model gpt-5.4 --reasoning-effort high \
   --chunk-size 5000 --retry 3
 ```
 

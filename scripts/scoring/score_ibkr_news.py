@@ -19,43 +19,41 @@ Features:
 - Supports --dry-run to preview what would be scored
 
 Column Naming Convention:
-    Model name is converted to column suffix: gpt-5.2 → gpt_5_2
-    sentiment_gpt_5_2, risk_gpt_5_2, sentiment_o4_mini, etc.
+    Model name is converted to column suffix: gpt-5.4 → gpt_5_4
+    sentiment_gpt_5_4, risk_gpt_5_4, sentiment_gpt_5_4_mini, etc.
 
 Usage:
     # Score Polygon news
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
         --data-dir data/news/raw/polygon
 
     # Score Finnhub news
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
         --data-dir data/news/raw/finnhub
 
-    # Score IBKR news (default)
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
+    # Score IBKR news (default data-dir)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4
 
-    # Switch model: continue from gpt-5.2, score remaining with gpt-5.4
-    # (only scores articles that gpt-5.2 hasn't scored yet)
+    # Continue from previous model (only scores articles not yet covered)
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
         --continue-from gpt-5.2 --reasoning-effort xhigh
 
-    # Chain: continue from gpt-5.2 AND gpt-5.4 (comma-separated)
-    # Only scores articles that NEITHER model has scored
+    # Chain: continue from multiple predecessors (comma-separated)
     python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 \\
         --continue-from gpt-5.2,gpt-5.4 --reasoning-effort high
 
-    # Force re-score everything with gpt-6 (overwrite existing gpt-6 scores)
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-6 --rescore
+    # Force re-score everything (overwrite existing scores)
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 --rescore
 
     # Preview what would be scored
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 --dry-run
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 --dry-run
 
     # With multiple API keys (one per line in file)
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
         --api-keys-file ~/.openai_keys --daily-token-limit 1000000
 
     # Enable Flex mode fallback after token limit
-    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \\
+    python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.4 \\
         --daily-token-limit 1000000 --allow-flex
 
     # Limit to specific month
