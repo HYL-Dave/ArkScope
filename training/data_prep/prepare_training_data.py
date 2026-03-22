@@ -101,8 +101,15 @@ SCORE_SOURCES = {
     },
     "polygon": {
         "base_dir": "data/news/raw/polygon",
-        "sentiment_col": "sentiment_gpt_5_2_xhigh",
-        "risk_col": "risk_gpt_5_2_xhigh",
+        # Model priority: coalesce newest → oldest (first non-null wins)
+        "sentiment_cols": [
+            "sentiment_gpt_5_4_xhigh",
+            "sentiment_gpt_5_2_xhigh",
+        ],
+        "risk_cols": [
+            "risk_gpt_5_4_xhigh",
+            "risk_gpt_5_2_xhigh",
+        ],
         "date_col": "published_at",
         "symbol_col": "ticker",
     },
@@ -167,6 +174,10 @@ def _load_model_scores(source, model, score_type, target_col):
 def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_sentiment"):
     """Load Polygon news scores from monthly Parquet files.
 
+    Supports multi-model coalesce: reads all available model columns
+    (e.g. sentiment_gpt_5_4_xhigh, sentiment_gpt_5_2_xhigh) and picks
+    the first non-null value per article in priority order (newest first).
+
     Args:
         base_dir: directory containing year/month parquet files
         score_type: "sentiment" or "risk"
@@ -175,34 +186,41 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
     import pyarrow.parquet as pq
 
     cfg = SCORE_SOURCES["polygon"]
-    src_col = cfg["sentiment_col"] if score_type == "sentiment" else cfg["risk_col"]
+    candidate_cols = cfg["sentiment_cols"] if score_type == "sentiment" else cfg["risk_cols"]
 
-    print(f"  Loading Polygon {score_type} scores from {base_dir} (column: {src_col})")
+    print(f"  Loading Polygon {score_type} scores from {base_dir}")
+    print(f"  Model priority (coalesce): {candidate_cols}")
+
     frames = []
     for root, _dirs, files in os.walk(base_dir):
         for f in sorted(files):
             if f.endswith(".parquet"):
                 path = os.path.join(root, f)
-                # Check parquet schema before reading — avoids ArrowInvalid
-                # when the score column hasn't been added yet (scoring in progress)
                 schema_cols = pq.read_schema(path).names
-                if src_col not in schema_cols:
+                # Read whichever candidate columns exist in this file
+                available = [c for c in candidate_cols if c in schema_cols]
+                if not available:
                     continue
-                df = pd.read_parquet(path, columns=["published_at", "ticker", src_col])
-                frames.append(df)
+                read_cols = ["published_at", "ticker"] + available
+                df = pd.read_parquet(path, columns=read_cols)
+                # Coalesce: first non-null in priority order
+                score_series = pd.array([pd.NA] * len(df), dtype="Float64")
+                for col in candidate_cols:
+                    if col in df.columns:
+                        mask = pd.isna(score_series)
+                        score_series[mask] = df.loc[mask, col].values
+                df["_score"] = score_series
+                frames.append(df[["published_at", "ticker", "_score"]])
 
     if not frames:
         raise FileNotFoundError(
-            f"No parquet files with column '{src_col}' found in {base_dir}. "
+            f"No parquet files with any of {candidate_cols} found in {base_dir}. "
             f"Run score_ibkr_news.py --mode {score_type} first."
         )
 
     scores = pd.concat(frames, ignore_index=True)
     scores["Date"] = pd.to_datetime(scores["published_at"]).dt.tz_localize(None)
-    scores = scores.rename(columns={
-        "ticker": "tic",
-        src_col: target_col,
-    })
+    scores = scores.rename(columns={"ticker": "tic", "_score": target_col})
 
     # Aggregate: daily mean per ticker (multiple articles per day)
     daily = scores.groupby([scores["Date"].dt.date, "tic"])[target_col].mean().reset_index()
@@ -379,7 +397,7 @@ Examples:
         tag = f"deepseek_{args.score_type}"
     elif args.source == "polygon":
         suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
-        tag = f"polygon_gpt52xhigh{suffix}"
+        tag = f"polygon_multi{suffix}"
     else:
         # Include score_type in tag when risk/both (default sentiment omitted for brevity)
         suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""

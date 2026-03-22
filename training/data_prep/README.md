@@ -137,13 +137,18 @@ CPPO (stocktrading_llm_risk.py):
   - PPO: `prepare_training_data.py --source gpt5 --model high`
   - CPPO: `prepare_training_data.py --source gpt5 --model high --score-type both`
 
-### 來源 4: Polygon API（現代資料）
+### 來源 4: Polygon API（現代資料，多模型 coalesce）
 
 - **路徑**: `data/news/raw/polygon/` (本專案內)
 - **格式**: Parquet（月檔，如 `2025/2025-01.parquet`）
-- **情緒欄位**: `sentiment_gpt_5_2_xhigh`
-- **風險欄位**: `risk_gpt_5_2_xhigh`（需先跑 `score_ibkr_news.py --mode risk`）
-- **日期範圍**: 2022-01 至 2026-02（110K 筆，持續更新）
+- **情緒欄位（coalesce 優先順序）**:
+  1. `sentiment_gpt_5_4_xhigh`（最新，2026-03+ 新文章）
+  2. `sentiment_gpt_5_2_xhigh`（主力，2022~2026-03 已評分）
+- **風險欄位（coalesce 優先順序）**:
+  1. `risk_gpt_5_4_xhigh`
+  2. `risk_gpt_5_2_xhigh`
+- **Coalesce 邏輯**: 每篇文章取第一個非空欄位（最新模型優先）
+- **日期範圍**: 2022-01 至今（113K+ 筆，持續更新）
 - **股票**: ~97 支/月
 - **品質**: 評分分佈較歷史資料平衡
 - **重要差異**:
@@ -185,7 +190,7 @@ Step 5: 分割 Train / Trade
 | HuggingFace | `Date` | `Stock_symbol` | `sentiment_deepseek` | `risk_deepseek` |
 | Claude | `Date` | `Stock_symbol` | `sentiment_opus` 等 | `risk_opus` 等 |
 | GPT-5 | `Date` | `Stock_symbol` | `sentiment_gpt_5` | `risk_gpt_5` |
-| Polygon | `published_at` | `ticker` | `sentiment_gpt_5_2_xhigh` | `risk_gpt_5_2_xhigh` |
+| Polygon | `published_at` | `ticker` | coalesce: `gpt_5_4_xhigh` → `gpt_5_2_xhigh` | 同左 |
 
 所有來源最終都要 rename 為 `llm_sentiment`（和 `llm_risk`）才能被訓練環境使用。
 
