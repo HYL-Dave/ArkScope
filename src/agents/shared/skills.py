@@ -75,13 +75,22 @@ class SkillMatchResult:
 
 # ── SKILL.md parser ──────────────────────────────────────────
 
-def _parse_skill_md(path: Path, *, hard_fail: bool = False) -> Optional[SkillDefinition]:
+def _parse_skill_md(
+    path: Path,
+    *,
+    hard_fail: bool = False,
+    require_name: bool = False,
+    allow_name_fallback: bool = True,
+) -> Optional[SkillDefinition]:
     """Parse a SKILL.md file into a SkillDefinition.
 
     Args:
         path: Path to SKILL.md file.
-        hard_fail: If True, raise on errors (for Tier 1 builtins).
-                   If False, log warning and return None.
+        hard_fail: If True, raise on read/parse errors.
+        require_name: If True, missing or invalid `name` is a hard failure
+            even when other parse failures only warn + skip.
+        allow_name_fallback: If True, missing `name` falls back to the
+            parent directory slug. Used for user-owned custom SKILL.md.
 
     Returns:
         SkillDefinition or None on parse failure (when hard_fail=False).
@@ -130,13 +139,20 @@ def _parse_skill_md(path: Path, *, hard_fail: bool = False) -> Optional[SkillDef
     if name is not None:
         name = str(name)
     if not name:
-        # Fallback: parent directory slug → snake_case
-        name = path.parent.name.replace("-", "_")
+        if allow_name_fallback:
+            # Fallback: parent directory slug → snake_case
+            name = path.parent.name.replace("-", "_")
+        else:
+            msg = f"Missing required skill name in {path}"
+            if hard_fail or require_name:
+                raise RuntimeError(msg)
+            logger.warning(msg)
+            return None
 
     # Validate name
     if not _NAME_RE.match(name):
         msg = f"Invalid skill name '{name}' in {path} (must be snake_case)"
-        if hard_fail:
+        if hard_fail or require_name:
             raise RuntimeError(msg)
         logger.warning(msg)
         return None
@@ -212,8 +228,13 @@ def _scan_builtin(builtin_dir: Path) -> Dict[str, SkillDefinition]:
             continue
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.exists():
-            continue
-        skill = _parse_skill_md(skill_file, hard_fail=True)
+            raise RuntimeError(f"Builtin skill missing SKILL.md: {skill_dir}")
+        skill = _parse_skill_md(
+            skill_file,
+            hard_fail=True,
+            require_name=True,
+            allow_name_fallback=False,
+        )
         assert skill is not None  # hard_fail=True guarantees this
         if skill.name in results:
             raise RuntimeError(
@@ -239,31 +260,25 @@ def _scan_dir(base_dir: Path, *, exclude: Optional[List[str]] = None) -> Dict[st
     if not base_dir.exists():
         return results
 
-    for category_dir in sorted(base_dir.iterdir()):
-        if not category_dir.is_dir() or category_dir.name in exclude:
+    for skill_file in sorted(base_dir.rglob("SKILL.md")):
+        rel = skill_file.relative_to(base_dir)
+        if rel.parts and rel.parts[0] in exclude:
             continue
-        for skill_dir in sorted(category_dir.iterdir()):
-            skill_file = skill_dir / "SKILL.md"
-            if not skill_file.exists():
-                continue
-            skill = _parse_skill_md(skill_file, hard_fail=False)
-            if skill is None:
-                continue
-            # Name validation for repo-owned (Tier 2)
-            if not _NAME_RE.match(skill.name):
-                if base_dir == _RESOURCES_DIR:
-                    raise RuntimeError(
-                        f"Invalid name '{skill.name}' in repo-owned {skill_file}"
-                    )
-                logger.warning(f"Skipping skill with invalid name '{skill.name}' in {skill_file}")
-                continue
-            if skill.name in results:
-                logger.warning(
-                    f"Duplicate skill '{skill.name}' in same tier: "
-                    f"keeping {results[skill.name].source_path}, skipping {skill.source_path}"
-                )
-                continue
-            results[skill.name] = skill
+        skill = _parse_skill_md(
+            skill_file,
+            hard_fail=False,
+            require_name=(base_dir == _RESOURCES_DIR),
+            allow_name_fallback=(base_dir != _RESOURCES_DIR),
+        )
+        if skill is None:
+            continue
+        if skill.name in results:
+            logger.warning(
+                f"Duplicate skill '{skill.name}' in same tier: "
+                f"keeping {results[skill.name].source_path}, skipping {skill.source_path}"
+            )
+            continue
+        results[skill.name] = skill
 
     return results
 
@@ -525,23 +540,28 @@ def match_skill_trigger(question: str) -> SkillMatchResult:
     matches: Dict[str, Tuple[int, int, SkillDefinition]] = {}
 
     for phrase, skill in _TRIGGER_INDEX:
-        if skill.name in matches:
-            continue  # Already matched this skill at a better or equal level
+        candidate: Optional[Tuple[int, int, SkillDefinition]] = None
 
         # Stage 1: exact phrase match
         pattern = r"\b" + re.escape(phrase) + r"\b"
         if re.search(pattern, q_lower):
-            matches[skill.name] = (1, -len(phrase), skill)
+            candidate = (1, -len(phrase), skill)
+        else:
+            # Stage 2: ordered words match
+            words = phrase.split()
+            if len(words) >= 2:
+                ordered_pattern = r"\b" + r"\b.*?\b".join(
+                    re.escape(w) for w in words
+                ) + r"\b"
+                if re.search(ordered_pattern, q_lower):
+                    candidate = (2, -len(phrase), skill)
+
+        if candidate is None:
             continue
 
-        # Stage 2: ordered words match
-        words = phrase.split()
-        if len(words) >= 2:
-            ordered_pattern = r"\b" + r"\b.*?\b".join(
-                re.escape(w) for w in words
-            ) + r"\b"
-            if re.search(ordered_pattern, q_lower):
-                matches[skill.name] = (2, -len(phrase), skill)
+        best = matches.get(skill.name)
+        if best is None or candidate[:2] < best[:2]:
+            matches[skill.name] = candidate
 
     if not matches:
         return SkillMatchResult()

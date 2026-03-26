@@ -18,6 +18,7 @@ from src.agents.shared.skills import (
     _BUILTIN_SKILL_NAMES,
     _CUSTOM_DIR,
     _parse_skill_md,
+    _scan_builtin,
     build_auto_apply_context,
     expand_skill,
     list_skills,
@@ -350,7 +351,7 @@ class TestSkillMdParsing:
         assert "Body text." in skill.prompt_template
 
     def test_name_fallback_to_parent_dir(self, tmp_path):
-        """If name is missing from frontmatter, use parent directory name."""
+        """Custom SKILL.md may fall back to the parent directory slug."""
         md = "---\ndescription: No name field\n---\n\nBody.\n"
         p = tmp_path / "my-cool-skill" / "SKILL.md"
         p.parent.mkdir()
@@ -358,6 +359,14 @@ class TestSkillMdParsing:
         skill = _parse_skill_md(p)
         assert skill is not None
         assert skill.name == "my_cool_skill"  # hyphens → underscores
+
+    def test_repo_owned_missing_name_raises(self, tmp_path):
+        md = "---\ndescription: No name field\n---\n\nBody.\n"
+        p = tmp_path / "packaged-skill" / "SKILL.md"
+        p.parent.mkdir()
+        p.write_text(md)
+        with pytest.raises(RuntimeError, match="Missing required skill name"):
+            _parse_skill_md(p, require_name=True, allow_name_fallback=False)
 
     def test_all_frontmatter_fields(self, tmp_path):
         md = (
@@ -385,6 +394,22 @@ class TestSkillMdParsing:
         assert skill.auto_apply is False
         assert skill.data_sources == {"required": ["tool_a"], "optional": ["tool_b"]}
         assert skill.output == "report"
+
+    def test_kebab_case_auto_apply_supported(self, tmp_path):
+        md = (
+            "---\n"
+            "name: kebab_auto\n"
+            "description: Kebab key\n"
+            "auto-apply: false\n"
+            "---\n\n"
+            "Body.\n"
+        )
+        p = tmp_path / "kebab_auto" / "SKILL.md"
+        p.parent.mkdir()
+        p.write_text(md)
+        skill = _parse_skill_md(p)
+        assert skill is not None
+        assert skill.auto_apply is False
 
     def test_empty_body_returns_none(self, tmp_path):
         """Empty body is treated as invalid (warning + skip)."""
@@ -532,6 +557,24 @@ class TestRegistryRebuild:
         rebuild_skill_registry()
         assert "my_custom" in SKILL_REGISTRY
 
+    def test_recursive_custom_md_skill_loaded(self, tmp_path, monkeypatch):
+        """Custom SKILL.md loading should recurse beyond one category level."""
+        skill_dir = tmp_path / "custom" / "alpha" / "beta" / "deep-skill"
+        skill_dir.mkdir(parents=True)
+        md = "---\nname: deep_skill\ndescription: Deep custom\n---\n\nDo something deep.\n"
+        (skill_dir / "SKILL.md").write_text(md)
+
+        import src.agents.shared.skills as skills_mod
+        monkeypatch.setattr(skills_mod, "_CUSTOM_DIR", tmp_path)
+        rebuild_skill_registry()
+        assert "deep_skill" in SKILL_REGISTRY
+
+    def test_builtin_missing_skill_md_raises(self, tmp_path):
+        """Builtin directories must each contain a SKILL.md file."""
+        (tmp_path / "missing-skill-md").mkdir()
+        with pytest.raises(RuntimeError, match="Builtin skill missing SKILL.md"):
+            _scan_builtin(tmp_path)
+
 
 # ============================================================
 # Auto-Trigger Matching Tests (Phase G)
@@ -589,6 +632,38 @@ class TestAutoTrigger:
     def test_empty_query_no_match(self):
         r = match_skill_trigger("")
         assert r.reason == "none"
+
+    def test_prefers_best_phrase_for_same_skill(self, monkeypatch):
+        import src.agents.shared.skills as skills_mod
+        original = list(skills_mod._TRIGGER_INDEX)
+        try:
+            skill_a = SkillDefinition(
+                name="skill_a",
+                description="A",
+                prompt_template="A",
+                trigger="alpha beta gamma|beta",
+            )
+            skill_b = SkillDefinition(
+                name="skill_b",
+                description="B",
+                prompt_template="B",
+                trigger="alpha beta gamma",
+            )
+            monkeypatch.setattr(
+                skills_mod,
+                "_TRIGGER_INDEX",
+                [
+                    ("alpha beta gamma", skill_a),
+                    ("alpha beta gamma", skill_b),
+                    ("beta", skill_a),
+                ],
+            )
+            r = match_skill_trigger("alpha xxx beta yyy gamma beta")
+            assert r.reason == "unique"
+            assert r.skill is not None
+            assert r.skill.name == "skill_a"
+        finally:
+            monkeypatch.setattr(skills_mod, "_TRIGGER_INDEX", original)
 
 
 # ============================================================
