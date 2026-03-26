@@ -267,12 +267,7 @@ When a skill prompt is active, it defines the goal, minimum data sources,
 and required output elements. You decide the best tools, order, and strategy
 to achieve the goal — the skill is a guide, not a rigid script.
 
-Available skills:
-- full_analysis <TICKER>: Comprehensive entry analysis (news, price, fundamentals,
-  options, adversarial check → save report)
-- portfolio_scan: Watchlist-wide screening with drill-down on top movers
-- earnings_prep <TICKER>: Pre-earnings risk/reward assessment
-- sector_rotation: Cross-sector relative strength and rotation analysis
+{skills_list}
 
 When executing a skill, ensure you cover all minimum data sources before
 synthesizing conclusions. If a data source is unavailable, note it as a gap.
@@ -342,13 +337,25 @@ def _get_rl_status_section() -> str:
         return ""
 
 
+def _get_skills_list() -> str:
+    """Generate dynamic skills list for the system prompt."""
+    from .skills import list_skills
+
+    lines = ["Available skills:"]
+    for s in list_skills():
+        rp = s["required_params"]
+        params = f" <{rp}>" if rp and rp != "(none)" else ""
+        lines.append(f"- {s['name']}{params}: {s['description']}")
+    return "\n".join(lines)
+
+
 def build_system_prompt(freshness_summary: str = "") -> str:
     """Build system prompt with optional dynamic sections.
 
     The static SYSTEM_PROMPT is always the base. Dynamic sections
     (freshness, RL status) are appended when available.
     """
-    result = SYSTEM_PROMPT
+    result = SYSTEM_PROMPT.replace("{skills_list}", _get_skills_list())
     sections = []
 
     # Freshness section

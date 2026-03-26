@@ -225,12 +225,10 @@ _CODE_BACKEND_OPTIONS = [
     ("claude-apikey", "Claude Code (API key)"),
 ]
 
-_SKILL_NAMES = [
-    ("full_analysis", "Comprehensive single-ticker entry analysis"),
-    ("portfolio_scan", "Watchlist-wide screening"),
-    ("earnings_prep", "Pre-earnings risk assessment"),
-    ("sector_rotation", "Cross-sector rotation analysis"),
-]
+def _get_skill_names():
+    """Dynamic skill completions from the registry."""
+    from .shared.skills import list_skills
+    return [(s["name"], s["description"]) for s in list_skills()]
 
 _SUBAGENT_NAMES = [
     ("code_analyst", "Quantitative Python analysis"),
@@ -301,7 +299,7 @@ class SlashCompleter(Completer):
         elif cmd in ("/compaction", "/cmp"):
             return _COMPACTION_OPTIONS
         elif cmd in ("/skill", "/sk"):
-            return _SKILL_NAMES
+            return _get_skill_names()
         elif cmd in ("/subagent", "/sa"):
             return _SUBAGENT_NAMES
         elif cmd in ("/model", "/m"):
@@ -1090,12 +1088,16 @@ def handle_skill_command(state: SessionState, arg: str) -> Optional[str]:
         # List all skills
         skills = list_skills()
         table = Table(title="Available Skills", box=box.SIMPLE_HEAVY)
+        table.add_column("Category", style="dim")
         table.add_column("Name", style="cyan")
         table.add_column("Description")
         table.add_column("Params", style="dim")
         table.add_column("Aliases", style="dim")
         for s in skills:
-            table.add_row(s["name"], s["description"], s["required_params"], s["aliases"])
+            table.add_row(
+                s.get("category", ""), s["name"], s["description"],
+                s["required_params"], s["aliases"],
+            )
         console.print(table)
         console.print("[dim]Usage: /skill <name> [args]  (e.g. /skill full_analysis NVDA)[/dim]\n")
         return None
@@ -2418,6 +2420,25 @@ def main():
             else:
                 console.print(f"[red]Unknown command: {cmd}[/red] [dim](try /help)[/dim]\n")
             continue
+
+        # --- Auto-trigger skill matching ---
+        if not question.startswith("/"):
+            from .shared.skills import match_skill_trigger, build_auto_apply_context, render_skill_suggestion_cli
+            _match = match_skill_trigger(question)
+            if _match.reason == "unique" and _match.skill:
+                if _match.skill.can_auto_apply():
+                    _ctx = build_auto_apply_context(_match.skill, question)
+                    if _ctx:
+                        console.print(f"[dim]Auto-applied skill: {_match.skill.name}[/dim]")
+                        question = _ctx
+                else:
+                    _hint = render_skill_suggestion_cli(_match)
+                    if _hint:
+                        console.print(_hint)
+            elif _match.reason == "multiple":
+                _hint = render_skill_suggestion_cli(_match)
+                if _hint:
+                    console.print(_hint)
 
         # --- Run query ---
         # Show attachment indicator

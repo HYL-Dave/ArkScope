@@ -224,31 +224,23 @@ class SkillSelectView(discord.ui.View):
         self._report_channel = report_channel
         self._state = state
 
-    @discord.ui.select(
-        placeholder="Select a skill...",
-        options=[
-            discord.SelectOption(
-                label="Full Analysis", value="full_analysis",
-                description="Complete ticker analysis", emoji="\U0001F4CA",
-            ),
-            discord.SelectOption(
-                label="Portfolio Scan", value="portfolio_scan",
-                description="Scan entire watchlist", emoji="\U0001F4CB",
-            ),
-            discord.SelectOption(
-                label="Earnings Prep", value="earnings_prep",
-                description="Prepare for earnings report", emoji="\U0001F4C5",
-            ),
-            discord.SelectOption(
-                label="Sector Rotation", value="sector_rotation",
-                description="Analyze sector trends", emoji="\U0001F310",
-            ),
-        ],
-    )
-    async def skill_select(
-        self, interaction: discord.Interaction, select: discord.ui.Select,
-    ) -> None:
-        selected = select.values[0]
+        # Build options dynamically from skill registry
+        from src.agents.shared.skills import list_skills
+        options = []
+        for s in list_skills():
+            label = s["name"].replace("_", " ").title()
+            desc = s["description"][:100]  # Discord limit
+            options.append(discord.SelectOption(label=label, value=s["name"], description=desc))
+        # Discord allows max 25 select options
+        select_menu = discord.ui.Select(
+            placeholder="Select a skill...",
+            options=options[:25],
+        )
+        select_menu.callback = self._skill_selected
+        self.add_item(select_menu)
+
+    async def _skill_selected(self, interaction: discord.Interaction) -> None:
+        selected = interaction.data["values"][0]  # type: ignore[index]
         from src.agents.shared.skills import expand_skill, SKILL_REGISTRY
 
         skill_def = SKILL_REGISTRY.get(selected)
@@ -750,6 +742,20 @@ class MindfulDiscordBot(discord.Client):
         if not question:
             await message.reply("Please provide a question.")
             return
+
+        # Auto-trigger skill matching
+        from src.agents.shared.skills import match_skill_trigger, build_auto_apply_context
+        _match = match_skill_trigger(question)
+        if _match.reason == "unique" and _match.skill and _match.skill.can_auto_apply():
+            _ctx = build_auto_apply_context(_match.skill, question)
+            if _ctx:
+                question = _ctx
+        elif _match.reason == "multiple":
+            names = ", ".join(f"**{n}**" for n in _match.candidates)
+            await message.reply(
+                f"\U0001F4A1 Multiple skills match: {names}. "
+                f"Use `/skill <name>` to choose.",
+            )
 
         async with message.channel.typing():
             answer, model_used = await _run_agent_query(question, self._dal, self._state)

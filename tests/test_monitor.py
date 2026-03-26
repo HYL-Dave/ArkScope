@@ -555,7 +555,8 @@ class TestSkillSelectView:
             view = SkillSelectView(dal=MagicMock())
             assert len(view.children) == 1
             select = view.children[0]
-            assert len(select.options) == 4
+            from src.agents.shared.skills import list_skills
+            assert len(select.options) == min(25, len(list_skills()))
 
         asyncio.run(_test())
 
