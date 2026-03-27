@@ -26,6 +26,8 @@ from src.tools.sa_tools import (
     refresh_sa_alpha_picks,
     _is_sa_enabled,
 )
+from src.tools.data_access import DataAccessLayer
+from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.registry import create_default_registry
 
 
@@ -888,6 +890,73 @@ class TestArticleTools:
         with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
             result = get_sa_article_detail(dal, "999")
             assert "error" in result
+
+
+class TestDataAccessArticleMeta:
+    def _make_dal(self):
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = DatabaseBackend("postgresql://example")
+        dal._compute_unresolved_symbols = MagicMock(return_value=[])
+        return dal
+
+    def test_quick_mode_refreshes_comments_when_remote_count_increases(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "123",
+                "url": "https://example.com/123",
+                "has_content": True,
+                "comments_count": 12,
+                "stored_comments_count": 7,
+                "comments_fetched_at": "2026-03-20T00:00:00+00:00",
+            },
+            {
+                "article_id": "999",
+                "url": "https://example.com/999",
+                "has_content": True,
+                "comments_count": 30,
+                "stored_comments_count": 0,
+                "comments_fetched_at": None,
+            },
+        ])
+
+        result = dal.save_sa_articles_meta([
+            {"article_id": "123", "url": "https://example.com/123"},
+        ], mode="quick")
+
+        assert result["need_content"] == []
+        assert result["need_comments"] == [
+            {"article_id": "123", "url": "https://example.com/123"},
+        ]
+
+    def test_quick_mode_skips_comment_refresh_for_articles_not_in_scan(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "123",
+                "url": "https://example.com/123",
+                "has_content": True,
+                "comments_count": 7,
+                "stored_comments_count": 7,
+                "comments_fetched_at": "2026-03-20T00:00:00+00:00",
+            },
+            {
+                "article_id": "999",
+                "url": "https://example.com/999",
+                "has_content": True,
+                "comments_count": 30,
+                "stored_comments_count": 0,
+                "comments_fetched_at": None,
+            },
+        ])
+
+        result = dal.save_sa_articles_meta([
+            {"article_id": "123", "url": "https://example.com/123"},
+        ], mode="quick")
+
+        assert result["need_comments"] == []
 
 
 class TestNativeHostArticles:

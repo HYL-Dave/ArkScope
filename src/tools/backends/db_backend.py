@@ -1471,7 +1471,9 @@ class DatabaseBackend:
                     f"SELECT article_id, url, title, ticker, published_date, "
                     f"article_type, comments_count, "
                     f"CASE WHEN body_markdown IS NOT NULL THEN true ELSE false END as has_content, "
-                    f"detail_fetched_at, comments_fetched_at "
+                    f"detail_fetched_at, comments_fetched_at, "
+                    f"(SELECT COUNT(*) FROM sa_article_comments c "
+                    f" WHERE c.article_id = sa_articles.article_id) AS stored_comments_count "
                     f"FROM sa_articles WHERE {where} "
                     f"ORDER BY published_date DESC NULLS LAST "
                     f"LIMIT %s",

@@ -711,16 +711,16 @@ class DataAccessLayer:
         saved = self._backend.upsert_sa_articles_meta(articles)
 
         # Determine need_content (body IS NULL)
-        need_content = self._backend.query_sa_articles(limit=9999)
+        all_articles = self._backend.query_sa_articles(limit=9999)
         need_content = [
             {"article_id": a["article_id"], "url": a.get("url", "")}
-            for a in need_content
+            for a in all_articles
             if not a.get("has_content")
         ]
 
-        # Determine need_comments (TTL expired, body exists)
-        # Only for full mode
+        # Determine need_comments
         need_comments = []
+        need_content_ids = {a["article_id"] for a in need_content}
         if mode == "full":
             from src.agents.config import get_agent_config
             try:
@@ -730,8 +730,6 @@ class DataAccessLayer:
                 ttl = 7
             from datetime import datetime, timezone, timedelta
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
-            all_articles = self._backend.query_sa_articles(limit=9999)
-            need_content_ids = {a["article_id"] for a in need_content}
             for a in all_articles:
                 if a["article_id"] in need_content_ids:
                     continue  # Mutual exclusion: need_content takes priority
@@ -748,6 +746,25 @@ class DataAccessLayer:
                 need_comments.append(
                     {"article_id": a["article_id"], "url": a.get("url", "")}
                 )
+        elif mode == "quick":
+            scanned_ids = {
+                a.get("article_id")
+                for a in articles
+                if a.get("article_id")
+            }
+            for a in all_articles:
+                if a["article_id"] not in scanned_ids:
+                    continue
+                if a["article_id"] in need_content_ids:
+                    continue
+                if not a.get("has_content"):
+                    continue
+                remote_count = int(a.get("comments_count") or 0)
+                stored_count = int(a.get("stored_comments_count") or 0)
+                if remote_count > stored_count:
+                    need_comments.append(
+                        {"article_id": a["article_id"], "url": a.get("url", "")}
+                    )
 
         # Unresolved symbols (current picks only, metadata-only matching)
         unresolved = self._compute_unresolved_symbols()
