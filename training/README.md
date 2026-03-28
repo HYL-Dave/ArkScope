@@ -17,9 +17,11 @@ training/
 ├── models.py                        # MLPActorCritic 神經網路架構
 ├── ppo.py                           # PPOBuffer + ppo() 演算法核心
 ├── cppo.py                          # CPPOBuffer + cppo() (CVaR 風險約束)
-├── train_ppo_llm.py                 # PPO 訓練入口（資料載入、環境設定、存檔）
-├── train_cppo_llm_risk.py           # CPPO 訓練入口
-├── backtest.py                      # 回測腳本
+├── train_ppo_llm.py                 # PPO 訓練入口（SpinningUp, CPU + MPI）
+├── train_ppo_sb3.py                 # PPO 訓練入口（SB3, GPU/CPU）
+├── train_cppo_llm_risk.py           # CPPO 訓練入口（SpinningUp, CPU + MPI）
+├── backtest.py                      # 回測腳本（SpinningUp 模型）
+├── backtest_sb3.py                  # 回測腳本（SB3 模型）
 ├── preprocessor.py                  # 資料前處理
 ├── envs/
 │   ├── stocktrading_llm.py          # 情緒增強交易環境
@@ -238,7 +240,7 @@ python training/train_cppo_llm_risk.py \
   --epochs 100
 ```
 
-### 範例 E: MPI 分散式正式訓練
+### 範例 E: MPI 分散式正式訓練（SpinningUp, CPU）
 
 ```bash
 # PPO 8 核心
@@ -251,6 +253,30 @@ OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
   mpirun -np 4 python training/train_cppo_llm_risk.py \
   --data training/data_prep/output/train_claude_opus_both.csv \
   --epochs 100
+```
+
+### 範例 F: SB3 PPO（GPU/CPU，推薦用於新訓練）
+
+```bash
+# GPU 自動偵測
+python training/train_ppo_sb3.py \
+  --data training/data_prep/output/train_polygon_multi_both.csv \
+  --epochs 100 --device auto
+
+# 明確使用 CPU
+python training/train_ppo_sb3.py \
+  --data training/data_prep/output/train_polygon_multi_both.csv \
+  --epochs 100 --device cpu
+
+# 多環境並行
+python training/train_ppo_sb3.py \
+  --data training/data_prep/output/train_polygon_multi_both.csv \
+  --epochs 100 --device auto --n-envs 4
+
+# 回測
+python training/backtest_sb3.py \
+  --data training/data_prep/output/trade_polygon_multi_both.csv \
+  --model trained_models/ppo_sb3_xxx/model_sb3.zip
 ```
 
 ---
@@ -287,6 +313,8 @@ OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
 
 ## 參考：訓練參數
 
+### SpinningUp 版（`train_ppo_llm.py` / `train_cppo_llm_risk.py`）
+
 | 參數 | 預設 | 說明 |
 |------|------|------|
 | `--data` | None | 本地 CSV 路徑（跳過 HuggingFace 下載） |
@@ -298,14 +326,34 @@ OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
 | `--gamma` | 0.995 | 折扣因子（僅 PPO） |
 | `--sentiment-scale` | strong | 情緒縮放: `strong` (±10%) / `weak` (±0.1%) |
 
-模型輸出檔名格式：`agent_{algo}_{data_tag}_{epochs}ep_s{seed}.pth`
+### SB3 版（`train_ppo_sb3.py`）
+
+| 參數 | 預設 | 說明 |
+|------|------|------|
+| `--data` | **必填** | 本地 CSV 路徑 |
+| `--epochs` | 100 | 訓練輪數（rollout cycles） |
+| `--steps` | 20000 | 每輪步數（n_steps） |
+| `--seed` / `-s` | 42 | 隨機種子 |
+| `--hid` | 512 | 隱藏層大小 |
+| `--l` | 2 | 隱藏層層數 |
+| `--gamma` | 0.995 | 折扣因子 |
+| `--lr` | 3e-5 | 學習率 |
+| `--device` | auto | `auto` / `cpu` / `cuda` |
+| `--n-envs` | 1 | 並行環境數（>1 用 SubprocVecEnv） |
+| `--sentiment-scale` | strong | 情緒縮放 |
+
+模型輸出：
+- SpinningUp: `trained_models/{model_id}/model.pth`
+- SB3: `trained_models/{model_id}/model_sb3.zip` + `model.pth`
 
 ## 參考：回測參數
+
+### SpinningUp 模型 → `backtest.py`
 
 ```bash
 python training/backtest.py \
   --data trade_*.csv \
-  --model trained_models/agent_*.pth \
+  --model trained_models/xxx/model.pth \
   --env sentiment \
   --hid 512 --l 2 \
   --sentiment-scale strong
@@ -319,9 +367,26 @@ python training/backtest.py \
 | `--hid` | 512 | 隱藏層大小（**必須與訓練一致**） |
 | `--l` | 2 | 隱藏層層數（**必須與訓練一致**） |
 | `--sentiment-scale` | `strong` | 情緒縮放（**必須與訓練一致**） |
-| `--output-plot` | `equity_curve.png` | 權益曲線圖輸出路徑 |
 
-輸出指標：Final Equity, Information Ratio, CVaR (95%)
+### SB3 模型 → `backtest_sb3.py`
+
+```bash
+python training/backtest_sb3.py \
+  --data trade_*.csv \
+  --model trained_models/xxx/model_sb3.zip \
+  --sentiment-scale strong
+```
+
+| 參數 | 預設 | 說明 |
+|------|------|------|
+| `--data` | **必填** | 回測資料 CSV |
+| `--model` | **必填** | SB3 模型檔（.zip） |
+| `--device` | auto | 推論設備 |
+| `--sentiment-scale` | `strong` | 情緒縮放（**必須與訓練一致**） |
+
+SB3 版不需要 `--hid` / `--l` / `--env` — 網路結構存在 .zip 內，環境固定為 sentiment。
+
+輸出指標：Final Equity, Sharpe Ratio, Max Drawdown, Calmar, Sortino, Win Rate, CVaR (95%)
 
 ## 回歸驗證（Regression Validation）
 
@@ -409,39 +474,69 @@ SpinningUp 預期 Gymnasium 原生 API（`reset()` 回傳 `obs, info`），
 
 ---
 
-## GPU 遷移路線（規劃中）
+## SpinningUp vs SB3 PPO 比較
 
-### 現況：為什麼是 CPU-only
+### 為什麼有兩個 PPO
 
-SpinningUp 的 MPI 同步層（`mpi_avg_grads`, `sync_params`）對 gradient / params
-呼叫 `.numpy()`，只能用於 CPU tensor。FinRL_DeepSeek 上游論文也是 CPU 訓練。
+SpinningUp 的 MPI 同步層（`mpi_avg_grads`, `sync_params`）對 gradient
+呼叫 `.numpy()`，鎖死在 CPU。FinRL_DeepSeek 上游論文也是 CPU 訓練。
 
-FinRL 主倉庫有 GPU 支援（ElegantRL / RLlib agent），但那些是獨立的 agent 實現，
-不包含我們的 CPPO CVaR 約束和情緒縮放邏輯。
+`train_ppo_sb3.py` 是使用 SB3 框架的替代版本，支援 GPU。
+兩者使用**完全相同的環境**（`stocktrading_llm.py`），情緒縮放邏輯在環境裡，
+不在 PPO 演算法裡，所以遷移不影響交易邏輯。
 
-### 框架比較
+### 實現差異
 
-| | SpinningUp (現在) | SB3 PPO | CleanRL PPO |
-|---|---|---|---|
-| GPU 支援 | 無（MPI .numpy()） | 有（原生 CUDA） | 有（原生 CUDA） |
-| PPO | 有 | 有，成熟穩定 | 有，單檔實現 |
-| CPPO (CVaR) | 自定義 `cppo.py` | 無現成，需繼承重寫 | 無現成，需自行加入 |
-| 情緒縮放 | training loop 內 | 可移到 env reward（更乾淨） | 同左 |
-| Gymnasium 環境 | 相容 | 原生支援 | 原生支援 |
-| 維護狀態 | 停維 (2020) | 活躍 | 活躍 |
-| Vectorized Env | 無（MPI 多進程） | SubprocVecEnv (GPU) | 支援 |
+| | SpinningUp (`train_ppo_llm.py`) | SB3 (`train_ppo_sb3.py`) |
+|---|---|---|
+| GPU | 無（MPI .numpy()） | 有（`--device auto/cuda`） |
+| 並行 | `mpirun -np N`（多進程） | `--n-envs N`（SubprocVecEnv） |
+| Minibatch | 整個 buffer 一次更新 | 分 minibatch（default 2048） |
+| Gradient clipping | 無 | SB3 內建 max_grad_norm=0.5 |
+| Advantage norm | MPI 跨進程統計 | 單進程 buffer 統計 |
+| 內部 epochs | `train_pi_iters=100`（per rollout） | `n_epochs=10`（per rollout） |
+| 模型輸出 | `model.pth`（state_dict） | `model_sb3.zip` + `model.pth` |
+| CPPO | 有（`train_cppo_llm_risk.py`） | 尚未實現 |
+| 維護 | 停維 (2020) | 活躍 |
 
-### 建議遷移順序
+### 超參數對應
 
-1. **PPO → SB3 PPO (GPU)**：難度低，環境不用改。情緒縮放邏輯從 training loop
-   移到環境的 reward shaping（`step()` 裡根據 sentiment 調整 reward）。
-   SB3 的 `PPO` 直接接 Gymnasium 環境即可。
+| SpinningUp | SB3 | 預設值 |
+|---|---|---|
+| `clip_ratio` | `clip_range` | 0.7 |
+| `pi_lr` | `learning_rate` | 3e-5 |
+| `gamma` | `gamma` | 0.995 |
+| `steps_per_epoch` | `n_steps` | 20000 |
+| `lam` | `gae_lambda` | 0.95 |
+| `target_kl` | `target_kl` | 0.35 |
+| `train_pi_iters=100` | `n_epochs=10` | 不同（見下文） |
 
-2. **CPPO → SB3 自定義**：難度中，需繼承 SB3 的 PPO 加入 CVaR constraint。
-   核心改動在 `train()` method（advantage 計算 + risk weight）。
+> **注意**：雖然超參數盡量對齊，但兩者在 minibatch 策略、gradient clipping、
+> advantage normalization 等細節上有差異，**同樣的超參數不保證完全相同的結果**。
+> 需要在同一份資料上各跑一次，比較 Sharpe / Max Drawdown 等指標來評估差異。
 
-3. **Env 不需改動**：`stocktrading_llm.py` / `stocktrading_llm_risk.py` 是標準
-   Gymnasium 環境，任何框架都能直接使用。
+### 驗證計畫
+
+使用同一份 Polygon Phase 1 資料（train 2022-2024, trade 2025-2026），
+分別用 SpinningUp CPU 和 SB3 GPU 訓練，比較 backtest 指標：
+
+```bash
+# SpinningUp CPU
+mpirun -np 8 python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_polygon_multi_both.csv --epochs 100
+
+# SB3 GPU
+python training/train_ppo_sb3.py \
+  --data training/data_prep/output/train_polygon_multi_both.csv --epochs 100 --device auto
+```
+
+比較項目：Final Equity, Sharpe, Max Drawdown, 訓練時間。
+
+### 後續遷移
+
+- **CPPO → SB3 自定義**：需繼承 SB3 PPO 加入 CVaR constraint。
+  核心改動在 `train()` method（advantage 計算 + risk weight）。待 PPO 比較完成後再進行。
+- **Env 不需改動**：兩種框架共用相同的 Gymnasium 環境。
 
 ---
 
