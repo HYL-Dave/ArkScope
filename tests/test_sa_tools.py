@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+from types import SimpleNamespace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -957,6 +958,120 @@ class TestDataAccessArticleMeta:
         ], mode="quick")
 
         assert result["need_comments"] == []
+
+
+    def test_full_mode_adds_top_gap_backfill_articles(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "need-content",
+                "url": "https://example.com/need-content",
+                "has_content": False,
+                "comments_count": 0,
+                "stored_comments_count": 0,
+                "published_date": "2026-03-28",
+                "comments_fetched_at": None,
+            },
+            {
+                "article_id": "ttl-refresh",
+                "url": "https://example.com/ttl-refresh",
+                "has_content": True,
+                "comments_count": 5,
+                "stored_comments_count": 5,
+                "published_date": "2026-03-01",
+                "comments_fetched_at": old,
+            },
+            {
+                "article_id": "gap-newer-big",
+                "url": "https://example.com/gap-newer-big",
+                "has_content": True,
+                "comments_count": 80,
+                "stored_comments_count": 30,
+                "published_date": "2026-03-28",
+                "comments_fetched_at": recent,
+            },
+            {
+                "article_id": "gap-older-big",
+                "url": "https://example.com/gap-older-big",
+                "has_content": True,
+                "comments_count": 70,
+                "stored_comments_count": 20,
+                "published_date": "2026-03-20",
+                "comments_fetched_at": recent,
+            },
+            {
+                "article_id": "gap-small",
+                "url": "https://example.com/gap-small",
+                "has_content": True,
+                "comments_count": 20,
+                "stored_comments_count": 12,
+                "published_date": "2026-03-27",
+                "comments_fetched_at": recent,
+            },
+            {
+                "article_id": "fresh-no-gap",
+                "url": "https://example.com/fresh-no-gap",
+                "has_content": True,
+                "comments_count": 9,
+                "stored_comments_count": 9,
+                "published_date": "2026-03-26",
+                "comments_fetched_at": recent,
+            },
+        ])
+
+        with patch(
+            "src.agents.config.get_agent_config",
+            return_value=SimpleNamespace(
+                sa_comments_cache_days=7,
+                sa_comments_backfill_per_full_scan=2,
+            ),
+        ):
+            result = dal.save_sa_articles_meta([
+                {"article_id": "123", "url": "https://example.com/123"},
+            ], mode="full")
+
+        assert result["need_content"] == [
+            {"article_id": "need-content", "url": "https://example.com/need-content"},
+        ]
+        assert result["need_comments"] == [
+            {"article_id": "ttl-refresh", "url": "https://example.com/ttl-refresh"},
+            {"article_id": "gap-newer-big", "url": "https://example.com/gap-newer-big"},
+            {"article_id": "gap-older-big", "url": "https://example.com/gap-older-big"},
+        ]
+
+
+    def test_full_mode_treats_missing_comments_timestamp_as_stale(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "never-fetched",
+                "url": "https://example.com/never-fetched",
+                "has_content": True,
+                "comments_count": 0,
+                "stored_comments_count": 0,
+                "published_date": "2026-03-25",
+                "comments_fetched_at": None,
+            },
+        ])
+
+        with patch(
+            "src.agents.config.get_agent_config",
+            return_value=SimpleNamespace(
+                sa_comments_cache_days=7,
+                sa_comments_backfill_per_full_scan=0,
+            ),
+        ):
+            result = dal.save_sa_articles_meta([
+                {"article_id": "123", "url": "https://example.com/123"},
+            ], mode="full")
+
+        assert result["need_comments"] == [
+            {"article_id": "never-fetched", "url": "https://example.com/never-fetched"},
+        ]
 
 
 class TestNativeHostArticles:

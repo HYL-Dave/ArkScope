@@ -726,26 +726,60 @@ class DataAccessLayer:
             try:
                 config = get_agent_config()
                 ttl = getattr(config, "sa_comments_cache_days", 7)
+                backfill_limit = max(
+                    0,
+                    int(getattr(config, "sa_comments_backfill_per_full_scan", 10)),
+                )
             except Exception:
                 ttl = 7
+                backfill_limit = 10
             from datetime import datetime, timezone, timedelta
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
+            need_comment_ids = set()
+            backfill_candidates = []
             for a in all_articles:
                 if a["article_id"] in need_content_ids:
                     continue  # Mutual exclusion: need_content takes priority
                 if not a.get("has_content"):
                     continue
+                remote_count = int(a.get("comments_count") or 0)
+                stored_count = int(a.get("stored_comments_count") or 0)
+                gap = remote_count - stored_count
                 fetched = a.get("comments_fetched_at")
+                is_stale = fetched is None
                 if fetched:
                     if isinstance(fetched, str):
                         fetched = datetime.fromisoformat(
                             fetched.replace("Z", "+00:00")
                         )
-                    if fetched > cutoff:
-                        continue  # Comments still fresh
-                need_comments.append(
-                    {"article_id": a["article_id"], "url": a.get("url", "")}
+                    is_stale = fetched <= cutoff
+                if is_stale:
+                    need_comments.append(
+                        {"article_id": a["article_id"], "url": a.get("url", "")}
+                    )
+                    need_comment_ids.add(a["article_id"])
+                    continue
+                if gap > 0:
+                    published = a.get("published_date")
+                    if hasattr(published, "isoformat"):
+                        published_key = published.isoformat()
+                    elif published is None:
+                        published_key = ""
+                    else:
+                        published_key = str(published)
+                    backfill_candidates.append((gap, published_key, a))
+            if backfill_limit > 0:
+                backfill_candidates.sort(
+                    key=lambda item: (item[0], item[1]),
+                    reverse=True,
                 )
+                for _, _, a in backfill_candidates[:backfill_limit]:
+                    if a["article_id"] in need_comment_ids:
+                        continue
+                    need_comments.append(
+                        {"article_id": a["article_id"], "url": a.get("url", "")}
+                    )
+                    need_comment_ids.add(a["article_id"])
         elif mode == "quick":
             scanned_ids = {
                 a.get("article_id")
