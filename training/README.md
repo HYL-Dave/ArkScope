@@ -409,4 +409,40 @@ SpinningUp 預期 Gymnasium 原生 API（`reset()` 回傳 `obs, info`），
 
 ---
 
+## GPU 遷移路線（規劃中）
+
+### 現況：為什麼是 CPU-only
+
+SpinningUp 的 MPI 同步層（`mpi_avg_grads`, `sync_params`）對 gradient / params
+呼叫 `.numpy()`，只能用於 CPU tensor。FinRL_DeepSeek 上游論文也是 CPU 訓練。
+
+FinRL 主倉庫有 GPU 支援（ElegantRL / RLlib agent），但那些是獨立的 agent 實現，
+不包含我們的 CPPO CVaR 約束和情緒縮放邏輯。
+
+### 框架比較
+
+| | SpinningUp (現在) | SB3 PPO | CleanRL PPO |
+|---|---|---|---|
+| GPU 支援 | 無（MPI .numpy()） | 有（原生 CUDA） | 有（原生 CUDA） |
+| PPO | 有 | 有，成熟穩定 | 有，單檔實現 |
+| CPPO (CVaR) | 自定義 `cppo.py` | 無現成，需繼承重寫 | 無現成，需自行加入 |
+| 情緒縮放 | training loop 內 | 可移到 env reward（更乾淨） | 同左 |
+| Gymnasium 環境 | 相容 | 原生支援 | 原生支援 |
+| 維護狀態 | 停維 (2020) | 活躍 | 活躍 |
+| Vectorized Env | 無（MPI 多進程） | SubprocVecEnv (GPU) | 支援 |
+
+### 建議遷移順序
+
+1. **PPO → SB3 PPO (GPU)**：難度低，環境不用改。情緒縮放邏輯從 training loop
+   移到環境的 reward shaping（`step()` 裡根據 sentiment 調整 reward）。
+   SB3 的 `PPO` 直接接 Gymnasium 環境即可。
+
+2. **CPPO → SB3 自定義**：難度中，需繼承 SB3 的 PPO 加入 CVaR constraint。
+   核心改動在 `train()` method（advantage 計算 + risk weight）。
+
+3. **Env 不需改動**：`stocktrading_llm.py` / `stocktrading_llm_risk.py` 是標準
+   Gymnasium 環境，任何框架都能直接使用。
+
+---
+
 *最後更新: 2026-03-28*
