@@ -160,7 +160,12 @@ function renderStatus(lastRefresh) {
       var parts = [];
       if (details.articles_saved > 0) parts.push(details.articles_saved + " articles");
       if (details.fetched > 0) parts.push(details.fetched + " content fetched");
-      if (details.comments_refreshed > 0) parts.push(details.comments_refreshed + " comments updated");
+      if (details.comments_refreshed > 0) {
+        var refreshedLabel = details.comments_refreshed === 1
+          ? " article comments refreshed"
+          : " articles' comments refreshed";
+        parts.push(details.comments_refreshed + refreshedLabel);
+      }
       if (details.failed > 0) parts.push(details.failed + " failed");
       var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "up to date");
       statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
