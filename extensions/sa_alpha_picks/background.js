@@ -9,6 +9,29 @@ const SA_ARTICLES_URL = "https://seekingalpha.com/alpha-picks/articles";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 const TABLE_SELECTOR = "table tbody tr";
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
+const COMMENT_SCROLL_PROFILES = {
+  quick: {
+    name: "quick",
+    maxScrolls: 12,
+    maxDurationMs: 12000,
+    staleRounds: 2,
+    settleMs: 900,
+  },
+  full: {
+    name: "full",
+    maxScrolls: 80,
+    maxDurationMs: 60000,
+    staleRounds: 4,
+    settleMs: 1400,
+  },
+  manual: {
+    name: "manual",
+    maxScrolls: 60,
+    maxDurationMs: 45000,
+    staleRounds: 4,
+    settleMs: 1200,
+  },
+};
 
 // --- Message listener (from popup) ---
 
@@ -243,6 +266,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   // Check auto_upgrade (first run, empty DB — status is "ok" but auto_upgrade=true)
   if (metaResult && metaResult.auto_upgrade && mode === "quick") {
     sendProgress("First run detected, switching to full scan...");
+    scrollMode = "full";
     await chrome.tabs.update(tabId, { active: true });
     await sleep(500);
     await scrollToLoadAll(tabId, 200);
@@ -292,7 +316,10 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
       // Scroll down to comments section + load all comments
       // This naturally provides human-like dwell time (10-30s per page)
-      await scrollToComments(tabId);
+      await scrollToComments(tabId, {
+        mode: scrollMode,
+        articleId: item.article_id,
+      });
 
       // Scrape comments
       var commentsResult = await injectCommentsScraper(tabId);
@@ -316,7 +343,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     // No artificial delay — comment scroll provides natural dwell time
   }
 
-  // ── Step 4: Refresh comments for TTL-expired articles (full scan only) ──
+  // ── Step 4: Refresh comments for articles flagged by DAL ──
   var commentsRefreshed = 0;
   if (needComments.length > 0) {
     sendProgress("Refreshing comments for " + needComments.length + " article(s)...");
@@ -331,7 +358,10 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       await waitForArticleReady(tabId);
 
       // Scroll to load comments (natural delay)
-      await scrollToComments(tabId);
+      await scrollToComments(tabId, {
+        mode: scrollMode,
+        articleId: cItem.article_id,
+      });
 
       var cResult = await injectCommentsScraper(tabId);
       var cComments = (cResult && cResult.comments) || [];
@@ -396,7 +426,10 @@ async function doManualFetch(items) {
         if (!detail || detail.error) { failed++; continue; }
 
         // Scroll to load comments (v3 path)
-        await scrollToComments(tabId);
+        await scrollToComments(tabId, {
+          mode: "manual",
+          articleId: articleId || item.symbol || "manual",
+        });
         var commentsResult = await injectCommentsScraper(tabId);
         var comments = (commentsResult && commentsResult.comments) || [];
 
@@ -511,14 +544,29 @@ async function scrollToLoadAll(tabId, maxScrolls) {
   }
 }
 
-async function scrollToComments(tabId) {
+function getCommentScrollProfile(mode) {
+  return COMMENT_SCROLL_PROFILES[mode] || COMMENT_SCROLL_PROFILES.quick;
+}
+
+async function scrollToComments(tabId, options) {
   // SA comments are lazy-loaded by scrolling — they appear inside
   // paywall-full-content as div.border-t-share-separator-thin elements.
-  // Scroll incrementally to trigger loading (natural dwell time).
-  var maxScrolls = 30;
+  // Scroll incrementally to trigger loading, but never let one article
+  // monopolize the whole refresh. Hard caps prevent hangs; stale detection
+  // exits early when the DOM stops growing.
+  options = options || {};
+  var profile = getCommentScrollProfile(options.mode);
+  var startedAt = Date.now();
+  var bestCount = 0;
+  var rounds = 0;
   var staleCount = 0;
+  var stopReason = "max_scrolls";
 
-  for (var i = 0; i < maxScrolls; i++) {
+  for (var i = 0; i < profile.maxScrolls; i++) {
+    if ((Date.now() - startedAt) >= profile.maxDurationMs) {
+      stopReason = "timeout";
+      break;
+    }
     var result = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
@@ -547,16 +595,35 @@ async function scrollToComments(tabId) {
       },
     });
     var check = result[0] && result[0].result;
+    rounds++;
+
+    if (check && check.comments > bestCount) {
+      bestCount = check.comments;
+    }
 
     if (check && check.atBottom && !check.clicked) {
       staleCount++;
-      if (staleCount >= 2) break;
+      if (staleCount >= profile.staleRounds) {
+        stopReason = bestCount > 0 ? "stale" : "empty";
+        break;
+      }
     } else {
       staleCount = 0;
     }
 
-    await sleep(1500);
+    await sleep(profile.settleMs);
   }
+
+  var stats = {
+    mode: profile.name,
+    article_id: options.articleId || null,
+    comments_loaded: bestCount,
+    rounds: rounds,
+    elapsed_ms: Date.now() - startedAt,
+    stop_reason: stopReason,
+  };
+  console.info("[SA] scrollToComments", JSON.stringify(stats));
+  return stats;
 }
 
 async function waitForArticlesReady(tabId, timeoutMs) {
