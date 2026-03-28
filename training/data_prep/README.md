@@ -257,41 +257,67 @@ data/prices/
 1. 載入 LLM 評分（根據 `--source` 選擇來源）
 2. yfinance 下載 OHLCV + 計算技術指標
 3. Left merge 評分到價格矩陣
-4. 分割 train / trade 時段
+4. 分割 train / trade 時段（或 `--train-only` 全資料訓練）
 5. 輸出 CSV（格式符合訓練資料合約）
 
+### 兩階段工作流程
+
+```
+Phase 1 — 驗證 (Validation Split)
+  train 在前，trade 在後（避免 look-ahead bias）
+  trade 期間 = out-of-sample backtest，確認模型能 generalize
+
+Phase 2 — 生產 (Full Retrain)
+  驗證通過後，用全部資料重新訓練（--train-only）
+  這個模型才是實際部署用的
+```
+
+**為什麼 train 一定要比 trade 早？** 只在 Phase 1 是這樣。trade 期間的角色是
+out-of-sample 驗證 — 如果用未來資料訓練、測過去的，就是 look-ahead bias，
+驗證結果無意義。Phase 2 沒有 trade split，全部資料都拿來訓練。
+
+### 使用範例
+
 ```bash
-# Claude Opus 情緒 only → PPO
+# ── Phase 1: 驗證分割 ──
+
+# Polygon 驗證（train 2022-2024, OOS test 2025-2026）
 python -m training.data_prep.prepare_training_data \
-  --source claude --model opus
+  --source polygon --score-type both \
+  --train-start 2022-01-01 --train-end 2024-12-31 \
+  --trade-start 2025-01-01 --trade-end 2026-03-26
 
 # Claude Opus 情緒 + 風險 → CPPO
 python -m training.data_prep.prepare_training_data \
   --source claude --model opus --score-type both
 
-# GPT-5 high effort 情緒 + 風險 → CPPO
-python -m training.data_prep.prepare_training_data \
-  --source gpt5 --model high --score-type both
-
 # HuggingFace DeepSeek (sentiment + risk → CPPO)
 python -m training.data_prep.prepare_training_data \
   --source huggingface --score-type both
 
-# Polygon 現代資料（僅 sentiment → PPO）
+# ── Phase 2: 驗證通過後，全資料重訓 ──
+
+# Polygon 全資料訓練（部署用）
 python -m training.data_prep.prepare_training_data \
-  --source polygon \
-  --train-start 2022-06-01 --train-end 2024-12-31 \
-  --trade-start 2025-01-01 --trade-end 2026-02-28
+  --source polygon --score-type both --train-only \
+  --train-start 2022-01-01 --train-end 2026-03-26
 
-# 訓練 PPO
-python training/train_ppo_llm.py --data training/data_prep/output/train_claude_opus.csv
+# HuggingFace 全資料訓練
+python -m training.data_prep.prepare_training_data \
+  --source huggingface --score-type both --train-only \
+  --train-start 2013-01-01 --train-end 2023-12-31
 
-# 訓練 CPPO
-python training/train_cppo_llm_risk.py --data training/data_prep/output/train_claude_opus_both.csv
+# ── 訓練模型 ──
+
+# PPO
+python training/train_ppo_llm.py --data training/data_prep/output/train_polygon_multi_both.csv
+
+# CPPO
+python training/train_cppo_llm_risk.py --data training/data_prep/output/train_polygon_multi_both.csv
 ```
 
 輸出目錄：`training/data_prep/output/`
 
 ---
 
-*最後更新: 2026-03-01*
+*最後更新: 2026-03-28*

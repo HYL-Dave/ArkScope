@@ -326,33 +326,38 @@ def main():
         description="Prepare training data from multiple LLM score sources",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Workflow — two-phase approach:
+
+  Phase 1 (Validation): train on past, trade on future (out-of-sample backtest).
+    train-end < trade-start to avoid look-ahead bias.
+
+  Phase 2 (Production): after validation, retrain on ALL data for deployment.
+    Use --train-only to output a single file covering the full date range.
+
 Examples:
-  # Claude Opus sentiment only (for PPO)
-  %(prog)s --source claude --model opus
 
-  # Claude Opus sentiment + risk (for CPPO)
-  %(prog)s --source claude --model opus --score-type both
+  # ── Phase 1: Validation split ──
 
-  # GPT-5 high effort sentiment only
-  %(prog)s --source gpt5 --model high
+  # Polygon: validate model generalizes (train 2022-2024, test 2025-2026)
+  %(prog)s --source polygon --score-type both \\
+           --train-start 2022-01-01 --train-end 2024-12-31 \\
+           --trade-start 2025-01-01 --trade-end 2026-03-26
 
-  # GPT-5 high effort sentiment + risk (for CPPO)
-  %(prog)s --source gpt5 --model high --score-type both
-
-  # HuggingFace DeepSeek sentiment (original pipeline)
-  %(prog)s --source huggingface --score-type sentiment
-
-  # HuggingFace sentiment + risk (for CPPO)
+  # HuggingFace DeepSeek (train 2013-2018, test 2019-2023)
   %(prog)s --source huggingface --score-type both
 
-  # Polygon modern data (2022-2026, sentiment only)
-  %(prog)s --source polygon --train-start 2022-06-01 --train-end 2024-12-31 \\
-           --trade-start 2025-01-01 --trade-end 2026-02-28
+  # Claude Opus sentiment + risk (same date defaults as HuggingFace)
+  %(prog)s --source claude --model opus --score-type both
 
-  # Polygon sentiment + risk (for CPPO, requires risk scoring done)
-  %(prog)s --source polygon --score-type both \\
-           --train-start 2022-06-01 --train-end 2024-12-31 \\
-           --trade-start 2025-01-01 --trade-end 2026-02-28
+  # ── Phase 2: Full retrain for production ──
+
+  # Polygon: train on ALL data after validation passes
+  %(prog)s --source polygon --score-type both --train-only \\
+           --train-start 2022-01-01 --train-end 2026-03-26
+
+  # HuggingFace: full retrain
+  %(prog)s --source huggingface --score-type both --train-only \\
+           --train-start 2013-01-01 --train-end 2023-12-31
         """,
     )
     parser.add_argument(
@@ -372,8 +377,15 @@ Examples:
     )
     parser.add_argument("--train-start", default="2013-01-01", help="Training period start")
     parser.add_argument("--train-end", default="2018-12-31", help="Training period end")
-    parser.add_argument("--trade-start", default="2019-01-01", help="Trading/test period start")
-    parser.add_argument("--trade-end", default="2023-12-31", help="Trading/test period end")
+    parser.add_argument("--trade-start", default="2019-01-01",
+                        help="OOS backtest period start (ignored with --train-only)")
+    parser.add_argument("--trade-end", default="2023-12-31",
+                        help="OOS backtest period end (ignored with --train-only)")
+    parser.add_argument(
+        "--train-only", action="store_true",
+        help="Production mode: output a single train CSV covering train-start to train-end. "
+             "No trade split. Use after Phase 1 validation confirms the model works.",
+    )
     parser.add_argument(
         "--output-dir", default="training/data_prep/output",
         help="Output directory for CSV files",
@@ -403,10 +415,18 @@ Examples:
         suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
         tag = f"{args.source}_{args.model}{suffix}"
 
+    # Effective end date for price download
+    price_end = args.train_end if args.train_only else args.trade_end
+
     print(f"\n{'=' * 60}")
     print(f"  Preparing training data: {tag}")
-    print(f"  Train: {args.train_start} → {args.train_end}")
-    print(f"  Trade: {args.trade_start} → {args.trade_end}")
+    if args.train_only:
+        print(f"  Mode: FULL RETRAIN (production)")
+        print(f"  Train: {args.train_start} → {args.train_end}")
+    else:
+        print(f"  Mode: VALIDATION SPLIT")
+        print(f"  Train: {args.train_start} → {args.train_end}")
+        print(f"  Trade: {args.trade_start} → {args.trade_end}")
     print(f"{'=' * 60}")
 
     # Step 1: Load scores
@@ -446,7 +466,7 @@ Examples:
 
     # Step 3: Download prices + features
     print("\n[3/4] Downloading prices and computing features...")
-    price_data = download_prices(tickers, args.train_start, args.trade_end)
+    price_data = download_prices(tickers, args.train_start, price_end)
 
     # Step 4: Merge scores and split
     print("\n[4/4] Merging scores and splitting...")
@@ -489,16 +509,20 @@ Examples:
 
     # Split into train and trade
     train = data_split(merged, args.train_start, args.train_end)
-    trade = data_split(merged, args.trade_start, args.trade_end)
 
     # Fill missing scores
     train["llm_sentiment"] = train["llm_sentiment"].fillna(0)
-    trade["llm_sentiment"] = trade["llm_sentiment"].fillna(0)
     if "llm_risk" in train.columns:
         train["llm_risk"] = train["llm_risk"].fillna(3)
-        trade["llm_risk"] = trade["llm_risk"].fillna(3)
 
-    # Fit scaler on train only, transform both
+    trade = None
+    if not args.train_only:
+        trade = data_split(merged, args.trade_start, args.trade_end)
+        trade["llm_sentiment"] = trade["llm_sentiment"].fillna(0)
+        if "llm_risk" in trade.columns:
+            trade["llm_risk"] = trade["llm_risk"].fillna(3)
+
+    # Fit scaler on train, transform both (or train only)
     if extra_cols:
         from training.data_prep.feature_engineering import FeatureScaler
 
@@ -511,20 +535,22 @@ Examples:
             fit_period=fit_period,
         )
         scaler.transform(train, extra_cols)
-        scaler.transform(trade, extra_cols)
+        if trade is not None:
+            scaler.transform(trade, extra_cols)
         scaler_path = os.path.join(args.output_dir, f"feature_scaler_{tag}.json")
         scaler.save(scaler_path)
         print(f"  Scaler fitted on train, saved: {scaler_path}")
 
     # Save
     train_path = os.path.join(args.output_dir, f"train_{tag}.csv")
-    trade_path = os.path.join(args.output_dir, f"trade_{tag}.csv")
     train.to_csv(train_path)
-    trade.to_csv(trade_path)
 
     print(f"\n{'=' * 60}")
     print(f"  Train: {train_path} ({len(train)} rows, {train['tic'].nunique()} tickers)")
-    print(f"  Trade: {trade_path} ({len(trade)} rows, {trade['tic'].nunique()} tickers)")
+    if trade is not None:
+        trade_path = os.path.join(args.output_dir, f"trade_{tag}.csv")
+        trade.to_csv(trade_path)
+        print(f"  Trade: {trade_path} ({len(trade)} rows, {trade['tic'].nunique()} tickers)")
     if extra_cols:
         print(f"  Features: {extra_cols}")
         print(f"  Scaler: {os.path.join(args.output_dir, f'feature_scaler_{tag}.json')}")
