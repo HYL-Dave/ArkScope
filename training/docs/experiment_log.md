@@ -195,8 +195,8 @@ python training/train_ppo_sb3.py \
 | G2 | Claude Opus | GPT-5 summary | 77,871 (61.2%) | 50.1% | 分佈更平衡 |
 | G3a | GPT-5 high | o3 summary | 77,871 (61.2%) | 54.0% | GPT-5 + 最強摘要 |
 | G3b | GPT-5 high | GPT-5 R_high summary | 77,871 (61.2%) | 53.9% | 同族摘要（vs G3a 18% per-article 差異） |
-| G4 | o3 high | o3 summary | 77,871 (61.2%) | **37.1%** | 辨別力最好 |
-| G5 | GPT-5-mini | GPT-5 R_high summary | 77,871 (61.2%) | **29.9%** | 最便宜 + 信號最強 |
+| G4 | o3 high | o3 summary | 77,871 (61.2%) | **37.1%** | 分佈最分散 |
+| G5 | GPT-5-mini | GPT-5 R_high summary | 77,871 (61.2%) | **29.9%** | 最便宜 + 方向性判斷最多 |
 
 **數量差異的影響**：Claude/GPT-5 少了 ~48K 筆評分，這些在 merge 到價格矩陣後會被
 填充為 0（sentiment）和 3（risk），等同「無 LLM 信號」。
@@ -220,7 +220,7 @@ DeepSeek 覆蓋率高但 66.9% 都是中性 3，也幾乎等同無信號。
 | 組別 | LLM 評分 | 摘要來源 | PPO | 目的 |
 |------|----------|---------|-----|------|
 | **G3b** | GPT-5 high | GPT-5 R_high summary | G3b-PPO | 同族摘要 vs G3a（18% per-article 差異） |
-| **G4** | o3 high | o3 summary | G4-PPO | 中性率最低 (37%)，辨別力最好 |
+| **G4** | o3 high | o3 summary | G4-PPO | 中性率最低 (37%)，分佈最分散 |
 | **G5** | GPT-5-mini | GPT-5 R_high summary | G5-PPO | 最便宜 + 中性率最低 (30%)，cost-performance |
 
 第一輪 6 個實驗 + 第二輪 3 個 = 共 9 個，每個 ~5h。
