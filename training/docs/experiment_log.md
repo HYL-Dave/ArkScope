@@ -172,14 +172,16 @@ python training/train_ppo_sb3.py \
 
 **摘要來源詳細記錄**：
 
-| 評分組 | 摘要模型 | 評分模型 | 檔名格式 |
-|--------|---------|---------|---------|
-| DeepSeek (原版) | Lsa_summary（傳統演算法） | DeepSeek V3 | `sentiment_deepseek_*.csv` |
-| Claude Opus | GPT-5 (R=minimal, V=low) | Claude Opus | `*_opus_by_gpt5_summary.csv` |
-| Claude Sonnet | GPT-5 | Claude Sonnet | `*_sonnet_by_gpt5_summary.csv` |
-| Claude Haiku | GPT-5 | Claude Haiku | `*_haiku_by_gpt5_summary.csv` |
-| GPT-5 high | o3 | GPT-5 (effort=high) | `*_gpt-5_high_by_o3_summary.csv` |
-| GPT-5 medium | o3 | GPT-5 (effort=medium) | `*_gpt-5_medium_by_o3_summary.csv` |
+| 評分組 | 摘要模型 | 評分模型 | 檔名格式 | 實驗組 |
+|--------|---------|---------|---------|--------|
+| DeepSeek (原版) | Lsa_summary（傳統演算法） | DeepSeek V3 | `sentiment_deepseek_*.csv` | G1 |
+| Claude Opus | GPT-5 (R=minimal, V=low) | Claude Opus | `*_opus_by_gpt5_summary.csv` | G2 |
+| GPT-5 high | o3 | GPT-5 (effort=high) | `*_gpt-5_high_by_o3_summary.csv` | G3a |
+| GPT-5 high | GPT-5 (R=high, V=low) | GPT-5 (effort=high) | `*_R_high_V_low_by_gpt-5_*_summary.csv` | G3b |
+| o3 high | o3 | o3 (effort=high) | `*_o3_high_by_o3_summary.csv` | G4 |
+| GPT-5-mini | GPT-5 (R=high, V=low) | GPT-5-mini | `*_gpt-5-mini_*_by_gpt-5_*_summary.csv` | G5 |
+| Claude Sonnet | GPT-5 | Claude Sonnet | `*_sonnet_by_gpt5_summary.csv` | (備用) |
+| Claude Haiku | GPT-5 | Claude Haiku | `*_haiku_by_gpt5_summary.csv` | (備用) |
 
 > 詳細的摘要品質比較見 `docs/analysis/SUMMARY_COMPARISON_REPORT.md`
 > 評分分佈比較見 `docs/analysis/DEEPSEEK_VS_CLAUDE_COMPARISON.md`
@@ -187,11 +189,14 @@ python training/train_ppo_sb3.py \
 
 ### 評分品質對比
 
-| LLM | 摘要來源 | 有效評分 | 中性 (3) 比例 | 說明 |
-|-----|---------|---------|--------------|------|
-| DeepSeek V3 (原版) | Lsa_summary | 126,224 (99.3%) | 66.9% | 覆蓋高但信號弱，2/3 都是中性 |
-| Claude Opus | GPT-5 summary | 77,871 (61.2%) | 50.1% | 分佈更平衡，辨別力更好 |
-| GPT-5 high | o3 summary | 77,871 (61.2%) | 54.0% | 類似 Opus，稍偏中性 |
+| 組 | LLM | 摘要來源 | 有效評分 | 中性 (3) | 說明 |
+|----|-----|---------|---------|---------|------|
+| G1 | DeepSeek V3 (原版) | Lsa_summary | 126,224 (99.3%) | 66.9% | 覆蓋高但信號弱 |
+| G2 | Claude Opus | GPT-5 summary | 77,871 (61.2%) | 50.1% | 分佈更平衡 |
+| G3a | GPT-5 high | o3 summary | 77,871 (61.2%) | 54.0% | GPT-5 + 最強摘要 |
+| G3b | GPT-5 high | GPT-5 R_high summary | 77,871 (61.2%) | 53.9% | 同族摘要（vs G3a 18% per-article 差異） |
+| G4 | o3 high | o3 summary | 77,871 (61.2%) | **37.1%** | 辨別力最好 |
+| G5 | GPT-5-mini | GPT-5 R_high summary | 77,871 (61.2%) | **29.9%** | 最便宜 + 信號最強 |
 
 **數量差異的影響**：Claude/GPT-5 少了 ~48K 筆評分，這些在 merge 到價格矩陣後會被
 填充為 0（sentiment）和 3（risk），等同「無 LLM 信號」。
@@ -202,13 +207,25 @@ DeepSeek 覆蓋率高但 66.9% 都是中性 3，也幾乎等同無信號。
 
 使用論文原始分割：`--train-start 2013-01-01 --train-end 2018-12-31 --trade-start 2019-01-01 --trade-end 2023-12-31`
 
-| 組別 | LLM 評分 | PPO | CPPO | 目的 |
-|------|----------|-----|------|------|
-| **G1** | DeepSeek V3 (原版) | G1-PPO | G1-CPPO | 重現論文 baseline |
-| **G2** | Claude Opus | G2-PPO | G2-CPPO | 最高品質 Claude 評分 |
-| **G3** | GPT-5 high | G3-PPO | G3-CPPO | GPT 系列最高 effort |
+**第一輪（PPO + CPPO，核心比較）**：
 
-共 6 個實驗，每個 ~5h。可平行跑 2-3 個（`mpirun -np 8` 各佔 8 核，24 核可跑 3 個）。
+| 組別 | LLM 評分 | 摘要來源 | PPO | CPPO | 目的 |
+|------|----------|---------|-----|------|------|
+| **G1** | DeepSeek V3 | Lsa_summary | G1-PPO | G1-CPPO | 論文 baseline |
+| **G2** | Claude Opus | GPT-5 summary | G2-PPO | G2-CPPO | 最高品質 Claude |
+| **G3a** | GPT-5 high | o3 summary | G3a-PPO | G3a-CPPO | GPT-5 + 最強摘要 |
+
+**第二輪（PPO only，擴展比較）**：
+
+| 組別 | LLM 評分 | 摘要來源 | PPO | 目的 |
+|------|----------|---------|-----|------|
+| **G3b** | GPT-5 high | GPT-5 R_high summary | G3b-PPO | 同族摘要 vs G3a（18% per-article 差異） |
+| **G4** | o3 high | o3 summary | G4-PPO | 中性率最低 (37%)，辨別力最好 |
+| **G5** | GPT-5-mini | GPT-5 R_high summary | G5-PPO | 最便宜 + 中性率最低 (30%)，cost-performance |
+
+第一輪 6 個實驗 + 第二輪 3 個 = 共 9 個，每個 ~5h。
+可平行跑 3 個（`mpirun -np 8` 各佔 8 核，24 核滿載）→ 3 批 × 5h = ~15h。
+第二輪的 CPPO 視第一輪結果決定是否追加。
 
 ### G1: DeepSeek V3 (原版 baseline)
 
@@ -291,7 +308,48 @@ python training/backtest.py \
   --model trained_models/<model_id>/model.pth --env risk
 ```
 
+### G3b: GPT-5 high (by GPT-5 R_high summary)
+
+**G3b-PPO**:
+```bash
+mpirun -np 8 python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_gpt5_high_gpt5sum_both.csv \
+  --epochs 100 --seed 42
+
+python training/backtest.py \
+  --data training/data_prep/output/trade_gpt5_high_gpt5sum_both.csv \
+  --model trained_models/<model_id>/model.pth --env sentiment
+```
+
+### G4: o3 high (by o3 summary)
+
+**G4-PPO**:
+```bash
+mpirun -np 8 python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_o3_high_both.csv \
+  --epochs 100 --seed 42
+
+python training/backtest.py \
+  --data training/data_prep/output/trade_o3_high_both.csv \
+  --model trained_models/<model_id>/model.pth --env sentiment
+```
+
+### G5: GPT-5-mini (by GPT-5 R_high summary)
+
+**G5-PPO**:
+```bash
+mpirun -np 8 python training/train_ppo_llm.py \
+  --data training/data_prep/output/train_gpt5mini_high_both.csv \
+  --epochs 100 --seed 42
+
+python training/backtest.py \
+  --data training/data_prep/output/trade_gpt5mini_high_both.csv \
+  --model trained_models/<model_id>/model.pth --env sentiment
+```
+
 ### 結果對照表（待填）
+
+**第一輪：**
 
 | 實驗 | Return | Sharpe | MDD | CVaR | 訓練時間 |
 |------|--------|--------|-----|------|---------|
@@ -299,8 +357,16 @@ python training/backtest.py \
 | G1-CPPO (DeepSeek) | | | | | |
 | G2-PPO (Opus) | | | | | |
 | G2-CPPO (Opus) | | | | | |
-| G3-PPO (GPT-5 high) | | | | | |
-| G3-CPPO (GPT-5 high) | | | | | |
+| G3a-PPO (GPT-5 high / o3 sum) | | | | | |
+| G3a-CPPO (GPT-5 high / o3 sum) | | | | | |
+
+**第二輪：**
+
+| 實驗 | Return | Sharpe | MDD | CVaR | 訓練時間 |
+|------|--------|--------|-----|------|---------|
+| G3b-PPO (GPT-5 high / gpt5 sum) | | | | | |
+| G4-PPO (o3 high) | | | | | |
+| G5-PPO (GPT-5-mini) | | | | | |
 
 **論文原始結果（Table 1, 2M steps）供參考**：
 
@@ -313,10 +379,10 @@ python training/backtest.py \
 
 ### 後續擴展（視結果決定）
 
-如果 G2/G3 明顯優於 G1，可追加弱模型組做 cost-performance 分析：
-- GPT-5 minimal（最低成本 GPT）
-- Claude Haiku（最低成本 Claude）
-- Claude Sonnet（中間檔）
+- 第二輪 G3b/G4/G5 的 CPPO（如果 PPO 結果有意義）
+- Claude Haiku / Sonnet（最低成本 Claude，已有評分資料）
+- GPT-5 minimal（最低成本 GPT，已有評分資料）
+- 所有評分資料預計開源到 HuggingFace（含各 R/V 組合）
 
 ---
 
@@ -330,4 +396,4 @@ python training/backtest.py \
 
 ---
 
-*最後更新: 2026-03-29*
+*最後更新: 2026-03-30*
