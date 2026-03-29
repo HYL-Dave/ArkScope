@@ -74,7 +74,7 @@ def load_data(data_path=None):
     train['new_idx'] = train['date'].map(date_to_idx)
     train = train.set_index('new_idx')
 
-    train['llm_sentiment'].fillna(0, inplace=True)
+    train['llm_sentiment'] = train['llm_sentiment'].fillna(0)
 
     return train
 
