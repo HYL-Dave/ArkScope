@@ -84,18 +84,56 @@ SCORE_SOURCES = {
     },
     "gpt5": {
         "sentiment": {
+            # by o3 summary
             "high": ("sentiment_gpt-5_high_by_o3_summary.csv", "sentiment_gpt_5"),
             "medium": ("sentiment_gpt-5_medium_by_o3_summary.csv", "sentiment_gpt_5"),
             "low": ("sentiment_gpt-5_low_by_o3_summary.csv", "sentiment_gpt_5"),
             "minimal": ("sentiment_gpt-5_minimal_by_o3_summary.csv", "sentiment_gpt_5"),
+            # by gpt-5 R_high summary (18% per-article difference vs o3 summary)
+            "high_gpt5sum": (
+                "sentiment_gpt-5_R_high_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv",
+                "sentiment_gpt_5",
+            ),
         },
         "risk": {
             "high": ("risk_gpt-5_high_by_o3_summary.csv", "risk_gpt_5"),
             "medium": ("risk_gpt-5_medium_by_o3_summary.csv", "risk_gpt_5"),
             "low": ("risk_gpt-5_low_by_o3_summary.csv", "risk_gpt_5"),
             "minimal": ("risk_gpt-5_minimal_by_o3_summary.csv", "risk_gpt_5"),
+            "high_gpt5sum": (
+                "risk_gpt-5_R_high_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv",
+                "risk_gpt_5",
+            ),
         },
         "base_dir": "/mnt/md0/finrl/gpt-5",
+        "date_col": "Date",
+        "symbol_col": "Stock_symbol",
+    },
+    "o3": {
+        "sentiment": {
+            "high": ("sentiment_o3_high_by_o3_summary.csv", "sentiment_o3"),
+        },
+        "risk": {
+            "high": ("risk_o3_high_by_o3_summary.csv", "risk_o3"),
+        },
+        "base_dir": "/mnt/md0/finrl/o3",
+        "date_col": "Date",
+        "symbol_col": "Stock_symbol",
+    },
+    "gpt5mini": {
+        "sentiment": {
+            "high": (
+                "sentiment_gpt-5-mini_with_R_high_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv",
+                "sentiment_gpt_5_mini",
+            ),
+        },
+        "risk": {
+            "high": (
+                "risk_gpt-5-mini_with_R_high_V_low_by_gpt-5_reason_high_verbosity_high_summary.csv",
+                "risk_gpt_5_mini",
+            ),
+        },
+        "base_dir": "/mnt/md0/finrl/gpt-5-mini",
         "date_col": "Date",
         "symbol_col": "Stock_symbol",
     },
@@ -362,12 +400,13 @@ Examples:
     )
     parser.add_argument(
         "--source", required=True,
-        choices=["huggingface", "claude", "gpt5", "polygon"],
+        choices=["huggingface", "claude", "gpt5", "o3", "gpt5mini", "polygon"],
         help="Score data source",
     )
     parser.add_argument(
         "--model", default=None,
-        help="Model variant (claude: opus/sonnet/haiku; gpt5: high/medium/low/minimal)",
+        help="Model variant (claude: opus/sonnet/haiku; gpt5: high/medium/low/minimal/high_gpt5sum; "
+             "o3: high; gpt5mini: high)",
     )
     parser.add_argument(
         "--score-type", default="sentiment",
@@ -399,7 +438,7 @@ Examples:
     args = parser.parse_args()
 
     # Validate model argument
-    if args.source in ("claude", "gpt5") and not args.model:
+    if args.source in ("claude", "gpt5", "o3", "gpt5mini") and not args.model:
         parser.error(f"--model is required for source={args.source}")
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -440,7 +479,7 @@ Examples:
             sentiment_scores = _load_huggingface_scores("sentiment", "llm_sentiment")
         if args.score_type in ("risk", "both"):
             risk_scores = _load_huggingface_scores("risk", "llm_risk")
-    elif args.source in ("claude", "gpt5"):
+    elif args.source in ("claude", "gpt5", "o3", "gpt5mini"):
         if args.score_type in ("sentiment", "both"):
             sentiment_scores = _load_model_scores(args.source, args.model, "sentiment", "llm_sentiment")
         if args.score_type in ("risk", "both"):
@@ -478,7 +517,7 @@ Examples:
     if args.score_type == "risk" and sentiment_scores is None:
         if args.source == "huggingface":
             sentiment_scores = _load_huggingface_scores("sentiment", "llm_sentiment")
-        elif args.source in ("claude", "gpt5"):
+        elif args.source in ("claude", "gpt5", "o3", "gpt5mini"):
             sentiment_scores = _load_model_scores(
                 args.source, args.model, "sentiment", "llm_sentiment",
             )
