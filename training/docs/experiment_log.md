@@ -155,13 +155,48 @@ python training/train_ppo_sb3.py \
 **目的**：驗證更好的 LLM 評分是否能改善 RL 策略效果。
 結果和評分資料預計開源到 HuggingFace。
 
+### 評分 Pipeline 差異（為什麼數量不同）
+
+原始 FNSPID 資料共 127,176 筆記錄，但只有 77,871 筆（61.2%）有 `Article` 原文內容。
+
+| 步驟 | DeepSeek (原版) | 我們的重新評分 (Claude / GPT-5) |
+|------|----------------|-------------------------------|
+| 1. 摘要來源 | 直接使用 `Lsa_summary`（傳統 LSA 演算法摘要） | 用 LLM 從**原文**生成摘要 |
+| 2. 能評分的條件 | 只要有 `Lsa_summary` 就能評 | 必須有 `Article` 原文才能生成 LLM summary |
+| 3. 有效評分數 | 126,224 (99.3%) | 77,871 (61.2%) |
+| 4. 摘要品質 | `Lsa_summary` 品質不穩定，噪音多 | LLM summary 語義更準確 |
+
+**為什麼 DeepSeek 多出 ~48K 筆**：DeepSeek 用的是 `Lsa_summary`（基於關鍵詞的傳統摘要），
+幾乎所有記錄都有。我們的 pipeline 用「原文 → LLM summary → LLM 評分」，
+沒有原文就無法生成 summary，所以少了 38.8% 的記錄。
+
+**摘要來源詳細記錄**：
+
+| 評分組 | 摘要模型 | 評分模型 | 檔名格式 |
+|--------|---------|---------|---------|
+| DeepSeek (原版) | Lsa_summary（傳統演算法） | DeepSeek V3 | `sentiment_deepseek_*.csv` |
+| Claude Opus | GPT-5 (R=minimal, V=low) | Claude Opus | `*_opus_by_gpt5_summary.csv` |
+| Claude Sonnet | GPT-5 | Claude Sonnet | `*_sonnet_by_gpt5_summary.csv` |
+| Claude Haiku | GPT-5 | Claude Haiku | `*_haiku_by_gpt5_summary.csv` |
+| GPT-5 high | o3 | GPT-5 (effort=high) | `*_gpt-5_high_by_o3_summary.csv` |
+| GPT-5 medium | o3 | GPT-5 (effort=medium) | `*_gpt-5_medium_by_o3_summary.csv` |
+
+> 詳細的摘要品質比較見 `docs/analysis/SUMMARY_COMPARISON_REPORT.md`
+> 評分分佈比較見 `docs/analysis/DEEPSEEK_VS_CLAUDE_COMPARISON.md`
+> 完整評分清單見 `docs/data/SCORING_DATA_INVENTORY.md`
+
 ### 評分品質對比
 
-| LLM | 評分率 | 中性 (3) 比例 | 說明 |
-|-----|--------|--------------|------|
-| DeepSeek V3 (原版) | 99.3% | 66.9% | 覆蓋高但信號弱，2/3 都是中性 |
-| Claude Opus | 61.2% | 50.1% | 分佈更平衡，辨別力更好 |
-| GPT-5 high | 61.2% | 54.0% | 類似 Opus，稍偏中性 |
+| LLM | 摘要來源 | 有效評分 | 中性 (3) 比例 | 說明 |
+|-----|---------|---------|--------------|------|
+| DeepSeek V3 (原版) | Lsa_summary | 126,224 (99.3%) | 66.9% | 覆蓋高但信號弱，2/3 都是中性 |
+| Claude Opus | GPT-5 summary | 77,871 (61.2%) | 50.1% | 分佈更平衡，辨別力更好 |
+| GPT-5 high | o3 summary | 77,871 (61.2%) | 54.0% | 類似 Opus，稍偏中性 |
+
+**數量差異的影響**：Claude/GPT-5 少了 ~48K 筆評分，這些在 merge 到價格矩陣後會被
+填充為 0（sentiment）和 3（risk），等同「無 LLM 信號」。
+DeepSeek 覆蓋率高但 66.9% 都是中性 3，也幾乎等同無信號。
+所以**有效信號量**可能差距沒有表面數字那麼大。
 
 ### 實驗矩陣
 
