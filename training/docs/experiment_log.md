@@ -103,16 +103,41 @@
 
 ## 待執行實驗（按優先級）
 
-### EXP-003: PPO, seed=0 (公平對比 CPPO) ⬅ 下一個
+### EXP-003: PPO, seed=0 (公平對比 CPPO) ✅
 
-**目的**: 用和 CPPO 相同的 seed=0 跑 PPO，才能公平比較演算法差異。
-同時也驗證 EXP-001 (seed=42) 是否為異常好的結果。
+| 項目 | 值 |
+|------|-----|
+| **Model ID** | `ppo_train_polygon_multi_both_100ep_s0_20260329T161449Z_d49531` |
+| **訓練時間** | 7.0 小時 |
+| **訓練曲線** | EpRet: 18 → 532 → 956 → 1,171（穩定上升） |
 
-```bash
-mpirun -np 8 python training/train_ppo_llm.py \
-  --data training/data_prep/output/train_polygon_multi_both.csv \
-  --epochs 100 --seed 0
-```
+**Backtest (OOS)**:
+
+| 指標 | 值 |
+|------|-----|
+| Final Equity | $1,182,569 |
+| Total Return | +18.3% |
+| Sharpe | 0.51 |
+| Max Drawdown | -27.0% |
+| CVaR (95%) | -4.9% |
+
+**判斷**：
+- 訓練 EpRet 和 EXP-001 幾乎相同（1171 vs 1160），但 OOS Return 天差地遠（18% vs 123%）
+- **確認 EXP-001 (seed=42) 是異常好的結果**，seed=0 的 OOS 才是更典型的水平
+- 和 EXP-002 CPPO (seed=0) 公平比較：PPO +18.3% vs CPPO +8.9%，PPO 仍較好
+- CPPO 的 CVaR 略優（-4.7% vs -4.9%），MDD 類似（-26.2% vs -27.0%）
+
+### 系列 A 三實驗完整對比
+
+| 指標 | EXP-001 PPO s42 | EXP-003 PPO s0 | EXP-002 CPPO s0 |
+|------|-----------------|----------------|-----------------|
+| Return | **+123.1%** | +18.3% | +8.9% |
+| Sharpe | **1.66** | 0.51 | 0.32 |
+| MDD | **-21.1%** | -27.0% | -26.2% |
+| CVaR | -5.9% | -4.9% | **-4.7%** |
+| 訓練 EpRet | 1,160 | 1,171 | 471 |
+
+**結論**：RL 結果隨機性大，單一 seed 不可靠。QQQ 同期 +15.8%，seed=0 的 PPO (+18.3%) 僅略勝大盤。
 
 ### EXP-004: PPO, seed=1 (穩定性驗證)
 
