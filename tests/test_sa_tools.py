@@ -28,7 +28,7 @@ from src.tools.sa_tools import (
     _is_sa_enabled,
 )
 from src.tools.data_access import DataAccessLayer, _sanitize_sa_comments_count
-from src.tools.backends.db_backend import DatabaseBackend
+from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
 from src.tools.registry import create_default_registry
 
 
@@ -608,7 +608,7 @@ class TestSaveDetailContract:
     def test_db_success_returns_true(self):
         """save_sa_pick_detail returns True when DB update succeeds."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend
+        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
 
         dal = DataAccessLayer.__new__(DataAccessLayer)
         dal._backend = MagicMock(spec=DatabaseBackend)
@@ -622,7 +622,7 @@ class TestSaveDetailContract:
     def test_db_failure_returns_false(self):
         """save_sa_pick_detail returns False when DB row not found (not masked by file save)."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend
+        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
 
         dal = DataAccessLayer.__new__(DataAccessLayer)
         dal._backend = MagicMock(spec=DatabaseBackend)
@@ -635,7 +635,7 @@ class TestSaveDetailContract:
     def test_db_exception_returns_false(self):
         """save_sa_pick_detail returns False when DB throws exception."""
         from src.tools.data_access import DataAccessLayer
-        from src.tools.backends.db_backend import DatabaseBackend
+        from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
 
         dal = DataAccessLayer.__new__(DataAccessLayer)
         dal._backend = MagicMock(spec=DatabaseBackend)
@@ -1254,6 +1254,197 @@ class TestNativeHostArticles:
         result = _handle_audit_unresolved(dal)
         assert result["status"] == "ok"
         assert "CVSA" in result["unresolved_symbols"]
+
+
+class TestCommentNormalization:
+    def test_normalize_comment_ids_merges_null_and_dated_duplicate(self):
+        from scripts.sa_native_host import _normalize_comment_ids
+
+        comments = [
+            {
+                "comment_id": "syn_null",
+                "commenter": "Alpha Brett",
+                "comment_text": "Same thesis.",
+                "comment_date": None,
+                "upvotes": 1,
+                "parent_comment_id": None,
+            },
+            {
+                "comment_id": "syn_dated",
+                "commenter": "Alpha Brett",
+                "comment_text": "Same thesis.",
+                "comment_date": "2026-03-29T01:23:00Z",
+                "upvotes": 4,
+                "parent_comment_id": None,
+            },
+        ]
+
+        normalized = _normalize_comment_ids("6272753", comments)
+
+        assert len(normalized) == 1
+        assert normalized[0]["comment_date"] == "2026-03-29T01:23:00+00:00"
+        assert normalized[0]["upvotes"] == 4
+
+    def test_normalize_comment_ids_preserves_distinct_dated_duplicates(self):
+        from scripts.sa_native_host import _normalize_comment_ids
+
+        comments = [
+            {
+                "comment_id": "syn_a",
+                "commenter": "Lacifer",
+                "comment_text": "Still bearish.",
+                "comment_date": "2026-03-29T01:23:00Z",
+                "upvotes": 1,
+                "parent_comment_id": None,
+            },
+            {
+                "comment_id": "syn_b",
+                "commenter": "Lacifer",
+                "comment_text": "Still bearish.",
+                "comment_date": "2026-03-30T01:23:00Z",
+                "upvotes": 2,
+                "parent_comment_id": None,
+            },
+        ]
+
+        normalized = _normalize_comment_ids("6216738", comments)
+
+        assert len(normalized) == 2
+        assert {c["comment_date"] for c in normalized} == {
+            "2026-03-29T01:23:00+00:00",
+            "2026-03-30T01:23:00+00:00",
+        }
+
+    def test_normalize_comment_ids_remaps_parent_after_merge(self):
+        from scripts.sa_native_host import _normalize_comment_ids
+
+        comments = [
+            {
+                "comment_id": "syn_parent_null",
+                "commenter": "Ajarn Brian",
+                "comment_text": "Base case.",
+                "comment_date": None,
+                "upvotes": 0,
+                "parent_comment_id": None,
+            },
+            {
+                "comment_id": "syn_parent_dated",
+                "commenter": "Ajarn Brian",
+                "comment_text": "Base case.",
+                "comment_date": "2026-03-29T01:23:00Z",
+                "upvotes": 1,
+                "parent_comment_id": None,
+            },
+            {
+                "comment_id": "syn_child",
+                "commenter": "Simon Dadouche",
+                "comment_text": "@Ajarn Brian agreed.",
+                "comment_date": "2026-03-29T01:30:00Z",
+                "upvotes": 0,
+                "parent_comment_id": "syn_parent_null",
+            },
+        ]
+
+        normalized = _normalize_comment_ids("6093149", comments)
+        parent = next(c for c in normalized if c["commenter"] == "Ajarn Brian")
+        child = next(c for c in normalized if c["commenter"] == "Simon Dadouche")
+
+        assert len(normalized) == 2
+        assert child["parent_comment_id"] == parent["comment_id"]
+
+
+class TestCommentUpsertPrep:
+    def test_prepare_comments_for_upsert_merges_into_existing_dated_comment(self):
+        existing = [
+            {
+                "comment_id": "canon_1",
+                "parent_comment_id": None,
+                "commenter": "Alpha Brett",
+                "comment_text": "Same thesis.",
+                "upvotes": 2,
+                "comment_date": datetime(2026, 3, 29, 1, 23, tzinfo=timezone.utc),
+            }
+        ]
+        incoming = [
+            {
+                "comment_id": "syn_1",
+                "parent_comment_id": None,
+                "commenter": "Alpha Brett",
+                "comment_text": "Same thesis.",
+                "upvotes": 5,
+                "comment_date": None,
+            }
+        ]
+
+        prepared = _prepare_comments_for_upsert(existing, incoming)
+
+        assert len(prepared) == 1
+        assert prepared[0]["comment_id"] == "canon_1"
+        assert prepared[0]["comment_date"] == "2026-03-29T01:23:00+00:00"
+        assert prepared[0]["upvotes"] == 5
+
+    def test_prepare_comments_for_upsert_keeps_distinct_real_duplicates(self):
+        existing = [
+            {
+                "comment_id": "canon_1",
+                "parent_comment_id": None,
+                "commenter": "Lacifer",
+                "comment_text": "Still bearish.",
+                "upvotes": 1,
+                "comment_date": datetime(2026, 3, 29, 1, 23, tzinfo=timezone.utc),
+            }
+        ]
+        incoming = [
+            {
+                "comment_id": "syn_2",
+                "parent_comment_id": None,
+                "commenter": "Lacifer",
+                "comment_text": "Still bearish.",
+                "upvotes": 3,
+                "comment_date": "2026-03-30T01:23:00Z",
+            }
+        ]
+
+        prepared = _prepare_comments_for_upsert(existing, incoming)
+
+        assert len(prepared) == 1
+        assert prepared[0]["comment_id"] == "syn_2"
+        assert prepared[0]["comment_date"] == "2026-03-30T01:23:00+00:00"
+
+    def test_prepare_comments_for_upsert_remaps_child_to_existing_parent(self):
+        existing = [
+            {
+                "comment_id": "canon_parent",
+                "parent_comment_id": None,
+                "commenter": "Ajarn Brian",
+                "comment_text": "Base case.",
+                "upvotes": 1,
+                "comment_date": datetime(2026, 3, 29, 1, 23, tzinfo=timezone.utc),
+            }
+        ]
+        incoming = [
+            {
+                "comment_id": "syn_parent",
+                "parent_comment_id": None,
+                "commenter": "Ajarn Brian",
+                "comment_text": "Base case.",
+                "upvotes": 1,
+                "comment_date": None,
+            },
+            {
+                "comment_id": "syn_child",
+                "parent_comment_id": "syn_parent",
+                "commenter": "Simon Dadouche",
+                "comment_text": "@Ajarn Brian agreed.",
+                "upvotes": 0,
+                "comment_date": "2026-03-29T01:30:00Z",
+            },
+        ]
+
+        prepared = _prepare_comments_for_upsert(existing, incoming)
+        child = next(c for c in prepared if c["commenter"] == "Simon Dadouche")
+
+        assert child["parent_comment_id"] == "canon_parent"
 
 
 class TestRegistryV3:

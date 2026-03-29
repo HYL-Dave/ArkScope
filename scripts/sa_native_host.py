@@ -10,11 +10,14 @@ Message format: 4-byte little-endian length prefix + UTF-8 JSON body.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import re
 import struct
 import sys
+from collections import defaultdict
 from datetime import datetime, timezone
 
 # Fix cwd — Chrome starts native hosts with unpredictable cwd.
@@ -308,36 +311,148 @@ def _handle_save_articles_meta(dal, msg):
         return {"status": "error", "error": str(e)}
 
 
+_COMMENT_SPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_comment_value(value):
+    return _COMMENT_SPACE_RE.sub(" ", (value or "")).strip()
+
+
+def _canonical_comment_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+    else:
+        return str(value)
+
+    if dt.tzinfo is None:
+        return dt.isoformat()
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _comment_identity_key(comment):
+    return (
+        _normalize_comment_value(comment.get("commenter")).lower(),
+        _normalize_comment_value(comment.get("comment_text")).lower(),
+    )
+
+
+def _merge_comment_bucket(bucket):
+    merged = dict(bucket[0])
+    merged["comment_date"] = _canonical_comment_date(merged.get("comment_date"))
+    merged["_source_ids"] = [c.get("comment_id") for c in bucket if c.get("comment_id")]
+
+    for item in bucket[1:]:
+        item_date = _canonical_comment_date(item.get("comment_date"))
+        if not merged.get("commenter") and item.get("commenter"):
+            merged["commenter"] = item.get("commenter")
+        if len(_normalize_comment_value(item.get("comment_text"))) > len(
+            _normalize_comment_value(merged.get("comment_text"))
+        ):
+            merged["comment_text"] = item.get("comment_text")
+        merged["upvotes"] = max(
+            int(merged.get("upvotes") or 0),
+            int(item.get("upvotes") or 0),
+        )
+        if not merged.get("comment_date") and item_date:
+            merged["comment_date"] = item_date
+        if not merged.get("parent_comment_id") and item.get("parent_comment_id"):
+            merged["parent_comment_id"] = item.get("parent_comment_id")
+        if item.get("comment_id"):
+            merged["_source_ids"].append(item.get("comment_id"))
+
+    return merged
+
+
+def _dedupe_comments(comments):
+    grouped = defaultdict(list)
+    group_order = []
+    for comment in comments:
+        item = dict(comment)
+        item["comment_date"] = _canonical_comment_date(item.get("comment_date"))
+        key = _comment_identity_key(item)
+        if key not in grouped:
+            group_order.append(key)
+        grouped[key].append(item)
+
+    deduped = []
+    for key in group_order:
+        dated_groups = defaultdict(list)
+        dated_order = []
+        null_dated = []
+        for item in grouped[key]:
+            date_key = item.get("comment_date")
+            if date_key:
+                if date_key not in dated_groups:
+                    dated_order.append(date_key)
+                dated_groups[date_key].append(item)
+            else:
+                null_dated.append(item)
+
+        if len(dated_groups) == 1:
+            only_date_key = dated_order[0]
+            deduped.append(_merge_comment_bucket(dated_groups[only_date_key] + null_dated))
+            continue
+
+        if not dated_groups:
+            deduped.append(_merge_comment_bucket(null_dated))
+            continue
+
+        for date_key in dated_order:
+            deduped.append(_merge_comment_bucket(dated_groups[date_key]))
+        if null_dated:
+            deduped.append(_merge_comment_bucket(null_dated))
+
+    return deduped
+
+
 def _normalize_comment_ids(article_id, comments):
-    """Ensure stable comment IDs using Python sha256 for synthetic keys.
+    """Ensure stable comment IDs and collapse obvious duplicate comment payloads."""
+    deduped = _dedupe_comments(comments)
 
-    Also remaps parent_comment_id references so the tree stays connected.
-    """
-    import hashlib
-
-    # Pass 1: build old→new ID mapping for synthetic keys
     id_map = {}
-    for c in comments:
-        old_id = c.get("comment_id", "")
+    for comment in deduped:
+        source_ids = comment.pop("_source_ids", [])
+        comment_date = _canonical_comment_date(comment.get("comment_date"))
+        comment["comment_date"] = comment_date
+
+        old_id = comment.get("comment_id", "")
         if not old_id or old_id.startswith("syn_"):
-            raw = "{}:{}:{}:{}".format(
-                article_id,
-                c.get("commenter", ""),
-                c.get("comment_date", ""),
-                (c.get("comment_text", "") or "")[:100],
-            )
-            new_id = hashlib.sha256(raw.encode()).hexdigest()[:20]
-            if old_id:
-                id_map[old_id] = new_id
-            c["comment_id"] = new_id
+            if comment_date:
+                raw = "{}:{}:{}:{}".format(
+                    article_id,
+                    comment.get("commenter", ""),
+                    comment_date,
+                    (comment.get("comment_text", "") or "")[:100],
+                )
+            else:
+                raw = "{}:{}:{}".format(
+                    article_id,
+                    comment.get("commenter", ""),
+                    (comment.get("comment_text", "") or "")[:100],
+                )
+            comment["comment_id"] = hashlib.sha256(raw.encode()).hexdigest()[:20]
 
-    # Pass 2: remap parent_comment_id references
-    for c in comments:
-        parent = c.get("parent_comment_id")
+        for source_id in source_ids:
+            id_map[source_id] = comment["comment_id"]
+
+    for comment in deduped:
+        parent = comment.get("parent_comment_id")
         if parent and parent in id_map:
-            c["parent_comment_id"] = id_map[parent]
+            comment["parent_comment_id"] = id_map[parent]
+        if comment.get("parent_comment_id") == comment.get("comment_id"):
+            comment["parent_comment_id"] = None
 
-    return comments
+    return deduped
 
 
 def _handle_save_article_content(dal, msg):

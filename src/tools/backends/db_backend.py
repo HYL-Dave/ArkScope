@@ -10,9 +10,11 @@ Connection string format:
 
 from __future__ import annotations
 
+from collections import defaultdict
 import json
 import logging
-from datetime import date, timedelta
+import re
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -20,6 +22,141 @@ import psycopg2
 import psycopg2.extras
 
 logger = logging.getLogger(__name__)
+
+
+_COMMENT_SPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_comment_identity_value(value: Any) -> str:
+    return _COMMENT_SPACE_RE.sub(" ", str(value or "")).strip()
+
+
+def _normalize_comment_identity_key(commenter: Any, comment_text: Any) -> tuple[str, str]:
+    return (
+        _normalize_comment_identity_value(commenter).lower(),
+        _normalize_comment_identity_value(comment_text).lower(),
+    )
+
+
+def _canonicalize_comment_date(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+    else:
+        return str(value)
+
+    if dt.tzinfo is None:
+        return dt.isoformat()
+    return dt.astimezone(timezone.utc).isoformat()
+
+
+def _merge_comment_record(target: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    if not target.get("commenter") and incoming.get("commenter"):
+        target["commenter"] = incoming.get("commenter")
+    if len(_normalize_comment_identity_value(incoming.get("comment_text"))) > len(
+        _normalize_comment_identity_value(target.get("comment_text"))
+    ):
+        target["comment_text"] = incoming.get("comment_text")
+    target["upvotes"] = max(
+        int(target.get("upvotes") or 0),
+        int(incoming.get("upvotes") or 0),
+    )
+    if not target.get("comment_date") and incoming.get("comment_date"):
+        target["comment_date"] = incoming.get("comment_date")
+    if not target.get("parent_comment_id") and incoming.get("parent_comment_id"):
+        target["parent_comment_id"] = incoming.get("parent_comment_id")
+    return target
+
+
+def _select_existing_comment_match(
+    candidates: List[Dict[str, Any]], incoming_date: Optional[str]
+) -> Optional[Dict[str, Any]]:
+    if not candidates:
+        return None
+
+    same_date = [
+        c for c in candidates if incoming_date and c.get("comment_date") == incoming_date
+    ]
+    if same_date:
+        return same_date[0]
+
+    null_date = [c for c in candidates if not c.get("comment_date")]
+    dated = [c for c in candidates if c.get("comment_date")]
+
+    if incoming_date:
+        if len(candidates) == 1 and len(null_date) == 1:
+            return null_date[0]
+        return None
+
+    if len(dated) == 1:
+        return dated[0]
+    if not dated and len(null_date) == 1:
+        return null_date[0]
+    return None
+
+
+def _prepare_comments_for_upsert(
+    existing_rows: List[Dict[str, Any]], incoming_comments: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    existing_by_key: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    for row in existing_rows:
+        row_copy = dict(row)
+        row_copy["comment_date"] = _canonicalize_comment_date(row_copy.get("comment_date"))
+        key = _normalize_comment_identity_key(
+            row_copy.get("commenter"), row_copy.get("comment_text")
+        )
+        existing_by_key[key].append(row_copy)
+
+    prepared: List[Dict[str, Any]] = []
+    prepared_by_id: Dict[str, Dict[str, Any]] = {}
+    id_map: Dict[str, str] = {}
+
+    for incoming in incoming_comments:
+        item = dict(incoming)
+        item["comment_date"] = _canonicalize_comment_date(item.get("comment_date"))
+        key = _normalize_comment_identity_key(item.get("commenter"), item.get("comment_text"))
+        candidates = existing_by_key.get(key, [])
+        match = _select_existing_comment_match(candidates, item.get("comment_date"))
+
+        if match:
+            item["comment_id"] = match.get("comment_id")
+            item["comment_date"] = item.get("comment_date") or match.get("comment_date")
+            if not item.get("parent_comment_id") and match.get("parent_comment_id"):
+                item["parent_comment_id"] = match.get("parent_comment_id")
+            _merge_comment_record(match, item)
+        else:
+            existing_by_key[key].append(dict(item))
+
+        original_id = incoming.get("comment_id")
+        canonical_id = item.get("comment_id")
+        if original_id and canonical_id:
+            id_map[original_id] = canonical_id
+
+        if canonical_id in prepared_by_id:
+            _merge_comment_record(prepared_by_id[canonical_id], item)
+            continue
+
+        prepared_item = dict(item)
+        prepared_by_id[canonical_id] = prepared_item
+        prepared.append(prepared_item)
+
+    for item in prepared:
+        parent = item.get("parent_comment_id")
+        if parent and parent in id_map:
+            item["parent_comment_id"] = id_map[parent]
+        if item.get("parent_comment_id") == item.get("comment_id"):
+            item["parent_comment_id"] = None
+
+    return prepared
 
 
 class DatabaseBackend:
@@ -1210,6 +1347,119 @@ class DatabaseBackend:
             logger.error("Failed to sanitize SA comments_count rows: %s", e)
             return 0
 
+    def _fetch_existing_article_comments(self, cur, article_id: str) -> List[Dict[str, Any]]:
+        with cur.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as fetch_cur:
+            fetch_cur.execute(
+                "SELECT comment_id, parent_comment_id, commenter, comment_text, upvotes, comment_date "
+                "FROM sa_article_comments WHERE article_id = %s",
+                (article_id,),
+            )
+            return [dict(row) for row in fetch_cur.fetchall()]
+
+    def _upsert_article_comments(self, cur, article_id: str, comments: list) -> int:
+        prepared_comments = _prepare_comments_for_upsert(
+            self._fetch_existing_article_comments(cur, article_id),
+            comments,
+        )
+        for comment in prepared_comments:
+            cur.execute(
+                """INSERT INTO sa_article_comments
+                (article_id, comment_id, parent_comment_id,
+                 commenter, comment_text, upvotes, comment_date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (article_id, comment_id) DO UPDATE SET
+                    parent_comment_id = COALESCE(sa_article_comments.parent_comment_id, EXCLUDED.parent_comment_id),
+                    commenter = COALESCE(sa_article_comments.commenter, EXCLUDED.commenter),
+                    comment_text = EXCLUDED.comment_text,
+                    upvotes = GREATEST(COALESCE(sa_article_comments.upvotes, 0), COALESCE(EXCLUDED.upvotes, 0)),
+                    comment_date = COALESCE(sa_article_comments.comment_date, EXCLUDED.comment_date)
+                """,
+                (
+                    article_id,
+                    comment.get("comment_id"),
+                    comment.get("parent_comment_id"),
+                    comment.get("commenter"),
+                    comment.get("comment_text"),
+                    comment.get("upvotes", 0),
+                    comment.get("comment_date"),
+                ),
+            )
+        return len(prepared_comments)
+
+    def cleanup_mixed_null_date_comment_duplicates(self) -> Dict[str, int]:
+        """Collapse safe duplicate groups where a null-date row matches a dated row."""
+        conn = self._get_conn()
+        old_autocommit = conn.autocommit
+        groups_processed = 0
+        comments_deleted = 0
+        parent_links_repointed = 0
+        try:
+            conn.autocommit = False
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """SELECT article_id, commenter, comment_text
+                    FROM sa_article_comments
+                    GROUP BY article_id, commenter, comment_text
+                    HAVING COUNT(*) > 1
+                       AND COUNT(*) FILTER (WHERE comment_date IS NULL) >= 1
+                       AND COUNT(*) FILTER (WHERE comment_date IS NOT NULL) >= 1
+                       AND COUNT(DISTINCT comment_date) FILTER (WHERE comment_date IS NOT NULL) = 1
+                    """
+                )
+                groups = cur.fetchall()
+                for group in groups:
+                    cur.execute(
+                        """SELECT id, comment_id, parent_comment_id, comment_date
+                        FROM sa_article_comments
+                        WHERE article_id = %s
+                          AND commenter IS NOT DISTINCT FROM %s
+                          AND comment_text = %s
+                        ORDER BY (comment_date IS NULL) ASC, comment_date ASC, id ASC
+                        """,
+                        (
+                            group["article_id"],
+                            group["commenter"],
+                            group["comment_text"],
+                        ),
+                    )
+                    rows = cur.fetchall()
+                    canonical = next((row for row in rows if row["comment_date"] is not None), rows[0])
+                    duplicates = [
+                        row for row in rows
+                        if row["comment_id"] != canonical["comment_id"] and row["comment_date"] is None
+                    ]
+                    if not duplicates:
+                        continue
+                    groups_processed += 1
+                    for duplicate in duplicates:
+                        cur.execute(
+                            "UPDATE sa_article_comments SET parent_comment_id = %s "
+                            "WHERE article_id = %s AND parent_comment_id = %s",
+                            (
+                                canonical["comment_id"],
+                                group["article_id"],
+                                duplicate["comment_id"],
+                            ),
+                        )
+                        parent_links_repointed += cur.rowcount or 0
+                        cur.execute(
+                            "DELETE FROM sa_article_comments WHERE id = %s",
+                            (duplicate["id"],),
+                        )
+                        comments_deleted += cur.rowcount or 0
+            conn.commit()
+            return {
+                "groups_processed": groups_processed,
+                "comments_deleted": comments_deleted,
+                "parent_links_repointed": parent_links_repointed,
+            }
+        except Exception as e:
+            conn.rollback()
+            logger.error("cleanup_mixed_null_date_comment_duplicates failed: %s", e)
+            raise
+        finally:
+            conn.autocommit = old_autocommit
+
     def save_article_with_comments(
         self,
         article_id: str,
@@ -1224,35 +1474,13 @@ class DatabaseBackend:
         try:
             conn.autocommit = False
             with conn.cursor() as cur:
-                # (a) Update article body
                 cur.execute(
                     "UPDATE sa_articles SET body_markdown = %s, "
                     "detail_fetched_at = NOW(), comments_fetched_at = NOW(), "
                     "updated_at = NOW() WHERE article_id = %s",
                     (body_markdown, article_id),
                 )
-                # (b) Upsert comments
-                for c in comments:
-                    cur.execute(
-                        """INSERT INTO sa_article_comments
-                        (article_id, comment_id, parent_comment_id,
-                         commenter, comment_text, upvotes, comment_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (article_id, comment_id) DO UPDATE SET
-                            comment_text = EXCLUDED.comment_text,
-                            upvotes = EXCLUDED.upvotes
-                        """,
-                        (
-                            article_id,
-                            c.get("comment_id"),
-                            c.get("parent_comment_id"),
-                            c.get("commenter"),
-                            c.get("comment_text"),
-                            c.get("upvotes", 0),
-                            c.get("comment_date"),
-                        ),
-                    )
-                # (c) Sync canonical article to matching picks
+                self._upsert_article_comments(cur, article_id, comments)
                 if sync_picks:
                     synced = self._sync_canonical_to_picks(cur, article_id)
             conn.commit()
@@ -1271,33 +1499,14 @@ class DatabaseBackend:
         try:
             conn.autocommit = False
             with conn.cursor() as cur:
-                for c in comments:
-                    cur.execute(
-                        """INSERT INTO sa_article_comments
-                        (article_id, comment_id, parent_comment_id,
-                         commenter, comment_text, upvotes, comment_date)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (article_id, comment_id) DO UPDATE SET
-                            comment_text = EXCLUDED.comment_text,
-                            upvotes = EXCLUDED.upvotes
-                        """,
-                        (
-                            article_id,
-                            c.get("comment_id"),
-                            c.get("parent_comment_id"),
-                            c.get("commenter"),
-                            c.get("comment_text"),
-                            c.get("upvotes", 0),
-                            c.get("comment_date"),
-                        ),
-                    )
+                prepared_count = self._upsert_article_comments(cur, article_id, comments)
                 cur.execute(
                     "UPDATE sa_articles SET comments_fetched_at = NOW(), "
                     "updated_at = NOW() WHERE article_id = %s",
                     (article_id,),
                 )
             conn.commit()
-            return len(comments)
+            return prepared_count
         except Exception as e:
             conn.rollback()
             logger.error("update_article_comments failed: %s", e)
