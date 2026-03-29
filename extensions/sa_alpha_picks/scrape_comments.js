@@ -74,9 +74,9 @@
   function extractCommentDate(el, textEl) {
     var timeEl = el.querySelector('time[datetime]');
     if (timeEl) {
-      var datetimeAttr = normalizeToIso(timeEl.getAttribute('datetime'));
+      var datetimeAttr = normalizeDatetimeAttr(timeEl.getAttribute('datetime'));
       if (datetimeAttr) return datetimeAttr;
-      var timeText = normalizeToIso(timeEl.innerText);
+      var timeText = normalizeTextDate(timeEl.innerText);
       if (timeText) return timeText;
     }
 
@@ -101,7 +101,7 @@
     addCandidate(el.innerText);
 
     for (var j = 0; j < candidates.length; j++) {
-      var parsed = normalizeToIso(candidates[j]);
+      var parsed = normalizeTextDate(candidates[j]);
       if (parsed) return parsed;
     }
     return null;
@@ -209,19 +209,25 @@
     return (value || '').replace(/\s+/g, ' ').trim();
   }
 
-  function normalizeToIso(value) {
+  function normalizeDatetimeAttr(value) {
+    var text = normalizeWhitespace(value);
+    if (!text) return null;
+
+    var parsed = Date.parse(text);
+    if (!isNaN(parsed)) return new Date(parsed).toISOString();
+    return text;
+  }
+
+  function normalizeTextDate(value) {
     var text = normalizeWhitespace(value);
     if (!text) return null;
 
     var parsed = parseDateText(text);
     if (!parsed) return null;
-    return parsed.toISOString();
+    return serializeLocalDate(parsed);
   }
 
   function parseDateText(text) {
-    var direct = Date.parse(text);
-    if (!isNaN(direct)) return new Date(direct);
-
     var relativeMatch = text.match(/\b(Today|Yesterday)\b[,]?\s+(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
     if (relativeMatch) {
       var now = new Date();
@@ -231,6 +237,12 @@
       }
       var relDate = applyClockTime(dayStart, relativeMatch[2]);
       if (relDate) return relDate;
+    }
+
+    var isoMatch = text.match(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?\b/);
+    if (isoMatch) {
+      var isoParsed = Date.parse(isoMatch[0]);
+      if (!isNaN(isoParsed)) return new Date(isoParsed);
     }
 
     var absMatch = text.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{1,2},\s*\d{4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)\b/i);
@@ -247,6 +259,16 @@
     }
 
     return null;
+  }
+
+  function serializeLocalDate(date) {
+    var year = String(date.getFullYear());
+    var month = String(date.getMonth() + 1).padStart(2, '0');
+    var day = String(date.getDate()).padStart(2, '0');
+    var hours = String(date.getHours()).padStart(2, '0');
+    var minutes = String(date.getMinutes()).padStart(2, '0');
+    var seconds = String(date.getSeconds()).padStart(2, '0');
+    return year + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds;
   }
 
   function applyClockTime(baseDate, clockText) {
