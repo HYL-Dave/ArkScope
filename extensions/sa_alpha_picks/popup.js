@@ -1,8 +1,9 @@
-// popup.js — Two-mode refresh: Quick (daily) + Full Scan (deep)
+// popup.js — Three-mode refresh: Quick + Full Scan + Deep Backfill
 
 var statusEl = document.getElementById("status");
 var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
+var backfillBtn = document.getElementById("backfillBtn");
 var progressEl = document.getElementById("progress");
 var manualSection = document.getElementById("manualSection");
 var manualInput = document.getElementById("manualInput");
@@ -29,18 +30,26 @@ fullBtn.addEventListener("click", function () {
   startRefresh("full");
 });
 
+backfillBtn.addEventListener("click", function () {
+  startRefresh("backfill");
+});
+
 function startRefresh(mode) {
   quickBtn.disabled = true;
   fullBtn.disabled = true;
-  var activeBtn = mode === "full" ? fullBtn : quickBtn;
+  backfillBtn.disabled = true;
+  var activeBtn = mode === "full" ? fullBtn : (mode === "backfill" ? backfillBtn : quickBtn);
   var originalText = activeBtn.textContent;
-  activeBtn.textContent = mode === "full" ? "Scanning..." : "Refreshing...";
+  activeBtn.textContent = mode === "full"
+    ? "Scanning..."
+    : (mode === "backfill" ? "Backfilling..." : "Refreshing...");
   progressEl.style.display = "block";
-  progressEl.textContent = "Opening SA page...";
+  progressEl.textContent = mode === "backfill" ? "Preparing backlog scan..." : "Opening SA page...";
 
   chrome.runtime.sendMessage({ action: "refresh", mode: mode }, function () {
     quickBtn.disabled = false;
     fullBtn.disabled = false;
+    backfillBtn.disabled = false;
     activeBtn.textContent = originalText;
     progressEl.style.display = "none";
 
@@ -107,7 +116,9 @@ function renderStatus(lastRefresh) {
   var current = lastRefresh.current;
   var closed = lastRefresh.closed;
   var timeStr = ts ? new Date(ts).toLocaleString() : "unknown";
-  var modeLabel = lastRefresh.mode === "full" ? " (full scan)" : " (quick)";
+  var modeLabel = " (quick)";
+  if (lastRefresh.mode === "full") modeLabel = " (full scan)";
+  if (lastRefresh.mode === "backfill") modeLabel = " (deep backfill)";
 
   var currentOk = current && current.status === "ok";
   var closedOk = closed && closed.status === "ok";

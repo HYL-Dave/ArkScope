@@ -59,9 +59,8 @@
       }
     }
 
-    // Extract comments count from card text
-    var commentsMatch = cardText.match(/(\d+)\s*Comments?/);
-    var commentsCount = commentsMatch ? parseInt(commentsMatch[1], 10) : 0;
+    // Extract comments count from comment label or post-date metadata.
+    var commentsCount = extractCommentsCount(card, cardText, date);
 
     // Auto-detect article_type from title + ticker presence
     var articleType = detectArticleType(text, ticker);
@@ -80,6 +79,60 @@
   return articles.length > 0
     ? articles
     : { error: "No articles found", total_links: links.length };
+
+  function extractCommentsCount(card, cardText, date) {
+    if (card) {
+      var nodes = card.querySelectorAll("a, span, div, p, li, small, strong");
+      for (var i = 0; i < nodes.length; i++) {
+        var nodeText = normalizeInlineText(nodes[i].innerText || "");
+        if (!nodeText) continue;
+        var exactMatch = nodeText.match(/^(\d{1,5})\s*Comments?$/i);
+        if (exactMatch) {
+          return sanitizeCommentsCount(parseInt(exactMatch[1], 10), date);
+        }
+      }
+    }
+
+    var searchText = cardText || "";
+    if (date) {
+      var dateIdx = searchText.indexOf(date);
+      if (dateIdx >= 0) {
+        searchText = searchText.substring(dateIdx + date.length);
+      }
+    }
+
+    var count = extractCommentsCountFromText(searchText);
+    if (count === null && searchText !== cardText) {
+      count = extractCommentsCountFromText(cardText);
+    }
+    return sanitizeCommentsCount(count, date);
+  }
+
+  function extractCommentsCountFromText(text) {
+    var normalized = normalizeInlineText(text);
+    if (!normalized) return null;
+    var match = normalized.match(/(?:^|\s)(\d{1,5})\s*Comments?\b/i);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  function sanitizeCommentsCount(count, date) {
+    if (count == null || isNaN(count) || count < 0) return 0;
+    var yearMatch = date && date.match(/(\d{4})$/);
+    if (!yearMatch) return count;
+    var yearText = yearMatch[1];
+    var countText = String(count);
+    if (count >= 10000 && countText.indexOf(yearText) === 0 && countText.length > yearText.length) {
+      var suffix = parseInt(countText.slice(yearText.length), 10);
+      if (!isNaN(suffix) && suffix >= 0 && suffix <= 9999) {
+        return suffix;
+      }
+    }
+    return count;
+  }
+
+  function normalizeInlineText(text) {
+    return (text || "").replace(/\s+/g, " ").trim();
+  }
 
   function detectArticleType(title, ticker) {
     var t = title.toLowerCase();

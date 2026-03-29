@@ -1188,6 +1188,28 @@ class DatabaseBackend:
             logger.error("Failed to upsert SA articles: %s", e)
         return count
 
+    def sanitize_corrupted_sa_comments_counts(self) -> int:
+        """Repair year-prefixed comments_count corruption in SA article metadata."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE sa_articles
+                    SET comments_count = CAST(SUBSTRING(comments_count::text FROM 5) AS INTEGER),
+                        updated_at = NOW()
+                    WHERE published_date IS NOT NULL
+                      AND comments_count >= 10000
+                      AND comments_count::text LIKE EXTRACT(YEAR FROM published_date)::int::text || '%'
+                      AND LENGTH(comments_count::text) > 4
+                      AND CAST(SUBSTRING(comments_count::text FROM 5) AS INTEGER) BETWEEN 0 AND 9999
+                    """
+                )
+                repaired = cur.rowcount or 0
+            return repaired
+        except Exception as e:
+            logger.error("Failed to sanitize SA comments_count rows: %s", e)
+            return 0
+
     def save_article_with_comments(
         self,
         article_id: str,

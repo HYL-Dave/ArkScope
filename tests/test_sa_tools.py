@@ -27,7 +27,7 @@ from src.tools.sa_tools import (
     refresh_sa_alpha_picks,
     _is_sa_enabled,
 )
-from src.tools.data_access import DataAccessLayer
+from src.tools.data_access import DataAccessLayer, _sanitize_sa_comments_count
 from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.registry import create_default_registry
 
@@ -897,8 +897,33 @@ class TestDataAccessArticleMeta:
     def _make_dal(self):
         dal = DataAccessLayer.__new__(DataAccessLayer)
         dal._backend = DatabaseBackend("postgresql://example")
+        dal._backend.sanitize_corrupted_sa_comments_counts = MagicMock(return_value=0)
         dal._compute_unresolved_symbols = MagicMock(return_value=[])
         return dal
+
+    def test_sanitize_sa_comments_count_strips_published_year_prefix(self):
+        assert _sanitize_sa_comments_count(202653, "2026-03-28") == 53
+        assert _sanitize_sa_comments_count(2024101, "2024-07-15") == 101
+        assert _sanitize_sa_comments_count(53, "2026-03-28") == 53
+
+    def test_save_sa_articles_meta_sanitizes_incoming_comments_count(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(side_effect=[[
+            {"article_id": "existing", "url": "https://example.com/existing", "has_content": True}
+        ], []])
+
+        dal.save_sa_articles_meta([
+            {
+                "article_id": "bad-count",
+                "url": "https://example.com/bad-count",
+                "published_date": "2026-03-28",
+                "comments_count": 202653,
+            }
+        ], mode="quick")
+
+        persisted = dal._backend.upsert_sa_articles_meta.call_args.args[0]
+        assert persisted[0]["comments_count"] == 53
 
     def test_quick_mode_refreshes_comments_when_remote_count_increases(self):
         dal = self._make_dal()
@@ -930,6 +955,27 @@ class TestDataAccessArticleMeta:
         assert result["need_comments"] == [
             {"article_id": "123", "url": "https://example.com/123"},
         ]
+
+    def test_quick_mode_ignores_year_prefixed_gap_artifact(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "123",
+                "url": "https://example.com/123",
+                "has_content": True,
+                "comments_count": 202653,
+                "stored_comments_count": 53,
+                "published_date": "2026-03-28",
+                "comments_fetched_at": "2026-03-28T00:00:00+00:00",
+            },
+        ])
+
+        result = dal.save_sa_articles_meta([
+            {"article_id": "123", "url": "https://example.com/123"},
+        ], mode="quick")
+
+        assert result["need_comments"] == []
 
     def test_quick_mode_skips_comment_refresh_for_articles_not_in_scan(self):
         dal = self._make_dal()
@@ -970,7 +1016,7 @@ class TestDataAccessArticleMeta:
                 "article_id": "need-content",
                 "url": "https://example.com/need-content",
                 "has_content": False,
-                "comments_count": 0,
+                "comments_count": 3,
                 "stored_comments_count": 0,
                 "published_date": "2026-03-28",
                 "comments_fetched_at": None,
@@ -1051,7 +1097,7 @@ class TestDataAccessArticleMeta:
                 "article_id": "never-fetched",
                 "url": "https://example.com/never-fetched",
                 "has_content": True,
-                "comments_count": 0,
+                "comments_count": 3,
                 "stored_comments_count": 0,
                 "published_date": "2026-03-25",
                 "comments_fetched_at": None,
@@ -1071,6 +1117,101 @@ class TestDataAccessArticleMeta:
 
         assert result["need_comments"] == [
             {"article_id": "never-fetched", "url": "https://example.com/never-fetched"},
+        ]
+
+
+    def test_backfill_skips_stale_zero_comment_articles(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "stale-zero",
+                "url": "https://example.com/stale-zero",
+                "has_content": True,
+                "comments_count": 0,
+                "stored_comments_count": 0,
+                "published_date": "2026-03-01",
+                "comments_fetched_at": old,
+            },
+            {
+                "article_id": "gap-positive",
+                "url": "https://example.com/gap-positive",
+                "has_content": True,
+                "comments_count": 40,
+                "stored_comments_count": 10,
+                "published_date": "2026-03-28",
+                "comments_fetched_at": recent,
+            },
+        ])
+
+        with patch(
+            "src.agents.config.get_agent_config",
+            return_value=SimpleNamespace(
+                sa_comments_cache_days=7,
+                sa_comments_backfill_per_full_scan=1,
+                sa_comments_backfill_per_backfill_scan=5,
+            ),
+        ):
+            result = dal.save_sa_articles_meta([
+                {"article_id": "123", "url": "https://example.com/123"},
+            ], mode="backfill")
+
+        assert result["need_comments"] == [
+            {"article_id": "gap-positive", "url": "https://example.com/gap-positive"},
+        ]
+
+    def test_backfill_mode_uses_deeper_backfill_limit(self):
+        dal = self._make_dal()
+        dal._backend.upsert_sa_articles_meta = MagicMock(return_value=1)
+        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        dal._backend.query_sa_articles = MagicMock(return_value=[
+            {
+                "article_id": "gap-a",
+                "url": "https://example.com/gap-a",
+                "has_content": True,
+                "comments_count": 90,
+                "stored_comments_count": 10,
+                "published_date": "2026-03-28",
+                "comments_fetched_at": recent,
+            },
+            {
+                "article_id": "gap-b",
+                "url": "https://example.com/gap-b",
+                "has_content": True,
+                "comments_count": 80,
+                "stored_comments_count": 10,
+                "published_date": "2026-03-27",
+                "comments_fetched_at": recent,
+            },
+            {
+                "article_id": "gap-c",
+                "url": "https://example.com/gap-c",
+                "has_content": True,
+                "comments_count": 70,
+                "stored_comments_count": 10,
+                "published_date": "2026-03-26",
+                "comments_fetched_at": recent,
+            },
+        ])
+
+        with patch(
+            "src.agents.config.get_agent_config",
+            return_value=SimpleNamespace(
+                sa_comments_cache_days=7,
+                sa_comments_backfill_per_full_scan=1,
+                sa_comments_backfill_per_backfill_scan=3,
+            ),
+        ):
+            result = dal.save_sa_articles_meta([
+                {"article_id": "123", "url": "https://example.com/123"},
+            ], mode="backfill")
+
+        assert result["need_comments"] == [
+            {"article_id": "gap-a", "url": "https://example.com/gap-a"},
+            {"article_id": "gap-b", "url": "https://example.com/gap-b"},
+            {"article_id": "gap-c", "url": "https://example.com/gap-c"},
         ]
 
 

@@ -108,6 +108,7 @@ class AgentConfig(BaseModel):
     sa_detail_cache_days: int = 7
     sa_comments_cache_days: int = 7
     sa_comments_backfill_per_full_scan: int = 10
+    sa_comments_backfill_per_backfill_scan: int = 50
 
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
@@ -267,6 +268,8 @@ def get_agent_config() -> AgentConfig:
         config.sa_comments_cache_days = sa_prefs["comments_cache_days"]
     if "comments_backfill_per_full_scan" in sa_prefs:
         config.sa_comments_backfill_per_full_scan = sa_prefs["comments_backfill_per_full_scan"]
+    if "comments_backfill_per_backfill_scan" in sa_prefs:
+        config.sa_comments_backfill_per_backfill_scan = sa_prefs["comments_backfill_per_backfill_scan"]
     if "cache_hours" in sa_prefs:
         config.sa_cache_hours = sa_prefs["cache_hours"]
     if "detail_cache_days" in sa_prefs:

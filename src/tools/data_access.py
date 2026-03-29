@@ -37,6 +37,67 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 
 
+def _extract_sa_published_year(published_date: Any) -> Optional[int]:
+    """Extract a four-digit year from SA article metadata."""
+    if hasattr(published_date, "year"):
+        try:
+            return int(published_date.year)
+        except Exception:
+            return None
+    if isinstance(published_date, str):
+        text = published_date.strip()
+        if len(text) >= 4 and text[:4].isdigit():
+            return int(text[:4])
+    return None
+
+
+def _sanitize_sa_comments_count(
+    comments_count: Any, published_date: Any
+) -> int:
+    """Normalize SA comment counts and strip known year-prefix pollution."""
+    try:
+        count = int(comments_count or 0)
+    except Exception:
+        return 0
+    if count < 0:
+        return 0
+
+    year = _extract_sa_published_year(published_date)
+    if year is None or count < 10000:
+        return count
+
+    count_text = str(count)
+    year_text = str(year)
+    if not count_text.startswith(year_text) or len(count_text) <= len(year_text):
+        return count
+
+    suffix_text = count_text[len(year_text):]
+    if not suffix_text.isdigit():
+        return count
+
+    suffix = int(suffix_text)
+    if 0 <= suffix <= 9999:
+        return suffix
+    return count
+
+
+def _sanitize_sa_article_meta(article: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of article metadata with normalized comment counts."""
+    normalized = dict(article)
+    published_date = normalized.get("published_date") or normalized.get("date")
+    raw_count = normalized.get("comments_count", 0)
+    clean_count = _sanitize_sa_comments_count(raw_count, published_date)
+    if clean_count != raw_count:
+        logger.warning(
+            "Sanitized SA comments_count for %s: %s -> %s",
+            normalized.get("article_id"),
+            raw_count,
+            clean_count,
+        )
+    normalized["comments_count"] = clean_count
+    return normalized
+
+
 class DataAccessLayer:
     """
     Unified data access entry point.
@@ -708,7 +769,17 @@ class DataAccessLayer:
             pass
 
         # Upsert metadata
-        saved = self._backend.upsert_sa_articles_meta(articles)
+        normalized_articles = [_sanitize_sa_article_meta(a) for a in articles]
+        saved = self._backend.upsert_sa_articles_meta(normalized_articles)
+
+        try:
+            cleaned = self._backend.sanitize_corrupted_sa_comments_counts()
+            if cleaned:
+                logger.warning("Sanitized %d corrupted SA comments_count rows in DB", cleaned)
+        except AttributeError:
+            pass
+        except Exception as e:
+            logger.warning("Failed to sanitize corrupted SA comments_count rows: %s", e)
 
         # Determine need_content (body IS NULL)
         all_articles = self._backend.query_sa_articles(limit=9999)
@@ -721,18 +792,24 @@ class DataAccessLayer:
         # Determine need_comments
         need_comments = []
         need_content_ids = {a["article_id"] for a in need_content}
-        if mode == "full":
+        if mode in ("full", "backfill"):
             from src.agents.config import get_agent_config
             try:
                 config = get_agent_config()
                 ttl = getattr(config, "sa_comments_cache_days", 7)
-                backfill_limit = max(
-                    0,
-                    int(getattr(config, "sa_comments_backfill_per_full_scan", 10)),
-                )
+                if mode == "backfill":
+                    backfill_limit = max(
+                        0,
+                        int(getattr(config, "sa_comments_backfill_per_backfill_scan", 50)),
+                    )
+                else:
+                    backfill_limit = max(
+                        0,
+                        int(getattr(config, "sa_comments_backfill_per_full_scan", 10)),
+                    )
             except Exception:
                 ttl = 7
-                backfill_limit = 10
+                backfill_limit = 50 if mode == "backfill" else 10
             from datetime import datetime, timezone, timedelta
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
             need_comment_ids = set()
@@ -742,7 +819,9 @@ class DataAccessLayer:
                     continue  # Mutual exclusion: need_content takes priority
                 if not a.get("has_content"):
                     continue
-                remote_count = int(a.get("comments_count") or 0)
+                remote_count = _sanitize_sa_comments_count(
+                    a.get("comments_count"), a.get("published_date")
+                )
                 stored_count = int(a.get("stored_comments_count") or 0)
                 gap = remote_count - stored_count
                 fetched = a.get("comments_fetched_at")
@@ -754,6 +833,8 @@ class DataAccessLayer:
                         )
                     is_stale = fetched <= cutoff
                 if is_stale:
+                    if remote_count <= 0 and stored_count <= 0:
+                        continue
                     need_comments.append(
                         {"article_id": a["article_id"], "url": a.get("url", "")}
                     )
@@ -783,7 +864,7 @@ class DataAccessLayer:
         elif mode == "quick":
             scanned_ids = {
                 a.get("article_id")
-                for a in articles
+                for a in normalized_articles
                 if a.get("article_id")
             }
             for a in all_articles:
@@ -793,7 +874,9 @@ class DataAccessLayer:
                     continue
                 if not a.get("has_content"):
                     continue
-                remote_count = int(a.get("comments_count") or 0)
+                remote_count = _sanitize_sa_comments_count(
+                    a.get("comments_count"), a.get("published_date")
+                )
                 stored_count = int(a.get("stored_comments_count") or 0)
                 if remote_count > stored_count:
                     need_comments.append(

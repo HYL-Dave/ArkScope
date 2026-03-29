@@ -24,6 +24,13 @@ const COMMENT_SCROLL_PROFILES = {
     staleRounds: 4,
     settleMs: 1400,
   },
+  backfill: {
+    name: "backfill",
+    maxScrolls: 140,
+    maxDurationMs: 120000,
+    staleRounds: 5,
+    settleMs: 1600,
+  },
   manual: {
     name: "manual",
     maxScrolls: 60,
@@ -236,8 +243,10 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   var scrollMode = mode;
   await chrome.tabs.update(tabId, { active: true });
   await sleep(500);
-  if (mode === "full") {
-    sendProgress("Full scan: loading all articles...");
+  if (mode === "full" || mode === "backfill") {
+    sendProgress(mode === "backfill"
+      ? "Deep backfill: loading all articles..."
+      : "Full scan: loading all articles...");
     await scrollToLoadAll(tabId, 200);
   } else {
     sendProgress("Loading recent articles...");
