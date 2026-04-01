@@ -69,7 +69,7 @@ def load_data(data_path):
     date_to_idx = {date: idx for idx, date in enumerate(unique_dates)}
     train["new_idx"] = train["date"].map(date_to_idx)
     train = train.set_index("new_idx")
-    train["llm_sentiment"].fillna(0, inplace=True)
+    train["llm_sentiment"] = train["llm_sentiment"].fillna(0)
 
     return train
 
@@ -237,7 +237,7 @@ Hyperparameter mapping (SpinningUp → SB3):
         device=args.device,
         learning_rate=args.lr,
         n_steps=effective_steps,
-        batch_size=min(effective_steps, 2048),  # SB3 uses minibatches
+        batch_size=min(effective_steps, 2000),  # factor of 20000 to avoid truncated minibatch
         n_epochs=10,              # SB3 inner optimization epochs per rollout
         gamma=args.gamma,
         gae_lambda=0.95,
