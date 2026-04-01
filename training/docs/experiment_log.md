@@ -404,28 +404,128 @@ python training/backtest.py \
   --model trained_models/<model_id>/model.pth --env sentiment
 ```
 
-### 結果對照表（待填）
+### 結果對照表 ✅
 
-**第一輪：**
+Benchmark: QQQ 2019-2023 = **+173.3%**
 
-| 實驗 | Return | Sharpe | MDD | CVaR | 訓練時間 |
-|------|--------|--------|-----|------|---------|
-| G1-PPO (DeepSeek) | | | | | |
-| G1-CPPO (DeepSeek) | | | | | |
-| G2-PPO (Opus) | | | | | |
-| G2-CPPO (Opus) | | | | | |
-| G3a-PPO (GPT-5 high / o3 sum) | | | | | |
-| G3a-CPPO (GPT-5 high / o3 sum) | | | | | |
+**第一輪（PPO + CPPO）：**
 
-**第二輪：**
+| 實驗 | Return | Sharpe | MDD | CVaR | Calmar |
+|------|--------|--------|-----|------|--------|
+| G1-PPO (DeepSeek) | +164.9% | 0.90 | -29.0% | -3.3% | 0.74 |
+| G2-PPO (Opus) | **+191.9%** | **0.95** | **-24.0%** | -3.4% | **1.00** |
+| G3a-PPO (GPT-5 high / o3 sum) | +218.8% | 0.79 | -58.4% | -5.0% | 0.45 |
+| G1-CPPO (DeepSeek) | +226.3% | 0.88 | -34.2% | -4.3% | 0.78 |
+| G2-CPPO (Opus) | +160.4% | 0.71 | -56.9% | -4.6% | 0.37 |
+| G3a-CPPO (GPT-5 high / o3 sum) | +171.1% | 0.75 | -43.2% | -4.5% | 0.51 |
 
-| 實驗 | Return | Sharpe | MDD | CVaR | 訓練時間 |
-|------|--------|--------|-----|------|---------|
-| G3b-PPO (GPT-5 high / gpt5 sum) | | | | | |
-| G4-PPO (o3 high) | | | | | |
-| G5-PPO (GPT-5-mini) | | | | | |
+**第二輪（PPO only）：**
 
-**論文原始結果（Table 1, 2M steps）供參考**：
+| 實驗 | Return | Sharpe | MDD | CVaR | Calmar |
+|------|--------|--------|-----|------|--------|
+| G3b-PPO (GPT-5 high / gpt5 sum) | +263.2% | 0.83 | -54.7% | -5.4% | 0.54 |
+| G4-PPO (o3 high) | +242.1% | **0.96** | -32.7% | -3.9% | 0.85 |
+| G5-PPO (GPT-5-mini) | +207.0% | **1.03** | **-22.7%** | **-3.2%** | **1.11** |
+
+**Model IDs：**
+
+| 實驗 | Model ID |
+|------|----------|
+| G1-PPO | `ppo_train_deepseek_both_100ep_s42_20260330T160955Z_1bde22` |
+| G1-CPPO | `cppo_train_deepseek_both_100ep_s42_20260331T124734Z_1bde22` |
+| G2-PPO | `ppo_train_claude_opus_both_100ep_s42_20260330T163218Z_1d8ab3` |
+| G2-CPPO | `cppo_train_claude_opus_both_100ep_s42_20260331T125222Z_1d8ab3` |
+| G3a-PPO | `ppo_train_gpt5_high_both_100ep_s42_20260330T163517Z_ec7e8c` |
+| G3a-CPPO | `cppo_train_gpt5_high_both_100ep_s42_20260331T124239Z_ec7e8c` |
+| G3b-PPO | `ppo_train_gpt5_high_gpt5sum_both_100ep_s42_20260401T082514Z_8ba1eb` |
+| G4-PPO | `ppo_train_o3_high_both_100ep_s42_20260401T083213Z_2468a3` |
+| G5-PPO | `ppo_train_gpt5mini_high_both_100ep_s42_20260401T080942Z_e7521d` |
+
+---
+
+### 分析
+
+#### 1. 風險調整後表現排名（按 Sharpe）
+
+| 排名 | 實驗 | Sharpe | Return | MDD |
+|------|------|--------|--------|-----|
+| 1 | **G5-PPO (GPT-5-mini)** | **1.03** | +207.0% | **-22.7%** |
+| 2 | G4-PPO (o3 high) | 0.96 | +242.1% | -32.7% |
+| 3 | G2-PPO (Opus) | 0.95 | +191.9% | -24.0% |
+| 4 | G1-PPO (DeepSeek) | 0.90 | +164.9% | -29.0% |
+| 5 | G1-CPPO (DeepSeek) | 0.88 | +226.3% | -34.2% |
+| 6 | G3b-PPO (GPT-5 high / gpt5sum) | 0.83 | +263.2% | -54.7% |
+| 7 | G3a-PPO (GPT-5 high / o3sum) | 0.79 | +218.8% | -58.4% |
+| 8 | G3a-CPPO (GPT-5 high) | 0.75 | +171.1% | -43.2% |
+| 9 | G2-CPPO (Opus) | 0.71 | +160.4% | -56.9% |
+
+#### 2. 關鍵發現
+
+**發現 A：GPT-5-mini (G5) 是最佳風險調整表現**
+
+G5 (GPT-5-mini) 在最便宜的模型下取得了：
+- 唯一 Sharpe > 1.0
+- 最低 MDD (-22.7%)
+- 最低 CVaR (-3.2%)
+- Calmar > 1.0（唯一一個）
+
+可能原因：中性率最低 (29.9%) → 更多方向性判斷 → 更清晰的信號。
+但需要注意這只是一個 seed 的結果。
+
+**發現 B：Claude Opus (G2) PPO 是第一輪最均衡的**
+
+G2-PPO：Sharpe 0.95、MDD 僅 -24%、Calmar 1.0。
+在 Return 和風險之間取得了最好的平衡。
+
+**發現 C：GPT-5 high (G3a/G3b) Return 高但風險巨大**
+
+G3a/G3b 的 Return 最高（219-263%），但 MDD 高達 -55~58%。
+這種策略在真實交易中很難執行 — 一次 58% drawdown 可能觸發止損或心理崩潰。
+
+**發現 D：摘要來源對 GPT-5 high 有顯著影響**
+
+G3a (o3 sum): Return +219%, Sharpe 0.79, MDD -58%
+G3b (gpt5 sum): Return +263%, Sharpe 0.83, MDD -55%
+
+雖然 aggregate 分佈幾乎一樣（54.0% vs 53.9% 中性），
+但 18% per-article 差異在 RL 訓練中被放大了。
+G3b 在所有指標上都略好，但兩者的 MDD 都不可接受。
+
+**發現 E：CPPO 的表現分化**
+
+- G1-CPPO (DeepSeek) > G1-PPO：CPPO 改善了 DeepSeek（Return +226% vs +165%）
+- G2-CPPO (Opus) < G2-PPO：CPPO 反而惡化了 Opus（MDD -57% vs -24%）
+- G3a-CPPO (GPT-5) < G3a-PPO：CPPO 降低了 Return 但也降低了 MDD
+
+CPPO 只對 DeepSeek 有正面效果。這可能與 DeepSeek 的高覆蓋率（包含 title-only）
+在 CPPO 的風險約束下提供了更多的 risk signal 有關。
+
+**發現 F：DeepSeek 的 title-only 覆蓋確實有價值**
+
+G1-PPO (DeepSeek) 覆蓋率 99% 但 49% 是 title-only 的中性 3。
+G2-PPO (Opus) 覆蓋率 61%，缺失部分填 0。
+
+G1 的 Sharpe (0.90) 略低於 G2 (0.95)，但差距不大。
+G1 在 CPPO 下反而是最好的（+226%）。
+
+結論：title-only 的低品質覆蓋**不比無覆蓋差**，在 CPPO 下甚至有幫助。
+但在 PPO 下，高品質評分（Opus）的風險控制更好。
+
+#### 3. 對照 QQQ Benchmark（+173.3%）
+
+| 打敗 QQQ | 未打敗 QQQ |
+|----------|-----------|
+| G1-CPPO (+226%) | G1-PPO (+165%) |
+| G2-PPO (+192%) | G2-CPPO (+160%) |
+| G3a-PPO (+219%) | G3a-CPPO (+171%) |
+| G3b-PPO (+263%) | |
+| G4-PPO (+242%) | |
+| G5-PPO (+207%) | |
+
+9 個實驗中 6 個打敗 QQQ，但要注意 2019-2023 包含大牛市（2020-2021），
+高 Return 不一定代表策略有效。**Sharpe 和 MDD 是更可靠的指標。**
+
+**論文原始結果供參考（Table 1, 2M steps, DeepSeek V3）**：
 
 | 模型 | Information Ratio | CVaR |
 |------|------------------|------|
@@ -434,12 +534,16 @@ python training/backtest.py \
 | CPPO (no LLM) | -0.0148 | -0.0439 |
 | CPPO-DeepSeek | 0.0078 | -0.0437 |
 
-### 後續擴展（視結果決定）
+我們的結果整體好於論文（可能原因：不同的 seed、我們修了 upstream bugs、
+不同的 LLM 評分品質）。但論文觀察到「CPPO + LLM 優於 PPO + LLM」的模式
+只在 DeepSeek (G1) 上重現。
 
-- 第二輪 G3b/G4/G5 的 CPPO（如果 PPO 結果有意義）
-- Claude Haiku / Sonnet（最低成本 Claude，已有評分資料）
-- GPT-5 minimal（最低成本 GPT，已有評分資料）
-- 所有評分資料預計開源到 HuggingFace（含各 R/V 組合）
+### 後續建議
+
+1. **多 seed 驗證 G5 (GPT-5-mini)**：Sharpe 1.03 是最好的結果，需要至少 3 個 seed 確認不是巧合
+2. **G4/G5 的 CPPO**：o3 和 GPT-5-mini 在 PPO 下表現好，CPPO 是否能進一步改善 MDD？
+3. **評分資料開源**：所有組的評分資料 + 訓練結果可以打包上 HuggingFace
+4. **調參方向**：GPT-5 high 的 MDD 問題可能可以用降低 clip_ratio (0.7→0.3) 緩解
 
 ---
 
@@ -450,7 +554,8 @@ python training/backtest.py \
 - Equity curve 圖在各 model 目錄下的 `equity_curve.png`
 - 訓練 log 在 `/mnt/md0/PycharmProjects/spinningup/data/` 下
 - 系列 A（Polygon）和系列 B（HuggingFace）是獨立的，不直接比較（不同資料源、不同日期、不同 tickers）
+- 系列 B 全部使用 seed=42，結果受 seed 影響大（見系列 A 的 EXP-001 vs EXP-003）
 
 ---
 
-*最後更新: 2026-03-30*
+*最後更新: 2026-04-01*
