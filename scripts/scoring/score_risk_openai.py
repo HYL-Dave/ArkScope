@@ -451,7 +451,12 @@ def main():
     valid_efforts = ["low", "medium", "high"]
     if args.model.startswith("gpt-5"):
         valid_efforts.append("minimal")
-    
+        # gpt-5.2+ supports xhigh (including gpt-5.4-nano, gpt-5.4-mini, gpt-5.4)
+        import re as _re
+        _m = _re.match(r"gpt-5\.(\d+)", args.model)
+        if _m and int(_m.group(1)) >= 2:
+            valid_efforts.append("xhigh")
+
     if args.reasoning_effort not in valid_efforts:
         parser.error(f"Invalid reasoning effort '{args.reasoning_effort}' for model '{args.model}'. Valid options: {valid_efforts}")
     
