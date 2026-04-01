@@ -231,21 +231,30 @@ Hyperparameter mapping (SpinningUp → SB3):
         print(f"  Extra features ({len(extra_cols)}): {extra_cols}")
 
     # Build SB3 PPO model
-    # Hyperparams matched to SpinningUp defaults for comparability
+    # Hyperparams aligned to SpinningUp for comparability:
+    #   SpinningUp: separate optimizers — pi_lr=3e-5, vf_lr=1e-4, no grad clipping
+    #   SB3: single optimizer — lr=pi_lr, vf_coef=vf_lr/pi_lr to match effective vf lr
+    #   n_epochs=10 × (20000/2000)=10 minibatches = 100 gradient steps ≈ train_pi_iters=100
+    #   max_grad_norm=None: SpinningUp doesn't clip gradients
+    pi_lr = args.lr          # 3e-5
+    vf_lr = args.lr * 3.33   # ≈ 1e-4, matching SpinningUp's vf_lr
+    vf_coef = vf_lr / pi_lr  # ≈ 3.33
+
     model = PPO(
         "MlpPolicy",
         env,
         device=args.device,
-        learning_rate=args.lr,
+        learning_rate=pi_lr,
         n_steps=effective_steps,
-        batch_size=min(effective_steps, 2000),  # factor of 20000 to avoid truncated minibatch
-        n_epochs=10,              # SB3 inner optimization epochs per rollout
+        batch_size=min(effective_steps, 2000),  # factor of 20000
+        n_epochs=10,              # 10 × 10 minibatches = 100 gradient steps
         gamma=args.gamma,
         gae_lambda=0.95,
         clip_range=0.7,
         target_kl=0.35,
-        vf_coef=0.5,
+        vf_coef=vf_coef,         # ≈3.33: compensate shared lr for value function
         ent_coef=0.0,
+        max_grad_norm=float("inf"),  # no gradient clipping (match SpinningUp)
         seed=args.seed,
         verbose=0,
         policy_kwargs=dict(
@@ -309,11 +318,16 @@ Hyperparameter mapping (SpinningUp → SB3):
             "hid": args.hid,
             "layers": args.l,
             "gamma": args.gamma,
-            "learning_rate": args.lr,
+            "pi_lr": pi_lr,
+            "vf_lr_effective": pi_lr * vf_coef,
+            "vf_coef": round(vf_coef, 4),
             "n_steps": args.steps,
+            "n_epochs": 10,
+            "batch_size": min(args.steps, 2000),
             "clip_range": 0.7,
             "target_kl": 0.35,
             "gae_lambda": 0.95,
+            "max_grad_norm": "inf",
             "device": device_name,
             "n_envs": args.n_envs,
             "sentiment_scale": args.sentiment_scale,
