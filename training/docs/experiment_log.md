@@ -538,12 +538,126 @@ G1 在 CPPO 下反而是最好的（+226%）。
 不同的 LLM 評分品質）。但論文觀察到「CPPO + LLM 優於 PPO + LLM」的模式
 只在 DeepSeek (G1) 上重現。
 
-### 後續建議
+---
 
-1. **多 seed 驗證 G5 (GPT-5-mini)**：Sharpe 1.03 是最好的結果，需要至少 3 個 seed 確認不是巧合
-2. **G4/G5 的 CPPO**：o3 和 GPT-5-mini 在 PPO 下表現好，CPPO 是否能進一步改善 MDD？
-3. **評分資料開源**：所有組的評分資料 + 訓練結果可以打包上 HuggingFace
-4. **調參方向**：GPT-5 high 的 MDD 問題可能可以用降低 clip_ratio (0.7→0.3) 緩解
+## 系列 C：SB3 驗證 + 大規模並行（規劃中）
+
+### SB3 vs SpinningUp 的並行效益
+
+| | SpinningUp (mpirun -np 8) | SB3 (--device cpu) |
+|---|---|---|
+| CPU cores / 實驗 | 8 | ~1 |
+| 24 核同時跑 | 3 個 | ~20 個 |
+| 每個實驗耗時 | ~18h (HF 資料) | ~18h（預估，待驗證） |
+| 18h 可完成 | 3 個 | ~20 個 |
+| **吞吐量** | **基準** | **~6-7x** |
+
+SB3 GPU 對 MLP policy 無加速效果（模型太小），但 `--device cuda` 可將 NN 計算
+offload 到 GPU，降低 CPU 負載。每個實驗只需 ~50MB VRAM（RTX 4090 24GB 可容納 ~200 個）。
+實際瓶頸是 CPU cores 數量。
+
+### 待辦：SB3 基準驗證
+
+先用 G5 (GPT-5-mini) 跑 SB3 vs SpinningUp 對照：
+
+```bash
+# SB3 CPU — 單個驗證
+python training/train_ppo_sb3.py \
+  --data training/data_prep/output/train_gpt5mini_high_both.csv \
+  --epochs 100 --device cpu --seed 42
+```
+
+比較 Sharpe、Return、MDD 和訓練時間。如果結果 comparable，後續全部切換到 SB3。
+
+### 待辦：多 seed 驗證（SB3 確認後）
+
+系列 B 全部用 seed=42，但系列 A 顯示 seed 影響極大（PPO s42: +123% vs s0: +18%）。
+Top 3 的 G5/G4/G2 需要多 seed 驗證。
+
+SB3 可 20 個並行，一次跑完全部 seed：
+
+| 實驗 | seed 0 | seed 1 | seed 2 | seed 3 | seed 4 |
+|------|--------|--------|--------|--------|--------|
+| G5-PPO (GPT-5-mini) | | | | | |
+| G4-PPO (o3 high) | | | | | |
+| G2-PPO (Opus) | | | | | |
+
+15 個實驗，SB3 並行 ~18h 全部完成（SpinningUp 需要 5 批 × 18h = 90h）。
+
+---
+
+## 系列 D：Title-only 補齊評分實驗（進行中）
+
+### 背景
+
+DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
+我們的評分（Claude/GPT-5 等）在這些記錄上完全缺失（填 0 或 3）。
+
+目前使用 gpt-5.4-nano (reasoning=xhigh) 對全部 127,176 筆標題重新評分。
+完成後需要合併工具：將 title-only 的新評分填入現有評分缺失的位置。
+
+### 評分進度
+
+- [ ] Sentiment: `gpt-5.4-nano_xhigh_by_title` — 進行中
+- [ ] Risk: `gpt-5.4-nano_xhigh_by_title` — 待 sentiment 完成後開始
+
+### 合併策略
+
+對每個實驗組，產出「補齊版」訓練資料：
+
+```
+原始 G5 評分（77,871 筆 summary-based）
+  + nano title-only 評分填入缺失的 49,102 筆
+  = 合併後 ~126K 筆覆蓋
+```
+
+需要開發合併工具，支援：
+- 指定 primary 評分來源（保留 summary-based 為主）
+- 指定 fallback 評分來源（title-only nano 填入缺失）
+- 輸出合併後的 train/trade CSV
+
+### 待驗證假設
+
+**假設 H1**：title-only 補齊 > 無覆蓋（填 0）
+  - 比較 G5-PPO (原始 77K) vs G5-PPO (補齊 126K)
+
+**假設 H2**：nano title-only 品質 > DeepSeek title-only（97.5% 中性 3）
+  - 如果 nano 的中性率明顯低於 97.5%，說明即使只看標題也能做出更好的判斷
+
+**假設 H3**：最佳配置 = 高品質 summary-based (主) + 低成本 title-only (補)
+  - 如果 H1+H2 都成立，這就是 cost-effective 的完整覆蓋方案
+
+---
+
+## 系列 E：SB3 CPPO（待開發）
+
+### 前置條件
+
+1. 系列 C 的 SB3 PPO 基準驗證通過
+2. 確認 SB3 的結果跟 SpinningUp comparable
+
+### 開發計畫
+
+繼承 SB3 PPO 加入 CVaR 約束。核心改動：
+- `train()` method 裡的 advantage 計算加入 CVaR penalty
+- 自適應 ν（門檻）和 λ_cvar（懲罰強度）
+- LLM 風險分數的 portfolio risk factor 計算
+
+估計 200-300 行代碼。完成後可以用 SB3 的並行優勢大規模測試 CPPO。
+
+---
+
+## 後續計畫總結（按優先級）
+
+| 優先級 | 項目 | 前置條件 | 預估工作量 |
+|--------|------|---------|-----------|
+| 1 | SB3 PPO 基準驗證 | 無 | 1 個實驗 (~18h) |
+| 2 | Title-only nano 評分完成 | 評分跑完 | 等待中 |
+| 3 | 評分合併工具 | #2 完成 | 開發 ~1h |
+| 4 | G5 補齊版 train/backtest | #3 完成 | 1 個實驗 |
+| 5 | SB3 多 seed 驗證 (G5/G4/G2 × 5 seeds) | #1 通過 | 15 個並行 ~18h |
+| 6 | SB3 CPPO 開發 | #1 通過 | 開發 ~3h |
+| 7 | 評分資料開源 HuggingFace | 結果穩定後 | 打包 ~2h |
 
 ---
 
@@ -558,4 +672,4 @@ G1 在 CPPO 下反而是最好的（+226%）。
 
 ---
 
-*最後更新: 2026-04-01*
+*最後更新: 2026-04-02*
