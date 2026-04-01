@@ -335,7 +335,7 @@ def _canonical_comment_date(value):
         return str(value)
 
     if dt.tzinfo is None:
-        return dt.isoformat()
+        return dt.replace(tzinfo=timezone.utc).isoformat()
     return dt.astimezone(timezone.utc).isoformat()
 
 

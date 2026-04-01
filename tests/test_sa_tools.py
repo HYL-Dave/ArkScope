@@ -1315,6 +1315,34 @@ class TestCommentNormalization:
             "2026-03-30T01:23:00+00:00",
         }
 
+    def test_normalize_comment_ids_merges_naive_and_utc_same_wall_clock(self):
+        from scripts.sa_native_host import _normalize_comment_ids
+
+        comments = [
+            {
+                "comment_id": "syn_local",
+                "commenter": "Odsmaker",
+                "comment_text": "Still tracking this.",
+                "comment_date": "2026-03-29T01:23:00",
+                "upvotes": 1,
+                "parent_comment_id": None,
+            },
+            {
+                "comment_id": "syn_utc",
+                "commenter": "Odsmaker",
+                "comment_text": "Still tracking this.",
+                "comment_date": "2026-03-29T01:23:00Z",
+                "upvotes": 3,
+                "parent_comment_id": None,
+            },
+        ]
+
+        normalized = _normalize_comment_ids("6093149", comments)
+
+        assert len(normalized) == 1
+        assert normalized[0]["comment_date"] == "2026-03-29T01:23:00+00:00"
+        assert normalized[0]["upvotes"] == 3
+
     def test_normalize_comment_ids_remaps_parent_after_merge(self):
         from scripts.sa_native_host import _normalize_comment_ids
 
@@ -1410,6 +1438,34 @@ class TestCommentUpsertPrep:
         assert len(prepared) == 1
         assert prepared[0]["comment_id"] == "syn_2"
         assert prepared[0]["comment_date"] == "2026-03-30T01:23:00+00:00"
+
+    def test_prepare_comments_for_upsert_matches_existing_utc_row_with_naive_incoming(self):
+        existing = [
+            {
+                "comment_id": "canon_1",
+                "parent_comment_id": None,
+                "commenter": "1629 Capital",
+                "comment_text": "@revinax done!",
+                "upvotes": 0,
+                "comment_date": datetime(2023, 10, 25, 18, 52, tzinfo=timezone.utc),
+            }
+        ]
+        incoming = [
+            {
+                "comment_id": "syn_1",
+                "parent_comment_id": None,
+                "commenter": "1629 Capital",
+                "comment_text": "@revinax done!",
+                "upvotes": 0,
+                "comment_date": "2023-10-25T18:52:00",
+            }
+        ]
+
+        prepared = _prepare_comments_for_upsert(existing, incoming)
+
+        assert len(prepared) == 1
+        assert prepared[0]["comment_id"] == "canon_1"
+        assert prepared[0]["comment_date"] == "2023-10-25T18:52:00+00:00"
 
     def test_prepare_comments_for_upsert_remaps_child_to_existing_parent(self):
         existing = [

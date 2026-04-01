@@ -214,7 +214,7 @@
     if (!text) return null;
 
     var parsed = Date.parse(text);
-    if (!isNaN(parsed)) return new Date(parsed).toISOString();
+    if (!isNaN(parsed)) return serializeLocalDate(new Date(parsed));
     return text;
   }
 

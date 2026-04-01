@@ -55,7 +55,7 @@ def _canonicalize_comment_date(value: Any) -> Optional[str]:
         return str(value)
 
     if dt.tzinfo is None:
-        return dt.isoformat()
+        return dt.replace(tzinfo=timezone.utc).isoformat()
     return dt.astimezone(timezone.utc).isoformat()
 
 
