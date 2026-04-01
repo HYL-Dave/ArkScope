@@ -36,6 +36,7 @@ import pandas as pd
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from training.config import (
@@ -104,7 +105,7 @@ def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None):
     }
 
     def _make():
-        return StockTradingEnv(df=train, **env_kwargs)
+        return Monitor(StockTradingEnv(df=train, **env_kwargs))
 
     return _make, stock_dimension, state_space
 
