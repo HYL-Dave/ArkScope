@@ -77,6 +77,92 @@ def _merge_comment_record(target: Dict[str, Any], incoming: Dict[str, Any]) -> D
     return target
 
 
+def _comment_duplicate_sort_key(row: Dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        0 if row.get("comment_date") is not None else 1,
+        0 if row.get("parent_comment_id") else 1,
+        row.get("comment_date") or datetime.max.replace(tzinfo=timezone.utc),
+        row.get("id") or 0,
+        row.get("comment_id") or "",
+    )
+
+
+
+def _plan_comment_duplicate_cleanup(rows: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
+    if len(rows) <= 1:
+        return {"delete_ids": [], "parent_rewrites": []}
+
+    normalized_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        row_copy = dict(row)
+        row_copy["comment_date"] = _canonicalize_comment_date(row_copy.get("comment_date"))
+        if row_copy.get("comment_date"):
+            row_copy["comment_date"] = datetime.fromisoformat(
+                row_copy["comment_date"].replace("Z", "+00:00")
+            )
+        normalized_rows.append(row_copy)
+
+    delete_ids: List[Any] = []
+    parent_rewrites: Dict[str, str] = {}
+    grouped_by_date: Dict[Optional[str], List[Dict[str, Any]]] = defaultdict(list)
+    for row in normalized_rows:
+        key = row["comment_date"].isoformat() if row.get("comment_date") else None
+        grouped_by_date[key].append(row)
+
+    kept_rows: List[Dict[str, Any]] = []
+    for date_rows in grouped_by_date.values():
+        date_rows.sort(key=_comment_duplicate_sort_key)
+        keeper = date_rows[0]
+        kept_rows.append(keeper)
+        for duplicate in date_rows[1:]:
+            if duplicate.get("comment_id") and keeper.get("comment_id"):
+                parent_rewrites[duplicate["comment_id"]] = keeper["comment_id"]
+            delete_ids.append(duplicate["id"])
+
+    null_rows = [row for row in kept_rows if row.get("comment_date") is None]
+    dated_rows = [row for row in kept_rows if row.get("comment_date") is not None]
+    if len(dated_rows) == 1 and null_rows:
+        canonical = dated_rows[0]
+        for duplicate in null_rows:
+            if duplicate.get("comment_id") and canonical.get("comment_id"):
+                parent_rewrites[duplicate["comment_id"]] = canonical["comment_id"]
+            delete_ids.append(duplicate["id"])
+        kept_rows = [canonical]
+
+    filtered_rows = [
+        row for row in kept_rows
+        if row.get("id") not in set(delete_ids) and row.get("comment_date") is not None
+    ]
+    filtered_rows.sort(key=_comment_duplicate_sort_key)
+    removed_indexes = set()
+    for i, left in enumerate(filtered_rows):
+        if i in removed_indexes:
+            continue
+        left_dt = left.get("comment_date")
+        if left_dt is None:
+            continue
+        for j in range(i + 1, len(filtered_rows)):
+            if j in removed_indexes:
+                continue
+            right = filtered_rows[j]
+            right_dt = right.get("comment_date")
+            if right_dt is None:
+                continue
+            delta = right_dt - left_dt
+            if delta == timedelta(hours=8):
+                if left.get("comment_id") and right.get("comment_id"):
+                    parent_rewrites[left["comment_id"]] = right["comment_id"]
+                delete_ids.append(left["id"])
+                removed_indexes.add(i)
+                break
+            if delta > timedelta(hours=8):
+                break
+
+    unique_delete_ids = list(dict.fromkeys(delete_ids))
+    unique_parent_rewrites = [(src, dst) for src, dst in parent_rewrites.items() if src and dst and src != dst]
+    return {"delete_ids": unique_delete_ids, "parent_rewrites": unique_parent_rewrites}
+
+
 def _select_existing_comment_match(
     candidates: List[Dict[str, Any]], incoming_date: Optional[str]
 ) -> Optional[Dict[str, Any]]:
@@ -1384,7 +1470,62 @@ class DatabaseBackend:
                     comment.get("comment_date"),
                 ),
             )
+        cleanup = self._cleanup_article_comment_duplicates(cur, article_id)
+        if cleanup["comments_deleted"] or cleanup["parent_links_repointed"]:
+            logger.info(
+                "Cleaned SA comment duplicates for %s: deleted=%s parent_links_repointed=%s",
+                article_id,
+                cleanup["comments_deleted"],
+                cleanup["parent_links_repointed"],
+            )
         return len(prepared_comments)
+
+    def _cleanup_article_comment_duplicates(self, cur, article_id: str) -> Dict[str, int]:
+        groups_processed = 0
+        comments_deleted = 0
+        parent_links_repointed = 0
+        with cur.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as fetch_cur:
+            fetch_cur.execute(
+                """SELECT commenter, comment_text
+                FROM sa_article_comments
+                WHERE article_id = %s
+                GROUP BY commenter, comment_text
+                HAVING COUNT(*) > 1
+                """,
+                (article_id,),
+            )
+            groups = fetch_cur.fetchall()
+
+            for group in groups:
+                fetch_cur.execute(
+                    """SELECT id, comment_id, parent_comment_id, comment_date
+                    FROM sa_article_comments
+                    WHERE article_id = %s
+                      AND commenter IS NOT DISTINCT FROM %s
+                      AND comment_text IS NOT DISTINCT FROM %s
+                    ORDER BY comment_date ASC NULLS LAST, id ASC
+                    """,
+                    (article_id, group["commenter"], group["comment_text"]),
+                )
+                rows = [dict(row) for row in fetch_cur.fetchall()]
+                plan = _plan_comment_duplicate_cleanup(rows)
+                if not plan["delete_ids"]:
+                    continue
+                groups_processed += 1
+                for duplicate_comment_id, canonical_comment_id in plan["parent_rewrites"]:
+                    cur.execute(
+                        "UPDATE sa_article_comments SET parent_comment_id = %s WHERE article_id = %s AND parent_comment_id = %s",
+                        (canonical_comment_id, article_id, duplicate_comment_id),
+                    )
+                    parent_links_repointed += cur.rowcount or 0
+                for delete_id in plan["delete_ids"]:
+                    cur.execute("DELETE FROM sa_article_comments WHERE id = %s", (delete_id,))
+                    comments_deleted += cur.rowcount or 0
+        return {
+            "groups_processed": groups_processed,
+            "comments_deleted": comments_deleted,
+            "parent_links_repointed": parent_links_repointed,
+        }
 
     def cleanup_mixed_null_date_comment_duplicates(self) -> Dict[str, int]:
         """Collapse safe duplicate groups where a null-date row matches a dated row."""

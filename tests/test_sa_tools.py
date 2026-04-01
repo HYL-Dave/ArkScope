@@ -28,7 +28,11 @@ from src.tools.sa_tools import (
     _is_sa_enabled,
 )
 from src.tools.data_access import DataAccessLayer, _sanitize_sa_comments_count
-from src.tools.backends.db_backend import DatabaseBackend, _prepare_comments_for_upsert
+from src.tools.backends.db_backend import (
+    DatabaseBackend,
+    _plan_comment_duplicate_cleanup,
+    _prepare_comments_for_upsert,
+)
 from src.tools.registry import create_default_registry
 
 
@@ -1501,6 +1505,71 @@ class TestCommentUpsertPrep:
         child = next(c for c in prepared if c["commenter"] == "Simon Dadouche")
 
         assert child["parent_comment_id"] == "canon_parent"
+
+
+class TestCommentDuplicateCleanupPlan:
+    def test_plan_comment_duplicate_cleanup_collapses_same_date_duplicates(self):
+        rows = [
+            {
+                "id": 1,
+                "comment_id": "canon_old",
+                "parent_comment_id": None,
+                "comment_date": datetime(2023, 10, 31, 16, 2, tzinfo=timezone.utc),
+            },
+            {
+                "id": 2,
+                "comment_id": "canon_new",
+                "parent_comment_id": None,
+                "comment_date": datetime(2023, 10, 31, 16, 2, tzinfo=timezone.utc),
+            },
+        ]
+
+        plan = _plan_comment_duplicate_cleanup(rows)
+
+        assert plan["delete_ids"] == [2]
+        assert plan["parent_rewrites"] == [("canon_new", "canon_old")]
+
+    def test_plan_comment_duplicate_cleanup_prefers_dated_over_null(self):
+        rows = [
+            {
+                "id": 1,
+                "comment_id": "null_id",
+                "parent_comment_id": None,
+                "comment_date": None,
+            },
+            {
+                "id": 2,
+                "comment_id": "dated_id",
+                "parent_comment_id": None,
+                "comment_date": datetime(2026, 3, 29, 1, 23, tzinfo=timezone.utc),
+            },
+        ]
+
+        plan = _plan_comment_duplicate_cleanup(rows)
+
+        assert plan["delete_ids"] == [1]
+        assert plan["parent_rewrites"] == [("null_id", "dated_id")]
+
+    def test_plan_comment_duplicate_cleanup_collapses_shifted_pairs(self):
+        rows = [
+            {
+                "id": 1,
+                "comment_id": "older_id",
+                "parent_comment_id": None,
+                "comment_date": datetime(2023, 10, 31, 8, 2, tzinfo=timezone.utc),
+            },
+            {
+                "id": 2,
+                "comment_id": "newer_id",
+                "parent_comment_id": None,
+                "comment_date": datetime(2023, 10, 31, 16, 2, tzinfo=timezone.utc),
+            },
+        ]
+
+        plan = _plan_comment_duplicate_cleanup(rows)
+
+        assert plan["delete_ids"] == [1]
+        assert plan["parent_rewrites"] == [("older_id", "newer_id")]
 
 
 class TestRegistryV3:
