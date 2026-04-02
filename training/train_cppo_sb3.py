@@ -315,6 +315,10 @@ def main():
     # CVaR parameters
     parser.add_argument("--alpha", type=float, default=0.85, help="CVaR confidence level")
     parser.add_argument("--beta", type=float, default=3000.0, help="CVaR constraint bound")
+    parser.add_argument(
+        "--full-batch", action="store_true",
+        help="Use full-batch gradient (like SpinningUp) instead of minibatch.",
+    )
     args = parser.parse_args()
 
     check_and_make_directories([TRAINED_MODEL_DIR])
@@ -341,6 +345,15 @@ def main():
     pi_lr = args.lr
     vf_coef = 1e-4 / pi_lr  # ≈ 3.33, matching SpinningUp's vf_lr=1e-4
 
+    if args.full_batch:
+        batch_size = args.steps
+        n_epochs = 100
+        batch_mode = "full-batch"
+    else:
+        batch_size = min(args.steps, 2000)
+        n_epochs = 10
+        batch_mode = "minibatch"
+
     scale = SENTIMENT_SCALES[args.sentiment_scale]
 
     model = CPPO_SB3(
@@ -349,8 +362,8 @@ def main():
         device=args.device,
         learning_rate=pi_lr,
         n_steps=args.steps,
-        batch_size=min(args.steps, 2000),
-        n_epochs=10,
+        batch_size=batch_size,
+        n_epochs=n_epochs,
         gamma=args.gamma,
         gae_lambda=0.95,
         clip_range=0.7,
@@ -373,6 +386,7 @@ def main():
 
     total_timesteps = args.epochs * args.steps
     print(f"  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
+    print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
     print(f"  CVaR: alpha={args.alpha}, beta={args.beta}")
 
     callback = EpochLogCallback(args.epochs)
@@ -425,6 +439,9 @@ def main():
             "pi_lr": pi_lr,
             "vf_lr_effective": pi_lr * vf_coef,
             "vf_coef": round(vf_coef, 4),
+            "n_epochs": n_epochs,
+            "batch_size": batch_size,
+            "batch_mode": batch_mode,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "alpha": args.alpha,
