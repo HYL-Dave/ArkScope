@@ -573,15 +573,35 @@ Model ID: `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260401T194136Z_e7521d`
 
 **修正**：`vf_coef=3.33`（= 1e-4 / 3e-5）+ `max_grad_norm=inf`。
 
-### 待辦：SB3 基準驗證 — 第二次（修正後）⬅ 進行中
+### SB3 基準驗證 — 第二次（vf_coef+grad_norm 修正）
 
-```bash
-python training/train_ppo_sb3.py \
-  --data training/data_prep/output/train_gpt5mini_high_both.csv \
-  --epochs 100 --device cpu --seed 42
-```
+| 指標 | SpinningUp PPO | SB3 PPO v1 | SB3 PPO v2 | SB3 CPPO |
+|------|---------------|------------|------------|----------|
+| Return | **+207.0%** | +164.8% | +134.5% | +165.2% |
+| Sharpe | **1.03** | 0.73 | 0.68 | 0.80 |
+| MDD | **-22.7%** | -43.2% | -33.4% | -31.1% |
+| Calmar | **1.11** | 0.50 | 0.56 | 0.69 |
+| CVaR | **-3.2%** | -4.6% | -4.1% | -3.9% |
 
-比較 Sharpe、Return、MDD 和訓練時間。如果結果 comparable，後續全部切換到 SB3。
+Model IDs:
+- SB3 PPO v2: `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260402T023157Z_e7521d`
+- SB3 CPPO: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260402T052747Z_e7521d`
+
+**觀察**：
+- v2 的 MDD 改善了（-43% → -33%），vf_coef 修正有效果但仍不足
+- SB3 CPPO > SB3 PPO（所有指標），CVaR 約束在 SB3 下也有正面效果
+- SpinningUp PPO 仍顯著勝出（Sharpe 1.03 vs 0.68/0.80）
+
+**SB3 vs SpinningUp 剩餘差異（待調查）**：
+
+| 差異 | SpinningUp | SB3 |
+|------|-----------|-----|
+| Gradient 計算 | Full-batch（整個 20K buffer） | Minibatch（2000 一批，10 批/epoch） |
+| KL early stop | 每個 gradient step 檢查，超過即停 | 每個 epoch 結束時檢查 |
+| Advantage norm | 跨 8 個 MPI worker 平均 mean/std | 單進程 buffer 的 mean/std |
+| Policy update 次數 | 10-99 次（KL 動態決定） | 固定 10 epochs × 10 batches = 100 次 |
+
+需要進一步實驗確認哪個差異是主要原因。
 
 ### 待辦：多 seed 驗證（SB3 確認後）
 
