@@ -592,16 +592,47 @@ Model IDs:
 - SB3 CPPO > SB3 PPO（所有指標），CVaR 約束在 SB3 下也有正面效果
 - SpinningUp PPO 仍顯著勝出（Sharpe 1.03 vs 0.68/0.80）
 
-**SB3 vs SpinningUp 剩餘差異（待調查）**：
+### SB3 基準驗證 — 第三次（full-batch，最接近 SpinningUp）
 
-| 差異 | SpinningUp | SB3 |
-|------|-----------|-----|
-| Gradient 計算 | Full-batch（整個 20K buffer） | Minibatch（2000 一批，10 批/epoch） |
-| KL early stop | 每個 gradient step 檢查，超過即停 | 每個 epoch 結束時檢查 |
-| Advantage norm | 跨 8 個 MPI worker 平均 mean/std | 單進程 buffer 的 mean/std |
-| Policy update 次數 | 10-99 次（KL 動態決定） | 固定 10 epochs × 10 batches = 100 次 |
+| 指標 | SpinningUp PPO | SB3 PPO v2 (minibatch) | SB3 PPO v3 (full-batch) | SB3 CPPO (minibatch) | SB3 CPPO (full-batch) |
+|------|---------------|----------------------|------------------------|--------------------|--------------------|
+| Return | **+207.0%** | +134.5% | +149.6% | +165.2% | **+218.8%** |
+| Sharpe | **1.03** | 0.68 | 0.79 | 0.80 | **0.93** |
+| MDD | **-22.7%** | -33.4% | -32.3% | -31.1% | -38.8% |
+| Calmar | **1.11** | 0.56 | 0.62 | 0.69 | 0.67 |
+| CVaR | **-3.2%** | -4.1% | -3.7% | -3.9% | -3.9% |
 
-需要進一步實驗確認哪個差異是主要原因。
+Model IDs:
+- SB3 PPO v3 (full-batch): `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260402T194507Z_e7521d`
+- SB3 CPPO (full-batch): `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260402T212258Z_e7521d`
+
+**結論**：
+- Full-batch 比 minibatch 改善明顯（PPO Sharpe 0.68→0.79，CPPO 0.80→0.93）
+- **SB3 CPPO full-batch 是 SB3 系列最佳**（Sharpe 0.93, Return +219%）
+- 但仍未追平 SpinningUp PPO（Sharpe 1.03, MDD -22.7%）
+
+**SB3 vs SpinningUp 剩餘差異分析**：
+
+| 差異 | SpinningUp | SB3 | 影響 |
+|------|-----------|-----|------|
+| ~~Gradient 計算~~ | ~~Full-batch~~ | ~~Minibatch~~ | **已驗證：部分原因**（full-batch 改善了 Sharpe +0.11） |
+| KL early stop | 每個 gradient step 檢查 | 每個 epoch 結束時檢查 | **可能是剩餘 gap 的主因** |
+| Advantage norm | 跨 8 個 MPI worker 的全局 mean/std | 單進程 buffer 的 mean/std | 可能有影響 |
+| Optimizer | 分離 pi/vf Adam | 共用 Adam + vf_coef 補償 | 近似但非完全等價 |
+
+### GPU offload 並行效益（實測）
+
+| 模式 | 每個實驗佔 CPU | 24 cores 可跑 |
+|------|--------------|-------------|
+| SpinningUp MPI (np 8) | 8 cores | 3 個 |
+| SB3 CPU minibatch | ~2-3 cores | ~10 個 |
+| SB3 CPU full-batch | ~10-12 cores（PyTorch OpenMP 多核） | ~2 個 |
+| **SB3 CUDA full-batch** | **~1 core**（NN offload 到 GPU） | **~20+ 個** |
+
+實測發現：CPU full-batch 下 PyTorch 自動用 OpenMP 多核做矩陣運算，2 個實驗就佔滿 24 cores。
+切換 `--device cuda` 後每個實驗只佔 1 core（NN 計算在 GPU），RTX 4090 VRAM 足夠容納 200+ 模型。
+
+**建議配置**：`--full-batch --device cuda` — 兼顧訓練品質和最大並行數。
 
 ### 待辦：多 seed 驗證（SB3 確認後）
 
