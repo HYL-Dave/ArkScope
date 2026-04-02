@@ -176,6 +176,11 @@ Hyperparameter mapping (SpinningUp → SB3):
     parser.add_argument("--gamma", type=float, default=0.995)
     parser.add_argument("--lr", type=float, default=3e-5, help="Learning rate")
     parser.add_argument(
+        "--full-batch", action="store_true",
+        help="Use full-batch gradient (like SpinningUp) instead of minibatch. "
+             "Sets batch_size=n_steps, n_epochs=100.",
+    )
+    parser.add_argument(
         "--device", default="auto", choices=["auto", "cpu", "cuda"],
         help="Device: auto (GPU if available), cpu, or cuda",
     )
@@ -240,14 +245,23 @@ Hyperparameter mapping (SpinningUp → SB3):
     vf_lr = args.lr * 3.33   # ≈ 1e-4, matching SpinningUp's vf_lr
     vf_coef = vf_lr / pi_lr  # ≈ 3.33
 
+    if args.full_batch:
+        batch_size = effective_steps   # full buffer = one giant batch
+        n_epochs = 100                 # 100 full-batch updates (= SpinningUp train_pi_iters)
+        batch_mode = "full-batch"
+    else:
+        batch_size = min(effective_steps, 2000)
+        n_epochs = 10                  # 10 epochs × 10 minibatches = 100 steps
+        batch_mode = "minibatch"
+
     model = PPO(
         "MlpPolicy",
         env,
         device=args.device,
         learning_rate=pi_lr,
         n_steps=effective_steps,
-        batch_size=min(effective_steps, 2000),  # factor of 20000
-        n_epochs=10,              # 10 × 10 minibatches = 100 gradient steps
+        batch_size=batch_size,
+        n_epochs=n_epochs,
         gamma=args.gamma,
         gae_lambda=0.95,
         clip_range=0.7,
@@ -266,6 +280,7 @@ Hyperparameter mapping (SpinningUp → SB3):
     total_timesteps = args.epochs * args.steps
     print(f"\n  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
     print(f"  Network: {[args.hid] * args.l}")
+    print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
 
     # Train
     callback = EpochLogCallback(args.epochs, args.steps)
@@ -322,8 +337,9 @@ Hyperparameter mapping (SpinningUp → SB3):
             "vf_lr_effective": pi_lr * vf_coef,
             "vf_coef": round(vf_coef, 4),
             "n_steps": args.steps,
-            "n_epochs": 10,
-            "batch_size": min(args.steps, 2000),
+            "n_epochs": n_epochs,
+            "batch_size": batch_size,
+            "batch_mode": batch_mode,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "gae_lambda": 0.95,
