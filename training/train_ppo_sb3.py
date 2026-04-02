@@ -34,6 +34,7 @@ import time
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
@@ -45,6 +46,41 @@ from training.config import (
     check_and_make_directories,
 )
 from training.envs.stocktrading_llm import StockTradingEnv
+
+
+# ── PPO with separate VF training (matches SpinningUp behavior) ──
+
+
+class SeparateVfPPO(PPO):
+    """PPO that continues training the value function after KL early stop.
+
+    In standard SB3 PPO, KL early stopping halts BOTH policy and value
+    updates. But SpinningUp trains value independently for train_v_iters
+    iterations AFTER the policy loop. PPG (Cobbe 2021) showed this matters:
+    PPO's multi-epoch training primarily benefits the value function.
+
+    This subclass runs the normal PPO train() loop, then does extra
+    VF-only passes over the rollout buffer to ensure the value function
+    is adequately trained regardless of when KL stopped the policy.
+    """
+
+    def __init__(self, *args, vf_extra_iters: int = 80, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.vf_extra_iters = vf_extra_iters
+
+    def train(self):
+        # Standard PPO training (policy + value combined, with KL early stop)
+        super().train()
+
+        # Extra VF-only training passes (like SpinningUp's separate vf loop)
+        if self.vf_extra_iters > 0:
+            for _ in range(self.vf_extra_iters):
+                for rollout_data in self.rollout_buffer.get(self.batch_size):
+                    values = self.policy.predict_values(rollout_data.observations)
+                    vf_loss = F.mse_loss(rollout_data.returns, values.flatten())
+                    self.policy.optimizer.zero_grad()
+                    vf_loss.backward()
+                    self.policy.optimizer.step()
 
 
 # ── Data loading (shared with train_ppo_llm.py) ────────────
@@ -181,6 +217,11 @@ Hyperparameter mapping (SpinningUp → SB3):
              "Sets batch_size=n_steps, n_epochs=100.",
     )
     parser.add_argument(
+        "--separate-vf", action="store_true",
+        help="Extra VF-only training after KL early stop (SpinningUp parity). "
+             "Adds 80 VF-only passes per rollout, matching SpinningUp's train_v_iters.",
+    )
+    parser.add_argument(
         "--device", default="auto", choices=["auto", "cpu", "cuda"],
         help="Device: auto (GPU if available), cpu, or cuda",
     )
@@ -254,7 +295,10 @@ Hyperparameter mapping (SpinningUp → SB3):
         n_epochs = 10                  # 10 epochs × 10 minibatches = 100 steps
         batch_mode = "minibatch"
 
-    model = PPO(
+    PPOClass = SeparateVfPPO if args.separate_vf else PPO
+    extra_kwargs = {"vf_extra_iters": 80} if args.separate_vf else {}
+
+    model = PPOClass(
         "MlpPolicy",
         env,
         device=args.device,
@@ -275,12 +319,15 @@ Hyperparameter mapping (SpinningUp → SB3):
             net_arch=dict(pi=[args.hid] * args.l, vf=[args.hid] * args.l),
             activation_fn=torch.nn.Tanh,
         ),
+        **extra_kwargs,
     )
 
     total_timesteps = args.epochs * args.steps
     print(f"\n  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
     print(f"  Network: {[args.hid] * args.l}")
     print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
+    if args.separate_vf:
+        print(f"  Separate VF: 80 extra VF-only iterations per rollout")
 
     # Train
     callback = EpochLogCallback(args.epochs, args.steps)
@@ -340,6 +387,8 @@ Hyperparameter mapping (SpinningUp → SB3):
             "n_epochs": n_epochs,
             "batch_size": batch_size,
             "batch_mode": batch_mode,
+            "separate_vf": args.separate_vf,
+            "vf_extra_iters": 80 if args.separate_vf else 0,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "gae_lambda": 0.95,
