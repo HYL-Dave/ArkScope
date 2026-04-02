@@ -24,17 +24,20 @@ from stable_baselines3 import PPO
 
 from training.backtest import compute_metrics, save_artifacts, _get_git_sha
 from training.config import INDICATORS, TRAINED_MODEL_DIR
-from training.envs.stocktrading_llm import StockTradingEnv
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Backtest SB3 PPO agent with sentiment signals"
+        description="Backtest SB3 PPO/CPPO agent with sentiment/risk signals"
     )
     parser.add_argument("--data", required=True, help="Trade-period CSV")
     parser.add_argument("--model", default=None, help="Path to model_sb3.zip")
     parser.add_argument("--model-id", default=None, help="Model ID from registry (or 'latest')")
     parser.add_argument("--output-dir", default=None, help="Output directory (default: model dir)")
+    parser.add_argument(
+        "--env", choices=["sentiment", "risk"], default="sentiment",
+        help="Environment type: sentiment (PPO) or risk (CPPO)",
+    )
     parser.add_argument(
         "--sentiment-scale", default="strong", choices=["strong", "weak"],
         help="Sentiment scaling (must match training)",
@@ -111,10 +114,15 @@ def main():
         else:
             warnings.warn(f"No feature_scaler.json in {model_dir}.")
 
-    # Build environment
+    # Select environment
     K = len(INDICATORS)
     F = len(extra_cols)
-    state_dim = 1 + 2 * stock_dim + (1 + K + F) * stock_dim
+    if args.env == "risk":
+        from training.envs.stocktrading_llm_risk import StockTradingEnv
+        state_dim = 1 + 2 * stock_dim + (2 + K + F) * stock_dim
+    else:
+        from training.envs.stocktrading_llm import StockTradingEnv
+        state_dim = 1 + 2 * stock_dim + (1 + K + F) * stock_dim
 
     df["date"] = df["date"].astype(str)
     df = df.sort_values(["date", "tic"]).reset_index(drop=True)
