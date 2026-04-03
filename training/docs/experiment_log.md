@@ -792,35 +792,17 @@ override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 | 10 | **Ensemble (PPO+SAC+TD3)** | FinRL Contest 冠軍做法：3 個模型獨立訓練，Sharpe 加權多數決投票。MDD 減半。需要 ensemble backtest 工具。 | **中** |
 | 11 | **TD3 訓練腳本** | 為 ensemble 補齊第三個演算法。SB3 內建。 | 低 |
 
-### 長期（LLM+RL 升級 + 風險框架）
+### 追蹤觀望（不列入近期實作計畫）
 
-| 優先級 | 項目 | 說明 | 工作量 | 評估 |
-|--------|------|------|--------|------|
-| 12 | **LLM Strategy Guide（第二代）** | LLM 不只評分 sentiment/risk，還產出策略方向信號（如月度 bull/bear/neutral）追加到 RL state。代碼改動小（state 多 1 維），但需設計 prompt + 驗證信號品質。參考: arXiv:2508.02366，mean Sharpe 1.10 vs 0.64 for RL-only。 | **中** | **推薦評估** — 改動小、潛在收益大 |
-| 13 | **FLAG-Trader（第三代）** | LLM 本身作為 RL policy，用 PPO 微調 LLM 的交易決策。arXiv preprint（未審查，非 ACL），135M fine-tuned model 在部分資產上勝過 GPT-4 zero-shot。只測 6 個資產，134 股未驗證。 | **高** | **值得追蹤但不急** — 單資產到多資產的跨越是未知的 |
-| 14 | **WCSAC / Distributional SAC** | SAC + CVaR 約束（WCSAC）或完整回報分佈建模（DSAC）。比 CPPO 的 advantage penalty 更原則性。需自訂實現。 | **高** | **待 SAC 基準確認後** — 先確認 SAC 本身效果 |
-| 15 | **Decision Transformer** | 離線預訓練（從歷史 backtest 的 expert trajectory）→ 線上微調。GPT-2 架構 + LoRA。適合初始化模型，再用 SAC/PPO 線上學習。 | **高** | **探索性** — 需要高品質 expert 資料 |
+以下方向在 `algorithm_survey_2026.md` 中有詳細調查記錄，但經複查後認為目前不具備
+足夠的證據或實用性列入實作計畫：
 
-### 關鍵研究發現（影響優先級判斷）
-
-**演算法選擇的重要性可能有限**（2025 meta-study, 167 篇研究，arXiv:2512.10913，⚠️ 未審查 preprint）：
-
-```
-Random Forest feature importance（原文標籤）：
-  Complexity score:  0.31（≈ 實現品質）
-  環境設計相關:      0.24
-  資料品質和特徵:    0.19
-  Algorithm family:  0.08（≈ 演算法類別）
-```
-
-PG 類 vs DQN 類差異不顯著 (p=0.640)。注意：原文是 PG vs DQN，非 PPO vs SAC。
-此結論證據強度有限（未審查、proxy 指標）。
-
-實際判斷：
-- 環境和資料優化可能比換演算法更重要
-- 但 SAC 仍值得做（工作量小 + 消除 target_kl 痛點）
-- Ensemble 可改善 MDD（但 Sharpe/Return 不一定更好，見 source_verification_2026.md）
-- 第二代 LLM 策略引導的 RL 增量很小（Sharpe 1.10 vs LLM-Only 1.03）
+| 方向 | 原因 | 狀態 |
+|------|------|------|
+| LLM Strategy Guide（第二代） | RL 增量僅 Sharpe +0.07（LLM-Only 1.03 vs LLM+RL 1.10）；未審查 preprint；只測 6 支科技股 | 追蹤，待更強證據 |
+| FLAG-Trader（第三代） | 未審查 preprint（非 ACL 2025）；fine-tuned vs zero-shot 不公平比較；只測 6 資產 | 追蹤，待多資產驗證 |
+| WCSAC / DSAC | 需大量自訂實現；依賴 SAC 基礎（先確認 SAC 效果） | 待 SAC 結果後再評估 |
+| Decision Transformer | 完全不同的方向（offline RL）；需高品質 expert 資料 | 與當前 pipeline 無關 |
 
 ### 技術評估筆記
 
@@ -829,26 +811,15 @@ PG 類 vs DQN 類差異不顯著 (p=0.640)。注意：原文是 PG vs DQN，非 
 - 自動 entropy tuning: `ent_coef="auto"` → 不需手動調（PPO 需要調 target_kl）
 - 風險: 可能持股時間短（高換手 → 高交易成本），需注意 transaction cost 設定
 
-**Ensemble 的具體做法**（FinRL Contest 冠軍）：
+**Ensemble 的具體做法**（FinRL Contest, arXiv:2501.10709）：
 1. 分別訓練 PPO、SAC、TD3（同資料、同環境）
 2. 每個模型在 validation set 上計算 Sharpe
 3. 交易時每天取 3 個模型的 action，用 Sharpe 加權平均
-4. 結果: MDD 從 -10~13% 降到 -8.98%，Sharpe 穩定 1.48
+4. 實際結果: MDD -8.98% (改善) vs solo PPO -9.96%，但 Sharpe 1.48 < solo PPO 1.55
+5. Ensemble 的價值是**風險控制**（MDD），不是回報最大化
 
-**第二代 LLM Strategy Guide 的做法**（arXiv:2508.02366）：
-1. Strategist LLM: 讀市場概況 → 輸出方向性 guidance scalar [-1, 1]
-2. Analyst LLM: 讀個股新聞 → 輸出個股 sentiment（我們已有）
-3. Guidance scalar 追加到 RL state（多 1 維）
-4. RL agent 學習在不同 guidance 下調整交易幅度
-5. 結果: mean Sharpe 1.10 vs RL-only 0.64
-
-**第三代 FLAG-Trader 的現實限制**：
-- 只測過 MSFT、TSLA、BTC 等單一資產
-- 134 股 portfolio 的 action space 對 LLM policy 可能太大
-- 需要 LLM fine-tuning（LoRA）基礎設施
-- 建議先觀望更多多資產驗證結果
-
-詳見 `training/docs/algorithm_survey_2026.md`。
+> ⚠️ 所有引用數據的驗證記錄見 `source_verification_2026.md`
+> 演算法調查完整記錄見 `algorithm_survey_2026.md`
 
 ---
 
