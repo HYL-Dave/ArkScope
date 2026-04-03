@@ -26,10 +26,13 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
+
+from training.train_ppo_sb3 import SeparateVfPPO
 
 from training.config import (
     INDICATORS,
@@ -106,149 +109,141 @@ def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None):
 # ── CVaR-constrained PPO ────────────────────────────────────
 
 
-class CPPO_SB3(PPO):
-    """PPO with CVaR risk constraint, ported from SpinningUp cppo.py.
+def make_cppo_class(base_class=PPO):
+    """Factory to create CPPO class with configurable base (PPO or SeparateVfPPO)."""
 
-    After each rollout, modifies advantages in the buffer to penalize
-    trajectories with poor risk-adjusted returns.
+    class CPPO_SB3(base_class):
+        """PPO with CVaR risk constraint, ported from SpinningUp cppo.py.
 
-    The CVaR constraint uses LLM risk scores extracted from observations
-    (last stock_dim elements) to compute a portfolio risk factor.
-    """
+        After each rollout, modifies advantages in the buffer to penalize
+        trajectories with poor risk-adjusted returns.
 
-    def __init__(
-        self,
-        *args,
-        stock_dim: int,
-        risk_weights: Optional[dict] = None,
-        alpha: float = 0.85,
-        beta: float = 3000.0,
-        nu_lr: float = 5e-4,
-        lam_lr: float = 5e-4,
-        nu_start: float = 0.1,
-        lam_start: float = 0.01,
-        nu_delay: float = 0.75,
-        delay: float = 1.0,
-        cvar_clip_ratio: float = 0.05,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.stock_dim = stock_dim
-        self.risk_weights = risk_weights or SENTIMENT_SCALES["strong"]["risk_weights"]
-        self.alpha = alpha
-        self.beta = beta
-        self.nu_lr = nu_lr
-        self.lam_lr = lam_lr
-        self.nu_delay = nu_delay
-        self.delay = delay
-        self.cvar_clip_ratio = cvar_clip_ratio
-
-        # Adaptive CVaR parameters
-        self.nu = nu_start
-        self.cvarlam = lam_start
-
-        # Per-episode tracking
-        self._ep_ret = 0.0
-        self._ep_returns = []
-
-    def collect_rollouts(self, env, callback, rollout_buffer, n_rollout_steps):
-        """Override to track per-step CVaR penalties during rollout."""
-        # Reset episode tracking
-        self._ep_returns = []
-        self._step_penalties = np.zeros(n_rollout_steps, dtype=np.float32)
-        self._step_values = np.zeros(n_rollout_steps, dtype=np.float32)
-        self._ep_ret = 0.0
-        self._ep_start_idx = 0
-
-        # Update cvarlam at the start of each rollout (= epoch)
-        self.cvarlam = self.cvarlam + self.lam_lr * (self.beta - self.nu)
-
-        result = super().collect_rollouts(env, callback, rollout_buffer, n_rollout_steps)
-
-        # After collection, apply CVaR penalty to advantages in the buffer
-        self._apply_cvar_penalty(rollout_buffer)
-
-        # Update nu from episode returns
-        if self._ep_returns:
-            self.nu = np.mean(self._ep_returns) * self.nu_delay
-
-        return result
-
-    def _apply_cvar_penalty(self, rollout_buffer):
-        """Apply CVaR penalty to advantages, matching SpinningUp's cppo.py logic.
-
-        For each step, compute the risk-adjusted trajectory return.
-        If below threshold nu, penalize the advantage.
+        The CVaR constraint uses LLM risk scores extracted from observations
+        (last stock_dim elements) to compute a portfolio risk factor.
         """
-        obs = rollout_buffer.observations
-        values = rollout_buffer.values
-        rewards = rollout_buffer.rewards
-        advantages = rollout_buffer.advantages
 
-        ep_ret = 0.0
-        bad_trajectory_num = 0
-        update_num = 0
+        def __init__(
+            self,
+            *args,
+            stock_dim: int,
+            risk_weights: Optional[dict] = None,
+            alpha: float = 0.85,
+            beta: float = 3000.0,
+            nu_lr: float = 5e-4,
+            lam_lr: float = 5e-4,
+            nu_start: float = 0.1,
+            lam_start: float = 0.01,
+            nu_delay: float = 0.75,
+            delay: float = 1.0,
+            cvar_clip_ratio: float = 0.05,
+            **kwargs,
+        ):
+            super().__init__(*args, **kwargs)
+            self.stock_dim = stock_dim
+            self.risk_weights = risk_weights or SENTIMENT_SCALES["strong"]["risk_weights"]
+            self.alpha = alpha
+            self.beta = beta
+            self.nu_lr = nu_lr
+            self.lam_lr = lam_lr
+            self.nu_delay = nu_delay
+            self.delay = delay
+            self.cvar_clip_ratio = cvar_clip_ratio
 
-        for t in range(rollout_buffer.buffer_size):
-            if not rollout_buffer.episode_starts[t] and t > 0:
-                ep_ret += rewards[t].item()
-            else:
-                # New episode starts
-                ep_ret = rewards[t].item()
+            # Adaptive CVaR parameters
+            self.nu = nu_start
+            self.cvarlam = lam_start
 
-            ob = obs[t].flatten()
-            v = values[t].item()
-            r = rewards[t].item()
+            # Per-episode tracking
+            self._ep_ret = 0.0
+            self._ep_returns = []
 
-            # Extract risk scores from observation (last stock_dim elements)
-            llm_risks = ob[-self.stock_dim:]
+        def collect_rollouts(self, env, callback, rollout_buffer, n_rollout_steps):
+            """Override to track per-step CVaR penalties during rollout."""
+            # Reset episode tracking
+            self._ep_returns = []
+            self._step_penalties = np.zeros(n_rollout_steps, dtype=np.float32)
+            self._step_values = np.zeros(n_rollout_steps, dtype=np.float32)
+            self._ep_ret = 0.0
+            self._ep_start_idx = 0
 
-            # Map to weights
-            risk_weight_arr = np.array(
-                [self.risk_weights.get(int(round(rs)), 1.0) for rs in llm_risks]
-            )
+            # Update cvarlam at the start of each rollout (= epoch)
+            self.cvarlam = self.cvarlam + self.lam_lr * (self.beta - self.nu)
 
-            # Portfolio weights from observation
-            prices = ob[1:self.stock_dim + 1]
-            shares = ob[self.stock_dim + 1:self.stock_dim * 2 + 1]
-            stock_values = prices * shares
-            total_value = np.sum(stock_values)
+            result = super().collect_rollouts(env, callback, rollout_buffer, n_rollout_steps)
 
-            if total_value > 0:
-                stock_weights = stock_values / total_value
-                llm_risk_factor = np.dot(stock_weights, risk_weight_arr)
-            else:
-                llm_risk_factor = 1.0
+            # After collection, apply CVaR penalty to advantages in the buffer
+            self._apply_cvar_penalty(rollout_buffer)
 
-            adjusted_D_pi = llm_risk_factor * (ep_ret + v - r)
+            # Update nu from episode returns
+            if self._ep_returns:
+                self.nu = np.mean(self._ep_returns) * self.nu_delay
 
-            if adjusted_D_pi < self.nu:
-                bad_trajectory_num += 1
-                penalty = self.delay * self.cvarlam / (1 - self.alpha) * (self.nu - adjusted_D_pi)
-                # Clip penalty
-                if penalty > abs(v) * self.cvar_clip_ratio:
-                    penalty = abs(v) * self.cvar_clip_ratio
-                    update_num += 1
-                advantages[t] -= penalty
+            return result
 
-            # Track episode returns at episode boundaries
-            if t + 1 < rollout_buffer.buffer_size and rollout_buffer.episode_starts[t + 1]:
-                self._ep_returns.append(adjusted_D_pi)
-                ep_ret = 0.0
+        def _apply_cvar_penalty(self, rollout_buffer):
+            """Apply CVaR penalty to advantages, matching SpinningUp's cppo.py logic."""
+            obs = rollout_buffer.observations
+            values = rollout_buffer.values
+            rewards = rollout_buffer.rewards
+            advantages = rollout_buffer.advantages
 
-        # Last episode
-        if ep_ret != 0.0:
-            self._ep_returns.append(ep_ret)
+            ep_ret = 0.0
+            bad_trajectory_num = 0
+            update_num = 0
 
-        # Re-normalize advantages after modification
-        adv_mean = advantages.mean()
-        adv_std = advantages.std()
-        if adv_std > 1e-8:
-            advantages[:] = (advantages - adv_mean) / adv_std
+            for t in range(rollout_buffer.buffer_size):
+                if not rollout_buffer.episode_starts[t] and t > 0:
+                    ep_ret += rewards[t].item()
+                else:
+                    ep_ret = rewards[t].item()
 
-        if bad_trajectory_num > 0:
-            print(f"  CVaR: bad_trajectories={bad_trajectory_num}, "
-                  f"clipped={update_num}, nu={self.nu:.4f}, lam={self.cvarlam:.4f}")
+                ob = obs[t].flatten()
+                v = values[t].item()
+                r = rewards[t].item()
+
+                llm_risks = ob[-self.stock_dim:]
+                risk_weight_arr = np.array(
+                    [self.risk_weights.get(int(round(rs)), 1.0) for rs in llm_risks]
+                )
+
+                prices = ob[1:self.stock_dim + 1]
+                shares = ob[self.stock_dim + 1:self.stock_dim * 2 + 1]
+                stock_values = prices * shares
+                total_value = np.sum(stock_values)
+
+                if total_value > 0:
+                    stock_weights = stock_values / total_value
+                    llm_risk_factor = np.dot(stock_weights, risk_weight_arr)
+                else:
+                    llm_risk_factor = 1.0
+
+                adjusted_D_pi = llm_risk_factor * (ep_ret + v - r)
+
+                if adjusted_D_pi < self.nu:
+                    bad_trajectory_num += 1
+                    penalty = self.delay * self.cvarlam / (1 - self.alpha) * (self.nu - adjusted_D_pi)
+                    if penalty > abs(v) * self.cvar_clip_ratio:
+                        penalty = abs(v) * self.cvar_clip_ratio
+                        update_num += 1
+                    advantages[t] -= penalty
+
+                if t + 1 < rollout_buffer.buffer_size and rollout_buffer.episode_starts[t + 1]:
+                    self._ep_returns.append(adjusted_D_pi)
+                    ep_ret = 0.0
+
+            if ep_ret != 0.0:
+                self._ep_returns.append(ep_ret)
+
+            adv_mean = advantages.mean()
+            adv_std = advantages.std()
+            if adv_std > 1e-8:
+                advantages[:] = (advantages - adv_mean) / adv_std
+
+            if bad_trajectory_num > 0:
+                print(f"  CVaR: bad_trajectories={bad_trajectory_num}, "
+                      f"clipped={update_num}, nu={self.nu:.4f}, lam={self.cvarlam:.4f}")
+
+    return CPPO_SB3
 
 
 # ── Logging callback ────────────────────────────────────────
@@ -320,6 +315,10 @@ def main():
         "--full-batch", action="store_true",
         help="Use full-batch gradient (like SpinningUp) instead of minibatch.",
     )
+    parser.add_argument(
+        "--separate-vf", action="store_true",
+        help="Extra VF-only training after KL early stop (SpinningUp parity).",
+    )
     args = parser.parse_args()
 
     check_and_make_directories([TRAINED_MODEL_DIR])
@@ -357,7 +356,11 @@ def main():
 
     scale = SENTIMENT_SCALES[args.sentiment_scale]
 
-    model = CPPO_SB3(
+    base_class = SeparateVfPPO if args.separate_vf else PPO
+    CPPO_Class = make_cppo_class(base_class)
+    extra_kwargs = {"vf_extra_iters": 80} if args.separate_vf else {}
+
+    model = CPPO_Class(
         "MlpPolicy",
         env,
         device=args.device,
@@ -383,11 +386,14 @@ def main():
         risk_weights=scale["risk_weights"],
         alpha=args.alpha,
         beta=args.beta,
+        **extra_kwargs,
     )
 
     total_timesteps = args.epochs * args.steps
     print(f"  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
     print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
+    if args.separate_vf:
+        print(f"  Separate VF: 80 extra VF-only iterations per rollout")
     print(f"  CVaR: alpha={args.alpha}, beta={args.beta}")
 
     callback = EpochLogCallback(args.epochs)
@@ -443,6 +449,8 @@ def main():
             "n_epochs": n_epochs,
             "batch_size": batch_size,
             "batch_mode": batch_mode,
+            "separate_vf": args.separate_vf,
+            "vf_extra_iters": 80 if args.separate_vf else 0,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "alpha": args.alpha,
