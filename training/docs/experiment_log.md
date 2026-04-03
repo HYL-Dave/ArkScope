@@ -632,7 +632,41 @@ Model IDs:
 實測發現：CPU full-batch 下 PyTorch 自動用 OpenMP 多核做矩陣運算，2 個實驗就佔滿 24 cores。
 切換 `--device cuda` 後每個實驗只佔 1 core（NN 計算在 GPU），RTX 4090 VRAM 足夠容納 200+ 模型。
 
-**建議配置**：`--full-batch --device cuda` — 兼顧訓練品質和最大並行數。
+### SB3 基準驗證 — 第四次（full-batch + separate-vf，更差）
+
+| 指標 | SB3 PPO v3 (full-batch) | SB3 PPO v4 (+separate-vf) | SB3 CPPO v3 (full-batch) | SB3 CPPO v4 (+separate-vf) |
+|------|------------------------|--------------------------|------------------------|--------------------------|
+| Sharpe | **0.79** | 0.63 | **0.93** | 0.73 |
+| Return | +149.6% | +105.2% | **+218.8%** | +144.5% |
+| MDD | -32.3% | -35.1% | -38.8% | -41.8% |
+
+Model IDs:
+- PPO v4: `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T023807Z_e7521d`
+- CPPO v4: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T055415Z_e7521d`
+
+**`--separate-vf` 反而有害**。原因：SB3 用共用 Adam optimizer，額外的 VF-only
+backward 汙染了共用的 Adam momentum/adaptive lr states。SpinningUp 用獨立
+optimizer 才能受益於分離更新。
+
+### SB3 最佳配置結論
+
+**`--full-batch --device cuda`** — 兼顧訓練品質和最大並行數。
+
+| 配置 | PPO Sharpe | CPPO Sharpe | 狀態 |
+|------|-----------|-------------|------|
+| v1 vf_coef=0.5 minibatch | 0.73 | — | 已作廢 |
+| v2 vf_coef=3.33 minibatch | 0.68 | 0.80 | ← vf_coef 修正有效 |
+| **v3 full-batch** | **0.79** | **0.93** | **← 最佳** |
+| v4 full-batch+separate-vf | 0.63 | 0.73 | ← 有害，共用 optimizer 問題 |
+| SpinningUp (參考) | 1.03 | — | 獨立 optimizer，不可直接比較 |
+
+SB3 CPPO full-batch (Sharpe 0.93) 接近 SpinningUp PPO (1.03)。
+剩餘 gap 來自共用 optimizer 的結構性限制，SB3 框架內無法完全消除。
+
+並行資源分配（400GB RAM，24 cores，4× RTX 4090）：
+- 每個實驗 ~35-40GB RAM → 最多 **9-10 個**同時訓練
+- `--device cuda:N` 分散到 4 張 GPU → 每張 2-3 個
+- 建議配置：**8 個並行**（安全邊際），分到 cuda:0~3 各 2 個
 
 ### 待辦：多 seed 驗證（SB3 確認後）
 
