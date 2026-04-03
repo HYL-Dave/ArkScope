@@ -20,7 +20,7 @@ import argparse
 import warnings
 
 import pandas as pd
-from stable_baselines3 import PPO, SAC
+from stable_baselines3 import PPO, SAC, TD3
 
 from training.backtest import compute_metrics, save_artifacts, _get_git_sha
 from training.config import INDICATORS, TRAINED_MODEL_DIR
@@ -159,6 +159,8 @@ def main():
 
     if "sac" in algo:
         model = SAC.load(args.model, device=args.device)
+    elif "td3" in algo:
+        model = TD3.load(args.model, device=args.device)
     else:
         model = PPO.load(args.model, device=args.device)
 

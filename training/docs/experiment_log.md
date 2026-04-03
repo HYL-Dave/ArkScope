@@ -776,22 +776,22 @@ override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 
 | 優先級 | 項目 | 狀態 | 預估工作量 |
 |--------|------|------|-----------|
-| 1 | ~~SB3 PPO 基準驗證~~ | ✅ 最佳: --full-batch --target-kl 0.05 | 完成 |
-| 2 | SB3 CPPO full-batch + kl=0.05 | 訓練中 | 等待結果 |
+| 1 | ~~SB3 PPO 基準驗證~~ | ✅ 最佳: --full-batch --target-kl 0.05 (Sharpe 0.90) | 完成 |
+| 2 | ~~SB3 CPPO full-batch + kl=0.05~~ | ✅ Sharpe 0.98, Return +271% | 完成 |
 | 3 | Title-only nano 評分 | 評分中 | 等待完成 |
 | 4 | 評分合併工具 | 待 #3 | 開發 ~1h |
 | 5 | G5 補齊版 train/backtest | 待 #4 | 1 個實驗 |
-| 6 | 多 seed 驗證 (G5/G4/G2 × 5 seeds) | 待最佳配置確定 | 8 個並行 |
+| 6 | 多 seed 驗證 (G5/G4/G2 × 5 seeds) | 待 SAC 結果後一起排 | 8 個並行 |
 | 7 | 評分資料開源 HuggingFace | 待結果穩定 | 打包 ~2h |
 
 ### 中期（新演算法 + Ensemble）
 
-| 優先級 | 項目 | 說明 | 工作量 |
+| 優先級 | 項目 | 狀態 | 工作量 |
 |--------|------|------|--------|
-| 8 | **SAC 訓練腳本** | SB3 內建 SAC，off-policy + 自動 entropy。不需調 target_kl，134 維連續 action 探索更好。從 train_ppo_sb3.py 改動少。 | **低** |
-| 9 | **SAC 基準實驗** | G5 資料跑 SAC，跟 PPO/CPPO 對比 Sharpe、MDD、訓練時間 | 幾個實驗 |
-| 10 | **Ensemble (PPO+SAC+TD3)** | FinRL Contest 冠軍做法：3 個模型獨立訓練，Sharpe 加權多數決投票。MDD 減半。需要 ensemble backtest 工具。 | **中** |
-| 11 | **TD3 訓練腳本** | 為 ensemble 補齊第三個演算法。SB3 內建。 | 低 |
+| 8 | ~~SAC 訓練腳本~~ | ✅ `train_sac_sb3.py` 完成 | 完成 |
+| 9 | **SAC 基準實驗** | 訓練中（G5 資料） | 等待結果 |
+| 10 | ~~TD3 訓練腳本~~ | ✅ `train_td3_sb3.py` 完成 | 完成 |
+| 11 | **Ensemble backtest 工具** | 待 SAC+TD3 結果 | 中 |
 
 ### 追蹤觀望（不列入近期實作計畫）
 
