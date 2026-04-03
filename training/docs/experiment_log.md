@@ -681,7 +681,7 @@ Model IDs:
 | v2 vf_coef=3.33 minibatch | 0.68 | 0.80 | vf_coef 修正 |
 | v3 full-batch kl=0.35 | 0.79 | 0.93 | full-batch |
 | v4 full-batch+separate-vf | 0.63 | 0.73 | 有害，已移除 |
-| **v5 full-batch kl=0.05** | **0.90** | **(待測)** | **KL 公式差異修正** |
+| **v5 full-batch kl=0.05** | **0.90** | **0.98** | **KL 公式差異修正** |
 | SpinningUp (參考) | 1.03 | — | 獨立 optimizer |
 
 **已確認的 gap 來源**（按影響大小排序）：
@@ -692,7 +692,8 @@ Model IDs:
 剩餘 Sharpe gap 0.13 和 MDD gap（-39.8% vs -22.7%）來自共用 Adam optimizer。
 SpinningUp 的獨立 pi/vf Adam 讓兩者有各自最佳的 momentum states。
 
-**待測**：SB3 CPPO full-batch + target_kl=0.05（預期會超過之前 CPPO 的 0.93）。
+**已測**：SB3 CPPO full-batch + target_kl=0.05 → **Sharpe 0.98, Return +271%**（超過 v3 的 0.93）。
+Model ID: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T160516Z_e7521d`
 
 並行資源分配（400GB RAM，24 cores，4× RTX 4090）：
 - 每個實驗 ~35-40GB RAM → 最多 **9-10 個**同時訓練
@@ -765,7 +766,7 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 支援 `--full-batch`, `--target-kl`, `--device cuda:N`。
 
-待測：CPPO + full-batch + target_kl=0.05（預期超過之前 CPPO 的 Sharpe 0.93）。
+✅ 已測：CPPO full-batch + target_kl=0.05 → Sharpe 0.98, Return +271%。
 
 ---
 
