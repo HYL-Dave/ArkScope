@@ -20,7 +20,7 @@ import argparse
 import warnings
 
 import pandas as pd
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 
 from training.backtest import compute_metrics, save_artifacts, _get_git_sha
 from training.config import INDICATORS, TRAINED_MODEL_DIR
@@ -150,7 +150,17 @@ def main():
     )
 
     # Load SB3 model
-    model = PPO.load(args.model, device=args.device)
+    # Auto-detect model type from registry or model_id naming
+    algo = "ppo"
+    if meta and meta.algorithm:
+        algo = meta.algorithm.lower()
+    elif "sac" in derived_model_id.lower():
+        algo = "sac"
+
+    if "sac" in algo:
+        model = SAC.load(args.model, device=args.device)
+    else:
+        model = PPO.load(args.model, device=args.device)
 
     print(f"\n  Backtesting: {derived_model_id}")
     print(f"  Data: {args.data} ({stock_dim} stocks, {len(unique_dates)} days)")
