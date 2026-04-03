@@ -648,20 +648,51 @@ Model IDs:
 backward 汙染了共用的 Adam momentum/adaptive lr states。SpinningUp 用獨立
 optimizer 才能受益於分離更新。
 
+### SB3 基準驗證 — 第五次（target_kl 修正，根因確認）
+
+**根因發現**：SB3 和 SpinningUp 使用不同的 KL 散度近似公式。
+SpinningUp 用一階近似（值大 2-4x），SB3 用二階近似（值小 2-4x）。
+同一個 `target_kl=0.35` 在 SB3 下永遠不觸發 early stop（KL ~0.11 << 閾值 0.525）。
+詳見 `training/docs/sb3_kl_divergence_analysis.md`。
+
+| 配置 | target_kl | Sharpe | Return | MDD |
+|------|-----------|--------|--------|-----|
+| v3 (full-batch, kl=0.35) | 0.35 | 0.79 | +149.6% | -32.3% |
+| **v5 (full-batch, kl=0.05)** | **0.05** | **0.90** | **+220.0%** | -39.8% |
+| v6 (full-batch, kl=0.08) | 0.08 | 0.75 | +151.9% | -34.7% |
+| SpinningUp | 0.35 | **1.03** | +207.0% | **-22.7%** |
+
+Model IDs:
+- v5 (kl=0.05): `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T104333Z_e7521d`
+- v6 (kl=0.08): `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T104418Z_e7521d`
+
+**分析**：
+- target_kl=0.05: Sharpe 0.79→**0.90**（最大改善），Return 甚至超過 SpinningUp
+- target_kl=0.08: 反而更差（0.75），太接近自然 KL 水平（~0.11）導致過早停止
+- **0.05 是 SB3 的甜蜜點**，讓 early stop 在合適的時機觸發
+
 ### SB3 最佳配置結論
 
-**`--full-batch --device cuda`** — 兼顧訓練品質和最大並行數。
+**`--full-batch --target-kl 0.05 --device cuda`**
 
-| 配置 | PPO Sharpe | CPPO Sharpe | 狀態 |
-|------|-----------|-------------|------|
-| v1 vf_coef=0.5 minibatch | 0.73 | — | 已作廢 |
-| v2 vf_coef=3.33 minibatch | 0.68 | 0.80 | ← vf_coef 修正有效 |
-| **v3 full-batch** | **0.79** | **0.93** | **← 最佳** |
-| v4 full-batch+separate-vf | 0.63 | 0.73 | ← 有害，共用 optimizer 問題 |
-| SpinningUp (參考) | 1.03 | — | 獨立 optimizer，不可直接比較 |
+| 配置 | PPO Sharpe | CPPO Sharpe | 關鍵改動 |
+|------|-----------|-------------|---------|
+| v1 vf_coef=0.5 minibatch | 0.73 | — | 初始版本 |
+| v2 vf_coef=3.33 minibatch | 0.68 | 0.80 | vf_coef 修正 |
+| v3 full-batch kl=0.35 | 0.79 | 0.93 | full-batch |
+| v4 full-batch+separate-vf | 0.63 | 0.73 | 有害，已移除 |
+| **v5 full-batch kl=0.05** | **0.90** | **(待測)** | **KL 公式差異修正** |
+| SpinningUp (參考) | 1.03 | — | 獨立 optimizer |
 
-SB3 CPPO full-batch (Sharpe 0.93) 接近 SpinningUp PPO (1.03)。
-剩餘 gap 來自共用 optimizer 的結構性限制，SB3 框架內無法完全消除。
+**已確認的 gap 來源**（按影響大小排序）：
+1. **KL 散度公式差異**（Sharpe +0.11）：已透過 target_kl=0.05 修正
+2. **Full-batch vs minibatch**（Sharpe +0.11）：已透過 --full-batch 修正
+3. **共用 optimizer**（Sharpe ~0.13 gap 殘留）：SB3 結構性限制，無法完全消除
+
+剩餘 Sharpe gap 0.13 和 MDD gap（-39.8% vs -22.7%）來自共用 Adam optimizer。
+SpinningUp 的獨立 pi/vf Adam 讓兩者有各自最佳的 momentum states。
+
+**待測**：SB3 CPPO full-batch + target_kl=0.05（預期會超過之前 CPPO 的 0.93）。
 
 並行資源分配（400GB RAM，24 cores，4× RTX 4090）：
 - 每個實驗 ~35-40GB RAM → 最多 **9-10 個**同時訓練
@@ -728,21 +759,13 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 
 ---
 
-## 系列 E：SB3 CPPO（待開發）
+## 系列 E：SB3 CPPO ✅ 已開發
 
-### 前置條件
+`train_cppo_sb3.py` 已完成。使用 `make_cppo_class()` factory 繼承 PPO，
+override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
+支援 `--full-batch`, `--target-kl`, `--device cuda:N`。
 
-1. 系列 C 的 SB3 PPO 基準驗證通過
-2. 確認 SB3 的結果跟 SpinningUp comparable
-
-### 開發計畫
-
-繼承 SB3 PPO 加入 CVaR 約束。核心改動：
-- `train()` method 裡的 advantage 計算加入 CVaR penalty
-- 自適應 ν（門檻）和 λ_cvar（懲罰強度）
-- LLM 風險分數的 portfolio risk factor 計算
-
-估計 200-300 行代碼。完成後可以用 SB3 的並行優勢大規模測試 CPPO。
+待測：CPPO + full-batch + target_kl=0.05（預期超過之前 CPPO 的 Sharpe 0.93）。
 
 ---
 
@@ -750,12 +773,12 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 
 | 優先級 | 項目 | 前置條件 | 預估工作量 |
 |--------|------|---------|-----------|
-| 1 | SB3 PPO 基準驗證 | 無 | 1 個實驗 (~18h) |
-| 2 | Title-only nano 評分完成 | 評分跑完 | 等待中 |
-| 3 | 評分合併工具 | #2 完成 | 開發 ~1h |
-| 4 | G5 補齊版 train/backtest | #3 完成 | 1 個實驗 |
-| 5 | SB3 多 seed 驗證 (G5/G4/G2 × 5 seeds) | #1 通過 | 15 個並行 ~18h |
-| 6 | SB3 CPPO 開發 | #1 通過 | 開發 ~3h |
+| 1 | ~~SB3 PPO 基準驗證~~ | ~~無~~ | ✅ 完成，最佳: --full-batch --target-kl 0.05 |
+| 2 | SB3 CPPO full-batch + kl=0.05 | 無 | 1 個實驗 |
+| 3 | Title-only nano 評分完成 | 評分跑完 | 等待中 |
+| 4 | 評分合併工具 | #3 完成 | 開發 ~1h |
+| 5 | G5 補齊版 train/backtest | #4 完成 | 1 個實驗 |
+| 6 | SB3 多 seed 驗證 (G5/G4/G2 × 5 seeds) | 最佳配置確定 | 8 個並行 |
 | 7 | 評分資料開源 HuggingFace | 結果穩定後 | 打包 ~2h |
 
 ---
@@ -771,4 +794,4 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 
 ---
 
-*最後更新: 2026-04-02*
+*最後更新: 2026-04-03*
