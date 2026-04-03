@@ -26,13 +26,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
-
-from training.train_ppo_sb3 import SeparateVfPPO
 
 from training.config import (
     INDICATORS,
@@ -315,10 +312,6 @@ def main():
         "--full-batch", action="store_true",
         help="Use full-batch gradient (like SpinningUp) instead of minibatch.",
     )
-    parser.add_argument(
-        "--separate-vf", action="store_true",
-        help="Extra VF-only training after KL early stop (SpinningUp parity).",
-    )
     args = parser.parse_args()
 
     check_and_make_directories([TRAINED_MODEL_DIR])
@@ -356,9 +349,7 @@ def main():
 
     scale = SENTIMENT_SCALES[args.sentiment_scale]
 
-    base_class = SeparateVfPPO if args.separate_vf else PPO
-    CPPO_Class = make_cppo_class(base_class)
-    extra_kwargs = {"vf_extra_iters": 80} if args.separate_vf else {}
+    CPPO_Class = make_cppo_class(PPO)
 
     model = CPPO_Class(
         "MlpPolicy",
@@ -386,14 +377,11 @@ def main():
         risk_weights=scale["risk_weights"],
         alpha=args.alpha,
         beta=args.beta,
-        **extra_kwargs,
     )
 
     total_timesteps = args.epochs * args.steps
     print(f"  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
     print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
-    if args.separate_vf:
-        print(f"  Separate VF: 80 extra VF-only iterations per rollout")
     print(f"  CVaR: alpha={args.alpha}, beta={args.beta}")
 
     callback = EpochLogCallback(args.epochs)
@@ -449,8 +437,6 @@ def main():
             "n_epochs": n_epochs,
             "batch_size": batch_size,
             "batch_mode": batch_mode,
-            "separate_vf": args.separate_vf,
-            "vf_extra_iters": 80 if args.separate_vf else 0,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "alpha": args.alpha,

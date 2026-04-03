@@ -217,11 +217,6 @@ Hyperparameter mapping (SpinningUp → SB3):
              "Sets batch_size=n_steps, n_epochs=100.",
     )
     parser.add_argument(
-        "--separate-vf", action="store_true",
-        help="Extra VF-only training after KL early stop (SpinningUp parity). "
-             "Adds 80 VF-only passes per rollout, matching SpinningUp's train_v_iters.",
-    )
-    parser.add_argument(
         "--device", default="auto",
         help="Device: auto, cpu, cuda, cuda:0, cuda:1, etc.",
     )
@@ -296,10 +291,7 @@ Hyperparameter mapping (SpinningUp → SB3):
         n_epochs = 10                  # 10 epochs × 10 minibatches = 100 steps
         batch_mode = "minibatch"
 
-    PPOClass = SeparateVfPPO if args.separate_vf else PPO
-    extra_kwargs = {"vf_extra_iters": 80} if args.separate_vf else {}
-
-    model = PPOClass(
+    model = PPO(
         "MlpPolicy",
         env,
         device=args.device,
@@ -320,15 +312,12 @@ Hyperparameter mapping (SpinningUp → SB3):
             net_arch=dict(pi=[args.hid] * args.l, vf=[args.hid] * args.l),
             activation_fn=torch.nn.Tanh,
         ),
-        **extra_kwargs,
     )
 
     total_timesteps = args.epochs * args.steps
     print(f"\n  Training: {args.epochs} epochs × {args.steps} steps = {total_timesteps} total")
     print(f"  Network: {[args.hid] * args.l}")
     print(f"  Batch mode: {batch_mode} (batch_size={batch_size}, n_epochs={n_epochs})")
-    if args.separate_vf:
-        print(f"  Separate VF: 80 extra VF-only iterations per rollout")
 
     # Train
     callback = EpochLogCallback(args.epochs, args.steps)
@@ -388,8 +377,6 @@ Hyperparameter mapping (SpinningUp → SB3):
             "n_epochs": n_epochs,
             "batch_size": batch_size,
             "batch_mode": batch_mode,
-            "separate_vf": args.separate_vf,
-            "vf_extra_iters": 80 if args.separate_vf else 0,
             "clip_range": 0.7,
             "target_kl": 0.35,
             "gae_lambda": 0.95,
