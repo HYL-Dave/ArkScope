@@ -212,6 +212,13 @@ Hyperparameter mapping (SpinningUp → SB3):
     parser.add_argument("--gamma", type=float, default=0.995)
     parser.add_argument("--lr", type=float, default=3e-5, help="Learning rate")
     parser.add_argument(
+        "--target-kl", type=float, default=0.35,
+        help="KL divergence target for early stopping. NOTE: SB3 uses a different KL "
+             "formula than SpinningUp (more conservative estimate), so the same value "
+             "produces very different behavior. SpinningUp 0.35 ≈ SB3 0.05. "
+             "See training/docs/sb3_kl_divergence_analysis.md for details.",
+    )
+    parser.add_argument(
         "--full-batch", action="store_true",
         help="Use full-batch gradient (like SpinningUp) instead of minibatch. "
              "Sets batch_size=n_steps, n_epochs=100.",
@@ -302,7 +309,7 @@ Hyperparameter mapping (SpinningUp → SB3):
         gamma=args.gamma,
         gae_lambda=0.95,
         clip_range=0.7,
-        target_kl=0.35,
+        target_kl=args.target_kl,
         vf_coef=vf_coef,         # ≈3.33: compensate shared lr for value function
         ent_coef=0.0,
         max_grad_norm=float("inf"),  # no gradient clipping (match SpinningUp)
@@ -378,7 +385,7 @@ Hyperparameter mapping (SpinningUp → SB3):
             "batch_size": batch_size,
             "batch_mode": batch_mode,
             "clip_range": 0.7,
-            "target_kl": 0.35,
+            "target_kl": args.target_kl,
             "gae_lambda": 0.95,
             "max_grad_norm": "inf",
             "device": device_name,

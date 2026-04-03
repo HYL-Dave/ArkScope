@@ -309,6 +309,11 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.85, help="CVaR confidence level")
     parser.add_argument("--beta", type=float, default=3000.0, help="CVaR constraint bound")
     parser.add_argument(
+        "--target-kl", type=float, default=0.35,
+        help="KL target for early stopping. SB3 KL formula gives smaller values "
+             "than SpinningUp; SpinningUp 0.35 ≈ SB3 0.05.",
+    )
+    parser.add_argument(
         "--full-batch", action="store_true",
         help="Use full-batch gradient (like SpinningUp) instead of minibatch.",
     )
@@ -362,7 +367,7 @@ def main():
         gamma=args.gamma,
         gae_lambda=0.95,
         clip_range=0.7,
-        target_kl=0.35,
+        target_kl=args.target_kl,
         vf_coef=vf_coef,
         ent_coef=0.0,
         max_grad_norm=float("inf"),
@@ -438,7 +443,7 @@ def main():
             "batch_size": batch_size,
             "batch_mode": batch_mode,
             "clip_range": 0.7,
-            "target_kl": 0.35,
+            "target_kl": args.target_kl,
             "alpha": args.alpha,
             "beta": args.beta,
             "sentiment_scale": args.sentiment_scale,
