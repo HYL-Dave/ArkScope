@@ -59,7 +59,7 @@ FinRL Contest 2023-2024 冠軍方案：
 |------|------|------|-----------|
 | **第一代** | LLM 評分 → RL state | FinRL-DeepSeek（我們） | ← 目前 |
 | **第二代** | LLM 策略引導 → RL 執行 | Language Model Guided RL (2025) | 可升級 |
-| **第三代** | LLM 本身就是 policy | FLAG-Trader (ACL 2025) | 需大量投資 |
+| **第三代** | LLM 本身就是 policy | FLAG-Trader (arXiv preprint, 未審查) | 需大量投資 |
 
 第二代最實用：LLM 不只評 sentiment，還產出月度策略方向信號，追加到 RL state。
 代碼改動小（state 多一個維度），但需要額外的 prompt 設計。
@@ -74,24 +74,43 @@ FinRL Contest 2023-2024 冠軍方案：
 | 4 | **WCSAC / DSAC** | 原則性風險管理取代 CPPO | 高（自訂實現） |
 | 5 | **Decision Transformer** | 離線預訓練 → 線上微調 | 高 |
 
-## 重要發現：演算法選擇的重要性有限
+## 參考發現：演算法選擇的重要性
 
-2024 年 meta-study（167 篇 RL 交易研究）：
+> ⚠️ 以下數據已驗證，部分有偏差。詳見 `source_verification_2026.md`。
+
+2025 meta-study（167 篇 RL 交易研究，arXiv:2512.10913，**未經 peer review**）：
 
 ```
-Feature importance for trading performance:
-  實現品質 (implementation complexity): 0.31
-  環境設計 (reward shaping, state design): 0.24
-  資料品質和特徵: 0.19
-  演算法選擇: 0.08  ← 最低
+Random Forest feature importance（原文標籤）：
+  Complexity score:  0.31（≈ 實現品質/複雜度）
+  環境設計相關:      0.24
+  資料品質和特徵:    0.19
+  Algorithm family:  0.08（≈ 演算法類別選擇）
 ```
 
-**PPO vs SAC 的差異在統計上不顯著 (p=0.640)**。
+**Policy Gradient 類 vs DQN 類差異不顯著 (p=0.640)**。
+~~注意~~：原始比較是 PG（含 PPO/A2C 等）vs DQN，不是 PPO vs SAC 的直接比較。
 
-這意味著：優化環境設計（reward function、state representation、LLM 信號品質）
-比換演算法更有效。但 SAC 仍值得做，因為工作量小且消除了 target_kl 調校的痛點。
+此結論來自未審查 preprint，feature importance 基於 meta-data proxy 指標而非直接 A/B 實驗。
+方向可能正確但數字精確度有限。
+
+### LLM+RL 演進的補充說明
+
+| 世代 | 代表 | 驗證狀態 |
+|------|------|---------|
+| 第一代 | FinRL-DeepSeek | 我們的上游，已驗證 |
+| 第二代 | Language Model Guided RL (arXiv:2508.02366) | 數字正確。但 LLM-Only baseline 也達 Sharpe 1.03（RL 增量僅 0.07）。只測 6 支科技股。未審查 preprint。 |
+| 第三代 | FLAG-Trader (arXiv:2502.11433) | **非 ACL 2025**，是未審查 preprint。135M fine-tuned model vs GPT-4 zero-shot 不完全公平。只測 6 個資產。 |
+
+### Ensemble 的補充說明
+
+FinRL Contest Ensemble (arXiv:2501.10709) 數字正確，但：
+- **Solo PPO 表現其實更好**：Return 63.37% vs Ensemble 62.60%，Sharpe 1.55 vs 1.48
+- Ensemble 的優勢**僅在 MDD**：-8.98% vs PPO -9.96%
+- Ensemble 的價值是**風險控制**，不是回報最大化
 
 ---
 
 *調查日期: 2026-04-03*
-*參考: 見 sb3_kl_divergence_analysis.md 的參考列表 + agent survey 原始來源*
+*來源驗證: 見 `source_verification_2026.md`*
+*原始來源: arXiv:2512.10913, arXiv:2501.10709, arXiv:2508.02366, arXiv:2502.11433, arXiv:2504.02281, arXiv:2501.04421*

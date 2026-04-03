@@ -797,27 +797,30 @@ override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 | 優先級 | 項目 | 說明 | 工作量 | 評估 |
 |--------|------|------|--------|------|
 | 12 | **LLM Strategy Guide（第二代）** | LLM 不只評分 sentiment/risk，還產出策略方向信號（如月度 bull/bear/neutral）追加到 RL state。代碼改動小（state 多 1 維），但需設計 prompt + 驗證信號品質。參考: arXiv:2508.02366，mean Sharpe 1.10 vs 0.64 for RL-only。 | **中** | **推薦評估** — 改動小、潛在收益大 |
-| 13 | **FLAG-Trader（第三代）** | LLM 本身作為 RL policy，用 PPO 微調 LLM 的交易決策。ACL 2025，135M 模型超越 GPT-4 Sharpe。但只測過單一資產，134 股 portfolio 未驗證。需要 LLM fine-tuning 基礎設施。 | **高** | **值得追蹤但不急** — 單資產到多資產的跨越是未知的 |
+| 13 | **FLAG-Trader（第三代）** | LLM 本身作為 RL policy，用 PPO 微調 LLM 的交易決策。arXiv preprint（未審查，非 ACL），135M fine-tuned model 在部分資產上勝過 GPT-4 zero-shot。只測 6 個資產，134 股未驗證。 | **高** | **值得追蹤但不急** — 單資產到多資產的跨越是未知的 |
 | 14 | **WCSAC / Distributional SAC** | SAC + CVaR 約束（WCSAC）或完整回報分佈建模（DSAC）。比 CPPO 的 advantage penalty 更原則性。需自訂實現。 | **高** | **待 SAC 基準確認後** — 先確認 SAC 本身效果 |
 | 15 | **Decision Transformer** | 離線預訓練（從歷史 backtest 的 expert trajectory）→ 線上微調。GPT-2 架構 + LoRA。適合初始化模型，再用 SAC/PPO 線上學習。 | **高** | **探索性** — 需要高品質 expert 資料 |
 
 ### 關鍵研究發現（影響優先級判斷）
 
-**演算法選擇的重要性有限**（2024 meta-study, 167 篇研究）：
+**演算法選擇的重要性可能有限**（2025 meta-study, 167 篇研究，arXiv:2512.10913，⚠️ 未審查 preprint）：
 
 ```
-影響交易績效的因素重要性：
-  實現品質 (implementation complexity): 0.31
-  環境設計 (reward shaping, state):    0.24
-  資料品質和特徵:                      0.19
-  演算法選擇:                          0.08  ← 最低
+Random Forest feature importance（原文標籤）：
+  Complexity score:  0.31（≈ 實現品質）
+  環境設計相關:      0.24
+  資料品質和特徵:    0.19
+  Algorithm family:  0.08（≈ 演算法類別）
 ```
 
-PPO vs SAC 差異統計不顯著 (p=0.640)。這意味著：
-- **優化環境和資料** > 換演算法
+PG 類 vs DQN 類差異不顯著 (p=0.640)。注意：原文是 PG vs DQN，非 PPO vs SAC。
+此結論證據強度有限（未審查、proxy 指標）。
+
+實際判斷：
+- 環境和資料優化可能比換演算法更重要
 - 但 SAC 仍值得做（工作量小 + 消除 target_kl 痛點）
-- Ensemble 是 proven 的穩定性提升方案
-- 第二代 LLM 策略引導可能比換演算法效果更大
+- Ensemble 可改善 MDD（但 Sharpe/Return 不一定更好，見 source_verification_2026.md）
+- 第二代 LLM 策略引導的 RL 增量很小（Sharpe 1.10 vs LLM-Only 1.03）
 
 ### 技術評估筆記
 
