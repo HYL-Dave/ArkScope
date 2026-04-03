@@ -47,8 +47,8 @@ def main():
         help="Override derived features (default: auto-detect from metadata).",
     )
     parser.add_argument(
-        "--device", default="auto", choices=["auto", "cpu", "cuda"],
-        help="Device for inference",
+        "--device", default="auto",
+        help="Device: auto, cpu, cuda, cuda:0, cuda:1, etc.",
     )
     args = parser.parse_args()
 

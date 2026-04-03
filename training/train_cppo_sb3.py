@@ -304,7 +304,8 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.995)
     parser.add_argument("--lr", type=float, default=3e-5, help="Policy learning rate")
     parser.add_argument(
-        "--device", default="cpu", choices=["auto", "cpu", "cuda"],
+        "--device", default="cpu",
+        help="Device: auto, cpu, cuda, cuda:0, cuda:1, etc.",
     )
     parser.add_argument(
         "--sentiment-scale", default="strong", choices=["strong", "weak"],

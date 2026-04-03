@@ -222,8 +222,8 @@ Hyperparameter mapping (SpinningUp → SB3):
              "Adds 80 VF-only passes per rollout, matching SpinningUp's train_v_iters.",
     )
     parser.add_argument(
-        "--device", default="auto", choices=["auto", "cpu", "cuda"],
-        help="Device: auto (GPU if available), cpu, or cuda",
+        "--device", default="auto",
+        help="Device: auto, cpu, cuda, cuda:0, cuda:1, etc.",
     )
     parser.add_argument(
         "--sentiment-scale", default="strong", choices=["strong", "weak"],
@@ -247,8 +247,9 @@ Hyperparameter mapping (SpinningUp → SB3):
     else:
         device_name = args.device
     print(f"\n  Device: {device_name}")
-    if device_name == "cuda":
-        print(f"  GPU: {torch.cuda.get_device_name(0)}")
+    if device_name.startswith("cuda"):
+        gpu_idx = int(device_name.split(":")[-1]) if ":" in device_name else 0
+        print(f"  GPU: {torch.cuda.get_device_name(gpu_idx)}")
 
     # Load data
     train = load_data(args.data)
