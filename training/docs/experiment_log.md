@@ -644,9 +644,10 @@ Model IDs:
 - PPO v4: `ppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T023807Z_e7521d`
 - CPPO v4: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T055415Z_e7521d`
 
-**`--separate-vf` 反而有害**。原因：SB3 用共用 Adam optimizer，額外的 VF-only
-backward 汙染了共用的 Adam momentum/adaptive lr states。SpinningUp 用獨立
-optimizer 才能受益於分離更新。
+**`--separate-vf` 反而有害**。原因可能是額外的 VF-only backward 改變了 vf 參數的
+Adam momentum states，使後續 combined loss 的 update 方向偏移。
+（注意：Adam 的 per-parameter states 在同一 optimizer 中不會跨參數干擾，
+但額外的 update 步驟本身改變了優化軌跡。）
 
 ### SB3 基準驗證 — 第五次（target_kl 修正，根因確認）
 
@@ -687,10 +688,16 @@ Model IDs:
 **已確認的 gap 來源**（按影響大小排序）：
 1. **KL 散度公式差異**（Sharpe +0.11）：已透過 target_kl=0.05 修正
 2. **Full-batch vs minibatch**（Sharpe +0.11）：已透過 --full-batch 修正
-3. **共用 optimizer**（Sharpe ~0.13 gap 殘留）：SB3 結構性限制，無法完全消除
+3. **剩餘 gap 原因未確定**（Sharpe ~0.13, MDD ~17%）：見下方分析
 
-剩餘 Sharpe gap 0.13 和 MDD gap（-39.8% vs -22.7%）來自共用 Adam optimizer。
-SpinningUp 的獨立 pi/vf Adam 讓兩者有各自最佳的 momentum states。
+~~之前歸因為「共用 Adam optimizer 限制」，但經分析 Adam 的 per-parameter states
+不會互相影響（每個 weight 有獨立的 m 和 v），且 vf_coef 的梯度縮放在 Adam 下
+會被約掉（尺度不變性）。此歸因已撤回。~~
+
+剩餘 gap 的可能來源（未驗證）：
+- MPI advantage normalization（8 worker 的跨軌跡統計 vs 單進程）
+- Seed 隨機性（系列 A 顯示單一 seed 不可靠）
+- Update 順序（SpinningUp 先完成所有 pi 更新再做 vf，SB3 每步同時更新）
 
 **已測**：SB3 CPPO full-batch + target_kl=0.05 → **Sharpe 0.98, Return +271%**（超過 v3 的 0.93）。
 Model ID: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T160516Z_e7521d`
@@ -812,7 +819,7 @@ Model IDs:
 - CPPO > PPO > TD3 ≈ SAC（Sharpe 排序）
 - SAC/TD3 沒有比 PPO 好，但這是單一 seed 結果
 - SAC 的 CVaR 最好（-3.6%），表現出 off-policy 的風險控制特性
-- SpinningUp 的 MDD -22.7% 仍遠優於所有 SB3（-35~40%），這個 gap 是共用 optimizer 限制
+- SpinningUp 的 MDD -22.7% 仍遠優於所有 SB3（-35~40%），原因未確定（可能是 MPI normalization 或 seed 效應）
 - Ensemble 的價值在於結合多演算法降低 MDD，而非提升 Sharpe
 
 ### 追蹤觀望（不列入近期實作計畫）

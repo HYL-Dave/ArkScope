@@ -136,7 +136,7 @@ Override `train()` 將 SB3 的 KL 計算改為 SpinningUp 的公式。
 |------|------|------|
 | vf_coef 未對齊 | 已修正 (v2) | 改善 MDD，但 Sharpe gap 仍在 |
 | Minibatch vs full-batch | 已驗證 (v3) | Sharpe 0.68→0.79，部分改善 |
-| Separate VF training | 已測試 (v4) | 有害，共用 optimizer 限制 |
+| Separate VF training | 已測試 (v4) | 有害（改變優化軌跡） |
 | KL early stop 粒度 | 已確認 | SB3 每步都檢查，跟 SpinningUp 一致 |
 | **KL 計算公式** | **已確認** | **主要原因：SB3 KL 值偏小 2-4x，early stop 從未觸發** |
 
@@ -154,7 +154,7 @@ Override `train()` 將 SB3 的 KL 計算改為 SpinningUp 的公式。
 | Activation | Tanh | Tanh | 已對齊 |
 | Network arch | [512, 512] 分離 pi/vf | [512, 512] 分離 pi/vf | 已對齊 |
 | **target_kl** | **0.35 (KL_1 公式)** | **0.35 (KL_2 公式) → 需降低** | **未對齊** |
-| **Optimizer** | **分離 Adam** | **共用 Adam** | **結構性差異，無法完全對齊** |
+| **Optimizer** | **分離 Adam** | **共用 Adam** | per-parameter states 獨立，非 gap 主因 |
 
 ---
 
