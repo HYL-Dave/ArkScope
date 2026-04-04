@@ -3,9 +3,12 @@
 # Uses --full-batch --target-kl 0.05 (best SB3 config)
 # Distributes across 4x RTX 4090 GPUs
 #
-# Batch 1: CPPO s0-4 + PPO s0       (6 parallel, ~210GB RAM)
-# Batch 2: PPO s1-3 + TD3 s0-2      (6 parallel, ~210GB RAM)
-# Batch 3: SAC s0-4 + TD3 s3        (6 parallel, ~210GB RAM, SAC grouped)
+# Resource per experiment: ~1-2GB RAM, ~1-2GB VRAM, 1 CPU core (100%)
+# Bottleneck: CPU cores (48 available), not RAM (503GB) or VRAM (24GB×4)
+#
+# Batch 1: CPPO s0-4 + PPO s0       (6 parallel, ~10GB RAM total)
+# Batch 2: PPO s1-3 + TD3 s0-2      (6 parallel, ~10GB RAM total)
+# Batch 3: SAC s0-4 + TD3 s3        (6 parallel, ~10GB RAM total, SAC grouped)
 #
 # Usage:
 #   cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
