@@ -20,8 +20,12 @@
 | 資源 | PPO (--full-batch --device cuda) | SAC (--device cuda) |
 |------|--------------------------------|---------------------|
 | **CPU** | 1 core 滿載（env.step 佔用） | **更低**（off-policy 更新不需等 rollout 完成） |
-| **RAM** | ~35-40 GB | ~40 GB（replay buffer 佔額外空間） |
+| **RAM** | ~1-2 GB | ~1-2 GB（replay buffer 在 CPU 但不大） |
 | **VRAM** | ~50 MB | **1.5-2 GB**（twin critics + replay buffer 的 GPU tensor） |
+
+> **修正（2026-04-05）**：先前測到 ~35-40GB/process 是因為 env 的 `state_memory`
+> 未在 `reset()` 清空，導致 2M timesteps × 985-dim state 的 Python list 無限累積
+> （~71GB/process）。修復後實際 RAM 僅 1-2GB。見 commit 900c48d。
 
 ### VRAM 差異說明
 
@@ -31,15 +35,15 @@ SAC 需要 1.5-2GB 因為：
 - Replay buffer 中的 batch 在 GPU 上做 gradient
 - Actor + critic 的 optimizer states
 
-### 並行容量估算（400GB RAM, 24 cores, 4× RTX 4090 各 24GB）
+### 並行容量估算
 
 | 演算法 | 限制因素 | 最大並行 |
 |--------|---------|---------|
-| PPO full-batch cuda | RAM (~40GB/exp) | ~9-10 個 |
-| SAC cuda | RAM (~40GB/exp) + VRAM (~2GB/exp) | ~9 個（RAM 先到限） |
+| PPO full-batch cuda | CPU cores（1 core/exp） | ~48 個（RAM/VRAM 無壓力） |
+| SAC cuda | CPU cores + VRAM (~2GB/exp) | ~48 個（每張 GPU ~12 個 VRAM 才到限） |
 
-RAM 是兩者的共同瓶頸。VRAM 方面 SAC 每張 4090 可跑 ~12 個（24GB / 2GB），
-但 24 cores / RAM 會先不夠。實際差異不大。
+**瓶頸是 CPU 核心**，不是 RAM。每個實驗 100% 佔用 1 core，48 核理論可跑 48 個。
+實際建議 3 批 × 6 並行（按演算法速度分組避免快慢混跑浪費等待時間）。之後我是建議每次規劃 16 - 24 個同時訓練。
 
 ## 超參數調校的痛點對比
 

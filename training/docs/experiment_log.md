@@ -702,10 +702,15 @@ Model IDs:
 **已測**：SB3 CPPO full-batch + target_kl=0.05 → **Sharpe 0.98, Return +271%**（超過 v3 的 0.93）。
 Model ID: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T160516Z_e7521d`
 
-並行資源分配（400GB RAM，24 cores，4× RTX 4090）：
-- 每個實驗 ~35-40GB RAM → 最多 **9-10 個**同時訓練
-- `--device cuda:N` 分散到 4 張 GPU → 每張 2-3 個
-- 建議配置：**8 個並行**（安全邊際），分到 cuda:0~3 各 2 個
+並行資源分配：
+- 每個實驗 ~1-2GB RAM、~1-2GB VRAM（修復 state_memory leak 後）
+- 瓶頸是 **CPU 核心**（每個實驗 100% 佔用 1 core），不是 RAM 或 VRAM
+- `--device cuda:N` 分散到 4 張 GPU → 每張可跑 12+ 個（VRAM 不是限制）
+- 實際配置：**3 批 × 6 並行**（按演算法速度分組，SAC 集中在同一批）
+
+> 注意：修復前因 `state_memory` 未在 `reset()` 清空，每個進程會洩漏 ~71GB RAM
+> （2M timesteps × 985-dim state × Python float），導致 9 並行時 OOM 當機。
+> 修復：commit 900c48d。
 
 ### 待辦：多 seed 驗證（SB3 確認後）
 
