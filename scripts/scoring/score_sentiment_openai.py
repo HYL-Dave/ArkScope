@@ -349,40 +349,56 @@ def main():
         out_dir = os.path.dirname(output_csv)
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
-        # Resume logic: count already processed rows
+        # Resume logic: build set of already-scored keys to skip duplicates
+        scored_keys = set()
         if os.path.exists(output_csv):
-            prev = pd.read_csv(output_csv, usecols=[date_col] if date_col else [],
-                               on_bad_lines='warn', engine='c')
-            processed_rows = len(prev)
+            key_cols = [c for c in [date_col, text_col, sym_col] if c]
+            prev = pd.read_csv(output_csv, usecols=key_cols,
+                               on_bad_lines='warn', engine='c', low_memory=False)
+            for _, r in prev.iterrows():
+                scored_keys.add(tuple(str(r[c]) for c in key_cols))
+            del prev
+            print(f"  Resume: {len(scored_keys):,} already scored rows found")
         else:
-            processed_rows = 0
+            print("  Starting fresh (no output file)")
 
         start_time = time.time()
-        
+
         # Clean CSV file of NUL characters
         cleaned_csv = input_csv + '.cleaned'
         with open(input_csv, 'rb') as f_in, open(cleaned_csv, 'wb') as f_out:
             content = f_in.read()
             content = content.replace(b'\x00', b'')
             f_out.write(content)
-        
+
         reader = pd.read_csv(cleaned_csv, chunksize=chunk_size,
                              on_bad_lines='warn', engine='c')
         # Dynamic column name based on model (e.g., gpt-5 → sentiment_gpt_5)
         model_suffix = model.replace("-", "_").replace(".", "_")
         out_col = f"sentiment_{model_suffix}"
+        key_cols = [c for c in [date_col, text_col, sym_col] if c]
         for i, chunk in enumerate(reader):
-            logging.info(f"Processing chunk {i}, {len(chunk)} rows")
-            if i * chunk_size < processed_rows:
+            # Filter out already-scored rows
+            if scored_keys:
+                mask = chunk.apply(
+                    lambda r: tuple(str(r[c]) for c in key_cols) not in scored_keys,
+                    axis=1,
+                )
+                todo = chunk[mask].copy()
+            else:
+                todo = chunk.copy()
+            if todo.empty:
+                logging.info(f"Chunk {i}: all {len(chunk)} rows already scored, skipping")
                 continue
+            logging.info(f"Processing chunk {i}: {len(todo)} new / {len(chunk)} total rows")
             # Validate required columns
             required = [sym_col, text_col] + ([date_col] if date_col else [])
-            missing = [c for c in required if c and c not in chunk.columns]
+            missing = [c for c in required if c and c not in todo.columns]
             if missing:
                 parser.error(f"Input CSV missing columns: {missing}")
-            chunk[out_col] = None
+            todo[out_col] = None
             # Score each row
-            for idx, row in chunk.iterrows():
+            for idx, row in todo.iterrows():
                 cell = row[text_col]
                 if pd.isna(cell) or not str(cell).strip():
                     logging.warning(f"Skipping empty text for {row[sym_col]}:{idx}")
@@ -399,15 +415,19 @@ def main():
                         f"Missing sentiment for {row[sym_col]}:{idx}, retrying"
                     )
                     val = score_headline(cell, row[sym_col], model, reasoning_effort, verbosity, retry=retry_internal)
-                chunk.at[idx, out_col] = val
+                todo.at[idx, out_col] = val
                 time.sleep(pause)
-            # Write all original columns plus new sentiment score
-            chunk.to_csv(
+            # Write only new rows (append)
+            write_header = not os.path.exists(output_csv) or os.path.getsize(output_csv) == 0
+            todo.to_csv(
                 output_csv,
                 mode='a',
-                header=not os.path.exists(output_csv),
-                index=False
+                header=write_header,
+                index=False,
             )
+            # Track newly scored keys
+            for _, r in todo.iterrows():
+                scored_keys.add(tuple(str(r[c]) for c in key_cols))
             # stop if daily token limit was reached during this chunk
             if STOP_AFTER_CHUNK:
                 print(f"Daily token limit reached; stopping after chunk {i}.")
