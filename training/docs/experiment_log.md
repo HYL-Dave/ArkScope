@@ -789,9 +789,31 @@ override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 | 優先級 | 項目 | 狀態 | 工作量 |
 |--------|------|------|--------|
 | 8 | ~~SAC 訓練腳本~~ | ✅ `train_sac_sb3.py` 完成 | 完成 |
-| 9 | **SAC 基準實驗** | 訓練中（G5 資料） | 等待結果 |
-| 10 | ~~TD3 訓練腳本~~ | ✅ `train_td3_sb3.py` 完成 | 完成 |
-| 11 | **Ensemble backtest 工具** | 待 SAC+TD3 結果 | 中 |
+| 9 | ~~SAC 基準實驗~~ | ✅ Sharpe 0.76, Return +136%, MDD -35.8% | 完成 |
+| 10 | ~~TD3 訓練腳本 + 基準實驗~~ | ✅ Sharpe 0.77, Return +165%, MDD -39.4% | 完成 |
+| 11 | **Ensemble backtest 工具** | 待做 | 中 |
+
+### G5 GPT-5-mini 全演算法對照（seed=42, HF 資料 2019-2023）
+
+| 演算法 | Sharpe | Return | MDD | CVaR |
+|--------|--------|--------|-----|------|
+| **SB3 CPPO** (full-batch kl=0.05) | **0.98** | **+271%** | -38.6% | -4.2% |
+| SB3 PPO (full-batch kl=0.05) | 0.90 | +220% | -39.8% | -3.7% |
+| SpinningUp PPO | 1.03 | +207% | **-22.7%** | **-3.2%** |
+| TD3 | 0.77 | +165% | -39.4% | -4.2% |
+| SAC | 0.76 | +136% | -35.8% | -3.6% |
+| QQQ benchmark | — | +173% | — | — |
+
+Model IDs:
+- SAC: `sac_sb3_train_gpt5mini_high_both_100ep_s42_20260404T004845Z_e7521d`
+- TD3: `td3_sb3_train_gpt5mini_high_both_100ep_s42_20260403T232053Z_e7521d`
+
+**觀察**：
+- CPPO > PPO > TD3 ≈ SAC（Sharpe 排序）
+- SAC/TD3 沒有比 PPO 好，但這是單一 seed 結果
+- SAC 的 CVaR 最好（-3.6%），表現出 off-policy 的風險控制特性
+- SpinningUp 的 MDD -22.7% 仍遠優於所有 SB3（-35~40%），這個 gap 是共用 optimizer 限制
+- Ensemble 的價值在於結合多演算法降低 MDD，而非提升 Sharpe
 
 ### 追蹤觀望（不列入近期實作計畫）
 
