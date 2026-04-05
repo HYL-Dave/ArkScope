@@ -20,7 +20,7 @@
 | 資源 | PPO (--full-batch --device cuda) | SAC (--device cuda) |
 |------|--------------------------------|---------------------|
 | **CPU** | 1 core 滿載（env.step 佔用） | **更低**（off-policy 更新不需等 rollout 完成） |
-| **RAM** | ~1-2 GB | ~1-2 GB（replay buffer 在 CPU 但不大） |
+| **RAM** | ~1-2 GB | **~8 GB**（1M replay buffer 在 CPU 佔主要部分） |
 | **VRAM** | ~50 MB | **1.5-2 GB**（twin critics + replay buffer 的 GPU tensor） |
 
 > **修正（2026-04-05）**：先前測到 ~35-40GB/process 是因為 env 的 `state_memory`
