@@ -863,11 +863,14 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 **H1**：title-only 補齊 vs 無覆蓋 → **部分成立**
   - PPO/TD3 持平或微升，CPPO/SAC 下降。填補不是萬靈丹，取決於算法對信號分佈的敏感度。
 
-**H2**：nano title-only 品質 > DeepSeek title-only → **成立**
-  - nano 中性率 60.8%（vs DeepSeek 97.5%）。標題含有效信號，nano 能捕捉到。
+**H2**：nano title-only 品質 > DeepSeek title-only → **待定**
+  - nano 中性率 60.8%（vs DeepSeek 97.5%），但低中性率不等於高品質。
+  - DeepSeek 可能正確判斷 title-only 文章缺乏明確信號而給中性分。
+  - nano 可能過度解讀標題。需要透過訓練結果驗證實際品質差異。
 
-**H3**：高品質 summary + 低成本 title 補齊 → **成立（限 PPO/TD3）**
-  - Claude Opus + nano fill + PPO = Sharpe 1.005，是最佳成本效益組合。
+**H3**：高品質 summary + 低成本 title 補齊 → **待定**
+  - Claude Opus + nano fill + PPO = Sharpe 1.005，但缺少 Claude Opus 原始（未填補）的 SB3 基線。
+  - 需要對比 nanofilled vs 原始才能確認填補本身是否有正面效果。
 
 ---
 
