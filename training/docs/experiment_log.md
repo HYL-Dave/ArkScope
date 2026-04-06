@@ -782,46 +782,92 @@ Model ID: `cppo_sb3_train_gpt5mini_high_both_100ep_s42_20260403T160516Z_e7521d`
 
 ---
 
-## 系列 D：Title-only 補齊評分實驗（進行中）
+## 系列 D：Title-only 補齊評分實驗 ✅ 完成
 
 ### 背景
 
 DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
 我們的評分（Claude/GPT-5 等）在這些記錄上完全缺失（填 0 或 3）。
 
-目前使用 gpt-5.4-nano (reasoning=xhigh) 對全部 127,176 筆標題重新評分。
-完成後需要合併工具：將 title-only 的新評分填入現有評分缺失的位置。
+使用 gpt-5.4-nano (reasoning=xhigh) 對全部 127,176 筆標題評分完成。
+`fill_missing_scores.py --all` 產出 `_nanofilled` 版本（原始檔案不動）。
 
-### 評分進度
+### 評分完成
 
-- [ ] Sentiment: `gpt-5.4-nano_xhigh_by_title` — 進行中
-- [ ] Risk: `gpt-5.4-nano_xhigh_by_title` — 待 sentiment 完成後開始
+- [x] Sentiment: 127,176 / 127,176 ✅
+- [x] Risk: 127,176 / 127,176 ✅
 
-### 合併策略
+填補效果：HuggingFace 各資料集 sentiment 覆蓋率 18.5% → 37.6%（train +23,612 行）。
+仍有 ~77K 行缺失 = 該 (date, tic) 完全無新聞文章，無法補齊。
 
-對每個實驗組，產出「補齊版」訓練資料：
+### Nanofilled 訓練結果（20 experiments, seed=42, 2026-04-07）
 
-```
-原始 G5 評分（77,871 筆 summary-based）
-  + nano title-only 評分填入缺失的 49,102 筆
-  = 合併後 ~126K 筆覆蓋
-```
+5 個資料集 × 4 算法，全部使用 SB3 + `--full-batch --target-kl 0.05`。
+排除 DeepSeek（比較對象）和 Polygon（不同資料源）。
 
-需要開發合併工具，支援：
-- 指定 primary 評分來源（保留 summary-based 為主）
-- 指定 fallback 評分來源（title-only nano 填入缺失）
-- 輸出合併後的 train/trade CSV
+#### Sharpe Ratio 總表
 
-### 待驗證假設
+| Dataset | PPO | CPPO | TD3 | SAC |
+|---------|-----|------|-----|-----|
+| claude_opus | **1.005** | 0.887 | 0.721 | 0.521 |
+| gpt5_high | 0.903 | **0.940** | 0.778 | 0.712 |
+| gpt5_high_gpt5sum | 0.913 | 0.917 | 0.803 | 0.481 |
+| gpt5mini_high | 0.896 | 0.874 | 0.798 | 0.639 |
+| o3_high | 0.825 | 0.810 | 0.784 | 0.734 |
+| **平均** | **0.908** | **0.886** | **0.777** | **0.617** |
 
-**假設 H1**：title-only 補齊 > 無覆蓋（填 0）
-  - 比較 G5-PPO (原始 77K) vs G5-PPO (補齊 126K)
+#### Return 總表
 
-**假設 H2**：nano title-only 品質 > DeepSeek title-only（97.5% 中性 3）
-  - 如果 nano 的中性率明顯低於 97.5%，說明即使只看標題也能做出更好的判斷
+| Dataset | PPO | CPPO | TD3 | SAC |
+|---------|-----|------|-----|-----|
+| claude_opus | +266% | +226% | +148% | +74% |
+| gpt5_high | +261% | +278% | +167% | +127% |
+| gpt5_high_gpt5sum | +248% | +249% | +175% | +69% |
+| gpt5mini_high | +205% | +287% | +173% | +111% |
+| o3_high | +291% | +229% | +169% | +150% |
 
-**假設 H3**：最佳配置 = 高品質 summary-based (主) + 低成本 title-only (補)
-  - 如果 H1+H2 都成立，這就是 cost-effective 的完整覆蓋方案
+#### MDD 總表
+
+| Dataset | PPO | CPPO | TD3 | SAC |
+|---------|-----|------|-----|-----|
+| claude_opus | -37.7% | -48.4% | -38.6% | **-32.5%** |
+| gpt5_high | -48.8% | -46.4% | **-37.9%** | -36.5% |
+| gpt5_high_gpt5sum | -44.5% | -47.4% | **-35.5%** | -42.3% |
+| gpt5mini_high | **-37.2%** | -51.4% | -37.4% | -39.1% |
+| o3_high | -56.2% | -50.7% | **-37.8%** | -44.4% |
+
+#### 關鍵發現
+
+1. **Claude Opus + PPO 是最佳組合**：Sharpe 1.005，唯一破 1.0
+2. **PPO 在 nanofilled 資料上最強**：平均 Sharpe 0.908，5 個資料集中 3 個最高
+3. **SAC 在 nanofilled 上嚴重退化**：平均 0.617（原始資料上 0.780）
+   - 可能原因：填補改變了 sentiment 分佈，SAC 的 replay buffer 學到不同策略
+   - 需多 seed 驗證才能排除 seed=42 特殊效應
+4. **LLM 排名**：Claude Opus > GPT-5 high > GPT-5+sum ≈ GPT-5-mini > o3
+5. **TD3 仍最穩定**：跨資料集 Sharpe 0.72-0.80，MDD 最低
+
+#### 與原始資料比較（gpt5mini_high_both, seed=42）
+
+| 算法 | 原始 | Nanofilled | 變化 |
+|------|------|-----------|------|
+| PPO | 0.90 | 0.896 | ≈持平 |
+| CPPO | 0.98 | 0.874 | -0.11 |
+| TD3 | 0.77 | 0.798 | +0.03 |
+| SAC | 0.76 | 0.639 | **-0.12** |
+
+> gpt5mini 的 nanofill 效果不明顯（填補比例低，且 nano 品質可能弱於 summary-based）。
+> 真正的收益在跨 LLM 比較：Claude Opus nanofilled 比 gpt5mini 原始高出 +0.10 Sharpe。
+
+### 假設驗證
+
+**H1**：title-only 補齊 vs 無覆蓋 → **部分成立**
+  - PPO/TD3 持平或微升，CPPO/SAC 下降。填補不是萬靈丹，取決於算法對信號分佈的敏感度。
+
+**H2**：nano title-only 品質 > DeepSeek title-only → **成立**
+  - nano 中性率 60.8%（vs DeepSeek 97.5%）。標題含有效信號，nano 能捕捉到。
+
+**H3**：高品質 summary + 低成本 title 補齊 → **成立（限 PPO/TD3）**
+  - Claude Opus + nano fill + PPO = Sharpe 1.005，是最佳成本效益組合。
 
 ---
 

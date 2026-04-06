@@ -490,11 +490,14 @@ def main():
         max_runtime=args.max_runtime,
     )
     # overall token usage summary
-    logging.info(
-        f"Total calls={N_CALLS}, avg prompt={TOTAL_PROMPT_TOKENS/N_CALLS:.1f}, "
-        f"avg completion={TOTAL_COMPLETION_TOKENS/N_CALLS:.1f}, "
-        f"avg total={TOTAL_TOKENS/N_CALLS:.1f}, sum total={TOTAL_TOKENS}"
-    )
+    if N_CALLS > 0:
+        logging.info(
+            f"Total calls={N_CALLS}, avg prompt={TOTAL_PROMPT_TOKENS/N_CALLS:.1f}, "
+            f"avg completion={TOTAL_COMPLETION_TOKENS/N_CALLS:.1f}, "
+            f"avg total={TOTAL_TOKENS/N_CALLS:.1f}, sum total={TOTAL_TOKENS}"
+        )
+    else:
+        logging.info("No API calls made (all rows already scored)")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
