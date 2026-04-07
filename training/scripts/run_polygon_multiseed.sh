@@ -72,7 +72,7 @@ run_batch() {
             python training/backtest_sb3.py \
                 --data "$TRADE" \
                 --model "$model_dir/model_sb3.zip" \
-                --env risk --device cpu
+                --device cpu
         else
             echo "  [WARN] n=$steps seed=$seed model not found"
         fi
