@@ -942,6 +942,51 @@ override `collect_rollouts()` 在 advantage 上加 CVaR penalty。
 
 ---
 
+## 系列 F：Polygon PPO 多 seed + n_steps 對比（規劃中）
+
+### 目標
+
+回到 Polygon 自有資料（134 tickers, 2022-2024），用 PPO 做系統性驗證：
+1. 確認 PPO 在不同資料源上的表現
+2. 比較 n_steps (20K/40K/60K) 對 gradient variance 的影響
+3. 為最終 Ensemble 建立模型池
+
+### Seed 選擇方法
+
+放棄連續整數 (0-9)，改用 **Master RNG 生成法**確保 seed 散佈在 2^31 空間：
+
+```python
+import numpy as np
+rng = np.random.RandomState(2026)  # master seed = 2026
+seeds = rng.randint(0, 2**31, size=10)
+# → [942082305, 1145077126, 1773871898, 1980789688, 2047133773,
+#    1988008269, 381818397, 889207412, 2058534300, 84665779]
+```
+
+理由：
+- 現代 PRNG (MT19937) 中不同 seed 數學上已統計獨立
+- 但大間隔 seed 在 PyTorch seeding pipeline 的 hash 過程中 collision 機率更低
+- Master seed 固定 → 完全可重現
+- 10 個 seed 覆蓋 92% 的 2^31 空間（span: 1.97B / 2.15B）
+
+### 實驗設計
+
+3 批 × 10 seeds = 30 個 PPO 實驗（順序執行，每批 10 並行）
+
+| Batch | n_steps | 目的 |
+|-------|---------|------|
+| 1 | 20,000 | 基線（與 HuggingFace 實驗一致） |
+| 2 | 40,000 | 2× rollout，降低 gradient variance |
+| 3 | 60,000 | 3× rollout，最低 variance |
+
+完成後：選最佳 n_steps → 10 個模型做 Sharpe-weighted Ensemble。
+
+### 結果
+
+（待訓練完成後填入）
+
+---
+
 ## 已完成項目總結
 
 | 項目 | 狀態 | 結果 |
