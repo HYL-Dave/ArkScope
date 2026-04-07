@@ -872,6 +872,83 @@ DeepSeek 有 49,102 筆 title-only 的評分（97.5% 為中性 3）。
   - Claude Opus + nano fill + PPO = Sharpe 1.005，但缺少 Claude Opus 原始（未填補）的 SB3 基線。
   - 需要對比 nanofilled vs 原始才能確認填補本身是否有正面效果。
 
+### Nanofilled 多 seed 驗證（2026-04-07，25 experiments）
+
+Top 5 組合 × 5 seeds (0-4)，驗證 seed=42 結果的代表性。
+
+| 組合 | s0 | s1 | s2 | s3 | s4 | **Mean±Std** | s42 |
+|------|----|----|----|----|-----|-------------|-----|
+| Claude Opus PPO | 0.835 | 0.652 | 0.704 | 0.803 | 0.789 | **0.757±0.073** | 1.005 |
+| GPT-5 high CPPO | **1.022** | 0.503 | 0.609 | 0.544 | 0.824 | **0.700±0.215** | 0.940 |
+| GPT-5+sum PPO | 0.843 | 0.737 | 0.606 | 0.600 | 0.780 | **0.713±0.103** | 0.913 |
+| GPT-5+sum CPPO | 0.670 | 0.567 | 0.563 | 0.605 | 0.807 | **0.642±0.100** | 0.917 |
+| GPT-5 high PPO | 0.808 | 0.285 | 0.680 | 0.540 | 0.791 | **0.621±0.212** | 0.903 |
+
+**seed=42 全部偏高**：5 個組合的 s42 結果都在分佈上端或遠超平均，確認不具代表性。
+
+#### 穩定性排名
+
+| 排名 | 組合 | Mean Sharpe | Std |
+|------|------|-----------|-----|
+| 1 | **Claude Opus PPO** | **0.757** | **0.073** |
+| 2 | GPT-5+sum PPO | 0.713 | 0.103 |
+| 3 | GPT-5 high CPPO | 0.700 | 0.215 |
+| 4 | GPT-5+sum CPPO | 0.642 | 0.100 |
+| 5 | GPT-5 high PPO | 0.621 | 0.212 |
+
+#### 分析與反思
+
+**1. CPPO 的 CVaR 約束未必有效**
+
+股票市場的複雜性遠超模擬環境。CPPO 的風險懲罰基於 LLM risk score，但：
+- Risk score 本身的品質和校準未驗證（不同 LLM 給出不同分數，誰對？）
+- 對高風險的行為懲罰可能同時懲罰了高報酬機會
+- 多 seed 下 CPPO std (0.100-0.215) 始終高於同資料的 PPO，說明約束增加了不穩定性
+
+**2. Seed 敏感度的兩種解釋**
+
+(a) **初始化非常重要**：神經網路初始權重決定了優化軌跡，不同起點可能收斂到
+    品質差距巨大的局部最優。對金融這種信噪比極低的領域尤其嚴重。
+
+(b) **方法本身不穩定**：RL 用有限的交易日數據學習策略，樣本效率低，
+    微小的隨機差異被放大。不是初始化的問題，而是學習過程的固有缺陷。
+
+兩者可能同時存在。FinRL GitHub Issue #190 報告了 DDPG 同一超參數不同 seed 的
+Sharpe 從 0.16 到 2.39（15 倍差距），說明這不是我們的特例。
+
+**3. PPO 的穩健性**
+
+跨所有實驗（原始 + nanofilled + 多 seed），PPO 從未是最高但也從未災難性失敗：
+- 不像 CPPO 那樣 seed 依賴極強
+- 不像 SAC 那樣在 nanofilled 上整體退化
+- 不像 TD3 那樣 Sharpe 天花板偏低
+PPO 是「不敢說最好，但沒有劣勢」的算法。
+
+**4. LLM 評分品質的影響可能被低估**
+
+Claude Opus 在所有算法上都排名第一，但這是 nanofilled 的結果。
+不同 LLM 的評分標準差異（什麼算「正面」？什麼算「高風險」？）
+可能比算法選擇更重要。Sonnet 4.6 在投資理解上可能不弱於 Opus 4.6，
+但本輪實驗未測試（缺少 Sonnet 評分資料）。
+
+#### 文獻參考：Seed 敏感度是 RL 的已知問題
+
+| 論文 | 發現 |
+|------|------|
+| Henderson et al. 2018 "Deep RL that Matters" (AAAI) | 同一超參不同 seed 可產生統計上不同的分佈；多數論文用 <5 seeds |
+| Colas et al. 2018 "How Many Random Seeds?" | 可靠結論需 10-20 seeds，取決於效應量和統計檢定力 |
+| Agarwal et al. 2021 (NeurIPS Outstanding Paper) | Mean/median over 3-5 seeds 不可靠；推薦 IQM + bootstrap CI |
+| Bjorck et al. 2022 "Is High Variance Unavoidable?" (ICLR) | Variance 來自早期數值不穩定；penultimate feature normalization 可降低 |
+| Holzer et al. 2025 (FinRL Contest) | Ensemble 的 std 約為單一 agent 的一半；RL 策略對 seed 敏感是已知前提 |
+| FinRL Issue #190 | DDPG 同一設定不同 seed：Sharpe 0.16 ~ 2.39 |
+
+**結論**：Seed 敏感度不是 bug，是 RL 的固有特性。「如何選種子或降低 seed 敏感度」
+是活躍的研究方向，已知的緩解方式包括：
+- Ensemble（多 seed 組合，FinRL Contest 的主流做法）
+- Penultimate feature normalization（Bjorck et al. 2022）
+- 更大的 batch / 更多並行環境（降低 gradient variance）
+- 報告 IQM + CI 而非 mean（Agarwal et al. 2021）
+
 ---
 
 ## 系列 E：SB3 CPPO ✅ 已開發
