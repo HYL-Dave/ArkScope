@@ -206,7 +206,8 @@ Hyperparameter mapping (SpinningUp → SB3):
     parser.add_argument("--data", required=True, help="Training CSV path")
     parser.add_argument("--epochs", type=int, default=100, help="Training epochs (rollout cycles)")
     parser.add_argument("--steps", type=int, default=20000, help="Steps per epoch (n_steps)")
-    parser.add_argument("--seed", "-s", type=int, default=42)
+    parser.add_argument("--seed", "-s", type=int, default=None,
+                        help="Random seed (default: None = random init for production ensemble)")
     parser.add_argument("--hid", type=int, default=512, help="Hidden layer size")
     parser.add_argument("--l", type=int, default=2, help="Number of hidden layers")
     parser.add_argument("--gamma", type=float, default=0.995)

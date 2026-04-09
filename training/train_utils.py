@@ -43,17 +43,19 @@ def generate_model_id(
     algorithm: str,
     data_tag: str,
     epochs: int,
-    seed: int,
+    seed: Optional[int],
     data_path: Optional[str] = None,
 ) -> str:
     """Generate a collision-resistant model_id.
 
     Format: {algo}_{tag}_{epochs}ep_s{seed}_{YYYYMMDDTHHMMSSZ}_{hash6}
+    When seed is None (production ensemble), uses 'rnd' as seed label.
     """
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     data_h = file_hash(data_path) if data_path else "hf"
     algo = algorithm.lower()
-    return f"{algo}_{data_tag}_{epochs}ep_s{seed}_{ts}_{data_h}"
+    seed_label = "rnd" if seed is None else str(seed)
+    return f"{algo}_{data_tag}_{epochs}ep_s{seed_label}_{ts}_{data_h}"
 
 
 def save_training_artifacts(
