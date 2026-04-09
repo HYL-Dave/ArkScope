@@ -1155,7 +1155,44 @@ SB3 PPO 已採用 orthogonal init，但其餘方法均未嘗試。
 若要進一步降低 seed sensitivity，Layer normalization 和 penultimate feature normalization
 是最容易實現的改善方向。
 
-#### 文獻參考（evaluation methodology）
+#### 上游專案做法調查（2026-04-09）
+
+| | FinRL (SB3 backend) | FinRL_DeepSeek |
+|---|---|---|
+| Seed | **不設**（seed=None） | PPO 固定 42，CPPO 固定 0 |
+| 多 seed 評估 | 無 | 無（note.md 提 ±0.02，未驗證） |
+| 分割方式 | 基本 2 段；Ensemble 版 **3 段 rolling** | 2 段固定（6 年 train / 5 年 trade） |
+| Validation | Ensemble 版有 63 天 validation window | 無 |
+| 初始化 | SB3 默認（PPO orthogonal） | PyTorch 默認 Kaiming uniform |
+| Ensemble | **Winner-takes-all**（每季選最佳 1 個） | 無 |
+| 統計嚴謹度 | 單次結果 | 單次結果 |
+
+**FinRL 的 3 段 rolling split** 是正確做法：
+- Train（expanding window）→ Validation（63 天，選模型）→ Trade（63 天，評估）
+- 每個 rebalance window 重新訓練和選擇，不依賴固定 seed
+- 這解決了我們遇到的 selection bias 問題
+
+**FinRL SB3 不設 seed 的啟示**：
+
+不設 seed（seed=None）在以下場景反而是最正確的做法：
+
+| 目的 | Seed 策略 |
+|------|----------|
+| Production ensemble | **不設** — 每個模型自然隨機，多樣性最大，無法 cherry-pick |
+| 算法比較（A vs B） | 固定同一組 seed — 控制變數 |
+| 可重現性 | 設但不選 — 記錄用了什麼，不挑好的 |
+| 調參 | 固定一個 — 排除隨機干擾 |
+
+我們之前的 seed 分析（Master RNG、top 3 挑選、seed=42 調查）本身是有價值的
+學習過程，但如果一開始就不設 seed + 全部 ensemble，selection bias 問題不會存在。
+
+**未來實驗方向：**
+1. 採用 FinRL 的 rolling 3-way split（train / validation / trade）
+2. Production ensemble 用 seed=None，訓練 N 個模型全部 ensemble
+3. 算法比較用固定 seed 組
+4. 報告所有模型的 IQM + CI，不做 top-K selection
+
+#### 文獻參考
 
 | 論文 | 核心觀點 |
 |------|---------|
