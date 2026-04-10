@@ -96,6 +96,9 @@ def handle_message(msg):
     elif action == "save_market_news":
         return _handle_save_market_news(dal, msg)
 
+    elif action == "get_market_news_recent_ids":
+        return _handle_get_market_news_recent_ids(dal, msg)
+
     elif action == "save_market_news_detail":
         return _handle_save_market_news_detail(dal, msg)
 
@@ -314,6 +317,18 @@ def _handle_save_market_news(dal, msg):
     except Exception as e:
         logger.error("save_market_news failed: %s", e)
         return {"status": "error", "error": str(e)}
+
+
+def _handle_get_market_news_recent_ids(dal, msg):
+    """Return recent stored market-news IDs for duplicate-aware scrolling."""
+    limit = msg.get("limit", 200)
+    try:
+        ids = dal.get_sa_market_news_recent_ids(limit=limit)
+        logger.info("get_market_news_recent_ids: count=%s limit=%s", len(ids), limit)
+        return {"status": "ok", "news_ids": ids}
+    except Exception as e:
+        logger.error("get_market_news_recent_ids failed: %s", e)
+        return {"status": "error", "error": str(e), "news_ids": []}
 
 
 def _handle_save_market_news_detail(dal, msg):

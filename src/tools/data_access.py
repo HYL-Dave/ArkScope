@@ -847,6 +847,12 @@ class DataAccessLayer:
             ticker=ticker, keyword=keyword, limit=limit
         )
 
+    def get_sa_market_news_recent_ids(self, limit: int = 200) -> List[str]:
+        """Return recent market-news IDs for duplicate-aware list scanning."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return []
+        return self._backend.query_sa_market_news_recent_ids(limit=limit)
+
     def save_sa_market_news_detail(self, news_id: str, body_markdown: str) -> bool:
         """Persist a single market-news body Markdown payload."""
         if not isinstance(self._backend, DatabaseBackend):

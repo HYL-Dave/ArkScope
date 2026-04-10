@@ -20,6 +20,8 @@ const MARKET_NEWS_PROFILES = {
   quick: {
     name: "quick",
     maxDetailFetches: 12,
+    recentKnownIdsLimit: 250,
+    knownTailStopCount: 8,
     listStartMinMs: 700,
     listStartMaxMs: 1300,
     listScrolls: 3,
@@ -35,6 +37,8 @@ const MARKET_NEWS_PROFILES = {
   full: {
     name: "full",
     maxDetailFetches: 30,
+    recentKnownIdsLimit: 400,
+    knownTailStopCount: 10,
     listStartMinMs: 900,
     listStartMaxMs: 1600,
     listScrolls: 8,
@@ -50,6 +54,8 @@ const MARKET_NEWS_PROFILES = {
   backfill: {
     name: "backfill",
     maxDetailFetches: 80,
+    recentKnownIdsLimit: 600,
+    knownTailStopCount: 12,
     listStartMinMs: 1200,
     listStartMaxMs: 2200,
     listScrolls: 8,
@@ -65,6 +71,8 @@ const MARKET_NEWS_PROFILES = {
   manual: {
     name: "manual",
     maxDetailFetches: 20,
+    recentKnownIdsLimit: 300,
+    knownTailStopCount: 8,
     listStartMinMs: 1000,
     listStartMaxMs: 1800,
     listScrolls: 4,
@@ -222,7 +230,8 @@ async function doMarketNewsRefresh(mode) {
 
     await chrome.tabs.update(tabId, { active: true });
     await sleep(randomBetween(profile.listStartMinMs, profile.listStartMaxMs));
-    await scrollMarketNews(tabId, profile);
+    var knownNewsIds = await getMarketNewsRecentIds(profile.recentKnownIdsLimit);
+    await scrollMarketNews(tabId, profile, knownNewsIds);
     await chrome.tabs.update(tabId, { active: false });
 
     sendProgress("Scraping market news...");
@@ -972,29 +981,77 @@ async function installMarketNewsPageGuards(tabId) {
   }
 }
 
-async function scrollMarketNews(tabId, maxScrolls) {
+function getContiguousKnownTailCount(ids, knownIdSet) {
+  if (!ids || ids.length === 0 || !knownIdSet || knownIdSet.size === 0) return 0;
+  var count = 0;
+  for (var i = ids.length - 1; i >= 0; i--) {
+    var id = ids[i];
+    if (!id || !knownIdSet.has(id)) break;
+    count++;
+  }
+  return count;
+}
+
+async function getMarketNewsRecentIds(limit) {
+  var result = await sendNativeMessage2({
+    action: "get_market_news_recent_ids",
+    limit: limit || 200,
+  });
+  if (!result || result.status !== "ok" || !Array.isArray(result.news_ids)) {
+    return [];
+  }
+  return result.news_ids;
+}
+
+async function scrollMarketNews(tabId, maxScrolls, knownNewsIds) {
   var profile = maxScrolls || getMarketNewsProfile("quick");
   var maxRounds = profile.listScrolls || 3;
   var staleCount = 0;
+  var knownIdSet = new Set(Array.isArray(knownNewsIds) ? knownNewsIds : []);
   for (var i = 0; i < maxRounds; i++) {
     var before = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
-        var count = document.querySelectorAll('a[href*="/news/"]').length;
+        var anchors = document.querySelectorAll('a[href*="/news/"]');
+        var ids = [];
+        var seen = {};
+        for (var n = 0; n < anchors.length; n++) {
+          var href = anchors[n].getAttribute("href") || anchors[n].href || "";
+          var match = href.match(/\/news\/(\d+)/);
+          if (!match || seen[match[1]]) continue;
+          seen[match[1]] = true;
+          ids.push(match[1]);
+        }
         window.scrollBy(0, window.innerHeight);
-        return count;
+        return { count: ids.length, ids: ids };
       },
     });
-    var prevCount = before[0] && before[0].result || 0;
+    var beforeResult = before[0] && before[0].result || {};
+    var prevCount = beforeResult.count || 0;
     await sleep(randomBetween(profile.listScrollSettleMinMs, profile.listScrollSettleMaxMs));
     var after = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
-        return document.querySelectorAll('a[href*="/news/"]').length;
+        var anchors = document.querySelectorAll('a[href*="/news/"]');
+        var ids = [];
+        var seen = {};
+        for (var n = 0; n < anchors.length; n++) {
+          var href = anchors[n].getAttribute("href") || anchors[n].href || "";
+          var match = href.match(/\/news\/(\d+)/);
+          if (!match || seen[match[1]]) continue;
+          seen[match[1]] = true;
+          ids.push(match[1]);
+        }
+        return { count: ids.length, ids: ids };
       },
     });
-    var newCount = after[0] && after[0].result || 0;
-    sendProgress("Loading market news... (" + newCount + " links, scroll " + (i + 1) + ")");
+    var afterResult = after[0] && after[0].result || {};
+    var newCount = afterResult.count || 0;
+    var knownTail = getContiguousKnownTailCount(afterResult.ids || [], knownIdSet);
+    sendProgress("Loading market news... (" + newCount + " links, scroll " + (i + 1) + ", known tail " + knownTail + ")");
+    if (knownTail >= (profile.knownTailStopCount || 8)) {
+      break;
+    }
     if (newCount <= prevCount) {
       staleCount++;
       if (staleCount >= 2) break;

@@ -1464,6 +1464,26 @@ class DatabaseBackend:
             logger.error("Failed to query SA market news: %s", e)
             return []
 
+    def query_sa_market_news_recent_ids(self, limit: int = 200) -> list[str]:
+        """Return recent market-news IDs ordered from newest to oldest."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT news_id
+                    FROM sa_market_news
+                    WHERE news_id IS NOT NULL AND news_id <> ''
+                    ORDER BY COALESCE(published_at, fetched_at) DESC NULLS LAST, id DESC
+                    LIMIT %s
+                    """,
+                    (max(1, min(int(limit or 200), 1000)),),
+                )
+                return [row[0] for row in cur.fetchall() if row and row[0]]
+        except Exception as e:
+            logger.error("Failed to query SA market news recent ids: %s", e)
+            return []
+
     def query_sa_market_news_need_detail(
         self,
         news_ids: list | None = None,

@@ -801,6 +801,17 @@ class TestDataAccessMarketNews:
             ticker="NVDA", keyword="earnings", limit=3
         )
 
+    def test_get_sa_market_news_recent_ids_queries_backend(self):
+        """Recent market-news id lookup delegates to DB backend."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.query_sa_market_news_recent_ids.return_value = ["123", "124"]
+
+        result = dal.get_sa_market_news_recent_ids(limit=150)
+
+        assert result == ["123", "124"]
+        dal._backend.query_sa_market_news_recent_ids.assert_called_once_with(limit=150)
+
     def test_save_sa_market_news_detail_updates_backend(self):
         """Market-news detail body persistence delegates to DB backend."""
         dal = DataAccessLayer.__new__(DataAccessLayer)
@@ -1384,6 +1395,17 @@ class TestNativeHostArticles:
         dal.save_sa_market_news_detail.assert_called_once_with(
             "123", "# Headline\n\nBody"
         )
+
+    def test_get_market_news_recent_ids(self):
+        """get_market_news_recent_ids returns recent ids from DAL."""
+        from scripts.sa_native_host import _handle_get_market_news_recent_ids
+        dal = MagicMock()
+        dal.get_sa_market_news_recent_ids.return_value = ["123", "124"]
+
+        result = _handle_get_market_news_recent_ids(dal, {"limit": 150})
+
+        assert result == {"status": "ok", "news_ids": ["123", "124"]}
+        dal.get_sa_market_news_recent_ids.assert_called_once_with(limit=150)
 
     def test_save_articles_meta(self):
         """save_articles_meta calls DAL and returns result."""
