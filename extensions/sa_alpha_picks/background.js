@@ -6,9 +6,78 @@
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
 const SA_ARTICLES_URL = "https://seekingalpha.com/alpha-picks/articles";
+const SA_MARKET_NEWS_URL = "https://seekingalpha.com/market-news";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 const TABLE_SELECTOR = "table tbody tr";
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
+const MARKET_NEWS_DETAIL_BACKFILL_LIMITS = {
+  quick: 0,
+  full: 20,
+  backfill: 60,
+  manual: 0,
+};
+const MARKET_NEWS_PROFILES = {
+  quick: {
+    name: "quick",
+    maxDetailFetches: 12,
+    listStartMinMs: 700,
+    listStartMaxMs: 1300,
+    listScrolls: 3,
+    listScrollSettleMinMs: 1400,
+    listScrollSettleMaxMs: 2200,
+    detailReadyDwellMinMs: 1200,
+    detailReadyDwellMaxMs: 2200,
+    detailGapMinMs: 3500,
+    detailGapMaxMs: 6000,
+    retryDelayMinMs: 2500,
+    retryDelayMaxMs: 4000,
+  },
+  full: {
+    name: "full",
+    maxDetailFetches: 30,
+    listStartMinMs: 900,
+    listStartMaxMs: 1600,
+    listScrolls: 8,
+    listScrollSettleMinMs: 1800,
+    listScrollSettleMaxMs: 2800,
+    detailReadyDwellMinMs: 1500,
+    detailReadyDwellMaxMs: 2600,
+    detailGapMinMs: 4500,
+    detailGapMaxMs: 7500,
+    retryDelayMinMs: 3000,
+    retryDelayMaxMs: 5000,
+  },
+  backfill: {
+    name: "backfill",
+    maxDetailFetches: 80,
+    listStartMinMs: 1200,
+    listStartMaxMs: 2200,
+    listScrolls: 8,
+    listScrollSettleMinMs: 2200,
+    listScrollSettleMaxMs: 3600,
+    detailReadyDwellMinMs: 1800,
+    detailReadyDwellMaxMs: 3200,
+    detailGapMinMs: 6000,
+    detailGapMaxMs: 10000,
+    retryDelayMinMs: 4000,
+    retryDelayMaxMs: 6500,
+  },
+  manual: {
+    name: "manual",
+    maxDetailFetches: 20,
+    listStartMinMs: 1000,
+    listStartMaxMs: 1800,
+    listScrolls: 4,
+    listScrollSettleMinMs: 1800,
+    listScrollSettleMaxMs: 2800,
+    detailReadyDwellMinMs: 1500,
+    detailReadyDwellMaxMs: 2600,
+    detailGapMinMs: 4000,
+    detailGapMaxMs: 6500,
+    retryDelayMinMs: 3000,
+    retryDelayMaxMs: 5000,
+  },
+};
 const COMMENT_SCROLL_PROFILES = {
   quick: {
     name: "quick",
@@ -49,6 +118,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.action === "manual_fetch") {
     doManualFetch(msg.items || []).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "refresh_market_news") {
+    doMarketNewsRefresh(msg.mode || "quick").then(sendResponse);
     return true;
   }
 });
@@ -124,6 +197,102 @@ async function doRefresh(mode) {
       try { chrome.tabs.remove(tabId); } catch (_) { /* tab may already be closed */ }
     }
   }
+}
+
+
+// --- Market News refresh flow ---
+
+async function doMarketNewsRefresh(mode) {
+  const batchTs = new Date().toISOString();
+  var profile = getMarketNewsProfile(mode);
+  var tabId = null;
+  try {
+    sendProgress("Opening market news page...");
+    const tab = await chrome.tabs.create({ url: SA_MARKET_NEWS_URL, active: false });
+    tabId = tab.id;
+    await waitForTabLoad(tabId);
+
+    sendProgress("Waiting for market news...");
+    var ready = await waitForMarketNewsReady(tabId);
+    if (!ready.ok) {
+      var failure = { status: "error", error: ready.error, saved: 0, count: 0 };
+      await saveMarketNewsState(batchTs, mode, failure);
+      return failure;
+    }
+
+    await chrome.tabs.update(tabId, { active: true });
+    await sleep(randomBetween(profile.listStartMinMs, profile.listStartMaxMs));
+    await scrollMarketNews(tabId, profile);
+    await chrome.tabs.update(tabId, { active: false });
+
+    sendProgress("Scraping market news...");
+    var items = await injectMarketNewsScraper(tabId);
+    if (!Array.isArray(items)) items = [];
+
+    sendProgress("Saving " + items.length + " market-news item(s)...");
+    var detailBackfillLimit = getMarketNewsDetailBackfillLimit(mode);
+    var result = await sendNativeMessage2({
+      action: "save_market_news",
+      items: items,
+      detail_backfill_limit: detailBackfillLimit,
+    });
+    if (!result || result.status !== "ok") {
+      result = { status: "error", error: (result && result.error) || "save_market_news failed", saved: 0 };
+    }
+    result.count = items.length;
+
+    var needDetail = result.need_detail || [];
+    if (profile.maxDetailFetches && needDetail.length > profile.maxDetailFetches) {
+      needDetail = needDetail.slice(0, profile.maxDetailFetches);
+    }
+    var detailFetched = 0;
+    var detailFailed = 0;
+    result.detail_queued = needDetail.length;
+    if (needDetail.length > 0) {
+      sendProgress("Fetching " + needDetail.length + " market-news detail page(s)...");
+    }
+    for (var i = 0; i < needDetail.length; i++) {
+      var item = needDetail[i];
+      sendProgress("News detail " + (i + 1) + "/" + needDetail.length + ": " + item.news_id);
+      try {
+        await chrome.tabs.update(tabId, { url: item.url, active: false });
+        await waitForTabLoad(tabId);
+        await installMarketNewsPageGuards(tabId);
+        var saveDetail = await fetchMarketNewsDetailWithRetry(tabId, item, profile);
+        if (saveDetail && saveDetail.ok) {
+          detailFetched++;
+        } else {
+          detailFailed++;
+        }
+      } catch (_) {
+        detailFailed++;
+      }
+      if (i + 1 < needDetail.length) {
+        await sleep(randomBetween(profile.detailGapMinMs, profile.detailGapMaxMs));
+      }
+    }
+    result.detail_fetched = detailFetched;
+    result.detail_failed = detailFailed;
+    await saveMarketNewsState(batchTs, mode, result);
+    sendProgress("Market news done!");
+    return result;
+  } catch (err) {
+    var errorResult = { status: "error", error: err.message || String(err), saved: 0, count: 0 };
+    await saveMarketNewsState(batchTs, mode, errorResult);
+    return errorResult;
+  } finally {
+    if (tabId) {
+      try { chrome.tabs.remove(tabId); } catch (_) { /* tab may already be closed */ }
+    }
+  }
+}
+
+function getMarketNewsDetailBackfillLimit(mode) {
+  return MARKET_NEWS_DETAIL_BACKFILL_LIMITS[mode] || MARKET_NEWS_DETAIL_BACKFILL_LIMITS.quick;
+}
+
+function getMarketNewsProfile(mode) {
+  return MARKET_NEWS_PROFILES[mode] || MARKET_NEWS_PROFILES.quick;
 }
 
 // --- Tab management ---
@@ -217,6 +386,11 @@ function sendToNativeHost(action, scope, picks, error, batchTs) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function randomBetween(minMs, maxMs) {
+  if (maxMs <= minMs) return minMs;
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
 function sendProgress(text) {
@@ -635,6 +809,209 @@ async function scrollToComments(tabId, options) {
   return stats;
 }
 
+
+async function waitForMarketNewsReady(tabId, timeoutMs) {
+  timeoutMs = timeoutMs || 20000;
+  var start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        if (location.href.includes("/login") || location.href.includes("/sign_in")) {
+          return { status: "login_redirect" };
+        }
+        var text = document.body ? document.body.innerText : "";
+        var links = document.querySelectorAll('a[href*="/news/"]');
+        if (links.length >= 3) return { status: "ready", count: links.length };
+        if (text.length > 1000 && links.length > 0) return { status: "ready", count: links.length };
+        return { status: "loading", count: links.length };
+      },
+    });
+    var check = results[0] && results[0].result;
+    if (!check || check.status === "login_redirect") return { ok: false, error: "Session expired" };
+    if (check.status === "ready") return { ok: true, count: check.count };
+    await sleep(500);
+  }
+  return { ok: false, error: "Timeout waiting for market news" };
+}
+
+async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
+  timeoutMs = timeoutMs || 15000;
+  var start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function (paywallMarkers) {
+        if (location.href.includes("/login") || location.href.includes("/sign_in")) {
+          return { status: "login_redirect" };
+        }
+        var text = document.body ? document.body.innerText : "";
+        for (var i = 0; i < paywallMarkers.length; i++) {
+          if (text.includes(paywallMarkers[i])) {
+            return { status: "paywall", marker: paywallMarkers[i] };
+          }
+        }
+        var article = document.querySelector("article") || document.querySelector("main");
+        var hasTitle = !!document.querySelector("h1");
+        if (article && article.innerText.trim().length > 120 && hasTitle) {
+          return { status: "ready" };
+        }
+        return { status: "loading" };
+      },
+      args: [PAYWALL_MARKERS],
+    });
+    var check = results[0] && results[0].result;
+    if (!check || check.status === "login_redirect") {
+      return { ok: false, error: "Session expired" };
+    }
+    if (check.status === "paywall") {
+      return { ok: false, error: "Paywall: " + check.marker };
+    }
+    if (check.status === "ready") return { ok: true };
+    await sleep(500);
+  }
+  return { ok: false, error: "Timeout waiting for market news detail" };
+}
+
+async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
+  for (var attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      sendProgress("Retrying news detail: " + item.news_id);
+      await chrome.tabs.reload(tabId);
+      await waitForTabLoad(tabId);
+      await installMarketNewsPageGuards(tabId);
+      await sleep(randomBetween(profile.retryDelayMinMs, profile.retryDelayMaxMs));
+    }
+
+    var detailReady = await waitForMarketNewsDetailReady(tabId);
+    if (!detailReady.ok) {
+      continue;
+    }
+
+    await sleep(randomBetween(
+      profile.detailReadyDwellMinMs,
+      profile.detailReadyDwellMaxMs
+    ));
+
+    var detail = await injectDetailScraper(tabId);
+    if (!detail || detail.error) {
+      continue;
+    }
+
+    var report = formatDetailReport(detail);
+    if (!report || report.trim().length < 40) {
+      continue;
+    }
+
+    var saveDetail = await sendNativeMessage2({
+      action: "save_market_news_detail",
+      news_id: item.news_id,
+      body_markdown: report,
+    });
+    if (saveDetail && saveDetail.ok) {
+      return { ok: true };
+    }
+  }
+  return { ok: false };
+}
+
+async function installMarketNewsPageGuards(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        if (window.__mindfulrlMarketNewsGuardInstalled) return;
+        window.__mindfulrlMarketNewsGuardInstalled = true;
+
+        var blocked = [
+          /please check back later/i,
+          /content error/i,
+          /something went wrong/i,
+          /temporarily unavailable/i,
+        ];
+
+        function shouldSuppress(text) {
+          if (!text) return false;
+          for (var i = 0; i < blocked.length; i++) {
+            if (blocked[i].test(text)) return true;
+          }
+          return false;
+        }
+
+        window.alert = function () {};
+        window.confirm = function () { return false; };
+        window.prompt = function () { return null; };
+
+        function hideErrorOverlays() {
+          var nodes = document.querySelectorAll(
+            '[role=\"dialog\"], [aria-live], [aria-modal=\"true\"], .toast, .snackbar, .modal, .popup'
+          );
+          for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            var text = (node.innerText || node.textContent || '').trim();
+            if (!shouldSuppress(text)) continue;
+            node.style.setProperty('display', 'none', 'important');
+            node.style.setProperty('visibility', 'hidden', 'important');
+            node.setAttribute('data-mindfulrl-hidden', 'true');
+          }
+        }
+
+        hideErrorOverlays();
+        var observer = new MutationObserver(function () {
+          hideErrorOverlays();
+        });
+        observer.observe(document.documentElement || document.body, {
+          subtree: true,
+          childList: true,
+          attributes: false,
+        });
+      },
+    });
+  } catch (_) {
+    // Best-effort guard only.
+  }
+}
+
+async function scrollMarketNews(tabId, maxScrolls) {
+  var profile = maxScrolls || getMarketNewsProfile("quick");
+  var maxRounds = profile.listScrolls || 3;
+  var staleCount = 0;
+  for (var i = 0; i < maxRounds; i++) {
+    var before = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        var count = document.querySelectorAll('a[href*="/news/"]').length;
+        window.scrollBy(0, window.innerHeight);
+        return count;
+      },
+    });
+    var prevCount = before[0] && before[0].result || 0;
+    await sleep(randomBetween(profile.listScrollSettleMinMs, profile.listScrollSettleMaxMs));
+    var after = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        return document.querySelectorAll('a[href*="/news/"]').length;
+      },
+    });
+    var newCount = after[0] && after[0].result || 0;
+    sendProgress("Loading market news... (" + newCount + " links, scroll " + (i + 1) + ")");
+    if (newCount <= prevCount) {
+      staleCount++;
+      if (staleCount >= 2) break;
+    } else {
+      staleCount = 0;
+    }
+  }
+}
+
+function injectMarketNewsScraper(tabId) {
+  return chrome.scripting
+    .executeScript({ target: { tabId }, files: ["scrape_market_news.js"] })
+    .then(function (results) {
+      return (results[0] && results[0].result) || [];
+    });
+}
+
 async function waitForArticlesReady(tabId, timeoutMs) {
   timeoutMs = timeoutMs || 20000;
   var start = Date.now();
@@ -715,9 +1092,14 @@ function injectCommentsScraper(tabId) {
 
 function formatDetailReport(detail) {
   var parts = [];
-  if (detail.title) parts.push("# " + detail.title);
+  var body = detail.body_markdown || "";
+  var normalizedBody = body.trim();
+  var normalizedTitleHeading = detail.title ? ("# " + detail.title).trim() : "";
+  if (detail.title && (!normalizedBody || !normalizedBody.startsWith(normalizedTitleHeading))) {
+    parts.push("# " + detail.title);
+  }
   if (detail.author) parts.push("*Author: " + detail.author + "*");
-  if (detail.body_markdown) parts.push(detail.body_markdown);
+  if (body) parts.push(body);
   return parts.join("\n\n");
 }
 
@@ -743,6 +1125,17 @@ async function saveRefreshState(batchTs, results) {
       closed: results.closed,
       details: results.details || null,
       mode: results.mode || "quick",
+    },
+  });
+}
+
+
+async function saveMarketNewsState(batchTs, mode, result) {
+  await chrome.storage.local.set({
+    lastMarketNewsRefresh: {
+      batch_ts: batchTs,
+      mode: mode || "quick",
+      result: result,
     },
   });
 }

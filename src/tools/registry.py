@@ -989,7 +989,7 @@ class ToolRegistry:
     def _register_sa_tools(self) -> None:
         from .sa_tools import (
             get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
-            get_sa_articles, get_sa_article_detail,
+            get_sa_articles, get_sa_article_detail, get_sa_market_news,
         )
 
         self.register(ToolDefinition(
@@ -1083,6 +1083,29 @@ class ToolRegistry:
             parameters=[
                 ToolParameter("article_id", "string",
                               "Article ID (from get_sa_articles results)"),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_market_news",
+            description=(
+                "Search recent Seeking Alpha market-news feed items captured by the "
+                "Chrome extension. Returns metadata only: title, URL, publish time, "
+                "tickers, summary, and comment count."
+            ),
+            function=get_sa_market_news,
+            category="news",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("ticker", "string",
+                              "Filter by mentioned ticker (e.g. NVDA)",
+                              required=False),
+                ToolParameter("keyword", "string",
+                              "Full-text search in title and summary",
+                              required=False),
+                ToolParameter("limit", "integer",
+                              "Max results (default 20, max 100)",
+                              required=False, default=20),
             ],
         ))
 

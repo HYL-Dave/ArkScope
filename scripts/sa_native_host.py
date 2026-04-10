@@ -93,6 +93,12 @@ def handle_message(msg):
     elif action == "save_articles_meta":
         return _handle_save_articles_meta(dal, msg)
 
+    elif action == "save_market_news":
+        return _handle_save_market_news(dal, msg)
+
+    elif action == "save_market_news_detail":
+        return _handle_save_market_news_detail(dal, msg)
+
     elif action == "save_article_content":
         return _handle_save_article_content(dal, msg)
 
@@ -286,6 +292,44 @@ def _parse_sa_date(date_str):
         return None
     except Exception:
         return None
+
+
+def _handle_save_market_news(dal, msg):
+    """Persist recent Seeking Alpha market-news metadata."""
+    items = msg.get("items", [])
+    detail_backfill_limit = msg.get("detail_backfill_limit", 0)
+    try:
+        result = dal.save_sa_market_news(
+            items,
+            detail_backfill_limit=detail_backfill_limit,
+        )
+        logger.info(
+            "save_market_news: saved=%s items=%s backfill_limit=%s need_detail=%s",
+            result.get("saved"),
+            len(items),
+            detail_backfill_limit,
+            len(result.get("need_detail") or []),
+        )
+        return result
+    except Exception as e:
+        logger.error("save_market_news failed: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
+def _handle_save_market_news_detail(dal, msg):
+    """Persist a single market-news body payload."""
+    news_id = msg.get("news_id", "")
+    body_markdown = msg.get("body_markdown", "")
+    try:
+        ok = dal.save_sa_market_news_detail(news_id, body_markdown)
+        logger.info(
+            "save_market_news_detail: %s (%d chars, ok=%s)",
+            news_id, len(body_markdown), ok,
+        )
+        return {"status": "ok" if ok else "error", "news_id": news_id, "ok": ok}
+    except Exception as e:
+        logger.error("save_market_news_detail failed for %s: %s", news_id, e)
+        return {"status": "error", "news_id": news_id, "error": str(e)}
 
 
 def _handle_save_articles_meta(dal, msg):

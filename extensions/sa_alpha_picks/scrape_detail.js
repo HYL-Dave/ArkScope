@@ -60,6 +60,9 @@
 
   // --- Body → Markdown (TreeWalker) ---
   var bodyMd = extractMarkdown(container);
+  if (isMarketNewsPage()) {
+    bodyMd = cleanMarketNewsMarkdown(bodyMd, title);
+  }
 
   return {
     title: title,
@@ -82,6 +85,153 @@
       if (md) parts.push(md);
     }
     return parts.join("\n\n");
+  }
+
+  function isMarketNewsPage() {
+    return /^\/news\//.test(location.pathname || "");
+  }
+
+  function cleanMarketNewsMarkdown(markdown, titleText) {
+    if (!markdown) return markdown;
+    titleText = (titleText || "").trim();
+    var titleHeading = titleText ? "# " + titleText : "";
+
+    var lines = markdown.split(/\r?\n/);
+    var cleaned = [];
+    for (var i = 0; i < lines.length; i++) {
+      cleaned.push(lines[i].replace(/\s+$/, ""));
+    }
+
+    while (cleaned.length > 0 && !cleaned[0].trim()) cleaned.shift();
+
+    var keptHeading = false;
+    var out = [];
+    if (
+      cleaned.length > 0 &&
+      cleaned[0].trim() === titleHeading
+    ) {
+      out.push(cleaned[0].trim());
+      keptHeading = true;
+      cleaned = cleaned.slice(1);
+    }
+
+    var start = 0;
+    while (start < cleaned.length) {
+      var current = cleaned[start].trim();
+      if (!current) {
+        start += 1;
+        continue;
+      }
+      if (isMarketNewsBodyLine(current)) break;
+      start += 1;
+    }
+
+    cleaned = cleaned.slice(start);
+
+    var tail = [];
+    for (var j = 0; j < cleaned.length; j++) {
+      var line = cleaned[j].trim();
+      if (!line) {
+        tail.push("");
+        continue;
+      }
+      if (isMarketNewsSectionStart(line)) break;
+      if (isMarketNewsNoiseLine(line)) continue;
+      tail.push(line);
+    }
+
+    out = out.concat(tail);
+
+    var deduped = [];
+    var seenTitleHeading = keptHeading;
+    for (var d = 0; d < out.length; d++) {
+      var normalized = out[d].trim ? out[d].trim() : out[d];
+      if (!normalized) {
+        deduped.push(out[d]);
+        continue;
+      }
+      if (titleText && normalized === titleText) continue;
+      if (titleHeading && normalized === titleHeading) {
+        if (seenTitleHeading) continue;
+        seenTitleHeading = true;
+      }
+      deduped.push(out[d]);
+    }
+
+    var compact = [];
+    var blank = false;
+    for (var k = 0; k < deduped.length; k++) {
+      var entry = deduped[k].trim ? deduped[k].trim() : deduped[k];
+      if (!entry) {
+        if (!blank && compact.length > 0) compact.push("");
+        blank = true;
+        continue;
+      }
+      compact.push(entry);
+      blank = false;
+    }
+    while (compact.length > 0 && !compact[compact.length - 1]) compact.pop();
+
+    if (!keptHeading && compact.length > 0 && titleHeading) {
+      compact.unshift(titleHeading);
+    }
+
+    return compact.join("\n");
+  }
+
+  function isMarketNewsBodyLine(line) {
+    if (!line) return false;
+    if (isMarketNewsNoiseLine(line)) return false;
+    if (isMarketNewsSectionStart(line)) return false;
+
+    if (/^- (?!Share$|Save$|Play$|Comments?$)/.test(line) && line.length >= 20) {
+      return true;
+    }
+
+    if (/^[A-Z].{60,}$/.test(line) && !/\b(?:AM|PM)\s+ET\b/.test(line)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function isMarketNewsSectionStart(line) {
+    return /^(?:##|###)\s+(?:More on|Recommended For You|Related Stocks|Related news|Read more on|More Trending News)\b/i.test(
+      line || ""
+    ) || /^(?:See More|Source\s*\|)\b/i.test(
+      line || ""
+    );
+  }
+
+  function isMarketNewsNoiseLine(line) {
+    line = line || "";
+    if (!line) return false;
+
+    if (
+      /^(?:- )?(?:Share|Save|Play|Comments?)$/i.test(line) ||
+      /^\((?:<)?\d+\s*min\)$/i.test(line) ||
+      /^\(\d+\)$/.test(line) ||
+      /^Follow Seeking Alpha on Google\b/i.test(line) ||
+      /^See More\b/i.test(line) ||
+      /^Source\s*\|/i.test(line) ||
+      /\bPlease check back later\b/i.test(line) ||
+      /\bContent error\b/i.test(line) ||
+      /\bSomething went wrong\b/i.test(line) ||
+      /\btemporarily unavailable\b/i.test(line)
+    ) {
+      return true;
+    }
+
+    if (
+      /^By:\s+/i.test(line) ||
+      /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+\d{1,2},\s+\d{4}/.test(line) ||
+      /\b(?:Today|Yesterday),?\s+\d{1,2}:\d{2}\s*(?:AM|PM)\b/i.test(line) ||
+      /\b(?:AM|PM)\s+ET\b/.test(line)
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   function nodeToMarkdown(node) {

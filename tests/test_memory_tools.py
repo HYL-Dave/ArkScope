@@ -339,4 +339,4 @@ class TestMemoryToolRegistry:
     def test_total_tool_count(self):
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 49
+        assert len(registry.list_all()) == 50

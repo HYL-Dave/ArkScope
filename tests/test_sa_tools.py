@@ -25,6 +25,7 @@ from src.tools.sa_tools import (
     get_sa_alpha_picks,
     get_sa_pick_detail,
     refresh_sa_alpha_picks,
+    get_sa_market_news,
     _is_sa_enabled,
 )
 from src.tools.data_access import DataAccessLayer, _sanitize_sa_comments_count
@@ -529,6 +530,27 @@ class TestToolFunctions:
             result = refresh_sa_alpha_picks(MagicMock())
             assert "message" in result
 
+    def test_get_market_news_disabled(self):
+        """Disabled SA market-news returns message."""
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=False):
+            result = get_sa_market_news(MagicMock())
+            assert "message" in result
+
+    def test_get_market_news_enabled(self):
+        """Market-news tool reads from DAL when SA is enabled."""
+        dal = MagicMock()
+        dal.get_sa_market_news.return_value = [
+            {"news_id": "123", "title": "Fed update", "tickers": ["SPY"]},
+        ]
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
+            result = get_sa_market_news(dal, ticker="spy", keyword="Fed", limit=5)
+
+        assert result["count"] == 1
+        assert result["items"][0]["news_id"] == "123"
+        dal.get_sa_market_news.assert_called_once_with(
+            ticker="spy", keyword="Fed", limit=5
+        )
+
     def test_filter_by_sector(self):
         """Sector filter works on returned picks."""
         with patch("src.tools.sa_tools._is_sa_enabled", return_value=True), \
@@ -555,27 +577,27 @@ class TestToolFunctions:
 # ============================================================
 
 class TestBridgeIntegration:
-    def test_registry_47(self):
-        """Registry should have 47 tools (44 + 3 SA)."""
+    def test_registry_50(self):
+        """Registry should have 50 tools."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 49
+        assert len(registry.list_all()) == 50
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (1 + 3 SA picks + 2 SA articles)."""
         registry = create_default_registry()
         assert len(registry.list_by_category("portfolio")) == 6
 
-    def test_openai_schema_47(self):
-        """OpenAI schema should have 47 tools."""
+    def test_openai_schema_50(self):
+        """OpenAI schema should have 50 tools."""
         registry = create_default_registry()
         schema = registry.to_openai_schema()
-        assert len(schema) == 49
+        assert len(schema) == 50
 
-    def test_anthropic_schema_47(self):
-        """Anthropic schema should have 47 tools."""
+    def test_anthropic_schema_50(self):
+        """Anthropic schema should have 50 tools."""
         registry = create_default_registry()
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 49
+        assert len(schema) == 50
 
     def test_sa_tool_names_in_registry(self):
         """SA tool names should exist in registry."""
@@ -584,15 +606,16 @@ class TestBridgeIntegration:
         assert "get_sa_alpha_picks" in names
         assert "get_sa_pick_detail" in names
         assert "refresh_sa_alpha_picks" in names
+        assert "get_sa_market_news" in names
 
-    def test_anthropic_bridge_48(self):
-        """Anthropic bridge should have 48 schemas (47 + delegate_to_subagent)."""
+    def test_anthropic_bridge_51(self):
+        """Anthropic bridge should have 51 schemas (50 registry + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 50
+        assert len(tools) == 51
 
-    def test_openai_bridge_48(self):
-        """OpenAI bridge should have 48 tools (47 + delegate, before web conditional)."""
+    def test_openai_bridge_includes_sa_market_news(self):
+        """Anthropic bridge includes SA market-news schema."""
         # Note: OpenAI tools count depends on web config.
         # Base tools (before web conditional) should be 48.
         # We test that SA tools are present in the schema names.
@@ -602,6 +625,7 @@ class TestBridgeIntegration:
         assert "get_sa_alpha_picks" in names
         assert "get_sa_pick_detail" in names
         assert "refresh_sa_alpha_picks" in names
+        assert "get_sa_market_news" in names
 
 
 # ============================================================
@@ -693,6 +717,102 @@ class TestGetDetailFileMerge:
         result = dal.get_sa_pick_detail("NVDA", "2025-11-15")
         assert result is not None
         assert result.get("detail_report") == "# Report"
+
+
+class TestDataAccessMarketNews:
+    def test_save_sa_market_news_normalizes_items(self):
+        """Market-news persistence normalizes IDs, tickers, and comment counts."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.upsert_sa_market_news.return_value = 1
+        dal._backend.query_sa_market_news_need_detail.return_value = [
+            {"news_id": "1234567-fed-update", "url": "https://seekingalpha.com/news/1234567-fed-update"}
+        ]
+
+        result = dal.save_sa_market_news([
+            {
+                "url": "https://seekingalpha.com/news/1234567-fed-update",
+                "title": "Fed update",
+                "tickers": ["spy", "SPY", " qqq "],
+                "comments_count": "7",
+            }
+        ])
+
+        assert result == {
+            "status": "ok",
+            "saved": 1,
+            "need_detail": [
+                {"news_id": "1234567-fed-update", "url": "https://seekingalpha.com/news/1234567-fed-update"}
+            ],
+        }
+        persisted = dal._backend.upsert_sa_market_news.call_args.args[0]
+        assert persisted[0]["news_id"] == "1234567-fed-update"
+        assert persisted[0]["tickers"] == ["SPY", "QQQ"]
+        assert persisted[0]["comments_count"] == 7
+        dal._backend.query_sa_market_news_need_detail.assert_called_once()
+
+    def test_save_sa_market_news_includes_backfill_candidates(self):
+        """Market-news save can append backlog detail candidates without duplicates."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.upsert_sa_market_news.return_value = 2
+        dal._backend.query_sa_market_news_need_detail.side_effect = [
+            [{"news_id": "123", "url": "https://seekingalpha.com/news/123"}],
+            [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
+                {"news_id": "456", "url": "https://seekingalpha.com/news/456"},
+            ],
+        ]
+
+        result = dal.save_sa_market_news(
+            [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123", "title": "Fed update"},
+                {"news_id": "789", "url": "https://seekingalpha.com/news/789", "title": "Oil update"},
+            ],
+            detail_backfill_limit=5,
+        )
+
+        assert result == {
+            "status": "ok",
+            "saved": 2,
+            "need_detail": [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
+                {"news_id": "456", "url": "https://seekingalpha.com/news/456"},
+            ],
+        }
+        assert dal._backend.query_sa_market_news_need_detail.call_count == 2
+        current_call = dal._backend.query_sa_market_news_need_detail.call_args_list[0]
+        backlog_call = dal._backend.query_sa_market_news_need_detail.call_args_list[1]
+        assert current_call.args[0] == ["123", "789"]
+        assert backlog_call.kwargs["news_ids"] is None
+        assert backlog_call.kwargs["exclude_news_ids"] == ["123", "789"]
+        assert backlog_call.kwargs["limit"] == 5
+
+    def test_get_sa_market_news_queries_backend(self):
+        """Market-news read path delegates to DB backend."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.query_sa_market_news.return_value = [{"news_id": "123"}]
+
+        result = dal.get_sa_market_news(ticker="NVDA", keyword="earnings", limit=3)
+
+        assert result == [{"news_id": "123"}]
+        dal._backend.query_sa_market_news.assert_called_once_with(
+            ticker="NVDA", keyword="earnings", limit=3
+        )
+
+    def test_save_sa_market_news_detail_updates_backend(self):
+        """Market-news detail body persistence delegates to DB backend."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.save_sa_market_news_detail.return_value = True
+
+        result = dal.save_sa_market_news_detail("123", "# Headline\n\nBody")
+
+        assert result is True
+        dal._backend.save_sa_market_news_detail.assert_called_once_with(
+            "123", "# Headline\n\nBody"
+        )
 
 
 # ============================================================
@@ -1220,6 +1340,51 @@ class TestDataAccessArticleMeta:
 
 
 class TestNativeHostArticles:
+    def test_save_market_news(self):
+        """save_market_news calls DAL and returns result."""
+        from scripts.sa_native_host import _handle_save_market_news
+        dal = MagicMock()
+        dal.save_sa_market_news.return_value = {"status": "ok", "saved": 2}
+        result = _handle_save_market_news(dal, {
+            "items": [
+                {"news_id": "123", "title": "Fed update"},
+                {"news_id": "124", "title": "Oil update"},
+            ],
+        })
+        assert result["saved"] == 2
+        dal.save_sa_market_news.assert_called_once()
+        assert dal.save_sa_market_news.call_args.kwargs["detail_backfill_limit"] == 0
+
+    def test_save_market_news_passes_backfill_limit(self):
+        """save_market_news forwards requested detail backlog limit."""
+        from scripts.sa_native_host import _handle_save_market_news
+        dal = MagicMock()
+        dal.save_sa_market_news.return_value = {"status": "ok", "saved": 1}
+        result = _handle_save_market_news(dal, {
+            "items": [{"news_id": "123", "title": "Fed update"}],
+            "detail_backfill_limit": 12,
+        })
+        assert result["saved"] == 1
+        dal.save_sa_market_news.assert_called_once_with(
+            [{"news_id": "123", "title": "Fed update"}],
+            detail_backfill_limit=12,
+        )
+
+    def test_save_market_news_detail(self):
+        """save_market_news_detail calls DAL and returns result."""
+        from scripts.sa_native_host import _handle_save_market_news_detail
+        dal = MagicMock()
+        dal.save_sa_market_news_detail.return_value = True
+        result = _handle_save_market_news_detail(dal, {
+            "news_id": "123",
+            "body_markdown": "# Headline\n\nBody",
+        })
+        assert result["status"] == "ok"
+        assert result["ok"] is True
+        dal.save_sa_market_news_detail.assert_called_once_with(
+            "123", "# Headline\n\nBody"
+        )
+
     def test_save_articles_meta(self):
         """save_articles_meta calls DAL and returns result."""
         from scripts.sa_native_host import _handle_save_articles_meta
@@ -1573,15 +1738,20 @@ class TestCommentDuplicateCleanupPlan:
 
 
 class TestRegistryV3:
-    def test_registry_49(self):
-        """Registry should have 49 tools (47 + 2 SA articles)."""
+    def test_registry_50(self):
+        """Registry should have 50 tools (47 + 2 SA articles + market news)."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 49
+        assert len(registry.list_all()) == 50
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (4 + 2 SA articles)."""
         registry = create_default_registry()
         assert len(registry.list_by_category("portfolio")) == 6
+
+    def test_news_category_6(self):
+        """News category should include the SA market-news tool."""
+        registry = create_default_registry()
+        assert len(registry.list_by_category("news")) == 6
 
     def test_new_tool_names_in_registry(self):
         """New SA article tool names should exist in registry."""
@@ -1589,3 +1759,4 @@ class TestRegistryV3:
         names = registry.list_names()
         assert "get_sa_articles" in names
         assert "get_sa_article_detail" in names
+        assert "get_sa_market_news" in names

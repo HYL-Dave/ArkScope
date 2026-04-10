@@ -1370,6 +1370,196 @@ class DatabaseBackend:
             logger.error("Failed to get SA refresh meta: %s", e)
         return result
 
+
+    def upsert_sa_market_news(self, items: list) -> int:
+        """Batch upsert Seeking Alpha market-news metadata."""
+        conn = self._get_conn()
+        count = 0
+        try:
+            with conn.cursor() as cur:
+                for item in items:
+                    cur.execute(
+                        """INSERT INTO sa_market_news
+                        (news_id, url, title, published_at, published_text, tickers,
+                         category, summary, comments_count, raw_data)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (news_id) DO UPDATE SET
+                            url = EXCLUDED.url,
+                            title = EXCLUDED.title,
+                            published_at = COALESCE(EXCLUDED.published_at, sa_market_news.published_at),
+                            published_text = COALESCE(EXCLUDED.published_text, sa_market_news.published_text),
+                            tickers = CASE
+                                WHEN COALESCE(array_length(EXCLUDED.tickers, 1), 0) > 0 THEN EXCLUDED.tickers
+                                ELSE sa_market_news.tickers
+                            END,
+                            category = COALESCE(EXCLUDED.category, sa_market_news.category),
+                            summary = COALESCE(EXCLUDED.summary, sa_market_news.summary),
+                            comments_count = GREATEST(
+                                COALESCE(sa_market_news.comments_count, 0),
+                                COALESCE(EXCLUDED.comments_count, 0)
+                            ),
+                            raw_data = COALESCE(EXCLUDED.raw_data, sa_market_news.raw_data),
+                            updated_at = NOW()
+                        """,
+                        (
+                            item.get("news_id"),
+                            item.get("url"),
+                            item.get("title"),
+                            item.get("published_at"),
+                            item.get("published_text"),
+                            item.get("tickers") or [],
+                            item.get("category"),
+                            item.get("summary"),
+                            item.get("comments_count", 0),
+                            psycopg2.extras.Json(item.get("raw_data")),
+                        ),
+                    )
+                    count += 1
+        except Exception as e:
+            logger.error("Failed to upsert SA market news: %s", e)
+        return count
+
+    def query_sa_market_news(
+        self,
+        ticker: Optional[str] = None,
+        keyword: Optional[str] = None,
+        limit: int = 20,
+    ) -> list:
+        """Query recent Seeking Alpha market-news items."""
+        conn = self._get_conn()
+        conditions = []
+        params = []
+        if ticker:
+            conditions.append("%s = ANY(tickers)")
+            params.append(ticker.upper())
+        if keyword:
+            conditions.append(
+                "to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(summary, '')) "
+                "@@ plainto_tsquery('english', %s)"
+            )
+            params.append(keyword)
+        where = " AND ".join(conditions) if conditions else "TRUE"
+        params.append(max(1, min(int(limit or 20), 100)))
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    f"""SELECT news_id, url, title, published_at, published_text,
+                        tickers, category, summary, comments_count, body_markdown,
+                        detail_fetched_at, fetched_at, updated_at
+                    FROM sa_market_news
+                    WHERE {where}
+                    ORDER BY COALESCE(published_at, fetched_at) DESC NULLS LAST, id DESC
+                    LIMIT %s""",
+                    tuple(params),
+                )
+                rows = []
+                for row in cur.fetchall():
+                    item = dict(row)
+                    for key in ("published_at", "detail_fetched_at", "fetched_at", "updated_at"):
+                        if item.get(key) and hasattr(item[key], "isoformat"):
+                            item[key] = item[key].isoformat()
+                    rows.append(item)
+                return rows
+        except Exception as e:
+            logger.error("Failed to query SA market news: %s", e)
+            return []
+
+    def query_sa_market_news_need_detail(
+        self,
+        news_ids: list | None = None,
+        detail_cache_hours: int = 24,
+        limit: int = 50,
+        exclude_news_ids: list | None = None,
+    ) -> list:
+        """Return market-news items that still need detail body fetch."""
+        if limit is not None and int(limit or 0) <= 0:
+            return []
+        conn = self._get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                filters = [
+                    "("
+                    "body_markdown IS NULL OR body_markdown = '' "
+                    "OR detail_fetched_at IS NULL "
+                    "OR detail_fetched_at < NOW() - (%s || ' hours')::interval"
+                    ")"
+                ]
+                params = [int(detail_cache_hours)]
+                if news_ids:
+                    filters.append("news_id = ANY(%s)")
+                    params.append(news_ids)
+                if exclude_news_ids:
+                    filters.append("NOT (news_id = ANY(%s))")
+                    params.append(exclude_news_ids)
+                params.append(max(1, min(int(limit or 50), 200)))
+                cur.execute(
+                    f"""
+                    SELECT news_id, url
+                    FROM sa_market_news
+                    WHERE {' AND '.join(filters)}
+                    ORDER BY
+                      CASE WHEN body_markdown IS NULL OR body_markdown = '' THEN 0 ELSE 1 END,
+                      COALESCE(detail_fetched_at, TIMESTAMPTZ '1970-01-01') ASC,
+                      COALESCE(published_at, fetched_at) DESC NULLS LAST
+                    LIMIT %s
+                    """,
+                    tuple(params),
+                )
+                return [dict(row) for row in cur.fetchall()]
+        except Exception as e:
+            logger.error("Failed to query SA market news detail candidates: %s", e)
+            return []
+
+    def invalidate_dirty_sa_market_news_detail(self) -> int:
+        """Drop cached market-news body content that matches known chrome noise."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE sa_market_news
+                    SET body_markdown = NULL,
+                        detail_fetched_at = NULL,
+                        updated_at = NOW()
+                    WHERE body_markdown IS NOT NULL
+                      AND (
+                        LOWER(body_markdown) LIKE '%follow seeking alpha on google%'
+                        OR LOWER(body_markdown) LIKE '%recommended for you%'
+                        OR LOWER(body_markdown) LIKE '%related stocks%'
+                        OR LOWER(body_markdown) LIKE '%## more on %'
+                        OR LOWER(body_markdown) LIKE '%### recommended for you%'
+                        OR LOWER(body_markdown) LIKE '%### more trending news%'
+                        OR LOWER(body_markdown) LIKE '%see more%'
+                        OR LOWER(body_markdown) LIKE '%- share%'
+                        OR body_markdown ~ E'^# .+\\n\\n# '
+                      )
+                    """
+                )
+                return int(cur.rowcount or 0)
+        except Exception as e:
+            logger.error("Failed to invalidate dirty SA market news detail cache: %s", e)
+            return 0
+
+    def save_sa_market_news_detail(self, news_id: str, body_markdown: str) -> bool:
+        """Persist market-news body Markdown for a single news item."""
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE sa_market_news
+                    SET body_markdown = %s,
+                        detail_fetched_at = NOW(),
+                        updated_at = NOW()
+                    WHERE news_id = %s
+                    """,
+                    (body_markdown, news_id),
+                )
+                return cur.rowcount > 0
+        except Exception as e:
+            logger.error("Failed to save SA market news detail for %s: %s", news_id, e)
+            return False
+
     # ============================================================
     # SA Articles + Comments (Phase 11c-v3)
     # ============================================================

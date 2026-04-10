@@ -1,9 +1,9 @@
 """
 Seeking Alpha Alpha Picks tool functions.
 
-5 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
-         get_sa_articles, get_sa_article_detail
-All require DAL, category="portfolio".
+6 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+         get_sa_articles, get_sa_article_detail, get_sa_market_news
+All require DAL. Alpha Picks tools are category="portfolio"; market news is category="news".
 """
 
 from __future__ import annotations
@@ -186,4 +186,28 @@ def get_sa_article_detail(dal: Any, article_id: str) -> Dict:
         return result
     except Exception as e:
         logger.error("get_sa_article_detail error: %s", e)
+        return {"error": str(e)}
+
+
+def get_sa_market_news(
+    dal: Any,
+    ticker: Optional[str] = None,
+    keyword: Optional[str] = None,
+    limit: int = 20,
+) -> Dict:
+    """Search recent Seeking Alpha market-news items.
+
+    Returns metadata-only feed items captured from /market-news: title, URL,
+    tickers, publish time text, summary, and comment count. When detail pages
+    have been fetched, results also include `body_markdown` and `detail_fetched_at`.
+    The Chrome extension performs the refresh; this tool reads the local DB cache.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    try:
+        items = dal.get_sa_market_news(ticker=ticker, keyword=keyword, limit=limit)
+        return {"items": items, "count": len(items)}
+    except Exception as e:
+        logger.error("get_sa_market_news error: %s", e)
         return {"error": str(e)}

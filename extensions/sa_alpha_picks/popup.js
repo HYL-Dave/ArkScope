@@ -1,20 +1,23 @@
 // popup.js — Three-mode refresh: Quick + Full Scan + Deep Backfill
 
 var statusEl = document.getElementById("status");
+var marketNewsStatusEl = document.getElementById("marketNewsStatus");
 var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
 var backfillBtn = document.getElementById("backfillBtn");
+var marketNewsBtn = document.getElementById("marketNewsBtn");
 var progressEl = document.getElementById("progress");
 var manualSection = document.getElementById("manualSection");
 var manualInput = document.getElementById("manualInput");
 var manualBtn = document.getElementById("manualBtn");
 
 // Load last refresh state + restore manual input
-chrome.storage.local.get(["lastRefresh", "manualDraft"], function (data) {
+chrome.storage.local.get(["lastRefresh", "lastMarketNewsRefresh", "manualDraft"], function (data) {
   if (data.manualDraft) {
     manualInput.value = data.manualDraft;
   }
   renderStatus(data.lastRefresh);
+  renderMarketNewsStatus(data.lastMarketNewsRefresh);
 });
 
 // Persist manual input on change (survives popup close/reopen)
@@ -34,10 +37,15 @@ backfillBtn.addEventListener("click", function () {
   startRefresh("backfill");
 });
 
+marketNewsBtn.addEventListener("click", function () {
+  startMarketNewsRefresh();
+});
+
 function startRefresh(mode) {
   quickBtn.disabled = true;
   fullBtn.disabled = true;
   backfillBtn.disabled = true;
+  marketNewsBtn.disabled = true;
   var activeBtn = mode === "full" ? fullBtn : (mode === "backfill" ? backfillBtn : quickBtn);
   var originalText = activeBtn.textContent;
   activeBtn.textContent = mode === "full"
@@ -50,11 +58,37 @@ function startRefresh(mode) {
     quickBtn.disabled = false;
     fullBtn.disabled = false;
     backfillBtn.disabled = false;
+    marketNewsBtn.disabled = false;
     activeBtn.textContent = originalText;
     progressEl.style.display = "none";
 
     chrome.storage.local.get("lastRefresh", function (data) {
       renderStatus(data.lastRefresh);
+    });
+  });
+}
+
+
+function startMarketNewsRefresh() {
+  quickBtn.disabled = true;
+  fullBtn.disabled = true;
+  backfillBtn.disabled = true;
+  marketNewsBtn.disabled = true;
+  var originalText = marketNewsBtn.textContent;
+  marketNewsBtn.textContent = "Syncing News...";
+  progressEl.style.display = "block";
+  progressEl.textContent = "Opening market news...";
+
+  chrome.runtime.sendMessage({ action: "refresh_market_news", mode: "quick" }, function () {
+    quickBtn.disabled = false;
+    fullBtn.disabled = false;
+    backfillBtn.disabled = false;
+    marketNewsBtn.disabled = false;
+    marketNewsBtn.textContent = originalText;
+    progressEl.style.display = "none";
+
+    chrome.storage.local.get("lastMarketNewsRefresh", function (data) {
+      renderMarketNewsStatus(data.lastMarketNewsRefresh);
     });
   });
 }
@@ -104,6 +138,29 @@ chrome.runtime.onMessage.addListener(function (msg) {
     progressEl.textContent = msg.text;
   }
 });
+
+function renderMarketNewsStatus(lastMarketNewsRefresh) {
+  if (!marketNewsStatusEl) return;
+  if (!lastMarketNewsRefresh) {
+    marketNewsStatusEl.className = "empty";
+    marketNewsStatusEl.textContent = "Market News: not synced yet.";
+    return;
+  }
+  var ts = lastMarketNewsRefresh.batch_ts;
+  var timeStr = ts ? new Date(ts).toLocaleString() : "unknown";
+  var result = lastMarketNewsRefresh.result || {};
+  if (result.status === "ok") {
+    marketNewsStatusEl.className = "success";
+    var detailSuffix = "";
+    if (typeof result.detail_fetched === "number") {
+      detailSuffix = ", " + result.detail_fetched + " detail fetched";
+    }
+    marketNewsStatusEl.textContent = "Market News: " + (result.saved || 0) + " saved / " + (result.count || 0) + " scraped" + detailSuffix + " (" + timeStr + ")";
+  } else {
+    marketNewsStatusEl.className = "error";
+    marketNewsStatusEl.textContent = "Market News failed: " + (result.error || "unknown") + " (" + timeStr + ")";
+  }
+}
 
 function renderStatus(lastRefresh) {
   if (!lastRefresh) {

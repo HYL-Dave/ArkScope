@@ -1133,6 +1133,23 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["article_id"],
             },
         },
+        {
+            "name": "get_sa_market_news",
+            "description": (
+                "Search recent Seeking Alpha market-news feed items captured by the "
+                "Chrome extension. Returns metadata only: title, URL, publish time, "
+                "tickers, summary, and comment count."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {"type": "string", "description": "Filter by mentioned ticker"},
+                    "keyword": {"type": "string", "description": "Full-text search in title and summary"},
+                    "limit": {"type": "integer", "description": "Max results (default 20)"},
+                },
+                "required": [],
+            },
+        },
     ])
 
     return tools
@@ -1236,7 +1253,7 @@ def execute_tool(
     from src.tools.rl_tools import get_rl_model_status, get_rl_prediction, get_rl_backtest_report
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
-        get_sa_articles, get_sa_article_detail,
+        get_sa_articles, get_sa_article_detail, get_sa_market_news,
     )
 
     # Tool dispatch map
@@ -1511,6 +1528,12 @@ def execute_tool(
         ),
         "get_sa_article_detail": lambda: get_sa_article_detail(
             dal, tool_input["article_id"]
+        ),
+        "get_sa_market_news": lambda: get_sa_market_news(
+            dal,
+            ticker=tool_input.get("ticker"),
+            keyword=tool_input.get("keyword"),
+            limit=tool_input.get("limit", 20),
         ),
     }
 

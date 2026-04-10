@@ -116,6 +116,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         refresh_sa_alpha_picks as _refresh_sa_alpha_picks,
         get_sa_articles as _get_sa_articles,
         get_sa_article_detail as _get_sa_article_detail,
+        get_sa_market_news as _get_sa_market_news,
     )
 
     # ================================================================
@@ -993,6 +994,19 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _get_sa_article_detail(dal, article_id)
         return _serialize_result(result, "get_sa_article_detail")
 
+    @function_tool
+    def tool_get_sa_market_news(
+        ticker: str = "", keyword: str = "", limit: int = 20
+    ) -> str:
+        """Search recent Seeking Alpha market-news items captured by the extension."""
+        result = _get_sa_market_news(
+            dal,
+            ticker=ticker or None,
+            keyword=keyword or None,
+            limit=limit,
+        )
+        return _serialize_result(result, "get_sa_market_news")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -1041,6 +1055,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_refresh_sa_alpha_picks,
         tool_get_sa_articles,
         tool_get_sa_article_detail,
+        tool_get_sa_market_news,
     ]
 
     # Conditionally add web tools

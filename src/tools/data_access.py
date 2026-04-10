@@ -9,6 +9,7 @@ Wraps a DataBackend (file or database) and adds:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -35,6 +36,7 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
+_SA_MARKET_NEWS_DETAIL_CACHE_HOURS = 24
 
 
 def _extract_sa_published_year(published_date: Any) -> Optional[int]:
@@ -79,6 +81,51 @@ def _sanitize_sa_comments_count(
     if 0 <= suffix <= 9999:
         return suffix
     return count
+
+
+def _normalize_sa_market_news_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize SA market-news metadata before DB persistence."""
+    normalized = dict(item)
+    url = (normalized.get("url") or "").strip()
+    title = (normalized.get("title") or "").strip()
+    news_id = str(normalized.get("news_id") or "").strip()
+    if not news_id and url:
+        # Prefer the numeric /news/{id} segment; fall back to a stable URL hash.
+        parts = [p for p in url.split("/") if p]
+        if "news" in parts:
+            idx = parts.index("news")
+            if idx + 1 < len(parts):
+                news_id = parts[idx + 1].split("?")[0].split("#")[0]
+        if not news_id:
+            news_id = hashlib.sha256(url.encode("utf-8")).hexdigest()[:20]
+    if not news_id and title:
+        raw = f"{title}:{normalized.get('published_text') or normalized.get('published_at') or ''}"
+        news_id = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
+
+    tickers = []
+    seen = set()
+    for ticker in normalized.get("tickers") or []:
+        t = str(ticker or "").strip().upper()
+        if not t or t in seen:
+            continue
+        seen.add(t)
+        tickers.append(t)
+
+    try:
+        comments_count = int(normalized.get("comments_count") or 0)
+    except Exception:
+        comments_count = 0
+    if comments_count < 0:
+        comments_count = 0
+
+    normalized.update({
+        "news_id": news_id,
+        "url": url,
+        "title": title,
+        "tickers": tickers,
+        "comments_count": comments_count,
+    })
+    return normalized
 
 
 def _sanitize_sa_article_meta(article: Dict[str, Any]) -> Dict[str, Any]:
@@ -747,6 +794,70 @@ class DataAccessLayer:
         if isinstance(self._backend, DatabaseBackend):
             return self._backend.get_sa_refresh_meta()
         return self._load_sa_file_meta() or {}
+
+
+    # ── SA Market News (SA-R1, DB-only) ──
+
+    def save_sa_market_news(
+        self,
+        items: List[Dict],
+        detail_backfill_limit: int = 0,
+    ) -> Dict[str, Any]:
+        """Persist recent Seeking Alpha market-news metadata."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return {"error": "DB required for market news"}
+        normalized = [
+            _normalize_sa_market_news_item(item)
+            for item in items
+            if (item.get("url") or item.get("title"))
+        ]
+        saved = self._backend.upsert_sa_market_news(normalized)
+        current_ids = [item["news_id"] for item in normalized if item.get("news_id")]
+        need_detail = self._backend.query_sa_market_news_need_detail(
+            current_ids,
+            detail_cache_hours=_SA_MARKET_NEWS_DETAIL_CACHE_HOURS,
+            limit=len(normalized) or 50,
+        )
+        if detail_backfill_limit:
+            backlog = self._backend.query_sa_market_news_need_detail(
+                news_ids=None,
+                detail_cache_hours=_SA_MARKET_NEWS_DETAIL_CACHE_HOURS,
+                limit=detail_backfill_limit,
+                exclude_news_ids=current_ids,
+            )
+            seen = {item.get("news_id") for item in need_detail if item.get("news_id")}
+            for item in backlog:
+                news_id = item.get("news_id")
+                if not news_id or news_id in seen:
+                    continue
+                seen.add(news_id)
+                need_detail.append(item)
+        return {"status": "ok", "saved": saved, "need_detail": need_detail}
+
+    def get_sa_market_news(
+        self,
+        ticker: str = None,
+        keyword: str = None,
+        limit: int = 20,
+    ) -> List[Dict]:
+        """Query recent Seeking Alpha market-news metadata."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return []
+        return self._backend.query_sa_market_news(
+            ticker=ticker, keyword=keyword, limit=limit
+        )
+
+    def save_sa_market_news_detail(self, news_id: str, body_markdown: str) -> bool:
+        """Persist a single market-news body Markdown payload."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return False
+        return self._backend.save_sa_market_news_detail(news_id, body_markdown)
+
+    def invalidate_dirty_sa_market_news_detail(self) -> int:
+        """Invalidate cached market-news body content that matches known noisy captures."""
+        if not isinstance(self._backend, DatabaseBackend):
+            return 0
+        return self._backend.invalidate_dirty_sa_market_news_detail()
 
     # ── SA Articles + Comments (Phase 11c-v3, DB-only) ──
 
