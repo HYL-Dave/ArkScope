@@ -10,6 +10,9 @@ const SA_MARKET_NEWS_URL = "https://seekingalpha.com/market-news";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 const TABLE_SELECTOR = "table tbody tr";
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
+const MARKET_NEWS_AUTO_SYNC_ALARM = "market-news-auto-sync";
+const MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 60;
+const MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS = [5, 15, 60];
 const MARKET_NEWS_DETAIL_BACKFILL_LIMITS = {
   quick: 0,
   full: 20,
@@ -19,7 +22,7 @@ const MARKET_NEWS_DETAIL_BACKFILL_LIMITS = {
 const MARKET_NEWS_PROFILES = {
   quick: {
     name: "quick",
-    maxDetailFetches: 12,
+    maxDetailFetches: 18,
     recentKnownIdsLimit: 250,
     knownTailStopCount: 8,
     listStartMinMs: 700,
@@ -116,6 +119,7 @@ const COMMENT_SCROLL_PROFILES = {
     settleMs: 1200,
   },
 };
+var marketNewsRefreshInFlight = false;
 
 // --- Message listener (from popup) ---
 
@@ -131,6 +135,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "refresh_market_news") {
     doMarketNewsRefresh(msg.mode || "quick").then(sendResponse);
     return true;
+  }
+  if (msg.action === "set_market_news_auto_sync") {
+    setMarketNewsAutoSyncEnabled(!!msg.enabled, msg.interval_minutes).then(sendResponse);
+    return true;
+  }
+});
+
+chrome.runtime.onInstalled.addListener(function () {
+  syncMarketNewsAutoSyncAlarm();
+});
+
+chrome.runtime.onStartup.addListener(function () {
+  syncMarketNewsAutoSyncAlarm();
+});
+
+chrome.alarms.onAlarm.addListener(function (alarm) {
+  if (alarm && alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
+    doMarketNewsRefresh("quick", { trigger: "alarm" });
   }
 });
 
@@ -210,7 +232,16 @@ async function doRefresh(mode) {
 
 // --- Market News refresh flow ---
 
-async function doMarketNewsRefresh(mode) {
+async function doMarketNewsRefresh(mode, options) {
+  options = options || {};
+  if (marketNewsRefreshInFlight) {
+    return {
+      status: "busy",
+      error: "market news refresh already running",
+      trigger: options.trigger || "manual",
+    };
+  }
+  marketNewsRefreshInFlight = true;
   const batchTs = new Date().toISOString();
   var profile = getMarketNewsProfile(mode);
   var tabId = null;
@@ -282,14 +313,22 @@ async function doMarketNewsRefresh(mode) {
     }
     result.detail_fetched = detailFetched;
     result.detail_failed = detailFailed;
+    result.trigger = options.trigger || "manual";
     await saveMarketNewsState(batchTs, mode, result);
     sendProgress("Market news done!");
     return result;
   } catch (err) {
-    var errorResult = { status: "error", error: err.message || String(err), saved: 0, count: 0 };
+    var errorResult = {
+      status: "error",
+      error: err.message || String(err),
+      saved: 0,
+      count: 0,
+      trigger: options.trigger || "manual",
+    };
     await saveMarketNewsState(batchTs, mode, errorResult);
     return errorResult;
   } finally {
+    marketNewsRefreshInFlight = false;
     if (tabId) {
       try { chrome.tabs.remove(tabId); } catch (_) { /* tab may already be closed */ }
     }
@@ -302,6 +341,47 @@ function getMarketNewsDetailBackfillLimit(mode) {
 
 function getMarketNewsProfile(mode) {
   return MARKET_NEWS_PROFILES[mode] || MARKET_NEWS_PROFILES.quick;
+}
+
+async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
+  var data = await chrome.storage.local.get(["marketNewsAutoSyncIntervalMinutes"]);
+  var normalizedInterval = normalizeMarketNewsAutoSyncIntervalMinutes(
+    intervalMinutes != null ? intervalMinutes : data.marketNewsAutoSyncIntervalMinutes
+  );
+  await chrome.storage.local.set({
+    marketNewsAutoSyncEnabled: enabled,
+    marketNewsAutoSyncIntervalMinutes: normalizedInterval,
+  });
+  await syncMarketNewsAutoSyncAlarm();
+  return {
+    status: "ok",
+    enabled: enabled,
+    interval_minutes: normalizedInterval,
+  };
+}
+
+async function syncMarketNewsAutoSyncAlarm() {
+  var data = await chrome.storage.local.get(["marketNewsAutoSyncEnabled", "marketNewsAutoSyncIntervalMinutes"]);
+  var enabled = !!data.marketNewsAutoSyncEnabled;
+  var intervalMinutes = normalizeMarketNewsAutoSyncIntervalMinutes(data.marketNewsAutoSyncIntervalMinutes);
+  if (data.marketNewsAutoSyncIntervalMinutes !== intervalMinutes) {
+    await chrome.storage.local.set({ marketNewsAutoSyncIntervalMinutes: intervalMinutes });
+  }
+  await chrome.alarms.clear(MARKET_NEWS_AUTO_SYNC_ALARM);
+  if (enabled) {
+    await chrome.alarms.create(MARKET_NEWS_AUTO_SYNC_ALARM, {
+      delayInMinutes: intervalMinutes,
+      periodInMinutes: intervalMinutes,
+    });
+  }
+}
+
+function normalizeMarketNewsAutoSyncIntervalMinutes(value) {
+  var mins = parseInt(value, 10);
+  if (MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS.indexOf(mins) === -1) {
+    return MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES;
+  }
+  return mins;
 }
 
 // --- Tab management ---

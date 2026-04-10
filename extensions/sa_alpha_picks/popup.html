@@ -74,6 +74,44 @@
       color: #666;
       display: none;
     }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 8px 0 10px 0;
+      padding: 8px;
+      border-radius: 4px;
+      background: #f5f5f5;
+      font-size: 12px;
+      color: #444;
+    }
+    .toggle-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .toggle-row small {
+      color: #777;
+      font-size: 11px;
+    }
+    .toggle-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toggle-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .toggle-row select {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: white;
+      color: #444;
+      font-size: 12px;
+      padding: 4px 6px;
+    }
   </style>
 </head>
 <body>
@@ -87,6 +125,20 @@
   <div class="btn-row">
     <button id="backfillBtn">Deep Backfill</button>
     <button id="marketNewsBtn">Market News</button>
+  </div>
+  <div class="toggle-row">
+    <label for="marketNewsAutoSyncToggle">
+      <span>Auto-sync Market News</span>
+      <small>Runs quick sync on the selected interval when enabled</small>
+    </label>
+    <div class="toggle-controls">
+      <select id="marketNewsAutoSyncInterval">
+        <option value="5">5 min</option>
+        <option value="15">15 min</option>
+        <option value="60">60 min</option>
+      </select>
+      <input id="marketNewsAutoSyncToggle" type="checkbox">
+    </div>
   </div>
   <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News: recent market feed</div>
   <div id="progress"></div>

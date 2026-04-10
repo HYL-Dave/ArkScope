@@ -6,16 +6,22 @@ var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
 var backfillBtn = document.getElementById("backfillBtn");
 var marketNewsBtn = document.getElementById("marketNewsBtn");
+var marketNewsAutoSyncToggle = document.getElementById("marketNewsAutoSyncToggle");
+var marketNewsAutoSyncInterval = document.getElementById("marketNewsAutoSyncInterval");
 var progressEl = document.getElementById("progress");
 var manualSection = document.getElementById("manualSection");
 var manualInput = document.getElementById("manualInput");
 var manualBtn = document.getElementById("manualBtn");
+var MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL = "60";
 
 // Load last refresh state + restore manual input
-chrome.storage.local.get(["lastRefresh", "lastMarketNewsRefresh", "manualDraft"], function (data) {
+chrome.storage.local.get(["lastRefresh", "lastMarketNewsRefresh", "manualDraft", "marketNewsAutoSyncEnabled", "marketNewsAutoSyncIntervalMinutes"], function (data) {
   if (data.manualDraft) {
     manualInput.value = data.manualDraft;
   }
+  marketNewsAutoSyncToggle.checked = !!data.marketNewsAutoSyncEnabled;
+  marketNewsAutoSyncInterval.value = normalizeMarketNewsAutoSyncIntervalValue(data.marketNewsAutoSyncIntervalMinutes);
+  marketNewsAutoSyncInterval.setAttribute("data-last-value", marketNewsAutoSyncInterval.value);
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
 });
@@ -39,6 +45,33 @@ backfillBtn.addEventListener("click", function () {
 
 marketNewsBtn.addEventListener("click", function () {
   startMarketNewsRefresh();
+});
+
+marketNewsAutoSyncToggle.addEventListener("change", function () {
+  var enabled = !!marketNewsAutoSyncToggle.checked;
+  updateMarketNewsAutoSyncSetting({
+    enabled: enabled,
+    interval_minutes: parseInt(marketNewsAutoSyncInterval.value, 10),
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      marketNewsAutoSyncToggle.checked = !enabled;
+    }
+  });
+});
+
+marketNewsAutoSyncInterval.addEventListener("change", function () {
+  var previousValue = marketNewsAutoSyncInterval.getAttribute("data-last-value") || MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL;
+  var intervalMinutes = parseInt(marketNewsAutoSyncInterval.value, 10);
+  updateMarketNewsAutoSyncSetting({
+    enabled: !!marketNewsAutoSyncToggle.checked,
+    interval_minutes: intervalMinutes,
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      marketNewsAutoSyncInterval.value = previousValue;
+      return;
+    }
+    marketNewsAutoSyncInterval.setAttribute("data-last-value", String(result.interval_minutes));
+  });
 });
 
 function startRefresh(mode) {
@@ -91,6 +124,43 @@ function startMarketNewsRefresh() {
       renderMarketNewsStatus(data.lastMarketNewsRefresh);
     });
   });
+}
+
+function updateMarketNewsAutoSyncSetting(payload, onDone) {
+  chrome.runtime.sendMessage({
+    action: "set_market_news_auto_sync",
+    enabled: !!payload.enabled,
+    interval_minutes: payload.interval_minutes,
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      progressEl.style.display = "block";
+      progressEl.textContent = "Failed to update auto-sync setting";
+      progressEl.style.color = "#c62828";
+      if (onDone) onDone(result);
+      return;
+    }
+    marketNewsAutoSyncInterval.value = String(result.interval_minutes);
+    marketNewsAutoSyncInterval.setAttribute("data-last-value", String(result.interval_minutes));
+    progressEl.style.display = "block";
+    progressEl.style.color = "#666";
+    progressEl.textContent = result.enabled
+      ? "Market News auto-sync enabled (" + formatAutoSyncIntervalLabel(result.interval_minutes) + ")"
+      : "Market News auto-sync disabled";
+    if (onDone) onDone(result);
+  });
+}
+
+function normalizeMarketNewsAutoSyncIntervalValue(value) {
+  var allowed = { "5": true, "15": true, "60": true };
+  var normalized = String(value || MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL);
+  if (!allowed[normalized]) return MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL;
+  return normalized;
+}
+
+function formatAutoSyncIntervalLabel(intervalMinutes) {
+  var mins = parseInt(intervalMinutes, 10);
+  if (mins === 60) return "every 60 min";
+  return "every " + mins + " min";
 }
 
 manualBtn.addEventListener("click", function () {
