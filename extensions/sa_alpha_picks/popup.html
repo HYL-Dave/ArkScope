@@ -127,6 +127,20 @@
     <button id="marketNewsBtn">Market News</button>
   </div>
   <div class="toggle-row">
+    <label for="alphaPicksAutoSyncToggle">
+      <span>Auto-sync Alpha Picks</span>
+      <small>Runs quick refresh on the selected interval when enabled</small>
+    </label>
+    <div class="toggle-controls">
+      <select id="alphaPicksAutoSyncInterval">
+        <option value="15">15 min</option>
+        <option value="30">30 min</option>
+        <option value="60">60 min</option>
+      </select>
+      <input id="alphaPicksAutoSyncToggle" type="checkbox">
+    </div>
+  </div>
+  <div class="toggle-row">
     <label for="marketNewsAutoSyncToggle">
       <span>Auto-sync Market News</span>
       <small>Runs quick sync on the selected interval when enabled</small>

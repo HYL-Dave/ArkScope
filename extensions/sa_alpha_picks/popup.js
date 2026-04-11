@@ -6,19 +6,33 @@ var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
 var backfillBtn = document.getElementById("backfillBtn");
 var marketNewsBtn = document.getElementById("marketNewsBtn");
+var alphaPicksAutoSyncToggle = document.getElementById("alphaPicksAutoSyncToggle");
+var alphaPicksAutoSyncInterval = document.getElementById("alphaPicksAutoSyncInterval");
 var marketNewsAutoSyncToggle = document.getElementById("marketNewsAutoSyncToggle");
 var marketNewsAutoSyncInterval = document.getElementById("marketNewsAutoSyncInterval");
 var progressEl = document.getElementById("progress");
 var manualSection = document.getElementById("manualSection");
 var manualInput = document.getElementById("manualInput");
 var manualBtn = document.getElementById("manualBtn");
+var ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL = "30";
 var MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL = "60";
 
 // Load last refresh state + restore manual input
-chrome.storage.local.get(["lastRefresh", "lastMarketNewsRefresh", "manualDraft", "marketNewsAutoSyncEnabled", "marketNewsAutoSyncIntervalMinutes"], function (data) {
+chrome.storage.local.get([
+  "lastRefresh",
+  "lastMarketNewsRefresh",
+  "manualDraft",
+  "alphaPicksAutoSyncEnabled",
+  "alphaPicksAutoSyncIntervalMinutes",
+  "marketNewsAutoSyncEnabled",
+  "marketNewsAutoSyncIntervalMinutes"
+], function (data) {
   if (data.manualDraft) {
     manualInput.value = data.manualDraft;
   }
+  alphaPicksAutoSyncToggle.checked = !!data.alphaPicksAutoSyncEnabled;
+  alphaPicksAutoSyncInterval.value = normalizeAlphaPicksAutoSyncIntervalValue(data.alphaPicksAutoSyncIntervalMinutes);
+  alphaPicksAutoSyncInterval.setAttribute("data-last-value", alphaPicksAutoSyncInterval.value);
   marketNewsAutoSyncToggle.checked = !!data.marketNewsAutoSyncEnabled;
   marketNewsAutoSyncInterval.value = normalizeMarketNewsAutoSyncIntervalValue(data.marketNewsAutoSyncIntervalMinutes);
   marketNewsAutoSyncInterval.setAttribute("data-last-value", marketNewsAutoSyncInterval.value);
@@ -45,6 +59,33 @@ backfillBtn.addEventListener("click", function () {
 
 marketNewsBtn.addEventListener("click", function () {
   startMarketNewsRefresh();
+});
+
+alphaPicksAutoSyncToggle.addEventListener("change", function () {
+  var enabled = !!alphaPicksAutoSyncToggle.checked;
+  updateAlphaPicksAutoSyncSetting({
+    enabled: enabled,
+    interval_minutes: parseInt(alphaPicksAutoSyncInterval.value, 10),
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      alphaPicksAutoSyncToggle.checked = !enabled;
+    }
+  });
+});
+
+alphaPicksAutoSyncInterval.addEventListener("change", function () {
+  var previousValue = alphaPicksAutoSyncInterval.getAttribute("data-last-value") || ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL;
+  var intervalMinutes = parseInt(alphaPicksAutoSyncInterval.value, 10);
+  updateAlphaPicksAutoSyncSetting({
+    enabled: !!alphaPicksAutoSyncToggle.checked,
+    interval_minutes: intervalMinutes,
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      alphaPicksAutoSyncInterval.value = previousValue;
+      return;
+    }
+    alphaPicksAutoSyncInterval.setAttribute("data-last-value", String(result.interval_minutes));
+  });
 });
 
 marketNewsAutoSyncToggle.addEventListener("change", function () {
@@ -126,6 +167,30 @@ function startMarketNewsRefresh() {
   });
 }
 
+function updateAlphaPicksAutoSyncSetting(payload, onDone) {
+  chrome.runtime.sendMessage({
+    action: "set_alpha_picks_auto_sync",
+    enabled: !!payload.enabled,
+    interval_minutes: payload.interval_minutes,
+  }, function (result) {
+    if (!result || result.status !== "ok") {
+      progressEl.style.display = "block";
+      progressEl.textContent = "Failed to update Alpha Picks auto-sync";
+      progressEl.style.color = "#c62828";
+      if (onDone) onDone(result);
+      return;
+    }
+    alphaPicksAutoSyncInterval.value = String(result.interval_minutes);
+    alphaPicksAutoSyncInterval.setAttribute("data-last-value", String(result.interval_minutes));
+    progressEl.style.display = "block";
+    progressEl.style.color = "#666";
+    progressEl.textContent = result.enabled
+      ? "Alpha Picks auto-sync enabled (" + formatAutoSyncIntervalLabel(result.interval_minutes) + ")"
+      : "Alpha Picks auto-sync disabled";
+    if (onDone) onDone(result);
+  });
+}
+
 function updateMarketNewsAutoSyncSetting(payload, onDone) {
   chrome.runtime.sendMessage({
     action: "set_market_news_auto_sync",
@@ -148,6 +213,13 @@ function updateMarketNewsAutoSyncSetting(payload, onDone) {
       : "Market News auto-sync disabled";
     if (onDone) onDone(result);
   });
+}
+
+function normalizeAlphaPicksAutoSyncIntervalValue(value) {
+  var allowed = { "15": true, "30": true, "60": true };
+  var normalized = String(value || ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL);
+  if (!allowed[normalized]) return ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL;
+  return normalized;
 }
 
 function normalizeMarketNewsAutoSyncIntervalValue(value) {

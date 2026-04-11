@@ -10,6 +10,9 @@ const SA_MARKET_NEWS_URL = "https://seekingalpha.com/market-news";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 const TABLE_SELECTOR = "table tbody tr";
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
+const ALPHA_PICKS_AUTO_SYNC_ALARM = "alpha-picks-auto-sync";
+const ALPHA_PICKS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 30;
+const ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS = [15, 30, 60];
 const MARKET_NEWS_AUTO_SYNC_ALARM = "market-news-auto-sync";
 const MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 60;
 const MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS = [5, 15, 60];
@@ -120,20 +123,32 @@ const COMMENT_SCROLL_PROFILES = {
   },
 };
 var marketNewsRefreshInFlight = false;
+var saSyncJobChain = Promise.resolve();
+var saSyncJobInFlight = false;
 
 // --- Message listener (from popup) ---
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "refresh") {
-    doRefresh(msg.mode || "quick").then(sendResponse);
+    enqueueSaSyncJob("Alpha Picks " + (msg.mode || "quick"), function () {
+      return doRefresh(msg.mode || "quick", { trigger: "manual" });
+    }).then(sendResponse);
     return true;
   }
   if (msg.action === "manual_fetch") {
-    doManualFetch(msg.items || []).then(sendResponse);
+    enqueueSaSyncJob("Manual fetch", function () {
+      return doManualFetch(msg.items || []);
+    }).then(sendResponse);
     return true;
   }
   if (msg.action === "refresh_market_news") {
-    doMarketNewsRefresh(msg.mode || "quick").then(sendResponse);
+    enqueueSaSyncJob("Market News " + (msg.mode || "quick"), function () {
+      return doMarketNewsRefresh(msg.mode || "quick", { trigger: "manual" });
+    }).then(sendResponse);
+    return true;
+  }
+  if (msg.action === "set_alpha_picks_auto_sync") {
+    setAlphaPicksAutoSyncEnabled(!!msg.enabled, msg.interval_minutes).then(sendResponse);
     return true;
   }
   if (msg.action === "set_market_news_auto_sync") {
@@ -143,24 +158,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(function () {
-  syncMarketNewsAutoSyncAlarm();
+  syncAllAutoSyncAlarms();
 });
 
 chrome.runtime.onStartup.addListener(function () {
-  syncMarketNewsAutoSyncAlarm();
+  syncAllAutoSyncAlarms();
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (alarm && alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
-    doMarketNewsRefresh("quick", { trigger: "alarm" });
+  if (!alarm) return;
+  if (alarm.name === ALPHA_PICKS_AUTO_SYNC_ALARM) {
+    enqueueSaSyncJob("Alpha Picks quick auto-sync", function () {
+      return doRefresh("quick", { trigger: "alarm" });
+    });
+    return;
+  }
+  if (alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
+    enqueueSaSyncJob("Market News quick auto-sync", function () {
+      return doMarketNewsRefresh("quick", { trigger: "alarm" });
+    });
   }
 });
 
+function enqueueSaSyncJob(jobName, jobFn) {
+  var run = saSyncJobChain.catch(function () {}).then(async function () {
+    if (saSyncJobInFlight) {
+      sendProgress("Queued: " + jobName);
+    }
+    saSyncJobInFlight = true;
+    try {
+      return await jobFn();
+    } finally {
+      saSyncJobInFlight = false;
+    }
+  });
+  saSyncJobChain = run.catch(function () {});
+  return run;
+}
+
 // --- Main refresh flow ---
 
-async function doRefresh(mode) {
+async function doRefresh(mode, options) {
+  options = options || {};
   const batchTs = new Date().toISOString();
-  const results = { current: null, closed: null, mode: mode };
+  const results = { current: null, closed: null, mode: mode, trigger: options.trigger || "manual" };
 
   let tabId = null;
   try {
@@ -343,6 +384,23 @@ function getMarketNewsProfile(mode) {
   return MARKET_NEWS_PROFILES[mode] || MARKET_NEWS_PROFILES.quick;
 }
 
+async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
+  var data = await chrome.storage.local.get(["alphaPicksAutoSyncIntervalMinutes"]);
+  var normalizedInterval = normalizeAlphaPicksAutoSyncIntervalMinutes(
+    intervalMinutes != null ? intervalMinutes : data.alphaPicksAutoSyncIntervalMinutes
+  );
+  await chrome.storage.local.set({
+    alphaPicksAutoSyncEnabled: enabled,
+    alphaPicksAutoSyncIntervalMinutes: normalizedInterval,
+  });
+  await syncAlphaPicksAutoSyncAlarm();
+  return {
+    status: "ok",
+    enabled: enabled,
+    interval_minutes: normalizedInterval,
+  };
+}
+
 async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
   var data = await chrome.storage.local.get(["marketNewsAutoSyncIntervalMinutes"]);
   var normalizedInterval = normalizeMarketNewsAutoSyncIntervalMinutes(
@@ -360,6 +418,27 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
   };
 }
 
+async function syncAllAutoSyncAlarms() {
+  await syncAlphaPicksAutoSyncAlarm();
+  await syncMarketNewsAutoSyncAlarm();
+}
+
+async function syncAlphaPicksAutoSyncAlarm() {
+  var data = await chrome.storage.local.get(["alphaPicksAutoSyncEnabled", "alphaPicksAutoSyncIntervalMinutes"]);
+  var enabled = !!data.alphaPicksAutoSyncEnabled;
+  var intervalMinutes = normalizeAlphaPicksAutoSyncIntervalMinutes(data.alphaPicksAutoSyncIntervalMinutes);
+  if (data.alphaPicksAutoSyncIntervalMinutes !== intervalMinutes) {
+    await chrome.storage.local.set({ alphaPicksAutoSyncIntervalMinutes: intervalMinutes });
+  }
+  await chrome.alarms.clear(ALPHA_PICKS_AUTO_SYNC_ALARM);
+  if (enabled) {
+    await chrome.alarms.create(ALPHA_PICKS_AUTO_SYNC_ALARM, {
+      delayInMinutes: intervalMinutes,
+      periodInMinutes: intervalMinutes,
+    });
+  }
+}
+
 async function syncMarketNewsAutoSyncAlarm() {
   var data = await chrome.storage.local.get(["marketNewsAutoSyncEnabled", "marketNewsAutoSyncIntervalMinutes"]);
   var enabled = !!data.marketNewsAutoSyncEnabled;
@@ -374,6 +453,14 @@ async function syncMarketNewsAutoSyncAlarm() {
       periodInMinutes: intervalMinutes,
     });
   }
+}
+
+function normalizeAlphaPicksAutoSyncIntervalMinutes(value) {
+  var mins = parseInt(value, 10);
+  if (ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS.indexOf(mins) === -1) {
+    return ALPHA_PICKS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES;
+  }
+  return mins;
 }
 
 function normalizeMarketNewsAutoSyncIntervalMinutes(value) {
@@ -1262,6 +1349,7 @@ async function saveRefreshState(batchTs, results) {
       closed: results.closed,
       details: results.details || null,
       mode: results.mode || "quick",
+      trigger: results.trigger || "manual",
     },
   });
 }
