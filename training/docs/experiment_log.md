@@ -7,7 +7,8 @@
 - **機器**: AMD Ryzen Threadripper PRO 5965WX 24-Cores (48 threads), 503GB RAM
 - **GPU**: 4× NVIDIA RTX 4090 24GB（SB3 訓練用 `--device cuda:N`）
 - **框架**: SB3 (PPO/CPPO/SAC/TD3, GPU) — SpinningUp 已棄用
-- **數據**: Polygon 2022-01 ~ 2026-03, 134 tickers, sentiment + risk (coalesce: gpt_5_2 96% + gpt_5_4 2%)
+- **數據**: Polygon 2022-01 ~ 2026-03, 134→145 tickers (IBKR 價格源), sentiment + risk (coalesce: gpt_5_4 + gpt_5_2)
+- **價格源**: yfinance (系列 A-F) → IBKR daily bars (系列 G 起)
 
 ## 數據分割
 
@@ -1253,6 +1254,58 @@ SB3 PPO 已採用 orthogonal init，但其餘方法均未嘗試。
 
 ---
 
+## IBKR 價格源整合（2026-04-11）
+
+### 背景
+
+yfinance 作為訓練資料的價格源有以下問題：
+- 134/146 tickers 成功（12 個下載失敗）
+- Rate limit 不穩定
+- `auto_adjust=True` 回溯調整股息（非實際交易價格）
+
+改用 IBKR Gateway（24/7 運行）作為替代。
+
+### 實作
+
+- `prepare_training_data.py --price-source ibkr` 直接從 IBKR API 取得日線
+- 不需要預先收集 CSV（一條指令完成）
+- VIX 仍從 yfinance 抓取（單一指數，穩定可靠）
+- 技術指標（MACD, Bollinger, RSI 等）照常計算
+
+### Ticker 調查結果
+
+| Ticker | 公司 | 狀態 | 處理 |
+|--------|------|------|------|
+| ATVI | Activision Blizzard | 已下市（Microsoft 收購 2023-10） | 移除，不訓練 |
+| ATGE | Adtalem Global Education | 改名 → CVSA（2026-02） | IBKR ticker 映射 |
+| COMM | CommScope | 改名 → VISN（2026-01） | IBKR ticker 映射 |
+| SQ | Block Inc. | 改名 → XYZ（2025） | IBKR ticker 映射 |
+| BRK.B | Berkshire Hathaway B | 格式問題 | IBKR 用 "BRK B"（空格） |
+
+**使用者決策**：下市股票不追蹤不訓練，因為預測不存在的股票沒意義。
+
+### _clean_data 過度嚴格問題
+
+**問題**：FinRL upstream 的 `_clean_data()` 用 `dropna(axis=1)` 過濾 pivot table，
+要求 100% 日期覆蓋率。只要某 ticker 少一天資料就整個被刪。
+
+**影響**：DKNG（1060/1061 天，只差 1 天）被完全刪除；ARM（IPO 2023-09，635 天）等新 IPO ticker 全被刪。
+141 tickers → 131 tickers，比 yfinance 的 134 還少。
+
+**修正**：
+- `_clean_data(min_coverage=0.5)` — 只刪覆蓋率低於 50% 的 tickers
+- `download_prices` 加 bfill 處理 pre-IPO 日期的 NaN（用 IPO 首日價格填充）
+
+### Ticker 覆蓋率（IBKR 2022-01 ~ 2026-03）
+
+| 類別 | Tickers | 範例 |
+|------|---------|------|
+| 完整覆蓋（1060+ bars） | ~130 | AAPL, DKNG, BMNR |
+| 部分覆蓋（IPO 後） | ~10 | ARM(635), CAVA(697), CRWV(250), GLXY(216) |
+| 已下市/改名 | 5 | ATVI, ATGE→CVSA, COMM→VISN, SQ→XYZ, BRK.B→"BRK B" |
+
+---
+
 ## 備註
 
 - 所有 model artifacts 在 `trained_models/` 下，含 metadata.json
@@ -1262,4 +1315,4 @@ SB3 PPO 已採用 orthogonal init，但其餘方法均未嘗試。
 
 ---
 
-*最後更新: 2026-04-07*
+*最後更新: 2026-04-11*

@@ -129,8 +129,21 @@ class FeatureEngineer:
         df = df.sort_values(["date", "tic"], ignore_index=True)
         df.index = df["date"].factorize()[0]
         merged = df.pivot_table(index="date", columns="tic", values="close")
-        merged = merged.dropna(axis=1)
-        df = df[df["tic"].isin(merged.columns)]
+        # Report coverage but keep all tickers that have any data.
+        # Pre-IPO gaps are handled by bfill in download_prices().
+        coverage = merged.notna().mean()
+        partial = coverage[coverage < 1.0]
+        if len(partial) > 0:
+            low = partial.sort_values()
+            summary = ", ".join(f"{t}({v:.0%})" for t, v in low.head(10).items())
+            print(f"  _clean_data: {len(partial)} tickers with partial coverage "
+                  f"(lowest: {summary})")
+        # Remove tickers with zero data (shouldn't happen, but safety check)
+        empty = coverage[coverage == 0].index
+        if len(empty) > 0:
+            print(f"  _clean_data: dropped {len(empty)} tickers with zero data: "
+                  f"{sorted(empty.tolist())}")
+            df = df[~df["tic"].isin(empty)]
         return df
 
     def _add_technical_indicators(self, data: pd.DataFrame) -> pd.DataFrame:

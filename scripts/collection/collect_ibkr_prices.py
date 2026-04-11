@@ -3,12 +3,9 @@
 Collect historical stock prices from IBKR for MindfulRL training.
 
 Data Collection Strategy (per plan):
-- 2023/01 - 2023/12: 1 hour bars (IBKR, ~7 bars/day)
-- 2024/01 - present: 15 minute bars (IBKR, ~26 bars/day)
-
-This gives:
-- 3 years of hourly data for baseline model training
-- 2 years of 15-minute data for fine-grained model training
+- 2022/01 - 2026/present: 1 day bars (for RL training)
+- 2023/01 - 2023/12: 1 hour bars (~7 bars/day)
+- 2024/01 - present: 15 minute bars (~26 bars/day)
 
 Requirements:
 - IBKR TWS or IB Gateway running locally
@@ -16,19 +13,24 @@ Requirements:
 - config/tickers_core.json for stock list
 
 Usage:
+    # Daily bars for RL training (replaces yfinance)
+    python collect_ibkr_prices.py --daily --tier all
+    python collect_ibkr_prices.py --daily --daily-start 2022-01-01 --tier all
+
+    # Intraday collection
     python collect_ibkr_prices.py --output data/prices/
     python collect_ibkr_prices.py --tickers AAPL,MSFT --output data/prices/
     python collect_ibkr_prices.py --tier tier1_core --output data/prices/
-    python collect_ibkr_prices.py --hourly-only --output data/prices/  # Only 2023 hourly data
-    python collect_ibkr_prices.py --minute-only --output data/prices/  # Only 2024 15-min data
+    python collect_ibkr_prices.py --hourly-only --output data/prices/
+    python collect_ibkr_prices.py --minute-only --output data/prices/
 
 Resume from interruption:
-    python collect_ibkr_prices.py --resume  # Continue from last checkpoint
-    python collect_ibkr_prices.py --resume --tier all  # Resume with all tickers
+    python collect_ibkr_prices.py --resume
+    python collect_ibkr_prices.py --daily --resume --tier all
 
 Incremental update (daily):
-    python collect_ibkr_prices.py --incremental  # Only fetch new data since last update
-    python collect_ibkr_prices.py --incremental --tier all  # Incremental for all tickers
+    python collect_ibkr_prices.py --incremental
+    python collect_ibkr_prices.py --incremental --tier all
 
 Checkpoint file is saved at: data/prices/ibkr_checkpoint.json
 """
@@ -140,16 +142,21 @@ def load_checkpoint(output_dir: str) -> Dict:
     Load checkpoint from file.
 
     Returns:
-        Dictionary with 'hourly_completed', '15min_completed', 'hourly_results', '15min_results'.
+        Dictionary with completed/results keys for daily, hourly, and 15min.
     """
     checkpoint_path = get_checkpoint_path(output_dir)
     if os.path.exists(checkpoint_path):
         with open(checkpoint_path, 'r') as f:
             checkpoint = json.load(f)
-            logger.info(f"Loaded checkpoint: {len(checkpoint.get('hourly_completed', []))} hourly, "
-                       f"{len(checkpoint.get('15min_completed', []))} 15-min tickers completed")
+            daily_n = len(checkpoint.get('daily_completed', []))
+            hourly_n = len(checkpoint.get('hourly_completed', []))
+            minute_n = len(checkpoint.get('15min_completed', []))
+            logger.info(f"Loaded checkpoint: {daily_n} daily, {hourly_n} hourly, "
+                       f"{minute_n} 15-min tickers completed")
             return checkpoint
     return {
+        'daily_completed': [],
+        'daily_results': {},
         'hourly_completed': [],
         '15min_completed': [],
         'hourly_results': {},
@@ -164,9 +171,13 @@ def save_checkpoint(
     minute_completed: List[str],
     hourly_results: Dict[str, int],
     minute_results: Dict[str, int],
+    daily_completed: Optional[List[str]] = None,
+    daily_results: Optional[Dict[str, int]] = None,
 ) -> None:
     """Save checkpoint to file."""
     checkpoint = {
+        'daily_completed': daily_completed or [],
+        'daily_results': daily_results or {},
         'hourly_completed': hourly_completed,
         '15min_completed': minute_completed,
         'hourly_results': hourly_results,
@@ -481,33 +492,53 @@ def generate_summary_report(
     hourly_results: Dict[str, int],
     minute_results: Dict[str, int],
     output_dir: str,
+    daily_results: Optional[Dict[str, int]] = None,
 ) -> None:
     """Generate collection summary report."""
     report = {
         'generated_at': datetime.now().isoformat(),
-        'hourly_data': {
+    }
+
+    if daily_results:
+        report['daily_data'] = {
+            'interval': '1 day',
+            'tickers_collected': len([t for t, c in daily_results.items() if c > 0]),
+            'total_bars': sum(daily_results.values()),
+            'by_ticker': daily_results,
+        }
+
+    if hourly_results:
+        report['hourly_data'] = {
             'period': '2023',
             'interval': '1 hour',
             'tickers_collected': len([t for t, c in hourly_results.items() if c > 0]),
             'total_bars': sum(hourly_results.values()),
             'by_ticker': hourly_results,
-        },
-        '15min_data': {
+        }
+
+    if minute_results:
+        report['15min_data'] = {
             'period': '2024-present',
             'interval': '15 mins',
             'tickers_collected': len([t for t, c in minute_results.items() if c > 0]),
             'total_bars': sum(minute_results.values()),
             'by_ticker': minute_results,
-        },
-    }
+        }
 
     report_path = os.path.join(output_dir, 'collection_summary.json')
     with open(report_path, 'w') as f:
         json.dump(report, f, indent=2)
 
     logger.info(f"\nCollection Summary saved to: {report_path}")
-    logger.info(f"Hourly data: {report['hourly_data']['total_bars']} bars from {report['hourly_data']['tickers_collected']} tickers")
-    logger.info(f"15-min data: {report['15min_data']['total_bars']} bars from {report['15min_data']['tickers_collected']} tickers")
+    if daily_results:
+        ok = len([t for t, c in daily_results.items() if c > 0])
+        logger.info(f"Daily data: {sum(daily_results.values())} bars from {ok} tickers")
+    if hourly_results:
+        logger.info(f"Hourly data: {sum(hourly_results.values())} bars from "
+                    f"{len([t for t, c in hourly_results.items() if c > 0])} tickers")
+    if minute_results:
+        logger.info(f"15-min data: {sum(minute_results.values())} bars from "
+                    f"{len([t for t, c in minute_results.items() if c > 0])} tickers")
 
 
 def main():
@@ -538,6 +569,18 @@ def main():
     parser.add_argument(
         '--port', type=int, default=None,
         help='IBKR TWS/Gateway port (default: from config/.env or 7497)'
+    )
+    parser.add_argument(
+        '--daily', action='store_true',
+        help='Collect daily bars (for RL training, replaces yfinance)'
+    )
+    parser.add_argument(
+        '--daily-start', type=str, default='2022-01-01',
+        help='Start date for daily data (default: 2022-01-01)'
+    )
+    parser.add_argument(
+        '--daily-end', type=str, default=None,
+        help='End date for daily data (default: today)'
     )
     parser.add_argument(
         '--hourly-only', action='store_true',
@@ -602,6 +645,8 @@ def main():
     logger.info(f"Loaded {len(tickers)} tickers: {tickers[:10]}{'...' if len(tickers) > 10 else ''}")
 
     # Parse dates
+    daily_start = date.fromisoformat(args.daily_start)
+    daily_end = date.fromisoformat(args.daily_end) if args.daily_end else date.today()
     hourly_start = date.fromisoformat(args.hourly_start)
     hourly_end = date.fromisoformat(args.hourly_end)
     minute_start = date.fromisoformat(args.minute_start)
@@ -631,20 +676,23 @@ def main():
     # Dry run mode
     if args.dry_run:
         logger.info("\n=== DRY RUN MODE ===")
-        logger.info(f"Tickers to collect: {tickers}")
-        logger.info(f"Hourly data: {hourly_start} to {hourly_end}")
-        logger.info(f"15-min data: {minute_start} to {minute_end}")
+        logger.info(f"Tickers to collect: {len(tickers)} tickers")
+        if args.daily:
+            logger.info(f"Daily data: {daily_start} to {daily_end}")
+            estimated_time = len(tickers) * 0.5 / 60
+            logger.info(f"Estimated IBKR requests: {len(tickers)} (1 per ticker)")
+            logger.info(f"Estimated time: {estimated_time:.1f} minutes")
+        else:
+            logger.info(f"Hourly data: {hourly_start} to {hourly_end}")
+            logger.info(f"15-min data: {minute_start} to {minute_end}")
+            num_tickers = len(tickers)
+            hourly_requests = num_tickers * ((hourly_end - hourly_start).days // 365 + 1)
+            minute_requests = num_tickers * ((minute_end - minute_start).days // 60 + 1)
+            total_requests = hourly_requests + minute_requests
+            estimated_time = total_requests * 1.5 / 60
+            logger.info(f"Estimated IBKR requests: {total_requests}")
+            logger.info(f"Estimated time: {estimated_time:.1f} minutes")
         logger.info(f"Output directory: {args.output}")
-
-        # Estimate collection time
-        num_tickers = len(tickers)
-        hourly_requests = num_tickers * ((hourly_end - hourly_start).days // 365 + 1)
-        minute_requests = num_tickers * ((minute_end - minute_start).days // 60 + 1)
-        total_requests = hourly_requests + minute_requests
-        estimated_time = total_requests * 1.5 / 60  # ~1.5 seconds per request
-
-        logger.info(f"\nEstimated IBKR requests: {total_requests}")
-        logger.info(f"Estimated time: {estimated_time:.1f} minutes")
         return
 
     # Import IBKR source (requires ib_insync)
@@ -669,28 +717,44 @@ def main():
 
     # Load checkpoint if resuming
     checkpoint = load_checkpoint(args.output) if args.resume else {
+        'daily_completed': [],
+        'daily_results': {},
         'hourly_completed': [],
         '15min_completed': [],
         'hourly_results': {},
         '15min_results': {},
     }
 
+    daily_completed = set(checkpoint.get('daily_completed', []))
     hourly_completed = set(checkpoint.get('hourly_completed', []))
     minute_completed = set(checkpoint.get('15min_completed', []))
+    daily_results = checkpoint.get('daily_results', {})
     hourly_results = checkpoint.get('hourly_results', {})
     minute_results = checkpoint.get('15min_results', {})
 
+    def _save_ckpt():
+        save_checkpoint(args.output, list(hourly_completed), list(minute_completed),
+                       hourly_results, minute_results,
+                       list(daily_completed), daily_results)
+
     # Filter out already completed tickers
-    hourly_tickers = [t for t in tickers if t not in hourly_completed] if not args.minute_only else []
-    minute_tickers = [t for t in tickers if t not in minute_completed] if not args.hourly_only else []
+    if args.daily:
+        daily_tickers = [t for t in tickers if t not in daily_completed]
+        hourly_tickers = []
+        minute_tickers = []
+    else:
+        daily_tickers = []
+        hourly_tickers = [t for t in tickers if t not in hourly_completed] if not args.minute_only else []
+        minute_tickers = [t for t in tickers if t not in minute_completed] if not args.hourly_only else []
 
     if args.resume:
-        logger.info(f"Resuming: {len(hourly_tickers)} hourly tickers remaining, "
+        remaining = len(daily_tickers) + len(hourly_tickers) + len(minute_tickers)
+        logger.info(f"Resuming: {len(daily_tickers)} daily, {len(hourly_tickers)} hourly, "
                    f"{len(minute_tickers)} 15-min tickers remaining")
 
-    if not hourly_tickers and not minute_tickers:
+    if not daily_tickers and not hourly_tickers and not minute_tickers:
         logger.info("All tickers already collected! Use --clear-checkpoint to start fresh.")
-        generate_summary_report(hourly_results, minute_results, args.output)
+        generate_summary_report(hourly_results, minute_results, args.output, daily_results)
         return
 
     # Load IBKR config from .env (command line args override)
@@ -711,6 +775,72 @@ def main():
                 sys.exit(1)
 
             logger.info("Connected to IBKR successfully")
+
+            # Collect daily data (for RL training)
+            if daily_tickers:
+                daily_dir = os.path.join(args.output, 'daily')
+                os.makedirs(daily_dir, exist_ok=True)
+
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Collecting DAILY bars: {daily_start} to {daily_end}")
+                logger.info(f"Tickers: {len(daily_tickers)} remaining")
+                logger.info('='*60)
+
+                for i, ticker in enumerate(daily_tickers):
+                    logger.info(f"[{i+1}/{len(daily_tickers)}] Collecting daily data for {ticker}")
+
+                    try:
+                        prices = ibkr.fetch_prices(
+                            tickers=[ticker],
+                            start_date=daily_start,
+                            end_date=daily_end,
+                            frequency='daily',
+                        )
+
+                        daily_results[ticker] = len(prices)
+
+                        if prices:
+                            df = pd.DataFrame([
+                                {
+                                    'date': p.date.isoformat(),
+                                    'open': p.open,
+                                    'high': p.high,
+                                    'low': p.low,
+                                    'close': p.close,
+                                    'volume': p.volume,
+                                    'ticker': p.ticker,
+                                }
+                                for p in prices
+                            ])
+                            output_path = os.path.join(
+                                daily_dir,
+                                f"{ticker}_daily_{daily_start.year}_{daily_end.year}.csv",
+                            )
+                            df.to_csv(output_path, index=False)
+                            logger.info(f"  Saved {len(prices)} bars to {output_path}")
+                        else:
+                            logger.warning(f"  No data for {ticker}")
+
+                        daily_completed.add(ticker)
+                        _save_ckpt()
+
+                    except KeyboardInterrupt:
+                        logger.warning("\n\nInterrupted! Saving checkpoint...")
+                        _save_ckpt()
+                        interrupted = True
+                        break
+                    except Exception as e:
+                        logger.error(f"  Error collecting {ticker}: {e}")
+                        daily_results[ticker] = 0
+
+                if interrupted:
+                    raise KeyboardInterrupt()
+
+                # Print daily summary
+                total_bars = sum(daily_results.values())
+                ok_tickers = sum(1 for v in daily_results.values() if v > 0)
+                logger.info(f"\nDaily collection done: {ok_tickers}/{len(tickers)} tickers, "
+                           f"{total_bars} total bars")
 
             # Collect hourly data (2023)
             if hourly_tickers and not args.minute_only:
@@ -755,13 +885,11 @@ def main():
 
                         # Mark as completed and save checkpoint
                         hourly_completed.add(ticker)
-                        save_checkpoint(args.output, list(hourly_completed), list(minute_completed),
-                                       hourly_results, minute_results)
+                        _save_ckpt()
 
                     except KeyboardInterrupt:
                         logger.warning("\n\nInterrupted! Saving checkpoint...")
-                        save_checkpoint(args.output, list(hourly_completed), list(minute_completed),
-                                       hourly_results, minute_results)
+                        _save_ckpt()
                         interrupted = True
                         break
                     except Exception as e:
@@ -838,13 +966,11 @@ def main():
 
                         # Mark as completed and save checkpoint
                         minute_completed.add(ticker)
-                        save_checkpoint(args.output, list(hourly_completed), list(minute_completed),
-                                       hourly_results, minute_results)
+                        _save_ckpt()
 
                     except KeyboardInterrupt:
                         logger.warning("\n\nInterrupted! Saving checkpoint...")
-                        save_checkpoint(args.output, list(hourly_completed), list(minute_completed),
-                                       hourly_results, minute_results)
+                        _save_ckpt()
                         interrupted = True
                         break
                     except Exception as e:
@@ -857,16 +983,21 @@ def main():
         sys.exit(1)
     except KeyboardInterrupt:
         logger.info("\nCollection interrupted. Use --resume to continue later.")
-        generate_summary_report(hourly_results, minute_results, args.output)
+        generate_summary_report(hourly_results, minute_results, args.output, daily_results)
         sys.exit(0)
 
     # Generate summary
-    generate_summary_report(hourly_results, minute_results, args.output)
+    generate_summary_report(hourly_results, minute_results, args.output,
+                           daily_results=daily_results)
 
     # Clear checkpoint on successful completion
-    all_hourly_done = len(hourly_completed) >= len(tickers) or args.minute_only
-    all_minute_done = len(minute_completed) >= len(tickers) or args.hourly_only
-    if all_hourly_done and all_minute_done:
+    if args.daily:
+        all_done = len(daily_completed) >= len(tickers)
+    else:
+        all_hourly_done = len(hourly_completed) >= len(tickers) or args.minute_only
+        all_minute_done = len(minute_completed) >= len(tickers) or args.hourly_only
+        all_done = all_hourly_done and all_minute_done
+    if all_done:
         clear_checkpoint(args.output)
         logger.info("\nCollection complete!")
     else:

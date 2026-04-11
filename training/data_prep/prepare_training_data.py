@@ -285,19 +285,135 @@ def _load_polygon_scores(base_dir, score_type="sentiment", target_col="llm_senti
 
 # ── Price + feature pipeline ────────────────────────────────────
 
+# Tickers that IBKR knows under a different symbol.
+# Keys = names used in Polygon scores, values = IBKR symbol.
+# NOTE: Only map when the NEW name is NOT a separate ticker in Polygon scores.
+#       COMM→VISN and SQ→XYZ are NOT mapped because Polygon has both old & new
+#       as separate tickers (old scores + new scores). Mapping would create duplicates.
+IBKR_TICKER_MAP = {
+    "BRK.B": "BRK B",   # Berkshire Hathaway B — IBKR uses space
+    "ATGE": "CVSA",      # Adtalem → Covista Inc., Feb 2026 (CVSA not in Polygon scores)
+}
+# Reverse: IBKR symbol → Polygon name (for mapping data back)
+_IBKR_TICKER_REVERSE = {v: k for k, v in IBKR_TICKER_MAP.items()}
 
-def download_prices(tickers, start_date, end_date):
-    """Download OHLCV + compute technical indicators via yfinance."""
-    print(f"\n  Downloading prices: {len(tickers)} tickers, {start_date} to {end_date}")
+# Permanently delisted — no data to fetch.
+# Tickers renamed but old name still resolves in IBKR (COMM, SQ) are NOT listed here —
+# IBKR will fail naturally and they'll be excluded.
+DELISTED_TICKERS = {"ATVI"}  # Activision Blizzard, acquired by Microsoft Oct 2023
 
-    # Filter out delisted tickers that cause yfinance errors
-    active_tickers = [t for t in tickers if t != "SGEN"]
 
-    df_raw = YahooDownloader(
-        start_date=start_date,
-        end_date=end_date,
-        ticker_list=active_tickers,
-    ).fetch_data()
+def _fetch_ibkr_daily(tickers, start_date, end_date):
+    """Fetch daily OHLCV directly from IBKR TWS/Gateway.
+
+    Connects to IBKR, fetches daily bars for each ticker, and returns
+    a DataFrame in the same format as YahooDownloader.fetch_data():
+      date (str YYYY-MM-DD), tic, open, high, low, close, volume, day
+    """
+    from datetime import date as date_cls
+
+    try:
+        from data_sources import IBKRDataSource
+    except ImportError:
+        raise ImportError(
+            "ib_insync not installed. Run: pip install ib_insync\n"
+            "Also ensure TWS or IB Gateway is running."
+        )
+
+    # Load IBKR connection settings from config/.env
+    _env_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "config", ".env",
+    )
+    if os.path.exists(_env_path):
+        with open(_env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if k.startswith('IBKR_') and k not in os.environ:
+                        os.environ[k] = v
+
+    start_d = date_cls.fromisoformat(start_date)
+    end_d = date_cls.fromisoformat(end_date)
+
+    # Apply ticker mapping: filter delisted, remap renamed tickers
+    active_tickers = [t for t in tickers if t not in DELISTED_TICKERS]
+    if len(active_tickers) < len(tickers):
+        removed = sorted(set(tickers) - set(active_tickers))
+        print(f"  Skipped {len(removed)} delisted tickers: {removed}")
+
+    ibkr_tickers = [IBKR_TICKER_MAP.get(t, t) for t in active_tickers]
+    mapped = {t: IBKR_TICKER_MAP[t] for t in active_tickers if t in IBKR_TICKER_MAP}
+    if mapped:
+        print(f"  Ticker mapping: {mapped}")
+
+    ibkr_host = os.getenv('IBKR_HOST', '127.0.0.1')
+    ibkr_port = os.getenv('IBKR_PORT', '7497')
+    print(f"  Connecting to IBKR at {ibkr_host}:{ibkr_port}...")
+    with IBKRDataSource() as ibkr:
+        if not ibkr.validate_credentials():
+            raise ConnectionError(
+                "Cannot connect to IBKR TWS/Gateway. "
+                "Make sure it's running with API enabled."
+            )
+        print(f"  Connected. Fetching daily bars for {len(ibkr_tickers)} tickers...")
+
+        prices = ibkr.fetch_prices(
+            tickers=ibkr_tickers,
+            start_date=start_d,
+            end_date=end_d,
+            frequency='daily',
+        )
+
+    if not prices:
+        raise ValueError("No price data returned from IBKR.")
+
+    # Convert StockPrice objects to DataFrame, reverse-map ticker names
+    data = pd.DataFrame([
+        {
+            'date': p.date.isoformat(),
+            'tic': _IBKR_TICKER_REVERSE.get(p.ticker, p.ticker),
+            'open': p.open,
+            'high': p.high,
+            'low': p.low,
+            'close': p.close,
+            'volume': p.volume,
+        }
+        for p in prices
+    ])
+
+    fetched_tickers = data['tic'].nunique()
+    missing = set(tickers) - set(data['tic'].unique())
+    if missing:
+        print(f"  WARNING: {len(missing)} tickers returned no data: "
+              f"{sorted(missing)[:10]}{'...' if len(missing) > 10 else ''}")
+
+    data["date"] = pd.to_datetime(data["date"])
+    data["day"] = data["date"].dt.dayofweek
+    data["date"] = data["date"].dt.strftime("%Y-%m-%d")
+    data = data.dropna().reset_index(drop=True)
+    data = data.sort_values(["date", "tic"]).reset_index(drop=True)
+    print(f"  IBKR: {len(data)} rows, {fetched_tickers} tickers")
+    return data
+
+
+def download_prices(tickers, start_date, end_date, price_source="yfinance"):
+    """Download OHLCV + compute technical indicators."""
+    print(f"\n  Price source: {price_source}")
+    print(f"  {len(tickers)} tickers, {start_date} to {end_date}")
+
+    if price_source == "ibkr":
+        df_raw = _fetch_ibkr_daily(tickers, start_date, end_date)
+    else:
+        # Filter out delisted tickers that cause yfinance errors
+        active_tickers = [t for t in tickers if t != "SGEN"]
+        df_raw = YahooDownloader(
+            start_date=start_date,
+            end_date=end_date,
+            ticker_list=active_tickers,
+        ).fetch_data()
 
     print(f"  Raw OHLCV: {len(df_raw)} rows, {df_raw['tic'].nunique()} tickers")
 
@@ -325,9 +441,11 @@ def download_prices(tickers, start_date, end_date):
     processed_full = processed_full[processed_full["date"].isin(processed["date"])]
     processed_full = processed_full.sort_values(["tic", "date"])
 
-    # Forward-fill within each ticker to avoid cross-ticker leakage
+    # Forward-fill within each ticker to avoid cross-ticker leakage,
+    # then backfill to handle leading NaN for tickers with later IPO dates
     non_key_cols = [c for c in processed_full.columns if c not in ("date", "tic")]
     processed_full[non_key_cols] = processed_full.groupby("tic")[non_key_cols].ffill()
+    processed_full[non_key_cols] = processed_full.groupby("tic")[non_key_cols].bfill()
     processed_full = processed_full.sort_values(["date", "tic"]).reset_index(drop=True)
 
     print(f"  Processed: {len(processed_full)} rows, {processed_full['tic'].nunique()} tickers")
@@ -426,6 +544,12 @@ Examples:
              "No trade split. Use after Phase 1 validation confirms the model works.",
     )
     parser.add_argument(
+        "--price-source", default="yfinance",
+        choices=["yfinance", "ibkr"],
+        help="Price data source (default: yfinance). "
+             "'ibkr' reads from data/prices/daily/ (run collect_ibkr_prices.py --daily first).",
+    )
+    parser.add_argument(
         "--output-dir", default="training/data_prep/output",
         help="Output directory for CSV files",
     )
@@ -504,8 +628,8 @@ Examples:
         tickers = NASDAQ_100
 
     # Step 3: Download prices + features
-    print("\n[3/4] Downloading prices and computing features...")
-    price_data = download_prices(tickers, args.train_start, price_end)
+    print(f"\n[3/4] Loading prices ({args.price_source}) and computing features...")
+    price_data = download_prices(tickers, args.train_start, price_end, args.price_source)
 
     # Step 4: Merge scores and split
     print("\n[4/4] Merging scores and splitting...")
