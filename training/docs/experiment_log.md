@@ -1304,6 +1304,36 @@ yfinance 作為訓練資料的價格源有以下問題：
 | 部分覆蓋（IPO 後） | ~10 | ARM(635), CAVA(697), CRWV(250), GLXY(216) |
 | 已下市/改名 | 5 | ATVI, ATGE→CVSA, COMM→VISN, SQ→XYZ, BRK.B→"BRK B" |
 
+### Production Ensemble v2（IBKR 價格源，2026-04-11）
+
+| 項目 | 值 |
+|------|-----|
+| **演算法** | PPO (SB3) |
+| **價格源** | IBKR daily bars（取代 yfinance） |
+| **數據** | Polygon 2022-01 ~ 2026-04-11, 143 tickers, sentiment + risk |
+| **模型數** | 10 (seed=None, 最大多樣性) |
+| **n_steps** | 40,000 (基於系列 F 最佳穩定性結論) |
+| **epochs** | 100, full-batch, target_kl=0.05 |
+| **GPU** | 4× RTX 4090, 每 GPU 2-3 models |
+| **stock_dim** | 143 |
+| **state_dim** | 1574 |
+| **data hash** | e8c66f |
+
+**vs Production v1（yfinance）：**
+
+| | v1 (yfinance) | v2 (IBKR) |
+|---|---|---|
+| Tickers | 134 | 143 (+9) |
+| Rows | ~141K | 153K |
+| 價格類型 | 調整價格 (auto_adjust) | 未調整 (actual trading price) |
+| Date range | 2022-01 ~ 2026-03 | 2022-01 ~ 2026-04-11 |
+| data hash | 1d92b4 | e8c66f |
+
+新增 tickers: ARM, BMNR, CAVA, CRDO, CRWV, DKNG, GLXY, MGX, NBIS, RGTI, VISN, XYZ 等
+（部分為新 IPO，pre-IPO 期間以首日價格 backfill）
+
+**待辦**：回測對比 v1 vs v2 ensemble 表現。
+
 ---
 
 ## 備註
@@ -1312,7 +1342,8 @@ yfinance 作為訓練資料的價格源有以下問題：
 - 系列 A（Polygon 2022-2024）和系列 B（HuggingFace 2019-2023）是獨立的
 - Sonnet 4.5 評分資料已存在（77,871 行），但尚未用於訓練
 - HuggingFace 資料的實驗已充分，下一階段轉向 Polygon 資料
+- Production v2 使用 IBKR 價格源，143 tickers（含新 IPO 股）
 
 ---
 
-*最後更新: 2026-04-11*
+*最後更新: 2026-04-12*
