@@ -281,6 +281,16 @@ chrome.runtime.onMessage.addListener(function (msg) {
   }
 });
 
+chrome.storage.onChanged.addListener(function (changes, areaName) {
+  if (areaName !== "local") return;
+  if (changes.lastRefresh) {
+    renderStatus(changes.lastRefresh.newValue);
+  }
+  if (changes.lastMarketNewsRefresh) {
+    renderMarketNewsStatus(changes.lastMarketNewsRefresh.newValue);
+  }
+});
+
 function renderMarketNewsStatus(lastMarketNewsRefresh) {
   if (!marketNewsStatusEl) return;
   if (!lastMarketNewsRefresh) {
@@ -368,13 +378,19 @@ function renderStatus(lastRefresh) {
       );
     } else {
       var parts = [];
-      if (details.articles_saved > 0) parts.push(details.articles_saved + " articles");
+      if (details.articles_saved > 0) parts.push(details.articles_saved + " recent articles scanned");
       if (details.fetched > 0) parts.push(details.fetched + " content fetched");
       if (details.comments_refreshed > 0) {
         var refreshedLabel = details.comments_refreshed === 1
-          ? " article comments refreshed"
-          : " articles' comments refreshed";
+          ? " article comments rescanned"
+          : " articles' comments rescanned";
         parts.push(details.comments_refreshed + refreshedLabel);
+      }
+      if ((details.net_new_comments || 0) > 0) {
+        var newCommentsLabel = details.net_new_comments === 1
+          ? " net new comment stored"
+          : " net new comments stored";
+        parts.push(details.net_new_comments + newCommentsLabel);
       }
       if (details.failed > 0) parts.push(details.failed + " failed");
       var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "up to date");

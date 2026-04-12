@@ -522,8 +522,11 @@ def _handle_save_article_content(dal, msg):
     try:
         result = dal.save_sa_article_with_comments(article_id, body_markdown, comments)
         logger.info(
-            "save_article_content: %s (%d chars, %d comments, synced=%s)",
-            article_id, len(body_markdown), len(comments),
+            "save_article_content: %s (%d chars, prepared=%d net_new=%d stored_total=%d synced=%s)",
+            article_id, len(body_markdown),
+            result.get("prepared_comments", 0),
+            result.get("net_new_comments", 0),
+            result.get("stored_comments_total", 0),
             result.get("synced_picks", 0),
         )
         return {"status": "ok", "article_id": article_id, **result}
@@ -537,9 +540,20 @@ def _handle_save_comments_only(dal, msg):
     article_id = msg.get("article_id", "")
     comments = _normalize_comment_ids(article_id, msg.get("comments", []))
     try:
-        count = dal.save_sa_comments_only(article_id, comments)
-        logger.info("save_comments_only: %s (%d comments)", article_id, count)
-        return {"status": "ok", "article_id": article_id, "comments_count": count}
+        stats = dal.save_sa_comments_only(article_id, comments)
+        logger.info(
+            "save_comments_only: %s (prepared=%d net_new=%d stored_total=%d)",
+            article_id,
+            stats.get("prepared_comments", 0),
+            stats.get("net_new_comments", 0),
+            stats.get("stored_comments_total", 0),
+        )
+        return {
+            "status": "ok",
+            "article_id": article_id,
+            "comments_count": stats.get("prepared_comments", 0),
+            **stats,
+        }
     except Exception as e:
         logger.error("save_comments_only failed for %s: %s", article_id, e)
         return {"status": "error", "article_id": article_id, "error": str(e)}

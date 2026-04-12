@@ -652,6 +652,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0;
+  var netNewComments = 0;
   var total = needContent.length + needComments.length;
 
   if (needContent.length > 0) {
@@ -693,6 +694,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       });
       if (saveResult && saveResult.ok) {
         fetched++;
+        netNewComments += saveResult.net_new_comments || 0;
       } else {
         failed++;
       }
@@ -725,12 +727,15 @@ async function doDetailFetch(tabId, currentPicks, mode) {
       var cResult = await injectCommentsScraper(tabId);
       var cComments = (cResult && cResult.comments) || [];
 
-      await sendNativeMessage2({
+      var saveCommentsOnlyResult = await sendNativeMessage2({
         action: "save_comments_only",
         article_id: cItem.article_id,
         comments: cComments,
       });
-      commentsRefreshed++;
+      if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
+        commentsRefreshed++;
+        netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
+      }
     } catch (err) {
       // Best effort for comments refresh
     }
@@ -748,6 +753,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     fetched: fetched,
     failed: failed,
     comments_refreshed: commentsRefreshed,
+    net_new_comments: netNewComments,
     unresolved_symbols: unresolvedSymbols,
   };
 }

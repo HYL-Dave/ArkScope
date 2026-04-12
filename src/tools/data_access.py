@@ -1024,10 +1024,10 @@ class DataAccessLayer:
 
     def save_sa_comments_only(
         self, article_id: str, comments: List[Dict]
-    ) -> int:
-        """Update comments only (TTL refresh). Returns count."""
+    ) -> Dict[str, int]:
+        """Update comments only (refresh run). Returns refresh stats."""
         if not isinstance(self._backend, DatabaseBackend):
-            return 0
+            return {"prepared_comments": 0, "stored_comments_total": 0, "net_new_comments": 0}
         return self._backend.update_article_comments(article_id, comments)
 
     def audit_sa_unresolved_symbols(self) -> Dict:

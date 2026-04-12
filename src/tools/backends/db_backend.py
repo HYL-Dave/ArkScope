@@ -1652,6 +1652,14 @@ class DatabaseBackend:
             )
             return [dict(row) for row in fetch_cur.fetchall()]
 
+    def _count_article_comments(self, cur, article_id: str) -> int:
+        cur.execute(
+            "SELECT COUNT(*) FROM sa_article_comments WHERE article_id = %s",
+            (article_id,),
+        )
+        row = cur.fetchone()
+        return int(row[0] or 0) if row else 0
+
     def _upsert_article_comments(self, cur, article_id: str, comments: list) -> int:
         prepared_comments = _prepare_comments_for_upsert(
             self._fetch_existing_article_comments(cur, article_id),
@@ -1825,17 +1833,25 @@ class DatabaseBackend:
         try:
             conn.autocommit = False
             with conn.cursor() as cur:
+                before_count = self._count_article_comments(cur, article_id)
                 cur.execute(
                     "UPDATE sa_articles SET body_markdown = %s, "
                     "detail_fetched_at = NOW(), comments_fetched_at = NOW(), "
                     "updated_at = NOW() WHERE article_id = %s",
                     (body_markdown, article_id),
                 )
-                self._upsert_article_comments(cur, article_id, comments)
+                prepared_count = self._upsert_article_comments(cur, article_id, comments)
+                after_count = self._count_article_comments(cur, article_id)
                 if sync_picks:
                     synced = self._sync_canonical_to_picks(cur, article_id)
             conn.commit()
-            return {"ok": True, "synced_picks": synced}
+            return {
+                "ok": True,
+                "synced_picks": synced,
+                "prepared_comments": prepared_count,
+                "stored_comments_total": after_count,
+                "net_new_comments": max(after_count - before_count, 0),
+            }
         except Exception as e:
             conn.rollback()
             logger.error("save_article_with_comments failed: %s", e)
@@ -1843,21 +1859,27 @@ class DatabaseBackend:
         finally:
             conn.autocommit = old_autocommit
 
-    def update_article_comments(self, article_id: str, comments: list) -> int:
-        """Comments-only update (for TTL refresh). Returns count."""
+    def update_article_comments(self, article_id: str, comments: list) -> Dict[str, int]:
+        """Comments-only update (for refresh runs). Returns refresh stats."""
         conn = self._get_conn()
         old_autocommit = conn.autocommit
         try:
             conn.autocommit = False
             with conn.cursor() as cur:
+                before_count = self._count_article_comments(cur, article_id)
                 prepared_count = self._upsert_article_comments(cur, article_id, comments)
                 cur.execute(
                     "UPDATE sa_articles SET comments_fetched_at = NOW(), "
                     "updated_at = NOW() WHERE article_id = %s",
                     (article_id,),
                 )
+                after_count = self._count_article_comments(cur, article_id)
             conn.commit()
-            return prepared_count
+            return {
+                "prepared_comments": prepared_count,
+                "stored_comments_total": after_count,
+                "net_new_comments": max(after_count - before_count, 0),
+            }
         except Exception as e:
             conn.rollback()
             logger.error("update_article_comments failed: %s", e)
