@@ -616,6 +616,10 @@ Examples:
              "Specific features: --features sentiment_7d_ma sentiment_momentum. "
              "Omit flag entirely to disable.",
     )
+    parser.add_argument(
+        "--tag-suffix", default=None,
+        help="Append suffix to output filename tag (e.g., --tag-suffix ext → train_polygon_multi_both_ext.csv)",
+    )
     args = parser.parse_args()
 
     # Validate model argument
@@ -634,6 +638,9 @@ Examples:
         # Include score_type in tag when risk/both (default sentiment omitted for brevity)
         suffix = f"_{args.score_type}" if args.score_type != "sentiment" else ""
         tag = f"{args.source}_{args.model}{suffix}"
+
+    if args.tag_suffix:
+        tag = f"{tag}_{args.tag_suffix}"
 
     # Effective end date for price download
     price_end = args.train_end if args.train_only else args.trade_end
