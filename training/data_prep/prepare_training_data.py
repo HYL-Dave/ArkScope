@@ -399,6 +399,60 @@ def _fetch_ibkr_daily(tickers, start_date, end_date):
     return data
 
 
+def _add_sector_etf_return(df, start_date, end_date):
+    """Add sector_return column: daily return of each ticker's sector ETF.
+
+    Loads ticker→ETF mapping from ticker_sector_etf.json, downloads ETF
+    prices from yfinance, computes daily pct_change, merges by date+tic.
+    """
+    mapping_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "ticker_sector_etf.json",
+    )
+    if not os.path.exists(mapping_path):
+        print("  WARNING: ticker_sector_etf.json not found, skipping sector_return")
+        df["sector_return"] = 0.0
+        return df
+
+    import json
+    with open(mapping_path) as f:
+        ticker_to_etf = json.load(f)
+
+    # Determine which ETFs we need
+    tickers_in_data = df["tic"].unique()
+    needed_etfs = sorted(set(
+        ticker_to_etf.get(t, "QQQ") for t in tickers_in_data
+    ))
+    print(f"  Downloading {len(needed_etfs)} sector ETFs: {needed_etfs}")
+
+    # Download ETF prices
+    etf_df = YahooDownloader(
+        start_date=start_date,
+        end_date=end_date,
+        ticker_list=needed_etfs,
+    ).fetch_data()
+
+    # Compute daily return per ETF
+    etf_df = etf_df.sort_values(["tic", "date"])
+    etf_df["etf_return"] = etf_df.groupby("tic")["close"].pct_change()
+    etf_returns = etf_df[["date", "tic", "etf_return"]].rename(
+        columns={"tic": "etf_tic"}
+    )
+
+    # Map each stock ticker to its ETF
+    df = df.copy()
+    df["etf_tic"] = df["tic"].map(lambda t: ticker_to_etf.get(t, "QQQ"))
+
+    # Merge ETF return by (date, etf_tic)
+    df = df.merge(etf_returns, on=["date", "etf_tic"], how="left")
+    df = df.rename(columns={"etf_return": "sector_return"})
+    df.drop(columns=["etf_tic"], inplace=True)
+    df["sector_return"] = df["sector_return"].fillna(0.0)
+
+    filled = (df["sector_return"] != 0).sum()
+    print(f"  sector_return: {filled}/{len(df)} rows filled ({filled/len(df):.1%})")
+    return df
+
+
 def download_prices(tickers, start_date, end_date, price_source="yfinance"):
     """Download OHLCV + compute technical indicators."""
     print(f"\n  Price source: {price_source}")
@@ -447,6 +501,9 @@ def download_prices(tickers, start_date, end_date, price_source="yfinance"):
     processed_full[non_key_cols] = processed_full.groupby("tic")[non_key_cols].ffill()
     processed_full[non_key_cols] = processed_full.groupby("tic")[non_key_cols].bfill()
     processed_full = processed_full.sort_values(["date", "tic"]).reset_index(drop=True)
+
+    # Add sector ETF return
+    processed_full = _add_sector_etf_return(processed_full, start_date, end_date)
 
     print(f"  Processed: {len(processed_full)} rows, {processed_full['tic'].nunique()} tickers")
     return processed_full

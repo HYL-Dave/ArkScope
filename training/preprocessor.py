@@ -112,6 +112,7 @@ class FeatureEngineer:
         df = self._clean_data(df)
         if self.use_technical_indicator:
             df = self._add_technical_indicators(df)
+            df = self._add_volume_ratio(df)
         if self.use_vix:
             df = self._add_vix(df)
         if self.use_turbulence:
@@ -173,6 +174,16 @@ class FeatureEngineer:
                     how="left",
                 )
         return df.sort_values(by=["date", "tic"])
+
+    @staticmethod
+    def _add_volume_ratio(data: pd.DataFrame) -> pd.DataFrame:
+        """Add volume_ratio = today's volume / 20-day SMA of volume per ticker."""
+        df = data.copy().sort_values(["tic", "date"])
+        df["volume_ratio"] = (
+            df.groupby("tic")["volume"]
+            .transform(lambda v: v / v.rolling(20, min_periods=1).mean())
+        )
+        return df.sort_values(["date", "tic"])
 
     def _add_vix(self, data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
