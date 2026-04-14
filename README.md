@@ -693,6 +693,21 @@ uvicorn src.api.app:create_app --factory --reload --port 8420
 
 ---
 
+## Open Data
+
+We open-sourced our multi-LLM financial news scoring dataset on HuggingFace:
+
+**[HYL/NASDAQ-News-Multi-LLM-Scores](https://huggingface.co/datasets/HYL/NASDAQ-News-Multi-LLM-Scores)**
+
+127,176 NASDAQ news articles (from [FNSPID](https://huggingface.co/datasets/Zihan1004/FNSPID)) re-scored by 11 LLMs for sentiment and risk:
+- Claude Opus 4.5, Sonnet 4.5, Haiku 4.5 (Anthropic)
+- GPT-5, GPT-5-mini, GPT-5.4-nano, GPT-4.1, GPT-4.1-mini, GPT-4.1-nano (OpenAI)
+- o3, o4-mini (OpenAI reasoning models)
+
+Includes 60 score columns, 26 summary variants (GPT-5 / GPT-5-mini at 4 reasoning × 3 verbosity levels), and cross-model analysis.
+
+Built upon [FinRL-DeepSeek](https://github.com/benstaf/FinRL_DeepSeek) ([arXiv:2502.07393](https://arxiv.org/abs/2502.07393)).
+
 ## License
 
 MIT License - see LICENSE file for details.

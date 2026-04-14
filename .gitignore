@@ -197,4 +197,4 @@ docs/insights/
 # -----------------------------------------------------------------------------
 *.local.md
 *.local.txt
-*.local.json
+*.local.jsonscripts/huggingface/output/
