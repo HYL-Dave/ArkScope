@@ -114,8 +114,14 @@ def main():
         else:
             warnings.warn(f"No feature_scaler.json in {model_dir}.")
 
+    # Detect indicators from CSV (supports both baseline and extended)
+    csv_indicators = [c for c in INDICATORS if c in df.columns]
+    if not csv_indicators:
+        raise ValueError("Trade CSV has no recognized indicator columns.")
+    print(f"  Indicators from CSV: {csv_indicators}")
+
     # Select environment
-    K = len(INDICATORS)
+    K = len(csv_indicators)
     F = len(extra_cols)
     if args.env == "risk":
         from training.envs.stocktrading_llm_risk import StockTradingEnv
@@ -143,7 +149,7 @@ def main():
         buy_cost_pct=[0.001] * stock_dim,
         sell_cost_pct=[0.001] * stock_dim,
         state_space=state_dim, action_space=stock_dim,
-        tech_indicator_list=INDICATORS,
+        tech_indicator_list=csv_indicators,
         reward_scaling=1e-4,
         sentiment_scale=args.sentiment_scale,
         extra_feature_cols=extra_cols,

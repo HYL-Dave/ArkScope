@@ -92,13 +92,17 @@ def load_data(data_path):
     if "Unnamed: 0" in train.columns:
         train = train.drop("Unnamed: 0", axis=1)
 
-    required = ["date", "tic", "close", "llm_sentiment"] + list(INDICATORS)
-    missing = [c for c in required if c not in train.columns]
+    base_required = ["date", "tic", "close", "llm_sentiment"]
+    missing = [c for c in base_required if c not in train.columns]
     if missing:
         raise ValueError(
             f"CSV missing required column(s): {missing}. "
             "See training/data_prep/README.md for format spec."
         )
+    # Detect which indicators are present in CSV (supports both baseline and extended)
+    csv_indicators = [c for c in INDICATORS if c in train.columns]
+    if not csv_indicators:
+        raise ValueError("CSV has no recognized indicator columns.")
 
     train["date"] = train["date"].astype(str)
     train = train.sort_values(["date", "tic"]).reset_index(drop=True)
@@ -108,20 +112,22 @@ def load_data(data_path):
     train = train.set_index("new_idx")
     train["llm_sentiment"] = train["llm_sentiment"].fillna(0)
 
-    return train
+    return train, csv_indicators
 
 
 # ── Environment factory ─────────────────────────────────────
 
 
-def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None):
+def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None,
+                tech_indicators=None):
     """Return a callable that creates the trading environment.
 
     SB3 expects a factory function (not a pre-built env) for vectorized envs.
     """
     extra = extra_feature_cols or []
+    indicators = tech_indicators if tech_indicators is not None else INDICATORS
     stock_dimension = len(train.tic.unique())
-    K = len(INDICATORS)
+    K = len(indicators)
     F = len(extra)
     state_space = 1 + 2 * stock_dimension + (1 + K + F) * stock_dimension
 
@@ -133,7 +139,7 @@ def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None):
         "sell_cost_pct": [0.001] * stock_dimension,
         "state_space": state_space,
         "stock_dim": stock_dimension,
-        "tech_indicator_list": INDICATORS,
+        "tech_indicator_list": indicators,
         "action_space": stock_dimension,
         "reward_scaling": 1e-4,
         "sentiment_scale": sentiment_scale,
@@ -255,7 +261,8 @@ Hyperparameter mapping (SpinningUp → SB3):
         print(f"  GPU: {torch.cuda.get_device_name(gpu_idx)}")
 
     # Load data
-    train = load_data(args.data)
+    train, csv_indicators = load_data(args.data)
+    print(f"  Indicators from CSV: {csv_indicators}")
 
     # Feature engineering
     from training.train_utils import detect_and_load_features
@@ -266,6 +273,7 @@ Hyperparameter mapping (SpinningUp → SB3):
     # Create environment
     env_fn, stock_dimension, state_space = make_env_fn(
         train, sentiment_scale=args.sentiment_scale, extra_feature_cols=extra_cols,
+        tech_indicators=csv_indicators,
     )
 
     if args.n_envs > 1:
