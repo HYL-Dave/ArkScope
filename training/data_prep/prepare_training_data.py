@@ -453,7 +453,14 @@ def _add_sector_etf_return(df, start_date, end_date):
     return df
 
 
-def download_prices(tickers, start_date, end_date, price_source="yfinance"):
+BASELINE_INDICATORS = [
+    "macd", "boll_ub", "boll_lb", "rsi_30",
+    "cci_30", "dx_30", "close_30_sma", "close_60_sma",
+]
+
+
+def download_prices(tickers, start_date, end_date, price_source="yfinance",
+                    baseline=False):
     """Download OHLCV + compute technical indicators."""
     print(f"\n  Price source: {price_source}")
     print(f"  {len(tickers)} tickers, {start_date} to {end_date}")
@@ -472,9 +479,10 @@ def download_prices(tickers, start_date, end_date, price_source="yfinance"):
     print(f"  Raw OHLCV: {len(df_raw)} rows, {df_raw['tic'].nunique()} tickers")
 
     # Add technical indicators
+    indicator_list = BASELINE_INDICATORS if baseline else INDICATORS
     fe = FeatureEngineer(
         use_technical_indicator=True,
-        tech_indicator_list=INDICATORS,
+        tech_indicator_list=indicator_list,
         use_vix=True,
         use_turbulence=True,
         user_defined_feature=False,
@@ -502,8 +510,9 @@ def download_prices(tickers, start_date, end_date, price_source="yfinance"):
     processed_full[non_key_cols] = processed_full.groupby("tic")[non_key_cols].bfill()
     processed_full = processed_full.sort_values(["date", "tic"]).reset_index(drop=True)
 
-    # Add sector ETF return
-    processed_full = _add_sector_etf_return(processed_full, start_date, end_date)
+    # Add sector ETF return (skip in baseline mode)
+    if not baseline:
+        processed_full = _add_sector_etf_return(processed_full, start_date, end_date)
 
     print(f"  Processed: {len(processed_full)} rows, {processed_full['tic'].nunique()} tickers")
     return processed_full
@@ -620,6 +629,11 @@ Examples:
         "--tag-suffix", default=None,
         help="Append suffix to output filename tag (e.g., --tag-suffix ext → train_polygon_multi_both_ext.csv)",
     )
+    parser.add_argument(
+        "--baseline", action="store_true",
+        help="Use original 8 indicators only (no ATR, volume_ratio, sector_return). "
+             "For A/B comparison with extended features.",
+    )
     args = parser.parse_args()
 
     # Validate model argument
@@ -693,7 +707,8 @@ Examples:
 
     # Step 3: Download prices + features
     print(f"\n[3/4] Loading prices ({args.price_source}) and computing features...")
-    price_data = download_prices(tickers, args.train_start, price_end, args.price_source)
+    price_data = download_prices(tickers, args.train_start, price_end, args.price_source,
+                                  baseline=args.baseline)
 
     # Step 4: Merge scores and split
     print("\n[4/4] Merging scores and splitting...")

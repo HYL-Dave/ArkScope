@@ -205,7 +205,7 @@ class FeatureEngineer:
     @staticmethod
     def _calculate_turbulence(data: pd.DataFrame) -> pd.DataFrame:
         df = data.copy()
-        pivot = df.pivot(index="date", columns="tic", values="close").pct_change()
+        pivot = df.pivot(index="date", columns="tic", values="close").pct_change(fill_method=None)
         dates = df["date"].unique()
         start = 252
         turb_idx = [0.0] * start
