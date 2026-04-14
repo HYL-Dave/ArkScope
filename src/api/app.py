@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     from .routes.config_routes import router as config_router
     from .routes.health import router as health_router
     from .routes.query import router as query_router
+    from .routes.analysis import router as analysis_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -63,5 +64,6 @@ def create_app() -> FastAPI:
     app.include_router(config_router)
     app.include_router(health_router)
     app.include_router(query_router)
+    app.include_router(analysis_router)
 
     return app

@@ -13,7 +13,10 @@ from fastapi.testclient import TestClient
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
 from src.api.app import create_app
+from src.agents.config import get_agent_config
+from src.api.routes.analysis import AnalysisRunRequest, run_analysis
 
 
 @pytest.fixture(scope="module")
@@ -217,3 +220,56 @@ class TestConfigEndpoints:
         data = r.json()
         assert "date" in data
         assert "holdings" in data
+
+
+class TestAnalysisEndpoint:
+    def test_analysis_run_disabled_by_default(self):
+        original = get_agent_config().analysis_pipeline_enabled
+        get_agent_config().analysis_pipeline_enabled = False
+        try:
+            with pytest.raises(Exception) as exc_info:
+                run_analysis(AnalysisRunRequest(ticker="NVDA"), dal=object())
+        finally:
+            get_agent_config().analysis_pipeline_enabled = original
+        assert getattr(exc_info.value, "status_code", None) == 503
+
+    def test_analysis_run_enabled(self, monkeypatch):
+        artifact = AnalysisArtifact(
+            request=AnalysisRequest(ticker="NVDA"),
+            context_summary={},
+            strategy_results={},
+            final_decision={"action": "buy", "summary": "NVDA: BUY bias"},
+            report_sections={"executive_summary": "NVDA: BUY bias"},
+            degradation_summary=[],
+        )
+
+        def _fake_run_analysis_request(request, *, dal=None, render_format="markdown"):
+            del request, dal, render_format
+            return type(
+                "_Output",
+                (),
+                {
+                    "artifact": artifact,
+                    "integrity": IntegrityResult(artifact=artifact, status="clean"),
+                    "report": RenderedReport(format="markdown", content="# NVDA\n\nNVDA: BUY bias\n"),
+                },
+            )()
+
+        monkeypatch.setattr(
+            "src.api.routes.analysis.run_analysis_request",
+            _fake_run_analysis_request,
+        )
+
+        original = get_agent_config().analysis_pipeline_enabled
+        get_agent_config().analysis_pipeline_enabled = True
+        try:
+            response = run_analysis(
+                AnalysisRunRequest(ticker="NVDA", depth="quick"),
+                dal=object(),
+            )
+        finally:
+            get_agent_config().analysis_pipeline_enabled = original
+        assert response.ticker == "NVDA"
+        assert response.integrity_status == "clean"
+        assert response.action == "buy"
+        assert response.report.startswith("# NVDA")

@@ -110,6 +110,9 @@ class AgentConfig(BaseModel):
     sa_comments_backfill_per_full_scan: int = 10
     sa_comments_backfill_per_backfill_scan: int = 50
 
+    # Phase D analysis pipeline scaffold
+    analysis_pipeline_enabled: bool = False
+
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
 _MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
@@ -274,6 +277,11 @@ def get_agent_config() -> AgentConfig:
         config.sa_cache_hours = sa_prefs["cache_hours"]
     if "detail_cache_days" in sa_prefs:
         config.sa_detail_cache_days = sa_prefs["detail_cache_days"]
+
+    # Phase D analysis pipeline
+    analysis_prefs = profile.get("analysis_pipeline", {})
+    if "enabled" in analysis_prefs:
+        config.analysis_pipeline_enabled = analysis_prefs["enabled"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})
