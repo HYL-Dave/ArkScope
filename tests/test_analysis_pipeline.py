@@ -5,7 +5,7 @@ from src.analysis.integrity import validate_and_repair_artifact
 from src.analysis.pipeline import AnalysisPipeline
 from src.analysis.renderer import render_report
 from src.analysis.scheduler_hooks import render_scheduled_batch
-from src.analysis.service import run_analysis_request
+from src.analysis.service import run_analysis_request, save_analysis_run
 from src.analysis.strategies import (
     DecisionStrategy,
     FundamentalStrategy,
@@ -201,6 +201,7 @@ def test_render_report_includes_strategy_sections_and_degradation_summary():
     assert "# AMD" in report.content
     assert "## Technical" in report.content
     assert "## Decision" in report.content
+    assert "## Context" in report.content
     assert "## Degradation" in report.content
     assert "fundamental:skipped" in report.content
 
@@ -352,3 +353,33 @@ def test_run_analysis_request_returns_artifact_integrity_and_report(monkeypatch)
     assert output.integrity.status == "clean"
     assert output.report is not None
     assert output.report.content.startswith("# NVDA")
+
+
+def test_save_analysis_run_uses_shared_report_tools(monkeypatch):
+    output = run_analysis_request(
+        AnalysisRequest(ticker="NVDA"),
+        dal=None,
+    )
+
+    captured = {}
+
+    def _fake_save_report(dal, **kwargs):
+        del dal
+        captured.update(kwargs)
+        return {
+            "id": 42,
+            "file_path": "data/reports/fake.md",
+            "title": kwargs["title"],
+            "created_at": "2026-04-15T00:00:00",
+        }
+
+    monkeypatch.setattr("src.tools.report_tools.save_report", _fake_save_report)
+
+    saved = save_analysis_run(object(), output, title="NVDA Phase D Analysis")
+
+    assert saved.id == 42
+    assert saved.file_path == "data/reports/fake.md"
+    assert captured["report_type"] == "phase_d_analysis"
+    assert captured["provider"] == "phase_d"
+    assert captured["model"] == "structured-pipeline"
+    assert captured["tickers"] == ["NVDA"]

@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 from html import escape
+from pathlib import Path
+from string import Template
 from typing import Any, Dict, Optional
 
 from .contracts import IntegrityResult, RenderedReport
+
+_TEMPLATES_DIR = Path(__file__).with_name("templates")
+
+
+def _load_template(name: str) -> Template:
+    """Load a renderer template from the local templates directory."""
+    return Template((_TEMPLATES_DIR / name).read_text(encoding="utf-8"))
 
 
 def _render_strategy_sections_markdown(strategies: Dict[str, Any]) -> str:
@@ -26,6 +35,30 @@ def _render_strategy_sections_markdown(strategies: Dict[str, Any]) -> str:
     return "\n\n".join(blocks)
 
 
+def _render_strategy_sections_html(strategies: Dict[str, Any]) -> str:
+    """Render compact per-strategy sections for the HTML report."""
+    blocks = []
+    for name, section in strategies.items():
+        parts = [
+            f"<h2>{escape(name.title())}</h2>",
+            f"<p>Status: {escape(str(section.get('status')))}</p>",
+        ]
+        score = section.get("score")
+        if score is not None:
+            parts.append(f"<p>Score: {score:.1f}</p>")
+        parts.extend(
+            f"<p>{escape(str(line))}</p>" for line in section.get("summary_lines", [])
+        )
+        parts.extend(
+            f"<p>Signal: {escape(str(signal))}</p>" for signal in section.get("signals", [])
+        )
+        parts.extend(
+            f"<p>Risk: {escape(str(risk))}</p>" for risk in section.get("risks", [])
+        )
+        blocks.append("".join(parts))
+    return "".join(blocks)
+
+
 def render_report(
     integrity_result: IntegrityResult,
     *,
@@ -40,51 +73,46 @@ def render_report(
     decision_action = artifact.final_decision.get("action", "unknown")
     strategy_sections = artifact.report_sections.get("strategies", {})
     degradation_summary = artifact.degradation_summary
+    context_summary = artifact.context_summary
 
     if fmt == "html":
-        strategy_html = "".join(
-            f"<h2>{escape(name.title())}</h2>"
-            f"<p>Status: {escape(str(section.get('status')))}</p>"
-            + (
-                f"<p>Score: {section.get('score'):.1f}</p>"
-                if section.get("score") is not None else ""
-            )
-            + "".join(f"<p>{escape(str(line))}</p>" for line in section.get("summary_lines", []))
-            for name, section in strategy_sections.items()
+        degradation_html = (
+            "<h2>Degradation</h2>" + "".join(f"<p>{escape(item)}</p>" for item in degradation_summary)
+            if degradation_summary else ""
         )
-        degradation_html = ""
-        if degradation_summary:
-            degradation_html = "<h2>Degradation</h2>" + "".join(
-                f"<p>{escape(item)}</p>" for item in degradation_summary
-            )
-        content = (
-            "<html><body>"
-            f"<h1>{artifact.request.ticker}</h1>"
-            f"<p>Action: {escape(str(decision_action))}</p>"
-            f"<p>{summary}</p>"
-            f"{strategy_html}"
-            f"{degradation_html}"
-            "</body></html>"
+        content = _load_template("report_html.tpl").safe_substitute(
+            ticker=escape(str(artifact.request.ticker)),
+            action=escape(str(decision_action)),
+            summary=escape(str(summary)),
+            mode=escape(str(context_summary.get("mode", ""))),
+            depth=escape(str(context_summary.get("depth", ""))),
+            backend_type=escape(str(context_summary.get("provider_status", {}).get("backend_type", ""))),
+            news_count=escape(str(context_summary.get("news_count", 0))),
+            social_count=escape(str(context_summary.get("social_count", 0))),
+            strategy_sections=_render_strategy_sections_html(strategy_sections),
+            degradation_section=degradation_html,
         )
     else:
-        parts = [
-            f"# {artifact.request.ticker}",
-            "",
-            f"Action: {decision_action}",
-            "",
-            summary,
-        ]
-        if strategy_sections:
-            parts.extend(["", _render_strategy_sections_markdown(strategy_sections)])
+        degradation_md = ""
         if degradation_summary:
-            parts.extend(
+            degradation_md = "\n".join(
                 [
-                    "",
                     "## Degradation",
                     *[f"- {item}" for item in degradation_summary],
                 ]
             )
-        content = "\n".join(parts).strip() + "\n"
+        content = _load_template("report_markdown.tpl").safe_substitute(
+            ticker=str(artifact.request.ticker),
+            action=str(decision_action),
+            summary=str(summary),
+            mode=str(context_summary.get("mode", "")),
+            depth=str(context_summary.get("depth", "")),
+            backend_type=str(context_summary.get("provider_status", {}).get("backend_type", "")),
+            news_count=str(context_summary.get("news_count", 0)),
+            social_count=str(context_summary.get("social_count", 0)),
+            strategy_sections=_render_strategy_sections_markdown(strategy_sections),
+            degradation_section=degradation_md,
+        ).strip() + "\n"
 
     return RenderedReport(
         format="html" if fmt == "html" else "markdown",

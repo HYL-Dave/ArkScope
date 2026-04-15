@@ -23,6 +23,16 @@ class AnalysisRunOutput:
     report: Optional[RenderedReport] = None
 
 
+@dataclass
+class SavedAnalysisReport:
+    """Metadata returned after persisting one Phase D analysis report."""
+
+    id: Optional[int]
+    file_path: str
+    title: str
+    created_at: str
+
+
 def run_analysis_request(
     request: AnalysisRequest,
     *,
@@ -38,4 +48,61 @@ def run_analysis_request(
         artifact=artifact,
         integrity=integrity,
         report=report,
+    )
+
+
+def _confidence_label_to_score(label: Optional[str]) -> Optional[float]:
+    """Map coarse confidence labels to an approximate numeric score."""
+    if not label:
+        return None
+    norm = str(label).strip().lower()
+    if norm == "high":
+        return 0.8
+    if norm == "medium":
+        return 0.6
+    if norm == "low":
+        return 0.35
+    return None
+
+
+def save_analysis_run(
+    dal: "DataAccessLayer",
+    output: AnalysisRunOutput,
+    *,
+    title: Optional[str] = None,
+    report_type: str = "phase_d_analysis",
+) -> SavedAnalysisReport:
+    """Persist a rendered Phase D analysis report via the shared report tooling."""
+    if output.report is None:
+        raise ValueError("Cannot save analysis without a rendered report")
+
+    from src.tools.report_tools import save_report
+
+    artifact = output.artifact
+    ticker = artifact.request.ticker.upper()
+    final_decision = artifact.final_decision
+    summary = final_decision.get("summary") or artifact.report_sections.get("executive_summary") or ticker
+    action = final_decision.get("action")
+    confidence = _confidence_label_to_score(final_decision.get("confidence"))
+    report_title = title or f"{ticker} Phase D Analysis"
+
+    saved = save_report(
+        dal,
+        title=report_title,
+        tickers=[ticker],
+        report_type=report_type,
+        summary=summary,
+        content=output.report.content,
+        conclusion=str(action).upper() if action else None,
+        confidence=confidence,
+        provider="phase_d",
+        model="structured-pipeline",
+        tools_used=list(artifact.strategy_results.keys()),
+        tool_calls=len(artifact.strategy_results),
+    )
+    return SavedAnalysisReport(
+        id=saved.get("id"),
+        file_path=saved["file_path"],
+        title=saved["title"],
+        created_at=saved["created_at"],
     )

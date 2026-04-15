@@ -14,6 +14,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
+from src.analysis.service import SavedAnalysisReport
 from src.api.app import create_app
 from src.agents.config import get_agent_config
 from src.api.routes.analysis import AnalysisRunRequest, run_analysis
@@ -259,12 +260,21 @@ class TestAnalysisEndpoint:
             "src.api.routes.analysis.run_analysis_request",
             _fake_run_analysis_request,
         )
+        monkeypatch.setattr(
+            "src.api.routes.analysis.save_analysis_run",
+            lambda dal, output, title=None: SavedAnalysisReport(
+                id=99,
+                file_path="data/reports/nvda.md",
+                title=title or "NVDA Phase D Analysis",
+                created_at="2026-04-15T00:00:00",
+            ),
+        )
 
         original = get_agent_config().analysis_pipeline_enabled
         get_agent_config().analysis_pipeline_enabled = True
         try:
             response = run_analysis(
-                AnalysisRunRequest(ticker="NVDA", depth="quick"),
+                AnalysisRunRequest(ticker="NVDA", depth="quick", persist=True),
                 dal=object(),
             )
         finally:
@@ -273,3 +283,5 @@ class TestAnalysisEndpoint:
         assert response.integrity_status == "clean"
         assert response.action == "buy"
         assert response.report.startswith("# NVDA")
+        assert response.saved_report_id == 99
+        assert response.saved_report_path == "data/reports/nvda.md"

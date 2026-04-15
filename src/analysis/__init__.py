@@ -18,7 +18,7 @@ from .context_builder import build_analysis_context
 from .factory import build_default_pipeline
 from .renderer import render_report
 from .scheduler_hooks import render_scheduled_batch, run_scheduled_batch
-from .service import AnalysisRunOutput, run_analysis_request
+from .service import AnalysisRunOutput, SavedAnalysisReport, run_analysis_request, save_analysis_run
 from .strategies import build_default_strategies
 
 __all__ = [
@@ -27,6 +27,7 @@ __all__ = [
     "AnalysisPipeline",
     "AnalysisRequest",
     "AnalysisRunOutput",
+    "SavedAnalysisReport",
     "IntegrityResult",
     "RenderedReport",
     "StrategyResult",
@@ -39,5 +40,6 @@ __all__ = [
     "render_scheduled_batch",
     "run_scheduled_batch",
     "run_analysis_request",
+    "save_analysis_run",
     "validate_and_repair_artifact",
 ]

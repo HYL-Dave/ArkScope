@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.agents.config import get_agent_config
-from src.analysis import AnalysisRequest, run_analysis_request
+from src.analysis import AnalysisRequest, run_analysis_request, save_analysis_run
 from src.api.dependencies import get_dal
 
 router = APIRouter(tags=["analysis"])
@@ -21,6 +21,8 @@ class AnalysisRunRequest(BaseModel):
     depth: Literal["quick", "standard", "full"] = "standard"
     format: Literal["markdown", "html"] = "markdown"
     user_query: Optional[str] = None
+    persist: bool = False
+    title: Optional[str] = None
 
 
 class AnalysisRunResponse(BaseModel):
@@ -32,6 +34,8 @@ class AnalysisRunResponse(BaseModel):
     degradation_summary: List[str]
     report: Optional[str] = None
     strategy_status: Dict[str, str]
+    saved_report_id: Optional[int] = None
+    saved_report_path: Optional[str] = None
 
 
 @router.post("/analysis/run", response_model=AnalysisRunResponse)
@@ -57,6 +61,13 @@ def run_analysis(
         dal=dal,
         render_format=request.format,
     )
+    saved_report = None
+    if request.persist:
+        saved_report = save_analysis_run(
+            dal,
+            output,
+            title=request.title,
+        )
     return AnalysisRunResponse(
         ticker=output.artifact.request.ticker,
         integrity_status=output.integrity.status,
@@ -67,4 +78,6 @@ def run_analysis(
             name: result.status
             for name, result in output.artifact.strategy_results.items()
         },
+        saved_report_id=saved_report.id if saved_report is not None else None,
+        saved_report_path=saved_report.file_path if saved_report is not None else None,
     )

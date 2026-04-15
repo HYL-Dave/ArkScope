@@ -24,6 +24,7 @@ Slash commands (during chat):
     /save           Save session exchanges as report
     /reports        List saved research reports
     /analyze        Run Phase D structured analysis pipeline
+    /analyze-save   Run Phase D pipeline and save a report
     /status         Show current session config
     help            Show all commands
     clear           Clear conversation history
@@ -191,6 +192,7 @@ _SLASH_COMMANDS = [
     ("/alpha-picks", "/ap", "Seeking Alpha Alpha Picks"),
     ("/monitor", "/mon", "Scan watchlist for alerts"),
     ("/analyze", "/az", "Run Phase D structured analysis pipeline"),
+    ("/analyze-save", "/asz", "Run Phase D pipeline and save a report"),
     ("/status", "/s", "Show session config"),
     ("/help", "", "Show all commands"),
 ]
@@ -379,6 +381,7 @@ def print_help():
             "  [cyan]/ap refresh[/cyan]         Force refresh from SA\n"
             "  [cyan]/analyze <TICKER>[/cyan]   Run Phase D pipeline (flag-gated)\n"
             "  [cyan]/analyze <TICKER> <depth>[/cyan] Depth: quick|standard|full\n"
+            "  [cyan]/analyze-save <TICKER>[/cyan] Run Phase D pipeline and save a report\n"
             "  [cyan]/status[/cyan]             Show current session config\n"
             "\n[bold]General[/bold]\n"
             "  [cyan]clear[/cyan]               Clear conversation history\n"
@@ -1690,9 +1693,9 @@ def handle_status_command(state: SessionState, backend_type: str, ticker_count: 
     )
 
 
-def handle_analyze_command(dal: Any, arg: str) -> None:
-    """Handle /analyze <ticker> [depth] using the Phase D pipeline."""
-    from src.analysis import AnalysisRequest, run_analysis_request
+def handle_analyze_command(dal: Any, arg: str, *, persist: bool = False) -> None:
+    """Handle /analyze[(-save)] <ticker> [depth] using the Phase D pipeline."""
+    from src.analysis import AnalysisRequest, run_analysis_request, save_analysis_run
 
     if not get_agent_config().analysis_pipeline_enabled:
         console.print(
@@ -1736,6 +1739,10 @@ def handle_analyze_command(dal: Any, arg: str) -> None:
         f"[dim]Integrity: {output.integrity.status} | "
         f"Strategies: {', '.join(output.artifact.strategy_results.keys())}[/dim]\n"
     )
+    if persist:
+        saved = save_analysis_run(dal, output)
+        id_str = f" (id={saved.id})" if saved.id is not None else ""
+        console.print(f"[green]Saved report:[/green] {saved.file_path}{id_str}\n")
 
 
 def handle_effort_command(state: SessionState, arg: str) -> None:
@@ -2470,6 +2477,8 @@ def main():
                 _handle_monitor_command(dal, arg)
             elif cmd in ("/analyze", "/az"):
                 handle_analyze_command(dal, arg)
+            elif cmd in ("/analyze-save", "/asz"):
+                handle_analyze_command(dal, arg, persist=True)
             elif cmd in ("/status", "/s"):
                 handle_status_command(state, backend_type, ticker_count)
             else:
