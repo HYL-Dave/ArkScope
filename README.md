@@ -1,10 +1,10 @@
-# MindfulRL-Intraday
+# ArkScope
 
-> Reinforcement learning trading system with dual-provider AI agents (Anthropic + OpenAI), 47 financial tools, Discord bot, and multi-source news/price/options data pipeline.
+> AI-powered investment research platform with dual-provider agents (Anthropic + OpenAI), knowledge graph memory, 49 financial tools, and multi-source news/price/options data pipeline.
 
 ## Overview
 
-MindfulRL-Intraday combines RL-based trading strategies with LLM-powered analysis:
+ArkScope combines RL-based trading strategies with LLM-powered analysis:
 
 - **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.4) with 49 tools, 4 skills, 4 subagents
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection

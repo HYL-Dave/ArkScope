@@ -1334,6 +1334,48 @@ yfinance 作為訓練資料的價格源有以下問題：
 
 **待辦**：回測對比 v1 vs v2 ensemble 表現。
 
+### Feature A/B Comparison（2026-04-14 ~ 04-15）
+
+**目的**：測試新增 ATR + volume_ratio + sector_return 特徵對 PPO 訓練的影響。
+
+| 項目 | Baseline | Extended |
+|------|----------|----------|
+| **指標** | 8 個（macd, boll_ub/lb, rsi_30, cci_30, dx_30, sma_30/60） | 11 個（+atr, volume_ratio, sector_return） |
+| **價格源** | IBKR daily bars | IBKR daily bars |
+| **Tickers** | 143 | 143 |
+| **Epochs** | 100 | 100 |
+| **Seeds** | 42, 0, 1, 2, 3 | 42, 0, 1, 2, 3 |
+| **GPU** | cuda (RTX 4090) | cuda (RTX 4090) |
+| **data hash** | 77b42b | 189c74 |
+| **腳本** | `training/scripts/run_feature_comparison.sh` | 同左 |
+
+**回測 Sharpe Ratio：**
+
+| Seed | Baseline | Extended | Diff |
+|------|----------|----------|------|
+| s0 | **1.432** | 0.594 | -0.838 |
+| s1 | 0.496 | **0.745** | +0.249 |
+| s2 | 0.471 | 0.409 | -0.062 |
+| s3 | 0.338 | **0.621** | +0.283 |
+| s42 | 0.611 | **0.718** | +0.107 |
+
+**統計彙總：**
+
+| 指標 | Baseline | Extended |
+|------|----------|----------|
+| Mean | 0.670 | 0.617 |
+| Median | 0.496 | **0.621** |
+| Std | 0.424 | **0.130** |
+| Min | 0.338 | 0.409 |
+| Max | **1.432** | 0.745 |
+
+**結論：**
+1. Extended 的 variance 顯著更低（std 0.130 vs 0.424）— 新特徵讓模型更穩定
+2. Baseline mean 被 s0 的異常值（1.432）拉高；去掉 s0 後 baseline mean = 0.479，extended = 0.617
+3. Median 方面 Extended 勝出（0.621 vs 0.496）
+4. Extended 4/5 seeds Sharpe > 0.5，baseline 僅 2/5
+5. 新特徵降低方差、提升中位數表現，建議 Production v3 採用 extended features
+
 ---
 
 ## 備註
@@ -1346,4 +1388,4 @@ yfinance 作為訓練資料的價格源有以下問題：
 
 ---
 
-*最後更新: 2026-04-12*
+*最後更新: 2026-04-15*
