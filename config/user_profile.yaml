@@ -433,5 +433,14 @@ rl_pipeline:
   # true  = 工具讀取 models_dir 的模型狀態和回測結果（推論功能待 Phase 1b 實作）
   enabled: false
 
+# ============================================
+# 14. Analysis Pipeline 設定
+# ============================================
+analysis_pipeline:
+  # Phase D 結構化分析管線
+  # false = /analyze 指令回傳「尚未啟用」提示
+  # true  = 啟用 /analyze 和 /analyze-save 指令
+  enabled: true
+
   # 已訓練模型的存放目錄（相對於專案根目錄）
   models_dir: "trained_models"

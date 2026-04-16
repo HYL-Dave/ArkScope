@@ -6,9 +6,10 @@
 
 ArkScope combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.4) with 49 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.4) with 50 tools, 4 skills, 4 subagents
+- **Analysis Pipeline** — Structured 5-strategy pipeline (technical, fundamental, sentiment, risk, decision) with report generation
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
-- **HTTP API** — 24 RESTful endpoints (FastAPI + Swagger UI)
+- **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
 - **News Pipeline** — Multi-source collection (Polygon, Finnhub, IBKR) with LLM scoring
 - **Analysis Toolkit** — Fundamentals (SEC EDGAR + Financial Datasets), options (IV/Greeks/chain), signals, web search
 - **RL Pipeline** — PPO/CPPO agents with sentiment/risk-enhanced data, model registry, 3 agent tools
@@ -61,7 +62,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasonin
 | 4 | OpenAI | GPT-5.4 Mini | mini, 5.4-mini | 400K | 128K | Fast + cost-efficient |
 | 5 | OpenAI | GPT-5.4 Nano | nano, 5.4-nano | 400K | 128K | Fastest, cheapest |
 
-### Slash Commands (21)
+### Slash Commands (23)
 
 | Command | Alias | Description |
 |---------|-------|-------------|
@@ -84,10 +85,12 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasonin
 | `/memory [save\|search\|delete]` | `/mem` | Episodic memory (cross-session knowledge) |
 | `/alpha-picks [symbol\|refresh]` | `/ap` | Seeking Alpha Alpha Picks portfolio & detail |
 | `/monitor` | `/mon` | Scan watchlist for alerts |
+| `/analyze <TICKER> [depth]` | `/az` | Run structured analysis pipeline (quick/standard/full) |
+| `/analyze-save <TICKER> [depth]` | `/asz` | Run analysis pipeline and save report |
 | `/status` | `/s` | Show session config |
 | `/help` | | Show all commands |
 
-### Tools (47)
+### Tools (50)
 
 | Category | Tool | Description |
 |----------|------|-------------|
@@ -124,6 +127,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasonin
 | | `refresh_sa_alpha_picks` | Force refresh from SA website + sync tickers |
 | | `get_sa_articles` | Search Alpha Picks articles by ticker/keyword/type |
 | | `get_sa_article_detail` | Full article content + nested comment tree |
+| | `get_sa_market_news` | SA market news headlines |
 | **Reports** | `save_report` | Save research report (Markdown + DB) |
 | | `list_reports` | List reports by ticker/type |
 | | `get_report` | Retrieve report by ID |
@@ -433,6 +437,47 @@ rl_pipeline:
 
 ---
 
+## Analysis Pipeline (Phase D)
+
+Structured 5-strategy analysis pipeline that runs independently from the agent conversation path.
+
+```yaml
+# config/user_profile.yaml
+analysis_pipeline:
+  enabled: true           # Enables /analyze and /analyze-save commands
+```
+
+### CLI
+
+```bash
+/analyze NVDA quick       # Fast scan (fewer news, price only)
+/analyze NVDA standard    # Balanced (fundamentals + sentiment + risk)
+/analyze NVDA full        # Deep analysis (all data sources)
+/analyze-save NVDA quick  # Run + save report to data/reports/
+```
+
+### API
+
+```bash
+curl -X POST http://localhost:8420/analysis/run \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "NVDA", "depth": "standard", "persist": true}'
+```
+
+### Pipeline Stages
+
+| Stage | Inputs | Output |
+|-------|--------|--------|
+| **Technical** | Price, MA5/10/20, volatility | Trend signal, score 0-100 |
+| **Fundamental** | Revenue growth, margins, D/E, PE | Quality rating, score 0-100 |
+| **Sentiment** | News sentiment scores | Sentiment regime, score 0-100 |
+| **Risk** | Volatility, beta, max drawdown | Risk level, score 0-100 |
+| **Decision** | Weighted aggregate of above | Buy/Hold/Sell + confidence |
+
+Reports are saved via the existing `save_report()` system (Markdown files + DB metadata).
+
+---
+
 ## Seeking Alpha Alpha Picks (Optional)
 
 Reads the [Alpha Picks](https://seekingalpha.com/alpha-picks/picks/current) portfolio via a Chrome Extension + Native Messaging architecture. Requires SA Premium + Alpha Picks subscription ($199/yr). Disabled by default.
@@ -511,6 +556,21 @@ The extension runs in your real Chrome browser (zero anti-bot detection risk). D
 | `freshness.py` | FreshnessRegistry singleton + data source health |
 | `rl_tools.py` | RL model status, prediction, backtest report |
 
+### Analysis Pipeline (`src/analysis/`)
+
+| Module | Description |
+|--------|-------------|
+| `contracts.py` | Data contracts (AnalysisRequest, AnalysisContext, StrategyResult, RenderedReport) |
+| `pipeline.py` | Sequential strategy execution and artifact aggregation |
+| `context_builder.py` | DAL adapter — assembles AnalysisContext from prices, fundamentals, news |
+| `strategies/` | 5 strategies: technical, fundamental, sentiment, risk, decision |
+| `integrity.py` | Field validation and placeholder fill for degraded inputs |
+| `renderer.py` | Template-based Markdown/HTML report rendering |
+| `service.py` | Public API: `run_analysis_request()`, `save_analysis_run()` |
+| `factory.py` | Default pipeline assembly |
+| `scheduler_hooks.py` | Batch/scheduled path adapter |
+| `templates/` | Report templates (`report_markdown.tpl`, `report_html.tpl`) |
+
 ### Monitor Layer (`src/monitor/`)
 
 | Module | Description |
@@ -554,7 +614,7 @@ The extension runs in your real Chrome browser (zero anti-bot detection risk). D
 | File | Description |
 |------|-------------|
 | `.env` | API keys (from `.env.template`) |
-| `user_profile.yaml` | 13 sections: watchlists, strategy, models, alerts, RL pipeline, Seeking Alpha, etc. |
+| `user_profile.yaml` | 14 sections: watchlists, strategy, models, alerts, RL pipeline, analysis pipeline, Seeking Alpha, etc. |
 | `sectors.yaml` | Sector definitions and ticker mappings |
 | `tickers_core.json` | Core ticker list (Tier 1/2/3) |
 | `skills/*.yaml` | Custom skill definitions |
@@ -669,6 +729,7 @@ pytest tests/test_env_extra_features.py -v   # Env state vector invariants
 pytest tests/test_train_utils.py -v          # Training utilities
 pytest tests/test_backtest_enhanced.py -v    # Backtest metrics + artifacts
 pytest tests/test_integration_pipeline.py -v # E2E features→train→backtest
+pytest tests/test_analysis_pipeline.py -v     # Analysis pipeline tests
 pytest tests/test_monitor.py -v              # Monitor tests
 pytest tests/ --cov=src --cov-report=html    # With coverage
 ```
