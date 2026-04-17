@@ -6,7 +6,7 @@
 
 ArkScope combines RL-based trading strategies with LLM-powered analysis:
 
-- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.6) + OpenAI (GPT-5.4) with 50 tools, 4 skills, 4 subagents
+- **Dual AI Agent CLI** — Anthropic (Claude Opus 4.7) + OpenAI (GPT-5.4) with 50 tools, 4 skills, 4 subagents
 - **Analysis Pipeline** — Structured 5-strategy pipeline (technical, fundamental, sentiment, risk, decision) with report generation
 - **Discord Bot** — Slash commands, interactive buttons, free-chat analysis, model selection
 - **HTTP API** — 25 RESTful endpoints (FastAPI + Swagger UI)
@@ -44,7 +44,7 @@ python scripts/monitor_service.py --discord
 ## AI Agent CLI
 
 ```bash
-python -m src.agents                                    # Default: Anthropic Opus 4.6
+python -m src.agents                                    # Default: Anthropic Opus 4.7
 python -m src.agents --provider openai                  # Use GPT-5.4
 python -m src.agents --model sonnet                     # Use Sonnet 4.6
 python -m src.agents --thinking                         # Enable extended thinking
@@ -56,7 +56,7 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasonin
 
 | # | Provider | Model | Aliases | Context | Output | Features |
 |---|----------|-------|---------|---------|--------|----------|
-| 1 | Anthropic | Claude Opus 4.6 | opus, o46 | 1M | 128K | Effort, thinking, compaction |
+| 1 | Anthropic | Claude Opus 4.7 | opus, o47 | 1M | 128K | Effort, thinking, compaction |
 | 2 | Anthropic | Claude Sonnet 4.6 | sonnet, s46 | 1M | 64K | Effort, thinking |
 | 3 | OpenAI | GPT-5.4 | gpt5, 5.4 | 1M | 128K | Reasoning effort |
 | 4 | OpenAI | GPT-5.4 Mini | mini, 5.4-mini | 400K | 128K | Fast + cost-efficient |
@@ -70,10 +70,10 @@ python -m src.agents --provider openai --reasoning xhigh  # GPT-5.4 max reasonin
 | `/code-model [name]` | `/cm` | Set code generation model |
 | `/code-backend [name]` | `/cb` | Set code generation backend (api/codex/claude) |
 | `/reasoning <level>` | `/r` | Set OpenAI reasoning (none/minimal/low/medium/high/xhigh) |
-| `/effort <level>` | `/e` | Set Anthropic effort (max/high/medium/low) |
+| `/effort <level>` | `/e` | Set Anthropic effort (max/xhigh/high/medium/low) |
 | `/thinking` | `/t` | Toggle extended thinking (Anthropic) |
 | `/context` | `/ctx` | Toggle 1M context beta (Anthropic) |
-| `/compaction` | `/cmp` | Toggle server-side compaction (Opus 4.6) |
+| `/compaction` | `/cmp` | Toggle server-side compaction (Opus 4.7) |
 | `/skill <name> [args]` | `/sk` | Run a skill workflow (e.g. `/sk fa NVDA`) |
 | `/subagent [name] [model]` | `/sa` | View/change subagent models |
 | `/scratchpad` | `/pad` | List recent scratchpad sessions |
@@ -167,7 +167,7 @@ Specialized agents delegated for specific tasks:
 | `code_analyst` | GPT-5.4 | Quantitative Python analysis, calculations |
 | `deep_researcher` | GPT-5.4 | Multi-source investigation across 14 tools |
 | `data_summarizer` | Sonnet 4.6 | Fast data retrieval and summarization |
-| `reviewer` | Opus 4.6 | Critical analysis review (adversarial) |
+| `reviewer` | Opus 4.7 | Critical analysis review (adversarial) |
 
 ---
 

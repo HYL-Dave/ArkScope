@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS agent_memories (
     tags            TEXT[],                          -- free-form tags {"earnings", "entry_strategy"}
     source          VARCHAR(30),                     -- agent_auto, user_manual, subagent
     provider        VARCHAR(20),                     -- anthropic, openai
-    model           VARCHAR(50),                     -- claude-opus-4-6, gpt-5.2
+    model           VARCHAR(50),                     -- claude-opus-4-7, gpt-5.4
     importance      SMALLINT DEFAULT 5,              -- 1-10 importance for ranking
     file_path       TEXT,                            -- data/agent_memory/2026-02-19_analysis_abc123.md
     expires_at      TIMESTAMPTZ,                     -- optional expiry (NULL = never expires)

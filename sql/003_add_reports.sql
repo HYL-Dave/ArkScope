@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS research_reports (
     conclusion      VARCHAR(20),                    -- BUY, HOLD, SELL, WATCH, NEUTRAL
     confidence      DOUBLE PRECISION,               -- 0-1
     provider        VARCHAR(20),                    -- openai, anthropic
-    model           VARCHAR(50),                    -- claude-opus-4-6, gpt-5.2
+    model           VARCHAR(50),                    -- claude-opus-4-7, gpt-5.4
     file_path       TEXT,                           -- data/reports/2026-02-18_AFRM_a3810ae0.md
     tools_used      JSONB,                          -- ["get_ticker_news", "get_analyst_consensus"]
     tool_calls      INTEGER,

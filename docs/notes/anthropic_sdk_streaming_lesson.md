@@ -4,7 +4,7 @@
 
 ## 問題
 
-使用 Anthropic Python SDK (v0.79.0) 搭配 Claude Opus 4.6 + thinking 模式時，
+使用 Anthropic Python SDK (v0.79.0) 搭配 Claude Opus 4.7 + thinking 模式時，
 `max_tokens` 設為 128,000（模型最大 output），CLI 查詢直接報錯：
 
 ```

@@ -12,7 +12,7 @@ Supported input/output formats:
 Models available:
 - claude-sonnet-4-5-20250929 (recommended): $3/$15 per 1M tokens
 - claude-haiku-4-5-20251001 (economy): $1/$5 per 1M tokens
-- claude-opus-4-6 (premium): $5/$25 per 1M tokens
+- claude-opus-4-7 (premium): $5/$25 per 1M tokens
 
 Batch API pricing (50% off, results within 24 hours):
 - Sonnet batch: $1.50/$7.50 per 1M tokens
@@ -116,7 +116,7 @@ logger = logging.getLogger(__name__)
 MODELS = {
     "sonnet": "claude-sonnet-4-5-20250929",
     "haiku": "claude-haiku-4-5-20251001",
-    "opus": "claude-opus-4-6",
+    "opus": "claude-opus-4-7",
 }
 
 # Default model
