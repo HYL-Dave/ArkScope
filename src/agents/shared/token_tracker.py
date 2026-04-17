@@ -40,7 +40,7 @@ class TokenTracker:
 
         # Anthropic — record after each messages.create() call
         response = client.messages.create(...)
-        tracker.record_anthropic(response, model="claude-opus-4-6")
+        tracker.record_anthropic(response, model="claude-opus-4-7")
 
         # OpenAI — record after Runner.run() completes
         result = await Runner.run(agent, ...)

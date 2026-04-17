@@ -91,7 +91,7 @@ def _make_mock_response(stop_reason="end_turn", content_blocks=None):
         cache_creation_input_tokens=0,
         cache_read_input_tokens=0,
     )
-    response.model = "claude-opus-4-6"
+    response.model = "claude-opus-4-7"
 
     return response
 
@@ -135,7 +135,7 @@ class TestAnthropicStream:
 
             # Config
             config = MagicMock()
-            config.anthropic_model = "claude-opus-4-6"
+            config.anthropic_model = "claude-opus-4-7"
             config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7
@@ -299,27 +299,27 @@ class TestAnthropicStream:
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
-        # Pass model directly — Opus 4.6 supports effort
+        # Pass model directly — Opus 4.7 supports effort
         self._collect_events(
-            run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), effort="medium")
+            run_query_stream("Test", model="claude-opus-4-7", dal=MagicMock(), effort="medium")
         )
 
         call_kwargs = mock_deps["client"].messages.stream.call_args
         assert call_kwargs.kwargs.get("output_config") == {"effort": "medium"}
 
     def test_thinking_kwarg_adaptive(self, mock_deps):
-        """Thinking override with Opus 4.6 uses adaptive mode + model max output."""
+        """Thinking override with Opus 4.7 uses adaptive mode + model max output."""
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
 
         from src.agents.anthropic_agent.agent import run_query_stream
-        # Pass model directly — Opus 4.6 uses adaptive thinking
+        # Pass model directly — Opus 4.7 uses adaptive thinking
         self._collect_events(
-            run_query_stream("Test", model="claude-opus-4-6", dal=MagicMock(), thinking=True)
+            run_query_stream("Test", model="claude-opus-4-7", dal=MagicMock(), thinking=True)
         )
 
         call_kwargs = mock_deps["client"].messages.stream.call_args
         assert call_kwargs.kwargs.get("thinking") == {"type": "adaptive"}
-        # max_tokens = Opus 4.6 max output
+        # max_tokens = Opus 4.7 max output
         assert call_kwargs.kwargs.get("max_tokens") == 128000
 
     def test_thinking_kwarg_enabled_for_non_opus(self, mock_deps):
@@ -373,7 +373,7 @@ class TestRunQueryBackwardCompat:
              patch("src.agents.config.get_agent_config") as mock_config:
 
             config = MagicMock()
-            config.anthropic_model = "claude-opus-4-6"
+            config.anthropic_model = "claude-opus-4-7"
             config.max_tokens = 16384
             config.max_tool_calls = 20
             config.context_threshold_ratio = 0.7

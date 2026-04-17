@@ -109,12 +109,12 @@ def _mock_anthropic_response(input_tokens: int, output_tokens: int, model: str =
 class TestAnthropicRecording:
     def test_record_anthropic(self):
         tracker = TokenTracker()
-        resp = _mock_anthropic_response(1500, 300, "claude-opus-4-6")
+        resp = _mock_anthropic_response(1500, 300, "claude-opus-4-7")
         usage = tracker.record_anthropic(resp)
 
         assert usage is not None
         assert usage.provider == "anthropic"
-        assert usage.model == "claude-opus-4-6"
+        assert usage.model == "claude-opus-4-7"
         assert usage.input_tokens == 1500
         assert usage.output_tokens == 300
         assert tracker.total_tokens == 1800
@@ -259,7 +259,7 @@ class TestCacheTokenFields:
 
     def test_turn_usage_default_cache_zero(self):
         usage = TurnUsage(
-            turn=1, provider="anthropic", model="claude-opus-4-6",
+            turn=1, provider="anthropic", model="claude-opus-4-7",
             input_tokens=100, output_tokens=50,
         )
         assert usage.cache_creation_tokens == 0
@@ -267,7 +267,7 @@ class TestCacheTokenFields:
 
     def test_turn_usage_explicit_cache(self):
         usage = TurnUsage(
-            turn=1, provider="anthropic", model="claude-opus-4-6",
+            turn=1, provider="anthropic", model="claude-opus-4-7",
             input_tokens=100, output_tokens=50,
             cache_creation_tokens=5000, cache_read_tokens=3000,
         )
@@ -299,7 +299,7 @@ class TestAnthropicCacheRecording:
 
     def _mock_response(self, cache_create=0, cache_read=0):
         return SimpleNamespace(
-            model="claude-opus-4-6",
+            model="claude-opus-4-7",
             usage=SimpleNamespace(
                 input_tokens=100, output_tokens=50,
                 cache_creation_input_tokens=cache_create,
@@ -331,7 +331,7 @@ class TestAnthropicCacheRecording:
         """Old API responses without cache fields."""
         tracker = TokenTracker()
         resp = SimpleNamespace(
-            model="claude-opus-4-6",
+            model="claude-opus-4-7",
             usage=SimpleNamespace(input_tokens=100, output_tokens=50),
         )
         usage = tracker.record_anthropic(resp)
@@ -342,7 +342,7 @@ class TestAnthropicCacheRecording:
         """Explicit None values treated as 0."""
         tracker = TokenTracker()
         resp = SimpleNamespace(
-            model="claude-opus-4-6",
+            model="claude-opus-4-7",
             usage=SimpleNamespace(
                 input_tokens=100, output_tokens=50,
                 cache_creation_input_tokens=None,

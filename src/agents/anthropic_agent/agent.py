@@ -21,7 +21,7 @@ from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
 _COMPACTION_BETA = "compact-2026-01-12"
-_COMPACTION_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_COMPACTION_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
 
 
 def _supports_compaction(model: str) -> bool:
@@ -73,13 +73,13 @@ _CLAUDE_WEB_SEARCH_TOOL = {
 
 # ── Model capability detection ──────────────────────────────────
 
-_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
-_EFFORT_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
+_EFFORT_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
 
 # 各模型最大 output tokens（API 硬限制）
 # 用於 thinking 模式自動設定 max_tokens
 _MODEL_MAX_OUTPUT = {
-    "claude-opus-4-6": 128000,
+    "claude-opus-4-7": 128000,
     "claude-sonnet-4-6": 64000,
 }
 
@@ -93,12 +93,12 @@ def _get_model_max_output(model: str) -> int:
 
 
 def _supports_adaptive_thinking(model: str) -> bool:
-    """Opus 4.6 / Sonnet 4.6 support adaptive thinking (no budget_tokens needed)."""
+    """Opus 4.7 / Sonnet 4.6 support adaptive thinking (no budget_tokens needed)."""
     return any(model.startswith(m) for m in _ADAPTIVE_THINKING_MODELS)
 
 
 def _supports_effort(model: str) -> bool:
-    """Opus 4.6 / Sonnet 4.6 support output_config.effort."""
+    """Opus 4.7 / Sonnet 4.6 support output_config.effort."""
     return any(model.startswith(m) for m in _EFFORT_MODELS)
 
 
@@ -107,10 +107,10 @@ def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
 
     設計決策 (Phase 8)：
     - max_tokens 和 budget_tokens 全自動推導，不需手動配置
-    - effective_max_tokens = 模型最大 output (Opus 4.6: 128K, Sonnet 4.6: 64K)
+    - effective_max_tokens = 模型最大 output (Opus 4.7: 128K, Sonnet 4.6: 64K)
     - budget_tokens = effective_max_tokens - config.max_tokens
       (留 config.max_tokens 給 response，其餘全給 thinking，效果最好)
-    - Adaptive 模式 (Opus 4.6 / Sonnet 4.6) 不需要 budget_tokens，Claude 自動調配
+    - Adaptive 模式 (Opus 4.7 / Sonnet 4.6) 不需要 budget_tokens，Claude 自動調配
 
     Args:
         model: Model ID string
@@ -127,7 +127,7 @@ def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
     effective_max_tokens = _get_model_max_output(model)
 
     if _supports_adaptive_thinking(model):
-        # Opus 4.6: Claude 自動判斷思考深度，不需 budget
+        # Opus 4.7: Claude 自動判斷思考深度，不需 budget
         return {"type": "adaptive"}, effective_max_tokens
     else:
         # 其他模型: 留 config.max_tokens 給 response，其餘全給 thinking
@@ -247,7 +247,7 @@ async def run_query_stream(
     # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
     use_beta = _use_extended_context_beta(model_name, config.extended_context)
 
-    # Server-side compaction (Phase 7a): Opus 4.6 + Sonnet 4.6
+    # Server-side compaction (Phase 7a): Opus 4.7 + Sonnet 4.6
     use_compaction = config.server_compaction and _supports_compaction(model_name)
     if use_compaction:
         use_beta = True  # compaction requires beta endpoint

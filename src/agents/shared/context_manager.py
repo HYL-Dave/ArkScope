@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Order matters: more specific prefixes first (prefix match)
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # Anthropic — 1M context GA (no beta header, standard pricing)
-    "claude-opus-4-6": 1_000_000,   # 1M context / 128K output ($5/$25)
+    "claude-opus-4-7": 1_000_000,   # 1M context / 128K output ($5/$25)
     "claude-sonnet-4-6": 1_000_000, # 1M context / 64K output ($3/$15)
     "claude-haiku": 200_000,        # Haiku 4.5: 200K context / 64K output
     # OpenAI — https://developers.openai.com/api/docs/models
@@ -58,7 +58,7 @@ class ContextManager:
 
     Usage::
 
-        ctx = ContextManager(model="claude-opus-4-6")
+        ctx = ContextManager(model="claude-opus-4-7")
 
         for turn in range(max_turns):
             response = client.messages.create(model=..., messages=messages)

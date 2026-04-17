@@ -292,7 +292,7 @@ class ChatHistory:
             user_message="分析 NVDA",
             agent_response="NVDA 近期表現強勁...",
             provider="anthropic",
-            model="claude-opus-4-6",
+            model="claude-opus-4-7",
             tools_used=["get_ticker_news"],
             elapsed_seconds=12.5,
             tickers=["NVDA"],

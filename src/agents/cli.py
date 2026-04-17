@@ -12,7 +12,7 @@ Slash commands (during chat):
     /reasoning      Pick reasoning effort interactively (OpenAI)
     /reasoning <n>  Set: none|minimal|low|medium|high|xhigh
     /effort         Pick effort level interactively (Anthropic, model-aware)
-    /effort <n>     Set: max|high|medium|low
+    /effort <n>     Set: max|xhigh|high|medium|low
     /thinking       Toggle extended thinking on/off (Anthropic)
     /context        Toggle 1M context beta on/off (Anthropic)
     /skill          Run a predefined skill workflow (e.g. /skill full_analysis NVDA)
@@ -247,7 +247,7 @@ def _get_effort_completions(state: SessionState):
     options = _get_effort_options_for_model(state.effective_model())
     if options is None:
         return []
-    descs = {"max": "Maximum (Opus 4.6 only)", "high": "High", "medium": "Medium", "low": "Low"}
+    descs = {"max": "Maximum (Opus 4.7 only)", "xhigh": "Extra High (Opus 4.7 only)", "high": "High", "medium": "Medium", "low": "Low"}
     return [(opt, descs.get(opt, "")) for opt in options]
 
 
@@ -348,7 +348,7 @@ def print_help():
             "  [cyan]/reasoning[/cyan]          Pick reasoning effort interactively (OpenAI)\n"
             "  [cyan]/reasoning <n>[/cyan]      Set: none|minimal|low|medium|high|xhigh\n"
             "  [cyan]/effort[/cyan]             Pick effort level interactively (Anthropic, model-aware)\n"
-            "  [cyan]/effort <n>[/cyan]         Set: max|high|medium|low\n"
+            "  [cyan]/effort <n>[/cyan]         Set: max|xhigh|high|medium|low\n"
             "  [cyan]/thinking[/cyan]           Toggle extended thinking on/off (Anthropic)\n"
             "  [cyan]/context[/cyan]            Toggle 1M context beta on/off (Anthropic)\n"
             "  [cyan]/skill[/cyan]              List available analysis skills\n"
@@ -1854,7 +1854,7 @@ def handle_compaction_command(state: SessionState, arg: str) -> None:
     """Handle /compaction [on|off] command. No arg = toggle.
 
     Server-side compaction (L2):
-    - Anthropic: beta compact-2026-01-12, Opus 4.6 + Sonnet 4.6
+    - Anthropic: beta compact-2026-01-12, Opus 4.7 + Sonnet 4.6
     - OpenAI: CompactionSession
     Both work on top of L1 client-side compaction.
     """
@@ -1863,13 +1863,13 @@ def handle_compaction_command(state: SessionState, arg: str) -> None:
         new_status = "ON" if state.server_compaction else "OFF"
         console.print(f"[green]Server compaction (L2):[/green] [bold]{new_status}[/bold]")
         if state.server_compaction:
-            console.print("[dim]Anthropic: Opus 4.6 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]")
+            console.print("[dim]Anthropic: Opus 4.7 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]")
         console.print()
         return
     if arg.lower() in ("on", "true", "1"):
         state.server_compaction = True
         console.print("[green]Server compaction (L2):[/green] [bold]ON[/bold]")
-        console.print("[dim]Anthropic: Opus 4.6 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]\n")
+        console.print("[dim]Anthropic: Opus 4.7 + Sonnet 4.6 | OpenAI: CompactionSession[/dim]\n")
     elif arg.lower() in ("off", "false", "0"):
         state.server_compaction = False
         console.print("[green]Server compaction (L2):[/green] [bold]OFF[/bold]\n")

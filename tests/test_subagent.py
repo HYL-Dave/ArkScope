@@ -141,7 +141,7 @@ class TestDetectProvider:
         assert _detect_provider("o4-mini") == "openai"
 
     def test_detect_claude_as_anthropic(self):
-        assert _detect_provider("claude-opus-4-6") == "anthropic"
+        assert _detect_provider("claude-opus-4-7") == "anthropic"
         assert _detect_provider("claude-sonnet-5-20260501") == "anthropic"
 
     def test_unknown_defaults_to_anthropic(self):
@@ -305,7 +305,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-opus-4-6",
+            name="test", description="", model="claude-opus-4-7",
             system_prompt="test",
         )
         result = _run_anthropic_subagent(config, "test question", dal=None)
@@ -345,7 +345,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-opus-4-6",
+            name="test", description="", model="claude-opus-4-7",
             system_prompt="test", max_turns=5,
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
@@ -378,7 +378,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-opus-4-6",
+            name="test", description="", model="claude-opus-4-7",
             system_prompt="test", max_turns=2,
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
@@ -404,7 +404,7 @@ class TestAnthropicSubagentRunner:
 
         from src.agents.shared.subagent import _run_anthropic_subagent
         config = SubagentConfig(
-            name="test", description="", model="claude-opus-4-6",
+            name="test", description="", model="claude-opus-4-7",
             system_prompt="test", extended_context=True,
         )
         result = _run_anthropic_subagent(config, "test", dal=None)
@@ -486,8 +486,8 @@ class TestExtendedContextBeta:
     """1M context: GA for 4.6 (no beta), legacy models still need beta header."""
 
     def test_opus_46_ga_no_beta(self):
-        # Opus 4.6: 1M is GA, no beta header needed
-        assert _use_extended_context_beta("claude-opus-4-6", True) is False
+        # Opus 4.7: 1M is GA, no beta header needed
+        assert _use_extended_context_beta("claude-opus-4-7", True) is False
 
     def test_sonnet_46_ga_no_beta(self):
         # Sonnet 4.6: 1M is GA, no beta header needed
@@ -591,14 +591,14 @@ class TestConfigSubagentModels:
 
     def test_config_subagent_models_settable(self):
         from src.agents.config import AgentConfig
-        config = AgentConfig(subagent_models={"code_analyst": "claude-opus-4-6"})
-        assert config.subagent_models["code_analyst"] == "claude-opus-4-6"
+        config = AgentConfig(subagent_models={"code_analyst": "claude-opus-4-7"})
+        assert config.subagent_models["code_analyst"] == "claude-opus-4-7"
 
     @patch("src.agents.config.get_agent_config")
     def test_model_override_applied(self, mock_config):
         """_apply_config_overrides should swap the model."""
         mock_config.return_value = MagicMock(
-            subagent_models={"code_analyst": "claude-opus-4-6"},
+            subagent_models={"code_analyst": "claude-opus-4-7"},
             subagent_max_turns={},
         )
         from src.agents.shared.subagent import _apply_config_overrides
@@ -607,7 +607,7 @@ class TestConfigSubagentModels:
             system_prompt="test",
         )
         result = _apply_config_overrides(original)
-        assert result.model == "claude-opus-4-6"
+        assert result.model == "claude-opus-4-7"
         # Original should be unchanged
         assert original.model == "gpt-5.2-codex"
 
@@ -660,7 +660,7 @@ class TestConfigSubagentModels:
     def test_both_overrides_applied(self, mock_config):
         """Both model and max_turns overrides at once."""
         mock_config.return_value = MagicMock(
-            subagent_models={"code_analyst": "claude-opus-4-6"},
+            subagent_models={"code_analyst": "claude-opus-4-7"},
             subagent_max_turns={"code_analyst": 12},
         )
         from src.agents.shared.subagent import _apply_config_overrides
@@ -669,7 +669,7 @@ class TestConfigSubagentModels:
             system_prompt="test", max_turns=8,
         )
         result = _apply_config_overrides(original)
-        assert result.model == "claude-opus-4-6"
+        assert result.model == "claude-opus-4-7"
         assert result.max_turns == 12
         assert original.model == "gpt-5.2-codex"
         assert original.max_turns == 8
@@ -718,14 +718,14 @@ class TestSaveLocalOverride:
 
             cfg_mod.save_local_override(
                 "llm_preferences", "subagent_models",
-                {"code_analyst": "claude-opus-4-6"},
+                {"code_analyst": "claude-opus-4-7"},
             )
 
             assert local_file.exists()
             import yaml
             with open(local_file) as f:
                 data = yaml.safe_load(f)
-            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-6"
+            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-7"
         finally:
             cfg_mod._LOCAL_CONFIG_PATH = original_path
             cfg_mod.get_agent_config.cache_clear()
@@ -748,7 +748,7 @@ class TestSaveLocalOverride:
             # Save subagent override
             cfg_mod.save_local_override(
                 "llm_preferences", "subagent_models",
-                {"code_analyst": "claude-opus-4-6"},
+                {"code_analyst": "claude-opus-4-7"},
             )
 
             with open(local_file) as f:
@@ -756,7 +756,7 @@ class TestSaveLocalOverride:
 
             # Both settings should exist
             assert data["llm_preferences"]["anthropic_thinking"] is True
-            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-6"
+            assert data["llm_preferences"]["subagent_models"]["code_analyst"] == "claude-opus-4-7"
         finally:
             cfg_mod._LOCAL_CONFIG_PATH = original_path
             cfg_mod.get_agent_config.cache_clear()

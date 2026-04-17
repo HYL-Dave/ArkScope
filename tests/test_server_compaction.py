@@ -31,7 +31,7 @@ class TestCompactionConfig:
 
 class TestAnthropicCompaction:
     def test_opus_46_supported(self):
-        assert _supports_compaction("claude-opus-4-6") is True
+        assert _supports_compaction("claude-opus-4-7") is True
 
     def test_opus_45_not_supported(self):
         assert _supports_compaction("claude-opus-4-5-20251101") is False
@@ -52,7 +52,7 @@ class TestAnthropicCompaction:
         assert _COMPACTION_BETA == "compact-2026-01-12"
 
     def test_compaction_models_set(self):
-        assert "claude-opus-4-6" in _COMPACTION_MODELS
+        assert "claude-opus-4-7" in _COMPACTION_MODELS
         assert "claude-sonnet-4-6" in _COMPACTION_MODELS
 
 

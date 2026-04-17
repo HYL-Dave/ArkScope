@@ -36,7 +36,7 @@ class TestAgentConfig:
         """Default config has expected values."""
         config = AgentConfig()
         assert config.openai_model == "gpt-5.4"
-        assert config.anthropic_model == "claude-opus-4-6"
+        assert config.anthropic_model == "claude-opus-4-7"
         assert config.reasoning_effort in ("none", "minimal", "low", "medium", "high", "xhigh")
         assert config.max_tool_calls > 0
         assert config.max_tokens > 0

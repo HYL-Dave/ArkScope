@@ -37,10 +37,10 @@ class TestDetectProvider:
         assert _detect_provider("gpt-5.2-codex") == "openai"
 
     def test_claude_detected_as_anthropic(self):
-        assert _detect_provider("claude-opus-4-6") == "anthropic"
+        assert _detect_provider("claude-opus-4-7") == "anthropic"
 
     def test_claude_opus_detected_as_anthropic(self):
-        assert _detect_provider("claude-opus-4-6") == "anthropic"
+        assert _detect_provider("claude-opus-4-7") == "anthropic"
 
     def test_o_series_detected_as_openai(self):
         assert _detect_provider("o3-mini") == "openai"
@@ -94,7 +94,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Calculate 6 * 7",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is True
@@ -113,7 +113,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Print 42",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is True
@@ -127,7 +127,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="This will fail",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=2,
         )
         assert result.success is False
@@ -142,7 +142,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Print 1",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.generated_code == 'x = 1\nprint(x)'
@@ -155,7 +155,7 @@ class TestGenerateAndExecute:
         result = generate_and_execute(
             task="Double the value",
             data_json='{"value": 21}',
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is True
@@ -172,7 +172,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Show current dir",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is True
@@ -186,7 +186,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Print something",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is True
@@ -199,7 +199,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Do something",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is False
@@ -212,7 +212,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Calculate something",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
         assert result.success is False
@@ -222,7 +222,7 @@ class TestGenerateAndExecute:
     @patch("src.tools.code_generator._resolve_code_model")
     def test_config_code_model_used(self, mock_resolve, mock_llm):
         """Uses config code_model when not specified."""
-        mock_resolve.return_value = "claude-opus-4-6"
+        mock_resolve.return_value = "claude-opus-4-7"
         mock_llm.return_value = 'print("from config model")'
 
         result = generate_and_execute(
@@ -242,7 +242,7 @@ class TestGenerateAndExecute:
         generate_and_execute(
             task="Analyze prices",
             data_json=data,
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
 
@@ -261,7 +261,7 @@ class TestGenerateAndExecute:
 
         result = generate_and_execute(
             task="Calculate",
-            code_model="claude-opus-4-6",
+            code_model="claude-opus-4-7",
             max_retries=1,
         )
 
@@ -484,7 +484,7 @@ class TestCLIBackend:
             mock_config.return_value = cfg
             result = _call_llm(
                 [{"role": "user", "content": "Task: test"}],
-                "claude-opus-4-6",
+                "claude-opus-4-7",
             )
         assert result == "print('fallback')"
         mock_claude_cli.assert_called_once()

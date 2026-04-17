@@ -272,14 +272,14 @@ llm_preferences:
     - "gpt_5"
 
   # ── Anthropic agent 設定 (Phase 8) ──
-  # Effort (Opus 4.6 / Sonnet 4.6, 不需 beta header)
-  # "max" (Opus 4.6 only) | "high" (default) | "medium" | "low"
+  # Effort (Opus 4.7 / Sonnet 4.6, 不需 beta header)
+  # "max" (Opus 4.7 only) | "high" (default) | "medium" | "low"
   # anthropic_effort: "high"
 
   # Extended thinking (所有 Claude 模型)
   # 開啟後 max_tokens 和 budget_tokens 全自動推導：
-  #   - max_tokens = 模型最大 output (Opus 4.6: 128K, 其他: 64K)
-  #   - Opus 4.6: adaptive 模式 (Claude 自動調配，不需 budget)
+  #   - max_tokens = 模型最大 output (Opus 4.7: 128K, 其他: 64K)
+  #   - Opus 4.7: adaptive 模式 (Claude 自動調配，不需 budget)
   #   - 其他模型: budget = max_output - max_tokens (留 max_tokens 給 response)
   # anthropic_thinking: false
 
@@ -288,7 +288,7 @@ llm_preferences:
   # true = inject freshness summary into system prompt (reduces cache hit rate)
   # freshness_in_prompt: false
 
-  # ── 1M Context (Anthropic: Opus 4.6 + Sonnet 4.6) ──
+  # ── 1M Context (Anthropic: Opus 4.7 + Sonnet 4.6) ──
   # 2026-03 起 1M context 為 GA，標準定價，不加價，不需 beta header
   # extended_context 設定僅影響舊模型（Sonnet 4.5 等），4.6 預設即為 1M
   # extended_context: false
@@ -299,11 +299,11 @@ llm_preferences:
   # 預設值：
   #   code_analyst:    gpt-5.4        (reasoning=xhigh)
   #   deep_researcher: gpt-5.4        (reasoning=xhigh)
-  #   data_summarizer: claude-opus-4-6
+  #   data_summarizer: claude-opus-4-7
   #
   # subagent_models:
-  #   code_analyst: "claude-opus-4-6"
-  #   deep_researcher: "claude-opus-4-6"
+  #   code_analyst: "claude-opus-4-7"
+  #   deep_researcher: "claude-opus-4-7"
 
   # Subagent max_turns 覆蓋（每個 role 的工具呼叫次數上限）
   # 預設值: code_analyst=8, deep_researcher=10, data_summarizer=6, reviewer=4
@@ -341,7 +341,7 @@ context_management:
   # ┌─────────────────────────────────┬─────────────────┬────────────┐
   # │ 模型                           │ Context          │ Max Output │
   # ├─────────────────────────────────┼─────────────────┼────────────┤
-  # │ claude-opus-4-6                 │ 1M (GA)         │ 128K       │
+  # │ claude-opus-4-7                 │ 1M (GA)         │ 128K       │
   # │ claude-sonnet-4-6               │ 1M (GA)         │ 64K        │
   # │ gpt-5.4                         │ 1M (>272K 加價) │ 128K       │
   # │ gpt-5.4-mini                    │ 400K            │ 128K       │
@@ -349,7 +349,7 @@ context_management:
   # └─────────────────────────────────┴─────────────────┴────────────┘
   #
   # 觸發閾值範例 (threshold_ratio=0.7):
-  #   claude-opus-4-6:  700K tokens 時觸發 (1M context)
+  #   claude-opus-4-7:  700K tokens 時觸發 (1M context)
   #   gpt-5.4:          700K tokens 時觸發 (1M context)
   #
   # 壓縮邏輯：

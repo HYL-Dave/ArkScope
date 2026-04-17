@@ -29,8 +29,8 @@ class AgentConfig(BaseModel):
     openai_model_advanced: str = "gpt-5.4"
 
     # Anthropic models
-    anthropic_model: str = "claude-opus-4-6"
-    anthropic_model_advanced: str = "claude-opus-4-6"
+    anthropic_model: str = "claude-opus-4-7"
+    anthropic_model_advanced: str = "claude-opus-4-7"
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -41,7 +41,7 @@ class AgentConfig(BaseModel):
 
     # Anthropic extended thinking (Phase 8)
     # 開啟後根據模型自動選擇模式：
-    #   Opus 4.6: adaptive (Claude 自動判斷思考深度，不需 budget)
+    #   Opus 4.7: adaptive (Claude 自動判斷思考深度，不需 budget)
     #   其他模型: enabled + budget_tokens (自動推導)
     # max_tokens 和 budget_tokens 全自動：
     #   effective_max_tokens = 模型最大 output (128K/64K)
@@ -67,7 +67,7 @@ class AgentConfig(BaseModel):
     # Code generation backend: api | codex | codex-apikey | claude | claude-apikey
     code_backend: str = "api"
 
-    # 1M extended context beta (Anthropic only, Opus 4.6 + Sonnet 4.5)
+    # 1M extended context beta (Anthropic only, Opus 4.7 + Sonnet 4.5)
     extended_context: bool = False
 
     # Subagent model overrides (Phase 6)
@@ -79,7 +79,7 @@ class AgentConfig(BaseModel):
     subagent_max_turns: Dict[str, int] = {}
 
     # Server-side compaction L2 (Phase 7a)
-    # Anthropic: beta compact-2026-01-12, Opus 4.6 + Sonnet 4.6, context_management param
+    # Anthropic: beta compact-2026-01-12, Opus 4.7 + Sonnet 4.6, context_management param
     # OpenAI: CompactionSession for within-run context compaction
     # Both work on top of L1 client-side compaction (ContextManager)
     server_compaction: bool = False
@@ -180,8 +180,8 @@ def get_agent_config() -> AgentConfig:
     user_profile.yaml can override under llm_preferences:
         agent_model: "gpt-5.4"
         agent_model_advanced: "gpt-5.4"
-        anthropic_model: "claude-opus-4-6"
-        anthropic_model_advanced: "claude-opus-4-6"
+        anthropic_model: "claude-opus-4-7"
+        anthropic_model_advanced: "claude-opus-4-7"
         reasoning_effort: "xhigh"
         max_tool_calls: 60
         max_tokens: 16384

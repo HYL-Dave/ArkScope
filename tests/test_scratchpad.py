@@ -460,7 +460,7 @@ class TestReadScratchpad:
 class TestScratchpadLogError:
     def test_log_error_basic(self, tmp_path):
         """log_error writes structured error event to scratchpad."""
-        pad = Scratchpad("test", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad = Scratchpad("test", "anthropic", "claude-opus-4-7", base_dir=tmp_path)
         pad.log_error(
             error_type="APIError",
             message="context_length_exceeded: max 200000 tokens",
@@ -525,7 +525,7 @@ class TestScratchpadLogError:
 
     def test_error_after_tool_results(self, tmp_path):
         """Full session: init → tool_result → tool_result → error."""
-        pad = Scratchpad("分析 TSLA", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad = Scratchpad("分析 TSLA", "anthropic", "claude-opus-4-7", base_dir=tmp_path)
         pad.log_tool_result("get_ticker_news", result_data='{"count": 5}',
                             tool_input={"ticker": "TSLA"})
         pad.log_tool_result("get_price_history", result_data='{"rows": 10}',
@@ -552,7 +552,7 @@ class TestScratchpadLogError:
 
 class TestScratchpadNewEvents:
     def test_log_thinking(self, tmp_path):
-        pad = Scratchpad("q", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad = Scratchpad("q", "anthropic", "claude-opus-4-7", base_dir=tmp_path)
         pad.log_thinking(preview="Let me analyze...", full_length=2500)
         pad.close()
 
@@ -619,7 +619,7 @@ class TestScratchpadNewEvents:
 
     def test_full_session_with_new_events(self, tmp_path):
         """Session with thinking + retry + tool + final."""
-        pad = Scratchpad("test", "anthropic", "claude-opus-4-6", base_dir=tmp_path)
+        pad = Scratchpad("test", "anthropic", "claude-opus-4-7", base_dir=tmp_path)
         pad.log_thinking(preview="Analyzing...", full_length=800)
         pad.log_tool_result("get_news", result_data='{"count": 5}')
         pad.log_compaction(source="server")

@@ -19,10 +19,10 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ── 1M context ─────────────────────────────────────────────────
-# Opus 4.6 / Sonnet 4.6: 1M context is GA (2026-03), no beta header needed.
+# Opus 4.7 / Sonnet 4.6: 1M context is GA (2026-03), no beta header needed.
 # Legacy models (Sonnet 4.5, Sonnet 4): still require beta header for 1M.
 
-_1M_GA_MODELS = {"claude-opus-4-6", "claude-sonnet-4-6"}
+_1M_GA_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
 _1M_BETA_MODELS = {"claude-sonnet-4-5", "claude-opus-4-5"}
 _EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
 
@@ -31,7 +31,7 @@ def _use_extended_context_beta(model: str, enabled: bool) -> bool:
     """Check if the 1M beta header is needed for this model.
 
     Returns True only for legacy models that still require the beta header.
-    Opus 4.6 / Sonnet 4.6 have 1M GA — no header needed.
+    Opus 4.7 / Sonnet 4.6 have 1M GA — no header needed.
     """
     if not enabled:
         return False
@@ -87,7 +87,7 @@ class SubagentConfig:
     reasoning_effort: Optional[str] = None   # OpenAI (e.g. "xhigh")
     anthropic_effort: Optional[str] = None   # Anthropic (e.g. "max")
     anthropic_thinking: bool = False
-    # 1M context beta (Anthropic only, Opus 4.6 + Sonnet 4.5)
+    # 1M context beta (Anthropic only, Opus 4.7 + Sonnet 4.5)
     extended_context: bool = False
 
 
@@ -246,7 +246,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "flaws, overlooked risks, data gaps, and common analytical biases. "
             "Returns structured confidence adjustment."
         ),
-        model="claude-opus-4-6",
+        model="claude-opus-4-7",
         system_prompt=_REVIEWER_PROMPT,
         tool_names=[
             "tavily_search",

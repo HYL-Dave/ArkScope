@@ -629,7 +629,7 @@ class TestRunAgentQuery:
         """Changing state after snapshot should not affect in-flight query."""
         from src.monitor.discord_bot import BotSessionState
 
-        state = BotSessionState(provider="anthropic", model="claude-opus-4-6")
+        state = BotSessionState(provider="anthropic", model="claude-opus-4-7")
         snap = state.snapshot()
 
         # Mutate original after snapshot
@@ -637,7 +637,7 @@ class TestRunAgentQuery:
         state.model = "gpt-5.2"
 
         assert snap.provider == "anthropic"
-        assert snap.model == "claude-opus-4-6"
+        assert snap.model == "claude-opus-4-7"
 
 
 class TestLongResponse:
@@ -1091,7 +1091,7 @@ class TestBotSessionState:
 
     def test_snapshot_is_independent_copy(self):
         from src.monitor.discord_bot import BotSessionState
-        state = BotSessionState(provider="anthropic", model="claude-opus-4-6")
+        state = BotSessionState(provider="anthropic", model="claude-opus-4-7")
         snap = state.snapshot()
 
         state.provider = "openai"
@@ -1099,7 +1099,7 @@ class TestBotSessionState:
         state.anthropic_effort = "max"
 
         assert snap.provider == "anthropic"
-        assert snap.model == "claude-opus-4-6"
+        assert snap.model == "claude-opus-4-7"
         assert snap.anthropic_effort is None
 
 
@@ -1108,7 +1108,7 @@ class TestModelCatalogShared:
 
     def test_find_by_id(self):
         from src.agents.shared.model_catalog import find_model
-        entry = find_model("claude-opus-4-6")
+        entry = find_model("claude-opus-4-7")
         assert entry is not None
         assert entry.provider == "anthropic"
 
@@ -1116,7 +1116,7 @@ class TestModelCatalogShared:
         from src.agents.shared.model_catalog import find_model
         entry = find_model("opus")
         assert entry is not None
-        assert entry.id == "claude-opus-4-6"
+        assert entry.id == "claude-opus-4-7"
 
     def test_find_openai(self):
         from src.agents.shared.model_catalog import find_model
@@ -1130,7 +1130,7 @@ class TestModelCatalogShared:
 
     def test_effort_options_opus(self):
         from src.agents.shared.model_catalog import get_effort_options
-        opts = get_effort_options("claude-opus-4-6")
+        opts = get_effort_options("claude-opus-4-7")
         assert "max" in opts
         assert "low" in opts
 

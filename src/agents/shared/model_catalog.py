@@ -23,10 +23,10 @@ class ModelEntry:
 # Canonical model list — update here when new models are available
 MODEL_CATALOG: List[ModelEntry] = [
     ModelEntry(
-        id="claude-opus-4-6",
+        id="claude-opus-4-7",
         provider="anthropic",
-        name="Opus 4.6",
-        aliases=["opus", "opus4.6", "opus-4.6", "o46", "claude-opus"],
+        name="Opus 4.7",
+        aliases=["opus", "opus4.7", "opus-4.7", "o47", "claude-opus"],
         description="Most intelligent — deep analysis & reasoning (128K output, $5/$25)",
     ),
     ModelEntry(
@@ -75,12 +75,12 @@ MODEL_CATALOG: List[ModelEntry] = [
 ]
 
 # Effort level constants
-VALID_ANTHROPIC_EFFORT = ("max", "high", "medium", "low")
+VALID_ANTHROPIC_EFFORT = ("max", "xhigh", "high", "medium", "low")
 VALID_REASONING_EFFORT = ("none", "minimal", "low", "medium", "high", "xhigh")
 
 # Per-model Anthropic effort options (prefix match)
 EFFORT_OPTIONS_BY_MODEL = {
-    "claude-opus-4-6": ("max", "high", "medium", "low"),
+    "claude-opus-4-7": ("max", "xhigh", "high", "medium", "low"),
     "claude-sonnet-4-6": ("high", "medium", "low"),
 }
 
