@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
     from .routes.analysis import router as analysis_router
     from .routes.jobs import router as jobs_router
     from .routes.seeking_alpha import router as seeking_alpha_router
+    from .routes.reports import router as reports_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -69,5 +70,6 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(jobs_router)
     app.include_router(seeking_alpha_router)
+    app.include_router(reports_router)
 
     return app

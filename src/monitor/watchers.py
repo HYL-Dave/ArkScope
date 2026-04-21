@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .notifiers import Alert
 
@@ -17,6 +17,26 @@ if TYPE_CHECKING:
     from src.tools.data_access import DataAccessLayer
 
 logger = logging.getLogger(__name__)
+
+
+def _preload_signal_news_df(
+    dal: "DataAccessLayer",
+    *,
+    days: int,
+) -> Optional[Any]:
+    """Prepare shared signal news context once per scan.
+
+    Signal synthesis needs a full-news DataFrame for sector/anomaly context.
+    Building that dataset for every ticker is extremely expensive during
+    monitor scans, so watchers preload it once and pass it through.
+    """
+    from src.tools.signal_tools import _prepare_news_df_for_signals
+
+    try:
+        return _prepare_news_df_for_signals(dal, ticker=None, days=days)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.debug("SignalWatcher preload failed, falling back to per-ticker load: %s", exc)
+        return None
 
 
 class BaseWatcher(ABC):
@@ -190,14 +210,21 @@ class SignalWatcher(BaseWatcher):
 
     def __init__(self, config: Dict[str, Any]) -> None:
         super().__init__(config)
+        self.days = 14
 
     async def check(self, dal: DataAccessLayer, tickers: List[str]) -> List[Alert]:
         from src.tools.signal_tools import synthesize_signal
 
         alerts: List[Alert] = []
+        shared_news_df = _preload_signal_news_df(dal, days=self.days)
         for ticker in tickers:
             try:
-                result = synthesize_signal(dal, ticker=ticker, days=14)
+                result = synthesize_signal(
+                    dal,
+                    ticker=ticker,
+                    days=self.days,
+                    news_df=shared_news_df,
+                )
                 if not result:
                     continue
 

@@ -15,6 +15,7 @@ sys.path.insert(0, str(project_root))
 from src.agents.config import get_agent_config
 from src.analysis.contracts import AnalysisArtifact, AnalysisRequest, IntegrityResult, RenderedReport
 from src.api.routes.jobs import JobRunRequest, jobs_status, run_named_job
+from src.api.routes.reports import report_detail, reports_list
 from src.api.routes.seeking_alpha import (
     _unwrap_sa_result,
     alpha_picks,
@@ -198,3 +199,123 @@ class TestSeekingAlphaRoutes:
     def test_unwrap_sa_result_keeps_non_error_hint_payload(self):
         payload = {"error": None, "detail": None, "hint": "use picked_date"}
         assert _unwrap_sa_result(payload) == payload
+
+
+class TestReportsRoutes:
+    def test_reports_list_route(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.api.routes.reports.list_reports",
+            lambda dal, ticker=None, days=30, report_type=None, limit=20: [
+                {
+                    "id": 7,
+                    "title": "NVDA Phase D Analysis",
+                    "tickers": ["NVDA"],
+                    "report_type": "phase_d_analysis",
+                    "summary": "summary",
+                    "conclusion": "BUY",
+                    "confidence": 0.8,
+                    "model": "structured-pipeline",
+                    "file_path": "data/reports/nvda.md",
+                    "tool_calls": 5,
+                    "duration_seconds": 12.4,
+                    "created_at": "2026-04-21T00:00:00",
+                }
+            ],
+        )
+        response = reports_list(dal=object())
+        assert response.count == 1
+        assert response.reports[0].id == 7
+        assert response.reports[0].title == "NVDA Phase D Analysis"
+
+    def test_reports_list_route_normalizes_nan_numeric_fields(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.api.routes.reports.list_reports",
+            lambda dal, ticker=None, days=30, report_type=None, limit=20: [
+                {
+                    "id": 8,
+                    "title": "ZETA Analysis",
+                    "tickers": ["ZETA"],
+                    "report_type": "phase_d_analysis",
+                    "summary": "summary",
+                    "conclusion": "WATCH",
+                    "confidence": float("nan"),
+                    "model": "structured-pipeline",
+                    "file_path": "data/reports/zeta.md",
+                    "tool_calls": float("nan"),
+                    "duration_seconds": float("nan"),
+                    "created_at": "2026-04-21T00:00:00",
+                }
+            ],
+        )
+        response = reports_list(dal=object())
+        assert response.count == 1
+        assert response.reports[0].confidence is None
+        assert response.reports[0].tool_calls is None
+        assert response.reports[0].duration_seconds is None
+
+    def test_report_detail_route(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.api.routes.reports.get_report",
+            lambda dal, report_id: {
+                "id": report_id,
+                "title": "NVDA Phase D Analysis",
+                "tickers": ["NVDA"],
+                "report_type": "phase_d_analysis",
+                "summary": "summary",
+                "conclusion": "BUY",
+                "confidence": 0.8,
+                "provider": "phase_d",
+                "model": "structured-pipeline",
+                "file_path": "data/reports/nvda.md",
+                "tools_used": ["technical", "fundamental"],
+                "tool_calls": 5,
+                "duration_seconds": 12.4,
+                "tokens_in": 1000,
+                "tokens_out": 500,
+                "created_at": "2026-04-21T00:00:00",
+                "content": "# NVDA",
+            },
+        )
+        response = report_detail(7, dal=object())
+        assert response.id == 7
+        assert response.content == "# NVDA"
+
+    def test_report_detail_route_normalizes_nan_numeric_fields(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.api.routes.reports.get_report",
+            lambda dal, report_id: {
+                "id": report_id,
+                "title": "ZETA Analysis",
+                "tickers": ["ZETA"],
+                "report_type": "phase_d_analysis",
+                "summary": "summary",
+                "conclusion": "WATCH",
+                "confidence": float("nan"),
+                "provider": "phase_d",
+                "model": "structured-pipeline",
+                "file_path": "data/reports/zeta.md",
+                "tools_used": ["technical"],
+                "tool_calls": float("nan"),
+                "duration_seconds": float("nan"),
+                "tokens_in": float("nan"),
+                "tokens_out": float("nan"),
+                "created_at": "2026-04-21T00:00:00",
+                "content": "# ZETA",
+            },
+        )
+        response = report_detail(8, dal=object())
+        assert response.id == 8
+        assert response.confidence is None
+        assert response.tool_calls is None
+        assert response.duration_seconds is None
+        assert response.tokens_in is None
+        assert response.tokens_out is None
+
+    def test_report_detail_maps_missing_to_404(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.api.routes.reports.get_report",
+            lambda dal, report_id: {"error": "Report file not found: data/reports/x.md"},
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            report_detail(7, dal=object())
+        assert exc_info.value.status_code == 404

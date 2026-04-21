@@ -224,6 +224,7 @@ def synthesize_signal(
     days: int = 30,
     strategy: Optional[str] = None,
     as_of_date: Optional[str] = None,
+    news_df: Optional[pd.DataFrame] = None,
 ) -> TradingSignal:
     """
     Synthesize a multi-factor trading signal for a ticker.
@@ -241,6 +242,9 @@ def synthesize_signal(
         strategy: Strategy name for custom weights (from user_profile.yaml)
         as_of_date: Anchor date (YYYY-MM-DD). Defaults to the latest date
                     in the data, ensuring reproducible offline analysis.
+        news_df: Optional preloaded news DataFrame. When provided, callers can
+                 reuse one prepared dataset across multiple tickers instead of
+                 rebuilding the same full-news context repeatedly.
 
     Returns:
         TradingSignal with action, confidence, composite_score,
@@ -261,7 +265,7 @@ def synthesize_signal(
             weights = w
 
     # Prepare news data
-    df = _prepare_news_df_for_signals(dal, ticker=None, days=days)
+    df = news_df if news_df is not None else _prepare_news_df_for_signals(dal, ticker=None, days=days)
 
     signals_input: Dict = {}
     # Use ticker-specific max date as anchor

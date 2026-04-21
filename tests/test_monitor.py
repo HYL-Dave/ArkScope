@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from src.monitor.notifiers import (
@@ -243,6 +244,32 @@ class TestSignalWatcher:
             alerts = asyncio.run(watcher.check(dal, ["NVDA"]))
 
         assert len(alerts) == 0
+
+    def test_reuses_preloaded_news_context_across_tickers(self):
+        watcher = SignalWatcher({})
+        dal = MagicMock()
+        shared_df = pd.DataFrame(
+            [
+                {"ticker": "NVDA", "date": "2026-04-21", "title": "NVDA momentum"},
+                {"ticker": "AMD", "date": "2026-04-21", "title": "AMD momentum"},
+            ]
+        )
+
+        mock_signal = MagicMock()
+        mock_signal.action = "HOLD"
+        mock_signal.confidence = 0.5
+        mock_signal.risk_level = 2
+        mock_signal.reasoning = "Neutral"
+
+        with patch("src.monitor.watchers._preload_signal_news_df", return_value=shared_df) as preload_mock:
+            with patch("src.tools.signal_tools.synthesize_signal", return_value=mock_signal) as synth_mock:
+                alerts = asyncio.run(watcher.check(dal, ["NVDA", "AMD"]))
+
+        assert alerts == []
+        preload_mock.assert_called_once_with(dal, days=14)
+        assert synth_mock.call_count == 2
+        for call in synth_mock.call_args_list:
+            assert call.kwargs["news_df"] is shared_df
 
 
 # ── SectorWatcher ─────────────────────────────────────────────
