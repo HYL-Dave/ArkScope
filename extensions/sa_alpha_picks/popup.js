@@ -64,6 +64,11 @@ chrome.storage.local.get([
   renderMarketNewsAutoSyncResolved();
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
+  chrome.runtime.sendMessage({ action: "ensure_auto_sync_alarms" }, function () {
+    if (chrome.runtime.lastError) {
+      return;
+    }
+  });
 });
 
 // Persist manual input on change (survives popup close/reopen)

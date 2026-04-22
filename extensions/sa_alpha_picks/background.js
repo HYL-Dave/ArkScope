@@ -16,6 +16,7 @@ const ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS = [15, 30, 60];
 const MARKET_NEWS_AUTO_SYNC_ALARM = "market-news-auto-sync";
 const MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 60;
 const MARKET_NEWS_AUTO_SYNC_AUTO_VALUE = "auto";
+const MARKET_NEWS_AUTO_SYNC_HEARTBEAT_MINUTES = 5;
 const MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS = [5, 15, 60];
 const MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
   weekday: [
@@ -180,6 +181,10 @@ const COMMENT_SCROLL_PROFILES = {
 var marketNewsRefreshInFlight = false;
 var saSyncJobChain = Promise.resolve();
 var saSyncJobInFlight = false;
+var saAutoJobPending = {
+  alphaPicks: false,
+  marketNews: false,
+};
 
 // --- Message listener (from popup) ---
 
@@ -210,6 +215,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     setMarketNewsAutoSyncEnabled(!!msg.enabled, msg.interval_minutes).then(sendResponse);
     return true;
   }
+  if (msg.action === "ensure_auto_sync_alarms") {
+    ensureAutoSyncAlarms().then(sendResponse);
+    return true;
+  }
 });
 
 chrome.runtime.onInstalled.addListener(function () {
@@ -223,13 +232,17 @@ chrome.runtime.onStartup.addListener(function () {
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
   if (alarm.name === ALPHA_PICKS_AUTO_SYNC_ALARM) {
-    enqueueSaSyncJob("Alpha Picks quick auto-sync", function () {
+    enqueueAutoSaSyncJob("alphaPicks", "Alpha Picks quick auto-sync", function () {
       return doRefresh("quick", { trigger: "alarm" });
     });
     return;
   }
   if (alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
-    enqueueSaSyncJob("Market News quick auto-sync", function () {
+    enqueueAutoSaSyncJob("marketNews", "Market News quick auto-sync", async function () {
+      if (!(await shouldRunMarketNewsAutoSync())) {
+        return { status: "skipped", reason: "not_due" };
+      }
+      await markMarketNewsAutoSyncStarted();
       return doMarketNewsRefresh("quick", { trigger: "alarm" });
     });
   }
@@ -249,6 +262,20 @@ function enqueueSaSyncJob(jobName, jobFn) {
   });
   saSyncJobChain = run.catch(function () {});
   return run;
+}
+
+function enqueueAutoSaSyncJob(jobKey, jobName, jobFn) {
+  if (saAutoJobPending[jobKey]) {
+    return Promise.resolve({ status: "skipped", reason: "already_pending" });
+  }
+  saAutoJobPending[jobKey] = true;
+  return enqueueSaSyncJob(jobName, async function () {
+    try {
+      return await jobFn();
+    } finally {
+      saAutoJobPending[jobKey] = false;
+    }
+  });
 }
 
 // --- Main refresh flow ---
@@ -427,7 +454,6 @@ async function doMarketNewsRefresh(mode, options) {
     if (tabId) {
       await safeRemoveTab(tabId);
     }
-    await syncMarketNewsAutoSyncAlarm();
   }
 }
 
@@ -515,6 +541,7 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
   await chrome.storage.local.set({
     marketNewsAutoSyncEnabled: enabled,
     marketNewsAutoSyncIntervalMinutes: normalizedInterval,
+    marketNewsAutoSyncLastStartedAt: null,
   });
   await syncMarketNewsAutoSyncAlarm();
   var schedule = getMarketNewsAutoSyncSchedule(normalizedInterval);
@@ -530,6 +557,34 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
 async function syncAllAutoSyncAlarms() {
   await syncAlphaPicksAutoSyncAlarm();
   await syncMarketNewsAutoSyncAlarm();
+}
+
+async function ensureAutoSyncAlarms() {
+  var data = await chrome.storage.local.get([
+    "alphaPicksAutoSyncEnabled",
+    "marketNewsAutoSyncEnabled",
+  ]);
+  var alarms = await getAllAlarms();
+  var names = {};
+  for (var i = 0; i < alarms.length; i++) {
+    if (alarms[i] && alarms[i].name) {
+      names[alarms[i].name] = true;
+    }
+  }
+
+  var repaired = [];
+  if (data.alphaPicksAutoSyncEnabled && !names[ALPHA_PICKS_AUTO_SYNC_ALARM]) {
+    await syncAlphaPicksAutoSyncAlarm();
+    repaired.push(ALPHA_PICKS_AUTO_SYNC_ALARM);
+  }
+  if (data.marketNewsAutoSyncEnabled && !names[MARKET_NEWS_AUTO_SYNC_ALARM]) {
+    await syncMarketNewsAutoSyncAlarm();
+    repaired.push(MARKET_NEWS_AUTO_SYNC_ALARM);
+  }
+  return {
+    status: "ok",
+    repaired: repaired,
+  };
 }
 
 async function syncAlphaPicksAutoSyncAlarm() {
@@ -557,11 +612,43 @@ async function syncMarketNewsAutoSyncAlarm() {
   }
   await chrome.alarms.clear(MARKET_NEWS_AUTO_SYNC_ALARM);
   if (enabled) {
-    var schedule = getMarketNewsAutoSyncSchedule(intervalMinutes);
+    var periodMinutes = intervalMinutes === MARKET_NEWS_AUTO_SYNC_AUTO_VALUE
+      ? MARKET_NEWS_AUTO_SYNC_HEARTBEAT_MINUTES
+      : intervalMinutes;
     await chrome.alarms.create(MARKET_NEWS_AUTO_SYNC_ALARM, {
-      delayInMinutes: schedule.intervalMinutes,
+      delayInMinutes: periodMinutes,
+      periodInMinutes: periodMinutes,
     });
   }
+}
+
+async function shouldRunMarketNewsAutoSync() {
+  var data = await chrome.storage.local.get([
+    "marketNewsAutoSyncEnabled",
+    "marketNewsAutoSyncIntervalMinutes",
+    "marketNewsAutoSyncLastStartedAt",
+  ]);
+  if (!data.marketNewsAutoSyncEnabled) return false;
+
+  var intervalSetting = normalizeMarketNewsAutoSyncIntervalMinutes(data.marketNewsAutoSyncIntervalMinutes);
+  if (intervalSetting !== MARKET_NEWS_AUTO_SYNC_AUTO_VALUE) {
+    return true;
+  }
+
+  var lastStartedAt = data.marketNewsAutoSyncLastStartedAt;
+  if (!lastStartedAt) return true;
+  var lastTs = Date.parse(lastStartedAt);
+  if (!Number.isFinite(lastTs)) return true;
+
+  var schedule = getMarketNewsAutoSyncSchedule(intervalSetting, new Date());
+  var requiredMs = schedule.intervalMinutes * 60 * 1000;
+  return (Date.now() - lastTs) >= requiredMs;
+}
+
+async function markMarketNewsAutoSyncStarted() {
+  await chrome.storage.local.set({
+    marketNewsAutoSyncLastStartedAt: new Date().toISOString(),
+  });
 }
 
 function normalizeAlphaPicksAutoSyncIntervalMinutes(value) {
@@ -805,6 +892,14 @@ function sendProgress(text) {
   // Send to popup if open
   chrome.runtime.sendMessage({ type: "progress", text }).catch(() => {
     // Popup may not be open, ignore
+  });
+}
+
+function getAllAlarms() {
+  return new Promise(function (resolve) {
+    chrome.alarms.getAll(function (alarms) {
+      resolve(Array.isArray(alarms) ? alarms : []);
+    });
   });
 }
 
