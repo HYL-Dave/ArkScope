@@ -37,6 +37,7 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 _SA_MARKET_NEWS_DETAIL_CACHE_HOURS = 24
+_SA_MARKET_NEWS_BACKFILL_PUBLISHED_WINDOW_HOURS = 24
 
 
 def _extract_sa_published_year(published_date: Any) -> Optional[int]:
@@ -801,6 +802,7 @@ class DataAccessLayer:
     def save_sa_market_news(
         self,
         items: List[Dict],
+        detail_current_limit: int | None = None,
         detail_backfill_limit: int = 0,
     ) -> Dict[str, Any]:
         """Persist recent Seeking Alpha market-news metadata."""
@@ -813,26 +815,40 @@ class DataAccessLayer:
         ]
         saved = self._backend.upsert_sa_market_news(normalized)
         current_ids = [item["news_id"] for item in normalized if item.get("news_id")]
-        need_detail = self._backend.query_sa_market_news_need_detail(
+        current_limit = detail_current_limit
+        if current_limit is None:
+            current_limit = len(normalized) or 50
+
+        need_detail_current = self._backend.query_sa_market_news_need_detail(
             current_ids,
             detail_cache_hours=_SA_MARKET_NEWS_DETAIL_CACHE_HOURS,
-            limit=len(normalized) or 50,
+            limit=current_limit,
         )
+        need_detail_backfill = []
         if detail_backfill_limit:
-            backlog = self._backend.query_sa_market_news_need_detail(
+            need_detail_backfill = self._backend.query_sa_market_news_need_detail(
                 news_ids=None,
                 detail_cache_hours=_SA_MARKET_NEWS_DETAIL_CACHE_HOURS,
                 limit=detail_backfill_limit,
                 exclude_news_ids=current_ids,
+                published_within_hours=_SA_MARKET_NEWS_BACKFILL_PUBLISHED_WINDOW_HOURS,
             )
-            seen = {item.get("news_id") for item in need_detail if item.get("news_id")}
-            for item in backlog:
+        need_detail = []
+        seen = set()
+        for bucket in (need_detail_current, need_detail_backfill):
+            for item in bucket:
                 news_id = item.get("news_id")
                 if not news_id or news_id in seen:
                     continue
                 seen.add(news_id)
                 need_detail.append(item)
-        return {"status": "ok", "saved": saved, "need_detail": need_detail}
+        return {
+            "status": "ok",
+            "saved": saved,
+            "need_detail": need_detail,
+            "need_detail_current": need_detail_current,
+            "need_detail_backfill": need_detail_backfill,
+        }
 
     def get_sa_market_news(
         self,

@@ -744,6 +744,10 @@ class TestDataAccessMarketNews:
             "need_detail": [
                 {"news_id": "1234567-fed-update", "url": "https://seekingalpha.com/news/1234567-fed-update"}
             ],
+            "need_detail_current": [
+                {"news_id": "1234567-fed-update", "url": "https://seekingalpha.com/news/1234567-fed-update"}
+            ],
+            "need_detail_backfill": [],
         }
         persisted = dal._backend.upsert_sa_market_news.call_args.args[0]
         assert persisted[0]["news_id"] == "1234567-fed-update"
@@ -779,6 +783,13 @@ class TestDataAccessMarketNews:
                 {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
                 {"news_id": "456", "url": "https://seekingalpha.com/news/456"},
             ],
+            "need_detail_current": [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
+            ],
+            "need_detail_backfill": [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
+                {"news_id": "456", "url": "https://seekingalpha.com/news/456"},
+            ],
         }
         assert dal._backend.query_sa_market_news_need_detail.call_count == 2
         current_call = dal._backend.query_sa_market_news_need_detail.call_args_list[0]
@@ -787,6 +798,38 @@ class TestDataAccessMarketNews:
         assert backlog_call.kwargs["news_ids"] is None
         assert backlog_call.kwargs["exclude_news_ids"] == ["123", "789"]
         assert backlog_call.kwargs["limit"] == 5
+        assert backlog_call.kwargs["published_within_hours"] == 24
+
+    def test_save_sa_market_news_respects_current_limit(self):
+        """Market-news save forwards a separate current-detail quota."""
+        dal = DataAccessLayer.__new__(DataAccessLayer)
+        dal._backend = MagicMock(spec=DatabaseBackend)
+        dal._backend.upsert_sa_market_news.return_value = 2
+        dal._backend.query_sa_market_news_need_detail.side_effect = [
+            [{"news_id": "123", "url": "https://seekingalpha.com/news/123"}],
+            [{"news_id": "456", "url": "https://seekingalpha.com/news/456"}],
+        ]
+
+        result = dal.save_sa_market_news(
+            [
+                {"news_id": "123", "url": "https://seekingalpha.com/news/123", "title": "Fed update"},
+                {"news_id": "789", "url": "https://seekingalpha.com/news/789", "title": "Oil update"},
+            ],
+            detail_current_limit=12,
+            detail_backfill_limit=6,
+        )
+
+        assert result["need_detail_current"] == [
+            {"news_id": "123", "url": "https://seekingalpha.com/news/123"},
+        ]
+        assert result["need_detail_backfill"] == [
+            {"news_id": "456", "url": "https://seekingalpha.com/news/456"},
+        ]
+        current_call = dal._backend.query_sa_market_news_need_detail.call_args_list[0]
+        backlog_call = dal._backend.query_sa_market_news_need_detail.call_args_list[1]
+        assert current_call.kwargs["limit"] == 12
+        assert backlog_call.kwargs["limit"] == 6
+        assert backlog_call.kwargs["published_within_hours"] == 24
 
     def test_get_sa_market_news_queries_backend(self):
         """Market-news read path delegates to DB backend."""
@@ -1364,20 +1407,23 @@ class TestNativeHostArticles:
         })
         assert result["saved"] == 2
         dal.save_sa_market_news.assert_called_once()
+        assert dal.save_sa_market_news.call_args.kwargs["detail_current_limit"] is None
         assert dal.save_sa_market_news.call_args.kwargs["detail_backfill_limit"] == 0
 
-    def test_save_market_news_passes_backfill_limit(self):
-        """save_market_news forwards requested detail backlog limit."""
+    def test_save_market_news_passes_detail_limits(self):
+        """save_market_news forwards current/backfill detail quotas."""
         from scripts.sa_native_host import _handle_save_market_news
         dal = MagicMock()
         dal.save_sa_market_news.return_value = {"status": "ok", "saved": 1}
         result = _handle_save_market_news(dal, {
             "items": [{"news_id": "123", "title": "Fed update"}],
+            "detail_current_limit": 12,
             "detail_backfill_limit": 12,
         })
         assert result["saved"] == 1
         dal.save_sa_market_news.assert_called_once_with(
             [{"news_id": "123", "title": "Fed update"}],
+            detail_current_limit=12,
             detail_backfill_limit=12,
         )
 

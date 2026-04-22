@@ -15,16 +15,71 @@ const ALPHA_PICKS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 30;
 const ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS = [15, 30, 60];
 const MARKET_NEWS_AUTO_SYNC_ALARM = "market-news-auto-sync";
 const MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 60;
+const MARKET_NEWS_AUTO_SYNC_AUTO_VALUE = "auto";
 const MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS = [5, 15, 60];
+const MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
+  weekday: [
+    { start: 0, end: 4 * 60, interval: 15 },
+    { start: 4 * 60, end: 5 * 60, interval: 5 },
+    { start: 5 * 60, end: 6 * 60, interval: 15 },
+    { start: 6 * 60, end: 12 * 60, interval: 60 },
+    { start: 12 * 60, end: 19 * 60, interval: 15 },
+    { start: 19 * 60, end: 24 * 60, interval: 5 },
+  ],
+  weekend: [
+    { start: 0, end: 1 * 60, interval: 60 },
+    { start: 1 * 60, end: 2 * 60, interval: 15 },
+    { start: 2 * 60, end: 12 * 60, interval: 60 },
+    { start: 12 * 60, end: 13 * 60, interval: 15 },
+    { start: 13 * 60, end: 15 * 60, interval: 60 },
+    { start: 15 * 60, end: 16 * 60, interval: 15 },
+    { start: 16 * 60, end: 18 * 60, interval: 60 },
+    { start: 18 * 60, end: 20 * 60, interval: 15 },
+    { start: 20 * 60, end: 22 * 60, interval: 5 },
+    { start: 22 * 60, end: 24 * 60, interval: 15 },
+  ],
+};
 const MARKET_NEWS_DETAIL_BACKFILL_LIMITS = {
   quick: 0,
+  catchup: 6,
   full: 20,
   backfill: 60,
   manual: 0,
 };
+const MARKET_NEWS_DETAIL_CURRENT_LIMITS = {
+  quick: 18,
+  catchup: 12,
+  full: 30,
+  backfill: 20,
+  manual: 20,
+};
+const MARKET_NEWS_DETAIL_TOTAL_LIMITS = {
+  quick: 18,
+  catchup: 18,
+  full: 30,
+  backfill: 80,
+  manual: 20,
+};
 const MARKET_NEWS_PROFILES = {
   quick: {
     name: "quick",
+    maxDetailFetches: 18,
+    recentKnownIdsLimit: 250,
+    knownTailStopCount: 8,
+    listStartMinMs: 700,
+    listStartMaxMs: 1300,
+    listScrolls: 3,
+    listScrollSettleMinMs: 1400,
+    listScrollSettleMaxMs: 2200,
+    detailReadyDwellMinMs: 1200,
+    detailReadyDwellMaxMs: 2200,
+    detailGapMinMs: 3500,
+    detailGapMaxMs: 6000,
+    retryDelayMinMs: 2500,
+    retryDelayMaxMs: 4000,
+  },
+  catchup: {
+    name: "catchup",
     maxDetailFetches: 18,
     recentKnownIdsLimit: 250,
     knownTailStopCount: 8,
@@ -311,10 +366,12 @@ async function doMarketNewsRefresh(mode, options) {
     if (!Array.isArray(items)) items = [];
 
     sendProgress("Saving " + items.length + " market-news item(s)...");
+    var detailCurrentLimit = getMarketNewsDetailCurrentLimit(mode);
     var detailBackfillLimit = getMarketNewsDetailBackfillLimit(mode);
     var result = await sendNativeMessage2({
       action: "save_market_news",
       items: items,
+      detail_current_limit: detailCurrentLimit,
       detail_backfill_limit: detailBackfillLimit,
     });
     if (!result || result.status !== "ok") {
@@ -322,10 +379,7 @@ async function doMarketNewsRefresh(mode, options) {
     }
     result.count = items.length;
 
-    var needDetail = result.need_detail || [];
-    if (profile.maxDetailFetches && needDetail.length > profile.maxDetailFetches) {
-      needDetail = needDetail.slice(0, profile.maxDetailFetches);
-    }
+    var needDetail = buildMarketNewsDetailQueue(result, mode);
     var detailFetched = 0;
     var detailFailed = 0;
     result.detail_queued = needDetail.length;
@@ -373,6 +427,7 @@ async function doMarketNewsRefresh(mode, options) {
     if (tabId) {
       await safeRemoveTab(tabId);
     }
+    await syncMarketNewsAutoSyncAlarm();
   }
 }
 
@@ -380,8 +435,59 @@ function getMarketNewsDetailBackfillLimit(mode) {
   return MARKET_NEWS_DETAIL_BACKFILL_LIMITS[mode] || MARKET_NEWS_DETAIL_BACKFILL_LIMITS.quick;
 }
 
+function getMarketNewsDetailCurrentLimit(mode) {
+  return MARKET_NEWS_DETAIL_CURRENT_LIMITS[mode] || MARKET_NEWS_DETAIL_CURRENT_LIMITS.quick;
+}
+
+function getMarketNewsDetailTotalLimit(mode) {
+  return MARKET_NEWS_DETAIL_TOTAL_LIMITS[mode] || MARKET_NEWS_DETAIL_TOTAL_LIMITS.quick;
+}
+
 function getMarketNewsProfile(mode) {
   return MARKET_NEWS_PROFILES[mode] || MARKET_NEWS_PROFILES.quick;
+}
+
+function buildMarketNewsDetailQueue(result, mode) {
+  result = result || {};
+  var totalLimit = getMarketNewsDetailTotalLimit(mode);
+  var currentLimit = getMarketNewsDetailCurrentLimit(mode);
+  var backfillLimit = getMarketNewsDetailBackfillLimit(mode);
+  var current = Array.isArray(result.need_detail_current) ? result.need_detail_current : [];
+  var backfill = Array.isArray(result.need_detail_backfill) ? result.need_detail_backfill : [];
+  var combined = Array.isArray(result.need_detail) ? result.need_detail : [];
+
+  if (current.length === 0 && backfill.length === 0) {
+    return totalLimit > 0 ? combined.slice(0, totalLimit) : combined.slice();
+  }
+
+  var queue = [];
+  var seen = {};
+
+  function addItems(items, limit) {
+    var added = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (limit != null && added >= limit) break;
+      if (queue.length >= totalLimit) break;
+      var item = items[i];
+      var newsId = item && item.news_id;
+      if (!newsId || seen[newsId]) continue;
+      seen[newsId] = true;
+      queue.push(item);
+      added++;
+    }
+    return added;
+  }
+
+  var currentAdded = addItems(current, currentLimit);
+  var backfillBudget = backfillLimit;
+  if (currentAdded < currentLimit) {
+    backfillBudget += (currentLimit - currentAdded);
+  }
+  addItems(backfill, backfillBudget);
+  if (queue.length < totalLimit) {
+    addItems(combined, totalLimit - queue.length);
+  }
+  return queue;
 }
 
 async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
@@ -411,10 +517,13 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
     marketNewsAutoSyncIntervalMinutes: normalizedInterval,
   });
   await syncMarketNewsAutoSyncAlarm();
+  var schedule = getMarketNewsAutoSyncSchedule(normalizedInterval);
   return {
     status: "ok",
     enabled: enabled,
-    interval_minutes: normalizedInterval,
+    interval_minutes: schedule.intervalMinutes,
+    interval_setting: normalizedInterval,
+    interval_label: schedule.label,
   };
 }
 
@@ -448,9 +557,9 @@ async function syncMarketNewsAutoSyncAlarm() {
   }
   await chrome.alarms.clear(MARKET_NEWS_AUTO_SYNC_ALARM);
   if (enabled) {
+    var schedule = getMarketNewsAutoSyncSchedule(intervalMinutes);
     await chrome.alarms.create(MARKET_NEWS_AUTO_SYNC_ALARM, {
-      delayInMinutes: intervalMinutes,
-      periodInMinutes: intervalMinutes,
+      delayInMinutes: schedule.intervalMinutes,
     });
   }
 }
@@ -464,11 +573,71 @@ function normalizeAlphaPicksAutoSyncIntervalMinutes(value) {
 }
 
 function normalizeMarketNewsAutoSyncIntervalMinutes(value) {
+  if (value === MARKET_NEWS_AUTO_SYNC_AUTO_VALUE) {
+    return MARKET_NEWS_AUTO_SYNC_AUTO_VALUE;
+  }
   var mins = parseInt(value, 10);
   if (MARKET_NEWS_AUTO_SYNC_ALLOWED_PERIODS.indexOf(mins) === -1) {
     return MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES;
   }
   return mins;
+}
+
+function formatAutoSyncIntervalLabel(intervalMinutes) {
+  var mins = parseInt(intervalMinutes, 10);
+  if (mins === 60) return "every 60 min";
+  return "every " + mins + " min";
+}
+
+function getMarketNewsAutoSyncSchedule(intervalSetting, now) {
+  if (intervalSetting !== MARKET_NEWS_AUTO_SYNC_AUTO_VALUE) {
+    var fixedMinutes = parseInt(intervalSetting, 10);
+    return {
+      intervalMinutes: fixedMinutes,
+      label: formatAutoSyncIntervalLabel(fixedMinutes),
+    };
+  }
+
+  var parts = getNewYorkTimeParts(now || new Date());
+  var totalMinutes = (parts.hour * 60) + parts.minute;
+  var windows = parts.weekday === "Sat" || parts.weekday === "Sun"
+    ? MARKET_NEWS_AUTO_SYNC_WINDOWS_ET.weekend
+    : MARKET_NEWS_AUTO_SYNC_WINDOWS_ET.weekday;
+  var resolvedMinutes = resolveMarketNewsAutoSyncInterval(windows, totalMinutes);
+
+  return {
+    intervalMinutes: resolvedMinutes,
+    label: "auto (" + formatAutoSyncIntervalLabel(resolvedMinutes) + ", ET)",
+  };
+}
+
+function resolveMarketNewsAutoSyncInterval(windows, totalMinutes) {
+  for (var i = 0; i < windows.length; i++) {
+    var window = windows[i];
+    if (totalMinutes >= window.start && totalMinutes < window.end) {
+      return window.interval;
+    }
+  }
+  return MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES;
+}
+
+function getNewYorkTimeParts(now) {
+  var formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  var parts = formatter.formatToParts(now || new Date());
+  var out = { weekday: "", hour: 0, minute: 0 };
+  for (var i = 0; i < parts.length; i++) {
+    var part = parts[i];
+    if (part.type === "weekday") out.weekday = part.value;
+    if (part.type === "hour") out.hour = parseInt(part.value, 10) || 0;
+    if (part.type === "minute") out.minute = parseInt(part.value, 10) || 0;
+  }
+  return out;
 }
 
 // --- Tab management ---

@@ -300,16 +300,19 @@ def _parse_sa_date(date_str):
 def _handle_save_market_news(dal, msg):
     """Persist recent Seeking Alpha market-news metadata."""
     items = msg.get("items", [])
+    detail_current_limit = msg.get("detail_current_limit")
     detail_backfill_limit = msg.get("detail_backfill_limit", 0)
     try:
         result = dal.save_sa_market_news(
             items,
+            detail_current_limit=detail_current_limit,
             detail_backfill_limit=detail_backfill_limit,
         )
         logger.info(
-            "save_market_news: saved=%s items=%s backfill_limit=%s need_detail=%s",
+            "save_market_news: saved=%s items=%s current_limit=%s backfill_limit=%s need_detail=%s",
             result.get("saved"),
             len(items),
+            detail_current_limit,
             detail_backfill_limit,
             len(result.get("need_detail") or []),
         )

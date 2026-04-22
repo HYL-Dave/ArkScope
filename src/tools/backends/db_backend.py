@@ -1490,6 +1490,7 @@ class DatabaseBackend:
         detail_cache_hours: int = 24,
         limit: int = 50,
         exclude_news_ids: list | None = None,
+        published_within_hours: int | None = None,
     ) -> list:
         """Return market-news items that still need detail body fetch."""
         if limit is not None and int(limit or 0) <= 0:
@@ -1511,6 +1512,11 @@ class DatabaseBackend:
                 if exclude_news_ids:
                     filters.append("NOT (news_id = ANY(%s))")
                     params.append(exclude_news_ids)
+                if published_within_hours is not None:
+                    filters.append(
+                        "COALESCE(published_at, fetched_at) >= NOW() - (%s || ' hours')::interval"
+                    )
+                    params.append(int(published_within_hours))
                 params.append(max(1, min(int(limit or 50), 200)))
                 cur.execute(
                     f"""

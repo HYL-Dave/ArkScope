@@ -62,6 +62,10 @@
       background: #00838f;
     }
     #marketNewsBtn:hover:not(:disabled) { background: #006064; }
+    #marketNewsCatchupBtn {
+      background: #00695c;
+    }
+    #marketNewsCatchupBtn:hover:not(:disabled) { background: #004d40; }
     .btn-hint {
       font-size: 10px;
       color: #999;
@@ -124,7 +128,10 @@
   </div>
   <div class="btn-row">
     <button id="backfillBtn">Deep Backfill</button>
-    <button id="marketNewsBtn">Market News</button>
+    <button id="marketNewsBtn">News Quick</button>
+  </div>
+  <div class="btn-row">
+    <button id="marketNewsCatchupBtn">News Catchup</button>
   </div>
   <div class="toggle-row">
     <label for="alphaPicksAutoSyncToggle">
@@ -143,10 +150,11 @@
   <div class="toggle-row">
     <label for="marketNewsAutoSyncToggle">
       <span>Auto-sync Market News</span>
-      <small>Runs quick sync on the selected interval when enabled</small>
+      <small>Auto uses observed ET publish-density windows, not a fixed market-hours rule</small>
     </label>
     <div class="toggle-controls">
       <select id="marketNewsAutoSyncInterval">
+        <option value="auto">Auto</option>
         <option value="5">5 min</option>
         <option value="15">15 min</option>
         <option value="60">60 min</option>
@@ -154,7 +162,8 @@
       <input id="marketNewsAutoSyncToggle" type="checkbox">
     </div>
   </div>
-  <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News: recent market feed</div>
+  <div id="marketNewsAutoSyncResolved" class="btn-hint" style="margin-top: -4px; margin-bottom: 8px;"></div>
+  <div class="btn-hint">Quick: recent updates &nbsp;|&nbsp; Full: balanced scan &nbsp;|&nbsp; Backfill: overnight comments &nbsp;|&nbsp; News Catchup: latest + backlog</div>
   <div id="progress"></div>
   <div id="manualSection" style="display:none; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
     <div style="font-size: 12px; color: #666; margin-bottom: 6px;">Paste missing article URLs (TICKER URL per line):</div>
