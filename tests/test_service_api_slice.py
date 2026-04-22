@@ -98,6 +98,22 @@ class TestServiceJobs:
             def __init__(self, dal):
                 del dal
                 self.default_tickers = ["NVDA", "AMD"]
+                self.last_scan_metrics = {
+                    "tickers_scanned": 2,
+                    "watchers": [
+                        {
+                            "watcher": "PriceWatcher",
+                            "status": "ok",
+                            "elapsed_seconds": 0.123,
+                            "alert_count": 1,
+                        }
+                    ],
+                    "alerts_before_dedup": 1,
+                    "alerts_after_dedup": 1,
+                    "notified": False,
+                    "notifications_sent": 0,
+                    "total_elapsed_seconds": 0.123,
+                }
 
             async def scan_once(self, tickers=None, notify=False):
                 del tickers, notify
@@ -117,6 +133,7 @@ class TestServiceJobs:
         assert result.status == "succeeded"
         assert result.result["alert_count"] == 1
         assert result.result["by_type"]["price"] == 1
+        assert result.result["scan_metrics"]["watchers"][0]["watcher"] == "PriceWatcher"
 
 
 class TestJobsRoutes:

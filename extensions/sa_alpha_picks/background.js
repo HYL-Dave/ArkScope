@@ -265,7 +265,7 @@ async function doRefresh(mode, options) {
     return results;
   } finally {
     if (tabId) {
-      try { chrome.tabs.remove(tabId); } catch (_) { /* tab may already be closed */ }
+      await safeRemoveTab(tabId);
     }
   }
 }
@@ -371,7 +371,7 @@ async function doMarketNewsRefresh(mode, options) {
   } finally {
     marketNewsRefreshInFlight = false;
     if (tabId) {
-      try { chrome.tabs.remove(tabId); } catch (_) { /* tab may already be closed */ }
+      await safeRemoveTab(tabId);
     }
   }
 }
@@ -473,16 +473,79 @@ function normalizeMarketNewsAutoSyncIntervalMinutes(value) {
 
 // --- Tab management ---
 
-function waitForTabLoad(tabId) {
-  return new Promise((resolve) => {
-    const listener = (id, changeInfo) => {
-      if (id === tabId && changeInfo.status === "complete") {
-        chrome.tabs.onUpdated.removeListener(listener);
+function waitForTabLoad(tabId, timeoutMs) {
+  timeoutMs = timeoutMs || 30000;
+  return new Promise((resolve, reject) => {
+    var settled = false;
+    var timeoutId = null;
+
+    function cleanup() {
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    }
+
+    function finish(error) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) {
+        reject(error);
+      } else {
         resolve();
       }
+    }
+
+    const onUpdated = (id, changeInfo, tab) => {
+      if (id !== tabId) return;
+      if (changeInfo.status === "complete" || (tab && tab.status === "complete")) {
+        finish();
+      }
     };
-    chrome.tabs.onUpdated.addListener(listener);
+
+    const onRemoved = (id) => {
+      if (id === tabId) {
+        finish(new Error("Tab closed before load completed"));
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+
+    timeoutId = setTimeout(() => {
+      finish(new Error("Timeout waiting for tab load"));
+    }, timeoutMs);
+
+    chrome.tabs.get(tabId).then((tab) => {
+      if (!tab) {
+        finish(new Error("Tab not found"));
+        return;
+      }
+      if (tab.status === "complete") {
+        finish();
+      }
+    }).catch((err) => {
+      finish(err || new Error("Failed to inspect tab state"));
+    });
   });
+}
+
+async function safeRemoveTab(tabId) {
+  if (tabId == null) return false;
+  try {
+    await chrome.tabs.remove(tabId);
+    return true;
+  } catch (err) {
+    var message = err && err.message ? err.message : String(err || "");
+    if (message && message.indexOf("No tab with id") >= 0) {
+      return false;
+    }
+    console.warn("[SA] Failed to remove tab", tabId, message);
+    return false;
+  }
 }
 
 // --- DOM readiness polling ---
@@ -863,7 +926,7 @@ async function doManualFetch(items) {
     return { fetched: fetched, failed: failed };
   } finally {
     if (tabId) {
-      try { chrome.tabs.remove(tabId); } catch (_) {}
+      await safeRemoveTab(tabId);
     }
   }
 }

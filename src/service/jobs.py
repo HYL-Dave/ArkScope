@@ -318,6 +318,7 @@ def _run_monitor_watchlist_scan(
         "requested_count": len(explicit_tickers or engine.default_tickers),
         "alert_count": len(alerts),
         "notified": notify,
+        "scan_metrics": engine.last_scan_metrics,
         "by_type": by_type,
         "by_severity": by_severity,
         "alerts": [_serialize_alert(alert) for alert in alerts],

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import yaml
@@ -104,10 +105,24 @@ class MonitorEngine:
 
         # Default tickers from config
         self._default_tickers = _extract_tickers(self._config)
+        self._last_scan_metrics: Dict[str, Any] = {
+            "tickers_scanned": 0,
+            "watchers": [],
+            "alerts_before_dedup": 0,
+            "alerts_after_dedup": 0,
+            "notified": False,
+            "notifications_sent": 0,
+            "total_elapsed_seconds": 0.0,
+        }
 
     @property
     def default_tickers(self) -> List[str]:
         return self._default_tickers
+
+    @property
+    def last_scan_metrics(self) -> Dict[str, Any]:
+        """Metrics from the most recent scan_once() execution."""
+        return self._last_scan_metrics
 
     async def scan_once(
         self,
@@ -125,38 +140,85 @@ class MonitorEngine:
         """
         scan_tickers = tickers or self._default_tickers
         if not scan_tickers:
+            self._last_scan_metrics = {
+                "tickers_scanned": 0,
+                "watchers": [],
+                "alerts_before_dedup": 0,
+                "alerts_after_dedup": 0,
+                "notified": notify,
+                "notifications_sent": 0,
+                "total_elapsed_seconds": 0.0,
+            }
             logger.warning("No tickers to scan")
             return []
 
         logger.info("Scanning %d tickers: %s", len(scan_tickers), ", ".join(scan_tickers))
 
+        total_started = perf_counter()
         all_alerts: List[Alert] = []
+        watcher_metrics: List[Dict[str, Any]] = []
         for watcher in self._watchers:
             watcher_name = type(watcher).__name__
+            watcher_started = perf_counter()
             try:
                 watcher_alerts = await watcher.check(self._dal, scan_tickers)
+                elapsed = round(perf_counter() - watcher_started, 3)
+                watcher_metrics.append({
+                    "watcher": watcher_name,
+                    "status": "ok",
+                    "elapsed_seconds": elapsed,
+                    "alert_count": len(watcher_alerts),
+                })
+                logger.info(
+                    "%s completed in %.3fs (%d alert(s))",
+                    watcher_name,
+                    elapsed,
+                    len(watcher_alerts),
+                )
                 if watcher_alerts:
                     logger.info(
                         "%s found %d alert(s)", watcher_name, len(watcher_alerts)
                     )
                     all_alerts.extend(watcher_alerts)
-            except Exception:
-                logger.exception("Watcher %s failed", watcher_name)
+            except Exception as exc:
+                elapsed = round(perf_counter() - watcher_started, 3)
+                watcher_metrics.append({
+                    "watcher": watcher_name,
+                    "status": "failed",
+                    "elapsed_seconds": elapsed,
+                    "alert_count": 0,
+                    "error": str(exc),
+                })
+                logger.exception("Watcher %s failed after %.3fs", watcher_name, elapsed)
 
         # Sort by severity (critical first)
         severity_order = {"critical": 0, "warning": 1, "info": 2}
         all_alerts.sort(key=lambda a: severity_order.get(a.severity, 9))
 
         # Dedup: suppress alerts whose value hasn't changed significantly
+        alerts_before_dedup = len(all_alerts)
         all_alerts = self._dedup.filter(all_alerts)
 
+        notifications_sent = 0
         if notify and all_alerts:
-            await self._router.dispatch_many(all_alerts)
+            notifications_sent = await self._router.dispatch_many(all_alerts)
+
+        total_elapsed = round(perf_counter() - total_started, 3)
+        self._last_scan_metrics = {
+            "tickers_scanned": len(scan_tickers),
+            "watchers": watcher_metrics,
+            "alerts_before_dedup": alerts_before_dedup,
+            "alerts_after_dedup": len(all_alerts),
+            "notified": notify,
+            "notifications_sent": notifications_sent,
+            "total_elapsed_seconds": total_elapsed,
+        }
 
         logger.info(
-            "Scan complete: %d alert(s) across %d tickers",
+            "Scan complete: %d alert(s) across %d tickers in %.3fs",
             len(all_alerts),
             len(scan_tickers),
+            total_elapsed,
         )
         return all_alerts
 

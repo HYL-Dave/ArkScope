@@ -395,6 +395,45 @@ class TestMonitorEngine:
         assert "Price Alerts" in summary
         assert "Signal Alerts" in summary
 
+    def test_scan_once_records_watcher_metrics(self):
+        dal = MagicMock()
+        config = {
+            "alerts": {"notification_channels": []},
+            "watchlists": {"core_holdings": {"tickers": ["NVDA"]}},
+        }
+        engine = MonitorEngine(dal=dal, config=config)
+
+        class FakeWatcher:
+            async def check(self, dal, tickers):
+                del dal, tickers
+                return [
+                    Alert(
+                        alert_type="price",
+                        severity="warning",
+                        title="Moved",
+                        message="NVDA moved",
+                        ticker="NVDA",
+                    )
+                ]
+
+        class ExplodingWatcher:
+            async def check(self, dal, tickers):
+                del dal, tickers
+                raise RuntimeError("boom")
+
+        engine._watchers = [FakeWatcher(), ExplodingWatcher()]
+
+        alerts = asyncio.run(engine.scan_once(notify=False))
+
+        assert len(alerts) == 1
+        assert engine.last_scan_metrics["tickers_scanned"] == 1
+        assert engine.last_scan_metrics["alerts_before_dedup"] == 1
+        assert engine.last_scan_metrics["alerts_after_dedup"] == 1
+        assert engine.last_scan_metrics["watchers"][0]["watcher"] == "FakeWatcher"
+        assert engine.last_scan_metrics["watchers"][0]["status"] == "ok"
+        assert engine.last_scan_metrics["watchers"][1]["watcher"] == "ExplodingWatcher"
+        assert engine.last_scan_metrics["watchers"][1]["status"] == "failed"
+
 
 # ── Tool registration ─────────────────────────────────────────
 
