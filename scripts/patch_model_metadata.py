@@ -40,6 +40,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT))
 
 from training.config import INDICATORS  # noqa: E402
+from training.data_prep.prepare_training_data import BASELINE_INDICATORS  # noqa: E402
 
 MODEL_ID_DATA_TAG = re.compile(
     r"^(?:ppo|cppo)_(?:sb3_)?(.+?)_\d+ep_s(?:rnd|\d+)_"
@@ -83,42 +84,55 @@ def load_ticker_order(csv_path: Path) -> List[str]:
     return tics
 
 
+def _expected_state_dim(n_tickers: int, n_indicators: int, n_extras: int) -> int:
+    return 1 + 2 * n_tickers + (1 + n_indicators + n_extras) * n_tickers
+
+
 def build_schema_patch(meta: dict, csv_path: Path) -> dict:
-    """Build the dict of schema fields to merge into metadata."""
+    """Build the dict of schema fields to merge into metadata.
+
+    Auto-detects whether the model was trained with the extended (9)
+    or baseline (8) indicator list by matching the recorded state_dim.
+    """
     tickers = load_ticker_order(csv_path)
 
     hp = meta.get("hyperparams") or {}
     sentiment_scale = hp.get("sentiment_scale", "strong")
+    extra_cols = list(meta.get("feature_set") or [])
 
-    patch = {
-        "ticker_order": tickers,
-        "tech_indicator_list": list(INDICATORS),
-        "extra_feature_cols": list(meta.get("feature_set") or []),
-        "llm_sentiment_col": "llm_sentiment",
-        "initial_amount": 1_000_000,
-        "sentiment_scale": sentiment_scale,
-    }
+    recorded_state_dim = meta.get("state_dim")
+    candidates = [("extended", INDICATORS), ("baseline", BASELINE_INDICATORS)]
+    chosen_indicators = None
+    for label, ind_list in candidates:
+        if _expected_state_dim(len(tickers), len(ind_list), len(extra_cols)) == recorded_state_dim:
+            chosen_indicators = list(ind_list)
+            break
 
-    expected_state_dim = (
-        1
-        + 2 * len(tickers)
-        + (1 + len(patch["tech_indicator_list"]) + len(patch["extra_feature_cols"]))
-        * len(tickers)
-    )
-    if meta.get("state_dim") and meta["state_dim"] != expected_state_dim:
-        raise ValueError(
-            f"Inferred state_dim {expected_state_dim} != metadata.state_dim "
-            f"{meta['state_dim']} for model {meta.get('model_id')}. "
-            "The recorded stock_dim/feature_set does not match the CSV's "
-            "ticker count + INDICATORS count. Refusing to patch."
+    if chosen_indicators is None:
+        tried = ", ".join(
+            f"{label}({len(ind)})={_expected_state_dim(len(tickers), len(ind), len(extra_cols))}"
+            for label, ind in candidates
         )
+        raise ValueError(
+            f"No indicator list produces state_dim {recorded_state_dim} for "
+            f"{meta.get('model_id')}. Tried: {tried}. Stock count: "
+            f"{len(tickers)}, extras: {len(extra_cols)}. Refusing to patch."
+        )
+
     if meta.get("stock_dim") and meta["stock_dim"] != len(tickers):
         raise ValueError(
             f"Inferred stock_dim {len(tickers)} != metadata.stock_dim "
             f"{meta['stock_dim']} for model {meta.get('model_id')}."
         )
 
-    return patch
+    return {
+        "ticker_order": tickers,
+        "tech_indicator_list": chosen_indicators,
+        "extra_feature_cols": extra_cols,
+        "llm_sentiment_col": "llm_sentiment",
+        "initial_amount": 1_000_000,
+        "sentiment_scale": sentiment_scale,
+    }
 
 
 def patch_model_dir(
