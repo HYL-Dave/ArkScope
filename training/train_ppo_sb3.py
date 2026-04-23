@@ -119,10 +119,12 @@ def load_data(data_path):
 
 
 def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None,
-                tech_indicators=None):
+                tech_indicators=None, monitor_file=None):
     """Return a callable that creates the trading environment.
 
     SB3 expects a factory function (not a pre-built env) for vectorized envs.
+    If monitor_file is set, per-episode rewards are persisted to that path
+    (useful for V-lite diagnosis runs).
     """
     extra = extra_feature_cols or []
     indicators = tech_indicators if tech_indicators is not None else INDICATORS
@@ -147,7 +149,7 @@ def make_env_fn(train, sentiment_scale="strong", extra_feature_cols=None,
     }
 
     def _make():
-        return Monitor(StockTradingEnv(df=train, **env_kwargs))
+        return Monitor(StockTradingEnv(df=train, **env_kwargs), filename=monitor_file)
 
     return _make, stock_dimension, state_space
 
@@ -246,7 +248,22 @@ Hyperparameter mapping (SpinningUp → SB3):
         "--n-envs", type=int, default=1,
         help="Number of parallel environments (1=DummyVecEnv, >1=SubprocVecEnv)",
     )
+    parser.add_argument(
+        "--telemetry", action="store_true",
+        help="Enable tensorboard + monitor telemetry for V-lite diagnosis. "
+             "Writes tfevents + monitor.csv under the run's model_dir. "
+             "Requires --n-envs 1 to keep monitor.csv in a single file.",
+    )
+    parser.add_argument(
+        "--log-std-init", type=float, default=0.0,
+        help="Initial log std of the gaussian policy head. Default 0.0 "
+             "(std=1.0) matches SB3/SpinningUp convention. For collapse "
+             "diagnosis set to e.g. -2.0 so initial std ≈ 0.135.",
+    )
     args = parser.parse_args()
+
+    if args.telemetry and args.n_envs != 1:
+        raise ValueError("--telemetry currently requires --n-envs 1")
 
     check_and_make_directories([TRAINED_MODEL_DIR])
 
@@ -270,10 +287,24 @@ Hyperparameter mapping (SpinningUp → SB3):
         train, args.features, data_path=args.data,
     )
 
-    # Create environment
+    # Hoist model_id + model_dir so telemetry can write into the final run dir.
+    from training.train_utils import generate_model_id
+    data_tag = os.path.splitext(os.path.basename(args.data))[0]
+    model_id = generate_model_id(
+        algorithm="ppo_sb3",
+        data_tag=data_tag,
+        epochs=args.epochs,
+        seed=args.seed,
+        data_path=args.data,
+    )
+    model_dir = os.path.join(TRAINED_MODEL_DIR, model_id)
+    os.makedirs(model_dir, exist_ok=True)
+
+    # Create environment (Monitor writes to model_dir/monitor.csv when telemetry on)
+    monitor_file = os.path.join(model_dir, "monitor.csv") if args.telemetry else None
     env_fn, stock_dimension, state_space = make_env_fn(
         train, sentiment_scale=args.sentiment_scale, extra_feature_cols=extra_cols,
-        tech_indicators=csv_indicators,
+        tech_indicators=csv_indicators, monitor_file=monitor_file,
     )
 
     if args.n_envs > 1:
@@ -284,9 +315,13 @@ Hyperparameter mapping (SpinningUp → SB3):
         env = DummyVecEnv([env_fn])
         effective_steps = args.steps
 
+    print(f"  Model ID: {model_id}")
+    print(f"  Model dir: {model_dir}")
     print(f"  Stock Dimension: {stock_dimension}, State Space: {state_space}")
     if extra_cols:
         print(f"  Extra features ({len(extra_cols)}): {extra_cols}")
+    if args.telemetry:
+        print(f"  Telemetry: tensorboard + monitor.csv → {model_dir}")
 
     # Build SB3 PPO model
     # Hyperparams aligned to SpinningUp for comparability:
@@ -307,6 +342,7 @@ Hyperparameter mapping (SpinningUp → SB3):
         n_epochs = 10                  # 10 epochs × 10 minibatches = 100 steps
         batch_mode = "minibatch"
 
+    tb_dir = os.path.join(model_dir, "tb") if args.telemetry else None
     model = PPO(
         "MlpPolicy",
         env,
@@ -323,10 +359,12 @@ Hyperparameter mapping (SpinningUp → SB3):
         ent_coef=0.0,
         max_grad_norm=float("inf"),  # no gradient clipping (match SpinningUp)
         seed=args.seed,
-        verbose=0,
+        verbose=1 if args.telemetry else 0,
+        tensorboard_log=tb_dir,
         policy_kwargs=dict(
             net_arch=dict(pi=[args.hid] * args.l, vf=[args.hid] * args.l),
             activation_fn=torch.nn.Tanh,
+            log_std_init=args.log_std_init,
         ),
     )
 
@@ -338,25 +376,19 @@ Hyperparameter mapping (SpinningUp → SB3):
     # Train
     callback = EpochLogCallback(args.epochs, args.steps)
     start_time = time.time()
-    model.learn(total_timesteps=total_timesteps, callback=callback)
+    model.learn(
+        total_timesteps=total_timesteps,
+        callback=callback,
+        log_interval=1,
+        tb_log_name="ppo",
+        progress_bar=False,
+    )
     elapsed = time.time() - start_time
     print(f"\n  Training complete in {elapsed:.1f}s ({elapsed / 60:.1f}m)")
 
-    # Save artifacts compatible with model registry
-    from training.train_utils import generate_model_id, save_training_artifacts
-
-    data_tag = os.path.splitext(os.path.basename(args.data))[0]
-    model_id = generate_model_id(
-        algorithm="ppo_sb3",
-        data_tag=data_tag,
-        epochs=args.epochs,
-        seed=args.seed,
-        data_path=args.data,
-    )
-
-    # Save SB3 model (zip) + extract state_dict for registry compatibility
-    model_dir = os.path.join(TRAINED_MODEL_DIR, model_id)
-    os.makedirs(model_dir, exist_ok=True)
+    # Save artifacts compatible with model registry (model_id + model_dir
+    # were hoisted pre-training so telemetry could write into the run dir).
+    from training.train_utils import save_training_artifacts
 
     # SB3 native save (complete model, for SB3 loading)
     sb3_path = os.path.join(model_dir, "model_sb3.zip")
