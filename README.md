@@ -227,11 +227,36 @@ curl "http://localhost:8420/options/PLTR"
 # Fundamentals
 curl "http://localhost:8420/fundamentals/AAPL"
 
+# Analysis pipeline (requires analysis_pipeline.enabled: true)
+curl -X POST "http://localhost:8420/analysis/run" \
+  -H "Content-Type: application/json" \
+  -d '{"ticker":"NVDA","depth":"quick","format":"markdown","persist":false}'
+
+# Jobs control plane
+curl "http://localhost:8420/jobs/status"
+curl -X POST "http://localhost:8420/jobs/run/monitor_watchlist_scan" \
+  -H "Content-Type: application/json" \
+  -d '{"notify":false}'
+
+# Seeking Alpha cached reads (requires seeking_alpha.enabled: true)
+curl "http://localhost:8420/sa/alpha-picks?status=current"
+curl "http://localhost:8420/sa/articles?ticker=NVDA&limit=5"
+curl "http://localhost:8420/sa/market-news?ticker=PLTR&limit=10"
+
+# Reports
+curl "http://localhost:8420/reports?ticker=NVDA&days=90"
+curl "http://localhost:8420/reports/123"
+
 # AI Agent query
 curl -X POST "http://localhost:8420/query" \
   -H "Content-Type: application/json" \
   -d '{"question": "Compare AMD and NVDA recent performance", "provider": "anthropic"}'
 ```
+
+Notes:
+
+- `analysis_watchlist_batch` and `monitor_watchlist_scan` are backend-runnable today via `/jobs/run/{job_name}`.
+- `sa_alpha_picks_refresh` and `sa_market_news_refresh` appear in `/jobs/status`, but remain Chrome-extension-managed for now.
 
 ---
 
