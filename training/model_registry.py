@@ -41,6 +41,13 @@ class ModelMetadata:
     training_date: str = ""          # ISO date (UTC with Z suffix)
     model_path: str = ""             # relative path to .pth
     data_hash: str = ""              # MD5 of training CSV
+    # State schema (required for live inference; patched via scripts/patch_model_metadata.py for older models)
+    ticker_order: List[str] = field(default_factory=list)
+    tech_indicator_list: List[str] = field(default_factory=list)
+    extra_feature_cols: List[str] = field(default_factory=list)
+    llm_sentiment_col: str = "llm_sentiment"
+    initial_amount: float = 1_000_000
+    sentiment_scale: str = "strong"
 
     def to_dict(self) -> Dict:
         return asdict(self)

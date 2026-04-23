@@ -404,6 +404,9 @@ Hyperparameter mapping (SpinningUp → SB3):
         },
         data_path=args.data,
         scaler=scaler,
+        ticker_order=sorted(train["tic"].unique().tolist()),
+        tech_indicator_list=list(csv_indicators),
+        sentiment_scale=args.sentiment_scale,
     )
 
     print(f"\n  SB3 model: {sb3_path}")

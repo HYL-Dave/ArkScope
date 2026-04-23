@@ -73,6 +73,11 @@ def save_training_artifacts(
     score_type: str = "sentiment",
     data_path: Optional[str] = None,
     scaler: Optional["FeatureScaler"] = None,
+    ticker_order: Optional[List[str]] = None,
+    tech_indicator_list: Optional[List[str]] = None,
+    llm_sentiment_col: str = "llm_sentiment",
+    initial_amount: float = 1_000_000,
+    sentiment_scale: str = "strong",
 ) -> str:
     """Save model + metadata + scaler to unified model directory.
 
@@ -114,6 +119,12 @@ def save_training_artifacts(
         training_date=training_date,
         model_path=rel_model_path,
         data_hash=data_h,
+        ticker_order=list(ticker_order) if ticker_order else [],
+        tech_indicator_list=list(tech_indicator_list) if tech_indicator_list else [],
+        extra_feature_cols=list(extra_cols),
+        llm_sentiment_col=llm_sentiment_col,
+        initial_amount=initial_amount,
+        sentiment_scale=sentiment_scale,
     )
     registry = ModelRegistry(models_dir=TRAINED_MODEL_DIR)
     registry.save_metadata(meta)
