@@ -271,18 +271,18 @@ class TestRLToolsDisabled:
     def test_model_status_disabled(self):
         from src.tools.rl_tools import get_rl_model_status
         result = get_rl_model_status(None)
-        assert "not enabled" in result.lower() or "not yet enabled" in result.lower()
+        assert any(s in result.lower() for s in ["not enabled", "not yet enabled", "disabled", "experimental"])
         assert "train" in result.lower()
 
     def test_prediction_disabled(self):
         from src.tools.rl_tools import get_rl_prediction
         result = get_rl_prediction(None, ticker="NVDA")
-        assert "not enabled" in result.lower() or "not yet enabled" in result.lower()
+        assert any(s in result.lower() for s in ["not enabled", "not yet enabled", "disabled", "experimental"])
 
     def test_backtest_report_disabled(self):
         from src.tools.rl_tools import get_rl_backtest_report
         result = get_rl_backtest_report(None, model_id="latest")
-        assert "not enabled" in result.lower() or "not yet enabled" in result.lower()
+        assert any(s in result.lower() for s in ["not enabled", "not yet enabled", "disabled", "experimental"])
 
 
 # ============================================================
@@ -343,10 +343,11 @@ class TestRLToolsEnabled:
         self._save_model()
         from src.tools.rl_tools import get_rl_prediction
         result = json.loads(get_rl_prediction(None, ticker="NVDA"))
-        assert result["status"] == "model_found"
+        assert result["status"] == "experimental_metadata_only"
         assert result["ticker"] == "NVDA"
         assert result["model_id"] == "ppo_test_20260301"
-        assert "inference not yet implemented" in result["note"].lower()
+        assert result.get("experimental") is True
+        assert "experimental" in result["note"].lower()
 
     def test_prediction_model_not_found(self):
         from src.tools.rl_tools import get_rl_prediction
@@ -439,7 +440,7 @@ class TestAnthropicRLExecution:
         dal = DataAccessLayer()
         result = execute_tool("get_rl_model_status", {}, dal)
         text = _unwrap(result)
-        assert "not enabled" in text.lower() or "not yet enabled" in text.lower()
+        assert any(s in text.lower() for s in ["not enabled", "not yet enabled", "disabled", "experimental"])
 
 
 # ============================================================
@@ -477,7 +478,11 @@ class TestSystemPromptRL:
     def test_build_system_prompt_includes_rl_section(self):
         """build_system_prompt includes RL status section."""
         from src.agents.shared.prompts import build_system_prompt
-        # Default config has rl_pipeline_enabled=False, so RL section shows "not enabled"
+        # Default config has rl_pipeline_enabled=False, so RL section shows
+        # disabled + experimental warning about the collapse investigation.
         prompt = build_system_prompt()
         assert "RL MODELS" in prompt
-        assert "not yet enabled" in prompt.lower() or "not enabled" in prompt.lower()
+        assert any(
+            s in prompt.lower()
+            for s in ("not yet enabled", "not enabled", "disabled", "experimental")
+        )

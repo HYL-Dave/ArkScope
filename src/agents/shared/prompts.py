@@ -303,11 +303,16 @@ def _get_rl_status_section() -> str:
         config = get_agent_config()
         if not config.rl_pipeline_enabled:
             return (
-                "─── RL MODELS ───\n\n"
-                "RL Pipeline is not yet enabled (no trained models). "
+                "─── RL MODELS (EXPERIMENTAL) ───\n\n"
+                "RL Pipeline is currently disabled and MUST NOT be used to offer "
+                "investment recommendations in the main decision path. The existing "
+                "production checkpoints have been diagnosed with policy collapse "
+                "(deterministic actions nearly state-invariant across dates). A "
+                "corrective training run with VecNormalize is in progress; until it "
+                "is validated end-to-end, RL tools are for research/introspection only.\n"
                 "The get_rl_model_status, get_rl_prediction, and get_rl_backtest_report "
-                "tools are available but will return informational messages. "
-                "Do not offer RL-based predictions until the pipeline is enabled.\n"
+                "tools are available but will return informational messages. Do not "
+                "offer RL-based predictions.\n"
             )
 
         from training.model_registry import ModelRegistry
@@ -315,7 +320,7 @@ def _get_rl_status_section() -> str:
         models = registry.list_models()
         if not models:
             return (
-                "─── RL MODELS ───\n\n"
+                "─── RL MODELS (EXPERIMENTAL) ───\n\n"
                 "RL Pipeline is enabled but no trained models found yet. "
                 "Use get_rl_model_status to check status.\n"
             )
@@ -325,13 +330,15 @@ def _get_rl_status_section() -> str:
         sharpe = bt.get("sharpe_ratio", "N/A")
         mdd = bt.get("max_drawdown", "N/A")
         return (
-            f"─── RL MODELS ───\n\n"
+            f"─── RL MODELS (EXPERIMENTAL) ───\n\n"
             f"{len(models)} trained model(s) available. "
             f"Latest: {latest.model_id} ({latest.algorithm}, "
             f"Sharpe={sharpe}, MDD={mdd}). "
-            f"Use get_rl_model_status for full list and get_rl_backtest_report for details. "
-            f"Note: get_rl_prediction currently confirms model availability only — "
-            f"full inference will be added in a future update.\n"
+            f"IMPORTANT: existing production models have been diagnosed with policy "
+            f"collapse (state-invariant deterministic actions). RL output is "
+            f"EXPERIMENTAL — do not treat as actionable trading signal in the main "
+            f"decision path. Use for research, comparison, and diagnosis only.\n"
+            f"Use get_rl_model_status for full list and get_rl_backtest_report for details.\n"
         )
     except Exception:
         return ""

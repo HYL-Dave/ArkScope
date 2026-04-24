@@ -19,13 +19,20 @@ from typing import Any, Dict
 logger = logging.getLogger(__name__)
 
 _DISABLED_MSG = (
-    "RL Pipeline is not enabled. No trained models are available yet.\n\n"
-    "To enable:\n"
-    "1. Train a model: python training/train_ppo_llm.py\n"
-    "2. Set rl_pipeline.enabled: true in config/user_profile.yaml\n\n"
-    "The RL Pipeline will provide daily-frequency trading signals based on "
-    "PPO/CPPO reinforcement learning models trained on historical price data "
-    "and LLM sentiment scores."
+    "RL Pipeline is currently disabled and should be treated as EXPERIMENTAL.\n\n"
+    "Status: the existing production-trained checkpoints (trained_models/ppo_sb3_*)"
+    " have been diagnosed with policy collapse — deterministic actions are nearly"
+    " state-invariant across dates (see scripts/rl_policy_sensitivity_probe.py and"
+    " scripts/rl_ensemble_scan.py). A corrective training run with VecNormalize"
+    " observation alignment is in progress; until it is validated end-to-end,"
+    " RL tools must NOT be used to generate investment recommendations in the"
+    " main decision path.\n\n"
+    "The tools remain registered so the agent can inspect model metadata /"
+    " backtest reports for research and diagnosis, but any numerical output"
+    " should carry an experimental label when surfaced to the user.\n\n"
+    "To re-enable after the corrective run passes validation:\n"
+    "1. Train a model: python training/train_ppo_sb3.py --vecnormalize-obs ...\n"
+    "2. Set rl_pipeline.enabled: true in config/user_profile.yaml"
 )
 
 
@@ -132,20 +139,27 @@ def get_rl_prediction(dal: Any, ticker: str, model_id: str = "latest") -> str:
                 "available_models": [m.model_id for m in registry.list_models()],
             })
 
-        # Phase 1c: return model info + placeholder for actual inference
-        # Actual inference (load .pth, construct state, forward pass) will be
-        # implemented in Phase 1b after training enhancement is complete.
+        # Inference wiring exists (src.rl.inference.predict_from_frame), but
+        # the production models have been diagnosed with policy collapse:
+        # deterministic actions are near state-invariant across dates. Until
+        # the VecNormalize corrective run is validated, this tool surfaces
+        # metadata only and labels any prediction as experimental.
         return json.dumps({
-            "status": "model_found",
+            "status": "experimental_metadata_only",
             "model_id": model.model_id,
             "algorithm": model.algorithm,
             "ticker": ticker.upper(),
             "note": (
-                "Inference not yet implemented. This tool currently confirms "
-                "model availability. Full inference (state construction → "
-                "forward pass → action interpretation) will be added in "
-                "Phase 1b after training enhancement is complete."
+                "EXPERIMENTAL: the existing production PPO checkpoints suffer "
+                "from policy collapse (see scripts/rl_policy_sensitivity_probe.py "
+                "and scripts/rl_ensemble_scan.py). Deterministic actions are "
+                "near state-invariant, so inference output is not actionable "
+                "and must not be surfaced as a trading recommendation. "
+                "A corrective training run with VecNormalize observation "
+                "alignment is in progress; until it is validated end-to-end, "
+                "this tool returns metadata only."
             ),
+            "experimental": True,
             "model_info": {
                 "feature_set": model.feature_set,
                 "stock_dim": model.stock_dim,
