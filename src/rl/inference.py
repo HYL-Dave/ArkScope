@@ -109,6 +109,7 @@ def load_model(model_dir: Path) -> InferenceArtifacts:
             low=-1.0, high=1.0, shape=(schema.stock_dim,)
         ),
         "_last_obs": None,
+        "_last_original_obs": None,
         "_last_episode_starts": None,
         "learning_rate": 0.0,
         "lr_schedule": lambda _: 0.0,
