@@ -36,8 +36,15 @@ echo "[vlite] Python: $PYTHON"
 echo "[vlite] 5 epochs × 20000 steps = 100k timesteps, full-batch, seed=42"
 
 LOG_STD_INIT="${LOG_STD_INIT:-0.0}"
+VECNORMALIZE_OBS="${VECNORMALIZE_OBS:-0}"
 
 echo "[vlite] log_std_init=$LOG_STD_INIT (initial std ≈ $(python -c "import math; print(f'{math.exp($LOG_STD_INIT):.4f}')"))"
+echo "[vlite] vecnormalize_obs=$VECNORMALIZE_OBS"
+
+EXTRA_ARGS=()
+if [[ "$VECNORMALIZE_OBS" == "1" ]]; then
+  EXTRA_ARGS+=(--vecnormalize-obs)
+fi
 
 "$PYTHON" training/train_ppo_sb3.py \
   --data "$DATA" \
@@ -50,4 +57,5 @@ echo "[vlite] log_std_init=$LOG_STD_INIT (initial std ≈ $(python -c "import ma
   --target-kl 0.35 \
   --sentiment-scale strong \
   --log-std-init "$LOG_STD_INIT" \
-  --telemetry
+  --telemetry \
+  "${EXTRA_ARGS[@]}"

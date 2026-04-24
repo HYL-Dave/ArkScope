@@ -161,9 +161,22 @@ def main() -> int:
     step_rewards = []
     actions_log = []
 
+    # If the model was trained with VecNormalize, pull its ObsNormalizer so
+    # the trained-mode replay sees the same normalized observations as the
+    # training loop did. Constant mode already went through predict_from_frame
+    # which applies normalization internally; zero mode doesn't need obs.
+    obs_normalizer = None
+    if args.mode == "trained" and trained_model is not None:
+        obs_normalizer = trained_model.obs_normalizer
+
     while True:
         if args.mode == "trained":
-            action, _state = trained_model.model.predict(obs, deterministic=True)
+            obs_for_policy = (
+                obs_normalizer.normalize(obs) if obs_normalizer is not None else obs
+            )
+            action, _state = trained_model.model.predict(
+                obs_for_policy, deterministic=True
+            )
             action = np.asarray(action, dtype=float).reshape(-1)
         elif args.mode == "constant":
             action = constant_vec

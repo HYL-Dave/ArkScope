@@ -38,7 +38,7 @@ import torch.nn.functional as F
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
 from training.config import (
     INDICATORS,
@@ -260,6 +260,13 @@ Hyperparameter mapping (SpinningUp → SB3):
              "(std=1.0) matches SB3/SpinningUp convention. For collapse "
              "diagnosis set to e.g. -2.0 so initial std ≈ 0.135.",
     )
+    parser.add_argument(
+        "--vecnormalize-obs", action="store_true",
+        help="Wrap env in VecNormalize(norm_obs=True, norm_reward=False, "
+             "clip_obs=10.0). Running stats persisted to "
+             "model_dir/vecnormalize.pkl; inference/replay tools load the "
+             "same stats to match training normalization.",
+    )
     args = parser.parse_args()
 
     if args.telemetry and args.n_envs != 1:
@@ -314,6 +321,17 @@ Hyperparameter mapping (SpinningUp → SB3):
     else:
         env = DummyVecEnv([env_fn])
         effective_steps = args.steps
+
+    if args.vecnormalize_obs:
+        env = VecNormalize(
+            env,
+            norm_obs=True,
+            norm_reward=False,
+            clip_obs=10.0,
+            gamma=args.gamma,
+            epsilon=1e-8,
+        )
+        print(f"  Obs normalization: VecNormalize(norm_obs=True, clip_obs=10.0)")
 
     print(f"  Model ID: {model_id}")
     print(f"  Model dir: {model_dir}")
@@ -394,6 +412,20 @@ Hyperparameter mapping (SpinningUp → SB3):
     sb3_path = os.path.join(model_dir, "model_sb3.zip")
     model.save(sb3_path)
 
+    # Save VecNormalize running stats (obs mean/var) so inference / replay /
+    # diagnostics can normalize in exactly the same way. Only written when
+    # env was wrapped in VecNormalize.
+    vecnorm_path = None
+    # Walk wrappers to find VecNormalize (DummyVecEnv wraps the inner vec env
+    # and we may have wrapped further with VecNormalize on top).
+    _probe_env = env
+    while _probe_env is not None and not isinstance(_probe_env, VecNormalize):
+        _probe_env = getattr(_probe_env, "venv", None)
+    if isinstance(_probe_env, VecNormalize):
+        vecnorm_path = os.path.join(model_dir, "vecnormalize.pkl")
+        _probe_env.save(vecnorm_path)
+        print(f"  VecNormalize stats saved: {vecnorm_path}")
+
     # Also save PyTorch state_dict (for backtest.py compatibility)
     # Extract the policy network weights
     state_dict = model.policy.state_dict()
@@ -440,6 +472,25 @@ Hyperparameter mapping (SpinningUp → SB3):
         tech_indicator_list=list(csv_indicators),
         sentiment_scale=args.sentiment_scale,
     )
+
+    # Augment metadata with obs_normalization block so inference / replay
+    # tooling can detect and load matching stats without guessing.
+    if vecnorm_path:
+        import json as _json
+        meta_path = os.path.join(model_dir, "metadata.json")
+        with open(meta_path) as _f:
+            _meta = _json.load(_f)
+        _meta["obs_normalization"] = {
+            "type": "vecnormalize",
+            "norm_obs": True,
+            "norm_reward": False,
+            "clip_obs": 10.0,
+            "epsilon": 1e-8,
+            "stats_file": "vecnormalize.pkl",
+        }
+        with open(meta_path, "w") as _f:
+            _json.dump(_meta, _f, indent=2, default=str)
+        print(f"  Metadata obs_normalization block added")
 
     print(f"\n  SB3 model: {sb3_path}")
     print(f"  State dict: {pth_path}")

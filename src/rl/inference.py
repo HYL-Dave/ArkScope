@@ -19,7 +19,7 @@ decode_action() plus realised-return backfill.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
@@ -34,13 +34,35 @@ from training.data_prep.state_builder import (
 
 
 @dataclass
+class ObsNormalizer:
+    """Applies VecNormalize-equivalent per-element observation normalization.
+
+    Reproduces SB3 ``VecNormalize._normalize_obs`` math manually so inference
+    and replay tools can skip the VecEnv wrapper. Stats are loaded from
+    ``model_dir/vecnormalize.pkl`` which is written during training when
+    ``--vecnormalize-obs`` is enabled.
+    """
+
+    mean: np.ndarray
+    var: np.ndarray
+    clip_obs: float
+    epsilon: float = 1e-8
+
+    def normalize(self, obs: np.ndarray) -> np.ndarray:
+        obs = np.asarray(obs, dtype=float)
+        out = (obs - self.mean) / np.sqrt(self.var + self.epsilon)
+        return np.clip(out, -self.clip_obs, self.clip_obs)
+
+
+@dataclass
 class InferenceArtifacts:
-    """What load_model() returns — model + schema + raw metadata."""
+    """What load_model() returns — model + schema + raw metadata + optional normalizer."""
 
     model: Any  # stable_baselines3.PPO (avoid import cost unless used)
     schema: StateSchema
     metadata: dict
     model_dir: Path
+    obs_normalizer: Optional[ObsNormalizer] = None
 
 
 def load_model(model_dir: Path) -> InferenceArtifacts:
@@ -96,7 +118,10 @@ def load_model(model_dir: Path) -> InferenceArtifacts:
         str(zip_path), device="cpu", custom_objects=custom_objects
     )
 
+    obs_normalizer = _try_load_obs_normalizer(model_dir, metadata)
+
     return InferenceArtifacts(
+        obs_normalizer=obs_normalizer,
         model=model,
         schema=schema,
         metadata=metadata,
@@ -138,6 +163,11 @@ def predict_from_frame(
             f"Observation shape {obs.shape} does not match "
             f"schema.state_dim {artifacts.schema.state_dim}"
         )
+    # If the model was trained with VecNormalize, apply the same per-element
+    # normalization using the stats loaded from vecnormalize.pkl. Without this,
+    # a normalized policy would see raw-scale features and produce garbage.
+    if artifacts.obs_normalizer is not None:
+        obs = artifacts.obs_normalizer.normalize(obs)
     action, _state = artifacts.model.predict(obs, deterministic=deterministic)
     action = np.asarray(action, dtype=float).reshape(-1)
     if action.shape != (artifacts.schema.stock_dim,):
@@ -217,3 +247,72 @@ def decode_action(
         },
         "signals": {t: round(a, 4) for t, a in scored},
     }
+
+def _try_load_obs_normalizer(
+    model_dir: Path, metadata: dict
+) -> Optional[ObsNormalizer]:
+    """Load VecNormalize stats from model_dir/vecnormalize.pkl if present.
+
+    The file is a serialized VecNormalize wrapper written by SB3's
+    ``VecNormalize.save()`` during training. For pure inference we extract
+    the running stats (obs_rms.mean, obs_rms.var) + clip_obs + epsilon and
+    apply them manually — no VecEnv wrapper needed on our side.
+
+    Returns None when the file is absent (model was trained without
+    ``--vecnormalize-obs``) or when loading fails (e.g. cross-environment
+    version skew); inference then runs on raw observations.
+    """
+    stats_file = "vecnormalize.pkl"
+    obs_norm_meta = metadata.get("obs_normalization") or {}
+    if obs_norm_meta:
+        stats_file = obs_norm_meta.get("stats_file", stats_file)
+    path = model_dir / stats_file
+    if not path.exists():
+        return None
+    try:
+        import gymnasium as gym
+        from gymnasium import spaces
+        from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+
+        # VecNormalize.load requires a venv; construct a minimal gymnasium
+        # env whose observation / action spaces match the saved wrapper.
+        # The dummy env is never actually stepped by inference.
+        schema = schema_from_metadata(metadata)
+
+        class _StubEnv(gym.Env):
+            def __init__(self):
+                super().__init__()
+                self.observation_space = spaces.Box(
+                    low=-np.inf, high=np.inf,
+                    shape=(schema.state_dim,), dtype=np.float32,
+                )
+                self.action_space = spaces.Box(
+                    low=-1.0, high=1.0,
+                    shape=(schema.stock_dim,), dtype=np.float32,
+                )
+
+            def reset(self, *, seed=None, options=None):
+                return np.zeros(schema.state_dim, dtype=np.float32), {}
+
+            def step(self, _action):
+                return (
+                    np.zeros(schema.state_dim, dtype=np.float32),
+                    0.0, True, False, {},
+                )
+
+        dummy = DummyVecEnv([lambda: _StubEnv()])
+        vec_norm = VecNormalize.load(str(path), dummy)
+        return ObsNormalizer(
+            mean=np.asarray(vec_norm.obs_rms.mean, dtype=float),
+            var=np.asarray(vec_norm.obs_rms.var, dtype=float),
+            clip_obs=float(getattr(vec_norm, "clip_obs", 10.0)),
+            epsilon=float(getattr(vec_norm, "epsilon", 1e-8)),
+        )
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to load obs normalizer from %s: %s; falling back to raw obs",
+            path, exc,
+        )
+        return None
