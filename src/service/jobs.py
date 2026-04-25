@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
@@ -10,6 +11,9 @@ from typing import Any, Dict, List, Literal, Optional
 from src.agents.config import AgentConfig, get_agent_config
 from src.analysis import AnalysisRequest, run_analysis_request, save_analysis_run
 from src.monitor.engine import MonitorEngine
+from src.service.job_runs_store import JobRunsStore
+
+logger = logging.getLogger(__name__)
 
 JobSource = Literal["api", "chrome_extension"]
 JobState = Literal["never_run", "running", "succeeded", "failed"]
@@ -156,13 +160,22 @@ def list_jobs_status(
     *,
     config: Optional[AgentConfig] = None,
 ) -> List[Dict[str, Any]]:
-    """Return job metadata plus last known process-local execution state."""
+    """Return job metadata merged with last known execution state.
+
+    Last-state preference: DB-backed ``job_runs`` (sql/011) when available,
+    falling back to the process-local ``_JOB_STATE`` cache when the store
+    cannot be reached. This keeps the UI honest after process restarts and
+    when other processes (Chrome extension, scheduler) record runs.
+    """
     cfg = config or get_agent_config()
     watchlist_count = len(_watchlist_tickers(dal))
+    store = JobRunsStore(dal)
+    db_latest = store.latest_runs_by_name() if store.is_available() else {}
+
     jobs: List[Dict[str, Any]] = []
     for name, definition in _JOB_DEFINITIONS.items():
-        state = _JOB_STATE[name]
         reason = _availability_reason(definition, cfg)
+        last = _resolve_last_state(name, db_latest)
         jobs.append(
             {
                 "name": definition.name,
@@ -173,14 +186,38 @@ def list_jobs_status(
                 "availability_reason": reason,
                 "default_params": dict(definition.default_params),
                 "watchlist_ticker_count": watchlist_count,
-                "last_status": state.last_status,
-                "last_started_at": state.last_started_at,
-                "last_finished_at": state.last_finished_at,
-                "last_message": state.last_message,
-                "last_result": state.last_result,
+                "last_status": last["last_status"],
+                "last_started_at": last["last_started_at"],
+                "last_finished_at": last["last_finished_at"],
+                "last_message": last["last_message"],
+                "last_result": last["last_result"],
             }
         )
     return jobs
+
+
+def _resolve_last_state(
+    job_name: str,
+    db_latest: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Pick DB-backed last state if present, else fall back to process-local."""
+    db_row = db_latest.get(job_name)
+    if db_row:
+        return {
+            "last_status": db_row["status"],
+            "last_started_at": db_row.get("started_at"),
+            "last_finished_at": db_row.get("finished_at"),
+            "last_message": db_row.get("message") or db_row.get("error"),
+            "last_result": db_row.get("result"),
+        }
+    state = _JOB_STATE[job_name]
+    return {
+        "last_status": state.last_status,
+        "last_started_at": state.last_started_at,
+        "last_finished_at": state.last_finished_at,
+        "last_message": state.last_message,
+        "last_result": state.last_result,
+    }
 
 
 def _mark_running(job_name: str) -> str:
@@ -331,8 +368,9 @@ def run_job(
     dal: Any,
     params: Optional[Dict[str, Any]] = None,
     config: Optional[AgentConfig] = None,
+    trigger_source: str = "api",
 ) -> JobRunResult:
-    """Execute one backend job and update process-local execution state."""
+    """Execute one backend job, persist a job_runs row, update process-local state."""
     job = _get_job_definition(name)
     cfg = config or get_agent_config()
     unavailable_reason = _availability_reason(job, cfg)
@@ -341,10 +379,15 @@ def run_job(
     if not job.runnable_via_api:
         raise JobNotRunnableError(unavailable_reason or "Job is not backend-runnable.")
 
-    started_at = _mark_running(job.name)
     payload = dict(job.default_params)
     if params:
         payload.update(params)
+
+    started_at = _mark_running(job.name)
+    store = JobRunsStore(dal)
+    run_id = store.create_run(
+        job.name, trigger_source=trigger_source, payload=payload,
+    )
 
     try:
         if job.name == "analysis_watchlist_batch":
@@ -355,7 +398,7 @@ def run_job(
             raise UnknownJobError(job.name)
 
         finished_at = _utcnow_iso()
-        message = "Job completed successfully."
+        message = _summarize_result(job.name, result)
         _mark_finished(
             job.name,
             status="succeeded",
@@ -363,6 +406,13 @@ def run_job(
             result=result,
             finished_at=finished_at,
         )
+        if run_id is not None:
+            store.finish_run(
+                run_id,
+                status="succeeded",
+                message=message,
+                result=result,
+            )
         return JobRunResult(
             name=job.name,
             status="succeeded",
@@ -373,12 +423,45 @@ def run_job(
         )
     except Exception as exc:
         finished_at = _utcnow_iso()
-        result = {"error": str(exc)}
+        error_str = str(exc)
+        result = {"error": error_str}
         _mark_finished(
             job.name,
             status="failed",
-            message=str(exc),
+            message=error_str,
             result=result,
             finished_at=finished_at,
         )
+        if run_id is not None:
+            store.finish_run(
+                run_id,
+                status="failed",
+                message=error_str,
+                error=error_str,
+                result=result,
+            )
         raise
+
+
+def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
+    """Compose a short success message suitable for ``last_message`` UI fields.
+
+    Per-job summary heuristics; falls back to a generic line when the
+    result shape is unexpected.
+    """
+    if not isinstance(result, dict):
+        return "Job completed successfully."
+    if job_name == "analysis_watchlist_batch":
+        ok = result.get("success_count")
+        total = result.get("processed_count")
+        persisted = result.get("persisted_count")
+        if ok is not None and total is not None:
+            base = f"Analysis pipeline ok={ok}/{total}"
+            if persisted:
+                base += f", {persisted} report(s) persisted"
+            return base
+    if job_name == "monitor_watchlist_scan":
+        alerts = result.get("alert_count")
+        if alerts is not None:
+            return f"Monitor scan emitted {alerts} alert(s)"
+    return "Job completed successfully."

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_dal
+from src.service.job_runs_store import JobRunsStore
 from src.service.jobs import (
     JobDisabledError,
     JobNotRunnableError,
@@ -65,6 +66,33 @@ class JobRunResponse(BaseModel):
     result: Dict[str, Any]
 
 
+class JobRunRow(BaseModel):
+    """One row from GET /jobs/history."""
+
+    id: int
+    job_name: str
+    status: Literal["running", "succeeded", "failed"]
+    trigger_source: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    started_at: str
+    finished_at: Optional[str] = None
+    duration_ms: Optional[int] = None
+    created_at: str
+    updated_at: str
+
+
+class JobsHistoryResponse(BaseModel):
+    """Response body for GET /jobs/history."""
+
+    count: int
+    limit: int
+    offset: int
+    runs: List[JobRunRow]
+
+
 @router.get("/status", response_model=JobsStatusResponse)
 def jobs_status(dal=Depends(get_dal)):
     """List available jobs plus last known process-local execution state."""
@@ -81,7 +109,7 @@ def run_named_job(
     """Execute one backend-runnable job inline and return the summary."""
     params = request.model_dump(exclude_none=True) if request is not None else {}
     try:
-        result = run_job(job_name, dal=dal, params=params)
+        result = run_job(job_name, dal=dal, params=params, trigger_source="api")
     except UnknownJobError:
         raise HTTPException(status_code=404, detail=f"Unknown job: {job_name}")
     except JobDisabledError as exc:
@@ -97,4 +125,26 @@ def run_named_job(
         started_at=result.started_at,
         finished_at=result.finished_at,
         result=result.result,
+    )
+
+
+@router.get("/history", response_model=JobsHistoryResponse)
+def jobs_history(
+    name: Optional[str] = Query(default=None, description="Filter by job_name"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    dal=Depends(get_dal),
+):
+    """Paginated history of recorded job runs (newest first).
+
+    Reads from the ``job_runs`` table (sql/011). When DB is unavailable
+    or the DAL is on FileBackend, returns an empty list with count=0.
+    """
+    store = JobRunsStore(dal)
+    rows = store.list_runs(job_name=name, limit=limit, offset=offset)
+    return JobsHistoryResponse(
+        count=len(rows),
+        limit=limit,
+        offset=offset,
+        runs=rows,
     )

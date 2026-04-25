@@ -166,7 +166,7 @@ class TestJobsRoutes:
     def test_run_named_job_maps_external_job_to_409(self, monkeypatch):
         monkeypatch.setattr(
             "src.api.routes.jobs.run_job",
-            lambda job_name, *, dal, params=None: (_ for _ in ()).throw(
+            lambda job_name, *, dal, params=None, trigger_source="api": (_ for _ in ()).throw(
                 JobNotRunnableError("extension-managed")
             ),
         )
