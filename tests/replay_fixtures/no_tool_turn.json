@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-04-25T10:00:00+00:00",
+  "entrypoint": "test",
+  "provider": "anthropic",
+  "model": "claude-opus-4-7",
+  "session_id": "fixture_no_tool",
+  "turn_id": 1,
+  "system_prompt_hash": "0000000000000000",
+  "user_input": "What is 2+2? Answer in one word.",
+  "tools_available": [
+    "get_ticker_news",
+    "get_news_brief"
+  ],
+  "tool_calls": [],
+  "final_answer": "Four.",
+  "final_answer_hash": "0000000000000000",
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 5
+  },
+  "notes": "Hand-crafted fixture: simple Q&A, model should answer directly without tools."
+}
