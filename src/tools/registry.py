@@ -421,6 +421,7 @@ class ToolRegistry:
         from .signal_tools import (
             detect_anomalies,
             detect_event_chains,
+            get_signal_factors,
             synthesize_signal,
         )
 
@@ -460,6 +461,30 @@ class ToolRegistry:
                               required=False),
                 ToolParameter("as_of_date", "string",
                               "Anchor date YYYY-MM-DD (default: latest in data)",
+                              required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_signal_factors",
+            description=(
+                "Return the multi-factor breakdown that backs synthesize_signal: "
+                "per-factor impact / weight / contribution plus a data_quality "
+                "block (news_count, scored_news_count, missing_factors, errors). "
+                "Recommendation only — not a price prediction. SECTOR_MOMENTUM is "
+                "shared across same-sector tickers, so its contribution is not "
+                "ticker-specific conviction."
+            ),
+            function=get_signal_factors,
+            category="signals",
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("days", "integer", "Lookback period in days", required=False, default=30),
+                ToolParameter("as_of_date", "string",
+                              "Anchor date YYYY-MM-DD (default: ticker's latest news date)",
+                              required=False),
+                ToolParameter("strategy", "string",
+                              "Strategy name for custom weights (from user_profile.yaml)",
                               required=False),
             ],
         ))

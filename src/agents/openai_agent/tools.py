@@ -77,6 +77,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
+        get_signal_factors,
         synthesize_signal,
     )
     from src.tools.analysis_tools import (
@@ -429,6 +430,34 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             dal, ticker, days=days, strategy=strategy, as_of_date=as_of_date,
         )
         return _serialize_result(result, "synthesize_signal")
+
+    @function_tool
+    def tool_get_signal_factors(
+        ticker: str,
+        days: int = 30,
+        as_of_date: Optional[str] = None,
+        strategy: Optional[str] = None,
+    ) -> str:
+        """Return per-factor breakdown for a multi-factor signal recommendation.
+
+        Companion to synthesize_signal that exposes raw impact / weight /
+        contribution per factor (SECTOR_MOMENTUM, EVENT_CHAIN,
+        SENTIMENT_ANOMALY, VOLUME_SPIKE, EXTREME_SENTIMENT) plus a
+        data_quality block with news_count, scored_news_count,
+        missing_factors, errors. This is a recommendation breakdown,
+        NOT a price prediction. SECTOR_MOMENTUM is sector-shared, not
+        ticker-specific conviction.
+
+        Args:
+            ticker: Stock ticker symbol
+            days: Lookback period in days (default: 30)
+            as_of_date: Anchor date YYYY-MM-DD (default: ticker's latest news date)
+            strategy: Optional strategy name for custom weights
+        """
+        result = get_signal_factors(
+            dal, ticker, days=days, as_of_date=as_of_date, strategy=strategy,
+        )
+        return _serialize_result(result, "get_signal_factors")
 
     # ================================================================
     # Analysis Tools
@@ -1050,6 +1079,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_detect_anomalies,
         tool_detect_event_chains,
         tool_synthesize_signal,
+        tool_get_signal_factors,
         tool_get_fundamentals_analysis,
         tool_get_detailed_financials,
         tool_get_peer_comparison,

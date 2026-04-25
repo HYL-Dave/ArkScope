@@ -440,6 +440,39 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": ["ticker"]
             }
         },
+        {
+            "name": "get_signal_factors",
+            "description": (
+                "Return the multi-factor breakdown behind synthesize_signal "
+                "(SECTOR_MOMENTUM / EVENT_CHAIN / SENTIMENT_ANOMALY / "
+                "VOLUME_SPIKE / EXTREME_SENTIMENT) with raw impact / weight / "
+                "contribution plus data_quality (news_count, scored_news_count, "
+                "missing_factors, errors). Recommendation, not prediction. "
+                "SECTOR_MOMENTUM is sector-shared, not ticker-specific."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 30)"
+                    },
+                    "as_of_date": {
+                        "type": "string",
+                        "description": "Anchor date YYYY-MM-DD (default: ticker's latest news date)"
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "description": "Strategy name for custom weights (from user_profile.yaml)"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
         # Analysis Tools
         {
             "name": "get_fundamentals_analysis",
@@ -1248,6 +1281,7 @@ def execute_tool(
     from src.tools.signal_tools import (
         detect_anomalies,
         detect_event_chains,
+        get_signal_factors,
         synthesize_signal,
     )
     from src.tools.analysis_tools import (
@@ -1375,6 +1409,13 @@ def execute_tool(
             days=tool_input.get("days", 30),
             strategy=tool_input.get("strategy"),
             as_of_date=tool_input.get("as_of_date"),
+        ),
+        "get_signal_factors": lambda: get_signal_factors(
+            dal,
+            tool_input["ticker"],
+            days=tool_input.get("days", 30),
+            as_of_date=tool_input.get("as_of_date"),
+            strategy=tool_input.get("strategy"),
         ),
         "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
             dal,
