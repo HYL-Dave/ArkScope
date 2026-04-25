@@ -38,7 +38,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, Iterable, List, Optional, Set
 
-RULE_SET_VERSION = "v1.0"
+RULE_SET_VERSION = "v1.1"
+# v1.1 (2026-04-25): word-boundary hedge matching (no "mighty"→"might"
+#                   false positive), "May" as month name skipped when
+#                   followed by a date, dot-suffix tickers (BRK.B / BF.A).
+# v1.0 (2026-04-25): initial release.
 
 
 # ---------------------------------------------------------------------------
@@ -100,12 +104,28 @@ KEYWORD_BUCKETS: Dict[str, List[str]] = {
 }
 
 # Hedging words trigger needs_verification when paired with a concrete claim.
-HEDGE_WORDS: FrozenSet[str] = frozenset({
+# ASCII hedges are matched as whole words (regex below); CJK hedges are
+# substring-matched since they have no word boundaries in Chinese text.
+HEDGE_WORDS_ASCII: FrozenSet[str] = frozenset({
     "rumor", "rumored", "hearing", "heard",
-    "seems", "seemingly", "might", "may", "could",
+    "seems", "seemingly", "might", "could",
     "maybe", "possibly", "supposedly", "allegedly",
-    "据说", "听说",
 })
+HEDGE_WORDS_CJK: FrozenSet[str] = frozenset({"据说", "听说"})
+
+_HEDGE_ASCII_RE = re.compile(
+    r"\b(" + "|".join(sorted(HEDGE_WORDS_ASCII, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE,
+)
+
+# "may" is special: HEDGE_WORDS would clash with the month name in
+# earnings-date contexts (e.g. "earnings May 5"). Match "may" as a hedge
+# only when it does NOT immediately precede a day-of-month token. Tested
+# in tests/test_sa_comment_signals.py.
+_MAY_HEDGE_RE = re.compile(
+    r"\bmay\b(?!\s+(?:\d{1,2}|first|second|third|fourth|\d{1,2}(?:st|nd|rd|th)))",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -114,9 +134,14 @@ HEDGE_WORDS: FrozenSet[str] = frozenset({
 
 # Three forms — explicit ones (dollar / paren) accept single-char tickers.
 # Bare uppercase requires >= 2 chars.
-_TICKER_DOLLAR_RE = re.compile(r"\$([A-Z]{1,5})\b")
-_TICKER_PAREN_RE = re.compile(r"\(([A-Z]{1,5})\)")
-_TICKER_BARE_RE = re.compile(r"\b([A-Z]{2,5})\b")
+# Dot tickers (BRK.B, BF.A) are supported by allowing an optional ".X" suffix
+# in all three forms.
+_TICKER_BODY = r"[A-Z]{1,5}(?:\.[A-Z]{1,2})?"
+_TICKER_DOLLAR_RE = re.compile(r"\$(" + _TICKER_BODY + r")\b")
+_TICKER_PAREN_RE = re.compile(r"\((" + _TICKER_BODY + r")\)")
+# Bare match still requires >= 2 alpha chars in the head to avoid matching
+# pronoun-like single letters; dot suffix optional.
+_TICKER_BARE_RE = re.compile(r"\b([A-Z]{2,5}(?:\.[A-Z]{1,2})?)\b")
 
 _URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
@@ -199,7 +224,7 @@ class CommentSignalExtractor:
         )
 
         has_claim = bool(ticker_mentions) or bool(keyword_hits)
-        has_hedge = any(h in text_lower for h in HEDGE_WORDS)
+        has_hedge = self._has_hedge_word(comment_text, text_lower)
 
         return CommentSignals(
             ticker_mentions=ticker_mentions,
@@ -257,6 +282,27 @@ class CommentSignalExtractor:
             if matched:
                 out[bucket] = matched
         return out
+
+    @staticmethod
+    def _has_hedge_word(text: str, text_lower: str) -> bool:
+        """Word-boundary aware hedge detection.
+
+        ASCII hedges are matched via regex word boundaries (so "may" matches
+        but "mayor" doesn't). The bare "may" is further filtered: it counts
+        as a hedge only when not followed by a day-of-month token, since
+        "earnings May 5" should not flag the comment as needs_verification.
+        CJK hedges are substring-matched — Chinese has no word boundaries.
+        """
+        # ASCII hedges (excluding "may" which has its own rule)
+        if _HEDGE_ASCII_RE.search(text):
+            return True
+        # "may" only when not followed by a date-ish token
+        if _MAY_HEDGE_RE.search(text):
+            return True
+        # CJK
+        if any(h in text_lower for h in HEDGE_WORDS_CJK):
+            return True
+        return False
 
     @staticmethod
     def _score(

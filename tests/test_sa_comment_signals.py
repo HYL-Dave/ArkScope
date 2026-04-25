@@ -266,6 +266,163 @@ def test_rule_set_version_is_threaded_through():
     assert sig.rule_set_version == "v1.1-test"
 
 
-def test_default_rule_set_version_is_v1():
+def test_default_rule_set_version_is_current():
+    from src.sa.comment_signals import RULE_SET_VERSION
     sig = _ext().extract("NVDA")
-    assert sig.rule_set_version == "v1.0"
+    assert sig.rule_set_version == RULE_SET_VERSION
+    assert sig.rule_set_version.startswith("v1.")
+
+
+# ---------------------------------------------------------------------------
+# Dot-suffix tickers (BRK.B, BF.A, etc.)
+# ---------------------------------------------------------------------------
+
+
+def test_dot_ticker_dollar_form():
+    extractor = CommentSignalExtractor(universe=("BRK.B", "NVDA"))
+    sig = extractor.extract("$BRK.B earnings beat consensus")
+    assert "BRK.B" in sig.ticker_mentions
+    assert "BRK" not in sig.candidate_mentions  # must not split on the dot
+
+
+def test_dot_ticker_paren_form():
+    extractor = CommentSignalExtractor(universe=("BRK.B",))
+    sig = extractor.extract("Berkshire (BRK.B) outperformed")
+    assert sig.ticker_mentions == ["BRK.B"]
+
+
+def test_dot_ticker_bare_form():
+    extractor = CommentSignalExtractor(universe=("BRK.B", "BF.A"))
+    sig = extractor.extract("BRK.B and BF.A both quality compounders")
+    assert "BRK.B" in sig.ticker_mentions
+    assert "BF.A" in sig.ticker_mentions
+
+
+def test_dot_ticker_off_universe_is_candidate():
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("Watching $XYZ.A")
+    assert "XYZ.A" in sig.candidate_mentions
+    assert sig.ticker_mentions == []
+
+
+# ---------------------------------------------------------------------------
+# "May" hedge handling
+# ---------------------------------------------------------------------------
+
+
+def test_may_as_month_does_not_trigger_verification():
+    extractor = CommentSignalExtractor(universe=("LITE",))
+    sig = extractor.extract("LITE earnings May 5 — buying ahead")
+    # "May 5" is a date, should not be a hedge
+    assert sig.needs_verification is False
+    assert "LITE" in sig.ticker_mentions
+
+
+def test_may_with_ordinal_date_not_hedge():
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("NVDA report May 12th")
+    assert sig.needs_verification is False
+
+
+def test_may_as_modal_verb_is_hedge():
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("NVDA may beat earnings this quarter")
+    # "may" not followed by a date → modal verb hedge
+    assert sig.needs_verification is True
+
+
+def test_hedge_substring_match_does_not_fire_on_unrelated_word():
+    """'mayor' must NOT match the 'may' hedge."""
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("NVDA earnings — the mayor of nowhere")
+    assert sig.needs_verification is False
+
+
+def test_hedge_word_boundary_for_might():
+    """Verify regex respects word boundaries for ASCII hedges."""
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("NVDA might beat next quarter")
+    assert sig.needs_verification is True
+
+    # 'mighty' must not match 'might'
+    sig2 = extractor.extract("NVDA had a mighty rally")
+    assert sig2.needs_verification is False
+
+
+def test_chinese_hedges_still_work():
+    """Chinese hedges have no word boundary, substring match retained."""
+    extractor = CommentSignalExtractor(universe=("NVDA",))
+    sig = extractor.extract("据说 NVDA 下季度 earnings 会超预期")
+    assert sig.needs_verification is True
+
+
+# ---------------------------------------------------------------------------
+# Backfill: max_extracted enforced inside the row loop
+# ---------------------------------------------------------------------------
+
+
+def test_backfill_max_extracted_caps_inside_batch():
+    """max_extracted=3 with batch_size=10 must stop at row 3, not row 10."""
+    from unittest.mock import MagicMock, patch
+    from src.sa.comment_signal_backfill import run_backfill
+
+    # Fake DAL with DatabaseBackend-shaped backend
+    dal = MagicMock()
+    backend = MagicMock()
+    conn = MagicMock()
+    backend._get_conn.return_value = conn
+    dal._backend = backend
+    # No watchlist / alpha picks
+    dal.get_watchlist.return_value = MagicMock(tickers=[])
+
+    # Build a stream of fake batch rows (10 per batch, 3 batches available)
+    rows_per_batch = [
+        [
+            (i, f"art-{i}", f"cm-{i}", f"NVDA earnings update #{i}", 0)
+            for i in range(1, 11)
+        ],
+        [
+            (i, f"art-{i}", f"cm-{i}", f"AMD beat #{i}", 0)
+            for i in range(11, 21)
+        ],
+        [],  # exhausted
+    ]
+    cursors = []
+
+    def cursor_factory(**_kwargs):
+        cur = MagicMock()
+        cur.__enter__ = MagicMock(return_value=cur)
+        cur.__exit__ = MagicMock(return_value=False)
+        cursors.append(cur)
+        return cur
+
+    conn.cursor.side_effect = cursor_factory
+
+    # First call: alpha picks SELECT (universe build) → empty
+    # Second call: count pending → 30
+    # Third call: fetch first batch → rows
+    # ... etc. The pattern is loose; we control fetchone/fetchall via side_effect.
+    fetchone_results = iter([
+        (30,),  # count_pending
+    ])
+    fetchall_results = iter([
+        [],            # alpha picks SELECT (universe)
+        rows_per_batch[0],
+        rows_per_batch[1],
+        rows_per_batch[2],
+    ])
+
+    def make_cursor():
+        cur = MagicMock()
+        cur.__enter__ = MagicMock(return_value=cur)
+        cur.__exit__ = MagicMock(return_value=False)
+        cur.fetchone.side_effect = lambda: next(fetchone_results, None)
+        cur.fetchall.side_effect = lambda: next(fetchall_results, [])
+        cur.execute = MagicMock()
+        return cur
+
+    conn.cursor.side_effect = lambda *a, **k: make_cursor()
+
+    result = run_backfill(dal, batch_size=10, max_extracted=3)
+    # Cap must apply inside the batch — only 3 rows extracted, not 10.
+    assert result["extracted_count"] == 3

@@ -577,27 +577,27 @@ class TestToolFunctions:
 # ============================================================
 
 class TestBridgeIntegration:
-    def test_registry_50(self):
-        """Registry should have 50 tools."""
+    def test_registry_count(self):
+        """Registry should have 51 tools after SA Comment Stage 1."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 50
+        assert len(registry.list_all()) == 51
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (1 + 3 SA picks + 2 SA articles)."""
         registry = create_default_registry()
         assert len(registry.list_by_category("portfolio")) == 6
 
-    def test_openai_schema_50(self):
-        """OpenAI schema should have 50 tools."""
+    def test_openai_schema_count(self):
+        """OpenAI schema should match registry count."""
         registry = create_default_registry()
         schema = registry.to_openai_schema()
-        assert len(schema) == 50
+        assert len(schema) == 51
 
-    def test_anthropic_schema_50(self):
-        """Anthropic schema should have 50 tools."""
+    def test_anthropic_schema_count(self):
+        """Anthropic schema should match registry count."""
         registry = create_default_registry()
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 50
+        assert len(schema) == 51
 
     def test_sa_tool_names_in_registry(self):
         """SA tool names should exist in registry."""
@@ -607,12 +607,13 @@ class TestBridgeIntegration:
         assert "get_sa_pick_detail" in names
         assert "refresh_sa_alpha_picks" in names
         assert "get_sa_market_news" in names
+        assert "list_high_value_comments" in names
 
-    def test_anthropic_bridge_51(self):
-        """Anthropic bridge should have 51 schemas (50 registry + delegate_to_subagent)."""
+    def test_anthropic_bridge_count(self):
+        """Anthropic bridge should have registry + delegate_to_subagent schemas."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 51
+        assert len(tools) == 52
 
     def test_openai_bridge_includes_sa_market_news(self):
         """Anthropic bridge includes SA market-news schema."""
@@ -1806,20 +1807,20 @@ class TestCommentDuplicateCleanupPlan:
 
 
 class TestRegistryV3:
-    def test_registry_50(self):
-        """Registry should have 50 tools (47 + 2 SA articles + market news)."""
+    def test_registry_count(self):
+        """Registry should have 51 tools after SA Comment Stage 1."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 50
+        assert len(registry.list_all()) == 51
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (4 + 2 SA articles)."""
         registry = create_default_registry()
         assert len(registry.list_by_category("portfolio")) == 6
 
-    def test_news_category_6(self):
-        """News category should include the SA market-news tool."""
+    def test_news_category_count(self):
+        """News category should include SA market-news + list_high_value_comments."""
         registry = create_default_registry()
-        assert len(registry.list_by_category("news")) == 6
+        assert len(registry.list_by_category("news")) == 7
 
     def test_new_tool_names_in_registry(self):
         """New SA article tool names should exist in registry."""

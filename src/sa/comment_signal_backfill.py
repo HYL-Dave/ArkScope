@@ -129,7 +129,8 @@ def run_backfill(
     sample_high_score = 0.0
     last_id = 0
 
-    while True:
+    cap_reached = False
+    while not cap_reached:
         rows = _fetch_pending_batch(
             conn, last_id=last_id, limit=batch_size,
             rule_set_version=rule_set_version,
@@ -150,11 +151,12 @@ def run_backfill(
             extracted += 1
             sample_high_score = max(sample_high_score, signals.high_value_score)
             last_id = max(last_id, row_id)
+            if max_extracted is not None and extracted >= max_extracted:
+                logger.info("run_backfill: max_extracted=%d reached", max_extracted)
+                cap_reached = True
+                break
 
         batch_count += 1
-        if max_extracted is not None and extracted >= max_extracted:
-            logger.info("run_backfill: max_extracted=%d reached", max_extracted)
-            break
 
     return {
         "extracted_count": extracted,
