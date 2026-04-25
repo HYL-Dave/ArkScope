@@ -254,14 +254,83 @@ function enqueueSaSyncJob(jobName, jobFn) {
       sendProgress("Queued: " + jobName);
     }
     saSyncJobInFlight = true;
+    var startedAt = new Date().toISOString();
+    var capturedResult = null;
+    var capturedError = null;
     try {
-      return await jobFn();
+      capturedResult = await jobFn();
+      return capturedResult;
+    } catch (err) {
+      capturedError = (err && err.message) ? err.message : String(err);
+      throw err;
     } finally {
       saSyncJobInFlight = false;
+      try {
+        recordExtensionJob(jobName, startedAt, new Date().toISOString(), capturedResult, capturedError);
+      } catch (_) {
+        // recording must never break the actual sync flow
+      }
     }
   });
   saSyncJobChain = run.catch(function () {});
   return run;
+}
+
+function slugifyExtensionJobName(name) {
+  var slug = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return "sa_extension:" + (slug || "unnamed");
+}
+
+function classifyExtensionJobOutcome(result, errorText) {
+  if (errorText) {
+    return { status: "failed", error: errorText, message: null };
+  }
+  if (!result || typeof result !== "object") {
+    return { status: "succeeded", error: null, message: null };
+  }
+  if (result.status === "error") {
+    return {
+      status: "failed",
+      error: result.error || "error",
+      message: null,
+    };
+  }
+  if (result.status === "busy" || result.status === "skipped") {
+    return {
+      status: "succeeded",
+      error: null,
+      message: result.status + (result.reason ? ": " + result.reason : ""),
+    };
+  }
+  return { status: "succeeded", error: null, message: null };
+}
+
+function recordExtensionJob(displayName, startedAt, finishedAt, result, errorText) {
+  try {
+    var outcome = classifyExtensionJobOutcome(result, errorText);
+    var payload = { display_name: displayName };
+    var resultPayload = (result && typeof result === "object") ? result : null;
+    var msg = {
+      action: "record_extension_job",
+      job_name: slugifyExtensionJobName(displayName),
+      status: outcome.status,
+      started_at: startedAt,
+      finished_at: finishedAt,
+      message: outcome.message,
+      error: outcome.error,
+      payload: payload,
+      result: resultPayload,
+      trigger_source: "extension",
+    };
+    chrome.runtime.sendNativeMessage(NATIVE_HOST, msg, function () {
+      // Fire-and-forget; native host writes the row best-effort.
+    });
+  } catch (_) {
+    // Recording must never break the actual sync flow.
+  }
 }
 
 function enqueueAutoSaSyncJob(jobKey, jobName, jobFn) {

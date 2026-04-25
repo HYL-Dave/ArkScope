@@ -500,3 +500,239 @@ def test_jobs_history_endpoint_returns_empty_when_unavailable():
         assert data["runs"] == []
     finally:
         app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# record_completed_run (P0.4 commit 2 — extension reports a finished run)
+# ---------------------------------------------------------------------------
+
+
+def test_record_completed_run_inserts_terminal_row():
+    dal, backend = _make_db_dal()
+    conn = MagicMock()
+    backend._get_conn.return_value = conn
+    cur = _mock_cursor(conn, fetchone=(123,))
+
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    finished = datetime(2026, 4, 25, 12, 0, 30, tzinfo=timezone.utc)
+    run_id = store.record_completed_run(
+        "sa_extension:market_news_quick",
+        status="succeeded",
+        started_at=started,
+        finished_at=finished,
+        trigger_source="extension",
+        payload={"display_name": "Market News quick"},
+        result={"saved": 17, "detail_fetched": 5},
+        message="ok",
+        duration_ms=30_000,
+    )
+
+    assert run_id == 123
+    cur.execute.assert_called_once()
+    sql, params = cur.execute.call_args[0]
+    assert "INSERT INTO job_runs" in sql
+    # Positional parameters: name, status, trigger, payload, result, message,
+    # error, started, finished, duration_ms, finished, started.
+    assert params[0] == "sa_extension:market_news_quick"
+    assert params[1] == "succeeded"
+    assert params[2] == "extension"
+    assert params[5] == "ok"  # message
+    assert params[6] is None  # error
+    assert params[7] == started
+    assert params[8] == finished
+    assert params[9] == 30_000
+
+
+def test_record_completed_run_rejects_running_status():
+    dal, _ = _make_db_dal()
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="terminal"):
+        store.record_completed_run("x", status="running", started_at=started)
+
+
+def test_record_completed_run_rejects_unknown_status():
+    dal, _ = _make_db_dal()
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="terminal"):
+        store.record_completed_run("x", status="bogus", started_at=started)
+
+
+def test_record_completed_run_returns_none_when_unavailable():
+    dal = _make_file_dal()
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    assert store.record_completed_run(
+        "x", status="succeeded", started_at=started
+    ) is None
+
+
+def test_record_completed_run_swallows_db_error():
+    dal, backend = _make_db_dal()
+    backend._get_conn.side_effect = RuntimeError("conn down")
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    # No exception raised — extension flow must not break on DB outage.
+    assert store.record_completed_run(
+        "x", status="failed", started_at=started, error="boom"
+    ) is None
+
+
+def test_record_completed_run_omits_finished_at_when_not_provided():
+    """No finished_at → SQL falls back to NOW()."""
+    dal, backend = _make_db_dal()
+    conn = MagicMock()
+    backend._get_conn.return_value = conn
+    cur = _mock_cursor(conn, fetchone=(7,))
+
+    store = JobRunsStore(dal)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    run_id = store.record_completed_run("x", status="succeeded", started_at=started)
+    assert run_id == 7
+    _, params = cur.execute.call_args[0]
+    assert params[8] is None  # finished_at omitted; SQL COALESCE handles it
+
+
+# ---------------------------------------------------------------------------
+# Native host: record_extension_job action
+# ---------------------------------------------------------------------------
+
+
+def test_record_extension_job_succeeded_path():
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    dal = MagicMock()
+    msg = {
+        "job_name": "sa_extension:market_news_quick",
+        "status": "succeeded",
+        "started_at": "2026-04-25T12:00:00Z",
+        "finished_at": "2026-04-25T12:00:30Z",
+        "duration_ms": 30000,
+        "payload": {"display_name": "Market News quick"},
+        "result": {"saved": 17},
+        "message": "ok",
+        "trigger_source": "extension",
+    }
+    with patch(
+        "src.service.job_runs_store.JobRunsStore.record_completed_run",
+        return_value=99,
+    ) as record:
+        result = _handle_record_extension_job(dal, msg)
+
+    assert result["status"] == "ok"
+    assert result["run_id"] == 99
+    assert result["persisted"] is True
+
+    record.assert_called_once()
+    kwargs = record.call_args.kwargs
+    assert kwargs["status"] == "succeeded"
+    assert kwargs["trigger_source"] == "extension"
+    assert kwargs["duration_ms"] == 30000
+    assert kwargs["payload"] == {"display_name": "Market News quick"}
+    assert kwargs["result"] == {"saved": 17}
+    # Timestamps parsed from ISO 8601 with trailing Z.
+    assert kwargs["started_at"].year == 2026
+    assert kwargs["started_at"].tzinfo is not None
+    assert kwargs["finished_at"].minute == 0
+    assert kwargs["finished_at"].second == 30
+
+
+def test_record_extension_job_failed_path_carries_error():
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    dal = MagicMock()
+    msg = {
+        "job_name": "sa_extension:alpha_picks_quick",
+        "status": "failed",
+        "started_at": "2026-04-25T12:00:00Z",
+        "error": "paywall: Subscribe to unlock",
+    }
+    with patch(
+        "src.service.job_runs_store.JobRunsStore.record_completed_run",
+        return_value=100,
+    ) as record:
+        result = _handle_record_extension_job(dal, msg)
+
+    assert result["status"] == "ok"
+    assert result["run_id"] == 100
+    kwargs = record.call_args.kwargs
+    assert kwargs["status"] == "failed"
+    assert kwargs["error"] == "paywall: Subscribe to unlock"
+
+
+def test_record_extension_job_rejects_invalid_status():
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    result = _handle_record_extension_job(
+        MagicMock(),
+        {"job_name": "x", "status": "running", "started_at": "2026-04-25T12:00:00Z"},
+    )
+    assert result["status"] == "error"
+    assert "invalid" in result["error"].lower()
+
+
+def test_record_extension_job_rejects_missing_started_at():
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    result = _handle_record_extension_job(
+        MagicMock(), {"job_name": "x", "status": "succeeded"}
+    )
+    assert result["status"] == "error"
+    assert "started_at" in result["error"]
+
+
+def test_record_extension_job_rejects_missing_job_name():
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    result = _handle_record_extension_job(
+        MagicMock(),
+        {"job_name": "", "status": "succeeded", "started_at": "2026-04-25T12:00:00Z"},
+    )
+    assert result["status"] == "error"
+    assert "job_name" in result["error"]
+
+
+def test_record_extension_job_persistence_failure_returns_ok_status_with_persisted_false():
+    """Best-effort: DB write fails inside store → action still returns ok=True."""
+    from scripts.sa_native_host import _handle_record_extension_job
+
+    dal = MagicMock()
+    with patch(
+        "src.service.job_runs_store.JobRunsStore.record_completed_run",
+        return_value=None,
+    ):
+        result = _handle_record_extension_job(
+            dal,
+            {
+                "job_name": "sa_extension:x",
+                "status": "succeeded",
+                "started_at": "2026-04-25T12:00:00Z",
+            },
+        )
+    assert result["status"] == "ok"
+    assert result["persisted"] is False
+    assert result["run_id"] is None
+
+
+def test_record_extension_job_dispatched_via_handle_message():
+    """handle_message routes action=record_extension_job to the helper."""
+    from scripts import sa_native_host
+
+    msg = {
+        "action": "record_extension_job",
+        "job_name": "sa_extension:market_news_quick",
+        "status": "succeeded",
+        "started_at": "2026-04-25T12:00:00Z",
+    }
+    with patch.object(
+        sa_native_host, "_handle_record_extension_job",
+        return_value={"status": "ok", "run_id": 1, "persisted": True},
+    ) as helper, patch(
+        "src.tools.data_access.DataAccessLayer", return_value=MagicMock()
+    ):
+        result = sa_native_host.handle_message(msg)
+
+    helper.assert_called_once()
+    assert result["run_id"] == 1

@@ -148,6 +148,78 @@ class JobRunsStore:
             logger.warning("JobRunsStore.finish_run failed for run_id=%s: %s", run_id, exc)
             return False
 
+    def record_completed_run(
+        self,
+        job_name: str,
+        *,
+        status: str,
+        started_at: Any,
+        finished_at: Optional[Any] = None,
+        trigger_source: str = "extension",
+        payload: Optional[Dict[str, Any]] = None,
+        result: Optional[Dict[str, Any]] = None,
+        message: Optional[str] = None,
+        error: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+    ) -> Optional[int]:
+        """Insert a row that's already in a terminal state.
+
+        Used by the Chrome extension: it only contacts native messaging
+        AFTER a sync flow finishes, so we never see the ``running`` state.
+        Caller-supplied ``started_at`` (and optional ``finished_at``)
+        preserve the wall-clock the extension observed; ``duration_ms`` is
+        computed server-side from the timestamps when not supplied.
+
+        Returns the new run id, or ``None`` on error / unavailable store.
+        """
+        if status not in _VALID_STATUSES or status == "running":
+            raise ValueError(f"record_completed_run requires terminal status, got {status!r}")
+        if not self.is_available():
+            return None
+        if psycopg2 is None:  # pragma: no cover
+            return None
+        try:
+            conn = self._backend._get_conn()
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO job_runs (
+                        job_name, status, trigger_source, payload, result,
+                        message, error, started_at, finished_at, duration_ms
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, COALESCE(%s, NOW()),
+                        COALESCE(
+                            %s,
+                            EXTRACT(EPOCH FROM (COALESCE(%s::timestamptz, NOW()) - %s::timestamptz)) * 1000
+                        )::INTEGER
+                    )
+                    RETURNING id
+                    """,
+                    (
+                        job_name,
+                        status,
+                        trigger_source,
+                        psycopg2.extras.Json(payload or {}),
+                        psycopg2.extras.Json(result) if result is not None else None,
+                        message,
+                        error,
+                        started_at,
+                        finished_at,
+                        duration_ms,
+                        finished_at,
+                        started_at,
+                    ),
+                )
+                row = cur.fetchone()
+            return int(row[0]) if row else None
+        except Exception as exc:
+            logger.warning(
+                "JobRunsStore.record_completed_run failed for %s: %s", job_name, exc
+            )
+            return None
+
     # -- reads ---------------------------------------------------------------
 
     def list_runs(

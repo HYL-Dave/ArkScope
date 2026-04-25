@@ -111,6 +111,9 @@ def handle_message(msg):
     elif action == "audit_unresolved":
         return _handle_audit_unresolved(dal)
 
+    elif action == "record_extension_job":
+        return _handle_record_extension_job(dal, msg)
+
     elif action == "ping":
         return {"status": "ok", "project_root": PROJECT_ROOT}
 
@@ -575,6 +578,77 @@ def _handle_audit_unresolved(dal):
     except Exception as e:
         logger.error("audit_unresolved failed: %s", e)
         return {"status": "error", "error": str(e)}
+
+
+def _handle_record_extension_job(dal, msg):
+    """Persist an extension-managed sync into job_runs (P0.4 commit 2).
+
+    The extension only contacts native messaging *after* a sync flow
+    finishes, so we land directly in the terminal state with the
+    extension's own start/finish timestamps. Best-effort: any DB error
+    is logged but never raised back to the extension.
+    """
+    job_name = msg.get("job_name") or ""
+    status = msg.get("status") or ""
+    if status not in ("succeeded", "failed"):
+        return {"status": "error", "error": f"invalid job status: {status!r}"}
+    if not job_name:
+        return {"status": "error", "error": "job_name required"}
+
+    started_at = _parse_iso_dt(msg.get("started_at"))
+    if started_at is None:
+        return {"status": "error", "error": "valid started_at required"}
+    finished_at = _parse_iso_dt(msg.get("finished_at"))
+
+    payload = msg.get("payload") or {}
+    result = msg.get("result")
+    message_text = msg.get("message")
+    error_text = msg.get("error")
+    duration_ms = msg.get("duration_ms")
+    if duration_ms is not None:
+        try:
+            duration_ms = int(duration_ms)
+        except (TypeError, ValueError):
+            duration_ms = None
+    trigger_source = msg.get("trigger_source") or "extension"
+
+    try:
+        from src.service.job_runs_store import JobRunsStore
+        store = JobRunsStore(dal)
+        run_id = store.record_completed_run(
+            job_name,
+            status=status,
+            started_at=started_at,
+            finished_at=finished_at,
+            trigger_source=trigger_source,
+            payload=payload if isinstance(payload, dict) else {"value": payload},
+            result=result if isinstance(result, dict) else None,
+            message=message_text,
+            error=error_text,
+            duration_ms=duration_ms,
+        )
+        logger.info(
+            "record_extension_job: name=%s status=%s run_id=%s duration_ms=%s",
+            job_name, status, run_id, duration_ms,
+        )
+        return {"status": "ok", "run_id": run_id, "persisted": run_id is not None}
+    except Exception as e:
+        logger.error("record_extension_job failed: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
+def _parse_iso_dt(value):
+    """Accept extension-supplied ISO 8601 strings (with trailing Z)."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _try_ticker_sync(dal, picks):
