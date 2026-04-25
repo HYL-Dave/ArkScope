@@ -253,12 +253,13 @@ def list_high_value_comments(
         }
 
     try:
+        from src.sa.comment_signals import RULE_SET_VERSION as _CURRENT_VERSION
         window_days = max(1, min(int(window_days), 90))
         limit = max(1, min(int(limit), 50))
         min_score = float(min_score)
 
         conn = backend._get_conn()
-        params: List[Any] = [window_days, min_score]
+        params: List[Any] = [window_days, min_score, _CURRENT_VERSION]
         ticker_clause = ""
         if ticker:
             ticker_clause = " AND %s = ANY(s.ticker_mentions)"
@@ -278,11 +279,13 @@ def list_high_value_comments(
                 s.ticker_mentions,
                 s.candidate_mentions,
                 s.keyword_buckets,
-                s.needs_verification
+                s.needs_verification,
+                s.rule_set_version
             FROM sa_comment_signals s
             JOIN sa_article_comments c ON c.id = s.comment_row_id
             WHERE c.comment_date >= NOW() - (%s || ' days')::INTERVAL
               AND s.high_value_score >= %s
+              AND s.rule_set_version = %s
               {ticker_clause}
             ORDER BY s.high_value_score DESC, c.comment_date DESC
             LIMIT %s
@@ -307,6 +310,7 @@ def list_high_value_comments(
             "count": len(comments),
             "window_days": window_days,
             "min_score": min_score,
+            "rule_set_version": _CURRENT_VERSION,
             "ticker_filter": ticker.upper() if ticker else None,
             "comments": comments,
         }
