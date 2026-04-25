@@ -6,8 +6,16 @@ mixing pipeline staleness, feed-content lulls, and detail-body gaps.
 
 Three layers:
 
-  - **freshness**     — last successful fetch / latest published-item age.
-                        Pipeline observability; "did the extension run?"
+  - **freshness**     — pipeline activity vs data freshness, surfaced
+                        side-by-side. Pipeline activity is read from
+                        ``job_runs`` (extension run history); data
+                        freshness is read from ``sa_market_news``
+                        (last fetched/published row). Keeping the two
+                        signals separate matters because
+                        ``upsert_sa_market_news`` only bumps
+                        ``updated_at`` on conflict — when SA returns
+                        only known items, ``fetched_at`` can look
+                        stale even if the extension is healthy.
   - **feed_health**   — recent metadata volume (24h / 7d).
                         Did the upstream feed actually produce items?
   - **detail_health** — fraction of last-7d rows with a stored body.
@@ -46,7 +54,11 @@ _SEVERITY_RANK = {SEVERITY_OK: 0, SEVERITY_WARNING: 1, SEVERITY_CRITICAL: 2}
 
 
 DEFAULT_THRESHOLDS: Dict[str, Any] = {
-    # Pipeline staleness: time since last successful row insert.
+    # Pipeline staleness: time since last successful pipeline activity.
+    # Preferred signal is the latest succeeded extension run in
+    # ``job_runs`` (job_name = ``EXTENSION_JOB_NAME``); falls back to
+    # MAX(fetched_at) on ``sa_market_news`` when no extension runs are
+    # recorded yet.
     "last_fetch_warning_seconds": 6 * 3600,
     # Feed lull: items_24h_published == 0 → warning, but only critical
     # when checked during regular US trading hours (NY 09:30-16:00).
@@ -58,6 +70,11 @@ DEFAULT_THRESHOLDS: Dict[str, Any] = {
     # when a tiny rolling window has 0/1 rows).
     "detail_completeness_min_rows": 5,
 }
+
+# Canonical extension job_name whose ``succeeded`` runs gate
+# pipeline-freshness. Matches ``_JOB_DEFINITIONS`` in src/service/jobs.py
+# so the same row also surfaces via /jobs/status.
+EXTENSION_JOB_NAME = "sa_market_news_refresh"
 
 
 @dataclass(frozen=True)
@@ -131,6 +148,7 @@ def evaluate_health(
 
     last_fetched_at = _coerce_dt(stats.get("last_fetched_at"))
     last_published_at = _coerce_dt(stats.get("last_published_at"))
+    extension_last_success_at = _coerce_dt(stats.get("extension_last_success_at"))
     rows_24h_fetched = int(stats.get("rows_24h_fetched") or 0)
     items_24h_published = int(stats.get("items_24h_published") or 0)
     items_7d = int(stats.get("items_7d") or 0)
@@ -142,21 +160,39 @@ def evaluate_health(
     # ---- freshness layer ------------------------------------------------
     last_fetch_age_seconds = _age_seconds(last_fetched_at, now)
     last_published_age_seconds = _age_seconds(last_published_at, now)
+    extension_last_success_age_seconds = _age_seconds(extension_last_success_at, now)
+
+    # Preferred pipeline signal: the extension's own job_runs record.
+    # Falls back to last_fetched_at when no extension run has been logged
+    # yet (older databases predating this signal). Avoids the case where
+    # SA returns only known items: upsert no-ops update updated_at, not
+    # fetched_at, so MAX(fetched_at) can look stale even though pipeline
+    # is healthy.
+    if extension_last_success_age_seconds is not None:
+        pipeline_age_seconds = extension_last_success_age_seconds
+        pipeline_signal = "extension_run"
+    else:
+        pipeline_age_seconds = last_fetch_age_seconds
+        pipeline_signal = "last_fetched_at" if last_fetched_at is not None else None
+
     last_fetch_status = SEVERITY_OK
-    if last_fetched_at is None:
+    if pipeline_signal is None:
         last_fetch_status = SEVERITY_CRITICAL
         reasons.append(_Reason(
             SEVERITY_CRITICAL,
-            "no_fetch_history",
-            "sa_market_news has no fetched_at — pipeline never ran or table is empty.",
+            "no_pipeline_signal",
+            "No extension run recorded and sa_market_news has no fetched_at — "
+            "pipeline never ran or table is empty.",
         ))
-    elif last_fetch_age_seconds is not None and \
-            last_fetch_age_seconds > thresholds["last_fetch_warning_seconds"]:
+    elif pipeline_age_seconds is not None and \
+            pipeline_age_seconds > thresholds["last_fetch_warning_seconds"]:
         last_fetch_status = SEVERITY_WARNING
+        signal_label = "extension run" if pipeline_signal == "extension_run" else "last fetched row"
         reasons.append(_Reason(
             SEVERITY_WARNING,
-            "stale_fetch",
-            f"Last fetch was {_humanize_seconds(last_fetch_age_seconds)} ago "
+            "stale_pipeline",
+            f"Last successful pipeline activity ({signal_label}) was "
+            f"{_humanize_seconds(pipeline_age_seconds)} ago "
             f"(threshold {_humanize_seconds(thresholds['last_fetch_warning_seconds'])}).",
         ))
 
@@ -167,6 +203,11 @@ def evaluate_health(
         "latest_published_at": _iso(last_published_at),
         "latest_published_age_seconds": last_published_age_seconds,
         "latest_published_age_human": _humanize_seconds(last_published_age_seconds),
+        "extension_last_success_at": _iso(extension_last_success_at),
+        "extension_last_success_age_seconds": extension_last_success_age_seconds,
+        "extension_last_success_age_human": _humanize_seconds(extension_last_success_age_seconds),
+        "pipeline_age_seconds": pipeline_age_seconds,
+        "pipeline_signal": pipeline_signal,
         "last_fetch_status": last_fetch_status,
     }
 
@@ -289,16 +330,46 @@ _HEALTH_SQL = """
     FROM sa_market_news
 """
 
+_EXTENSION_RUN_SQL = """
+    SELECT MAX(finished_at) FILTER (WHERE status = 'succeeded')
+        AS extension_last_success_at
+    FROM job_runs
+    WHERE job_name = %(job_name)s
+"""
+
 
 def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
-    """Single-pass aggregation over sa_market_news."""
+    """Aggregate sa_market_news + read latest extension run from job_runs.
+
+    Two queries: the data-layer aggregation is required, and the
+    extension-run lookup gracefully degrades (returns ``None``) when
+    ``job_runs`` is missing or unreachable. This way pre-P0.2 deployments
+    still get a usable health report.
+    """
     from psycopg2 import extras as _pg_extras
 
     conn = backend._get_conn()
     with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
         cur.execute(_HEALTH_SQL, {"now": now})
-        row = cur.fetchone() or {}
-    return dict(row)
+        market_row = cur.fetchone() or {}
+
+    extension_last_success_at: Any = None
+    try:
+        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
+            cur.execute(_EXTENSION_RUN_SQL, {"job_name": EXTENSION_JOB_NAME})
+            row = cur.fetchone() or {}
+            extension_last_success_at = row.get("extension_last_success_at")
+    except Exception as exc:
+        # job_runs absent (pre-P0.2) or transient DB error — fall back to
+        # row-level signals only. Log once; do not raise.
+        logger.warning(
+            "sa_market_news health: extension_last_success_at lookup failed: %s",
+            exc,
+        )
+
+    out = dict(market_row)
+    out["extension_last_success_at"] = extension_last_success_at
+    return out
 
 
 def _db_unavailable_report(
@@ -324,6 +395,11 @@ def _db_unavailable_report(
             "latest_published_at": None,
             "latest_published_age_seconds": None,
             "latest_published_age_human": None,
+            "extension_last_success_at": None,
+            "extension_last_success_age_seconds": None,
+            "extension_last_success_age_human": None,
+            "pipeline_age_seconds": None,
+            "pipeline_signal": None,
             "last_fetch_status": SEVERITY_CRITICAL,
         },
         "feed_health": {

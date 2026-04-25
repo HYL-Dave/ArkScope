@@ -190,20 +190,35 @@ var saAutoJobPending = {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "refresh") {
-    enqueueSaSyncJob("Alpha Picks " + (msg.mode || "quick"), function () {
-      return doRefresh(msg.mode || "quick", { trigger: "manual" });
+    var mode = msg.mode || "quick";
+    enqueueSaSyncJob({
+      displayName: "Alpha Picks " + mode,
+      canonicalName: "sa_alpha_picks_refresh",
+      payload: { mode: mode, trigger: "manual" },
+    }, function () {
+      return doRefresh(mode, { trigger: "manual" });
     }).then(sendResponse);
     return true;
   }
   if (msg.action === "manual_fetch") {
-    enqueueSaSyncJob("Manual fetch", function () {
+    enqueueSaSyncJob({
+      displayName: "Manual fetch",
+      // No canonical mapping — doManualFetch is per-item, not a full
+      // refresh. Slugified name keeps it observable via /jobs/history.
+      payload: { trigger: "manual", item_count: (msg.items || []).length },
+    }, function () {
       return doManualFetch(msg.items || []);
     }).then(sendResponse);
     return true;
   }
   if (msg.action === "refresh_market_news") {
-    enqueueSaSyncJob("Market News " + (msg.mode || "quick"), function () {
-      return doMarketNewsRefresh(msg.mode || "quick", { trigger: "manual" });
+    var mnMode = msg.mode || "quick";
+    enqueueSaSyncJob({
+      displayName: "Market News " + mnMode,
+      canonicalName: "sa_market_news_refresh",
+      payload: { mode: mnMode, trigger: "manual" },
+    }, function () {
+      return doMarketNewsRefresh(mnMode, { trigger: "manual" });
     }).then(sendResponse);
     return true;
   }
@@ -232,13 +247,21 @@ chrome.runtime.onStartup.addListener(function () {
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
   if (alarm.name === ALPHA_PICKS_AUTO_SYNC_ALARM) {
-    enqueueAutoSaSyncJob("alphaPicks", "Alpha Picks quick auto-sync", function () {
+    enqueueAutoSaSyncJob("alphaPicks", {
+      displayName: "Alpha Picks quick auto-sync",
+      canonicalName: "sa_alpha_picks_refresh",
+      payload: { mode: "quick", trigger: "alarm" },
+    }, function () {
       return doRefresh("quick", { trigger: "alarm" });
     });
     return;
   }
   if (alarm.name === MARKET_NEWS_AUTO_SYNC_ALARM) {
-    enqueueAutoSaSyncJob("marketNews", "Market News quick auto-sync", async function () {
+    enqueueAutoSaSyncJob("marketNews", {
+      displayName: "Market News quick auto-sync",
+      canonicalName: "sa_market_news_refresh",
+      payload: { mode: "quick", trigger: "alarm" },
+    }, async function () {
       if (!(await shouldRunMarketNewsAutoSync())) {
         return { status: "skipped", reason: "not_due" };
       }
@@ -248,10 +271,22 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
   }
 });
 
-function enqueueSaSyncJob(jobName, jobFn) {
+function enqueueSaSyncJob(opts, jobFn) {
+  // opts may be a string (display name only, slug fallback) or
+  // { displayName, canonicalName, payload }. Canonical names match
+  // _JOB_DEFINITIONS keys (sa_alpha_picks_refresh / sa_market_news_refresh)
+  // so /jobs/status sees extension runs in the same row.
+  if (typeof opts === "string") {
+    opts = { displayName: opts };
+  }
+  opts = opts || {};
+  var displayName = opts.displayName || "unnamed";
+  var canonicalName = opts.canonicalName || null;
+  var extraPayload = opts.payload || null;
+
   var run = saSyncJobChain.catch(function () {}).then(async function () {
     if (saSyncJobInFlight) {
-      sendProgress("Queued: " + jobName);
+      sendProgress("Queued: " + displayName);
     }
     saSyncJobInFlight = true;
     var startedAt = new Date().toISOString();
@@ -266,9 +301,17 @@ function enqueueSaSyncJob(jobName, jobFn) {
     } finally {
       saSyncJobInFlight = false;
       try {
-        recordExtensionJob(jobName, startedAt, new Date().toISOString(), capturedResult, capturedError);
+        await recordExtensionJobAsync({
+          displayName: displayName,
+          canonicalName: canonicalName,
+          extraPayload: extraPayload,
+          startedAt: startedAt,
+          finishedAt: new Date().toISOString(),
+          result: capturedResult,
+          error: capturedError,
+        });
       } catch (_) {
-        // recording must never break the actual sync flow
+        // Recording must never break the actual sync flow.
       }
     }
   });
@@ -308,37 +351,61 @@ function classifyExtensionJobOutcome(result, errorText) {
   return { status: "succeeded", error: null, message: null };
 }
 
-function recordExtensionJob(displayName, startedAt, finishedAt, result, errorText) {
-  try {
-    var outcome = classifyExtensionJobOutcome(result, errorText);
-    var payload = { display_name: displayName };
-    var resultPayload = (result && typeof result === "object") ? result : null;
-    var msg = {
-      action: "record_extension_job",
-      job_name: slugifyExtensionJobName(displayName),
-      status: outcome.status,
-      started_at: startedAt,
-      finished_at: finishedAt,
-      message: outcome.message,
-      error: outcome.error,
-      payload: payload,
-      result: resultPayload,
-      trigger_source: "extension",
+var EXTENSION_JOB_RECORD_TIMEOUT_MS = 2000;
+
+function recordExtensionJobAsync(opts) {
+  return new Promise(function (resolve) {
+    var settled = false;
+    var settle = function (value) {
+      if (settled) return;
+      settled = true;
+      resolve(value);
     };
-    chrome.runtime.sendNativeMessage(NATIVE_HOST, msg, function () {
-      // Fire-and-forget; native host writes the row best-effort.
-    });
-  } catch (_) {
-    // Recording must never break the actual sync flow.
-  }
+    var timer = setTimeout(function () {
+      settle({ ok: false, error: "record_timeout" });
+    }, EXTENSION_JOB_RECORD_TIMEOUT_MS);
+
+    try {
+      var outcome = classifyExtensionJobOutcome(opts.result, opts.error);
+      var payload = Object.assign({ display_name: opts.displayName }, opts.extraPayload || {});
+      var resultPayload = (opts.result && typeof opts.result === "object") ? opts.result : null;
+      // Canonical name preferred so /jobs/status merges by job_runs.job_name
+      // against _JOB_DEFINITIONS; slug fallback keeps non-canonical flows
+      // (e.g. doManualFetch) observable in /jobs/history.
+      var jobName = opts.canonicalName || slugifyExtensionJobName(opts.displayName);
+      var msg = {
+        action: "record_extension_job",
+        job_name: jobName,
+        status: outcome.status,
+        started_at: opts.startedAt,
+        finished_at: opts.finishedAt,
+        message: outcome.message,
+        error: outcome.error,
+        payload: payload,
+        result: resultPayload,
+        trigger_source: "extension",
+      };
+      chrome.runtime.sendNativeMessage(NATIVE_HOST, msg, function (response) {
+        clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          settle({ ok: false, error: chrome.runtime.lastError.message });
+        } else {
+          settle({ ok: true, response: response });
+        }
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      settle({ ok: false, error: (err && err.message) || String(err) });
+    }
+  });
 }
 
-function enqueueAutoSaSyncJob(jobKey, jobName, jobFn) {
+function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
   if (saAutoJobPending[jobKey]) {
     return Promise.resolve({ status: "skipped", reason: "already_pending" });
   }
   saAutoJobPending[jobKey] = true;
-  return enqueueSaSyncJob(jobName, async function () {
+  return enqueueSaSyncJob(jobOpts, async function () {
     try {
       return await jobFn();
     } finally {

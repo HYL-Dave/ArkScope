@@ -51,6 +51,7 @@ def _stats(
     *,
     last_fetched_at=None,
     last_published_at=None,
+    extension_last_success_at=None,
     rows_24h_fetched=0,
     items_24h_published=0,
     items_7d=0,
@@ -59,6 +60,7 @@ def _stats(
     return {
         "last_fetched_at": last_fetched_at,
         "last_published_at": last_published_at,
+        "extension_last_success_at": extension_last_success_at,
         "rows_24h_fetched": rows_24h_fetched,
         "items_24h_published": items_24h_published,
         "items_7d": items_7d,
@@ -67,10 +69,11 @@ def _stats(
 
 
 def _healthy_stats(now: datetime):
-    """Plausible healthy DB state: fresh fetch, recent publish, lots of detail."""
+    """Plausible healthy DB state: fresh extension run, recent publish, lots of detail."""
     return _stats(
         last_fetched_at=now - timedelta(minutes=20),
         last_published_at=now - timedelta(minutes=45),
+        extension_last_success_at=now - timedelta(minutes=10),
         rows_24h_fetched=180,
         items_24h_published=170,
         items_7d=900,
@@ -125,14 +128,59 @@ class TestEvaluateHealthSeverity:
         assert report["severity"] == SEVERITY_OK
         assert report["reasons"] == []
 
-    def test_stale_fetch_triggers_warning(self):
+    def test_stale_extension_triggers_warning(self):
+        """Extension run is the preferred signal; stale extension → warning."""
         now = WEEKDAY_MARKET_HOURS_UTC
         stats = _healthy_stats(now)
-        stats["last_fetched_at"] = now - timedelta(hours=8)  # >6h threshold
+        stats["extension_last_success_at"] = now - timedelta(hours=8)  # >6h threshold
+        # Keep last_fetched_at recent — extension signal takes precedence.
         report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
         assert report["severity"] == SEVERITY_WARNING
         codes = [r["code"] for r in report["reasons"]]
-        assert "stale_fetch" in codes
+        assert "stale_pipeline" in codes
+        # Reason references the extension signal explicitly.
+        msgs = " ".join(r["message"] for r in report["reasons"])
+        assert "extension run" in msgs
+
+    def test_extension_recent_masks_stale_fetched_at(self):
+        """Stale fetched_at must NOT fire when extension run is recent.
+
+        The dedup-no-update gotcha: upsert on already-known items only
+        bumps updated_at, so MAX(fetched_at) goes stale even though the
+        extension is healthy. Extension run wins.
+        """
+        now = WEEKDAY_MARKET_HOURS_UTC
+        stats = _healthy_stats(now)
+        stats["last_fetched_at"] = now - timedelta(hours=12)  # very stale
+        # extension_last_success_at unchanged (10 min ago, fresh).
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_OK
+        codes = [r["code"] for r in report["reasons"]]
+        assert "stale_pipeline" not in codes
+        assert report["freshness"]["pipeline_signal"] == "extension_run"
+
+    def test_no_extension_runs_falls_back_to_last_fetched_at_when_recent(self):
+        """Pre-P0.2 environments may have no job_runs rows yet."""
+        now = WEEKDAY_MARKET_HOURS_UTC
+        stats = _healthy_stats(now)
+        stats["extension_last_success_at"] = None
+        # last_fetched_at recent → fallback says ok.
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_OK
+        assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
+
+    def test_no_extension_runs_falls_back_to_last_fetched_at_when_stale(self):
+        now = WEEKDAY_MARKET_HOURS_UTC
+        stats = _healthy_stats(now)
+        stats["extension_last_success_at"] = None
+        stats["last_fetched_at"] = now - timedelta(hours=8)
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_WARNING
+        codes = [r["code"] for r in report["reasons"]]
+        assert "stale_pipeline" in codes
+        msgs = " ".join(r["message"] for r in report["reasons"])
+        assert "last fetched row" in msgs
+        assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
 
     def test_zero_published_items_market_hours_is_critical(self):
         now = WEEKDAY_MARKET_HOURS_UTC
@@ -209,13 +257,14 @@ class TestEvaluateHealthSeverity:
         report = evaluate_health(_stats(), now=now, thresholds=DEFAULT_THRESHOLDS)
         assert report["severity"] == SEVERITY_CRITICAL
         codes = [r["code"] for r in report["reasons"]]
-        assert "no_fetch_history" in codes
+        assert "no_pipeline_signal" in codes
+        assert report["freshness"]["pipeline_signal"] is None
 
     def test_overall_severity_is_max_of_layers(self):
-        """A stale fetch + completeness critical → critical (not warning)."""
+        """Stale extension + completeness critical → critical (not warning)."""
         now = WEEKDAY_MARKET_HOURS_UTC
         stats = _healthy_stats(now)
-        stats["last_fetched_at"] = now - timedelta(hours=8)  # warning
+        stats["extension_last_success_at"] = now - timedelta(hours=8)  # warning
         stats["items_7d"] = 100
         stats["detail_present_7d"] = 30  # critical
         report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
@@ -244,15 +293,19 @@ class TestResponseShape:
         ):
             assert key in report, f"missing top-level key: {key}"
 
-    def test_freshness_block_carries_both_ages(self):
+    def test_freshness_block_carries_all_ages(self):
         now = WEEKDAY_MARKET_HOURS_UTC
         stats = _healthy_stats(now)
         report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
         f = report["freshness"]
         assert isinstance(f["last_fetch_age_seconds"], int)
         assert isinstance(f["latest_published_age_seconds"], int)
+        assert isinstance(f["extension_last_success_age_seconds"], int)
+        assert isinstance(f["pipeline_age_seconds"], int)
         assert f["last_fetch_age_human"] is not None
         assert f["latest_published_age_human"] is not None
+        assert f["extension_last_success_age_human"] is not None
+        assert f["pipeline_signal"] == "extension_run"
         assert f["last_fetch_status"] in (SEVERITY_OK, SEVERITY_WARNING, SEVERITY_CRITICAL)
 
     def test_thresholds_visible_in_response(self):
@@ -288,6 +341,8 @@ class TestThresholdOverrides:
     def test_custom_stale_fetch_threshold(self):
         now = WEEKDAY_MARKET_HOURS_UTC
         stats = _healthy_stats(now)
+        # Override the preferred extension signal too — both must be old.
+        stats["extension_last_success_at"] = now - timedelta(hours=2)
         stats["last_fetched_at"] = now - timedelta(hours=2)
         # Default 6h → ok. Tightened 30min → warning.
         custom = {**DEFAULT_THRESHOLDS, "last_fetch_warning_seconds": 30 * 60}
