@@ -117,6 +117,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sa_articles as _get_sa_articles,
         get_sa_article_detail as _get_sa_article_detail,
         get_sa_market_news as _get_sa_market_news,
+        list_high_value_comments as _list_high_value_comments,
     )
 
     # ================================================================
@@ -1007,6 +1008,29 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result, "get_sa_market_news")
 
+    @function_tool
+    def tool_list_high_value_comments(
+        window_days: int = 7,
+        ticker: str = "",
+        min_score: float = 2.0,
+        limit: int = 20,
+    ) -> str:
+        """List high-scoring SA comments (rule-based extraction).
+
+        Returns ranked comments with ticker_mentions, candidate_mentions,
+        keyword_buckets (matched terms), high_value_score (0-10), and
+        needs_verification flag. Use to surface community signals like
+        earnings hints, eligibility queries, catalyst chatter.
+        """
+        result = _list_high_value_comments(
+            dal,
+            window_days=window_days,
+            ticker=ticker or None,
+            min_score=min_score,
+            limit=limit,
+        )
+        return _serialize_result(result, "list_high_value_comments")
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -1056,6 +1080,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_articles,
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
+        tool_list_high_value_comments,
     ]
 
     # Conditionally add web tools

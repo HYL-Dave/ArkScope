@@ -1,9 +1,10 @@
 """
 Seeking Alpha Alpha Picks tool functions.
 
-6 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
-         get_sa_articles, get_sa_article_detail, get_sa_market_news
-All require DAL. Alpha Picks tools are category="portfolio"; market news is category="news".
+7 tools: get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
+         get_sa_articles, get_sa_article_detail, get_sa_market_news,
+         list_high_value_comments
+All require DAL. Alpha Picks tools are category="portfolio"; market news + comments are category="news".
 """
 
 from __future__ import annotations
@@ -211,3 +212,104 @@ def get_sa_market_news(
     except Exception as e:
         logger.error("get_sa_market_news error: %s", e)
         return {"error": str(e)}
+
+
+def list_high_value_comments(
+    dal: Any,
+    window_days: int = 7,
+    ticker: Optional[str] = None,
+    min_score: float = 2.0,
+    limit: int = 20,
+) -> Dict:
+    """List high-scoring SA comments within a time window.
+
+    Reads from sa_comment_signals (rule-based extraction; see
+    docs/design/SA_COMMENT_INTELLIGENCE_PLAN.md §5.1). Comments are ranked
+    by ``high_value_score`` (0..10 weighted sum of ticker mentions, keyword
+    bucket hits, external links, and log(upvotes)).
+
+    Args:
+        window_days: lookback window using ``comment_date`` (1..90).
+        ticker: optional filter — only comments whose ``ticker_mentions``
+            includes this symbol (case-insensitive).
+        min_score: cutoff (default 2.0). Anything below is filtered out.
+        limit: max comments returned (1..50).
+
+    Returns:
+        ``{count, window_days, min_score, comments: [{...}]}`` where each
+        comment dict carries: comment_id, article_id, commenter, comment_date,
+        upvotes, preview (first 300 chars), high_value_score, ticker_mentions,
+        candidate_mentions, keyword_buckets, needs_verification.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    backend = getattr(dal, "_backend", None)
+    if backend is None or not hasattr(backend, "_get_conn"):
+        return {
+            "error": "DB unavailable; high-value comments require the database backend.",
+            "comments": [],
+            "count": 0,
+        }
+
+    try:
+        window_days = max(1, min(int(window_days), 90))
+        limit = max(1, min(int(limit), 50))
+        min_score = float(min_score)
+
+        conn = backend._get_conn()
+        params: List[Any] = [window_days, min_score]
+        ticker_clause = ""
+        if ticker:
+            ticker_clause = " AND %s = ANY(s.ticker_mentions)"
+            params.append(ticker.upper())
+        params.append(limit)
+
+        sql = f"""
+            SELECT
+                c.id AS comment_row_id,
+                c.article_id,
+                c.comment_id,
+                c.commenter,
+                c.upvotes,
+                c.comment_date,
+                LEFT(c.comment_text, 300) AS preview,
+                s.high_value_score,
+                s.ticker_mentions,
+                s.candidate_mentions,
+                s.keyword_buckets,
+                s.needs_verification
+            FROM sa_comment_signals s
+            JOIN sa_article_comments c ON c.id = s.comment_row_id
+            WHERE c.comment_date >= NOW() - (%s || ' days')::INTERVAL
+              AND s.high_value_score >= %s
+              {ticker_clause}
+            ORDER BY s.high_value_score DESC, c.comment_date DESC
+            LIMIT %s
+        """
+        from psycopg2 import extras as _pg_extras
+        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+
+        comments: List[Dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            cd = d.get("comment_date")
+            if cd is not None and hasattr(cd, "isoformat"):
+                d["comment_date"] = cd.isoformat()
+            score = d.get("high_value_score")
+            if score is not None:
+                d["high_value_score"] = float(score)
+            comments.append(d)
+
+        return {
+            "count": len(comments),
+            "window_days": window_days,
+            "min_score": min_score,
+            "ticker_filter": ticker.upper() if ticker else None,
+            "comments": comments,
+        }
+    except Exception as e:
+        logger.error("list_high_value_comments error: %s", e)
+        return {"error": str(e), "comments": [], "count": 0}

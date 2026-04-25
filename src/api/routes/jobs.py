@@ -53,6 +53,9 @@ class JobRunRequest(BaseModel):
     depth: Literal["quick", "standard", "full"] = "standard"
     persist_reports: bool = False
     notify: bool = False
+    # extract_sa_comment_signals
+    batch_size: Optional[int] = Field(default=None, ge=1, le=5000)
+    max_extracted: Optional[int] = Field(default=None, ge=1)
 
 
 class JobRunResponse(BaseModel):

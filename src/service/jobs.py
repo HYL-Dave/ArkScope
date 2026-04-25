@@ -96,6 +96,19 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         runnable_via_api=False,
         feature_flag="sa_enabled",
     ),
+    "extract_sa_comment_signals": JobDefinition(
+        name="extract_sa_comment_signals",
+        description=(
+            "Extract rule-based signals from sa_article_comments into "
+            "sa_comment_signals: ticker / candidate mentions, keyword buckets, "
+            "score, and needs_verification flag. Default mode processes only "
+            "the pending tail (no rows at current rule_set_version)."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="sa_enabled",
+        default_params={"batch_size": 500},
+    ),
 }
 
 _JOB_STATE: Dict[str, JobExecutionState] = {
@@ -394,6 +407,8 @@ def run_job(
             result = _run_analysis_watchlist_batch(dal, payload)
         elif job.name == "monitor_watchlist_scan":
             result = _run_monitor_watchlist_scan(dal, payload)
+        elif job.name == "extract_sa_comment_signals":
+            result = _run_extract_sa_comment_signals(dal, payload)
         else:  # pragma: no cover - defensive branch
             raise UnknownJobError(job.name)
 
@@ -443,6 +458,28 @@ def run_job(
         raise
 
 
+def _run_extract_sa_comment_signals(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Backfill / incremental extraction over sa_article_comments."""
+    from src.sa.comment_signal_backfill import run_backfill
+
+    batch_size = int(params.get("batch_size", 500))
+    if batch_size <= 0:
+        raise ValueError("batch_size must be >= 1")
+    max_extracted = params.get("max_extracted")
+    if max_extracted is not None:
+        max_extracted = int(max_extracted)
+        if max_extracted <= 0:
+            raise ValueError("max_extracted must be >= 1")
+    return run_backfill(
+        dal,
+        batch_size=batch_size,
+        max_extracted=max_extracted,
+    )
+
+
 def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
     """Compose a short success message suitable for ``last_message`` UI fields.
 
@@ -464,4 +501,12 @@ def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
         alerts = result.get("alert_count")
         if alerts is not None:
             return f"Monitor scan emitted {alerts} alert(s)"
+    if job_name == "extract_sa_comment_signals":
+        extracted = result.get("extracted_count")
+        pending = result.get("total_pending")
+        if extracted is not None:
+            base = f"Extracted {extracted} comment signal(s)"
+            if pending is not None and pending > extracted:
+                base += f" of {pending} pending"
+            return base
     return "Job completed successfully."

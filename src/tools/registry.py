@@ -990,6 +990,7 @@ class ToolRegistry:
         from .sa_tools import (
             get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
             get_sa_articles, get_sa_article_detail, get_sa_market_news,
+            list_high_value_comments,
         )
 
         self.register(ToolDefinition(
@@ -1105,6 +1106,36 @@ class ToolRegistry:
                               required=False),
                 ToolParameter("limit", "integer",
                               "Max results (default 20, max 100)",
+                              required=False, default=20),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="list_high_value_comments",
+            description=(
+                "List high-scoring SA comments within a time window. "
+                "Reads sa_comment_signals (rule-based extraction). "
+                "Each comment carries ticker_mentions, candidate_mentions "
+                "(off-universe candidates), keyword_buckets (with matched "
+                "terms), high_value_score (0-10), and needs_verification "
+                "(claim with hedging language). Use this to surface community "
+                "signals — earnings hints, eligibility queries, catalyst chatter."
+            ),
+            function=list_high_value_comments,
+            category="news",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("window_days", "integer",
+                              "Lookback window in days (1-90, default 7)",
+                              required=False, default=7),
+                ToolParameter("ticker", "string",
+                              "Filter by ticker_mentions membership (case-insensitive)",
+                              required=False),
+                ToolParameter("min_score", "number",
+                              "Minimum high_value_score (default 2.0)",
+                              required=False, default=2.0),
+                ToolParameter("limit", "integer",
+                              "Max comments returned (1-50, default 20)",
                               required=False, default=20),
             ],
         ))

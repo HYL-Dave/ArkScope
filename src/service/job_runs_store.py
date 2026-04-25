@@ -214,7 +214,7 @@ class JobRunsStore:
                         message, error, started_at, finished_at, duration_ms,
                         created_at, updated_at
                     FROM job_runs
-                    ORDER BY job_name, started_at DESC
+                    ORDER BY job_name, started_at DESC, id DESC
                     """
                 )
                 rows = cur.fetchall()

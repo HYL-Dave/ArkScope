@@ -1150,6 +1150,26 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": [],
             },
         },
+        {
+            "name": "list_high_value_comments",
+            "description": (
+                "List high-scoring SA comments within a time window. Reads "
+                "sa_comment_signals (rule-based: ticker_mentions, candidate_mentions, "
+                "keyword_buckets with matched terms, high_value_score 0-10, "
+                "needs_verification). Surfaces community signals like earnings "
+                "hints, eligibility queries, and catalyst chatter."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "window_days": {"type": "integer", "description": "Lookback in days (1-90, default 7)"},
+                    "ticker": {"type": "string", "description": "Filter by ticker_mentions (case-insensitive)"},
+                    "min_score": {"type": "number", "description": "Minimum high_value_score (default 2.0)"},
+                    "limit": {"type": "integer", "description": "Max comments returned (1-50, default 20)"},
+                },
+                "required": [],
+            },
+        },
     ])
 
     return tools
@@ -1254,6 +1274,7 @@ def execute_tool(
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
+        list_high_value_comments,
     )
 
     # Tool dispatch map
@@ -1533,6 +1554,13 @@ def execute_tool(
             dal,
             ticker=tool_input.get("ticker"),
             keyword=tool_input.get("keyword"),
+            limit=tool_input.get("limit", 20),
+        ),
+        "list_high_value_comments": lambda: list_high_value_comments(
+            dal,
+            window_days=tool_input.get("window_days", 7),
+            ticker=tool_input.get("ticker"),
+            min_score=tool_input.get("min_score", 2.0),
             limit=tool_input.get("limit", 20),
         ),
     }
