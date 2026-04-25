@@ -16,8 +16,10 @@ from ..config import get_agent_config
 from ..shared.context_manager import ContextManager
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.replay import ReplayCapture, is_capture_enabled
 from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
+from ..shared.token_tracker import TokenTracker
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
 _COMPACTION_BETA = "compact-2026-01-12"
@@ -27,8 +29,6 @@ _COMPACTION_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
 def _supports_compaction(model: str) -> bool:
     """Check if the model supports server-side compaction."""
     return any(model.startswith(m) for m in _COMPACTION_MODELS)
-
-from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +218,23 @@ async def run_query_stream(
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
+
+    capture: Optional[ReplayCapture] = None
+    if is_capture_enabled():
+        try:
+            capture = ReplayCapture(
+                provider="anthropic",
+                model=model_name,
+                entrypoint="cli",
+            )
+            capture.set_initial(
+                question=question,
+                system_prompt=effective_prompt,
+                tools_available=[t.get("name", "") for t in tools if t.get("name")],
+            )
+        except Exception as exc:
+            logger.warning("Replay capture init failed: %s", exc)
+            capture = None
     ctx = ContextManager(
         model=model_name,
         threshold_ratio=config.context_threshold_ratio,
@@ -336,6 +353,12 @@ async def run_query_stream(
                     tools_used=list(set(tools_used)),
                 )
                 pad.close()
+                if capture is not None:
+                    try:
+                        capture.record_final(final_text, tracker.summary())
+                        capture.save()
+                    except Exception as exc:
+                        logger.warning("Replay capture save failed: %s", exc)
                 yield AgentEvent(EventType.done, {
                     "answer": final_text,
                     "tools_used": list(set(tools_used)),
@@ -379,6 +402,12 @@ async def run_query_stream(
                 result_str = str(result)
                 pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
 
+                if capture is not None:
+                    try:
+                        capture.record_tool_call(tool_name, tool_input, result)
+                    except Exception as exc:
+                        logger.warning("Replay capture record_tool_call failed: %s", exc)
+
                 yield AgentEvent(EventType.tool_end, {
                     "tool": tool_name,
                     "summary": result_str[:200],
@@ -404,6 +433,13 @@ async def run_query_stream(
         logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
         pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
+        if capture is not None:
+            try:
+                capture.add_note("max_tool_calls reached without final answer")
+                capture.record_final("", tracker.summary())
+                capture.save()
+            except Exception as exc:
+                logger.warning("Replay capture save failed: %s", exc)
         yield AgentEvent(EventType.done, {
             "answer": "Maximum tool calls reached. Please try a simpler query.",
             "tools_used": list(set(tools_used)),
