@@ -111,9 +111,25 @@ class TestGetSignalFactorsShape:
         for f in result["factors"]:
             assert {"factor_type", "impact", "weight", "contribution", "details"} <= f.keys()
             assert f["factor_type"] in FACTOR_TYPES
-            # contribution = impact * weight (within rounding)
-            expected = round(f["impact"] * f["weight"], 4)
-            assert abs(f["contribution"] - expected) < 1e-3
+            # SignalSynthesizer's `impact` is already the score_delta it
+            # added to composite_score (i.e. already weighted), so
+            # contribution == impact. Multiplying by weight again would
+            # double-count and break additivity below.
+            assert abs(f["contribution"] - f["impact"]) < 1e-3
+
+    def test_contributions_sum_to_composite_score(self, dal):
+        """Per-factor contributions must be additive — sum ≈ composite_score.
+
+        This is the explainability contract: a caller who sees
+        ``contribution`` should be able to add them up and recover
+        ``composite.score``. If the math drifts, the breakdown stops
+        being trustworthy.
+        """
+        result = get_signal_factors(dal, ticker="NVDA", days=9999)
+        if not result["factors"]:
+            pytest.skip("synthesizer emitted no factors for this fixture")
+        total = sum(f["contribution"] for f in result["factors"])
+        assert abs(total - result["composite"]["score"]) < 1e-2
 
     def test_composite_uses_recommendation_vocabulary(self, dal):
         result = get_signal_factors(dal, ticker="NVDA", days=9999)
@@ -477,3 +493,94 @@ class TestFactorRankRoute:
         )
         assert seen == ["EAT", "MFC"]
         assert result["ticker_count_total"] == 2
+
+
+# ---------------------------------------------------------------------------
+# /signals/factor-rank routing — real HTTP via TestClient
+# ---------------------------------------------------------------------------
+
+
+class TestFactorRankHTTPRouting:
+    """Direct-call tests bypass Starlette routing. This class hits the
+    actual app so a misordered route declaration (static /factor-rank
+    after dynamic /{ticker}) is caught — Starlette would otherwise
+    capture the request as ticker=\"factor-rank\" and dispatch to
+    signal_for_ticker.
+    """
+
+    @staticmethod
+    def _fake_news_df():
+        return pd.DataFrame({
+            "date": pd.to_datetime(["2026-04-23", "2026-04-25"]),
+            "ticker": ["NVDA", "AMD"],
+            "title": ["beat", "guidance"],
+            "llm_sentiment": [4.2, 3.8],
+            "llm_risk": [2.0, 2.5],
+            "source": ["x", "x"],
+            "event_type": ["earnings", "guidance"],
+        })
+
+    def test_factor_rank_route_not_shadowed_by_ticker_route(self, monkeypatch):
+        from fastapi.testclient import TestClient
+        from src.api.app import create_app
+        from src.api.dependencies import get_dal
+
+        dal = MagicMock()
+        dal.get_watchlist.return_value = SimpleNamespace(tickers=["NVDA", "AMD"])
+
+        monkeypatch.setattr(
+            "src.api.routes.signals._prepare_news_df_for_signals",
+            lambda *a, **k: self._fake_news_df(),
+        )
+        monkeypatch.setattr(
+            "src.api.routes.signals.get_signal_factors",
+            lambda *a, **k: _factors_result(ticker=kwa(a, k, "ticker")),
+        )
+
+        app = create_app()
+        app.dependency_overrides[get_dal] = lambda: dal
+        try:
+            with TestClient(app) as client:
+                r = client.get(
+                    "/signals/factor-rank?universe=watchlist&factor=composite&top=5"
+                )
+            assert r.status_code == 200, r.text
+            body = r.json()
+            # Shape produced by factor_rank, NOT TradingSignal:
+            assert "ranked" in body
+            assert "missing_data_tickers" in body
+            assert "ticker_count_total" in body
+            assert body["universe"] == "watchlist"
+            assert body["factor"] == "composite"
+            # TradingSignal-only keys must not appear at top level.
+            assert "composite_score" not in body
+            assert "action" not in body
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_factor_rank_invalid_factor_returns_422_via_http(self, monkeypatch):
+        from fastapi.testclient import TestClient
+        from src.api.app import create_app
+        from src.api.dependencies import get_dal
+
+        dal = MagicMock()
+        dal.get_watchlist.return_value = SimpleNamespace(tickers=["NVDA"])
+
+        app = create_app()
+        app.dependency_overrides[get_dal] = lambda: dal
+        try:
+            with TestClient(app) as client:
+                r = client.get("/signals/factor-rank?factor=quality")
+            assert r.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+
+def kwa(args, kwargs, name):
+    """Pull a positional-or-keyword arg from a lambda's *args/**kwargs."""
+    if name in kwargs:
+        return kwargs[name]
+    # signal_tools.get_signal_factors signature: (dal, ticker, ...)
+    if name == "ticker" and len(args) >= 2:
+        return args[1]
+    return None

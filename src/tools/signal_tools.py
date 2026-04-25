@@ -535,11 +535,16 @@ def get_signal_factors(
     if ctx.raw_signal is not None:
         for f in ctx.raw_signal.factors:
             details = dict(f.details) if isinstance(f.details, dict) else {}
+            # SignalSynthesizer sets ``impact`` to the score_delta it added
+            # to composite_score directly (see synthesizer._process_*); it is
+            # already weighted. ``contribution`` therefore equals ``impact``,
+            # so per-factor contributions sum (within rounding) to
+            # composite_score and the breakdown is additive for explainability.
             factors_out.append({
                 "factor_type": f.factor_type,
                 "impact": round(float(f.impact), 4),
                 "weight": round(float(f.weight), 4),
-                "contribution": round(float(f.impact) * float(f.weight), 4),
+                "contribution": round(float(f.impact), 4),
                 "details": details,
             })
 

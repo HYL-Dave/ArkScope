@@ -120,43 +120,11 @@ def _missing_reason(factors_result: dict, factor: str) -> Optional[str]:
     return None
 
 
-@router.get("/{ticker}")
-def signal_for_ticker(
-    ticker: str,
-    days: int = Query(30, ge=1, le=9999),
-    strategy: Optional[str] = Query(None),
-    as_of_date: Optional[str] = Query(None, description="Anchor date YYYY-MM-DD (default: latest in data)"),
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Synthesize a multi-factor trading signal for a ticker."""
-    result = synthesize_signal(
-        dal, ticker=ticker, days=days, strategy=strategy,
-        as_of_date=_validate_as_of_date(as_of_date),
-    )
-    return result.model_dump()
-
-
-@router.get("/{ticker}/anomalies")
-def anomalies_for_ticker(
-    ticker: str,
-    days: int = Query(30, ge=1, le=9999),
-    as_of_date: Optional[str] = Query(None, description="Anchor date YYYY-MM-DD (default: latest in data)"),
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Detect sentiment and volume anomalies for a ticker."""
-    return detect_anomalies(
-        dal, ticker=ticker, days=days, as_of_date=_validate_as_of_date(as_of_date),
-    )
-
-
-@router.get("/{ticker}/event-chains")
-def event_chains_for_ticker(
-    ticker: str,
-    days: int = Query(30, ge=1, le=9999),
-    dal: DataAccessLayer = Depends(get_dal),
-):
-    """Detect event chain patterns for a ticker."""
-    return detect_event_chains(dal, ticker=ticker, days=days)
+# NOTE: static routes (e.g. /factor-rank) MUST be declared before the
+# dynamic /{ticker} catch-all. Starlette matches in declaration order, so
+# /signals/factor-rank would otherwise be captured as ticker="factor-rank".
+# Regression test in tests/test_signal_factors_p1.py uses TestClient to
+# guard this ordering.
 
 
 @router.get("/factor-rank")
@@ -314,3 +282,50 @@ def _factor_notes(factor: str) -> List[str]:
             "do not size positions on this rank alone."
         )
     return notes
+
+
+# Dynamic ticker routes follow. They are registered AFTER /factor-rank so
+# Starlette's first-match-wins ordering doesn't capture /factor-rank as
+# ticker="factor-rank". /{ticker}/anomalies and /{ticker}/event-chains
+# have an extra path segment so they don't collide with /{ticker}, but
+# any future static /signals/<word> route must also be declared above
+# this point.
+
+
+@router.get("/{ticker}")
+def signal_for_ticker(
+    ticker: str,
+    days: int = Query(30, ge=1, le=9999),
+    strategy: Optional[str] = Query(None),
+    as_of_date: Optional[str] = Query(None, description="Anchor date YYYY-MM-DD (default: latest in data)"),
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Synthesize a multi-factor trading signal for a ticker."""
+    result = synthesize_signal(
+        dal, ticker=ticker, days=days, strategy=strategy,
+        as_of_date=_validate_as_of_date(as_of_date),
+    )
+    return result.model_dump()
+
+
+@router.get("/{ticker}/anomalies")
+def anomalies_for_ticker(
+    ticker: str,
+    days: int = Query(30, ge=1, le=9999),
+    as_of_date: Optional[str] = Query(None, description="Anchor date YYYY-MM-DD (default: latest in data)"),
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Detect sentiment and volume anomalies for a ticker."""
+    return detect_anomalies(
+        dal, ticker=ticker, days=days, as_of_date=_validate_as_of_date(as_of_date),
+    )
+
+
+@router.get("/{ticker}/event-chains")
+def event_chains_for_ticker(
+    ticker: str,
+    days: int = Query(30, ge=1, le=9999),
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Detect event chain patterns for a ticker."""
+    return detect_event_chains(dal, ticker=ticker, days=days)
