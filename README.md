@@ -770,8 +770,9 @@ uvicorn src.api.app:create_app --factory --reload --port 8420
 | Category | Files |
 |----------|-------|
 | **Architecture** | `docs/design/MINDFULRL_ARCHITECTURE.md`, `SERVICE_ARCHITECTURE.md`, `DATA_STORAGE_ACCESS.md` |
+| **Priority Map** | `docs/design/PROJECT_PRIORITY_MAP.md` (P0/P1/P2/P3 ordered backlog — start here) |
 | **Agent Evolution** | `docs/design/AGENT_EVOLUTION_TRACKER.md` (detailed changelog, Phase 0-15 + A-F) |
-| **RL Pipeline** | `docs/design/RL_PIPELINE_DESIGN.md` (end-to-end integration design) |
+| **RL Pipeline** | `docs/design/RL_COLLAPSE_FINDINGS.md` (PAUSED 2026-04-25; original design archived under `docs/design/archive/`) |
 | **Data** | `docs/data/DATA_SUBSCRIPTION_GUIDE.md`, `OPTIONS_FLOW_GUIDE.md`, `OPTIONS_PRICING_THEORY.md` |
 | **Analysis** | `docs/analysis/SCORING_VALIDATION_METHODOLOGY.md` |
 | **Scripts** | `scripts/scoring/README.md`, `scripts/visualization/README.md` |
