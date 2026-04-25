@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from src.agents.config import get_agent_config
 from src.api.dependencies import get_dal
+from src.service.sa_market_news_health import compute_market_news_health
 from src.tools.sa_tools import (
     _DISABLED_MSG,
     get_sa_alpha_picks,
@@ -94,3 +96,31 @@ def market_news(
     return _unwrap_sa_result(
         get_sa_market_news(dal, ticker=ticker, keyword=keyword, limit=limit)
     )
+
+
+@router.get("/market-news/health")
+def market_news_health(
+    response: Response,
+    strict: bool = Query(False, description="Return 503 when severity != ok."),
+    dal=Depends(get_dal),
+):
+    """Return SA market-news pipeline health (P0.4).
+
+    Three layers reported separately so callers can tell pipeline staleness
+    from feed-content lulls from detail-body gaps:
+
+      - ``freshness``     last fetch / latest published age
+      - ``feed_health``   rows in 24h / 7d
+      - ``detail_health`` 7d body completeness
+
+    Severity ladder: ``ok`` / ``warning`` / ``critical``. Default returns
+    200 with the structured payload regardless. ``?strict=true`` upgrades
+    any non-``ok`` severity to HTTP 503 for healthcheck-style probes.
+    """
+    if not get_agent_config().sa_enabled:
+        raise HTTPException(status_code=503, detail=_DISABLED_MSG)
+
+    report = compute_market_news_health(dal)
+    if strict and report.get("severity") != "ok":
+        response.status_code = 503
+    return report
