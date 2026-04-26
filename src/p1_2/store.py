@@ -31,7 +31,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -62,14 +63,17 @@ def economic_event_fingerprint(country: str, event_name: str, event_time: dateti
     """Stable identity for an economic-calendar event.
 
     Inputs are normalised (country uppercased, event_name stripped, event_time
-    rendered as UTC ISO 8601 with seconds) so re-fetching the same row from
-    Finnhub upserts the same canonical row instead of duplicating it.
+    converted to UTC and rendered as ISO 8601 with seconds) so re-fetching the
+    same row from Finnhub upserts the same canonical row instead of
+    duplicating it. The astimezone(UTC) step matters: the same wall-clock
+    instant expressed as `+09:00` or `+00:00` must produce the same
+    fingerprint, and Finnhub's `time` field is UTC anyway (smoke §5.2).
     """
     if event_time.tzinfo is None:
         raise ValueError("event_time must be timezone-aware")
     canon_country = (country or "").strip().upper()
     canon_name = (event_name or "").strip()
-    canon_time = event_time.astimezone(tz=event_time.tzinfo).strftime("%Y-%m-%dT%H:%M:%S%z")
+    canon_time = event_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
     raw = f"{canon_country}|{canon_name}|{canon_time}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -96,9 +100,59 @@ def ipo_event_fingerprint(name: str, ipo_date: date) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _tracked_payload_differs(existing: Dict[str, Any], new: Dict[str, Any], fields: Iterable[str]) -> bool:
+def _normalize_for_diff(value: Any) -> Any:
+    """Coerce numeric-shaped values into a single canonical form for diffing.
+
+    PostgreSQL NUMERIC columns come back as ``Decimal``; Finnhub payloads
+    deliver ``float`` / ``int``. ``Decimal('4.1') != 4.1`` in vanilla
+    Python, which would mark every re-ingest of an unchanged numeric row
+    as a mutation and flood the revision log with no-ops.
+
+    Strategy: numeric inputs (``Decimal`` / ``int`` / ``float`` / numeric
+    strings) all collapse to ``Decimal(str(value))``. Bool inputs are
+    intentionally NOT normalised — bool is a numeric subtype in Python
+    but our schema uses bool semantically (no calendar field is bool
+    today, but defending against the surprise costs nothing).
+
+    Non-numeric values pass through unchanged so string / date /
+    timestamp comparisons still work as expected.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, Decimal):
+        try:
+            return Decimal(str(value))
+        except InvalidOperation:
+            return value
+    if isinstance(value, (int, float)):
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return value
+    if isinstance(value, str):
+        # Try to coerce numeric strings; non-numeric strings stay as-is so
+        # status / hour / event_name comparisons keep their natural form.
+        try:
+            return Decimal(value)
+        except (InvalidOperation, ValueError):
+            return value
+    return value
+
+
+def _tracked_payload_differs(
+    existing: Dict[str, Any],
+    new: Dict[str, Any],
+    fields: Iterable[str],
+) -> bool:
+    """Compare tracked fields with type-aware coercion.
+
+    See ``_normalize_for_diff``. The TL;DR: ``Decimal('4.1')`` from the DB
+    must compare equal to ``4.1`` from a Finnhub re-fetch.
+    """
     for f in fields:
-        if existing.get(f) != new.get(f):
+        if _normalize_for_diff(existing.get(f)) != _normalize_for_diff(new.get(f)):
             return True
     return False
 

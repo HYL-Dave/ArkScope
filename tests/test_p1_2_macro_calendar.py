@@ -21,7 +21,8 @@ the same paths against real PostgreSQL.
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -35,6 +36,8 @@ from src.p1_2.store import (
     ECONOMIC_TRACKED_FIELDS,
     IPO_TRACKED_FIELDS,
     MacroCalendarStore,
+    _normalize_for_diff,
+    _tracked_payload_differs,
     earnings_event_fingerprint,
     economic_event_fingerprint,
     ipo_event_fingerprint,
@@ -101,6 +104,16 @@ class TestFingerprints:
         t2 = datetime(2024, 12, 18, 19, 1, tzinfo=timezone.utc)
         assert economic_event_fingerprint("US", "X", t1) != \
                economic_event_fingerprint("US", "X", t2)
+
+    def test_economic_fingerprint_same_instant_different_offsets(self):
+        """A given UTC instant must produce the same fingerprint regardless of
+        which timezone the caller represents it in."""
+        utc = datetime(2024, 12, 18, 19, 0, tzinfo=timezone.utc)
+        # Same instant, expressed in JST (+09:00).
+        jst = utc.astimezone(timezone(timedelta(hours=9)))
+        assert utc != jst.replace(tzinfo=utc.tzinfo)  # sanity: different tz objects
+        assert economic_event_fingerprint("US", "X", utc) == \
+               economic_event_fingerprint("US", "X", jst)
 
     def test_earnings_fingerprint_normalises_symbol(self):
         a = earnings_event_fingerprint("nvda", 2026, 1)
@@ -401,6 +414,93 @@ class TestMacro:
         assert params[2] == 312.332
         assert params[3] == date(2024, 4, 10)
         assert params[4] is None
+
+
+class TestNumericDiffNormalisation:
+    """Decimal vs float vs int vs numeric-string must all compare equal when
+    they represent the same number. Without this, every re-fetch of an
+    unchanged numeric row would mark a mutation and flood the revision log.
+    """
+
+    def test_decimal_vs_float_equal(self):
+        assert _normalize_for_diff(Decimal("4.1")) == _normalize_for_diff(4.1)
+
+    def test_decimal_vs_int_equal(self):
+        assert _normalize_for_diff(Decimal("5")) == _normalize_for_diff(5)
+
+    def test_decimal_vs_numeric_string_equal(self):
+        assert _normalize_for_diff(Decimal("4.50")) == _normalize_for_diff("4.50")
+
+    def test_none_passes_through(self):
+        assert _normalize_for_diff(None) is None
+
+    def test_non_numeric_string_passes_through(self):
+        assert _normalize_for_diff("amc") == "amc"
+        assert _normalize_for_diff("") == ""
+
+    def test_bool_not_normalised_to_decimal(self):
+        # bool is a numeric subtype in Python but we never want True coerced
+        # into Decimal('1') for our diff (semantic difference).
+        assert _normalize_for_diff(True) is True
+        assert _normalize_for_diff(False) is False
+
+    def test_tracked_payload_differs_decimal_vs_float_no_mutation(self):
+        """The headline invariant: Decimal('4.1') from DB vs 4.1 from
+        Finnhub re-fetch must NOT register as a mutation."""
+        existing = {"actual": Decimal("4.1"), "estimate": Decimal("4.5"), "prev": Decimal("4.75")}
+        new = {"actual": 4.1, "estimate": 4.5, "prev": 4.75}
+        assert _tracked_payload_differs(existing, new, ECONOMIC_TRACKED_FIELDS) is False
+
+    def test_tracked_payload_differs_real_change_still_detected(self):
+        existing = {"actual": Decimal("4.1"), "estimate": Decimal("4.5"), "prev": Decimal("4.75")}
+        new = {"actual": 4.2, "estimate": 4.5, "prev": 4.75}  # actual changed
+        assert _tracked_payload_differs(existing, new, ECONOMIC_TRACKED_FIELDS) is True
+
+    def test_mutation_detection_treats_none_to_value_as_change(self):
+        """null → populated is the most common revision (release prints actual)."""
+        existing = {"actual": None, "estimate": Decimal("4.5"), "prev": Decimal("4.75")}
+        new = {"actual": 4.5, "estimate": 4.5, "prev": 4.75}
+        assert _tracked_payload_differs(existing, new, ECONOMIC_TRACKED_FIELDS) is True
+
+
+class TestUpsertEconomicNoOpOnDecimalFloatEqual:
+    """End-to-end check: store.upsert_economic_event must return action='unchanged'
+    (no canonical UPDATE, no revision INSERT) when the only 'change' is
+    Decimal-vs-float type difference."""
+
+    def test_decimal_existing_vs_float_payload_is_unchanged(self):
+        dal = MagicMock()
+        backend = MagicMock()
+        backend._get_conn = MagicMock()
+        dal._backend = backend
+
+        store = MacroCalendarStore(dal)
+        executions = []
+        existing_row = {
+            "event_id": 42,
+            "actual": Decimal("4.5"),
+            "estimate": Decimal("4.5"),
+            "prev": Decimal("4.75"),
+        }
+        conn = _make_conn(executions, [existing_row])
+        backend._get_conn.return_value = conn
+
+        eid, action = store.upsert_economic_event(
+            payload={
+                "country": "US",
+                "event_name": "Fed Interest Rate Decision",
+                "event_time": datetime(2024, 12, 18, 19, 0, tzinfo=timezone.utc),
+                "impact": "high",
+                "unit": "%",
+                "actual": 4.5,    # float — same number as Decimal('4.5')
+                "estimate": 4.5,
+                "prev": 4.75,
+            },
+            source_payload={"raw": "noisy refetch"},
+        )
+        assert (eid, action) == (42, "unchanged")
+        assert len(executions) == 1  # only the SELECT
+        conn.commit.assert_called_once()
 
 
 class TestTrackedFields:
