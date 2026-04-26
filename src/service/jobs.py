@@ -109,6 +109,33 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         feature_flag="sa_enabled",
         default_params={"batch_size": 500},
     ),
+    "fetch_fred_release_dates": JobDefinition(
+        name="fetch_fred_release_dates",
+        description=(
+            "Refresh macro_release_dates from FRED /release/dates for the "
+            "curated release_id set in config/p1_2_macro_series.yaml. Run "
+            "before fetch_fred_series so latest_only ingestion has a "
+            "realtime_start lookup."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="p1_2_enabled",
+        default_params={},
+    ),
+    "fetch_fred_series": JobDefinition(
+        name="fetch_fred_series",
+        description=(
+            "Refresh macro_series + macro_observations from FRED. "
+            "latest_only series store one row per observation_date keyed on "
+            "release_date; full_vintages series store one row per ALFRED "
+            "vintage window. Default is incremental (~90 days back); set "
+            "full_refresh=true for full backfill."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="p1_2_enabled",
+        default_params={"full_refresh": False},
+    ),
 }
 
 _JOB_STATE: Dict[str, JobExecutionState] = {
@@ -163,6 +190,8 @@ def _availability_reason(job: JobDefinition, config: AgentConfig) -> Optional[st
             return "Enable analysis_pipeline.enabled to run this job."
         if job.feature_flag == "sa_enabled":
             return "Enable seeking_alpha.enabled to expose this job."
+        if job.feature_flag == "p1_2_enabled":
+            return "Enable p1_2.enabled to expose this job."
     if not job.runnable_via_api:
         return "This job is currently managed by the SA Chrome extension, not the backend API."
     return None
@@ -409,6 +438,10 @@ def run_job(
             result = _run_monitor_watchlist_scan(dal, payload)
         elif job.name == "extract_sa_comment_signals":
             result = _run_extract_sa_comment_signals(dal, payload)
+        elif job.name == "fetch_fred_release_dates":
+            result = _run_fetch_fred_release_dates(dal, payload)
+        elif job.name == "fetch_fred_series":
+            result = _run_fetch_fred_series(dal, payload)
         else:  # pragma: no cover - defensive branch
             raise UnknownJobError(job.name)
 
@@ -480,6 +513,38 @@ def _run_extract_sa_comment_signals(
     )
 
 
+def _run_fetch_fred_release_dates(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Refresh macro_release_dates from FRED for the curated release_id set."""
+    from src.p1_2.fred_ingestion import fetch_fred_release_dates
+
+    release_ids = params.get("release_ids")
+    stats = fetch_fred_release_dates(
+        dal,
+        release_ids=release_ids,
+    )
+    return stats.to_dict()
+
+
+def _run_fetch_fred_series(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Refresh macro_series + macro_observations from FRED."""
+    from src.p1_2.fred_ingestion import fetch_fred_series
+
+    series_ids = params.get("series_ids")
+    full_refresh = bool(params.get("full_refresh", False))
+    stats = fetch_fred_series(
+        dal,
+        series_ids=series_ids,
+        full_refresh=full_refresh,
+    )
+    return stats.to_dict()
+
+
 def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
     """Compose a short success message suitable for ``last_message`` UI fields.
 
@@ -508,5 +573,25 @@ def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
             base = f"Extracted {extracted} comment signal(s)"
             if pending is not None and pending > extracted:
                 base += f" of {pending} pending"
+            return base
+    if job_name == "fetch_fred_release_dates":
+        upserted = result.get("release_dates_upserted")
+        errs = result.get("errors") or []
+        if upserted is not None:
+            base = f"Upserted {upserted} release_date(s)"
+            if errs:
+                base += f", {len(errs)} error(s)"
+            return base
+    if job_name == "fetch_fred_series":
+        processed = result.get("series_processed")
+        skipped = result.get("series_skipped", 0)
+        upserted = result.get("observations_upserted", 0)
+        skipped_obs = result.get("observations_skipped_no_release", 0)
+        if processed is not None:
+            base = f"Processed {processed} series, {upserted} obs upserted"
+            if skipped:
+                base += f", {skipped} series skipped"
+            if skipped_obs:
+                base += f", {skipped_obs} obs skipped (no release_date)"
             return base
     return "Job completed successfully."
