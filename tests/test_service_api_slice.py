@@ -175,6 +175,51 @@ class TestJobsRoutes:
             run_named_job("sa_alpha_picks_refresh", JobRunRequest(), dal=object())
         assert exc_info.value.status_code == 409
 
+    def test_macro_calendar_params_round_trip_through_request_model(self):
+        """Regression: from_date/to_date/years_back/symbols must survive
+        Pydantic validation. Pre-fix Pydantic silently dropped these fields,
+        so /jobs/run requests with explicit windows fell back to defaults.
+        Lock the contract — and series_ids / release_ids / full_refresh for
+        the FRED jobs — so it can't drift again.
+        """
+        req = JobRunRequest.model_validate({
+            "from_date": "2026-01-01",
+            "to_date": "2026-01-15",
+            "years_back": 2,
+            "symbols": ["AAPL", "NVDA"],
+            "series_ids": ["CPIAUCNS"],
+            "release_ids": [10],
+            "full_refresh": True,
+        })
+        params = req.model_dump(exclude_none=True)
+        assert params["from_date"] == "2026-01-01"
+        assert params["to_date"] == "2026-01-15"
+        assert params["years_back"] == 2
+        assert params["symbols"] == ["AAPL", "NVDA"]
+        assert params["series_ids"] == ["CPIAUCNS"]
+        assert params["release_ids"] == [10]
+        assert params["full_refresh"] is True
+
+    def test_request_model_rejects_zero_years_back(self):
+        """years_back=0 must raise at the API boundary, not silently accept
+        and let the dispatcher's ValueError surface as 400 mid-call."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            JobRunRequest.model_validate({"years_back": 0})
+
+    def test_request_model_omits_calendar_fields_when_unset(self):
+        """exclude_none=True must drop the new optional fields so a payload
+        like {"depth":"standard"} doesn't accidentally surface from_date=None
+        as a real param."""
+        req = JobRunRequest.model_validate({"depth": "quick"})
+        params = req.model_dump(exclude_none=True)
+        for key in (
+            "from_date", "to_date", "years_back", "symbols",
+            "series_ids", "release_ids", "full_refresh",
+        ):
+            assert key not in params, f"{key} should have been excluded"
+
 
 class TestSeekingAlphaRoutes:
     def test_alpha_picks_route_passthrough(self, monkeypatch):

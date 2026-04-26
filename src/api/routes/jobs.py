@@ -46,8 +46,13 @@ class JobsStatusResponse(BaseModel):
 
 
 class JobRunRequest(BaseModel):
-    """Optional request body for POST /jobs/run/{job_name}."""
+    """Optional request body for POST /jobs/run/{job_name}.
 
+    Field set is union-of-all-jobs; per-job dispatchers in
+    ``src/service/jobs.py`` consume only the keys they recognise.
+    """
+
+    # analysis_watchlist_batch / monitor_watchlist_scan
     tickers: Optional[List[str]] = None
     limit: Optional[int] = Field(default=None, ge=1, le=200)
     depth: Literal["quick", "standard", "full"] = "standard"
@@ -56,6 +61,15 @@ class JobRunRequest(BaseModel):
     # extract_sa_comment_signals
     batch_size: Optional[int] = Field(default=None, ge=1, le=5000)
     max_extracted: Optional[int] = Field(default=None, ge=1)
+    # macro_calendar Finnhub jobs (commit 4)
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    years_back: Optional[int] = Field(default=None, ge=1)
+    symbols: Optional[List[str]] = None
+    # macro_calendar FRED jobs
+    series_ids: Optional[List[str]] = None
+    release_ids: Optional[List[int]] = None
+    full_refresh: Optional[bool] = None
 
 
 class JobRunResponse(BaseModel):
