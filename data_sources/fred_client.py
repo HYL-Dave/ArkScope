@@ -254,14 +254,28 @@ class FREDClient:
         vintage_dates: Optional[Sequence[date]] = None,
         limit: Optional[int] = None,
         sort_order: str = "asc",
+        output_type: Optional[int] = None,
     ) -> List[FREDObservation]:
         """Return observations for ``series_id``.
 
         Vintage selection: ``realtime_start`` + ``realtime_end`` give a
         single as-of vintage; ``vintage_dates`` gives a comma-separated
-        list of explicit snapshots (used by ``full_vintages`` ingestion).
-        Without either, FRED returns the current-vintage values with
-        realtime_window collapsed to today.
+        list of explicit snapshots; ``output_type`` controls the row
+        shape:
+
+          - 1 (default): "By Real-Time Period" — one row per
+            [realtime_start, realtime_end) window. The natural
+            full-revision history shape; this is what our parser
+            expects and what ``full_vintages`` ingestion uses.
+          - 2 / 3: wide-format rows with ``SERIES_YYYYMMDD`` keys.
+            **Not supported by this client's parser** — request these
+            and you'll get an empty result.
+          - 4: "Initial Release Only" — one row matching the first
+            publication realtime window. Used by ``latest_only``
+            ingestion.
+
+        See ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the
+        live-call evidence behind this mapping.
         """
         params: Dict[str, Any] = {
             "series_id": series_id,
@@ -279,6 +293,14 @@ class FREDClient:
             params["vintage_dates"] = ",".join(d.isoformat() for d in vintage_dates)
         if limit is not None:
             params["limit"] = int(limit)
+        if output_type is not None:
+            if output_type not in (1, 4):
+                raise ValueError(
+                    "Only output_type=1 (real-time periods) and =4 "
+                    "(initial release) are supported by this client; "
+                    "=2/=3 return wide-format rows the parser doesn't handle."
+                )
+            params["output_type"] = int(output_type)
         body = self._get("/series/observations", params)
         return [
             _observation_from_json(r)

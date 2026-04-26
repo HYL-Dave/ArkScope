@@ -348,20 +348,12 @@ def _ingest_latest_only(
         realtime_start=ALFRED_FULL_HISTORY_START,
         realtime_end=ALFRED_FULL_HISTORY_END,
         sort_order="asc",
+        output_type=OUTPUT_TYPE_INITIAL_RELEASE,
     )
-    if not obs:
-        return
-    # Group by observation_date and keep the row with the earliest
-    # realtime_start. For a non-revising series ALFRED already returns
-    # exactly one row per observation_date so this is a no-op; for any
-    # series mistakenly tagged latest_only that does revise, this picks
-    # the first-publication value (and we leak no future revision).
-    earliest: Dict[date, Any] = {}
     for row in obs:
-        existing = earliest.get(row.observation_date)
-        if existing is None or row.realtime_start < existing.realtime_start:
-            earliest[row.observation_date] = row
-    for row in earliest.values():
+        # output_type=4 returns one row per observation_date already
+        # matching the first-publication realtime window. No dedupe
+        # needed — see P1_2_PROVIDER_DISCOVERY.md §6.3.
         ok = store.upsert_macro_observation(
             series_id=entry.series_id,
             observation_date=row.observation_date,
@@ -382,11 +374,17 @@ def _ingest_full_vintages(
 ) -> None:
     """Ingest each ALFRED-supplied vintage as its own realtime window.
 
-    Crucially we MUST pass ``realtime_start='1776-07-04'`` +
-    ``realtime_end='9999-12-31'`` to opt into ALFRED. Without those
-    parameters FRED defaults to today's vintage only and the "full
-    revision history" promise quietly collapses to current values
-    (see ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6).
+    Critical: ``output_type=1`` is the parser-friendly format
+    ("By Real-Time Period"). It IS the FRED default today, but we
+    request it explicitly so a future server-side default change can't
+    silently collapse our revision history. The wide-format
+    ``output_type=2``/``=3`` responses share the endpoint name but
+    return ``{date, GDP_YYYYMMDD: value, ...}`` rows our parser ignores.
+
+    The full ALFRED window (``realtime_start='1776-07-04'``,
+    ``realtime_end='9999-12-31'``) ensures FRED returns every revision
+    instead of just today's vintage. See
+    ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the spike.
     """
     obs = fred.get_observations(
         entry.series_id,
@@ -394,6 +392,7 @@ def _ingest_full_vintages(
         realtime_start=ALFRED_FULL_HISTORY_START,
         realtime_end=ALFRED_FULL_HISTORY_END,
         sort_order="asc",
+        output_type=OUTPUT_TYPE_REAL_TIME_PERIOD,
     )
     for row in obs:
         ok = store.upsert_macro_observation(
@@ -412,3 +411,9 @@ def _ingest_full_vintages(
 # tighter restricts the response to a sub-window of vintages.
 ALFRED_FULL_HISTORY_START = date(1776, 7, 4)
 ALFRED_FULL_HISTORY_END = date(9999, 12, 31)
+
+# FRED /series/observations output_type values. We pin the two we use
+# explicitly so a future API default change can't silently change our
+# row shape. See P1_2_PROVIDER_DISCOVERY.md §6.3 for the spike.
+OUTPUT_TYPE_REAL_TIME_PERIOD = 1   # full revision history, our parser format
+OUTPUT_TYPE_INITIAL_RELEASE = 4    # first publication only

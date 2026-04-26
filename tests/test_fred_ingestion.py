@@ -35,6 +35,8 @@ from src.p1_2 import fred_ingestion as ing
 from src.p1_2.fred_ingestion import (
     ALFRED_FULL_HISTORY_END,
     ALFRED_FULL_HISTORY_START,
+    OUTPUT_TYPE_INITIAL_RELEASE,
+    OUTPUT_TYPE_REAL_TIME_PERIOD,
     Catalog,
     CatalogEntry,
     IngestionStats,
@@ -166,6 +168,31 @@ class TestClientHttpShape:
         assert meta is not None
         assert meta.last_updated is not None
         assert meta.last_updated.tzinfo is not None
+
+    def test_output_type_sent_as_param(self):
+        """output_type must appear in the FRED request params when specified."""
+        client = self._make_client(_mock_response({"observations": []}))
+        client.get_observations("GDP", output_type=1)
+        params = client._session.get.call_args.kwargs["params"]
+        assert params["output_type"] == 1
+
+    def test_no_output_type_omits_param(self):
+        """When output_type is not given the param must be absent so FRED
+        applies its own default (currently =1) rather than receiving an
+        explicit value from us."""
+        client = self._make_client(_mock_response({"observations": []}))
+        client.get_observations("CPIAUCNS")
+        params = client._session.get.call_args.kwargs["params"]
+        assert "output_type" not in params
+
+    def test_unsupported_output_type_raises_value_error(self):
+        """output_type=2/3 return wide-format SERIES_YYYYMMDD rows that our
+        parser doesn't handle. The client must reject them at call time rather
+        than silently returning an empty list."""
+        client = self._make_client(_mock_response({"observations": []}))
+        for bad_ot in (2, 3):
+            with pytest.raises(ValueError, match="output_type"):
+                client.get_observations("GDP", output_type=bad_ot)
 
 
 # ---------------------------------------------------------------------------
@@ -366,14 +393,11 @@ class TestLatestOnlyIngestion:
         assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
         assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
 
-    def test_latest_only_dedupes_to_earliest_realtime_per_obs_date(
-        self, monkeypatch,
-    ):
-        """If FRED returns multiple realtime windows for the same
-        observation_date (i.e. a series mistakenly tagged latest_only
-        actually revises), keep the earliest realtime_start. We must
-        not leak a later revision's value as if it were knowable on the
-        first-publication date."""
+    def test_latest_only_passes_each_row_to_store(self, monkeypatch):
+        """With output_type=4, FRED returns at most one row per observation_date
+        (the initial release). The ingestion path passes each row straight to
+        the store; deduplication is handled at the DB layer via ON CONFLICT.
+        Two observation_dates → two store writes."""
         store = _FakeStore()
         client = _client_with_canned(
             metadata=FREDSeriesMetadata(
@@ -381,15 +405,44 @@ class TestLatestOnlyIngestion:
                 units="x", seasonal_adjustment=None, last_updated=None,
             ),
             observations=[
-                # Two windows for same obs — first publication on 4/10,
-                # later revision on 5/15.
+                # Separate observation_dates — one row each (output_type=4
+                # guarantees this in production; we verify the write-through).
+                FREDObservation(date(2024, 2, 1), 311.054,
+                                realtime_start=date(2024, 3, 12),
+                                realtime_end=date(9999, 12, 31)),
                 FREDObservation(date(2024, 3, 1), 312.332,
                                 realtime_start=date(2024, 4, 10),
-                                realtime_end=date(2024, 5, 15)),
-                FREDObservation(date(2024, 3, 1), 312.500,
-                                realtime_start=date(2024, 5, 15),
                                 realtime_end=date(9999, 12, 31)),
             ],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="CPIAUCNS",
+            revision_strategy="latest_only",
+            release_id=10,
+        )), monkeypatch)
+        _patch_store(store, monkeypatch)
+
+        stats = fetch_fred_series(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            full_refresh=True,
+        )
+        assert stats.observations_upserted == 2
+        obs_dates = {w["observation_date"] for w in store.observation_writes}
+        assert obs_dates == {date(2024, 2, 1), date(2024, 3, 1)}
+
+    def test_latest_only_uses_output_type_initial_release(self, monkeypatch):
+        """latest_only ingestion must pass output_type=4 (Initial Release Only)
+        so FRED returns exactly one row per observation_date carrying the
+        first-publication realtime_start. Live evidence (GDP 2024-Q1 spike,
+        §6.3): output_type=4 → 1 row vs output_type=1 → 5 revision rows."""
+        store = _FakeStore()
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(
+                series_id="CPIAUCNS", title="x", frequency="m",
+                units="x", seasonal_adjustment=None, last_updated=None,
+            ),
+            observations=[],
         )
         _patch_catalog(_tiny_catalog(CatalogEntry(
             series_id="CPIAUCNS",
@@ -403,12 +456,8 @@ class TestLatestOnlyIngestion:
             client=client,
             full_refresh=True,
         )
-        # Exactly one row written, and it carries the FIRST publication
-        # date (2024-04-10) and the FIRST publication value (312.332).
-        assert len(store.observation_writes) == 1
-        w = store.observation_writes[0]
-        assert w["realtime_start"] == date(2024, 4, 10)
-        assert w["value"] == 312.332
+        kwargs = client.get_observations.call_args.kwargs
+        assert kwargs["output_type"] == OUTPUT_TYPE_INITIAL_RELEASE  # 4
 
 
 class TestFullVintagesIngestion:
@@ -473,6 +522,35 @@ class TestFullVintagesIngestion:
         kwargs = client.get_observations.call_args.kwargs
         assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
         assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
+
+    def test_full_vintages_uses_output_type_real_time_period(self, monkeypatch):
+        """full_vintages ingestion must pass output_type=1 (By Real-Time Period)
+        explicitly. output_type=1 IS the current FRED default, but we pin it
+        defensively so a future server-side default change can't silently
+        collapse revision history into a single today's-vintage row.
+        Live evidence (§6.3 spike): output_type=1 → 5 rows for GDP 2024-Q1
+        vs output_type=4 → 1 row."""
+        store = _FakeStore()
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(
+                series_id="GDP", title="GDP", frequency="q",
+                units="$B", seasonal_adjustment="SAAR", last_updated=None,
+            ),
+            observations=[],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="GDP", revision_strategy="full_vintages",
+            release_id=53,
+        )), monkeypatch)
+        _patch_store(store, monkeypatch)
+
+        fetch_fred_series(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            full_refresh=True,
+        )
+        kwargs = client.get_observations.call_args.kwargs
+        assert kwargs["output_type"] == OUTPUT_TYPE_REAL_TIME_PERIOD  # 1
 
 
 class TestReleaseDateIngestion:
