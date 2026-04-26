@@ -113,13 +113,13 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         name="fetch_fred_release_dates",
         description=(
             "Refresh macro_release_dates from FRED /release/dates for the "
-            "curated release_id set in config/p1_2_macro_series.yaml. Run "
+            "curated release_id set in config/macro_calendar_series.yaml. Run "
             "before fetch_fred_series so latest_only ingestion has a "
             "realtime_start lookup."
         ),
         source="api",
         runnable_via_api=True,
-        feature_flag="p1_2_enabled",
+        feature_flag="macro_calendar_enabled",
         default_params={},
     ),
     "fetch_fred_series": JobDefinition(
@@ -133,7 +133,7 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         ),
         source="api",
         runnable_via_api=True,
-        feature_flag="p1_2_enabled",
+        feature_flag="macro_calendar_enabled",
         default_params={"full_refresh": False},
     ),
 }
@@ -190,8 +190,8 @@ def _availability_reason(job: JobDefinition, config: AgentConfig) -> Optional[st
             return "Enable analysis_pipeline.enabled to run this job."
         if job.feature_flag == "sa_enabled":
             return "Enable seeking_alpha.enabled to expose this job."
-        if job.feature_flag == "p1_2_enabled":
-            return "Enable p1_2.enabled to expose this job."
+        if job.feature_flag == "macro_calendar_enabled":
+            return "Enable macro_calendar.enabled to expose this job."
     if not job.runnable_via_api:
         return "This job is currently managed by the SA Chrome extension, not the backend API."
     return None
@@ -518,7 +518,7 @@ def _run_fetch_fred_release_dates(
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Refresh macro_release_dates from FRED for the curated release_id set."""
-    from src.p1_2.fred_ingestion import fetch_fred_release_dates
+    from src.macro_calendar.fred_ingestion import fetch_fred_release_dates
 
     release_ids = params.get("release_ids")
     stats = fetch_fred_release_dates(
@@ -533,7 +533,7 @@ def _run_fetch_fred_series(
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Refresh macro_series + macro_observations from FRED."""
-    from src.p1_2.fred_ingestion import fetch_fred_series
+    from src.macro_calendar.fred_ingestion import fetch_fred_series
 
     series_ids = params.get("series_ids")
     full_refresh = bool(params.get("full_refresh", False))

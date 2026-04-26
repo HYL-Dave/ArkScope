@@ -22,7 +22,7 @@ Design notes:
     unrecognised impact → ``""``. An unrecognised status → row skipped
     (``_ipo_from_json`` returns None).
   - **No DB writes**: pure HTTP/parse layer. Persistence lives in
-    ``src/p1_2/finnhub_ingestion.py``.
+    ``src/macro_calendar/finnhub_ingestion.py``.
 """
 
 from __future__ import annotations

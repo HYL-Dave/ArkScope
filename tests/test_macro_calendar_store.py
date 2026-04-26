@@ -31,7 +31,7 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.p1_2.store import (
+from src.macro_calendar.store import (
     EARNINGS_TRACKED_FIELDS,
     ECONOMIC_TRACKED_FIELDS,
     IPO_TRACKED_FIELDS,

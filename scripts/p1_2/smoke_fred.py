@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from data_sources.fred_client import FREDClient, FREDError  # noqa: E402
-from src.p1_2.fred_ingestion import (  # noqa: E402
+from src.macro_calendar.fred_ingestion import (  # noqa: E402
     Catalog, CatalogEntry, fetch_fred_series, load_catalog,
 )
 
@@ -119,7 +119,7 @@ def main() -> int:
             release_date_value=r.release_date,
         )
 
-    from src.p1_2 import fred_ingestion as ing
+    from src.macro_calendar import fred_ingestion as ing
     real_store_factory = ing.MacroCalendarStore
     ing.MacroCalendarStore = lambda dal: store
 

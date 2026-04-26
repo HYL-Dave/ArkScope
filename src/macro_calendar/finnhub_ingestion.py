@@ -11,7 +11,7 @@ Three callable entry points the job runner wraps (commit 4):
     for a date window.
 
 All three follow the canonical/revision upsert contract from the
-``MacroCalendarStore`` (see ``src/p1_2/store.py``):
+``MacroCalendarStore`` (see ``src/macro_calendar/store.py``):
 
   - First ingestion of a fingerprint → ``"inserted"`` (canonical row +
     baseline revision in one transaction).
@@ -34,7 +34,7 @@ from data_sources.finnhub_calendar_client import (
     FinnhubCalendarClient,
     FinnhubError,
 )
-from src.p1_2.store import MacroCalendarStore
+from src.macro_calendar.store import MacroCalendarStore
 
 logger = logging.getLogger(__name__)
 

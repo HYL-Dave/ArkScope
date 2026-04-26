@@ -34,8 +34,8 @@ from data_sources.finnhub_calendar_client import (
     _normalize_impact,
     _parse_finnhub_time,
 )
-from src.p1_2 import finnhub_ingestion as ing
-from src.p1_2.finnhub_ingestion import (
+from src.macro_calendar import finnhub_ingestion as ing
+from src.macro_calendar.finnhub_ingestion import (
     FinnhubIngestionStats,
     fetch_finnhub_earnings_events,
     fetch_finnhub_economic_events,

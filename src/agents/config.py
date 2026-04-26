@@ -113,12 +113,12 @@ class AgentConfig(BaseModel):
     # Phase D analysis pipeline scaffold
     analysis_pipeline_enabled: bool = False
 
-    # P1.2 free calendar / macro layer (FRED + Finnhub calendars).
+    # Free macro/calendar layer (FRED + Finnhub calendars).
     # Gates registration of fetch_fred_series / fetch_fred_release_dates jobs
     # so an environment without FRED_API_KEY doesn't get them surfaced via
     # /jobs/status. Calendar tables in sql/013 always exist; the flag only
     # controls the ingestion jobs.
-    p1_2_enabled: bool = False
+    macro_calendar_enabled: bool = False
 
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
@@ -290,10 +290,10 @@ def get_agent_config() -> AgentConfig:
     if "enabled" in analysis_prefs:
         config.analysis_pipeline_enabled = analysis_prefs["enabled"]
 
-    # P1.2 free calendar / macro layer
-    p1_2_prefs = profile.get("p1_2", {})
-    if "enabled" in p1_2_prefs:
-        config.p1_2_enabled = p1_2_prefs["enabled"]
+    # Free macro/calendar layer
+    mc_prefs = profile.get("macro_calendar", {})
+    if "enabled" in mc_prefs:
+        config.macro_calendar_enabled = mc_prefs["enabled"]
 
     # Context management overrides
     ctx_prefs = profile.get("context_management", {})

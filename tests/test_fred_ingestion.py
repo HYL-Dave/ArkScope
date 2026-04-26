@@ -31,8 +31,8 @@ from data_sources.fred_client import (
     _parse_offset_aware_dt,
     _parse_value,
 )
-from src.p1_2 import fred_ingestion as ing
-from src.p1_2.fred_ingestion import (
+from src.macro_calendar import fred_ingestion as ing
+from src.macro_calendar.fred_ingestion import (
     ALFRED_FULL_HISTORY_END,
     ALFRED_FULL_HISTORY_START,
     OUTPUT_TYPE_INITIAL_RELEASE,
@@ -647,36 +647,36 @@ class TestUnavailableDal:
 
 
 class TestJobDefinitions:
-    def test_jobs_present_when_p1_2_enabled(self):
+    def test_jobs_present_when_macro_calendar_enabled(self):
         from src.agents.config import get_agent_config
         from src.service.jobs import _JOB_DEFINITIONS, _availability_reason
 
         cfg = get_agent_config()
-        original = cfg.p1_2_enabled
-        cfg.p1_2_enabled = True
+        original = cfg.macro_calendar_enabled
+        cfg.macro_calendar_enabled = True
         try:
             assert "fetch_fred_series" in _JOB_DEFINITIONS
             assert "fetch_fred_release_dates" in _JOB_DEFINITIONS
             jd = _JOB_DEFINITIONS["fetch_fred_series"]
-            assert jd.feature_flag == "p1_2_enabled"
+            assert jd.feature_flag == "macro_calendar_enabled"
             assert _availability_reason(jd, cfg) is None
         finally:
-            cfg.p1_2_enabled = original
+            cfg.macro_calendar_enabled = original
 
     def test_disabled_reports_availability_reason(self):
         from src.agents.config import get_agent_config
         from src.service.jobs import _JOB_DEFINITIONS, _availability_reason
 
         cfg = get_agent_config()
-        original = cfg.p1_2_enabled
-        cfg.p1_2_enabled = False
+        original = cfg.macro_calendar_enabled
+        cfg.macro_calendar_enabled = False
         try:
             jd = _JOB_DEFINITIONS["fetch_fred_release_dates"]
             reason = _availability_reason(jd, cfg)
             assert reason is not None
-            assert "p1_2" in reason
+            assert "macro_calendar" in reason
         finally:
-            cfg.p1_2_enabled = original
+            cfg.macro_calendar_enabled = original
 
 
 class TestJobDispatchers:
@@ -691,7 +691,7 @@ class TestJobDispatchers:
             return IngestionStats(release_dates_upserted=3)
 
         monkeypatch.setattr(
-            "src.p1_2.fred_ingestion.fetch_fred_release_dates",
+            "src.macro_calendar.fred_ingestion.fetch_fred_release_dates",
             fake_ingest,
         )
         result = _run_fetch_fred_release_dates(
@@ -712,7 +712,7 @@ class TestJobDispatchers:
             return IngestionStats(series_processed=2, observations_upserted=10)
 
         monkeypatch.setattr(
-            "src.p1_2.fred_ingestion.fetch_fred_series",
+            "src.macro_calendar.fred_ingestion.fetch_fred_series",
             fake_ingest,
         )
         result = _run_fetch_fred_series(

@@ -8,7 +8,7 @@ Two callable entry points the job runner wraps:
     realtime_start (FRED supplies that authoritatively per row).
   - ``fetch_fred_series(dal, ...)`` — refresh ``macro_series`` metadata
     + ``macro_observations`` for every series in
-    ``config/p1_2_macro_series.yaml``. Strategy is per-series:
+    ``config/macro_calendar_series.yaml``. Strategy is per-series:
 
       * ``latest_only``: trust the FRED-supplied ``realtime_start`` /
         ``realtime_end`` on each observation row. For non-revising
@@ -47,11 +47,11 @@ from data_sources.fred_client import (
     FREDReleaseDate,
     FREDSeriesMetadata,
 )
-from src.p1_2.store import MacroCalendarStore
+from src.macro_calendar.store import MacroCalendarStore
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "config" / "p1_2_macro_series.yaml"
+DEFAULT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "config" / "macro_calendar_series.yaml"
 
 
 @dataclass

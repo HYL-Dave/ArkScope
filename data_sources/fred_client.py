@@ -20,7 +20,7 @@ Design notes:
     unchanged. Spec §3.2 requires we never invent a ``realtime_start``,
     so this client just returns whatever FRED gives us.
   - **No DB writes**: pure HTTP/parse layer. Persistence lives in
-    ``src/p1_2/fred_ingestion.py``.
+    ``src/macro_calendar/fred_ingestion.py``.
 
 Rate limit (smoke §6): 2 req/s on the free tier, no daily cap. We keep a
 small ``time.sleep`` inter-call delay so a batched ingestion won't blow
