@@ -268,8 +268,8 @@ class FREDClient:
             full-revision history shape; this is what our parser
             expects and what ``full_vintages`` ingestion uses.
           - 2 / 3: wide-format rows with ``SERIES_YYYYMMDD`` keys.
-            **Not supported by this client's parser** — request these
-            and you'll get an empty result.
+            **Not supported by this client's parser** — requesting
+            these raises ``ValueError`` at call time.
           - 4: "Initial Release Only" — one row matching the first
             publication realtime window. Used by ``latest_only``
             ingestion.
