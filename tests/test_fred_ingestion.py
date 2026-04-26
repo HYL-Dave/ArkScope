@@ -33,10 +33,12 @@ from data_sources.fred_client import (
 )
 from src.p1_2 import fred_ingestion as ing
 from src.p1_2.fred_ingestion import (
+    ALFRED_FULL_HISTORY_END,
+    ALFRED_FULL_HISTORY_START,
     Catalog,
     CatalogEntry,
     IngestionStats,
-    _infer_realtime_start,
+    _release_dates_page_size,
     fetch_fred_release_dates,
     fetch_fred_series,
 )
@@ -193,44 +195,32 @@ class TestCatalogLoad:
 
 
 # ---------------------------------------------------------------------------
-# realtime_start inference
+# Release-dates page size
 # ---------------------------------------------------------------------------
 
 
-class TestRealtimeStartInference:
-    def test_picks_first_release_date_after_observation(self):
-        # CPI Mar-2024 actually prints 2024-04-10. Schedule entries:
-        # 2024-04-10 covers Mar; the 03-12 entry is for Feb so it's <
-        # observation_date 2024-03-01 ... wait no, 03-12 IS >= 03-01.
-        # Use a more realistic schedule where the only release ≥ obs_date
-        # is the Apr one.
-        releases = [date(2024, 1, 11), date(2024, 2, 13),
-                    date(2024, 4, 10), date(2024, 5, 15)]
-        rt = _infer_realtime_start(date(2024, 3, 1), releases)
-        assert rt == date(2024, 4, 10)
+class TestReleaseDatesPageSize:
+    def test_default_when_no_catalog(self):
+        # Smoke: missing catalog still returns a usable cap.
+        assert _release_dates_page_size(None) == 1000
 
-    def test_picks_earliest_release_after_obs_even_if_lots_match(self):
-        """Sanity: if multiple release_dates are >= obs_date, the first one
-        wins. This is the conservative lookahead-safe choice — earliest
-        date the data could possibly have been knowable."""
-        releases = [date(2024, 3, 5), date(2024, 4, 10), date(2024, 5, 15)]
-        rt = _infer_realtime_start(date(2024, 3, 1), releases)
-        assert rt == date(2024, 3, 5)
+    def test_caps_at_1000_for_long_lookback(self):
+        catalog = Catalog(
+            entries=(),
+            observation_start=date(2024, 1, 1),
+            release_date_lookback_years=50,
+        )
+        # 50y * 250 daily releases = 12500, but capped at FRED's 1000.
+        assert _release_dates_page_size(catalog) == 1000
 
-    def test_returns_oldest_release_when_obs_predates_all(self):
-        # Observation predates the entire schedule → first available release wins.
-        releases = [date(2024, 4, 10), date(2024, 5, 15)]
-        rt = _infer_realtime_start(date(1999, 1, 1), releases)
-        assert rt == date(2024, 4, 10)
-
-    def test_returns_none_when_obs_postdates_all_releases(self):
-        # Observation is after every known release → no upper bound, skip.
-        releases = [date(2024, 4, 10), date(2024, 5, 15)]
-        rt = _infer_realtime_start(date(2030, 1, 1), releases)
-        assert rt is None
-
-    def test_no_releases_yields_none(self):
-        assert _infer_realtime_start(date(2024, 1, 1), []) is None
+    def test_short_lookback_returns_proportional_size(self):
+        catalog = Catalog(
+            entries=(),
+            observation_start=date(2024, 1, 1),
+            release_date_lookback_years=2,
+        )
+        # 2y * 250 = 500.
+        assert _release_dates_page_size(catalog) == 500
 
 
 # ---------------------------------------------------------------------------
@@ -305,20 +295,13 @@ def _patch_catalog(catalog, monkeypatch):
 
 
 class TestLatestOnlyIngestion:
-    def test_uses_release_date_for_realtime_start_and_skips_when_missing(
-        self, monkeypatch,
-    ):
+    def test_uses_FRED_realtime_start_authoritatively(self, monkeypatch):
+        """Spec §3.2: realtime_start comes from FRED, not from the release
+        schedule. The earlier release-schedule join was wrong because a
+        within-month release of a different period (Feb CPI on Mar 12)
+        would pre-date the observation_date for the new period (Mar 1)
+        and leak the value 4 weeks early."""
         store = _FakeStore()
-        # Pre-seed the release schedule for release_id=10.
-        # NB: 2024-03-12 would also satisfy 'release >= 2024-03-01', but
-        # in reality that's the Feb-2024 CPI release; for the Mar-2024
-        # observation we want 2024-04-10. Drop the 03-12 entry from
-        # this fixture so the schedule reflects only releases that
-        # actually cover the Mar obs.
-        store._release_dates[10] = [
-            date(2024, 1, 11), date(2024, 2, 13),
-            date(2024, 4, 10),
-        ]
         client = _client_with_canned(
             metadata=FREDSeriesMetadata(
                 series_id="CPIAUCNS",
@@ -329,13 +312,10 @@ class TestLatestOnlyIngestion:
                 last_updated=datetime(2024, 4, 10, 13, 8, tzinfo=timezone.utc),
             ),
             observations=[
-                # Mar 2024 obs → realtime_start = 2024-04-10
+                # Mar-2024 CPI was first published 2024-04-10 — that's
+                # what FRED returns as realtime_start when ALFRED is engaged.
                 FREDObservation(date(2024, 3, 1), 312.332,
                                 realtime_start=date(2024, 4, 10),
-                                realtime_end=date(9999, 12, 31)),
-                # 2099 obs → no release_date covers it → must be SKIPPED.
-                FREDObservation(date(2099, 1, 1), 999.99,
-                                realtime_start=date(2099, 2, 1),
                                 realtime_end=date(9999, 12, 31)),
             ],
         )
@@ -353,12 +333,82 @@ class TestLatestOnlyIngestion:
         )
         assert stats.series_processed == 1
         assert stats.observations_upserted == 1
-        assert stats.observations_skipped_no_release == 1
-        # Verify the upserted obs uses the correct realtime_start.
+        assert stats.observations_skipped_no_release == 0
         assert store.observation_writes[0]["realtime_start"] == date(2024, 4, 10)
-        # No sentinel write for the skipped one.
-        assert all(w["observation_date"] != date(2099, 1, 1)
-                   for w in store.observation_writes)
+
+    def test_latest_only_passes_full_alfred_window_to_client(self, monkeypatch):
+        """The latest_only path must request the full ALFRED window so the
+        returned realtime_start equals the FIRST publication date, not
+        today (FRED's default vintage). Without this, realtime_start
+        collapses to today and a backtest at decision_date < today
+        cannot see the value at all."""
+        store = _FakeStore()
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(
+                series_id="CPIAUCNS", title="x", frequency="m",
+                units="x", seasonal_adjustment=None, last_updated=None,
+            ),
+            observations=[],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="CPIAUCNS",
+            revision_strategy="latest_only",
+            release_id=10,
+        )), monkeypatch)
+        _patch_store(store, monkeypatch)
+
+        fetch_fred_series(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            full_refresh=True,
+        )
+        kwargs = client.get_observations.call_args.kwargs
+        assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
+        assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
+
+    def test_latest_only_dedupes_to_earliest_realtime_per_obs_date(
+        self, monkeypatch,
+    ):
+        """If FRED returns multiple realtime windows for the same
+        observation_date (i.e. a series mistakenly tagged latest_only
+        actually revises), keep the earliest realtime_start. We must
+        not leak a later revision's value as if it were knowable on the
+        first-publication date."""
+        store = _FakeStore()
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(
+                series_id="CPIAUCNS", title="x", frequency="m",
+                units="x", seasonal_adjustment=None, last_updated=None,
+            ),
+            observations=[
+                # Two windows for same obs — first publication on 4/10,
+                # later revision on 5/15.
+                FREDObservation(date(2024, 3, 1), 312.332,
+                                realtime_start=date(2024, 4, 10),
+                                realtime_end=date(2024, 5, 15)),
+                FREDObservation(date(2024, 3, 1), 312.500,
+                                realtime_start=date(2024, 5, 15),
+                                realtime_end=date(9999, 12, 31)),
+            ],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="CPIAUCNS",
+            revision_strategy="latest_only",
+            release_id=10,
+        )), monkeypatch)
+        _patch_store(store, monkeypatch)
+
+        fetch_fred_series(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            full_refresh=True,
+        )
+        # Exactly one row written, and it carries the FIRST publication
+        # date (2024-04-10) and the FIRST publication value (312.332).
+        assert len(store.observation_writes) == 1
+        w = store.observation_writes[0]
+        assert w["realtime_start"] == date(2024, 4, 10)
+        assert w["value"] == 312.332
 
 
 class TestFullVintagesIngestion:
@@ -395,6 +445,34 @@ class TestFullVintagesIngestion:
         rt_ends = {w["realtime_end"] for w in store.observation_writes}
         assert rt_starts == {date(2024, 4, 25), date(2024, 5, 30)}
         assert rt_ends == {date(2024, 5, 30), date(9999, 12, 31)}
+
+    def test_full_vintages_passes_full_alfred_window_to_client(self, monkeypatch):
+        """Without these params FRED collapses the response to today's
+        vintage and the 'full revision history' contract silently breaks.
+        The previous implementation forgot this and stored only current
+        values for GDP / GDPC1 / PAYEMS — see review of f03cf86."""
+        store = _FakeStore()
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(
+                series_id="GDP", title="GDP", frequency="q",
+                units="$B", seasonal_adjustment="SAAR", last_updated=None,
+            ),
+            observations=[],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="GDP", revision_strategy="full_vintages",
+            release_id=53,
+        )), monkeypatch)
+        _patch_store(store, monkeypatch)
+
+        fetch_fred_series(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            full_refresh=True,
+        )
+        kwargs = client.get_observations.call_args.kwargs
+        assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
+        assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
 
 
 class TestReleaseDateIngestion:
@@ -439,6 +517,41 @@ class TestReleaseDateIngestion:
         )
         assert stats.release_dates_upserted == 0
         client.get_release_dates.assert_not_called()
+
+    def test_uses_catalog_lookback_for_page_size(self, monkeypatch):
+        """Default catalog asks for 50 years; that maps to the FRED-cap
+        1000 page size (vs. the previous hardcoded 200)."""
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(Catalog(
+            entries=(CatalogEntry("CPIAUCNS", "latest_only", release_id=10),),
+            observation_start=date(2024, 1, 1),
+            release_date_lookback_years=50,
+        ), monkeypatch)
+        client = MagicMock(spec=FREDClient)
+        client.get_release_dates.return_value = []
+        fetch_fred_release_dates(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+        )
+        kwargs = client.get_release_dates.call_args.kwargs
+        assert kwargs["limit"] == 1000
+
+    def test_explicit_limit_overrides_catalog(self, monkeypatch):
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(_tiny_catalog(
+            CatalogEntry("CPIAUCNS", "latest_only", release_id=10),
+        ), monkeypatch)
+        client = MagicMock(spec=FREDClient)
+        client.get_release_dates.return_value = []
+        fetch_fred_release_dates(
+            dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+            client=client,
+            limit=42,
+        )
+        kwargs = client.get_release_dates.call_args.kwargs
+        assert kwargs["limit"] == 42
 
 
 class TestUnavailableDal:

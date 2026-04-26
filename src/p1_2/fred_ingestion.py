@@ -3,22 +3,27 @@
 Two callable entry points the job runner wraps:
 
   - ``fetch_fred_release_dates(dal, ...)`` — refresh
-    ``macro_release_dates`` for the curated set of release_ids. Run this
-    before ``fetch_fred_series`` so ``latest_only`` ingestion has a
-    realtime_start lookup table.
+    ``macro_release_dates`` for the curated set of release_ids. The
+    schedule is recorded for audit / monitoring, not used to derive
+    realtime_start (FRED supplies that authoritatively per row).
   - ``fetch_fred_series(dal, ...)`` — refresh ``macro_series`` metadata
     + ``macro_observations`` for every series in
     ``config/p1_2_macro_series.yaml``. Strategy is per-series:
 
-      * ``latest_only``: one row per ``observation_date``,
-        ``realtime_start = first release_date >= observation_date``
-        (joined from ``macro_release_dates``). If no release_date can
-        be inferred (e.g. release_id is null or no row in the schedule
-        table covers the observation), the row is logged and skipped —
-        no sentinel writes (spec §3.2).
-      * ``full_vintages``: ALFRED ``vintage_dates`` request returns
-        rows already split per realtime window; we upsert each one as
-        FRED supplies it.
+      * ``latest_only``: trust the FRED-supplied ``realtime_start`` /
+        ``realtime_end`` on each observation row. For non-revising
+        monthly series like CPIAUCNS this collapses to one row per
+        observation_date with realtime_window = [first_release, ∞).
+        We do NOT derive realtime_start from the release schedule:
+        that gave wrong answers when an earlier release in the same
+        month covered a different period (e.g. 2024-03-12 publishes
+        Feb CPI; using it as realtime_start for Mar-2024 CPI would
+        leak the value 4 weeks early).
+      * ``full_vintages``: explicitly request the full ALFRED window
+        (``realtime_start='1776-07-04'``, ``realtime_end='9999-12-31'``)
+        so revising series like GDP return one row per vintage. Default
+        FRED requests collapse to today's vintage only — see
+        docs/design/P1_2_PROVIDER_DISCOVERY.md §6.
 
 Both entry points are pure-Python coroutines of the FRED HTTP client
 and the ``MacroCalendarStore`` from commit 1. No FastAPI / agent tool
@@ -56,6 +61,10 @@ class IngestionStats:
     series_processed: int = 0
     series_skipped: int = 0
     observations_upserted: int = 0
+    # Reserved for future use (spec §3.2 anticipates skipping rows that
+    # can't have a realtime_start derived). Today's ingestion trusts FRED's
+    # own realtime_start so this counter stays 0; we keep it in the schema
+    # so /jobs/status surfaces it the moment skip cases appear.
     observations_skipped_no_release: int = 0
     release_dates_upserted: int = 0
     errors: List[str] = field(default_factory=list)
@@ -147,11 +156,18 @@ def fetch_fred_release_dates(
     release_ids: Optional[Iterable[int]] = None,
     catalog_path: Path = DEFAULT_CATALOG_PATH,
     client: Optional[FREDClient] = None,
+    limit: Optional[int] = None,
 ) -> IngestionStats:
     """Refresh ``macro_release_dates`` for the curated release_id set.
 
     Pass ``release_ids`` to override the catalog (useful for tests).
-    Returns an ``IngestionStats`` with ``release_dates_upserted`` populated.
+    The page size FRED returns per release_id is sized to cover the
+    catalog's ``release_date_lookback_years`` for daily releases
+    (e.g. H.15 / Treasury rates) — at ~250 trading days/year, 50 years
+    is ~12,500 rows. FRED's hard cap on this endpoint is 1000 per call
+    so for now we cap at 1000 and accept that very-deep history will
+    arrive in batches over multiple runs (a future commit can paginate
+    via the offset parameter if we discover it matters).
     """
     stats = IngestionStats()
     store = MacroCalendarStore(dal)
@@ -159,19 +175,23 @@ def fetch_fred_release_dates(
         stats.errors.append("DAL backend unavailable")
         return stats
 
-    if release_ids is None:
+    catalog: Optional[Catalog] = None
+    if release_ids is None or limit is None:
         try:
             catalog = load_catalog(catalog_path)
         except Exception as exc:
             stats.errors.append(f"catalog load failed: {exc}")
             return stats
-        release_ids = catalog.release_ids()
+        if release_ids is None:
+            release_ids = catalog.release_ids()
     release_ids = sorted({int(r) for r in release_ids})
+
+    page_size = limit if limit is not None else _release_dates_page_size(catalog)
 
     fred = client or FREDClient()
     for rid in release_ids:
         try:
-            rows = fred.get_release_dates(rid, limit=200, sort_order="desc")
+            rows = fred.get_release_dates(rid, limit=page_size, sort_order="desc")
         except FREDError as exc:
             stats.errors.append(f"release_dates({rid}): {exc}")
             continue
@@ -184,6 +204,21 @@ def fetch_fred_release_dates(
             if ok:
                 stats.release_dates_upserted += 1
     return stats
+
+
+def _release_dates_page_size(catalog: Optional[Catalog]) -> int:
+    """Pick a release/dates page size from catalog lookback.
+
+    Daily releases (H.15) generate ~250 release_dates/year, so 50 years
+    is well past FRED's 1000-row hard cap on this endpoint. For now we
+    cap at 1000; deeper history can be paged on a follow-up commit if
+    we ever observe it being needed.
+    """
+    if catalog is None:
+        return 1000
+    years = max(1, int(catalog.release_date_lookback_years))
+    # 250 daily releases per year is a generous upper bound for H.15.
+    return min(1000, years * 250)
 
 
 # ---------------------------------------------------------------------------
@@ -290,32 +325,49 @@ def _ingest_latest_only(
     obs_start: date,
     stats: IngestionStats,
 ) -> None:
-    """Ingest one row per observation_date with realtime_start derived from
-    the release schedule. Skip rows whose realtime_start can't be inferred."""
+    """Ingest one row per observation_date using FRED's authoritative
+    realtime_start.
+
+    For non-revising series the default FRED response collapses to today's
+    vintage with realtime_start = today, but we want the FIRST-publication
+    date (so a backtest at decision_date >= first_publication can use it).
+    Pass realtime_start='1776-07-04' + realtime_end='9999-12-31' so ALFRED
+    returns one row per [realtime_start, realtime_end) window. For a
+    non-revising series like CPIAUCNS that's exactly one row per
+    observation_date with realtime_start = first_publication.
+
+    We don't try to infer realtime_start from the release schedule — that
+    fails on series whose monthly observation_date overlaps an earlier
+    release of a different period (e.g. release 2024-03-12 publishes Feb
+    CPI, but a naive `release_date >= obs_date` rule would attach it to
+    Mar 2024 CPI and leak the value 4 weeks early).
+    """
     obs = fred.get_observations(
         entry.series_id,
         observation_start=obs_start,
+        realtime_start=ALFRED_FULL_HISTORY_START,
+        realtime_end=ALFRED_FULL_HISTORY_END,
         sort_order="asc",
     )
     if not obs:
         return
-
-    release_dates = _release_dates_sorted(store, entry.release_id) if entry.release_id else []
+    # Group by observation_date and keep the row with the earliest
+    # realtime_start. For a non-revising series ALFRED already returns
+    # exactly one row per observation_date so this is a no-op; for any
+    # series mistakenly tagged latest_only that does revise, this picks
+    # the first-publication value (and we leak no future revision).
+    earliest: Dict[date, Any] = {}
     for row in obs:
-        rt = _infer_realtime_start(row.observation_date, release_dates)
-        if rt is None:
-            stats.observations_skipped_no_release += 1
-            logger.debug(
-                "skip %s/%s: no release_date covers it",
-                entry.series_id, row.observation_date,
-            )
-            continue
+        existing = earliest.get(row.observation_date)
+        if existing is None or row.realtime_start < existing.realtime_start:
+            earliest[row.observation_date] = row
+    for row in earliest.values():
         ok = store.upsert_macro_observation(
             series_id=entry.series_id,
             observation_date=row.observation_date,
             value=row.value,
-            realtime_start=rt,
-            realtime_end=None,
+            realtime_start=row.realtime_start,
+            realtime_end=None,  # canonical "current" tail
         )
         if ok:
             stats.observations_upserted += 1
@@ -330,15 +382,17 @@ def _ingest_full_vintages(
 ) -> None:
     """Ingest each ALFRED-supplied vintage as its own realtime window.
 
-    We don't request specific vintage_dates — FRED's default response
-    already collapses each observation to one row per realtime window
-    (start → end). For revising series like GDP we therefore see multiple
-    rows per observation_date, each with its own [realtime_start,
-    realtime_end) range.
+    Crucially we MUST pass ``realtime_start='1776-07-04'`` +
+    ``realtime_end='9999-12-31'`` to opt into ALFRED. Without those
+    parameters FRED defaults to today's vintage only and the "full
+    revision history" promise quietly collapses to current values
+    (see ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6).
     """
     obs = fred.get_observations(
         entry.series_id,
         observation_start=obs_start,
+        realtime_start=ALFRED_FULL_HISTORY_START,
+        realtime_end=ALFRED_FULL_HISTORY_END,
         sort_order="asc",
     )
     for row in obs:
@@ -353,26 +407,8 @@ def _ingest_full_vintages(
             stats.observations_upserted += 1
 
 
-def _release_dates_sorted(store: MacroCalendarStore, release_id: int) -> List[date]:
-    """Pull the release schedule from macro_release_dates, ascending."""
-    return sorted(store.get_release_dates(release_id, limit=1000))
-
-
-def _infer_realtime_start(
-    observation_date: date,
-    release_dates_asc: Sequence[date],
-) -> Optional[date]:
-    """Return the first scheduled release_date that is >= observation_date.
-
-    That is the earliest date the source would have published this
-    observation, so it's a faithful lower bound for ``realtime_start`` in
-    a ``latest_only`` series. Returns None when no release covers the
-    observation (e.g. observation predates our schedule fetch window) —
-    the caller skips the row in that case (spec §3.2).
-    """
-    if not release_dates_asc:
-        return None
-    for rd in release_dates_asc:
-        if rd >= observation_date:
-            return rd
-    return None
+# ALFRED accepts the full history range when realtime_start='1776-07-04'
+# (FRED's documented sentinel) and realtime_end='9999-12-31'. Anything
+# tighter restricts the response to a sub-window of vintages.
+ALFRED_FULL_HISTORY_START = date(1776, 7, 4)
+ALFRED_FULL_HISTORY_END = date(9999, 12, 31)
