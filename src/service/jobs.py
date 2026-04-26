@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from src.agents.config import AgentConfig, get_agent_config
@@ -135,6 +135,59 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         runnable_via_api=True,
         feature_flag="macro_calendar_enabled",
         default_params={"full_refresh": False},
+    ),
+    "fetch_economic_calendar_recent": JobDefinition(
+        name="fetch_economic_calendar_recent",
+        description=(
+            "Refresh cal_economic_events + revision log from Finnhub "
+            "/calendar/economic for a recent window (default: today-7d "
+            "through today+14d). Captures actual=null → value flips for "
+            "events that just released. Override: from_date / to_date "
+            "(ISO YYYY-MM-DD)."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="macro_calendar_enabled",
+        default_params={},
+    ),
+    "fetch_economic_calendar_backfill": JobDefinition(
+        name="fetch_economic_calendar_backfill",
+        description=(
+            "Backfill cal_economic_events from Finnhub /calendar/economic "
+            "for a historical window. Default: last 1 year. Override: "
+            "from_date / to_date (ISO YYYY-MM-DD) or years_back (int>=1)."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="macro_calendar_enabled",
+        default_params={},
+    ),
+    "fetch_earnings_calendar": JobDefinition(
+        name="fetch_earnings_calendar",
+        description=(
+            "Refresh cal_earnings_events from Finnhub /calendar/earnings. "
+            "Default: watchlist symbols × today→today+30d, one API call "
+            "per symbol (unfiltered queries under-sample the universe — "
+            "see P1_2_PROVIDER_DISCOVERY §5.5). Override: symbols list, "
+            "from_date / to_date (ISO YYYY-MM-DD)."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="macro_calendar_enabled",
+        default_params={},
+    ),
+    "fetch_ipo_calendar": JobDefinition(
+        name="fetch_ipo_calendar",
+        description=(
+            "Refresh cal_ipo_events + revision log from Finnhub "
+            "/calendar/ipo. Default: today-30d through today+90d "
+            "(recent priced + upcoming pipeline). Override: from_date / "
+            "to_date (ISO YYYY-MM-DD)."
+        ),
+        source="api",
+        runnable_via_api=True,
+        feature_flag="macro_calendar_enabled",
+        default_params={},
     ),
 }
 
@@ -442,6 +495,14 @@ def run_job(
             result = _run_fetch_fred_release_dates(dal, payload)
         elif job.name == "fetch_fred_series":
             result = _run_fetch_fred_series(dal, payload)
+        elif job.name == "fetch_economic_calendar_recent":
+            result = _run_fetch_economic_calendar_recent(dal, payload)
+        elif job.name == "fetch_economic_calendar_backfill":
+            result = _run_fetch_economic_calendar_backfill(dal, payload)
+        elif job.name == "fetch_earnings_calendar":
+            result = _run_fetch_earnings_calendar(dal, payload)
+        elif job.name == "fetch_ipo_calendar":
+            result = _run_fetch_ipo_calendar(dal, payload)
         else:  # pragma: no cover - defensive branch
             raise UnknownJobError(job.name)
 
@@ -545,6 +606,137 @@ def _run_fetch_fred_series(
     return stats.to_dict()
 
 
+def _parse_iso_date_param(raw: Any, name: str) -> Optional[date]:
+    """Parse one optional ISO date param. Empty / None → None.
+
+    Raises ``ValueError`` with the param name on malformed input so the
+    job's error message points the caller at the bad field.
+    """
+    if raw is None or raw == "":
+        return None
+    try:
+        return date.fromisoformat(str(raw))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be ISO date (YYYY-MM-DD): {exc}")
+
+
+def _validate_date_window(date_from: date, date_to: date) -> None:
+    if date_to < date_from:
+        raise ValueError(
+            f"to_date ({date_to.isoformat()}) must be >= "
+            f"from_date ({date_from.isoformat()})"
+        )
+
+
+def _run_fetch_economic_calendar_recent(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Recent economic-calendar refresh — captures upcoming + just-released."""
+    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_economic_events
+
+    today = date.today()
+    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") \
+        or today - timedelta(days=7)
+    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
+        or today + timedelta(days=14)
+    _validate_date_window(date_from, date_to)
+    stats = fetch_finnhub_economic_events(
+        dal,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return stats.to_dict()
+
+
+def _run_fetch_economic_calendar_backfill(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Historical backfill of cal_economic_events.
+
+    Window: explicit from_date / to_date wins; otherwise [today - years_back×365d, today]
+    with years_back defaulting to 1.
+    """
+    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_economic_events
+
+    today = date.today()
+    explicit_from = _parse_iso_date_param(params.get("from_date"), "from_date")
+    if explicit_from is None:
+        years_back = int(params.get("years_back", 1))
+        if years_back <= 0:
+            raise ValueError("years_back must be >= 1")
+        date_from = today - timedelta(days=years_back * 365)
+    else:
+        date_from = explicit_from
+    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") or today
+    _validate_date_window(date_from, date_to)
+    stats = fetch_finnhub_economic_events(
+        dal,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return stats.to_dict()
+
+
+def _run_fetch_earnings_calendar(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Earnings calendar refresh, per-symbol over the watchlist by default.
+
+    Symbol selection priority:
+      1. ``symbols`` param (explicit override)
+      2. DAL watchlist tickers
+      3. None → single unfiltered call (best-effort fallback)
+
+    Smoke §5.5 is the reason for the per-symbol default: an unfiltered query
+    over the same window may omit symbols that a per-symbol query returns.
+    """
+    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_earnings_events
+
+    today = date.today()
+    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") or today
+    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
+        or today + timedelta(days=30)
+    _validate_date_window(date_from, date_to)
+
+    explicit = _normalize_tickers(params.get("symbols"))
+    if explicit:
+        symbols: Optional[List[str]] = explicit
+    else:
+        watchlist = _watchlist_tickers(dal)
+        symbols = watchlist or None
+    stats = fetch_finnhub_earnings_events(
+        dal,
+        date_from=date_from,
+        date_to=date_to,
+        symbols=symbols,
+    )
+    return stats.to_dict()
+
+
+def _run_fetch_ipo_calendar(
+    dal: Any,
+    params: Dict[str, Any],
+) -> Dict[str, Any]:
+    """IPO calendar refresh: recent priced + upcoming pipeline."""
+    from src.macro_calendar.finnhub_ingestion import fetch_finnhub_ipo_events
+
+    today = date.today()
+    date_from = _parse_iso_date_param(params.get("from_date"), "from_date") \
+        or today - timedelta(days=30)
+    date_to = _parse_iso_date_param(params.get("to_date"), "to_date") \
+        or today + timedelta(days=90)
+    _validate_date_window(date_from, date_to)
+    stats = fetch_finnhub_ipo_events(
+        dal,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return stats.to_dict()
+
+
 def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
     """Compose a short success message suitable for ``last_message`` UI fields.
 
@@ -593,5 +785,23 @@ def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
                 base += f", {skipped} series skipped"
             if skipped_obs:
                 base += f", {skipped_obs} obs skipped (no release_date)"
+            return base
+    if job_name in (
+        "fetch_economic_calendar_recent",
+        "fetch_economic_calendar_backfill",
+        "fetch_earnings_calendar",
+        "fetch_ipo_calendar",
+    ):
+        inserted = result.get("events_inserted")
+        if inserted is not None:
+            mutated = result.get("events_mutated", 0)
+            unchanged = result.get("events_unchanged", 0)
+            skipped = result.get("events_skipped", 0)
+            errs = result.get("errors") or []
+            base = f"{inserted} new, {mutated} updated, {unchanged} unchanged"
+            if skipped:
+                base += f", {skipped} skipped"
+            if errs:
+                base += f", {len(errs)} error(s)"
             return base
     return "Job completed successfully."

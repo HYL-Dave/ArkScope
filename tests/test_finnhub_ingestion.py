@@ -716,3 +716,291 @@ class TestIPOIngestion:
         )
         assert stats.events_inserted == 0
         assert any("timeout" in e for e in stats.errors)
+
+
+# ---------------------------------------------------------------------------
+# Job wiring — JobDefinitions, dispatchers, summaries
+# ---------------------------------------------------------------------------
+
+
+class TestFinnhubJobDefinitions:
+    """Verify the four Finnhub calendar JobDefinitions are registered and
+    correctly gated on macro_calendar_enabled."""
+
+    _JOB_NAMES = (
+        "fetch_economic_calendar_recent",
+        "fetch_economic_calendar_backfill",
+        "fetch_earnings_calendar",
+        "fetch_ipo_calendar",
+    )
+
+    def test_jobs_present_when_macro_calendar_enabled(self):
+        from src.agents.config import get_agent_config
+        from src.service.jobs import _JOB_DEFINITIONS, _availability_reason
+
+        cfg = get_agent_config()
+        original = cfg.macro_calendar_enabled
+        cfg.macro_calendar_enabled = True
+        try:
+            for name in self._JOB_NAMES:
+                assert name in _JOB_DEFINITIONS, f"{name} missing from registry"
+                jd = _JOB_DEFINITIONS[name]
+                assert jd.feature_flag == "macro_calendar_enabled"
+                assert jd.runnable_via_api is True
+                assert jd.source == "api"
+                assert _availability_reason(jd, cfg) is None
+        finally:
+            cfg.macro_calendar_enabled = original
+
+    def test_disabled_reports_availability_reason(self):
+        from src.agents.config import get_agent_config
+        from src.service.jobs import _JOB_DEFINITIONS, _availability_reason
+
+        cfg = get_agent_config()
+        original = cfg.macro_calendar_enabled
+        cfg.macro_calendar_enabled = False
+        try:
+            for name in self._JOB_NAMES:
+                reason = _availability_reason(_JOB_DEFINITIONS[name], cfg)
+                assert reason is not None
+                assert "macro_calendar" in reason
+        finally:
+            cfg.macro_calendar_enabled = original
+
+
+def _capture_call(monkeypatch, ingestion_path):
+    """Patch the named ingestion function and return a dict that captures
+    its kwargs on each invocation, plus a stub return value."""
+    captured: Dict[str, Any] = {}
+
+    def fake(dal, **kwargs):
+        captured["dal"] = dal
+        captured.update(kwargs)
+        return FinnhubIngestionStats(events_inserted=1)
+
+    monkeypatch.setattr(ingestion_path, fake)
+    return captured
+
+
+class TestEconomicRecentDispatcher:
+    PATH = "src.macro_calendar.finnhub_ingestion.fetch_finnhub_economic_events"
+
+    def test_default_window_is_minus7_plus14(self, monkeypatch):
+        from src.service.jobs import _run_fetch_economic_calendar_recent
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        result = _run_fetch_economic_calendar_recent(dal="dal-x", params={})
+        today = date.today()
+        assert captured["date_from"] == today - __import__("datetime").timedelta(days=7)
+        assert captured["date_to"] == today + __import__("datetime").timedelta(days=14)
+        assert result["events_inserted"] == 1
+
+    def test_explicit_dates_override_defaults(self, monkeypatch):
+        from src.service.jobs import _run_fetch_economic_calendar_recent
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_economic_calendar_recent(
+            dal="dal-x",
+            params={"from_date": "2026-01-01", "to_date": "2026-01-15"},
+        )
+        assert captured["date_from"] == date(2026, 1, 1)
+        assert captured["date_to"] == date(2026, 1, 15)
+
+    def test_invalid_iso_date_raises(self):
+        from src.service.jobs import _run_fetch_economic_calendar_recent
+
+        with pytest.raises(ValueError, match="from_date"):
+            _run_fetch_economic_calendar_recent(
+                dal="dal-x", params={"from_date": "not-a-date"}
+            )
+
+    def test_to_before_from_raises(self):
+        from src.service.jobs import _run_fetch_economic_calendar_recent
+
+        with pytest.raises(ValueError, match="must be >="):
+            _run_fetch_economic_calendar_recent(
+                dal="dal-x",
+                params={"from_date": "2026-01-15", "to_date": "2026-01-01"},
+            )
+
+
+class TestEconomicBackfillDispatcher:
+    PATH = "src.macro_calendar.finnhub_ingestion.fetch_finnhub_economic_events"
+
+    def test_default_years_back_is_one(self, monkeypatch):
+        from src.service.jobs import _run_fetch_economic_calendar_backfill
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_economic_calendar_backfill(dal="dal-x", params={})
+        today = date.today()
+        # ~365 day spread (allow ±1 day for date arithmetic).
+        spread = (captured["date_to"] - captured["date_from"]).days
+        assert 364 <= spread <= 366
+        assert captured["date_to"] == today
+
+    def test_years_back_param_widens_window(self, monkeypatch):
+        from src.service.jobs import _run_fetch_economic_calendar_backfill
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_economic_calendar_backfill(
+            dal="dal-x", params={"years_back": 2}
+        )
+        spread = (captured["date_to"] - captured["date_from"]).days
+        assert 729 <= spread <= 731
+
+    def test_explicit_from_date_overrides_years_back(self, monkeypatch):
+        from src.service.jobs import _run_fetch_economic_calendar_backfill
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_economic_calendar_backfill(
+            dal="dal-x",
+            params={"from_date": "2020-01-01", "years_back": 5},
+        )
+        assert captured["date_from"] == date(2020, 1, 1)
+
+    def test_zero_years_back_raises(self):
+        from src.service.jobs import _run_fetch_economic_calendar_backfill
+
+        with pytest.raises(ValueError, match="years_back"):
+            _run_fetch_economic_calendar_backfill(
+                dal="dal-x", params={"years_back": 0}
+            )
+
+
+class TestEarningsDispatcher:
+    PATH = "src.macro_calendar.finnhub_ingestion.fetch_finnhub_earnings_events"
+
+    def _watchlist_dal(self, tickers):
+        dal = MagicMock()
+        dal.get_watchlist.return_value = SimpleNamespace(tickers=tickers)
+        return dal
+
+    def test_uses_watchlist_when_no_symbols_param(self, monkeypatch):
+        from src.service.jobs import _run_fetch_earnings_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        dal = self._watchlist_dal(["AAPL", "NVDA"])
+        _run_fetch_earnings_calendar(dal=dal, params={})
+        assert captured["symbols"] == ["AAPL", "NVDA"]
+
+    def test_explicit_symbols_override_watchlist(self, monkeypatch):
+        from src.service.jobs import _run_fetch_earnings_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        dal = self._watchlist_dal(["AAPL", "NVDA"])
+        _run_fetch_earnings_calendar(
+            dal=dal, params={"symbols": ["TSLA", "MSFT"]},
+        )
+        # Explicit symbols win — watchlist not consulted.
+        assert captured["symbols"] == ["TSLA", "MSFT"]
+        dal.get_watchlist.assert_not_called()
+
+    def test_empty_watchlist_falls_back_to_unfiltered(self, monkeypatch):
+        from src.service.jobs import _run_fetch_earnings_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        dal = self._watchlist_dal([])
+        _run_fetch_earnings_calendar(dal=dal, params={})
+        # symbols=None signals the ingestion to issue one unfiltered call.
+        assert captured["symbols"] is None
+
+    def test_default_window_today_to_plus30(self, monkeypatch):
+        from src.service.jobs import _run_fetch_earnings_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        dal = self._watchlist_dal(["AAPL"])
+        _run_fetch_earnings_calendar(dal=dal, params={})
+        today = date.today()
+        assert captured["date_from"] == today
+        assert captured["date_to"] == today + __import__("datetime").timedelta(days=30)
+
+
+class TestIpoDispatcher:
+    PATH = "src.macro_calendar.finnhub_ingestion.fetch_finnhub_ipo_events"
+
+    def test_default_window_minus30_plus90(self, monkeypatch):
+        from src.service.jobs import _run_fetch_ipo_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_ipo_calendar(dal="dal-x", params={})
+        today = date.today()
+        assert captured["date_from"] == today - __import__("datetime").timedelta(days=30)
+        assert captured["date_to"] == today + __import__("datetime").timedelta(days=90)
+
+    def test_explicit_dates_threaded(self, monkeypatch):
+        from src.service.jobs import _run_fetch_ipo_calendar
+
+        captured = _capture_call(monkeypatch, self.PATH)
+        _run_fetch_ipo_calendar(
+            dal="dal-x",
+            params={"from_date": "2026-01-01", "to_date": "2026-04-30"},
+        )
+        assert captured["date_from"] == date(2026, 1, 1)
+        assert captured["date_to"] == date(2026, 4, 30)
+
+
+class TestFinnhubJobSummaries:
+    def test_summary_for_economic_recent(self):
+        from src.service.jobs import _summarize_result
+
+        msg = _summarize_result("fetch_economic_calendar_recent", {
+            "events_inserted": 12,
+            "events_mutated": 3,
+            "events_unchanged": 50,
+            "events_skipped": 0,
+            "errors": [],
+        })
+        assert "12 new" in msg
+        assert "3 updated" in msg
+        assert "50 unchanged" in msg
+
+    def test_summary_for_earnings_with_errors(self):
+        from src.service.jobs import _summarize_result
+
+        msg = _summarize_result("fetch_earnings_calendar", {
+            "events_inserted": 5,
+            "events_mutated": 0,
+            "events_unchanged": 1,
+            "events_skipped": 2,
+            "errors": ["AAPL: 429", "NVDA: 429"],
+        })
+        assert "5 new" in msg
+        assert "2 skipped" in msg
+        assert "2 error(s)" in msg
+
+    def test_summary_for_ipo_unchanged_only(self):
+        from src.service.jobs import _summarize_result
+
+        msg = _summarize_result("fetch_ipo_calendar", {
+            "events_inserted": 0,
+            "events_mutated": 0,
+            "events_unchanged": 200,
+            "events_skipped": 0,
+            "errors": [],
+        })
+        assert "0 new" in msg
+        assert "200 unchanged" in msg
+        # No skipped / errors fragments when zero.
+        assert "skipped" not in msg
+        assert "error" not in msg
+
+    def test_summary_for_backfill_uses_event_keys(self):
+        from src.service.jobs import _summarize_result
+
+        msg = _summarize_result("fetch_economic_calendar_backfill", {
+            "events_inserted": 642,
+            "events_mutated": 0,
+            "events_unchanged": 0,
+            "events_skipped": 0,
+            "errors": [],
+        })
+        assert "642 new" in msg
+
+    def test_unknown_result_shape_falls_back_to_generic(self):
+        from src.service.jobs import _summarize_result
+
+        # No events_inserted key → generic fallback.
+        msg = _summarize_result(
+            "fetch_economic_calendar_recent", {"errors": ["boom"]}
+        )
+        assert "completed successfully" in msg.lower()
