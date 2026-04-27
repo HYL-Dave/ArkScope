@@ -61,10 +61,11 @@ def get_economic_calendar(
         importance: "low" / "medium" / "high". CSV supported.
         days_back: window start = today - days_back (default 7).
         days_forward: window end = today + days_forward (default 14).
-        as_of: ISO timestamp. When set, returns the revision that was
-               visible at that moment via cal_economic_event_revisions
-               (lookahead-safe replay). Events first observed AFTER as_of
-               are excluded entirely.
+        as_of: ISO date or timestamp. Date inputs (YYYY-MM-DD) are read as
+               end-of-day UTC. When set, returns the revision visible at
+               that moment via cal_economic_event_revisions (lookahead-safe
+               replay). Events first observed AFTER as_of are excluded
+               entirely.
         limit: hard cap on rows (1..500, default 50).
     """
     if not get_agent_config().macro_calendar_enabled:
@@ -243,16 +244,27 @@ def _format_economic_rows(
 
 
 def _parse_iso_dt(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO date / datetime → tz-aware datetime.
+
+    Date-only inputs map to end-of-day UTC (23:59:59.999999Z) so a date
+    as_of catches revisions observed during the day, matching the API
+    spec §6.1 contract.
+    """
     if value is None or value == "":
         return None
-    try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
+    s = str(value).strip()
+    if len(s) == 10 and s.count("-") == 2:
         try:
-            d = date.fromisoformat(str(value))
-            dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+            d = date.fromisoformat(s)
+            return datetime(
+                d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=timezone.utc
+            )
         except ValueError:
-            return None
+            pass
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt

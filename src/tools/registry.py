@@ -1193,8 +1193,9 @@ class ToolRegistry:
                 ),
                 ToolParameter(
                     "importance", "string",
-                    "Filter by impact level. CSV supported.",
-                    required=False, enum=["low", "medium", "high"],
+                    "Filter by impact level: 'low', 'medium', 'high'. "
+                    "CSV multi-select like 'high,medium' supported.",
+                    required=False,
                 ),
                 ToolParameter(
                     "days_back", "integer",
@@ -1208,7 +1209,9 @@ class ToolRegistry:
                 ),
                 ToolParameter(
                     "as_of", "string",
-                    "ISO-8601 timestamp for vintage replay; omit for current view.",
+                    "ISO-8601 date or timestamp for vintage replay. Date "
+                    "inputs (YYYY-MM-DD) are interpreted as end-of-day UTC. "
+                    "Omit for current view.",
                     required=False,
                 ),
                 ToolParameter(

@@ -170,6 +170,34 @@ class TestEconomicCalendarRoute:
         finally:
             undo()
 
+    def test_as_of_date_only_maps_to_eod_utc(self, monkeypatch):
+        """Spec §6.1: date-only as_of must cover the full UTC day so callers
+        who pass YYYY-MM-DD don't silently miss revisions observed that day."""
+        undo = _enable_macro()
+        try:
+            captured = {}
+
+            def fake_list(self, **kw):
+                captured.update(kw)
+                return []
+
+            monkeypatch.setattr(
+                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                fake_list,
+                raising=True,
+            )
+            economic_calendar(
+                country=None, impact=None,
+                from_date=None, to_date=None,
+                as_of="2024-12-18",
+                limit=100, dal=object(),
+            )
+            assert captured["as_of"] == datetime(
+                2024, 12, 18, 23, 59, 59, 999999, tzinfo=timezone.utc
+            )
+        finally:
+            undo()
+
 
 # ---------------------------------------------------------------------------
 # /macro/earnings-calendar + /macro/ipo-calendar routes
@@ -378,6 +406,30 @@ class TestGetEconomicCalendarTool:
             )
             out = get_economic_calendar(dal=object(), as_of="not-a-date")
             assert "Invalid as_of" in out
+        finally:
+            undo()
+
+    def test_date_only_as_of_passes_eod_to_store(self, monkeypatch):
+        """Tool layer must apply the same date-only → EOD UTC contract as
+        the API. Otherwise an agent passing a date string would silently miss
+        same-day revisions."""
+        undo = _enable_macro()
+        try:
+            captured = {}
+            store_mock = MagicMock(
+                is_available=MagicMock(return_value=True),
+                list_economic_events=MagicMock(
+                    side_effect=lambda **kw: (captured.update(kw) or [])
+                ),
+            )
+            monkeypatch.setattr(
+                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                lambda dal: store_mock,
+            )
+            get_economic_calendar(dal=object(), as_of="2024-12-18")
+            assert captured["as_of"] == datetime(
+                2024, 12, 18, 23, 59, 59, 999999, tzinfo=timezone.utc
+            )
         finally:
             undo()
 

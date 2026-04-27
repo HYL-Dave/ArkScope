@@ -1225,8 +1225,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "importance": {
                         "type": "string",
-                        "enum": ["low", "medium", "high"],
-                        "description": "Filter by impact level. CSV supported.",
+                        "description": (
+                            "Filter by impact level: 'low', 'medium', 'high'. "
+                            "CSV multi-select like 'high,medium' supported."
+                        ),
                     },
                     "days_back": {
                         "type": "integer",
@@ -1238,7 +1240,11 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "as_of": {
                         "type": "string",
-                        "description": "ISO-8601 timestamp for vintage replay; omit for current view.",
+                        "description": (
+                            "ISO-8601 date or timestamp for vintage replay. "
+                            "Date inputs (YYYY-MM-DD) are interpreted as "
+                            "end-of-day UTC. Omit for current view."
+                        ),
                     },
                     "limit": {
                         "type": "integer",

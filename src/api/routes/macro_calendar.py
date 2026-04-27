@@ -40,21 +40,31 @@ def _require_enabled() -> None:
 
 
 def _parse_iso_datetime(value: Optional[str], name: str) -> Optional[datetime]:
-    """Parse an optional ISO-8601 datetime/date param. Date-only inputs are
-    treated as start-of-day UTC."""
+    """Parse an optional ISO-8601 datetime/date param.
+
+    Date-only inputs (YYYY-MM-DD) are interpreted as end-of-day UTC
+    (23:59:59.999999Z) per spec §6.1, so "as-of close of day D" naturally
+    includes every revision observed during D. Timestamp inputs are honoured
+    at the precision provided.
+    """
     if value is None or value == "":
         return None
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+    s = value.strip()
+    if len(s) == 10 and s.count("-") == 2:
         try:
-            d = date.fromisoformat(value)
-            dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{name} must be ISO-8601 (YYYY-MM-DD or full timestamp): {exc}",
+            d = date.fromisoformat(s)
+            return datetime(
+                d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=timezone.utc
             )
+        except ValueError:
+            pass
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{name} must be ISO-8601 (YYYY-MM-DD or full timestamp): {exc}",
+        )
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
@@ -118,7 +128,10 @@ def economic_calendar(
     to_date: Optional[str] = Query(None, description="ISO date or full timestamp"),
     as_of: Optional[str] = Query(
         None,
-        description="ISO timestamp; returns the revision visible at that moment",
+        description=(
+            "ISO date or timestamp. Date inputs (YYYY-MM-DD) are read as "
+            "end-of-day UTC; returns the revision visible at that moment."
+        ),
     ),
     limit: int = Query(100, ge=1, le=1000),
     dal=Depends(get_dal),
