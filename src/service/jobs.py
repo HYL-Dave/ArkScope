@@ -582,9 +582,14 @@ def _run_fetch_fred_release_dates(
     from src.macro_calendar.fred_ingestion import fetch_fred_release_dates
 
     release_ids = params.get("release_ids")
+    limit_raw = params.get("limit")
+    limit = int(limit_raw) if limit_raw is not None else None
+    if limit is not None and limit <= 0:
+        raise ValueError("limit must be >= 1")
     stats = fetch_fred_release_dates(
         dal,
         release_ids=release_ids,
+        limit=limit,
     )
     return stats.to_dict()
 

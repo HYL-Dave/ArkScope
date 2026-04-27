@@ -54,7 +54,10 @@ class JobRunRequest(BaseModel):
 
     # analysis_watchlist_batch / monitor_watchlist_scan
     tickers: Optional[List[str]] = None
-    limit: Optional[int] = Field(default=None, ge=1, le=200)
+    # limit: per-job semantic. analysis_watchlist_batch caps tickers
+    # processed; fetch_fred_release_dates sets FRED page size (FRED's hard
+    # cap is 1000). le=1000 covers both ranges.
+    limit: Optional[int] = Field(default=None, ge=1, le=1000)
     depth: Literal["quick", "standard", "full"] = "standard"
     persist_reports: bool = False
     notify: bool = False

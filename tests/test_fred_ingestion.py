@@ -685,9 +685,10 @@ class TestJobDispatchers:
 
         captured = {}
 
-        def fake_ingest(dal, *, release_ids=None):
+        def fake_ingest(dal, *, release_ids=None, limit=None):
             captured["dal"] = dal
             captured["release_ids"] = release_ids
+            captured["limit"] = limit
             return IngestionStats(release_dates_upserted=3)
 
         monkeypatch.setattr(
@@ -700,6 +701,42 @@ class TestJobDispatchers:
         )
         assert result["release_dates_upserted"] == 3
         assert captured["release_ids"] == [10]
+        # limit defaults to None (catalog-derived page size).
+        assert captured["limit"] is None
+
+    def test_run_fetch_fred_release_dates_threads_limit(self, monkeypatch):
+        """Spec §4 lists `limit` as an override; lock the dispatcher actually
+        forwards it. Pre-fix the dispatcher silently dropped the field.
+        """
+        from src.service.jobs import _run_fetch_fred_release_dates
+
+        captured = {}
+
+        def fake_ingest(dal, *, release_ids=None, limit=None):
+            captured["release_ids"] = release_ids
+            captured["limit"] = limit
+            return IngestionStats(release_dates_upserted=0)
+
+        monkeypatch.setattr(
+            "src.macro_calendar.fred_ingestion.fetch_fred_release_dates",
+            fake_ingest,
+        )
+        _run_fetch_fred_release_dates(
+            dal="dal-sentinel",
+            params={"release_ids": [10], "limit": 42},
+        )
+        assert captured["limit"] == 42
+
+    def test_run_fetch_fred_release_dates_rejects_zero_limit(self):
+        """Tightens the dispatcher contract — 0 limit must fail-fast rather
+        than reach FRED and return an empty page silently."""
+        from src.service.jobs import _run_fetch_fred_release_dates
+
+        with pytest.raises(ValueError, match="limit"):
+            _run_fetch_fred_release_dates(
+                dal="dal-sentinel",
+                params={"release_ids": [10], "limit": 0},
+            )
 
     def test_run_fetch_fred_series_threads_full_refresh(self, monkeypatch):
         from src.service.jobs import _run_fetch_fred_series
