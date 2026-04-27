@@ -92,8 +92,11 @@ DEFAULT_THRESHOLDS: Dict[str, Any] = {
     # Table-level: any table older than this is warning regardless of job.
     # 14d is generous — a healthy weekly cadence is well inside it.
     "table_stale_warning_seconds": 14 * 86400,
-    # Backfill never_run is warning by default; flip to "ignore" to
-    # suppress the row entirely if you don't care.
+    # Backfill never_run severity. Use SEVERITY_OK to mute it on installs
+    # that don't run backfill, SEVERITY_WARNING (default) to surface as
+    # an actionable hint, SEVERITY_CRITICAL to gate strict-mode 503s on it.
+    # Must be one of the three canonical severity values — anything else
+    # raises KeyError when overall severity is computed.
     "backfill_never_run_severity": SEVERITY_WARNING,
 }
 
@@ -310,6 +313,11 @@ def _evaluate_job(
     warning_threshold = cadence_seconds * thresholds["warning_cadence_multiplier"]
     critical_threshold = cadence_seconds * thresholds["critical_cadence_multiplier"]
 
+    # Compute cadence-based severity first; failure-after-success layers
+    # on top so a stale critical doesn't get downgraded by a recent failure
+    # reason and a fresh-but-with-recent-failure case still warns.
+    cadence_severity = SEVERITY_OK
+
     # Market-hours upgrade for the recent economic feed: stale during US
     # market hours is more concerning than off-hours staleness because
     # economic events fire at 08:30/10:00/14:00 ET.
@@ -326,35 +334,43 @@ def _evaluate_job(
             f"during US market hours (cadence "
             f"{_humanize_seconds(cadence_seconds)}).",
         ))
-        block["status"] = SEVERITY_CRITICAL
-        return block, SEVERITY_CRITICAL
-
-    if age_seconds is not None and age_seconds > critical_threshold:
-        sev = SEVERITY_CRITICAL
+        cadence_severity = SEVERITY_CRITICAL
+    elif age_seconds is not None and age_seconds > critical_threshold:
         reasons.append(_Reason(
-            sev,
+            SEVERITY_CRITICAL,
             "job_stale_critical",
             f"Job {job_name} last succeeded {_humanize_seconds(age_seconds)} ago "
             f"(>{thresholds['critical_cadence_multiplier']:.0f}× cadence "
             f"{_humanize_seconds(cadence_seconds)}).",
         ))
-        block["status"] = sev
-        return block, sev
-
-    if age_seconds is not None and age_seconds > warning_threshold:
-        sev = SEVERITY_WARNING
+        cadence_severity = SEVERITY_CRITICAL
+    elif age_seconds is not None and age_seconds > warning_threshold:
         reasons.append(_Reason(
-            sev,
+            SEVERITY_WARNING,
             "job_stale_warning",
             f"Job {job_name} last succeeded {_humanize_seconds(age_seconds)} ago "
             f"(>{thresholds['warning_cadence_multiplier']:.1f}× cadence "
             f"{_humanize_seconds(cadence_seconds)}).",
         ))
-        block["status"] = sev
-        return block, sev
+        cadence_severity = SEVERITY_WARNING
 
-    block["status"] = SEVERITY_OK
-    return block, SEVERITY_OK
+    final_severity = cadence_severity
+    if last_run_age_seconds is not None and last_any_at > last_success_at:
+        # A run failed after the last success. Independent signal from
+        # cadence — a fresh job with a recent failure is degraded, and
+        # a stale-critical job with a recent failure stays critical
+        # while still surfacing the failure as an additional reason.
+        reasons.append(_Reason(
+            SEVERITY_WARNING,
+            "job_recent_failure",
+            f"Job {job_name} failed after its last success "
+            f"({_humanize_seconds(_age_seconds(last_success_at, now))} ago).",
+        ))
+        if _SEVERITY_RANK[SEVERITY_WARNING] > _SEVERITY_RANK[final_severity]:
+            final_severity = SEVERITY_WARNING
+
+    block["status"] = final_severity
+    return block, final_severity
 
 
 def _evaluate_table(

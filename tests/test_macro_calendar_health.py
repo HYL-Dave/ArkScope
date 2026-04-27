@@ -243,8 +243,11 @@ class TestJobNeverRun:
         assert any(r["code"] == "job_never_run" for r in report["reasons"])
 
     def test_backfill_never_run_is_warning_not_critical(self):
-        """One-shot backfill is expected to be never_run on a clean install;
-        it shouldn't produce a critical that would trip strict-mode 503s."""
+        """One-shot backfill is expected to be never_run on a clean install
+        and shouldn't be flagged as actively-broken (critical). Default
+        severity is warning — strict-mode callers will still see 503 for
+        it; ops who want to mute the signal can override the threshold to
+        SEVERITY_OK."""
         now = WEEKDAY_OFF_HOURS_UTC
         stats = _all_healthy_stats(now)
         stats["jobs"]["fetch_economic_calendar_backfill"] = {
@@ -253,6 +256,21 @@ class TestJobNeverRun:
         }
         report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
         assert report["severity"] == SEVERITY_WARNING
+
+    def test_backfill_never_run_can_be_muted_to_ok(self):
+        """Threshold override SEVERITY_OK suppresses the never_run reason
+        entirely so /macro/health?strict=true returns 200 on a clean
+        install where backfill is intentionally never invoked."""
+        now = WEEKDAY_OFF_HOURS_UTC
+        stats = _all_healthy_stats(now)
+        stats["jobs"]["fetch_economic_calendar_backfill"] = {
+            "last_success_at": None,
+            "last_any_at": None,
+        }
+        thresholds = {**DEFAULT_THRESHOLDS, "backfill_never_run_severity": SEVERITY_OK}
+        report = evaluate_health(stats, now=now, thresholds=thresholds)
+        assert report["severity"] == SEVERITY_OK
+        assert all(r["code"] != "job_never_run" for r in report["reasons"])
 
     def test_failed_but_never_succeeded_is_critical(self):
         """A job that has runs but no successful one is critical: the
@@ -268,6 +286,60 @@ class TestJobNeverRun:
         assert any(
             r["code"] == "job_no_successful_run" for r in report["reasons"]
         )
+
+
+class TestPeriodicRecentFailure:
+    """Independent of cadence freshness: a periodic job whose most recent
+    run failed (last_any_at > last_success_at) must surface a warning
+    reason. Pre-fix the periodic path went straight from cadence checks to
+    return ok and ignored the failure entirely."""
+
+    def test_fresh_success_with_recent_failure_warns(self):
+        now = WEEKDAY_OFF_HOURS_UTC
+        stats = _all_healthy_stats(now)
+        # Last success 30m ago (within hourly cadence) but a failed run
+        # happened 5m ago.
+        stats["jobs"]["fetch_economic_calendar_recent"] = {
+            "last_success_at": now - timedelta(minutes=30),
+            "last_any_at": now - timedelta(minutes=5),
+        }
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_WARNING
+        codes = {r["code"] for r in report["reasons"]}
+        assert "job_recent_failure" in codes
+        # Cadence is fine, so no stale reason should fire.
+        assert "job_stale_warning" not in codes
+        assert "job_stale_critical" not in codes
+
+    def test_stale_critical_with_recent_failure_keeps_critical(self):
+        """A job that's both stale-critical AND recently-failed reports
+        critical (the worse signal) and includes both reasons additively."""
+        now = WEEKDAY_OFF_HOURS_UTC
+        stats = _all_healthy_stats(now)
+        # 5 hours ago success (>1h × 3 critical) + recent failure 5m ago.
+        stats["jobs"]["fetch_economic_calendar_recent"] = {
+            "last_success_at": now - timedelta(hours=5),
+            "last_any_at": now - timedelta(minutes=5),
+        }
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_CRITICAL
+        codes = {r["code"] for r in report["reasons"]}
+        # Both signals surface — caller can see what's degraded.
+        assert "job_stale_critical" in codes
+        assert "job_recent_failure" in codes
+
+    def test_periodic_success_only_no_failure_is_ok(self):
+        """Sanity: when last_any_at == last_success_at (most recent run
+        was the success), no failure reason fires."""
+        now = WEEKDAY_OFF_HOURS_UTC
+        stats = _all_healthy_stats(now)
+        same = now - timedelta(minutes=10)
+        stats["jobs"]["fetch_earnings_calendar"] = {
+            "last_success_at": same,
+            "last_any_at": same,
+        }
+        report = evaluate_health(stats, now=now, thresholds=DEFAULT_THRESHOLDS)
+        assert report["severity"] == SEVERITY_OK
 
 
 class TestBackfillOneShot:
