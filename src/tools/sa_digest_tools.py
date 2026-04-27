@@ -122,7 +122,9 @@ def get_sa_digest(
     max_articles = _clamp(int(max_articles), _MAX_ARTICLES_MIN, _MAX_ARTICLES_MAX)
     max_news = _clamp(int(max_news), _MAX_NEWS_MIN, _MAX_NEWS_MAX)
     max_comments = _clamp(int(max_comments), _MAX_COMMENTS_MIN, _MAX_COMMENTS_MAX)
-    min_comment_score = float(min_comment_score)
+    # Stage 1 high_value_score is bounded 0..10; clamp so out-of-range
+    # input either returns no rows or includes everything, never errors.
+    min_comment_score = _clamp_float(float(min_comment_score), 0.0, 10.0)
 
     # 4. Window
     now = datetime.now(tz=timezone.utc)
@@ -542,6 +544,10 @@ def _empty_pack(ticker: str, days: int, *, error: str) -> Dict[str, Any]:
 
 
 def _clamp(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(value, hi))
+
+
+def _clamp_float(value: float, lo: float, hi: float) -> float:
     return max(lo, min(value, hi))
 
 

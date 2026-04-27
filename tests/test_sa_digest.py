@@ -174,6 +174,61 @@ class TestParamClamping:
         assert captured["max_news"] == 20
         assert captured["max_comments"] == 30
 
+    def test_min_comment_score_clamped(self, monkeypatch):
+        """Stage 1 high_value_score is bounded 0..10. Out-of-range input
+        must not propagate to SQL — negative would let near-zero comments
+        through; >10 would empty the query forever."""
+        _enable_sa(monkeypatch)
+        captured = {}
+
+        def fake(backend, sql, params):
+            if "sa_comment_signals" in sql:
+                captured["min_score"] = params.get("min_score")
+            return []
+
+        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        get_sa_digest(
+            dal=_dal_with(_fake_backend()), ticker="NVDA", min_comment_score=-5.0,
+        )
+        assert captured["min_score"] == 0.0
+
+        get_sa_digest(
+            dal=_dal_with(_fake_backend()), ticker="NVDA", min_comment_score=99.0,
+        )
+        assert captured["min_score"] == 10.0
+
+
+class TestCommentsSqlShape:
+    """Spec §5.3 contract: SQL must use the layered CTE form so per-article
+    cap is applied BEFORE per-kind ROW_NUMBER. A drift back to the parallel
+    form would silently underfill — these assertions are the canary."""
+
+    def test_comments_sql_uses_layered_cte_with_per_article_cap(self, monkeypatch):
+        _enable_sa(monkeypatch)
+        captured = {}
+
+        def fake(backend, sql, params):
+            if "sa_comment_signals" in sql:
+                captured["sql"] = sql
+                captured["params"] = params
+            return []
+
+        monkeypatch.setattr(sd, "_fetch_dicts", fake)
+        get_sa_digest(dal=_dal_with(_fake_backend()), ticker="NVDA")
+
+        sql = captured["sql"]
+        assert "per_article AS" in sql, "missing per_article CTE"
+        assert "rn_per_article" in sql, "missing per-article row number"
+        assert "rn_per_kind" in sql, "missing per-kind row number"
+        # Layered shape: per_article filtered BEFORE rn_per_kind computed.
+        # The literal "WHERE rn_per_article" must appear before "rn_per_kind <="
+        # in source order.
+        idx_filter = sql.index("WHERE rn_per_article")
+        idx_kind_cap = sql.index("rn_per_kind <=")
+        assert idx_filter < idx_kind_cap, "per-article filter must come before per-kind cap"
+
+        assert captured["params"]["per_article_cap"] == 3
+
 
 # ---------------------------------------------------------------------------
 # 6-7: per-source normalization
