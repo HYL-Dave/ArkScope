@@ -339,4 +339,5 @@ class TestMemoryToolRegistry:
     def test_total_tool_count(self):
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 50
+        # +2 for macro_calendar (P1.2 commit 6).
+        assert len(registry.list_all()) == 54

@@ -516,3 +516,181 @@ class TestTrackedFields:
         assert "status" in IPO_TRACKED_FIELDS
         assert "exchange" in IPO_TRACKED_FIELDS
         assert "price" in IPO_TRACKED_FIELDS
+
+
+# ---------------------------------------------------------------------------
+# Read-only list helpers (commit 6)
+# ---------------------------------------------------------------------------
+
+
+def _fake_conn_with_rows(rows):
+    """Build a mock psycopg2 conn whose cursor.fetchall() returns ``rows``."""
+    cursor = MagicMock()
+    cursor.__enter__ = MagicMock(return_value=cursor)
+    cursor.__exit__ = MagicMock(return_value=False)
+    cursor.fetchall.return_value = rows
+    cursor.fetchone.return_value = rows[0] if rows else None
+    conn = MagicMock()
+    conn.cursor.return_value = cursor
+    return conn, cursor
+
+
+def _store_with_conn(conn):
+    backend = MagicMock()
+    backend._get_conn.return_value = conn
+    dal = MagicMock()
+    dal._backend = backend
+    return MacroCalendarStore(dal)
+
+
+class TestListEconomicEvents:
+    def _store(self, rows):
+        conn, _ = _fake_conn_with_rows(rows)
+        return _store_with_conn(conn)
+
+    def test_canonical_filters_threaded_into_sql(self):
+        """No as_of → canonical SQL with country/impact normalised filters."""
+        rows = [{"event_id": 1, "country": "US"}]
+        conn, cursor = _fake_conn_with_rows(rows)
+        store = _store_with_conn(conn)
+        out = store.list_economic_events(
+            date_from=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 30, tzinfo=timezone.utc),
+            countries=["us", "cn", "us"],   # normalised + deduped
+            impacts=["HIGH"],
+            limit=50,
+        )
+        assert out == [{"event_id": 1, "country": "US"}]
+        sql, params = cursor.execute.call_args.args
+        # Canonical SQL: NOT the LATERAL form.
+        assert "FROM cal_economic_events" in sql
+        assert "INNER JOIN LATERAL" not in sql
+        assert params["countries"] == ["US", "CN"]
+        assert params["impacts"] == ["high"]
+        assert params["limit"] == 50
+
+    def test_as_of_uses_lateral_join_to_revisions(self):
+        rows = [{"event_id": 1, "actual": 4.25}]
+        conn, cursor = _fake_conn_with_rows(rows)
+        store = _store_with_conn(conn)
+        as_of = datetime(2024, 12, 18, 18, 0, tzinfo=timezone.utc)
+        store.list_economic_events(
+            date_from=datetime(2024, 12, 18, tzinfo=timezone.utc),
+            date_to=datetime(2024, 12, 18, 23, tzinfo=timezone.utc),
+            as_of=as_of,
+        )
+        sql, params = cursor.execute.call_args.args
+        assert "INNER JOIN LATERAL" in sql
+        assert "cal_economic_event_revisions" in sql
+        assert params["as_of"] == as_of
+
+    def test_no_filters_passes_none_for_array_params(self):
+        """countries=None / impacts=None must remain None so the SQL
+        ``IS NULL`` branch skips the filter (rather than turning into an
+        empty array which would match nothing)."""
+        rows = []
+        conn, cursor = _fake_conn_with_rows(rows)
+        store = _store_with_conn(conn)
+        store.list_economic_events(
+            date_from=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 30, tzinfo=timezone.utc),
+        )
+        _, params = cursor.execute.call_args.args
+        assert params["countries"] is None
+        assert params["impacts"] is None
+
+    def test_limit_clamped_to_1000(self):
+        rows = []
+        conn, cursor = _fake_conn_with_rows(rows)
+        store = _store_with_conn(conn)
+        store.list_economic_events(
+            date_from=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 30, tzinfo=timezone.utc),
+            limit=99999,
+        )
+        _, params = cursor.execute.call_args.args
+        assert params["limit"] == 1000
+
+    def test_unavailable_dal_returns_empty_list(self):
+        from types import SimpleNamespace
+        dal = SimpleNamespace(_backend=object())
+        store = MacroCalendarStore(dal)
+        out = store.list_economic_events(
+            date_from=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 30, tzinfo=timezone.utc),
+        )
+        assert out == []
+
+
+class TestListEarningsAndIpo:
+    def test_earnings_canonical_filters(self):
+        conn, cursor = _fake_conn_with_rows([{"earnings_id": 1}])
+        store = _store_with_conn(conn)
+        store.list_earnings_events(
+            date_from=date(2026, 4, 1),
+            date_to=date(2026, 4, 30),
+            symbols=["aapl", "NVDA"],
+        )
+        sql, params = cursor.execute.call_args.args
+        assert "FROM cal_earnings_events" in sql
+        assert "INNER JOIN LATERAL" not in sql
+        assert params["symbols"] == ["AAPL", "NVDA"]
+
+    def test_earnings_as_of_uses_revisions(self):
+        conn, cursor = _fake_conn_with_rows([])
+        store = _store_with_conn(conn)
+        store.list_earnings_events(
+            date_from=date(2026, 4, 1),
+            date_to=date(2026, 4, 30),
+            as_of=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        )
+        sql, _ = cursor.execute.call_args.args
+        assert "cal_earnings_event_revisions" in sql
+
+    def test_ipo_status_lowercased(self):
+        conn, cursor = _fake_conn_with_rows([])
+        store = _store_with_conn(conn)
+        store.list_ipo_events(
+            date_from=date(2025, 1, 1),
+            date_to=date(2025, 12, 31),
+            statuses=["PRICED", "Filed"],
+        )
+        _, params = cursor.execute.call_args.args
+        assert params["statuses"] == ["priced", "filed"]
+
+
+class TestGetMacroObservations:
+    def _store(self, meta, obs_rows):
+        cursor = MagicMock()
+        cursor.__enter__ = MagicMock(return_value=cursor)
+        cursor.__exit__ = MagicMock(return_value=False)
+        cursor.fetchone.return_value = meta
+        cursor.fetchall.return_value = obs_rows
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+        return _store_with_conn(conn), cursor
+
+    def test_unknown_series_returns_none(self):
+        store, _ = self._store(None, [])
+        assert store.get_macro_observations("DOES_NOT_EXIST") is None
+
+    def test_current_vintage_uses_realtime_end_sentinel(self):
+        meta = {"series_id": "CPIAUCNS", "title": "CPI", "frequency": "m", "units": "Index"}
+        store, cursor = self._store(meta, [{"observation_date": date(2024, 3, 1), "value": 312.332}])
+        out = store.get_macro_observations("CPIAUCNS")
+        # Two execute calls: SELECT macro_series + SELECT observations.
+        sql_calls = [c.args[0] for c in cursor.execute.call_args_list]
+        # Second call is the observations query.
+        assert "realtime_end = '9999-12-31'::date" in sql_calls[1]
+        assert out["title"] == "CPI"
+        assert out["observations"][0]["value"] == 312.332
+
+    def test_as_of_uses_vintage_window_bracket(self):
+        meta = {"series_id": "CPIAUCNS", "title": "CPI", "frequency": "m", "units": "Index"}
+        store, cursor = self._store(meta, [])
+        store.get_macro_observations(
+            "CPIAUCNS", as_of=date(2024, 5, 1),
+        )
+        sql_calls = [c.args[0] for c in cursor.execute.call_args_list]
+        assert "realtime_start <= %(as_of)s" in sql_calls[1]
+        assert "realtime_end   >  %(as_of)s" in sql_calls[1]

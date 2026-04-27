@@ -1205,6 +1205,78 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ])
 
+    # macro_calendar tools (P1.2 commit 6)
+    tools.extend([
+        {
+            "name": "get_economic_calendar",
+            "description": (
+                "List recent + upcoming economic events (CPI, FOMC, GDP, unemployment, etc.) "
+                "from the macro_calendar layer. Each row carries country, event_time (UTC), "
+                "impact, actual / estimate / prev. Pass as_of (ISO timestamp) for "
+                "lookahead-safe replay — events first observed AFTER as_of are excluded "
+                "entirely. Requires macro_calendar.enabled=true."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "country": {
+                        "type": "string",
+                        "description": "ISO 2-letter country (US, CN, …); CSV like 'US,CN' supported.",
+                    },
+                    "importance": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high"],
+                        "description": "Filter by impact level. CSV supported.",
+                    },
+                    "days_back": {
+                        "type": "integer",
+                        "description": "Window start = today - days_back (default 7).",
+                    },
+                    "days_forward": {
+                        "type": "integer",
+                        "description": "Window end = today + days_forward (default 14).",
+                    },
+                    "as_of": {
+                        "type": "string",
+                        "description": "ISO-8601 timestamp for vintage replay; omit for current view.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Hard cap on rows (1-500, default 50).",
+                    },
+                },
+                "required": [],
+            },
+        },
+        {
+            "name": "get_macro_value",
+            "description": (
+                "Point-in-time macro lookup. Returns the value of a FRED series for a "
+                "specific observation_date, optionally constrained by an as_of vintage "
+                "(ALFRED replay). Use for lookahead-safe reads of CPI / FFR / GDP / "
+                "unemployment / yield-spread values. Requires macro_calendar.enabled=true."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "series_id": {
+                        "type": "string",
+                        "description": "FRED series id (CPIAUCNS, FEDFUNDS, GDP, UNRATE, DGS10, …).",
+                    },
+                    "observation_date": {
+                        "type": "string",
+                        "description": "ISO YYYY-MM-DD — the date the value REFERS to.",
+                    },
+                    "as_of": {
+                        "type": "string",
+                        "description": "ISO YYYY-MM-DD — caller's effective vintage date. Omit for current value.",
+                    },
+                },
+                "required": ["series_id", "observation_date"],
+            },
+        },
+    ])
+
     return tools
 
 
@@ -1237,6 +1309,29 @@ def _dispatch_subagent(tool_input: Dict[str, Any], dal: "DataAccessLayer") -> Di
         task=tool_input["task"],
         context_json=tool_input.get("context_json", ""),
         dal=dal,
+    )
+
+
+def _macro_get_economic_calendar(dal: "DataAccessLayer", tool_input: Dict[str, Any]) -> str:
+    from src.tools.macro_calendar_tools import get_economic_calendar
+    return get_economic_calendar(
+        dal,
+        country=tool_input.get("country"),
+        importance=tool_input.get("importance"),
+        days_back=tool_input.get("days_back", 7),
+        days_forward=tool_input.get("days_forward", 14),
+        as_of=tool_input.get("as_of"),
+        limit=tool_input.get("limit", 50),
+    )
+
+
+def _macro_get_macro_value(dal: "DataAccessLayer", tool_input: Dict[str, Any]) -> str:
+    from src.tools.macro_calendar_tools import get_macro_value
+    return get_macro_value(
+        dal,
+        series_id=tool_input["series_id"],
+        observation_date=tool_input["observation_date"],
+        as_of=tool_input.get("as_of"),
     )
 
 
@@ -1604,6 +1699,9 @@ def execute_tool(
             min_score=tool_input.get("min_score", 2.0),
             limit=tool_input.get("limit", 20),
         ),
+        # macro_calendar (P1.2 commit 6)
+        "get_economic_calendar": lambda: _macro_get_economic_calendar(dal, tool_input),
+        "get_macro_value": lambda: _macro_get_macro_value(dal, tool_input),
     }
 
     if tool_name not in tool_map:

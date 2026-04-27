@@ -169,6 +169,7 @@ class ToolRegistry:
         self._register_freshness_tools()
         self._register_rl_tools()
         self._register_sa_tools()
+        self._register_macro_calendar_tools()
 
     def _register_news_tools(self) -> None:
         from .news_tools import (
@@ -1162,6 +1163,91 @@ class ToolRegistry:
                 ToolParameter("limit", "integer",
                               "Max comments returned (1-50, default 20)",
                               required=False, default=20),
+            ],
+        ))
+
+
+    def _register_macro_calendar_tools(self) -> None:
+        """Register the two read-only macro_calendar tools (P1.2 commit 6)."""
+        from .macro_calendar_tools import get_economic_calendar, get_macro_value
+
+        self.register(ToolDefinition(
+            name="get_economic_calendar",
+            description=(
+                "List recent + upcoming economic-calendar events (CPI, FOMC, "
+                "GDP, unemployment, etc.) from Finnhub's free economic "
+                "calendar, persisted via the macro_calendar layer. Each row "
+                "carries country, event_time (UTC), impact, actual / "
+                "estimate / prev. Pass as_of (ISO timestamp) for lookahead-"
+                "safe replay — events first observed AFTER as_of are "
+                "excluded entirely. Requires macro_calendar.enabled=true."
+            ),
+            function=get_economic_calendar,
+            category="analysis",
+            requires_dal=True,
+            parameters=[
+                ToolParameter(
+                    "country", "string",
+                    "ISO 2-letter country code (e.g. US, CN). CSV like 'US,CN' supported.",
+                    required=False,
+                ),
+                ToolParameter(
+                    "importance", "string",
+                    "Filter by impact level. CSV supported.",
+                    required=False, enum=["low", "medium", "high"],
+                ),
+                ToolParameter(
+                    "days_back", "integer",
+                    "Window start = today - days_back (default 7).",
+                    required=False, default=7,
+                ),
+                ToolParameter(
+                    "days_forward", "integer",
+                    "Window end = today + days_forward (default 14).",
+                    required=False, default=14,
+                ),
+                ToolParameter(
+                    "as_of", "string",
+                    "ISO-8601 timestamp for vintage replay; omit for current view.",
+                    required=False,
+                ),
+                ToolParameter(
+                    "limit", "integer",
+                    "Hard cap on rows (1-500, default 50).",
+                    required=False, default=50,
+                ),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_macro_value",
+            description=(
+                "Point-in-time macro lookup. Returns the value of a FRED "
+                "series for a specific observation_date, optionally "
+                "constrained by an as_of vintage (ALFRED replay). Use this "
+                "to read CPI / FFR / GDP / unemployment / yield-spread "
+                "values lookahead-safely from a backtest perspective. "
+                "Requires macro_calendar.enabled=true."
+            ),
+            function=get_macro_value,
+            category="analysis",
+            requires_dal=True,
+            parameters=[
+                ToolParameter(
+                    "series_id", "string",
+                    "FRED series id (e.g. CPIAUCNS, FEDFUNDS, GDP, UNRATE, DGS10).",
+                ),
+                ToolParameter(
+                    "observation_date", "string",
+                    "ISO YYYY-MM-DD — the date the value REFERS to "
+                    "(e.g. '2024-03-01' for March 2024 CPI).",
+                ),
+                ToolParameter(
+                    "as_of", "string",
+                    "ISO YYYY-MM-DD — caller's effective vintage date. "
+                    "Omit for current value.",
+                    required=False,
+                ),
             ],
         ))
 

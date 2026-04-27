@@ -730,3 +730,342 @@ class MacroCalendarStore:
         except Exception as exc:
             logger.warning("revision as-of read failed: %s", exc)
             return None
+
+    # =====================================================================
+    # Read-only list queries (commit 6)
+    # =====================================================================
+
+    def list_economic_events(
+        self,
+        *,
+        date_from: datetime,
+        date_to: datetime,
+        countries: Optional[Iterable[str]] = None,
+        impacts: Optional[Iterable[str]] = None,
+        as_of: Optional[datetime] = None,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """List economic events in [date_from, date_to].
+
+        When ``as_of`` is None: returns canonical (current) values.
+        When ``as_of`` is set: returns the revision visible at that
+        timestamp via ``cal_economic_event_revisions`` — events first
+        observed AFTER ``as_of`` are excluded entirely (they were
+        unknown at that time, so a lookahead-safe read must omit them).
+        """
+        if not self.is_available() or psycopg2 is None:
+            return []
+        country_arr = _normalize_str_array(countries, upper=True)
+        impact_arr = _normalize_str_array(impacts, lower=True)
+        try:
+            conn = self._backend._get_conn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if as_of is None:
+                    cur.execute(_LIST_ECONOMIC_CANONICAL_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "countries": country_arr,
+                        "impacts": impact_arr,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                else:
+                    cur.execute(_LIST_ECONOMIC_AS_OF_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "countries": country_arr,
+                        "impacts": impact_arr,
+                        "as_of": as_of,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("list_economic_events failed: %s", exc)
+            return []
+
+    def list_earnings_events(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        symbols: Optional[Iterable[str]] = None,
+        as_of: Optional[datetime] = None,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """List earnings events in [date_from, date_to] (report_date filter)."""
+        if not self.is_available() or psycopg2 is None:
+            return []
+        symbol_arr = _normalize_str_array(symbols, upper=True)
+        try:
+            conn = self._backend._get_conn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if as_of is None:
+                    cur.execute(_LIST_EARNINGS_CANONICAL_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "symbols": symbol_arr,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                else:
+                    cur.execute(_LIST_EARNINGS_AS_OF_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "symbols": symbol_arr,
+                        "as_of": as_of,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("list_earnings_events failed: %s", exc)
+            return []
+
+    def list_ipo_events(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        statuses: Optional[Iterable[str]] = None,
+        as_of: Optional[datetime] = None,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """List IPO events in [date_from, date_to]."""
+        if not self.is_available() or psycopg2 is None:
+            return []
+        status_arr = _normalize_str_array(statuses, lower=True)
+        try:
+            conn = self._backend._get_conn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                if as_of is None:
+                    cur.execute(_LIST_IPO_CANONICAL_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "statuses": status_arr,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                else:
+                    cur.execute(_LIST_IPO_AS_OF_SQL, {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "statuses": status_arr,
+                        "as_of": as_of,
+                        "limit": _clamp_limit(limit, hi=1000),
+                    })
+                return [dict(r) for r in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("list_ipo_events failed: %s", exc)
+            return []
+
+    def get_macro_observations(
+        self,
+        series_id: str,
+        *,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        as_of: Optional[date] = None,
+        limit: int = 1000,
+    ) -> Optional[Dict[str, Any]]:
+        """Return series metadata + observation list for ``series_id``.
+
+        ``as_of`` selects the vintage window that contained that date —
+        i.e. ``realtime_start <= as_of < realtime_end``. Without ``as_of``
+        the current vintage (``realtime_end='9999-12-31'``) is returned.
+        Returns None when the series is unknown.
+        """
+        if not self.is_available() or psycopg2 is None:
+            return None
+        try:
+            conn = self._backend._get_conn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM macro_series WHERE series_id = %s",
+                    (series_id,),
+                )
+                meta = cur.fetchone()
+                if meta is None:
+                    return None
+                params: Dict[str, Any] = {
+                    "series_id": series_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "limit": _clamp_limit(limit, hi=10000),
+                }
+                if as_of is None:
+                    cur.execute(_OBSERVATIONS_CURRENT_SQL, params)
+                else:
+                    params["as_of"] = as_of
+                    cur.execute(_OBSERVATIONS_AS_OF_SQL, params)
+                obs = [dict(r) for r in cur.fetchall()]
+            return {**dict(meta), "observations": obs}
+        except Exception as exc:
+            logger.warning("get_macro_observations failed for %s: %s", series_id, exc)
+            return None
+
+
+# ---------------------------------------------------------------------------
+# Read-query SQL + helpers (commit 6)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_str_array(
+    values: Optional[Iterable[str]],
+    *,
+    upper: bool = False,
+    lower: bool = False,
+) -> Optional[List[str]]:
+    """Return a normalized list for psycopg2 ``ANY(%s::text[])`` filters,
+    or None when the caller passed nothing (so the SQL ``IS NULL`` branch
+    skips the filter)."""
+    if values is None:
+        return None
+    out: List[str] = []
+    seen = set()
+    for v in values:
+        if v is None:
+            continue
+        s = str(v).strip()
+        if not s:
+            continue
+        if upper:
+            s = s.upper()
+        elif lower:
+            s = s.lower()
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out or None
+
+
+def _clamp_limit(limit: Any, *, hi: int, lo: int = 1) -> int:
+    try:
+        n = int(limit)
+    except (TypeError, ValueError):
+        return hi
+    return max(lo, min(hi, n))
+
+
+# Canonical (current-state) reads. ``%(countries)s::text[] IS NULL OR
+# country = ANY(...)`` skips the filter when the caller passed None.
+
+_LIST_ECONOMIC_CANONICAL_SQL = """
+    SELECT event_id, country, event_name, event_time, impact, unit,
+           actual, estimate, prev,
+           NULL::timestamptz AS as_of_observed_at
+    FROM cal_economic_events
+    WHERE event_time >= %(date_from)s AND event_time <= %(date_to)s
+      AND (%(countries)s::text[] IS NULL OR country = ANY(%(countries)s::text[]))
+      AND (%(impacts)s::text[]   IS NULL OR impact  = ANY(%(impacts)s::text[]))
+    ORDER BY event_time ASC
+    LIMIT %(limit)s
+"""
+
+# As-of reads use INNER JOIN LATERAL: events with no revision <= as_of are
+# excluded because they were unknown at that timestamp (lookahead-safe).
+_LIST_ECONOMIC_AS_OF_SQL = """
+    SELECT e.event_id, e.country, e.event_name, e.event_time, e.impact, e.unit,
+           rev.actual, rev.estimate, rev.prev,
+           rev.observed_at AS as_of_observed_at
+    FROM cal_economic_events e
+    INNER JOIN LATERAL (
+        SELECT actual, estimate, prev, observed_at
+        FROM cal_economic_event_revisions
+        WHERE event_id = e.event_id AND observed_at <= %(as_of)s
+        ORDER BY observed_at DESC
+        LIMIT 1
+    ) rev ON TRUE
+    WHERE e.event_time >= %(date_from)s AND e.event_time <= %(date_to)s
+      AND (%(countries)s::text[] IS NULL OR e.country = ANY(%(countries)s::text[]))
+      AND (%(impacts)s::text[]   IS NULL OR e.impact  = ANY(%(impacts)s::text[]))
+    ORDER BY e.event_time ASC
+    LIMIT %(limit)s
+"""
+
+_LIST_EARNINGS_CANONICAL_SQL = """
+    SELECT earnings_id, symbol, report_date, year, quarter, hour,
+           eps_estimate, eps_actual, revenue_estimate, revenue_actual,
+           NULL::timestamptz AS as_of_observed_at
+    FROM cal_earnings_events
+    WHERE report_date >= %(date_from)s AND report_date <= %(date_to)s
+      AND (%(symbols)s::text[] IS NULL OR symbol = ANY(%(symbols)s::text[]))
+    ORDER BY report_date ASC, symbol ASC
+    LIMIT %(limit)s
+"""
+
+_LIST_EARNINGS_AS_OF_SQL = """
+    SELECT e.earnings_id, e.symbol, e.report_date, e.year, e.quarter,
+           rev.hour,
+           rev.eps_estimate, rev.eps_actual,
+           rev.revenue_estimate, rev.revenue_actual,
+           rev.observed_at AS as_of_observed_at
+    FROM cal_earnings_events e
+    INNER JOIN LATERAL (
+        SELECT hour, eps_estimate, eps_actual,
+               revenue_estimate, revenue_actual, observed_at
+        FROM cal_earnings_event_revisions
+        WHERE earnings_id = e.earnings_id AND observed_at <= %(as_of)s
+        ORDER BY observed_at DESC
+        LIMIT 1
+    ) rev ON TRUE
+    WHERE e.report_date >= %(date_from)s AND e.report_date <= %(date_to)s
+      AND (%(symbols)s::text[] IS NULL OR e.symbol = ANY(%(symbols)s::text[]))
+    ORDER BY e.report_date ASC, e.symbol ASC
+    LIMIT %(limit)s
+"""
+
+_LIST_IPO_CANONICAL_SQL = """
+    SELECT ipo_id, symbol, name, ipo_date, exchange, status,
+           number_of_shares, price, total_shares_value,
+           NULL::timestamptz AS as_of_observed_at
+    FROM cal_ipo_events
+    WHERE ipo_date >= %(date_from)s AND ipo_date <= %(date_to)s
+      AND (%(statuses)s::text[] IS NULL OR status = ANY(%(statuses)s::text[]))
+    ORDER BY ipo_date ASC, name ASC
+    LIMIT %(limit)s
+"""
+
+_LIST_IPO_AS_OF_SQL = """
+    SELECT e.ipo_id, e.symbol, e.name, e.ipo_date,
+           rev.exchange, rev.status,
+           rev.number_of_shares, rev.price, rev.total_shares_value,
+           rev.observed_at AS as_of_observed_at
+    FROM cal_ipo_events e
+    INNER JOIN LATERAL (
+        SELECT exchange, status, number_of_shares, price,
+               total_shares_value, observed_at
+        FROM cal_ipo_event_revisions
+        WHERE ipo_id = e.ipo_id AND observed_at <= %(as_of)s
+        ORDER BY observed_at DESC
+        LIMIT 1
+    ) rev ON TRUE
+    WHERE e.ipo_date >= %(date_from)s AND e.ipo_date <= %(date_to)s
+      AND (%(statuses)s::text[] IS NULL OR rev.status = ANY(%(statuses)s::text[]))
+    ORDER BY e.ipo_date ASC, e.name ASC
+    LIMIT %(limit)s
+"""
+
+# Macro observations. Current vintage = realtime_end='9999-12-31' window.
+# Date filters are optional (NULL skips the clause).
+_OBSERVATIONS_CURRENT_SQL = """
+    SELECT observation_date, value, realtime_start, realtime_end
+    FROM macro_observations
+    WHERE series_id = %(series_id)s
+      AND realtime_end = '9999-12-31'::date
+      AND (%(date_from)s::date IS NULL OR observation_date >= %(date_from)s::date)
+      AND (%(date_to)s::date   IS NULL OR observation_date <= %(date_to)s::date)
+    ORDER BY observation_date ASC
+    LIMIT %(limit)s
+"""
+
+# As-of: pick the vintage window that contained ``as_of``. For each
+# observation_date in range, the matching row is the one whose
+# [realtime_start, realtime_end) bracket contains as_of.
+_OBSERVATIONS_AS_OF_SQL = """
+    SELECT observation_date, value, realtime_start, realtime_end
+    FROM macro_observations
+    WHERE series_id = %(series_id)s
+      AND realtime_start <= %(as_of)s::date
+      AND realtime_end   >  %(as_of)s::date
+      AND (%(date_from)s::date IS NULL OR observation_date >= %(date_from)s::date)
+      AND (%(date_to)s::date   IS NULL OR observation_date <= %(date_to)s::date)
+    ORDER BY observation_date ASC
+    LIMIT %(limit)s
+"""

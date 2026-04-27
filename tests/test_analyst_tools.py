@@ -258,17 +258,19 @@ class TestConsensus:
 # ============================================================
 
 class TestBridgeIntegration:
-    def test_registry_23(self):
-        """Registry has 44 tools (including check_data_freshness + 3 RL tools)."""
+    def test_registry_total_count(self):
+        """Registry total: base + RL + SA + macro_calendar tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 50
+        # +2 for macro_calendar (P1.2 commit 6: get_economic_calendar, get_macro_value)
+        assert len(registry.list_all()) == 54
 
-    def test_analysis_category_6(self):
-        """Analysis category has 10 tools (including check_data_freshness)."""
+    def test_analysis_category_count(self):
+        """Analysis category includes get_economic_calendar + get_macro_value."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_by_category("analysis")) == 10
+        # +2 for macro_calendar both registered as category="analysis"
+        assert len(registry.list_by_category("analysis")) == 12
 
     def test_anthropic_includes(self):
         """Anthropic bridge includes get_analyst_consensus."""

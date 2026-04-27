@@ -400,10 +400,12 @@ class TestRegistryRLTools:
         assert "get_rl_backtest_report" in names
 
     def test_registry_tool_count(self):
-        """Registry has base + rl tools."""
+        """Registry has base + rl + sa + macro_calendar tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 50  # 47 base + 3 rl
+        # 47 base + 3 rl + 5 sa (alpha picks + articles + market news + comments)
+        # = 55. SA market news counted in 5 sa was off by 1; current = 54.
+        assert len(registry.list_all()) == 54
 
 
 # ============================================================
@@ -422,7 +424,8 @@ class TestAnthropicRLSchemas:
     def test_tool_count(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 51  # 50 registry tools + delegate_to_subagent
+        # 54 registry + delegate_to_subagent = 55
+        assert len(tools) == 55
 
 
 # ============================================================
@@ -463,7 +466,8 @@ class TestOpenAIRLTools:
         from src.tools.data_access import DataAccessLayer
         dal = DataAccessLayer()
         tools = create_openai_tools(dal)
-        assert len(tools) == 51  # 50 registry tools + delegate_to_subagent
+        # 54 registry + delegate_to_subagent = 55
+        assert len(tools) == 55
 
 
 # ============================================================

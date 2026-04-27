@@ -1060,6 +1060,55 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result, "list_high_value_comments")
 
+    # macro_calendar tools (P1.2 commit 6)
+    @function_tool
+    def tool_get_economic_calendar(
+        country: str = "",
+        importance: str = "",
+        days_back: int = 7,
+        days_forward: int = 14,
+        as_of: str = "",
+        limit: int = 50,
+    ) -> str:
+        """List recent + upcoming economic events from the macro_calendar layer.
+
+        Each row carries country, event_time (UTC), impact, actual / estimate
+        / prev. Pass as_of (ISO timestamp) for lookahead-safe replay — events
+        first observed AFTER as_of are excluded entirely. country/importance
+        accept CSV (e.g. "US,CN").
+        """
+        from src.tools.macro_calendar_tools import get_economic_calendar
+        return get_economic_calendar(
+            dal,
+            country=country or None,
+            importance=importance or None,
+            days_back=days_back,
+            days_forward=days_forward,
+            as_of=as_of or None,
+            limit=limit,
+        )
+
+    @function_tool
+    def tool_get_macro_value(
+        series_id: str,
+        observation_date: str,
+        as_of: str = "",
+    ) -> str:
+        """Point-in-time macro lookup with ALFRED vintage replay.
+
+        Returns the value of a FRED series (CPIAUCNS, FEDFUNDS, GDP, UNRATE,
+        DGS10, …) for a specific observation_date. Pass as_of (ISO YYYY-MM-DD)
+        to read the value as it was known on that date — required for
+        lookahead-safe backtesting.
+        """
+        from src.tools.macro_calendar_tools import get_macro_value
+        return get_macro_value(
+            dal,
+            series_id=series_id,
+            observation_date=observation_date,
+            as_of=as_of or None,
+        )
+
     # Return all tools as a list
     tools = [
         tool_get_ticker_news,
@@ -1111,6 +1160,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
         tool_list_high_value_comments,
+        # macro_calendar (P1.2 commit 6)
+        tool_get_economic_calendar,
+        tool_get_macro_value,
     ]
 
     # Conditionally add web tools
