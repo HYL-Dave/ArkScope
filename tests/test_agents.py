@@ -270,7 +270,12 @@ class TestAnthropicToolExecution:
         assert kw["max_comments"] == 8
         assert kw["min_comment_score"] == 4.0
         # Output is wrapped with the standard tool_output envelope.
-        assert "ok" in _unwrap(result)
+        # Assert the envelope explicitly so a future drop of the wrapper
+        # (or wrong tool_name attribute) trips this test — `_unwrap` alone
+        # would silently fall through if the wrapper went away.
+        assert result.startswith('<tool_output tool="get_sa_digest">')
+        assert result.endswith("</tool_output>")
+        assert json.loads(_unwrap(result)) == {"ok": True}
 
 
 # ============================================================
