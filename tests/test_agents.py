@@ -90,7 +90,7 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All bridge tools (registry 54 + delegate_to_subagent = 55)."""
+        """All bridge tools (registry 55 + delegate_to_subagent = 56)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
         assert len(tools) == 56
@@ -233,6 +233,45 @@ class TestAnthropicToolExecution:
         data = json.loads(result)
         assert "error" in data
 
+    def test_execute_get_sa_digest_dispatch(self, dal, monkeypatch):
+        """execute_tool dispatches get_sa_digest with the correct kwargs.
+
+        Counts tests don't catch a wiring mistake where the dispatch entry
+        passes the wrong field name (e.g. 'lookback' instead of 'days').
+        Lock the kwarg names + defaults via monkeypatch on the source
+        module (execute_tool re-imports get_sa_digest function-locally,
+        so we patch where it's defined)."""
+        from src.agents.anthropic_agent.tools import execute_tool
+
+        captured = {}
+
+        def fake(*args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return {"ok": True}
+
+        monkeypatch.setattr(
+            "src.tools.sa_digest_tools.get_sa_digest", fake,
+        )
+        result = execute_tool(
+            "get_sa_digest",
+            {"ticker": "NVDA", "days": 30, "max_articles": 7},
+            dal,
+        )
+        # First positional arg is the dal object the bridge passed in.
+        assert captured["args"][0] is dal
+        # Explicit kwargs should override defaults; missing keys should
+        # fall back to the documented default values.
+        kw = captured["kwargs"]
+        assert kw["ticker"] == "NVDA"
+        assert kw["days"] == 30
+        assert kw["max_articles"] == 7
+        assert kw["max_news"] == 5             # default per spec §3
+        assert kw["max_comments"] == 8
+        assert kw["min_comment_score"] == 4.0
+        # Output is wrapped with the standard tool_output envelope.
+        assert "ok" in _unwrap(result)
+
 
 # ============================================================
 # OpenAI Tool Creation Tests
@@ -244,7 +283,7 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """OpenAI bridge tools (registry 54 + delegate_to_subagent = 55)."""
+        """OpenAI bridge tools (registry 55 + delegate_to_subagent = 56)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
         assert len(tools) == 56

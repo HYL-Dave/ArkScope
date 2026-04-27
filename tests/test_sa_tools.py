@@ -610,7 +610,7 @@ class TestBridgeIntegration:
         assert "list_high_value_comments" in names
 
     def test_anthropic_bridge_count(self):
-        """Anthropic bridge should have registry (54) + delegate_to_subagent."""
+        """Anthropic bridge should have registry (55) + delegate_to_subagent."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
         assert len(tools) == 56
