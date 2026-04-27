@@ -246,6 +246,97 @@ class TestMissingAndCorruptRecords:
 
 
 # ============================================================
+# Tamper detection (integrity validation in read())
+# ============================================================
+
+
+class TestTamperDetection:
+    """A record on disk could be tampered with by a process that bypasses
+    OverflowStore.write(). read() must refuse tampered records — return
+    None — so the agent never sees mismatched overflow data."""
+
+    @staticmethod
+    def _write_raw(store: OverflowStore, record_id: str, data: dict) -> None:
+        path = store.session_dir / f"{record_id}.json"
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    def test_filename_record_id_mismatch_rejected(self, tmp_path):
+        """File at <id_a>.json containing record_id=<id_b> → None."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("t", {"x": 1}, "payload")
+
+        # Persist the same JSON under a different filename
+        wrong_path = store.session_dir / ("f" * 16 + ".json")
+        wrong_path.write_text(
+            json.dumps(record.to_dict(), ensure_ascii=False),
+            encoding="utf-8",
+        )
+        # The filename id "ffffffffffffffff" doesn't match the JSON
+        # record_id, so the integrity check refuses to return it.
+        assert store.read("f" * 16) is None
+
+    def test_tampered_tool_name_rejected(self, tmp_path):
+        """Tool name swapped → recomputed id won't match → None."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("original_tool", {}, "payload")
+
+        data = record.to_dict()
+        data["tool_name"] = "swapped_tool"
+        self._write_raw(store, record.record_id, data)
+
+        assert store.read(record.record_id) is None
+
+    def test_tampered_args_hash_rejected(self, tmp_path):
+        """Edited args_hash without changing args → mismatch with canonical."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("t", {"x": 1}, "payload")
+
+        data = record.to_dict()
+        data["args_hash"] = "0" * 64  # bogus
+        self._write_raw(store, record.record_id, data)
+
+        assert store.read(record.record_id) is None
+
+    def test_tampered_original_size_rejected(self, tmp_path):
+        """Edited original_size without re-encoding → mismatch with payload bytes."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("t", {}, "hello")  # 5 bytes utf-8
+
+        data = record.to_dict()
+        data["original_size"] = 99  # lie
+        self._write_raw(store, record.record_id, data)
+
+        assert store.read(record.record_id) is None
+
+    def test_tampered_payload_rejected(self, tmp_path):
+        """Edited original_payload but kept original record_id → recompute fails."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("t", {}, "original")
+
+        data = record.to_dict()
+        data["original_payload"] = "swapped"
+        # If we also re-set original_size to match, we still fail at the
+        # recompute step. Show that by updating size honestly:
+        data["original_size"] = len("swapped".encode("utf-8"))
+        self._write_raw(store, record.record_id, data)
+
+        assert store.read(record.record_id) is None
+
+    def test_consistent_record_with_recomputed_id_accepted(self, tmp_path):
+        """A record where every field is internally consistent and the
+        recomputed id matches must read back successfully (no false-positive
+        rejection)."""
+        store = OverflowStore(tmp_path, session_id="sess-1")
+        record = store.write("t", {"k": "v"}, "payload")
+
+        # Round-trip read on the legit record must work
+        result = store.read(record.record_id)
+        assert result is not None
+        assert result.record_id == record.record_id
+        assert result.original_payload == "payload"
+
+
+# ============================================================
 # Session isolation
 # ============================================================
 

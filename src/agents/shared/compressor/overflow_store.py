@@ -168,11 +168,25 @@ class OverflowStore:
     # ------------------------------------------------------------------
 
     def read(self, record_id: str) -> Optional[CompressionRecord]:
-        """Read a record by id. Returns ``None`` on missing / invalid / corrupt.
+        """Read a record by id. Returns ``None`` on missing / invalid / corrupt
+        / **tampered**.
 
         Never raises for normal not-found or malformed-id scenarios —
         callers (Layer 5 transcript renderer, CLI debug, etc.) treat
         ``None`` as "no overflow available".
+
+        Integrity validation (mismatch → return None, no raise):
+
+          1. ``record_id`` argument must match canonical-id pattern.
+          2. JSON ``record_id`` field must equal the filename-derived id.
+          3. ``args_hash`` field must equal ``canonical_args_hash(args)``.
+          4. ``original_size`` field must equal
+             ``len(original_payload.encode("utf-8"))``.
+          5. ``compute_record_id(tool_name, args, payload_bytes)`` must
+             equal the JSON ``record_id``.
+
+          Any of (2)-(5) failing means the record was tampered with on
+          disk; we refuse to surface tampered data to the agent.
         """
         if not is_valid_record_id(record_id):
             logger.debug("Rejected invalid record_id: %r", record_id)
@@ -184,13 +198,79 @@ class OverflowStore:
 
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            return CompressionRecord.from_dict(data)
+            record = CompressionRecord.from_dict(data)
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             logger.warning(
                 "Failed to read overflow record %s in session %s: %s",
                 record_id, self._session_id, exc,
             )
             return None
+
+        if not self._verify_record_integrity(record, expected_filename_id=record_id):
+            return None
+        return record
+
+    def _verify_record_integrity(
+        self,
+        record: CompressionRecord,
+        *,
+        expected_filename_id: str,
+    ) -> bool:
+        """Return True iff every cross-field invariant holds. False = tampered."""
+        # (2) JSON record_id must match the filename
+        if record.record_id != expected_filename_id:
+            logger.warning(
+                "Overflow record id mismatch: filename=%s, json=%s — refusing",
+                expected_filename_id, record.record_id,
+            )
+            return False
+
+        # (3) args_hash must match canonical_args_hash(args)
+        expected_args_hash = canonical_args_hash(record.args)
+        if record.args_hash != expected_args_hash:
+            logger.warning(
+                "Overflow record args_hash mismatch for id=%s — refusing",
+                record.record_id,
+            )
+            return False
+
+        # (4) original_size must match the utf-8 byte length of original_payload
+        try:
+            payload_bytes = record.original_payload.encode("utf-8")
+        except (AttributeError, UnicodeError):
+            logger.warning(
+                "Overflow record original_payload not utf-8 encodable for id=%s",
+                record.record_id,
+            )
+            return False
+        if record.original_size != len(payload_bytes):
+            logger.warning(
+                "Overflow record original_size mismatch for id=%s "
+                "(claimed=%d, actual=%d) — refusing",
+                record.record_id, record.original_size, len(payload_bytes),
+            )
+            return False
+
+        # (5) recomputed id from (tool_name, args, payload) must match
+        try:
+            recomputed = compute_record_id(
+                record.tool_name, record.args, payload_bytes,
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "Overflow record recompute failed for id=%s: %s",
+                record.record_id, exc,
+            )
+            return False
+        if recomputed != record.record_id:
+            logger.warning(
+                "Overflow record recomputed id mismatch for id=%s "
+                "(recomputed=%s) — refusing",
+                record.record_id, recomputed,
+            )
+            return False
+
+        return True
 
     # ------------------------------------------------------------------
     # Internals
