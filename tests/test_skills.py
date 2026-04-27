@@ -91,6 +91,24 @@ class TestExpandSkill:
         assert result is not None
         assert "TSLA" in result
 
+    def test_earnings_prep_mentions_get_sa_digest(self):
+        """P1.3 spec §7.1: earnings_prep MUST instruct the agent to call
+        get_sa_digest(ticker, days=30, ...). A future tool rename or
+        prompt drift should fail this assertion."""
+        result = expand_skill("earnings_prep", {"ticker": "NVDA"})
+        assert result is not None
+        assert "get_sa_digest" in result
+        assert "days=30" in result
+        # Disclaimer present so agent doesn't treat investor opinion as fact
+        assert "investor-opinion" in result or "investor opinion" in result
+
+    def test_full_analysis_mentions_get_sa_digest(self):
+        """P1.3 spec §7.2: full_analysis recommends get_sa_digest(ticker, days=14)."""
+        result = expand_skill("full_analysis", {"ticker": "NVDA"})
+        assert result is not None
+        assert "get_sa_digest" in result
+        assert "days=14" in result
+
     def test_expand_sector_rotation(self):
         result = expand_skill("sector_rotation", {})
         assert result is not None
