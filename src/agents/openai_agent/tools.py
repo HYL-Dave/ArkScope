@@ -120,6 +120,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sa_market_news as _get_sa_market_news,
         list_high_value_comments as _list_high_value_comments,
     )
+    from src.tools.sa_digest_tools import (
+        get_sa_digest as _get_sa_digest,
+    )
 
     # ================================================================
     # News Tools
@@ -1060,6 +1063,34 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         )
         return _serialize_result(result, "list_high_value_comments")
 
+    @function_tool
+    def tool_get_sa_digest(
+        ticker: str,
+        days: int = 14,
+        max_articles: int = 5,
+        max_news: int = 5,
+        max_comments: int = 8,
+        min_comment_score: float = 4.0,
+    ) -> str:
+        """Return a deterministic SA evidence pack for one ticker.
+
+        Composes sa_articles + sa_market_news + sa_comment_signals over a
+        configurable window. Returns recent_articles, high_discussion_news,
+        high_value_comments split by ticker / candidate mentions,
+        data_quality, and source_notes. needs_verification rows are kept —
+        treat as investor opinion needing audit, not verified fact.
+        """
+        result = _get_sa_digest(
+            dal,
+            ticker=ticker,
+            days=days,
+            max_articles=max_articles,
+            max_news=max_news,
+            max_comments=max_comments,
+            min_comment_score=min_comment_score,
+        )
+        return _serialize_result(result, "get_sa_digest")
+
     # macro_calendar tools (P1.2 commit 6)
     @function_tool
     def tool_get_economic_calendar(
@@ -1160,6 +1191,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
         tool_list_high_value_comments,
+        tool_get_sa_digest,
         # macro_calendar (P1.2 commit 6)
         tool_get_economic_calendar,
         tool_get_macro_value,

@@ -1018,6 +1018,7 @@ class ToolRegistry:
             get_sa_articles, get_sa_article_detail, get_sa_market_news,
             list_high_value_comments,
         )
+        from .sa_digest_tools import get_sa_digest
 
         self.register(ToolDefinition(
             name="get_sa_alpha_picks",
@@ -1133,6 +1134,45 @@ class ToolRegistry:
                 ToolParameter("limit", "integer",
                               "Max results (default 20, max 100)",
                               required=False, default=20),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_digest",
+            description=(
+                "Return a deterministic SA evidence pack for one ticker — composes "
+                "sa_articles (Alpha Picks articles) + sa_market_news (feed items "
+                "with comments_count >= 10) + sa_comment_signals (Stage 1 rule-based "
+                "scoring) over a configurable window. Output keys: recent_articles, "
+                "high_discussion_news, high_value_comments.{ticker_mentions, "
+                "candidate_mentions}, data_quality, source_notes. needs_verification "
+                "rows pass through — treat as investor opinion needing audit, not "
+                "verified fact. No internal LLM call; agent produces any summary in "
+                "its own context. Requires SA layer enabled."
+            ),
+            function=get_sa_digest,
+            category="news",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("ticker", "string",
+                              "Symbol (case-insensitive)."),
+                ToolParameter("days", "integer",
+                              "Lookback window 1-90 (default 14).",
+                              required=False, default=14),
+                ToolParameter("max_articles", "integer",
+                              "Cap on recent_articles 1-20 (default 5).",
+                              required=False, default=5),
+                ToolParameter("max_news", "integer",
+                              "Cap on high_discussion_news 1-20 (default 5).",
+                              required=False, default=5),
+                ToolParameter("max_comments", "integer",
+                              "Per-kind cap on comments 1-30 (default 8). Total "
+                              "comments returned <= 2 * max_comments.",
+                              required=False, default=8),
+                ToolParameter("min_comment_score", "number",
+                              "Stage 1 high_value_score floor 0.0-10.0 "
+                              "(default 4.0). Out-of-range values are clamped.",
+                              required=False, default=4.0),
             ],
         ))
 

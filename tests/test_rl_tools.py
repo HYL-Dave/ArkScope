@@ -403,9 +403,8 @@ class TestRegistryRLTools:
         """Registry has base + rl + sa + macro_calendar tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        # 47 base + 3 rl + 5 sa (alpha picks + articles + market news + comments)
-        # = 55. SA market news counted in 5 sa was off by 1; current = 54.
-        assert len(registry.list_all()) == 54
+        # Registry total bumped by P1.3 commit 2 (get_sa_digest) → 55.
+        assert len(registry.list_all()) == 55
 
 
 # ============================================================
@@ -424,8 +423,8 @@ class TestAnthropicRLSchemas:
     def test_tool_count(self):
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        # 54 registry + delegate_to_subagent = 55
-        assert len(tools) == 55
+        # 55 registry + delegate_to_subagent = 56
+        assert len(tools) == 56
 
 
 # ============================================================
@@ -466,8 +465,8 @@ class TestOpenAIRLTools:
         from src.tools.data_access import DataAccessLayer
         dal = DataAccessLayer()
         tools = create_openai_tools(dal)
-        # 54 registry + delegate_to_subagent = 55
-        assert len(tools) == 55
+        # 55 registry + delegate_to_subagent = 56
+        assert len(tools) == 56
 
 
 # ============================================================

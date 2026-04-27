@@ -1203,6 +1203,32 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": [],
             },
         },
+        {
+            "name": "get_sa_digest",
+            "description": (
+                "Return a deterministic SA evidence pack for one ticker. Composes "
+                "sa_articles + sa_market_news + sa_comment_signals over a "
+                "configurable window. Output keys: recent_articles, "
+                "high_discussion_news, high_value_comments.{ticker_mentions, "
+                "candidate_mentions}, data_quality, source_notes. Comments come "
+                "from Stage 1 rule-based scoring with ticker-vs-candidate split "
+                "preserved; needs_verification rows pass through (investor "
+                "opinion, not verified fact). No internal LLM call — agent "
+                "produces any summary in its own context."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {"type": "string", "description": "Symbol (case-insensitive)."},
+                    "days": {"type": "integer", "description": "Lookback window 1-90 (default 14)."},
+                    "max_articles": {"type": "integer", "description": "Cap on recent_articles 1-20 (default 5)."},
+                    "max_news": {"type": "integer", "description": "Cap on high_discussion_news 1-20 (default 5)."},
+                    "max_comments": {"type": "integer", "description": "Per-kind cap on comments 1-30 (default 8)."},
+                    "min_comment_score": {"type": "number", "description": "Stage 1 high_value_score floor 0.0-10.0 (default 4.0)."},
+                },
+                "required": ["ticker"],
+            },
+        },
     ])
 
     # macro_calendar tools (P1.2 commit 6)
@@ -1411,6 +1437,7 @@ def execute_tool(
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
         list_high_value_comments,
     )
+    from src.tools.sa_digest_tools import get_sa_digest
 
     # Tool dispatch map
     tool_map = {
@@ -1704,6 +1731,15 @@ def execute_tool(
             ticker=tool_input.get("ticker"),
             min_score=tool_input.get("min_score", 2.0),
             limit=tool_input.get("limit", 20),
+        ),
+        "get_sa_digest": lambda: get_sa_digest(
+            dal,
+            ticker=tool_input.get("ticker", ""),
+            days=tool_input.get("days", 14),
+            max_articles=tool_input.get("max_articles", 5),
+            max_news=tool_input.get("max_news", 5),
+            max_comments=tool_input.get("max_comments", 8),
+            min_comment_score=tool_input.get("min_comment_score", 4.0),
         ),
         # macro_calendar (P1.2 commit 6)
         "get_economic_calendar": lambda: _macro_get_economic_calendar(dal, tool_input),

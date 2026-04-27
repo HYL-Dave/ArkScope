@@ -144,10 +144,10 @@ class TestGetInsiderTrades:
 
 class TestBridgeIntegration:
     def test_registry_23(self):
-        """Registry has 54 tools (incl. P1.2 macro_calendar)."""
+        """Registry has 55 tools (incl. P1.2 macro_calendar + P1.3 get_sa_digest)."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 54
+        assert len(registry.list_all()) == 55
 
     def test_analysis_category_6(self):
         """Analysis category has 12 tools (incl. P1.2 get_economic_calendar + get_macro_value)."""
