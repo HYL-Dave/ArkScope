@@ -198,6 +198,37 @@ class TestEconomicCalendarRoute:
         finally:
             undo()
 
+    def test_same_day_window_covers_full_day(self, monkeypatch):
+        """Regression: ``from_date=to_date=D`` must hit the FULL UTC day,
+        not a one-microsecond slice. ``from_date`` is SOD, ``to_date`` is
+        EOD; if either side is wrong the route excludes most of the day."""
+        undo = _enable_macro()
+        try:
+            captured = {}
+
+            def fake_list(self, **kw):
+                captured.update(kw)
+                return []
+
+            monkeypatch.setattr(
+                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                fake_list,
+                raising=True,
+            )
+            economic_calendar(
+                country=None, impact=None,
+                from_date="2024-12-18", to_date="2024-12-18",
+                as_of=None, limit=100, dal=object(),
+            )
+            assert captured["date_from"] == datetime(
+                2024, 12, 18, 0, 0, 0, 0, tzinfo=timezone.utc
+            )
+            assert captured["date_to"] == datetime(
+                2024, 12, 18, 23, 59, 59, 999999, tzinfo=timezone.utc
+            )
+        finally:
+            undo()
+
 
 # ---------------------------------------------------------------------------
 # /macro/earnings-calendar + /macro/ipo-calendar routes

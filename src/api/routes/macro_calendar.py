@@ -39,23 +39,21 @@ def _require_enabled() -> None:
         raise HTTPException(status_code=503, detail=_DISABLED_MSG)
 
 
-def _parse_iso_datetime(value: Optional[str], name: str) -> Optional[datetime]:
-    """Parse an optional ISO-8601 datetime/date param.
-
-    Date-only inputs (YYYY-MM-DD) are interpreted as end-of-day UTC
-    (23:59:59.999999Z) per spec §6.1, so "as-of close of day D" naturally
-    includes every revision observed during D. Timestamp inputs are honoured
-    at the precision provided.
-    """
+def _parse_iso_datetime_impl(
+    value: Optional[str], name: str, *, date_to_eod: bool
+) -> Optional[datetime]:
     if value is None or value == "":
         return None
     s = value.strip()
     if len(s) == 10 and s.count("-") == 2:
         try:
             d = date.fromisoformat(s)
-            return datetime(
-                d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=timezone.utc
-            )
+            if date_to_eod:
+                return datetime(
+                    d.year, d.month, d.day,
+                    23, 59, 59, 999999, tzinfo=timezone.utc,
+                )
+            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
         except ValueError:
             pass
     try:
@@ -68,6 +66,26 @@ def _parse_iso_datetime(value: Optional[str], name: str) -> Optional[datetime]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _parse_iso_datetime_start(value: Optional[str], name: str) -> Optional[datetime]:
+    """Parse ISO date/datetime as a window START.
+
+    Date-only inputs (YYYY-MM-DD) → start-of-day UTC (00:00:00Z) so
+    ``from_date=D`` includes events from the very start of D.
+    Timestamp inputs are honoured at the precision provided.
+    """
+    return _parse_iso_datetime_impl(value, name, date_to_eod=False)
+
+
+def _parse_iso_datetime_end(value: Optional[str], name: str) -> Optional[datetime]:
+    """Parse ISO date/datetime as a window END or as-of moment.
+
+    Date-only inputs (YYYY-MM-DD) → end-of-day UTC (23:59:59.999999Z) per
+    spec §6.1 so ``to_date=D`` and ``as_of=D`` cover the full UTC day D.
+    Timestamp inputs are honoured at the precision provided.
+    """
+    return _parse_iso_datetime_impl(value, name, date_to_eod=True)
 
 
 def _parse_iso_date(value: Optional[str], name: str) -> Optional[date]:
@@ -140,8 +158,10 @@ def economic_calendar(
     _require_enabled()
 
     today = datetime.now(tz=timezone.utc)
-    df = _parse_iso_datetime(from_date, "from_date") or (today - timedelta(days=7))
-    dt = _parse_iso_datetime(to_date, "to_date") or (today + timedelta(days=14))
+    df = _parse_iso_datetime_start(from_date, "from_date") or (
+        today - timedelta(days=7)
+    )
+    dt = _parse_iso_datetime_end(to_date, "to_date") or (today + timedelta(days=14))
     _validate_window(df, dt)
 
     rows = MacroCalendarStore(dal).list_economic_events(
@@ -149,7 +169,7 @@ def economic_calendar(
         date_to=dt,
         countries=_split_csv(country),
         impacts=_split_csv(impact),
-        as_of=_parse_iso_datetime(as_of, "as_of"),
+        as_of=_parse_iso_datetime_end(as_of, "as_of"),
         limit=limit,
     )
     return {
@@ -186,7 +206,7 @@ def earnings_calendar(
         date_from=df,
         date_to=dt,
         symbols=_split_csv(symbol),
-        as_of=_parse_iso_datetime(as_of, "as_of"),
+        as_of=_parse_iso_datetime_end(as_of, "as_of"),
         limit=limit,
     )
     return {
@@ -225,7 +245,7 @@ def ipo_calendar(
         date_from=df,
         date_to=dt,
         statuses=_split_csv(status),
-        as_of=_parse_iso_datetime(as_of, "as_of"),
+        as_of=_parse_iso_datetime_end(as_of, "as_of"),
         limit=limit,
     )
     return {
