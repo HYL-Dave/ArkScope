@@ -167,6 +167,12 @@ def apply_layer_1(
     left unchanged. Recent items (>= boundary) are passed through
     verbatim — protecting the prompt cache.
 
+    Mirrors :func:`apply_layer_0` envelope handling: production tool results
+    are wrapped as ``<tool_output tool="X">\\n<JSON>\\n</tool_output>`` by the
+    bridge. We unwrap before parsing so JSON minification works on real
+    payloads, then re-wrap the minified content so the agent's prompt parser
+    keeps seeing the expected envelope.
+
     Returns a NEW list; input is not mutated.
     """
     if not messages:
@@ -193,8 +199,10 @@ def apply_layer_1(
             out.append(dict(msg))
             continue
 
+        inner, wrapped_tool = _unwrap_tool_output(content)
+
         try:
-            parsed = json.loads(content)
+            parsed = json.loads(inner)
         except (json.JSONDecodeError, TypeError):
             out.append(dict(msg))
             continue
@@ -204,6 +212,9 @@ def apply_layer_1(
         except (TypeError, ValueError):
             out.append(dict(msg))
             continue
+
+        if wrapped_tool is not None:
+            minified = _rewrap_tool_output(minified, wrapped_tool)
 
         new_msg = dict(msg)
         new_msg["content"] = minified

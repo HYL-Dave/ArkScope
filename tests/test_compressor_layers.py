@@ -367,6 +367,70 @@ class TestLayer1:
         out = apply_layer_1(msgs, keep_recent_turns=1)
         assert out is not msgs
 
+    def test_unwraps_envelope_before_minify(self):
+        """Production tool_results are wrapped as <tool_output tool="X">JSON</tool_output>.
+        Layer 1 must unwrap before json.loads so the minify branch actually
+        fires on real bridge output, then re-wrap for the agent's parser."""
+        from src.agents.shared.security import wrap_tool_result
+
+        formatted = json.dumps(
+            {"results": [{"a": 1, "b": [2, 3]}, {"a": 4, "b": [5, 6]}]},
+            indent=2,
+        )
+        wrapped = wrap_tool_result(formatted, "tavily_search")
+        msgs = [
+            {"role": "user", "content": "u1"},
+            {"role": "tool_result", "tool_name": "tavily_search", "content": wrapped},
+            {"role": "user", "content": "u2"},
+            {"role": "user", "content": "u3"},
+        ]
+        out = apply_layer_1(msgs, keep_recent_turns=2)
+        new_content = out[1]["content"]
+        # Re-wrapped — envelope preserved on output
+        assert new_content.startswith('<tool_output tool="tavily_search">\n')
+        assert new_content.endswith("\n</tool_output>")
+        # Inner JSON minified (no pretty-print indents, no ", " separator)
+        inner = new_content[len('<tool_output tool="tavily_search">\n'):-len("\n</tool_output>")]
+        assert "\n" not in inner
+        assert ", " not in inner
+        assert json.loads(inner) == {"results": [{"a": 1, "b": [2, 3]}, {"a": 4, "b": [5, 6]}]}
+        # Net size shrunk (the whole point)
+        assert len(new_content) < len(wrapped)
+
+    def test_no_envelope_when_input_not_wrapped(self):
+        """If the tool_result content is raw JSON (no envelope), Layer 1
+        must NOT insert a spurious wrapper."""
+        formatted = json.dumps({"a": 1, "b": [1, 2, 3]}, indent=2)
+        msgs = [
+            {"role": "user", "content": "u1"},
+            {"role": "tool_result", "tool_name": "t", "content": formatted},
+            {"role": "user", "content": "u2"},
+            {"role": "user", "content": "u3"},
+        ]
+        out = apply_layer_1(msgs, keep_recent_turns=2)
+        new_content = out[1]["content"]
+        assert "<tool_output" not in new_content
+        assert "</tool_output>" not in new_content
+        # Still minified
+        assert "\n" not in new_content
+        assert json.loads(new_content) == {"a": 1, "b": [1, 2, 3]}
+
+    def test_wrapped_non_json_passes_through(self):
+        """If the envelope wraps non-JSON text, the content must pass through
+        unchanged — including the envelope (no half-rewrite)."""
+        from src.agents.shared.security import wrap_tool_result
+
+        wrapped = wrap_tool_result("plain text response, no JSON here", "some_tool")
+        msgs = [
+            {"role": "user", "content": "u1"},
+            {"role": "tool_result", "tool_name": "some_tool", "content": wrapped},
+            {"role": "user", "content": "u2"},
+            {"role": "user", "content": "u3"},
+        ]
+        out = apply_layer_1(msgs, keep_recent_turns=2)
+        # Pass-through: identical to input
+        assert out[1]["content"] == wrapped
+
 
 # ============================================================
 # Layer 2: scratchpad reuse
