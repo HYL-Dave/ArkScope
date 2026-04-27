@@ -92,17 +92,25 @@ def truncate_with_marker(payload: str, *, budget: int) -> Tuple[str, Dict[str, A
 
 
 # ---------------------------------------------------------------------------
-# web_result_reducer (tavily_search / tavily_fetch / web_browse / codex_web_research)
+# tavily_search_reducer  (only `tavily_search` — others have non-results shapes)
 # ---------------------------------------------------------------------------
 
 
-def web_result_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For web tools: keep title + URL + snippet per result; drop bodies.
+def tavily_search_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
+    """For ``tavily_search``: keep query + answer + per-result title/url/snippet.
 
-    Expected shape (best-effort): ``{"results": [{"title", "url", "content"}, ...]}``
-    or ``{"query": ..., "results": [...]}``.
+    Real shape (from ``src/tools/web_tools.py``):
 
-    On any deviation, falls through to ``truncate_with_marker``.
+    .. code-block:: text
+
+        {"query": str, "answer": str, "result_count": int,
+         "results": [{"title", "url", "content", ...}, ...]}
+
+    Falls through to ``truncate_with_marker`` on any shape deviation.
+
+    NOTE: ``tavily_fetch`` / ``web_browse`` / ``codex_web_research`` have
+    different shapes (single ``content`` field, not a results list); they
+    use the default truncate reducer.
     """
     if len(payload) <= budget:
         return payload, {}
@@ -120,6 +128,7 @@ def web_result_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
         return truncate_with_marker(payload, budget=budget)
 
     snippet_chars = 500
+    answer_chars = 1000
     pruned: List[Dict[str, Any]] = []
     for r in results:
         if not isinstance(r, dict):
@@ -133,12 +142,12 @@ def web_result_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
 
     out = {
         "query": str(data.get("query") or "")[:200],
+        "answer": str(data.get("answer") or "")[:answer_chars],
         "result_count": len(results),
         "results": pruned,
     }
     summary = json.dumps(out, ensure_ascii=False)
 
-    # If still over budget, fall through (default reducer will tail-end-trim)
     if len(summary) > budget:
         return truncate_with_marker(summary, budget=budget)
 
@@ -149,28 +158,43 @@ def web_result_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
     }
 
 
+# Backwards-compat alias (commit 2 used this name)
+web_result_reducer = tavily_search_reducer
+
+
 # ---------------------------------------------------------------------------
 # option_chain_reducer (get_option_chain)
 # ---------------------------------------------------------------------------
 
 
 def option_chain_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For option chains: keep ATM ± 5 strikes per expiry; drop deep ITM/OTM.
+    """For ``get_option_chain``: keep ATM ± 5 strikes; drop deep ITM/OTM.
 
-    Expected shape (best-effort):
+    Real shape (from ``src/tools/option_chain_tools.py``):
 
     .. code-block:: text
 
         {
           "ticker": "...",
-          "spot": 123.45,
-          "expiries": [
-            {"date": "2026-05-16", "calls": [{"strike": ..., ...}, ...], "puts": [...]},
-            ...
-          ]
+          "spot_price": 123.45,
+          "timestamp": "...",
+          "selected_expiry": "20260516",
+          "selected_dte": 14,
+          "expirations_summary": [...],   # list of expiry summary dicts
+          "chain": {"calls": [...], "puts": [...]},   # ONE selected expiry
+          "metrics": {...},
+          "oi_concentration": {"calls": [...], "puts": [...]},
         }
 
-    Falls through to default reducer on any shape mismatch.
+    Strategy:
+      - Keep ticker / spot_price / timestamp / selected_expiry / selected_dte
+        / metrics / oi_concentration verbatim (small).
+      - Slice ``chain.calls`` and ``chain.puts`` to the 5 strikes nearest
+        ``spot_price`` on each side.
+      - Cap ``expirations_summary`` to 10 rows.
+
+    Falls through to ``truncate_with_marker`` on any shape mismatch
+    (key missing, wrong types, etc.).
     """
     if len(payload) <= budget:
         return payload, {}
@@ -183,40 +207,46 @@ def option_chain_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, A
     if not isinstance(data, dict):
         return truncate_with_marker(payload, budget=budget)
 
-    spot = data.get("spot")
-    expiries = data.get("expiries")
-    if not isinstance(expiries, list) or not isinstance(spot, (int, float)):
+    spot = data.get("spot_price")
+    chain = data.get("chain")
+    if not isinstance(spot, (int, float)) or not isinstance(chain, dict):
         return truncate_with_marker(payload, budget=budget)
 
     keep_per_side = 5
-    pruned_expiries: List[Dict[str, Any]] = []
+    sliced_chain: Dict[str, List[Dict[str, Any]]] = {}
     total_dropped_strikes = 0
-
-    for exp in expiries:
-        if not isinstance(exp, dict):
+    for side in ("calls", "puts"):
+        rows = chain.get(side)
+        if not isinstance(rows, list):
+            sliced_chain[side] = []
             continue
-        out_exp = {"date": exp.get("date")}
-        for side in ("calls", "puts"):
-            rows = exp.get(side)
-            if not isinstance(rows, list):
-                out_exp[side] = []
-                continue
-            # Keep rows with strike closest to spot, ± keep_per_side
-            ranked = sorted(
-                (r for r in rows if isinstance(r, dict) and isinstance(r.get("strike"), (int, float))),
-                key=lambda r: abs(r["strike"] - spot),
-            )
-            kept = ranked[: keep_per_side * 2]
-            kept_sorted = sorted(kept, key=lambda r: r["strike"])
-            out_exp[side] = kept_sorted
-            total_dropped_strikes += max(0, len(rows) - len(kept_sorted))
-        pruned_expiries.append(out_exp)
+        ranked = sorted(
+            (
+                r for r in rows
+                if isinstance(r, dict) and isinstance(r.get("strike"), (int, float))
+            ),
+            key=lambda r: abs(r["strike"] - spot),
+        )
+        kept = ranked[: keep_per_side * 2]
+        sliced_chain[side] = sorted(kept, key=lambda r: r["strike"])
+        total_dropped_strikes += max(0, len(rows) - len(kept))
+
+    expirations = data.get("expirations_summary")
+    capped_expirations = (
+        expirations[:10] if isinstance(expirations, list) else expirations
+    )
 
     out = {
         "ticker": data.get("ticker"),
-        "spot": spot,
-        "kept_strikes_per_side": keep_per_side,
-        "expiries": pruned_expiries,
+        "spot_price": spot,
+        "timestamp": data.get("timestamp"),
+        "selected_expiry": data.get("selected_expiry"),
+        "selected_dte": data.get("selected_dte"),
+        "expirations_summary": capped_expirations,
+        "chain": sliced_chain,
+        "metrics": data.get("metrics"),
+        "oi_concentration": data.get("oi_concentration"),
+        "_compressed": {"kept_per_side": keep_per_side},
     }
     summary = json.dumps(out, ensure_ascii=False)
     if len(summary) > budget:
@@ -235,18 +265,20 @@ def option_chain_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, A
 
 
 def iv_history_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For IV history: keep most recent 30 trading days; drop older.
+    """For ``get_iv_history_data``: keep last 30 days from a list-of-points payload.
 
-    Expected shape (best-effort):
+    Real shape (from ``src/tools/options_tools.py``):
+    a top-level JSON list of :class:`IVHistoryPoint`-shaped dicts:
 
     .. code-block:: text
 
-        {
-          "ticker": "...",
-          "history": [{"date": "...", "iv": ...}, ...],
-        }
+        [{"date": "...", "atm_iv": 0.25, "hv_30d": ..., "vrp": ...,
+          "spot_price": ..., "num_quotes": ...}, ...]
 
-    Falls through to default on any shape mismatch.
+    Strategy: parse as list, keep last ``keep_days`` rows, re-serialise
+    with a ``_compressed`` metadata dict appended.
+
+    Falls through to ``truncate_with_marker`` on shape mismatch.
     """
     if len(payload) <= budget:
         return payload, {}
@@ -256,19 +288,36 @@ def iv_history_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
     except (json.JSONDecodeError, TypeError):
         return truncate_with_marker(payload, budget=budget)
 
-    if not isinstance(data, dict):
-        return truncate_with_marker(payload, budget=budget)
-
-    history = data.get("history")
-    if not isinstance(history, list):
+    # Accept both list and dict-with-history shapes (defensive)
+    history: List[Any]
+    if isinstance(data, list):
+        history = data
+    elif isinstance(data, dict) and isinstance(data.get("history"), list):
+        history = data["history"]
+    else:
         return truncate_with_marker(payload, budget=budget)
 
     keep_days = 30
     kept = history[-keep_days:]
-    out = dict(data)
-    out["history"] = kept
-    out["history_kept_days"] = keep_days
-    out["history_dropped_rows"] = max(0, len(history) - len(kept))
+    dropped = max(0, len(history) - len(kept))
+
+    if isinstance(data, list):
+        out: Any = {
+            "_compressed": {
+                "shape": "list",
+                "kept_days": keep_days,
+                "dropped_rows": dropped,
+            },
+            "history": kept,
+        }
+    else:
+        out = dict(data)
+        out["history"] = kept
+        out["_compressed"] = {
+            "shape": "dict.history",
+            "kept_days": keep_days,
+            "dropped_rows": dropped,
+        }
 
     summary = json.dumps(out, ensure_ascii=False)
     if len(summary) > budget:
@@ -276,7 +325,7 @@ def iv_history_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
 
     return summary, {
         "dropped_chars": len(payload) - len(summary),
-        "dropped_rows": out["history_dropped_rows"],
+        "dropped_rows": dropped,
         "kept_days": keep_days,
     }
 
@@ -287,15 +336,24 @@ def iv_history_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any
 
 
 def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, Any]]:
-    """For Python analysis output: keep last 2KB stdout + last 1KB stderr.
+    """For ``execute_python_analysis``: tail-trim ``output`` + ``error`` fields.
 
-    Expected shape (best-effort):
+    Real shape (from ``CodeExecutionResult`` in
+    ``src/tools/code_executor.py``):
 
     .. code-block:: text
 
-        {"stdout": "...", "stderr": "...", "ok": true}
+        {"success": bool, "output": str, "error": str,
+         "execution_time": float, "output_file": str, "pid": int,
+         "generated_code": str}
 
-    Falls through to default on any shape mismatch.
+    Strategy:
+      - Keep last 2KB of ``output`` (was named ``stdout`` upstream).
+      - Keep last 1KB of ``error`` (was named ``stderr`` upstream).
+      - Tail-trim ``generated_code`` to 2KB if present (large generated
+        scripts are the second-largest source of bloat).
+
+    Falls through to ``truncate_with_marker`` on shape mismatch.
     """
     if len(payload) <= budget:
         return payload, {}
@@ -308,21 +366,32 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
     if not isinstance(data, dict):
         return truncate_with_marker(payload, budget=budget)
 
-    stdout_keep = 2000
-    stderr_keep = 1000
-    stdout = str(data.get("stdout") or "")
-    stderr = str(data.get("stderr") or "")
+    output_keep = 2000
+    error_keep = 1000
+    code_keep = 2000
+    output = str(data.get("output") or "")
+    error = str(data.get("error") or "")
+    gen_code = str(data.get("generated_code") or "")
 
-    stdout_trimmed = stdout[-stdout_keep:] if len(stdout) > stdout_keep else stdout
-    stderr_trimmed = stderr[-stderr_keep:] if len(stderr) > stderr_keep else stderr
+    output_trimmed = output[-output_keep:] if len(output) > output_keep else output
+    error_trimmed = error[-error_keep:] if len(error) > error_keep else error
+    code_trimmed = gen_code[-code_keep:] if len(gen_code) > code_keep else gen_code
 
     out = dict(data)
-    out["stdout"] = stdout_trimmed
-    out["stderr"] = stderr_trimmed
-    if len(stdout) > stdout_keep:
-        out["stdout_dropped_chars"] = len(stdout) - stdout_keep
-    if len(stderr) > stderr_keep:
-        out["stderr_dropped_chars"] = len(stderr) - stderr_keep
+    out["output"] = output_trimmed
+    out["error"] = error_trimmed
+    if "generated_code" in data:
+        out["generated_code"] = code_trimmed
+
+    compressed_meta: Dict[str, Any] = {}
+    if len(output) > output_keep:
+        compressed_meta["output_dropped_chars"] = len(output) - output_keep
+    if len(error) > error_keep:
+        compressed_meta["error_dropped_chars"] = len(error) - error_keep
+    if len(gen_code) > code_keep:
+        compressed_meta["generated_code_dropped_chars"] = len(gen_code) - code_keep
+    if compressed_meta:
+        out["_compressed"] = compressed_meta
 
     summary = json.dumps(out, ensure_ascii=False)
     if len(summary) > budget:
@@ -330,8 +399,8 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
     return summary, {
         "dropped_chars": len(payload) - len(summary),
-        "stdout_keep_chars": stdout_keep,
-        "stderr_keep_chars": stderr_keep,
+        "output_keep_chars": output_keep,
+        "error_keep_chars": error_keep,
     }
 
 
@@ -341,16 +410,16 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
 
 _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
-    # Web tools (large HTML / markdown bodies)
-    "tavily_search":          web_result_reducer,
-    "tavily_fetch":           web_result_reducer,
-    "web_browse":              web_result_reducer,
-    "codex_web_research":      web_result_reducer,
+    # tavily_search has a `results: [...]` shape that we know how to slice.
+    # tavily_fetch / web_browse / codex_web_research all return a single
+    # `content` (or `report`) field — the default head+tail reducer is
+    # already a good fit; adding a custom one would just risk shape drift.
+    "tavily_search":           tavily_search_reducer,
     # Options
     "get_option_chain":        option_chain_reducer,
-    # IV history
+    # IV history (top-level list of IVHistoryPoint)
     "get_iv_history_data":     iv_history_reducer,
-    # Python analysis
+    # Python analysis (CodeExecutionResult.output / .error / .generated_code)
     "execute_python_analysis": python_output_reducer,
 }
 

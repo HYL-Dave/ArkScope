@@ -231,6 +231,91 @@ class TestLayer0:
         assert out == big
         assert record is None
 
+    def test_unwraps_tool_output_envelope_before_reducer(self, tmp_path):
+        """Bridge wraps tool output as <tool_output tool="X">JSON</tool_output>.
+        Layer 0 must unwrap before calling the reducer (otherwise JSON parse
+        fails and reducer falls back to truncate_with_marker, losing the
+        ability to preserve titles / URLs / etc.)."""
+        from src.agents.shared.security import wrap_tool_result
+
+        store = OverflowStore(tmp_path, session_id="s1")
+        # Real tavily_search shape, then wrapped by the bridge
+        inner = json.dumps({
+            "query": "find me NVDA",
+            "answer": "NVIDIA reports earnings...",
+            "result_count": 3,
+            "results": [
+                {"title": f"R{i}", "url": f"https://x/{i}", "content": "y" * 10_000}
+                for i in range(3)
+            ],
+        })
+        wrapped = wrap_tool_result(inner, "tavily_search")
+
+        out, record = apply_layer_0(
+            tool_name="tavily_search",
+            args={"query": "find me NVDA"},
+            payload=wrapped,
+            overflow_store=store,
+            budget_chars=4_000,
+        )
+        assert record is not None
+        # Output is re-wrapped — agent's parser still sees the envelope
+        assert out.startswith('<tool_output tool="tavily_search">\n')
+        assert "</tool_output>" in out
+        # The reducer DID run on inner content (URLs preserved)
+        for i in range(3):
+            assert f"https://x/{i}" in out
+        # No 1000-char body runs survived (specific reducer was used,
+        # NOT the default head+tail)
+        assert out.count("y" * 1000) == 0
+        # overflow_record reference appended OUTSIDE the envelope
+        assert "[overflow_record=" in out
+        ref_idx = out.index("[overflow_record=")
+        envelope_end = out.index("</tool_output>")
+        assert ref_idx > envelope_end
+
+    def test_overflow_round_trip_preserves_original_wrapped_payload(self, tmp_path):
+        """The overflow record stores the EXACT original (wrapped) payload —
+        retrieval gives it back byte-for-byte."""
+        from src.agents.shared.security import wrap_tool_result
+
+        store = OverflowStore(tmp_path, session_id="s1")
+        inner = json.dumps({
+            "query": "x",
+            "answer": "...",
+            "result_count": 1,
+            "results": [{"title": "T", "url": "U", "content": "z" * 50_000}],
+        })
+        wrapped = wrap_tool_result(inner, "tavily_search")
+
+        _out, record = apply_layer_0(
+            tool_name="tavily_search",
+            args={},
+            payload=wrapped,
+            overflow_store=store,
+            budget_chars=2_000,
+        )
+        assert record is not None
+        retrieved = store.read(record.record_id)
+        assert retrieved is not None
+        assert retrieved.original_payload == wrapped  # byte-perfect
+
+    def test_no_unwrap_when_payload_not_wrapped(self, tmp_path):
+        """If the payload is NOT wrapped, Layer 0 must not insert a
+        spurious envelope on the output side."""
+        store = OverflowStore(tmp_path, session_id="s1")
+        big = "raw plain text " * 5_000
+        out, record = apply_layer_0(
+            tool_name="unknown_tool",
+            args={},
+            payload=big,
+            overflow_store=store,
+            budget_chars=500,
+        )
+        assert record is not None
+        assert "<tool_output" not in out
+        assert "</tool_output>" not in out
+
 
 # ============================================================
 # Layer 1: microcompact JSON in old turns
@@ -326,6 +411,39 @@ class TestLayer2:
         # Recent tool_result preserved
         recent_tool = out[5]
         assert recent_tool["content"] == "RECENT RESULT"
+
+    def test_idempotent_repeated_application_replaces_summary(self):
+        """If apply_layer_2 runs twice with different scratchpads, only
+        ONE summary item should remain — and it should carry the latest
+        scratchpad text, not stack on top of the previous one."""
+        original = [
+            {"role": "user", "content": "u1"},
+            {"role": "tool_result", "tool_name": "t", "content": "BIG"},
+            {"role": "user", "content": "u2"},
+            {"role": "user", "content": "u3"},
+        ]
+        v1 = apply_layer_2(original, scratchpad="v1 ctx", keep_recent_turns=2)
+        v2 = apply_layer_2(v1, scratchpad="v2 ctx", keep_recent_turns=2)
+
+        summaries = [m for m in v2 if m.get("is_compaction_summary")]
+        assert len(summaries) == 1
+        assert "v2 ctx" in summaries[0]["content"]
+        assert "v1 ctx" not in summaries[0]["content"]
+        # Total length unchanged across the second application
+        assert len(v2) == len(v1)
+
+    def test_idempotent_with_same_scratchpad(self):
+        """Running with the same scratchpad twice is a no-op effectively
+        (summary content same, no extra item)."""
+        original = [
+            {"role": "user", "content": "u1"},
+            {"role": "user", "content": "u2"},
+            {"role": "user", "content": "u3"},
+        ]
+        v1 = apply_layer_2(original, scratchpad="ctx", keep_recent_turns=2)
+        v2 = apply_layer_2(v1, scratchpad="ctx", keep_recent_turns=2)
+        assert len(v1) == len(v2)
+        assert sum(1 for m in v2 if m.get("is_compaction_summary")) == 1
 
 
 # ============================================================

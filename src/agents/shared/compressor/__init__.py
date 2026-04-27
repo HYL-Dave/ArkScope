@@ -64,8 +64,9 @@ from .reducers import (
     option_chain_reducer,
     python_output_reducer,
     register_reducer,
+    tavily_search_reducer,
     truncate_with_marker,
-    web_result_reducer,
+    web_result_reducer,  # backwards-compat alias for tavily_search_reducer
 )
 from .transcript import find_recent_boundary, format_messages_as_transcript
 from .types import CompressionRecord, ProjectedMessage
@@ -87,6 +88,7 @@ __all__ = [
     "option_chain_reducer",
     "python_output_reducer",
     "register_reducer",
+    "tavily_search_reducer",
     "truncate_with_marker",
     "web_result_reducer",
     # Layers

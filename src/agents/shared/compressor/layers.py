@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -24,6 +25,40 @@ from .transcript import find_recent_boundary
 from .types import CompressionRecord, ProjectedMessage
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# tool_output envelope helpers (mirrors src/agents/shared/security.py)
+# ---------------------------------------------------------------------------
+
+# Anthropic + OpenAI bridges both wrap tool results via wrap_tool_result(),
+# producing ``<tool_output tool="X">\n<content>\n</tool_output>``. Reducers
+# operate on the inner content; this layer unwraps before reducing and
+# re-wraps the summary so the agent's prompt parser keeps seeing the
+# expected envelope.
+_TOOL_OUTPUT_RE = re.compile(
+    r'^<tool_output tool="([^"]+)">\n(.*)\n</tool_output>$',
+    re.DOTALL,
+)
+
+
+def _unwrap_tool_output(payload: str) -> Tuple[str, Optional[str]]:
+    """Strip ``<tool_output tool="...">\\n...\\n</tool_output>`` envelope.
+
+    Returns ``(inner_content, tool_name)`` if the envelope was present;
+    ``(payload_unchanged, None)`` otherwise.
+    """
+    if not isinstance(payload, str) or not payload.startswith('<tool_output tool="'):
+        return payload, None
+    m = _TOOL_OUTPUT_RE.match(payload)
+    if not m:
+        return payload, None
+    return m.group(2), m.group(1)
+
+
+def _rewrap_tool_output(content: str, tool_name: str) -> str:
+    """Inverse of :func:`_unwrap_tool_output`. Matches ``security.wrap_tool_result``."""
+    return f'<tool_output tool="{tool_name}">\n{content}\n</tool_output>'
 
 
 # ---------------------------------------------------------------------------
@@ -64,10 +99,15 @@ def apply_layer_0(
     if len(payload) <= budget_chars:
         return payload, None
 
+    # Bridges wrap tool output as <tool_output tool="X">\n...\n</tool_output>;
+    # reducers see the inner JSON / text. We re-wrap before returning so the
+    # agent's prompt parser still sees the envelope.
+    inner, wrapped_tool = _unwrap_tool_output(payload)
+
     # Reducer step (fail-open)
     reducer = get_reducer(tool_name, registry)
     try:
-        summary, _meta = reducer(payload, budget=budget_chars)
+        summary, _meta = reducer(inner, budget=budget_chars)
     except Exception as exc:
         logger.warning(
             "Layer 0 reducer for %s raised %s — using original payload",
@@ -82,7 +122,8 @@ def apply_layer_0(
         )
         return payload, None
 
-    # Persist original (fail-open on disk error)
+    # Persist ORIGINAL wrapped payload (overflow round-trip is byte-perfect
+    # against what entered Layer 0, including the envelope).
     try:
         record = overflow_store.write(tool_name, args or {}, payload)
     except Exception as exc:
@@ -92,7 +133,12 @@ def apply_layer_0(
         )
         return payload, None
 
-    # Append record reference to summary
+    # Re-wrap the summary if the input had a tool_output envelope.
+    if wrapped_tool is not None:
+        summary = _rewrap_tool_output(summary, wrapped_tool)
+
+    # Append record reference outside the envelope (it's prompt-side
+    # metadata, not tool data — doesn't belong inside <tool_output>).
     summary_with_ref = (
         summary
         + f"\n[overflow_record={record.record_id}, "
@@ -184,17 +230,36 @@ def apply_layer_2(
 
     No-op when ``scratchpad`` is empty / whitespace.
 
+    **Idempotent**: if ``messages[0]`` is already a scratchpad summary
+    (``is_compaction_summary=True`` AND content starts with
+    ``<scratchpad_summary>``), it is replaced with the new scratchpad
+    rather than another summary being prepended on top. This lets
+    ``compact_pre_call`` run repeatedly across model calls without
+    summaries piling up.
+
     Behaviour:
-      1. Prepend a single user-shaped message containing the scratchpad,
-         tagged ``is_compaction_summary=True`` so Layer 5 + boundary
-         finder treat it as a prior summary.
-      2. For items strictly older than the boundary AND of role
+      1. Strip any pre-existing scratchpad summary at index 0.
+      2. Prepend a single user-shaped message containing the new
+         scratchpad, tagged ``is_compaction_summary=True``.
+      3. For items strictly older than the boundary AND of role
          ``tool_result``, replace ``content`` with a one-line stub
          ``"[old <tool_name> result, see scratchpad summary]"``.
-      3. Recent items pass through verbatim.
+      4. Recent items pass through verbatim.
     """
     if not isinstance(scratchpad, str) or not scratchpad.strip():
         return list(messages)
+
+    # Idempotency: strip an existing scratchpad summary so we don't
+    # stack a fresh one on top.
+    msgs = list(messages)
+    if (
+        msgs
+        and isinstance(msgs[0], dict)
+        and msgs[0].get("is_compaction_summary")
+        and isinstance(msgs[0].get("content"), str)
+        and msgs[0]["content"].startswith(_SCRATCHPAD_SUMMARY_MARKER)
+    ):
+        msgs = msgs[1:]
 
     summary_item: ProjectedMessage = {
         "role": "user",
@@ -202,13 +267,13 @@ def apply_layer_2(
         "is_compaction_summary": True,
     }
 
-    if not messages:
+    if not msgs:
         return [summary_item]
 
-    boundary = find_recent_boundary(messages, keep_recent_turns=keep_recent_turns)
+    boundary = find_recent_boundary(msgs, keep_recent_turns=keep_recent_turns)
     out: List[ProjectedMessage] = [summary_item]
 
-    for i, msg in enumerate(messages):
+    for i, msg in enumerate(msgs):
         if not isinstance(msg, dict):
             out.append(msg)
             continue
