@@ -2343,26 +2343,41 @@ def handle_overflow_command(arg: str) -> None:
                 console.print(f"  [dim]{p}[/dim]")
             console.print(f"[dim]Showing newest: {matches[0]}[/dim]\n")
         record_path = matches[0]
-        try:
-            data = json.loads(record_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            console.print(f"[red]Failed to read {record_path}: {exc}[/red]\n")
+        # Use OverflowStore.read() so the 5-invariant tamper detection from
+        # commit 1 (filename↔JSON id, args_hash, original_size, payload utf-8,
+        # recomputed id) gates the CLI surface. A direct json.loads here
+        # would silently surface tampered records — see commit 4 review.
+        from .shared.compressor import OverflowStore as _OverflowStore
+        session_id = record_path.parent.name
+        store = _OverflowStore(overflow_root, session_id)
+        record = store.read(record_id)
+        if record is None:
+            console.print(
+                f"[red]Record {record_id} failed integrity verification[/red]\n"
+                f"[dim]Path: {record_path}\n"
+                "Possible causes: tampered on disk, malformed JSON, "
+                "args_hash / original_size / record_id mismatch.\n"
+                "OverflowStore.read() returned None — refusing to surface "
+                "untrusted payload.[/dim]\n"
+            )
             return
-        # Pretty-print metadata + truncated payload
-        meta_keys = ("record_id", "tool_name", "args_hash", "original_size", "written_at")
         console.print(f"\n[bold]{record_path}[/bold]")
-        for k in meta_keys:
-            v = data.get(k, "<missing>")
+        for k, v in (
+            ("record_id", record.record_id),
+            ("tool_name", record.tool_name),
+            ("args_hash", record.args_hash),
+            ("original_size", record.original_size),
+            ("written_at", record.written_at),
+        ):
             console.print(f"  [cyan]{k}:[/cyan] {v}")
-        payload = data.get("original_payload", "")
-        if isinstance(payload, str):
-            preview = payload[:1500]
-            console.print(f"\n[bold]Payload preview ({len(payload)} chars):[/bold]")
-            console.print(preview)
-            if len(payload) > len(preview):
-                console.print(
-                    f"\n[dim]...truncated. Full content at {record_path}[/dim]"
-                )
+        payload = record.original_payload
+        preview = payload[:1500]
+        console.print(f"\n[bold]Payload preview ({len(payload)} chars):[/bold]")
+        console.print(preview)
+        if len(payload) > len(preview):
+            console.print(
+                f"\n[dim]...truncated. Full content at {record_path}[/dim]"
+            )
         console.print()
         return
 
