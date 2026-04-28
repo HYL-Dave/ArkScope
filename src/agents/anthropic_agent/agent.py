@@ -10,9 +10,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from ..config import get_agent_config
+from ..shared.compressor import CompressorConfig
 from ..shared.context_manager import ContextManager
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
@@ -235,11 +237,24 @@ async def run_query_stream(
         except Exception as exc:
             logger.warning("Replay capture init failed: %s", exc)
             capture = None
+    compaction_cfg: Optional[CompressorConfig] = None
+    if config.compaction_enabled:
+        compaction_cfg = CompressorConfig(
+            enabled=True,
+            layer_0_budget_chars=config.compaction_layer_0_budget_chars,
+            layer_2_threshold_chars=config.compaction_layer_2_threshold_chars,
+            layer_3_threshold_chars=config.compaction_layer_3_threshold_chars,
+            keep_recent_turns=config.context_keep_recent_turns,
+        )
     ctx = ContextManager(
         model=model_name,
         threshold_ratio=config.context_threshold_ratio,
         keep_recent_turns=config.context_keep_recent_turns,
         preview_chars=config.context_preview_chars,
+        session_id=pad.session_id,
+        overflow_dir=Path(config.compaction_overflow_dir),
+        compaction_config=compaction_cfg,
+        scratchpad="",  # P1.4: L2 no-op until semantic summary builder lands
     )
 
     # Build optional API params (effort + thinking)
@@ -399,7 +414,9 @@ async def run_query_stream(
 
                 # Execute the tool
                 result = execute_tool(tool_name, tool_input, dal)
-                result_str = str(result)
+                # P1.4 Layer 0: budget + overflow disk persist (no-op when disabled)
+                result = ctx.maybe_apply_layer_0(tool_name, tool_input, result)
+                result_str = result if isinstance(result, str) else str(result)
                 pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
 
                 if capture is not None:
@@ -424,8 +441,14 @@ async def run_query_stream(
             messages.append({"role": "assistant", "content": response.content})
             messages.append({"role": "user", "content": tool_results})
 
-            # Compact old tool results if context is growing too large
-            if ctx.should_compact(tracker):
+            # P1.4: when compaction_enabled, compress every turn (compressor's
+            # own char thresholds gate L1/L2/L3). Otherwise fall back to the
+            # legacy token-threshold gate.
+            if config.compaction_enabled:
+                messages, compact_stats = ctx.compact_messages(messages)
+                if compact_stats.get("compacted", 0) > 0 or compact_stats.get("events"):
+                    logger.info(f"Context compacted: {compact_stats}")
+            elif ctx.should_compact(tracker):
                 messages, compact_stats = ctx.compact_messages(messages)
                 logger.info(f"Context compacted: {compact_stats}")
 

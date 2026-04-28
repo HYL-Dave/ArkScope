@@ -120,6 +120,16 @@ class AgentConfig(BaseModel):
     # controls the ingestion jobs.
     macro_calendar_enabled: bool = False
 
+    # P1.4 Phase B client-side compaction (separate from server_compaction).
+    # When False (default), the legacy ContextManager path runs unchanged.
+    # When True, ContextManager delegates Layers 0-3 to ContextCompressor.
+    # Loaded from a top-level compaction: section in user_profile.yaml.
+    compaction_enabled: bool = False
+    compaction_layer_0_budget_chars: int = 8000
+    compaction_layer_2_threshold_chars: int = 100_000
+    compaction_layer_3_threshold_chars: int = 150_000
+    compaction_overflow_dir: str = "data/overflow"
+
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
 _MAIN_CONFIG_PATH = Path("config/user_profile.yaml")
@@ -303,5 +313,18 @@ def get_agent_config() -> AgentConfig:
         config.context_keep_recent_turns = ctx_prefs["keep_recent_turns"]
     if "preview_chars" in ctx_prefs:
         config.context_preview_chars = ctx_prefs["preview_chars"]
+
+    # P1.4 client-side compaction overrides (top-level "compaction:" section)
+    compaction_prefs = profile.get("compaction", {})
+    if "enabled" in compaction_prefs:
+        config.compaction_enabled = compaction_prefs["enabled"]
+    if "layer_0_budget_chars" in compaction_prefs:
+        config.compaction_layer_0_budget_chars = compaction_prefs["layer_0_budget_chars"]
+    if "layer_2_threshold_chars" in compaction_prefs:
+        config.compaction_layer_2_threshold_chars = compaction_prefs["layer_2_threshold_chars"]
+    if "layer_3_threshold_chars" in compaction_prefs:
+        config.compaction_layer_3_threshold_chars = compaction_prefs["layer_3_threshold_chars"]
+    if "overflow_dir" in compaction_prefs:
+        config.compaction_overflow_dir = compaction_prefs["overflow_dir"]
 
     return config

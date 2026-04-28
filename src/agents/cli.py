@@ -83,6 +83,7 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
 from .shared.attachments import Attachment, AttachmentManager
+from .shared.compressor import CompressorConfig
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad, _safe_serialize
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
@@ -611,11 +612,24 @@ def run_anthropic_interactive(
     tracker = TokenTracker()
     _query_start = time.time()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
+    compaction_cfg: Optional[CompressorConfig] = None
+    if config.compaction_enabled:
+        compaction_cfg = CompressorConfig(
+            enabled=True,
+            layer_0_budget_chars=config.compaction_layer_0_budget_chars,
+            layer_2_threshold_chars=config.compaction_layer_2_threshold_chars,
+            layer_3_threshold_chars=config.compaction_layer_3_threshold_chars,
+            keep_recent_turns=config.context_keep_recent_turns,
+        )
     ctx = ContextManager(
         model=model_name,
         threshold_ratio=config.context_threshold_ratio,
         keep_recent_turns=config.context_keep_recent_turns,
         preview_chars=config.context_preview_chars,
+        session_id=pad.session_id,
+        overflow_dir=Path(config.compaction_overflow_dir),
+        compaction_config=compaction_cfg,
+        scratchpad="",  # P1.4: L2 no-op until semantic summary builder lands
     )
 
     # Build optional API params (effort + thinking)
@@ -790,6 +804,9 @@ def run_anthropic_interactive(
                 with console.status("", spinner="dots"):
                     result = execute_tool(tool_name, tool_input, dal)
 
+                # P1.4 Layer 0: budget + overflow disk persist (no-op when disabled)
+                result = ctx.maybe_apply_layer_0(tool_name, tool_input, result)
+
                 pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
                 print_tool_result_summary(tool_name, result)
 
@@ -810,8 +827,14 @@ def run_anthropic_interactive(
             messages.append({"role": "assistant", "content": response.content})
             messages.append({"role": "user", "content": tool_results})
 
-            # L1: Compact old tool results if context is growing too large
-            if ctx.should_compact(tracker):
+            # P1.4: when compaction_enabled, compress every turn (compressor
+            # gates L1/L2/L3 internally on char thresholds). Otherwise fall
+            # back to the legacy token-threshold gate.
+            if config.compaction_enabled:
+                messages, compact_stats = ctx.compact_messages(messages)
+                if compact_stats.get("compacted", 0) > 0 or compact_stats.get("events"):
+                    logger.info(f"CLI context compacted: {compact_stats}")
+            elif ctx.should_compact(tracker):
                 messages, compact_stats = ctx.compact_messages(messages)
                 logger.info(f"CLI context compacted: {compact_stats}")
 

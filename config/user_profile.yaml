@@ -359,6 +359,22 @@ context_management:
   #   4. 格式: [Compacted] tool_name(params) → N chars. Preview: ...
 
 # ============================================
+# 9b. P1.4 Client-side Compaction (Phase B, optional)
+# ============================================
+# 與 server_compaction 區分：
+#   - server_compaction: 提供商原生（Anthropic compact-2026-01-12 beta）
+#   - compaction (本節): client-side 7-layer，library-not-runner
+# Default: enabled=false → 走 §9 legacy ContextManager 路徑
+# 啟用後：每輪都跑 Layer 1-3（compressor 內部以 char threshold 自閘控）
+# Layer 0 預算 + overflow 落盤；Layer 5 (LLM compact) 暫未上線
+# compaction:
+#   enabled: false                  # master toggle; true 切到 ContextCompressor 路徑
+#   layer_0_budget_chars: 8000      # 單一 tool_result 預算（超過走 reducer + 落盤）
+#   layer_2_threshold_chars: 100000 # Layer 2 (scratchpad reuse) 閾值
+#   layer_3_threshold_chars: 150000 # Layer 3 (progressive truncation) 閾值
+#   overflow_dir: data/overflow     # L0 overflow records 落盤路徑
+
+# ============================================
 # 10. 報告偏好
 # ============================================
 report_preferences:
