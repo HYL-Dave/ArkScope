@@ -93,7 +93,12 @@ class TestModelContextLimit:
         """Future Claude models should match via prefix fallback."""
         assert get_model_context_limit("claude-sonnet-5-20260501") == 200_000
 
-    def test_gpt54(self):
+    def test_gpt55_default(self):
+        assert get_model_context_limit("gpt-5.5") == 1_050_000
+
+    def test_gpt54_legacy_still_resolved(self):
+        """gpt-5.4 stays in catalog as a fallback so configs that pin it
+        (or environments where gpt-5.5 isn't yet served) keep working."""
         assert get_model_context_limit("gpt-5.4") == 1_050_000
 
     def test_gpt54_mini(self):

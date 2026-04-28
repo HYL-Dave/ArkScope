@@ -37,11 +37,11 @@ MODEL_CATALOG: List[ModelEntry] = [
         description="Fast + intelligent — financial analysis (64K output, $3/$15)",
     ),
     ModelEntry(
-        id="gpt-5.4",
+        id="gpt-5.5",
         provider="openai",
-        name="GPT-5.4",
-        aliases=["gpt5", "gpt-5", "gpt5.4", "5.4"],
-        description="SOTA reasoning with configurable effort",
+        name="GPT-5.5",
+        aliases=["gpt5", "gpt-5", "gpt5.5", "5.5"],
+        description="SOTA reasoning with configurable effort (default)",
     ),
     ModelEntry(
         id="gpt-5.4-mini",
@@ -57,13 +57,21 @@ MODEL_CATALOG: List[ModelEntry] = [
         aliases=["gpt5-nano", "gpt-5-nano", "5.4-nano", "nano"],
         description="Fastest, cheapest — simple tasks",
     ),
-    # Legacy models — kept for backward compatibility with existing configs
+    # Legacy / fallback models — kept resolvable so configs that pin a
+    # specific id still work if the newer default isn't yet served.
+    ModelEntry(
+        id="gpt-5.4",
+        provider="openai",
+        name="GPT-5.4 (legacy)",
+        aliases=["gpt5.4", "5.4"],
+        description="Legacy — fallback if gpt-5.5 unavailable",
+    ),
     ModelEntry(
         id="gpt-5.2",
         provider="openai",
         name="GPT-5.2 (legacy)",
         aliases=["gpt5.2", "5.2"],
-        description="Legacy — consider upgrading to gpt-5.4",
+        description="Legacy — consider upgrading to gpt-5.5",
     ),
     ModelEntry(
         id="gpt-5.2-codex",

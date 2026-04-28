@@ -337,20 +337,21 @@ context_management:
   # 壓縮後保留的內容預覽字元數
   preview_chars: 200
 
-  # 參考：各模型上下文極限（2026-03 更新）
+  # 參考：各模型上下文極限（2026-04 更新）
   # ┌─────────────────────────────────┬─────────────────┬────────────┐
   # │ 模型                           │ Context          │ Max Output │
   # ├─────────────────────────────────┼─────────────────┼────────────┤
   # │ claude-opus-4-7                 │ 1M (GA)         │ 128K       │
   # │ claude-sonnet-4-6               │ 1M (GA)         │ 64K        │
-  # │ gpt-5.4                         │ 1M (>272K 加價) │ 128K       │
+  # │ gpt-5.5  (default)              │ 1M (>272K 加價) │ 128K       │
+  # │ gpt-5.4  (legacy / fallback)    │ 1M (>272K 加價) │ 128K       │
   # │ gpt-5.4-mini                    │ 400K            │ 128K       │
   # │ gpt-5.4-nano                    │ 400K            │ 128K       │
   # └─────────────────────────────────┴─────────────────┴────────────┘
   #
   # 觸發閾值範例 (threshold_ratio=0.7):
   #   claude-opus-4-7:  700K tokens 時觸發 (1M context)
-  #   gpt-5.4:          700K tokens 時觸發 (1M context)
+  #   gpt-5.5:          700K tokens 時觸發 (1M context)
   #
   # 壓縮邏輯：
   #   1. 條件: turn_count > keep_recent_turns AND input_tokens > threshold

@@ -48,9 +48,11 @@ _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-sonnet-4-6": 1_000_000, # 1M context / 64K output ($3/$15)
     "claude-haiku": 200_000,        # Haiku 4.5: 200K context / 64K output
     # OpenAI — https://developers.openai.com/api/docs/models
+    # NOTE: prefix-match — list more specific keys first
+    "gpt-5.5": 1_050_000,           # 1M context / 128K output (default)
     "gpt-5.4-mini": 400_000,        # 400K context / 128K output ($0.75/$4.50)
     "gpt-5.4-nano": 400_000,        # 400K context / 128K output ($0.20/$1.25)
-    "gpt-5.4": 1_050_000,           # 1M context / 128K output ($2.50/$15)
+    "gpt-5.4": 1_050_000,           # 1M context / 128K output (legacy / fallback)
     "gpt-5.2": 400_000,             # 400K context / 128K output (legacy)
 }
 

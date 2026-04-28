@@ -35,7 +35,7 @@ class TestAgentConfig:
     def test_default_config(self):
         """Default config has expected values."""
         config = AgentConfig()
-        assert config.openai_model == "gpt-5.4"
+        assert config.openai_model == "gpt-5.5"
         assert config.anthropic_model == "claude-opus-4-7"
         assert config.reasoning_effort in ("none", "minimal", "low", "medium", "high", "xhigh")
         assert config.max_tool_calls > 0
@@ -324,10 +324,11 @@ class TestOpenAIMaxTokens:
     def test_model_max_output_lookup(self):
         """All GPT-5.x models map to 128K."""
         from src.agents.openai_agent.agent import _get_openai_max_output
-        assert _get_openai_max_output("gpt-5.4") == 128000
+        assert _get_openai_max_output("gpt-5.5") == 128000           # default
+        assert _get_openai_max_output("gpt-5.4") == 128000           # legacy / fallback
         assert _get_openai_max_output("gpt-5.4-mini") == 128000
         assert _get_openai_max_output("gpt-5.4-nano") == 128000
-        assert _get_openai_max_output("gpt-5.2") == 128000  # legacy
+        assert _get_openai_max_output("gpt-5.2") == 128000           # legacy
         # Unknown models get default 128K
         assert _get_openai_max_output("gpt-5-future") == 128000
         # Unknown model gets default
