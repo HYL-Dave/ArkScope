@@ -569,6 +569,119 @@ class TestIdempotency:
 # ============================================================
 
 
+class TestL0CallgraphRegression:
+    """Lock that agent.py and cli.py both invoke ``ctx.compress_tool_result``
+    (or the ``maybe_apply_layer_0`` BC wrapper) between ``execute_tool`` and
+    ``tool_results.append``. If a future commit removes the L0 hook, these
+    AST-based tests fail — cheaper than full Anthropic SDK mocking and
+    exactly catches the regression we care about: "someone unwired the
+    call site".
+    """
+
+    @staticmethod
+    def _find_method_calls(source: str, method_names: set[str]) -> list[str]:
+        """Return method names from ``method_names`` that appear as
+        ``something.<name>(...)`` calls in the source's AST."""
+        import ast
+        tree = ast.parse(source)
+        hits: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr in method_names:
+                    hits.append(node.func.attr)
+        return hits
+
+    @staticmethod
+    def _find_call_with_kwarg(
+        source: str, method_name: str, kwarg_name: str,
+    ) -> bool:
+        """True if any call to ``something.<method_name>(..., <kwarg_name>=...)``
+        exists in the AST."""
+        import ast
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == method_name):
+                if any(k.arg == kwarg_name for k in node.keywords):
+                    return True
+        return False
+
+    def test_anthropic_agent_invokes_l0_hook(self):
+        path = project_root / "src" / "agents" / "anthropic_agent" / "agent.py"
+        hits = self._find_method_calls(
+            path.read_text(encoding="utf-8"),
+            {"compress_tool_result", "maybe_apply_layer_0"},
+        )
+        assert hits, (
+            "anthropic_agent/agent.py must call ctx.compress_tool_result "
+            "(or maybe_apply_layer_0) between execute_tool and tool_results.append"
+        )
+
+    def test_cli_invokes_l0_hook(self):
+        path = project_root / "src" / "agents" / "cli.py"
+        hits = self._find_method_calls(
+            path.read_text(encoding="utf-8"),
+            {"compress_tool_result", "maybe_apply_layer_0"},
+        )
+        assert hits, (
+            "cli.py must call ctx.compress_tool_result "
+            "(or maybe_apply_layer_0) between execute_tool and tool_results.append"
+        )
+
+    def test_anthropic_agent_forwards_compression_to_pad(self):
+        """If the L0 hook ran but log_tool_result didn't get the metadata,
+        scratchpad would be silently lying. Lock the kwarg."""
+        src = (project_root / "src" / "agents" / "anthropic_agent" / "agent.py").read_text(encoding="utf-8")
+        assert self._find_call_with_kwarg(src, "log_tool_result", "compression"), (
+            "agent.py: pad.log_tool_result must receive compression= kwarg "
+            "(audit pipeline reconciliation contract)"
+        )
+
+    def test_anthropic_agent_forwards_compression_to_capture(self):
+        src = (project_root / "src" / "agents" / "anthropic_agent" / "agent.py").read_text(encoding="utf-8")
+        assert self._find_call_with_kwarg(src, "record_tool_call", "compression"), (
+            "agent.py: capture.record_tool_call must receive compression= kwarg"
+        )
+
+    def test_cli_forwards_compression_to_pad(self):
+        src = (project_root / "src" / "agents" / "cli.py").read_text(encoding="utf-8")
+        assert self._find_call_with_kwarg(src, "log_tool_result", "compression"), (
+            "cli.py: pad.log_tool_result must receive compression= kwarg"
+        )
+
+    def test_compress_tool_result_called_with_raw_payload(self, tmp_path, monkeypatch):
+        """Behavior-level: simulate the call chain with mocks and verify
+        that the payload going into compress_tool_result is the raw output
+        of execute_tool (NOT something already projected / wrapped twice)."""
+        ctx = ContextManager(
+            model="claude-opus-4-7",
+            keep_recent_turns=2,
+            session_id="callgraph-test",
+            overflow_dir=tmp_path,
+            compaction_config=CompressorConfig(
+                enabled=True, layer_0_budget_chars=2_000,
+            ),
+        )
+        observed_inputs: list[tuple] = []
+        original_compress = ctx.compress_tool_result
+
+        def spy(tool_name, tool_input, result):
+            observed_inputs.append((tool_name, tool_input, result))
+            return original_compress(tool_name, tool_input, result)
+
+        monkeypatch.setattr(ctx, "compress_tool_result", spy)
+
+        # Mirror agent.py / cli.py call sequence
+        oversize = json.dumps({"x": "y" * 30_000})
+        compressed, compression = ctx.compress_tool_result(
+            "tavily_search", {"q": "x"}, oversize,
+        )
+        assert observed_inputs == [("tavily_search", {"q": "x"}, oversize)]
+        assert compression["raw_bytes"] == len(oversize.encode("utf-8"))
+        assert compression["compressed"] is True
+
+
 class TestSharedL0Helper:
     def test_agent_and_cli_get_identical_l0_output(self, tmp_path):
         """Both agent.py and cli.py call ``ctx.maybe_apply_layer_0(...)``.

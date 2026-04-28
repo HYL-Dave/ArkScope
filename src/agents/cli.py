@@ -37,6 +37,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import time
 import traceback as _traceback_mod
@@ -126,7 +127,7 @@ class SessionState:
     code_backend: str = "api"  # api | codex | codex-apikey | claude | claude-apikey
     max_tool_calls: Optional[int] = None  # None = use config default
     attachments: List[Attachment] = field(default_factory=list)
-    chat_history: Optional["ChatHistory"] = None  # Per-session chat history
+    chat_history: Optional[ChatHistory] = None  # Per-session chat history
 
     def effective_model(self) -> str:
         """Return the active model ID."""
@@ -184,6 +185,7 @@ _SLASH_COMMANDS = [
     ("/skill", "/sk", "Run a predefined skill workflow"),
     ("/subagent", "/sa", "View/change subagent models"),
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
+    ("/overflow", "/of", "Inspect P1.4 Layer 0 overflow records"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
     ("/attach", "/at", "Attach file (PDF/image/text) to next query"),
@@ -581,7 +583,7 @@ def run_anthropic_interactive(
     extended_context: bool = False,
     max_tool_calls: Optional[int] = None,
     attachments: Optional[List[Attachment]] = None,
-    chat_history: Optional["ChatHistory"] = None,
+    chat_history: Optional[ChatHistory] = None,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -804,10 +806,18 @@ def run_anthropic_interactive(
                 with console.status("", spinner="dots"):
                     result = execute_tool(tool_name, tool_input, dal)
 
-                # P1.4 Layer 0: budget + overflow disk persist (no-op when disabled)
-                result = ctx.maybe_apply_layer_0(tool_name, tool_input, result)
+                # P1.4 Layer 0: budget + overflow disk persist + observability
+                # metadata (single source of truth across pad / chat history).
+                result, compression = ctx.compress_tool_result(
+                    tool_name, tool_input, result,
+                )
 
-                pad.log_tool_result(tool_name, result_data=result, tool_input=tool_input)
+                pad.log_tool_result(
+                    tool_name,
+                    result_data=result,
+                    tool_input=tool_input,
+                    compression=compression,
+                )
                 print_tool_result_summary(tool_name, result)
 
                 # Collect tool call detail for ChatHistory
@@ -815,6 +825,7 @@ def run_anthropic_interactive(
                     "name": tool_name,
                     "params": _safe_serialize(tool_input) if isinstance(tool_input, dict) else {},
                     "result_preview": result[:200] if isinstance(result, str) else str(result)[:200],
+                    "compression": compression,
                 })
 
                 tool_results.append({
@@ -899,7 +910,7 @@ def run_openai_interactive(
     reasoning_effort: Optional[str] = None,
     max_tool_calls: Optional[int] = None,
     attachments: Optional[List[Attachment]] = None,
-    chat_history: Optional["ChatHistory"] = None,
+    chat_history: Optional[ChatHistory] = None,
 ) -> Dict[str, Any]:
     """
     Run OpenAI agent query with status display.
@@ -2244,6 +2255,129 @@ def handle_scratchpad_command(arg: str) -> None:
     )
 
 
+# ── /overflow command (P1.4 commit 4) ────────────────────────────
+
+
+def handle_overflow_command(arg: str) -> None:
+    """Inspect P1.4 Layer 0 overflow records.
+
+    Subcommands:
+
+      ``/overflow`` / ``/overflow help``  show usage
+      ``/overflow list``                  list session dirs under data/overflow/
+      ``/overflow show <record_id>``      dump one record (cross-session scan;
+                                          if multiple matches, list all paths
+                                          and pick the newest deterministically)
+
+    record_id is content-addressed (sha256 of tool+args+payload, first 16
+    hex), so the same tool call in different sessions produces the same id —
+    we list all matches but show the newest by mtime.
+    """
+    parts = arg.split(None, 1) if arg else []
+    sub = parts[0].lower() if parts else ""
+    rest = parts[1].strip() if len(parts) > 1 else ""
+
+    overflow_root = Path(_get_compaction_overflow_dir())
+
+    if not sub or sub == "help":
+        console.print(
+            "[dim]Usage: /overflow list | /overflow show <record_id>\n"
+            f"Records live under {overflow_root}/<session_id>/<record_id>.json[/dim]\n"
+        )
+        return
+
+    if not overflow_root.exists():
+        console.print(f"[dim]No overflow dir at {overflow_root}.[/dim]\n")
+        return
+
+    if sub == "list":
+        sessions = sorted(
+            (p for p in overflow_root.iterdir() if p.is_dir()),
+            key=lambda p: p.stat().st_mtime, reverse=True,
+        )
+        if not sessions:
+            console.print(f"[dim]No session dirs in {overflow_root}/.[/dim]\n")
+            return
+        table = Table(
+            box=box.SIMPLE_HEAVY, show_header=True,
+            header_style="bold", padding=(0, 1),
+        )
+        table.add_column("Session", style="cyan")
+        table.add_column("Records", style="dim")
+        table.add_column("Modified", style="dim")
+        import datetime as _dt
+        for s in sessions[:20]:
+            count = sum(1 for _ in s.glob("*.json"))
+            mtime = _dt.datetime.fromtimestamp(s.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            table.add_row(s.name, str(count), mtime)
+        console.print()
+        console.print(table)
+        console.print(f"[dim]\n{len(sessions)} session dirs (showing up to 20).[/dim]\n")
+        return
+
+    if sub == "show":
+        if not rest:
+            console.print("[red]Usage: /overflow show <record_id>[/red]\n")
+            return
+        record_id = rest.split()[0]
+        # Validate shape early (16-hex)
+        if not re.fullmatch(r"[0-9a-f]{16}", record_id):
+            console.print(
+                f"[red]Invalid record_id {record_id!r}[/red] "
+                "[dim](expected 16 hex chars)[/dim]\n"
+            )
+            return
+        matches = sorted(
+            overflow_root.glob(f"*/{record_id}.json"),
+            key=lambda p: p.stat().st_mtime, reverse=True,
+        )
+        if not matches:
+            console.print(f"[red]No record matching {record_id}[/red]\n")
+            return
+        if len(matches) > 1:
+            console.print(
+                f"[yellow]{len(matches)} matching records "
+                "(content-addressed id can collide across sessions):[/yellow]"
+            )
+            for p in matches:
+                console.print(f"  [dim]{p}[/dim]")
+            console.print(f"[dim]Showing newest: {matches[0]}[/dim]\n")
+        record_path = matches[0]
+        try:
+            data = json.loads(record_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            console.print(f"[red]Failed to read {record_path}: {exc}[/red]\n")
+            return
+        # Pretty-print metadata + truncated payload
+        meta_keys = ("record_id", "tool_name", "args_hash", "original_size", "written_at")
+        console.print(f"\n[bold]{record_path}[/bold]")
+        for k in meta_keys:
+            v = data.get(k, "<missing>")
+            console.print(f"  [cyan]{k}:[/cyan] {v}")
+        payload = data.get("original_payload", "")
+        if isinstance(payload, str):
+            preview = payload[:1500]
+            console.print(f"\n[bold]Payload preview ({len(payload)} chars):[/bold]")
+            console.print(preview)
+            if len(payload) > len(preview):
+                console.print(
+                    f"\n[dim]...truncated. Full content at {record_path}[/dim]"
+                )
+        console.print()
+        return
+
+    console.print(f"[red]Unknown /overflow subcommand: {sub}[/red] [dim](try /overflow help)[/dim]\n")
+
+
+def _get_compaction_overflow_dir() -> str:
+    """Resolve overflow dir from current AgentConfig."""
+    try:
+        config = get_agent_config()
+        return config.compaction_overflow_dir
+    except Exception:
+        return "data/overflow"
+
+
 def handle_history_command(state: "SessionState", arg: str) -> None:
     """Handle /history [N] command. Show current session chat history.
 
@@ -2482,6 +2616,8 @@ def main():
                 handle_subagent_command(state, arg)
             elif cmd in ("/scratchpad", "/pad"):
                 handle_scratchpad_command(arg)
+            elif cmd in ("/overflow", "/of"):
+                handle_overflow_command(arg)
             elif cmd in ("/history", "/h"):
                 handle_history_command(state, arg)
             elif cmd == "/turns":

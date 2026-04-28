@@ -1,0 +1,55 @@
+{
+  "name": "l3_stub_old_results",
+  "description": "Layer 3 replaces old tool_results with one-line stubs once total content size exceeds layer_3_threshold_chars. record_id (when L0 ran first) is preserved in the stub via regex from the content marker. Native Anthropic message shape; layer_1 disabled to isolate L3 behaviour.",
+  "config": {
+    "compaction_enabled": true,
+    "layer_1_enabled": false,
+    "layer_2_threshold_chars": 1000000000,
+    "layer_3_threshold_chars": 100,
+    "keep_recent_turns": 2
+  },
+  "input_messages": [
+    {"role": "user", "content": "Q"},
+    {
+      "role": "assistant",
+      "content": [{"type": "tool_use", "id": "tu_1", "name": "get_x", "input": {}}]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "tu_1",
+          "content": "<tool_output tool=\"get_x\">\nthe original payload was big — only a summary made it back, see record [overflow_record=deadbeefcafebabe, original_size=42000]\n</tool_output>"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [{"type": "tool_use", "id": "tu_2", "name": "get_x", "input": {}}]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "tu_2", "content": "RECENT"}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [{"type": "tool_use", "id": "tu_3", "name": "get_x", "input": {}}]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "tu_3", "content": "RECENT_2"}
+      ]
+    }
+  ],
+  "expected": {
+    "old_tool_result_index": 2,
+    "old_tool_result_content_starts_with": "[old get_x result; record_id=deadbeefcafebabe",
+    "events_layer_3_present": true,
+    "events_layer_1_absent": true,
+    "compacted_at_least": 1
+  }
+}

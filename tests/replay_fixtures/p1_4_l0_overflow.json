@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-04-28T12:00:00+00:00",
+  "entrypoint": "test",
+  "provider": "anthropic",
+  "model": "claude-opus-4-7",
+  "session_id": "fixture_p1_4_l0_overflow",
+  "turn_id": 1,
+  "system_prompt_hash": "0000000000000000",
+  "user_input": "Find recent NVDA news.",
+  "tools_available": [
+    "tavily_search",
+    "get_ticker_news"
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "name": "tavily_search",
+      "arguments": {
+        "max_results": 5,
+        "query": "NVDA earnings preview"
+      },
+      "arguments_digest": "0000000000000000",
+      "result_digest": "1111111111111111",
+      "result_shape": {
+        "answer": "str",
+        "query": "str",
+        "result_count": "int",
+        "results": [
+          {
+            "content": "str",
+            "score": "float",
+            "title": "str",
+            "url": "str"
+          }
+        ]
+      },
+      "compression": {
+        "layer": 0,
+        "compressed": true,
+        "raw_bytes": 32540,
+        "compressed_bytes": 1820,
+        "raw_digest": "f3a82b91c4d570e8",
+        "compressed_digest": "82d4191b3c5fa006",
+        "overflow_record_id": "deadbeefcafebabe"
+      }
+    }
+  ],
+  "final_answer": "NVDA upcoming earnings driven by AI demand and data center growth.",
+  "final_answer_hash": "0000000000000000",
+  "usage": {
+    "input_tokens": 4200,
+    "output_tokens": 95
+  },
+  "notes": "P1.4 commit 4 fixture: oversized tavily_search payload triggered Layer 0 (raw 32K bytes -> compressed 1.8K, with on-disk overflow record). The compression block carries raw/compressed digests + overflow_record_id so an analyst can reconcile this trace against data/overflow/<session>/<record_id>.json. Hand-crafted shape; digests + record_id are illustrative, not real hashes."
+}

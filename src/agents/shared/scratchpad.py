@@ -128,17 +128,27 @@ class Scratchpad:
         tool_name: str,
         result_data: str = "",
         tool_input: Optional[Dict[str, Any]] = None,
+        compression: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Record a tool execution with full result (like Dexter's scratchpad).
 
         Stores complete result data for debugging. If tool_input is provided,
         creates a combined event with both args and result.
+
+        ``compression`` is the P1.4 observability dict from
+        :meth:`ContextManager.compress_tool_result`. When provided, it's
+        embedded under the ``"compression"`` key so post-hoc analysis can
+        reconcile raw / compressed / overflow without dereferencing the
+        record file. When ``None``, the field is omitted (no schema bump
+        for callers that don't run a compressor).
         """
         data: Dict[str, Any] = {"tool": tool_name}
         if tool_input is not None:
             data["args"] = _safe_serialize(tool_input)
         data["result"] = _try_parse_json(result_data)
         data["result_chars"] = len(result_data) if isinstance(result_data, str) else 0
+        if compression is not None:
+            data["compression"] = compression
         self._write_event("tool_result", data)
 
     def log_final_answer(

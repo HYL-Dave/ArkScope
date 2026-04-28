@@ -414,14 +414,27 @@ async def run_query_stream(
 
                 # Execute the tool
                 result = execute_tool(tool_name, tool_input, dal)
-                # P1.4 Layer 0: budget + overflow disk persist (no-op when disabled)
-                result = ctx.maybe_apply_layer_0(tool_name, tool_input, result)
+                # P1.4 Layer 0: budget + overflow disk persist + observability
+                # metadata. compression dict carries raw/compressed digests +
+                # bytes + overflow_record_id so audit pipelines can reconcile
+                # post-compression. metadata is identical across pad / capture
+                # — single source of truth (commit 4 reconciliation contract).
+                result, compression = ctx.compress_tool_result(
+                    tool_name, tool_input, result,
+                )
                 result_str = result if isinstance(result, str) else str(result)
-                pad.log_tool_result(tool_name, result_data=result_str, tool_input=tool_input)
+                pad.log_tool_result(
+                    tool_name,
+                    result_data=result_str,
+                    tool_input=tool_input,
+                    compression=compression,
+                )
 
                 if capture is not None:
                     try:
-                        capture.record_tool_call(tool_name, tool_input, result)
+                        capture.record_tool_call(
+                            tool_name, tool_input, result, compression=compression,
+                        )
                     except Exception as exc:
                         logger.warning("Replay capture record_tool_call failed: %s", exc)
 

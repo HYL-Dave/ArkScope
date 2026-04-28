@@ -20,6 +20,7 @@ existing tests in ``tests/test_context_manager.py`` keep passing.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -198,23 +199,81 @@ class ContextManager:
         tool_input: Dict[str, Any],
         result: Any,
     ) -> str:
-        """Run Layer 0 budget at tool_result insertion time.
+        """Backwards-compatible thin wrapper around :meth:`compress_tool_result`.
 
-        Returns the (possibly compressed) result string. When the compressor
-        is not instantiated (flag off), returns ``str(result)`` unchanged so
-        callers can use this helper unconditionally. The record_id, when one
-        is written, is embedded inside the returned content via the
-        ``[overflow_record=<id>, original_size=<n>]`` marker — callers do NOT
-        need to attach it as a separate field on the tool_result block (and
-        SHOULD NOT, since unknown keys may be rejected by the API).
+        Returns just the (possibly compressed) result string, dropping the
+        observability metadata. Prefer :meth:`compress_tool_result` directly
+        in new code so audit pipelines (scratchpad / replay / chat history)
+        can record raw + compressed digests.
         """
-        result_str = result if isinstance(result, str) else str(result)
-        if self._compressor is None:
-            return result_str
-        compressed, _record = self._compressor.process_tool_result(
-            tool_name, tool_input, result_str,
-        )
+        compressed, _meta = self.compress_tool_result(tool_name, tool_input, result)
         return compressed
+
+    def compress_tool_result(
+        self,
+        tool_name: str,
+        tool_input: Dict[str, Any],
+        result: Any,
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Run Layer 0 budget AND emit observability metadata.
+
+        Returns ``(compressed_str, compression_metadata)``. The metadata is
+        a single public dict the caller forwards to all three audit
+        pipelines so raw / compressed / overflow can be reconciled
+        post-hoc (commit 4 contract).
+
+        Metadata shape (always the same keys, even when L0 is disabled or
+        the payload is under budget — easier downstream queries):
+
+        ::
+
+            {
+                "layer": 0,
+                "compressed": bool,             # True only when reducer ran
+                "raw_bytes": int,               # len(raw.encode("utf-8"))
+                "compressed_bytes": int,
+                "raw_digest": str,              # sha256(raw_utf8)[:16]
+                "compressed_digest": str,
+                "overflow_record_id": str | None,  # 16-hex when written
+            }
+
+        Sizes are UTF-8 BYTES (not chars) so they line up with
+        ``OverflowStore.original_size`` regardless of CJK / emoji content.
+        """
+        raw_str = result if isinstance(result, str) else str(result)
+        raw_bytes_buf = raw_str.encode("utf-8", errors="replace")
+        raw_bytes = len(raw_bytes_buf)
+        raw_digest = hashlib.sha256(raw_bytes_buf).hexdigest()[:16]
+
+        if self._compressor is None:
+            # L0 disabled — passthrough, but still emit metadata for the
+            # audit pipelines (compressed_* equals raw_* in this branch).
+            return raw_str, {
+                "layer": 0,
+                "compressed": False,
+                "raw_bytes": raw_bytes,
+                "compressed_bytes": raw_bytes,
+                "raw_digest": raw_digest,
+                "compressed_digest": raw_digest,
+                "overflow_record_id": None,
+            }
+
+        compressed_str, record = self._compressor.process_tool_result(
+            tool_name, tool_input, raw_str,
+        )
+        compressed_bytes_buf = compressed_str.encode("utf-8", errors="replace")
+        compressed_bytes = len(compressed_bytes_buf)
+        compressed_digest = hashlib.sha256(compressed_bytes_buf).hexdigest()[:16]
+
+        return compressed_str, {
+            "layer": 0,
+            "compressed": record is not None,
+            "raw_bytes": raw_bytes,
+            "compressed_bytes": compressed_bytes,
+            "raw_digest": raw_digest,
+            "compressed_digest": compressed_digest,
+            "overflow_record_id": record.record_id if record else None,
+        }
 
     @property
     def compressor(self) -> Optional[ContextCompressor]:

@@ -130,6 +130,10 @@ class CapturedToolCall:
     arguments_digest: str
     result_digest: str
     result_shape: Any
+    # P1.4 commit 4: optional compression observability metadata. ``None``
+    # when no compressor was attached (legacy path, OpenAI loop). Forward-
+    # compatible: replay validators that don't know about this key ignore it.
+    compression: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -217,6 +221,7 @@ class ReplayCapture:
         name: str,
         arguments: Any,
         result: Any,
+        compression: Optional[Dict[str, Any]] = None,
     ) -> None:
         norm = normalize_args(arguments)
         decoded = _coerce_result(result)
@@ -227,6 +232,7 @@ class ReplayCapture:
             arguments_digest=digest_json(norm),
             result_digest=digest_json(decoded),
             result_shape=compute_shape(decoded),
+            compression=compression,
         )
         self._tool_calls.append(call)
         self._tool_call_index += 1
@@ -328,6 +334,7 @@ def load_trace(path: Path) -> ReplayTrace:
             arguments_digest=c.get("arguments_digest", ""),
             result_digest=c.get("result_digest", ""),
             result_shape=c.get("result_shape"),
+            compression=c.get("compression"),  # P1.4: forward-compat (None for old fixtures)
         )
         for c in data["tool_calls"]
     ]

@@ -1,0 +1,60 @@
+{
+  "name": "l1_minify_wrapped_json",
+  "description": "Layer 1 minifies pretty-printed JSON inside <tool_output> envelopes for old turns. Native Anthropic message shape (user-string question + user-list tool_results), not a ReplayTrace — replay_run.py does not re-run layer transformations.",
+  "config": {
+    "compaction_enabled": true,
+    "layer_2_threshold_chars": 1000000000,
+    "layer_3_threshold_chars": 1000000000,
+    "keep_recent_turns": 2
+  },
+  "input_messages": [
+    {"role": "user", "content": "Q"},
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "tu_1", "name": "tavily_search", "input": {"q": "x"}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "tu_1",
+          "content": "<tool_output tool=\"tavily_search\">\n{\n  \"results\": [\n    {\n      \"a\": 1,\n      \"b\": [1, 2, 3]\n    }\n  ]\n}\n</tool_output>"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "tu_2", "name": "tavily_search", "input": {}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "tu_2", "content": "RECENT_RESULT"}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "tool_use", "id": "tu_3", "name": "tavily_search", "input": {}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "tu_3", "content": "RECENT_RESULT_2"}
+      ]
+    }
+  ],
+  "expected": {
+    "old_tool_result_index": 2,
+    "old_tool_result_inner_minified": "{\"results\":[{\"a\":1,\"b\":[1,2,3]}]}",
+    "envelope_preserved": true,
+    "events_layer_1_present": true,
+    "compacted_at_least": 1
+  }
+}
