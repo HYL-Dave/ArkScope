@@ -277,13 +277,13 @@ class ContextCompressor:
             )
         ):
             before_5 = total_chars(messages)
-            new_msgs, prefix_to, success = apply_layer_5(
+            new_msgs, prefix_to, outcome = apply_layer_5(
                 messages,
                 keep_recent_turns=keep,
                 summary_caller=self._summary_caller,
                 prior_summary=prior_summary,
             )
-            if success:
+            if outcome == "success":
                 self._layer_5_consecutive_failures = 0
                 messages = new_msgs
                 replace_prefix_to = prefix_to
@@ -295,7 +295,9 @@ class ContextCompressor:
                 ))
                 layers_fired.append(5)
                 l5_fired = True
-            else:
+            elif outcome == "failed":
+                # Caller was actually invoked and returned None/empty or
+                # raised. Count toward circuit breaker.
                 self._layer_5_consecutive_failures += 1
                 self._events.append(CompressionEvent(
                     layer=5, before_chars=before_5, after_chars=before_5,
@@ -305,6 +307,11 @@ class ContextCompressor:
                 # If circuit just opened, the next pre-call will skip L5
                 # and Layer 3 already ran above (fall-back path is
                 # implicit — no need to re-fire here).
+            # outcome == "noop": boundary check failed (not enough turns
+            # or only prior summary was old). Caller was NEVER invoked,
+            # so this is silent — no event, no counter increment, no
+            # layers_fired entry. Forced /compact attempts on a too-short
+            # history will simply do nothing rather than burn the breaker.
 
         # Layer 6: post-compact anchor recovery. Runs only after L4 / L5
         # mutated the cached prefix. spec §3.7.

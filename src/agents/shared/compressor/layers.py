@@ -17,7 +17,14 @@ import json
 import logging
 import re
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
+
+# Layer 5 result discriminator. ``noop`` means the layer never invoked the
+# LLM (boundary check failed / empty messages / prior-summary-only body) —
+# the orchestrator must NOT count it against the circuit breaker. ``failed``
+# means the caller was actually attempted and either raised or returned
+# empty/None — that one DOES count toward the breaker.
+Layer5Outcome = Literal["success", "noop", "failed"]
 
 from .overflow_store import OverflowStore
 from .reducers import ToolReducer, get_reducer
@@ -379,25 +386,30 @@ def apply_layer_5(
     keep_recent_turns: int,
     summary_caller,  # SummaryCaller (avoid import cycle here)
     prior_summary: Optional[str] = None,
-) -> Tuple[List[ProjectedMessage], int, bool]:
+) -> Tuple[List[ProjectedMessage], int, Layer5Outcome]:
     """Replace ``messages[:boundary]`` with a single compaction summary.
 
-    Returns ``(new_messages, replace_prefix_to, success)``:
+    Returns ``(new_messages, replace_prefix_to, outcome)``:
 
-      - ``new_messages``: the transformed projected list. On success this is
-        ``[summary_item] + messages[boundary:]``. On failure / no-op this is
-        a copy of ``messages`` unchanged.
+      - ``new_messages``: the transformed projected list. On ``success``
+        this is ``[summary_item] + messages[boundary:]``. On ``noop`` /
+        ``failed`` this is a copy of ``messages`` unchanged.
       - ``replace_prefix_to``: the projected boundary index ``B`` used to
         slice. The orchestrator forwards this to the adapter so the native
         prefix can be replaced with ``[{role:user, content:<summary>}]``.
-        ``0`` means "Layer 5 chose no-op" — adapter must not slice native
-        messages.
-      - ``success``: True if the summarizer returned non-None text and the
-        replacement actually happened. False on caller failure or no-op.
+        ``0`` means Layer 5 did not transform anything (noop or failed) —
+        adapter must not slice native messages.
+      - ``outcome``: one of ``"success" | "noop" | "failed"``. The
+        orchestrator counts ``failed`` against the circuit breaker but
+        treats ``noop`` as silent (no LLM call was attempted, so it is
+        not evidence of a model fault).
 
-    No-op cases:
-      - Empty messages or boundary at 0 (not enough turns).
-      - Caller returns None (LLM failure / empty output).
+    Outcomes:
+      - ``noop``: empty messages, boundary at 0, or only a prior summary
+        was old — no body to compact. Caller is NOT invoked.
+      - ``failed``: caller returned None / empty / raised. Increments
+        consecutive-failure counter.
+      - ``success``: caller returned non-empty text and replacement happened.
 
     Idempotency: ``prior_summary`` is the content string from a previous
     compaction summary (passed in by the adapter when it has detached
@@ -418,12 +430,12 @@ def apply_layer_5(
     )
 
     if not messages:
-        return list(messages), 0, False
+        return list(messages), 0, "noop"
 
     boundary = find_recent_boundary(messages, keep_recent_turns=keep_recent_turns)
     if boundary == 0:
         # Not enough turns to safely compact — no-op (spec §3.6 step 1).
-        return list(messages), 0, False
+        return list(messages), 0, "noop"
 
     # Auto-detect prior summary from messages[0] only if the caller
     # didn't pass one in (the adapter generally has already detached
@@ -443,7 +455,7 @@ def apply_layer_5(
         boundary -= 1
         if boundary <= 0:
             # Only the prior summary was old — no body to compact.
-            return list(messages), 0, False
+            return list(messages), 0, "noop"
 
     transcript = render_layer_5_transcript(
         body[:boundary], prior_summary=prior_summary,
@@ -459,7 +471,9 @@ def apply_layer_5(
         raw_summary = None
 
     if not isinstance(raw_summary, str) or not raw_summary.strip():
-        return list(messages), 0, False
+        # LLM was actually invoked but produced nothing usable — this is
+        # a real failure, not a no-op (orchestrator counts toward circuit).
+        return list(messages), 0, "failed"
 
     capped = cap_summary(raw_summary)
     summary_content = wrap_compaction_summary(capped)
@@ -475,7 +489,7 @@ def apply_layer_5(
     # summary at index 0, add 1 back so the adapter sees the same
     # coordinate it passed in.
     replace_prefix_to_orig = boundary + auto_detected_offset
-    return new_messages, replace_prefix_to_orig, True
+    return new_messages, replace_prefix_to_orig, "success"
 
 
 # ---------------------------------------------------------------------------

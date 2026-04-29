@@ -378,6 +378,37 @@ class TestLayer5Firing:
         assert c._layer_5_consecutive_failures == 0
         assert c.layer_5_circuit_open is False
 
+    def test_noop_does_not_burn_circuit_breaker(self, tmp_path):
+        """Forced /compact on a too-short history must not count toward
+        the circuit. apply_layer_5 returns ``"noop"`` (caller never
+        invoked) and the orchestrator MUST NOT increment failures —
+        otherwise three rapid /compact attempts would open the circuit
+        with zero real LLM faults.
+        """
+        c = _make_compressor(
+            tmp_path,
+            layer_1_enabled=False,
+            layer_5_enabled=True,
+            layer_5_threshold_chars=1,
+            circuit_breaker_max_failures=3,
+        )
+        # If anything from this queue gets popped, we know the noop
+        # gating was wrong and the caller was actually invoked.
+        c._summary_caller = FakeSummaryCaller(["should-never-be-popped"])
+        # 2 user turns with keep_recent_turns=2 (CompressorConfig
+        # default) → find_recent_boundary returns 0 → noop branch.
+        msgs = [
+            {"role": "user", "content": "Q1"},
+            {"role": "assistant", "content": "a1"},
+        ]
+        for _ in range(5):  # well past circuit_breaker_max_failures=3
+            c.force_layer_5_once = True
+            res = c.compact_pre_call(msgs)
+            assert res.replace_prefix_to is None  # nothing fired
+        assert c._layer_5_consecutive_failures == 0  # not counted
+        assert c.layer_5_circuit_open is False  # circuit still closed
+        assert c._summary_caller.calls == []  # caller never invoked
+
 
 # ============================================================
 # Force-flag — lock #2 (consume + clear UNDER ALL CONDITIONS)
@@ -989,6 +1020,80 @@ class TestCompactCommand:
         assert state.force_layer_5_next is True
         out = recording.export_text()
         assert "already armed" in out.lower()
+
+    def test_force_flag_still_builds_summary_caller_when_layer5_disabled(
+        self, tmp_path, monkeypatch,
+    ):
+        """Regression: with default config (compaction_enabled=True,
+        compaction_layer_5_enabled=False), arming /compact must still
+        cause run_anthropic_interactive to build AnthropicSummaryCaller.
+        Otherwise ContextCompressor._summary_caller is None and
+        compact_pre_call's gate ``self._summary_caller is not None``
+        skips L5 silently — /compact would no-op.
+        """
+        import sys
+        from src.agents import cli
+        from src.agents.config import AgentConfig
+
+        cfg = AgentConfig()
+        cfg.compaction_enabled = True
+        cfg.compaction_layer_5_enabled = False  # default
+        cfg.compaction_overflow_dir = str(tmp_path)
+        monkeypatch.setattr("src.agents.cli.get_agent_config", lambda: cfg)
+
+        # Spy on AnthropicSummaryCaller construction.
+        constructed: list = []
+        original_caller = cli.AnthropicSummaryCaller
+
+        class _SpyCaller(original_caller):
+            def __init__(self, **kw):  # type: ignore[no-untyped-def]
+                constructed.append(kw)
+                # Don't call parent — we'll bail before any invocation.
+
+        monkeypatch.setattr("src.agents.cli.AnthropicSummaryCaller", _SpyCaller)
+
+        # Make the Anthropic client raise on first stream so we exit early.
+        class _BoomStream:
+            def __enter__(self_inner):
+                raise RuntimeError("intentional-bail-out-after-wiring")
+
+            def __exit__(self_inner, *a):
+                return False
+
+        class _BoomMessages:
+            @staticmethod
+            def stream(**kw):
+                return _BoomStream()
+
+        class _BoomClient:
+            messages = _BoomMessages()
+
+        # cli.run_anthropic_interactive imports `Anthropic` from the
+        # anthropic module locally — patch the symbol there.
+        import anthropic
+        monkeypatch.setattr(anthropic, "Anthropic", lambda: _BoomClient())
+
+        # Bypass tool fetch + system-prompt build (irrelevant here).
+        monkeypatch.setattr(
+            "src.agents.anthropic_agent.tools.get_anthropic_tools",
+            lambda: [],
+        )
+
+        # Now invoke. We expect the wiring to happen BEFORE the API call,
+        # so the spy fires; then the API call raises and we catch.
+        try:
+            cli.run_anthropic_interactive(
+                question="Q", dal=None, model="claude-opus-4-6",
+                force_layer_5=True,
+            )
+        except Exception:  # noqa: BLE001 — any exception is fine; we set up the bail-out
+            pass
+
+        assert len(constructed) == 1, (
+            f"AnthropicSummaryCaller MUST be built when force_layer_5=True "
+            f"even with compaction_layer_5_enabled=False. "
+            f"Got {len(constructed)} construction(s)."
+        )
 
 
 # ============================================================

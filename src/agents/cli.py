@@ -636,7 +636,14 @@ def run_anthropic_interactive(
             layer_5_threshold_chars=config.compaction_layer_5_threshold_chars,
             keep_recent_turns=config.context_keep_recent_turns,
         )
-        if config.compaction_layer_5_enabled:
+        # Build the L5 caller + L6 anchor provider when EITHER the
+        # layer_5_enabled toggle is on (auto path) OR the user has armed
+        # /compact for this turn (force_layer_5). Without this, the
+        # default "compaction.enabled=true, layer_5_enabled=false"
+        # config would make /compact silently no-op: handler would arm
+        # force_layer_5_once but the compressor would have no caller to
+        # invoke, so it would skip L5 entirely.
+        if config.compaction_layer_5_enabled or force_layer_5:
             summary_caller = AnthropicSummaryCaller(
                 model=config.compaction_layer_5_model_anthropic,
             )
