@@ -690,6 +690,209 @@ class TestOverflowCommandIntegrity:
         assert "original honest payload" not in out
 
 
+class TestLayer5L6Integration:
+    """End-to-end through ``ContextManager.compact_messages`` with Layer 5
+    enabled. Exercises the dual-dispatch adapter path (prefix replacement
+    + Layer 6 anchor) on native Anthropic message shape — the unit-level
+    coverage in ``test_compressor_layer5.py`` already locks the
+    ``ContextCompressor`` behaviour; here we just confirm the adapter
+    rebuilds native messages the way agent.py / cli.py expect."""
+
+    @staticmethod
+    def _native_history():
+        """5 user turns + 4 assistant turns = enough for L5 to fire AND
+        for the post-r1 tail to still satisfy keep_recent_turns=2."""
+        return [
+            {"role": "user", "content": "Q1"},
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t1", name="get_x", input={"ticker": "NVDA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t1", "content": "RES1",
+            }]},
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t2", name="get_x", input={"ticker": "NVDA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t2",
+                "content": "RES2 with [overflow_record=abcd1234deadbeef, "
+                           "original_size=9000]",
+            }]},
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t3", name="get_x", input={"ticker": "NVDA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t3", "content": "RES3",
+            }]},
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t4", name="get_x", input={"ticker": "NVDA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t4", "content": "RES4",
+            }]},
+        ]
+
+    def _make_ctx_with_l5(self, tmp_path, *, fake_caller, anchor_data=None):
+        """ContextManager wired with Layer 5 + Layer 6 (using fake caller)."""
+        from src.agents.shared.compressor import FakeSummaryCaller
+        provider = (lambda: anchor_data) if anchor_data is not None else None
+        ctx = ContextManager(
+            model="claude-opus-4-7",
+            keep_recent_turns=2,
+            session_id="l5-int",
+            overflow_dir=tmp_path,
+            compaction_config=CompressorConfig(
+                enabled=True,
+                layer_1_enabled=False,
+                layer_2_threshold_chars=10**9,
+                layer_3_threshold_chars=10**9,
+                layer_5_enabled=True,
+                layer_5_threshold_chars=1,
+                keep_recent_turns=2,
+            ),
+            summary_caller=fake_caller,
+            anchor_data_provider=provider,
+        )
+        return ctx
+
+    def test_compact_messages_layer_5_produces_summary_user_message(self, tmp_path):
+        from src.agents.shared.compressor import FakeSummaryCaller
+        msgs = self._native_history()
+        ctx = self._make_ctx_with_l5(
+            tmp_path, fake_caller=FakeSummaryCaller(["compact summary v1"]),
+        )
+        out, stats = ctx.compact_messages(msgs)
+        # Index 0 is the summary user message
+        assert out[0]["role"] == "user"
+        assert out[0]["content"].startswith("<compaction_summary>")
+        assert "compact summary v1" in out[0]["content"]
+        # No tool_result blocks orphaned: every tool_result in the tail
+        # has a tool_use_id that resolves to a tool_use block in the
+        # immediately-preceding assistant message.
+        seen_tool_use_ids = set()
+        for msg in out:
+            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                for b in msg["content"]:
+                    bid = b.get("id") if isinstance(b, dict) else getattr(b, "id", None)
+                    btype = (
+                        b.get("type") if isinstance(b, dict)
+                        else getattr(b, "type", None)
+                    )
+                    if btype == "tool_use" and bid:
+                        seen_tool_use_ids.add(bid)
+            if msg.get("role") == "user" and isinstance(msg.get("content"), list):
+                for item in msg["content"]:
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        ref = item.get("tool_use_id")
+                        if ref:
+                            assert ref in seen_tool_use_ids, (
+                                f"orphan tool_result references {ref}"
+                            )
+        # Stats expose Layer 5 firing
+        assert any(e["layer"] == 5 for e in stats["events"])
+
+    def test_compact_messages_appends_layer_6_anchor(self, tmp_path):
+        from src.agents.shared.compressor import FakeSummaryCaller
+        msgs = self._native_history()
+        ctx = self._make_ctx_with_l5(
+            tmp_path,
+            fake_caller=FakeSummaryCaller(["v1"]),
+            anchor_data={"tickers": ["NVDA"], "recent_record_ids": ["abcd1234deadbeef"]},
+        )
+        out, stats = ctx.compact_messages(msgs)
+        last = out[-1]
+        assert last["role"] == "user"
+        assert last["content"].startswith("<anchor>")
+        assert "NVDA" in last["content"]
+        assert "abcd1234deadbeef" in last["content"]
+        assert any(e["layer"] == 6 for e in stats["events"])
+
+    def test_compact_messages_repeated_replaces_summary_and_anchor(self, tmp_path):
+        """Re-running compact_messages on its own output must NOT stack
+        summaries OR anchors — the detach-anchor + detach-summary flow
+        keeps the projection 1:1 across re-projection."""
+        from src.agents.shared.compressor import FakeSummaryCaller
+        msgs = self._native_history()
+        ctx = self._make_ctx_with_l5(
+            tmp_path,
+            fake_caller=FakeSummaryCaller(["v1", "v2"]),
+            anchor_data={"tickers": ["NVDA"], "recent_record_ids": ["abcd1234deadbeef"]},
+        )
+        v1, _ = ctx.compact_messages(msgs)
+        # Continue the conversation so round 2 has body to compact.
+        round_2_input = list(v1)
+        # Insert the new turns BEFORE the trailing anchor (anchor stays
+        # at tail).
+        if round_2_input and round_2_input[-1]["content"].startswith("<anchor>"):
+            anchor = round_2_input.pop()
+        else:
+            anchor = None
+        round_2_input += [
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t5", name="get_x", input={"ticker": "TSLA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t5", "content": "RES5",
+            }]},
+            {"role": "assistant", "content": [
+                _FakeToolUseBlock(id="t6", name="get_x", input={"ticker": "TSLA"}),
+            ]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "t6", "content": "RES6",
+            }]},
+        ]
+        if anchor is not None:
+            round_2_input.append(anchor)
+
+        v2, _ = ctx.compact_messages(round_2_input)
+        # Exactly ONE summary at the head
+        summaries = [
+            m for m in v2
+            if m.get("role") == "user"
+            and isinstance(m.get("content"), str)
+            and m["content"].startswith("<compaction_summary>")
+        ]
+        assert len(summaries) == 1
+        assert "v2" in summaries[0]["content"]
+        assert "v1" not in summaries[0]["content"]
+        # Exactly ONE anchor at the tail
+        anchors = [
+            m for m in v2
+            if m.get("role") == "user"
+            and isinstance(m.get("content"), str)
+            and m["content"].startswith("<anchor>")
+        ]
+        assert len(anchors) == 1
+
+    def test_compact_messages_no_l5_fire_when_caller_missing(self, tmp_path):
+        """Layer 5 enabled in config but no summary_caller → adapter falls
+        through to Layer 1-3 path (here L1/L2/L3 disabled too → no-op)."""
+        msgs = self._native_history()
+        ctx = ContextManager(
+            model="claude-opus-4-7",
+            keep_recent_turns=2,
+            session_id="l5-no-caller",
+            overflow_dir=tmp_path,
+            compaction_config=CompressorConfig(
+                enabled=True,
+                layer_1_enabled=False,
+                layer_2_threshold_chars=10**9,
+                layer_3_threshold_chars=10**9,
+                layer_5_enabled=True,
+                layer_5_threshold_chars=1,
+            ),
+            summary_caller=None,  # missing
+        )
+        out, stats = ctx.compact_messages(msgs)
+        # No L5 event recorded (we cannot fire without a caller)
+        assert all(e["layer"] != 5 for e in stats["events"])
+        # Output should be structurally equivalent to input (no summary at head)
+        assert not (
+            isinstance(out[0].get("content"), str)
+            and out[0]["content"].startswith("<compaction_summary>")
+        )
+
+
 class TestL0CallgraphRegression:
     """Lock that agent.py and cli.py both invoke ``ctx.compress_tool_result``
     (or the ``maybe_apply_layer_0`` BC wrapper) between ``execute_tool`` and

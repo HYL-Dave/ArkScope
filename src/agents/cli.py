@@ -84,7 +84,8 @@ from prompt_toolkit.formatted_text import ANSI
 
 from .config import get_agent_config, ReasoningEffort
 from .shared.attachments import Attachment, AttachmentManager
-from .shared.compressor import CompressorConfig
+from .shared.compressor import AnthropicSummaryCaller, CompressorConfig
+from .shared.context_manager import build_anchor_from_messages
 from .shared.prompts import SYSTEM_PROMPT
 from .shared.scratchpad import ChatHistory, Scratchpad, _safe_serialize
 from .shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
@@ -123,6 +124,12 @@ class SessionState:
     anthropic_thinking: bool = False
     extended_context: bool = False  # 1M context beta (Anthropic only)
     server_compaction: bool = False  # Server-side compaction L2 (Anthropic + OpenAI)
+    # P1.4 commit 5 — when True, the next query's Layer 5 fires regardless
+    # of the threshold + layer_5_enabled config (still respects master
+    # compaction_enabled, summary_caller availability, and circuit breaker).
+    # /compact sets this flag; cleared automatically after the next ctx
+    # is built and its force_layer_5_once is consumed.
+    force_layer_5_next: bool = False
     code_model: str = ""  # Code generation model (empty = auto)
     code_backend: str = "api"  # api | codex | codex-apikey | claude | claude-apikey
     max_tool_calls: Optional[int] = None  # None = use config default
@@ -186,6 +193,7 @@ _SLASH_COMMANDS = [
     ("/subagent", "/sa", "View/change subagent models"),
     ("/scratchpad", "/pad", "List recent scratchpad sessions"),
     ("/overflow", "/of", "Inspect P1.4 Layer 0 overflow records"),
+    ("/compact", "/cp", "Force P1.4 Layer 5 LLM full compact on next query"),
     ("/history", "/h", "Show recent chat history (Q&A pairs)"),
     ("/turns", "", "Set max tool calls per query"),
     ("/attach", "/at", "Attach file (PDF/image/text) to next query"),
@@ -584,6 +592,7 @@ def run_anthropic_interactive(
     max_tool_calls: Optional[int] = None,
     attachments: Optional[List[Attachment]] = None,
     chat_history: Optional[ChatHistory] = None,
+    force_layer_5: bool = False,
 ) -> Dict[str, Any]:
     """
     Run Anthropic agent with live tool call display.
@@ -615,14 +624,23 @@ def run_anthropic_interactive(
     _query_start = time.time()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
     compaction_cfg: Optional[CompressorConfig] = None
+    summary_caller = None
+    anchor_data_provider = None
     if config.compaction_enabled:
         compaction_cfg = CompressorConfig(
             enabled=True,
             layer_0_budget_chars=config.compaction_layer_0_budget_chars,
             layer_2_threshold_chars=config.compaction_layer_2_threshold_chars,
             layer_3_threshold_chars=config.compaction_layer_3_threshold_chars,
+            layer_5_enabled=config.compaction_layer_5_enabled,
+            layer_5_threshold_chars=config.compaction_layer_5_threshold_chars,
             keep_recent_turns=config.context_keep_recent_turns,
         )
+        if config.compaction_layer_5_enabled:
+            summary_caller = AnthropicSummaryCaller(
+                model=config.compaction_layer_5_model_anthropic,
+            )
+            anchor_data_provider = lambda: build_anchor_from_messages(messages)
     ctx = ContextManager(
         model=model_name,
         threshold_ratio=config.context_threshold_ratio,
@@ -632,7 +650,14 @@ def run_anthropic_interactive(
         overflow_dir=Path(config.compaction_overflow_dir),
         compaction_config=compaction_cfg,
         scratchpad="",  # P1.4: L2 no-op until semantic summary builder lands
+        summary_caller=summary_caller,
+        anchor_data_provider=anchor_data_provider,
     )
+    # /compact one-shot bypass: only request if compressor was actually
+    # built (request_force_layer_5 returns False otherwise — caller
+    # surfaces a friendly message via state.force_layer_5_next reset).
+    if force_layer_5:
+        ctx.request_force_layer_5()
 
     # Build optional API params (effort + thinking)
     api_kwargs: Dict[str, Any] = {}
@@ -2384,6 +2409,50 @@ def handle_overflow_command(arg: str) -> None:
     console.print(f"[red]Unknown /overflow subcommand: {sub}[/red] [dim](try /overflow help)[/dim]\n")
 
 
+def handle_compact_command(state: SessionState, arg: str) -> None:
+    """Handle ``/compact`` (alias ``/cp``) — force Layer 5 on next query.
+
+    Distinct from ``/compaction`` (server-side compaction L2 toggle).
+
+    Per commit-5 lock #2 + #3, /compact bypasses the layer_5_threshold
+    and ``compaction.layer_5_enabled`` config, but does NOT bypass:
+      - ``compaction.enabled`` (master toggle): if off, the request is
+        rejected here so we don't quietly leave a flag set that would
+        never fire (cleaner than letting it sit and surprise the user).
+      - ``summary_caller`` availability: enforced inside
+        ``ContextCompressor.compact_pre_call`` — flag is consumed +
+        cleared even when caller is missing.
+      - circuit breaker: same, consumed + cleared on circuit-open path.
+    """
+    cfg = get_agent_config()
+    if not cfg.compaction_enabled:
+        console.print(
+            "[red]/compact rejected:[/red] master ``compaction.enabled`` "
+            "is OFF in user_profile.yaml.\n"
+            "[dim]Set ``compaction:\\n  enabled: true`` and restart, then "
+            "/compact will be honoured.[/dim]\n"
+        )
+        return
+    if state.provider != "anthropic":
+        console.print(
+            "[yellow]/compact only applies to the Anthropic agent path.[/yellow]\n"
+            "[dim]OpenAI runs through the agents-SDK Runner; ContextManager "
+            "is not in that loop.[/dim]\n"
+        )
+        return
+    if state.force_layer_5_next:
+        console.print(
+            "[dim]/compact already armed — next query will force Layer 5.[/dim]\n"
+        )
+        return
+    state.force_layer_5_next = True
+    console.print(
+        "[green]/compact armed.[/green] Layer 5 will fire on the next query.\n"
+        "[dim]One-shot — auto-clears after one compaction cycle, "
+        "regardless of success / failure / circuit state.[/dim]\n"
+    )
+
+
 def _get_compaction_overflow_dir() -> str:
     """Resolve overflow dir from current AgentConfig."""
     try:
@@ -2633,6 +2702,8 @@ def main():
                 handle_scratchpad_command(arg)
             elif cmd in ("/overflow", "/of"):
                 handle_overflow_command(arg)
+            elif cmd in ("/compact", "/cp"):
+                handle_compact_command(state, arg)
             elif cmd in ("/history", "/h"):
                 handle_history_command(state, arg)
             elif cmd == "/turns":
@@ -2694,6 +2765,12 @@ def main():
             get_agent_config().server_compaction = state.server_compaction
 
             if state.provider == "anthropic":
+                # Consume the /compact one-shot flag here so that even
+                # if the run raises mid-flight, we don't leak the flag
+                # into the next query (commit-5 lock #2: clear under
+                # all paths).
+                _force_l5 = state.force_layer_5_next
+                state.force_layer_5_next = False
                 result = run_anthropic_interactive(
                     question=question,
                     dal=dal,
@@ -2705,6 +2782,7 @@ def main():
                     max_tool_calls=state.max_tool_calls,
                     attachments=query_attachments,
                     chat_history=state.chat_history,
+                    force_layer_5=_force_l5,
                 )
                 # Update history for next turn
                 if state.messages_history is not None and result.get("messages"):

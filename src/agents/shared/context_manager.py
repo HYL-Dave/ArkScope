@@ -32,6 +32,7 @@ from .compressor import (
     ProjectedMessage,
 )
 from .compressor.layers import _SCRATCHPAD_SUMMARY_MARKER  # type: ignore[attr-defined]
+from .compressor.types import CompactionResult
 from .token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,16 @@ logger = logging.getLogger(__name__)
 # Matches the marker Layer 0 appends to summaries:
 #   "...]\n[overflow_record=<16-hex>, original_size=<int>]"
 _OVERFLOW_RECORD_RE = re.compile(r"\[overflow_record=([0-9a-f]{16})")
+
+# Layer 5 / 6 marker prefixes used to recognise prior summaries / anchors
+# on re-projection. Mirror the wrappers in
+# :mod:`src.agents.shared.compressor.summary_prompt`.
+_COMPACTION_SUMMARY_MARKER = "<compaction_summary>"
+_ANCHOR_MARKER = "<anchor>"
+_SUMMARY_MARKERS: Tuple[str, ...] = (
+    _SCRATCHPAD_SUMMARY_MARKER,
+    _COMPACTION_SUMMARY_MARKER,
+)
 
 # Model context window sizes (input tokens)
 # Order matters: more specific prefixes first (prefix match)
@@ -101,6 +112,8 @@ class ContextManager:
         overflow_dir: Optional[Path] = None,
         compaction_config: Optional[CompressorConfig] = None,
         scratchpad: str = "",
+        summary_caller: Optional[Any] = None,
+        anchor_data_provider: Optional[Any] = None,
     ) -> None:
         """
         Args:
@@ -147,6 +160,8 @@ class ContextManager:
                     session_id=session_id,
                     overflow_dir=Path(overflow_dir),
                     config=compaction_config,
+                    summary_caller=summary_caller,
+                    anchor_data_provider=anchor_data_provider,
                 )
 
     @property
@@ -282,6 +297,25 @@ class ContextManager:
         """Underlying ContextCompressor (None when compaction disabled)."""
         return self._compressor
 
+    def request_force_layer_5(self) -> bool:
+        """Mark next compact_messages as a forced Layer 5 trigger.
+
+        Returns ``True`` on success. Returns ``False`` (and does NOT set
+        the flag) when the compressor is not instantiated — there's no
+        L5 to force in legacy / disabled paths, so silently swallowing
+        would mask user error. CLI ``/compact`` should print a clear
+        message in that case.
+
+        Per commit-5 lock #2, the flag is auto-cleared by the next
+        ``ContextCompressor.compact_pre_call`` regardless of whether
+        Layer 5 actually fires (caller missing / circuit open / master
+        disabled paths still consume + clear the flag).
+        """
+        if self._compressor is None:
+            return False
+        self._compressor.force_layer_5_once = True
+        return True
+
     # ── Legacy single-layer path (Phase 3, behaviour-frozen) ─────
 
     def _compact_messages_legacy(
@@ -394,20 +428,28 @@ class ContextManager:
         self,
         messages: List[Dict[str, Any]],
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-        """Delegate to :class:`ContextCompressor` (Layers 1-3) via patch-based
-        projection. Returns a new list; native ContentBlock objects on
-        assistant messages are preserved by identity (never mutated).
+        """Delegate to :class:`ContextCompressor` (Layers 1-3 + 5/6) via
+        patch-based projection. Native ContentBlock objects on assistant
+        messages are preserved by identity (never mutated).
 
-        Summary handling lives at this layer (NOT in the projection adapter)
-        so the projection ↔ patch-back alignment stays 1:1 even across
-        repeated compact_messages calls. The flow is:
+        Two paths handled here:
 
-          1. Detach a pre-existing summary at messages[0] if present.
-          2. Project + compress the remaining body.
-          3. Detach Layer-2-prepended summary from compressed (if any).
-          4. Patch the body back; project anchors and body align 1:1.
-          5. Re-attach the summary: a freshly-prepended one wins; else the
-             pre-existing one is preserved; else no summary.
+          - **1:1 body patch** (``replace_prefix_to is None``): Layers 1-3
+            transformed tool_result content strings; we patch them back
+            onto the existing native messages.
+          - **Prefix replacement** (``replace_prefix_to`` set, Layer 5
+            fired): the projection's prefix was collapsed to a single
+            summary item. We map ``replace_prefix_to`` (a body-relative
+            projected index — it counts WITHIN body_messages, AFTER the
+            existing summary/anchor were detached) back to native via
+            ``anchors``, find a safe cut (only back up if target is a
+            tool_result group — see :func:`_find_safe_native_cut`), and
+            rebuild ``[summary] + native_body[safe_cut:]``.
+
+        Layer 6 anchor (when ``appended_anchor=True``) is re-attached at
+        the END of the rebuilt list. Pre-existing summaries / anchors
+        from prior compaction are re-recognised and replaced (not
+        stacked) so repeated calls stay idempotent.
         """
         assert self._compressor is not None  # narrow
 
@@ -416,39 +458,102 @@ class ContextManager:
 
         before_total = _native_total_chars(messages)
 
-        # Step 1: detach pre-existing summary
-        existing_summary, body_messages = _detach_summary_msg(messages)
+        # Step 1: detach pre-existing summary AND anchor (so projection +
+        # anchors stay aligned 1:1 with body_messages — commit-5 lock #1:
+        # all anchor / replace_prefix_to indices are body-relative).
+        existing_anchor, body_messages = _detach_anchor_msg(messages)
+        existing_summary, body_messages = _detach_summary_msg(body_messages)
 
         # Step 2: project + compress body
         projected, anchors = _project_for_compression(body_messages)
-        compressed = self._compressor.compact_pre_call(
-            projected, scratchpad=self._scratchpad,
+        # Forward the detached summary's content so apply_layer_5 can
+        # render it as [PRIOR SUMMARY] and absorb it into the new summary
+        # rather than starting from scratch (idempotency).
+        prior_summary_content: Optional[str] = None
+        if existing_summary is not None:
+            content = existing_summary.get("content")
+            if isinstance(content, str):
+                prior_summary_content = content
+        result = self._compressor.compact_pre_call(
+            projected,
+            scratchpad=self._scratchpad,
+            prior_summary=prior_summary_content,
         )
+        compressed = result.messages
 
-        # Step 3: detach Layer-2-prepended summary
-        new_summary_str: Optional[str] = None
-        compressed_body = compressed
-        if compressed and compressed[0].get("is_compaction_summary"):
-            new_summary_str = compressed[0].get("content", "")
-            compressed_body = compressed[1:]
+        # Step 3: split into "Layer 5 prefix-replacement" vs "1:1 body patch"
+        # paths. Layer 6 anchor (if any) is at compressed[-1] and detached
+        # so the body alignment math doesn't have to know about it.
+        appended_anchor_item: Optional[ProjectedMessage] = None
+        if result.appended_anchor and compressed and compressed[-1].get("is_anchor"):
+            appended_anchor_item = compressed[-1]
+            compressed = compressed[:-1]
 
-        # Step 4: patch body back
-        new_body = _apply_compression_back(body_messages, compressed_body, anchors)
-
-        # Step 5: re-attach summary
-        if new_summary_str is not None:
-            new_messages = [
-                {"role": "user", "content": new_summary_str}
-            ] + new_body
-        elif existing_summary is not None:
-            new_messages = [existing_summary] + new_body
+        if result.replace_prefix_to is not None:
+            new_messages_body = _apply_layer_5_prefix_replacement(
+                body_messages, result, anchors, compressed,
+            )
         else:
-            new_messages = new_body
+            # Detach Layer-2-prepended summary (Layers 1-3 path keeps the
+            # prior single-summary handling).
+            new_summary_str: Optional[str] = None
+            compressed_body = compressed
+            if compressed and compressed[0].get("is_compaction_summary"):
+                new_summary_str = compressed[0].get("content", "")
+                compressed_body = compressed[1:]
+            patched = _apply_compression_back(
+                body_messages, compressed_body, anchors,
+            )
+            if new_summary_str is not None:
+                new_messages_body = [
+                    {"role": "user", "content": new_summary_str}
+                ] + patched
+            else:
+                new_messages_body = patched
+
+        # Step 4: re-attach pre-existing summary (only if Layer 5 didn't
+        # produce a fresh one — L5 path emits its own at the head).
+        l5_emitted_summary = (
+            result.replace_prefix_to is not None
+            and bool(new_messages_body)
+            and isinstance(new_messages_body[0], dict)
+            and isinstance(new_messages_body[0].get("content"), str)
+            and (
+                new_messages_body[0]["content"].startswith(_COMPACTION_SUMMARY_MARKER)
+                or new_messages_body[0]["content"].startswith(_SCRATCHPAD_SUMMARY_MARKER)
+            )
+        )
+        if (
+            existing_summary is not None
+            and not l5_emitted_summary
+            and not (
+                bool(new_messages_body)
+                and isinstance(new_messages_body[0], dict)
+                and isinstance(new_messages_body[0].get("content"), str)
+                and (
+                    new_messages_body[0]["content"].startswith(_SCRATCHPAD_SUMMARY_MARKER)
+                    or new_messages_body[0]["content"].startswith(_COMPACTION_SUMMARY_MARKER)
+                )
+            )
+        ):
+            new_messages_body = [existing_summary] + new_messages_body
+
+        # Step 5: re-attach anchor at tail. A freshly-emitted Layer 6
+        # anchor wins; otherwise preserve any pre-existing anchor.
+        if appended_anchor_item is not None:
+            new_messages_body = new_messages_body + [{
+                "role": "user",
+                "content": appended_anchor_item.get("content", ""),
+            }]
+        elif existing_anchor is not None:
+            new_messages_body = new_messages_body + [existing_anchor]
+
+        new_messages = new_messages_body
 
         after_total = _native_total_chars(new_messages)
         chars_saved = max(0, before_total - after_total)
 
-        compacted = _count_changed_tool_results(projected, compressed_body)
+        compacted = _count_changed_tool_results(projected, compressed)
 
         self._compaction_count += 1
         self._total_chars_saved += chars_saved
@@ -607,8 +712,17 @@ def _native_total_chars(messages: List[Dict[str, Any]]) -> int:
 def _extract_assistant_text(content: Any) -> str:
     """Pull plaintext from an assistant message's content for projection.
 
-    Used only to give find_recent_boundary a stable ProjectedMessage to
-    iterate over — we never patch this back into the native message.
+    Reasoning passthrough rule (commit 5 / spec A4): Anthropic
+    ``ThinkingBlock`` items render as ``[REASONING (verbatim)]\\n<text>\\n
+    [/REASONING]``; ``RedactedThinkingBlock`` items render as
+    ``[REASONING DROPPED]``. We never paraphrase reasoning into plain
+    assistant prose at projection time — the L5 prompt later tells the
+    summarizer NOT to copy or interpret these labelled regions.
+
+    Used to give find_recent_boundary a stable ProjectedMessage to
+    iterate over AND to feed Layer 5's transcript renderer. We never
+    patch this back into the native message — assistant ContentBlock
+    objects keep their identity through ``_apply_compression_back``.
     """
     if isinstance(content, str):
         return content
@@ -616,6 +730,23 @@ def _extract_assistant_text(content: Any) -> str:
         return ""
     parts: List[str] = []
     for item in content:
+        # Thinking blocks (reasoning passthrough rule — A4).
+        item_type = (
+            item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+        )
+        if item_type == "thinking":
+            thinking_text = (
+                item.get("thinking") if isinstance(item, dict)
+                else getattr(item, "thinking", None)
+            )
+            if isinstance(thinking_text, str):
+                parts.append(
+                    f"[REASONING (verbatim)]\n{thinking_text}\n[/REASONING]"
+                )
+            continue
+        if item_type == "redacted_thinking":
+            parts.append("[REASONING DROPPED]")
+            continue
         # SDK ContentBlock objects expose .text on TextBlock
         text = getattr(item, "text", None)
         if isinstance(text, str):
@@ -688,8 +819,12 @@ def _project_for_compression(
 
         if role == "user" and isinstance(content, str):
             pm: ProjectedMessage = {"role": "user", "content": content}
-            if content.startswith(_SCRATCHPAD_SUMMARY_MARKER):
+            if any(content.startswith(m) for m in _SUMMARY_MARKERS):
                 pm["is_compaction_summary"] = True
+            elif content.startswith(_ANCHOR_MARKER):
+                # Layer 6 anchor — find_recent_boundary skips it so it
+                # doesn't inflate the user-turn count (commit 5 lock #4).
+                pm["is_anchor"] = True
             projected.append(pm)
             anchors.append((msg_idx, -1, ""))
             continue
@@ -746,21 +881,45 @@ def _project_for_compression(
 def _detach_summary_msg(
     messages: List[Dict[str, Any]],
 ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
-    """If ``messages[0]`` is a scratchpad summary user message, split it off.
+    """If ``messages[0]`` is a scratchpad-summary or compaction-summary user
+    message, split it off.
 
-    Returns ``(existing_summary, body_messages)``. The body is what the
-    projection adapter walks; the summary is re-attached after Layer 2 has
-    had a chance to prepend a fresh one (or kept as-is if Layer 2 didn't
-    fire). This decoupling keeps the projection ↔ patch-back alignment
-    1:1 even after repeated compact_messages calls.
+    Recognises both Layer 2's ``<scratchpad_summary>`` marker AND Layer 5's
+    ``<compaction_summary>`` marker — repeated compaction calls must
+    replace the existing summary, never stack a new one on top.
+
+    Returns ``(existing_summary, body_messages)``.
     """
     if not messages or not isinstance(messages[0], dict):
         return None, list(messages)
     m0 = messages[0]
-    if (m0.get("role") == "user"
-            and isinstance(m0.get("content"), str)
-            and m0["content"].startswith(_SCRATCHPAD_SUMMARY_MARKER)):
+    if m0.get("role") != "user" or not isinstance(m0.get("content"), str):
+        return None, list(messages)
+    content = m0["content"]
+    if any(content.startswith(m) for m in _SUMMARY_MARKERS):
         return m0, list(messages[1:])
+    return None, list(messages)
+
+
+def _detach_anchor_msg(
+    messages: List[Dict[str, Any]],
+) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    """If ``messages[-1]`` is a Layer 6 anchor user message, split it off.
+
+    The anchor is appended at the END of native messages (post-compaction
+    orientation block). Re-detaching it before re-projection keeps body
+    anchors / projection 1:1 and lets the next compaction emit a FRESH
+    anchor without stacking.
+
+    Returns ``(existing_anchor, body_messages_without_anchor)``.
+    """
+    if not messages or not isinstance(messages[-1], dict):
+        return None, list(messages)
+    m_last = messages[-1]
+    if (m_last.get("role") == "user"
+            and isinstance(m_last.get("content"), str)
+            and m_last["content"].startswith(_ANCHOR_MARKER)):
+        return m_last, list(messages[:-1])
     return None, list(messages)
 
 
@@ -813,6 +972,185 @@ def _apply_compression_back(
         else:
             out.append(msg)
 
+    return out
+
+
+# ── Layer 5 prefix replacement adapter (commit 5) ─────────────────
+
+
+def _find_safe_native_cut(
+    body_messages: List[Dict[str, Any]],
+    target_msg_idx: int,
+) -> int:
+    """Map a body-relative ``msg_idx`` to a native cut point that won't
+    leave orphan tool_result blocks.
+
+    Anthropic requires every ``tool_result`` block to be paired with a
+    ``tool_use`` block in the immediately-preceding assistant message.
+    If we replace ``body_messages[:cut]`` with a summary and ``cut``
+    points at a user message that contains tool_result blocks, those
+    tool_results would reference ``tool_use`` blocks in the deleted
+    assistant message → API rejects the turn.
+
+    Commit-5 lock #2: back up only when the target IS a tool_result
+    group. If the target is plain user text (e.g. an attachment-bearing
+    user question, or a pure-text user message), do NOT back up — that
+    would gratuitously eat the prior assistant turn.
+
+    Returns the cut index (always ``>= 0``).
+    """
+    if target_msg_idx <= 0:
+        return 0
+    target = body_messages[target_msg_idx]
+    if not isinstance(target, dict):
+        return target_msg_idx
+    if target.get("role") != "user":
+        return target_msg_idx
+    content = target.get("content")
+    if not isinstance(content, list):
+        return target_msg_idx
+    has_tool_results = any(
+        isinstance(item, dict) and item.get("type") == "tool_result"
+        for item in content
+    )
+    if has_tool_results:
+        return max(0, target_msg_idx - 1)
+    return target_msg_idx
+
+
+def _apply_layer_5_prefix_replacement(
+    body_messages: List[Dict[str, Any]],
+    result: CompactionResult,
+    anchors: List[_AnchorTuple],
+    compressed: List[ProjectedMessage],
+) -> List[Dict[str, Any]]:
+    """Build the post-Layer-5 native body: summary + safe-cut tail.
+
+    Boundary handling (commit-5 lock #1):
+      - ``replace_prefix_to == 0``: explicit no-op. Layer 5 chose not to
+        compact (typically because the projection had < ``keep_recent_turns``
+        user turns). Return the body untouched.
+      - ``replace_prefix_to >= len(anchors)``: malformed result —
+        anchors[B] would IndexError. Bail to no-op + warn (matches the
+        fail-open principle from spec §3.6).
+      - Otherwise: map ``B`` to a native cut via ``anchors[B].msg_idx``
+        and apply the safe-cut rule.
+
+    All indices are body-relative: callers detach pre-existing summary
+    + anchor before invoking this, so anchors and ``replace_prefix_to``
+    agree on the body coordinate system.
+    """
+    B = result.replace_prefix_to
+    if B is None or B == 0:
+        return list(body_messages)
+    if B >= len(anchors):
+        logger.warning(
+            "Layer 5 replace_prefix_to=%d >= anchors=%d — bailing to no-op",
+            B, len(anchors),
+        )
+        return list(body_messages)
+
+    target_msg_idx = anchors[B][0]
+    safe_cut = _find_safe_native_cut(body_messages, target_msg_idx)
+
+    # Pull the summary content from compressed[0] (the LLM-generated
+    # marker-wrapped summary item).
+    if not compressed or not isinstance(compressed[0], dict):
+        logger.warning("Layer 5 compressed[0] missing — bailing to no-op")
+        return list(body_messages)
+    summary_text = compressed[0].get("content", "")
+    if not isinstance(summary_text, str) or not summary_text.strip():
+        logger.warning("Layer 5 compressed[0] has empty content — bailing to no-op")
+        return list(body_messages)
+
+    summary_msg = {"role": "user", "content": summary_text}
+    return [summary_msg] + list(body_messages[safe_cut:])
+
+
+def build_anchor_from_messages(
+    messages: List[Dict[str, Any]],
+    *,
+    max_tickers: int = 8,
+    max_record_ids: int = 5,
+) -> Dict[str, Any]:
+    """Extract anchor data from a native Anthropic message history.
+
+    Used as the ``anchor_data_provider`` payload for Layer 6 (post-compact
+    recovery). v1 anchor surface is intentionally minimal:
+
+      - ``tickers``: union of ``tool_input["ticker"]`` and
+        ``tool_input["tickers"]`` values across all tool_use blocks,
+        capped at ``max_tickers`` (most recent first).
+      - ``recent_record_ids``: most recent ``max_record_ids`` 16-hex
+        ids from ``[overflow_record=<id>]`` markers in any tool_result
+        content. Walking right-to-left so we get the most recent.
+
+    Empty result → Layer 6 sees a falsy dict and no-ops, which is the
+    correct behaviour when nothing meaningful needs anchoring.
+    """
+    tickers: List[str] = []
+    seen_tickers: set = set()
+    record_ids: List[str] = []
+    seen_records: set = set()
+
+    # Walk from newest to oldest so "most recent" wins.
+    for msg in reversed(messages):
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+        content = msg.get("content")
+
+        if role == "assistant" and isinstance(content, list):
+            for block in content:
+                # Detect tool_use blocks (SDK ContentBlock or dict)
+                btype = (
+                    block.get("type") if isinstance(block, dict)
+                    else getattr(block, "type", None)
+                )
+                if btype != "tool_use":
+                    continue
+                binput = (
+                    block.get("input") if isinstance(block, dict)
+                    else getattr(block, "input", None)
+                )
+                if not isinstance(binput, dict):
+                    continue
+                t = binput.get("ticker")
+                if isinstance(t, str) and t and t not in seen_tickers:
+                    tickers.append(t.upper())
+                    seen_tickers.add(t)
+                ts = binput.get("tickers")
+                if isinstance(ts, list):
+                    for x in ts:
+                        if isinstance(x, str) and x and x not in seen_tickers:
+                            tickers.append(x.upper())
+                            seen_tickers.add(x)
+                if len(tickers) >= max_tickers:
+                    break
+        elif role == "user" and isinstance(content, list):
+            for item in content:
+                if not (isinstance(item, dict) and item.get("type") == "tool_result"):
+                    continue
+                inner = item.get("content")
+                if not isinstance(inner, str):
+                    continue
+                m = _OVERFLOW_RECORD_RE.search(inner)
+                if m:
+                    rid = m.group(1)
+                    if rid not in seen_records:
+                        record_ids.append(rid)
+                        seen_records.add(rid)
+                if len(record_ids) >= max_record_ids:
+                    break
+
+        if len(tickers) >= max_tickers and len(record_ids) >= max_record_ids:
+            break
+
+    out: Dict[str, Any] = {}
+    if tickers:
+        out["tickers"] = tickers[:max_tickers]
+    if record_ids:
+        out["recent_record_ids"] = record_ids[:max_record_ids]
     return out
 
 

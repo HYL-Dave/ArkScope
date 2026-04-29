@@ -9,8 +9,8 @@ tests/test_compressor_overflow_store.py::TestNoAgentImports.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, TypedDict
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 @dataclass(frozen=True)
@@ -89,9 +89,14 @@ class ProjectedMessage(TypedDict, total=False):
         overflow_record_id: set by Layer 0 when this row's content was
             truncated and the original was persisted to the overflow
             store. Layers 1-3 preserve this field across compaction.
-        is_compaction_summary: True for the marker-wrapped Layer 5
-            summary item (commit 5; included here so Layers 1-3 know
-            not to mutate it).
+        is_compaction_summary: True for the marker-wrapped Layer 2 /
+            Layer 5 summary item. Layers 1-3 do not mutate it; Layer 2 /
+            Layer 5 strip-and-replace at most one such item to stay
+            idempotent across re-projection.
+        is_anchor: True for the Layer 6 post-compact anchor block
+            (appended at the END of messages with current ticker(s) +
+            recent record_ids). ``find_recent_boundary`` must skip these
+            so they don't inflate the user-turn count.
         original_chars: for diagnostics / `data_quality` reporting.
     """
 
@@ -100,4 +105,51 @@ class ProjectedMessage(TypedDict, total=False):
     tool_name: str
     overflow_record_id: str
     is_compaction_summary: bool
+    is_anchor: bool
     original_chars: int
+
+
+# ---------------------------------------------------------------------------
+# Compaction result envelope (commit 5)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CompactionResult:
+    """Return value of :meth:`ContextCompressor.compact_pre_call`.
+
+    Splits the "what messages to use" answer from the "how to apply them
+    to native messages" answer, so the adapter in
+    :mod:`src.agents.shared.context_manager` can dispatch between two
+    distinct shapes:
+
+      - **1:1 body patch** (Layers 1-3 only): ``replace_prefix_to`` is
+        ``None``; ``messages`` aligns 1:1 with the projection anchors.
+        The adapter patches ``tool_result`` content strings in place.
+
+      - **Prefix replacement** (Layer 5 fired): ``replace_prefix_to`` is
+        the projected index ``B`` such that ``messages`` is laid out as
+        ``[summary] + projected_input[B:]``. The adapter walks anchors
+        to find the safe native cut and rebuilds
+        ``[{role: user, content: <compaction_summary>...}] +
+        native[safe_cut:]``.
+
+    ``appended_anchor`` indicates Layer 6 added a tail item that the
+    adapter should preserve as a regular user-shaped native message.
+
+    Attributes:
+        messages: post-compaction projection. Aligned with anchors when
+            ``replace_prefix_to is None``; otherwise has shape
+            ``[summary] + projected[replace_prefix_to:]``.
+        replace_prefix_to: when set, the projected boundary index used
+            for prefix replacement. ``None`` for Layer 1-3-only paths.
+        appended_anchor: True when Layer 6 appended an anchor item at
+            ``messages[-1]``.
+        layers_fired: list of layer numbers that fired this call (for
+            telemetry; mirrors :class:`CompressionEvent.layer`).
+    """
+
+    messages: List["ProjectedMessage"]
+    replace_prefix_to: Optional[int] = None
+    appended_anchor: bool = False
+    layers_fired: List[int] = field(default_factory=list)

@@ -66,6 +66,11 @@ def find_recent_boundary(
         if msg.get("is_compaction_summary"):
             # Compaction summaries are user-shaped but not counted
             continue
+        if msg.get("is_anchor"):
+            # Layer 6 anchor blocks are appended at the tail to give
+            # post-compaction orientation; they are not real user turns
+            # and would otherwise inflate the count by one (commit 5).
+            continue
         user_count += 1
         if user_count >= keep_recent_turns:
             return i
@@ -97,6 +102,10 @@ def format_messages_as_transcript(messages: Iterable[ProjectedMessage]) -> str:
 
         if msg.get("is_compaction_summary"):
             parts.append(f"[COMPACTION SUMMARY]:\n{content}")
+            continue
+
+        if msg.get("is_anchor"):
+            parts.append(f"[ANCHOR]:\n{content}")
             continue
 
         if role == "tool_use":

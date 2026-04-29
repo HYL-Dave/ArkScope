@@ -129,6 +129,13 @@ class AgentConfig(BaseModel):
     compaction_layer_2_threshold_chars: int = 100_000
     compaction_layer_3_threshold_chars: int = 150_000
     compaction_overflow_dir: str = "data/overflow"
+    # Layer 5 (LLM full compact, commit 5). Default OFF — explicit opt-in.
+    # /compact CLI command bypasses this flag and the threshold but still
+    # honours compaction_enabled, summary_caller availability, and the
+    # circuit breaker.
+    compaction_layer_5_enabled: bool = False
+    compaction_layer_5_threshold_chars: int = 250_000
+    compaction_layer_5_model_anthropic: str = "claude-sonnet-4-6"
 
 
 _LOCAL_CONFIG_PATH = Path("config/user_profile.local.yaml")
@@ -326,5 +333,12 @@ def get_agent_config() -> AgentConfig:
         config.compaction_layer_3_threshold_chars = compaction_prefs["layer_3_threshold_chars"]
     if "overflow_dir" in compaction_prefs:
         config.compaction_overflow_dir = compaction_prefs["overflow_dir"]
+    # Layer 5 opt-in (commit 5)
+    if "layer_5_enabled" in compaction_prefs:
+        config.compaction_layer_5_enabled = compaction_prefs["layer_5_enabled"]
+    if "layer_5_threshold_chars" in compaction_prefs:
+        config.compaction_layer_5_threshold_chars = compaction_prefs["layer_5_threshold_chars"]
+    if "layer_5_model_anthropic" in compaction_prefs:
+        config.compaction_layer_5_model_anthropic = compaction_prefs["layer_5_model_anthropic"]
 
     return config

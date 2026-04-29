@@ -14,8 +14,11 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from ..config import get_agent_config
-from ..shared.compressor import CompressorConfig
-from ..shared.context_manager import ContextManager
+from ..shared.compressor import (
+    AnthropicSummaryCaller,
+    CompressorConfig,
+)
+from ..shared.context_manager import ContextManager, build_anchor_from_messages
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.replay import ReplayCapture, is_capture_enabled
@@ -238,14 +241,26 @@ async def run_query_stream(
             logger.warning("Replay capture init failed: %s", exc)
             capture = None
     compaction_cfg: Optional[CompressorConfig] = None
+    summary_caller = None
+    anchor_data_provider = None
     if config.compaction_enabled:
         compaction_cfg = CompressorConfig(
             enabled=True,
             layer_0_budget_chars=config.compaction_layer_0_budget_chars,
             layer_2_threshold_chars=config.compaction_layer_2_threshold_chars,
             layer_3_threshold_chars=config.compaction_layer_3_threshold_chars,
+            layer_5_enabled=config.compaction_layer_5_enabled,
+            layer_5_threshold_chars=config.compaction_layer_5_threshold_chars,
             keep_recent_turns=config.context_keep_recent_turns,
         )
+        # L5 caller + L6 anchor provider only when explicitly opted in.
+        # Closure over `messages` captures the current binding at call
+        # time so the anchor reflects the live history.
+        if config.compaction_layer_5_enabled:
+            summary_caller = AnthropicSummaryCaller(
+                model=config.compaction_layer_5_model_anthropic,
+            )
+            anchor_data_provider = lambda: build_anchor_from_messages(messages)
     ctx = ContextManager(
         model=model_name,
         threshold_ratio=config.context_threshold_ratio,
@@ -255,6 +270,8 @@ async def run_query_stream(
         overflow_dir=Path(config.compaction_overflow_dir),
         compaction_config=compaction_cfg,
         scratchpad="",  # P1.4: L2 no-op until semantic summary builder lands
+        summary_caller=summary_caller,
+        anchor_data_provider=anchor_data_provider,
     )
 
     # Build optional API params (effort + thinking)

@@ -634,11 +634,16 @@ class TestContextCompressor:
             {"role": "user", "content": "u2"},
             {"role": "user", "content": "u3"},
         ]
-        out = c.compact_pre_call(msgs)
+        result = c.compact_pre_call(msgs)
+        out = result.messages
         # Layer 1 ran, minified the old tool_result
         assert "\n" not in out[1]["content"]
         # Telemetry recorded
         assert any(e.layer == 1 for e in c.events)
+        # Layer 1 path: not a prefix replacement
+        assert result.replace_prefix_to is None
+        assert result.appended_anchor is False
+        assert 1 in result.layers_fired
 
     def test_compact_pre_call_layer_2_fires_above_threshold(self, tmp_path):
         c = ContextCompressor(
@@ -656,10 +661,13 @@ class TestContextCompressor:
             {"role": "user", "content": "u2"},
             {"role": "user", "content": "u3"},
         ]
-        out = c.compact_pre_call(msgs, scratchpad="here is prior context")
+        result = c.compact_pre_call(msgs, scratchpad="here is prior context")
+        out = result.messages
         # Layer 2 prepended summary
         assert out[0].get("is_compaction_summary") is True
         assert any(e.layer == 2 for e in c.events)
+        assert result.replace_prefix_to is None  # L2 is not L5 prefix replace
+        assert 2 in result.layers_fired
 
     def test_compact_pre_call_layer_3_fires_above_threshold(self, tmp_path):
         c = ContextCompressor(
@@ -677,10 +685,13 @@ class TestContextCompressor:
             {"role": "user", "content": "u2"},
             {"role": "user", "content": "u3"},
         ]
-        out = c.compact_pre_call(msgs)
+        result = c.compact_pre_call(msgs)
+        out = result.messages
         # Old tool_result stubbed
         assert "[old t result" in out[1]["content"]
         assert any(e.layer == 3 for e in c.events)
+        assert result.replace_prefix_to is None
+        assert 3 in result.layers_fired
 
     def test_compact_pre_call_no_trigger_below_threshold(self, tmp_path):
         c = ContextCompressor(
@@ -698,8 +709,11 @@ class TestContextCompressor:
             {"role": "user", "content": "u2"},
             {"role": "user", "content": "u3"},
         ]
-        out = c.compact_pre_call(msgs)
-        assert out == msgs
+        result = c.compact_pre_call(msgs)
+        assert result.messages == msgs
+        assert result.replace_prefix_to is None
+        assert result.appended_anchor is False
+        assert result.layers_fired == []
         assert c.events == []
 
     def test_circuit_breaker_state_starts_closed(self, tmp_path):

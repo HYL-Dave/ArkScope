@@ -366,3 +366,186 @@ def total_chars(messages: List[ProjectedMessage]) -> int:
         if isinstance(msg, dict):
             total += len(str(msg.get("content") or ""))
     return total
+
+
+# ---------------------------------------------------------------------------
+# Layer 5: LLM full compact (last resort, expensive)
+# ---------------------------------------------------------------------------
+
+
+def apply_layer_5(
+    messages: List[ProjectedMessage],
+    *,
+    keep_recent_turns: int,
+    summary_caller,  # SummaryCaller (avoid import cycle here)
+    prior_summary: Optional[str] = None,
+) -> Tuple[List[ProjectedMessage], int, bool]:
+    """Replace ``messages[:boundary]`` with a single compaction summary.
+
+    Returns ``(new_messages, replace_prefix_to, success)``:
+
+      - ``new_messages``: the transformed projected list. On success this is
+        ``[summary_item] + messages[boundary:]``. On failure / no-op this is
+        a copy of ``messages`` unchanged.
+      - ``replace_prefix_to``: the projected boundary index ``B`` used to
+        slice. The orchestrator forwards this to the adapter so the native
+        prefix can be replaced with ``[{role:user, content:<summary>}]``.
+        ``0`` means "Layer 5 chose no-op" — adapter must not slice native
+        messages.
+      - ``success``: True if the summarizer returned non-None text and the
+        replacement actually happened. False on caller failure or no-op.
+
+    No-op cases:
+      - Empty messages or boundary at 0 (not enough turns).
+      - Caller returns None (LLM failure / empty output).
+
+    Idempotency: ``prior_summary`` is the content string from a previous
+    compaction summary (passed in by the adapter when it has detached
+    one from the native messages, OR auto-detected here from
+    ``messages[0]`` if the projection still contains it). When set, it
+    is rendered into the transcript as a ``[PRIOR SUMMARY]`` block so
+    the new summary absorbs it rather than stacking on top.
+
+    The output cap (word/char) is applied here in code — never trust the
+    LLM to obey the prompt's "≤2000 words" rule.
+    """
+    from .summary_prompt import (
+        build_layer_5_system_prompt,
+        build_layer_5_user_prompt,
+        cap_summary,
+        render_layer_5_transcript,
+        wrap_compaction_summary,
+    )
+
+    if not messages:
+        return list(messages), 0, False
+
+    boundary = find_recent_boundary(messages, keep_recent_turns=keep_recent_turns)
+    if boundary == 0:
+        # Not enough turns to safely compact — no-op (spec §3.6 step 1).
+        return list(messages), 0, False
+
+    # Auto-detect prior summary from messages[0] only if the caller
+    # didn't pass one in (the adapter generally has already detached
+    # the native summary and forwarded its content).
+    body = messages
+    auto_detected_offset = 0
+    if (
+        prior_summary is None
+        and boundary > 0
+        and isinstance(messages[0], dict)
+        and messages[0].get("is_compaction_summary")
+        and isinstance(messages[0].get("content"), str)
+    ):
+        prior_summary = messages[0]["content"]
+        body = messages[1:]
+        auto_detected_offset = 1
+        boundary -= 1
+        if boundary <= 0:
+            # Only the prior summary was old — no body to compact.
+            return list(messages), 0, False
+
+    transcript = render_layer_5_transcript(
+        body[:boundary], prior_summary=prior_summary,
+    )
+
+    try:
+        raw_summary = summary_caller(
+            system_prompt=build_layer_5_system_prompt(),
+            user_prompt=build_layer_5_user_prompt(transcript),
+        )
+    except Exception as exc:
+        logger.warning("Layer 5 summary_caller raised %s — treating as failure", exc)
+        raw_summary = None
+
+    if not isinstance(raw_summary, str) or not raw_summary.strip():
+        return list(messages), 0, False
+
+    capped = cap_summary(raw_summary)
+    summary_content = wrap_compaction_summary(capped)
+
+    summary_item: ProjectedMessage = {
+        "role": "user",
+        "content": summary_content,
+        "is_compaction_summary": True,
+    }
+    new_messages = [summary_item] + list(body[boundary:])
+    # ``replace_prefix_to`` is reported in the ORIGINAL (un-shifted)
+    # ``messages`` index space. If we auto-detected + popped a prior
+    # summary at index 0, add 1 back so the adapter sees the same
+    # coordinate it passed in.
+    replace_prefix_to_orig = boundary + auto_detected_offset
+    return new_messages, replace_prefix_to_orig, True
+
+
+# ---------------------------------------------------------------------------
+# Layer 6: post-compact anchor recovery (free, runs after Layer 4 / 5)
+# ---------------------------------------------------------------------------
+
+
+_ANCHOR_BYTE_CAP = 1024
+"""spec §3.7: anchor block must be ≤ 1KB to keep cache invalidation cheap."""
+
+
+def apply_layer_6(
+    messages: List[ProjectedMessage],
+    *,
+    anchor_data: Dict[str, Any],
+) -> List[ProjectedMessage]:
+    """Append a single anchor item at the END of messages.
+
+    ``anchor_data`` is provider-supplied — typically::
+
+        {
+            "tickers": ["NVDA", "TSLA"],
+            "recent_record_ids": ["abcd1234deadbeef", ...],
+        }
+
+    Empty / falsy ``anchor_data`` → no-op (returns input copy).
+
+    The anchor is wrapped in the canonical ``<anchor>`` marker so that
+    re-projection can recognise it via content prefix and
+    :func:`find_recent_boundary` can skip it via ``is_anchor=True``.
+
+    Size cap: ≤ 1024 bytes after marker wrapping. Truncation appends
+    `` [TRUNCATED:anchor_cap=1024]`` so a reader knows the cut happened.
+    """
+    from .summary_prompt import wrap_anchor
+
+    if not isinstance(anchor_data, dict) or not anchor_data:
+        return list(messages)
+
+    parts: List[str] = []
+    tickers = anchor_data.get("tickers")
+    if isinstance(tickers, (list, tuple)) and tickers:
+        parts.append("tickers: " + ", ".join(str(t) for t in tickers))
+    recent_ids = anchor_data.get("recent_record_ids")
+    if isinstance(recent_ids, (list, tuple)) and recent_ids:
+        parts.append("recent overflow record_ids: " + ", ".join(
+            str(r) for r in recent_ids
+        ))
+
+    if not parts:
+        return list(messages)
+
+    body = "\n".join(parts)
+    wrapped = wrap_anchor(body)
+
+    # Hard byte cap (≤ _ANCHOR_BYTE_CAP after marker is appended).
+    # Reserve marker bytes BEFORE truncation so the final UTF-8 size
+    # stays under the cap — otherwise a max-size truncation + marker
+    # append would overshoot by ~28 bytes.
+    cap_marker = f" [TRUNCATED:anchor_cap={_ANCHOR_BYTE_CAP}]"
+    cap_marker_bytes = len(cap_marker.encode("utf-8"))
+    encoded = wrapped.encode("utf-8")
+    if len(encoded) > _ANCHOR_BYTE_CAP:
+        budget = _ANCHOR_BYTE_CAP - cap_marker_bytes
+        cut = encoded[:budget].decode("utf-8", errors="ignore")
+        wrapped = cut + cap_marker
+
+    anchor_item: ProjectedMessage = {
+        "role": "user",
+        "content": wrapped,
+        "is_anchor": True,
+    }
+    return list(messages) + [anchor_item]

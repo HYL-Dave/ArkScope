@@ -15,18 +15,20 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .layers import (
     apply_layer_0,
     apply_layer_1,
     apply_layer_2,
     apply_layer_3,
+    apply_layer_5,
+    apply_layer_6,
     total_chars,
 )
 from .overflow_store import OverflowStore
 from .reducers import ToolReducer
-from .types import CompressionRecord, ProjectedMessage
+from .types import CompactionResult, CompressionRecord, ProjectedMessage
 
 logger = logging.getLogger(__name__)
 
@@ -102,12 +104,22 @@ class ContextCompressor:
         overflow_dir: Path,
         config: Optional[CompressorConfig] = None,
         reducer_registry: Optional[Dict[str, ToolReducer]] = None,
+        summary_caller: Optional[Callable[..., Optional[str]]] = None,
+        anchor_data_provider: Optional[Callable[[], Dict[str, Any]]] = None,
     ) -> None:
         self.config = config or CompressorConfig()
         self._reducer_registry = reducer_registry  # None → use module default
         self._overflow_store = OverflowStore(Path(overflow_dir), session_id)
         self._events: List[CompressionEvent] = []
         self._layer_5_consecutive_failures = 0  # circuit breaker (commit 5)
+        # Layer 5 / 6 dependencies — None disables those layers cleanly.
+        self._summary_caller = summary_caller
+        self._anchor_data_provider = anchor_data_provider
+        # /compact one-shot bypass (commit 5). Set externally; cleared
+        # UNCONDITIONALLY at the top of every compact_pre_call so a
+        # threshold-bypass attempt that fails (caller missing / circuit
+        # open / master disabled) doesn't leak state into the next turn.
+        self.force_layer_5_once: bool = False
 
     # -----------------------------------------------------------------
     # Properties
@@ -166,22 +178,38 @@ class ContextCompressor:
         messages: List[ProjectedMessage],
         *,
         scratchpad: str = "",
-    ) -> List[ProjectedMessage]:
-        """Run Layers 1, 2, 3 in sequence based on size thresholds.
+        prior_summary: Optional[str] = None,
+    ) -> CompactionResult:
+        """Run Layers 1, 2, 3, 5, 6 in sequence based on size thresholds.
 
-        Each layer respects its own enabled flag. Layer 1 always runs
-        when enabled (cheap minify). Layer 2 fires when total size
-        exceeds ``layer_2_threshold_chars`` AND ``scratchpad`` is
-        non-empty. Layer 3 fires when (after Layers 1 + 2) total size
-        still exceeds ``layer_3_threshold_chars``.
+        Returns a :class:`CompactionResult`:
 
-        Returns a new message list; input is not mutated.
+          - ``messages``: post-compaction projection.
+          - ``replace_prefix_to``: set when Layer 5 fired (the projected
+            boundary the adapter slices native messages at). ``None`` for
+            1:1-body-patch paths (Layers 1-3 only).
+          - ``appended_anchor``: ``True`` when Layer 6 added a tail
+            anchor block.
+          - ``layers_fired``: which layer numbers fired this call.
+
+        ``force_layer_5_once`` (set externally by ``/compact``) is
+        consumed at the TOP of this method and cleared UNCONDITIONALLY,
+        regardless of whether Layer 5 actually fires (master disabled,
+        caller missing, circuit open all leave the flag cleared so a
+        rejected /compact doesn't leak state into the next turn).
         """
+        # Consume the one-shot flag immediately. Per commit-5 lock #2:
+        # clear regardless of L5 success / failure / threshold bypass /
+        # caller missing / circuit open.
+        force_layer_5 = self.force_layer_5_once
+        self.force_layer_5_once = False
+
         if not self.config.enabled or not messages:
-            return list(messages)
+            return CompactionResult(messages=list(messages))
 
         before = total_chars(messages)
         keep = self.config.keep_recent_turns
+        layers_fired: List[int] = []
 
         # Layer 1: microcompact (cheap, always run when enabled)
         if self.config.layer_1_enabled:
@@ -192,6 +220,7 @@ class ContextCompressor:
                     after_chars=total_chars(after),
                     note="microcompact",
                 ))
+                layers_fired.append(1)
             messages = after
 
         # Layer 2: scratchpad reuse
@@ -209,6 +238,7 @@ class ContextCompressor:
                 after_chars=total_chars(messages),
                 note="scratchpad_reuse",
             ))
+            layers_fired.append(2)
 
         # Layer 3: progressive truncation
         if (
@@ -222,12 +252,86 @@ class ContextCompressor:
                 after_chars=total_chars(messages),
                 note="progressive_truncation",
             ))
+            layers_fired.append(3)
 
-        # Layer 4 (provider native) lands as a flag the agent adapter reads;
-        # it's not a transformation we apply here.
-        # Layer 5 (LLM full compact) is wired in commit 5.
+        # Layer 4 (provider native) is an agent-adapter flag, not a
+        # transformation we apply here.
 
-        return messages
+        # Layer 5: LLM full compact. Gating per commit-5 lock #3:
+        #   - master config.enabled MUST be on (already checked above)
+        #   - summary_caller MUST be supplied (None disables L5)
+        #   - circuit MUST be closed
+        #   - either force_layer_5 (one-shot /compact) OR
+        #     (layer_5_enabled AND threshold)
+        replace_prefix_to: Optional[int] = None
+        l5_fired = False
+        if (
+            self._summary_caller is not None
+            and not self.layer_5_circuit_open
+            and (
+                force_layer_5
+                or (
+                    self.config.layer_5_enabled
+                    and total_chars(messages) > self.config.layer_5_threshold_chars
+                )
+            )
+        ):
+            before_5 = total_chars(messages)
+            new_msgs, prefix_to, success = apply_layer_5(
+                messages,
+                keep_recent_turns=keep,
+                summary_caller=self._summary_caller,
+                prior_summary=prior_summary,
+            )
+            if success:
+                self._layer_5_consecutive_failures = 0
+                messages = new_msgs
+                replace_prefix_to = prefix_to
+                self._events.append(CompressionEvent(
+                    layer=5, before_chars=before_5,
+                    after_chars=total_chars(messages),
+                    note="llm_full_compact"
+                          + (" (forced)" if force_layer_5 else ""),
+                ))
+                layers_fired.append(5)
+                l5_fired = True
+            else:
+                self._layer_5_consecutive_failures += 1
+                self._events.append(CompressionEvent(
+                    layer=5, before_chars=before_5, after_chars=before_5,
+                    note=f"failure_{self._layer_5_consecutive_failures}",
+                ))
+                # Do NOT add to layers_fired — only successful firings.
+                # If circuit just opened, the next pre-call will skip L5
+                # and Layer 3 already ran above (fall-back path is
+                # implicit — no need to re-fire here).
+
+        # Layer 6: post-compact anchor recovery. Runs only after L4 / L5
+        # mutated the cached prefix. spec §3.7.
+        appended_anchor = False
+        if l5_fired and self._anchor_data_provider is not None:
+            try:
+                anchor_data = self._anchor_data_provider()
+            except Exception as exc:
+                logger.warning("anchor_data_provider raised %s — skipping L6", exc)
+                anchor_data = {}
+            if isinstance(anchor_data, dict) and anchor_data:
+                before_6 = total_chars(messages)
+                messages = apply_layer_6(messages, anchor_data=anchor_data)
+                self._events.append(CompressionEvent(
+                    layer=6, before_chars=before_6,
+                    after_chars=total_chars(messages),
+                    note="post_compact_anchor",
+                ))
+                layers_fired.append(6)
+                appended_anchor = True
+
+        return CompactionResult(
+            messages=messages,
+            replace_prefix_to=replace_prefix_to,
+            appended_anchor=appended_anchor,
+            layers_fired=layers_fired,
+        )
 
     # -----------------------------------------------------------------
     # CLI / test helper — NOT agent-exposed in v1 (see spec §5.1)

@@ -7,9 +7,10 @@ Public API:
     :func:`canonical_args_hash`, :func:`compute_record_id`,
     :func:`is_valid_record_id`.
 
-  - **Layers 0-3 implementations** (pure functions):
+  - **Layers 0-3 + 5/6 implementations** (pure functions):
     :func:`apply_layer_0`, :func:`apply_layer_1`,
     :func:`apply_layer_2`, :func:`apply_layer_3`,
+    :func:`apply_layer_5`, :func:`apply_layer_6`,
     :func:`total_chars`.
 
   - **Reducers**:
@@ -21,14 +22,22 @@ Public API:
 
   - **Transcript / boundary helpers**:
     :func:`find_recent_boundary`,
-    :func:`format_messages_as_transcript`.
+    :func:`format_messages_as_transcript`,
+    :func:`render_layer_5_transcript`.
+
+  - **Layer 5 prompt + caller**:
+    :func:`build_layer_5_system_prompt`,
+    :func:`build_layer_5_user_prompt`, :func:`cap_summary`,
+    :func:`wrap_compaction_summary`, :func:`wrap_anchor`,
+    :class:`SummaryCaller`, :class:`AnthropicSummaryCaller`,
+    :class:`FakeSummaryCaller` (test helper).
 
   - **Orchestrator**:
     :class:`ContextCompressor`, :class:`CompressorConfig`,
-    :class:`CompressionEvent`.
+    :class:`CompressionEvent`, :class:`CompactionResult`.
 
   - **Types**:
-    :class:`ProjectedMessage`.
+    :class:`ProjectedMessage`, :class:`CompactionResult`.
 
 **Library-not-runner guarantee** (P1_4_SPEC §1.2 #1):
 This package imports nothing from ``src.agents.anthropic_agent`` or
@@ -48,6 +57,8 @@ from .layers import (
     apply_layer_1,
     apply_layer_2,
     apply_layer_3,
+    apply_layer_5,
+    apply_layer_6,
     total_chars,
 )
 from .overflow_store import (
@@ -68,11 +79,29 @@ from .reducers import (
     truncate_with_marker,
     web_result_reducer,  # backwards-compat alias for tavily_search_reducer
 )
+from .summary_callers import (
+    DEFAULT_ANTHROPIC_MAX_TOKENS,
+    DEFAULT_ANTHROPIC_MODEL,
+    AnthropicSummaryCaller,
+    FakeSummaryCaller,
+    SummaryCaller,
+)
+from .summary_prompt import (
+    LAYER_5_CHAR_CAP,
+    LAYER_5_WORD_CAP,
+    build_layer_5_system_prompt,
+    build_layer_5_user_prompt,
+    cap_summary,
+    render_layer_5_transcript,
+    wrap_anchor,
+    wrap_compaction_summary,
+)
 from .transcript import find_recent_boundary, format_messages_as_transcript
-from .types import CompressionRecord, ProjectedMessage
+from .types import CompactionResult, CompressionRecord, ProjectedMessage
 
 __all__ = [
     # Types
+    "CompactionResult",
     "CompressionRecord",
     "ProjectedMessage",
     # Overflow store
@@ -96,10 +125,26 @@ __all__ = [
     "apply_layer_1",
     "apply_layer_2",
     "apply_layer_3",
+    "apply_layer_5",
+    "apply_layer_6",
     "total_chars",
     # Transcript
     "find_recent_boundary",
     "format_messages_as_transcript",
+    "render_layer_5_transcript",
+    # Layer 5 prompt + caller
+    "AnthropicSummaryCaller",
+    "DEFAULT_ANTHROPIC_MAX_TOKENS",
+    "DEFAULT_ANTHROPIC_MODEL",
+    "FakeSummaryCaller",
+    "LAYER_5_CHAR_CAP",
+    "LAYER_5_WORD_CAP",
+    "SummaryCaller",
+    "build_layer_5_system_prompt",
+    "build_layer_5_user_prompt",
+    "cap_summary",
+    "wrap_anchor",
+    "wrap_compaction_summary",
     # Orchestrator
     "CompressionEvent",
     "CompressorConfig",
