@@ -24,6 +24,9 @@ from src.agents.shared.replay import (
     CapturedToolCall,
     ReplayCapture,
     ValidationResult,
+    _SERVER_TOOL_KINDS_BY_PROVIDER,
+    _canonical_tool_name,
+    _currently_wired_server_tools,
     compute_shape,
     digest_json,
     hash_text,
@@ -308,3 +311,163 @@ def test_validate_warns_on_registry_diff(real_registry):
     # Capture claimed only 2 tools; current registry has many more → "added"
     result = validate_trace_against_registry(trace, real_registry)
     assert any("newly registered" in w for w in result.warnings)
+
+
+# ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 1: tool-name canonicalization
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_tool_name_strips_openai_bridge_prefix():
+    # OpenAI bridge functions are registered as ``tool_<canonical>``.
+    assert _canonical_tool_name("tool_get_ticker_news") == "get_ticker_news"
+    assert _canonical_tool_name("tool_get_news_brief") == "get_news_brief"
+
+
+def test_canonical_tool_name_idempotent_and_safe():
+    # Anthropic / canonical names are pass-through.
+    assert _canonical_tool_name("get_ticker_news") == "get_ticker_news"
+    # Idempotent — applying twice yields the same result.
+    once = _canonical_tool_name("tool_foo")
+    assert _canonical_tool_name(once) == once
+    # Non-string input must not raise.
+    assert _canonical_tool_name(None) == ""  # type: ignore[arg-type]
+    assert _canonical_tool_name(123) == ""  # type: ignore[arg-type]
+    # Empty string stays empty (no spurious prefix strip).
+    assert _canonical_tool_name("") == ""
+
+
+def test_provider_tool_name_round_trips_through_save_and_load(tmp_path):
+    cap = ReplayCapture(
+        provider="openai",
+        model="gpt-5.4",
+        entrypoint="test",
+        output_dir=tmp_path,
+    )
+    cap.set_initial(
+        question="news on NVDA",
+        system_prompt="You are an assistant.",
+        tools_available=["get_ticker_news"],
+    )
+    cap.record_tool_call(
+        name="get_ticker_news",
+        arguments={"ticker": "NVDA"},
+        result='{"ticker": "NVDA", "articles": []}',
+        provider_tool_name="tool_get_ticker_news",
+    )
+    cap.record_final("done", {})
+    path = cap.save()
+
+    trace = load_trace(path)
+    call = trace.tool_calls[0]
+    assert call.name == "get_ticker_news"  # canonical persisted as primary name
+    assert call.provider_tool_name == "tool_get_ticker_news"  # bridge name preserved
+
+
+def test_provider_tool_name_optional_for_anthropic_path(tmp_path):
+    # Anthropic regular tools never set ``provider_tool_name`` — confirm
+    # the field stays ``None`` (forward-compat through load_trace).
+    cap = ReplayCapture(
+        provider="anthropic",
+        model="claude-opus-4-7",
+        entrypoint="test",
+        output_dir=tmp_path,
+    )
+    cap.set_initial("q", "sys", ["get_ticker_news"])
+    cap.record_tool_call(
+        name="get_ticker_news",
+        arguments={"ticker": "NVDA"},
+        result="{}",
+    )
+    cap.record_final("ok", {})
+    trace = load_trace(cap.save())
+    assert trace.tool_calls[0].provider_tool_name is None
+
+
+# ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 1: server-tool namespacing + introspection
+# ---------------------------------------------------------------------------
+
+
+def _make_server_trace(provider: str, kinds: list) -> Any:
+    """Helper: synthesize a minimal trace claiming the given server tools."""
+    base = load_trace(NO_TOOL_FIXTURE)
+    base.provider = provider
+    base.tools_available = kinds + ["get_ticker_news"]  # mix server + registry
+    base.tool_calls = []
+    return base
+
+
+def test_validate_accepts_server_web_search_for_anthropic(real_registry):
+    trace = _make_server_trace("anthropic", ["server:web_search"])
+    result = validate_trace_against_registry(trace, real_registry)
+    # Anthropic agent module currently wires _CLAUDE_WEB_SEARCH_TOOL → passes.
+    assert result.passed is True, result.render()
+    # No "server tool no longer wired" error.
+    assert not any("server tool" in e for e in result.errors)
+
+
+def test_validate_rejects_server_when_anthropic_not_wired(real_registry, monkeypatch):
+    # Drop the ``type`` key on the live Anthropic web-search constant —
+    # the introspective helper falls through to empty, so the captured
+    # ``server:web_search`` claim fails validation.
+    from src.agents.anthropic_agent import agent as a_mod
+    monkeypatch.setattr(a_mod, "_CLAUDE_WEB_SEARCH_TOOL", {"name": "web_search"})
+
+    trace = _make_server_trace("anthropic", ["server:web_search"])
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any("server tool" in e and "web_search" in e for e in result.errors)
+
+
+def test_currently_wired_server_tools_unknown_provider_empty():
+    # Defensive: unknown provider name must return empty set (no crash).
+    assert _currently_wired_server_tools("vertex") == set()
+    assert _currently_wired_server_tools("") == set()
+
+
+def test_server_tool_mapping_forward_anthropic_constant_in_mapping():
+    """Forward safeguard: the live Anthropic web-search constant's
+    ``type`` value must be a key in the static mapping. Catches version
+    bumps (e.g. ``web_search_20260209`` → ``web_search_20270101``) that
+    forget to update the mapping — without this, every existing fixture
+    claiming ``server:web_search`` would silently fail validation."""
+    from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
+    raw_type = _CLAUDE_WEB_SEARCH_TOOL.get("type")
+    assert raw_type, "_CLAUDE_WEB_SEARCH_TOOL must declare a 'type' key"
+    assert raw_type in _SERVER_TOOL_KINDS_BY_PROVIDER["anthropic"], (
+        f"Anthropic _CLAUDE_WEB_SEARCH_TOOL['type']={raw_type!r} drifted "
+        f"out of sync with _SERVER_TOOL_KINDS_BY_PROVIDER['anthropic']"
+    )
+
+
+def test_server_tool_mapping_forward_openai_websearchtool_class_name():
+    """Forward safeguard: the OpenAI mapping must use the actual class
+    name of ``WebSearchTool``. Catches SDK renames before validation
+    silently breaks."""
+    pytest.importorskip("agents")
+    from agents import WebSearchTool
+    cls_name = WebSearchTool.__name__
+    assert cls_name in _SERVER_TOOL_KINDS_BY_PROVIDER["openai"], (
+        f"agents.WebSearchTool.__name__={cls_name!r} drifted out of sync "
+        f"with _SERVER_TOOL_KINDS_BY_PROVIDER['openai']"
+    )
+
+
+def test_server_tool_mapping_reverse_helper_resolves_known_kinds(monkeypatch):
+    """Reverse safeguard: every kind the static mapping CAN produce must
+    be reachable through ``_currently_wired_server_tools`` when the live
+    module's symbol matches a mapping key. Stops mappings from accreting
+    orphan entries that don't correspond to any live wiring path."""
+    from src.agents.anthropic_agent import agent as a_mod
+    for raw_type, kind in _SERVER_TOOL_KINDS_BY_PROVIDER["anthropic"].items():
+        # Synthesize live state matching this mapping key.
+        monkeypatch.setattr(
+            a_mod, "_CLAUDE_WEB_SEARCH_TOOL", {"type": raw_type}, raising=False,
+        )
+        wired = _currently_wired_server_tools("anthropic")
+        assert kind in wired, (
+            f"Mapping entry {raw_type!r} → {kind!r} did not resolve via "
+            f"_currently_wired_server_tools — helper is broken or mapping "
+            f"references a key the helper does not consult."
+        )

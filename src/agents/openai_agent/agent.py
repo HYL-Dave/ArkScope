@@ -17,6 +17,12 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
+from ..shared.replay import (
+    ReplayCapture,
+    _SERVER_TOOL_KINDS_BY_PROVIDER,
+    _canonical_tool_name,
+    is_capture_enabled,
+)
 from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
 
@@ -86,11 +92,17 @@ def _extract_tool_info(
     pad: Scratchpad,
     tracker: TokenTracker,
     model_name: str,
+    capture: Optional[ReplayCapture] = None,
 ) -> ToolExtraction:
     """Extract tool calls, results, tickers from Runner result.
 
     Shared by all 3 run functions to avoid logic drift.
     Uses call_id mapping to correctly associate results with calls.
+
+    When ``capture`` is supplied, each (call, result) pair is also
+    forwarded to ``ReplayCapture.record_tool_call`` with canonical
+    tool names + the bridge name on ``provider_tool_name``. Capture
+    failures are logged but do not interrupt extraction.
     """
     ext = ToolExtraction()
     if not hasattr(result, "raw_responses"):
@@ -101,6 +113,11 @@ def _extract_tool_info(
     # Build call_id → detail index mapping for correct result association
     call_id_map: Dict[str, int] = {}
     unmatched_results = 0
+    # P0.1 full-v1: parallel structure tracking the (canonical name,
+    # raw bridge name, args dict) per detail index, so the result-side
+    # branch can call ``capture.record_tool_call`` once it has the
+    # output_str. Avoids walking raw_responses twice.
+    capture_pending: List[Optional[Dict[str, Any]]] = []
 
     for response in result.raw_responses:
         if not hasattr(response, "output"):
@@ -138,6 +155,18 @@ def _extract_tool_info(
                 ext.tool_calls_detail.append(detail)
                 if call_id:
                     call_id_map[call_id] = len(ext.tool_calls_detail) - 1
+                # Track for capture so the result-side branch can record
+                # the (call, result) pair with canonical name.
+                if capture is not None:
+                    raw_name = item.name
+                    canonical = _canonical_tool_name(raw_name)
+                    capture_pending.append({
+                        "raw_name": raw_name,
+                        "canonical": canonical,
+                        "args": args_dict,
+                    })
+                else:
+                    capture_pending.append(None)
 
             elif item_type == "function_call_output" or (
                 item_type is None and hasattr(item, "output")
@@ -150,6 +179,7 @@ def _extract_tool_info(
                     target_detail = ext.tool_calls_detail[target_idx]
                 elif ext.tool_calls_detail:
                     target_detail = ext.tool_calls_detail[-1]
+                    target_idx = len(ext.tool_calls_detail) - 1
                     unmatched_results += 1
                 else:
                     unmatched_results += 1
@@ -160,6 +190,30 @@ def _extract_tool_info(
                     result_data=output_str[:5000],
                     tool_input=target_detail.get("params"),
                 )
+                # P0.1 full-v1: forward to capture if armed and we have
+                # a matching pending entry.
+                if (
+                    capture is not None
+                    and target_idx is not None
+                    and target_idx < len(capture_pending)
+                    and capture_pending[target_idx] is not None
+                ):
+                    pending = capture_pending[target_idx]
+                    try:
+                        capture.record_tool_call(
+                            pending["canonical"],
+                            pending["args"],
+                            output_str,
+                            provider_tool_name=(
+                                pending["raw_name"]
+                                if pending["raw_name"] != pending["canonical"]
+                                else None
+                            ),
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Replay capture record_tool_call failed: %s", exc,
+                        )
 
     if unmatched_results:
         logger.debug(
@@ -167,6 +221,59 @@ def _extract_tool_info(
             unmatched_results,
         )
     return ext
+
+
+def _replay_tools_available_openai(all_tools: list) -> List[str]:
+    """Convert the OpenAI tool list (function-tool wrappers + WebSearchTool
+    etc.) into canonical replay names.
+
+    - ``WebSearchTool()`` → ``"server:web_search"`` (per ``_SERVER_TOOL_KINDS_BY_PROVIDER``).
+    - ``@function_tool``-decorated wrappers → canonical registry name
+      via ``_canonical_tool_name``.
+    - Anything we cannot classify is silently skipped (capture is best-effort).
+    """
+    server_map = _SERVER_TOOL_KINDS_BY_PROVIDER.get("openai", {})
+    out: List[str] = []
+    for t in all_tools:
+        cls_name = type(t).__name__
+        if cls_name in server_map:
+            out.append(server_map[cls_name])
+            continue
+        raw_name = getattr(t, "name", None)
+        if isinstance(raw_name, str) and raw_name:
+            out.append(_canonical_tool_name(raw_name))
+    return out
+
+
+def _install_capture(
+    *,
+    question: str,
+    system_prompt: str,
+    all_tools: list,
+    model_name: str,
+    entrypoint: str,
+) -> Optional[ReplayCapture]:
+    """Build + arm a ``ReplayCapture`` for the OpenAI path. Returns
+    ``None`` when the env flag is off or any wiring step raises (the
+    agent path stays alive — capture is best-effort).
+    """
+    if not is_capture_enabled():
+        return None
+    try:
+        capture = ReplayCapture(
+            provider="openai",
+            model=model_name,
+            entrypoint=entrypoint,
+        )
+        capture.set_initial(
+            question=question,
+            system_prompt=system_prompt,
+            tools_available=_replay_tools_available_openai(all_tools),
+        )
+        return capture
+    except Exception as exc:
+        logger.warning("Replay capture init failed: %s", exc)
+        return None
 
 
 def _build_agent(
@@ -281,6 +388,15 @@ async def run_query(
     tracker = TokenTracker()
     tools_used: List[str] = []
 
+    # P0.1 full-v1: replay capture (gated by ARKSCOPE_REPLAY_CAPTURE).
+    capture = _install_capture(
+        question=question,
+        system_prompt=effective_prompt,
+        all_tools=getattr(agent, "tools", tools),
+        model_name=model_name,
+        entrypoint="api",
+    )
+
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
@@ -338,13 +454,21 @@ async def run_query(
         )
 
         # Extract tools used, tool details, tickers, and token usage from result
-        ext = _extract_tool_info(result, pad, tracker, model_name)
+        ext = _extract_tool_info(result, pad, tracker, model_name, capture=capture)
         tools_used = ext.tools_used
 
         answer = str(result.final_output) if result.final_output else ""
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
+
+        # P0.1 full-v1: finalise replay capture (best-effort; never raises).
+        if capture is not None:
+            try:
+                capture.record_final(answer, tracker.summary())
+                capture.save()
+            except Exception as exc:
+                logger.warning("Replay capture save failed: %s", exc)
 
         logger.info(f"OpenAI agent done: {tracker}")
 
@@ -431,6 +555,15 @@ def run_query_sync(
     tracker = TokenTracker()
     tools_used: List[str] = []
 
+    # P0.1 full-v1: replay capture (gated by ARKSCOPE_REPLAY_CAPTURE).
+    capture = _install_capture(
+        question=question,
+        system_prompt=effective_prompt,
+        all_tools=getattr(agent, "tools", tools),
+        model_name=model_name,
+        entrypoint="api",
+    )
+
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
@@ -479,13 +612,21 @@ def run_query_sync(
         )
 
         # Extract tools used and token usage
-        ext = _extract_tool_info(result, pad, tracker, model_name)
+        ext = _extract_tool_info(result, pad, tracker, model_name, capture=capture)
         tools_used = ext.tools_used
 
         answer = str(result.final_output) if result.final_output else ""
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
+
+        # P0.1 full-v1: finalise replay capture (best-effort; never raises).
+        if capture is not None:
+            try:
+                capture.record_final(answer, tracker.summary())
+                capture.save()
+            except Exception as exc:
+                logger.warning("Replay capture save failed: %s", exc)
 
         logger.info(f"OpenAI agent done (sync): {tracker}")
 
@@ -575,6 +716,15 @@ async def run_query_stream(
     tracker = TokenTracker()
     tools_used: List[str] = []
 
+    # P0.1 full-v1: replay capture (gated by ARKSCOPE_REPLAY_CAPTURE).
+    capture = _install_capture(
+        question=question,
+        system_prompt=effective_prompt,
+        all_tools=getattr(agent, "tools", tools),
+        model_name=model_name,
+        entrypoint="api",
+    )
+
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
@@ -624,7 +774,7 @@ async def run_query_stream(
         )
 
         # Extract tools used and token usage from result
-        ext = _extract_tool_info(result, pad, tracker, model_name)
+        ext = _extract_tool_info(result, pad, tracker, model_name, capture=capture)
         tools_used = ext.tools_used
 
         # Emit tool_end events for stream consumers
@@ -635,6 +785,14 @@ async def run_query_stream(
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
+
+        # P0.1 full-v1: finalise replay capture (best-effort; never raises).
+        if capture is not None:
+            try:
+                capture.record_final(answer, tracker.summary())
+                capture.save()
+            except Exception as exc:
+                logger.warning("Replay capture save failed: %s", exc)
 
         logger.info(f"OpenAI agent done (stream): {tracker}")
 

@@ -31,7 +31,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +118,90 @@ def _coerce_result(result: Any) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 1: tool-name canonicalization + server-tool namespacing
+# ---------------------------------------------------------------------------
+
+# OpenAI bridge functions are decorated with ``@function_tool`` and the SDK
+# uses each function's ``__name__`` as the tool name surfaced to the model.
+# Our bridges use the ``tool_<canonical>`` convention (see
+# ``src/agents/openai_agent/tools.py``) — strip the prefix so capture stores
+# the canonical registry name. Anthropic tools are already canonical.
+
+_OPENAI_BRIDGE_PREFIX = "tool_"
+
+
+def _canonical_tool_name(raw_name: str) -> str:
+    """Convert a provider-side raw tool name to the canonical registry name.
+
+    Currently only strips the OpenAI ``tool_`` bridge prefix. If the prefix
+    is absent the input is returned unchanged. Idempotent.
+    """
+    if not isinstance(raw_name, str):
+        return ""
+    if raw_name.startswith(_OPENAI_BRIDGE_PREFIX):
+        return raw_name[len(_OPENAI_BRIDGE_PREFIX):]
+    return raw_name
+
+
+# Provider-native server tools (executed server-side, not in ``ToolRegistry``).
+# This mapping is a PURE NORMALISATION HELPER (raw provider name → canonical
+# ``server:<kind>`` form). It is NOT the source of truth for "is the tool
+# currently wired" — that role belongs to ``_currently_wired_server_tools``,
+# which inspects the live agent module. See P0.1 full-v1 spec §2.1.2.
+_SERVER_TOOL_KINDS_BY_PROVIDER: Dict[str, Dict[str, str]] = {
+    "anthropic": {
+        # _CLAUDE_WEB_SEARCH_TOOL["type"] in src/agents/anthropic_agent/agent.py
+        "web_search_20260209": "server:web_search",
+    },
+    "openai": {
+        # WebSearchTool() class name from the agents SDK
+        "WebSearchTool": "server:web_search",
+    },
+}
+
+
+def _currently_wired_server_tools(provider: str) -> Set[str]:
+    """Return the set of canonical ``server:<kind>`` names that the agent
+    module would CURRENTLY wire if all relevant config flags were on.
+
+    Source of truth is the LIVE agent module — not
+    ``_SERVER_TOOL_KINDS_BY_PROVIDER``. The mapping is consulted only AFTER
+    the live import succeeds; if the live agent module has dropped the
+    symbol (Phase C refactor removes ``_CLAUDE_WEB_SEARCH_TOOL`` entirely),
+    this helper returns an empty set and any fixture claiming
+    ``server:<kind>`` for that provider fails validation.
+
+    Layered defense: a separate forward/reverse safeguard pair (see
+    ``test_replay.py`` mapping safeguards) catches drift between the
+    static mapping and what the agent module actually wires.
+
+    Returns ``set()`` for unknown providers, missing symbols, or import
+    failures. Never raises.
+    """
+    kinds: Set[str] = set()
+    if provider == "anthropic":
+        try:  # noqa: SIM105 — multiple specific exceptions, not a catch-all
+            from src.agents.anthropic_agent import agent as a_mod
+            tool_def = getattr(a_mod, "_CLAUDE_WEB_SEARCH_TOOL", None)
+            if isinstance(tool_def, dict):
+                raw_type = tool_def.get("type", "")
+                mapped = _SERVER_TOOL_KINDS_BY_PROVIDER["anthropic"].get(raw_type)
+                if mapped:
+                    kinds.add(mapped)
+        except (AttributeError, ImportError):
+            pass
+    elif provider == "openai":
+        try:
+            from agents import WebSearchTool  # noqa: F401 — SDK probe
+            mapped = _SERVER_TOOL_KINDS_BY_PROVIDER["openai"].get("WebSearchTool")
+            if mapped:
+                kinds.add(mapped)
+        except ImportError:
+            pass
+    return kinds
+
+
+# ---------------------------------------------------------------------------
 # Trace dataclass
 # ---------------------------------------------------------------------------
 
@@ -134,6 +218,14 @@ class CapturedToolCall:
     # when no compressor was attached (legacy path, OpenAI loop). Forward-
     # compatible: replay validators that don't know about this key ignore it.
     compression: Optional[Dict[str, Any]] = None
+    # P0.1 full-v1 commit 1: bridge function name (e.g.
+    # ``tool_get_ticker_news`` for OpenAI). ``name`` carries the canonical
+    # registry name (``get_ticker_news``); this field is informational so
+    # an analyst can see which bridge function the SDK actually invoked.
+    # The validator does NOT consult this field — registry lookup is by
+    # ``name`` only. ``None`` for traces where the bridge name equals the
+    # canonical name (Anthropic regular tools).
+    provider_tool_name: Optional[str] = None
 
 
 @dataclass
@@ -222,6 +314,7 @@ class ReplayCapture:
         arguments: Any,
         result: Any,
         compression: Optional[Dict[str, Any]] = None,
+        provider_tool_name: Optional[str] = None,
     ) -> None:
         norm = normalize_args(arguments)
         decoded = _coerce_result(result)
@@ -233,6 +326,7 @@ class ReplayCapture:
             result_digest=digest_json(decoded),
             result_shape=compute_shape(decoded),
             compression=compression,
+            provider_tool_name=provider_tool_name,
         )
         self._tool_calls.append(call)
         self._tool_call_index += 1
@@ -335,6 +429,9 @@ def load_trace(path: Path) -> ReplayTrace:
             result_digest=c.get("result_digest", ""),
             result_shape=c.get("result_shape"),
             compression=c.get("compression"),  # P1.4: forward-compat (None for old fixtures)
+            # P0.1 full-v1: forward-compat — None for fixtures captured before
+            # the field landed (Anthropic regular tools never set it anyway).
+            provider_tool_name=c.get("provider_tool_name"),
         )
         for c in data["tool_calls"]
     ]
@@ -370,11 +467,18 @@ def validate_trace_against_registry(
     errors: List[str] = []
     warnings: List[str] = []
 
-    # Tool availability set diff
+    # P0.1 full-v1: separate ``server:`` names (provider-native hosted tools)
+    # from canonical registry names. Server names are validated against the
+    # live agent module via ``_currently_wired_server_tools``, NOT
+    # ``ToolRegistry``. ``tool_calls[].name`` is never expected to carry
+    # ``server:`` — server tool execution is invisible to capture.
+    captured_server = {n for n in trace.tools_available if n.startswith("server:")}
+    captured_registry_names = set(trace.tools_available) - captured_server
+
+    # Tool availability set diff (registry-side only)
     current_names = set(registry.list_names())
-    captured_names = set(trace.tools_available)
-    removed_from_registry = captured_names - current_names
-    added_to_registry = current_names - captured_names
+    removed_from_registry = captured_registry_names - current_names
+    added_to_registry = current_names - captured_registry_names
     if removed_from_registry:
         warnings.append(
             "Tools no longer registered (removed since capture): "
@@ -385,6 +489,19 @@ def validate_trace_against_registry(
             "Tools newly registered (added since capture): "
             + ", ".join(sorted(added_to_registry))
         )
+
+    # Server-tool gate: any captured ``server:<kind>`` MUST currently be
+    # wired in the live agent module for this trace's provider. Source of
+    # truth is the introspective helper, not the static mapping.
+    if captured_server:
+        currently_wired = _currently_wired_server_tools(trace.provider)
+        missing_server = captured_server - currently_wired
+        if missing_server:
+            errors.append(
+                f"server tool(s) no longer wired in current "
+                f"{trace.provider!r} agent module: "
+                + ", ".join(sorted(missing_server))
+            )
 
     # Per-call validation
     for call in trace.tool_calls:
