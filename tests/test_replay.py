@@ -407,12 +407,15 @@ def test_validate_accepts_server_web_search_for_anthropic(real_registry):
     assert not any("server tool" in e for e in result.errors)
 
 
-def test_validate_rejects_server_when_anthropic_not_wired(real_registry, monkeypatch):
-    # Drop the ``type`` key on the live Anthropic web-search constant —
-    # the introspective helper falls through to empty, so the captured
-    # ``server:web_search`` claim fails validation.
-    from src.agents.anthropic_agent import agent as a_mod
-    monkeypatch.setattr(a_mod, "_CLAUDE_WEB_SEARCH_TOOL", {"name": "web_search"})
+def test_validate_rejects_server_when_shared_helper_returns_empty(
+    real_registry, monkeypatch,
+):
+    """If the shared source-of-truth (``anthropic_server_tools``) ever
+    yields an empty list — e.g. Phase C drops the helper or moves
+    hosted-tool wiring elsewhere — the validator must treat fixtures
+    claiming ``server:web_search`` as a regression."""
+    from src.agents.shared import server_tools as st
+    monkeypatch.setattr(st, "anthropic_server_tools", lambda _config: [])
 
     trace = _make_server_trace("anthropic", ["server:web_search"])
     result = validate_trace_against_registry(trace, real_registry)
@@ -426,12 +429,30 @@ def test_currently_wired_server_tools_unknown_provider_empty():
     assert _currently_wired_server_tools("") == set()
 
 
+def test_currently_wired_server_tools_reads_from_shared_source_of_truth(
+    monkeypatch,
+):
+    """Sentinel test: ``_currently_wired_server_tools`` MUST consult
+    ``server_tools.all_kinds_for_provider`` — not re-implement the
+    introspection. Stubbing the shared module to return a sentinel kind
+    must propagate to the validator."""
+    sentinel = "server:test_only_sentinel_v1"
+    from src.agents.shared import server_tools as st
+    monkeypatch.setattr(
+        st, "all_kinds_for_provider", lambda _p: {sentinel},
+    )
+    assert sentinel in _currently_wired_server_tools("anthropic")
+    assert sentinel in _currently_wired_server_tools("openai")
+
+
 def test_server_tool_mapping_forward_anthropic_constant_in_mapping():
-    """Forward safeguard: the live Anthropic web-search constant's
-    ``type`` value must be a key in the static mapping. Catches version
-    bumps (e.g. ``web_search_20260209`` → ``web_search_20270101``) that
-    forget to update the mapping — without this, every existing fixture
-    claiming ``server:web_search`` would silently fail validation."""
+    """Forward safeguard for the CAPTURE walker (not the validator):
+    the live Anthropic web-search constant's ``type`` value must remain
+    a key in ``_SERVER_TOOL_KINDS_BY_PROVIDER`` so capture-time tooling
+    that walks ``tools=[]`` can still label a hosted tool as
+    ``server:<kind>``. Validator's source of truth is now the shared
+    ``server_tools`` helpers — this mapping survives only for the
+    capture-side normalisation."""
     from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
     raw_type = _CLAUDE_WEB_SEARCH_TOOL.get("type")
     assert raw_type, "_CLAUDE_WEB_SEARCH_TOOL must declare a 'type' key"
@@ -442,9 +463,10 @@ def test_server_tool_mapping_forward_anthropic_constant_in_mapping():
 
 
 def test_server_tool_mapping_forward_openai_websearchtool_class_name():
-    """Forward safeguard: the OpenAI mapping must use the actual class
-    name of ``WebSearchTool``. Catches SDK renames before validation
-    silently breaks."""
+    """Forward safeguard for the OpenAI capture walker
+    (``_replay_tools_available_openai``): the SDK class name of
+    ``WebSearchTool`` must remain a key in the OpenAI mapping. Catches
+    SDK renames before capture-time labelling silently breaks."""
     pytest.importorskip("agents")
     from agents import WebSearchTool
     cls_name = WebSearchTool.__name__
@@ -454,20 +476,93 @@ def test_server_tool_mapping_forward_openai_websearchtool_class_name():
     )
 
 
-def test_server_tool_mapping_reverse_helper_resolves_known_kinds(monkeypatch):
-    """Reverse safeguard: every kind the static mapping CAN produce must
-    be reachable through ``_currently_wired_server_tools`` when the live
-    module's symbol matches a mapping key. Stops mappings from accreting
-    orphan entries that don't correspond to any live wiring path."""
+# ---------------------------------------------------------------------------
+# Sentinel safeguards: wiring MUST go through shared/server_tools.py
+# ---------------------------------------------------------------------------
+
+
+def test_anthropic_wiring_actually_uses_anthropic_server_tools(monkeypatch):
+    """White-box safeguard: ``_build_anthropic_tools_list`` must
+    physically iterate ``anthropic_server_tools(config)``'s output.
+
+    Replaces the helper with a stub that returns a sentinel tool_def;
+    if the wiring bypasses the helper (e.g. Phase C inlines
+    ``_CLAUDE_WEB_SEARCH_TOOL``), the sentinel never reaches the
+    returned tools list and this test fails."""
+    sentinel_tool_def = {
+        "type": "test_sentinel_tool_v1",
+        "name": "sentinel",
+    }
+
+    def fake_helper(_config):
+        return [("server:test_sentinel", sentinel_tool_def)]
+
     from src.agents.anthropic_agent import agent as a_mod
-    for raw_type, kind in _SERVER_TOOL_KINDS_BY_PROVIDER["anthropic"].items():
-        # Synthesize live state matching this mapping key.
-        monkeypatch.setattr(
-            a_mod, "_CLAUDE_WEB_SEARCH_TOOL", {"type": raw_type}, raising=False,
-        )
-        wired = _currently_wired_server_tools("anthropic")
-        assert kind in wired, (
-            f"Mapping entry {raw_type!r} → {kind!r} did not resolve via "
-            f"_currently_wired_server_tools — helper is broken or mapping "
-            f"references a key the helper does not consult."
-        )
+    monkeypatch.setattr(a_mod, "anthropic_server_tools", fake_helper)
+
+    from types import SimpleNamespace
+    config = SimpleNamespace(web_claude_search=True, web_claude_max_uses=5)
+    tools_list = a_mod._build_anthropic_tools_list(config)
+
+    assert sentinel_tool_def in tools_list, (
+        "_build_anthropic_tools_list bypassed anthropic_server_tools — "
+        "Phase C may have inlined hosted-tool wiring without going "
+        "through the shared single source of truth."
+    )
+
+
+def test_anthropic_wiring_omits_hosted_when_flag_off():
+    """Smoke test: with ``web_claude_search=False``, no hosted tool
+    descriptor reaches the tools list. The list still contains regular
+    registry tools (sanity that we didn't accidentally wipe them)."""
+    from src.agents.anthropic_agent.agent import _build_anthropic_tools_list
+
+    from types import SimpleNamespace
+    config = SimpleNamespace(web_claude_search=False, web_claude_max_uses=5)
+    tools_list = _build_anthropic_tools_list(config)
+
+    assert len(tools_list) > 0
+    # No hosted web_search descriptor present
+    assert not any(
+        isinstance(t, dict) and str(t.get("type", "")).startswith("web_search_")
+        for t in tools_list
+    )
+
+
+def test_openai_wiring_actually_uses_openai_server_tools(monkeypatch):
+    """White-box safeguard: ``_build_openai_all_tools`` must physically
+    iterate ``openai_server_tools(config)``'s output. Stubbed sentinel
+    must round-trip to the returned list."""
+
+    class SentinelTool:
+        pass
+
+    sentinel_obj = SentinelTool()
+
+    def fake_helper(_config):
+        return [("server:test_sentinel", sentinel_obj)]
+
+    from src.agents.openai_agent import agent as oa_mod
+    monkeypatch.setattr(oa_mod, "openai_server_tools", fake_helper)
+
+    from types import SimpleNamespace
+    config = SimpleNamespace(web_openai_search=True)
+    out = oa_mod._build_openai_all_tools([], config)
+
+    assert sentinel_obj in out, (
+        "_build_openai_all_tools bypassed openai_server_tools — "
+        "Phase C may have inlined hosted-tool wiring without going "
+        "through the shared single source of truth."
+    )
+
+
+def test_openai_wiring_omits_hosted_when_flag_off():
+    from src.agents.openai_agent.agent import _build_openai_all_tools
+
+    from types import SimpleNamespace
+    config = SimpleNamespace(web_openai_search=False)
+    base = ["dummy_a", "dummy_b"]
+    out = _build_openai_all_tools(base, config)
+
+    # Only base tools survive — no hosted appendage.
+    assert out == base

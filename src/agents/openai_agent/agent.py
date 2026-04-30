@@ -23,6 +23,7 @@ from ..shared.replay import (
     _canonical_tool_name,
     is_capture_enabled,
 )
+from ..shared.server_tools import openai_server_tools
 from ..shared.scratchpad import Scratchpad
 from ..shared.token_tracker import TokenTracker
 
@@ -276,6 +277,24 @@ def _install_capture(
         return None
 
 
+def _build_openai_all_tools(base_tools: list, config) -> list:
+    """Return the full tool list to give to ``agents.Agent``, including
+    every hosted server tool that ``config`` enables.
+
+    LOAD-BEARING: this is the SINGLE wiring point for OpenAI hosted
+    server tools. ``_build_agent`` MUST call this helper — never
+    re-implement the loop. Bypassing it (e.g. Phase C unified runner
+    appending ``WebSearchTool()`` directly) makes the replay validator's
+    ``_currently_wired_server_tools`` lie about what's wired. The
+    sentinel-based safeguard test in ``tests/test_replay_openai.py``
+    catches that drift.
+    """
+    all_tools = list(base_tools)
+    for _kind, tool_obj in openai_server_tools(config):
+        all_tools.append(tool_obj)
+    return all_tools
+
+
 def _build_agent(
     model_name: str,
     tools: list,
@@ -294,15 +313,10 @@ def _build_agent(
     from agents import Agent, ModelSettings
     from openai.types.shared import Reasoning
 
-    # Conditionally add OpenAI WebSearchTool (Phase 10)
+    # Build full tool list including any hosted server tools (single
+    # wiring point — see ``_build_openai_all_tools`` docstring).
     config = get_agent_config()
-    all_tools = list(tools)
-    if config.web_openai_search:
-        try:
-            from agents import WebSearchTool
-            all_tools.append(WebSearchTool())
-        except ImportError:
-            logger.warning("WebSearchTool not available in this agents SDK version")
+    all_tools = _build_openai_all_tools(tools, config)
 
     # 自動決定 effective_max_tokens
     if reasoning_effort == "none":

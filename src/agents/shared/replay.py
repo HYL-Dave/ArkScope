@@ -161,44 +161,29 @@ _SERVER_TOOL_KINDS_BY_PROVIDER: Dict[str, Dict[str, str]] = {
 
 
 def _currently_wired_server_tools(provider: str) -> Set[str]:
-    """Return the set of canonical ``server:<kind>`` names that the agent
-    module would CURRENTLY wire if all relevant config flags were on.
+    """Return the set of canonical ``server:<kind>`` names that the
+    provider's live wiring would expose if all relevant config flags
+    were on.
 
-    Source of truth is the LIVE agent module — not
-    ``_SERVER_TOOL_KINDS_BY_PROVIDER``. The mapping is consulted only AFTER
-    the live import succeeds; if the live agent module has dropped the
-    symbol (Phase C refactor removes ``_CLAUDE_WEB_SEARCH_TOOL`` entirely),
-    this helper returns an empty set and any fixture claiming
-    ``server:<kind>`` for that provider fails validation.
+    SOURCE OF TRUTH is ``shared.server_tools.all_kinds_for_provider``,
+    which iterates the same per-provider helpers the agent wiring uses
+    (``anthropic_server_tools`` / ``openai_server_tools``). That shared
+    module is therefore the single point where adding/removing a
+    hosted tool propagates to BOTH the wiring AND the validator.
 
-    Layered defense: a separate forward/reverse safeguard pair (see
-    ``test_replay.py`` mapping safeguards) catches drift between the
-    static mapping and what the agent module actually wires.
+    Sentinel-based safeguards in ``tests/test_replay.py`` /
+    ``tests/test_replay_openai.py`` enforce that the wiring path
+    actually consumes the shared helpers — Phase C refactors that
+    bypass them (e.g. inlining ``WebSearchTool()``) fail the safeguards.
 
-    Returns ``set()`` for unknown providers, missing symbols, or import
-    failures. Never raises.
+    Returns ``set()`` for unknown providers or import failures. Never
+    raises.
     """
-    kinds: Set[str] = set()
-    if provider == "anthropic":
-        try:  # noqa: SIM105 — multiple specific exceptions, not a catch-all
-            from src.agents.anthropic_agent import agent as a_mod
-            tool_def = getattr(a_mod, "_CLAUDE_WEB_SEARCH_TOOL", None)
-            if isinstance(tool_def, dict):
-                raw_type = tool_def.get("type", "")
-                mapped = _SERVER_TOOL_KINDS_BY_PROVIDER["anthropic"].get(raw_type)
-                if mapped:
-                    kinds.add(mapped)
-        except (AttributeError, ImportError):
-            pass
-    elif provider == "openai":
-        try:
-            from agents import WebSearchTool  # noqa: F401 — SDK probe
-            mapped = _SERVER_TOOL_KINDS_BY_PROVIDER["openai"].get("WebSearchTool")
-            if mapped:
-                kinds.add(mapped)
-        except ImportError:
-            pass
-    return kinds
+    try:
+        from src.agents.shared.server_tools import all_kinds_for_provider
+        return all_kinds_for_provider(provider)
+    except (AttributeError, ImportError):
+        return set()
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ from ..shared.context_manager import ContextManager, build_anchor_from_messages
 from ..shared.events import AgentEvent, EventType
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.replay import ReplayCapture, is_capture_enabled
+from ..shared.server_tools import anthropic_server_tools
 from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from ..shared.token_tracker import TokenTracker
@@ -75,6 +76,26 @@ _CLAUDE_WEB_SEARCH_TOOL = {
     "type": "web_search_20260209",
     "name": "web_search",
 }
+
+
+def _build_anthropic_tools_list(config) -> list:
+    """Build the tools list to send to the Anthropic API.
+
+    LOAD-BEARING: this is the SINGLE wiring point for hosted server
+    tools on the Anthropic side. ``run_query_stream`` (and any future
+    Anthropic entry point) MUST call this helper to assemble its tools
+    array — never re-implement the loop. Bypassing this function (e.g.
+    Phase C unified runner appending ``_CLAUDE_WEB_SEARCH_TOOL``
+    directly) makes the replay validator's
+    ``_currently_wired_server_tools`` lie about what's wired. The
+    sentinel-based safeguard test in ``tests/test_replay.py`` catches
+    that drift.
+    """
+    from .tools import get_anthropic_tools  # local: keeps module load light
+    tools = get_anthropic_tools()
+    for _kind, tool_def in anthropic_server_tools(config):
+        tools.append(tool_def)
+    return tools
 
 # ── Model capability detection ──────────────────────────────────
 
@@ -178,7 +199,7 @@ async def run_query_stream(
             "Anthropic SDK not installed. Run: pip install anthropic"
         )
 
-    from .tools import get_anthropic_tools, execute_tool
+    from .tools import execute_tool
 
     # Get or create DAL
     if dal is None:
@@ -192,15 +213,9 @@ async def run_query_stream(
     # Initialize client
     client = Anthropic()
 
-    # Get tool definitions
-    tools = get_anthropic_tools()
-
-    # Conditionally add Claude web search server tool (Phase 10)
-    if config.web_claude_search:
-        tools.append({
-            **_CLAUDE_WEB_SEARCH_TOOL,
-            "max_uses": config.web_claude_max_uses,
-        })
+    # Build tool list including any hosted server tools (single wiring
+    # point — see ``_build_anthropic_tools_list`` docstring).
+    tools = _build_anthropic_tools_list(config)
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
