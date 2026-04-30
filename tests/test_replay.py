@@ -566,3 +566,60 @@ def test_openai_wiring_omits_hosted_when_flag_off():
 
     # Only base tools survive — no hosted appendage.
     assert out == base
+
+
+def test_claude_web_search_constant_only_imported_via_helper():
+    """Architectural safeguard: ``_CLAUDE_WEB_SEARCH_TOOL`` is owned by
+    ``anthropic_agent/agent.py`` and consumed by ``shared/server_tools.py``.
+    Every other Anthropic wiring path (cli, subagent, future runners)
+    MUST route through ``anthropic_server_tools(config)`` instead of
+    importing the constant directly.
+
+    This test pins single-source-of-truth across CLI / API / subagent —
+    the sentinel-based wiring tests above only cover the API builders,
+    so this AST scan acts as the architectural backstop. If a new path
+    needs hosted tools, it imports the helper, not the constant.
+
+    Uses AST so comments / docstrings mentioning the constant by name
+    don't trigger a false positive — only actual import statements do.
+    """
+    import ast
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    src_root = repo_root / "src" / "agents"
+
+    target = "_CLAUDE_WEB_SEARCH_TOOL"
+    allowed = {
+        (src_root / "anthropic_agent" / "agent.py").resolve(),  # owns it
+        (src_root / "shared" / "server_tools.py").resolve(),    # consumer
+    }
+
+    offenders: list[str] = []
+    for py_file in src_root.rglob("*.py"):
+        if py_file.resolve() in allowed:
+            continue
+        try:
+            tree = ast.parse(py_file.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            # ImportFrom: from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
+            if isinstance(node, ast.ImportFrom):
+                if any(alias.name == target for alias in node.names):
+                    offenders.append(str(py_file.relative_to(repo_root)))
+                    break
+            # Import: import src.agents.anthropic_agent.agent as ...
+            #   (no constant-level import via plain Import; no need to
+            #   cover, since constant access would still need attribute
+            #   access — but cover Name lookups defensively below)
+            if isinstance(node, ast.Name) and node.id == target:
+                offenders.append(str(py_file.relative_to(repo_root)))
+                break
+
+    assert not offenders, (
+        f"Modules importing or referencing {target} outside the "
+        f"single-source-of-truth path: {offenders}. Use "
+        f"`from src.agents.shared.server_tools import anthropic_server_tools` "
+        f"and iterate the (kind, tool_def) pairs instead."
+    )

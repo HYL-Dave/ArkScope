@@ -611,10 +611,13 @@ def run_anthropic_interactive(
     client = Anthropic()
     tools = get_anthropic_tools()
 
-    # Conditionally add Claude web search server tool
-    if config.web_claude_search:
-        from .anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
-        tools.append({**_CLAUDE_WEB_SEARCH_TOOL, "max_uses": config.web_claude_max_uses})
+    # Hosted server tools — single source of truth in shared/server_tools.py.
+    # Sentinel safeguards in tests/test_replay.py + the architectural test
+    # `test_claude_web_search_constant_only_imported_via_helper` ensure no
+    # other module re-implements this loop.
+    from .shared.server_tools import anthropic_server_tools
+    for _kind, tool_def in anthropic_server_tools(config):
+        tools.append(tool_def)
 
     tools_used: List[str] = []
     _tool_calls_detail: List[Dict[str, Any]] = []

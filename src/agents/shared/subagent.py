@@ -409,13 +409,10 @@ def _run_anthropic_subagent(
     all_tools = get_anthropic_tools()
     tools = _filter_anthropic_tools(all_tools, config.tool_names)
 
-    # Conditionally add Claude web search server tool (Phase 10)
-    if agent_config.web_claude_search:
-        from ..anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
-        tools.append({
-            **_CLAUDE_WEB_SEARCH_TOOL,
-            "max_uses": agent_config.web_claude_max_uses,
-        })
+    # Hosted server tools — single source of truth in shared/server_tools.py.
+    from .server_tools import anthropic_server_tools
+    for _kind, tool_def in anthropic_server_tools(agent_config):
+        tools.append(tool_def)
 
     # Apply prompt caching: cache_control on tools (last) + system prompt
     tools = _prepare_cached_tools(tools)
