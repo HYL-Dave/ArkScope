@@ -1,24 +1,43 @@
 #!/usr/bin/env python
-"""Static validator for replay fixtures (P0.1 minimal-spike).
+"""Static validator for replay fixtures (P0.1 full-v1).
 
 Usage:
     python scripts/replay_run.py tests/replay_fixtures/one_tool_turn.json
+    python -m pytest tests/test_replay_fixtures.py    # parametrised gate
 
 Reads a captured turn fixture and validates against the current
-``ToolRegistry`` and (optionally) the current rendered system prompt.
-Does NOT call any LLM. Does NOT replay tool execution. Does NOT compare
+``ToolRegistry`` + bridge surface + attachment-handling code. Does
+NOT call any LLM. Does NOT replay tool execution. Does NOT compare
 full tool results.
 
+Validation goes through the unified resolver (per spec §2.3):
+``ToolRegistry`` → ``shared/server_tools.py`` (``server:*`` hosted
+tools) → ``shared/bridge_tools.py`` (bridge-only tools like
+``delegate_to_subagent``). Each name is resolved against all three
+sources before ``unknown_tool`` is reported. Argument-shape gates
+fire identically for registry and bridge tools.
+
 Checks:
-  - all captured tool names still exist in the current registry
-  - captured argument keys are still accepted by current tool schema
+  - all captured tool names resolve via the unified resolver
+  - captured argument keys are still accepted by the resolved tool's schema
   - currently-required arguments are present in the capture
+  - ``pinned_tool_names`` REQUIRED-RESOLUTION (NOT skip-list) — every
+    pinned name must resolve through the same resolver
+  - ``attachments_shape``: each ``(type, block_kind)`` pair must be
+    producible by ``AttachmentManager`` for the trace's provider
+  - subagent_traces[i] recursed via the same resolver under the parent's
+    provider; child errors prefixed with ``subagent_traces[i] (<role>): ``
   - system_prompt_hash drift (warning only — content drift is expected)
 
 Exit codes:
   0 — passed (no errors; warnings allowed)
   1 — failed (one or more errors)
   2 — usage error (bad path, malformed fixture)
+
+For automation use ``tests/test_replay_fixtures.py`` — that module
+parametrises every fixture under ``tests/replay_fixtures/`` and is the
+load-bearing regression vector for Phase C. This script is the
+ad-hoc developer-friendly entry point.
 """
 
 from __future__ import annotations

@@ -732,10 +732,20 @@ def _validate_calls_and_pins(
     errors: List[str] = []
     warnings: List[str] = []
 
-    # tools_available diff: server:* validated against currently-wired
-    # server tools; registry names produce informational warnings only.
+    # tools_available diff is RESOLVER-AWARE: server:* go to the
+    # server-tool gate; bridge-resolved names (e.g. ``delegate_to_subagent``)
+    # are excluded from the registry diff because they live on the bridge
+    # surface, not in ToolRegistry. Without this exclusion, every fixture
+    # that anchors a bridge-only tool emits a misleading "no longer
+    # registered" warning even though the tool resolves cleanly.
     captured_server = {n for n in tools_available if n.startswith("server:")}
-    captured_registry_names = set(tools_available) - captured_server
+    captured_non_server = set(tools_available) - captured_server
+    captured_bridge: Set[str] = set()
+    for name in captured_non_server:
+        kind, _ = _resolve_tool(name, provider, registry)
+        if kind == "bridge":
+            captured_bridge.add(name)
+    captured_registry_names = captured_non_server - captured_bridge
 
     current_names = set(registry.list_names())
     removed_from_registry = captured_registry_names - current_names

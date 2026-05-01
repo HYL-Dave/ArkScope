@@ -1178,6 +1178,43 @@ def test_attachment_unknown_type_opts_out(real_registry):
     assert result.passed, result.render()
 
 
+def test_availability_diff_excludes_bridge_resolved_names(real_registry):
+    """Resolver-aware availability diff: ``delegate_to_subagent`` is
+    bridge-only and lives outside ToolRegistry, so it MUST NOT appear
+    in the "Tools no longer registered" warning. Before this fix, the
+    ad-hoc ``scripts/replay_run.py`` printed a misleading warning for
+    every fixture that anchored a bridge-only tool — even though the
+    tool resolved cleanly through the bridge branch.
+
+    This test pins the warning text so the fix can't silently regress.
+    """
+    trace = load_trace(SUBAGENT_FIXTURE)
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed, result.render()
+    for warning in result.warnings:
+        if "no longer registered" in warning:
+            assert "delegate_to_subagent" not in warning, (
+                f"Bridge-resolved name leaked into removed-from-registry "
+                f"warning: {warning}"
+            )
+
+
+def test_availability_diff_still_flags_truly_removed_names(real_registry):
+    """Symmetric guard for the resolver-aware diff: a name that resolves
+    through NONE of the three resolver sources (typo, deleted from
+    registry AND bridge) MUST still appear in the removed-from-registry
+    warning. The fix narrows the diff, doesn't silence it.
+    """
+    trace = load_trace(ONE_TOOL_FIXTURE)
+    # Inject a name that won't resolve anywhere.
+    trace.tools_available = list(trace.tools_available) + ["definitely_gone_tool"]
+    result = validate_trace_against_registry(trace, real_registry)
+    assert any(
+        "no longer registered" in w and "definitely_gone_tool" in w
+        for w in result.warnings
+    ), f"Expected removed-from-registry warning for stray name; got: {result.render()}"
+
+
 def test_subagent_recursion_emits_role_prefixed_errors(real_registry):
     """Errors inside ``subagent_traces`` must be prefixed with the
     role for traceability. Ensures commit 3's recursion isn't a silent
