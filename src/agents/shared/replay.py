@@ -359,12 +359,15 @@ class ReplayTrace:
     # final_answer_hash}`. Validator (commit 3) recurses into the nested
     # tools_available + tool_calls to catch child-side tool drift.
     subagent_traces: Optional[List[Dict[str, Any]]] = None
-    # ``pinned_tool_names``: explicit list of registry tools whose
-    # presence the validator (commit 3) MUST gate, regardless of registry
-    # additions/removals elsewhere. Pin only the tools the fixture's
-    # behaviour depends on (e.g. the one tool actually called); do NOT
+    # ``pinned_tool_names``: REQUIRED-RESOLUTION list — every name here
+    # must resolve via the validator's unified resolver (commit 3),
+    # which consults ToolRegistry → server-tools → provider bridge
+    # surface in that order. Pinning is NEVER a skip-list; it lists what
+    # MUST resolve, not what to bypass. Pin only the tools the fixture's
+    # behaviour depends on (e.g. the one tool actually called) — do NOT
     # mirror the full ``tools_available``. Server tools (``server:*``)
-    # stay out of this pin and remain validated by the server-tool path.
+    # stay out of this pin since the server-tool validator branch
+    # handles them via ``_currently_wired_server_tools``.
     pinned_tool_names: Optional[List[str]] = None
     # ``attachments_shape``: per-attachment classification produced at
     # capture time. Each entry: ``{type, size_class, mime, content_digest,

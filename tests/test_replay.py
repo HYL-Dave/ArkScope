@@ -758,8 +758,11 @@ def test_load_subagent_fixture_anchors_delegate_at_parent():
     # Bridge-side dispatch arguments mirrored
     assert "subagent" in parent_call.arguments
     assert "task" in parent_call.arguments
-    # Parent pins the dispatch tool — commit 3's pinning logic uses this
-    # to bypass per-call registry lookup for bridge-only tools.
+    # Parent pins the dispatch tool — commit 3's unified resolver must
+    # resolve every pinned name via ToolRegistry → server-tools →
+    # provider bridge surface. ``delegate_to_subagent`` is bridge-only,
+    # so it resolves through the bridge surface branch. Pin is REQUIRED
+    # resolution, never skip-lookup.
     assert trace.pinned_tool_names == ["delegate_to_subagent"]
 
 
