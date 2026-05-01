@@ -930,6 +930,21 @@ def test_classify_attachments_uses_raw_byte_digest():
     assert out[0]["content_digest"] == expected
 
 
+def test_classify_attachments_empty_bytes_uses_sha256_of_empty():
+    """An attachment with ``data=b''`` must still produce a stable digest
+    (SHA256 of the empty byte string), NOT a blank string. Blank string
+    is ``digest_bytes``'s sentinel for non-bytes input — conflating "empty
+    file" with "non-bytes" loses the ability to distinguish them.
+    """
+    import hashlib
+    empty = _FakeAttachment(data=b"", media_type="text/plain", is_text=True)
+    out = classify_attachments("anthropic", [empty])
+    assert out is not None and len(out) == 1
+    expected = hashlib.sha256(b"").hexdigest()[:DIGEST_LEN]
+    assert out[0]["content_digest"] == expected
+    assert out[0]["size_class"] == "small"
+
+
 def test_validate_registry_only_new_fixtures_clean(real_registry):
     """The 3 fixtures whose tool_calls only reference core ``ToolRegistry``
     tools must validate clean today (no ``unknown_tool`` /
@@ -942,18 +957,25 @@ def test_validate_registry_only_new_fixtures_clean(real_registry):
         assert result.passed, f"{path.name} did not validate clean: {result.render()}"
 
 
-def test_subagent_fixture_fails_today_pending_commit_3_pinning(real_registry):
+def test_subagent_fixture_fails_today_pending_commit_3_resolver(real_registry):
     """The subagent fixture references ``delegate_to_subagent`` — which is
     bridge-only, NOT in ``ToolRegistry``. Today's validator reports it as
     ``unknown_tool``. This test pins THAT specific failure shape so commit
-    3's pinning logic has a concrete green-flip target: once the validator
-    consults ``pinned_tool_names`` and bypasses per-call registry lookup
-    for pinned bridge-only tools, the subagent fixture validates clean.
+    3's UNIFIED RESOLVER has a concrete green-flip target.
 
-    If the failure shape changes (e.g. ``delegate_to_subagent`` gets added
+    Commit 3's contract (per spec §2.3): pinning is a REQUIRED-RESOLUTION
+    list, NOT a skip-list. The validator must consult, in order,
+    ``ToolRegistry`` → server-tools → provider bridge surface. Once the
+    bridge-surface branch lands, ``delegate_to_subagent`` resolves via
+    the Anthropic bridge and the fixture validates clean — without ever
+    bypassing per-call lookup. Skipping lookup would let Phase C silently
+    drop the bridge tool while the pin keeps the fixture green; the
+    resolver path closes that loophole.
+
+    If the failure shape changes (e.g. ``delegate_to_subagent`` is added
     to ``ToolRegistry`` core, or the validator's error message format
-    drifts), this test fails — by design — and commit 3 needs to update
-    it alongside flipping the assertion to ``passed is True``.
+    drifts), this test fails — by design — and commit 3 must update it
+    alongside flipping the assertion to ``passed is True``.
     """
     trace = load_trace(SUBAGENT_FIXTURE)
     result = validate_trace_against_registry(trace, real_registry)

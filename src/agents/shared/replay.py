@@ -260,8 +260,12 @@ def classify_attachments(provider: str, attachments: Any) -> Optional[List[Dict[
         try:
             data = getattr(att, "data", b"") or b""
             mime = getattr(att, "media_type", None)
-            digest = digest_bytes(data) if data else ""
-            size = len(data) if data else 0
+            # Always digest — an empty attachment hashes to SHA256(b'')
+            # which is a stable, distinguishable value. Returning ""
+            # for empty would conflate "no content" with "non-bytes
+            # input" (which ``digest_bytes`` reserves "" for).
+            digest = digest_bytes(data)
+            size = len(data)
             sclass = _size_class(size)
 
             is_pdf = bool(getattr(att, "is_pdf", False))
