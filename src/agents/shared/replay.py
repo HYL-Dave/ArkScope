@@ -31,7 +31,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -360,14 +360,16 @@ class ReplayTrace:
     # tools_available + tool_calls to catch child-side tool drift.
     subagent_traces: Optional[List[Dict[str, Any]]] = None
     # ``pinned_tool_names``: REQUIRED-RESOLUTION list — every name here
-    # must resolve via the validator's unified resolver (commit 3),
-    # which consults ToolRegistry → server-tools → provider bridge
-    # surface in that order. Pinning is NEVER a skip-list; it lists what
-    # MUST resolve, not what to bypass. Pin only the tools the fixture's
-    # behaviour depends on (e.g. the one tool actually called) — do NOT
-    # mirror the full ``tools_available``. Server tools (``server:*``)
-    # stay out of this pin since the server-tool validator branch
-    # handles them via ``_currently_wired_server_tools``.
+    # must resolve via the validator's unified resolver, which consults
+    # ToolRegistry → ``shared/server_tools.py`` (server:* hosted tools)
+    # → ``shared/bridge_tools.py`` (bridge-only tools like
+    # ``delegate_to_subagent``) in that order. Pinning is NEVER a
+    # skip-list; it lists what MUST resolve through the resolver,
+    # not what to bypass. Any of the three resolver sources is a
+    # legitimate pin target — including ``server:web_search`` and
+    # bridge-only names. Pin only the tools the fixture's behaviour
+    # depends on (e.g. the one tool actually called); do NOT mirror
+    # the full ``tools_available``.
     pinned_tool_names: Optional[List[str]] = None
     # ``attachments_shape``: per-attachment classification produced at
     # capture time. Each entry: ``{type, size_class, mime, content_digest,
@@ -610,81 +612,295 @@ def load_trace(path: Path) -> ReplayTrace:
     )
 
 
+# ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 3: unified resolver + attachment pair gate
+# ---------------------------------------------------------------------------
+
+# Supported (canonical type, provider-native block_kind) pairs. Validating
+# the PAIR (not just block_kind) catches provider mis-classification — e.g.
+# {"type": "pdf", "block_kind": "image"} would be flagged because that
+# combination is not produced by AttachmentManager. Source of truth:
+# ``src/agents/shared/attachments.py::AttachmentManager.to_anthropic_blocks``
+# and ``to_openai_blocks``. Forward safeguard test in tests/test_replay.py
+# runs canonical fake attachments through both methods and asserts every
+# emitted (canonical_type, block_kind) pair appears here.
+_SUPPORTED_ATTACHMENT_PAIRS_BY_PROVIDER: Dict[str, Set[Tuple[str, str]]] = {
+    "anthropic": {
+        ("pdf", "document"),
+        ("image", "image"),
+        ("text", "text"),
+    },
+    "openai": {
+        ("pdf", "input_text"),
+        ("image", "input_image"),
+        ("text", "input_text"),
+    },
+}
+
+
+def _supported_attachment_pairs(provider: str) -> Set[Tuple[str, str]]:
+    """Return a fresh copy of the (type, block_kind) pairs the current
+    attachment-handling code path can emit for ``provider``.
+
+    Returning a copy keeps tests that monkeypatch this helper from
+    poisoning the module-level table.
+    """
+    return set(_SUPPORTED_ATTACHMENT_PAIRS_BY_PROVIDER.get(provider, set()))
+
+
+# Resolver kinds. ``"server"`` and ``"bridge"`` shapes mean "name resolves;
+# arg-shape check uses spec dict"; ``"registry"`` means "use the live
+# registry's ToolDefinition for arg-shape." ``None`` means unresolved.
+_ResolveKind = Optional[str]
+
+
+def _resolve_tool(
+    name: str,
+    provider: str,
+    registry: Any,
+) -> Tuple[_ResolveKind, Optional[Any]]:
+    """Unified resolver. Returns ``(kind, spec_or_def)``.
+
+    Resolution order (per P0.1 spec §2.3 resolver contract):
+      1. ``server:`` prefixed names → ``shared/server_tools.py``
+      2. ToolRegistry (canonical 49-tool set)
+      3. ``shared/bridge_tools.py`` (bridge-only tools)
+
+    ``kind == "server"`` returns ``spec_or_def == None`` because server
+    tools are validated by name only — they execute server-side and have
+    no client-visible argument schema.
+
+    ``kind == "registry"`` returns the live ``ToolDefinition``.
+
+    ``kind == "bridge"`` returns the bridge spec dict
+    ``{"parameters": Set[str], "required": Set[str]}`` — the validator
+    uses this to detect bridge-tool argument drift identically to
+    registry tools.
+
+    ``kind is None`` means the name resolves through none of the three
+    sources → emit ``unknown_tool``.
+    """
+    if not isinstance(name, str) or not name:
+        return (None, None)
+    if name.startswith("server:"):
+        if name in _currently_wired_server_tools(provider):
+            return ("server", None)
+        return (None, None)
+    tool_def = registry.get(name)
+    if tool_def is not None:
+        return ("registry", tool_def)
+    try:
+        from src.agents.shared.bridge_tools import all_bridge_specs_for_provider
+        bridge_specs = all_bridge_specs_for_provider(provider)
+    except (AttributeError, ImportError):
+        bridge_specs = {}
+    if name in bridge_specs:
+        return ("bridge", bridge_specs[name])
+    return (None, None)
+
+
+def _check_arg_shape(
+    captured_keys: Set[str],
+    param_names: Set[str],
+    required_names: Set[str],
+) -> Tuple[Set[str], Set[str]]:
+    """Return (unknown_args, missing_required) sets — uniform between
+    registry tools and bridge tools."""
+    unknown = captured_keys - param_names
+    missing = required_names - captured_keys
+    return unknown, missing
+
+
+def _validate_calls_and_pins(
+    *,
+    tool_calls: Sequence[Any],
+    pinned_tool_names: Optional[Sequence[str]],
+    tools_available: Sequence[str],
+    provider: str,
+    registry: Any,
+    prefix: str,
+) -> Tuple[List[str], List[str]]:
+    """Shared per-trace-like validation kernel.
+
+    Used for parent traces (prefix="") AND each ``subagent_traces`` entry
+    (prefix="subagent_traces[i] (role): "). Same unified resolver, same
+    arg-shape semantics, same diff codes.
+
+    Returns ``(errors, warnings)``. Caller composes them into the parent
+    ``ValidationResult``.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    # tools_available diff: server:* validated against currently-wired
+    # server tools; registry names produce informational warnings only.
+    captured_server = {n for n in tools_available if n.startswith("server:")}
+    captured_registry_names = set(tools_available) - captured_server
+
+    current_names = set(registry.list_names())
+    removed_from_registry = captured_registry_names - current_names
+    added_to_registry = current_names - captured_registry_names
+    if removed_from_registry:
+        warnings.append(
+            f"{prefix}Tools no longer registered (removed since capture): "
+            + ", ".join(sorted(removed_from_registry))
+        )
+    if added_to_registry:
+        warnings.append(
+            f"{prefix}Tools newly registered (added since capture): "
+            + ", ".join(sorted(added_to_registry))
+        )
+
+    if captured_server:
+        currently_wired = _currently_wired_server_tools(provider)
+        missing_server = captured_server - currently_wired
+        if missing_server:
+            errors.append(
+                f"{prefix}server tool(s) no longer wired in current "
+                f"{provider!r} agent module: "
+                + ", ".join(sorted(missing_server))
+            )
+
+    # Per-call validation via unified resolver.
+    for call in tool_calls:
+        kind, spec_or_def = _resolve_tool(call.name, provider, registry)
+        if kind is None:
+            errors.append(
+                f"{prefix}tool_calls[{call.index}]: tool {call.name!r} "
+                f"not found in current registry"
+            )
+            continue
+        if kind == "server":
+            # Server tools have no client-visible arg schema — name match
+            # is the contract. Capture should never record server tools
+            # in tool_calls[] anyway (executed server-side), but if a
+            # hand-crafted fixture does, we accept it.
+            continue
+        if kind == "registry":
+            tool_def = spec_or_def
+            param_names = {p.name for p in tool_def.parameters}
+            required_names = {p.name for p in tool_def.parameters if p.required}
+        else:  # kind == "bridge"
+            param_names = set(spec_or_def["parameters"])
+            required_names = set(spec_or_def["required"])
+
+        captured_keys = set(call.arguments.keys()) - {"_raw"}
+        unknown, missing = _check_arg_shape(captured_keys, param_names, required_names)
+        if unknown:
+            errors.append(
+                f"{prefix}tool_calls[{call.index}] {call.name}: captured "
+                f"argument(s) {sorted(unknown)} no longer accepted by tool"
+            )
+        if missing:
+            errors.append(
+                f"{prefix}tool_calls[{call.index}] {call.name}: tool now "
+                f"requires argument(s) {sorted(missing)} not present in capture"
+            )
+
+    # Pinned tools: REQUIRED-RESOLUTION via the same resolver. Any pinned
+    # name that fails to resolve is unknown_tool — the pin is what MUST
+    # exist, not what to skip. Note: server:* and bridge-only names are
+    # legitimate pin targets and resolve through their respective resolver
+    # branches.
+    if pinned_tool_names:
+        for name in pinned_tool_names:
+            kind, _ = _resolve_tool(name, provider, registry)
+            if kind is None:
+                errors.append(
+                    f"{prefix}pinned_tool_names: pinned tool {name!r} "
+                    f"does not resolve via ToolRegistry / server-tools / "
+                    f"bridge surface for provider {provider!r}"
+                )
+
+    return errors, warnings
+
+
 def validate_trace_against_registry(
     trace: ReplayTrace,
     registry: Any,
     *,
     current_system_prompt: Optional[str] = None,
 ) -> ValidationResult:
-    """Static diff: tool existence + argument shape compatibility + sequence.
+    """Static diff: tool existence + argument shape + attachment shape.
 
     Does NOT call any LLM. Does NOT compare full tool results.
+
+    Resolution order for every tool name encountered (parent or nested
+    subagent trace): ToolRegistry → server-tools (``server:*``) → bridge
+    tools. ``pinned_tool_names`` is REQUIRED-RESOLUTION through that
+    same resolver, never a skip-list.
+
+    Attachment shape gate: when ``trace.attachments_shape`` is set,
+    every entry's ``(type, block_kind)`` pair must be producible by the
+    current ``AttachmentManager`` for ``trace.provider``. Entries with
+    ``type == "unknown"`` opt out (per spec §6 risk register).
     """
     errors: List[str] = []
     warnings: List[str] = []
 
-    # P0.1 full-v1: separate ``server:`` names (provider-native hosted tools)
-    # from canonical registry names. Server names are validated against the
-    # live agent module via ``_currently_wired_server_tools``, NOT
-    # ``ToolRegistry``. ``tool_calls[].name`` is never expected to carry
-    # ``server:`` — server tool execution is invisible to capture.
-    captured_server = {n for n in trace.tools_available if n.startswith("server:")}
-    captured_registry_names = set(trace.tools_available) - captured_server
+    # Parent kernel.
+    parent_errs, parent_warns = _validate_calls_and_pins(
+        tool_calls=trace.tool_calls,
+        pinned_tool_names=trace.pinned_tool_names,
+        tools_available=trace.tools_available,
+        provider=trace.provider,
+        registry=registry,
+        prefix="",
+    )
+    errors.extend(parent_errs)
+    warnings.extend(parent_warns)
 
-    # Tool availability set diff (registry-side only)
-    current_names = set(registry.list_names())
-    removed_from_registry = captured_registry_names - current_names
-    added_to_registry = current_names - captured_registry_names
-    if removed_from_registry:
-        warnings.append(
-            "Tools no longer registered (removed since capture): "
-            + ", ".join(sorted(removed_from_registry))
-        )
-    if added_to_registry:
-        warnings.append(
-            "Tools newly registered (added since capture): "
-            + ", ".join(sorted(added_to_registry))
-        )
+    # Subagent traces: same kernel, prefixed errors. Hand-crafted fixtures
+    # ship dict entries; nested ``tool_calls`` are dicts (not
+    # ``CapturedToolCall``), so coerce lazily into a duck-typed shim.
+    if trace.subagent_traces:
+        for i, sub in enumerate(trace.subagent_traces):
+            role = sub.get("role", "<unknown>")
+            sub_prefix = f"subagent_traces[{i}] ({role}): "
+            sub_calls = [
+                CapturedToolCall(
+                    index=c.get("index", j),
+                    name=c.get("name", ""),
+                    arguments=c.get("arguments", {}) or {},
+                    arguments_digest=c.get("arguments_digest", ""),
+                    result_digest=c.get("result_digest", ""),
+                    result_shape=c.get("result_shape"),
+                    compression=c.get("compression"),
+                    provider_tool_name=c.get("provider_tool_name"),
+                )
+                for j, c in enumerate(sub.get("tool_calls", []) or [])
+            ]
+            sub_errs, sub_warns = _validate_calls_and_pins(
+                tool_calls=sub_calls,
+                pinned_tool_names=sub.get("pinned_tool_names"),
+                tools_available=sub.get("tools_available", []) or [],
+                provider=trace.provider,  # subagent runs under parent's provider
+                registry=registry,
+                prefix=sub_prefix,
+            )
+            errors.extend(sub_errs)
+            warnings.extend(sub_warns)
 
-    # Server-tool gate: any captured ``server:<kind>`` MUST currently be
-    # wired in the live agent module for this trace's provider. Source of
-    # truth is the introspective helper, not the static mapping.
-    if captured_server:
-        currently_wired = _currently_wired_server_tools(trace.provider)
-        missing_server = captured_server - currently_wired
-        if missing_server:
-            errors.append(
-                f"server tool(s) no longer wired in current "
-                f"{trace.provider!r} agent module: "
-                + ", ".join(sorted(missing_server))
-            )
-
-    # Per-call validation
-    for call in trace.tool_calls:
-        tool_def = registry.get(call.name)
-        if tool_def is None:
-            errors.append(
-                f"tool_calls[{call.index}]: tool {call.name!r} not found in current registry"
-            )
-            continue
-        param_names = {p.name for p in tool_def.parameters}
-        required_names = {p.name for p in tool_def.parameters if p.required}
-        captured_keys = set(call.arguments.keys()) - {"_raw"}
-
-        # Captured key not in current schema → backward-incompat refactor
-        unknown = captured_keys - param_names
-        if unknown:
-            errors.append(
-                f"tool_calls[{call.index}] {call.name}: captured argument(s) "
-                f"{sorted(unknown)} no longer accepted by tool"
-            )
-        # Required parameter not in captured args → tool got stricter
-        missing_required = required_names - captured_keys
-        if missing_required:
-            errors.append(
-                f"tool_calls[{call.index}] {call.name}: tool now requires "
-                f"argument(s) {sorted(missing_required)} not present in capture"
-            )
+    # Attachment shape gate: (type, block_kind) pair must be producible
+    # by the current attachment-handling code path. The pair-level check
+    # rejects mis-classified entries like {"type":"pdf","block_kind":"image"}
+    # which a block_kind-only check would miss.
+    if trace.attachments_shape:
+        supported_pairs = _supported_attachment_pairs(trace.provider)
+        for i, entry in enumerate(trace.attachments_shape):
+            atype = entry.get("type")
+            block_kind = entry.get("block_kind")
+            if atype == "unknown":
+                # Per spec §6 risk register: 'unknown' opts out of
+                # attachment validation (intentional escape hatch).
+                continue
+            if (atype, block_kind) not in supported_pairs:
+                errors.append(
+                    f"attachments_shape[{i}]: pair "
+                    f"({atype!r}, {block_kind!r}) is not produced by "
+                    f"current {trace.provider!r} attachment-handling code; "
+                    f"supported pairs: {sorted(supported_pairs)}"
+                )
 
     # System prompt drift (warning only)
     if current_system_prompt is not None:

@@ -948,42 +948,400 @@ def test_classify_attachments_empty_bytes_uses_sha256_of_empty():
     assert out[0]["size_class"] == "small"
 
 
-def test_validate_registry_only_new_fixtures_clean(real_registry):
-    """The 3 fixtures whose tool_calls only reference core ``ToolRegistry``
-    tools must validate clean today (no ``unknown_tool`` /
-    ``unknown_arg`` / ``missing_required`` errors). Warnings such as
-    "tools newly registered" are allowed."""
+def test_validate_all_new_fixtures_clean(real_registry):
+    """All 4 commit-2 fixtures must validate clean against commit 3's
+    unified resolver — including ``subagent_turn`` whose
+    ``delegate_to_subagent`` resolves through the bridge-surface branch.
+    Warnings such as "tools newly registered" are allowed; errors are not.
+    """
     for path in (OPENAI_NO_TOOL_FIXTURE, OPENAI_ONE_TOOL_FIXTURE,
-                 ATTACHMENT_FIXTURE):
+                 ATTACHMENT_FIXTURE, SUBAGENT_FIXTURE):
         trace = load_trace(path)
         result = validate_trace_against_registry(trace, real_registry)
         assert result.passed, f"{path.name} did not validate clean: {result.render()}"
 
 
-def test_subagent_fixture_fails_today_pending_commit_3_resolver(real_registry):
-    """The subagent fixture references ``delegate_to_subagent`` — which is
-    bridge-only, NOT in ``ToolRegistry``. Today's validator reports it as
-    ``unknown_tool``. This test pins THAT specific failure shape so commit
-    3's UNIFIED RESOLVER has a concrete green-flip target.
+def test_subagent_fixture_validates_via_unified_resolver(real_registry):
+    """``subagent_turn`` fixture's parent tool call ``delegate_to_subagent``
+    is bridge-only (NOT in ``ToolRegistry``). The unified resolver must
+    find it via ``shared/bridge_tools.py`` (resolver step 3). The child
+    trace's ``get_ticker_news`` resolves via ``ToolRegistry`` (step 1).
 
-    Commit 3's contract (per spec §2.3): pinning is a REQUIRED-RESOLUTION
-    list, NOT a skip-list. The validator must consult, in order,
-    ``ToolRegistry`` → server-tools → provider bridge surface. Once the
-    bridge-surface branch lands, ``delegate_to_subagent`` resolves via
-    the Anthropic bridge and the fixture validates clean — without ever
-    bypassing per-call lookup. Skipping lookup would let Phase C silently
-    drop the bridge tool while the pin keeps the fixture green; the
-    resolver path closes that loophole.
-
-    If the failure shape changes (e.g. ``delegate_to_subagent`` is added
-    to ``ToolRegistry`` core, or the validator's error message format
-    drifts), this test fails — by design — and commit 3 must update it
-    alongside flipping the assertion to ``passed is True``.
+    This test was the pinned-failure target before commit 3 (see
+    ``test_subagent_fixture_fails_today_pending_commit_3_resolver`` in git
+    history) — flipped to pass-case once the bridge branch landed.
     """
     trace = load_trace(SUBAGENT_FIXTURE)
     result = validate_trace_against_registry(trace, real_registry)
-    assert result.passed is False
-    # The single error must point at delegate_to_subagent specifically.
-    assert any("delegate_to_subagent" in e for e in result.errors), (
-        f"Expected unknown_tool error for delegate_to_subagent; got: {result.render()}"
+    assert result.passed, (
+        f"subagent fixture must validate clean via unified resolver: "
+        f"{result.render()}"
     )
+    # Subagent recursion happened: nested trace has 1 tool call, no errors.
+    assert trace.subagent_traces is not None
+    assert len(trace.subagent_traces) == 1
+
+
+# ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 3: unified resolver regression tests
+# ---------------------------------------------------------------------------
+
+
+def _fake_registry(tools_by_name):
+    """Build a minimal registry shim accepted by the validator.
+
+    ``tools_by_name`` maps name → object exposing ``parameters`` (each
+    with ``.name`` + ``.required``). Used to construct registry deltas
+    (added / removed tools) without touching the live registry.
+    """
+    from types import SimpleNamespace
+
+    def _param(name, required=False):
+        return SimpleNamespace(name=name, required=required)
+
+    class _Reg:
+        def __init__(self, table):
+            self._table = dict(table)
+
+        def list_names(self):
+            return list(self._table.keys())
+
+        def get(self, name):
+            return self._table.get(name)
+
+    return _Reg(tools_by_name), _param
+
+
+def test_pinned_tool_names_respects_registry_additions(real_registry):
+    """Adding an unrelated tool to the registry must not fail a fixture
+    whose pin only names tools it actually uses. This is the
+    "expected-diff pass" acceptance from spec §4.2.
+    """
+    trace = load_trace(ONE_TOOL_FIXTURE)
+    # Pin only the actually-called tool.
+    trace.pinned_tool_names = ["get_ticker_news"]
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed, result.render()
+
+
+def test_pinned_tool_names_rejects_when_pinned_tool_removed(real_registry):
+    """Removing a pinned tool from the registry must produce an
+    ``unknown_tool``-style error naming the pin. Spec §4.2 expected-diff
+    fail acceptance.
+    """
+    trace = load_trace(ONE_TOOL_FIXTURE)
+    # Pin a name we'll then strip from a stub registry.
+    trace.pinned_tool_names = ["get_ticker_news"]
+
+    stripped, _ = _fake_registry({})  # registry that knows zero tools
+    result = validate_trace_against_registry(trace, stripped)
+    assert result.passed is False
+    assert any(
+        "pinned_tool_names" in e and "get_ticker_news" in e
+        for e in result.errors
+    ), f"Expected pinned_tool_names error for get_ticker_news; got: {result.render()}"
+
+
+def test_bridge_drop_makes_subagent_fixture_fail(monkeypatch, real_registry):
+    """LOAD-BEARING for spec §2.3 resolver contract: pinning is
+    REQUIRED-RESOLUTION, NOT skip-lookup.
+
+    If pinning were "trust and skip lookup," dropping
+    ``delegate_to_subagent`` from the bridge surface would still leave
+    ``subagent_turn`` validating green (Phase C silently breaks
+    subagent dispatch with no test signal). Because the unified
+    resolver actually consults the bridge surface, removing the bridge
+    entry produces ``unknown_tool`` for ``delegate_to_subagent``.
+    """
+    monkeypatch.setattr(
+        "src.agents.shared.bridge_tools.all_bridge_specs_for_provider",
+        lambda provider: {},
+    )
+    trace = load_trace(SUBAGENT_FIXTURE)
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "delegate_to_subagent" in e for e in result.errors
+    ), f"Expected unknown_tool for delegate_to_subagent; got: {result.render()}"
+
+
+def test_bridge_arg_shape_missing_required_fails(real_registry):
+    """Bridge tools must use the SAME arg-shape gate as registry tools.
+    A ``delegate_to_subagent`` call missing the required ``task`` arg
+    must fail with ``missing_required``-style error. Without this,
+    Phase C could rename ``task`` → ``prompt`` and the fixture would
+    still validate green.
+    """
+    trace = load_trace(SUBAGENT_FIXTURE)
+    # Mutate first tool call to drop ``task``.
+    bad_call = trace.tool_calls[0]
+    bad_call.arguments = {"subagent": "data_summarizer"}
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "delegate_to_subagent" in e and "task" in e and "requires" in e
+        for e in result.errors
+    ), f"Expected missing-required error for 'task'; got: {result.render()}"
+
+
+def test_bridge_arg_shape_unknown_arg_fails(real_registry):
+    """Symmetric to ``missing_required``: a captured arg not in the
+    bridge spec must fail with ``unknown_arg`` shape — catches Phase C
+    accepting a deprecated arg name silently.
+    """
+    trace = load_trace(SUBAGENT_FIXTURE)
+    bad_call = trace.tool_calls[0]
+    bad_call.arguments = {
+        "subagent": "data_summarizer",
+        "task": "summarize",
+        "obsolete_arg": "x",
+    }
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "delegate_to_subagent" in e and "obsolete_arg" in e and "no longer accepted" in e
+        for e in result.errors
+    ), f"Expected unknown-arg error for 'obsolete_arg'; got: {result.render()}"
+
+
+def test_attachment_pair_passes_clean(real_registry):
+    """``attachment_turn`` ships ``("pdf", "document")`` and
+    ``("image", "image")`` pairs — both are produced by the current
+    Anthropic ``AttachmentManager.to_anthropic_blocks``, so the
+    validator must accept the fixture clean.
+    """
+    trace = load_trace(ATTACHMENT_FIXTURE)
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed, result.render()
+
+
+def test_attachment_pair_fails_when_pair_removed(monkeypatch, real_registry):
+    """Spec §4.2 attachment-fail acceptance: monkeypatching the
+    supported-pair helper to drop ``("pdf", "document")`` makes
+    ``attachment_turn`` fail with an attachment-shape diff. The pair
+    granularity (NOT just block_kind) is what catches mis-classified
+    entries — see ``test_attachment_pair_check_is_pair_not_just_block_kind``.
+    """
+    from src.agents.shared import replay as replay_mod
+
+    monkeypatch.setattr(
+        replay_mod,
+        "_supported_attachment_pairs",
+        lambda provider: {("image", "image"), ("text", "text")},  # drops pdf/document
+    )
+    trace = load_trace(ATTACHMENT_FIXTURE)
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "attachments_shape" in e and "'pdf'" in e and "'document'" in e
+        for e in result.errors
+    ), f"Expected pair-mismatch error for (pdf, document); got: {result.render()}"
+
+
+def test_attachment_pair_check_is_pair_not_just_block_kind(real_registry):
+    """A fixture-style entry with mismatched type/block_kind
+    (``{"type":"pdf","block_kind":"image"}``) must fail — even though
+    "image" is a valid block_kind on its own. Validates that the gate
+    is on the PAIR, not on each axis independently.
+    """
+    trace = load_trace(ATTACHMENT_FIXTURE)
+    # Forge a mis-classified entry: pdf with image block_kind.
+    trace.attachments_shape = [{
+        "type": "pdf",
+        "size_class": "small",
+        "mime": "application/pdf",
+        "content_digest": "0" * 16,
+        "block_kind": "image",
+    }]
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "attachments_shape" in e and "'pdf'" in e and "'image'" in e
+        for e in result.errors
+    ), f"Expected pair-mismatch error; got: {result.render()}"
+
+
+def test_attachment_unknown_type_opts_out(real_registry):
+    """Per spec §6 risk register: ``type == "unknown"`` is the explicit
+    opt-out — the validator skips the pair check rather than failing.
+    Reviewers reject ``unknown`` fixtures unless intentional.
+    """
+    trace = load_trace(ATTACHMENT_FIXTURE)
+    trace.attachments_shape = [{
+        "type": "unknown",
+        "size_class": "small",
+        "mime": "application/octet-stream",
+        "content_digest": "0" * 16,
+        "block_kind": "definitely_not_real",
+    }]
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed, result.render()
+
+
+def test_subagent_recursion_emits_role_prefixed_errors(real_registry):
+    """Errors inside ``subagent_traces`` must be prefixed with the
+    role for traceability. Ensures commit 3's recursion isn't a silent
+    no-op: corrupt the child's tool name and confirm the error names
+    the subagent role.
+    """
+    trace = load_trace(SUBAGENT_FIXTURE)
+    # Corrupt the child's tool call to a non-existent name.
+    trace.subagent_traces[0]["tool_calls"][0]["name"] = "definitely_not_a_tool"
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    assert any(
+        "subagent_traces[0]" in e
+        and "data_summarizer" in e
+        and "definitely_not_a_tool" in e
+        for e in result.errors
+    ), f"Expected role-prefixed child error; got: {result.render()}"
+
+
+# ---------------------------------------------------------------------------
+# Forward safeguards — keep helper tables in sync with live code paths
+# ---------------------------------------------------------------------------
+
+
+def test_bridge_helper_stays_in_sync_with_anthropic_surface(real_registry):
+    """Forward safeguard: the names exposed by Anthropic's bridge but
+    NOT in ``ToolRegistry`` must equal the keys in
+    ``anthropic_bridge_tool_specs``. Phase C adding a new bridge-only
+    tool without updating the helper fails this test.
+
+    Server-tool kinds (``server:*``) are stripped because they live
+    in ``shared/server_tools.py``, not the bridge spec table.
+    """
+    from src.agents.anthropic_agent.tools import get_anthropic_tools
+    from src.agents.shared.bridge_tools import anthropic_bridge_tool_specs
+
+    # Force-on hosted-tool config so ``get_anthropic_tools`` includes
+    # everything the bridge can wire — we want the maximal surface,
+    # then we subtract registry + server-tool stand-ins.
+    surface_names = {t["name"] for t in get_anthropic_tools()}
+    registry_names = set(real_registry.list_names())
+
+    bridge_only = surface_names - registry_names
+    helper_names = set(anthropic_bridge_tool_specs().keys())
+    assert bridge_only == helper_names, (
+        f"Anthropic bridge surface drift — surface_only={bridge_only}, "
+        f"helper={helper_names}. Update shared/bridge_tools.py to match."
+    )
+
+
+def test_bridge_helper_stays_in_sync_with_openai_surface(real_registry):
+    """Symmetric forward safeguard for OpenAI. The agents SDK exposes
+    each function's ``__name__`` to the model with a ``tool_`` prefix,
+    so we strip it before comparing to the canonical helper.
+    """
+    from src.agents.openai_agent.tools import create_openai_tools
+    from src.agents.shared.bridge_tools import openai_bridge_tool_specs
+
+    # ``create_openai_tools`` needs a DAL; it's only used for closure
+    # over data access, not for listing names — pass a dummy.
+    class _DummyDAL:
+        pass
+
+    bridge_objs = create_openai_tools(_DummyDAL())
+    raw_names = set()
+    for t in bridge_objs:
+        # @function_tool wrappers expose ``.name`` (FunctionTool) or
+        # the underlying function's ``__name__``.
+        name = getattr(t, "name", None) or getattr(t, "__name__", "")
+        raw_names.add(name)
+    # Strip bridge prefix so we compare canonical names.
+    canonical = {n[len("tool_"):] if n.startswith("tool_") else n for n in raw_names}
+    registry_names = set(real_registry.list_names())
+
+    bridge_only = canonical - registry_names
+    helper_names = set(openai_bridge_tool_specs().keys())
+    assert bridge_only == helper_names, (
+        f"OpenAI bridge surface drift — surface_only={bridge_only}, "
+        f"helper={helper_names}. Update shared/bridge_tools.py to match."
+    )
+
+
+def _probe_attachments():
+    """Build canonical PDF / PNG / text ``Attachment`` instances for
+    forward-safeguard tests. ``AttachmentManager`` accepts pre-built
+    ``Attachment`` objects; the bytes are minimal-valid since
+    ``to_anthropic_blocks`` only base64-encodes them, and
+    ``to_openai_blocks``'s PDF extraction is monkeypatched at call site.
+    """
+    from src.agents.shared.attachments import Attachment
+
+    return [
+        Attachment(
+            path="/tmp/probe.pdf",
+            filename="probe.pdf",
+            media_type="application/pdf",
+            data=b"%PDF-1.4\n" + b"x" * 100,
+        ),
+        Attachment(
+            path="/tmp/probe.png",
+            filename="probe.png",
+            media_type="image/png",
+            data=b"\x89PNG\r\n\x1a\n" + b"x" * 100,
+        ),
+        Attachment(
+            path="/tmp/probe.txt",
+            filename="probe.txt",
+            media_type="text/plain",
+            data=b"hello world",
+        ),
+    ]
+
+
+def test_supported_attachment_pairs_match_anthropic_attachment_manager():
+    """Forward safeguard for the (type, block_kind) registry: every
+    pair the live ``AttachmentManager.to_anthropic_blocks`` actually
+    produces must appear in ``_supported_attachment_pairs("anthropic")``.
+
+    Drift in ``attachments.py`` (e.g. PDF moves from ``document`` to
+    ``url``) breaks this test before any fixture silently passes.
+    """
+    from src.agents.shared.attachments import AttachmentManager
+    from src.agents.shared.replay import _supported_attachment_pairs
+
+    blocks = AttachmentManager.to_anthropic_blocks(_probe_attachments())
+    supported = _supported_attachment_pairs("anthropic")
+    # Probe order tracks emitted order. Anthropic emits a block per
+    # attachment (no decoding required), so all 3 are present.
+    assert len(blocks) == 3
+    expected_types = ["pdf", "image", "text"]
+    for canonical_type, block in zip(expected_types, blocks):
+        block_kind = block.get("type")
+        assert (canonical_type, block_kind) in supported, (
+            f"Anthropic block ({canonical_type!r}, {block_kind!r}) emitted "
+            f"by AttachmentManager but not in _supported_attachment_pairs."
+        )
+
+
+def test_supported_attachment_pairs_match_openai_attachment_manager(monkeypatch):
+    """Symmetric forward safeguard for OpenAI. PDF on OpenAI extracts
+    to ``input_text`` via ``PDFProcessor.extract_text`` — we patch the
+    extractor to a stub since the probe bytes aren't a real PDF; the
+    test gates on the BLOCK KIND, not the extracted content.
+    """
+    from src.agents.shared import attachments as attachments_mod
+    from src.agents.shared.attachments import AttachmentManager
+    from src.agents.shared.replay import _supported_attachment_pairs
+
+    monkeypatch.setattr(
+        attachments_mod.PDFProcessor,
+        "extract_text",
+        staticmethod(lambda data, pages="": "stub-extracted text"),
+    )
+
+    blocks = AttachmentManager.to_openai_blocks(_probe_attachments())
+    # OpenAI emit order: image-first PDF/text fallthrough — the manager
+    # iterates in the original list order, so emission order = probe
+    # order = pdf, image, text.
+    assert len(blocks) == 3
+    supported = _supported_attachment_pairs("openai")
+    expected_types = ["pdf", "image", "text"]
+    for canonical_type, block in zip(expected_types, blocks):
+        block_kind = block.get("type")
+        assert (canonical_type, block_kind) in supported, (
+            f"OpenAI block ({canonical_type!r}, {block_kind!r}) emitted "
+            f"by AttachmentManager but not in _supported_attachment_pairs."
+        )
