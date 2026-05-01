@@ -568,6 +568,34 @@ def test_openai_wiring_omits_hosted_when_flag_off():
     assert out == base
 
 
+def _file_references_target(py_path, target: str) -> bool:
+    """Return True iff ``py_path`` imports or references ``target``.
+
+    AST-based: catches three shapes — ``ImportFrom`` (``from x import target``),
+    bare ``Name`` (``x = target``), and ``Attribute`` access
+    (``a_mod.target``). Comments / docstrings mentioning the name are
+    NOT flagged because they parse to ``ast.Constant`` strings.
+
+    Returns False on read errors or syntax errors (best-effort scan;
+    the architectural test still passes when an unrelated file is
+    transiently broken).
+    """
+    import ast
+    try:
+        tree = ast.parse(py_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if any(alias.name == target for alias in node.names):
+                return True
+        if isinstance(node, ast.Name) and node.id == target:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == target:
+            return True
+    return False
+
+
 def test_claude_web_search_constant_only_imported_via_helper():
     """Architectural safeguard: ``_CLAUDE_WEB_SEARCH_TOOL`` is owned by
     ``anthropic_agent/agent.py`` and consumed by ``shared/server_tools.py``.
@@ -583,7 +611,6 @@ def test_claude_web_search_constant_only_imported_via_helper():
     Uses AST so comments / docstrings mentioning the constant by name
     don't trigger a false positive — only actual import statements do.
     """
-    import ast
     from pathlib import Path
 
     repo_root = Path(__file__).parent.parent
@@ -599,32 +626,62 @@ def test_claude_web_search_constant_only_imported_via_helper():
     for py_file in src_root.rglob("*.py"):
         if py_file.resolve() in allowed:
             continue
-        try:
-            tree = ast.parse(py_file.read_text(encoding="utf-8"))
-        except (OSError, SyntaxError):
-            continue
-        for node in ast.walk(tree):
-            # `from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL`
-            if isinstance(node, ast.ImportFrom):
-                if any(alias.name == target for alias in node.names):
-                    offenders.append(str(py_file.relative_to(repo_root)))
-                    break
-            # Bare `_CLAUDE_WEB_SEARCH_TOOL` as a Name — direct
-            # reference inside the same module's namespace.
-            if isinstance(node, ast.Name) and node.id == target:
-                offenders.append(str(py_file.relative_to(repo_root)))
-                break
-            # Module-attribute access: `a_mod._CLAUDE_WEB_SEARCH_TOOL`
-            # (after `import src.agents.anthropic_agent.agent as a_mod`).
-            # Without this branch, a future file could bypass the helper
-            # by importing the module + reading the attribute.
-            if isinstance(node, ast.Attribute) and node.attr == target:
-                offenders.append(str(py_file.relative_to(repo_root)))
-                break
+        if _file_references_target(py_file, target):
+            offenders.append(str(py_file.relative_to(repo_root)))
 
     assert not offenders, (
         f"Modules importing or referencing {target} outside the "
         f"single-source-of-truth path: {offenders}. Use "
         f"`from src.agents.shared.server_tools import anthropic_server_tools` "
         f"and iterate the (kind, tool_def) pairs instead."
+    )
+
+
+def test_guard_helper_detects_each_bypass_shape(tmp_path):
+    """Lock the guard's behaviour against synthetic bypass shapes —
+    ensures all three AST branches (ImportFrom / Name / Attribute) stay
+    wired. If a future refactor accidentally removes a branch,
+    ``_file_references_target`` would return False here and this test
+    fails before the architectural scan can silently pass.
+    """
+    target = "_CLAUDE_WEB_SEARCH_TOOL"
+
+    # 1. ImportFrom — direct import of the constant.
+    f_import = tmp_path / "via_import_from.py"
+    f_import.write_text(f"from x.y import {target}\n")
+    assert _file_references_target(f_import, target), (
+        "Guard missed ImportFrom — `from x.y import _CLAUDE_WEB_SEARCH_TOOL`"
+    )
+
+    # 2. Bare Name — the symbol used as a value (e.g. via a star import
+    #    or after being bound elsewhere in the same module).
+    f_name = tmp_path / "via_bare_name.py"
+    f_name.write_text(f"def f():\n    return {target}\n")
+    assert _file_references_target(f_name, target), (
+        "Guard missed bare Name — `return _CLAUDE_WEB_SEARCH_TOOL`"
+    )
+
+    # 3. Attribute access — `a_mod._CLAUDE_WEB_SEARCH_TOOL` after
+    #    importing the module. This is the bypass shape the original
+    #    AST guard missed (Low review finding).
+    f_attr = tmp_path / "via_attribute.py"
+    f_attr.write_text(
+        "from src.agents.anthropic_agent import agent as a_mod\n"
+        f"def f():\n    return a_mod.{target}\n"
+    )
+    assert _file_references_target(f_attr, target), (
+        "Guard missed Attribute — `a_mod._CLAUDE_WEB_SEARCH_TOOL`"
+    )
+
+    # 4. Negative control — a comment or docstring mentioning the name
+    #    must NOT be flagged (we'd lose code-review-friendly
+    #    documentation referring to the constant by name).
+    f_comment = tmp_path / "comment_only.py"
+    f_comment.write_text(
+        f'"""Docstring mentions {target} as documentation."""\n'
+        f"# Comment also mentions {target}\n"
+        "x = 1\n"
+    )
+    assert not _file_references_target(f_comment, target), (
+        "Guard false-positive on comment / docstring mention"
     )
