@@ -604,16 +604,21 @@ def test_claude_web_search_constant_only_imported_via_helper():
         except (OSError, SyntaxError):
             continue
         for node in ast.walk(tree):
-            # ImportFrom: from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL
+            # `from src.agents.anthropic_agent.agent import _CLAUDE_WEB_SEARCH_TOOL`
             if isinstance(node, ast.ImportFrom):
                 if any(alias.name == target for alias in node.names):
                     offenders.append(str(py_file.relative_to(repo_root)))
                     break
-            # Import: import src.agents.anthropic_agent.agent as ...
-            #   (no constant-level import via plain Import; no need to
-            #   cover, since constant access would still need attribute
-            #   access — but cover Name lookups defensively below)
+            # Bare `_CLAUDE_WEB_SEARCH_TOOL` as a Name — direct
+            # reference inside the same module's namespace.
             if isinstance(node, ast.Name) and node.id == target:
+                offenders.append(str(py_file.relative_to(repo_root)))
+                break
+            # Module-attribute access: `a_mod._CLAUDE_WEB_SEARCH_TOOL`
+            # (after `import src.agents.anthropic_agent.agent as a_mod`).
+            # Without this branch, a future file could bypass the helper
+            # by importing the module + reading the attribute.
+            if isinstance(node, ast.Attribute) and node.attr == target:
                 offenders.append(str(py_file.relative_to(repo_root)))
                 break
 
