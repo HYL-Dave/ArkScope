@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-01T10:01:00+00:00",
+  "entrypoint": "test",
+  "provider": "openai",
+  "model": "gpt-5.4",
+  "session_id": "fixture_openai_one_tool",
+  "turn_id": 1,
+  "system_prompt_hash": "0000000000000000",
+  "user_input": "Summarize recent news for NVDA.",
+  "tools_available": [
+    "get_news_brief",
+    "get_ticker_news"
+  ],
+  "tool_calls": [
+    {
+      "index": 0,
+      "name": "get_ticker_news",
+      "arguments": {
+        "days": 7,
+        "ticker": "NVDA"
+      },
+      "arguments_digest": "0000000000000000",
+      "result_digest": "1111111111111111",
+      "result_shape": {
+        "ticker": "str",
+        "articles": [
+          {
+            "title": "str",
+            "date": "str",
+            "source": "str",
+            "sentiment_gpt_5_4_xhigh": "int",
+            "risk_gpt_5_4_xhigh": "int"
+          }
+        ],
+        "count": "int"
+      },
+      "compression": null,
+      "provider_tool_name": "tool_get_ticker_news"
+    }
+  ],
+  "final_answer": "NVDA recent news shows mixed sentiment over the past 7 days.",
+  "final_answer_hash": "0000000000000000",
+  "usage": {
+    "input_tokens": 1500,
+    "output_tokens": 80
+  },
+  "notes": "Hand-crafted OpenAI one-tool fixture. tool_calls[0].name is the canonical registry name; provider_tool_name preserves the OpenAI SDK bridge prefix (tool_<canonical>). pinned_tool_names locks only the tool the fixture actually depends on, NOT all of tools_available.",
+  "subagent_traces": null,
+  "pinned_tool_names": [
+    "get_ticker_news"
+  ],
+  "attachments_shape": null
+}

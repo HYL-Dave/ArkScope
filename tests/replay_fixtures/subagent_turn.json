@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-01T10:03:00+00:00",
+  "entrypoint": "test",
+  "provider": "anthropic",
+  "model": "claude-opus-4-7",
+  "session_id": "fixture_subagent",
+  "turn_id": 1,
+  "system_prompt_hash": "0000000000000000",
+  "user_input": "Run a deep summary of NVDA news and tell me the dominant sentiment.",
+  "tools_available": [
+    "get_news_brief",
+    "get_ticker_news"
+  ],
+  "tool_calls": [],
+  "final_answer": "Subagent reports neutral-to-positive sentiment on NVDA over the last 7 days, dominated by earnings-beat coverage.",
+  "final_answer_hash": "0000000000000000",
+  "usage": {
+    "input_tokens": 3100,
+    "output_tokens": 110
+  },
+  "notes": "Hand-crafted subagent fixture. v1 has no live subagent capture — parent's tool_calls is empty because the delegate-to-subagent dispatch happens outside the recorded tool loop. The child trace is embedded in subagent_traces[] with the same nested shape (tools_available + tool_calls) so commit 3's validator can recurse and catch child-side tool drift. Hashes are illustrative; the field's existence + nested shape is what's load-bearing.",
+  "subagent_traces": [
+    {
+      "role": "data_summarizer",
+      "system_prompt_hash": "1111111111111111",
+      "tools_available": [
+        "get_news_brief",
+        "get_ticker_news"
+      ],
+      "tool_calls": [
+        {
+          "index": 0,
+          "name": "get_ticker_news",
+          "arguments": {
+            "days": 7,
+            "ticker": "NVDA"
+          },
+          "arguments_digest": "2222222222222222",
+          "result_digest": "3333333333333333",
+          "result_shape": {
+            "ticker": "str",
+            "articles": [
+              {
+                "title": "str",
+                "date": "str",
+                "source": "str"
+              }
+            ],
+            "count": "int"
+          },
+          "compression": null,
+          "provider_tool_name": null
+        }
+      ],
+      "final_answer_hash": "4444444444444444"
+    }
+  ],
+  "pinned_tool_names": null,
+  "attachments_shape": null
+}

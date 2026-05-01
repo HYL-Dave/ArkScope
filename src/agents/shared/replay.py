@@ -187,6 +187,101 @@ def _currently_wired_server_tools(provider: str) -> Set[str]:
 
 
 # ---------------------------------------------------------------------------
+# P0.1 full-v1 commit 2: attachments_shape classifier
+# ---------------------------------------------------------------------------
+
+# Size class thresholds (per spec §2.2.1). The boundaries are inclusive on
+# the lower side — bytes are integers, fractional sizes never apply.
+_SIZE_CLASS_BOUNDARIES = (
+    (32 * 1024, "small"),         # ≤ 32 KB
+    (512 * 1024, "medium"),       # ≤ 512 KB
+    (8 * 1024 * 1024, "large"),   # ≤ 8 MB
+    # > 8 MB → "huge" (catch-all below)
+)
+
+
+def _size_class(num_bytes: int) -> str:
+    for boundary, label in _SIZE_CLASS_BOUNDARIES:
+        if num_bytes <= boundary:
+            return label
+    return "huge"
+
+
+# Provider-native block kinds derived from `AttachmentManager.to_anthropic_blocks`
+# (Anthropic) and `to_openai_blocks` (OpenAI) in `src/agents/shared/attachments.py`.
+# The classifier mirrors those block-construction paths exactly — if the
+# attachment-handling code changes (e.g. switches PDF-as-document to URL),
+# this classifier needs to track it.
+def classify_attachments(provider: str, attachments: Any) -> Optional[List[Dict[str, Any]]]:
+    """Convert an iterable of ``Attachment`` objects to the
+    ``attachments_shape`` field shape.
+
+    Each output entry: ``{type, size_class, mime, content_digest, block_kind}``.
+
+    - ``type``: canonical kind (``pdf`` / ``image`` / ``text`` / ``unknown``)
+    - ``size_class``: ``small`` / ``medium`` / ``large`` / ``huge``
+    - ``mime``: provider-reported media type
+    - ``content_digest``: SHA256 prefix of raw bytes (stable across base64
+      and provider-block reshaping)
+    - ``block_kind``: provider-native block ``type`` field — what the
+      real content block emits (``document`` / ``image`` / ``text`` for
+      Anthropic; ``input_image`` / ``input_text`` for OpenAI)
+
+    Returns ``None`` when ``attachments`` is None or empty so the field
+    stays unset on traces with no attachments. Best-effort: any exception
+    while inspecting an attachment yields an ``unknown``-typed entry
+    rather than raising, matching the rest of the capture path's
+    exception-swallowing pattern.
+    """
+    if not attachments:
+        return None
+    out: List[Dict[str, Any]] = []
+    for att in attachments:
+        try:
+            data = getattr(att, "data", b"") or b""
+            mime = getattr(att, "media_type", None)
+            digest = digest_json(data) if data else ""
+            size = len(data) if data else 0
+            sclass = _size_class(size)
+
+            is_pdf = bool(getattr(att, "is_pdf", False))
+            is_image = bool(getattr(att, "is_image", False))
+            is_text = bool(getattr(att, "is_text", False))
+
+            if is_pdf:
+                canonical = "pdf"
+                block_kind = "document" if provider == "anthropic" else "input_text"
+            elif is_image:
+                canonical = "image"
+                block_kind = "image" if provider == "anthropic" else "input_image"
+            elif is_text:
+                canonical = "text"
+                block_kind = "text" if provider == "anthropic" else "input_text"
+            else:
+                canonical = "unknown"
+                # Fallback path in attachments.py also lands as text/input_text.
+                block_kind = "text" if provider == "anthropic" else "input_text"
+
+            out.append({
+                "type": canonical,
+                "size_class": sclass,
+                "mime": mime,
+                "content_digest": digest,
+                "block_kind": block_kind,
+            })
+        except Exception as exc:  # noqa: BLE001 — best-effort, mirror capture path
+            logger.warning("classify_attachments: skipping malformed attachment: %s", exc)
+            out.append({
+                "type": "unknown",
+                "size_class": "small",
+                "mime": None,
+                "content_digest": "",
+                "block_kind": "unknown",
+            })
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Trace dataclass
 # ---------------------------------------------------------------------------
 
@@ -230,6 +325,29 @@ class ReplayTrace:
     final_answer_hash: str = ""
     usage: Dict[str, Any] = field(default_factory=dict)
     notes: str = ""
+    # P0.1 full-v1 commit 2: opt-in fields for fixture coverage of paths
+    # not exercised by the live capture loop. Each is forward-compatible
+    # (None default) so old fixtures continue to load.
+    #
+    # ``subagent_traces``: hand-crafted nested traces describing what the
+    # subagent path WOULD record once real capture wiring lands. Each entry
+    # is `{role, system_prompt_hash, tools_available[], tool_calls[],
+    # final_answer_hash}`. Validator (commit 3) recurses into the nested
+    # tools_available + tool_calls to catch child-side tool drift.
+    subagent_traces: Optional[List[Dict[str, Any]]] = None
+    # ``pinned_tool_names``: explicit list of registry tools whose
+    # presence the validator (commit 3) MUST gate, regardless of registry
+    # additions/removals elsewhere. Pin only the tools the fixture's
+    # behaviour depends on (e.g. the one tool actually called); do NOT
+    # mirror the full ``tools_available``. Server tools (``server:*``)
+    # stay out of this pin and remain validated by the server-tool path.
+    pinned_tool_names: Optional[List[str]] = None
+    # ``attachments_shape``: per-attachment classification produced at
+    # capture time. Each entry: ``{type, size_class, mime, content_digest,
+    # block_kind}``. Validator (commit 3) asserts the current code path
+    # can produce a block of the same ``type`` + ``block_kind`` for the
+    # trace's provider — i.e. attachment handling is still wired.
+    attachments_shape: Optional[List[Dict[str, Any]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -280,6 +398,11 @@ class ReplayCapture:
         self._usage: Dict[str, Any] = {}
         self._notes: str = ""
         self._tool_call_index = 0
+        # P0.1 full-v1 commit 2: opt-in trace fields. None when unused so
+        # the trace's JSON stays small for the common case.
+        self._attachments_shape: Optional[List[Dict[str, Any]]] = None
+        self._pinned_tool_names: Optional[List[str]] = None
+        self._subagent_traces: Optional[List[Dict[str, Any]]] = None
 
     # -- recording -----------------------------------------------------------
 
@@ -288,10 +411,19 @@ class ReplayCapture:
         question: str,
         system_prompt: str,
         tools_available: Sequence[str],
+        *,
+        attachments_shape: Optional[List[Dict[str, Any]]] = None,
+        pinned_tool_names: Optional[Sequence[str]] = None,
     ) -> None:
         self._user_input = question
         self._system_prompt_hash = hash_text(system_prompt)
         self._tools_available = sorted(tools_available)
+        # P0.1 full-v1 commit 2: opt-in. ``None`` keeps the trace's JSON
+        # free of empty arrays — easier to diff hand-crafted fixtures.
+        self._attachments_shape = attachments_shape if attachments_shape else None
+        self._pinned_tool_names = (
+            sorted(pinned_tool_names) if pinned_tool_names else None
+        )
 
     def record_tool_call(
         self,
@@ -342,6 +474,13 @@ class ReplayCapture:
             final_answer_hash=hash_text(self._final_answer) if self._final_answer else "",
             usage=self._usage,
             notes=self._notes,
+            # P0.1 full-v1 commit 2: opt-in fields. None at capture time
+            # unless ``set_initial`` populated them; hand-crafted fixtures
+            # populate ``subagent_traces`` directly via JSON since no live
+            # subagent-capture wiring exists in v1.
+            subagent_traces=self._subagent_traces,
+            pinned_tool_names=self._pinned_tool_names,
+            attachments_shape=self._attachments_shape,
         )
 
     def save(self, output_dir: Optional[Path] = None) -> Path:
@@ -436,6 +575,11 @@ def load_trace(path: Path) -> ReplayTrace:
         final_answer_hash=data.get("final_answer_hash", ""),
         usage=data.get("usage", {}),
         notes=data.get("notes", ""),
+        # P0.1 full-v1 commit 2: forward-compat — None for fixtures
+        # captured before these fields landed.
+        subagent_traces=data.get("subagent_traces"),
+        pinned_tool_names=data.get("pinned_tool_names"),
+        attachments_shape=data.get("attachments_shape"),
     )
 
 

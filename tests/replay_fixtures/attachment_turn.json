@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-01T10:02:00+00:00",
+  "entrypoint": "test",
+  "provider": "anthropic",
+  "model": "claude-opus-4-7",
+  "session_id": "fixture_attachment",
+  "turn_id": 1,
+  "system_prompt_hash": "0000000000000000",
+  "user_input": "Summarize this PDF and describe the chart image.",
+  "tools_available": [
+    "get_news_brief",
+    "get_ticker_news"
+  ],
+  "tool_calls": [],
+  "final_answer": "The PDF discusses Q3 earnings; the image shows a stock chart trending upward.",
+  "final_answer_hash": "0000000000000000",
+  "usage": {
+    "input_tokens": 4200,
+    "output_tokens": 60
+  },
+  "notes": "Hand-crafted Anthropic attachment fixture. attachments_shape carries one PDF (document block) and one PNG (image block). Validator (commit 3) gates that to_anthropic_blocks still emits each block_kind for the trace's provider; absent that wiring, the attachment fixture would be schema-only theatre.",
+  "subagent_traces": null,
+  "pinned_tool_names": null,
+  "attachments_shape": [
+    {
+      "type": "pdf",
+      "size_class": "medium",
+      "mime": "application/pdf",
+      "content_digest": "aaaaaaaaaaaaaaaa",
+      "block_kind": "document"
+    },
+    {
+      "type": "image",
+      "size_class": "small",
+      "mime": "image/png",
+      "content_digest": "bbbbbbbbbbbbbbbb",
+      "block_kind": "image"
+    }
+  ]
+}

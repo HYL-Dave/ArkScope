@@ -21,6 +21,7 @@ from ..shared.replay import (
     ReplayCapture,
     _SERVER_TOOL_KINDS_BY_PROVIDER,
     _canonical_tool_name,
+    classify_attachments,
     is_capture_enabled,
 )
 from ..shared.server_tools import openai_server_tools
@@ -253,10 +254,17 @@ def _install_capture(
     all_tools: list,
     model_name: str,
     entrypoint: str,
+    attachments: Optional[list] = None,
 ) -> Optional[ReplayCapture]:
     """Build + arm a ``ReplayCapture`` for the OpenAI path. Returns
     ``None`` when the env flag is off or any wiring step raises (the
     agent path stays alive — capture is best-effort).
+
+    ``attachments`` is the same list later passed to
+    ``AttachmentManager.to_openai_blocks``; the capture records its
+    classification at install time so ``attachments_shape`` reflects
+    what the provider WILL produce, independent of when the content
+    blocks themselves are built.
     """
     if not is_capture_enabled():
         return None
@@ -270,6 +278,7 @@ def _install_capture(
             question=question,
             system_prompt=system_prompt,
             tools_available=_replay_tools_available_openai(all_tools),
+            attachments_shape=classify_attachments("openai", attachments),
         )
         return capture
     except Exception as exc:
@@ -403,12 +412,17 @@ async def run_query(
     tools_used: List[str] = []
 
     # P0.1 full-v1: replay capture (gated by ARKSCOPE_REPLAY_CAPTURE).
+    # ``attachments`` flows in so the capture can classify and store
+    # ``attachments_shape`` even though the actual content blocks are
+    # built later (line ~426 below). Order-independence keeps capture
+    # a true side-channel of the agent path.
     capture = _install_capture(
         question=question,
         system_prompt=effective_prompt,
         all_tools=getattr(agent, "tools", tools),
         model_name=model_name,
         entrypoint="api",
+        attachments=attachments,
     )
 
     # Server-side compaction (Phase 7a)
