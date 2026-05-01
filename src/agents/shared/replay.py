@@ -63,12 +63,32 @@ def digest_json(value: Any) -> str:
     Sorts dict keys, uses tight separators, falls back to ``str()`` for
     non-JSON-native types (e.g. datetime, numpy types). Stable across
     runs given the same logical value.
+
+    NOTE: do NOT use this for raw byte content (e.g. attachment file
+    bytes) — JSON serialisation of ``bytes`` falls through ``default=str``
+    and hashes the ``str(b'...')`` repr, NOT the bytes themselves. Use
+    ``digest_bytes`` for that case.
     """
     try:
         canon = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     except (TypeError, ValueError):
         canon = repr(value)
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:DIGEST_LEN]
+
+
+def digest_bytes(data: Any) -> str:
+    """SHA256 prefix of raw bytes.
+
+    Used for the ``content_digest`` field on ``attachments_shape`` —
+    the digest must reflect the file content itself so it stays stable
+    across base64 reshaping, provider-block reformatting, or any other
+    transport-layer changes. Falls back to an empty string for
+    non-bytes input rather than raising, matching the rest of the
+    capture path's exception-swallowing pattern.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        return ""
+    return hashlib.sha256(bytes(data)).hexdigest()[:DIGEST_LEN]
 
 
 def compute_shape(value: Any, depth: int = 0) -> Any:
@@ -240,7 +260,7 @@ def classify_attachments(provider: str, attachments: Any) -> Optional[List[Dict[
         try:
             data = getattr(att, "data", b"") or b""
             mime = getattr(att, "media_type", None)
-            digest = digest_json(data) if data else ""
+            digest = digest_bytes(data) if data else ""
             size = len(data) if data else 0
             sclass = _size_class(size)
 

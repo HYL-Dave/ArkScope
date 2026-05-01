@@ -9,17 +9,38 @@
   "system_prompt_hash": "0000000000000000",
   "user_input": "Run a deep summary of NVDA news and tell me the dominant sentiment.",
   "tools_available": [
+    "delegate_to_subagent",
     "get_news_brief",
     "get_ticker_news"
   ],
-  "tool_calls": [],
+  "tool_calls": [
+    {
+      "index": 0,
+      "name": "delegate_to_subagent",
+      "arguments": {
+        "subagent": "data_summarizer",
+        "task": "Summarize the last 7 days of NVDA news and surface dominant sentiment."
+      },
+      "arguments_digest": "5555555555555555",
+      "result_digest": "6666666666666666",
+      "result_shape": {
+        "subagent_role": "str",
+        "summary": "str",
+        "tools_used": [
+          "str"
+        ]
+      },
+      "compression": null,
+      "provider_tool_name": null
+    }
+  ],
   "final_answer": "Subagent reports neutral-to-positive sentiment on NVDA over the last 7 days, dominated by earnings-beat coverage.",
   "final_answer_hash": "0000000000000000",
   "usage": {
     "input_tokens": 3100,
     "output_tokens": 110
   },
-  "notes": "Hand-crafted subagent fixture. v1 has no live subagent capture — parent's tool_calls is empty because the delegate-to-subagent dispatch happens outside the recorded tool loop. The child trace is embedded in subagent_traces[] with the same nested shape (tools_available + tool_calls) so commit 3's validator can recurse and catch child-side tool drift. Hashes are illustrative; the field's existence + nested shape is what's load-bearing.",
+  "notes": "Hand-crafted subagent fixture. Parent anchors delegate_to_subagent — this is the spec's core Phase C failure mode (a refactor that drops the bridge-side delegate_to_subagent without registering a replacement must fail this fixture). Parent's pinned_tool_names = ['delegate_to_subagent'] tells commit 3's pinning logic to treat delegate_to_subagent as a known anchor (it is currently bridge-only, NOT in ToolRegistry — commit 3 must augment its lookup to consult the bridge surface, OR pinning bypasses per-call registry lookup for pinned names). The child trace embedded in subagent_traces[] mirrors what the data_summarizer subagent actually invoked; commit 3 is expected to recurse into the child's tool_calls and pin its own dependency (get_ticker_news) at child level rather than duplicating it on the parent's pin. Hashes are illustrative; the field structure + pin semantics are what's load-bearing for the validator.",
   "subagent_traces": [
     {
       "role": "data_summarizer",
@@ -53,9 +74,14 @@
           "provider_tool_name": null
         }
       ],
+      "pinned_tool_names": [
+        "get_ticker_news"
+      ],
       "final_answer_hash": "4444444444444444"
     }
   ],
-  "pinned_tool_names": null,
+  "pinned_tool_names": [
+    "delegate_to_subagent"
+  ],
   "attachments_shape": null
 }

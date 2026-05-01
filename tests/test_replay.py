@@ -30,6 +30,7 @@ from src.agents.shared.replay import (
     _size_class,
     classify_attachments,
     compute_shape,
+    digest_bytes,
     digest_json,
     hash_text,
     is_capture_enabled,
@@ -745,19 +746,40 @@ def test_load_attachment_fixture_carries_shape():
         assert {"type", "size_class", "mime", "content_digest", "block_kind"} <= shape.keys()
 
 
+def test_load_subagent_fixture_anchors_delegate_at_parent():
+    """Parent must anchor ``delegate_to_subagent`` directly — it's the
+    spec's core Phase C failure mode. Without this anchor, dropping the
+    bridge-side dispatch would not fail any fixture."""
+    trace = load_trace(SUBAGENT_FIXTURE)
+    assert "delegate_to_subagent" in trace.tools_available
+    assert len(trace.tool_calls) == 1
+    parent_call = trace.tool_calls[0]
+    assert parent_call.name == "delegate_to_subagent"
+    # Bridge-side dispatch arguments mirrored
+    assert "subagent" in parent_call.arguments
+    assert "task" in parent_call.arguments
+    # Parent pins the dispatch tool — commit 3's pinning logic uses this
+    # to bypass per-call registry lookup for bridge-only tools.
+    assert trace.pinned_tool_names == ["delegate_to_subagent"]
+
+
 def test_load_subagent_fixture_carries_nested_traces():
     trace = load_trace(SUBAGENT_FIXTURE)
     assert trace.subagent_traces is not None
     assert len(trace.subagent_traces) == 1
     child = trace.subagent_traces[0]
     # Nested shape locked here so commit 3 can recurse: tools_available
-    # + tool_calls keep the same vocabulary as the parent trace.
+    # + tool_calls keep the same vocabulary as the parent trace, plus an
+    # opt-in pinned_tool_names so the child can pin its own dependency
+    # rather than the parent duplicating it.
     assert {"role", "system_prompt_hash", "tools_available", "tool_calls",
             "final_answer_hash"} <= child.keys()
     assert child["role"] == "data_summarizer"
     assert child["tool_calls"], "Nested tool_calls must not be empty — commit 3 needs them to recurse"
     nested_call = child["tool_calls"][0]
     assert nested_call["name"] == "get_ticker_news"
+    # Child pins its own behaviour-dependent tool — separates from parent's pin.
+    assert child.get("pinned_tool_names") == ["get_ticker_news"]
 
 
 def test_replay_capture_round_trips_new_fields(tmp_path):
@@ -865,12 +887,78 @@ def test_classify_attachments_handles_unknown_kind_gracefully():
     assert out[0]["block_kind"] == "text"
 
 
-def test_validate_new_fixtures_clean_against_registry(real_registry):
-    """All 4 new fixtures must validate clean against the current
-    registry — no ``unknown_tool`` / ``unknown_arg`` / ``missing_required``
-    errors. Warnings (e.g. "tools newly registered") are allowed."""
+def test_digest_bytes_matches_hashlib_prefix():
+    """``digest_bytes`` must hash raw bytes via SHA256 — NOT the
+    str(b'...') repr (the former-bug that ``digest_json(bytes)``
+    silently fell into via ``default=str``).
+    """
+    import hashlib
+    raw = b"hello world"
+    expected = hashlib.sha256(raw).hexdigest()[:DIGEST_LEN]
+    assert digest_bytes(raw) == expected
+
+
+def test_digest_bytes_stable_and_distinguishes_content():
+    """Same bytes → same digest; different bytes → different digest;
+    digest length matches ``DIGEST_LEN``."""
+    assert digest_bytes(b"abc") == digest_bytes(b"abc")
+    assert digest_bytes(b"abc") != digest_bytes(b"abd")
+    assert len(digest_bytes(b"x")) == DIGEST_LEN
+    # bytearray accepted (caller may have mutable buffer)
+    assert digest_bytes(bytearray(b"abc")) == digest_bytes(b"abc")
+
+
+def test_digest_bytes_handles_non_bytes_safely():
+    """Non-bytes input returns empty string rather than crashing —
+    matches the rest of the capture path's exception-swallowing."""
+    assert digest_bytes(None) == ""
+    assert digest_bytes("string not bytes") == ""
+    assert digest_bytes(42) == ""
+
+
+def test_classify_attachments_uses_raw_byte_digest():
+    """Regression guard for the Medium finding: ``content_digest`` must
+    reflect the raw file bytes, NOT a serialized form. A future refactor
+    that swapped ``digest_bytes`` back to ``digest_json`` would change
+    the digest on the same bytes — this assertion catches that drift.
+    """
+    import hashlib
+    raw = b"\x89PNG\r\n\x1a\n" + b"x" * 200
+    img = _FakeAttachment(data=raw, media_type="image/png", is_image=True)
+    out = classify_attachments("anthropic", [img])
+    expected = hashlib.sha256(raw).hexdigest()[:DIGEST_LEN]
+    assert out[0]["content_digest"] == expected
+
+
+def test_validate_registry_only_new_fixtures_clean(real_registry):
+    """The 3 fixtures whose tool_calls only reference core ``ToolRegistry``
+    tools must validate clean today (no ``unknown_tool`` /
+    ``unknown_arg`` / ``missing_required`` errors). Warnings such as
+    "tools newly registered" are allowed."""
     for path in (OPENAI_NO_TOOL_FIXTURE, OPENAI_ONE_TOOL_FIXTURE,
-                 ATTACHMENT_FIXTURE, SUBAGENT_FIXTURE):
+                 ATTACHMENT_FIXTURE):
         trace = load_trace(path)
         result = validate_trace_against_registry(trace, real_registry)
         assert result.passed, f"{path.name} did not validate clean: {result.render()}"
+
+
+def test_subagent_fixture_fails_today_pending_commit_3_pinning(real_registry):
+    """The subagent fixture references ``delegate_to_subagent`` — which is
+    bridge-only, NOT in ``ToolRegistry``. Today's validator reports it as
+    ``unknown_tool``. This test pins THAT specific failure shape so commit
+    3's pinning logic has a concrete green-flip target: once the validator
+    consults ``pinned_tool_names`` and bypasses per-call registry lookup
+    for pinned bridge-only tools, the subagent fixture validates clean.
+
+    If the failure shape changes (e.g. ``delegate_to_subagent`` gets added
+    to ``ToolRegistry`` core, or the validator's error message format
+    drifts), this test fails — by design — and commit 3 needs to update
+    it alongside flipping the assertion to ``passed is True``.
+    """
+    trace = load_trace(SUBAGENT_FIXTURE)
+    result = validate_trace_against_registry(trace, real_registry)
+    assert result.passed is False
+    # The single error must point at delegate_to_subagent specifically.
+    assert any("delegate_to_subagent" in e for e in result.errors), (
+        f"Expected unknown_tool error for delegate_to_subagent; got: {result.render()}"
+    )
