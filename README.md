@@ -1,5 +1,7 @@
 # ArkScope
 
+> **2026-05-02 — Repositioning in progress.** The project is transitioning to a **local-first financial research agent workbench** (single-user; SQLite + DuckDB profile-bound storage; zip-and-go cross-machine portability; research GUI with Hermes-grade agent capabilities). The legacy description below reflects the pre-pivot scope and will be rewritten once `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` lands. Current canonical references: `docs/design/PROJECT_PRIORITY_MAP.md` (top of §1) and `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md`. The local directory is still `MindfulRL-Intraday`; the GitHub repo is `HYL-Dave/ArkScope`; treat both as referring to the same project.
+
 > AI-powered investment research platform with dual-provider agents (Anthropic + OpenAI), knowledge graph memory, 49 financial tools, and multi-source news/price/options data pipeline.
 
 ## Overview
