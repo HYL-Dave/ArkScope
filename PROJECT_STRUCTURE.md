@@ -90,9 +90,6 @@ MindfulRL-Intraday/
 │   └── ...
 │
 ├── docs/                            # 文檔
-│   ├── strategy/                   # 策略相關
-│   │   ├── STRATEGIC_DIRECTION_2026Q1.md
-│   │   └── SIDEQUEST_CLAUDE_CODE_PLUGINS.md
 │   ├── design/                     # 設計文檔
 │   │   ├── MULTI_FACTOR_SIGNAL_DETECTION.md
 │   │   ├── FINRL_INTEGRATION_DESIGN.md
@@ -262,7 +259,6 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2
 
 - [CLAUDE.md](CLAUDE.md) - AI 助手指南
 - [README.md](README.md) - 專案總覽
-- [docs/strategy/STRATEGIC_DIRECTION_2026Q1.md](docs/strategy/STRATEGIC_DIRECTION_2026Q1.md) - 2026 Q1 策略方向
 - [docs/analysis/SCORING_VALIDATION_METHODOLOGY.md](docs/analysis/SCORING_VALIDATION_METHODOLOGY.md) - 評分驗證方法論
 
 ---

@@ -596,5 +596,4 @@ if result.risk_level >= 4:
 
 ## 相關文件
 
-- [STRATEGIC_DIRECTION_2026Q1.md](../../docs/strategy/STRATEGIC_DIRECTION_2026Q1.md) - 多因子信號系統設計背景
 - [MULTI_FACTOR_SIGNAL_DETECTION.md](../../docs/design/MULTI_FACTOR_SIGNAL_DETECTION.md) - 詳細設計文檔
