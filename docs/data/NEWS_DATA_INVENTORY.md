@@ -4,8 +4,8 @@
 >
 > 相關文件:
 > - [儲存設計](../../NEWS_STORAGE_DESIGN.md) - 目錄結構、Schema、收集策略
-> - [評分數據清單](SCORING_DATA_INVENTORY.md) - LLM 評分數據狀態
 > - [歷史分析紀錄](../analysis/HISTORICAL_ANALYSIS_LOG.md) - 分析實驗紀錄
+> - LLM 評分資料的舊獨立清單已移除；目前以 `/mnt/md0/finrl` 實體 CSV、`scripts/huggingface/output/README.md`、`scripts/huggingface/column_mapping.md`、`scripts/huggingface/merge_for_release.py` 為準。
 
 > **⚠️ 版本說明 (2026-01-06)**
 > - 本文件部分內容為歷史實驗紀錄，可能與當前專案狀態有出入
@@ -1054,4 +1054,3 @@ Risk 分佈 (所有模型平均):
 > - 備份位置: `/mnt/md0/finrl/backups/repair_20251227/`
 
 ---
-
