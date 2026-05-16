@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "SA Alpha Picks Exporter",
+  "version": "1.0.0",
+  "description": "Export Seeking Alpha Alpha Picks portfolio data for MindfulRL agent",
+  "permissions": [
+    "alarms",
+    "scripting",
+    "nativeMessaging",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://seekingalpha.com/*"
+  ],
+  "background": {
+    "scripts": [
+      "compat_firefox.js",
+      "background.js"
+    ]
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SA Alpha Picks"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sa-alpha-picks@mindfulrl.local",
+      "strict_min_version": "121.0"
+    }
+  },
+  "icons": {}
+}
