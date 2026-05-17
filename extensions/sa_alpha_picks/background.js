@@ -61,6 +61,9 @@ const MARKET_NEWS_DETAIL_TOTAL_LIMITS = {
   backfill: 80,
   manual: 20,
 };
+const COLLECTOR_TABS_STORAGE_KEY = "saCollectorTabs";
+const COLLECTOR_TAB_STALE_MS = 10 * 60 * 1000;
+const MARKET_NEWS_DETAIL_ITEM_TIMEOUT_MS = 90 * 1000;
 const MARKET_NEWS_PROFILES = {
   quick: {
     name: "quick",
@@ -237,15 +240,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(function () {
+  cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
   syncAllAutoSyncAlarms();
 });
 
 chrome.runtime.onStartup.addListener(function () {
+  cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
   syncAllAutoSyncAlarms();
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
+  if (!saSyncJobInFlight && !marketNewsRefreshInFlight) {
+    cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
+  }
   if (alarm.name === ALPHA_PICKS_AUTO_SYNC_ALARM) {
     enqueueAutoSaSyncJob("alphaPicks", {
       displayName: "Alpha Picks quick auto-sync",
@@ -423,10 +431,12 @@ async function doRefresh(mode, options) {
 
   let tabId = null;
   try {
+    await cleanupCollectorTabs({ force: true });
     // --- Scrape current picks ---
     sendProgress("Opening current picks page...");
     const tab = await chrome.tabs.create({ url: SA_CURRENT_URL, active: false });
     tabId = tab.id;
+    await registerCollectorTab(tabId, "alpha_picks");
     await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_CURRENT_URL));
 
     sendProgress("Waiting for current picks table...");
@@ -484,6 +494,7 @@ async function doRefresh(mode, options) {
   } finally {
     if (tabId) {
       await safeRemoveTab(tabId);
+      await unregisterCollectorTab(tabId);
     }
   }
 }
@@ -505,9 +516,11 @@ async function doMarketNewsRefresh(mode, options) {
   var profile = getMarketNewsProfile(mode);
   var tabId = null;
   try {
+    await cleanupCollectorTabs({ force: true });
     sendProgress("Opening market news page...");
     const tab = await chrome.tabs.create({ url: SA_MARKET_NEWS_URL, active: false });
     tabId = tab.id;
+    await registerCollectorTab(tabId, "market_news");
     await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_MARKET_NEWS_URL));
 
     sendProgress("Waiting for market news...");
@@ -545,6 +558,7 @@ async function doMarketNewsRefresh(mode, options) {
     var needDetail = buildMarketNewsDetailQueue(result, mode);
     var detailFetched = 0;
     var detailFailed = 0;
+    var detailFailures = [];
     result.detail_queued = needDetail.length;
     if (needDetail.length > 0) {
       sendProgress("Fetching " + needDetail.length + " market-news detail page(s)...");
@@ -553,17 +567,37 @@ async function doMarketNewsRefresh(mode, options) {
       var item = needDetail[i];
       sendProgress("News detail " + (i + 1) + "/" + needDetail.length + ": " + item.news_id);
       try {
-        await chrome.tabs.update(tabId, { url: item.url, active: false });
+        await withTimeout(
+          chrome.tabs.update(tabId, { url: item.url, active: false }),
+          45000,
+          "market news tab update timeout"
+        );
         await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
-        await installMarketNewsPageGuards(tabId);
-        var saveDetail = await fetchMarketNewsDetailWithRetry(tabId, item, profile);
+        await withTimeout(
+          installMarketNewsPageGuards(tabId),
+          10000,
+          "market news guard timeout"
+        );
+        var saveDetail = await withTimeout(
+          fetchMarketNewsDetailWithRetry(tabId, item, profile),
+          MARKET_NEWS_DETAIL_ITEM_TIMEOUT_MS,
+          "market news detail timeout"
+        );
         if (saveDetail && saveDetail.ok) {
           detailFetched++;
         } else {
           detailFailed++;
+          detailFailures.push({
+            news_id: item.news_id,
+            error: (saveDetail && saveDetail.error) || "detail_not_saved",
+          });
         }
-      } catch (_) {
+      } catch (err) {
         detailFailed++;
+        detailFailures.push({
+          news_id: item.news_id,
+          error: (err && err.message) || String(err || "detail_error"),
+        });
       }
       if (i + 1 < needDetail.length) {
         await sleep(randomBetween(profile.detailGapMinMs, profile.detailGapMaxMs));
@@ -571,6 +605,9 @@ async function doMarketNewsRefresh(mode, options) {
     }
     result.detail_fetched = detailFetched;
     result.detail_failed = detailFailed;
+    if (detailFailures.length > 0) {
+      result.detail_failures = detailFailures;
+    }
     result.trigger = options.trigger || "manual";
     await saveMarketNewsState(batchTs, mode, result);
     sendProgress("Market news done!");
@@ -589,6 +626,7 @@ async function doMarketNewsRefresh(mode, options) {
     marketNewsRefreshInFlight = false;
     if (tabId) {
       await safeRemoveTab(tabId);
+      await unregisterCollectorTab(tabId);
     }
   }
 }
@@ -942,6 +980,83 @@ function tabMatchesExpectedUrl(tab, expectedUrlFragment) {
   return currentUrl.indexOf(expectedUrlFragment) >= 0;
 }
 
+function withTimeout(promise, timeoutMs, label) {
+  var timer = null;
+  var timeout = new Promise(function (_, reject) {
+    timer = setTimeout(function () {
+      reject(new Error(label || "operation timeout"));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(function () {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function getCollectorTabs() {
+  try {
+    var data = await chrome.storage.local.get([COLLECTOR_TABS_STORAGE_KEY]);
+    var tabs = data && data[COLLECTOR_TABS_STORAGE_KEY];
+    return tabs && typeof tabs === "object" ? tabs : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+async function setCollectorTabs(tabs) {
+  var value = {};
+  if (tabs && typeof tabs === "object") {
+    value[COLLECTOR_TABS_STORAGE_KEY] = tabs;
+  } else {
+    value[COLLECTOR_TABS_STORAGE_KEY] = {};
+  }
+  await chrome.storage.local.set(value);
+}
+
+async function registerCollectorTab(tabId, flow) {
+  if (tabId == null) return;
+  var tabs = await getCollectorTabs();
+  tabs[String(tabId)] = {
+    tabId: tabId,
+    flow: flow || "unknown",
+    createdAt: new Date().toISOString(),
+  };
+  await setCollectorTabs(tabs);
+}
+
+async function unregisterCollectorTab(tabId) {
+  if (tabId == null) return;
+  var tabs = await getCollectorTabs();
+  delete tabs[String(tabId)];
+  await setCollectorTabs(tabs);
+}
+
+async function cleanupCollectorTabs(options) {
+  options = options || {};
+  var force = !!options.force;
+  var maxAgeMs = options.maxAgeMs || COLLECTOR_TAB_STALE_MS;
+  var now = Date.now();
+  var tabs = await getCollectorTabs();
+  var changed = false;
+  var entries = Object.keys(tabs);
+
+  for (var i = 0; i < entries.length; i++) {
+    var key = entries[i];
+    var item = tabs[key] || {};
+    var tabId = item.tabId != null ? item.tabId : parseInt(key, 10);
+    var createdAt = Date.parse(item.createdAt || "");
+    var isStale = !Number.isFinite(createdAt) || (now - createdAt) >= maxAgeMs;
+    if (!force && !isStale) continue;
+
+    await safeRemoveTab(tabId);
+    delete tabs[key];
+    changed = true;
+  }
+
+  if (changed) {
+    await setCollectorTabs(tabs);
+  }
+}
+
 async function safeRemoveTab(tabId) {
   if (tabId == null) return false;
   try {
@@ -1247,9 +1362,11 @@ async function doManualFetch(items) {
   var fetched = 0, failed = 0;
   var succeededSymbols = [];
   try {
+    await cleanupCollectorTabs({ force: true });
     // Create a tab for fetching
     var tab = await chrome.tabs.create({ url: items[0].url, active: false });
     tabId = tab.id;
+    await registerCollectorTab(tabId, "manual_fetch");
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -1344,6 +1461,7 @@ async function doManualFetch(items) {
   } finally {
     if (tabId) {
       await safeRemoveTab(tabId);
+      await unregisterCollectorTab(tabId);
     }
   }
 }
