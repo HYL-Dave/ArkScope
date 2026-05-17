@@ -37,6 +37,11 @@ Then in Firefox:
 4. Sign in to Seeking Alpha in Firefox.
 5. Run `Quick Refresh` from the extension popup.
 
+Important: do not select files from `extensions/sa_alpha_picks/` directly.
+That directory is the Chrome build and its `manifest.json` uses
+`background.service_worker`, which Firefox rejects. Always load the generated
+`build/firefox/manifest.json`.
+
 ## Expected verification
 
 Successful runs should append entries to:
