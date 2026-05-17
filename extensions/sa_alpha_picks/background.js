@@ -427,7 +427,7 @@ async function doRefresh(mode, options) {
     sendProgress("Opening current picks page...");
     const tab = await chrome.tabs.create({ url: SA_CURRENT_URL, active: false });
     tabId = tab.id;
-    await waitForTabLoad(tabId);
+    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_CURRENT_URL));
 
     sendProgress("Waiting for current picks table...");
     let ready = await waitForTableReady(tabId);
@@ -443,7 +443,7 @@ async function doRefresh(mode, options) {
     // --- Scrape closed (removed) picks ---
     sendProgress("Opening closed picks page...");
     await chrome.tabs.update(tabId, { url: SA_CLOSED_URL });
-    await waitForTabLoad(tabId);
+    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_CLOSED_URL));
 
     sendProgress("Waiting for closed picks table...");
     ready = await waitForTableReady(tabId);
@@ -508,7 +508,7 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Opening market news page...");
     const tab = await chrome.tabs.create({ url: SA_MARKET_NEWS_URL, active: false });
     tabId = tab.id;
-    await waitForTabLoad(tabId);
+    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_MARKET_NEWS_URL));
 
     sendProgress("Waiting for market news...");
     var ready = await waitForMarketNewsReady(tabId);
@@ -554,7 +554,7 @@ async function doMarketNewsRefresh(mode, options) {
       sendProgress("News detail " + (i + 1) + "/" + needDetail.length + ": " + item.news_id);
       try {
         await chrome.tabs.update(tabId, { url: item.url, active: false });
-        await waitForTabLoad(tabId);
+        await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
         await installMarketNewsPageGuards(tabId);
         var saveDetail = await fetchMarketNewsDetailWithRetry(tabId, item, profile);
         if (saveDetail && saveDetail.ok) {
@@ -865,7 +865,7 @@ function getNewYorkTimeParts(now) {
 
 // --- Tab management ---
 
-function waitForTabLoad(tabId, timeoutMs) {
+function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
   timeoutMs = timeoutMs || 30000;
   return new Promise((resolve, reject) => {
     var settled = false;
@@ -893,7 +893,10 @@ function waitForTabLoad(tabId, timeoutMs) {
 
     const onUpdated = (id, changeInfo, tab) => {
       if (id !== tabId) return;
-      if (changeInfo.status === "complete" || (tab && tab.status === "complete")) {
+      if (
+        (changeInfo.status === "complete" || (tab && tab.status === "complete")) &&
+        tabMatchesExpectedUrl(tab, expectedUrlFragment)
+      ) {
         finish();
       }
     };
@@ -916,13 +919,27 @@ function waitForTabLoad(tabId, timeoutMs) {
         finish(new Error("Tab not found"));
         return;
       }
-      if (tab.status === "complete") {
+      if (tab.status === "complete" && tabMatchesExpectedUrl(tab, expectedUrlFragment)) {
         finish();
       }
     }).catch((err) => {
       finish(err || new Error("Failed to inspect tab state"));
     });
   });
+}
+
+function expectedPathFromUrl(url) {
+  try {
+    return new URL(url).pathname;
+  } catch (_) {
+    return url || null;
+  }
+}
+
+function tabMatchesExpectedUrl(tab, expectedUrlFragment) {
+  if (!expectedUrlFragment) return true;
+  var currentUrl = (tab && (tab.url || tab.pendingUrl)) || "";
+  return currentUrl.indexOf(expectedUrlFragment) >= 0;
 }
 
 async function safeRemoveTab(tabId) {
@@ -1045,7 +1062,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
   // ── Step 1: Load articles page + scroll ──
   sendProgress("Loading articles page...");
   await chrome.tabs.update(tabId, { url: SA_ARTICLES_URL });
-  await waitForTabLoad(tabId);
+  await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_ARTICLES_URL));
 
   var articlesReady = await waitForArticlesReady(tabId);
   if (!articlesReady.ok) {
@@ -1129,7 +1146,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
     try {
       // Navigate to article (tab must be active for comment scroll)
       await chrome.tabs.update(tabId, { url: item.url, active: true });
-      await waitForTabLoad(tabId);
+      await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       var ready = await waitForArticleReady(tabId);
       if (!ready.ok) { failed++; continue; }
 
@@ -1178,7 +1195,7 @@ async function doDetailFetch(tabId, currentPicks, mode) {
 
     try {
       await chrome.tabs.update(tabId, { url: cItem.url, active: true });
-      await waitForTabLoad(tabId);
+      await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
       await waitForArticleReady(tabId);
 
       // Scroll to load comments (natural delay)
@@ -1242,7 +1259,7 @@ async function doManualFetch(items) {
         if (i > 0) {
           await chrome.tabs.update(tabId, { url: item.url, active: true });
         }
-        await waitForTabLoad(tabId);
+        await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
         var ready = await waitForArticleReady(tabId);
         if (!ready.ok) { failed++; continue; }
 
@@ -1523,7 +1540,7 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
     if (attempt > 0) {
       sendProgress("Retrying news detail: " + item.news_id);
       await chrome.tabs.reload(tabId);
-      await waitForTabLoad(tabId);
+      await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       await installMarketNewsPageGuards(tabId);
       await sleep(randomBetween(profile.retryDelayMinMs, profile.retryDelayMaxMs));
     }

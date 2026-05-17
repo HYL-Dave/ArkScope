@@ -120,8 +120,86 @@ def handle_message(msg):
     return {"status": "error", "error": f"unknown action: {action}"}
 
 
+_SA_PICK_DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$|^\d{4}-\d{2}-\d{2}")
+_SA_PICK_PCT_RE = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?%")
+_VALID_REFRESH_SCOPES = {"current", "closed"}
+
+
+def _looks_like_sa_date(value):
+    return bool(_SA_PICK_DATE_RE.match(str(value or "").strip()))
+
+
+def _looks_like_sa_pct(value):
+    return bool(_SA_PICK_PCT_RE.search(str(value or "").strip()))
+
+
+def _infer_pick_scope(pick):
+    """Infer current/closed from scraper payload shape when possible."""
+    if not isinstance(pick, dict):
+        return None
+
+    raw_data = pick.get("raw_data") if isinstance(pick.get("raw_data"), dict) else {}
+    detail_url = str(raw_data.get("detail_url") or pick.get("detail_url") or "").lower()
+    if "section_asset%3acurrent" in detail_url or "section_asset:current" in detail_url:
+        return "current"
+    if (
+        "section_asset%3aremoved" in detail_url
+        or "section_asset%3aclosed" in detail_url
+        or "section_asset:removed" in detail_url
+        or "section_asset:closed" in detail_url
+    ):
+        return "closed"
+
+    cells = raw_data.get("cells") if isinstance(raw_data, dict) else None
+    if isinstance(cells, list) and len(cells) >= 4:
+        # current: Symbol | Picked | Return% | Sector | Rating | Holding%
+        # closed:  Symbol | Picked | Closed | Return% | Sector | Rating
+        if _looks_like_sa_date(cells[2]) and _looks_like_sa_pct(cells[3]):
+            return "closed"
+        if _looks_like_sa_pct(cells[2]):
+            return "current"
+
+    if pick.get("closed_date"):
+        return "closed"
+    if "holding_pct" in pick and pick.get("holding_pct") is not None:
+        return "current"
+    return None
+
+
+def _validate_refresh_scope(scope, picks):
+    if scope not in _VALID_REFRESH_SCOPES:
+        return f"invalid refresh scope: {scope!r}"
+    if not isinstance(picks, list):
+        return "refresh picks payload must be a list"
+
+    mismatches = []
+    for pick in picks:
+        inferred_scope = _infer_pick_scope(pick)
+        if inferred_scope and inferred_scope != scope:
+            symbol = pick.get("symbol") if isinstance(pick, dict) else None
+            mismatches.append(f"{symbol or '?'}:{inferred_scope}")
+            if len(mismatches) >= 5:
+                break
+
+    if mismatches:
+        return (
+            f"refresh scope mismatch: requested {scope}, "
+            f"payload looks like {', '.join(mismatches)}"
+        )
+    return None
+
+
 def _handle_refresh(dal, scope, picks, attempt_ts):
     """Persist scraped picks via DAL."""
+    mismatch_reason = _validate_refresh_scope(scope, picks)
+    if mismatch_reason:
+        logger.error("Refresh %s rejected: %s", scope, mismatch_reason)
+        try:
+            dal.record_sa_refresh_failure(scope, attempt_ts, mismatch_reason)
+        except Exception:
+            pass
+        return {"status": "error", "scope": scope, "error": mismatch_reason}
+
     # Add portfolio_status and is_stale (extension doesn't set these)
     for pick in picks:
         pick["portfolio_status"] = scope

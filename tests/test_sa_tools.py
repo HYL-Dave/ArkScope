@@ -231,6 +231,93 @@ class TestNativeHost:
             call_picks = mock_dal.apply_sa_refresh.call_args[1].get("picks") or mock_dal.apply_sa_refresh.call_args[0][1]
             assert call_picks[0]["raw_data"]["detail_url"] == "https://seekingalpha.com/alpha-picks/acme-123"
 
+    def test_closed_refresh_rejects_current_page_payload(self):
+        """Native host refuses to persist current-shaped rows as closed picks."""
+        from scripts.sa_native_host import handle_message
+
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            MockDAL.return_value = mock_dal
+
+            result = handle_message({
+                "action": "refresh",
+                "scope": "closed",
+                "batch_ts": "2026-05-17T12:00:00Z",
+                "picks": [{
+                    "symbol": "MXL",
+                    "picked_date": "2026-05-15",
+                    "return_pct": 1.73,
+                    "holding_pct": 0.40,
+                    "raw_data": {
+                        "cells": ["MXL", "05/15/2026", "1.73%", "Information Technology", "STRONG BUY", "0.40%"],
+                        "detail_url": "https://seekingalpha.com/symbol/mxl#source=first_level_url%3Aalpha-picks%7Csection_asset%3Acurrent",
+                    },
+                }],
+            })
+
+            assert result["status"] == "error"
+            assert "scope mismatch" in result["error"]
+            assert "MXL:current" in result["error"]
+            mock_dal.apply_sa_refresh.assert_not_called()
+            mock_dal.record_sa_refresh_failure.assert_called_once()
+
+    def test_current_refresh_rejects_closed_page_payload(self):
+        """Native host refuses to persist closed-shaped rows as current picks."""
+        from scripts.sa_native_host import handle_message
+
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            MockDAL.return_value = mock_dal
+
+            result = handle_message({
+                "action": "refresh",
+                "scope": "current",
+                "batch_ts": "2026-05-17T12:00:00Z",
+                "picks": [{
+                    "symbol": "ACME",
+                    "picked_date": "2026-05-01",
+                    "closed_date": "2026-05-15",
+                    "return_pct": 5.25,
+                    "raw_data": {
+                        "cells": ["ACME", "05/01/2026", "05/15/2026", "5.25%", "Technology", "BUY"],
+                    },
+                }],
+            })
+
+            assert result["status"] == "error"
+            assert "scope mismatch" in result["error"]
+            assert "ACME:closed" in result["error"]
+            mock_dal.apply_sa_refresh.assert_not_called()
+            mock_dal.record_sa_refresh_failure.assert_called_once()
+
+    def test_closed_refresh_accepts_closed_page_payload(self):
+        """Closed-shaped rows still persist through the normal refresh path."""
+        from scripts.sa_native_host import handle_message
+
+        with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
+            mock_dal = MagicMock()
+            mock_dal.apply_sa_refresh.return_value = 1
+            MockDAL.return_value = mock_dal
+
+            result = handle_message({
+                "action": "refresh",
+                "scope": "closed",
+                "batch_ts": "2026-05-17T12:00:00Z",
+                "picks": [{
+                    "symbol": "ACME",
+                    "picked_date": "2026-05-01",
+                    "closed_date": "2026-05-15",
+                    "return_pct": 5.25,
+                    "raw_data": {
+                        "cells": ["ACME", "05/01/2026", "05/15/2026", "5.25%", "Technology", "BUY"],
+                    },
+                }],
+            })
+
+            assert result["status"] == "ok"
+            assert result["count"] == 1
+            mock_dal.apply_sa_refresh.assert_called_once()
+
 
 # ============================================================
 # Tool stale_warning pass-through
