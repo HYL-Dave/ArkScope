@@ -832,8 +832,6 @@ IBIS Research Platform 包含 "Live Event Calendars"，但這是 GUI only：
 ## 相關文件
 
 - [OPTIONS_FLOW_GUIDE.md](./OPTIONS_FLOW_GUIDE.md) - Options Flow 詳細指南
-- [TRADING_FREQUENCY_DATA_STRATEGY.md](./TRADING_FREQUENCY_DATA_STRATEGY.md) - 交易頻率與數據策略
-- [L3_DAY_TRADING_FEASIBILITY.md](./L3_DAY_TRADING_FEASIBILITY.md) - L3 日內交易可行性
 - [sector_breakout_patterns.md](../insights/sector_breakout_patterns.md) - 板塊爆發模式案例
 
 ---

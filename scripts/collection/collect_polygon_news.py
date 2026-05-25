@@ -2,7 +2,7 @@
 """
 Polygon.io 新聞收集腳本
 
-收集 3+ 年歷史新聞，遵循 NEWS_STORAGE_DESIGN.md 結構：
+收集 3+ 年歷史新聞：
 - 儲存位置: data/news/raw/polygon/YYYY/YYYY-MM.parquet
 - 支援 checkpoint/resume (長時間收集可中斷)
 - 遵守免費方案 rate limit: 5 calls/min (12 秒間隔)
@@ -99,7 +99,7 @@ class CollectionConfig:
 
 @dataclass
 class NewsArticle:
-    """新聞文章資料結構 (符合 NEWS_STORAGE_DESIGN.md schema)"""
+    """新聞文章資料結構"""
     article_id: str
     ticker: str
     title: str

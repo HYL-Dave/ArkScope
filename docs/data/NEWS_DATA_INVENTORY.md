@@ -1,9 +1,8 @@
 # 新聞數據清單 (News Data Inventory)
 
-> 此文件從 `NEWS_STORAGE_DESIGN.md` 分離，專門記錄現有新聞數據來源和狀態。
+> 現有新聞數據來源和狀態。
 >
 > 相關文件:
-> - [儲存設計](../../NEWS_STORAGE_DESIGN.md) - 目錄結構、Schema、收集策略
 > - [歷史分析紀錄](../analysis/HISTORICAL_ANALYSIS_LOG.md) - 分析實驗紀錄
 > - LLM 評分資料的舊獨立清單已移除；目前以 `/mnt/md0/finrl` 實體 CSV、`scripts/huggingface/output/README.md`、`scripts/huggingface/column_mapping.md`、`scripts/huggingface/merge_for_release.py` 為準。
 
