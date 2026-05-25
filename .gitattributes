@@ -5,7 +5,6 @@
 data_sources/PAID_SUBSCRIPTION_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_VALUE.md filter=git-crypt diff=git-crypt
-ARCHITECTURE_VISION.md filter=git-crypt diff=git-crypt
 
 # 內部設計與特徵文件
 docs/design/** filter=git-crypt diff=git-crypt
