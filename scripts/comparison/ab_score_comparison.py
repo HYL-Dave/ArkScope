@@ -16,7 +16,7 @@ Usage:
     python ab_score_comparison.py --mode scoring-model --score-type risk --sample-size 2000
 
     # Full A/B analysis with report
-    python ab_score_comparison.py --mode full --output docs/analysis/SCORE_COMPARISON_REPORT.md
+    python ab_score_comparison.py --mode full --output out/SCORE_COMPARISON_REPORT.md
 """
 
 import argparse
@@ -565,7 +565,7 @@ def main():
                         help='Score type to compare')
     parser.add_argument('--sample-size', type=int, default=2000,
                         help='Sample size for comparisons')
-    parser.add_argument('--output', default='docs/analysis/SCORE_COMPARISON_REPORT.md',
+    parser.add_argument('--output', default='out/SCORE_COMPARISON_REPORT.md',
                         help='Output path for report')
     parser.add_argument('--verbose', action='store_true',
                         help='Enable verbose logging')
