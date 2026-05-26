@@ -426,7 +426,7 @@ def main():
                         help='Comparison mode')
     parser.add_argument('--sample-size', type=int, default=2000,
                         help='Number of records to sample for similarity calculations')
-    parser.add_argument('--output', default='docs/analysis/SUMMARY_COMPARISON_REPORT.md',
+    parser.add_argument('--output', default='out/SUMMARY_COMPARISON_REPORT.md',
                         help='Output path for markdown report')
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
 

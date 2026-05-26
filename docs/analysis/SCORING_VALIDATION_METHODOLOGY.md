@@ -193,7 +193,28 @@ python scripts/analysis/sentiment_backtest.py --file <scoring.csv> --score-col s
 
 ---
 
-## 五、參考文獻
+## 五、Historical Baseline (2026-01, old models/data — not production evidence)
+
+以下結論來自 2026-01 使用舊模型（gpt-5 / o3 / gpt-4.1-mini / Opus / Sonnet，
+均無版本號）對 2009-2023 FNSPID + Polygon 數據的驗證。**這是歷史基準，不是
+現行模型的真值，也不是交易建議。** 原始報告（~2,600 行）已在 docs consolidation
+Group 5 中退場（git history 可取回）。如果用新模型/新數據，必須重跑驗證。
+
+1. **整體相關性弱**: 多個 LLM sentiment 模型與次日報酬相關性均 < 0.03
+   （2023 單年 cross-model 比較）。
+2. **Sentiment 有弱但顯著的 1-2 日訊號**: IC=0.0146, Spearman corr=0.0103
+   (p<0.01)（2009-2023 長期驗證）。
+3. **極端分數比中間分數有用**: Score 5 約 +0.445% 次日, Score 1 約 -0.272%
+   次日; Long-Short 5v1 historical Sharpe 1.053。Mid-range 2-4 噪音高，
+   不應直接當方向性 alpha。
+4. **Risk directional score 無預測力**: IC≈0, corr≈0。除非重新設計與重驗證，
+   不應當 alpha；可作風險分級 / triage 訊號。
+5. **研究約束**: 不要過度相信單篇新聞的平均情緒分數；如果用 LLM 分數做
+   研究，優先看 extreme signal (Score 1/5)，且必須用當前模型重跑驗證。
+
+---
+
+## 六、參考文獻
 
 1. Grinold, R. C., & Kahn, R. N. (2000). *Active Portfolio Management*. McGraw-Hill.
 2. Clarke, R., de Silva, H., & Thorley, S. (2002). Portfolio Constraints and the Fundamental Law of Active Management. *Financial Analysts Journal*.
@@ -209,7 +230,7 @@ python scripts/analysis/sentiment_backtest.py --file <scoring.csv> --score-col s
 | `scripts/analysis/sentiment_backtest.py` | 回測腳本 |
 | `scripts/analysis/analyze_finrl_scores.py` | 跨模型評分分析 |
 | `scripts/analysis/detailed_factor_comparison.py` | 因子比較分析 |
-| `docs/analysis/SCORING_VALUE_VALIDATION_REPORT.md` | 驗證結果報告 |
+| §五 Historical Baseline | 2026-01 舊模型驗證結果摘要（原報告已退場，git history 可取回）|
 
 ---
 

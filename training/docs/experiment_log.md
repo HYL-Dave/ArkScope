@@ -191,9 +191,8 @@
 | Claude Sonnet | GPT-5 | Claude Sonnet | `*_sonnet_by_gpt5_summary.csv` | (備用) |
 | Claude Haiku | GPT-5 | Claude Haiku | `*_haiku_by_gpt5_summary.csv` | (備用) |
 
-> 詳細的摘要品質比較見 `docs/analysis/SUMMARY_COMPARISON_REPORT.md`
-> 評分分佈比較見 `docs/analysis/DEEPSEEK_VS_CLAUDE_COMPARISON.md`
-> 完整評分清單見 `docs/data/SCORING_DATA_INVENTORY.md`
+> 原始比較報告已在 docs consolidation Group 5 退場（git history 可取回）。
+> 歷史基準摘要見 `docs/analysis/SCORING_VALIDATION_METHODOLOGY.md` §五。
 
 ### 評分品質對比
 
