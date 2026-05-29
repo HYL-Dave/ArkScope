@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS sa_alpha_picks (
     symbol            VARCHAR(20) NOT NULL,
     company           VARCHAR(200) NOT NULL,
     picked_date       DATE NOT NULL,
+    closed_date       DATE,
     portfolio_status  VARCHAR(20) NOT NULL DEFAULT 'current',  -- current/closed (SA business state)
     is_stale          BOOLEAN NOT NULL DEFAULT FALSE,           -- sync state: not seen in last refresh
     return_pct        NUMERIC(8,2),
@@ -19,7 +20,7 @@ CREATE TABLE IF NOT EXISTS sa_alpha_picks (
     last_seen_snapshot TIMESTAMPTZ,
     fetched_at        TIMESTAMPTZ DEFAULT NOW(),
     updated_at        TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (symbol, picked_date)
+    UNIQUE (symbol, picked_date, portfolio_status)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sa_picks_status ON sa_alpha_picks(portfolio_status);

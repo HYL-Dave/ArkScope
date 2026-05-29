@@ -317,6 +317,83 @@ class TestNativeHost:
             assert result["status"] == "ok"
             assert result["count"] == 1
             mock_dal.apply_sa_refresh.assert_called_once()
+            call_picks = mock_dal.apply_sa_refresh.call_args[1].get("picks")
+            assert call_picks[0]["closed_date"] == "2026-05-15"
+
+
+# ============================================================
+# SA Alpha Picks storage contract
+# ============================================================
+
+class TestSAAlphaPicksStorageContract:
+    def test_sql_schema_preserves_dual_tab_membership_and_closed_date(self):
+        """Schema models SA's source quirk: same pick may be current and closed."""
+        base_sql = Path("sql/007_add_sa_alpha_picks.sql").read_text()
+        migration_sql = Path(
+            "sql/014_sa_alpha_picks_closed_date_and_dual_membership.sql"
+        ).read_text()
+
+        assert "closed_date       DATE" in base_sql
+        assert "UNIQUE (symbol, picked_date, portfolio_status)" in base_sql
+        assert "ADD COLUMN IF NOT EXISTS closed_date DATE" in migration_sql
+        assert "sa_alpha_picks_symbol_picked_date_status_key" in migration_sql
+        assert "UNIQUE (symbol, picked_date, portfolio_status)" in migration_sql
+
+    def test_db_apply_refresh_uses_status_scoped_upsert(self):
+        """DB upsert must not collapse current and closed rows for same pick."""
+        calls = []
+
+        class FakeCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def execute(self, sql, params=None):
+                calls.append((sql, params))
+
+        class FakeConn:
+            autocommit = True
+
+            def cursor(self):
+                return FakeCursor()
+
+            def commit(self):
+                pass
+
+            def rollback(self):
+                pass
+
+        backend = DatabaseBackend.__new__(DatabaseBackend)
+        backend._get_conn = lambda: FakeConn()
+        attempt_ts = datetime(2026, 5, 29, tzinfo=timezone.utc)
+        snapshot_ts = datetime(2026, 5, 29, 1, tzinfo=timezone.utc)
+
+        count = backend.apply_sa_refresh(
+            scope="closed",
+            picks=[{
+                "symbol": "ARQT",
+                "company": "",
+                "picked_date": "2025-03-17",
+                "closed_date": "2026-05-13",
+                "return_pct": 29.64,
+                "sector": "Health Care",
+                "sa_rating": "STRONG SELL",
+                "holding_pct": None,
+                "raw_data": {"cells": ["ARQT", "03/17/2025", "05/13/2026"]},
+            }],
+            attempt_ts=attempt_ts,
+            snapshot_ts=snapshot_ts,
+        )
+
+        assert count == 1
+        insert_sql, insert_params = calls[1]
+        assert "closed_date" in insert_sql
+        assert "COALESCE(EXCLUDED.closed_date, sa_alpha_picks.closed_date)" in insert_sql
+        assert "ON CONFLICT (symbol, picked_date, portfolio_status)" in insert_sql
+        assert insert_params[3] == "2026-05-13"
+        assert insert_params[4] == "closed"
 
 
 # ============================================================

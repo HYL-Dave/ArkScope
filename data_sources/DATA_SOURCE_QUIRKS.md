@@ -8,6 +8,21 @@ doc。
 
 ---
 
+## Seeking Alpha Alpha Picks — Open/Closed dual membership
+
+- **Observed (2026-05-29)**: Some picks can appear in both Open/Current and
+  Closed/Removed tabs with the same `(symbol, picked_date)`. Examples observed
+  locally: `AGX` and `APP`.
+- **Implication**: This is a source-state inconsistency, not an extension
+  scraper bug. Storage must preserve tab membership instead of treating
+  `(symbol, picked_date)` as globally unique.
+- **Workaround / Fix**: PostgreSQL migration
+  `sql/014_sa_alpha_picks_closed_date_and_dual_membership.sql` adds
+  `closed_date` and changes the uniqueness contract to
+  `(symbol, picked_date, portfolio_status)`.
+
+---
+
 ## Finnhub Free Tier — 新聞歷史深度
 
 - **聲稱**: 1 年（見 [API_SPECIFICATIONS.md](./API_SPECIFICATIONS.md)

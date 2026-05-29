@@ -1168,13 +1168,13 @@ class DatabaseBackend:
                     cur.execute(
                         """
                         INSERT INTO sa_alpha_picks
-                            (symbol, company, picked_date, portfolio_status,
+                            (symbol, company, picked_date, closed_date, portfolio_status,
                              is_stale, return_pct, sector, sa_rating, holding_pct,
                              raw_data, last_seen_snapshot, fetched_at, updated_at)
-                        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        ON CONFLICT (symbol, picked_date) DO UPDATE SET
+                        VALUES (%s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        ON CONFLICT (symbol, picked_date, portfolio_status) DO UPDATE SET
                             company = EXCLUDED.company,
-                            portfolio_status = EXCLUDED.portfolio_status,
+                            closed_date = COALESCE(EXCLUDED.closed_date, sa_alpha_picks.closed_date),
                             is_stale = FALSE,
                             return_pct = EXCLUDED.return_pct,
                             sector = EXCLUDED.sector,
@@ -1188,6 +1188,7 @@ class DatabaseBackend:
                             pick.get("symbol"),
                             pick.get("company", ""),
                             pick.get("picked_date"),
+                            pick.get("closed_date"),
                             scope,
                             pick.get("return_pct"),
                             pick.get("sector"),
@@ -1282,7 +1283,7 @@ class DatabaseBackend:
 
         where = " AND ".join(conditions) if conditions else "TRUE"
         sql = (
-            f"SELECT symbol, company, picked_date, portfolio_status, is_stale, "
+            f"SELECT symbol, company, picked_date, closed_date, portfolio_status, is_stale, "
             f"return_pct, sector, sa_rating, holding_pct, "
             f"detail_fetched_at IS NOT NULL AS has_detail, "
             f"last_seen_snapshot, fetched_at, updated_at "
@@ -1313,7 +1314,9 @@ class DatabaseBackend:
                 if picked_date:
                     cur.execute(
                         "SELECT * FROM sa_alpha_picks "
-                        "WHERE symbol = %s AND picked_date = %s",
+                        "WHERE symbol = %s AND picked_date = %s "
+                        "ORDER BY CASE portfolio_status WHEN 'current' THEN 0 ELSE 1 END, "
+                        "is_stale ASC LIMIT 1",
                         (symbol.upper(), picked_date),
                     )
                 else:

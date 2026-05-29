@@ -1684,6 +1684,8 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
             # Show detail
             console.print(f"[bold]{result.get('company', symbol)} ({result.get('symbol', symbol)})[/bold]")
             console.print(f"  Picked: {result.get('picked_date', '?')}")
+            if result.get("closed_date"):
+                console.print(f"  Closed: {result.get('closed_date')}")
             console.print(f"  Status: {result.get('portfolio_status', '?')}")
             console.print(f"  Return: {result.get('return_pct', '?')}%")
             console.print(f"  Sector: {result.get('sector', '?')}")
@@ -1720,6 +1722,8 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
             rating = p.get("sa_rating") or ""
             sector = p.get("sector") or ""
             picked = p.get("picked_date") or ""
+            closed = p.get("closed_date") or ""
+            date_str = f"{picked}->{closed}" if closed else picked
             if ret is not None:
                 try:
                     ret_val = float(ret)
@@ -1733,7 +1737,7 @@ def handle_alpha_picks_command(dal, arg: str) -> None:
                 ret_color = "dim"
             console.print(
                 f"  [cyan]{sym:6s}[/cyan] [{ret_color}]{ret_str}[/{ret_color}] "
-                f"[dim]{rating:12s} {sector:15s} {picked}[/dim] {company}"
+                f"[dim]{rating:12s} {sector:15s} {date_str}[/dim] {company}"
             )
 
     freshness = result.get("freshness", {})
