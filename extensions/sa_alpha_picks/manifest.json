@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SA Alpha Picks Exporter",
   "version": "1.0.0",
-  "description": "Export Seeking Alpha Alpha Picks portfolio data for MindfulRL agent",
+  "description": "Export Seeking Alpha Alpha Picks portfolio data for ArkScope",
   "permissions": [
     "alarms",
     "scripting",

@@ -11,8 +11,12 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOST_NAME="com.mindfulrl.sa_alpha_picks"
 ADDON_ID="${SA_ALPHA_PICKS_FIREFOX_ID:-sa-alpha-picks@mindfulrl.local}"
 HOST_SCRIPT="$PROJECT_ROOT/scripts/sa_native_host.py"
+LAUNCHER_SOURCE="$SCRIPT_DIR/native_host_launcher.sh"
+LAUNCHER_DIR="${ARKSCOPE_NATIVE_HOST_DIR:-$HOME/.local/share/arkscope/native-hosts}"
+LAUNCHER_PATH="$LAUNCHER_DIR/sa_alpha_picks_host.sh"
+CONFIG_DIR="${ARKSCOPE_CONFIG_DIR:-$HOME/.config/arkscope}"
+CONFIG_PATH="$CONFIG_DIR/sa_native_host.json"
 BUILD_DIR="$SCRIPT_DIR/build/firefox"
-WRAPPER_PATH="$BUILD_DIR/sa_native_host_firefox.sh"
 MANIFEST_DIR="${MOZILLA_NATIVE_MESSAGING_DIR:-$HOME/.mozilla/native-messaging-hosts}"
 NATIVE_MANIFEST_PATH="$MANIFEST_DIR/$HOST_NAME.json"
 
@@ -20,10 +24,17 @@ echo "SA Alpha Picks — Firefox Installer"
 echo "=================================="
 echo "Project root: $PROJECT_ROOT"
 echo "Add-on ID:    $ADDON_ID"
+echo "Launcher:     $LAUNCHER_PATH"
+echo "Config:       $CONFIG_PATH"
 echo ""
 
 if [ ! -f "$HOST_SCRIPT" ]; then
     echo "ERROR: Native host script not found: $HOST_SCRIPT"
+    exit 1
+fi
+
+if [ ! -f "$LAUNCHER_SOURCE" ]; then
+    echo "ERROR: Native host launcher template not found: $LAUNCHER_SOURCE"
     exit 1
 fi
 
@@ -48,6 +59,30 @@ else
     fi
 fi
 
+mkdir -p "$LAUNCHER_DIR" "$CONFIG_DIR"
+cp "$LAUNCHER_SOURCE" "$LAUNCHER_PATH"
+chmod +x "$LAUNCHER_PATH"
+
+"$PYTHON_PATH" - "$PROJECT_ROOT" "$PYTHON_PATH" "$HOST_SCRIPT" "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+project_root, python_path, host_script, config_path = sys.argv[1:]
+Path(config_path).write_text(
+    json.dumps(
+        {
+            "project_root": project_root,
+            "python_path": python_path,
+            "host_script": host_script,
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+PY
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
@@ -65,19 +100,12 @@ if ! grep -q 'compat_firefox.js' "$BUILD_DIR/popup.html"; then
     exit 1
 fi
 
-cat > "$WRAPPER_PATH" << EOF
-#!/bin/sh
-cd "$PROJECT_ROOT"
-exec "$PYTHON_PATH" "$HOST_SCRIPT"
-EOF
-chmod +x "$WRAPPER_PATH"
-
 mkdir -p "$MANIFEST_DIR"
 cat > "$NATIVE_MANIFEST_PATH" << EOF
 {
   "name": "$HOST_NAME",
-  "description": "SA Alpha Picks data bridge for MindfulRL",
-  "path": "$WRAPPER_PATH",
+  "description": "SA Alpha Picks data bridge for ArkScope",
+  "path": "$LAUNCHER_PATH",
   "type": "stdio",
   "allowed_extensions": ["$ADDON_ID"]
 }
@@ -87,7 +115,9 @@ echo ""
 echo "Firefox build and native host registered."
 echo "  Extension build: $BUILD_DIR"
 echo "  Native manifest: $NATIVE_MANIFEST_PATH"
-echo "  Native wrapper:  $WRAPPER_PATH"
+echo "  Launcher:        $LAUNCHER_PATH"
+echo "  Config:          $CONFIG_PATH"
+echo "  Native host:     $HOST_SCRIPT"
 echo "  Python:          $PYTHON_PATH"
 echo ""
 echo "Load in Firefox:"
