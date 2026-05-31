@@ -329,15 +329,24 @@ class TestSAAlphaPicksStorageContract:
     def test_sql_schema_preserves_dual_tab_membership_and_closed_date(self):
         """Schema models SA's source quirk: same pick may be current and closed."""
         base_sql = Path("sql/007_add_sa_alpha_picks.sql").read_text()
-        migration_sql = Path(
+        migration_014_sql = Path(
             "sql/014_sa_alpha_picks_closed_date_and_dual_membership.sql"
+        ).read_text()
+        migration_015_sql = Path(
+            "sql/015_sa_alpha_picks_closed_event_identity.sql"
         ).read_text()
 
         assert "closed_date       DATE" in base_sql
-        assert "UNIQUE (symbol, picked_date, portfolio_status)" in base_sql
-        assert "ADD COLUMN IF NOT EXISTS closed_date DATE" in migration_sql
-        assert "sa_alpha_picks_symbol_picked_date_status_key" in migration_sql
-        assert "UNIQUE (symbol, picked_date, portfolio_status)" in migration_sql
+        assert "idx_sa_picks_current_unique" in base_sql
+        assert "WHERE portfolio_status = 'current'" in base_sql
+        assert "idx_sa_picks_closed_unique" in base_sql
+        assert "closed_date)" in base_sql
+        assert "WHERE portfolio_status = 'closed'" in base_sql
+        assert "ADD COLUMN IF NOT EXISTS closed_date DATE" in migration_014_sql
+        assert "sa_alpha_picks_symbol_picked_date_status_key" in migration_014_sql
+        assert "DROP CONSTRAINT IF EXISTS sa_alpha_picks_symbol_picked_date_status_key" in migration_015_sql
+        assert "idx_sa_picks_current_unique" in migration_015_sql
+        assert "idx_sa_picks_closed_unique" in migration_015_sql
 
     def test_db_apply_refresh_uses_status_scoped_upsert(self):
         """DB upsert must not collapse current and closed rows for same pick."""
@@ -390,10 +399,66 @@ class TestSAAlphaPicksStorageContract:
         assert count == 1
         insert_sql, insert_params = calls[1]
         assert "closed_date" in insert_sql
-        assert "COALESCE(EXCLUDED.closed_date, sa_alpha_picks.closed_date)" in insert_sql
-        assert "ON CONFLICT (symbol, picked_date, portfolio_status)" in insert_sql
+        assert "ON CONFLICT (symbol, picked_date, portfolio_status, closed_date)" in insert_sql
+        assert "WHERE portfolio_status = 'closed'" in insert_sql
         assert insert_params[3] == "2026-05-13"
         assert insert_params[4] == "closed"
+
+    def test_db_apply_refresh_current_uses_current_partial_index(self):
+        """Current rows keep the old one-row-per-pick identity."""
+        calls = []
+
+        class FakeCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def execute(self, sql, params=None):
+                calls.append((sql, params))
+
+        class FakeConn:
+            autocommit = True
+
+            def cursor(self):
+                return FakeCursor()
+
+            def commit(self):
+                pass
+
+            def rollback(self):
+                pass
+
+        backend = DatabaseBackend.__new__(DatabaseBackend)
+        backend._get_conn = lambda: FakeConn()
+        attempt_ts = datetime(2026, 5, 29, tzinfo=timezone.utc)
+        snapshot_ts = datetime(2026, 5, 29, 1, tzinfo=timezone.utc)
+
+        count = backend.apply_sa_refresh(
+            scope="current",
+            picks=[{
+                "symbol": "MXL",
+                "company": "",
+                "picked_date": "2026-05-15",
+                "closed_date": None,
+                "return_pct": 2.38,
+                "sector": "Information Technology",
+                "sa_rating": "STRONG BUY",
+                "holding_pct": 0.39,
+                "raw_data": {"cells": ["MXL", "05/15/2026"]},
+            }],
+            attempt_ts=attempt_ts,
+            snapshot_ts=snapshot_ts,
+        )
+
+        assert count == 1
+        insert_sql, insert_params = calls[1]
+        assert "ON CONFLICT (symbol, picked_date, portfolio_status)" in insert_sql
+        assert "WHERE portfolio_status = 'current'" in insert_sql
+        assert "ON CONFLICT (symbol, picked_date, portfolio_status, closed_date)" not in insert_sql
+        assert insert_params[3] is None
+        assert insert_params[4] == "current"
 
 
 # ============================================================

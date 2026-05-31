@@ -19,9 +19,18 @@ CREATE TABLE IF NOT EXISTS sa_alpha_picks (
     raw_data          JSONB,
     last_seen_snapshot TIMESTAMPTZ,
     fetched_at        TIMESTAMPTZ DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (symbol, picked_date, portfolio_status)
+    updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Current/open membership has one row per pick.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sa_picks_current_unique
+    ON sa_alpha_picks(symbol, picked_date, portfolio_status)
+    WHERE portfolio_status = 'current';
+
+-- Closed/removed history can contain multiple close events for the same pick.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sa_picks_closed_unique
+    ON sa_alpha_picks(symbol, picked_date, portfolio_status, closed_date)
+    WHERE portfolio_status = 'closed';
 
 CREATE INDEX IF NOT EXISTS idx_sa_picks_status ON sa_alpha_picks(portfolio_status);
 CREATE INDEX IF NOT EXISTS idx_sa_picks_symbol ON sa_alpha_picks(symbol);

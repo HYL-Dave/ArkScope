@@ -1165,16 +1165,12 @@ class DatabaseBackend:
                 # 2. Upsert new rows (don't touch detail_report/detail_fetched_at)
                 count = 0
                 for pick in picks:
-                    cur.execute(
-                        """
-                        INSERT INTO sa_alpha_picks
-                            (symbol, company, picked_date, closed_date, portfolio_status,
-                             is_stale, return_pct, sector, sa_rating, holding_pct,
-                             raw_data, last_seen_snapshot, fetched_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                        ON CONFLICT (symbol, picked_date, portfolio_status) DO UPDATE SET
+                    if scope == "closed":
+                        conflict_clause = """
+                        ON CONFLICT (symbol, picked_date, portfolio_status, closed_date)
+                        WHERE portfolio_status = 'closed' DO UPDATE SET
                             company = EXCLUDED.company,
-                            closed_date = COALESCE(EXCLUDED.closed_date, sa_alpha_picks.closed_date),
+                            closed_date = EXCLUDED.closed_date,
                             is_stale = FALSE,
                             return_pct = EXCLUDED.return_pct,
                             sector = EXCLUDED.sector,
@@ -1183,6 +1179,30 @@ class DatabaseBackend:
                             raw_data = EXCLUDED.raw_data,
                             last_seen_snapshot = EXCLUDED.last_seen_snapshot,
                             updated_at = NOW()
+                        """
+                    else:
+                        conflict_clause = """
+                        ON CONFLICT (symbol, picked_date, portfolio_status)
+                        WHERE portfolio_status = 'current' DO UPDATE SET
+                            company = EXCLUDED.company,
+                            closed_date = EXCLUDED.closed_date,
+                            is_stale = FALSE,
+                            return_pct = EXCLUDED.return_pct,
+                            sector = EXCLUDED.sector,
+                            sa_rating = EXCLUDED.sa_rating,
+                            holding_pct = EXCLUDED.holding_pct,
+                            raw_data = EXCLUDED.raw_data,
+                            last_seen_snapshot = EXCLUDED.last_seen_snapshot,
+                            updated_at = NOW()
+                        """
+                    cur.execute(
+                        f"""
+                        INSERT INTO sa_alpha_picks
+                            (symbol, company, picked_date, closed_date, portfolio_status,
+                             is_stale, return_pct, sector, sa_rating, holding_pct,
+                             raw_data, last_seen_snapshot, fetched_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, FALSE, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        {conflict_clause}
                         """,
                         (
                             pick.get("symbol"),
