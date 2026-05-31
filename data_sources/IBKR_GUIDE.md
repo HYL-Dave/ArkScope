@@ -2,7 +2,7 @@
 
 ## 概述
 
-IBKR 提供免費的歷史數據存取（含交易帳戶），適合作為 FinRL 訓練的主要數據來源。
+IBKR 提供免費的歷史數據存取（含交易帳戶），是本專案的主力資料來源（價格 / 新聞 / 波動率 / 基本面）。未來 desktop app 會在 Settings 提供 IB Gateway 連線設定。
 
 ## 運行方式比較
 
@@ -210,7 +210,7 @@ with IBKRDataSource(port=4001) as ibkr:
 | `BID` | 買價 | 訂單簿分析 |
 | `ASK` | 賣價 | 訂單簿分析 |
 | `BID_ASK` | 時間加權價差 | 價差分析 |
-| `ADJUSTED_LAST` | 調整後股價 (含股息/分割) | **RL 訓練 (推薦)** |
+| `ADJUSTED_LAST` | 調整後股價 (含股息/分割) | **回測 / 歷史分析 (推薦)** |
 | `HISTORICAL_VOLATILITY` | 歷史波動率 | 風險指標 |
 | `OPTION_IMPLIED_VOLATILITY` | 期權 IV | 期權策略 |
 | `FEE_RATE` | 做空借券費率 | 做空成本分析 |
@@ -301,7 +301,7 @@ docker run -d \
 3. 重新設定 2FA，選擇「I want to manage my own key」
 4. 記錄 Base32 secret key
 
-## FinRL 訓練建議
+## 歷史資料批次抓取建議
 
 ### 推薦配置
 
