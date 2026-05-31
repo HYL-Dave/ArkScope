@@ -430,7 +430,7 @@ MIT License
 
 ## 👥 维护者
 
-FinRL Team - MindfulRL-Intraday Project
+FinRL Team - ArkScope Project
 
 ---
 

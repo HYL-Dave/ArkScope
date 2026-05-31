@@ -115,7 +115,7 @@ async def run_service(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="MindfulRL Monitor Service — automated watchlist scanning",
+        description="ArkScope Monitor Service — automated watchlist scanning",
     )
     parser.add_argument(
         "--interval", type=int, default=5,

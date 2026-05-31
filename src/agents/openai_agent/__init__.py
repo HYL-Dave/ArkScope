@@ -1,5 +1,5 @@
 """
-OpenAI Agents SDK integration for MindfulRL.
+OpenAI Agents SDK integration for ArkScope.
 
 Usage:
     from src.agents.openai_agent import run_query

@@ -1,5 +1,5 @@
 """
-Anthropic SDK integration for MindfulRL.
+Anthropic SDK integration for ArkScope.
 
 Usage:
     from src.agents.anthropic_agent import run_query

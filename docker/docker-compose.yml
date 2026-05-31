@@ -1,4 +1,4 @@
-# MindfulRL-Intraday: PostgreSQL + pgvector
+# ArkScope: PostgreSQL + pgvector
 #
 # Usage:
 #   docker compose up -d              # Start (default port 15432)

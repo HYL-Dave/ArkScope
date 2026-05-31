@@ -1,5 +1,5 @@
 -- =============================================================================
--- MindfulRL-Intraday: Add news_scores table for multi-model scoring
+-- ArkScope: Add news_scores table for multi-model scoring
 -- =============================================================================
 -- Separates scoring from news articles so each article can have multiple
 -- scores from different models (haiku, gpt-5.2, gpt-6, ...).

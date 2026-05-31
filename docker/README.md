@@ -1,4 +1,4 @@
-# MindfulRL-Intraday: PostgreSQL + pgvector
+# ArkScope: PostgreSQL + pgvector
 
 ## Quick Start
 

@@ -164,7 +164,7 @@ def alert_to_embed(alert: Alert) -> discord.Embed:
         elif not isinstance(value, (list, dict)):
             embed.add_field(name=key, value=str(value), inline=True)
 
-    embed.set_footer(text="MindfulRL Monitor")
+    embed.set_footer(text="ArkScope Monitor")
     return embed
 
 
@@ -585,7 +585,7 @@ async def _send_as_embeds(
     """
     from datetime import datetime as _dt
 
-    footer_text = f"MindfulRL Agent \u00b7 {model_name}" if model_name else "MindfulRL Agent"
+    footer_text = f"ArkScope Agent \u00b7 {model_name}" if model_name else "ArkScope Agent"
 
     chunks = _split_message(text, limit=4000)
     embeds: List[discord.Embed] = []
@@ -593,7 +593,7 @@ async def _send_as_embeds(
     for i, chunk in enumerate(chunks):
         embed = discord.Embed(description=chunk, color=color)
         if i == 0:
-            embed.set_author(name="MindfulRL Analysis")
+            embed.set_author(name="ArkScope Analysis")
         if i == len(chunks) - 1:
             embed.set_footer(text=footer_text)
             embed.timestamp = _dt.now()
@@ -723,7 +723,7 @@ class MindfulDiscordBot(discord.Client):
             await self._handle_agent_query(message)
             return
 
-        # @MindfulRL mention in any channel
+        # @ArkScope mention in any channel
         if self.user and self.user.mentioned_in(message):
             await self._handle_agent_query(message)
             return

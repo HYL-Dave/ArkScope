@@ -42,7 +42,7 @@ async def query_agent(
     """
     Execute a natural language query using an AI agent.
 
-    The agent has access to all MindfulRL tools (news, prices, options,
+    The agent has access to all ArkScope tools (news, prices, options,
     signals, fundamentals) and will call them as needed to answer your question.
 
     Args:

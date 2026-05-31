@@ -422,7 +422,7 @@ def run_tests(args):
     """Run all IBKR tests."""
     print("\n" + "="*70)
     print("       INTERACTIVE BROKERS (IBKR) DATA SOURCE TEST SUITE")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("="*70)
     print(f"\n  Connection target: {args.host}:{args.port}")
     print(f"  Client ID: {args.client_id}")
@@ -533,7 +533,7 @@ def run_tests(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Test IBKR data source for MindfulRL-Intraday",
+        description="Test IBKR data source for ArkScope",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

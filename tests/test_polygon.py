@@ -45,7 +45,7 @@ def run_tests():
 
     print("\n" + "="*60)
     print("       POLYGON.IO API TEST SUITE")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("       (Free tier: 5 calls/min)")
     print("="*60)
 

@@ -1,5 +1,5 @@
 """
-HTTP API package — FastAPI application for MindfulRL data access.
+HTTP API package — FastAPI application for ArkScope data access.
 
 Start the server:
     python -m src.api

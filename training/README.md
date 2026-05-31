@@ -168,7 +168,7 @@ print('All training deps OK')
 ### 範例 A: Claude Opus → PPO（最快上手）
 
 ```bash
-cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+cd /mnt/md0/PycharmProjects/ArkScope
 workon FinRL
 
 # 1. 準備資料（sentiment only）

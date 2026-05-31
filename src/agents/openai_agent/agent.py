@@ -334,7 +334,7 @@ def _build_agent(
         effective_max_tokens = _get_openai_max_output(model_name)
 
     return Agent(
-        name="MindfulRL Assistant",
+        name="ArkScope Assistant",
         instructions=system_prompt or SYSTEM_PROMPT,
         model=model_name,
         tools=all_tools,

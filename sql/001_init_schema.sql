@@ -1,5 +1,5 @@
 -- =============================================================================
--- MindfulRL-Intraday: PostgreSQL Schema Initialization
+-- ArkScope: PostgreSQL Schema Initialization
 -- =============================================================================
 -- Run via: psql "$DATABASE_URL" -f sql/001_init_schema.sql
 -- Or auto-executed by Docker on first startup via /docker-entrypoint-initdb.d

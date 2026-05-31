@@ -48,7 +48,7 @@ from .sec_edgar_source import SECEdgarDataSource
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SEC_CONTACT = 'MindfulRL-Intraday research@example.com'
+_DEFAULT_SEC_CONTACT = 'ArkScope research@example.com'
 
 
 def _get_sec_user_agent() -> str:
@@ -58,7 +58,7 @@ def _get_sec_user_agent() -> str:
     """
     contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
     if contact:
-        return f'MindfulRL-Intraday {contact}'
+        return f'ArkScope {contact}'
     legacy = os.environ.get('SEC_USER_AGENT', '').strip()
     if legacy:
         return legacy

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Collect historical stock prices from IBKR for MindfulRL training.
+Collect historical stock prices from IBKR for ArkScope training.
 
 Data Collection Strategy (per plan):
 - 2022/01 - 2026/present: 1 day bars (for RL training)

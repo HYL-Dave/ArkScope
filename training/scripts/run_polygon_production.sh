@@ -8,13 +8,21 @@
 # Resource: ~20GB RAM, 10/48 CPU cores, ~3 per GPU
 #
 # Usage:
-#   cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+#   cd /mnt/md0/PycharmProjects/ArkScope
 #   workon FinRL
 #   nohup bash training/scripts/run_polygon_production.sh > training/scripts/polygon_production.log 2>&1 &
 #   tail -f training/scripts/polygon_production.log
 
 set -e
-cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    echo "Usage: bash training/scripts/run_polygon_production.sh"
+    echo "Launches 10 PPO production training jobs from the ArkScope repo root."
+    exit 0
+fi
 
 TRAIN="training/data_prep/output/train_polygon_multi_both.csv"
 COMMON="--epochs 100 --full-batch --target-kl 0.05 --steps 40000"

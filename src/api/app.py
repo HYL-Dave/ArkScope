@@ -1,5 +1,5 @@
 """
-FastAPI application factory for MindfulRL.
+FastAPI application factory for ArkScope.
 
 Usage:
     uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8420
@@ -24,21 +24,21 @@ async def lifespan(app: FastAPI):
     dal = get_dal()
     registry = get_registry()
     logger.info(
-        f"MindfulRL API ready — "
+        f"ArkScope API ready — "
         f"{len(registry.list_all())} tools, "
         f"{len(dal.get_available_tickers('prices'))} price tickers"
     )
     yield
     # Shutdown
     dal.clear_cache()
-    logger.info("MindfulRL API shutdown")
+    logger.info("ArkScope API shutdown")
 
 
 def create_app() -> FastAPI:
     """Application factory."""
     app = FastAPI(
-        title="MindfulRL API",
-        description="Data access and analysis API for MindfulRL-Intraday",
+        title="ArkScope API",
+        description="Data access and analysis API for ArkScope",
         version="0.1.0",
         lifespan=lifespan,
     )

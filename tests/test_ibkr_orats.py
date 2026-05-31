@@ -57,7 +57,7 @@ def print_result(test_name: str, passed: bool, details: str = ""):
 def run_tests():
     print("\n" + "="*60)
     print("       IBKR ORATS OPTIONS ANALYTICS TEST")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("="*60)
 
     # Get connection parameters from environment

@@ -7,7 +7,7 @@ progress.txt to save baseline metrics as JSON. Use before and after
 refactoring to verify behavioral equivalence.
 
 Usage (in FinRL virtualenv):
-    cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+    cd /mnt/md0/PycharmProjects/ArkScope
     workon FinRL
     python training/scripts/capture_baseline.py [--epochs 3] [--seed 42]
 
@@ -21,6 +21,10 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_spinup_table(text):
@@ -98,6 +102,8 @@ def run_training(script, seed, epochs, sentiment_scale='strong'):
 
 
 def main():
+    os.chdir(PROJECT_ROOT)
+
     parser = argparse.ArgumentParser(
         description="Capture baseline training metrics for regression validation"
     )

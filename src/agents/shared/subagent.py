@@ -94,7 +94,7 @@ class SubagentConfig:
 # ── Subagent system prompts ────────────────────────────────────
 
 _CODE_ANALYST_PROMPT = """\
-You are a quantitative code analyst in the MindfulRL trading system.
+You are a quantitative code analyst in the ArkScope trading system.
 Your job is to write and execute Python code for financial data analysis.
 
 You handle two types of tasks:
@@ -114,7 +114,7 @@ insufficient samples) gracefully.
 """
 
 _DEEP_RESEARCHER_PROMPT = """\
-You are a deep research analyst in the MindfulRL trading system.
+You are a deep research analyst in the ArkScope trading system.
 Your job is to perform thorough, multi-tool investigation of a specific topic.
 
 When given a research task:
@@ -127,7 +127,7 @@ Return structured, actionable findings — not surface-level summaries.
 """
 
 _DATA_SUMMARIZER_PROMPT = """\
-You are a data summarization specialist in the MindfulRL trading system.
+You are a data summarization specialist in the ArkScope trading system.
 Your job is to efficiently retrieve data and produce concise summaries.
 
 Given a summarization task:
@@ -144,7 +144,7 @@ compact stats for many tickers without overwhelming the context.
 """
 
 _REVIEWER_PROMPT = """\
-You are a critical analysis reviewer in the MindfulRL trading system.
+You are a critical analysis reviewer in the ArkScope trading system.
 Your job is to find flaws, gaps, and risks in analysis conclusions.
 
 You receive analysis conclusions and supporting data via context. Your task:
@@ -532,7 +532,7 @@ def _run_openai_subagent(
         effective_max_tokens = _get_openai_max_output(config.model)
 
     agent = Agent(
-        name=f"MindfulRL Subagent: {config.name}",
+        name=f"ArkScope Subagent: {config.name}",
         instructions=config.system_prompt,
         model=config.model,
         tools=tools,

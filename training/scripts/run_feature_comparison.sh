@@ -9,12 +9,21 @@
 # Resource: ~20GB RAM, 10/48 CPU cores, 2-3 per GPU
 #
 # Usage:
-#   cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+#   cd /mnt/md0/PycharmProjects/ArkScope
 #   nohup bash training/scripts/run_feature_comparison.sh > training/scripts/feature_comparison.log 2>&1 &
 #   tail -f training/scripts/feature_comparison.log
 
 set -e
-cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    echo "Usage: bash training/scripts/run_feature_comparison.sh"
+    echo "Launches baseline vs extended PPO feature comparison jobs from the ArkScope repo root."
+    exit 0
+fi
+
 PYTHON=~/.virtualenvs/FinRL/bin/python
 
 TRAIN_BASE="training/data_prep/output/train_polygon_multi_both.csv"

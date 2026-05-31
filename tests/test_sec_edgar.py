@@ -45,7 +45,7 @@ def run_tests():
 
     print("\n" + "="*60)
     print("       SEC EDGAR API TEST SUITE")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("       (No API key required - Free & Official)")
     print("="*60)
 

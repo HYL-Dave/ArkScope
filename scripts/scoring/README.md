@@ -62,7 +62,7 @@ API_KEY_FILES=(
 
 **Usage:**
 ```bash
-cd /mnt/md0/PycharmProjects/MindfulRL-Intraday
+cd /mnt/md0/PycharmProjects/ArkScope
 ./scripts/scoring/batch_risk_scoring.sh
 ./scripts/scoring/batch_sentiment_scoring.sh
 ```

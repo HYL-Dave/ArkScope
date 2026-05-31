@@ -45,7 +45,7 @@ def run_tests():
 
     print("\n" + "="*60)
     print("       FINNHUB API TEST SUITE")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("="*60)
 
     results = []

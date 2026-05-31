@@ -1,5 +1,5 @@
 """
-Interactive CLI chat for MindfulRL agents.
+Interactive CLI chat for ArkScope agents.
 
 Run:
     python -m src.agents
@@ -335,7 +335,7 @@ def print_banner():
     console.print()
     console.print(
         Panel(
-            "[bold cyan]MindfulRL[/bold cyan] [dim]Interactive Agent[/dim]\n"
+            "[bold cyan]ArkScope[/bold cyan] [dim]Interactive Agent[/dim]\n"
             "[dim]Type your question, or /help for commands[/dim]",
             border_style="cyan",
             box=box.ROUNDED,
@@ -2556,7 +2556,7 @@ def handle_code_backend_command(state: SessionState, arg: str) -> None:
 # ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="MindfulRL Interactive Agent")
+    parser = argparse.ArgumentParser(description="ArkScope Interactive Agent")
     parser.add_argument(
         "--provider", "-p",
         choices=["anthropic", "openai"],

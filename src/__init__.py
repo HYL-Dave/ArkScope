@@ -1,1 +1,1 @@
-# MindfulRL-Intraday source modules
+# ArkScope source modules

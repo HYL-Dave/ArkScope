@@ -112,7 +112,7 @@ class SECEdgarDataSource(BaseDataSource):
             # Prefer SEC_CONTACT_EMAIL (new), fallback to SEC_USER_AGENT (legacy)
             contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
             if contact:
-                self.user_agent = f'MindfulRL-Intraday {contact}'
+                self.user_agent = f'ArkScope {contact}'
             else:
                 legacy = os.environ.get('SEC_USER_AGENT', '').strip()
                 if legacy:
@@ -123,7 +123,7 @@ class SECEdgarDataSource(BaseDataSource):
                         "SEC may rate-limit or reject requests. "
                         "Set SEC_CONTACT_EMAIL in config/.env"
                     )
-                    self.user_agent = 'MindfulRL-Intraday research@example.com'
+                    self.user_agent = 'ArkScope research@example.com'
 
         self._session = requests.Session()
         self._session.headers.update({

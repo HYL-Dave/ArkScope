@@ -1,5 +1,5 @@
 """
-Unified Data Sources Module for MindfulRL-Intraday
+Unified Data Sources Module for ArkScope
 
 This module provides a unified interface for fetching financial data from
 multiple sources (Tiingo, Finnhub, Financial Datasets, etc.)

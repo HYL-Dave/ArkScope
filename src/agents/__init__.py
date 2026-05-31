@@ -1,5 +1,5 @@
 """
-Agent SDK integration for MindfulRL.
+Agent SDK integration for ArkScope.
 
 Supports both OpenAI Agents SDK and Anthropic SDK for natural language
 queries against the tools layer.

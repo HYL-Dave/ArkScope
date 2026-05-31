@@ -271,7 +271,7 @@ def main():
     """Run all tests."""
     print("\n" + "=" * 60)
     print("       TIINGO API TEST SUITE")
-    print("       MindfulRL-Intraday Project")
+    print("       ArkScope Project")
     print("=" * 60)
 
     results = {}
