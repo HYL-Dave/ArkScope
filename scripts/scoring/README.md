@@ -38,8 +38,10 @@ Validates CSV files with sentiment/risk scores.
 
 **Usage:**
 ```bash
-python scripts/scoring/validate_scores.py <csv_file>
+python scripts/scoring/validate_scores.py --input <csv_file> \
+    --sentiment-column sentiment_<model>   # e.g. --sentiment-column sentiment_gpt_5_4_high
 ```
+(Also accepts `--symbol-column`, `--text-column`, `--date-column`; see `--help`.)
 
 ### score_ibkr_news.py
 
@@ -64,27 +66,9 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
 - API key files: `api_keys_tier1.txt`, `api_keys_tier5.txt` (gitignored)
 - Open-dataset prompts (provenance): `../huggingface/SCORING_PROMPTS.md`
 
-## Migration Notes (2026-01-08)
+## score_ibkr_news.py — detailed reference
 
-Files moved from project root:
-- `run_risk_scoring_multi_keys.sh` -> `batch_risk_scoring.sh`
-- `run_sentiment_scoring_multi_keys.sh` -> `batch_sentiment_scoring.sh`
-- `run_risk_scoring_custom.sh` -> `batch_scoring_template.sh`
-- `check_sentiment_csv.py` -> `validate_scores.py`
-
-After moving, update shell script paths to call Python scripts from the new location.
-
-## Migration Notes (2026-01-12)
-
-### Scripts Consolidated to scripts/scoring/
-
-Moved from project root:
-- `score_sentiment_openai.py` - OpenAI sentiment scoring (CSV)
-- `score_risk_openai.py` - OpenAI risk scoring (CSV)
-- `score_sentiment_anthropic.py` - Anthropic sentiment scoring (CSV)
-- `score_risk_anthropic.py` - Anthropic risk scoring (CSV)
-
-### score_ibkr_news.py: Dynamic Column Naming
+### Dynamic Column Naming
 
 **Breaking Change**: Column names are now dynamically generated based on model AND reasoning effort.
 
