@@ -15,6 +15,8 @@ GPT-5.4-nano scores are 100% complete (title-only, no article text needed).
 
 All scores are integer 1-5 scale (1=most negative/highest risk, 5=most positive/lowest risk).
 
+**Exact scoring/summary prompts (provenance):** [`SCORING_PROMPTS.md`](./SCORING_PROMPTS.md).
+
 ---
 
 ## File Structure
