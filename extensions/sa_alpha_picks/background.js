@@ -63,6 +63,10 @@ const MARKET_NEWS_DETAIL_TOTAL_LIMITS = {
 };
 const COLLECTOR_TABS_STORAGE_KEY = "saCollectorTabs";
 const COLLECTOR_TAB_STALE_MS = 10 * 60 * 1000;
+const DEFAULT_TAB_LOAD_TIMEOUT_MS = 30 * 1000;
+const MARKET_NEWS_INITIAL_TAB_LOAD_TIMEOUT_MS = 45 * 1000;
+const MARKET_NEWS_RETRY_TAB_LOAD_TIMEOUT_MS = 45 * 1000;
+const MARKET_NEWS_DETAIL_TAB_LOAD_TIMEOUT_MS = 45 * 1000;
 const MARKET_NEWS_DETAIL_ITEM_TIMEOUT_MS = 90 * 1000;
 const MARKET_NEWS_PROFILES = {
   quick: {
@@ -273,8 +277,11 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
       if (!(await shouldRunMarketNewsAutoSync())) {
         return { status: "skipped", reason: "not_due" };
       }
-      await markMarketNewsAutoSyncStarted();
-      return doMarketNewsRefresh("quick", { trigger: "alarm" });
+      var result = await doMarketNewsRefresh("quick", { trigger: "alarm" });
+      if (shouldMarkMarketNewsAutoSyncRun(result)) {
+        await markMarketNewsAutoSyncStarted();
+      }
+      return result;
     });
   }
 });
@@ -521,7 +528,7 @@ async function doMarketNewsRefresh(mode, options) {
     const tab = await chrome.tabs.create({ url: SA_MARKET_NEWS_URL, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "market_news");
-    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_MARKET_NEWS_URL));
+    await waitForMarketNewsPageLoad(tabId);
 
     sendProgress("Waiting for market news...");
     var ready = await waitForMarketNewsReady(tabId);
@@ -572,7 +579,7 @@ async function doMarketNewsRefresh(mode, options) {
           45000,
           "market news tab update timeout"
         );
-        await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
+        await waitForTabLoad(tabId, MARKET_NEWS_DETAIL_TAB_LOAD_TIMEOUT_MS, expectedPathFromUrl(item.url));
         await withTimeout(
           installMarketNewsPageGuards(tabId),
           10000,
@@ -825,6 +832,11 @@ async function markMarketNewsAutoSyncStarted() {
   });
 }
 
+function shouldMarkMarketNewsAutoSyncRun(result) {
+  if (!result || typeof result !== "object") return false;
+  return result.status !== "error" && result.status !== "busy";
+}
+
 function normalizeAlphaPicksAutoSyncIntervalMinutes(value) {
   var mins = parseInt(value, 10);
   if (ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS.indexOf(mins) === -1) {
@@ -904,7 +916,7 @@ function getNewYorkTimeParts(now) {
 // --- Tab management ---
 
 function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
-  timeoutMs = timeoutMs || 30000;
+  timeoutMs = timeoutMs || DEFAULT_TAB_LOAD_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     var settled = false;
     var timeoutId = null;
@@ -949,7 +961,11 @@ function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
     chrome.tabs.onRemoved.addListener(onRemoved);
 
     timeoutId = setTimeout(() => {
-      finish(new Error("Timeout waiting for tab load"));
+      chrome.tabs.get(tabId).then((tab) => {
+        finish(new Error(formatTabLoadTimeout(tab, expectedUrlFragment, timeoutMs)));
+      }).catch(() => {
+        finish(new Error("Timeout waiting for tab load"));
+      });
     }, timeoutMs);
 
     chrome.tabs.get(tabId).then((tab) => {
@@ -964,6 +980,28 @@ function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
       finish(err || new Error("Failed to inspect tab state"));
     });
   });
+}
+
+function formatTabLoadTimeout(tab, expectedUrlFragment, timeoutMs) {
+  var status = (tab && tab.status) || "unknown";
+  var url = shortenForLog((tab && tab.url) || "", 180);
+  var pendingUrl = shortenForLog((tab && tab.pendingUrl) || "", 180);
+  return (
+    "Timeout waiting for tab load" +
+    " (" + timeoutMs + "ms" +
+    ", expected=" + (expectedUrlFragment || "any") +
+    ", status=" + status +
+    ", url=" + (url || "n/a") +
+    ", pendingUrl=" + (pendingUrl || "n/a") +
+    ")"
+  );
+}
+
+function shortenForLog(value, maxLen) {
+  value = String(value || "");
+  maxLen = maxLen || 180;
+  if (value.length <= maxLen) return value;
+  return value.slice(0, maxLen - 3) + "...";
 }
 
 function expectedPathFromUrl(url) {
@@ -989,6 +1027,94 @@ function withTimeout(promise, timeoutMs, label) {
   });
   return Promise.race([promise, timeout]).finally(function () {
     if (timer) clearTimeout(timer);
+  });
+}
+
+async function waitForMarketNewsPageLoad(tabId) {
+  var expectedPath = expectedPathFromUrl(SA_MARKET_NEWS_URL);
+  var firstError = null;
+  try {
+    await waitForTabLoad(tabId, MARKET_NEWS_INITIAL_TAB_LOAD_TIMEOUT_MS, expectedPath);
+    return;
+  } catch (err) {
+    firstError = err;
+  }
+
+  var firstProbe = await probeMarketNewsListDom(tabId);
+  if (firstProbe.status === "ready") {
+    console.warn("[SA] Market News tab did not report complete, but DOM is ready:", firstProbe);
+    return;
+  }
+  if (firstProbe.status === "login_redirect") {
+    throw new Error("Session expired");
+  }
+
+  sendProgress("Retrying market news page load...");
+  try {
+    await chrome.tabs.reload(tabId);
+    await waitForTabLoad(tabId, MARKET_NEWS_RETRY_TAB_LOAD_TIMEOUT_MS, expectedPath);
+    return;
+  } catch (retryErr) {
+    var retryProbe = await probeMarketNewsListDom(tabId);
+    if (retryProbe.status === "ready") {
+      console.warn("[SA] Market News tab retry did not report complete, but DOM is ready:", retryProbe);
+      return;
+    }
+    if (retryProbe.status === "login_redirect") {
+      throw new Error("Session expired");
+    }
+    throw new Error(
+      "Timeout waiting for market news tab load after retry; first=" +
+      ((firstError && firstError.message) || String(firstError)) +
+      "; retry=" +
+      ((retryErr && retryErr.message) || String(retryErr)) +
+      "; probe=" + formatMarketNewsProbe(retryProbe)
+    );
+  }
+}
+
+async function probeMarketNewsListDom(tabId) {
+  try {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: function () {
+        var href = location.href || "";
+        if (href.includes("/login") || href.includes("/sign_in")) {
+          return { status: "login_redirect", url: href };
+        }
+        var body = document.body;
+        var text = body ? body.innerText : "";
+        var links = document.querySelectorAll('a[href*="/news/"]');
+        if (links.length >= 3) {
+          return { status: "ready", count: links.length, textLength: text.length, url: href };
+        }
+        if (text.length > 1000 && links.length > 0) {
+          return { status: "ready", count: links.length, textLength: text.length, url: href };
+        }
+        return {
+          status: "loading",
+          count: links.length,
+          textLength: text.length,
+          readyState: document.readyState,
+          url: href,
+        };
+      },
+    });
+    return (results[0] && results[0].result) || { status: "no_result" };
+  } catch (err) {
+    return { status: "probe_error", error: (err && err.message) || String(err) };
+  }
+}
+
+function formatMarketNewsProbe(probe) {
+  probe = probe || {};
+  return JSON.stringify({
+    status: probe.status || "unknown",
+    count: probe.count,
+    textLength: probe.textLength,
+    readyState: probe.readyState,
+    url: shortenForLog(probe.url || "", 180),
+    error: probe.error,
   });
 }
 
