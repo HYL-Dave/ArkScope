@@ -6,86 +6,26 @@ LLM-based sentiment and risk scoring tools for financial news.
 
 ```
 scripts/scoring/
-├── batch_risk_scoring.sh        # Multi-API-key risk scoring pipeline
-├── batch_sentiment_scoring.sh   # Multi-API-key sentiment scoring pipeline
-├── batch_scoring_template.sh    # Advanced configuration template (Flex mode, timeout)
-├── validate_scores.py           # CSV validation tool
-├── score_ibkr_news.py          # Universal parquet news scoring (Polygon/Finnhub/IBKR)
+├── score_ibkr_news.py           # Universal parquet news scoring (Polygon/Finnhub/IBKR) — active
+├── score_sentiment_anthropic.py # Claude sentiment scorer (parquet + CSV, Batch API)
+├── score_risk_anthropic.py      # Claude risk scorer (parquet + CSV, Batch API)
+├── openai_summary.py            # Article → summary (scoring input for some columns)
+├── validate_scores.py           # Score-output validator (CSV; to be reworked for parquet)
 └── README.md
 ```
 
-## Historical Context
+## Open-dataset provenance (retired CSV/FNSPID pipeline)
 
-These scripts were developed to maximize the daily free quota across multiple OpenAI API accounts (Tier 1 and Tier 5). The multi-key rotation strategy allowed efficient processing of large news datasets.
-
-### Usage History (2024-2025)
-
-| Script | Original Name | Executions | Output Size |
-|--------|---------------|------------|-------------|
-| batch_risk_scoring.sh | run_risk_scoring_multi_keys.sh | 10+ | ~3GB |
-| batch_sentiment_scoring.sh | run_sentiment_scoring_multi_keys.sh | 10+ | ~3GB |
-| batch_scoring_template.sh | run_risk_scoring_custom.sh | 0 (template) | - |
-| validate_scores.py | check_sentiment_csv.py | - | - |
-
-Output files stored at:
-- `/mnt/md0/finrl/o3/risk/` (~3GB)
-- `/mnt/md0/finrl/o3/sentiment/` (~3GB)
+The OpenAI CSV scoring pipeline that produced the open dataset
+[HYL/NASDAQ-News-Multi-LLM-Scores](https://huggingface.co/datasets/HYL/NASDAQ-News-Multi-LLM-Scores)
+— `score_sentiment_openai.py`, `score_risk_openai.py`, the `batch_*_scoring.sh`
+multi-API-key shells (hard-wired to `/mnt/md0/finrl/...` FNSPID/o3 paths), and the root
+`OPENAI_SCRIPTS.md` — was retired in the 2026-05 local-first pivot. The exact sentiment /
+risk / summary prompts are preserved for reproducibility at
+[`../huggingface/SCORING_PROMPTS.md`](../huggingface/SCORING_PROMPTS.md); the dataset
+column mapping is in [`../huggingface/column_mapping.md`](../huggingface/column_mapping.md).
 
 ## Scripts
-
-### batch_risk_scoring.sh / batch_sentiment_scoring.sh
-
-Multi-stage scoring with API key rotation and resume capability.
-
-**Features:**
-- Multiple API key files processed in sequence
-- Automatic resume from last checkpoint
-- Daily token limit per key file
-- Chunk-based processing
-
-**Configuration:**
-```bash
-# Input/Output
-INPUT_CSV="..."
-OUTPUT_CSV="..."
-
-# Model settings
-MODEL="o3"
-REASONING_EFFORT="high"
-
-# API keys (processed in order)
-API_KEY_FILES=(
-    "api_keys_tier1.txt"
-    "api_keys_tier5.txt"
-)
-```
-
-**Usage:**
-```bash
-cd /mnt/md0/PycharmProjects/ArkScope
-./scripts/scoring/batch_risk_scoring.sh
-./scripts/scoring/batch_sentiment_scoring.sh
-```
-
-### batch_scoring_template.sh
-
-Advanced configuration template with additional options:
-- Flex mode (50% cost reduction)
-- Max runtime limits
-- Verbose logging
-
-**Additional Options:**
-```bash
-# Flex mode (uncomment to enable)
-# FLEX_MODE="--allow-flex"
-# FLEX_TIMEOUT="--flex-timeout 900.0"
-
-# Runtime limit
-# MAX_RUNTIME="--max-runtime 3600"
-
-# Logging
-VERBOSE="--verbose"
-```
 
 ### validate_scores.py
 
@@ -120,9 +60,9 @@ python scripts/scoring/score_ibkr_news.py --mode sentiment --model gpt-5.2 \
 
 ## Related Files
 
-- Scoring scripts (now in this directory): `score_sentiment_openai.py`, `score_risk_openai.py`, `score_sentiment_anthropic.py`, `score_risk_anthropic.py`
+- Active scorers: `score_ibkr_news.py`, `score_sentiment_anthropic.py`, `score_risk_anthropic.py`, `openai_summary.py`
 - API key files: `api_keys_tier1.txt`, `api_keys_tier5.txt` (gitignored)
-- Documentation: `OPENAI_SCRIPTS.md`
+- Open-dataset prompts (provenance): `../huggingface/SCORING_PROMPTS.md`
 
 ## Migration Notes (2026-01-08)
 

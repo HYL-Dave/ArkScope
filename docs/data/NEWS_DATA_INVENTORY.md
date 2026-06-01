@@ -582,7 +582,11 @@ print(f"過濾後: {has_lsa.sum()} 行")
 EOF
 ```
 
-**原始評分命令參考 (從 bash history):**
+**原始評分命令參考 (從 bash history) — ⚠️ 已退場 pipeline，僅供歷史參考：**
+
+> 下列 OpenAI CSV scorer（`score_sentiment_openai.py` / `score_risk_openai.py`）已於
+> 2026-05 local-first pivot 移除，**非可執行建議**。當時評分用的 prompt 已保留於
+> `scripts/huggingface/SCORING_PROMPTS.md`（開源資料集 provenance）。
 ```bash
 # o4-mini 評分命令 (早期版本)
 python score_sentiment_openai.py \

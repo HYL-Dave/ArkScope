@@ -87,7 +87,7 @@ except ImportError:
     pass  # python-dotenv not installed, rely on environment variables
 
 # =============================================================================
-# API Key Management (shared with score_sentiment_openai.py)
+# API Key Management (multi-key rotation + daily token limit)
 # =============================================================================
 
 API_KEYS = []

@@ -2,7 +2,7 @@
 """
 Score sentiment of financial news headlines using Anthropic Claude.
 
-This script mirrors score_sentiment_openai.py but uses Claude models.
+Scores news sentiment with Anthropic Claude models (parquet + CSV input/output).
 Supports Batch API for 50% cost savings (async processing).
 
 Supported input/output formats:
