@@ -41,21 +41,16 @@ Includes 60 score columns, 26 summary variants (GPT-5 / GPT-5-mini at 4 reasonin
 This dataset stays published regardless of the project's direction — it is a
 standalone research contribution.
 
-## Source-data lineage (FNSPID → ticker universe)
+## Source-data lineage (FNSPID)
 
-Two facts about how the news corpus and ticker universe were derived from
-**FNSPID** ([Zihan1004/FNSPID](https://huggingface.co/datasets/Zihan1004/FNSPID)),
-recorded so the current `config/tickers_core.json` is not mistaken for the original
-design boundary:
-
-- **Tickers: 89 → 75 → 130+.** FNSPID's original 89 NASDAQ tickers reduced to **75
-  usable** after cleaning — 14 were dropped because their FNSPID data stopped around
-  2020-06-10 with all-zero sentiment (e.g. NFLX, GOOGL, CSCO, MAR, LULU). FinRL_DeepSeek
-  used the same 75. `config/tickers_core.json` has since grown into its own **130+
-  tiered universe**, independent of and not bounded by that original 75/89.
-- **FNSPID vs FinRL_DeepSeek counts.** Cleaned FNSPID held 218,654 articles vs
-  FinRL_DeepSeek's 127,176; ~143,373 were FNSPID-only (≈65%), spanning 2013-01→2023-12.
-  The published score dataset (above) re-scores the 127,176 set.
+The news corpus derives from **FNSPID** ([Zihan1004/FNSPID](https://huggingface.co/datasets/Zihan1004/FNSPID))
+and the **FinRL_DeepSeek** subset. The target universe was **89 NASDAQ tickers**;
+FinRL_DeepSeek's published set covers all 89, while the local FNSPID re-extraction
+yielded **75 usable** (14 dropped — FNSPID data ended ~2020-06-10 with placeholder
+sentiment). `config/tickers_core.json` has since grown into its own **130+ tiered
+universe**, so 75/89 are *not* the current design boundary. Full extraction lineage +
+the FNSPID-vs-FinRL_DeepSeek comparison:
+[`history/FNSPID_NEWS_EXTRACTION.md`](history/FNSPID_NEWS_EXTRACTION.md).
 
 ## The 2026-05 pivot — why RL was de-focused
 

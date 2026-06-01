@@ -12,7 +12,7 @@
 | `data/` | 285 | 主要數據 (新聞、股價) |
 | `data_lake/` | 132 | 基本面數據 |
 | `comparison_results/` | 32 | API 測試結果 |
-| `NewsExtraction/` | 15 | 歷史新聞 (FNSPID) |
+| `NewsExtraction/` | 15 | 歷史 FNSPID 本地資料（處理工具已退場 2026-06 → `docs/history/FNSPID_NEWS_EXTRACTION.md`） |
 | `data_sources/` | 11 | 數據源測試 |
 
 | 格式 | 文件數 | 典型用途 |
@@ -150,6 +150,10 @@ risk_haiku          - Haiku 風險分數
 
 ### 1.6 FNSPID 歷史新聞
 
+> ⚠️ **歷史資料**：`NewsExtraction/` 處理工具已於 2026-06 退場（git history 可復原）；
+> 下列為仍存在的本地 FNSPID 資料檔。完整 extraction lineage 與數字校正見
+> [`../history/FNSPID_NEWS_EXTRACTION.md`](../history/FNSPID_NEWS_EXTRACTION.md)。
+
 **位置**: `NewsExtraction/`
 
 ```
@@ -172,7 +176,7 @@ Lsa_summary         - LSA 摘要
 importance_score    - 重要性分數
 ```
 
-**數據量**: 218,654 則 (2013-2023，89 支股票)
+**數據量**: 218,654 則 (2013-2023；**75 支可用股票**，取自 89 檔目標 universe)
 
 ---
 

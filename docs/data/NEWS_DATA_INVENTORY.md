@@ -21,12 +21,15 @@
 | 數據來源 | 位置 | 行數 | 時間範圍 | 情緒分數狀態 | 內容完整度 |
 |----------|------|------|----------|--------------|-----------|
 | **FinRL DeepSeek** | `/mnt/md0/finrl/huggingface_datasets/` | 127,176 | 2009-2024 | ✅ 已有 `sentiment_deepseek` (99%) | ⚠️ Article 61% + 4種摘要 61% |
-| **FNSPID** | `NewsExtraction/fnspid_89_2013_2023_cleaned.csv` | 218,654 | 2013-2023 | ❌ 全部是 0 (佔位符) | ✅ Article + Lsa_summary |
+| **FNSPID** (歷史) | `NewsExtraction/fnspid_89_2013_2023_cleaned.csv` | 218,654 | 2013-2023 | ❌ 全部是 0 (佔位符) | ✅ Article + Lsa_summary |
 | **Polygon** | `data/news/polygon_for_scoring.csv` | 63,412 | 2022-2025 | ❌ 82% NULL | ❌ 只有 description |
 | **IBKR** | `data/news/raw/ibkr/` | 52,755 | 2023-2025 | ❌ 100% NULL | ✅ content 全文 |
 | **Finnhub** | `data/news/raw/finnhub/2025/` | ~9,419 | 2025 | 未評分 | 待確認 |
 
 #### FNSPID vs FinRL DeepSeek 詳細對比 (2025-12-30 驗證)
+
+> 📌 **歷史快照**（數字正確，保留為驗證紀錄）。FNSPID 處理工具已退場；canonical
+> lineage 見 [`../history/FNSPID_NEWS_EXTRACTION.md`](../history/FNSPID_NEWS_EXTRACTION.md)。
 
 | 指標 | FNSPID | FinRL DeepSeek | 差異說明 |
 |------|--------|----------------|----------|
