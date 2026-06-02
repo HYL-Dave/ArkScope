@@ -13,13 +13,13 @@ Strict behaviour:
 
 Usage:
     # Single date
-    python scripts/rl_live_inference_smoke.py --date 2026-04-14
+    python training/research/rl_live_inference_smoke.py --date 2026-04-14
 
     # Multiple dates (comma-separated)
-    python scripts/rl_live_inference_smoke.py --date 2026-04-14,2026-04-15,2026-04-16
+    python training/research/rl_live_inference_smoke.py --date 2026-04-14,2026-04-15,2026-04-16
 
     # Different model
-    python scripts/rl_live_inference_smoke.py \\
+    python training/research/rl_live_inference_smoke.py \\
         --model-dir trained_models/ppo_sb3_..._s0_... \\
         --date 2026-04-14
 
@@ -39,11 +39,11 @@ import time
 from pathlib import Path
 from typing import List
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.rl.inference import decode_action, load_model, predict_from_frame  # noqa: E402
-from src.rl.live_features import (  # noqa: E402
+from training.rl.inference import decode_action, load_model, predict_from_frame  # noqa: E402
+from training.rl.live_features import (  # noqa: E402
     IBKRDailyPriceAdapter,
     ParquetSentimentAdapter,
     build_live_features,

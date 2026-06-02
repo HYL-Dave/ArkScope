@@ -17,8 +17,8 @@
 #       --model-dir trained_models/<model_id>
 #
 # Usage:
-#   bash scripts/rl_vlite_rerun.sh                                  # ext CSV (default)
-#   bash scripts/rl_vlite_rerun.sh <path/to/train_csv>              # custom CSV
+#   bash training/scripts/rl_vlite_rerun.sh                                  # ext CSV (default)
+#   bash training/scripts/rl_vlite_rerun.sh <path/to/train_csv>              # custom CSV
 
 set -euo pipefail
 

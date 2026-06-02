@@ -5,7 +5,7 @@ Produces a single-day ``features_df`` matching the training CSV schema:
     columns = ["date", "tic", "close", *tech_indicator_list, llm_sentiment_col]
     rows    = one per ticker, in ``ticker_order``
 
-The day frame feeds directly into :func:`src.rl.inference.predict_from_frame`.
+The day frame feeds directly into :func:`training.rl.inference.predict_from_frame`.
 
 Adapter boundary:
   - PriceAdapter       — returns multi-day OHLCV for enough lookback

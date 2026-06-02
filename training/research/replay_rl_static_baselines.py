@@ -21,7 +21,7 @@ FeatureEngineer, same make_env_fn, same env_kwargs — so baselines are
 apples-to-apples with training reward.
 
 Usage:
-    python scripts/analysis/replay_rl_static_baselines.py \\
+    python training/research/replay_rl_static_baselines.py \\
         --model-dir trained_models/<model_id> \\
         --data training/data_prep/output/train_polygon_multi_both_ext.csv \\
         --mode {trained|constant|zero} \\
@@ -80,7 +80,7 @@ def _build_env(args, meta: dict):
 
 def _constant_action_from_day(model_dir: Path, train: pd.DataFrame, action_day: str):
     """Match the probe's definition: predict at action_day with shares=0 / cash=initial."""
-    from src.rl.inference import load_model, predict_from_frame
+    from training.rl.inference import load_model, predict_from_frame
 
     artifacts = load_model(model_dir)
     day_frame = train[train["date"] == action_day].reset_index(drop=True)
@@ -144,7 +144,7 @@ def main() -> int:
     trained_model = None
     constant_vec = None
     if args.mode == "trained":
-        from src.rl.inference import load_model
+        from training.rl.inference import load_model
         trained_model = load_model(model_dir)
     elif args.mode == "constant":
         constant_vec, trained_model = _constant_action_from_day(

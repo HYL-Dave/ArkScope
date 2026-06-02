@@ -28,11 +28,11 @@ from typing import Dict, List, Sequence
 import numpy as np
 import pandas as pd
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.rl.inference import load_model, predict_from_frame  # noqa: E402
-from src.rl.live_features import ParquetSentimentAdapter  # noqa: E402
+from training.rl.inference import load_model, predict_from_frame  # noqa: E402
+from training.rl.live_features import ParquetSentimentAdapter  # noqa: E402
 from training.data_prep.state_builder import build_observation  # noqa: E402
 
 

@@ -6,9 +6,9 @@ no live feature computation — this is the model-loading and action-decode
 smoke test that precedes B1 (live feature frame) and B2 (signal report).
 
 Usage:
-    python scripts/rl_offline_inference.py
-    python scripts/rl_offline_inference.py --model-dir <path> --date 2026-04-10
-    python scripts/rl_offline_inference.py --top-n 15 --json
+    python training/research/rl_offline_inference.py
+    python training/research/rl_offline_inference.py --model-dir <path> --date 2026-04-10
+    python training/research/rl_offline_inference.py --top-n 15 --json
 """
 
 from __future__ import annotations
@@ -20,10 +20,10 @@ from pathlib import Path
 
 import pandas as pd
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
 
-from src.rl.inference import decode_action, load_model, predict_from_frame  # noqa: E402
+from training.rl.inference import decode_action, load_model, predict_from_frame  # noqa: E402
 
 _DEFAULT_MODEL_DIR = (
     _REPO_ROOT

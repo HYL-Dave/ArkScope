@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.rl.live_features import build_live_features
+from training.rl.live_features import build_live_features
 from training.config import INDICATORS
 
 

@@ -32,7 +32,7 @@ def artifacts():
     if not (_MODEL_DIR / "metadata.json").exists():
         pytest.skip(f"Model metadata not found at {_MODEL_DIR}")
 
-    from src.rl.inference import load_model
+    from training.rl.inference import load_model
     return load_model(_MODEL_DIR)
 
 
@@ -56,7 +56,7 @@ def test_load_model_returns_schema_and_model(artifacts):
 
 
 def test_predict_from_frame_returns_bounded_action(artifacts, last_day_frame):
-    from src.rl.inference import predict_from_frame
+    from training.rl.inference import predict_from_frame
     action = predict_from_frame(artifacts, last_day_frame)
     assert action.shape == (artifacts.schema.stock_dim,)
     assert action.dtype == np.float64
@@ -69,7 +69,7 @@ def test_predict_from_frame_returns_bounded_action(artifacts, last_day_frame):
 
 
 def test_decode_action_shape_and_counts(artifacts, last_day_frame):
-    from src.rl.inference import decode_action, predict_from_frame
+    from training.rl.inference import decode_action, predict_from_frame
 
     action = predict_from_frame(artifacts, last_day_frame)
     decoded = decode_action(
@@ -98,7 +98,7 @@ def test_decode_action_shape_and_counts(artifacts, last_day_frame):
 
 def test_predict_is_deterministic(artifacts, last_day_frame):
     """Same input + deterministic=True should yield identical action twice."""
-    from src.rl.inference import predict_from_frame
+    from training.rl.inference import predict_from_frame
 
     a1 = predict_from_frame(artifacts, last_day_frame, deterministic=True)
     a2 = predict_from_frame(artifacts, last_day_frame, deterministic=True)
