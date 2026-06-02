@@ -37,7 +37,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 50
+        assert data["tools_registered"] == 52
         assert data["data_sources"]["price_tickers"] > 50
 
 

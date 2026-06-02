@@ -106,11 +106,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     )
     from src.tools.monitor_tools import scan_alerts as _scan_alerts
     from src.tools.freshness import check_data_freshness as _check_data_freshness
-    from src.tools.rl_tools import (
-        get_rl_model_status as _get_rl_model_status,
-        get_rl_prediction as _get_rl_prediction,
-        get_rl_backtest_report as _get_rl_backtest_report,
-    )
     from src.tools.sa_tools import (
         get_sa_alpha_picks as _get_sa_alpha_picks,
         get_sa_pick_detail as _get_sa_pick_detail,
@@ -937,41 +932,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "check_data_freshness")
 
     # ================================================================
-    # RL Pipeline Tools
-    # ================================================================
-
-    @function_tool
-    def tool_get_rl_model_status() -> str:
-        """List all trained RL models (PPO/CPPO) with backtest performance.
-
-        Returns:
-            Sharpe ratio, information ratio, max drawdown, CVaR for each model.
-        """
-        result = _get_rl_model_status(dal)
-        return _serialize_result(result, "get_rl_model_status")
-
-    @function_tool
-    def tool_get_rl_prediction(ticker: str, model_id: str = "latest") -> str:
-        """Get RL model trading signal for a ticker.
-
-        Args:
-            ticker: Stock ticker symbol
-            model_id: Model ID to use (default: 'latest' = most recent)
-        """
-        result = _get_rl_prediction(dal, ticker=ticker, model_id=model_id)
-        return _serialize_result(result, "get_rl_prediction")
-
-    @function_tool
-    def tool_get_rl_backtest_report(model_id: str = "latest") -> str:
-        """Get detailed backtest report for a trained RL model.
-
-        Args:
-            model_id: Model ID (default: 'latest' = most recent)
-        """
-        result = _get_rl_backtest_report(dal, model_id=model_id)
-        return _serialize_result(result, "get_rl_backtest_report")
-
-    # ================================================================
     # SA Alpha Picks (Phase 11c)
     # ================================================================
 
@@ -1181,9 +1141,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_delete_memory,
         tool_scan_alerts,
         tool_check_data_freshness,
-        tool_get_rl_model_status,
-        tool_get_rl_prediction,
-        tool_get_rl_backtest_report,
         tool_get_sa_alpha_picks,
         tool_get_sa_pick_detail,
         tool_refresh_sa_alpha_picks,

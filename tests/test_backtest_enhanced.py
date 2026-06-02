@@ -1,6 +1,5 @@
 """Tests for enhanced backtest metrics, artifacts, and registry integration."""
 
-import json
 import os
 
 import numpy as np
@@ -206,60 +205,3 @@ class TestGitSha:
         # In this repo, should be non-empty
         if sha:
             assert len(sha) >= 7
-
-
-# ── IR=None contract in rl_tools ─────────────────────────────
-
-
-class TestIRNoteContract:
-    def test_backtest_report_includes_ir_note(self, monkeypatch, tmp_path):
-        """When backtest_results has IR=None + ir_note, report should include ir_note."""
-        monkeypatch.setattr("src.tools.rl_tools._is_enabled", lambda: True)
-        monkeypatch.setattr("src.tools.rl_tools._get_models_dir", lambda: str(tmp_path))
-
-        from training.model_registry import ModelMetadata, ModelRegistry
-        registry = ModelRegistry(models_dir=str(tmp_path))
-        meta = ModelMetadata(
-            model_id="test_ir",
-            algorithm="PPO",
-            score_source="test",
-            training_date="2026-03-01",
-            backtest_results={
-                "sharpe_ratio": 1.5,
-                "information_ratio": None,
-                "ir_note": "Requires --benchmark flag (e.g. SPY).",
-                "max_drawdown": -0.10,
-            },
-        )
-        registry.save_metadata(meta)
-
-        from src.tools.rl_tools import get_rl_backtest_report
-        result = json.loads(get_rl_backtest_report(None, model_id="test_ir"))
-        assert result["backtest_results"]["information_ratio"] is None
-        assert "ir_note" in result
-        assert "benchmark" in result["ir_note"].lower()
-
-    def test_model_status_includes_ir_note(self, monkeypatch, tmp_path):
-        """Model status should include ir_note when IR is None."""
-        monkeypatch.setattr("src.tools.rl_tools._is_enabled", lambda: True)
-        monkeypatch.setattr("src.tools.rl_tools._get_models_dir", lambda: str(tmp_path))
-
-        from training.model_registry import ModelMetadata, ModelRegistry
-        registry = ModelRegistry(models_dir=str(tmp_path))
-        meta = ModelMetadata(
-            model_id="test_ir_status",
-            algorithm="PPO",
-            score_source="test",
-            training_date="2026-03-01",
-            backtest_results={
-                "information_ratio": None,
-                "ir_note": "Requires --benchmark.",
-            },
-        )
-        registry.save_metadata(meta)
-
-        from src.tools.rl_tools import get_rl_model_status
-        result = json.loads(get_rl_model_status(None))
-        model_entry = result["models"][0]
-        assert model_entry["information_ratio"] is None
-        assert "ir_note" in model_entry

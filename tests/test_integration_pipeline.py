@@ -1,4 +1,4 @@
-"""Integration smoke test: features -> env -> train_utils -> backtest -> rl_tools.
+"""Integration smoke test: features -> env -> train_utils -> backtest -> model registry.
 
 Tests the full pipeline chain without actually running PPO/CPPO training
 (which requires MPI + GPU). Instead, we simulate the pipeline by:
@@ -7,10 +7,9 @@ Tests the full pipeline chain without actually running PPO/CPPO training
 3. Building environments with extra features
 4. Saving a fake model via save_training_artifacts
 5. Running compute_metrics + save_artifacts
-6. Querying rl_tools to verify registry integration
+6. Updating and verifying the model registry
 """
 
-import json
 import os
 
 import numpy as np
@@ -65,7 +64,7 @@ def _make_pipeline_df(n_tickers=3, n_days=20):
 
 
 class TestFullPipelineIntegration:
-    """End-to-end smoke test for the feature → train → backtest → rl_tools chain."""
+    """End-to-end smoke test for the feature → train → backtest → model-registry chain."""
 
     @pytest.fixture
     def pipeline_dir(self, tmp_path):
@@ -73,7 +72,7 @@ class TestFullPipelineIntegration:
         return tmp_path
 
     def test_ppo_pipeline(self, pipeline_dir, monkeypatch):
-        """PPO: features → env → save_artifacts → registry → rl_tools."""
+        """PPO: features → env → save_artifacts → registry."""
         monkeypatch.setattr("training.train_utils.TRAINED_MODEL_DIR", str(pipeline_dir))
 
         # 1. Create dataset and compute features
@@ -167,25 +166,6 @@ class TestFullPipelineIntegration:
             "feature_set": extra_cols,
         })
         registry.save_metadata(meta)
-
-        # 11. Verify via rl_tools
-        monkeypatch.setattr("src.tools.rl_tools._is_enabled", lambda: True)
-        monkeypatch.setattr("src.tools.rl_tools._get_models_dir", lambda: str(pipeline_dir))
-
-        from src.tools.rl_tools import get_rl_backtest_report, get_rl_model_status
-
-        status = json.loads(get_rl_model_status(None))
-        assert status["status"] == "active"
-        assert status["model_count"] == 1
-        assert status["models"][0]["model_id"] == model_id
-        assert status["models"][0]["information_ratio"] is None
-        assert "ir_note" in status["models"][0]
-
-        report = json.loads(get_rl_backtest_report(None, model_id=model_id))
-        assert report["model_id"] == model_id
-        assert report["feature_set"] == extra_cols
-        assert report["backtest_results"]["sharpe_ratio"] is not None
-        assert "ir_note" in report
 
     def test_cppo_pipeline(self, pipeline_dir, monkeypatch):
         """CPPO: features → env → risk tail invariant holds through pipeline."""
