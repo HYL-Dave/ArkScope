@@ -663,7 +663,7 @@ def _resolve_tool(
 
     Resolution order (per P0.1 spec §2.3 resolver contract):
       1. ``server:`` prefixed names → ``shared/server_tools.py``
-      2. ToolRegistry (canonical 49-tool set)
+      2. ToolRegistry (live canonical registry tools)
       3. ``shared/bridge_tools.py`` (bridge-only tools)
 
     ``kind == "server"`` returns ``spec_or_def == None`` because server

@@ -8,7 +8,7 @@ because subagent dispatch has no DAL implementation.
 This module is the third source consulted by the replay validator's
 unified resolver (see ``shared/replay.py`` validate path):
 
-    1. ``ToolRegistry``                       → canonical 49-tool set
+    1. ``ToolRegistry``                       → live canonical registry tools
     2. ``shared/server_tools.py``             → server:* hosted tools
     3. ``shared/bridge_tools.py`` (THIS FILE) → bridge-only tools
 
