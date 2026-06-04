@@ -2,7 +2,7 @@
 FastAPI application factory for ArkScope.
 
 Usage:
-    uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port 8420
+    uvicorn src.api.app:create_app --factory --host 127.0.0.1 --port 8420
 """
 
 from __future__ import annotations
