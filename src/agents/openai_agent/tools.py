@@ -943,7 +943,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
 
     @function_tool
     def tool_refresh_sa_alpha_picks() -> str:
-        """Force refresh Alpha Picks from Seeking Alpha website. Syncs symbols to watchlist."""
+        """Return cached Alpha Picks state (current + closed picks, freshness) + a refresh_hint. Read-only: the Chrome extension does the actual refresh; does not scrape, write config, or change the watchlist."""
         result = _refresh_sa_alpha_picks(dal)
         return _serialize_result(result, "refresh_sa_alpha_picks")
 

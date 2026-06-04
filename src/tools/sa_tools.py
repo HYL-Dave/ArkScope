@@ -130,17 +130,24 @@ def get_sa_pick_detail(
 
 
 def refresh_sa_alpha_picks(dal: Any) -> Dict:
-    """Return current SA data state + refresh instructions.
+    """Return current SA data state + refresh instructions (read-only status).
 
     Actual refresh is done by the Chrome extension. This returns cached data
     with a refresh_hint directing the user to click the extension.
+
+    Read-only: this does NOT modify ``config/tickers_core.json`` or any
+    profile/universe state. The research-universe sync from Alpha Picks is owned
+    by the SA native host on extension-refresh success (a PROTECTED pipeline
+    path), not by this status tool. An explicit, gated "follow Alpha Picks"
+    action (``profile_state_write``) is a desktop-phase tool — see
+    ARKSCOPE_TOOL_CATALOG §1.5.
     """
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
 
     try:
         client = _get_client(dal)
-        return client.refresh_portfolio(sync_tickers=True)
+        return client.refresh_portfolio()
     except Exception as e:
         logger.error("refresh_sa_alpha_picks error: %s", e)
         return {"error": str(e)}

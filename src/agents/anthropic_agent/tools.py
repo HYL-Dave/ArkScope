@@ -1045,8 +1045,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "refresh_sa_alpha_picks",
             "description": (
-                "Force refresh Alpha Picks from Seeking Alpha website. "
-                "Scrapes both tabs, updates cache, syncs symbols to watchlist."
+                "Return the cached Alpha Picks state (current + closed picks, "
+                "freshness) + a refresh_hint. Read-only status: the Chrome "
+                "extension does the actual refresh; this does not scrape, write "
+                "config, or change the watchlist."
             ),
             "input_schema": {
                 "type": "object",

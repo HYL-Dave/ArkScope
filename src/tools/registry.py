@@ -990,9 +990,10 @@ class ToolRegistry:
         self.register(ToolDefinition(
             name="refresh_sa_alpha_picks",
             description=(
-                "Force refresh Alpha Picks from Seeking Alpha website. "
-                "Scrapes both current and closed tabs, updates cache, "
-                "and syncs new symbols to data collection watchlist."
+                "Return the cached Seeking Alpha Alpha Picks state (current + "
+                "closed picks, freshness) plus a refresh_hint. Read-only status: "
+                "the actual refresh is done by the Chrome extension; this tool "
+                "does not scrape, write config, or change the watchlist."
             ),
             function=refresh_sa_alpha_picks,
             category="portfolio",
