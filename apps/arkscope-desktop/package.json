@@ -1,0 +1,13 @@
+{
+  "name": "arkscope-desktop",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ArkScope desktop shell (Electron). Spawns the local Python sidecar (127.0.0.1, ephemeral port, per-run token) and loads the cockpit from apps/arkscope-web/dist.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

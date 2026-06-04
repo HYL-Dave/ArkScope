@@ -198,3 +198,12 @@ scripts/huggingface/output/
 # Local tooling / generated indexes (machine-local, never track)
 # -----------------------------------------------------------------------------
 .codegraph/
+
+# -----------------------------------------------------------------------------
+# Desktop shell (Node / Electron) — build + dependency artifacts
+# -----------------------------------------------------------------------------
+node_modules/
+apps/*/dist/
+apps/*/dist-electron/
+apps/*/release/
+*.tsbuildinfo

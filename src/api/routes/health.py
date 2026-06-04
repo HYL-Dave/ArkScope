@@ -11,6 +11,17 @@ from src.tools.registry import ToolRegistry
 router = APIRouter(tags=["system"])
 
 
+@router.get("/healthz")
+def healthz():
+    """Cheap liveness probe for sidecar readiness.
+
+    No DAL, no registry, no agent — safe to poll at high frequency while the
+    desktop shell waits for the spawned sidecar to come up. The richer /status
+    payload (which touches the DAL) is the dashboard, not the readiness probe.
+    """
+    return {"status": "ok"}
+
+
 @router.get("/status")
 def status(
     dal: DataAccessLayer = Depends(get_dal),

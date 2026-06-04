@@ -1,0 +1,15 @@
+{
+  "name": "arkscope-workbench",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ArkScope desktop workbench — npm workspaces root (Vite/React renderer + Electron shell). The Python sidecar lives in src/api and is spawned by the desktop app.",
+  "workspaces": [
+    "apps/arkscope-web",
+    "apps/arkscope-desktop"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace apps/arkscope-web",
+    "dev:web": "npm run dev --workspace apps/arkscope-web",
+    "start": "npm run build && npm run start --workspace apps/arkscope-desktop"
+  }
+}

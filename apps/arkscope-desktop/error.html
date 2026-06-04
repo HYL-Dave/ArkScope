@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ArkScope — sidecar error</title>
+    <style>
+      body {
+        background: #0e1116;
+        color: #e6edf3;
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin: 0;
+        padding: 32px;
+      }
+      h1 {
+        color: #f85149;
+        font-size: 18px;
+      }
+      pre {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 16px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .muted {
+        color: #8b949e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sidecar failed to start</h1>
+    <p>The local ArkScope Python service did not become healthy. Last output:</p>
+    <pre id="log">(no output captured)</pre>
+    <p class="muted">
+      Check that the Python environment can run <code>python -m src.api</code> from the repo
+      root, then relaunch.
+    </p>
+    <script>
+      const msg = new URLSearchParams(location.search).get("msg");
+      if (msg) document.getElementById("log").textContent = msg;
+    </script>
+  </body>
+</html>

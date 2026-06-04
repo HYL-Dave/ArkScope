@@ -8,9 +8,12 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .dependencies import get_dal, get_registry
 
@@ -73,5 +76,30 @@ def create_app() -> FastAPI:
     app.include_router(seeking_alpha_router)
     app.include_router(reports_router)
     app.include_router(macro_calendar_router)
+
+    # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
+    # CORS added first => outermost, so even a 401 carries CORS headers. The API
+    # is local-only (127.0.0.1) and token-gated when launched by the shell, so
+    # permissive CORS is acceptable for the desktop renderer / browser dev origin.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the
+    # Electron shell sets a per-run token). Unset = existing dev/test behaviour,
+    # unchanged. /healthz stays open so readiness probing needs no token.
+    @app.middleware("http")
+    async def _token_guard(request: Request, call_next):
+        token = os.environ.get("ARKSCOPE_API_TOKEN")
+        if token and request.url.path != "/healthz":
+            if request.headers.get("x-arkscope-token") != token:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "invalid or missing API token"},
+                )
+        return await call_next(request)
 
     return app
