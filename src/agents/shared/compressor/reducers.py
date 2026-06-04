@@ -108,9 +108,9 @@ def tavily_search_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
     Falls through to ``truncate_with_marker`` on any shape deviation.
 
-    NOTE: ``tavily_fetch`` / ``web_browse`` / ``codex_web_research`` have
-    different shapes (single ``content`` field, not a results list); they
-    use the default truncate reducer.
+    NOTE: ``tavily_fetch`` / ``web_browse`` have different shapes (single
+    ``content`` field, not a results list); they use the default truncate
+    reducer.
     """
     if len(payload) <= budget:
         return payload, {}
@@ -411,9 +411,9 @@ def python_output_reducer(payload: str, *, budget: int) -> Tuple[str, Dict[str, 
 
 _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
     # tavily_search has a `results: [...]` shape that we know how to slice.
-    # tavily_fetch / web_browse / codex_web_research all return a single
-    # `content` (or `report`) field — the default head+tail reducer is
-    # already a good fit; adding a custom one would just risk shape drift.
+    # tavily_fetch / web_browse both return a single `content` field — the
+    # default head+tail reducer is already a good fit; adding a custom one
+    # would just risk shape drift.
     "tavily_search":           tavily_search_reducer,
     # Options
     "get_option_chain":        option_chain_reducer,

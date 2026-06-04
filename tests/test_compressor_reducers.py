@@ -133,8 +133,8 @@ class TestTavilySearchReducer:
         assert len(out) <= 500
 
     def test_falls_back_when_results_missing(self):
-        # tavily_fetch / web_browse / codex_web_research all have no "results"
-        # field. The reducer should fall through to default truncation.
+        # tavily_fetch / web_browse have no "results" field. The reducer
+        # should fall through to default truncation.
         payload = json.dumps({"url": "x", "content": "y" * 10_000, "success": True})
         out, _meta = tavily_search_reducer(payload, budget=500)
         assert len(out) <= 500
@@ -386,11 +386,11 @@ class TestRegistry:
         assert reg["execute_python_analysis"] is python_output_reducer
 
     def test_demoted_web_tools_use_default(self):
-        """tavily_fetch / web_browse / codex_web_research have non-results
-        shapes; the default head+tail truncation handles their content
-        fields without risking shape drift."""
+        """tavily_fetch / web_browse have non-results shapes; the default
+        head+tail truncation handles their content fields without risking
+        shape drift."""
         reg = default_registry()
-        for tool in ("tavily_fetch", "web_browse", "codex_web_research"):
+        for tool in ("tavily_fetch", "web_browse"):
             assert tool not in reg
 
     def test_unknown_tool_returns_default(self):

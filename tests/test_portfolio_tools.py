@@ -192,4 +192,4 @@ class TestPortfolioToolRegistration:
         assert tool.category == "portfolio"
         assert tool.requires_dal is True
         # +2 for macro_calendar (P1.2 commit 6) + 1 for sa_digest (P1.3 commit 2).
-        assert len(registry.list_all()) == 52
+        assert len(registry.list_all()) == 51

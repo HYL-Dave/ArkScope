@@ -16,7 +16,7 @@ You have access to these tool categories:
 - Fundamentals: P/E, ROE, margins, SEC filings, insider trades (Form 4)
 - Analyst Consensus: recommendation distribution, earnings surprise history, upcoming earnings, price targets
 - Portfolio: watchlist overview, morning brief
-- Web Search: search the web (tavily_search), fetch URL content (tavily_fetch), browse JS pages (web_browse), deep research (codex_web_research)
+- Web Search: search the web (tavily_search), fetch URL content (tavily_fetch), browse JS-heavy pages (web_browse)
 - Memory: save knowledge across sessions (save_memory), recall past insights (recall_memories)
 - Code Execution: run Python for custom calculations (execute_python_analysis)
 
@@ -136,14 +136,9 @@ Web search tools (from lightweight to deep):
     → Quick search with AI summary. Free (1000/month). Use FIRST for most queries.
   tavily_fetch(url="https://...")  → Extract article content (supports pagination)
   web_browse(url="https://...")    → Headless browser for JS-heavy pages
-  codex_web_research(query="NVDA earnings impact on AI sector valuation")
-    → Deep research agent: searches multiple sources, cross-references, produces
-      structured report. Takes 1-5 minutes. Use for complex investigations.
 
 WHEN TO USE WHICH:
 - Quick facts (stock price, latest news) → tavily_search
-- Deep investigation (earnings analysis, event timeline, competitive landscape)
-  → codex_web_research
 - Specific article content → tavily_fetch
 - JS-heavy pages → web_browse
 - Data available locally → use local tools first (prices, scored news, fundamentals)
@@ -165,7 +160,6 @@ Do NOT use web search for:
    - Narrow down: add date ranges (days=7), specific topic terms
    - Broaden: remove overly specific terms
    - Switch provider: tavily_search → web_browse for JS-heavy sites
-   - For complex topics: escalate to codex_web_research
 
 3. SEARCH SUFFICIENCY: Stop searching when:
    - You have 2+ independent sources confirming the same fact

@@ -90,10 +90,10 @@ class TestPrompts:
 
 class TestAnthropicToolSchemas:
     def test_tool_count(self):
-        """All bridge tools (registry 52 + delegate_to_subagent = 53)."""
+        """All bridge tools (registry 51 + delegate_to_subagent = 52)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 53
+        assert len(tools) == 52
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -139,7 +139,6 @@ class TestAnthropicToolSchemas:
             "tavily_search",
             "tavily_fetch",
             "web_browse",
-            "codex_web_research",
             "save_report",
             "list_reports",
             "get_report",
@@ -285,10 +284,10 @@ class TestOpenAIToolCreation:
         return DataAccessLayer()
 
     def test_create_tools_count(self, dal):
-        """OpenAI bridge tools (registry 52 + delegate_to_subagent = 53)."""
+        """OpenAI bridge tools (registry 51 + delegate_to_subagent = 52)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 53
+        assert len(tools) == 52
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -523,7 +522,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 52
+        assert len(schemas) == 51
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -537,7 +536,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 52
+        assert len(schemas) == 51
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema
