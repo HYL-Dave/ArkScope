@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getOverview, getPriceChange, type PriceChange, type WatchlistRow } from "./api";
+import {
+  addNote,
+  deleteNote,
+  getCockpitWatchlist,
+  getNotes,
+  getPriceChange,
+  setArchived,
+  type CockpitRow,
+  type Note,
+  type PriceChange,
+} from "./api";
+
+interface CockpitData {
+  rows: CockpitRow[];
+  asOf: string | null;
+  total: number;
+  shown: number;
+  archivedCount: number;
+}
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; rows: WatchlistRow[]; date: string }
+  | { kind: "ready"; data: CockpitData }
   | { kind: "error"; message: string };
 
 type SortKey =
@@ -14,40 +32,55 @@ type SortKey =
   | "sentiment_mean"
   | "priority";
 type SortDir = "asc" | "desc";
+type DetailTab = "overview" | "notes";
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 export function WatchlistView() {
   const [state, setState] = useState<State>({ kind: "loading" });
-  const [selected, setSelected] = useState<WatchlistRow | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyTicker, setBusyTicker] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (includeArchived: boolean) => {
     setRefreshing(true);
-    setRefreshError(null);
+    setActionError(null);
     try {
-      const o = await getOverview();
-      setState({ kind: "ready", rows: o.tickers, date: o.date });
+      const d = await getCockpitWatchlist(includeArchived);
+      setState({
+        kind: "ready",
+        data: {
+          rows: d.rows,
+          asOf: d.as_of,
+          total: d.total,
+          shown: d.shown,
+          archivedCount: d.archived_count,
+        },
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      // Keep an already-loaded table visible on a transient refresh failure;
-      // only fall back to the full error screen on the initial load.
+      // Keep an already-loaded table on a transient failure; full error screen
+      // only on the initial load.
       setState((prev) => (prev.kind === "ready" ? prev : { kind: "error", message }));
-      setRefreshError(message);
+      setActionError(message);
     } finally {
       setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(showArchived);
+  }, [load, showArchived]);
 
-  const rows = state.kind === "ready" ? state.rows : [];
+  const data = state.kind === "ready" ? state.data : null;
+  const rows = data?.rows ?? [];
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
+  const selected = selectedTicker ? rows.find((r) => r.ticker === selectedTicker) ?? null : null;
 
   function toggleSort(k: SortKey) {
     if (k === sortKey) {
@@ -58,6 +91,47 @@ export function WatchlistView() {
     }
   }
 
+  const patchNoteCount = useCallback((ticker: string, noteCount: number) => {
+    setState((prev) =>
+      prev.kind === "ready"
+        ? {
+            ...prev,
+            data: {
+              ...prev.data,
+              rows: prev.data.rows.map((r) =>
+                r.ticker === ticker ? { ...r, note_count: noteCount } : r,
+              ),
+            },
+          }
+        : prev,
+    );
+  }, []);
+
+  const onArchiveToggle = useCallback(
+    async (row: CockpitRow) => {
+      setBusyTicker(row.ticker);
+      setActionError(null);
+      try {
+        await setArchived(row.ticker, !row.archived);
+        await load(showArchived);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusyTicker(null);
+      }
+    },
+    [load, showArchived],
+  );
+
+  function openRow(ticker: string) {
+    setSelectedTicker(ticker);
+    setDetailTab("overview");
+  }
+  function openNotes(ticker: string) {
+    setSelectedTicker(ticker);
+    setDetailTab("notes");
+  }
+
   const thProps = { sortKey, sortDir, toggleSort };
 
   return (
@@ -66,24 +140,32 @@ export function WatchlistView() {
         {state.kind === "loading" && <p className="muted">Loading watchlist…</p>}
         {state.kind === "error" && (
           <div className="errorbox">
-            <p>Could not load the watchlist (/overview).</p>
+            <p>Could not load the watchlist (/cockpit/watchlist).</p>
             <p className="muted">{state.message}</p>
           </div>
         )}
-        {state.kind === "ready" && (
+        {data && (
           <>
             <div className="surface-head">
               <h2 className="surface-title">Watchlist</h2>
               <span className="muted">
-                {state.rows.length} tickers · as of {state.date}
+                {data.shown} of {data.total}
+                {data.archivedCount > 0 && ` · ${data.archivedCount} archived`}
+                {data.asOf && ` · as of ${data.asOf}`}
               </span>
               <span className="spacer" />
-              {refreshError && (
-                <span className="refresh-err" title={refreshError}>
-                  refresh failed
+              {actionError && (
+                <span className="refresh-err" title={actionError}>
+                  action failed
                 </span>
               )}
-              <button className="btn-ghost" onClick={() => void load()} disabled={refreshing}>
+              <button
+                className={`btn-ghost ${showArchived ? "on" : ""}`}
+                onClick={() => setShowArchived((v) => !v)}
+              >
+                {showArchived ? "✓ Archived" : "Show archived"}
+              </button>
+              <button className="btn-ghost" onClick={() => void load(showArchived)} disabled={refreshing}>
                 {refreshing ? "↻ …" : "↻ Refresh"}
               </button>
             </div>
@@ -104,10 +186,19 @@ export function WatchlistView() {
                 {sorted.map((r) => (
                   <tr
                     key={r.ticker}
-                    className={selected?.ticker === r.ticker ? "sel" : ""}
-                    onClick={() => setSelected(r)}
+                    className={[
+                      selectedTicker === r.ticker ? "sel" : "",
+                      r.archived ? "archived" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => openRow(r.ticker)}
                   >
-                    <td className="mono strong">{r.ticker}</td>
+                    <td className="mono strong">
+                      {r.ticker}
+                      {r.archived && <span className="tag-archived">archived</span>}
+                      {r.note_count > 0 && <span className="note-dot" title={`${r.note_count} note(s)`}>✎{r.note_count}</span>}
+                    </td>
                     <td className="num">{fmtNum(r.latest_close)}</td>
                     <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
                     <td className="num">{r.news_count_7d}</td>
@@ -116,7 +207,12 @@ export function WatchlistView() {
                       <span className={`badge p-${r.priority}`}>{r.priority}</span>
                     </td>
                     <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
-                      <RowActions />
+                      <RowActions
+                        row={r}
+                        busy={busyTicker === r.ticker}
+                        onArchiveToggle={() => void onArchiveToggle(r)}
+                        onNote={() => openNotes(r.ticker)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -124,8 +220,8 @@ export function WatchlistView() {
             </table>
 
             <p className="muted tiny">
-              Row actions (star / note / tag / archive) are placeholders — lifecycle persistence
-              (profile_state_write) lands with the profile/Settings surface.
+              Archive is a soft hide (restorable). Lists, tags and multi-tab views come with the
+              profile surface — this v0 shows the aggregate "All Active" set.
             </p>
           </>
         )}
@@ -133,7 +229,13 @@ export function WatchlistView() {
 
       <aside className="rightpanel detail">
         {selected ? (
-          <TickerDetail row={selected} />
+          <TickerDetail
+            key={selected.ticker}
+            row={selected}
+            tab={detailTab}
+            onTab={setDetailTab}
+            onNoteCount={(n) => patchNoteCount(selected.ticker, n)}
+          />
         ) : (
           <p className="muted">Select a ticker to see its detail.</p>
         )}
@@ -169,19 +271,93 @@ function Th({
   );
 }
 
-function RowActions() {
-  // Placeholder affordances; the parent <td> stops row-selection propagation.
+function RowActions({
+  row,
+  busy,
+  onArchiveToggle,
+  onNote,
+}: {
+  row: CockpitRow;
+  busy: boolean;
+  onArchiveToggle: () => void;
+  onNote: () => void;
+}) {
   return (
-    <span className="rowactions" title="lifecycle actions — coming with the profile surface">
-      <button type="button" aria-label="star">☆</button>
-      <button type="button" aria-label="note">📝</button>
-      <button type="button" aria-label="tag">🏷</button>
-      <button type="button" aria-label="archive">🗄</button>
+    <span className="rowactions">
+      <button type="button" title="Notes" onClick={onNote}>
+        📝
+      </button>
+      <button
+        type="button"
+        title={row.archived ? "Restore" : "Archive"}
+        disabled={busy}
+        onClick={onArchiveToggle}
+      >
+        {busy ? "…" : row.archived ? "↩" : "🗄"}
+      </button>
     </span>
   );
 }
 
-function TickerDetail({ row }: { row: WatchlistRow }) {
+function TickerDetail({
+  row,
+  tab,
+  onTab,
+  onNoteCount,
+}: {
+  row: CockpitRow;
+  tab: DetailTab;
+  onTab: (t: DetailTab) => void;
+  onNoteCount: (n: number) => void;
+}) {
+  return (
+    <div className="detailpane">
+      <div className="detail-head">
+        <span className="mono strong big">{row.ticker}</span>
+        <span className={`badge p-${row.priority}`}>{row.priority}</span>
+        {row.archived && <span className="tag-archived">archived</span>}
+      </div>
+      <div className="muted tiny">{row.group ?? "—"}</div>
+      {row.lists.length > 0 && (
+        <div className="chips">
+          {row.lists.map((l) => (
+            <span key={l} className="list-chip">
+              {l}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="detail-tabs">
+        <button
+          type="button"
+          className={`tab ${tab === "overview" ? "active" : ""}`}
+          onClick={() => onTab("overview")}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          className={`tab ${tab === "notes" ? "active" : ""}`}
+          onClick={() => onTab("notes")}
+        >
+          Notes {row.note_count > 0 ? `(${row.note_count})` : ""}
+        </button>
+        <span className="tab disabled" title="agent wiring deferred">
+          AI summary
+        </span>
+      </div>
+
+      {tab === "overview" ? (
+        <OverviewTab row={row} />
+      ) : (
+        <NotesTab ticker={row.ticker} onNoteCount={onNoteCount} />
+      )}
+    </div>
+  );
+}
+
+function OverviewTab({ row }: { row: CockpitRow }) {
   const [pc, setPc] = useState<PriceChange | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -203,21 +379,7 @@ function TickerDetail({ row }: { row: WatchlistRow }) {
   }, [row.ticker]);
 
   return (
-    <div className="detailpane">
-      <div className="detail-head">
-        <span className="mono strong big">{row.ticker}</span>
-        <span className={`badge p-${row.priority}`}>{row.priority}</span>
-      </div>
-      <div className="muted tiny">{row.group}</div>
-
-      <div className="detail-tabs">
-        {["Overview", "Notes", "Related news", "AI summary"].map((t, i) => (
-          <span key={t} className={`tab ${i === 0 ? "active" : "disabled"}`}>
-            {t}
-          </span>
-        ))}
-      </div>
-
+    <>
       <dl className="kv">
         <Kv k="Last close" v={fmtNum(row.latest_close)} />
         <Kv k="Change 7d" v={fmtPct(row.change_7d_pct)} cls={changeClass(row.change_7d_pct)} />
@@ -241,11 +403,110 @@ function TickerDetail({ row }: { row: WatchlistRow }) {
           <Kv k="Dates" v={pc.date_range} />
         </dl>
       )}
+    </>
+  );
+}
 
-      <h4 className="detail-section">Actions</h4>
-      <p className="muted tiny">
-        analyze · summarize · add to thesis · generate note — agent wiring deferred.
-      </p>
+function NotesTab({
+  ticker,
+  onNoteCount,
+}: {
+  ticker: string;
+  onNoteCount: (n: number) => void;
+}) {
+  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const d = await getNotes(ticker);
+      setNotes(d.notes);
+      onNoteCount(d.notes.length);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, [ticker, onNoteCount]);
+
+  useEffect(() => {
+    setNotes(null);
+    setErr(null);
+    void refresh();
+  }, [refresh]);
+
+  async function submit() {
+    const body = draft.trim();
+    if (!body || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await addNote(ticker, body);
+      setDraft("");
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: number) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await deleteNote(ticker, id);
+      await refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="notes">
+      <textarea
+        className="note-input"
+        placeholder={`Add a note on ${ticker}…`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit();
+        }}
+        rows={3}
+      />
+      <div className="note-actions">
+        <span className="muted tiny">⌘/Ctrl+Enter to save</span>
+        <button type="button" disabled={busy || !draft.trim()} onClick={() => void submit()}>
+          Add note
+        </button>
+      </div>
+      {err && <p className="refresh-err tiny">{err}</p>}
+
+      {notes === null && !err && <p className="muted tiny">loading…</p>}
+      {notes && notes.length === 0 && <p className="muted tiny">No notes yet.</p>}
+      {notes && notes.length > 0 && (
+        <ul className="note-list">
+          {notes.map((n) => (
+            <li key={n.id} className="note-item">
+              <div className="note-body">{n.body}</div>
+              <div className="note-meta">
+                <span className="muted tiny">{n.created_at.replace("T", " ").replace("+00:00", "Z")}</span>
+                <button
+                  type="button"
+                  className="note-del"
+                  disabled={busy}
+                  title="Delete note"
+                  onClick={() => void remove(n.id)}
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -261,7 +522,7 @@ function Kv({ k, v, cls }: { k: string; v: string; cls?: string }) {
 
 // ---- helpers ----
 
-function sortRows(rows: WatchlistRow[], key: SortKey, dir: SortDir): WatchlistRow[] {
+function sortRows(rows: CockpitRow[], key: SortKey, dir: SortDir): CockpitRow[] {
   const mul = dir === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     if (key === "ticker") return a.ticker.localeCompare(b.ticker) * mul;

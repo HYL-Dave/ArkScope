@@ -43,6 +43,51 @@ export interface PriceChange {
   date_range: string;
 }
 
+// --- cockpit watchlist + profile-state (lifecycle) ---
+
+export interface CockpitRow {
+  ticker: string;
+  group: string | null;
+  priority: string;
+  latest_close: number | null;
+  change_7d_pct: number | null;
+  news_count_7d: number;
+  sentiment_mean: number | null;
+  bullish_ratio: number | null;
+  lists: string[];
+  archived: boolean;
+  tags: string[];
+  note_count: number;
+  freshness: string | null;
+  per_ticker_error: string | null;
+}
+
+export interface CockpitWatchlist {
+  as_of: string | null;
+  generated_at: string;
+  total: number;
+  shown: number;
+  archived_count: number;
+  include_archived: boolean;
+  rows: CockpitRow[];
+}
+
+export interface TickerAggregate {
+  ticker: string;
+  lists: string[];
+  list_ids: number[];
+  archived: boolean;
+  note_count: number;
+}
+
+export interface Note {
+  id: number;
+  ticker: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ArkscopeBridge {
   apiBase: string;
   apiToken?: string;
@@ -66,12 +111,17 @@ function authHeaders(): Record<string, string> {
   return apiToken ? { "x-arkscope-token": apiToken } : {};
 }
 
-async function fetchWithTimeout(path: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  path: string,
+  timeoutMs: number,
+  init?: RequestInit,
+): Promise<Response> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(`${apiBase}${path}`, {
-      headers: authHeaders(),
+      ...init,
+      headers: { ...authHeaders(), ...((init?.headers as Record<string, string>) ?? {}) },
       signal: controller.signal,
     });
   } catch (e) {
@@ -87,6 +137,22 @@ async function fetchWithTimeout(path: string, timeoutMs: number): Promise<Respon
 async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const r = await fetchWithTimeout(path, timeoutMs);
   if (!r.ok) throw new Error(`${path} returned ${r.status}`);
+  return (await r.json()) as T;
+}
+
+async function sendJSON<T>(
+  path: string,
+  method: "POST" | "PUT" | "DELETE",
+  body?: unknown,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
+  const r = await fetchWithTimeout(path, timeoutMs, {
+    method,
+    headers: body === undefined ? {} : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`${path} returned ${r.status}`);
+  if (r.status === 204) return undefined as T;
   return (await r.json()) as T;
 }
 
@@ -109,4 +175,33 @@ export function getOverview(): Promise<WatchlistOverview> {
 
 export function getPriceChange(ticker: string, days = 7): Promise<PriceChange> {
   return getJSON<PriceChange>(`/prices/${encodeURIComponent(ticker)}/change?days=${days}`);
+}
+
+export function getCockpitWatchlist(includeArchived = false): Promise<CockpitWatchlist> {
+  return getJSON<CockpitWatchlist>(`/cockpit/watchlist?include_archived=${includeArchived}`);
+}
+
+export function setArchived(ticker: string, archived: boolean): Promise<TickerAggregate> {
+  return sendJSON<TickerAggregate>(
+    `/profile/tickers/${encodeURIComponent(ticker)}/archive`,
+    "POST",
+    { archived },
+  );
+}
+
+export function getNotes(ticker: string): Promise<{ ticker: string; notes: Note[] }> {
+  return getJSON<{ ticker: string; notes: Note[] }>(
+    `/profile/tickers/${encodeURIComponent(ticker)}/notes`,
+  );
+}
+
+export function addNote(ticker: string, body: string): Promise<Note> {
+  return sendJSON<Note>(`/profile/tickers/${encodeURIComponent(ticker)}/notes`, "POST", { body });
+}
+
+export function deleteNote(ticker: string, noteId: number): Promise<{ deleted: boolean; id: number }> {
+  return sendJSON<{ deleted: boolean; id: number }>(
+    `/profile/tickers/${encodeURIComponent(ticker)}/notes/${noteId}`,
+    "DELETE",
+  );
 }
