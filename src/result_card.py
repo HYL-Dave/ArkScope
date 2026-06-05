@@ -38,12 +38,26 @@ class Completeness(BaseModel):
     note: Optional[str] = None
 
 
+class ClaimCitation(BaseModel):
+    """Links one synthesized claim back to the evidence_id(s) it rests on (§2.3).
+
+    The synthesis layer must cite, for every material claim, which evidence
+    items support it. ``evidence_ids`` reference ``EvidenceItem.evidence_id``
+    values in the packet the card was generated from.
+    """
+
+    claim: str
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
 class Traceability(BaseModel):
     """§2.3 per-claim traceability: what data, as-of when, real-time?, single-model?."""
 
     data_sources: list[DataSourceRef] = Field(default_factory=list)
     is_single_model_inference: bool = True
     completeness: Completeness = Field(default_factory=Completeness)
+    # Per-claim citations into the evidence packet. Empty for hand-built cards.
+    claims: list[ClaimCitation] = Field(default_factory=list)
 
 
 class KeyLevels(BaseModel):
