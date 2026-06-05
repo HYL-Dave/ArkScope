@@ -1,15 +1,43 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiBase, getStatus, type ApiStatus } from "./api";
+import { apiBase, getStatus } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
+import { HomeView } from "./Home";
 import { WatchlistView } from "./Watchlist";
 
-const NAV = ["Dashboard", "Watchlist", "News", "Signals", "Options", "Reports", "Settings"] as const;
+// Nav aligned to the desktop-app design doc (PDF p6) — MVP subset. Keys are
+// stable English ids; labels follow the mockups (Chinese-primary). Most are
+// stubs for now; the old dev health view is demoted from product-home to
+// "System / Health".
+const NAV = [
+  "Home",
+  "Watchlist",
+  "Research",
+  "Holdings",
+  "Alerts",
+  "News",
+  "Notes",
+  "System",
+  "Settings",
+] as const;
 type Nav = (typeof NAV)[number];
-const ENABLED: Nav[] = ["Dashboard", "Watchlist"];
+
+const ENABLED: Nav[] = ["Home", "Watchlist", "System"];
+
+const LABELS: Record<Nav, string> = {
+  Home: "工作台",
+  Watchlist: "自選股",
+  Research: "AI 研究",
+  Holdings: "持倉",
+  Alerts: "告警",
+  News: "新聞·事件",
+  Notes: "研究筆記",
+  System: "System / Health",
+  Settings: "設定",
+};
 
 export function App() {
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
-  const [view, setView] = useState<Nav>("Watchlist");
+  const [view, setView] = useState<Nav>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -49,25 +77,32 @@ export function App() {
 
       <div className="body">
         <nav className="leftnav">
-          {NAV.map((label) => {
-            const enabled = ENABLED.includes(label);
+          {NAV.map((key) => {
+            const enabled = ENABLED.includes(key);
             return (
               <button
-                key={label}
-                className={`navitem ${view === label ? "active" : ""}`}
+                key={key}
+                className={`navitem ${view === key ? "active" : ""}`}
                 disabled={!enabled}
-                onClick={() => enabled && setView(label)}
+                onClick={() => enabled && setView(key)}
+                title={enabled ? LABELS[key] : `${LABELS[key]} — 規劃中`}
               >
-                {label}
+                {LABELS[key]}
               </button>
             );
           })}
         </nav>
 
-        {view === "Dashboard" ? (
+        {view === "Home" ? (
+          <HomeView status={status} onNavigate={setView} />
+        ) : view === "Watchlist" ? (
+          <WatchlistView />
+        ) : view === "System" ? (
           <DashboardView status={status} onRetry={refresh} />
         ) : (
-          <WatchlistView />
+          <main className="main">
+            <p className="muted">{LABELS[view]} — 規劃中。</p>
+          </main>
         )}
       </div>
     </div>

@@ -504,3 +504,135 @@ table.wl tbody tr.archived td {
   color: var(--bad);
   background: rgba(248, 81, 73, 0.1);
 }
+
+/* ---- Home / 工作台 ---- */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.home-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.ov-tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.ov-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ov-value {
+  font-size: 24px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.ov-sub {
+  margin-top: 2px;
+}
+.home-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.home-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.home-block-head h2 {
+  font-size: 14px;
+  margin: 0;
+}
+.home-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.home-table th,
+.home-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.home-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11.5px;
+}
+.home-table td.num,
+.home-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.home-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.clickrow {
+  cursor: pointer;
+}
+.clickrow:hover td {
+  background: rgba(88, 166, 255, 0.06);
+}
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.card-row:hover {
+  border-color: var(--accent);
+}
+.card-ticker {
+  font-weight: 600;
+  min-width: 56px;
+}
+.card-concl {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+  font-size: 12.5px;
+}
+.card-time {
+  flex: 0 0 auto;
+}
+.conf {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-radius: 10px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.conf-high {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.conf-medium {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.conf-low {
+  color: var(--bad);
+  border-color: var(--bad);
+}

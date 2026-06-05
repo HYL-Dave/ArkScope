@@ -88,6 +88,23 @@ export interface Note {
   updated_at: string;
 }
 
+// --- §2 AI cards (recent runs) ---
+
+export interface CardSummary {
+  run_id: number;
+  ticker: string;
+  question: string | null;
+  horizon: string | null;
+  card_type: string;
+  status: string;
+  provider: string | null;
+  model: string | null;
+  generated_at: string;
+  saved_report_id: number | null;
+  conclusion: string | null;
+  confidence_level: "high" | "medium" | "low" | null;
+}
+
 interface ArkscopeBridge {
   apiBase: string;
   apiToken?: string;
@@ -204,4 +221,14 @@ export function deleteNote(ticker: string, noteId: number): Promise<{ deleted: b
     `/profile/tickers/${encodeURIComponent(ticker)}/notes/${noteId}`,
     "DELETE",
   );
+}
+
+export function getCards(
+  ticker?: string,
+  limit = 20,
+  includeArchived = false,
+): Promise<{ cards: CardSummary[] }> {
+  const params = new URLSearchParams({ limit: String(limit), include_archived: String(includeArchived) });
+  if (ticker) params.set("ticker", ticker);
+  return getJSON<{ cards: CardSummary[] }>(`/analysis/cards?${params.toString()}`);
 }
