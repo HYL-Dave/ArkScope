@@ -16,6 +16,8 @@ import os
 from datetime import date
 from typing import TYPE_CHECKING, Dict, List, Optional
 
+import pandas as pd
+
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
@@ -292,10 +294,20 @@ def get_watchlist_overview(
             tickers: list of per-ticker summaries
     """
     from .price_tools import get_price_change
-    from .news_tools import get_news_sentiment_summary
 
     watchlist = dal.get_watchlist(include_sectors=False)
-    available_prices = set(dal.get_available_tickers("prices"))
+    try:
+        news_rows = dal.get_news_stats(days=7)
+        news_by_ticker = {
+            str(row.get("ticker", "")).upper(): row
+            for row in news_rows
+            if row.get("ticker")
+        }
+    except Exception as e:
+        logger.warning("watchlist overview: news stats scan failed: %s", e)
+        news_by_ticker = {}
+
+    include_iv = os.environ.get("ARKSCOPE_OVERVIEW_INCLUDE_IV") == "1"
 
     tickers_summary: List[dict] = []
 
@@ -305,38 +317,52 @@ def get_watchlist_overview(
             "ticker": t,
             "group": info.group,
             "priority": info.priority,
+            "latest_close": None,
+            "change_7d_pct": None,
+            "news_count_7d": 0,
+            "sentiment_mean": None,
+            "bullish_ratio": 0,
         }
 
-        # Price change (7 days)
-        if t in available_prices:
+        # Price change (7 days). Avoid a global DISTINCT ticker scan over the
+        # full prices table; the watchlist is small, so per-ticker lookups are
+        # cheaper and fail independently.
+        try:
+            change = get_price_change(dal, t, days=7)
+            if "error" not in change:
+                summary["latest_close"] = change["latest_close"]
+                summary["change_7d_pct"] = change["change_pct"]
+        except Exception:
+            pass
+
+        # News sentiment (7 days), using one batch stats query for the whole
+        # watchlist instead of one article query per ticker.
+        stats = news_by_ticker.get(t.upper())
+        if stats:
+            article_count = _as_int(stats.get("article_count"), 0)
+            scored_count = _as_int(stats.get("scored_count"), 0)
+            bullish_count = _as_int(stats.get("bullish_count"), 0)
+            summary["news_count_7d"] = article_count
+            summary["sentiment_mean"] = _as_float(stats.get("avg_sentiment"))
+            summary["bullish_ratio"] = (
+                round(bullish_count / scored_count, 3) if scored_count else 0
+            )
+
+        # IV is intentionally off the default cockpit path: querying full IV
+        # history once per ticker makes /overview too slow for startup UI. Keep
+        # the legacy field available for manual diagnostics when explicitly
+        # requested.
+        if include_iv:
             try:
-                change = get_price_change(dal, t, days=7)
-                if "error" not in change:
-                    summary["latest_close"] = change["latest_close"]
-                    summary["change_7d_pct"] = change["change_pct"]
+                iv_points = dal.get_iv_history(t)
+                if iv_points:
+                    summary["latest_iv"] = round(iv_points[-1].atm_iv, 4)
+                    summary["latest_vrp"] = (
+                        round(iv_points[-1].vrp, 4)
+                        if iv_points[-1].vrp is not None else None
+                    )
             except Exception:
                 pass
-
-        # News sentiment (7 days)
-        try:
-            sent = get_news_sentiment_summary(dal, t, days=7)
-            summary["news_count_7d"] = sent["article_count"]
-            summary["sentiment_mean"] = sent["sentiment_mean"]
-            summary["bullish_ratio"] = sent["bullish_ratio"]
-        except Exception:
-            pass
-
-        # IV (latest)
-        try:
-            iv_points = dal.get_iv_history(t)
-            if iv_points:
-                summary["latest_iv"] = round(iv_points[-1].atm_iv, 4)
-                summary["latest_vrp"] = (
-                    round(iv_points[-1].vrp, 4)
-                    if iv_points[-1].vrp is not None else None
-                )
-        except Exception:
-            pass
 
         tickers_summary.append(summary)
 
@@ -345,6 +371,26 @@ def get_watchlist_overview(
         "ticker_count": len(tickers_summary),
         "tickers": tickers_summary,
     }
+
+
+def _as_int(value, default: int = 0) -> int:
+    """Best-effort int conversion for pandas/DB scalar values."""
+    try:
+        if value is None or pd.isna(value):
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+
+def _as_float(value) -> Optional[float]:
+    """Best-effort float conversion for pandas/DB scalar values."""
+    try:
+        if value is None or pd.isna(value):
+            return None
+        return float(value)
+    except Exception:
+        return None
 
 
 def get_morning_brief(
