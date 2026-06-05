@@ -78,28 +78,35 @@ def create_app() -> FastAPI:
     app.include_router(macro_calendar_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
-    # CORS added first => outermost, so even a 401 carries CORS headers. The API
-    # is local-only (127.0.0.1) and token-gated when launched by the shell, so
-    # permissive CORS is acceptable for the desktop renderer / browser dev origin.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the
     # Electron shell sets a per-run token). Unset = existing dev/test behaviour,
-    # unchanged. /healthz stays open so readiness probing needs no token.
+    # unchanged. Exemptions:
+    #   - /healthz stays open so readiness probing needs no token.
+    #   - OPTIONS (CORS preflight) is never token-checked: browsers send no
+    #     custom headers on preflight, so gating it would 401 the preflight and
+    #     break every cross-origin renderer fetch ("Failed to fetch").
     @app.middleware("http")
     async def _token_guard(request: Request, call_next):
         token = os.environ.get("ARKSCOPE_API_TOKEN")
-        if token and request.url.path != "/healthz":
+        if token and request.method != "OPTIONS" and request.url.path != "/healthz":
             if request.headers.get("x-arkscope-token") != token:
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "invalid or missing API token"},
                 )
         return await call_next(request)
+
+    # CORS is added LAST so it is the OUTERMOST middleware (Starlette applies the
+    # most-recently-added middleware first). That lets it answer the preflight
+    # and stamp Access-Control-Allow-Origin on every response — including the
+    # token guard's 401. The API is local-only (127.0.0.1) and token-gated under
+    # the shell, so permissive CORS is acceptable for the desktop renderer / Vite
+    # dev origin.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     return app
