@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from src.agents.config import get_agent_config
 from src.api.dependencies import get_card_store, get_dal
-from src.api.permissions import require_profile_state_write
+from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
 from src.card_synthesis import confidence_to_score, render_card_markdown, synthesize_card
 from src.evidence_packet import gather_evidence
@@ -107,7 +107,7 @@ def generate_card(
         logger.warning("Card synthesis failed for %s: %s", ticker, exc)
         raise HTTPException(status_code=502, detail=f"synthesis failed: {exc}")
 
-    require_profile_state_write(
+    require_db_write(
         "card_generate", {"ticker": packet.ticker, "provider": provider}
     )
     run = store.record(
@@ -185,7 +185,7 @@ def save_card(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"stored card is malformed: {exc}")
 
-    require_profile_state_write("card_save", {"run_id": run_id, "ticker": run.ticker})
+    require_db_write("card_save", {"run_id": run_id, "ticker": run.ticker})
     rep = save_report(
         dal,
         title=f"{run.ticker} — research card",
@@ -218,7 +218,7 @@ def archive_card(
     if not run or run.status == "deleted":
         raise HTTPException(status_code=404, detail="card run not found")
     action = "card_archive" if body.archived else "card_restore"
-    require_profile_state_write(action, {"run_id": run_id})
+    require_db_write(action, {"run_id": run_id})
     if body.archived:
         target = "archived"
     else:
@@ -239,6 +239,6 @@ def delete_card(
     run = store.get(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="card run not found")
-    require_profile_state_write("card_delete", {"run_id": run_id})
+    require_db_write("card_delete", {"run_id": run_id})
     store.set_status(run_id, "deleted")
     return {"deleted": True, "id": run_id}

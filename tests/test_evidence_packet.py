@@ -198,6 +198,46 @@ def test_empty_analyst_degrades_to_coverage_not_evidence():
     assert "analyst" not in cov.data["present"]
 
 
+def test_sa_digest_extracts_correct_fields_when_enabled():
+    # Real get_sa_digest shape: comments under high_value_comments.{ticker,candidate}_mentions,
+    # excerpt=preview, article date=published_date/excerpt=summary_excerpt.
+    fake_digest = {
+        "ticker": "AAPL",
+        "window": {"start": "2026-05-22", "end": "2026-06-05", "days": 14},
+        "recent_articles": [
+            {"title": "A1", "published_date": "2026-06-01", "url": "http://a", "summary_excerpt": "ex"}
+        ],
+        "high_value_comments": {
+            "ticker_mentions": [
+                {"preview": "great quarter", "high_value_score": 7.5, "upvotes": 3,
+                 "comment_date": "2026-06-02", "needs_verification": False}
+            ],
+            "candidate_mentions": [
+                {"preview": "maybe", "high_value_score": 5.0, "upvotes": 1,
+                 "comment_date": "2026-06-01", "needs_verification": True}
+            ],
+        },
+    }
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
+        mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
+        mp.setattr("src.tools.options_tools.get_iv_analysis", lambda dal, t: _IV)
+        mp.setattr("src.tools.sa_digest_tools.get_sa_digest", lambda dal, t: fake_digest)
+        packet = gather_evidence(
+            _FakeDAL(_bars(), _scored_articles()), "AAPL",
+            now_iso="2026-06-05T00:00:00Z", sa_enabled=True,
+        )
+    sa = next(i for i in packet.items if i.source == "sa_digest")
+    assert sa.source_type == "sa_community"
+    art = sa.data["recent_articles"][0]
+    assert art["title"] == "A1" and art["date"] == "2026-06-01" and art["excerpt"] == "ex"
+    comments = sa.data["high_value_comments"]
+    assert len(comments) == 2  # ticker + candidate flattened (the old buggy key gave 0)
+    assert comments[0]["excerpt"] == "great quarter" and comments[0]["high_value_score"] == 7.5
+    blob = json.dumps(sa.data, default=str)
+    assert "sentiment_score" not in blob and "risk_score" not in blob
+
+
 # --- clean technical math ---------------------------------------------------
 
 

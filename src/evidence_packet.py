@@ -79,6 +79,15 @@ _EXCLUSION_NOTE = (
 )
 
 
+def _as_str(value: Any) -> Optional[str]:
+    """Coerce a value (e.g. a DB date/datetime) to str; None stays None.
+
+    Keeps the packet JSON-safe so ``CardRunStore.record``'s ``json.dumps`` never
+    meets a raw datetime/date object.
+    """
+    return None if value is None else str(value)
+
+
 class EvidenceItem(BaseModel):
     """One objective evidence fact, traceable by ``evidence_id``."""
 
@@ -451,24 +460,42 @@ def gather_evidence(
             digest = get_sa_digest(dal, tkr)
             if digest and "message" not in digest:
                 articles = [
-                    {"title": a.get("title"), "date": a.get("published_at") or a.get("date"), "url": a.get("url")}
+                    {
+                        "title": a.get("title"),
+                        "date": _as_str(a.get("published_date")),
+                        "url": a.get("url"),
+                        "excerpt": a.get("summary_excerpt"),
+                    }
                     for a in (digest.get("recent_articles") or [])
                 ]
+                # comments live under high_value_comments.{ticker,candidate}_mentions;
+                # excerpt is `preview`, high_value_score is rule-based (Stage 1), NOT LLM.
+                hvc = digest.get("high_value_comments") or {}
+                raw_comments = (hvc.get("ticker_mentions") or []) + (hvc.get("candidate_mentions") or [])
                 comments = [
-                    {"excerpt": c.get("excerpt") or c.get("body"), "high_value_score": c.get("high_value_score")}
-                    for c in (digest.get("ticker_comments") or [])
-                ]
-                b.add(
-                    "sa_digest",
-                    "sa_community",
                     {
-                        "window": digest.get("window"),
-                        "recent_articles": articles,
-                        "high_value_comments": comments,
-                    },
-                    note="Seeking Alpha community/opinion evidence; rule-based high_value_score, NOT LLM sentiment.",
-                )
-                present.append("sa")
+                        "excerpt": c.get("preview"),
+                        "high_value_score": c.get("high_value_score"),
+                        "upvotes": c.get("upvotes"),
+                        "date": _as_str(c.get("comment_date")),
+                        "needs_verification": c.get("needs_verification"),
+                    }
+                    for c in raw_comments
+                ]
+                if articles or comments:
+                    b.add(
+                        "sa_digest",
+                        "sa_community",
+                        {
+                            "window": digest.get("window"),
+                            "recent_articles": articles,
+                            "high_value_comments": comments,
+                        },
+                        note="Seeking Alpha community/opinion evidence; rule-based high_value_score (Stage 1), NOT LLM sentiment.",
+                    )
+                    present.append("sa")
+                else:
+                    missing.append("sa")
             else:
                 missing.append("sa")
         except Exception as exc:

@@ -56,3 +56,14 @@ def require_profile_state_write(action: str, detail: dict | None = None) -> None
     report / analysis records).
     """
     require_permission(PermissionClass.profile_state_write, action, detail)
+
+
+def require_db_write(action: str, detail: dict | None = None) -> None:
+    """``db_write``: additive analysis records / cache — memory, reports, and
+    generated AI-card runs.
+
+    Distinct from ``profile_state_write`` (research-universe / profile-state
+    mutations): persisting or status-changing a generated card is an additive
+    analysis record, not a change to what the user follows.
+    """
+    require_permission(PermissionClass.db_write, action, detail)
