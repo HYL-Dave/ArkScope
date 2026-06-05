@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .dependencies import get_dal, get_registry
+from .dependencies import get_dal
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +23,13 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
-    # Startup: warm up singletons
-    dal = get_dal()
-    registry = get_registry()
-    logger.info(
-        f"ArkScope API ready — "
-        f"{len(registry.list_all())} tools, "
-        f"{len(dal.get_available_tickers('prices'))} price tickers"
-    )
+    # Keep startup cheap. The desktop shell polls /healthz while launching; that
+    # readiness path must not depend on DB availability or expensive data scans.
+    logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
     # Shutdown
-    dal.clear_cache()
+    if get_dal.cache_info().currsize:
+        get_dal().clear_cache()
     logger.info("ArkScope API shutdown")
 
 

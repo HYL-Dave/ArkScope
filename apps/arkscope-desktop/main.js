@@ -17,14 +17,30 @@ const path = require("node:path");
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const WEB_DIST = path.join(__dirname, "..", "arkscope-web", "dist", "index.html");
 const PYTHON = process.env.ARKSCOPE_PYTHON || "python";
+const ECHO_SIDECAR =
+  process.env.ARKSCOPE_SIDECAR_LOG === "1" || Boolean(process.env.ARKSCOPE_WEB_DEV_URL);
+
+if (process.env.ARKSCOPE_ENABLE_GPU !== "1") {
+  // Linux desktop/dev environments can fail ANGLE/EGL GPU initialization. The
+  // cockpit does not need hardware acceleration yet; keep rendering stable by
+  // default and allow ARKSCOPE_ENABLE_GPU=1 for future charting experiments.
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch("disable-gpu");
+}
 
 let sidecar = null;
 let win = null;
 const stderrTail = [];
 
-function pushTail(buf) {
+function pushTail(buf, stream = "stdout") {
   for (const line of buf.toString().split("\n")) {
-    if (line.trim()) stderrTail.push(line);
+    if (!line.trim()) continue;
+    stderrTail.push(line);
+    if (ECHO_SIDECAR) {
+      const prefix = stream === "stderr" ? "[sidecar:stderr]" : "[sidecar]";
+      const writer = stream === "stderr" ? console.error : console.log;
+      writer(`${prefix} ${line}`);
+    }
   }
   while (stderrTail.length > 40) stderrTail.shift();
 }
@@ -79,6 +95,9 @@ async function waitForHealth(port, token, timeoutMs = 40000) {
 }
 
 function startSidecar(port, token) {
+  if (ECHO_SIDECAR) {
+    console.log(`[sidecar] starting: ${PYTHON} -m src.api on 127.0.0.1:${port}`);
+  }
   sidecar = spawn(PYTHON, ["-m", "src.api"], {
     cwd: REPO_ROOT,
     env: {
@@ -90,10 +109,10 @@ function startSidecar(port, token) {
       PYTHONUNBUFFERED: "1",
     },
   });
-  sidecar.stdout.on("data", pushTail);
-  sidecar.stderr.on("data", pushTail);
-  sidecar.on("error", (e) => pushTail(Buffer.from(`[spawn error] ${e.message}`)));
-  sidecar.on("exit", (code) => pushTail(Buffer.from(`[sidecar exited code=${code}]`)));
+  sidecar.stdout.on("data", (buf) => pushTail(buf, "stdout"));
+  sidecar.stderr.on("data", (buf) => pushTail(buf, "stderr"));
+  sidecar.on("error", (e) => pushTail(Buffer.from(`[spawn error] ${e.message}`), "stderr"));
+  sidecar.on("exit", (code) => pushTail(Buffer.from(`[sidecar exited code=${code}]`), "stderr"));
 }
 
 function stopSidecar() {

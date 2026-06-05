@@ -60,20 +60,39 @@ export const apiBase: string =
   "http://127.0.0.1:8420";
 
 const apiToken: string | undefined = window.arkscope?.apiToken;
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 function authHeaders(): Record<string, string> {
   return apiToken ? { "x-arkscope-token": apiToken } : {};
 }
 
-async function getJSON<T>(path: string): Promise<T> {
-  const r = await fetch(`${apiBase}${path}`, { headers: authHeaders() });
+async function fetchWithTimeout(path: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(`${apiBase}${path}`, {
+      headers: authHeaders(),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`${path} timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const r = await fetchWithTimeout(path, timeoutMs);
   if (!r.ok) throw new Error(`${path} returned ${r.status}`);
   return (await r.json()) as T;
 }
 
 export async function getHealthz(): Promise<boolean> {
   try {
-    const r = await fetch(`${apiBase}/healthz`, { headers: authHeaders() });
+    const r = await fetchWithTimeout("/healthz", 3_000);
     return r.ok;
   } catch {
     return false;
@@ -81,7 +100,7 @@ export async function getHealthz(): Promise<boolean> {
 }
 
 export function getStatus(): Promise<ApiStatus> {
-  return getJSON<ApiStatus>("/status");
+  return getJSON<ApiStatus>("/status", 8_000);
 }
 
 export function getOverview(): Promise<WatchlistOverview> {
