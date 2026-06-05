@@ -57,6 +57,7 @@ def cockpit_watchlist(
     rows = overview.get("tickers", [])
     as_of = overview.get("date")
 
+    require_profile_state_write("sync_universe", {"source": "overview", "rows": len(rows)})
     store.sync_universe(rows)
     agg = store.get_aggregate([r.get("ticker", "") for r in rows])
 
@@ -135,6 +136,8 @@ def set_ticker_archived(
     require_profile_state_write(action, {"ticker": ticker})
     try:
         agg = store.archive_ticker(ticker) if body.archived else store.restore_ticker(ticker)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=e.args[0] if e.args else str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return asdict(agg)

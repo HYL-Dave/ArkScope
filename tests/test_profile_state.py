@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi import HTTPException
+from pydantic import ValidationError
 
-from src.api.app import create_app
-from src.api.dependencies import get_dal, get_profile_store
+from src.api.routes.profile import (
+    ArchiveBody,
+    NoteBody,
+    add_ticker_note,
+    cockpit_watchlist,
+    delete_ticker_note,
+    list_ticker_notes,
+    profile_lists,
+    set_ticker_archived,
+)
 from src.profile_state import ProfileStateStore
 
 # A canned /overview payload so the cockpit-DTO route never touches the DB.
@@ -109,22 +118,17 @@ def test_add_note_rejects_blank(store):
 
 
 @pytest.fixture()
-def client(tmp_path, monkeypatch):
+def api_store(tmp_path, monkeypatch):
     test_store = ProfileStateStore(tmp_path / "api_profile.db")
     monkeypatch.setattr(
         "src.api.routes.profile.get_watchlist_overview",
         lambda dal: CANNED_OVERVIEW,
     )
-    app = create_app()
-    app.dependency_overrides[get_dal] = lambda: None
-    app.dependency_overrides[get_profile_store] = lambda: test_store
-    return TestClient(app)
+    return test_store
 
 
-def test_cockpit_shape_seeds_and_archive_filter(client):
-    r = client.get("/cockpit/watchlist")
-    assert r.status_code == 200
-    data = r.json()
+def test_cockpit_shape_seeds_and_archive_filter(api_store):
+    data = cockpit_watchlist(dal=None, store=api_store)
     assert data["total"] == 3 and data["shown"] == 3 and data["archived_count"] == 0
     row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
     for field in (
@@ -137,38 +141,48 @@ def test_cockpit_shape_seeds_and_archive_filter(client):
     assert "followed" not in row  # follow/star deliberately not in v0
 
     # cockpit load seeded the substrate
-    lists = client.get("/profile/lists").json()["lists"]
+    lists = profile_lists(store=api_store)["lists"]
     assert {li["name"] for li in lists} == {"Holdings", "Interested"}
 
     # archive AAPL -> hidden by default, visible with include_archived
-    assert client.post("/profile/tickers/AAPL/archive", json={"archived": True}).status_code == 200
-    hidden = client.get("/cockpit/watchlist").json()
+    assert set_ticker_archived("AAPL", ArchiveBody(archived=True), store=api_store)["archived"] is True
+    hidden = cockpit_watchlist(dal=None, store=api_store)
     assert hidden["shown"] == 2 and hidden["archived_count"] == 1
     assert all(x["ticker"] != "AAPL" for x in hidden["rows"])
 
-    shown = client.get("/cockpit/watchlist", params={"include_archived": True}).json()
+    shown = cockpit_watchlist(include_archived=True, dal=None, store=api_store)
     assert shown["shown"] == 3
     aapl = next(x for x in shown["rows"] if x["ticker"] == "AAPL")
     assert aapl["archived"] is True and aapl["lists"] == []
 
     # restore brings it back to active
-    assert client.post("/profile/tickers/AAPL/archive", json={"archived": False}).status_code == 200
-    assert client.get("/cockpit/watchlist").json()["shown"] == 3
+    assert set_ticker_archived("AAPL", ArchiveBody(archived=False), store=api_store)["archived"] is False
+    assert cockpit_watchlist(dal=None, store=api_store)["shown"] == 3
 
 
-def test_notes_endpoints(client):
-    client.get("/cockpit/watchlist")  # seed
-    assert client.post("/profile/tickers/MSFT/notes", json={"body": "earnings 7/22"}).status_code == 200
-    listed = client.get("/profile/tickers/MSFT/notes").json()
+def test_archive_unknown_ticker_is_404(api_store):
+    cockpit_watchlist(dal=None, store=api_store)  # seed
+    with pytest.raises(HTTPException) as exc:
+        set_ticker_archived("NOPE", ArchiveBody(archived=True), store=api_store)
+    assert exc.value.status_code == 404
+
+
+def test_notes_endpoints(api_store):
+    cockpit_watchlist(dal=None, store=api_store)  # seed
+    add_ticker_note("MSFT", NoteBody(body="earnings 7/22"), store=api_store)
+    listed = list_ticker_notes("MSFT", store=api_store)
     assert listed["ticker"] == "MSFT" and len(listed["notes"]) == 1
     note_id = listed["notes"][0]["id"]
 
-    msft = next(x for x in client.get("/cockpit/watchlist").json()["rows"] if x["ticker"] == "MSFT")
+    msft = next(x for x in cockpit_watchlist(dal=None, store=api_store)["rows"] if x["ticker"] == "MSFT")
     assert msft["note_count"] == 1
 
-    assert client.delete(f"/profile/tickers/MSFT/notes/{note_id}").status_code == 200
-    assert client.delete(f"/profile/tickers/MSFT/notes/{note_id}").status_code == 404
+    assert delete_ticker_note("MSFT", note_id, store=api_store) == {"deleted": True, "id": note_id}
+    with pytest.raises(HTTPException) as exc:
+        delete_ticker_note("MSFT", note_id, store=api_store)
+    assert exc.value.status_code == 404
 
 
-def test_add_note_blank_is_422(client):
-    assert client.post("/profile/tickers/MSFT/notes", json={"body": ""}).status_code == 422
+def test_add_note_blank_is_422():
+    with pytest.raises(ValidationError):
+        NoteBody(body="")

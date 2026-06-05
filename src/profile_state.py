@@ -314,6 +314,12 @@ class ProfileStateStore:
             raise ValueError("ticker is required")
         now = _now()
         with self._write_lock, self._connect() as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM watchlist_memberships WHERE ticker = ? LIMIT 1",
+                (t,),
+            ).fetchone()
+            if not exists:
+                raise KeyError(f"{t} is not in any watchlist")
             conn.execute(
                 "UPDATE watchlist_memberships SET archived_at = ?, updated_at = ? "
                 "WHERE ticker = ? AND archived_at IS NULL",
@@ -329,6 +335,12 @@ class ProfileStateStore:
             raise ValueError("ticker is required")
         now = _now()
         with self._write_lock, self._connect() as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM watchlist_memberships WHERE ticker = ? LIMIT 1",
+                (t,),
+            ).fetchone()
+            if not exists:
+                raise KeyError(f"{t} is not in any watchlist")
             conn.execute(
                 "UPDATE watchlist_memberships SET archived_at = NULL, updated_at = ? "
                 "WHERE ticker = ? AND archived_at IS NOT NULL",
