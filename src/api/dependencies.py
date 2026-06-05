@@ -37,7 +37,22 @@ def get_profile_store():
     """
     from src.profile_state import ProfileStateStore
 
-    db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+    return ProfileStateStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
+def get_card_store():
+    """Singleton local store for generated §2 AI card runs (same local SQLite).
+
+    Auto-cached generated cards live alongside profile state in the local DB,
+    never the remote PG. Path overridable via ``ARKSCOPE_PROFILE_DB``.
+    """
+    from src.card_runs import CardRunStore
+
+    return CardRunStore(_local_state_db_path())
+
+
+def _local_state_db_path() -> str:
+    return os.environ.get("ARKSCOPE_PROFILE_DB") or str(
         Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
     )
-    return ProfileStateStore(db_path)
