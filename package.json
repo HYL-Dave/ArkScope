@@ -10,7 +10,7 @@
   "scripts": {
     "build": "npm run build --workspace apps/arkscope-web",
     "dev:web": "npm run dev --workspace apps/arkscope-web",
-    "dev:desktop": "ARKSCOPE_WEB_DEV_URL=http://127.0.0.1:5173 npm run start --workspace apps/arkscope-desktop",
+    "dev:desktop": "ARKSCOPE_WEB_DEV_URL=http://127.0.0.1:${ARKSCOPE_WEB_DEV_PORT:-8430} npm run start --workspace apps/arkscope-desktop",
     "start": "npm run build && npm run start --workspace apps/arkscope-desktop"
   }
 }
