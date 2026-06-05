@@ -7,6 +7,7 @@ that all route handlers share.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,3 +25,19 @@ def get_dal() -> DataAccessLayer:
 def get_registry() -> ToolRegistry:
     """Singleton ToolRegistry with all tools registered."""
     return create_default_registry()
+
+
+@lru_cache(maxsize=1)
+def get_profile_store():
+    """Singleton local profile-state store (SQLite).
+
+    Holds user research-universe state (followed / archived / notes) — local,
+    never the remote PG. Path overridable via ``ARKSCOPE_PROFILE_DB``; defaults
+    to ``<repo>/data/profile_state.db``.
+    """
+    from src.profile_state import ProfileStateStore
+
+    db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+        Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
+    )
+    return ProfileStateStore(db_path)
