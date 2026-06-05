@@ -10,6 +10,7 @@ import {
   type Note,
   type PriceChange,
 } from "./api";
+import { AICardTab } from "./AICard";
 
 interface CockpitData {
   rows: CockpitRow[];
@@ -32,7 +33,7 @@ type SortKey =
   | "sentiment_mean"
   | "priority";
 type SortDir = "asc" | "desc";
-type DetailTab = "overview" | "notes";
+type DetailTab = "overview" | "notes" | "ai";
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
@@ -351,15 +352,21 @@ function TickerDetail({
         >
           Notes {row.note_count > 0 ? `(${row.note_count})` : ""}
         </button>
-        <span className="tab disabled" title="agent wiring deferred">
+        <button
+          type="button"
+          className={`tab ${tab === "ai" ? "active" : ""}`}
+          onClick={() => onTab("ai")}
+        >
           AI summary
-        </span>
+        </button>
       </div>
 
       {tab === "overview" ? (
         <OverviewTab row={row} />
-      ) : (
+      ) : tab === "notes" ? (
         <NotesTab ticker={row.ticker} onNoteCount={onNoteCount} />
+      ) : (
+        <AICardTab ticker={row.ticker} />
       )}
     </div>
   );

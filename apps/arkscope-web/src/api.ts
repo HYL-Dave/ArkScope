@@ -105,6 +105,66 @@ export interface CardSummary {
   confidence_level: "high" | "medium" | "low" | null;
 }
 
+export interface DataSourceRef {
+  name: string;
+  as_of: string | null;
+  is_real_time: boolean;
+  detail: string | null;
+}
+export interface ClaimCitation {
+  claim: string;
+  evidence_ids: string[];
+}
+export interface Completeness {
+  news: boolean;
+  fundamentals: boolean;
+  technicals: boolean;
+  note: string | null;
+}
+export interface Traceability {
+  data_sources: DataSourceRef[];
+  is_single_model_inference: boolean;
+  completeness: Completeness;
+  claims: ClaimCitation[];
+}
+export interface ResultCard {
+  ticker: string;
+  question: string | null;
+  horizon: string | null;
+  card_type: string;
+  analysis_time: string;
+  conclusion: string;
+  primary_reasons: string[];
+  counter_thesis: string[];
+  key_assumptions: string[];
+  trigger_conditions: string[];
+  invalidation_conditions: string[];
+  risks: string[];
+  watch_list: string[];
+  market_narrative: string | null;
+  divergence: string | null;
+  confidence_level: "high" | "medium" | "low";
+  confidence_rationale: string | null;
+  traceability: Traceability;
+}
+export interface GenerateResult {
+  run_id: number;
+  status: string;
+  provider: string | null;
+  model: string | null;
+  generated_at: string;
+  card: ResultCard;
+}
+export interface CardDetail extends GenerateResult {
+  ticker: string;
+  question: string | null;
+  horizon: string | null;
+  card_type: string;
+  as_of: string | null;
+  saved_report_id: number | null;
+  evidence_packet: unknown;
+}
+
 interface ArkscopeBridge {
   apiBase: string;
   apiToken?: string;
@@ -231,4 +291,30 @@ export function getCards(
   const params = new URLSearchParams({ limit: String(limit), include_archived: String(includeArchived) });
   if (ticker) params.set("ticker", ticker);
   return getJSON<{ cards: CardSummary[] }>(`/analysis/cards?${params.toString()}`);
+}
+
+// Generation runs the gather + LLM synthesis server-side (~1-2 min for one
+// card), so it needs a generous timeout — well past the 15s default.
+const CARD_GEN_TIMEOUT_MS = 240_000;
+
+export function generateCard(
+  ticker: string,
+  body: { question?: string; horizon?: string; provider?: string; include_sa?: boolean } = {},
+): Promise<GenerateResult> {
+  return sendJSON<GenerateResult>(
+    `/analysis/card/${encodeURIComponent(ticker)}`,
+    "POST",
+    body,
+    CARD_GEN_TIMEOUT_MS,
+  );
+}
+
+export function getCard(runId: number): Promise<CardDetail> {
+  return getJSON<CardDetail>(`/analysis/cards/${runId}`);
+}
+
+export function saveCard(
+  runId: number,
+): Promise<{ run_id: number; status: string; saved_report_id: number | null }> {
+  return sendJSON(`/analysis/cards/${runId}/save`, "POST");
 }
