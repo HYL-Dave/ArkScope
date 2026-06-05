@@ -107,6 +107,14 @@ export function WatchlistView() {
     );
   }, []);
 
+  // Stable per selected ticker so NotesTab's effect never re-fires on a note write.
+  const onNoteCount = useCallback(
+    (n: number) => {
+      if (selectedTicker) patchNoteCount(selectedTicker, n);
+    },
+    [selectedTicker, patchNoteCount],
+  );
+
   const onArchiveToggle = useCallback(
     async (row: CockpitRow) => {
       setBusyTicker(row.ticker);
@@ -234,7 +242,7 @@ export function WatchlistView() {
             row={selected}
             tab={detailTab}
             onTab={setDetailTab}
-            onNoteCount={(n) => patchNoteCount(selected.ticker, n)}
+            onNoteCount={onNoteCount}
           />
         ) : (
           <p className="muted">Select a ticker to see its detail.</p>
@@ -419,15 +427,18 @@ function NotesTab({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  // Depends only on ticker, so the mount effect runs once per ticker — note
+  // writes call onNoteCount() explicitly below, never via this load path.
+  const refresh = useCallback(async (): Promise<number | null> => {
     try {
       const d = await getNotes(ticker);
       setNotes(d.notes);
-      onNoteCount(d.notes.length);
+      return d.notes.length;
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      return null;
     }
-  }, [ticker, onNoteCount]);
+  }, [ticker]);
 
   useEffect(() => {
     setNotes(null);
@@ -443,7 +454,8 @@ function NotesTab({
     try {
       await addNote(ticker, body);
       setDraft("");
-      await refresh();
+      const n = await refresh();
+      if (n != null) onNoteCount(n);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -456,7 +468,8 @@ function NotesTab({
     setErr(null);
     try {
       await deleteNote(ticker, id);
-      await refresh();
+      const n = await refresh();
+      if (n != null) onNoteCount(n);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
