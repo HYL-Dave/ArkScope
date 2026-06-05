@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getOverview, getPriceChange, type PriceChange, type WatchlistRow } from "./api";
 
 type State =
@@ -22,21 +22,29 @@ export function WatchlistView() {
   const [selected, setSelected] = useState<WatchlistRow | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const o = await getOverview();
+      setState({ kind: "ready", rows: o.tickers, date: o.date });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      // Keep an already-loaded table visible on a transient refresh failure;
+      // only fall back to the full error screen on the initial load.
+      setState((prev) => (prev.kind === "ready" ? prev : { kind: "error", message }));
+      setRefreshError(message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const o = await getOverview();
-        if (alive) setState({ kind: "ready", rows: o.tickers, date: o.date });
-      } catch (e) {
-        if (alive) setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    void load();
+  }, [load]);
 
   const rows = state.kind === "ready" ? state.rows : [];
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
@@ -69,6 +77,15 @@ export function WatchlistView() {
               <span className="muted">
                 {state.rows.length} tickers · as of {state.date}
               </span>
+              <span className="spacer" />
+              {refreshError && (
+                <span className="refresh-err" title={refreshError}>
+                  refresh failed
+                </span>
+              )}
+              <button className="btn-ghost" onClick={() => void load()} disabled={refreshing}>
+                {refreshing ? "↻ …" : "↻ Refresh"}
+              </button>
             </div>
 
             <table className="wl">
@@ -93,7 +110,7 @@ export function WatchlistView() {
                     <td className="mono strong">{r.ticker}</td>
                     <td className="num">{fmtNum(r.latest_close)}</td>
                     <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
-                    <td className="num">{r.news_count_7d || "—"}</td>
+                    <td className="num">{r.news_count_7d}</td>
                     <td className="num">{fmtSent(r.sentiment_mean)}</td>
                     <td>
                       <span className={`badge p-${r.priority}`}>{r.priority}</span>
@@ -206,7 +223,7 @@ function TickerDetail({ row }: { row: WatchlistRow }) {
         <Kv k="Change 7d" v={fmtPct(row.change_7d_pct)} cls={changeClass(row.change_7d_pct)} />
         <Kv k="News 7d" v={String(row.news_count_7d)} />
         <Kv k="Sentiment" v={fmtSent(row.sentiment_mean)} />
-        <Kv k="Bullish ratio" v={fmtSent(row.bullish_ratio)} />
+        <Kv k="Bullish %" v={fmtRatioPct(row.bullish_ratio)} />
       </dl>
 
       <h4 className="detail-section">Price (30d)</h4>
@@ -218,7 +235,7 @@ function TickerDetail({ row }: { row: WatchlistRow }) {
           <Kv k="Change %" v={fmtPct(pc.change_pct)} cls={changeClass(pc.change_pct)} />
           <Kv k="Period high" v={fmtNum(pc.period_high)} />
           <Kv k="Period low" v={fmtNum(pc.period_low)} />
-          <Kv k="Range %" v={fmtNum(pc.high_low_range_pct)} />
+          <Kv k="Range %" v={fmtRangePct(pc.high_low_range_pct)} />
           <Kv k="Volume" v={fmtNum(pc.total_volume)} />
           <Kv k="Bars" v={String(pc.bar_count)} />
           <Kv k="Dates" v={pc.date_range} />
@@ -271,4 +288,14 @@ function fmtSent(v: number | null): string {
 
 function changeClass(v: number | null): string {
   return v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
+}
+
+// Bullish ratio is a 0..1 fraction — render it as a whole percent (0.32 -> 32%).
+function fmtRatioPct(v: number | null): string {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+
+// Range is a magnitude (never negative), so append "%" without a +/- sign.
+function fmtRangePct(v: number | null): string {
+  return v == null ? "—" : `${v.toFixed(2)}%`;
 }
