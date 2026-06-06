@@ -894,9 +894,9 @@ table.wl tbody tr.archived td {
 }
 
 /* ---- Settings: model routing ---- */
-.settings-page {
-  grid-column: 2 / -1;
-}
+/* Settings occupies the normal main column (1fr); the old 3-column
+   `grid-column: 2 / -1` span was removed when the right rail became its own
+   collapsible column (it had pushed .rightrail out of place). */
 .page-head {
   display: flex;
   align-items: flex-start;
@@ -1387,6 +1387,7 @@ table.wl tbody tr.archived td {
   position: fixed;
   right: 0;
   top: 64px;
+  z-index: 20; /* above page content / scrollbars, below the modal (50) */
   background: var(--panel);
   color: var(--muted);
   border: 1px solid var(--border);

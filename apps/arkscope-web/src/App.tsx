@@ -107,7 +107,7 @@ export function App() {
           <button
             type="button"
             className="topbar-model"
-            onClick={() => setView("Settings")}
+            onClick={() => goView("Settings")}
             title={
               `卡片合成 ${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}\n` +
               `卡片翻譯 ${runtime.card_translation.provider}/${runtime.card_translation.model}\n` +
