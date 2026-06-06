@@ -32,7 +32,12 @@ def _user_agent() -> str:
 
 
 _lock = threading.Lock()
-_cache: Optional[list[dict]] = None  # in-memory [{ticker, name}], loaded once
+_cache: Optional[list[dict]] = None  # in-memory [{ticker, name}]
+_cache_built_at: float = 0.0        # when _cache was last (re)built
+_cache_sec_ok: bool = False         # did the last build get SEC names?
+# If a build's SEC overlay failed (offline/403), let a later call retry rather
+# than serving blank names for the whole process — but not on every keystroke.
+_RETRY_AFTER_SEC_FAIL = 600.0
 
 
 def _cache_path() -> Path:
@@ -100,15 +105,25 @@ def load_catalog(force: bool = False) -> list[dict]:
     Never raises and never ends up empty when we track anything: the local seed
     is always present, so add-ticker works even if SEC is blocked/offline.
     """
-    global _cache
+    global _cache, _cache_built_at, _cache_sec_ok
     with _lock:
         if _cache is not None and not force:
-            return _cache
+            age = time.time() - _cache_built_at
+            stale = age >= _TTL_SECONDS
+            # Self-heal: if the last build couldn't reach SEC (blank names), let
+            # a later call retry after a backoff so a long-running server picks
+            # up SEC names without a restart.
+            retry_after_fail = (not _cache_sec_ok) and age >= _RETRY_AFTER_SEC_FAIL
+            if not stale and not retry_after_fail:
+                return _cache
         merged = _local_seed()  # {TICKER: ""}
-        for ticker, name in _load_sec(force).items():
+        sec = _load_sec(force)
+        for ticker, name in sec.items():
             # SEC name enriches; SEC-only tickers are added too (broad US list).
             merged[ticker] = name or merged.get(ticker, "")
         _cache = [{"ticker": t, "name": n} for t, n in merged.items()]
+        _cache_built_at = time.time()
+        _cache_sec_ok = bool(sec)
         return _cache
 
 
@@ -139,13 +154,17 @@ def search(q: str, limit: int = 20) -> list[dict]:
 
 
 def reset_for_tests() -> None:
-    global _cache
+    global _cache, _cache_built_at, _cache_sec_ok
     with _lock:
         _cache = None
+        _cache_built_at = 0.0
+        _cache_sec_ok = False
 
 
 def set_catalog_for_tests(entries: list[dict]) -> None:
     """Inject a ``[{ticker, name}]`` catalog directly (avoids network in tests)."""
-    global _cache
+    global _cache, _cache_built_at, _cache_sec_ok
     with _lock:
         _cache = [{"ticker": str(e["ticker"]).upper(), "name": e.get("name", "")} for e in entries]
+        _cache_built_at = time.time()
+        _cache_sec_ok = True

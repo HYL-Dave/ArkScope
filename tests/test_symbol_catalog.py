@@ -58,6 +58,21 @@ def test_local_seed_works_when_sec_unavailable(monkeypatch):
     assert symbol_catalog.search("MXL")[0]["ticker"] == "MXL"
 
 
+def test_cache_reoverlays_sec_names_when_stale(monkeypatch):
+    # First load with SEC down → blank names; once stale, a later load picks up
+    # SEC names without a process restart (self-heal).
+    symbol_catalog.reset_for_tests()
+    monkeypatch.setattr(symbol_catalog, "_local_seed", lambda: {"RKLB": ""})
+    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {})  # SEC down
+    symbol_catalog.load_catalog(force=True)
+    assert symbol_catalog.search("RKLB")[0]["name"] == ""  # blank for now
+    # SEC recovers; mark the in-memory cache stale → next (force=False) load rebuilds
+    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {"RKLB": "Rocket Lab"})
+    symbol_catalog._cache_built_at = 0.0
+    symbol_catalog.load_catalog()  # not forced, but stale → re-overlay
+    assert symbol_catalog.search("RKLB")[0]["name"] == "Rocket Lab"
+
+
 def test_sec_overlay_enriches_names(monkeypatch):
     symbol_catalog.reset_for_tests()
     monkeypatch.setattr(symbol_catalog, "_local_seed", lambda: {"RKLB": ""})
