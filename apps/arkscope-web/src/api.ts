@@ -612,7 +612,14 @@ const CARD_GEN_TIMEOUT_MS = 240_000;
 
 export function generateCard(
   ticker: string,
-  body: { question?: string; horizon?: string; provider?: string; include_sa?: boolean } = {},
+  body: {
+    question?: string;
+    horizon?: string;
+    provider?: string;
+    include_sa?: boolean;
+    news_days?: number;
+    max_news?: number;
+  } = {},
 ): Promise<GenerateResult> {
   return sendJSON<GenerateResult>(
     `/analysis/card/${encodeURIComponent(ticker)}`,

@@ -61,6 +61,24 @@ def stub_generation(monkeypatch):
                         lambda packet, **kw: (_card(), {"provider": "anthropic", "model": "claude-opus-4-7"}))
 
 
+def test_generate_clamps_and_forwards_news_window(store, monkeypatch):
+    captured: dict = {}
+
+    def capture_gather(dal, ticker, **kw):
+        captured.update(kw)
+        return _packet()
+
+    monkeypatch.setattr(routes, "gather_evidence", capture_gather)
+    monkeypatch.setattr(routes, "synthesize_card",
+                        lambda packet, **kw: (_card(), {"provider": "anthropic", "model": "m"}))
+    # out-of-range values get clamped (days→90, news→1); defaults pass nothing
+    generate_card("AAPL", GenerateBody(include_sa=False, news_days=999, max_news=0), dal=object(), store=store)
+    assert captured["news_days"] == 90 and captured["max_news"] == 1
+    captured.clear()
+    generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)
+    assert "news_days" not in captured and "max_news" not in captured  # gather defaults apply
+
+
 def test_translate_caches_and_returns(store, stub_generation, monkeypatch):
     rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
     calls = {"n": 0}

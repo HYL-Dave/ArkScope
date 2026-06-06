@@ -31,6 +31,10 @@ export function AICardTab({ ticker }: { ticker: string }) {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Evidence news window (defaults match the backend: 21 days / 12 articles).
+  const [showAdv, setShowAdv] = useState(false);
+  const [newsDays, setNewsDays] = useState(21);
+  const [maxNews, setMaxNews] = useState(12);
 
   // Request token for IN-INSTANCE supersession: generate() and openCard() bump
   // it, so if the user opens a recent card (or starts another generate) while a
@@ -77,6 +81,8 @@ export function AICardTab({ ticker }: { ticker: string }) {
         question: question.trim() || undefined,
         provider: "anthropic",
         // include_sa intentionally omitted → backend uses config.sa_enabled.
+        news_days: newsDays,
+        max_news: maxNews,
       });
       if (id !== reqRef.current) return; // superseded (ticker switch / new action)
       setCard(r.card);
@@ -142,7 +148,23 @@ export function AICardTab({ ticker }: { ticker: string }) {
         <button className="btn-ghost" onClick={() => void generate()} disabled={busy}>
           {busy ? "產生中…" : "✨ 產生卡片"}
         </button>
+        <button className="btn-ghost" onClick={() => setShowAdv((v) => !v)} disabled={busy} title="新聞範圍">
+          {showAdv ? "▴ 進階" : "▾ 進階"}
+        </button>
       </div>
+      {showAdv && (
+        <div className="aicard-adv">
+          <label>新聞回看
+            <input type="number" min={1} max={90} value={newsDays} disabled={busy}
+              onChange={(e) => setNewsDays(clampInt(e.target.value, 1, 90, 21))} /> 天
+          </label>
+          <label>最多採用
+            <input type="number" min={1} max={50} value={maxNews} disabled={busy}
+              onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> 篇（最近期）
+          </label>
+          <span className="muted tiny">預設 21 天 / 12 篇；不會用上全部保留的新聞。</span>
+        </div>
+      )}
       {busy && <p className="muted tiny">蒐集客觀證據 + 合成卡片，單檔約 1–2 分鐘…</p>}
       {err && <p className="refresh-err tiny">{err}</p>}
 
@@ -498,6 +520,12 @@ function Para({ title, text }: { title: string; text: string }) {
 
 function yn(b: boolean): string {
   return b ? "✓" : "—";
+}
+
+function clampInt(raw: string, lo: number, hi: number, fallback: number): number {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(lo, Math.min(hi, n));
 }
 
 function unique(xs: string[]): string[] {

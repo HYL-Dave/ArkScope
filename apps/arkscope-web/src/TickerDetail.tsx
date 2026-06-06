@@ -70,17 +70,22 @@ export function TickerDetailView({
   );
 }
 
+const PRICE_WINDOWS = [5, 7, 30, 90, 365] as const;
+const PRICE_WINDOW_LABEL: Record<number, string> = { 5: "5D", 7: "7D", 30: "30D", 90: "90D", 365: "1Y" };
+
 function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null }) {
   const [pc, setPc] = useState<PriceChange | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [days, setDays] = useState<number>(30);
 
+  // Refetch when ticker OR the selected window changes; drop stale responses.
   useEffect(() => {
     let alive = true;
     setPc(null);
     setErr(null);
     (async () => {
       try {
-        const d = await getPriceChange(ticker, 30);
+        const d = await getPriceChange(ticker, days);
         if (alive) setPc(d);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : String(e));
@@ -89,7 +94,7 @@ function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null 
     return () => {
       alive = false;
     };
-  }, [ticker]);
+  }, [ticker, days]);
 
   return (
     <div className="detail-grid">
@@ -107,7 +112,20 @@ function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null 
           </>
         )}
 
-        <h4 className="detail-section">Price (30d)</h4>
+        <div className="detail-pricehead">
+          <h4 className="detail-section">Price ({PRICE_WINDOW_LABEL[days]})</h4>
+          <span className="price-windows">
+            {PRICE_WINDOWS.map((d) => (
+              <button
+                key={d}
+                className={`price-win ${days === d ? "active" : ""}`}
+                onClick={() => setDays(d)}
+              >
+                {PRICE_WINDOW_LABEL[d]}
+              </button>
+            ))}
+          </span>
+        </div>
         {err && <p className="muted tiny">price detail unavailable: {err}</p>}
         {!err && !pc && <p className="muted tiny">loading…</p>}
         {pc && (

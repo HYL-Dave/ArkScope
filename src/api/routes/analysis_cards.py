@@ -49,6 +49,10 @@ class GenerateBody(BaseModel):
     horizon: Optional[str] = None
     provider: Optional[str] = None
     include_sa: Optional[bool] = None  # override config.sa_enabled for this run
+    # Evidence news window: how recent + how many headlines feed the card.
+    # Defaults (None) → gather_evidence's 21 days / 12 most-recent articles.
+    news_days: Optional[int] = None
+    max_news: Optional[int] = None
 
 
 class ArchiveBody(BaseModel):
@@ -99,6 +103,13 @@ def generate_card(
     now = _utcnow()
     sa_enabled = body.include_sa if body.include_sa is not None else get_agent_config().sa_enabled
 
+    # Optional news-window overrides, clamped to sane bounds (else gather defaults).
+    gather_kwargs: dict = {}
+    if body.news_days is not None:
+        gather_kwargs["news_days"] = max(1, min(int(body.news_days), 90))
+    if body.max_news is not None:
+        gather_kwargs["max_news"] = max(1, min(int(body.max_news), 50))
+
     packet = gather_evidence(
         dal,
         ticker,
@@ -106,6 +117,7 @@ def generate_card(
         question=body.question,
         horizon=body.horizon,
         sa_enabled=sa_enabled,
+        **gather_kwargs,
     )
 
     try:
