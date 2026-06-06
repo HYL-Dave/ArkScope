@@ -30,6 +30,7 @@ from src.api.permissions import require_profile_state_write
 from src.profile_state import ProfileStateStore, _norm
 from src.tools.analysis_tools import get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
+from src.universe_config import tier_named_lists
 
 router = APIRouter(tags=["profile"])
 
@@ -114,52 +115,6 @@ class ImportBody(BaseModel):
     include_tiers: bool = True   # config/tickers_core.json tier categories (the ~130 universe)
 
 
-# Friendly names for the tickers_core tiers. legacy_reference is intentionally
-# omitted from the default import.
-_TIER_NAMES = {
-    "tier1_core": "Tier 1 · Core",
-    "tier2_expanded": "Tier 2 · Expanded",
-    "tier3_user_watchlist": "Tier 3 · Watchlist",
-}
-
-
-def _named_lists_from_tiers(dal: DataAccessLayer) -> list[dict]:
-    """Flatten each tickers_core tier into one named list (kind='tier').
-
-    Each tier is a dict of category → [tickers]; we union all category lists in
-    the tier. Metadata keys (``_description`` etc.) are skipped. Best-effort:
-    a missing/odd config simply yields no tier lists.
-    """
-    try:
-        core = dal._load_json("tickers_core.json")
-    except Exception:
-        return []
-    def _category_tickers(cat_val) -> list[str]:
-        # A category is usually {"_description": ..., "tickers": [...]}, but be
-        # tolerant of a bare [...] list too.
-        if isinstance(cat_val, dict):
-            seq = cat_val.get("tickers") or []
-        elif isinstance(cat_val, list):
-            seq = cat_val
-        else:
-            seq = []
-        return [str(t) for t in seq if isinstance(t, str)]
-
-    out: list[dict] = []
-    for tier_key, list_name in _TIER_NAMES.items():
-        tier = core.get(tier_key)
-        if not isinstance(tier, dict):
-            continue
-        tickers: list[str] = []
-        for cat_key, cat_val in tier.items():
-            if cat_key.startswith("_"):
-                continue
-            tickers.extend(_category_tickers(cat_val))
-        if tickers:
-            out.append({"name": list_name, "kind": "tier", "tickers": tickers})
-    return out
-
-
 @router.post("/profile/import-universe")
 def import_universe(
     body: ImportBody | None = None,
@@ -185,7 +140,7 @@ def import_universe(
                 by_group.setdefault(group, []).append(t)
         named.extend({"name": g, "tickers": ts} for g, ts in by_group.items())
     if opts.include_tiers:
-        named.extend(_named_lists_from_tiers(dal))
+        named.extend(tier_named_lists())
 
     require_profile_state_write(
         "import_universe",
@@ -195,6 +150,67 @@ def import_universe(
     return {
         "imported": summary,
         "lists": [asdict(li) for li in store.list_watchlists()],
+    }
+
+
+@router.get("/profile/universe")
+def universe(
+    include_archived: bool = True,
+    dal: DataAccessLayer = Depends(get_dal),
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """All imported tickers (the full tracked universe), not just the curated
+    overview. PURE READ.
+
+    Each row carries the user-state roll-up (lists / archived / note_count) plus
+    ``has_summary`` — True when the ticker is in the current overview (so market
+    summary fields are populated), False for universe-only tickers (summary
+    fields null; computing them for the whole universe is deferred / lazy). This
+    is the substrate behind a Universe browser and the not-yet-summarized rows
+    in list tabs.
+    """
+    overview = get_watchlist_overview(dal)
+    by_ticker = {r.get("ticker"): r for r in overview.get("tickers", []) if r.get("ticker")}
+    as_of = overview.get("date")
+
+    tickers = sorted(set(store.all_tickers()) | set(by_ticker))
+    agg = store.get_aggregate(tickers)
+
+    rows: list[dict] = []
+    archived_count = 0
+    for t in tickers:
+        a = agg.get(_norm(t))
+        archived = a.archived if a else False
+        if archived:
+            archived_count += 1
+        if archived and not include_archived:
+            continue
+        ov = by_ticker.get(t)
+        rows.append(
+            {
+                "ticker": t,
+                "has_summary": ov is not None,
+                "group": ov.get("group") if ov else None,
+                "priority": ov.get("priority") if ov else None,
+                "latest_close": ov.get("latest_close") if ov else None,
+                "change_7d_pct": ov.get("change_7d_pct") if ov else None,
+                "news_count_7d": ov.get("news_count_7d", 0) if ov else 0,
+                "sentiment_mean": ov.get("sentiment_mean") if ov else None,
+                "bullish_ratio": ov.get("bullish_ratio") if ov else None,
+                "lists": a.lists if a else [],
+                "archived": archived,
+                "note_count": a.note_count if a else 0,
+            }
+        )
+
+    return {
+        "as_of": as_of,
+        "generated_at": _utcnow(),
+        "total": len(tickers),
+        "shown": len(rows),
+        "archived_count": archived_count,
+        "summarized": sum(1 for r in rows if r["has_summary"]),
+        "rows": rows,
     }
 
 

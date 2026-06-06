@@ -313,6 +313,17 @@ class ProfileStateStore:
         t = _norm(ticker)
         return self.get_aggregate([t]).get(t, TickerAggregate(t, [], [], False, 0))
 
+    def all_tickers(self) -> list[str]:
+        """Distinct tickers across all list memberships (the imported universe).
+
+        Includes archived members; the caller filters via ``get_aggregate``.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT ticker FROM watchlist_memberships ORDER BY ticker"
+            ).fetchall()
+        return [r["ticker"] for r in rows]
+
     def list_notes(self, ticker: str) -> list[Note]:
         t = _norm(ticker)
         with self._connect() as conn:

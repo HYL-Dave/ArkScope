@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from src.api.routes.profile import (
     ArchiveBody,
+    ImportBody,
     NoteBody,
     add_ticker_note,
     cockpit_watchlist,
@@ -16,6 +17,7 @@ from src.api.routes.profile import (
     list_ticker_notes,
     profile_lists,
     set_ticker_archived,
+    universe,
 )
 from src.profile_state import ProfileStateStore
 
@@ -162,7 +164,7 @@ def test_cockpit_read_does_not_write(api_store):
 
 def test_import_universe_then_archive_filter(api_store):
     # Explicit import seeds the lists (dal=None → tiers no-op; groups only).
-    imported = import_universe(dal=None, store=api_store)
+    imported = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
     assert {li["name"] for li in imported["lists"]} == {"Holdings", "Interested"}
 
     lists = profile_lists(store=api_store)["lists"]
@@ -189,14 +191,14 @@ def test_import_universe_then_archive_filter(api_store):
 
 
 def test_archive_unknown_ticker_is_404(api_store):
-    import_universe(dal=None, store=api_store)  # explicit seed
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)  # explicit seed
     with pytest.raises(HTTPException) as exc:
         set_ticker_archived("NOPE", ArchiveBody(archived=True), store=api_store)
     assert exc.value.status_code == 404
 
 
 def test_notes_endpoints(api_store):
-    import_universe(dal=None, store=api_store)  # explicit seed
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)  # explicit seed
     add_ticker_note("MSFT", NoteBody(body="earnings 7/22"), store=api_store)
     listed = list_ticker_notes("MSFT", store=api_store)
     assert listed["ticker"] == "MSFT" and len(listed["notes"]) == 1
@@ -214,3 +216,39 @@ def test_notes_endpoints(api_store):
 def test_add_note_blank_is_422():
     with pytest.raises(ValidationError):
         NoteBody(body="")
+
+
+def test_all_tickers_distinct_sorted(store):
+    store.import_lists(
+        [
+            {"name": "L1", "tickers": ["AAPL", "MSFT"]},
+            {"name": "L2", "tickers": ["MSFT", "NVDA"]},  # MSFT duplicate across lists
+        ]
+    )
+    assert store.all_tickers() == ["AAPL", "MSFT", "NVDA"]
+
+
+def test_universe_surfaces_all_imported_with_has_summary(api_store):
+    # groups (3 overview tickers) + a universe-only list (NVDA not in overview)
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    api_store.import_lists([{"name": "Tier X", "kind": "tier", "tickers": ["NVDA", "AAPL"]}])
+
+    u = universe(dal=None, store=api_store)
+    rows = {r["ticker"]: r for r in u["rows"]}
+    assert {"AAPL", "MSFT", "TSLA", "NVDA"} <= set(rows)
+    # overview ticker → summary populated
+    assert rows["AAPL"]["has_summary"] is True and rows["AAPL"]["latest_close"] == 200.0
+    # universe-only ticker → no summary, but its list membership shows
+    assert rows["NVDA"]["has_summary"] is False and rows["NVDA"]["latest_close"] is None
+    assert "Tier X" in rows["NVDA"]["lists"]
+    assert u["summarized"] == 3  # only the 3 overview tickers are summarized
+
+
+def test_tier_named_lists_structure():
+    from src.universe_config import TIER_NAMES, tier_named_lists
+
+    lists = tier_named_lists()
+    for li in lists:  # tolerant: empty if config absent, else well-formed
+        assert li["kind"] == "tier"
+        assert li["name"] in TIER_NAMES.values()
+        assert li["tickers"] and all(isinstance(t, str) for t in li["tickers"])
