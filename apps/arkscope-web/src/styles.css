@@ -1317,3 +1317,46 @@ table.wl tbody tr.archived td {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Universe (full inventory) ---- */
+.universe-hint {
+  margin: 2px 0 8px;
+  max-width: 880px;
+}
+.universe-importmsg {
+  color: var(--accent);
+  margin: 0 0 8px;
+}
+.universe-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.universe-filters .aicard-q {
+  max-width: 240px;
+}
+.universe-select {
+  background: var(--panel2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 12.5px;
+}
+.universe-table tbody tr.no-summary td {
+  color: var(--muted);
+}
+.universe-table tbody tr.no-summary td.mono.strong {
+  color: var(--fg); /* keep the ticker legible even without summary */
+}
+.tag-nosum {
+  margin-left: 7px;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 6px;
+}

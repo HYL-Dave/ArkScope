@@ -4,6 +4,7 @@ import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
 import { TickerDetailView } from "./TickerDetail";
+import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
 
 // Nav aligned to the desktop-app design doc (PDF p6) — MVP subset. Keys are
@@ -13,6 +14,7 @@ import { WatchlistView } from "./Watchlist";
 const NAV = [
   "Home",
   "Watchlist",
+  "Universe",
   "Research",
   "Holdings",
   "Alerts",
@@ -23,11 +25,12 @@ const NAV = [
 ] as const;
 type Nav = (typeof NAV)[number];
 
-const ENABLED: Nav[] = ["Home", "Watchlist", "System", "Settings"];
+const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "System", "Settings"];
 
 const LABELS: Record<Nav, string> = {
   Home: "工作台",
   Watchlist: "自選股",
+  Universe: "全部標的",
   Research: "AI 研究",
   Holdings: "持倉",
   Alerts: "告警",
@@ -146,6 +149,8 @@ export function App() {
           <HomeView status={status} onNavigate={goView} onOpenTicker={openTicker} />
         ) : view === "Watchlist" ? (
           <WatchlistView onOpenTicker={openTicker} />
+        ) : view === "Universe" ? (
+          <UniverseView onOpenTicker={openTicker} />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
         ) : view === "Settings" ? (

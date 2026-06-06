@@ -198,6 +198,38 @@ export interface TickerAggregate {
   note_count: number;
 }
 
+// --- universe (full tracked inventory) ---
+
+export interface UniverseRow {
+  ticker: string;
+  has_summary: boolean;
+  group: string | null;
+  priority: string | null;
+  latest_close: number | null;
+  change_7d_pct: number | null;
+  news_count_7d: number;
+  sentiment_mean: number | null;
+  bullish_ratio: number | null;
+  lists: string[];
+  archived: boolean;
+  note_count: number;
+}
+
+export interface UniverseResponse {
+  as_of: string | null;
+  generated_at: string;
+  total: number;
+  shown: number;
+  archived_count: number;
+  summarized: number;
+  rows: UniverseRow[];
+}
+
+export interface ImportResult {
+  imported: { lists_created: number; memberships_added: number };
+  lists: { id: number; name: string; kind: string; total_count: number; active_count: number }[];
+}
+
 export interface Note {
   id: number;
   ticker: string;
@@ -477,6 +509,18 @@ export function getPriceChange(ticker: string, days = 7): Promise<PriceChange> {
 
 export function getCockpitWatchlist(includeArchived = false): Promise<CockpitWatchlist> {
   return getJSON<CockpitWatchlist>(`/cockpit/watchlist?include_archived=${includeArchived}`);
+}
+
+export function getUniverse(includeArchived = true): Promise<UniverseResponse> {
+  return getJSON<UniverseResponse>(`/profile/universe?include_archived=${includeArchived}`);
+}
+
+// Seeds lists from user_profile groups + tickers_core tiers. The groups source
+// runs the overview (per-ticker price), so allow a generous timeout.
+export function importUniverse(
+  body: { include_groups?: boolean; include_tiers?: boolean } = {},
+): Promise<ImportResult> {
+  return sendJSON<ImportResult>("/profile/import-universe", "POST", body, 60_000);
 }
 
 export function setArchived(ticker: string, archived: boolean): Promise<TickerAggregate> {
