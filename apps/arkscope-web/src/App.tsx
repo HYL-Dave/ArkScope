@@ -87,16 +87,19 @@ export function App() {
         </span>
         <span className="spacer" />
         {runtime && (
-          <span
+          <button
+            type="button"
             className="topbar-model"
+            onClick={() => setView("Settings")}
             title={
               `卡片合成 ${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}\n` +
               `卡片翻譯 ${runtime.card_translation.provider}/${runtime.card_translation.model}\n` +
-              `Anthropic key ${runtime.anthropic.key_set ? "✓" : "✗"} · OpenAI key ${runtime.openai.key_set ? "✓" : "✗"}`
+              `Anthropic key ${runtime.anthropic.key_set ? "✓" : "✗"} · OpenAI key ${runtime.openai.key_set ? "✓" : "✗"}\n` +
+              "點擊進入模型設定"
             }
           >
             ✦ {runtime.card_synthesis.provider}/{runtime.card_synthesis.model}
-          </span>
+          </button>
         )}
         <span className="topbar-meta">{apiBase}</span>
         {lastOk && <span className="topbar-meta">updated {lastOk}</span>}
