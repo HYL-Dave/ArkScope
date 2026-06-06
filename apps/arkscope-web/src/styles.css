@@ -762,3 +762,58 @@ table.wl tbody tr.archived td {
   border-radius: 10px;
   padding: 1px 8px;
 }
+.trace-claims-wrap {
+  margin-top: 8px;
+}
+.trace-claims-h {
+  margin-bottom: 4px;
+}
+.trace-claims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.trace-claims li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11.5px;
+}
+.claim-txt {
+  flex: 1;
+}
+.claim-cite {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- read-a-card-in-place modal (Home) ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+.modal-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(720px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 16px 18px;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}

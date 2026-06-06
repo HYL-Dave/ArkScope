@@ -6,9 +6,10 @@ pipeline — deterministic objective EvidencePacket → forced-structured synthe
 validated ResultCard — and auto-caches the run locally (CardRunStore). Generated
 runs are short-term/traceable; "Save as report" promotes one to a durable report.
 
-Local writes funnel through the ``profile_state_write`` choke-point. A single
-card's LLM inference is NOT metered_spend-gated (that gate is reserved for batch /
-fan-out spend), matching the locked permission taxonomy.
+Card-run writes funnel through the ``db_write`` choke-point — a generated card is
+an *additive analysis record*, not a research-universe/profile-state mutation. A
+single card's LLM inference is NOT metered_spend-gated (that gate is reserved for
+batch / fan-out spend), matching the locked permission taxonomy.
 """
 
 from __future__ import annotations

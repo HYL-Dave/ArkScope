@@ -14,6 +14,7 @@ import {
   type CockpitWatchlist,
 } from "./api";
 import type { StatusState } from "./Dashboard";
+import { CardModal } from "./AICard";
 
 type NavTarget = "Home" | "Watchlist" | "System";
 
@@ -27,6 +28,7 @@ export function HomeView({
   const [wl, setWl] = useState<CockpitWatchlist | null>(null);
   const [cards, setCards] = useState<CardSummary[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openCardId, setOpenCardId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -89,7 +91,7 @@ export function HomeView({
                 </thead>
                 <tbody>
                   {movers.map((r) => (
-                    <tr key={r.ticker} className="clickrow" onClick={() => onNavigate("Watchlist")}>
+                    <tr key={r.ticker}>
                       <td className="strong">{r.ticker}</td>
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
@@ -114,7 +116,7 @@ export function HomeView({
             ) : (
               <ul className="card-list">
                 {cards.map((c) => (
-                  <li key={c.run_id} className="card-row" onClick={() => onNavigate("Watchlist")}>
+                  <li key={c.run_id} className="card-row" onClick={() => setOpenCardId(c.run_id)}>
                     <span className="card-ticker">{c.ticker}</span>
                     <span className={`conf conf-${c.confidence_level ?? "na"}`}>
                       {(c.confidence_level ?? "—").toUpperCase()}
@@ -135,6 +137,14 @@ export function HomeView({
           事件 / 告警 / AI 摘要 — 規劃中。AI 不是獨立分頁，而是進到每個項目的詳情（vision §1/§3）。
         </p>
       </aside>
+
+      {openCardId != null && (
+        <CardModal
+          runId={openCardId}
+          onClose={() => setOpenCardId(null)}
+          onChanged={() => void load()}
+        />
+      )}
     </>
   );
 }
