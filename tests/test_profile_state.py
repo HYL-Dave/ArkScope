@@ -252,3 +252,21 @@ def test_tier_named_lists_structure():
         assert li["kind"] == "tier"
         assert li["name"] in TIER_NAMES.values()
         assert li["tickers"] and all(isinstance(t, str) for t in li["tickers"])
+
+
+def test_universe_batch_summary_fills_universe_only(api_store, monkeypatch):
+    # A universe-only ticker (not in overview) gets market data from the batch
+    # summary — so it is NOT stuck at has_summary=False.
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    api_store.import_lists([{"name": "Tier X", "kind": "tier", "tickers": ["NVDA"]}])
+    monkeypatch.setattr(
+        "src.api.routes.profile.get_universe_summaries",
+        lambda dal, days=7: {
+            "NVDA": {"latest_close": 905.1, "change_pct": 3.2, "total_volume": 1, "bars": 130, "news_count_7d": 9},
+        },
+    )
+    u = universe(dal=None, store=api_store)
+    nvda = next(r for r in u["rows"] if r["ticker"] == "NVDA")
+    assert nvda["has_summary"] is True
+    assert nvda["latest_close"] == 905.1 and nvda["change_7d_pct"] == 3.2 and nvda["news_count_7d"] == 9
+    assert "Tier X" in nvda["lists"]

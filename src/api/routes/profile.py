@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
 from src.profile_state import ProfileStateStore, _norm
-from src.tools.analysis_tools import get_watchlist_overview
+from src.tools.analysis_tools import get_universe_summaries, get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
 from src.universe_config import tier_named_lists
 
@@ -162,16 +162,16 @@ def universe(
     """All imported tickers (the full tracked universe), not just the curated
     overview. PURE READ.
 
-    Each row carries the user-state roll-up (lists / archived / note_count) plus
-    ``has_summary`` — True when the ticker is in the current overview (so market
-    summary fields are populated), False for universe-only tickers (summary
-    fields null; computing them for the whole universe is deferred / lazy). This
-    is the substrate behind a Universe browser and the not-yet-summarized rows
-    in list tabs.
+    Market summary comes from a cheap batch query over the whole universe
+    (``get_universe_summaries`` — two queries, not one per ticker), enriched with
+    the overview's group / priority / sentiment where the ticker is curated.
+    ``has_summary`` is True when price data exists for the ticker in the window;
+    universe tickers with no price bars render with null fields.
     """
     overview = get_watchlist_overview(dal)
     by_ticker = {r.get("ticker"): r for r in overview.get("tickers", []) if r.get("ticker")}
     as_of = overview.get("date")
+    summaries = get_universe_summaries(dal)  # {TICKER: {latest_close, change_pct, ...}}
 
     tickers = sorted(set(store.all_tickers()) | set(by_ticker))
     agg = store.get_aggregate(tickers)
@@ -186,15 +186,29 @@ def universe(
         if archived and not include_archived:
             continue
         ov = by_ticker.get(t)
+        s = summaries.get(_norm(t))
+        # has_summary: real market data available (batch price OR curated overview)
+        has_summary = bool(s) or ov is not None
+        # price prefers the batch summary; falls back to the overview's value
+        latest_close = (s.get("latest_close") if s else None)
+        change_7d = (s.get("change_pct") if s else None)
+        news_7d = (s.get("news_count_7d") if s else None)
+        if latest_close is None and ov:
+            latest_close = ov.get("latest_close")
+        if change_7d is None and ov:
+            change_7d = ov.get("change_7d_pct")
+        if news_7d is None:
+            news_7d = ov.get("news_count_7d", 0) if ov else 0
         rows.append(
             {
                 "ticker": t,
-                "has_summary": ov is not None,
+                "has_summary": has_summary,
                 "group": ov.get("group") if ov else None,
                 "priority": ov.get("priority") if ov else None,
-                "latest_close": ov.get("latest_close") if ov else None,
-                "change_7d_pct": ov.get("change_7d_pct") if ov else None,
-                "news_count_7d": ov.get("news_count_7d", 0) if ov else 0,
+                "latest_close": latest_close,
+                "change_7d_pct": change_7d,
+                "news_count_7d": news_7d,
+                # sentiment/bullish remain overview-only (curated) for now
                 "sentiment_mean": ov.get("sentiment_mean") if ov else None,
                 "bullish_ratio": ov.get("bullish_ratio") if ov else None,
                 "lists": a.lists if a else [],

@@ -373,6 +373,85 @@ def get_watchlist_overview(
     }
 
 
+def get_universe_summaries(dal: DataAccessLayer, days: int = 7) -> Dict[str, dict]:
+    """Batch market summary for the whole tracked universe in TWO queries.
+
+    Returns ``{TICKER: {latest_close, change_pct, total_volume, news_count_7d}}``
+    for every ticker with price data in the window — computed with one aggregate
+    SQL query over ``prices`` (not one round-trip per ticker) plus one news-count
+    query. This is the cheap read behind the Universe surface, so it can show
+    market data for all ~150 tickers, not just the curated overview.
+
+    DB backend only; returns ``{}`` for a file backend (callers treat a missing
+    ticker as "no summary").
+    """
+    backend = getattr(dal, "_backend", None)
+    if backend is None or not hasattr(backend, "_get_conn"):
+        return {}
+
+    price_sql = """
+        WITH w AS (
+            SELECT ticker, datetime, open, close, volume
+            FROM prices
+            WHERE interval = '15min'
+              AND datetime >= NOW() - (%(pdays)s || ' days')::INTERVAL
+        )
+        SELECT ticker,
+               (ARRAY_AGG(close ORDER BY datetime DESC))[1] AS latest_close,
+               (ARRAY_AGG(open  ORDER BY datetime ASC))[1]  AS period_open,
+               SUM(volume) AS total_volume,
+               COUNT(*)    AS bars
+        FROM w GROUP BY ticker
+    """
+    news_sql = """
+        SELECT ticker, COUNT(*) AS n
+        FROM news
+        WHERE published_at >= NOW() - (%(ndays)s || ' days')::INTERVAL
+        GROUP BY ticker
+    """
+
+    out: Dict[str, dict] = {}
+    try:
+        from psycopg2 import extras as _pg_extras
+
+        conn = backend._get_conn()
+        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
+            cur.execute(price_sql, {"pdays": int(days)})
+            for r in cur.fetchall():
+                t = str(r["ticker"]).upper()
+                latest = r["latest_close"]
+                opened = r["period_open"]
+                change = (
+                    round((latest - opened) / opened * 100, 2)
+                    if latest is not None and opened
+                    else None
+                )
+                out[t] = {
+                    "latest_close": round(latest, 2) if latest is not None else None,
+                    "change_pct": change,
+                    "total_volume": int(r["total_volume"]) if r["total_volume"] is not None else None,
+                    "bars": int(r["bars"]) if r["bars"] is not None else 0,
+                    "news_count_7d": 0,
+                }
+            cur.execute(news_sql, {"ndays": int(days)})
+            for r in cur.fetchall():
+                t = str(r["ticker"]).upper()
+                if t in out:
+                    out[t]["news_count_7d"] = int(r["n"])
+                else:
+                    out[t] = {
+                        "latest_close": None,
+                        "change_pct": None,
+                        "total_volume": None,
+                        "bars": 0,
+                        "news_count_7d": int(r["n"]),
+                    }
+    except Exception as e:  # pragma: no cover - defensive (DB hiccup degrades gracefully)
+        logger.warning("get_universe_summaries failed: %s", e)
+        return {}
+    return out
+
+
 def _as_int(value, default: int = 0) -> int:
     """Best-effort int conversion for pandas/DB scalar values."""
     try:

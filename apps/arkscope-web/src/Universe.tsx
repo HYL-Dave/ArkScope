@@ -83,7 +83,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
       <p className="muted tiny universe-hint">
         從 user_profile groups 和 tickers_core tiers 匯入清單；可重複執行，不會恢復已 archive 的項目。
-        「全部標的」管理系統知道哪些 ticker；日常研究清單在「自選股」。
+        「全部標的」是研究宇宙與清單成員管理；「自選股」是日常研究 cockpit。兩者共用同一套 profile-state 清單。
       </p>
       {importMsg && <p className="tiny universe-importmsg">{importMsg}</p>}
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
