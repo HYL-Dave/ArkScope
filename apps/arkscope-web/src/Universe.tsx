@@ -70,7 +70,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
         <h2 className="surface-title">全部標的 · Universe</h2>
         {meta && (
           <span className="muted">
-            {meta.total} 檔 · {meta.summarized} 有摘要 · {meta.total - meta.summarized} 僅在宇宙
+            {meta.total} 檔 · {meta.summarized} 有摘要 · {meta.total - meta.summarized} 無摘要
             {meta.archived > 0 && ` · ${meta.archived} 已封存`}
           </span>
         )}
@@ -83,7 +83,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
       <p className="muted tiny universe-hint">
         從 user_profile groups 和 tickers_core tiers 匯入清單；可重複執行，不會恢復已 archive 的項目。
-        「全部標的」是研究宇宙與清單成員管理；「自選股」是日常研究 cockpit。兩者共用同一套 profile-state 清單。
+        「全部標的」管理系統追蹤的所有標的與清單成員；「自選股」是日常研究 cockpit。兩者共用同一套 profile-state 清單。
       </p>
       {importMsg && <p className="tiny universe-importmsg">{importMsg}</p>}
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -152,7 +152,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           </table>
           {filtered.length === 0 && (
             <p className="muted tiny">
-              {rows.length === 0 ? "宇宙是空的。按「匯入清單」從現有分類種入標的。" : "沒有符合的標的。"}
+              {rows.length === 0 ? "尚無標的。按「匯入清單」從現有分類種入。" : "沒有符合的標的。"}
             </p>
           )}
         </>

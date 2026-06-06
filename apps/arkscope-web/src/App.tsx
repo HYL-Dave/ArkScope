@@ -47,6 +47,8 @@ export function App() {
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   // Full-page ticker detail overlay (null = show the selected nav view).
   const [detail, setDetail] = useState<{ ticker: string; row?: CockpitRow } | null>(null);
+  // Right rail is collapsed by default — it only reserves width when opened.
+  const [railOpen, setRailOpen] = useState(false);
 
   const openTicker = useCallback((ticker: string, row?: CockpitRow) => {
     setDetail({ ticker, row });
@@ -120,7 +122,7 @@ export function App() {
         {lastOk && <span className="topbar-meta">updated {lastOk}</span>}
       </header>
 
-      <div className="body">
+      <div className={`body ${railOpen ? "rail-open" : "rail-closed"}`}>
         <nav className="leftnav">
           {NAV.map((key) => {
             const enabled = ENABLED.includes(key);
@@ -159,6 +161,28 @@ export function App() {
           <main className="main">
             <p className="muted">{LABELS[view]} — 規劃中。</p>
           </main>
+        )}
+
+        {railOpen ? (
+          <aside className="rightrail">
+            <div className="rightrail-head">
+              <h3>面板</h3>
+              <span className="spacer" />
+              <button className="btn-ghost" onClick={() => setRailOpen(false)} title="收合">✕</button>
+            </div>
+            <p className="muted tiny">
+              嵌入式 AI 助手與「今日重點」（事件 / 告警 / 摘要）將放這裡。AI 嵌入各頁，
+              AI 研究頁集中管理對話 threads（vision §1/§3）。規劃中。
+            </p>
+          </aside>
+        ) : (
+          <button
+            className="rail-tab"
+            onClick={() => setRailOpen(true)}
+            title="展開側面板"
+          >
+            面板 ‹
+          </button>
         )}
       </div>
     </div>

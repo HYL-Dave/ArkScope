@@ -133,13 +133,6 @@ export function HomeView({
         </div>
       </main>
 
-      <aside className="rightpanel">
-        <h3>今日重點</h3>
-        <p className="muted">
-          事件 / 告警 / AI 摘要 — 規劃中。AI 會嵌入各頁，AI 研究頁集中管理對話 threads。
-        </p>
-      </aside>
-
       {openCardId != null && (
         <CardModal
           runId={openCardId}

@@ -15,28 +15,18 @@ export function DashboardView({
   onRetry: () => void;
 }) {
   return (
-    <>
-      <main className="main">
-        {status.kind === "loading" && <p className="muted">Connecting to the local sidecar…</p>}
-        {status.kind === "error" && (
-          <div className="errorbox">
-            <p>Could not reach the sidecar.</p>
-            <p className="muted">{status.message}</p>
-            <button onClick={onRetry}>Retry</button>
-          </div>
-        )}
-        {runtime && <RuntimePanel rt={runtime} />}
-        {status.kind === "ready" && <StatusTiles status={status.status} />}
-      </main>
-
-      <aside className="rightpanel">
-        <h3>Agent</h3>
-        <p className="muted">
-          Embedded agent panel — placeholder. AI lives in every page, not a separate chat tab
-          (vision §1/§3). Wiring is deferred.
-        </p>
-      </aside>
-    </>
+    <main className="main">
+      {status.kind === "loading" && <p className="muted">Connecting to the local sidecar…</p>}
+      {status.kind === "error" && (
+        <div className="errorbox">
+          <p>Could not reach the sidecar.</p>
+          <p className="muted">{status.message}</p>
+          <button onClick={onRetry}>Retry</button>
+        </div>
+      )}
+      {runtime && <RuntimePanel rt={runtime} />}
+      {status.kind === "ready" && <StatusTiles status={status.status} />}
+    </main>
   );
 }
 
