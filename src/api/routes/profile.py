@@ -243,6 +243,89 @@ def profile_lists(
     return {"lists": [asdict(li) for li in store.list_watchlists(include_archived=include_archived)]}
 
 
+class ListCreateBody(BaseModel):
+    name: str = Field(min_length=1)
+    kind: str | None = None
+
+
+class ListRenameBody(BaseModel):
+    name: str = Field(min_length=1)
+
+
+class MemberBody(BaseModel):
+    ticker: str = Field(min_length=1)
+
+
+@router.post("/profile/lists")
+def create_list(
+    body: ListCreateBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Create a user list. 400 if the name already exists."""
+    require_profile_state_write("create_list", {"name": body.name})
+    try:
+        return asdict(store.create_list(body.name, body.kind))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/profile/lists/{list_id}")
+def rename_list(
+    list_id: int,
+    body: ListRenameBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    require_profile_state_write("rename_list", {"list_id": list_id, "name": body.name})
+    try:
+        return asdict(store.rename_list(list_id, body.name))
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=e.args[0] if e.args else str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/profile/lists/{list_id}")
+def delete_list(
+    list_id: int,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Delete a list (and its memberships); tickers survive in other lists."""
+    require_profile_state_write("delete_list", {"list_id": list_id})
+    if not store.delete_list(list_id):
+        raise HTTPException(status_code=404, detail=f"list {list_id} not found")
+    return {"deleted": True, "id": list_id}
+
+
+@router.post("/profile/lists/{list_id}/members")
+def add_member(
+    list_id: int,
+    body: MemberBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Add a ticker to a specific list (reactivates an archived membership)."""
+    require_profile_state_write("add_member", {"list_id": list_id, "ticker": body.ticker})
+    try:
+        store.add_member(list_id, body.ticker)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=e.args[0] if e.args else str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return asdict(store.get_ticker(body.ticker))
+
+
+@router.delete("/profile/lists/{list_id}/members/{ticker}")
+def remove_member(
+    list_id: int,
+    ticker: str,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Remove a ticker from THIS list only (distinct from global archive)."""
+    require_profile_state_write("remove_member", {"list_id": list_id, "ticker": ticker})
+    if not store.remove_member(list_id, ticker):
+        raise HTTPException(status_code=404, detail="membership not found")
+    return {"removed": True, "list_id": list_id, "ticker": _norm(ticker)}
+
+
 @router.get("/profile/tickers/{ticker}/state")
 def get_ticker_state(
     ticker: str,

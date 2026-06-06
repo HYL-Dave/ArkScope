@@ -9,13 +9,21 @@ from pydantic import ValidationError
 from src.api.routes.profile import (
     ArchiveBody,
     ImportBody,
+    ListCreateBody,
+    ListRenameBody,
+    MemberBody,
     NoteBody,
+    add_member,
     add_ticker_note,
     cockpit_watchlist,
+    create_list,
+    delete_list,
     delete_ticker_note,
     import_universe,
     list_ticker_notes,
     profile_lists,
+    remove_member,
+    rename_list,
     set_ticker_archived,
     universe,
 )
@@ -114,6 +122,53 @@ def test_aggregate_read_model_active_vs_archived_lists(store):
     assert a.lists == []  # no ACTIVE membership while archived
     assert set(a.archived_lists) == {"Holdings", "Tier 1 · Core"}  # provenance kept
     assert set(a.all_lists) == {"Holdings", "Tier 1 · Core"}
+
+
+def test_list_crud_and_membership(store):
+    li = store.create_list("My Picks")
+    assert li.name == "My Picks" and li.kind == "custom" and li.total_count == 0
+    # duplicate name rejected
+    with pytest.raises(ValueError):
+        store.create_list("My Picks")
+    # rename
+    li2 = store.rename_list(li.id, "Core Picks")
+    assert li2.name == "Core Picks"
+    # add members (per-list); add is idempotent
+    store.add_member(li.id, "nvda")
+    store.add_member(li.id, "AMD")
+    store.add_member(li.id, "NVDA")  # idempotent
+    agg = store.get_ticker("NVDA")
+    assert "Core Picks" in agg.lists
+    summary = next(x for x in store.list_watchlists() if x.id == li.id)
+    assert summary.active_count == 2
+    # add to unknown list → KeyError
+    with pytest.raises(KeyError):
+        store.add_member(999999, "AAPL")
+    # remove from THIS list (hard delete membership, ticker survives elsewhere)
+    store.create_list("Other")
+    other = next(x for x in store.list_watchlists() if x.name == "Other")
+    store.add_member(other.id, "NVDA")
+    assert store.remove_member(li.id, "NVDA") is True
+    agg = store.get_ticker("NVDA")
+    assert agg.lists == ["Other"]  # gone from Core Picks, still in Other
+    assert store.remove_member(li.id, "NVDA") is False  # already gone
+    # delete list → its memberships vanish, ticker survives in others
+    store.add_member(li.id, "TSLA")
+    assert store.delete_list(li.id) is True
+    assert store.get_ticker("TSLA").lists == []  # TSLA only lived in the deleted list
+    assert store.get_ticker("AMD").lists == []   # AMD too
+    assert all(x.name != "Core Picks" for x in store.list_watchlists())
+
+
+def test_add_member_reactivates_archived(store):
+    store.create_list("L")
+    lid = next(x for x in store.list_watchlists() if x.name == "L").id
+    store.add_member(lid, "NVDA")
+    store.archive_ticker("NVDA")  # global archive
+    assert store.get_ticker("NVDA").archived is True
+    store.add_member(lid, "NVDA")  # re-add reactivates this membership
+    assert store.get_ticker("NVDA").archived is False
+    assert "L" in store.get_ticker("NVDA").lists
 
 
 def test_default_aggregate_for_unknown_ticker(store):
@@ -238,6 +293,41 @@ def test_notes_endpoints(api_store):
 def test_add_note_blank_is_422():
     with pytest.raises(ValidationError):
         NoteBody(body="")
+
+
+def test_list_crud_routes(api_store):
+    created = create_list(ListCreateBody(name="My Picks"), store=api_store)
+    lid = created["id"]
+    assert created["name"] == "My Picks"
+    # duplicate → 400
+    with pytest.raises(HTTPException) as exc:
+        create_list(ListCreateBody(name="My Picks"), store=api_store)
+    assert exc.value.status_code == 400
+
+    assert rename_list(lid, ListRenameBody(name="Picks"), store=api_store)["name"] == "Picks"
+    with pytest.raises(HTTPException) as exc:
+        rename_list(999999, ListRenameBody(name="x"), store=api_store)
+    assert exc.value.status_code == 404
+
+    # add member → appears in the ticker's lists (verified via the store directly);
+    # then remove from THIS list.
+    add_member(lid, MemberBody(ticker="nvda"), store=api_store)
+    assert "Picks" in api_store.get_ticker("NVDA").lists
+    assert remove_member(lid, "NVDA", store=api_store)["removed"] is True
+    assert api_store.get_ticker("NVDA").lists == []
+    with pytest.raises(HTTPException) as exc:
+        remove_member(lid, "NVDA", store=api_store)  # already gone → 404
+    assert exc.value.status_code == 404
+
+    assert delete_list(lid, store=api_store)["deleted"] is True
+    with pytest.raises(HTTPException) as exc:
+        delete_list(lid, store=api_store)  # already gone → 404
+    assert exc.value.status_code == 404
+
+
+def test_create_list_blank_is_422():
+    with pytest.raises(ValidationError):
+        ListCreateBody(name="")
 
 
 def test_all_tickers_distinct_sorted(store):

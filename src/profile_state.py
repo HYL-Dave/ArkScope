@@ -26,6 +26,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS watchlists (
@@ -364,6 +365,129 @@ class ProfileStateStore:
             )
             for r in rows
         ]
+
+    # --- list CRUD + membership (user-created lists) --------------------
+
+    def _list_summary(self, conn, list_id: int) -> Optional[WatchlistSummary]:
+        r = conn.execute(
+            """
+            SELECT w.id, w.name, w.kind, w.position, w.archived_at,
+                   SUM(CASE WHEN m.ticker IS NOT NULL AND m.archived_at IS NULL
+                            THEN 1 ELSE 0 END) AS active_count,
+                   SUM(CASE WHEN m.ticker IS NOT NULL THEN 1 ELSE 0 END) AS total_count
+            FROM watchlists w
+            LEFT JOIN watchlist_memberships m ON m.list_id = w.id
+            WHERE w.id = ?
+            GROUP BY w.id, w.name, w.kind, w.position, w.archived_at
+            """,
+            (list_id,),
+        ).fetchone()
+        if not r:
+            return None
+        return WatchlistSummary(
+            id=r["id"], name=r["name"], kind=r["kind"], position=r["position"],
+            archived=r["archived_at"] is not None,
+            active_count=int(r["active_count"] or 0), total_count=int(r["total_count"] or 0),
+        )
+
+    def create_list(self, name: str, kind: Optional[str] = None) -> WatchlistSummary:
+        n = (name or "").strip()
+        if not n:
+            raise ValueError("list name is required")
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            pos = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM watchlists"
+            ).fetchone()["p"]
+            try:
+                cur = conn.execute(
+                    "INSERT INTO watchlists (name, kind, position, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (n, kind or _infer_kind(n), pos, now, now),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ValueError(f"a list named '{n}' already exists") from exc
+            conn.commit()
+            summary = self._list_summary(conn, cur.lastrowid)
+        assert summary is not None
+        return summary
+
+    def rename_list(self, list_id: int, name: str) -> WatchlistSummary:
+        n = (name or "").strip()
+        if not n:
+            raise ValueError("list name is required")
+        with self._write_lock, self._connect() as conn:
+            if not conn.execute("SELECT 1 FROM watchlists WHERE id = ?", (list_id,)).fetchone():
+                raise KeyError(f"list {list_id} not found")
+            try:
+                conn.execute(
+                    "UPDATE watchlists SET name = ?, updated_at = ? WHERE id = ?",
+                    (n, _now(), list_id),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ValueError(f"a list named '{n}' already exists") from exc
+            conn.commit()
+            summary = self._list_summary(conn, list_id)
+        assert summary is not None
+        return summary
+
+    def delete_list(self, list_id: int) -> bool:
+        """Hard-delete a list and its memberships (FK ON DELETE CASCADE).
+
+        This removes the list as a container; the tickers themselves survive in
+        any OTHER lists they belong to. (Distinct from archiving a ticker.)
+        """
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM watchlists WHERE id = ?", (list_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    def add_member(self, list_id: int, ticker: str) -> None:
+        """Add a ticker to a specific list (reactivates an archived membership)."""
+        t = _norm(ticker)
+        if not t:
+            raise ValueError("ticker is required")
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            if not conn.execute("SELECT 1 FROM watchlists WHERE id = ?", (list_id,)).fetchone():
+                raise KeyError(f"list {list_id} not found")
+            existing = conn.execute(
+                "SELECT archived_at FROM watchlist_memberships WHERE list_id = ? AND ticker = ?",
+                (list_id, t),
+            ).fetchone()
+            if existing is None:
+                pos = conn.execute(
+                    "SELECT COALESCE(MAX(position), -1) + 1 AS p "
+                    "FROM watchlist_memberships WHERE list_id = ?",
+                    (list_id,),
+                ).fetchone()["p"]
+                conn.execute(
+                    "INSERT INTO watchlist_memberships "
+                    "(list_id, ticker, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (list_id, t, pos, now, now),
+                )
+            elif existing["archived_at"] is not None:
+                conn.execute(
+                    "UPDATE watchlist_memberships SET archived_at = NULL, updated_at = ? "
+                    "WHERE list_id = ? AND ticker = ?",
+                    (now, list_id, t),
+                )
+            conn.commit()
+
+    def remove_member(self, list_id: int, ticker: str) -> bool:
+        """Remove a ticker from THIS list only (hard-delete the membership).
+
+        Distinct from ``archive_ticker`` (global soft-archive across all lists):
+        the ticker stays active in any other list it belongs to.
+        """
+        t = _norm(ticker)
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM watchlist_memberships WHERE list_id = ? AND ticker = ?",
+                (list_id, t),
+            )
+            conn.commit()
+            return cur.rowcount > 0
 
     # --- writes ----------------------------------------------------------
 
