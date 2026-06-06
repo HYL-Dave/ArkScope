@@ -212,6 +212,8 @@ def universe(
                 "sentiment_mean": ov.get("sentiment_mean") if ov else None,
                 "bullish_ratio": ov.get("bullish_ratio") if ov else None,
                 "lists": a.lists if a else [],
+                "all_lists": a.all_lists if a else [],
+                "archived_lists": a.archived_lists if a else [],
                 "archived": archived,
                 "note_count": a.note_count if a else 0,
             }

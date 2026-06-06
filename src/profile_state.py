@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -109,6 +109,14 @@ class TickerAggregate:
     ``archived`` is True only when the ticker has memberships but none of them
     are active (membership-level soft archive); a ticker with no membership at
     all defaults to active.
+
+    ``lists`` / ``list_ids`` are the ACTIVE memberships (back-compat). The
+    membership read-model distinguishes them from archived ones so an archived
+    ticker doesn't lose its list provenance (needed for archived management and
+    the future "remove from THIS list" vs "global archive" distinction):
+      - ``archived_lists`` — list names where the membership exists but is
+        archived (membership archived OR its list archived).
+      - ``all_lists`` — every list the ticker belongs to (active + archived).
     """
 
     ticker: str
@@ -116,6 +124,8 @@ class TickerAggregate:
     list_ids: list[int]
     archived: bool
     note_count: int
+    all_lists: list[str] = field(default_factory=list)
+    archived_lists: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -300,12 +310,24 @@ class ProfileStateStore:
             active = [
                 m for m in ms if m["archived_at"] is None and m["list_archived_at"] is None
             ]
+            archived = [
+                m for m in ms if m["archived_at"] is not None or m["list_archived_at"] is not None
+            ]
+            # all_lists: every list the ticker belongs to, de-duplicated, active first.
+            seen: set[str] = set()
+            all_lists: list[str] = []
+            for m in [*active, *archived]:
+                if m["list_name"] not in seen:
+                    seen.add(m["list_name"])
+                    all_lists.append(m["list_name"])
             out[t] = TickerAggregate(
                 ticker=t,
                 lists=[m["list_name"] for m in active],
                 list_ids=[m["list_id"] for m in active],
                 archived=bool(ms) and not active,
                 note_count=note_counts.get(t, 0),
+                all_lists=all_lists,
+                archived_lists=[m["list_name"] for m in archived],
             )
         return out
 

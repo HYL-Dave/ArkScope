@@ -94,6 +94,28 @@ def test_import_lists_allows_duplicate_membership(store):
     assert again == {"lists_created": 0, "memberships_added": 0}
 
 
+def test_aggregate_read_model_active_vs_archived_lists(store):
+    # A ticker in two lists; archive it → active `lists` empties, but the
+    # provenance survives in archived_lists / all_lists (gpt-5.5 read-model gap).
+    store.import_lists(
+        [
+            {"name": "Holdings", "kind": "holdings", "tickers": ["NVDA"]},
+            {"name": "Tier 1 · Core", "kind": "tier", "tickers": ["NVDA"]},
+        ]
+    )
+    a = store.get_ticker("NVDA")
+    assert set(a.lists) == {"Holdings", "Tier 1 · Core"}
+    assert a.archived_lists == []
+    assert set(a.all_lists) == {"Holdings", "Tier 1 · Core"}
+
+    store.archive_ticker("NVDA")
+    a = store.get_ticker("NVDA")
+    assert a.archived is True
+    assert a.lists == []  # no ACTIVE membership while archived
+    assert set(a.archived_lists) == {"Holdings", "Tier 1 · Core"}  # provenance kept
+    assert set(a.all_lists) == {"Holdings", "Tier 1 · Core"}
+
+
 def test_default_aggregate_for_unknown_ticker(store):
     agg = store.get_ticker("NVDA")
     assert agg.ticker == "NVDA"
