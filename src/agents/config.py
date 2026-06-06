@@ -18,11 +18,13 @@ from typing import Dict, Literal, Optional
 import yaml
 from pydantic import BaseModel
 
+from src.env_keys import ensure_env_loaded
 from src.model_routing import (
     Provider,
     TaskId,
     TaskRoute,
     default_model_for,
+    is_valid_effort,
     is_seed_model,
     model_provider,
 )
@@ -46,8 +48,10 @@ class AgentConfig(BaseModel):
     # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
     card_synthesis_provider: str = ""  # "" → anthropic unless model infers otherwise
     card_synthesis_model: str = ""    # "" → anthropic_model_advanced (Opus-class)
+    card_synthesis_effort: str = ""   # "" → provider default
     card_translation_provider: str = ""  # "" → anthropic unless model infers otherwise
     card_translation_model: str = ""  # "" → a fast model (Sonnet)
+    card_translation_effort: str = ""  # "" → provider default
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -240,10 +244,14 @@ def get_agent_config() -> AgentConfig:
         config.card_synthesis_provider = llm_prefs["card_synthesis_provider"]
     if "card_synthesis_model" in llm_prefs:
         config.card_synthesis_model = llm_prefs["card_synthesis_model"]
+    if "card_synthesis_effort" in llm_prefs:
+        config.card_synthesis_effort = llm_prefs["card_synthesis_effort"]
     if "card_translation_provider" in llm_prefs:
         config.card_translation_provider = llm_prefs["card_translation_provider"]
     if "card_translation_model" in llm_prefs:
         config.card_translation_model = llm_prefs["card_translation_model"]
+    if "card_translation_effort" in llm_prefs:
+        config.card_translation_effort = llm_prefs["card_translation_effort"]
     if "reasoning_effort" in llm_prefs:
         config.reasoning_effort = llm_prefs["reasoning_effort"]
     if "max_tool_calls" in llm_prefs:
@@ -358,8 +366,16 @@ def get_agent_config() -> AgentConfig:
 # chat/deep-research) route to cheaper/faster models, without a full Settings UI.
 _DEFAULT_TRANSLATION_MODEL = "claude-sonnet-4-6"
 _TASK_ENV = {
-    "card_synthesis": ("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", "ARKSCOPE_CARD_SYNTHESIS_MODEL"),
-    "card_translation": ("ARKSCOPE_CARD_TRANSLATION_PROVIDER", "ARKSCOPE_CARD_TRANSLATION_MODEL"),
+    "card_synthesis": (
+        "ARKSCOPE_CARD_SYNTHESIS_PROVIDER",
+        "ARKSCOPE_CARD_SYNTHESIS_MODEL",
+        "ARKSCOPE_CARD_SYNTHESIS_EFFORT",
+    ),
+    "card_translation": (
+        "ARKSCOPE_CARD_TRANSLATION_PROVIDER",
+        "ARKSCOPE_CARD_TRANSLATION_MODEL",
+        "ARKSCOPE_CARD_TRANSLATION_EFFORT",
+    ),
 }
 
 
@@ -369,11 +385,19 @@ def _clean_provider(value: str | None) -> Provider | None:
     return None
 
 
-def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str]:
+def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str, str]:
     if task == "card_synthesis":
-        return config.card_synthesis_provider, config.card_synthesis_model
+        return (
+            config.card_synthesis_provider,
+            config.card_synthesis_model,
+            config.card_synthesis_effort,
+        )
     if task == "card_translation":
-        return config.card_translation_provider, config.card_translation_model
+        return (
+            config.card_translation_provider,
+            config.card_translation_model,
+            config.card_translation_effort,
+        )
     raise ValueError(f"unknown task: {task}")
 
 
@@ -384,15 +408,24 @@ def task_route(task: TaskId) -> TaskRoute:
     default. If only a model is provided, known model prefixes infer provider
     (``claude-*`` → Anthropic, ``gpt-*``/``o*`` → OpenAI).
     """
+    ensure_env_loaded()
     config = get_agent_config()
-    profile_provider, profile_model = _configured_task_values(config, task)
-    env_provider_key, env_model_key = _TASK_ENV[task]
+    profile_provider, profile_model, profile_effort = _configured_task_values(config, task)
+    env_provider_key, env_model_key, env_effort_key = _TASK_ENV[task]
     env_provider = _clean_provider(os.environ.get(env_provider_key))
     env_model = (os.environ.get(env_model_key) or "").strip()
+    env_effort = (os.environ.get(env_effort_key) or "").strip()
 
     provider = env_provider or _clean_provider(profile_provider)
     model = env_model or profile_model.strip()
-    source = "env" if env_provider or env_model else "profile" if provider or model else "default"
+    effort = env_effort or profile_effort.strip() or "default"
+    source = (
+        "env"
+        if env_provider or env_model or env_effort
+        else "profile"
+        if provider or model or profile_effort
+        else "default"
+    )
 
     if not provider and model:
         provider = model_provider(model)
@@ -409,12 +442,22 @@ def task_route(task: TaskId) -> TaskRoute:
         else:
             model = default_model_for(provider, task)
 
+    warning = None
+    if not is_valid_effort(provider, effort):
+        warning = (
+            f"Configured effort '{effort}' is not known for provider '{provider}'; "
+            "using provider default."
+        )
+        effort = "default"
+
     return TaskRoute(
         task=task,
         provider=provider,
         model=model,
+        effort=effort,
         source=source,
         custom=not is_seed_model(provider, model),
+        warning=warning,
     )
 
 

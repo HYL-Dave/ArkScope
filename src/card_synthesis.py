@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.evidence_packet import EvidencePacket
+from src.model_credentials import looks_like_effort_error
 from src.result_card import (
     ClaimCitation,
     Completeness,
@@ -130,59 +131,107 @@ def _build_user_message(packet: EvidencePacket) -> str:
 # ── provider calls ──────────────────────────────────────────────────────────
 
 
-def _synthesize_anthropic(packet: EvidencePacket, model: str) -> CardSynthesis:
+def _synthesize_anthropic(
+    packet: EvidencePacket,
+    model: str,
+    effort: str = "default",
+) -> tuple[CardSynthesis, dict[str, Any]]:
     from anthropic import Anthropic
 
-    client = Anthropic()
-    resp = client.messages.create(
-        model=model,
-        max_tokens=_MAX_TOKENS,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_user_message(packet)}],
-        tools=[
-            {
-                "name": _TOOL_NAME,
-                "description": "Emit the structured §2 result card.",
-                "input_schema": _CARD_TOOL_SCHEMA,
-            }
-        ],
-        tool_choice={"type": "tool", "name": _TOOL_NAME},
-    )
-    for block in resp.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == _TOOL_NAME:
-            return CardSynthesis(**block.input)
-    raise RuntimeError("Anthropic synthesis did not return the emit_result_card tool call")
-
-
-def _synthesize_openai(packet: EvidencePacket, model: str) -> CardSynthesis:
-    from openai import OpenAI
-
-    client = OpenAI()
-    resp = client.chat.completions.create(
-        model=model,
-        max_completion_tokens=_MAX_TOKENS,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_message(packet)},
-        ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
+    def run_once(selected_effort: str) -> CardSynthesis:
+        kwargs: dict[str, Any] = {}
+        if selected_effort != "default":
+            kwargs["output_config"] = {"effort": selected_effort}
+        client = Anthropic()
+        resp = client.messages.create(
+            model=model,
+            max_tokens=_MAX_TOKENS,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": _build_user_message(packet)}],
+            tools=[
+                {
                     "name": _TOOL_NAME,
                     "description": "Emit the structured §2 result card.",
-                    "parameters": _CARD_TOOL_SCHEMA,
-                },
+                    "input_schema": _CARD_TOOL_SCHEMA,
+                }
+            ],
+            tool_choice={"type": "tool", "name": _TOOL_NAME},
+            **kwargs,
+        )
+        for block in resp.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == _TOOL_NAME:
+                return CardSynthesis(**block.input)
+        raise RuntimeError("Anthropic synthesis did not return the emit_result_card tool call")
+
+    try:
+        return run_once(effort), {"effort": effort}
+    except Exception as exc:
+        if effort != "default" and looks_like_effort_error(exc):
+            synth = run_once("default")
+            return synth, {
+                "effort": effort,
+                "fallback_effort": "default",
+                "warning": (
+                    f"Provider rejected effort '{effort}', so synthesis fell back "
+                    "to provider default."
+                ),
             }
-        ],
-        tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
-    )
-    msg = resp.choices[0].message
-    tool_calls = getattr(msg, "tool_calls", None) or []
-    for tc in tool_calls:
-        if tc.function.name == _TOOL_NAME:
-            return CardSynthesis(**json.loads(tc.function.arguments))
-    raise RuntimeError("OpenAI synthesis did not return the emit_result_card tool call")
+        raise
+
+
+def _synthesize_openai(
+    packet: EvidencePacket,
+    model: str,
+    effort: str = "default",
+) -> tuple[CardSynthesis, dict[str, Any]]:
+    from openai import OpenAI
+
+    def run_once(selected_effort: str) -> CardSynthesis:
+        kwargs: dict[str, Any] = {}
+        if selected_effort != "default":
+            kwargs["reasoning_effort"] = selected_effort
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=model,
+            max_completion_tokens=_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": _build_user_message(packet)},
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": _TOOL_NAME,
+                        "description": "Emit the structured §2 result card.",
+                        "parameters": _CARD_TOOL_SCHEMA,
+                    },
+                }
+            ],
+            tool_choice={"type": "function", "function": {"name": _TOOL_NAME}},
+            **kwargs,
+        )
+        msg = resp.choices[0].message
+        tool_calls = getattr(msg, "tool_calls", None) or []
+        for tc in tool_calls:
+            if tc.function.name == _TOOL_NAME:
+                return CardSynthesis(**json.loads(tc.function.arguments))
+        raise RuntimeError("OpenAI synthesis did not return the emit_result_card tool call")
+
+    try:
+        return run_once(effort), {"effort": effort}
+    except Exception as exc:
+        if effort != "default" and looks_like_effort_error(exc):
+            synth = run_once("default")
+            return synth, {
+                "effort": effort,
+                "fallback_effort": "default",
+                "warning": (
+                    f"Provider rejected effort '{effort}', so synthesis fell back "
+                    "to provider default."
+                ),
+            }
+        raise
 
 
 # ── merge + entry point ──────────────────────────────────────────────────────
@@ -263,16 +312,18 @@ def synthesize_card(
     route = task_route("card_synthesis")
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
-        synth = _synthesize_anthropic(packet, model)
+        effort = route.effort if route.provider == "anthropic" else "default"
+        synth, effort_meta = _synthesize_anthropic(packet, model, effort)
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
-        synth = _synthesize_openai(packet, model)
+        effort = route.effort if route.provider == "openai" else "default"
+        synth, effort_meta = _synthesize_openai(packet, model, effort)
     else:
         raise ValueError(f"unknown provider: {provider}")
     card = _merge_to_card(
         packet, synth, now_iso=now_iso, question=question, horizon=horizon
     )
-    return card, {"provider": provider, "model": model}
+    return card, {"provider": provider, "model": model, **effort_meta}
 
 
 def confidence_to_score(level: str) -> float:
@@ -379,10 +430,11 @@ def translate_card(
     )
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
+    effort = route.effort if provider == route.provider else "default"
     if provider == "anthropic":
-        translated = _translate_anthropic(model, system, user, schema, target)
+        translated = _translate_anthropic(model, system, user, schema, target, effort)
     elif provider == "openai":
-        translated = _translate_openai(model, system, user, schema, target)
+        translated = _translate_openai(model, system, user, schema, target, effort)
     else:
         raise ValueError(f"unknown provider: {provider}")
 
@@ -394,59 +446,105 @@ def translate_card(
     return out
 
 
-def _translate_anthropic(model: str, system: str, user: str, schema: dict, target: str) -> dict:
+def _translate_anthropic(
+    model: str,
+    system: str,
+    user: str,
+    schema: dict,
+    target: str,
+    effort: str = "default",
+) -> dict:
     from anthropic import Anthropic
 
-    client = Anthropic()
-    resp = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-        tools=[
-            {
-                "name": "emit_translation",
-                "description": f"Emit the {target} translation of the given fields.",
-                "input_schema": schema,
-            }
-        ],
-        tool_choice={"type": "tool", "name": "emit_translation"},
-    )
-    for block in resp.content:
-        if getattr(block, "type", None) == "tool_use" and block.name == "emit_translation":
-            return block.input
-    raise RuntimeError("Anthropic translation did not return emit_translation")
-
-
-def _translate_openai(model: str, system: str, user: str, schema: dict, target: str) -> dict:
-    from openai import OpenAI
-
-    client = OpenAI()
-    resp = client.chat.completions.create(
-        model=model,
-        max_completion_tokens=4096,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
+    def run_once(selected_effort: str) -> dict:
+        kwargs: dict[str, Any] = {}
+        if selected_effort != "default":
+            kwargs["output_config"] = {"effort": selected_effort}
+        client = Anthropic()
+        resp = client.messages.create(
+            model=model,
+            max_tokens=4096,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+            tools=[
+                {
                     "name": "emit_translation",
                     "description": f"Emit the {target} translation of the given fields.",
-                    "parameters": schema,
-                },
-            }
-        ],
-        tool_choice={"type": "function", "function": {"name": "emit_translation"}},
-    )
-    msg = resp.choices[0].message
-    tool_calls = getattr(msg, "tool_calls", None) or []
-    for tc in tool_calls:
-        if tc.function.name == "emit_translation":
-            return json.loads(tc.function.arguments)
-    raise RuntimeError("OpenAI translation did not return emit_translation")
+                    "input_schema": schema,
+                }
+            ],
+            tool_choice={"type": "tool", "name": "emit_translation"},
+            **kwargs,
+        )
+        for block in resp.content:
+            if getattr(block, "type", None) == "tool_use" and block.name == "emit_translation":
+                return block.input
+        raise RuntimeError("Anthropic translation did not return emit_translation")
+
+    try:
+        return run_once(effort)
+    except Exception as exc:
+        if effort != "default" and looks_like_effort_error(exc):
+            logger.warning(
+                "Anthropic translation effort %s was rejected; retrying with provider default",
+                effort,
+            )
+            return run_once("default")
+        raise
+
+
+def _translate_openai(
+    model: str,
+    system: str,
+    user: str,
+    schema: dict,
+    target: str,
+    effort: str = "default",
+) -> dict:
+    from openai import OpenAI
+
+    def run_once(selected_effort: str) -> dict:
+        kwargs: dict[str, Any] = {}
+        if selected_effort != "default":
+            kwargs["reasoning_effort"] = selected_effort
+        client = OpenAI()
+        resp = client.chat.completions.create(
+            model=model,
+            max_completion_tokens=4096,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "emit_translation",
+                        "description": f"Emit the {target} translation of the given fields.",
+                        "parameters": schema,
+                    },
+                }
+            ],
+            tool_choice={"type": "function", "function": {"name": "emit_translation"}},
+            **kwargs,
+        )
+        msg = resp.choices[0].message
+        tool_calls = getattr(msg, "tool_calls", None) or []
+        for tc in tool_calls:
+            if tc.function.name == "emit_translation":
+                return json.loads(tc.function.arguments)
+        raise RuntimeError("OpenAI translation did not return emit_translation")
+
+    try:
+        return run_once(effort)
+    except Exception as exc:
+        if effort != "default" and looks_like_effort_error(exc):
+            logger.warning(
+                "OpenAI translation effort %s was rejected; retrying with provider default",
+                effort,
+            )
+            return run_once("default")
+        raise
 
 
 def _validate_translation(card: dict, out: dict) -> None:

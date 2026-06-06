@@ -53,7 +53,10 @@ def _synth() -> CardSynthesis:
 
 
 def test_synthesize_merges_metadata_and_citations(monkeypatch):
-    monkeypatch.setattr("src.card_synthesis._synthesize_anthropic", lambda packet, model: _synth())
+    monkeypatch.setattr(
+        "src.card_synthesis._synthesize_anthropic",
+        lambda packet, model, effort="default": (_synth(), {"effort": effort}),
+    )
     card, meta = synthesize_card(
         _packet(), now_iso="2026-06-05T00:00:00Z", provider="anthropic",
         question="thesis into the print?", horizon="swing",
@@ -78,7 +81,7 @@ def test_synthesize_merges_metadata_and_citations(monkeypatch):
     assert card.traceability.completeness.technicals is True
     assert card.traceability.completeness.fundamentals is False
     assert "iv" in (card.traceability.completeness.note or "")
-    assert meta == {"provider": "anthropic", "model": meta["model"]}
+    assert meta == {"provider": "anthropic", "model": meta["model"], "effort": "default"}
 
 
 def test_synthesize_rejects_unknown_provider():
@@ -121,7 +124,10 @@ def test_task_model_routing(monkeypatch):
 
 
 def test_render_card_markdown_has_core_sections(monkeypatch):
-    monkeypatch.setattr("src.card_synthesis._synthesize_anthropic", lambda packet, model: _synth())
+    monkeypatch.setattr(
+        "src.card_synthesis._synthesize_anthropic",
+        lambda packet, model, effort="default": (_synth(), {"effort": effort}),
+    )
     card, _ = synthesize_card(_packet(), now_iso="2026-06-05T00:00:00Z", provider="anthropic")
     md = render_card_markdown(card)
     assert "## Conclusion" in md

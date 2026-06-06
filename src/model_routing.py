@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 Provider = Literal["anthropic", "openai"]
 TaskId = Literal["card_synthesis", "card_translation"]
 RouteSource = Literal["env", "profile", "default"]
+EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 OPENAI_MODELS_SOURCE = "https://developers.openai.com/api/docs/models"
 OPENAI_LATEST_SOURCE = "https://developers.openai.com/api/docs/guides/latest-model"
@@ -48,14 +49,25 @@ class TaskRoute(BaseModel):
     task: TaskId
     provider: Provider
     model: str
+    effort: str = "default"
     source: RouteSource = "default"
     custom: bool = False
+    warning: str | None = None
+
+
+class EffortOption(BaseModel):
+    id: EffortId
+    provider: Provider
+    label: str
+    description: str
+    applies_to_card_tasks: bool = True
 
 
 class ModelCatalog(BaseModel):
     providers: list[Provider]
     tasks: list[TaskInfo]
     models: list[ModelOption]
+    effort_options: dict[Provider, list[EffortOption]]
 
 
 TASKS: list[TaskInfo] = [
@@ -157,8 +169,107 @@ MODEL_CATALOG: list[ModelOption] = [
 ]
 
 
+EFFORT_OPTIONS: dict[Provider, list[EffortOption]] = {
+    "openai": [
+        EffortOption(
+            id="default",
+            provider="openai",
+            label="Provider default",
+            description="Do not send a reasoning effort override; use the model/API default.",
+        ),
+        EffortOption(
+            id="none",
+            provider="openai",
+            label="None",
+            description="Project sentinel for no reasoning effort where the SDK/model accepts it.",
+        ),
+        EffortOption(
+            id="minimal",
+            provider="openai",
+            label="Minimal",
+            description="Small reasoning budget; useful for cheap translation or short checks.",
+        ),
+        EffortOption(
+            id="low",
+            provider="openai",
+            label="Low",
+            description="Low reasoning effort.",
+        ),
+        EffortOption(
+            id="medium",
+            provider="openai",
+            label="Medium",
+            description="Balanced reasoning effort.",
+        ),
+        EffortOption(
+            id="high",
+            provider="openai",
+            label="High",
+            description="High reasoning effort for more difficult synthesis.",
+        ),
+        EffortOption(
+            id="xhigh",
+            provider="openai",
+            label="Extra high",
+            description="SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+        ),
+    ],
+    "anthropic": [
+        EffortOption(
+            id="default",
+            provider="anthropic",
+            label="Provider default",
+            description="Do not send output_config.effort; use the Claude API default.",
+        ),
+        EffortOption(
+            id="low",
+            provider="anthropic",
+            label="Low",
+            description="Lower effort via Anthropic output_config.effort.",
+        ),
+        EffortOption(
+            id="medium",
+            provider="anthropic",
+            label="Medium",
+            description="Medium effort via Anthropic output_config.effort.",
+        ),
+        EffortOption(
+            id="high",
+            provider="anthropic",
+            label="High",
+            description="High effort via Anthropic output_config.effort.",
+        ),
+        EffortOption(
+            id="xhigh",
+            provider="anthropic",
+            label="Extra high",
+            description="Extra-high effort via Anthropic output_config.effort where available.",
+        ),
+        EffortOption(
+            id="max",
+            provider="anthropic",
+            label="Max",
+            description="Maximum effort via Anthropic output_config.effort where available.",
+        ),
+    ],
+}
+
+
 def catalog() -> ModelCatalog:
-    return ModelCatalog(providers=["anthropic", "openai"], tasks=TASKS, models=MODEL_CATALOG)
+    return ModelCatalog(
+        providers=["anthropic", "openai"],
+        tasks=TASKS,
+        models=MODEL_CATALOG,
+        effort_options=EFFORT_OPTIONS,
+    )
+
+
+def effort_options(provider: Provider) -> list[EffortOption]:
+    return EFFORT_OPTIONS[provider]
+
+
+def is_valid_effort(provider: Provider, effort: str) -> bool:
+    return any(option.id == effort for option in EFFORT_OPTIONS[provider])
 
 
 def model_provider(model: str) -> Provider | None:

@@ -1028,6 +1028,11 @@ table.wl tbody tr.archived td {
   padding: 8px 9px;
   font: inherit;
 }
+.field-help {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
 .custom-field {
   margin-top: 12px;
 }
@@ -1114,6 +1119,102 @@ table.wl tbody tr.archived td {
 .provider-links a {
   color: var(--accent);
   font-size: 11.5px;
+}
+.settings-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.credential-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.credential-row {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px;
+  background: var(--panel2);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+}
+.credential-row strong,
+.credential-row span {
+  display: block;
+}
+.credential-row span {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.credential-row p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.discovery-box,
+.test-status {
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  border-radius: 7px;
+  padding: 8px;
+}
+.discovery-box {
+  margin: 10px 0;
+}
+.discovery-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.discovery-head a {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.discovery-models {
+  display: grid;
+  gap: 6px;
+}
+.model-discovery-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 7px;
+  padding: 6px;
+  font-size: 11.5px;
+}
+.model-discovery-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .model-discovery-row {
+    grid-template-columns: 1fr;
+  }
+}
+.test-status {
+  color: var(--muted);
+  font-size: 11.5px;
+  min-width: min(320px, 100%);
+}
+.test-status.ok strong {
+  color: var(--ok);
+}
+.test-status.bad strong {
+  color: var(--bad);
+}
+.test-status p {
+  margin: 4px 0 0;
 }
 .error-text {
   color: var(--bad);

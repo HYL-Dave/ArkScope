@@ -13,8 +13,21 @@ export interface ApiStatus {
 }
 
 export interface RuntimeConfig {
-  anthropic: { model: string; model_advanced: string; effort: string | null; thinking: boolean; key_set: boolean };
-  openai: { model: string; model_advanced: string; reasoning_effort: string; key_set: boolean };
+  anthropic: {
+    model: string;
+    model_advanced: string;
+    effort: string | null;
+    thinking: boolean;
+    key_set: boolean;
+    credentials: ProviderCredential[];
+  };
+  openai: {
+    model: string;
+    model_advanced: string;
+    reasoning_effort: string;
+    key_set: boolean;
+    credentials: ProviderCredential[];
+  };
   card_synthesis: TaskRoute;
   card_translation: TaskRoute;
   data_keys: Record<string, boolean>;
@@ -27,8 +40,18 @@ export interface TaskRoute {
   task: ModelTask;
   provider: ModelProvider;
   model: string;
+  effort: string;
   source: "env" | "profile" | "default";
   custom: boolean;
+  warning: string | null;
+}
+
+export interface EffortOption {
+  id: string;
+  provider: ModelProvider;
+  label: string;
+  description: string;
+  applies_to_card_tasks: boolean;
 }
 
 export interface ModelOption {
@@ -58,8 +81,51 @@ export interface ModelCatalog {
   providers: ModelProvider[];
   tasks: TaskInfo[];
   models: ModelOption[];
+  effort_options: Record<ModelProvider, EffortOption[]>;
   routes: Record<ModelTask, TaskRoute>;
+  credentials: Record<ModelProvider, ProviderCredential[]>;
   custom_allowed: boolean;
+}
+
+export interface ProviderCredential {
+  id: string;
+  provider: ModelProvider;
+  auth_type: "api_key" | "api_key_pool" | "oauth" | "setup_token";
+  label: string;
+  source: string;
+  available: boolean;
+  masked: string | null;
+  can_discover_models: boolean;
+  can_test_models: boolean;
+  notes: string;
+}
+
+export interface DiscoveredModel {
+  id: string;
+  provider: ModelProvider;
+  label: string;
+  source: "provider_api" | "seed";
+}
+
+export interface ModelDiscoveryResult {
+  provider: ModelProvider;
+  credential_id: string | null;
+  status: "ok" | "missing_credential" | "unsupported" | "error";
+  models: DiscoveredModel[];
+  error: string | null;
+  source_url: string | null;
+}
+
+export interface ModelTestResult {
+  provider: ModelProvider;
+  credential_id: string | null;
+  model: string;
+  effort: string;
+  status: "ok" | "missing_credential" | "error";
+  latency_ms: number | null;
+  error: string | null;
+  warning: string | null;
+  fallback_effort: string | null;
 }
 
 export interface WatchlistRow {
@@ -221,6 +287,9 @@ export interface GenerateResult {
   status: string;
   provider: string | null;
   model: string | null;
+  effort?: string | null;
+  fallback_effort?: string | null;
+  warning?: string | null;
   generated_at: string;
   card: ResultCard;
   evidence_packet: EvidencePacket | null;
@@ -325,13 +394,39 @@ export function getModelCatalog(): Promise<ModelCatalog> {
 }
 
 export function saveModelRoutes(
-  routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string }>>,
+  routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string; effort: string }>>,
 ): Promise<{ routes: Partial<Record<ModelTask, TaskRoute>> }> {
   return sendJSON<{ routes: Partial<Record<ModelTask, TaskRoute>> }>(
     "/config/model-routes",
     "PUT",
     { routes },
     8_000,
+  );
+}
+
+export function discoverModels(
+  provider: ModelProvider,
+  credentialId?: string | null,
+): Promise<ModelDiscoveryResult> {
+  return sendJSON<ModelDiscoveryResult>(
+    "/config/model-discovery",
+    "POST",
+    { provider, credential_id: credentialId ?? null },
+    25_000,
+  );
+}
+
+export function testModelAccess(
+  provider: ModelProvider,
+  model: string,
+  effort: string,
+  credentialId?: string | null,
+): Promise<ModelTestResult> {
+  return sendJSON<ModelTestResult>(
+    "/config/model-test",
+    "POST",
+    { provider, model, effort, credential_id: credentialId ?? null },
+    45_000,
   );
 }
 
