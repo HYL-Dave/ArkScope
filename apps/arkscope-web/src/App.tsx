@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiBase, getStatus } from "./api";
+import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
 import { WatchlistView } from "./Watchlist";
@@ -39,6 +39,7 @@ export function App() {
   const [status, setStatus] = useState<StatusState>({ kind: "loading" });
   const [view, setView] = useState<Nav>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -56,6 +57,11 @@ export function App() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  // Runtime config (active models + key presence) changes rarely — fetch once.
+  useEffect(() => {
+    void getRuntimeConfig().then(setRuntime).catch(() => setRuntime(null));
+  }, []);
+
   const dot = status.kind === "ready" ? "ok" : status.kind === "error" ? "bad" : "wait";
 
   return (
@@ -71,6 +77,18 @@ export function App() {
               : "connecting…"}
         </span>
         <span className="spacer" />
+        {runtime && (
+          <span
+            className="topbar-model"
+            title={
+              `卡片合成 ${runtime.card_synthesis.provider}/${runtime.card_synthesis.model}\n` +
+              `卡片翻譯 ${runtime.card_translation.provider}/${runtime.card_translation.model}\n` +
+              `Anthropic key ${runtime.anthropic.key_set ? "✓" : "✗"} · OpenAI key ${runtime.openai.key_set ? "✓" : "✗"}`
+            }
+          >
+            ✦ {runtime.card_synthesis.provider}/{runtime.card_synthesis.model}
+          </span>
+        )}
         <span className="topbar-meta">{apiBase}</span>
         {lastOk && <span className="topbar-meta">updated {lastOk}</span>}
       </header>
@@ -98,7 +116,7 @@ export function App() {
         ) : view === "Watchlist" ? (
           <WatchlistView />
         ) : view === "System" ? (
-          <DashboardView status={status} onRetry={refresh} />
+          <DashboardView status={status} runtime={runtime} onRetry={refresh} />
         ) : (
           <main className="main">
             <p className="muted">{LABELS[view]} — 規劃中。</p>

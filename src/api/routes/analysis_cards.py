@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["analysis-cards"])
 
 _VALID_PROVIDERS = {"anthropic", "openai"}
+_ALLOWED_LANGS = {"zh-Hant", "zh-Hans"}
 
 
 class GenerateBody(BaseModel):
@@ -240,15 +241,18 @@ def translate_card_route(
     if not run or run.status == "deleted":
         raise HTTPException(status_code=404, detail="card run not found")
     lang = (body.lang or "zh-Hant").strip()
+    if lang not in _ALLOWED_LANGS:
+        raise HTTPException(status_code=400, detail=f"unsupported lang: {lang}")
     cached = (run.translations or {}).get(lang)
     if cached:
         return {"run_id": run_id, "lang": lang, "card": cached, "cached": True}
+    # Gate BEFORE spending tokens, so a future permission engine can deny pre-LLM.
+    require_db_write("card_translate", {"run_id": run_id, "lang": lang})
     try:
         translated = translate_card(run.result_card, lang=lang)
     except Exception as exc:
         logger.warning("Card translate failed for run %s: %s", run_id, exc)
         raise HTTPException(status_code=502, detail=f"translate failed: {exc}")
-    require_db_write("card_translate", {"run_id": run_id, "lang": lang})
     store.set_translation(run_id, lang, translated)
     return {"run_id": run_id, "lang": lang, "card": translated, "cached": False}
 

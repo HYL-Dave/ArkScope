@@ -16,7 +16,7 @@ from src.card_synthesis import (
     synthesize_card,
 )
 from src.evidence_packet import EvidenceItem, EvidencePacket
-from src.result_card import ResultCard
+from src.result_card import ResultCard, Traceability
 
 
 def _packet() -> EvidencePacket:
@@ -84,6 +84,21 @@ def test_synthesize_merges_metadata_and_citations(monkeypatch):
 def test_synthesize_rejects_unknown_provider():
     with pytest.raises(ValueError):
         synthesize_card(_packet(), now_iso="t", provider="grok")  # type: ignore[arg-type]
+
+
+def test_translation_validation_rejects_list_count_change():
+    from src.card_synthesis import _validate_translation
+
+    card = ResultCard(
+        ticker="AAPL", analysis_time="t", conclusion="c",
+        primary_reasons=["a", "b"], counter_thesis=["x"],
+        confidence_level="low", traceability=Traceability(),
+    ).model_dump()
+    # same structure → ok
+    _validate_translation(card, {**card, "conclusion": "結論", "primary_reasons": ["甲", "乙"]})
+    # dropped a list item → reject (would silently lose a reason)
+    with pytest.raises(ValueError):
+        _validate_translation(card, {**card, "primary_reasons": ["只剩一條"]})
 
 
 def test_render_card_markdown_has_core_sections(monkeypatch):

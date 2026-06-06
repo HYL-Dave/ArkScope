@@ -854,3 +854,29 @@ table.wl tbody tr.archived td {
   padding: 3px 9px;
   font-size: 11.5px;
 }
+
+/* ---- runtime model/key visibility ---- */
+.topbar-model {
+  font-size: 11.5px;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+.rt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.rt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

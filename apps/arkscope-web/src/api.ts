@@ -12,6 +12,14 @@ export interface ApiStatus {
   data_sources: Record<string, number>;
 }
 
+export interface RuntimeConfig {
+  anthropic: { model: string; model_advanced: string; effort: string | null; thinking: boolean; key_set: boolean };
+  openai: { model: string; model_advanced: string; reasoning_effort: string; key_set: boolean };
+  card_synthesis: { provider: string; model: string };
+  card_translation: { provider: string; model: string };
+  data_keys: Record<string, boolean>;
+}
+
 export interface WatchlistRow {
   ticker: string;
   group: string;
@@ -264,6 +272,10 @@ export async function getHealthz(): Promise<boolean> {
 
 export function getStatus(): Promise<ApiStatus> {
   return getJSON<ApiStatus>("/status", 8_000);
+}
+
+export function getRuntimeConfig(): Promise<RuntimeConfig> {
+  return getJSON<RuntimeConfig>("/config/runtime", 8_000);
 }
 
 export function getOverview(): Promise<WatchlistOverview> {

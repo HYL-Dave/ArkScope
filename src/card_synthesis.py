@@ -399,4 +399,16 @@ def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = 
     for k, v in translated.items():
         if k in _TRANSLATABLE_FIELDS:
             out[k] = v
+    _validate_translation(card, out)
     return out
+
+
+def _validate_translation(card: dict, out: dict) -> None:
+    """Guard the translation: list item counts must match and the typed §2
+    contract must still validate. Raises ValueError on any drift (the route
+    turns this into a 502 and does NOT cache the result)."""
+    for k in _TRANSLATABLE_FIELDS:
+        src = card.get(k)
+        if isinstance(src, list) and len(out.get(k) or []) != len(src):
+            raise ValueError(f"translation changed list length for '{k}'")
+    ResultCard(**out)  # re-validate the typed result-card schema

@@ -49,3 +49,47 @@ def morning_brief(
 ):
     """Generate personalized morning briefing."""
     return get_morning_brief(dal)
+
+
+@router.get("/config/runtime")
+def runtime_config():
+    """What the agent will actually use — models, effort, and which API keys are
+    present (booleans only, never the key values). Lets the UI answer "which
+    provider/model/key is active" without exposing secrets.
+    """
+    import os
+
+    from src.agents.config import get_agent_config
+    from src.env_keys import ensure_env_loaded
+
+    ensure_env_loaded()
+    cfg = get_agent_config()
+
+    def key_set(name: str) -> bool:
+        return bool(os.environ.get(name))
+
+    return {
+        "anthropic": {
+            "model": cfg.anthropic_model,
+            "model_advanced": cfg.anthropic_model_advanced,
+            "effort": cfg.anthropic_effort,
+            "thinking": cfg.anthropic_thinking,
+            "key_set": key_set("ANTHROPIC_API_KEY"),
+        },
+        "openai": {
+            "model": cfg.openai_model,
+            "model_advanced": cfg.openai_model_advanced,
+            "reasoning_effort": cfg.reasoning_effort,
+            "key_set": key_set("OPENAI_API_KEY"),
+        },
+        # Per-task model routing (so the UI can show what each operation uses).
+        "card_synthesis": {"provider": "anthropic", "model": cfg.anthropic_model_advanced},
+        "card_translation": {"provider": "anthropic", "model": cfg.anthropic_model},
+        "data_keys": {
+            "finnhub": key_set("FINNHUB_API_KEY"),
+            "polygon": key_set("POLYGON_API_KEY"),
+            "financial_datasets": key_set("FINANCIAL_DATASETS_API_KEY"),
+            "fred": key_set("FRED_API_KEY"),
+            "tavily": key_set("TAVILY_API_KEY"),
+        },
+    }

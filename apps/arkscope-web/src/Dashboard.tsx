@@ -1,4 +1,4 @@
-import type { ApiStatus } from "./api";
+import type { ApiStatus, RuntimeConfig } from "./api";
 
 export type StatusState =
   | { kind: "loading" }
@@ -7,9 +7,11 @@ export type StatusState =
 
 export function DashboardView({
   status,
+  runtime,
   onRetry,
 }: {
   status: StatusState;
+  runtime?: RuntimeConfig | null;
   onRetry: () => void;
 }) {
   return (
@@ -23,6 +25,7 @@ export function DashboardView({
             <button onClick={onRetry}>Retry</button>
           </div>
         )}
+        {runtime && <RuntimePanel rt={runtime} />}
         {status.kind === "ready" && <StatusTiles status={status.status} />}
       </main>
 
@@ -33,6 +36,44 @@ export function DashboardView({
           (vision §1/§3). Wiring is deferred.
         </p>
       </aside>
+    </>
+  );
+}
+
+function RuntimePanel({ rt }: { rt: RuntimeConfig }) {
+  const keyRow = (label: string, set: boolean) => (
+    <div className="rt-row" key={label}>
+      <span>{label}</span>
+      <span className={set ? "up" : "down"}>{set ? "✓ set" : "✗ missing"}</span>
+    </div>
+  );
+  return (
+    <>
+      <h2 className="section">Models in use</h2>
+      <div className="rt-list">
+        <div className="rt-row">
+          <span>card synthesis</span>
+          <span className="mono">{rt.card_synthesis.provider} · {rt.card_synthesis.model}</span>
+        </div>
+        <div className="rt-row">
+          <span>card translation</span>
+          <span className="mono">{rt.card_translation.provider} · {rt.card_translation.model}</span>
+        </div>
+        <div className="rt-row">
+          <span>anthropic (default / advanced)</span>
+          <span className="mono">{rt.anthropic.model} / {rt.anthropic.model_advanced}</span>
+        </div>
+        <div className="rt-row">
+          <span>openai (default / advanced)</span>
+          <span className="mono">{rt.openai.model} / {rt.openai.model_advanced}</span>
+        </div>
+      </div>
+      <h2 className="section">API keys present</h2>
+      <div className="rt-list">
+        {keyRow("anthropic", rt.anthropic.key_set)}
+        {keyRow("openai", rt.openai.key_set)}
+        {Object.entries(rt.data_keys).map(([k, v]) => keyRow(k, v))}
+      </div>
     </>
   );
 }
