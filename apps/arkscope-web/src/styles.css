@@ -1443,3 +1443,169 @@ table.wl tbody tr.no-summary td {
 table.wl tbody tr.no-summary td.mono.strong {
   color: var(--fg);
 }
+
+/* ---- Watchlist: left list-rail layout ---- */
+.wl-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.wl-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-right: 1px solid var(--border);
+  padding-right: 12px;
+  min-height: 200px;
+}
+.wl-railitem {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+.wl-railitem.active {
+  background: rgba(88, 166, 255, 0.12);
+}
+/* "All Active" is a bare button; list rows wrap a name button + actions */
+button.wl-railitem {
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+button.wl-railitem.active,
+.wl-railitem.active .wl-railname {
+  color: var(--fg);
+}
+.wl-railname {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wl-railitem:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.wl-railname:hover {
+  color: var(--fg);
+}
+.wl-railcount {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.wl-railbtn {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  opacity: 0;
+}
+.wl-railitem:hover .wl-railbtn,
+.wl-railedit .wl-railbtn {
+  opacity: 1;
+}
+.wl-railbtn:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.08);
+}
+.wl-railadd {
+  text-align: left;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 7px 9px;
+  margin-top: 6px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wl-railadd:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.wl-railedit {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+.wl-railinput {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel2);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12.5px;
+}
+.wl-content {
+  min-width: 0;
+}
+/* add-ticker box */
+.wl-addbox {
+  position: relative;
+  margin-bottom: 12px;
+  max-width: 460px;
+}
+.wl-addbox .aicard-q {
+  width: 100%;
+}
+.wl-addresults {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.wl-addhint {
+  padding: 8px 10px;
+}
+.wl-addrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.wl-addrow:last-child {
+  border-bottom: 0;
+}
+.wl-addrow:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.08);
+}
+.wl-addname {
+  flex: 1;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

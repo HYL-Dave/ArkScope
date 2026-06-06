@@ -404,7 +404,7 @@ async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise
 
 async function sendJSON<T>(
   path: string,
-  method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
@@ -529,6 +529,38 @@ export function getUniverse(includeArchived = true): Promise<UniverseResponse> {
 
 export function getProfileLists(includeArchived = false): Promise<{ lists: WatchlistSummary[] }> {
   return getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`);
+}
+
+// --- list CRUD + membership ---
+
+export function createList(name: string, kind?: string): Promise<WatchlistSummary> {
+  return sendJSON<WatchlistSummary>("/profile/lists", "POST", { name, kind });
+}
+export function renameList(listId: number, name: string): Promise<WatchlistSummary> {
+  return sendJSON<WatchlistSummary>(`/profile/lists/${listId}`, "PATCH", { name });
+}
+export function deleteList(listId: number): Promise<{ deleted: boolean; id: number }> {
+  return sendJSON(`/profile/lists/${listId}`, "DELETE");
+}
+export function addMember(listId: number, ticker: string): Promise<TickerAggregate> {
+  return sendJSON<TickerAggregate>(`/profile/lists/${listId}/members`, "POST", { ticker });
+}
+export function removeMember(
+  listId: number,
+  ticker: string,
+): Promise<{ removed: boolean; list_id: number; ticker: string }> {
+  return sendJSON(`/profile/lists/${listId}/members/${encodeURIComponent(ticker)}`, "DELETE");
+}
+
+// --- symbol search (local-first autocomplete; NOT fuzzy) ---
+
+export interface SymbolHit {
+  ticker: string;
+  name: string;
+  tracked: boolean;
+}
+export function searchSymbols(q: string, limit = 10): Promise<{ q: string; results: SymbolHit[] }> {
+  return getJSON(`/symbols/search?q=${encodeURIComponent(q)}&limit=${limit}`, 20_000);
 }
 
 // Seeds lists from user_profile groups + tickers_core tiers. The groups source
