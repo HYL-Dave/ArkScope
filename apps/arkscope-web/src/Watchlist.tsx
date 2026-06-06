@@ -90,6 +90,17 @@ export function WatchlistView({
   // Separate request tokens per source so a stale response is dropped.
   const cockpitReq = useRef(0);
   const universeReq = useRef(0);
+  // In-flight counter so the spinner stays on until ALL concurrent loads finish
+  // (a single boolean let the faster of cockpit+universe clear it early).
+  const inflight = useRef(0);
+  const beginLoad = useCallback(() => {
+    inflight.current += 1;
+    setRefreshing(true);
+  }, []);
+  const endLoad = useCallback(() => {
+    inflight.current = Math.max(0, inflight.current - 1);
+    if (inflight.current === 0) setRefreshing(false);
+  }, []);
 
   const loadLists = useCallback(async () => {
     try {
@@ -101,7 +112,7 @@ export function WatchlistView({
 
   const loadCockpit = useCallback(async () => {
     const id = ++cockpitReq.current;
-    setRefreshing(true);
+    beginLoad();
     setErr(null);
     try {
       const d = await getCockpitWatchlist(true); // all rows; filter archived client-side
@@ -109,13 +120,13 @@ export function WatchlistView({
     } catch (e) {
       if (id === cockpitReq.current) setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      if (id === cockpitReq.current) setRefreshing(false);
+      endLoad();
     }
-  }, []);
+  }, [beginLoad, endLoad]);
 
   const loadUniverse = useCallback(async () => {
     const id = ++universeReq.current;
-    setRefreshing(true);
+    beginLoad();
     setErr(null);
     try {
       const u = await getUniverse(true);
@@ -123,9 +134,9 @@ export function WatchlistView({
     } catch (e) {
       if (id === universeReq.current) setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      if (id === universeReq.current) setRefreshing(false);
+      endLoad();
     }
-  }, []);
+  }, [beginLoad, endLoad]);
 
   useEffect(() => {
     void loadLists();
