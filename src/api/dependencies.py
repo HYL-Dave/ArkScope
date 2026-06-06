@@ -52,6 +52,14 @@ def get_card_store():
     return CardRunStore(_local_state_db_path())
 
 
+@lru_cache(maxsize=1)
+def get_credential_store():
+    """Singleton local LLM credential store (same ignored local SQLite DB)."""
+    from src.model_credentials import CredentialStore
+
+    return CredentialStore(_local_state_db_path())
+
+
 def _local_state_db_path() -> str:
     return os.environ.get("ARKSCOPE_PROFILE_DB") or str(
         Path(__file__).resolve().parents[2] / "data" / "profile_state.db"

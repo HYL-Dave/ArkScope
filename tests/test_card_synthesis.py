@@ -104,9 +104,16 @@ def test_translation_validation_rejects_list_count_change():
         _validate_translation(card, {**card, "primary_reasons": ["只剩一條"]})
 
 
-def test_task_model_routing(monkeypatch):
+def test_task_model_routing(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
     from src.agents.config import get_agent_config, task_model, task_route
 
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_PROVIDER", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_MODEL", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", raising=False)
     get_agent_config.cache_clear()
     # translation defaults to the fast model (not the Opus synthesis model)
     assert task_model("card_translation") == "claude-sonnet-4-6"

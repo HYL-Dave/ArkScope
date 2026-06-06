@@ -95,6 +95,8 @@ export interface ProviderCredential {
   source: string;
   available: boolean;
   masked: string | null;
+  active: boolean;
+  editable: boolean;
   can_discover_models: boolean;
   can_test_models: boolean;
   notes: string;
@@ -400,6 +402,41 @@ export function saveModelRoutes(
     "/config/model-routes",
     "PUT",
     { routes },
+    8_000,
+  );
+}
+
+export function listCredentials(): Promise<{ credentials: Record<ModelProvider, ProviderCredential[]> }> {
+  return getJSON<{ credentials: Record<ModelProvider, ProviderCredential[]> }>("/config/credentials", 8_000);
+}
+
+export function addCredential(body: {
+  provider: ModelProvider;
+  auth_type: "api_key" | "oauth" | "setup_token";
+  alias: string;
+  secret: string;
+  make_active: boolean;
+}): Promise<{ credential: ProviderCredential }> {
+  return sendJSON<{ credential: ProviderCredential }>("/config/credentials", "POST", body, 8_000);
+}
+
+export function updateCredential(
+  credentialId: string,
+  body: { alias?: string; secret?: string; active?: boolean },
+): Promise<{ credential: ProviderCredential }> {
+  return sendJSON<{ credential: ProviderCredential }>(
+    `/config/credentials/${encodeURIComponent(credentialId)}`,
+    "PUT",
+    body,
+    8_000,
+  );
+}
+
+export function deleteCredential(credentialId: string): Promise<{ deleted: boolean; id: string }> {
+  return sendJSON<{ deleted: boolean; id: string }>(
+    `/config/credentials/${encodeURIComponent(credentialId)}`,
+    "DELETE",
+    undefined,
     8_000,
   );
 }

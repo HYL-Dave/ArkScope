@@ -5,18 +5,25 @@ import pytest
 from fastapi import HTTPException
 
 from src.api.routes.config_routes import (
+    CredentialCreate,
+    CredentialUpdate,
     ModelRoutesUpdate,
     ModelTestRequest,
     RouteUpdate,
+    add_credential,
+    delete_credential,
     model_catalog,
     run_provider_model_test,
     runtime_config,
+    update_credential,
     update_model_routes,
 )
+from src.model_credentials import CredentialStore, provider_credentials
 
 
-def test_model_catalog_exposes_seed_models():
-    res = model_catalog()
+def test_model_catalog_exposes_seed_models(tmp_path):
+    store = CredentialStore(tmp_path / "profile_state.db")
+    res = model_catalog(store=store)
     ids = {m["id"] for m in res["models"]}
     assert "claude-opus-4-8" in ids
     assert "gpt-5.5" in ids
@@ -52,7 +59,7 @@ def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):
     assert data["llm_preferences"]["card_synthesis_provider"] == "openai"
     assert data["llm_preferences"]["card_synthesis_model"] == "gpt-5.5"
     assert data["llm_preferences"]["card_synthesis_effort"] == "high"
-    assert runtime_config()["card_synthesis"]["provider"] == "openai"
+    assert runtime_config(store=CredentialStore(tmp_path / "profile_state.db"))["card_synthesis"]["provider"] == "openai"
 
     cfg_mod.get_agent_config.cache_clear()
 
@@ -93,14 +100,54 @@ def test_invalid_effort_falls_back_to_default(tmp_path, monkeypatch):
     cfg_mod.get_agent_config.cache_clear()
 
 
-def test_model_test_missing_credential_returns_seed_error(monkeypatch):
+def test_model_test_missing_credential_returns_seed_error(tmp_path, monkeypatch):
     import src.model_credentials as creds_mod
 
+    store = CredentialStore(tmp_path / "profile_state.db")
     monkeypatch.setattr(creds_mod, "ensure_env_loaded", lambda: None)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
     res = run_provider_model_test(
-        ModelTestRequest(provider="openai", model="gpt-5.5", effort="high")
+        ModelTestRequest(provider="openai", model="gpt-5.5", effort="high"),
+        store=store,
     )
     assert res["status"] == "missing_credential"
     assert "No direct API-key credential" in res["error"]
+
+
+def test_local_credential_crud_and_active_selection(tmp_path, monkeypatch):
+    import src.model_credentials as creds_mod
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    monkeypatch.setattr(creds_mod, "ensure_env_loaded", lambda: None)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEYS", raising=False)
+
+    created = add_credential(
+        CredentialCreate(
+            provider="anthropic",
+            alias="primary claude",
+            secret="sk-ant-test-123456",
+            make_active=True,
+        ),
+        store=store,
+    )["credential"]
+    assert created["editable"] is True
+    assert created["active"] is True
+    assert created["masked"].startswith("sk-a")
+    assert "123456" not in created["masked"]
+
+    updated = update_credential(
+        created["id"],
+        CredentialUpdate(alias="renamed claude", active=True),
+        store=store,
+    )["credential"]
+    assert updated["label"] == "renamed claude"
+    assert updated["active"] is True
+
+    creds = provider_credentials(store)["anthropic"]
+    assert any(c.id == created["id"] and c.active for c in creds)
+
+    deleted = delete_credential(created["id"], store=store)
+    assert deleted["deleted"] is True
+    assert not any(c.id == created["id"] for c in provider_credentials(store)["anthropic"])

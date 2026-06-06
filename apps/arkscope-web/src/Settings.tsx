@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
+  addCredential,
+  deleteCredential,
   discoverModels,
   getModelCatalog,
   saveModelRoutes,
   testModelAccess,
+  updateCredential,
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelOption,
@@ -31,7 +34,7 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "models",
     title: "Models",
-    description: "任務路由、模型選擇、custom model id。",
+    description: "任務路由、model id、effort。",
     enabled: true,
   },
   {
@@ -149,7 +152,7 @@ export function SettingsView({
           <p className="eyebrow">Settings</p>
           <h1>模型與任務路由</h1>
           <p className="muted">
-            為每個 AI 任務選擇 provider 和 model。Seed catalog 來自官方文件；帳號權限不同時可用 custom model id。
+            為每個 AI 任務選擇 provider、model id 和 effort。Provider 頁可用目前 active key discovery/test 實際可用模型。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void save()} disabled={saving || loading || !catalog}>
@@ -245,6 +248,11 @@ export function SettingsView({
                 catalog={catalog}
                 runtime={runtime}
                 discovery={discovery}
+                onRefresh={async () => {
+                  const refreshed = await getModelCatalog();
+                  setCatalog(refreshed);
+                  await onRuntimeChanged();
+                }}
                 onDiscover={async (provider, credentialId) => {
                   setDiscovery((prev) => ({
                     ...prev,
@@ -308,7 +316,7 @@ function ModelRoutingSection({
         <div>
           <h2>任務模型路由</h2>
           <p className="muted">
-            這裡控制實際會被 AI card / 翻譯呼叫的模型。Seed list 只是快速入口；任何 provider 都可以填 custom model id。
+            這裡控制實際會被 AI card / 翻譯呼叫的模型。可以從 seed/discovery 套用，也可以直接輸入 provider model id。
           </p>
         </div>
       </div>
@@ -389,64 +397,31 @@ function ModelRoutingSection({
               </label>
 
               <label className="field">
-                <span>Model</span>
-                <select
-                  value={row.custom ? "__custom" : row.model}
+                <span>Model ID</span>
+                <input
+                  list={`models-${task.id}-${row.provider}`}
+                  value={row.model}
+                  placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const value = e.target.value.trim();
                     onDraft((prev) => ({
                       ...prev,
                       [task.id]: {
                         ...row,
-                        custom: value === "__custom",
-                        model: value === "__custom" ? "" : value,
+                        custom: !options.some((m) => m.id === value),
+                        model: value,
                       },
                     }));
                   }}
-                >
+                />
+                <datalist id={`models-${task.id}-${row.provider}`}>
                   {options.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label} · {m.quality}/{m.cost_tier}
-                    </option>
+                    <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
-                  <option value="__custom">Custom model id…</option>
-                </select>
-              </label>
-
-              <label className="field custom-field">
-                <span>Custom model id</span>
-                <div className="custom-row">
-                  <input
-                    value={row.custom ? row.model : ""}
-                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
-                    onFocus={() => {
-                      if (!row.custom) {
-                        onDraft((prev) => ({
-                          ...prev,
-                          [task.id]: { ...row, custom: true, model: "" },
-                        }));
-                      }
-                    }}
-                    onChange={(e) => {
-                      onDraft((prev) => ({
-                        ...prev,
-                        [task.id]: { ...row, custom: true, model: e.target.value },
-                      }));
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-ghost small"
-                    onClick={() => {
-                      onDraft((prev) => ({
-                        ...prev,
-                        [task.id]: { ...row, custom: true, model: "" },
-                      }));
-                    }}
-                  >
-                    使用自訂
-                  </button>
-                </div>
+                </datalist>
+                <span className="field-help">
+                  可以直接輸入 provider 回傳的 model id；Providers 頁 discovery 後可一鍵套用。
+                </span>
               </label>
 
               <ModelNotes models={options} selected={row.model} custom={row.custom} />
@@ -474,15 +449,88 @@ function ProviderSection({
   catalog,
   runtime,
   discovery,
+  onRefresh,
   onDiscover,
   onUseModel,
 }: {
   catalog: ModelCatalog;
   runtime: RuntimeConfig | null;
   discovery: DiscoveryState;
+  onRefresh: () => Promise<void>;
   onDiscover: (provider: ModelProvider, credentialId: string | null) => Promise<void>;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
 }) {
+  const [selectedCreds, setSelectedCreds] = useState<Partial<Record<ModelProvider, string>>>({});
+  const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
+  const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
+  const [renames, setRenames] = useState<Record<string, string>>({});
+  const [providerMsg, setProviderMsg] = useState<string | null>(null);
+  const [providerErr, setProviderErr] = useState<string | null>(null);
+
+  async function addKey(provider: ModelProvider) {
+    const alias = (newAlias[provider] ?? "").trim();
+    const secret = (newSecret[provider] ?? "").trim();
+    if (!secret) {
+      setProviderErr(`${provider}: API key 不可為空`);
+      return;
+    }
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await addCredential({
+        provider,
+        auth_type: "api_key",
+        alias: alias || `${provider} key`,
+        secret,
+        make_active: true,
+      });
+      setNewAlias((prev) => ({ ...prev, [provider]: "" }));
+      setNewSecret((prev) => ({ ...prev, [provider]: "" }));
+      setProviderMsg(`${provider} key 已新增並設為 active。`);
+      await onRefresh();
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function setActive(credentialId: string) {
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await updateCredential(credentialId, { active: true });
+      setProviderMsg("Active key 已更新。");
+      await onRefresh();
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function saveAlias(credentialId: string) {
+    const alias = (renames[credentialId] ?? "").trim();
+    if (!alias) return;
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await updateCredential(credentialId, { alias });
+      setProviderMsg("Alias 已更新。");
+      await onRefresh();
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function removeKey(credentialId: string) {
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await deleteCredential(credentialId);
+      setProviderMsg("Credential 已刪除。");
+      await onRefresh();
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <>
       <div className="settings-section-head">
@@ -493,6 +541,8 @@ function ProviderSection({
           </p>
         </div>
       </div>
+      {providerErr && <p className="error-text">{providerErr}</p>}
+      {providerMsg && <p className="ok-text">{providerMsg}</p>}
       <div className="provider-grid">
         {catalog.providers.map((provider) => {
           const models = catalog.models.filter((m) => m.provider === provider);
@@ -503,13 +553,18 @@ function ProviderSection({
           const keySet = credentials.some((c) => c.available && c.can_test_models);
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
           const discoveryState = discovery[provider];
-          const firstUsable = credentials.find((c) => c.available && c.can_discover_models);
+          const usable = credentials.filter((c) => c.available && c.can_discover_models);
+          const activeUsable = usable.find((c) => c.active);
+          const selectedDraft = selectedCreds[provider];
+          const selectedCredential = usable.some((c) => c.id === selectedDraft)
+            ? selectedDraft ?? null
+            : activeUsable?.id ?? usable[0]?.id ?? null;
           return (
             <div className="settings-panel provider-card" key={provider}>
               <div className="settings-panel-head">
                 <div>
                   <h2>{provider}</h2>
-                  <p className="muted">{models.length} seed models · custom model id allowed</p>
+                  <p className="muted">{models.length} seed models · direct model id input allowed</p>
                 </div>
                 <span className={`key-pill ${keySet ? "ok" : "missing"}`}>
                   {keySet ? "key set" : "no key"}
@@ -520,13 +575,55 @@ function ProviderSection({
                   <span key={model.id}>{model.id}</span>
                 ))}
               </div>
-              <CredentialList credentials={credentials} />
+              <div className="credential-add-box">
+                <label className="field">
+                  <span>新增 API key alias</span>
+                  <input
+                    value={newAlias[provider] ?? ""}
+                    placeholder={`${provider} primary`}
+                    onChange={(e) => setNewAlias((prev) => ({ ...prev, [provider]: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span>新增 API key</span>
+                  <input
+                    type="password"
+                    value={newSecret[provider] ?? ""}
+                    placeholder={provider === "openai" ? "sk-…" : "sk-ant-…"}
+                    onChange={(e) => setNewSecret((prev) => ({ ...prev, [provider]: e.target.value }))}
+                  />
+                </label>
+                <button type="button" className="btn-ghost small" onClick={() => void addKey(provider)}>
+                  新增並設為 active
+                </button>
+              </div>
+              <CredentialList
+                credentials={credentials}
+                renames={renames}
+                onRenameDraft={(id, alias) => setRenames((prev) => ({ ...prev, [id]: alias }))}
+                onSaveAlias={(id) => void saveAlias(id)}
+                onSetActive={(id) => void setActive(id)}
+                onDelete={(id) => void removeKey(id)}
+              />
               <div className="settings-actions">
+                <label className="field credential-select">
+                  <span>Discovery/Test credential</span>
+                  <select
+                    value={selectedCredential ?? ""}
+                    onChange={(e) => setSelectedCreds((prev) => ({ ...prev, [provider]: e.target.value }))}
+                  >
+                    {usable.map((cred) => (
+                      <option key={cred.id} value={cred.id}>
+                        {cred.active ? "★ " : ""}{cred.label} · {cred.masked ?? cred.source}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   type="button"
                   className="btn-ghost small"
-                  disabled={!firstUsable || discoveryState?.loading}
-                  onClick={() => void onDiscover(provider, firstUsable?.id ?? null)}
+                  disabled={!selectedCredential || discoveryState?.loading}
+                  onClick={() => void onDiscover(provider, selectedCredential)}
                 >
                   {discoveryState?.loading ? "讀取模型中…" : "列出此 key 可見模型"}
                 </button>
@@ -598,7 +695,7 @@ function ModelNotes({
   if (custom) {
     return (
       <p className="muted tiny">
-        Custom model ids are accepted so new or account-specific models can be used before the seed catalog is updated.
+        這個 model id 不在 seed catalog；請用 Providers 的 discovery/test 確認此 credential 是否可用。
       </p>
     );
   }
@@ -614,19 +711,62 @@ function ModelNotes({
   );
 }
 
-function CredentialList({ credentials }: { credentials: ProviderCredential[] }) {
+function CredentialList({
+  credentials,
+  renames,
+  onRenameDraft,
+  onSaveAlias,
+  onSetActive,
+  onDelete,
+}: {
+  credentials: ProviderCredential[];
+  renames: Record<string, string>;
+  onRenameDraft: (id: string, alias: string) => void;
+  onSaveAlias: (id: string) => void;
+  onSetActive: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   return (
     <div className="credential-list">
       {credentials.map((cred) => (
         <div className="credential-row" key={cred.id}>
           <div>
-            <strong>{cred.label}</strong>
+            <strong>{cred.active ? "★ " : ""}{cred.label}</strong>
             <span>{cred.auth_type} · {cred.source}</span>
           </div>
           <span className={`key-pill ${cred.available ? "ok" : "missing"}`}>
             {cred.available ? cred.masked ?? "available" : "missing"}
           </span>
           <p>{cred.notes}</p>
+          {cred.editable && (
+            <div className="credential-actions">
+              <input
+                value={renames[cred.id] ?? cred.label}
+                onChange={(e) => onRenameDraft(cred.id, e.target.value)}
+                aria-label={`${cred.label} alias`}
+              />
+              <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
+                儲存 alias
+              </button>
+              <button
+                type="button"
+                className="btn-ghost small"
+                disabled={cred.active}
+                onClick={() => onSetActive(cred.id)}
+              >
+                設為 active
+              </button>
+              <button
+                type="button"
+                className="btn-ghost small danger"
+                onClick={() => {
+                  if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
+                }}
+              >
+                刪除
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -640,6 +780,10 @@ function DiscoveryResultView({
   result: ModelDiscoveryResult;
   onUse: (model: string, task: ModelTask) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const models = result.models.filter((model) =>
+    model.id.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   return (
     <div className="discovery-box">
       <div className="discovery-head">
@@ -651,8 +795,12 @@ function DiscoveryResultView({
         )}
       </div>
       {result.error && <p className="warn-text tiny">{result.error}</p>}
+      <label className="field discovery-filter">
+        <span>搜尋模型</span>
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="gpt / claude / mini…" />
+      </label>
       <div className="discovery-models">
-        {result.models.slice(0, 24).map((model) => (
+        {models.map((model) => (
           <div className="model-discovery-row" key={model.id}>
             <span>{model.id}</span>
             <button type="button" className="btn-ghost small" onClick={() => onUse(model.id, "card_synthesis")}>
@@ -664,9 +812,9 @@ function DiscoveryResultView({
           </div>
         ))}
       </div>
-      {result.models.length > 24 && (
-        <p className="muted tiny">顯示前 24 個；custom model id 仍可手動填入。</p>
-      )}
+      <p className="muted tiny">
+        顯示 {models.length} / {result.models.length} 個 provider 回傳模型；任務頁仍可直接輸入任何 model id。
+      </p>
     </div>
   );
 }

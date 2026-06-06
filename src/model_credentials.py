@@ -10,7 +10,12 @@ direct API credentials until their provider-specific flow is implemented.
 from __future__ import annotations
 
 import os
+import sqlite3
+import threading
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
 import httpx
@@ -31,6 +36,8 @@ class ProviderCredential(BaseModel):
     source: str
     available: bool
     masked: str | None = None
+    active: bool = False
+    editable: bool = False
     can_discover_models: bool = False
     can_test_models: bool = False
     notes: str = ""
@@ -71,10 +78,195 @@ class _ResolvedCredential(BaseModel):
     secret: str | None = None
 
 
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS llm_credentials (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider   TEXT NOT NULL,
+    auth_type  TEXT NOT NULL DEFAULT 'api_key',
+    alias      TEXT NOT NULL,
+    secret     TEXT NOT NULL,
+    active     INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_credentials_provider ON llm_credentials(provider);
+"""
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _default_credential_db_path() -> str:
+    return os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+        Path(__file__).resolve().parents[1] / "data" / "profile_state.db"
+    )
+
+
+@dataclass
+class StoredCredential:
+    id: int
+    provider: Provider
+    auth_type: CredentialAuthType
+    alias: str
+    secret: str
+    active: bool
+    created_at: str
+    updated_at: str
+
+
+class CredentialStore:
+    """Local SQLite credential store.
+
+    Secrets are intentionally never returned by API responses. This is a local
+    desktop-app store, not an encrypted vault; a future pass can swap the secret
+    column for OS keyring / encrypted storage without changing the Settings API
+    shape.
+    """
+
+    def __init__(self, db_path: str | Path | None = None):
+        self.db_path = str(db_path or _default_credential_db_path())
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._write_lock = threading.Lock()
+        self._ensure_schema()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _ensure_schema(self) -> None:
+        with self._write_lock, self._connect() as conn:
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.executescript(_SCHEMA)
+            conn.commit()
+        try:
+            os.chmod(self.db_path, 0o600)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _row(row: sqlite3.Row) -> StoredCredential:
+        return StoredCredential(
+            id=int(row["id"]),
+            provider=row["provider"],
+            auth_type=row["auth_type"],
+            alias=row["alias"],
+            secret=row["secret"],
+            active=bool(row["active"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def list(self, provider: Provider | None = None) -> list[StoredCredential]:
+        where = "WHERE provider = ?" if provider else ""
+        params = (provider,) if provider else ()
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM llm_credentials {where} ORDER BY provider, active DESC, id",
+                params,
+            ).fetchall()
+        return [self._row(r) for r in rows]
+
+    def get(self, credential_id: str) -> StoredCredential | None:
+        local_id = _parse_local_id(credential_id)
+        if local_id is None:
+            return None
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM llm_credentials WHERE id = ?", (local_id,)).fetchone()
+        return self._row(row) if row else None
+
+    def add(
+        self,
+        *,
+        provider: Provider,
+        auth_type: CredentialAuthType,
+        alias: str,
+        secret: str,
+        make_active: bool = True,
+    ) -> StoredCredential:
+        alias = alias.strip() or f"{provider} key"
+        secret = secret.strip()
+        if not secret:
+            raise ValueError("secret is required")
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            if make_active:
+                conn.execute("UPDATE llm_credentials SET active = 0 WHERE provider = ?", (provider,))
+            cur = conn.execute(
+                "INSERT INTO llm_credentials "
+                "(provider, auth_type, alias, secret, active, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (provider, auth_type, alias, secret, 1 if make_active else 0, now, now),
+            )
+            conn.commit()
+            new_id = cur.lastrowid
+        got = self.get(f"local:{new_id}")
+        assert got is not None
+        return got
+
+    def update(
+        self,
+        credential_id: str,
+        *,
+        alias: str | None = None,
+        secret: str | None = None,
+        active: bool | None = None,
+    ) -> StoredCredential | None:
+        existing = self.get(credential_id)
+        if not existing:
+            return None
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            if active is True:
+                conn.execute(
+                    "UPDATE llm_credentials SET active = 0 WHERE provider = ?",
+                    (existing.provider,),
+                )
+            sets = ["updated_at = ?"]
+            params: list = [now]
+            if alias is not None:
+                clean_alias = alias.strip()
+                if clean_alias:
+                    sets.append("alias = ?")
+                    params.append(clean_alias)
+            if secret is not None:
+                clean_secret = secret.strip()
+                if clean_secret:
+                    sets.append("secret = ?")
+                    params.append(clean_secret)
+            if active is not None:
+                sets.append("active = ?")
+                params.append(1 if active else 0)
+            params.append(existing.id)
+            conn.execute(f"UPDATE llm_credentials SET {', '.join(sets)} WHERE id = ?", params)
+            conn.commit()
+        return self.get(credential_id)
+
+    def delete(self, credential_id: str) -> bool:
+        local_id = _parse_local_id(credential_id)
+        if local_id is None:
+            return False
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM llm_credentials WHERE id = ?", (local_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+
 def _mask_secret(value: str) -> str:
     if len(value) <= 10:
         return "••••"
     return f"{value[:4]}…{value[-4:]}"
+
+
+def _parse_local_id(credential_id: str | None) -> int | None:
+    if not credential_id or not credential_id.startswith("local:"):
+        return None
+    try:
+        return int(credential_id.split(":", 1)[1])
+    except ValueError:
+        return None
 
 
 def _split_key_pool(raw: str | None) -> list[str]:
@@ -107,13 +299,41 @@ def looks_like_effort_error(exc: Exception) -> bool:
     return any(needle in text for needle in needles)
 
 
-def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
+def provider_credentials(store: CredentialStore | None = None) -> dict[Provider, list[ProviderCredential]]:
     """Return masked credential inventory grouped by provider."""
     ensure_env_loaded()
+    store = store or CredentialStore()
     out: dict[Provider, list[ProviderCredential]] = {"anthropic": [], "openai": []}
+
+    local_by_provider: dict[Provider, list[ProviderCredential]] = {"anthropic": [], "openai": []}
+    for row in store.list():
+        can_use = row.auth_type in ("api_key", "api_key_pool")
+        local_by_provider[row.provider].append(
+            ProviderCredential(
+                id=f"local:{row.id}",
+                provider=row.provider,
+                auth_type=row.auth_type,
+                label=row.alias,
+                source="profile_state.db",
+                available=True,
+                masked=_mask_secret(row.secret),
+                active=row.active,
+                editable=True,
+                can_discover_models=can_use,
+                can_test_models=can_use,
+                notes=(
+                    "Local Settings credential. Stored in the ignored local SQLite profile DB."
+                    if can_use
+                    else "Stored for future auth flow support; not used as a direct API key in v0."
+                ),
+            )
+        )
+    out["anthropic"].extend(local_by_provider["anthropic"])
+    out["openai"].extend(local_by_provider["openai"])
 
     def add_api_key(provider: Provider, env_name: str, label: str) -> None:
         value = os.environ.get(env_name, "").strip()
+        has_local_active = any(c.active for c in local_by_provider[provider])
         out[provider].append(
             ProviderCredential(
                 id=f"{provider}:{env_name}",
@@ -123,6 +343,10 @@ def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
                 source=env_name,
                 available=bool(value),
                 masked=_mask_secret(value) if value else None,
+                active=bool(value) and not has_local_active and not any(
+                    c.active and c.provider == provider for c in out[provider]
+                ),
+                editable=False,
                 can_discover_models=bool(value),
                 can_test_models=bool(value),
                 notes="Direct provider API key from environment/config/.env.",
@@ -131,6 +355,7 @@ def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
 
     def add_key_pool(provider: Provider, env_name: str) -> None:
         for idx, value in enumerate(_split_key_pool(os.environ.get(env_name))):
+            has_local_active = any(c.active for c in local_by_provider[provider])
             out[provider].append(
                 ProviderCredential(
                     id=f"{provider}:{env_name}:{idx}",
@@ -140,6 +365,10 @@ def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
                     source=env_name,
                     available=True,
                     masked=_mask_secret(value),
+                    active=not has_local_active and not any(
+                        c.active and c.provider == provider for c in out[provider]
+                    ),
+                    editable=False,
                     can_discover_models=True,
                     can_test_models=True,
                     notes="Direct provider API key from a comma-separated key pool.",
@@ -181,6 +410,8 @@ def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
                 source=env_name,
                 available=bool(value),
                 masked=_mask_secret(value) if value else None,
+                active=False,
+                editable=False,
                 can_discover_models=False,
                 can_test_models=False,
                 notes=notes,
@@ -190,11 +421,29 @@ def provider_credentials() -> dict[Provider, list[ProviderCredential]]:
     return out
 
 
-def _resolve_api_credential(provider: Provider, credential_id: str | None) -> _ResolvedCredential | None:
+def _resolve_api_credential(
+    provider: Provider,
+    credential_id: str | None,
+    store: CredentialStore | None = None,
+) -> _ResolvedCredential | None:
     ensure_env_loaded()
-    creds = provider_credentials()[provider]
+    store = store or CredentialStore()
+    local = store.get(credential_id) if credential_id else None
+    if local and local.provider == provider and local.auth_type in ("api_key", "api_key_pool"):
+        return _ResolvedCredential(
+            id=f"local:{local.id}",
+            provider=provider,
+            auth_type=local.auth_type,
+            secret=local.secret,
+        )
+
+    creds = provider_credentials(store)[provider]
     usable = [c for c in creds if c.available and c.can_test_models]
-    selected = next((c for c in usable if c.id == credential_id), None) if credential_id else (usable[0] if usable else None)
+    selected = (
+        next((c for c in usable if c.id == credential_id), None)
+        if credential_id
+        else next((c for c in usable if c.active), None) or (usable[0] if usable else None)
+    )
     if not selected:
         return None
 
@@ -216,9 +465,13 @@ def _resolve_api_credential(provider: Provider, credential_id: str | None) -> _R
     )
 
 
-def discover_models(provider: Provider, credential_id: str | None = None) -> ModelDiscoveryResult:
+def discover_models(
+    provider: Provider,
+    credential_id: str | None = None,
+    store: CredentialStore | None = None,
+) -> ModelDiscoveryResult:
     """Discover models for a provider/key when supported; fall back to seeds."""
-    cred = _resolve_api_credential(provider, credential_id)
+    cred = _resolve_api_credential(provider, credential_id, store)
     if not cred or not cred.secret:
         return ModelDiscoveryResult(
             provider=provider,
@@ -282,9 +535,10 @@ def test_model(
     model: str,
     effort: str = "default",
     credential_id: str | None = None,
+    store: CredentialStore | None = None,
 ) -> ModelTestResult:
     """Run a tiny paid provider call to verify credential/model/effort access."""
-    cred = _resolve_api_credential(provider, credential_id)
+    cred = _resolve_api_credential(provider, credential_id, store)
     if not cred or not cred.secret:
         return ModelTestResult(
             provider=provider,
