@@ -101,6 +101,19 @@ def test_translation_validation_rejects_list_count_change():
         _validate_translation(card, {**card, "primary_reasons": ["只剩一條"]})
 
 
+def test_task_model_routing(monkeypatch):
+    from src.agents.config import get_agent_config, task_model
+
+    get_agent_config.cache_clear()
+    # translation defaults to the fast model (not the Opus synthesis model)
+    assert task_model("card_translation") == "claude-sonnet-4-6"
+    # env override wins for either task
+    monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_MODEL", "claude-haiku-4-5")
+    monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "test-model-x")
+    assert task_model("card_translation") == "claude-haiku-4-5"
+    assert task_model("card_synthesis") == "test-model-x"
+
+
 def test_render_card_markdown_has_core_sections(monkeypatch):
     monkeypatch.setattr("src.card_synthesis._synthesize_anthropic", lambda packet, model: _synth())
     card, _ = synthesize_card(_packet(), now_iso="2026-06-05T00:00:00Z", provider="anthropic")

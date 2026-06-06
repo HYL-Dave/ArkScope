@@ -59,7 +59,7 @@ def runtime_config():
     """
     import os
 
-    from src.agents.config import get_agent_config
+    from src.agents.config import get_agent_config, task_model
     from src.env_keys import ensure_env_loaded
 
     ensure_env_loaded()
@@ -83,8 +83,8 @@ def runtime_config():
             "key_set": key_set("OPENAI_API_KEY"),
         },
         # Per-task model routing (so the UI can show what each operation uses).
-        "card_synthesis": {"provider": "anthropic", "model": cfg.anthropic_model_advanced},
-        "card_translation": {"provider": "anthropic", "model": cfg.anthropic_model},
+        "card_synthesis": {"provider": "anthropic", "model": task_model("card_synthesis")},
+        "card_translation": {"provider": "anthropic", "model": task_model("card_translation")},
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),

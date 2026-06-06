@@ -21,7 +21,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from src.agents.config import get_agent_config
+from src.agents.config import get_agent_config, task_model
 from src.env_keys import ensure_env_loaded
 from src.evidence_packet import EvidencePacket
 from src.result_card import (
@@ -262,7 +262,7 @@ def synthesize_card(
     ensure_env_loaded()
     config = get_agent_config()
     if provider == "anthropic":
-        model = model or config.anthropic_model_advanced
+        model = model or task_model("card_synthesis")
         synth = _synthesize_anthropic(packet, model)
     elif provider == "openai":
         model = model or config.openai_model_advanced
@@ -347,8 +347,7 @@ def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = 
     tool guarantees the structure (and list item counts) survive.
     """
     ensure_env_loaded()
-    config = get_agent_config()
-    model = model or config.anthropic_model
+    model = model or task_model("card_translation")
     target = _LANG_NAMES.get(lang, lang)
 
     payload = {k: card.get(k) for k in _TRANSLATABLE_FIELDS if card.get(k) not in (None, "", [])}

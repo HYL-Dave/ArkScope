@@ -10,6 +10,7 @@ Models can be configured via:
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Literal, Optional
@@ -31,6 +32,11 @@ class AgentConfig(BaseModel):
     # Anthropic models
     anthropic_model: str = "claude-opus-4-7"
     anthropic_model_advanced: str = "claude-opus-4-7"
+
+    # Per-task model routing (minimal; full Settings UI later). Empty string =
+    # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
+    card_synthesis_model: str = ""    # "" → anthropic_model_advanced (Opus-class)
+    card_translation_model: str = ""  # "" → a fast model (Sonnet)
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -219,6 +225,10 @@ def get_agent_config() -> AgentConfig:
         config.anthropic_model = llm_prefs["anthropic_model"]
     if "anthropic_model_advanced" in llm_prefs:
         config.anthropic_model_advanced = llm_prefs["anthropic_model_advanced"]
+    if "card_synthesis_model" in llm_prefs:
+        config.card_synthesis_model = llm_prefs["card_synthesis_model"]
+    if "card_translation_model" in llm_prefs:
+        config.card_translation_model = llm_prefs["card_translation_model"]
     if "reasoning_effort" in llm_prefs:
         config.reasoning_effort = llm_prefs["reasoning_effort"]
     if "max_tool_calls" in llm_prefs:
@@ -326,3 +336,28 @@ def get_agent_config() -> AgentConfig:
         config.compaction_layer_5_model_anthropic = compaction_prefs["layer_5_model_anthropic"]
 
     return config
+
+
+# Per-task model routing. Resolution: env override → user_profile → built-in
+# default. Lets card synthesis stay Opus-class while translation (and future
+# chat/deep-research) route to cheaper/faster models, without a full Settings UI.
+_DEFAULT_TRANSLATION_MODEL = "claude-sonnet-4-6"
+_TASK_ENV = {
+    "card_synthesis": "ARKSCOPE_CARD_SYNTHESIS_MODEL",
+    "card_translation": "ARKSCOPE_CARD_TRANSLATION_MODEL",
+}
+
+
+def task_model(task: str) -> str:
+    """Resolve the model id for a per-task LLM operation (env → profile → default)."""
+    env_key = _TASK_ENV.get(task)
+    if env_key:
+        env_val = os.environ.get(env_key)
+        if env_val:
+            return env_val
+    config = get_agent_config()
+    if task == "card_synthesis":
+        return config.card_synthesis_model or config.anthropic_model_advanced
+    if task == "card_translation":
+        return config.card_translation_model or _DEFAULT_TRANSLATION_MODEL
+    return config.anthropic_model
