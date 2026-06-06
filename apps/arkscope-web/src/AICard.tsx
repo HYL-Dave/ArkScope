@@ -31,10 +31,12 @@ export function AICardTab({ ticker }: { ticker: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Monotonic request token: a response is only applied if its token is still
-  // current. Switching ticker (effect) and starting generate/openCard bump it,
-  // so a slow generate (1-2 min) can never backfill into a different ticker or
-  // override a card the user opened while waiting.
+  // Request token for IN-INSTANCE supersession: generate() and openCard() bump
+  // it, so if the user opens a recent card (or starts another generate) while a
+  // 1-2 min generate is still running, the stale response is dropped instead of
+  // clobbering the newer one. Cross-ticker isolation comes from the parent
+  // remounting this component per ticker (Watchlist keys TickerDetail by
+  // ticker), NOT from this token.
   const reqRef = useRef(0);
 
   const loadRecent = useCallback(async () => {
@@ -327,12 +329,29 @@ export function CardModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes; move focus into the dialog on open and restore it on close.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    closeBtnRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+    };
+  }, [onClose]);
 
   useEffect(() => {
     let alive = true;
     setCard(null);
     setEvidencePacket(null);
     setErr(null);
+    setSaved(false);
+    setSaving(false);
     getCard(runId)
       .then((d) => {
         if (alive) {
@@ -365,11 +384,17 @@ export function CardModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={card ? `${card.ticker} AI 卡片` : "AI 卡片"}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <span className="strong">{card ? `${card.ticker} · AI 卡片` : "AI 卡片"}</span>
           <span className="spacer" />
-          <button className="btn-ghost" onClick={onClose}>✕ 關閉</button>
+          <button ref={closeBtnRef} className="btn-ghost" onClick={onClose}>✕ 關閉</button>
         </div>
         {err && <p className="refresh-err tiny">{err}</p>}
         {!card && err ? (
