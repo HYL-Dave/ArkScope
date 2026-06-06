@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import yaml
+import pytest
+from fastapi import HTTPException
+
+from src.api.routes.config_routes import ModelRoutesUpdate, RouteUpdate, model_catalog, runtime_config, update_model_routes
+
+
+def test_model_catalog_exposes_seed_models():
+    res = model_catalog()
+    ids = {m["id"] for m in res["models"]}
+    assert "claude-opus-4-8" in ids
+    assert "gpt-5.5" in ids
+    assert set(res["routes"]) == {"card_synthesis", "card_translation"}
+
+
+def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_PROVIDER", raising=False)
+    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_MODEL", raising=False)
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    cfg_mod.get_agent_config.cache_clear()
+
+    res = update_model_routes(
+        ModelRoutesUpdate(
+            routes={
+                "card_synthesis": RouteUpdate(provider="openai", model="gpt-5.5"),
+                "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-4-6"),
+            }
+        )
+    )
+    assert res["routes"]["card_synthesis"]["provider"] == "openai"
+    assert res["routes"]["card_synthesis"]["model"] == "gpt-5.5"
+
+    data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
+    assert data["llm_preferences"]["card_synthesis_provider"] == "openai"
+    assert data["llm_preferences"]["card_synthesis_model"] == "gpt-5.5"
+    assert runtime_config()["card_synthesis"]["provider"] == "openai"
+
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_update_model_routes_rejects_provider_model_mismatch():
+    with pytest.raises(HTTPException) as exc:
+        update_model_routes(
+            ModelRoutesUpdate(
+                routes={
+                    "card_synthesis": RouteUpdate(provider="anthropic", model="gpt-5.5"),
+                }
+            )
+        )
+    assert exc.value.status_code == 400

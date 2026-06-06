@@ -21,7 +21,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.agents.config import get_agent_config
+from src.agents.config import get_agent_config, task_route
 from src.api.dependencies import get_card_store, get_dal
 from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
@@ -47,7 +47,7 @@ _ALLOWED_LANGS = {"zh-Hant", "zh-Hans"}
 class GenerateBody(BaseModel):
     question: Optional[str] = None
     horizon: Optional[str] = None
-    provider: str = "anthropic"
+    provider: Optional[str] = None
     include_sa: Optional[bool] = None  # override config.sa_enabled for this run
 
 
@@ -90,9 +90,11 @@ def generate_card(
     store: CardRunStore = Depends(get_card_store),
 ):
     """Generate a §2 card: gather objective evidence → synthesize → cache the run."""
-    provider = (body.provider or "anthropic").lower()
+    route = task_route("card_synthesis")
+    provider = (body.provider or route.provider).lower()
     if provider not in _VALID_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"unknown provider: {provider}")
+    model = route.model if provider == route.provider else None
 
     now = _utcnow()
     sa_enabled = body.include_sa if body.include_sa is not None else get_agent_config().sa_enabled
@@ -111,6 +113,7 @@ def generate_card(
             packet,
             now_iso=now,
             provider=provider,  # type: ignore[arg-type]
+            model=model,
             question=body.question,
             horizon=body.horizon,
         )

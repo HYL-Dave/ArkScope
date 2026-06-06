@@ -18,6 +18,15 @@ from typing import Dict, Literal, Optional
 import yaml
 from pydantic import BaseModel
 
+from src.model_routing import (
+    Provider,
+    TaskId,
+    TaskRoute,
+    default_model_for,
+    is_seed_model,
+    model_provider,
+)
+
 # Valid reasoning effort levels for GPT-5.x / o-series
 ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 
@@ -35,7 +44,9 @@ class AgentConfig(BaseModel):
 
     # Per-task model routing (minimal; full Settings UI later). Empty string =
     # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
+    card_synthesis_provider: str = ""  # "" → anthropic unless model infers otherwise
     card_synthesis_model: str = ""    # "" → anthropic_model_advanced (Opus-class)
+    card_translation_provider: str = ""  # "" → anthropic unless model infers otherwise
     card_translation_model: str = ""  # "" → a fast model (Sonnet)
 
     # Reasoning (GPT-5.x / o-series)
@@ -225,8 +236,12 @@ def get_agent_config() -> AgentConfig:
         config.anthropic_model = llm_prefs["anthropic_model"]
     if "anthropic_model_advanced" in llm_prefs:
         config.anthropic_model_advanced = llm_prefs["anthropic_model_advanced"]
+    if "card_synthesis_provider" in llm_prefs:
+        config.card_synthesis_provider = llm_prefs["card_synthesis_provider"]
     if "card_synthesis_model" in llm_prefs:
         config.card_synthesis_model = llm_prefs["card_synthesis_model"]
+    if "card_translation_provider" in llm_prefs:
+        config.card_translation_provider = llm_prefs["card_translation_provider"]
     if "card_translation_model" in llm_prefs:
         config.card_translation_model = llm_prefs["card_translation_model"]
     if "reasoning_effort" in llm_prefs:
@@ -343,21 +358,71 @@ def get_agent_config() -> AgentConfig:
 # chat/deep-research) route to cheaper/faster models, without a full Settings UI.
 _DEFAULT_TRANSLATION_MODEL = "claude-sonnet-4-6"
 _TASK_ENV = {
-    "card_synthesis": "ARKSCOPE_CARD_SYNTHESIS_MODEL",
-    "card_translation": "ARKSCOPE_CARD_TRANSLATION_MODEL",
+    "card_synthesis": ("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", "ARKSCOPE_CARD_SYNTHESIS_MODEL"),
+    "card_translation": ("ARKSCOPE_CARD_TRANSLATION_PROVIDER", "ARKSCOPE_CARD_TRANSLATION_MODEL"),
 }
 
 
-def task_model(task: str) -> str:
-    """Resolve the model id for a per-task LLM operation (env → profile → default)."""
-    env_key = _TASK_ENV.get(task)
-    if env_key:
-        env_val = os.environ.get(env_key)
-        if env_val:
-            return env_val
-    config = get_agent_config()
+def _clean_provider(value: str | None) -> Provider | None:
+    if value in ("anthropic", "openai"):
+        return value
+    return None
+
+
+def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str]:
     if task == "card_synthesis":
-        return config.card_synthesis_model or config.anthropic_model_advanced
+        return config.card_synthesis_provider, config.card_synthesis_model
     if task == "card_translation":
-        return config.card_translation_model or _DEFAULT_TRANSLATION_MODEL
-    return config.anthropic_model
+        return config.card_translation_provider, config.card_translation_model
+    raise ValueError(f"unknown task: {task}")
+
+
+def task_route(task: TaskId) -> TaskRoute:
+    """Resolve provider + model for a per-task LLM operation.
+
+    Resolution is env override → user_profile.local/user_profile → built-in
+    default. If only a model is provided, known model prefixes infer provider
+    (``claude-*`` → Anthropic, ``gpt-*``/``o*`` → OpenAI).
+    """
+    config = get_agent_config()
+    profile_provider, profile_model = _configured_task_values(config, task)
+    env_provider_key, env_model_key = _TASK_ENV[task]
+    env_provider = _clean_provider(os.environ.get(env_provider_key))
+    env_model = (os.environ.get(env_model_key) or "").strip()
+
+    provider = env_provider or _clean_provider(profile_provider)
+    model = env_model or profile_model.strip()
+    source = "env" if env_provider or env_model else "profile" if provider or model else "default"
+
+    if not provider and model:
+        provider = model_provider(model)
+    if not provider:
+        provider = "anthropic"
+
+    if not model:
+        if task == "card_synthesis" and provider == "anthropic":
+            model = config.anthropic_model_advanced
+        elif task == "card_synthesis" and provider == "openai":
+            model = config.openai_model_advanced
+        elif task == "card_translation" and provider == "anthropic":
+            model = _DEFAULT_TRANSLATION_MODEL
+        else:
+            model = default_model_for(provider, task)
+
+    return TaskRoute(
+        task=task,
+        provider=provider,
+        model=model,
+        source=source,
+        custom=not is_seed_model(provider, model),
+    )
+
+
+def task_model(task: TaskId) -> str:
+    """Resolve the model id for a per-task LLM operation."""
+    return task_route(task).model
+
+
+def task_provider(task: TaskId) -> Provider:
+    """Resolve the provider for a per-task LLM operation."""
+    return task_route(task).provider

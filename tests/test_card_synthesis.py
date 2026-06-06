@@ -102,7 +102,7 @@ def test_translation_validation_rejects_list_count_change():
 
 
 def test_task_model_routing(monkeypatch):
-    from src.agents.config import get_agent_config, task_model
+    from src.agents.config import get_agent_config, task_model, task_route
 
     get_agent_config.cache_clear()
     # translation defaults to the fast model (not the Opus synthesis model)
@@ -112,6 +112,12 @@ def test_task_model_routing(monkeypatch):
     monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "test-model-x")
     assert task_model("card_translation") == "claude-haiku-4-5"
     assert task_model("card_synthesis") == "test-model-x"
+    # provider can be set independently; model-only OpenAI ids infer provider.
+    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL")
+    monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "gpt-5.4-mini")
+    assert task_route("card_synthesis").provider == "openai"
+    monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", "anthropic")
+    assert task_route("card_synthesis").provider == "anthropic"
 
 
 def test_render_card_markdown_has_core_sections(monkeypatch):

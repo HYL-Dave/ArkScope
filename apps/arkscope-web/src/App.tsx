@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
+import { SettingsView } from "./Settings";
 import { WatchlistView } from "./Watchlist";
 
 // Nav aligned to the desktop-app design doc (PDF p6) — MVP subset. Keys are
@@ -21,7 +22,7 @@ const NAV = [
 ] as const;
 type Nav = (typeof NAV)[number];
 
-const ENABLED: Nav[] = ["Home", "Watchlist", "System"];
+const ENABLED: Nav[] = ["Home", "Watchlist", "System", "Settings"];
 
 const LABELS: Record<Nav, string> = {
   Home: "工作台",
@@ -51,6 +52,14 @@ export function App() {
     }
   }, []);
 
+  const refreshRuntime = useCallback(async () => {
+    try {
+      setRuntime(await getRuntimeConfig());
+    } catch {
+      setRuntime(null);
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
     const id = window.setInterval(() => void refresh(), 15_000);
@@ -59,8 +68,8 @@ export function App() {
 
   // Runtime config (active models + key presence) changes rarely — fetch once.
   useEffect(() => {
-    void getRuntimeConfig().then(setRuntime).catch(() => setRuntime(null));
-  }, []);
+    void refreshRuntime();
+  }, [refreshRuntime]);
 
   const dot = status.kind === "ready" ? "ok" : status.kind === "error" ? "bad" : "wait";
 
@@ -117,6 +126,8 @@ export function App() {
           <WatchlistView />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
+        ) : view === "Settings" ? (
+          <SettingsView runtime={runtime} onRuntimeChanged={refreshRuntime} />
         ) : (
           <main className="main">
             <p className="muted">{LABELS[view]} — 規劃中。</p>

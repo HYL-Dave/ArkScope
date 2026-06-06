@@ -21,7 +21,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from src.agents.config import get_agent_config, task_model
+from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
 from src.evidence_packet import EvidencePacket
 from src.result_card import (
@@ -260,12 +260,12 @@ def synthesize_card(
     record. Raises on provider failure or malformed output (validated by Pydantic).
     """
     ensure_env_loaded()
-    config = get_agent_config()
+    route = task_route("card_synthesis")
     if provider == "anthropic":
-        model = model or task_model("card_synthesis")
+        model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         synth = _synthesize_anthropic(packet, model)
     elif provider == "openai":
-        model = model or config.openai_model_advanced
+        model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         synth = _synthesize_openai(packet, model)
     else:
         raise ValueError(f"unknown provider: {provider}")
@@ -339,7 +339,13 @@ _TRANSLATABLE_FIELDS = (
 )
 
 
-def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = None) -> dict:
+def translate_card(
+    card: dict,
+    *,
+    lang: str = "zh-Hant",
+    provider: Optional[Provider] = None,
+    model: Optional[str] = None,
+) -> dict:
     """Translate a card's natural-language fields into ``lang``; return a full card dict.
 
     Only prose fields are translated; ticker, numbers, %, evidence_ids,
@@ -347,7 +353,9 @@ def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = 
     tool guarantees the structure (and list item counts) survive.
     """
     ensure_env_loaded()
-    model = model or task_model("card_translation")
+    route = task_route("card_translation")
+    provider = provider or route.provider
+    model = model or route.model
     target = _LANG_NAMES.get(lang, lang)
 
     payload = {k: card.get(k) for k in _TRANSLATABLE_FIELDS if card.get(k) not in (None, "", [])}
@@ -371,6 +379,22 @@ def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = 
     )
     user = json.dumps(payload, ensure_ascii=False, indent=2)
 
+    if provider == "anthropic":
+        translated = _translate_anthropic(model, system, user, schema, target)
+    elif provider == "openai":
+        translated = _translate_openai(model, system, user, schema, target)
+    else:
+        raise ValueError(f"unknown provider: {provider}")
+
+    out = dict(card)
+    for k, v in translated.items():
+        if k in _TRANSLATABLE_FIELDS:
+            out[k] = v
+    _validate_translation(card, out)
+    return out
+
+
+def _translate_anthropic(model: str, system: str, user: str, schema: dict, target: str) -> dict:
     from anthropic import Anthropic
 
     client = Anthropic()
@@ -388,18 +412,41 @@ def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = 
         ],
         tool_choice={"type": "tool", "name": "emit_translation"},
     )
-    translated: dict = {}
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and block.name == "emit_translation":
-            translated = block.input
-            break
+            return block.input
+    raise RuntimeError("Anthropic translation did not return emit_translation")
 
-    out = dict(card)
-    for k, v in translated.items():
-        if k in _TRANSLATABLE_FIELDS:
-            out[k] = v
-    _validate_translation(card, out)
-    return out
+
+def _translate_openai(model: str, system: str, user: str, schema: dict, target: str) -> dict:
+    from openai import OpenAI
+
+    client = OpenAI()
+    resp = client.chat.completions.create(
+        model=model,
+        max_completion_tokens=4096,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "emit_translation",
+                    "description": f"Emit the {target} translation of the given fields.",
+                    "parameters": schema,
+                },
+            }
+        ],
+        tool_choice={"type": "function", "function": {"name": "emit_translation"}},
+    )
+    msg = resp.choices[0].message
+    tool_calls = getattr(msg, "tool_calls", None) or []
+    for tc in tool_calls:
+        if tc.function.name == "emit_translation":
+            return json.loads(tc.function.arguments)
+    raise RuntimeError("OpenAI translation did not return emit_translation")
 
 
 def _validate_translation(card: dict, out: dict) -> None:

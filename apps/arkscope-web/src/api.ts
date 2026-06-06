@@ -15,9 +15,51 @@ export interface ApiStatus {
 export interface RuntimeConfig {
   anthropic: { model: string; model_advanced: string; effort: string | null; thinking: boolean; key_set: boolean };
   openai: { model: string; model_advanced: string; reasoning_effort: string; key_set: boolean };
-  card_synthesis: { provider: string; model: string };
-  card_translation: { provider: string; model: string };
+  card_synthesis: TaskRoute;
+  card_translation: TaskRoute;
   data_keys: Record<string, boolean>;
+}
+
+export type ModelProvider = "anthropic" | "openai";
+export type ModelTask = "card_synthesis" | "card_translation";
+
+export interface TaskRoute {
+  task: ModelTask;
+  provider: ModelProvider;
+  model: string;
+  source: "env" | "profile" | "default";
+  custom: boolean;
+}
+
+export interface ModelOption {
+  id: string;
+  provider: ModelProvider;
+  label: string;
+  quality: "frontier" | "high" | "balanced" | "fast";
+  speed: "slow" | "medium" | "fast";
+  cost_tier: "high" | "medium" | "low";
+  supports_structured_output: boolean;
+  supports_tool_calling: boolean;
+  recommended_for: ModelTask[];
+  source_url: string;
+  verified_at: string;
+  notes: string;
+}
+
+export interface TaskInfo {
+  id: ModelTask;
+  label: string;
+  description: string;
+  default_provider: ModelProvider;
+  recommended_model: string;
+}
+
+export interface ModelCatalog {
+  providers: ModelProvider[];
+  tasks: TaskInfo[];
+  models: ModelOption[];
+  routes: Record<ModelTask, TaskRoute>;
+  custom_allowed: boolean;
 }
 
 export interface WatchlistRow {
@@ -276,6 +318,21 @@ export function getStatus(): Promise<ApiStatus> {
 
 export function getRuntimeConfig(): Promise<RuntimeConfig> {
   return getJSON<RuntimeConfig>("/config/runtime", 8_000);
+}
+
+export function getModelCatalog(): Promise<ModelCatalog> {
+  return getJSON<ModelCatalog>("/config/model-catalog", 8_000);
+}
+
+export function saveModelRoutes(
+  routes: Partial<Record<ModelTask, { provider: ModelProvider; model: string }>>,
+): Promise<{ routes: Partial<Record<ModelTask, TaskRoute>> }> {
+  return sendJSON<{ routes: Partial<Record<ModelTask, TaskRoute>> }>(
+    "/config/model-routes",
+    "PUT",
+    { routes },
+    8_000,
+  );
 }
 
 export function getOverview(): Promise<WatchlistOverview> {

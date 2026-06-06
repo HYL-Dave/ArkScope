@@ -1,12 +1,25 @@
 """Config and overview routes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
+from src.agents.config import save_local_override, task_route
+from src.api.permissions import require_profile_state_write
 from src.api.dependencies import get_dal
+from src.model_routing import Provider, TaskId, TaskRoute, catalog, is_seed_model, model_provider
 from src.tools.data_access import DataAccessLayer
 from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
 
 router = APIRouter(tags=["config"])
+
+
+class RouteUpdate(BaseModel):
+    provider: Provider
+    model: str
+
+
+class ModelRoutesUpdate(BaseModel):
+    routes: dict[TaskId, RouteUpdate]
 
 
 @router.get("/config/watchlist")
@@ -59,7 +72,7 @@ def runtime_config():
     """
     import os
 
-    from src.agents.config import get_agent_config, task_model
+    from src.agents.config import get_agent_config
     from src.env_keys import ensure_env_loaded
 
     ensure_env_loaded()
@@ -83,8 +96,8 @@ def runtime_config():
             "key_set": key_set("OPENAI_API_KEY"),
         },
         # Per-task model routing (so the UI can show what each operation uses).
-        "card_synthesis": {"provider": "anthropic", "model": task_model("card_synthesis")},
-        "card_translation": {"provider": "anthropic", "model": task_model("card_translation")},
+        "card_synthesis": task_route("card_synthesis").model_dump(),
+        "card_translation": task_route("card_translation").model_dump(),
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),
@@ -93,3 +106,53 @@ def runtime_config():
             "tavily": key_set("TAVILY_API_KEY"),
         },
     }
+
+
+@router.get("/config/model-catalog")
+def model_catalog():
+    """Seed model catalog + current task routes for Settings.
+
+    The catalog intentionally allows custom model IDs: official docs can lag
+    account entitlements, and providers roll models independently.
+    """
+    return {
+        **catalog().model_dump(),
+        "routes": {
+            "card_synthesis": task_route("card_synthesis").model_dump(),
+            "card_translation": task_route("card_translation").model_dump(),
+        },
+        "custom_allowed": True,
+    }
+
+
+@router.put("/config/model-routes")
+def update_model_routes(body: ModelRoutesUpdate):
+    """Persist per-task provider/model routing in user_profile.local.yaml."""
+    if not body.routes:
+        raise HTTPException(status_code=400, detail="no routes supplied")
+
+    saved: dict[str, TaskRoute] = {}
+    for task, update in body.routes.items():
+        model = update.model.strip()
+        if not model:
+            raise HTTPException(status_code=400, detail=f"{task}: model is required")
+        inferred = model_provider(model)
+        if inferred and inferred != update.provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{task}: model '{model}' looks like {inferred}, not {update.provider}",
+            )
+        require_profile_state_write(
+            "model_route_update",
+            {"task": task, "provider": update.provider, "model": model},
+        )
+        save_local_override("llm_preferences", f"{task}_provider", update.provider)
+        save_local_override("llm_preferences", f"{task}_model", model)
+        saved[task] = TaskRoute(
+            task=task,
+            provider=update.provider,
+            model=model,
+            source="profile",
+            custom=not is_seed_model(update.provider, model),
+        )
+    return {"routes": {k: v.model_dump() for k, v in saved.items()}}
