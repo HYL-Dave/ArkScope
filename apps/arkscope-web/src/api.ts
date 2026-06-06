@@ -210,9 +210,21 @@ export interface UniverseRow {
   news_count_7d: number;
   sentiment_mean: number | null;
   bullish_ratio: number | null;
-  lists: string[];
+  lists: string[];          // active list memberships
+  all_lists: string[];      // active + archived (full provenance)
+  archived_lists: string[]; // memberships that are archived
   archived: boolean;
   note_count: number;
+}
+
+export interface WatchlistSummary {
+  id: number;
+  name: string;
+  kind: string; // holdings | interested | theme | tier | custom
+  position: number;
+  archived: boolean;
+  active_count: number;
+  total_count: number;
 }
 
 export interface UniverseResponse {
@@ -513,6 +525,10 @@ export function getCockpitWatchlist(includeArchived = false): Promise<CockpitWat
 
 export function getUniverse(includeArchived = true): Promise<UniverseResponse> {
   return getJSON<UniverseResponse>(`/profile/universe?include_archived=${includeArchived}`);
+}
+
+export function getProfileLists(includeArchived = false): Promise<{ lists: WatchlistSummary[] }> {
+  return getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`);
 }
 
 // Seeds lists from user_profile groups + tickers_core tiers. The groups source

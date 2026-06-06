@@ -1404,3 +1404,42 @@ table.wl tbody tr.archived td {
   color: var(--fg);
   border-color: var(--accent);
 }
+
+/* ---- Watchlist list tabs ---- */
+.wl-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.wl-tab {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 3px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wl-tab:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.wl-tab.active {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+}
+.wl-tab-count {
+  color: var(--muted);
+  font-size: 10.5px;
+  margin-left: 2px;
+}
+/* universe-only rows in the watchlist table read as muted (shared with Universe) */
+table.wl tbody tr.no-summary td {
+  color: var(--muted);
+}
+table.wl tbody tr.no-summary td.mono.strong {
+  color: var(--fg);
+}
