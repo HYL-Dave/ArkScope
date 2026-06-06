@@ -14,6 +14,7 @@ import {
   getCard,
   getCards,
   saveCard,
+  translateCard,
   type CardSummary,
   type EvidenceItem,
   type EvidencePacket,
@@ -147,7 +148,9 @@ export function AICardTab({ ticker }: { ticker: string }) {
 
       {card ? (
         <CardView
+          key={runId ?? "none"}
           card={card}
+          runId={runId}
           evidencePacket={evidencePacket}
           saved={saved}
           saving={saving}
@@ -186,6 +189,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
 // its own close button) to hide the internal back button.
 export function CardView({
   card,
+  runId,
   evidencePacket,
   saved,
   saving,
@@ -194,6 +198,7 @@ export function CardView({
   backLabel = "← 卡片列表",
 }: {
   card: ResultCard;
+  runId?: number | null;
   evidencePacket?: EvidencePacket | null;
   saved: boolean;
   saving?: boolean;
@@ -213,6 +218,33 @@ export function CardView({
       ? citedEvidenceIds.map((id) => evidenceById.get(id)).filter((x): x is EvidenceItem => Boolean(x))
       : (evidencePacket?.items ?? []);
 
+  // On-demand 繁中 translation (prose fields only; cached server-side). CardView
+  // is keyed by runId at the call sites, so this state resets per card.
+  const [lang, setLang] = useState<"en" | "zh">("en");
+  const [zh, setZh] = useState<ResultCard | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [tErr, setTErr] = useState<string | null>(null);
+  const shown = lang === "zh" && zh ? zh : card;
+
+  async function toZh() {
+    if (zh) {
+      setLang("zh");
+      return;
+    }
+    if (runId == null) return;
+    setTranslating(true);
+    setTErr(null);
+    try {
+      const r = await translateCard(runId, "zh-Hant");
+      setZh(r.card);
+      setLang("zh");
+    } catch (e) {
+      setTErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   return (
     <div className="cardview">
       <div className="cardview-head">
@@ -221,28 +253,47 @@ export function CardView({
             {backLabel}
           </button>
         )}
+        {runId != null && (
+          <span className="lang-toggle">
+            <button
+              className={`btn-ghost ${lang === "en" ? "on" : ""}`}
+              onClick={() => setLang("en")}
+              disabled={translating}
+            >
+              EN
+            </button>
+            <button
+              className={`btn-ghost ${lang === "zh" ? "on" : ""}`}
+              onClick={() => void toZh()}
+              disabled={translating}
+            >
+              {translating ? "翻譯中…" : "繁中"}
+            </button>
+          </span>
+        )}
         <span className="spacer" />
         <span className={`conf conf-${card.confidence_level}`}>{card.confidence_level.toUpperCase()}</span>
         <button className="btn-ghost" onClick={onSave} disabled={saved || saving}>
           {saved ? "✓ 已存報告" : saving ? "存檔中…" : "存成報告"}
         </button>
       </div>
+      {tErr && <p className="refresh-err tiny">翻譯失敗：{tErr}</p>}
 
-      {card.question && <p className="cardview-q muted tiny">Q：{card.question}</p>}
-      <p className="cardview-concl">{card.conclusion}</p>
-      {card.confidence_rationale && (
-        <p className="muted tiny">可信度說明：{card.confidence_rationale}</p>
+      {shown.question && <p className="cardview-q muted tiny">Q：{shown.question}</p>}
+      <p className="cardview-concl">{shown.conclusion}</p>
+      {shown.confidence_rationale && (
+        <p className="muted tiny">可信度說明：{shown.confidence_rationale}</p>
       )}
 
-      <Section title="主要理由" items={card.primary_reasons} />
-      <Section title="反方理由" items={card.counter_thesis} counter />
-      <Section title="失效條件" items={card.invalidation_conditions} />
-      <Section title="觸發條件" items={card.trigger_conditions} />
-      <Section title="關鍵假設" items={card.key_assumptions} />
-      <Section title="風險" items={card.risks} />
-      <Section title="觀察清單" items={card.watch_list} />
-      {card.market_narrative && <Para title="市場敘事" text={card.market_narrative} />}
-      {card.divergence && <Para title="與共識分歧" text={card.divergence} />}
+      <Section title="主要理由" items={shown.primary_reasons} />
+      <Section title="反方理由" items={shown.counter_thesis} counter />
+      <Section title="失效條件" items={shown.invalidation_conditions} />
+      <Section title="觸發條件" items={shown.trigger_conditions} />
+      <Section title="關鍵假設" items={shown.key_assumptions} />
+      <Section title="風險" items={shown.risks} />
+      <Section title="觀察清單" items={shown.watch_list} />
+      {shown.market_narrative && <Para title="市場敘事" text={shown.market_narrative} />}
+      {shown.divergence && <Para title="與共識分歧" text={shown.divergence} />}
 
       <details className="cardview-trace">
         <summary>
@@ -408,7 +459,9 @@ export function CardModal({
           <p className="muted">載入中…</p>
         ) : (
           <CardView
+            key={runId}
             card={card}
+            runId={runId}
             evidencePacket={evidencePacket}
             saved={saved}
             saving={saving}

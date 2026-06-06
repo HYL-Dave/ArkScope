@@ -117,3 +117,14 @@ def test_archive_generated_before(store):
     assert n == 1
     assert store.get(old.id).status == "archived"
     assert store.get(new.id).status == "generated"
+
+
+def test_translation_roundtrip(store):
+    run = store.record(ticker="AAPL", result_card=_minimal_card().model_dump())
+    assert store.get_translation(run.id, "zh-Hant") is None
+    store.set_translation(run.id, "zh-Hant", {"conclusion": "看多"})
+    assert store.get_translation(run.id, "zh-Hant") == {"conclusion": "看多"}
+    # persisted on the run row
+    assert store.get(run.id).translations["zh-Hant"]["conclusion"] == "看多"
+    # unknown id is a no-op (no crash)
+    store.set_translation(999999, "zh-Hant", {"x": 1})

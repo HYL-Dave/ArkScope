@@ -25,7 +25,12 @@ from src.agents.config import get_agent_config
 from src.api.dependencies import get_card_store, get_dal
 from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
-from src.card_synthesis import confidence_to_score, render_card_markdown, synthesize_card
+from src.card_synthesis import (
+    confidence_to_score,
+    render_card_markdown,
+    synthesize_card,
+    translate_card,
+)
 from src.evidence_packet import gather_evidence
 from src.result_card import ResultCard
 from src.tools.data_access import DataAccessLayer
@@ -47,6 +52,10 @@ class GenerateBody(BaseModel):
 
 class ArchiveBody(BaseModel):
     archived: bool
+
+
+class TranslateBody(BaseModel):
+    lang: str = "zh-Hant"
 
 
 def _utcnow() -> str:
@@ -215,6 +224,33 @@ def save_card(
         "saved_report_id": report_id,
         "report": rep,
     }
+
+
+@router.post("/analysis/cards/{run_id}/translate")
+def translate_card_route(
+    run_id: int,
+    body: TranslateBody,
+    store: CardRunStore = Depends(get_card_store),
+):
+    """Translate a card into ``body.lang`` on demand; cache it on the run + return it.
+
+    Cached per language, so re-toggling EN/繁中 costs no further tokens.
+    """
+    run = store.get(run_id)
+    if not run or run.status == "deleted":
+        raise HTTPException(status_code=404, detail="card run not found")
+    lang = (body.lang or "zh-Hant").strip()
+    cached = (run.translations or {}).get(lang)
+    if cached:
+        return {"run_id": run_id, "lang": lang, "card": cached, "cached": True}
+    try:
+        translated = translate_card(run.result_card, lang=lang)
+    except Exception as exc:
+        logger.warning("Card translate failed for run %s: %s", run_id, exc)
+        raise HTTPException(status_code=502, detail=f"translate failed: {exc}")
+    require_db_write("card_translate", {"run_id": run_id, "lang": lang})
+    store.set_translation(run_id, lang, translated)
+    return {"run_id": run_id, "lang": lang, "card": translated, "cached": False}
 
 
 @router.post("/analysis/cards/{run_id}/archive")

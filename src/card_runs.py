@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS ai_card_runs (
     as_of                TEXT,
     status               TEXT NOT NULL DEFAULT 'generated',
     saved_report_id      INTEGER,
-    expires_at           TEXT
+    expires_at           TEXT,
+    translations_json    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_runs_ticker ON ai_card_runs(ticker);
@@ -72,6 +73,7 @@ class CardRun:
     status: str
     saved_report_id: Optional[int]
     expires_at: Optional[str]
+    translations: Optional[dict] = None  # {lang: translated result_card dict}
 
 
 class CardRunStore:
@@ -92,6 +94,10 @@ class CardRunStore:
         with self._write_lock, self._connect() as conn:
             conn.execute("PRAGMA journal_mode = WAL")
             conn.executescript(_SCHEMA)
+            # Migration: add translations_json to a pre-existing table (idempotent).
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(ai_card_runs)").fetchall()}
+            if "translations_json" not in cols:
+                conn.execute("ALTER TABLE ai_card_runs ADD COLUMN translations_json TEXT")
             conn.commit()
 
     @staticmethod
@@ -111,6 +117,9 @@ class CardRunStore:
             status=r["status"],
             saved_report_id=r["saved_report_id"],
             expires_at=r["expires_at"],
+            translations=json.loads(r["translations_json"])
+            if r["translations_json"]
+            else None,
         )
 
     # --- writes ----------------------------------------------------------
@@ -225,3 +234,27 @@ class CardRunStore:
                 params,
             ).fetchall()
         return [self._row(r) for r in rows]
+
+    # --- translations (on-demand, cached) --------------------------------
+
+    def set_translation(self, run_id: int, lang: str, card: dict) -> None:
+        """Cache a per-language translated card on the run (merged by lang)."""
+        with self._write_lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT translations_json FROM ai_card_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+            if row is None:
+                return
+            current = json.loads(row["translations_json"]) if row["translations_json"] else {}
+            current[lang] = card
+            conn.execute(
+                "UPDATE ai_card_runs SET translations_json = ? WHERE id = ?",
+                (json.dumps(current), run_id),
+            )
+            conn.commit()
+
+    def get_translation(self, run_id: int, lang: str) -> Optional[dict]:
+        run = self.get(run_id)
+        if run and run.translations:
+            return run.translations.get(lang)
+        return None

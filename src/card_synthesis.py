@@ -318,3 +318,85 @@ def render_card_markdown(card: ResultCard) -> str:
         lines.append("")
     lines += ["---", f"_Single-model inference · generated {card.analysis_time}_"]
     return "\n".join(lines)
+
+
+# ── on-demand translation ─────────────────────────────────────────────────────
+
+_LANG_NAMES = {"zh-Hant": "Traditional Chinese (繁體中文)", "zh-Hans": "Simplified Chinese"}
+_TRANSLATABLE_FIELDS = (
+    "question",
+    "conclusion",
+    "primary_reasons",
+    "counter_thesis",
+    "key_assumptions",
+    "trigger_conditions",
+    "invalidation_conditions",
+    "risks",
+    "watch_list",
+    "market_narrative",
+    "divergence",
+    "confidence_rationale",
+)
+
+
+def translate_card(card: dict, *, lang: str = "zh-Hant", model: Optional[str] = None) -> dict:
+    """Translate a card's natural-language fields into ``lang``; return a full card dict.
+
+    Only prose fields are translated; ticker, numbers, %, evidence_ids,
+    confidence_level, traceability and metadata are preserved unchanged. A forced
+    tool guarantees the structure (and list item counts) survive.
+    """
+    ensure_env_loaded()
+    config = get_agent_config()
+    model = model or config.anthropic_model
+    target = _LANG_NAMES.get(lang, lang)
+
+    payload = {k: card.get(k) for k in _TRANSLATABLE_FIELDS if card.get(k) not in (None, "", [])}
+    if not payload:
+        return dict(card)
+
+    props: dict[str, Any] = {}
+    for k, v in payload.items():
+        props[k] = (
+            {"type": "array", "items": {"type": "string"}}
+            if isinstance(v, list)
+            else {"type": "string"}
+        )
+    schema = {"type": "object", "additionalProperties": False, "properties": props, "required": list(props)}
+
+    system = (
+        f"You are a precise financial translator. Translate every value into {target}. "
+        "Keep tickers, numbers, %, currency, dates, and evidence ids (E1, E2, …) exactly as-is. "
+        "Preserve list structure and item COUNT — translate each item in place, never add, drop, "
+        "merge, or reorder items. Respond ONLY via the emit_translation tool."
+    )
+    user = json.dumps(payload, ensure_ascii=False, indent=2)
+
+    from anthropic import Anthropic
+
+    client = Anthropic()
+    resp = client.messages.create(
+        model=model,
+        max_tokens=4096,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        tools=[
+            {
+                "name": "emit_translation",
+                "description": f"Emit the {target} translation of the given fields.",
+                "input_schema": schema,
+            }
+        ],
+        tool_choice={"type": "tool", "name": "emit_translation"},
+    )
+    translated: dict = {}
+    for block in resp.content:
+        if getattr(block, "type", None) == "tool_use" and block.name == "emit_translation":
+            translated = block.input
+            break
+
+    out = dict(card)
+    for k, v in translated.items():
+        if k in _TRANSLATABLE_FIELDS:
+            out[k] = v
+    return out

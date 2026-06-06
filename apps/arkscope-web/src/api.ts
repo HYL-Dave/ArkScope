@@ -338,3 +338,12 @@ export function saveCard(
 ): Promise<{ run_id: number; status: string; saved_report_id: number | null }> {
   return sendJSON(`/analysis/cards/${runId}/save`, "POST");
 }
+
+// On-demand translation (cached server-side per language). Smaller than a
+// generation but still an LLM call, so allow a generous timeout.
+export function translateCard(
+  runId: number,
+  lang = "zh-Hant",
+): Promise<{ run_id: number; lang: string; card: ResultCard; cached: boolean }> {
+  return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, 120_000);
+}

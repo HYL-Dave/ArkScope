@@ -14,12 +14,14 @@ from src.api.routes import analysis_cards as routes
 from src.api.routes.analysis_cards import (
     ArchiveBody,
     GenerateBody,
+    TranslateBody,
     archive_card,
     delete_card,
     generate_card,
     get_card,
     list_cards,
     save_card,
+    translate_card_route,
 )
 from src.card_runs import CardRunStore
 from src.evidence_packet import EvidenceItem, EvidencePacket
@@ -57,6 +59,24 @@ def stub_generation(monkeypatch):
                         lambda dal, ticker, **kw: _packet())
     monkeypatch.setattr(routes, "synthesize_card",
                         lambda packet, **kw: (_card(), {"provider": "anthropic", "model": "claude-opus-4-7"}))
+
+
+def test_translate_caches_and_returns(store, stub_generation, monkeypatch):
+    rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    calls = {"n": 0}
+
+    def fake_translate(card, *, lang="zh-Hant", model=None):
+        calls["n"] += 1
+        return {**card, "conclusion": "繁中結論"}
+
+    monkeypatch.setattr(routes, "translate_card", fake_translate)
+    r1 = translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+    assert r1["card"]["conclusion"] == "繁中結論"
+    assert r1["cached"] is False
+    # second call hits the cache — no re-translation
+    r2 = translate_card_route(rid, TranslateBody(lang="zh-Hant"), store=store)
+    assert r2["cached"] is True
+    assert calls["n"] == 1
 
 
 def test_generate_caches_run(store, stub_generation):

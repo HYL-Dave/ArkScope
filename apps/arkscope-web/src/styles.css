@@ -846,3 +846,11 @@ table.wl tbody tr.archived td {
   gap: 8px;
   margin-bottom: 8px;
 }
+.lang-toggle {
+  display: inline-flex;
+  gap: 2px;
+}
+.lang-toggle .btn-ghost {
+  padding: 3px 9px;
+  font-size: 11.5px;
+}
