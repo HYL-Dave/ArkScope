@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
     from .routes.macro_calendar import router as macro_calendar_router
     from .routes.profile import router as profile_router
     from .routes.analysis_cards import router as analysis_cards_router
+    from .routes.symbols import router as symbols_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(macro_calendar_router)
     app.include_router(profile_router)
     app.include_router(analysis_cards_router)
+    app.include_router(symbols_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the
