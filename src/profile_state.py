@@ -154,42 +154,51 @@ class ProfileStateStore:
             conn.executescript(_SCHEMA)
             conn.commit()
 
-    # --- universe bootstrap ---------------------------------------------
+    # --- universe import (EXPLICIT — never run from a read path) ---------
 
-    def sync_universe(self, rows) -> None:
-        """Ensure a list exists per ``group`` and each ticker is a member.
+    def import_lists(self, named_lists) -> dict:
+        """Additive, archive-preserving seed of named lists + memberships.
 
-        ``rows`` is any iterable of mappings with ``ticker`` and ``group`` keys
-        (the cockpit passes the overview rows). Idempotent and additive: it
-        creates missing lists / memberships but NEVER touches the ``archived_at``
-        of an existing membership, so user archives survive a re-sync and a
-        ticker newly added upstream simply appears as active.
+        ``named_lists`` is an iterable of mappings ``{"name", "kind"?, "tickers"}``.
+        A ticker may appear in several lists (duplicate membership is allowed by
+        design). Idempotent: missing lists/memberships are created, but the
+        ``archived_at`` of an existing membership is NEVER touched, so user
+        archives survive re-imports. Returns a ``{lists_created, memberships_added}``
+        summary.
+
+        This is the EXPLICIT importer — it must only be called from a gated
+        write action (bootstrap / re-import), never from a read endpoint.
         """
         now = _now()
+        lists_created = 0
+        memberships_added = 0
         with self._write_lock, self._connect() as conn:
             lists = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM watchlists")}
             max_pos = conn.execute(
                 "SELECT COALESCE(MAX(position), -1) AS p FROM watchlists"
             ).fetchone()["p"]
-            for r in rows:
-                group = (r.get("group") or "Watchlist").strip() or "Watchlist"
-                ticker = _norm(r.get("ticker"))
-                if not ticker:
+            for spec in named_lists:
+                name = (spec.get("name") or "").strip()
+                if not name:
                     continue
-                if group not in lists:
+                kind = spec.get("kind") or _infer_kind(name)
+                if name not in lists:
                     max_pos += 1
                     cur = conn.execute(
                         "INSERT INTO watchlists (name, kind, position, created_at, updated_at) "
                         "VALUES (?, ?, ?, ?, ?)",
-                        (group, _infer_kind(group), max_pos, now, now),
+                        (name, kind, max_pos, now, now),
                     )
-                    lists[group] = cur.lastrowid
-                list_id = lists[group]
-                exists = conn.execute(
-                    "SELECT 1 FROM watchlist_memberships WHERE list_id = ? AND ticker = ?",
-                    (list_id, ticker),
-                ).fetchone()
-                if not exists:
+                    lists[name] = cur.lastrowid
+                    lists_created += 1
+                list_id = lists[name]
+                for t in _dedup_norm(spec.get("tickers") or []):
+                    exists = conn.execute(
+                        "SELECT 1 FROM watchlist_memberships WHERE list_id = ? AND ticker = ?",
+                        (list_id, t),
+                    ).fetchone()
+                    if exists:
+                        continue
                     pos = conn.execute(
                         "SELECT COALESCE(MAX(position), -1) + 1 AS p "
                         "FROM watchlist_memberships WHERE list_id = ?",
@@ -199,9 +208,27 @@ class ProfileStateStore:
                         "INSERT INTO watchlist_memberships "
                         "(list_id, ticker, position, created_at, updated_at) "
                         "VALUES (?, ?, ?, ?, ?)",
-                        (list_id, ticker, pos, now, now),
+                        (list_id, t, pos, now, now),
                     )
+                    memberships_added += 1
             conn.commit()
+        return {"lists_created": lists_created, "memberships_added": memberships_added}
+
+    def sync_universe(self, rows) -> dict:
+        """Seed one list per ``group`` from overview-shaped rows (delegates to
+        :meth:`import_lists`). Kept for the overview-groups import source.
+
+        ``rows`` is any iterable of mappings with ``ticker`` and ``group`` keys.
+        Additive / archive-preserving (see ``import_lists``).
+        """
+        by_group: dict[str, list[str]] = {}
+        for r in rows:
+            group = (r.get("group") or "Watchlist").strip() or "Watchlist"
+            ticker = _norm(r.get("ticker"))
+            if ticker:
+                by_group.setdefault(group, []).append(ticker)
+        named = [{"name": g, "tickers": ts} for g, ts in by_group.items()]
+        return self.import_lists(named)
 
     # --- reads -----------------------------------------------------------
 

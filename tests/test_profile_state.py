@@ -12,6 +12,7 @@ from src.api.routes.profile import (
     add_ticker_note,
     cockpit_watchlist,
     delete_ticker_note,
+    import_universe,
     list_ticker_notes,
     profile_lists,
     set_ticker_archived,
@@ -75,6 +76,22 @@ def test_sync_universe_is_idempotent_and_archive_preserving(store):
     assert store.get_ticker("AAPL").archived is True
 
 
+def test_import_lists_allows_duplicate_membership(store):
+    # A ticker may belong to several lists (by design).
+    summary = store.import_lists(
+        [
+            {"name": "Tier 1 · Core", "kind": "tier", "tickers": ["NVDA", "AMD"]},
+            {"name": "AI 基礎設施", "kind": "theme", "tickers": ["NVDA", "AVGO"]},
+        ]
+    )
+    assert summary == {"lists_created": 2, "memberships_added": 4}
+    agg = store.get_aggregate(["NVDA"])
+    assert set(agg["NVDA"].lists) == {"Tier 1 · Core", "AI 基礎設施"}
+    # Re-import is idempotent (nothing new created/added).
+    again = store.import_lists([{"name": "Tier 1 · Core", "tickers": ["NVDA", "AMD"]}])
+    assert again == {"lists_created": 0, "memberships_added": 0}
+
+
 def test_default_aggregate_for_unknown_ticker(store):
     agg = store.get_ticker("NVDA")
     assert agg.ticker == "NVDA"
@@ -127,7 +144,8 @@ def api_store(tmp_path, monkeypatch):
     return test_store
 
 
-def test_cockpit_shape_seeds_and_archive_filter(api_store):
+def test_cockpit_read_does_not_write(api_store):
+    # A read must NOT seed the substrate (no implicit profile_state_write).
     data = cockpit_watchlist(dal=None, store=api_store)
     assert data["total"] == 3 and data["shown"] == 3 and data["archived_count"] == 0
     row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
@@ -137,12 +155,22 @@ def test_cockpit_shape_seeds_and_archive_filter(api_store):
         "archived", "tags", "note_count", "freshness", "per_ticker_error",
     ):
         assert field in row
-    assert row["lists"] == ["Holdings"]
+    assert row["lists"] == []  # not imported yet → empty, not seeded by the read
     assert "followed" not in row  # follow/star deliberately not in v0
+    assert profile_lists(store=api_store)["lists"] == []  # read created no lists
 
-    # cockpit load seeded the substrate
+
+def test_import_universe_then_archive_filter(api_store):
+    # Explicit import seeds the lists (dal=None → tiers no-op; groups only).
+    imported = import_universe(dal=None, store=api_store)
+    assert {li["name"] for li in imported["lists"]} == {"Holdings", "Interested"}
+
     lists = profile_lists(store=api_store)["lists"]
     assert {li["name"] for li in lists} == {"Holdings", "Interested"}
+
+    data = cockpit_watchlist(dal=None, store=api_store)
+    row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
+    assert row["lists"] == ["Holdings"]
 
     # archive AAPL -> hidden by default, visible with include_archived
     assert set_ticker_archived("AAPL", ArchiveBody(archived=True), store=api_store)["archived"] is True
@@ -161,14 +189,14 @@ def test_cockpit_shape_seeds_and_archive_filter(api_store):
 
 
 def test_archive_unknown_ticker_is_404(api_store):
-    cockpit_watchlist(dal=None, store=api_store)  # seed
+    import_universe(dal=None, store=api_store)  # explicit seed
     with pytest.raises(HTTPException) as exc:
         set_ticker_archived("NOPE", ArchiveBody(archived=True), store=api_store)
     assert exc.value.status_code == 404
 
 
 def test_notes_endpoints(api_store):
-    cockpit_watchlist(dal=None, store=api_store)  # seed
+    import_universe(dal=None, store=api_store)  # explicit seed
     add_ticker_note("MSFT", NoteBody(body="earnings 7/22"), store=api_store)
     listed = list_ticker_notes("MSFT", store=api_store)
     assert listed["ticker"] == "MSFT" and len(listed["notes"]) == 1

@@ -10,6 +10,11 @@ full field set (explicit ``null`` / ``0`` / ``[]`` for missing data), unlike the
 agent-tool-shaped ``/overview`` which omits absent fields. The substrate is the
 multi-list model (ProductSpec §168); the v0 surface here renders a single
 aggregate "All Active" view + an Archived filter.
+
+Read endpoints are PURE READS — they never mutate profile state. Seeding the
+list substrate from existing categories (user_profile groups + tickers_core
+tiers) is an EXPLICIT, gated action (``POST /profile/import-universe``), so
+opening a page never triggers a ``profile_state_write``.
 """
 
 from __future__ import annotations
@@ -49,16 +54,15 @@ def cockpit_watchlist(
 ):
     """Stable cockpit watchlist: market data joined with local user state.
 
-    Archived tickers are hidden by default (``include_archived=true`` reveals
-    them). The ticker universe is synced into the profile-state substrate from
-    the overview's groups (additive, archive-preserving) on each load.
+    PURE READ. Archived tickers are hidden by default (``include_archived=true``
+    reveals them). Tickers present in the overview but not yet imported into the
+    substrate simply show empty ``lists`` — run ``POST /profile/import-universe``
+    to seed lists from existing categories. This endpoint never writes.
     """
     overview = get_watchlist_overview(dal)
     rows = overview.get("tickers", [])
     as_of = overview.get("date")
 
-    require_profile_state_write("sync_universe", {"source": "overview", "rows": len(rows)})
-    store.sync_universe(rows)
     agg = store.get_aggregate([r.get("ticker", "") for r in rows])
 
     out_rows: list[dict] = []
@@ -102,6 +106,95 @@ def cockpit_watchlist(
         "archived_count": archived_count,
         "include_archived": include_archived,
         "rows": out_rows,
+    }
+
+
+class ImportBody(BaseModel):
+    include_groups: bool = True  # user_profile watchlists (Holdings / Interested / themes)
+    include_tiers: bool = True   # config/tickers_core.json tier categories (the ~130 universe)
+
+
+# Friendly names for the tickers_core tiers. legacy_reference is intentionally
+# omitted from the default import.
+_TIER_NAMES = {
+    "tier1_core": "Tier 1 · Core",
+    "tier2_expanded": "Tier 2 · Expanded",
+    "tier3_user_watchlist": "Tier 3 · Watchlist",
+}
+
+
+def _named_lists_from_tiers(dal: DataAccessLayer) -> list[dict]:
+    """Flatten each tickers_core tier into one named list (kind='tier').
+
+    Each tier is a dict of category → [tickers]; we union all category lists in
+    the tier. Metadata keys (``_description`` etc.) are skipped. Best-effort:
+    a missing/odd config simply yields no tier lists.
+    """
+    try:
+        core = dal._load_json("tickers_core.json")
+    except Exception:
+        return []
+    def _category_tickers(cat_val) -> list[str]:
+        # A category is usually {"_description": ..., "tickers": [...]}, but be
+        # tolerant of a bare [...] list too.
+        if isinstance(cat_val, dict):
+            seq = cat_val.get("tickers") or []
+        elif isinstance(cat_val, list):
+            seq = cat_val
+        else:
+            seq = []
+        return [str(t) for t in seq if isinstance(t, str)]
+
+    out: list[dict] = []
+    for tier_key, list_name in _TIER_NAMES.items():
+        tier = core.get(tier_key)
+        if not isinstance(tier, dict):
+            continue
+        tickers: list[str] = []
+        for cat_key, cat_val in tier.items():
+            if cat_key.startswith("_"):
+                continue
+            tickers.extend(_category_tickers(cat_val))
+        if tickers:
+            out.append({"name": list_name, "kind": "tier", "tickers": tickers})
+    return out
+
+
+@router.post("/profile/import-universe")
+def import_universe(
+    body: ImportBody | None = None,
+    dal: DataAccessLayer = Depends(get_dal),
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Seed the multi-list substrate from existing categories (EXPLICIT + gated).
+
+    Sources (both on by default): user_profile watchlist groups (via the
+    overview) and the ``tickers_core.json`` tiers. Additive and
+    archive-preserving — safe to re-run; it never resurrects an archived
+    membership or duplicates a list.
+    """
+    opts = body or ImportBody()
+    named: list[dict] = []
+    if opts.include_groups:
+        overview = get_watchlist_overview(dal)
+        by_group: dict[str, list[str]] = {}
+        for r in overview.get("tickers", []):
+            group = (r.get("group") or "Watchlist").strip() or "Watchlist"
+            t = _norm(r.get("ticker"))
+            if t:
+                by_group.setdefault(group, []).append(t)
+        named.extend({"name": g, "tickers": ts} for g, ts in by_group.items())
+    if opts.include_tiers:
+        named.extend(_named_lists_from_tiers(dal))
+
+    require_profile_state_write(
+        "import_universe",
+        {"groups": opts.include_groups, "tiers": opts.include_tiers, "lists": len(named)},
+    )
+    summary = store.import_lists(named)
+    return {
+        "imported": summary,
+        "lists": [asdict(li) for li in store.list_watchlists()],
     }
 
 
