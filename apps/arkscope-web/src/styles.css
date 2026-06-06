@@ -1225,3 +1225,51 @@ table.wl tbody tr.archived td {
 .ok-text {
   color: var(--ok);
 }
+
+/* ---- Full-page ticker detail ---- */
+.main.detail-full {
+  grid-column: 2 / -1; /* span the old main + right-panel columns */
+}
+.detailpage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.detailpage-ticker {
+  font-size: 24px;
+  font-weight: 700;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.detail-col {
+  min-width: 0;
+}
+.chart-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 320px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  text-align: center;
+  padding: 16px;
+}
+/* AI card / notes read better at a bounded width on a wide page */
+.detail-ai-wrap,
+.detail-notes {
+  max-width: 760px;
+}
+@media (max-width: 1100px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
+import { apiBase, getRuntimeConfig, getStatus, type CockpitRow, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
+import { TickerDetailView } from "./TickerDetail";
 import { WatchlistView } from "./Watchlist";
 
 // Nav aligned to the desktop-app design doc (PDF p6) — MVP subset. Keys are
@@ -41,6 +42,17 @@ export function App() {
   const [view, setView] = useState<Nav>("Home");
   const [lastOk, setLastOk] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
+  // Full-page ticker detail overlay (null = show the selected nav view).
+  const [detail, setDetail] = useState<{ ticker: string; row?: CockpitRow } | null>(null);
+
+  const openTicker = useCallback((ticker: string, row?: CockpitRow) => {
+    setDetail({ ticker, row });
+  }, []);
+
+  const goView = useCallback((next: Nav) => {
+    setDetail(null);
+    setView(next);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -112,9 +124,9 @@ export function App() {
             return (
               <button
                 key={key}
-                className={`navitem ${view === key ? "active" : ""}`}
+                className={`navitem ${view === key && !detail ? "active" : ""}`}
                 disabled={!enabled}
-                onClick={() => enabled && setView(key)}
+                onClick={() => enabled && goView(key)}
                 title={enabled ? LABELS[key] : `${LABELS[key]} — 規劃中`}
               >
                 {LABELS[key]}
@@ -123,10 +135,17 @@ export function App() {
           })}
         </nav>
 
-        {view === "Home" ? (
-          <HomeView status={status} onNavigate={setView} />
+        {detail ? (
+          <TickerDetailView
+            key={detail.ticker}
+            ticker={detail.ticker}
+            row={detail.row}
+            onBack={() => setDetail(null)}
+          />
+        ) : view === "Home" ? (
+          <HomeView status={status} onNavigate={goView} onOpenTicker={openTicker} />
         ) : view === "Watchlist" ? (
-          <WatchlistView />
+          <WatchlistView onOpenTicker={openTicker} />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
         ) : view === "Settings" ? (
