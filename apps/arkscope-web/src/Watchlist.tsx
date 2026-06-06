@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCockpitWatchlist,
   getProfileLists,
@@ -26,10 +26,10 @@ interface TabRow {
   cockpit?: CockpitRow;
 }
 
-type State =
-  | { kind: "loading" }
-  | { kind: "ready"; rows: TabRow[]; asOf: string | null }
-  | { kind: "error"; message: string };
+interface Snapshot<T> {
+  rows: T[];
+  asOf: string | null;
+}
 
 type SortKey = "ticker" | "latest_close" | "change_7d_pct" | "news_count_7d" | "sentiment_mean" | "priority";
 type SortDir = "asc" | "desc";
@@ -71,17 +71,26 @@ export function WatchlistView({
 }: {
   onOpenTicker: (ticker: string, row?: CockpitRow) => void;
 }) {
-  const [state, setState] = useState<State>({ kind: "loading" });
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [tab, setTab] = useState<string>(ALL_ACTIVE); // ALL_ACTIVE or a list name
   const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
 
-  // List catalog (tab bar) — loaded once; refreshed after an archive toggle.
+  // Cached, TAB-INDEPENDENT sources (fetched with include_archived=true; the
+  // Show-archived toggle and tab switching are pure client-side derivation, so
+  // switching tabs never refetches). Cockpit backs "All Active"; universe backs
+  // every list tab. Late responses only refresh a cache — they can't clobber
+  // the wrong tab because the displayed rows are derived from `tab` at render.
+  const [cockpit, setCockpit] = useState<Snapshot<CockpitRow> | null>(null);
+  const [universe, setUniverse] = useState<Snapshot<UniverseRow> | null>(null);
+  // Separate request tokens per source so a stale response is dropped.
+  const cockpitReq = useRef(0);
+  const universeReq = useRef(0);
+
   const loadLists = useCallback(async () => {
     try {
       setLists((await getProfileLists(false)).lists);
@@ -90,46 +99,69 @@ export function WatchlistView({
     }
   }, []);
 
+  const loadCockpit = useCallback(async () => {
+    const id = ++cockpitReq.current;
+    setRefreshing(true);
+    setErr(null);
+    try {
+      const d = await getCockpitWatchlist(true); // all rows; filter archived client-side
+      if (id === cockpitReq.current) setCockpit({ rows: d.rows, asOf: d.as_of });
+    } catch (e) {
+      if (id === cockpitReq.current) setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (id === cockpitReq.current) setRefreshing(false);
+    }
+  }, []);
+
+  const loadUniverse = useCallback(async () => {
+    const id = ++universeReq.current;
+    setRefreshing(true);
+    setErr(null);
+    try {
+      const u = await getUniverse(true);
+      if (id === universeReq.current) setUniverse({ rows: u.rows, asOf: u.as_of });
+    } catch (e) {
+      if (id === universeReq.current) setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (id === universeReq.current) setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadLists();
-  }, [loadLists]);
+    void loadCockpit();
+  }, [loadLists, loadCockpit]);
 
-  // Rows for the current tab: All Active → cockpit DTO; a list → universe rows
-  // filtered by membership (active, or active+archived when showing archived).
-  const load = useCallback(
-    async (currentTab: string, includeArchived: boolean) => {
-      setRefreshing(true);
-      setActionError(null);
-      try {
-        if (currentTab === ALL_ACTIVE) {
-          const d = await getCockpitWatchlist(includeArchived);
-          setState({ kind: "ready", rows: d.rows.map(cockpitToTab), asOf: d.as_of });
-        } else {
-          const u = await getUniverse(true);
-          const rows = u.rows
-            .filter((r) =>
-              includeArchived ? r.all_lists.includes(currentTab) : r.lists.includes(currentTab),
-            )
-            .map(universeToTab);
-          setState({ kind: "ready", rows, asOf: u.as_of });
-        }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        setState((prev) => (prev.kind === "ready" ? prev : { kind: "error", message }));
-        setActionError(message);
-      } finally {
-        setRefreshing(false);
-      }
-    },
-    [],
-  );
-
+  // Universe is fetched lazily the first time a list tab is opened, then cached.
   useEffect(() => {
-    void load(tab, showArchived);
-  }, [load, tab, showArchived]);
+    if (tab !== ALL_ACTIVE && universe === null) void loadUniverse();
+  }, [tab, universe, loadUniverse]);
 
-  const rows = state.kind === "ready" ? state.rows : [];
-  const asOf = state.kind === "ready" ? state.asOf : null;
+  const refreshCurrent = useCallback(() => {
+    void loadCockpit();
+    if (universe !== null || tab !== ALL_ACTIVE) void loadUniverse();
+    void loadLists();
+  }, [loadCockpit, loadUniverse, loadLists, universe, tab]);
+
+  // Displayed rows are DERIVED from the cached sources + current tab + toggle.
+  const { rows, asOf } = useMemo<{ rows: TabRow[]; asOf: string | null }>(() => {
+    if (tab === ALL_ACTIVE) {
+      const src = cockpit?.rows ?? [];
+      return {
+        rows: src.filter((r) => showArchived || !r.archived).map(cockpitToTab),
+        asOf: cockpit?.asOf ?? null,
+      };
+    }
+    const src = universe?.rows ?? [];
+    return {
+      rows: src
+        .filter((r) => (showArchived ? r.all_lists : r.lists).includes(tab))
+        .map(universeToTab),
+      asOf: universe?.asOf ?? null,
+    };
+  }, [tab, showArchived, cockpit, universe]);
+
+  const isLoading = tab === ALL_ACTIVE ? cockpit === null : universe === null;
   const archivedCount = useMemo(() => rows.filter((r) => r.archived).length, [rows]);
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
 
@@ -144,29 +176,32 @@ export function WatchlistView({
   const onArchiveToggle = useCallback(
     async (row: TabRow) => {
       setBusyTicker(row.ticker);
-      setActionError(null);
+      setErr(null);
       try {
         await setArchived(row.ticker, !row.archived); // NOTE: global archive (per-list removal = later slice)
-        await load(tab, showArchived);
+        // Archive is global → refresh both cached sources + the list counts.
+        await loadCockpit();
+        if (universe !== null) await loadUniverse();
         void loadLists();
       } catch (e) {
-        setActionError(e instanceof Error ? e.message : String(e));
+        setErr(e instanceof Error ? e.message : String(e));
       } finally {
         setBusyTicker(null);
       }
     },
-    [load, loadLists, tab, showArchived],
+    [loadCockpit, loadUniverse, loadLists, universe],
   );
 
   const thProps = { sortKey, sortDir, toggleSort };
   const tabLabel = tab === ALL_ACTIVE ? "All Active" : tab;
+  const hasData = tab === ALL_ACTIVE ? cockpit !== null : universe !== null;
 
   return (
     <main className="main">
-      {state.kind === "error" && (
+      {err && !hasData && (
         <div className="errorbox">
           <p>Could not load the watchlist.</p>
-          <p className="muted">{state.message}</p>
+          <p className="muted">{err}</p>
         </div>
       )}
 
@@ -178,11 +213,11 @@ export function WatchlistView({
           {asOf && ` · as of ${asOf}`}
         </span>
         <span className="spacer" />
-        {actionError && <span className="refresh-err" title={actionError}>action failed</span>}
+        {err && hasData && <span className="refresh-err" title={err}>action failed</span>}
         <button className={`btn-ghost ${showArchived ? "on" : ""}`} onClick={() => setShowArchived((v) => !v)}>
           {showArchived ? "✓ Archived" : "Show archived"}
         </button>
-        <button className="btn-ghost" onClick={() => void load(tab, showArchived)} disabled={refreshing}>
+        <button className="btn-ghost" onClick={refreshCurrent} disabled={refreshing}>
           {refreshing ? "↻ …" : "↻ Refresh"}
         </button>
       </div>
@@ -206,7 +241,7 @@ export function WatchlistView({
         )}
       </div>
 
-      {state.kind === "loading" ? (
+      {isLoading ? (
         <p className="muted">Loading…</p>
       ) : (
         <>
