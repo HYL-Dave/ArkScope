@@ -127,6 +127,25 @@ export interface Traceability {
   completeness: Completeness;
   claims: ClaimCitation[];
 }
+export interface EvidenceItem {
+  evidence_id: string;
+  source: string;
+  source_type: string;
+  as_of: string | null;
+  is_real_time: boolean;
+  freshness: string | null;
+  derived_from: string[];
+  data: Record<string, unknown>;
+  note: string | null;
+}
+export interface EvidencePacket {
+  ticker: string;
+  generated_at: string;
+  question: string | null;
+  horizon: string | null;
+  items: EvidenceItem[];
+  excluded_note: string;
+}
 export interface ResultCard {
   ticker: string;
   question: string | null;
@@ -154,6 +173,7 @@ export interface GenerateResult {
   model: string | null;
   generated_at: string;
   card: ResultCard;
+  evidence_packet: EvidencePacket | null;
 }
 export interface CardDetail extends GenerateResult {
   ticker: string;
@@ -162,7 +182,7 @@ export interface CardDetail extends GenerateResult {
   card_type: string;
   as_of: string | null;
   saved_report_id: number | null;
-  evidence_packet: unknown;
+  evidence_packet: EvidencePacket | null;
 }
 
 interface ArkscopeBridge {

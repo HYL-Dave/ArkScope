@@ -86,7 +86,7 @@ export function HomeView({
                     <th className="num">Close</th>
                     <th className="num">7d %</th>
                     <th className="num">News</th>
-                    <th className="num">Sent.</th>
+                    <th>Priority</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -96,7 +96,7 @@ export function HomeView({
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
                       <td className="num">{r.news_count_7d}</td>
-                      <td className="num">{fmtSent(r.sentiment_mean)}</td>
+                      <td>{r.priority || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -134,7 +134,7 @@ export function HomeView({
       <aside className="rightpanel">
         <h3>今日重點</h3>
         <p className="muted">
-          事件 / 告警 / AI 摘要 — 規劃中。AI 不是獨立分頁，而是進到每個項目的詳情（vision §1/§3）。
+          事件 / 告警 / AI 摘要 — 規劃中。AI 會嵌入各頁，AI 研究頁集中管理對話 threads。
         </p>
       </aside>
 
@@ -169,9 +169,6 @@ function fmtNum(v: number | null): string {
 }
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
-}
-function fmtSent(v: number | null): string {
-  return v == null ? "—" : v.toFixed(2);
 }
 function changeClass(v: number | null): string {
   return v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : "";

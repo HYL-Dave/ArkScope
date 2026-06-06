@@ -15,12 +15,15 @@ import {
   getCards,
   saveCard,
   type CardSummary,
+  type EvidenceItem,
+  type EvidencePacket,
   type ResultCard,
 } from "./api";
 
 export function AICardTab({ ticker }: { ticker: string }) {
   const [recent, setRecent] = useState<CardSummary[] | null>(null);
   const [card, setCard] = useState<ResultCard | null>(null);
+  const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,6 +50,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
   useEffect(() => {
     reqRef.current++; // invalidate any in-flight response from a prior ticker
     setCard(null);
+    setEvidencePacket(null);
     setRunId(null);
     setSaved(false);
     setSaving(false);
@@ -62,6 +66,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
     setBusy(true);
     setErr(null);
     setCard(null);
+    setEvidencePacket(null);
     setRunId(null);
     setSaved(false);
     try {
@@ -72,6 +77,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
       });
       if (id !== reqRef.current) return; // superseded (ticker switch / new action)
       setCard(r.card);
+      setEvidencePacket(r.evidence_packet);
       setRunId(r.run_id);
       void loadRecent();
     } catch (e) {
@@ -88,6 +94,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
       const d = await getCard(rid);
       if (id !== reqRef.current) return;
       setCard(d.card);
+      setEvidencePacket(d.evidence_packet);
       setRunId(d.run_id);
       setSaved(d.status === "saved");
     } catch (e) {
@@ -111,6 +118,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
 
   function backToList() {
     setCard(null);
+    setEvidencePacket(null);
     setRunId(null);
     void loadRecent();
   }
@@ -138,6 +146,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
       {card ? (
         <CardView
           card={card}
+          evidencePacket={evidencePacket}
           saved={saved}
           saving={saving}
           onSave={() => void save()}
@@ -175,6 +184,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
 // its own close button) to hide the internal back button.
 export function CardView({
   card,
+  evidencePacket,
   saved,
   saving,
   onSave,
@@ -182,6 +192,7 @@ export function CardView({
   backLabel = "← 卡片列表",
 }: {
   card: ResultCard;
+  evidencePacket?: EvidencePacket | null;
   saved: boolean;
   saving?: boolean;
   onSave: () => void;
@@ -189,6 +200,17 @@ export function CardView({
   backLabel?: string;
 }) {
   const tr = card.traceability;
+  const evidenceById = new Map(
+    (evidencePacket?.items ?? []).map((item) => [item.evidence_id, item]),
+  );
+  const citedEvidenceIds = unique(
+    tr.claims.flatMap((claim) => claim.evidence_ids),
+  );
+  const shownEvidence =
+    citedEvidenceIds.length > 0
+      ? citedEvidenceIds.map((id) => evidenceById.get(id)).filter((x): x is EvidenceItem => Boolean(x))
+      : (evidencePacket?.items ?? []);
+
   return (
     <div className="cardview">
       <div className="cardview-head">
@@ -247,6 +269,35 @@ export function CardView({
             </ul>
           </div>
         )}
+        {evidencePacket && (
+          <div className="trace-evidence-wrap">
+            <div className="muted tiny trace-claims-h">
+              引用證據摘要（{shownEvidence.length || evidencePacket.items.length} / {evidencePacket.items.length}）
+            </div>
+            {shownEvidence.length === 0 ? (
+              <p className="muted tiny">此卡片沒有可對應的 evidence item。</p>
+            ) : (
+              <ul className="trace-evidence">
+                {shownEvidence.map((item) => (
+                  <li key={item.evidence_id}>
+                    <div className="evidence-head">
+                      <span className="claim-cite">{item.evidence_id}</span>
+                      <span className="strong">{item.source}</span>
+                      <span className="muted tiny">{item.source_type}</span>
+                    </div>
+                    <div className="muted tiny">
+                      {item.as_of ? `as-of ${item.as_of}` : "as-of —"}
+                      {item.freshness ? ` · ${item.freshness}` : ""}
+                      {item.is_real_time ? " · realtime" : ""}
+                    </div>
+                    {item.note && <div className="muted tiny">{item.note}</div>}
+                    <div className="evidence-data tiny">{summarizeEvidenceData(item.data)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className="muted tiny">
           completeness — news {yn(tr.completeness.news)} · fundamentals {yn(tr.completeness.fundamentals)} ·
           technicals {yn(tr.completeness.technicals)}
@@ -271,18 +322,22 @@ export function CardModal({
   onChanged?: () => void;
 }) {
   const [card, setCard] = useState<ResultCard | null>(null);
+  const [evidencePacket, setEvidencePacket] = useState<EvidencePacket | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let alive = true;
     setCard(null);
+    setEvidencePacket(null);
     setErr(null);
     getCard(runId)
       .then((d) => {
         if (alive) {
           setCard(d.card);
+          setEvidencePacket(d.evidence_packet);
           setSaved(d.status === "saved");
         }
       })
@@ -292,7 +347,7 @@ export function CardModal({
     return () => {
       alive = false;
     };
-  }, [runId]);
+  }, [runId, reload]);
 
   async function save() {
     if (saving || saved) return;
@@ -317,10 +372,23 @@ export function CardModal({
           <button className="btn-ghost" onClick={onClose}>✕ 關閉</button>
         </div>
         {err && <p className="refresh-err tiny">{err}</p>}
-        {!card ? (
+        {!card && err ? (
+          <div>
+            <p className="muted">卡片載入失敗。</p>
+            <button className="btn-ghost" onClick={() => setReload((x) => x + 1)}>
+              重試
+            </button>
+          </div>
+        ) : !card ? (
           <p className="muted">載入中…</p>
         ) : (
-          <CardView card={card} saved={saved} saving={saving} onSave={() => void save()} />
+          <CardView
+            card={card}
+            evidencePacket={evidencePacket}
+            saved={saved}
+            saving={saving}
+            onSave={() => void save()}
+          />
         )}
       </div>
     </div>
@@ -352,4 +420,30 @@ function Para({ title, text }: { title: string; text: string }) {
 
 function yn(b: boolean): string {
   return b ? "✓" : "—";
+}
+
+function unique(xs: string[]): string[] {
+  return Array.from(new Set(xs.filter(Boolean)));
+}
+
+function summarizeEvidenceData(data: Record<string, unknown>): string {
+  const entries = Object.entries(data).slice(0, 6);
+  if (entries.length === 0) return "no structured payload";
+  return entries.map(([key, value]) => `${key}: ${summarizeValue(value)}`).join(" · ");
+}
+
+function summarizeValue(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "string") return clip(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return `[${value.length} items]`;
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    return `{${keys.slice(0, 4).join(", ")}${keys.length > 4 ? ", …" : ""}}`;
+  }
+  return clip(String(value));
+}
+
+function clip(s: string): string {
+  return s.length > 120 ? `${s.slice(0, 117)}…` : s;
 }

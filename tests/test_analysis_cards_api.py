@@ -94,6 +94,25 @@ def test_save_promotes_to_report(store, stub_generation, monkeypatch):
     assert get_card(rid, store=store)["status"] == "saved"
 
 
+def test_save_is_idempotent_after_report_promotion(store, stub_generation, monkeypatch):
+    rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    calls = {"n": 0}
+
+    def fake_save_report(dal, **kw):
+        calls["n"] += 1
+        return {"id": 7, "file_path": "data/reports/x.md", "title": kw["title"]}
+
+    monkeypatch.setattr(routes, "save_report", fake_save_report)
+    first = save_card(rid, dal=object(), store=store)
+    second = save_card(rid, dal=object(), store=store)
+
+    assert first["status"] == "saved"
+    assert second["status"] == "saved"
+    assert second["saved_report_id"] == 7
+    assert second["already_saved"] is True
+    assert calls["n"] == 1
+
+
 def test_restore_keeps_saved_card_saved(store, stub_generation, monkeypatch):
     rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
     monkeypatch.setattr(routes, "save_report", lambda dal, **kw: {"id": 9, "title": kw["title"]})

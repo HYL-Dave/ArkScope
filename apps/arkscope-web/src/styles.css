@@ -790,6 +790,35 @@ table.wl tbody tr.archived td {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.trace-evidence-wrap {
+  margin-top: 10px;
+}
+.trace-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trace-evidence li {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: var(--panel2);
+}
+.evidence-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.evidence-data {
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
 
 /* ---- read-a-card-in-place modal (Home) ---- */
 .modal-backdrop {

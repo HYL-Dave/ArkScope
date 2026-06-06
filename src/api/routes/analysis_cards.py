@@ -129,6 +129,7 @@ def generate_card(
         "model": run.model,
         "generated_at": run.generated_at,
         "card": card.model_dump(),
+        "evidence_packet": packet.model_dump(),
     }
 
 
@@ -181,6 +182,14 @@ def save_card(
     run = store.get(run_id)
     if not run or run.status == "deleted":
         raise HTTPException(status_code=404, detail="card run not found")
+    if run.status == "saved" and run.saved_report_id is not None:
+        return {
+            "run_id": run_id,
+            "status": run.status,
+            "saved_report_id": run.saved_report_id,
+            "report": None,
+            "already_saved": True,
+        }
     try:
         card = ResultCard(**run.result_card)
     except Exception as exc:
