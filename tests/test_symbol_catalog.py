@@ -46,6 +46,27 @@ def test_search_respects_limit():
     assert len(symbol_catalog.search("A", limit=2)) == 2
 
 
+def test_local_seed_works_when_sec_unavailable(monkeypatch):
+    # SEC blocked/offline (403 → {}), but local universe still makes RKLB/MXL findable.
+    symbol_catalog.reset_for_tests()
+    monkeypatch.setattr(symbol_catalog, "_local_seed", lambda: {"RKLB": "", "MXL": "", "NVDA": ""})
+    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {})
+    cat = symbol_catalog.load_catalog(force=True)
+    tickers = {e["ticker"] for e in cat}
+    assert {"RKLB", "MXL", "NVDA"} <= tickers
+    assert symbol_catalog.search("RKLB")[0]["ticker"] == "RKLB"
+    assert symbol_catalog.search("MXL")[0]["ticker"] == "MXL"
+
+
+def test_sec_overlay_enriches_names(monkeypatch):
+    symbol_catalog.reset_for_tests()
+    monkeypatch.setattr(symbol_catalog, "_local_seed", lambda: {"RKLB": ""})
+    monkeypatch.setattr(symbol_catalog, "_load_sec", lambda force: {"RKLB": "Rocket Lab", "TSLA": "Tesla Inc"})
+    cat = {e["ticker"]: e["name"] for e in symbol_catalog.load_catalog(force=True)}
+    assert cat["RKLB"] == "Rocket Lab"  # SEC name fills the local-seed blank
+    assert cat["TSLA"] == "Tesla Inc"   # SEC-only ticker also present
+
+
 def test_route_flags_tracked(tmp_path):
     store = ProfileStateStore(tmp_path / "p.db")
     store.import_lists([{"name": "Holdings", "kind": "holdings", "tickers": ["NVDA"]}])

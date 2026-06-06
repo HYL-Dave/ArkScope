@@ -1609,3 +1609,8 @@ button.wl-railitem.active,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.wl-adddirect {
+  color: var(--accent);
+  border-top: 1px solid var(--border);
+}

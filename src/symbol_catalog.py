@@ -14,6 +14,7 @@ DB. The on-disk cache is ``data/cache/sec_company_tickers.json`` (gitignored).
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -21,8 +22,14 @@ from typing import Optional
 
 _SEC_URL = "https://www.sec.gov/files/company_tickers.json"
 _TTL_SECONDS = 30 * 86_400  # refresh monthly
-# SEC requires a descriptive User-Agent on automated requests.
-_UA = "ArkScope/0.1 research workbench (local single-user)"
+# SEC's fair-access policy REJECTS (HTTP 403) a UA without a contact — it must
+# include an email-like token. Override with a real contact via the env var.
+_DEFAULT_UA = "ArkScope/0.1 (arkscope@example.com)"
+
+
+def _user_agent() -> str:
+    return os.environ.get("ARKSCOPE_SEC_USER_AGENT") or _DEFAULT_UA
+
 
 _lock = threading.Lock()
 _cache: Optional[list[dict]] = None  # in-memory [{ticker, name}], loaded once
@@ -32,54 +39,76 @@ def _cache_path() -> Path:
     return Path(__file__).resolve().parents[1] / "data" / "cache" / "sec_company_tickers.json"
 
 
-def _parse(raw) -> list[dict]:
-    """SEC shape: {"0": {"cik_str", "ticker", "title"}, ...}. Tolerant of a list."""
+def _parse_sec(raw) -> dict[str, str]:
+    """SEC shape {"0": {"cik_str","ticker","title"}, ...} → {TICKER: name}."""
     entries = raw.values() if isinstance(raw, dict) else (raw or [])
-    out: list[dict] = []
+    out: dict[str, str] = {}
     for e in entries:
         if not isinstance(e, dict):
             continue
         t = str(e.get("ticker", "")).upper().strip()
         if t:
-            out.append({"ticker": t, "name": str(e.get("title", "")).strip()})
+            out[t] = str(e.get("title", "")).strip()
     return out
 
 
-def _fetch_and_store(path: Path) -> list[dict]:
-    import requests
+def _local_seed() -> dict[str, str]:
+    """Tickers we track (tickers_core) → name "" (filled by SEC overlay if any).
 
-    resp = requests.get(_SEC_URL, headers={"User-Agent": _UA}, timeout=30)
-    resp.raise_for_status()
-    raw = resp.json()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(raw), encoding="utf-8")
-    return _parse(raw)
+    The local-first spine: search works offline / when SEC 403s, and always
+    covers everything in our universe (e.g. RKLB, MXL)."""
+    try:
+        from src.universe_config import all_universe_tickers
+
+        return {t: "" for t in all_universe_tickers()}
+    except Exception:
+        return {}
+
+
+def _load_sec(force: bool) -> dict[str, str]:
+    """SEC ticker→name map from cache (fresh) or network. {} on any failure."""
+    path = _cache_path()
+    fresh = path.exists() and (time.time() - path.stat().st_mtime) < _TTL_SECONDS
+    try:
+        if fresh and not force:
+            return _parse_sec(json.loads(path.read_text(encoding="utf-8")))
+        import requests
+
+        resp = requests.get(
+            _SEC_URL,
+            headers={"User-Agent": _user_agent(), "Accept-Encoding": "gzip, deflate"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(raw), encoding="utf-8")
+        return _parse_sec(raw)
+    except Exception:
+        # fall back to a stale cache file if present, else nothing (local seed covers)
+        if path.exists():
+            try:
+                return _parse_sec(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                return {}
+        return {}
 
 
 def load_catalog(force: bool = False) -> list[dict]:
-    """Return the cached catalog, refreshing from SEC if stale/missing.
+    """Catalog = local universe (always) overlaid with SEC names (when reachable).
 
-    Never raises: on any failure it falls back to a stale cache, then ``[]``.
+    Never raises and never ends up empty when we track anything: the local seed
+    is always present, so add-ticker works even if SEC is blocked/offline.
     """
     global _cache
     with _lock:
         if _cache is not None and not force:
             return _cache
-        path = _cache_path()
-        fresh = path.exists() and (time.time() - path.stat().st_mtime) < _TTL_SECONDS
-        try:
-            if fresh and not force:
-                _cache = _parse(json.loads(path.read_text(encoding="utf-8")))
-            else:
-                _cache = _fetch_and_store(path)
-        except Exception:
-            if path.exists():
-                try:
-                    _cache = _parse(json.loads(path.read_text(encoding="utf-8")))
-                except Exception:
-                    _cache = []
-            else:
-                _cache = []
+        merged = _local_seed()  # {TICKER: ""}
+        for ticker, name in _load_sec(force).items():
+            # SEC name enriches; SEC-only tickers are added too (broad US list).
+            merged[ticker] = name or merged.get(ticker, "")
+        _cache = [{"ticker": t, "name": n} for t, n in merged.items()]
         return _cache
 
 

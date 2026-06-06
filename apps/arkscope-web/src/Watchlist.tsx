@@ -87,6 +87,7 @@ export function WatchlistView({
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<SymbolHit[] | null>(null);
   const [addBusy, setAddBusy] = useState(false);
+  const searchReq = useRef(0); // drop stale debounced-search responses
 
   const loadLists = useCallback(async () => {
     try {
@@ -141,15 +142,17 @@ export function WatchlistView({
     }
   }, [lists, selectedId]);
 
-  // Debounced symbol search for the add-ticker box.
+  // Debounced symbol search for the add-ticker box (stale responses dropped).
   useEffect(() => {
     const q = addQuery.trim();
     if (!q) { setAddResults(null); return; }
+    const id = ++searchReq.current;
     const t = window.setTimeout(async () => {
       try {
-        setAddResults((await searchSymbols(q, 8)).results);
+        const r = await searchSymbols(q, 8);
+        if (id === searchReq.current) setAddResults(r.results);
       } catch {
-        setAddResults([]);
+        if (id === searchReq.current) setAddResults([]);
       }
     }, 200);
     return () => window.clearTimeout(t);
@@ -228,7 +231,10 @@ export function WatchlistView({
     try {
       await renameList(id, name);
       setRenamingId(null);
-      await loadLists();
+      // Reload universe too: cached rows' membership names still hold the OLD
+      // name, and filtering keys off the (new) list name — without this the
+      // current list's rows vanish until a manual refresh.
+      await reloadAfterMutation();
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }
 
@@ -262,6 +268,7 @@ export function WatchlistView({
   const thProps = { sortKey, sortDir, toggleSort };
   const hasData = selectedList === null ? cockpit !== null : universe !== null;
   const title = selectedList === null ? "All Active" : selectedList.name;
+  const normQuery = addQuery.trim().toUpperCase(); // for direct-add (symbol not in catalog)
 
   return (
     <main className="main">
@@ -346,25 +353,37 @@ export function WatchlistView({
             <div className="wl-addbox">
               <input
                 className="aicard-q"
-                placeholder={`加入標的到「${selectedList.name}」… 輸入代號或公司名`}
+                placeholder={`加入標的到「${selectedList.name}」… 輸入代號或公司名（Enter 直接加入）`}
                 value={addQuery}
                 onChange={(e) => setAddQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && normQuery) void onAddSymbol(normQuery);
+                }}
                 disabled={addBusy}
               />
               {addQuery.trim() && (
                 <div className="wl-addresults">
                   {addResults === null ? (
                     <div className="muted tiny wl-addhint">搜尋中…</div>
-                  ) : addResults.length === 0 ? (
-                    <div className="muted tiny wl-addhint">找不到符合的標的（目錄為精確/前綴比對，非模糊）。可直接輸入完整代號。</div>
                   ) : (
-                    addResults.map((h) => (
-                      <button key={h.ticker} className="wl-addrow" disabled={addBusy} onClick={() => void onAddSymbol(h.ticker)}>
-                        <span className="mono strong">{h.ticker}</span>
-                        <span className="wl-addname">{h.name}</span>
-                        {h.tracked && <span className="muted tiny">已追蹤</span>}
+                    <>
+                      {addResults.map((h) => (
+                        <button key={h.ticker} className="wl-addrow" disabled={addBusy} onClick={() => void onAddSymbol(h.ticker)}>
+                          <span className="mono strong">{h.ticker}</span>
+                          <span className="wl-addname">{h.name}</span>
+                          {h.tracked && <span className="muted tiny">已追蹤</span>}
+                        </button>
+                      ))}
+                      {addResults.length === 0 && (
+                        <div className="muted tiny wl-addhint">
+                          目錄無相符（精確/前綴比對，非模糊）。
+                        </div>
+                      )}
+                      {/* Direct-add: any symbol, even if not in the catalog. */}
+                      <button className="wl-addrow wl-adddirect" disabled={addBusy} onClick={() => void onAddSymbol(normQuery)}>
+                        ＋ 直接加入代號 <span className="mono strong">{normQuery}</span>
                       </button>
-                    ))
+                    </>
                   )}
                 </div>
               )}

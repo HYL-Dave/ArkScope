@@ -51,6 +51,25 @@ def _category_tickers(cat_val: Any) -> list[str]:
     return [str(t) for t in seq if isinstance(t, str)]
 
 
+def all_universe_tickers() -> list[str]:
+    """Every distinct ticker across all tiers (incl. legacy_reference), sorted.
+
+    The local seed for the symbol catalog — so add-ticker autocomplete works
+    offline / when SEC is unreachable, and always covers what we track.
+    """
+    core = load_tickers_core()
+    seen: set[str] = set()
+    for key, tier in core.items():
+        if key.startswith("_") or not isinstance(tier, dict):
+            continue
+        for cat_key, cat_val in tier.items():
+            if cat_key.startswith("_"):
+                continue
+            for t in _category_tickers(cat_val):
+                seen.add(t.upper())
+    return sorted(seen)
+
+
 def tier_named_lists() -> list[dict]:
     """Flatten each tier into one named list ``{name, kind='tier', tickers}``.
 
