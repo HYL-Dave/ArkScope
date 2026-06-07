@@ -416,6 +416,125 @@ def test_tier_named_lists_structure():
         assert li["tickers"] and all(isinstance(t, str) for t in li["tickers"])
 
 
+# --- tags (classification metadata, decoupled from list membership) -------
+
+
+def test_get_tags_empty(store):
+    assert store.get_tags([]) == {}
+    assert store.get_tags(["NVDA"]) == {}  # no tags → ticker absent from result
+
+
+def test_seed_tags_get_and_source_grouping(store):
+    summary = store.seed_tags(
+        [
+            {"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA", "AMD"]},
+            {"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["NVDA"]},
+        ]
+    )
+    assert summary == {"tags_added": 3}
+    tags = store.get_tags(["NVDA", "AMD"])
+    # config rows ordered by (source, tag): config:category before config:tier
+    assert tags["NVDA"] == [
+        {"tag": "Mega Cap Tech", "source": "config:category"},
+        {"tag": "Tier 1 · Core", "source": "config:tier"},
+    ]
+    assert tags["AMD"] == [{"tag": "Tier 1 · Core", "source": "config:tier"}]
+    # re-seed is idempotent (duplicate rows ignored)
+    again = store.seed_tags([{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA"]}])
+    assert again == {"tags_added": 0}
+
+
+def test_tag_add_remove_user_only_by_default(store):
+    store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
+    store.add_tag("aapl", "watch-me")  # defaults to source="user", normalizes ticker
+    # remove without source → ONLY the user tag goes; config tag is protected
+    assert store.remove_tag("AAPL", "watch-me") is True
+    assert store.remove_tag("AAPL", "Mega Cap Tech") is False  # not a user tag
+    assert store.get_tags(["AAPL"]) == {"AAPL": [{"tag": "Mega Cap Tech", "source": "config:category"}]}
+    # explicit source CAN remove a config tag
+    assert store.remove_tag("AAPL", "Mega Cap Tech", source="config:category") is True
+    assert store.get_tags(["AAPL"]) == {}
+
+
+def test_seed_tags_replace_preserves_user_and_reflects_removal(store):
+    store.seed_tags([{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA", "AMD"]}])
+    store.add_tag("NVDA", "my-thesis", "user")
+    # re-seed config:tier WITHOUT AMD → AMD's config tag dropped; NVDA's kept; user kept
+    store.seed_tags(
+        [{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA"]}],
+        replace_sources=["config:tier"],
+    )
+    tags = store.get_tags(["NVDA", "AMD"])
+    assert {"tag": "Tier 1 · Core", "source": "config:tier"} in tags["NVDA"]
+    assert {"tag": "my-thesis", "source": "user"} in tags["NVDA"]
+    assert "AMD" not in tags  # config tag removed and AMD had no other tags
+
+
+def test_add_tag_rejects_blank(store):
+    with pytest.raises(ValueError):
+        store.add_tag("NVDA", "   ")
+    with pytest.raises(ValueError):
+        store.add_tag("", "x")
+
+
+def test_config_tag_groups_structure():
+    from src.universe_config import config_tag_groups
+
+    groups = config_tag_groups()
+    for g in groups:  # tolerant: empty if config absent, else well-formed
+        assert g["source"] in {"config:tier", "config:category"}
+        assert g["tag"] and isinstance(g["tag"], str)
+        assert g["tickers"] and all(isinstance(t, str) and t == t.upper() for t in g["tickers"])
+    if groups:  # real config present → both families emitted
+        assert {g["source"] for g in groups} == {"config:tier", "config:category"}
+
+
+def test_cockpit_universe_ticker_state_carry_tags(api_store):
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)  # seed lists
+    api_store.seed_tags(
+        [
+            {"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL", "MSFT"]},
+            {"tag": "watch-me", "source": "user", "tickers": ["AAPL"]},
+        ]
+    )
+    cockpit = {r["ticker"]: r for r in cockpit_watchlist(dal=None, store=api_store)["rows"]}
+    assert {(t["tag"], t["source"]) for t in cockpit["AAPL"]["tags"]} == {
+        ("Mega Cap Tech", "config:category"),
+        ("watch-me", "user"),
+    }
+    assert cockpit["TSLA"]["tags"] == []  # untagged ticker → empty
+
+    u = {r["ticker"]: r for r in universe(dal=None, store=api_store)["rows"]}
+    assert {(t["tag"], t["source"]) for t in u["MSFT"]["tags"]} == {("Mega Cap Tech", "config:category")}
+
+    state = get_ticker_state("AAPL", dal=None, store=api_store)
+    assert ("watch-me", "user") in {(t["tag"], t["source"]) for t in state["tags"]}
+
+
+def test_import_universe_seeds_theme_tags(api_store, monkeypatch):
+    # A theme group ("theme:量子計算") becomes a config:theme tag; Holdings does not.
+    monkeypatch.setattr(
+        "src.api.routes.profile.get_watchlist_overview",
+        lambda dal: {
+            "date": "2026-06-05",
+            "tickers": [
+                {"ticker": "IONQ", "group": "theme:量子計算"},
+                {"ticker": "RGTI", "group": "theme:量子計算"},
+                {"ticker": "AAPL", "group": "Holdings"},
+            ],
+        },
+    )
+    out = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    assert out["tags"]["tags_added"] == 2  # IONQ, RGTI under 量子計算
+    tags = api_store.get_tags(["IONQ", "AAPL"])
+    assert tags["IONQ"] == [{"tag": "量子計算", "source": "config:theme"}]
+    assert "AAPL" not in tags  # Holdings group is not a theme → no tag
+
+    # Re-import replaces config:theme (idempotent membership) but doesn't double-count
+    again = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    assert again["tags"]["tags_added"] == 2  # replaced then re-added the same 2
+
+
 def test_universe_batch_summary_fills_universe_only(api_store, monkeypatch):
     # A universe-only ticker (not in overview) gets market data from the batch
     # summary — so it is NOT stuck at has_summary=False.

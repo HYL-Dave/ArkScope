@@ -70,6 +70,51 @@ def all_universe_tickers() -> list[str]:
     return sorted(seen)
 
 
+def _prettify_category(key: str) -> str:
+    """``mega_cap_tech`` → ``Mega Cap Tech`` (display tag for a tickers_core category)."""
+    return " ".join(w.capitalize() for w in str(key).replace("-", "_").split("_") if w)
+
+
+def config_tag_groups() -> list[dict]:
+    """Classification tag groups derived from ``tickers_core.json``.
+
+    Each named tier contributes two tag families per category:
+      - a ``config:tier`` tag (e.g. "Tier 1 · Core"), and
+      - a ``config:category`` tag (e.g. "Mega Cap Tech").
+    ``legacy_reference`` is excluded (mirrors :func:`tier_named_lists`). Returns
+    a list of ``{tag, source, tickers}`` aggregated per ``(source, tag)``; empty
+    when the config is missing. Feeds ``ProfileStateStore.seed_tags`` so the
+    tag axis stays decoupled from list membership.
+    """
+    core = load_tickers_core()
+    groups: dict[tuple[str, str], list[str]] = {}
+
+    def _add(source: str, tag: str, tickers: list[str]) -> None:
+        bucket = groups.setdefault((source, tag), [])
+        for t in tickers:
+            u = t.upper()
+            if u not in bucket:
+                bucket.append(u)
+
+    for tier_key, tier_name in TIER_NAMES.items():
+        tier = core.get(tier_key)
+        if not isinstance(tier, dict):
+            continue
+        for cat_key, cat_val in tier.items():
+            if cat_key.startswith("_"):
+                continue
+            tickers = _category_tickers(cat_val)
+            if not tickers:
+                continue
+            _add("config:tier", tier_name, tickers)
+            _add("config:category", _prettify_category(cat_key), tickers)
+
+    return [
+        {"tag": tag, "source": source, "tickers": tickers}
+        for (source, tag), tickers in groups.items()
+    ]
+
+
 def tier_named_lists() -> list[dict]:
     """Flatten each tier into one named list ``{name, kind='tier', tickers}``.
 

@@ -27,10 +27,10 @@ from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
-from src.profile_state import ProfileStateStore, _norm
+from src.profile_state import ProfileStateStore, _infer_kind, _norm
 from src.tools.analysis_tools import get_universe_summaries, get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
-from src.universe_config import tier_named_lists
+from src.universe_config import config_tag_groups, tier_named_lists
 
 router = APIRouter(tags=["profile"])
 
@@ -56,6 +56,7 @@ def _ticker_state_payload(
 ) -> dict:
     norm = _norm(ticker)
     data = asdict(store.get_ticker(norm))
+    data["tags"] = store.get_tags([norm]).get(norm, [])
     priority = store.get_priorities([norm]).get(norm)
     if priority is None and include_profile_priority:
         try:
@@ -91,6 +92,7 @@ def cockpit_watchlist(
     tickers = [r.get("ticker", "") for r in rows]
     agg = store.get_aggregate(tickers)
     prios = store.get_priorities(tickers)  # user override wins
+    tags = store.get_tags(tickers)
 
     out_rows: list[dict] = []
     archived_count = 0
@@ -114,7 +116,7 @@ def cockpit_watchlist(
                 "bullish_ratio": r.get("bullish_ratio"),
                 "lists": a.lists if a else [],
                 "archived": archived,
-                "tags": [],  # tag store deferred (UI defers tags too)
+                "tags": tags.get(_norm(ticker), []),
                 "note_count": a.note_count if a else 0,
                 # Per-source freshness is TBD; expose the overview as-of date so
                 # the field is part of the stable contract from day one.
@@ -157,6 +159,8 @@ def import_universe(
     """
     opts = body or ImportBody()
     named: list[dict] = []
+    tag_groups: list[dict] = []
+    replace_sources: list[str] = []
     if opts.include_groups:
         overview = get_watchlist_overview(dal)
         by_group: dict[str, list[str]] = {}
@@ -169,16 +173,30 @@ def import_universe(
             {"name": g, "kind": "imported_profile", "tickers": ts}
             for g, ts in by_group.items()
         )
+        # Theme groups also seed the decoupled classification axis as config:theme
+        # tags ("theme:量子計算" → tag "量子計算"); non-theme groups stay lists only.
+        replace_sources.append("config:theme")
+        for g, ts in by_group.items():
+            if _infer_kind(g) == "theme":
+                tag = g.split(":", 1)[1].strip() if ":" in g else g.strip()
+                if tag:
+                    tag_groups.append({"tag": tag, "source": "config:theme", "tickers": ts})
     if opts.include_tiers:
         named.extend(tier_named_lists())
+        tag_groups.extend(config_tag_groups())  # config:tier + config:category
+        replace_sources.extend(["config:tier", "config:category"])
 
     require_profile_state_write(
         "import_universe",
         {"groups": opts.include_groups, "tiers": opts.include_tiers, "lists": len(named)},
     )
     summary = store.import_lists(named)
+    # Tags are config-authoritative: re-seeding REPLACES the config:* families we
+    # build here so config edits/removals propagate; source="user" tags survive.
+    tag_summary = store.seed_tags(tag_groups, replace_sources=replace_sources)
     return {
         "imported": summary,
+        "tags": tag_summary,
         "lists": [asdict(li) for li in store.list_watchlists()],
     }
 
@@ -206,6 +224,7 @@ def universe(
     tickers = sorted(set(store.all_tickers()) | set(by_ticker))
     agg = store.get_aggregate(tickers)
     prios = store.get_priorities(tickers)  # user override wins
+    tags = store.get_tags(tickers)
 
     rows: list[dict] = []
     archived_count = 0
@@ -246,6 +265,7 @@ def universe(
                 "all_lists": a.all_lists if a else [],
                 "archived_lists": a.archived_lists if a else [],
                 "archived": archived,
+                "tags": tags.get(_norm(t), []),
                 "note_count": a.note_count if a else 0,
             }
         )

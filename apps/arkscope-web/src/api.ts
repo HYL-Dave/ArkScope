@@ -163,6 +163,13 @@ export interface PriceChange {
 
 // --- cockpit watchlist + profile-state (lifecycle) ---
 
+// Classification tag, decoupled from list membership. source ∈
+// user | config:tier | config:theme | config:category (provider:* later).
+export interface TagRef {
+  tag: string;
+  source: string;
+}
+
 export interface CockpitRow {
   ticker: string;
   group: string | null;
@@ -174,7 +181,7 @@ export interface CockpitRow {
   bullish_ratio: number | null;
   lists: string[];
   archived: boolean;
-  tags: string[];
+  tags: TagRef[];
   note_count: number;
   freshness: string | null;
   per_ticker_error: string | null;
@@ -197,6 +204,7 @@ export interface TickerAggregate {
   archived: boolean;
   note_count: number;
   priority: string | null;
+  tags?: TagRef[];
 }
 
 // --- universe (full tracked inventory) ---
@@ -215,6 +223,7 @@ export interface UniverseRow {
   all_lists: string[];      // active + archived (full provenance)
   archived_lists: string[]; // memberships that are archived
   archived: boolean;
+  tags: TagRef[];
   note_count: number;
 }
 

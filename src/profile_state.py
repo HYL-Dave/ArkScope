@@ -66,6 +66,17 @@ CREATE TABLE IF NOT EXISTS ticker_meta (
     priority   TEXT,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ticker_tags (
+    ticker     TEXT NOT NULL,
+    tag        TEXT NOT NULL,
+    source     TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (ticker, tag, source)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticker_tags_ticker ON ticker_tags(ticker);
+CREATE INDEX IF NOT EXISTS idx_ticker_tags_tag ON ticker_tags(tag);
 """
 
 _PRIORITIES = ("high", "medium", "low")
@@ -392,6 +403,106 @@ class ProfileStateStore:
                 (t, priority, now),
             )
             conn.commit()
+
+    # --- tags (classification metadata, DECOUPLED from list membership) --
+
+    def get_tags(self, tickers) -> dict[str, list[dict]]:
+        """Per-ticker tags as ``{ticker: [{"tag","source"}, ...]}``.
+
+        Tags are classification metadata (tier / theme / category / user-defined),
+        intentionally decoupled from watchlist membership: a ticker keeps its tags
+        whether or not it sits in any list. Only tickers with at least one tag
+        appear in the result; rows are ordered ``source`` then ``tag`` so config
+        tags group before user tags deterministically.
+        """
+        keys = _dedup_norm(tickers)
+        if not keys:
+            return {}
+        ph = ",".join("?" * len(keys))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT ticker, tag, source FROM ticker_tags "
+                f"WHERE ticker IN ({ph}) ORDER BY ticker, source, tag",
+                keys,
+            ).fetchall()
+        out: dict[str, list[dict]] = {}
+        for r in rows:
+            out.setdefault(r["ticker"], []).append({"tag": r["tag"], "source": r["source"]})
+        return out
+
+    def add_tag(self, ticker: str, tag: str, source: str = "user") -> None:
+        """Attach a tag to a ticker (idempotent). Defaults to a user tag."""
+        t = _norm(ticker)
+        tg = (tag or "").strip()
+        src = (source or "user").strip() or "user"
+        if not t:
+            raise ValueError("ticker is required")
+        if not tg:
+            raise ValueError("tag is required")
+        with self._write_lock, self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO ticker_tags (ticker, tag, source, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (t, tg, src, _now()),
+            )
+            conn.commit()
+
+    def remove_tag(self, ticker: str, tag: str, source: Optional[str] = None) -> bool:
+        """Detach a tag from a ticker.
+
+        Without ``source`` this removes only the ``user`` tag — config-sourced
+        tags (``config:*``) are owned by re-import, not by per-ticker deletion,
+        so a user clearing a chip can't desync the catalog. Pass an explicit
+        ``source`` to target a specific family.
+        """
+        t = _norm(ticker)
+        tg = (tag or "").strip()
+        with self._write_lock, self._connect() as conn:
+            if source is None:
+                cur = conn.execute(
+                    "DELETE FROM ticker_tags WHERE ticker = ? AND tag = ? AND source = 'user'",
+                    (t, tg),
+                )
+            else:
+                cur = conn.execute(
+                    "DELETE FROM ticker_tags WHERE ticker = ? AND tag = ? AND source = ?",
+                    (t, tg, source),
+                )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def seed_tags(self, groups, replace_sources=None) -> dict:
+        """Additive, user-preserving seed of tags from config-shaped groups.
+
+        ``groups`` is an iterable of mappings ``{"tag", "source"?, "tickers"}``.
+        Idempotent: duplicate ``(ticker, tag, source)`` rows are ignored. When
+        ``replace_sources`` is given (e.g. ``["config:tier", "config:theme"]``)
+        those source families are deleted FIRST so a re-import reflects config
+        removals — but ``source="user"`` tags are NEVER touched. Returns a
+        ``{"tags_added": N}`` summary.
+
+        EXPLICIT importer — only call from a gated write action, never a read
+        path (mirrors :meth:`import_lists`).
+        """
+        now = _now()
+        tags_added = 0
+        with self._write_lock, self._connect() as conn:
+            for src in (replace_sources or []):
+                conn.execute("DELETE FROM ticker_tags WHERE source = ?", (src,))
+            for spec in groups:
+                tag = (spec.get("tag") or "").strip()
+                if not tag:
+                    continue
+                src = (spec.get("source") or "user").strip() or "user"
+                for t in _dedup_norm(spec.get("tickers") or []):
+                    cur = conn.execute(
+                        "INSERT OR IGNORE INTO ticker_tags (ticker, tag, source, created_at) "
+                        "VALUES (?, ?, ?, ?)",
+                        (t, tag, src, now),
+                    )
+                    tags_added += cur.rowcount
+            conn.commit()
+        return {"tags_added": tags_added}
 
     def list_notes(self, ticker: str) -> list[Note]:
         t = _norm(ticker)
