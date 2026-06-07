@@ -14,6 +14,7 @@ from src.api.routes.profile import (
     MemberBody,
     NoteBody,
     add_member,
+    PriorityBody,
     add_ticker_note,
     cockpit_watchlist,
     create_list,
@@ -25,6 +26,7 @@ from src.api.routes.profile import (
     remove_member,
     rename_list,
     set_ticker_archived,
+    set_ticker_priority,
     universe,
 )
 from src.profile_state import ProfileStateStore
@@ -169,6 +171,18 @@ def test_add_member_reactivates_archived(store):
     store.add_member(lid, "NVDA")  # re-add reactivates this membership
     assert store.get_ticker("NVDA").archived is False
     assert "L" in store.get_ticker("NVDA").lists
+
+
+def test_priority_set_get_clear(store):
+    assert store.get_priorities(["NVDA"]) == {}
+    store.set_priority("nvda", "high")
+    assert store.get_priorities(["NVDA", "AMD"]) == {"NVDA": "high"}
+    store.set_priority("NVDA", "low")  # update
+    assert store.get_priorities(["NVDA"]) == {"NVDA": "low"}
+    store.set_priority("NVDA", None)  # clear
+    assert store.get_priorities(["NVDA"]) == {}
+    with pytest.raises(ValueError):
+        store.set_priority("NVDA", "urgent")
 
 
 def test_default_aggregate_for_unknown_ticker(store):
@@ -328,6 +342,22 @@ def test_list_crud_routes(api_store):
 def test_create_list_blank_is_422():
     with pytest.raises(ValidationError):
         ListCreateBody(name="")
+
+
+def test_set_priority_route_overrides_overview(api_store):
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    # AAPL's overview priority is "high"; user override → "low"
+    set_ticker_priority("AAPL", PriorityBody(priority="low"), store=api_store)
+    row = next(x for x in cockpit_watchlist(dal=None, store=api_store)["rows"] if x["ticker"] == "AAPL")
+    assert row["priority"] == "low"
+    # clear → falls back to the overview's "high"
+    set_ticker_priority("AAPL", PriorityBody(priority=None), store=api_store)
+    row = next(x for x in cockpit_watchlist(dal=None, store=api_store)["rows"] if x["ticker"] == "AAPL")
+    assert row["priority"] == "high"
+    # invalid → 400
+    with pytest.raises(HTTPException) as exc:
+        set_ticker_priority("AAPL", PriorityBody(priority="urgent"), store=api_store)
+    assert exc.value.status_code == 400
 
 
 def test_all_tickers_distinct_sorted(store):

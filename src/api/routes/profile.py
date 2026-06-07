@@ -64,7 +64,9 @@ def cockpit_watchlist(
     rows = overview.get("tickers", [])
     as_of = overview.get("date")
 
-    agg = store.get_aggregate([r.get("ticker", "") for r in rows])
+    tickers = [r.get("ticker", "") for r in rows]
+    agg = store.get_aggregate(tickers)
+    prios = store.get_priorities(tickers)  # user override wins
 
     out_rows: list[dict] = []
     archived_count = 0
@@ -80,7 +82,7 @@ def cockpit_watchlist(
             {
                 "ticker": ticker,
                 "group": r.get("group"),
-                "priority": r.get("priority"),
+                "priority": prios.get(_norm(ticker)) or r.get("priority"),
                 "latest_close": r.get("latest_close"),
                 "change_7d_pct": r.get("change_7d_pct"),
                 "news_count_7d": r.get("news_count_7d", 0),
@@ -175,6 +177,7 @@ def universe(
 
     tickers = sorted(set(store.all_tickers()) | set(by_ticker))
     agg = store.get_aggregate(tickers)
+    prios = store.get_priorities(tickers)  # user override wins
 
     rows: list[dict] = []
     archived_count = 0
@@ -204,7 +207,7 @@ def universe(
                 "ticker": t,
                 "has_summary": has_summary,
                 "group": ov.get("group") if ov else None,
-                "priority": ov.get("priority") if ov else None,
+                "priority": prios.get(_norm(t)) or (ov.get("priority") if ov else None),
                 "latest_close": latest_close,
                 "change_7d_pct": change_7d,
                 "news_count_7d": news_7d,
@@ -349,6 +352,25 @@ def set_ticker_archived(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return asdict(agg)
+
+
+class PriorityBody(BaseModel):
+    priority: str | None = None  # high | medium | low | null (clear)
+
+
+@router.post("/profile/tickers/{ticker}/priority")
+def set_ticker_priority(
+    ticker: str,
+    body: PriorityBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Set or clear a ticker's user priority (overrides any profile-derived one)."""
+    require_profile_state_write("set_priority", {"ticker": ticker, "priority": body.priority})
+    try:
+        store.set_priority(ticker, body.priority)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ticker": _norm(ticker), "priority": body.priority}
 
 
 @router.get("/profile/tickers/{ticker}/notes")

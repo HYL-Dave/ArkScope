@@ -60,7 +60,15 @@ CREATE TABLE IF NOT EXISTS ticker_notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ticker_notes_ticker ON ticker_notes(ticker);
+
+CREATE TABLE IF NOT EXISTS ticker_meta (
+    ticker     TEXT PRIMARY KEY,
+    priority   TEXT,
+    updated_at TEXT NOT NULL
+);
 """
+
+_PRIORITIES = ("high", "medium", "low")
 
 
 def _now() -> str:
@@ -346,6 +354,38 @@ class ProfileStateStore:
                 "SELECT DISTINCT ticker FROM watchlist_memberships ORDER BY ticker"
             ).fetchall()
         return [r["ticker"] for r in rows]
+
+    def get_priorities(self, tickers) -> dict[str, str]:
+        """User-set priority per ticker (only those with one). Overrides any
+        profile-derived priority in the cockpit/universe DTOs."""
+        keys = _dedup_norm(tickers)
+        if not keys:
+            return {}
+        ph = ",".join("?" * len(keys))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT ticker, priority FROM ticker_meta "
+                f"WHERE ticker IN ({ph}) AND priority IS NOT NULL",
+                keys,
+            ).fetchall()
+        return {r["ticker"]: r["priority"] for r in rows}
+
+    def set_priority(self, ticker: str, priority: Optional[str]) -> None:
+        """Set (or clear, with None) a ticker's user priority. high|medium|low."""
+        t = _norm(ticker)
+        if not t:
+            raise ValueError("ticker is required")
+        if priority is not None and priority not in _PRIORITIES:
+            raise ValueError(f"invalid priority: {priority}")
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO ticker_meta (ticker, priority, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(ticker) DO UPDATE SET priority = excluded.priority, "
+                "updated_at = excluded.updated_at",
+                (t, priority, now),
+            )
+            conn.commit()
 
     def list_notes(self, ticker: str) -> list[Note]:
         t = _norm(ticker)
