@@ -456,3 +456,42 @@ def delete_ticker_note(
     if not store.delete_note(ticker, note_id):
         raise HTTPException(status_code=404, detail="note not found")
     return {"deleted": True, "id": note_id}
+
+
+class TagBody(BaseModel):
+    tag: str = Field(min_length=1)
+
+
+@router.post("/profile/tickers/{ticker}/tags")
+def add_ticker_tag(
+    ticker: str,
+    body: TagBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Attach a USER tag (source='user') to a ticker.
+
+    Only user tags can be created here; the ``config:*`` families are owned by
+    ``import-universe`` re-seeding. A user tag whose label collides with a config
+    tag is stored as a distinct ``source='user'`` row by design.
+    """
+    require_profile_state_write("add_tag", {"ticker": ticker, "tag": body.tag})
+    try:
+        store.add_tag(ticker, body.tag, source="user")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _ticker_state_payload(store, ticker)
+
+
+@router.delete("/profile/tickers/{ticker}/tags/{tag}")
+def remove_ticker_tag(
+    ticker: str,
+    tag: str,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Detach a USER tag from a ticker. ``config:*`` tags are NOT removable via
+    the API (``remove_tag`` defaults to user-only), so a 404 here means there was
+    no user tag by that label."""
+    require_profile_state_write("remove_tag", {"ticker": ticker, "tag": tag})
+    if not store.remove_tag(ticker, tag):  # user-only by default
+        raise HTTPException(status_code=404, detail="user tag not found")
+    return {"removed": True, "ticker": _norm(ticker), "tag": tag}

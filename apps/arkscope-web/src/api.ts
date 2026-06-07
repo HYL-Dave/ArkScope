@@ -640,6 +640,26 @@ export function deleteNote(ticker: string, noteId: number): Promise<{ deleted: b
   );
 }
 
+// User tags only (source='user'). config:* tags are seeded by import-universe
+// and are NOT creatable/removable here. Returns the refreshed ticker state.
+export function addTickerTag(ticker: string, tag: string): Promise<TickerAggregate> {
+  return sendJSON<TickerAggregate>(
+    `/profile/tickers/${encodeURIComponent(ticker)}/tags`,
+    "POST",
+    { tag },
+  );
+}
+
+export function removeTickerTag(
+  ticker: string,
+  tag: string,
+): Promise<{ removed: boolean; ticker: string; tag: string }> {
+  return sendJSON<{ removed: boolean; ticker: string; tag: string }>(
+    `/profile/tickers/${encodeURIComponent(ticker)}/tags/${encodeURIComponent(tag)}`,
+    "DELETE",
+  );
+}
+
 export function getCards(
   ticker?: string,
   limit = 20,

@@ -15,7 +15,9 @@ from src.api.routes.profile import (
     NoteBody,
     add_member,
     PriorityBody,
+    TagBody,
     add_ticker_note,
+    add_ticker_tag,
     cockpit_watchlist,
     create_list,
     delete_list,
@@ -25,6 +27,7 @@ from src.api.routes.profile import (
     list_ticker_notes,
     profile_lists,
     remove_member,
+    remove_ticker_tag,
     rename_list,
     set_ticker_archived,
     set_ticker_priority,
@@ -533,6 +536,47 @@ def test_import_universe_seeds_theme_tags(api_store, monkeypatch):
     # Re-import replaces config:theme (idempotent membership) but doesn't double-count
     again = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
     assert again["tags"]["tags_added"] == 2  # replaced then re-added the same 2
+
+
+def test_user_tag_add_remove_routes(api_store):
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    api_store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
+
+    # add a user tag → state reflects it with source='user'
+    state = add_ticker_tag("aapl", TagBody(tag="my-watch"), store=api_store)
+    pairs = {(t["tag"], t["source"]) for t in state["tags"]}
+    assert ("my-watch", "user") in pairs
+    assert ("Mega Cap Tech", "config:category") in pairs  # config tag untouched
+
+    # removing the user tag works; the config tag is NOT removable via the API
+    assert remove_ticker_tag("AAPL", "my-watch", store=api_store)["removed"] is True
+    with pytest.raises(HTTPException) as exc:
+        remove_ticker_tag("AAPL", "Mega Cap Tech", store=api_store)  # config tag → 404
+    assert exc.value.status_code == 404
+    remaining = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
+    assert remaining == {("Mega Cap Tech", "config:category")}  # config survived
+
+    # removing a non-existent user tag → 404
+    with pytest.raises(HTTPException) as exc:
+        remove_ticker_tag("AAPL", "nope", store=api_store)
+    assert exc.value.status_code == 404
+
+
+def test_user_tag_label_colliding_with_config_is_distinct(api_store):
+    # A user tag whose label equals a config tag is a separate source='user' row.
+    api_store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
+    add_ticker_tag("AAPL", TagBody(tag="Mega Cap Tech"), store=api_store)
+    pairs = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
+    assert pairs == {("Mega Cap Tech", "config:category"), ("Mega Cap Tech", "user")}
+    # the API-removable one is the user row; config remains
+    assert remove_ticker_tag("AAPL", "Mega Cap Tech", store=api_store)["removed"] is True
+    pairs = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
+    assert pairs == {("Mega Cap Tech", "config:category")}
+
+
+def test_add_tag_blank_is_422():
+    with pytest.raises(ValidationError):
+        TagBody(tag="")
 
 
 def test_universe_batch_summary_fills_universe_only(api_store, monkeypatch):
