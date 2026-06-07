@@ -20,6 +20,7 @@ from src.api.routes.profile import (
     create_list,
     delete_list,
     delete_ticker_note,
+    get_ticker_state,
     import_universe,
     list_ticker_notes,
     profile_lists,
@@ -257,9 +258,11 @@ def test_import_universe_then_archive_filter(api_store):
     # Explicit import seeds the lists (dal=None → tiers no-op; groups only).
     imported = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
     assert {li["name"] for li in imported["lists"]} == {"Holdings", "Interested"}
+    assert {li["kind"] for li in imported["lists"]} == {"imported_profile"}
 
     lists = profile_lists(store=api_store)["lists"]
     assert {li["name"] for li in lists} == {"Holdings", "Interested"}
+    assert {li["kind"] for li in lists} == {"imported_profile"}
 
     data = cockpit_watchlist(dal=None, store=api_store)
     row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
@@ -358,6 +361,23 @@ def test_set_priority_route_overrides_overview(api_store):
     with pytest.raises(HTTPException) as exc:
         set_ticker_priority("AAPL", PriorityBody(priority="urgent"), store=api_store)
     assert exc.value.status_code == 400
+
+
+def test_priority_route_overrides_universe_and_ticker_state(api_store):
+    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    set_ticker_priority("MSFT", PriorityBody(priority="high"), store=api_store)
+
+    u = universe(dal=None, store=api_store)
+    msft = next(x for x in u["rows"] if x["ticker"] == "MSFT")
+    assert msft["priority"] == "high"  # overview says medium; user override wins
+
+    state = get_ticker_state("MSFT", dal=None, store=api_store)
+    assert state["ticker"] == "MSFT"
+    assert state["priority"] == "high"
+
+    set_ticker_priority("MSFT", PriorityBody(priority=None), store=api_store)
+    state = get_ticker_state("MSFT", dal=None, store=api_store)
+    assert state["priority"] == "medium"
 
 
 def test_all_tickers_distinct_sorted(store):

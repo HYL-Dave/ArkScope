@@ -102,8 +102,9 @@ def fetch_recommendation_consensus(ticker: str) -> dict:
     get_analyst_consensus. Returns the derived summary plus a ``status``:
 
       ok            — real recommendation data (cache it)
-      no_data       — Finnhub returned nothing (no coverage OR transient 429/
-                      network — indistinguishable; do NOT cache)
+      no_coverage   — Finnhub returned a successful empty recommendation list
+                      (do NOT cache)
+      rate_limited  — Finnhub returned 429 (do NOT cache)
       missing_key   — FINNHUB_API_KEY not set (do NOT cache)
       provider_error— unexpected error (do NOT cache)
     """
@@ -112,15 +113,34 @@ def fetch_recommendation_consensus(ticker: str) -> dict:
     if not os.environ.get("FINNHUB_API_KEY"):
         return {**_empty_summary(), "status": "missing_key"}
     try:
-        from src.tools.analyst_tools import _fetch_recommendations
+        from src.tools import analyst_tools
 
-        rec = _fetch_recommendations(ticker)  # only /stock/recommendation
+        analyst_tools._throttle()
+        session, _ = analyst_tools._get_finnhub_session()
+        resp = session.get(
+            f"{analyst_tools._FINNHUB_BASE}/stock/recommendation",
+            params={"symbol": _norm(ticker)},
+            timeout=15,
+        )
+        if resp.status_code == 429:
+            return {**_empty_summary(), "status": "rate_limited", "message": "Finnhub rate limit"}
+        if resp.status_code == 403:
+            return {**_empty_summary(), "status": "provider_error", "message": "Finnhub returned 403"}
+        resp.raise_for_status()
+        data = resp.json()
     except Exception as exc:  # pragma: no cover - defensive
         return {**_empty_summary(), "status": "provider_error", "message": str(exc)}
-    current = (rec or {}).get("current")
+
+    if not isinstance(data, list):
+        return {**_empty_summary(), "status": "provider_error", "message": "Unexpected Finnhub payload"}
+    if not data:
+        return {**_empty_summary(), "status": "no_coverage"}
+    current = data[0]
     if not current:
-        return {**_empty_summary(), "status": "no_data"}
+        return {**_empty_summary(), "status": "no_coverage"}
     summary = derive_consensus(current)
+    if summary["total"] <= 0:
+        return {**_empty_summary(), "status": "no_coverage"}
     summary["status"] = "ok"
     return summary
 
@@ -219,8 +239,8 @@ class AnalystConsensusCache:
             if cached is not None:
                 return {**cached, "status": "cached", "cached": True}
             result = fetcher(t)  # {status, ...summary}
-            # Only cache a real recommendation — never a transient failure, a
-            # missing key, or an ambiguous no-data (it would stick for 24h).
+            # Only cache a real recommendation — never a transient failure,
+            # missing key, rate limit, or no-coverage response.
             if result.get("status") == "ok":
                 stored = self.put(t, result)
                 return {**stored, "status": "ok", "cached": False}

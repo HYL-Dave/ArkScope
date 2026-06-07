@@ -7,11 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   addNote,
   deleteNote,
+  getTickerState,
   getNotes,
   getPriceChange,
-  type CockpitRow,
   type Note,
   type PriceChange,
+  type TickerAggregate,
 } from "./api";
 import { AICardTab } from "./AICard";
 
@@ -19,30 +20,46 @@ type Tab = "overview" | "notes" | "ai";
 
 export function TickerDetailView({
   ticker,
-  row,
   onBack,
 }: {
   ticker: string;
-  row?: CockpitRow | null;
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
+  const [state, setState] = useState<TickerAggregate | null>(null);
+  const [stateErr, setStateErr] = useState<string | null>(null);
+
+  const refreshState = useCallback(async () => {
+    try {
+      const d = await getTickerState(ticker);
+      setState(d);
+      setStateErr(null);
+    } catch (e) {
+      setStateErr(e instanceof Error ? e.message : String(e));
+    }
+  }, [ticker]);
+
+  useEffect(() => {
+    setState(null);
+    setStateErr(null);
+    void refreshState();
+  }, [refreshState]);
 
   return (
     <main className="main detail-full">
       <div className="detailpage-head">
         <button className="btn-ghost" onClick={onBack}>← 自選股</button>
         <span className="mono strong detailpage-ticker">{ticker}</span>
-        {row?.priority && <span className={`badge p-${row.priority}`}>{row.priority}</span>}
-        {row?.archived && <span className="tag-archived">archived</span>}
-        {row?.group && <span className="muted tiny">{row.group}</span>}
-        {row?.lists && row.lists.length > 0 && (
+        {state?.priority && <span className={`badge p-${state.priority}`}>{state.priority}</span>}
+        {state?.archived && <span className="tag-archived">archived</span>}
+        {state?.lists && state.lists.length > 0 && (
           <span className="chips">
-            {row.lists.map((l) => (
+            {state.lists.map((l) => (
               <span key={l} className="list-chip">{l}</span>
             ))}
           </span>
         )}
+        {stateErr && <span className="refresh-err tiny">{stateErr}</span>}
       </div>
 
       <div className="detail-tabs">
@@ -50,7 +67,7 @@ export function TickerDetailView({
           總覽
         </button>
         <button type="button" className={`tab ${tab === "notes" ? "active" : ""}`} onClick={() => setTab("notes")}>
-          筆記{row && row.note_count > 0 ? `（${row.note_count}）` : ""}
+          筆記{state && state.note_count > 0 ? `（${state.note_count}）` : ""}
         </button>
         <button type="button" className={`tab ${tab === "ai" ? "active" : ""}`} onClick={() => setTab("ai")}>
           AI 卡片
@@ -58,9 +75,9 @@ export function TickerDetailView({
       </div>
 
       {tab === "overview" ? (
-        <OverviewTab ticker={ticker} row={row} />
+        <OverviewTab ticker={ticker} />
       ) : tab === "notes" ? (
-        <NotesTab ticker={ticker} />
+        <NotesTab ticker={ticker} onChanged={refreshState} />
       ) : (
         <div className="detail-ai-wrap">
           <AICardTab ticker={ticker} />
@@ -75,7 +92,7 @@ const PRICE_WINDOW_LABEL: Record<number, string> = {
   5: "5D", 7: "7D", 30: "30D", 90: "90D", 365: "1Y", 3650: "Max",
 };
 
-function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null }) {
+function OverviewTab({ ticker }: { ticker: string }) {
   const [pc, setPc] = useState<PriceChange | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [days, setDays] = useState<number>(30);
@@ -101,19 +118,6 @@ function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null 
   return (
     <div className="detail-grid">
       <section className="detail-col">
-        {row && (
-          <>
-            <h4 className="detail-section">Snapshot</h4>
-            <dl className="kv">
-              <Kv k="Last close" v={fmtNum(row.latest_close)} />
-              <Kv k="Change 7d" v={fmtPct(row.change_7d_pct)} cls={changeClass(row.change_7d_pct)} />
-              <Kv k="News 7d" v={String(row.news_count_7d)} />
-              <Kv k="Sentiment" v={fmtSent(row.sentiment_mean)} />
-              <Kv k="Bullish %" v={fmtRatioPct(row.bullish_ratio)} />
-            </dl>
-          </>
-        )}
-
         <div className="detail-pricehead">
           <h4 className="detail-section">Price ({PRICE_WINDOW_LABEL[days]})</h4>
           <span className="price-windows">
@@ -157,7 +161,7 @@ function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null 
   );
 }
 
-function NotesTab({ ticker }: { ticker: string }) {
+function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => void }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -187,6 +191,7 @@ function NotesTab({ ticker }: { ticker: string }) {
       await addNote(ticker, body);
       setDraft("");
       await refresh();
+      onChanged?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -200,6 +205,7 @@ function NotesTab({ ticker }: { ticker: string }) {
     try {
       await deleteNote(ticker, id);
       await refresh();
+      onChanged?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -271,14 +277,8 @@ function fmtNum(v: number | null): string {
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
-function fmtSent(v: number | null): string {
-  return v == null ? "—" : v.toFixed(2);
-}
 function changeClass(v: number | null): string {
   return v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
-}
-function fmtRatioPct(v: number | null): string {
-  return v == null ? "—" : `${Math.round(v * 100)}%`;
 }
 function fmtRangePct(v: number | null): string {
   return v == null ? "—" : `${v.toFixed(2)}%`;

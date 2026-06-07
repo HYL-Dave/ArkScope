@@ -25,7 +25,7 @@ export function HomeView({
 }: {
   status: StatusState;
   onNavigate: (view: NavTarget) => void;
-  onOpenTicker: (ticker: string, row?: CockpitRow) => void;
+  onOpenTicker: (ticker: string) => void;
 }) {
   const [wl, setWl] = useState<CockpitWatchlist | null>(null);
   const [cards, setCards] = useState<CardSummary[] | null>(null);
@@ -93,7 +93,7 @@ export function HomeView({
                 </thead>
                 <tbody>
                   {movers.map((r) => (
-                    <tr key={r.ticker} className="clickrow" onClick={() => onOpenTicker(r.ticker, r)}>
+                    <tr key={r.ticker} className="clickrow" onClick={() => onOpenTicker(r.ticker)}>
                       <td className="strong">{r.ticker}</td>
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>

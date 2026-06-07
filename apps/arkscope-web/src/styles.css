@@ -1468,7 +1468,7 @@ table.wl tbody tr.no-summary td.mono.strong {
 .wl-railitem.active {
   background: rgba(88, 166, 255, 0.12);
 }
-/* "All Active" is a bare button; list rows wrap a name button + actions */
+/* The aggregate custom-list view is a bare button; list rows wrap a name button + actions. */
 button.wl-railitem {
   text-align: left;
   background: transparent;
@@ -1710,10 +1710,21 @@ button.wl-railitem.active,
   white-space: nowrap;
 }
 .consensus-tag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.15;
 }
 .consensus-tag.muted {
   color: var(--muted);
   font-weight: 400;
+}
+.consensus-votes {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
 }

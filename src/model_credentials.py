@@ -134,11 +134,17 @@ class CredentialStore:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")  # wait out brief write locks
         return conn
 
     def _ensure_schema(self) -> None:
         with self._write_lock, self._connect() as conn:
-            conn.execute("PRAGMA journal_mode = WAL")
+            # WAL is an optimization; it errors immediately if another
+            # connection is open during concurrent first construction.
+            try:
+                conn.execute("PRAGMA journal_mode = WAL")
+            except sqlite3.OperationalError:
+                pass
             conn.executescript(_SCHEMA)
             conn.commit()
         try:

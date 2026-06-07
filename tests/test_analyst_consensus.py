@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from src.analyst_consensus import AnalystConsensusCache, derive_consensus
+from src.analyst_consensus import (
+    AnalystConsensusCache,
+    derive_consensus,
+    fetch_recommendation_consensus,
+)
 
 
 def _cur(sb=0, b=0, h=0, s=0, ss=0):
@@ -42,19 +46,14 @@ def test_cache_only_caches_ok_and_hits(tmp_path):
     assert calls["n"] == 1
 
 
-def test_transient_and_no_data_are_not_cached(tmp_path):
+def test_non_ok_statuses_are_not_cached(tmp_path):
     cache = AnalystConsensusCache(tmp_path / "ac.db")
     from src.analyst_consensus import _empty_summary
 
-    # no_data (ambiguous: no coverage OR 429/network) must NOT be cached
-    r = cache.get_or_fetch("AAPL", lambda t: {**_empty_summary(), "status": "no_data"})
-    assert r["status"] == "no_data" and r["rating"] is None
-    assert cache.get("AAPL") is None  # not cached → a later working fetch still runs
-
-    # missing_key likewise uncached
-    r2 = cache.get_or_fetch("MSFT", lambda t: {**_empty_summary(), "status": "missing_key"})
-    assert r2["status"] == "missing_key"
-    assert cache.get("MSFT") is None
+    for status in ("no_coverage", "rate_limited", "missing_key", "provider_error"):
+        r = cache.get_or_fetch("AAPL", lambda t, s=status: {**_empty_summary(), "status": s})
+        assert r["status"] == status and r["rating"] is None
+        assert cache.get("AAPL") is None  # not cached → a later working fetch still runs
 
 
 def test_get_or_fetch_never_raises_on_fetcher_error(tmp_path):
@@ -65,3 +64,52 @@ def test_get_or_fetch_never_raises_on_fetcher_error(tmp_path):
 
     r = cache.get_or_fetch("AAPL", boom)
     assert r["ticker"] == "AAPL" and r["rating"] is None and r["status"] == "provider_error"
+
+
+class _Resp:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+class _Session:
+    def __init__(self, resp):
+        self.resp = resp
+
+    def get(self, *args, **kwargs):
+        return self.resp
+
+
+def _patch_finnhub(monkeypatch, resp):
+    import src.tools.analyst_tools as tools
+
+    monkeypatch.setenv("FINNHUB_API_KEY", "test-key")
+    monkeypatch.setattr(tools, "_throttle", lambda: None)
+    monkeypatch.setattr(tools, "_get_finnhub_session", lambda: (_Session(resp), "test-key"))
+
+
+def test_fetch_recommendation_consensus_splits_statuses(monkeypatch):
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    assert fetch_recommendation_consensus("AAPL")["status"] == "missing_key"
+
+    _patch_finnhub(monkeypatch, _Resp(429, []))
+    assert fetch_recommendation_consensus("AAPL")["status"] == "rate_limited"
+
+    _patch_finnhub(monkeypatch, _Resp(200, []))
+    assert fetch_recommendation_consensus("AAPL")["status"] == "no_coverage"
+
+    _patch_finnhub(monkeypatch, _Resp(200, {"unexpected": True}))
+    assert fetch_recommendation_consensus("AAPL")["status"] == "provider_error"
+
+    _patch_finnhub(monkeypatch, _Resp(200, [_cur(sb=2, b=1, h=1)]))
+    ok = fetch_recommendation_consensus("AAPL")
+    assert ok["status"] == "ok"
+    assert ok["rating"] == "Buy"
+    assert ok["total"] == 4

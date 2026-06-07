@@ -221,7 +221,7 @@ export interface UniverseRow {
 export interface WatchlistSummary {
   id: number;
   name: string;
-  kind: string; // holdings | interested | theme | tier | custom
+  kind: string; // custom | imported_profile | holdings | interested | theme | tier
   position: number;
   archived: boolean;
   active_count: number;
@@ -574,7 +574,7 @@ export interface ConsensusSummary {
   source: string;
   cached?: boolean;
   fetched_at?: string;
-  // ok | cached | no_data | missing_key | provider_error
+  // ok | cached | no_coverage | rate_limited | missing_key | provider_error
   status?: string;
   message?: string;
 }

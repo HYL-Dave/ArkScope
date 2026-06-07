@@ -18,8 +18,8 @@ import {
 } from "./api";
 
 // One normalized row the table renders. The single source is the universe
-// (profile-state substrate); "All Active" is the union of active memberships
-// across the user's lists — NOT a separate curated source.
+// (profile-state substrate); the aggregate view is the union of active
+// memberships across app-created custom lists, not legacy config imports.
 interface TabRow {
   ticker: string;
   latest_close: number | null;
@@ -56,7 +56,7 @@ function universeToTab(r: UniverseRow): TabRow {
 
 export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null); // null = All Active
+  const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
   const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -83,7 +83,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     try {
       setLists((await getProfileLists(false)).lists);
     } catch {
-      /* rail degrades to All Active only */
+      /* rail degrades to the aggregate custom-list view only */
     }
   }, []);
 
@@ -106,19 +106,19 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     void loadUniverse();
   }, [loadLists, loadUniverse]);
 
-  const selectedList = selectedId === null ? null : lists.find((l) => l.id === selectedId) ?? null;
-  // If the selected list vanished (deleted/renamed away), fall back to All Active.
+  // 自選股 = app-created custom lists only. Imported legacy groups from
+  // user_profile.yaml and tickers_core tier inventory belong to 全部標的 as seed
+  // material; otherwise old visual/reference config keeps polluting the app UI.
+  const railLists = useMemo(() => lists.filter((l) => l.kind === "custom"), [lists]);
+  const watchlistNames = useMemo(() => new Set(railLists.map((l) => l.name)), [railLists]);
+  const selectedList = selectedId === null ? null : railLists.find((l) => l.id === selectedId) ?? null;
+  // If the selected list vanished, was deleted, or is a hidden tier inventory
+  // list, fall back to the visible aggregate.
   useEffect(() => {
-    if (selectedId !== null && lists.length && !lists.some((l) => l.id === selectedId)) {
+    if (selectedId !== null && lists.length && !railLists.some((l) => l.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [lists, selectedId]);
-
-  // 自選股 = the user's CURATED lists only. Tier lists (the tickers_core
-  // inventory imported via import-universe) belong to 全部標的, not here — else
-  // "All Active" would just mirror the whole universe and 全部標的 loses meaning.
-  const railLists = useMemo(() => lists.filter((l) => l.kind !== "tier"), [lists]);
-  const watchlistNames = useMemo(() => new Set(railLists.map((l) => l.name)), [railLists]);
+  }, [lists.length, railLists, selectedId]);
 
   // Debounced symbol search for the add-ticker box (stale responses dropped).
   useEffect(() => {
@@ -136,14 +136,14 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     return () => window.clearTimeout(t);
   }, [addQuery]);
 
-  // Rows are derived from the universe. All Active = rows with ≥1 active list
-  // membership (or any membership when showing archived) — so it auto-populates
-  // from your lists and is honestly empty for a new user.
+  // Rows are derived from the universe. 全部清單 = rows with >=1 active custom
+  // list membership (or any custom membership when showing archived). Legacy
+  // imported inventory stays visible in 全部標的, not in this daily work list.
   const { rows, asOf } = useMemo<{ rows: TabRow[]; asOf: string | null }>(() => {
     const src = universe?.rows ?? [];
     const asOfVal = universe?.asOf ?? null;
     if (selectedList === null) {
-      // union of active members across CURATED (non-tier) lists only
+      // union of active members across app-created custom lists only
       return {
         rows: src
           .filter((r) => (showArchived ? r.all_lists : r.lists).some((n) => watchlistNames.has(n)))
@@ -328,7 +328,8 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   }
 
   const thProps = { sortKey, sortDir, toggleSort };
-  const title = selectedList === null ? "All Active" : selectedList.name;
+  const title = selectedList === null ? "全部清單" : selectedList.name;
+  const universeCount = universe?.rows.length ?? null;
   const normQuery = addQuery.trim().toUpperCase();
 
   return (
@@ -337,6 +338,8 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
         <h2 className="surface-title">自選股</h2>
         <span className="muted">
           {title} · {rows.length} 檔
+          {selectedList === null && ` · ${railLists.length} 個自訂清單`}
+          {selectedList === null && universeCount !== null && ` · 全部標的 ${universeCount}`}
           {archivedCount > 0 && ` · ${archivedCount} archived`}
           {asOf && ` · as of ${asOf}`}
         </span>
@@ -355,9 +358,9 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           <button
             className={`wl-railitem ${selectedId === null ? "active" : ""}`}
             onClick={() => setSelectedId(null)}
-            title="所有清單中 active 的標的聯集"
+            title="app 內建立的自訂清單中 active 標的的聯集；完整 inventory 在「全部標的」"
           >
-            All Active
+            全部清單
           </button>
           {railLists.map((li) =>
             renamingId === li.id ? (
@@ -510,7 +513,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               </table>
               <p className="muted tiny">
                 ↗ 開詳情 · {selectedList ? "✕ 從此清單移除 · " : ""}🗄 全域封存（所有清單）· Priority 下拉可設定。
-                {selectedList === null && " 「All Active」= 你所有清單中 active 標的的聯集；新增請到清單裡加。"}
+                {selectedList === null && " 「全部清單」= app 內自訂清單中 active 標的的聯集；舊設定匯入與完整 inventory 在「全部標的」。新增請到清單裡加。"}
               </p>
             </>
           )}
@@ -539,7 +542,7 @@ function EmptyState({
       <div className="wl-empty">
         <p className="muted">還沒有任何清單。</p>
         <p className="muted tiny">
-          建立你的第一個清單，或到「全部標的」按「匯入清單」帶入現有分類。
+          建立你的第一個 app 自訂清單；舊設定匯入與 tier inventory 會留在「全部標的」，不會自動填入自選股。
         </p>
         <button className="btn-ghost" onClick={onCreate}>＋ 新增清單</button>
       </div>
@@ -579,19 +582,25 @@ function renderConsensus(c: ConsensusCell | undefined) {
   // Distinguish missing-key / provider-error / no-coverage (gpt-5.5) — not all "—".
   if (d.status === "missing_key")
     return <span className="muted tiny" title="未設定 FINNHUB_API_KEY">🔑</span>;
+  if (d.status === "rate_limited")
+    return <span className="muted tiny" title="Finnhub rate limit；稍後重新整理可重試">⏳</span>;
   if (d.status === "provider_error")
-    return <span className="muted tiny" title="分析師資料來源錯誤；重新整理可重試">⚠</span>;
+    return <span className="muted tiny" title={d.message || "分析師資料來源錯誤；重新整理可重試"}>⚠</span>;
+  if (d.status === "no_data")
+    return <span className="muted tiny" title="暫無資料或資料來源暫時失敗；重新整理可重試">—</span>;
   if (!d.rating)
-    return <span className="muted tiny" title="無分析師覆蓋（或暫時無資料）">—</span>;
+    return <span className="muted tiny" title="無分析師覆蓋">—</span>;
   const cn = d.counts || {};
   const when = d.fetched_at ? d.fetched_at.slice(0, 10) : "—";
+  const votes = `${cn.strongBuy ?? 0}/${cn.buy ?? 0}/${cn.hold ?? 0}/${cn.sell ?? 0}/${cn.strongSell ?? 0}`;
   const tip =
     `強力買進 ${cn.strongBuy ?? 0} · 買進 ${cn.buy ?? 0} · 持有 ${cn.hold ?? 0} · ` +
     `賣出 ${cn.sell ?? 0} · 強力賣出 ${cn.strongSell ?? 0}\n共 ${d.total} 位分析師 · 更新 ${when}` +
     (d.status === "cached" ? "（快取）" : "");
   return (
     <span className={`consensus-tag ${_CONSENSUS_CLASS[d.rating] ?? "muted"}`} title={tip}>
-      {d.rating} <span className="muted tiny">({d.total})</span>
+      <span>{d.rating}</span>
+      <span className="consensus-votes">{votes}</span>
     </span>
   );
 }

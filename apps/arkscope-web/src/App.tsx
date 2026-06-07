@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiBase, getRuntimeConfig, getStatus, type CockpitRow, type RuntimeConfig } from "./api";
+import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
@@ -46,12 +46,12 @@ export function App() {
   const [lastOk, setLastOk] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   // Full-page ticker detail overlay (null = show the selected nav view).
-  const [detail, setDetail] = useState<{ ticker: string; row?: CockpitRow } | null>(null);
+  const [detail, setDetail] = useState<{ ticker: string } | null>(null);
   // Right rail is collapsed by default — it only reserves width when opened.
   const [railOpen, setRailOpen] = useState(false);
 
-  const openTicker = useCallback((ticker: string, row?: CockpitRow) => {
-    setDetail({ ticker, row });
+  const openTicker = useCallback((ticker: string) => {
+    setDetail({ ticker });
   }, []);
 
   const goView = useCallback((next: Nav) => {
@@ -144,7 +144,6 @@ export function App() {
           <TickerDetailView
             key={detail.ticker}
             ticker={detail.ticker}
-            row={detail.row}
             onBack={() => setDetail(null)}
           />
         ) : view === "Home" ? (

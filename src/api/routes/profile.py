@@ -8,8 +8,8 @@ permission choke-point.
 ``/cockpit/watchlist`` is the stable cockpit DTO: every row always carries the
 full field set (explicit ``null`` / ``0`` / ``[]`` for missing data), unlike the
 agent-tool-shaped ``/overview`` which omits absent fields. The substrate is the
-multi-list model (ProductSpec §168); the v0 surface here renders a single
-aggregate "All Active" view + an Archived filter.
+multi-list model (ProductSpec §168); the cockpit surface derives an aggregate
+view from app-created custom lists plus an Archived filter.
 
 Read endpoints are PURE READS — they never mutate profile state. Seeding the
 list substrate from existing categories (user_profile groups + tickers_core
@@ -45,6 +45,30 @@ class NoteBody(BaseModel):
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _ticker_state_payload(
+    store: ProfileStateStore,
+    ticker: str,
+    *,
+    dal: DataAccessLayer | None = None,
+    include_profile_priority: bool = False,
+) -> dict:
+    norm = _norm(ticker)
+    data = asdict(store.get_ticker(norm))
+    priority = store.get_priorities([norm]).get(norm)
+    if priority is None and include_profile_priority:
+        try:
+            overview = get_watchlist_overview(dal)
+            row = next(
+                (r for r in overview.get("tickers", []) if _norm(r.get("ticker")) == norm),
+                None,
+            )
+            priority = row.get("priority") if row else None
+        except Exception:
+            priority = None
+    data["priority"] = priority
+    return data
 
 
 @router.get("/cockpit/watchlist")
@@ -113,7 +137,7 @@ def cockpit_watchlist(
 
 
 class ImportBody(BaseModel):
-    include_groups: bool = True  # user_profile watchlists (Holdings / Interested / themes)
+    include_groups: bool = True  # user_profile legacy visual/reference groups
     include_tiers: bool = True   # config/tickers_core.json tier categories (the ~130 universe)
 
 
@@ -125,10 +149,11 @@ def import_universe(
 ):
     """Seed the multi-list substrate from existing categories (EXPLICIT + gated).
 
-    Sources (both on by default): user_profile watchlist groups (via the
-    overview) and the ``tickers_core.json`` tiers. Additive and
-    archive-preserving — safe to re-run; it never resurrects an archived
-    membership or duplicates a list.
+    Sources (both on by default): legacy user_profile groups (via the overview)
+    and the ``tickers_core.json`` tiers. Additive and archive-preserving — safe
+    to re-run; it never resurrects an archived membership or duplicates a list.
+    Legacy groups are tagged ``imported_profile`` so app-created custom lists
+    remain the only source for the self-selected cockpit rail.
     """
     opts = body or ImportBody()
     named: list[dict] = []
@@ -140,7 +165,10 @@ def import_universe(
             t = _norm(r.get("ticker"))
             if t:
                 by_group.setdefault(group, []).append(t)
-        named.extend({"name": g, "tickers": ts} for g, ts in by_group.items())
+        named.extend(
+            {"name": g, "kind": "imported_profile", "tickers": ts}
+            for g, ts in by_group.items()
+        )
     if opts.include_tiers:
         named.extend(tier_named_lists())
 
@@ -313,7 +341,7 @@ def add_member(
         raise HTTPException(status_code=404, detail=e.args[0] if e.args else str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return asdict(store.get_ticker(body.ticker))
+    return _ticker_state_payload(store, body.ticker)
 
 
 @router.delete("/profile/lists/{list_id}/members/{ticker}")
@@ -332,9 +360,10 @@ def remove_member(
 @router.get("/profile/tickers/{ticker}/state")
 def get_ticker_state(
     ticker: str,
+    dal: DataAccessLayer = Depends(get_dal),
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    return asdict(store.get_ticker(ticker))
+    return _ticker_state_payload(store, ticker, dal=dal, include_profile_priority=True)
 
 
 @router.post("/profile/tickers/{ticker}/archive")
@@ -351,7 +380,7 @@ def set_ticker_archived(
         raise HTTPException(status_code=404, detail=e.args[0] if e.args else str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return asdict(agg)
+    return _ticker_state_payload(store, agg.ticker)
 
 
 class PriorityBody(BaseModel):

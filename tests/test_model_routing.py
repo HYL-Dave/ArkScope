@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import yaml
 import pytest
 from fastapi import HTTPException
@@ -151,3 +153,13 @@ def test_local_credential_crud_and_active_selection(tmp_path, monkeypatch):
     deleted = delete_credential(created["id"], store=store)
     assert deleted["deleted"] is True
     assert not any(c.id == created["id"] for c in provider_credentials(store)["anthropic"])
+
+
+def test_credential_store_concurrent_first_init_does_not_lock(tmp_path):
+    db = tmp_path / "profile_state.db"
+
+    def init_once():
+        return len(CredentialStore(db).list())
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert list(pool.map(lambda _: init_once(), range(12))) == [0] * 12
