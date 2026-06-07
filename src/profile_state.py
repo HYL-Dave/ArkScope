@@ -67,19 +67,35 @@ CREATE TABLE IF NOT EXISTS ticker_meta (
     updated_at TEXT NOT NULL
 );
 
+-- Classification tags, two-dimensional (facet × source), decoupled from list
+-- membership. facet = semantic axis (category|theme|provenance|sector|industry);
+-- source = authority/origin (user|legacy|system|provider:*|sec|broker), which
+-- also determines editability (user/legacy editable; the rest read-only facts).
 CREATE TABLE IF NOT EXISTS ticker_tags (
     ticker     TEXT NOT NULL,
-    tag        TEXT NOT NULL,
+    facet      TEXT NOT NULL,
+    value      TEXT NOT NULL,
     source     TEXT NOT NULL DEFAULT 'user',
     created_at TEXT NOT NULL,
-    PRIMARY KEY (ticker, tag, source)
+    PRIMARY KEY (ticker, facet, value, source)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ticker_tags_ticker ON ticker_tags(ticker);
-CREATE INDEX IF NOT EXISTS idx_ticker_tags_tag ON ticker_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_ticker_tags_facet ON ticker_tags(facet);
+
+-- Small key/value bag for app-managed profile settings (e.g. default watchlist).
+CREATE TABLE IF NOT EXISTS profile_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL
+);
 """
 
 _PRIORITIES = ("high", "medium", "low")
+
+# source families a user may edit/remove via the API; the rest are read-only
+# facts owned by import/providers.
+EDITABLE_TAG_SOURCES = ("user", "legacy")
 
 
 def _now() -> str:
@@ -187,8 +203,68 @@ class ProfileStateStore:
                 conn.execute("PRAGMA journal_mode = WAL")
             except sqlite3.OperationalError:
                 pass
+            # Migrate the old ticker_tags shape FIRST: _SCHEMA's facet index would
+            # otherwise error against a pre-existing v1 table (no facet column).
+            self._migrate_tags_v2(conn)
             conn.executescript(_SCHEMA)
             conn.commit()
+
+    @staticmethod
+    def _migrate_tags_v2(conn) -> None:
+        """Migrate a v1 ``ticker_tags(ticker, tag, source)`` table to the
+        two-dimensional ``(ticker, facet, value, source)`` model.
+
+        The classification model was redesigned (facet × source); the local DB is
+        gitignored and regenerable, but we migrate in place so any user-added tags
+        survive. Mapping: ``config:tier`` is dropped (Tier retired), ``config:category``
+        → ``legacy:category``, ``config:theme`` → ``legacy:theme``, ``user`` →
+        ``user:theme``; anything else defaults to the ``theme`` facet keeping its
+        source. Idempotent: a no-op once the table is already v2.
+        """
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(ticker_tags)").fetchall()}
+        if "tag" not in cols or "facet" in cols:
+            return  # already v2 (or freshly created with the new schema)
+        try:
+            conn.execute(
+                """
+                CREATE TABLE ticker_tags__v2 (
+                    ticker     TEXT NOT NULL,
+                    facet      TEXT NOT NULL,
+                    value      TEXT NOT NULL,
+                    source     TEXT NOT NULL DEFAULT 'user',
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (ticker, facet, value, source)
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO ticker_tags__v2 (ticker, facet, value, source, created_at)
+                SELECT ticker,
+                       CASE source WHEN 'config:category' THEN 'category'
+                                   WHEN 'config:theme'    THEN 'theme'
+                                   ELSE 'theme' END,
+                       tag,
+                       CASE source WHEN 'config:category' THEN 'legacy'
+                                   WHEN 'config:theme'    THEN 'legacy'
+                                   WHEN 'user'            THEN 'user'
+                                   ELSE source END,
+                       created_at
+                FROM ticker_tags
+                WHERE source != 'config:tier'
+                """
+            )
+            conn.execute("DROP TABLE ticker_tags")
+            conn.execute("ALTER TABLE ticker_tags__v2 RENAME TO ticker_tags")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ticker_tags_ticker ON ticker_tags(ticker)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ticker_tags_facet ON ticker_tags(facet)")
+        except sqlite3.OperationalError:
+            # Another constructor won the race (concurrent first-construction);
+            # the table is already migrated. Clean up our scratch table if left.
+            try:
+                conn.execute("DROP TABLE IF EXISTS ticker_tags__v2")
+            except sqlite3.OperationalError:
+                pass
 
     # --- universe import (EXPLICIT — never run from a read path) ---------
 
@@ -404,16 +480,16 @@ class ProfileStateStore:
             )
             conn.commit()
 
-    # --- tags (classification metadata, DECOUPLED from list membership) --
+    # --- tags (two-dimensional facet × source, DECOUPLED from list membership) --
 
     def get_tags(self, tickers) -> dict[str, list[dict]]:
-        """Per-ticker tags as ``{ticker: [{"tag","source"}, ...]}``.
+        """Per-ticker tags as ``{ticker: [{"facet","value","source"}, ...]}``.
 
-        Tags are classification metadata (tier / theme / category / user-defined),
+        Tags are classification metadata (category / theme / provenance / …),
         intentionally decoupled from watchlist membership: a ticker keeps its tags
         whether or not it sits in any list. Only tickers with at least one tag
-        appear in the result; rows are ordered ``source`` then ``tag`` so config
-        tags group before user tags deterministically.
+        appear in the result; rows are ordered ``facet`` then ``source`` then
+        ``value`` so a ticker's chips render deterministically.
         """
         keys = _dedup_norm(tickers)
         if not keys:
@@ -421,88 +497,115 @@ class ProfileStateStore:
         ph = ",".join("?" * len(keys))
         with self._connect() as conn:
             rows = conn.execute(
-                f"SELECT ticker, tag, source FROM ticker_tags "
-                f"WHERE ticker IN ({ph}) ORDER BY ticker, source, tag",
+                f"SELECT ticker, facet, value, source FROM ticker_tags "
+                f"WHERE ticker IN ({ph}) ORDER BY ticker, facet, source, value",
                 keys,
             ).fetchall()
         out: dict[str, list[dict]] = {}
         for r in rows:
-            out.setdefault(r["ticker"], []).append({"tag": r["tag"], "source": r["source"]})
+            out.setdefault(r["ticker"], []).append(
+                {"facet": r["facet"], "value": r["value"], "source": r["source"]}
+            )
         return out
 
-    def add_tag(self, ticker: str, tag: str, source: str = "user") -> None:
-        """Attach a tag to a ticker (idempotent). Defaults to a user tag."""
+    def add_tag(self, ticker: str, value: str, *, facet: str = "theme", source: str = "user") -> None:
+        """Attach a tag to a ticker (idempotent). Defaults to a user theme tag."""
         t = _norm(ticker)
-        tg = (tag or "").strip()
+        val = (value or "").strip()
+        fac = (facet or "theme").strip() or "theme"
         src = (source or "user").strip() or "user"
         if not t:
             raise ValueError("ticker is required")
-        if not tg:
-            raise ValueError("tag is required")
+        if not val:
+            raise ValueError("tag value is required")
         with self._write_lock, self._connect() as conn:
             conn.execute(
-                "INSERT OR IGNORE INTO ticker_tags (ticker, tag, source, created_at) "
-                "VALUES (?, ?, ?, ?)",
-                (t, tg, src, _now()),
+                "INSERT OR IGNORE INTO ticker_tags (ticker, facet, value, source, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (t, fac, val, src, _now()),
             )
             conn.commit()
 
-    def remove_tag(self, ticker: str, tag: str, source: Optional[str] = None) -> bool:
+    def remove_tag(
+        self, ticker: str, value: str, *, facet: str = "theme", source: Optional[str] = None
+    ) -> bool:
         """Detach a tag from a ticker.
 
-        Without ``source`` this removes only the ``user`` tag — config-sourced
-        tags (``config:*``) are owned by re-import, not by per-ticker deletion,
-        so a user clearing a chip can't desync the catalog. Pass an explicit
-        ``source`` to target a specific family.
+        Without ``source`` this removes only the ``user`` tag for that
+        ``(facet, value)``. Read-only families (``system`` / ``provider:*`` /
+        ``sec`` / ``broker``) are facts owned by import/providers, so the API
+        layer must restrict ``source`` to the editable families
+        (:data:`EDITABLE_TAG_SOURCES`); this store method itself deletes exactly
+        what it is told.
         """
         t = _norm(ticker)
-        tg = (tag or "").strip()
+        val = (value or "").strip()
+        fac = (facet or "theme").strip() or "theme"
         with self._write_lock, self._connect() as conn:
             if source is None:
                 cur = conn.execute(
-                    "DELETE FROM ticker_tags WHERE ticker = ? AND tag = ? AND source = 'user'",
-                    (t, tg),
+                    "DELETE FROM ticker_tags WHERE ticker = ? AND facet = ? AND value = ? "
+                    "AND source = 'user'",
+                    (t, fac, val),
                 )
             else:
                 cur = conn.execute(
-                    "DELETE FROM ticker_tags WHERE ticker = ? AND tag = ? AND source = ?",
-                    (t, tg, source),
+                    "DELETE FROM ticker_tags WHERE ticker = ? AND facet = ? AND value = ? "
+                    "AND source = ?",
+                    (t, fac, val, source),
                 )
             conn.commit()
             return cur.rowcount > 0
 
-    def seed_tags(self, groups, replace_sources=None) -> dict:
-        """Additive, user-preserving seed of tags from config-shaped groups.
+    def seed_tags(self, groups) -> dict:
+        """Additive, idempotent bootstrap seed of tags from config-shaped groups.
 
-        ``groups`` is an iterable of mappings ``{"tag", "source"?, "tickers"}``.
-        Idempotent: duplicate ``(ticker, tag, source)`` rows are ignored. When
-        ``replace_sources`` is given (e.g. ``["config:tier", "config:theme"]``)
-        those source families are deleted FIRST so a re-import reflects config
-        removals — but ``source="user"`` tags are NEVER touched. Returns a
-        ``{"tags_added": N}`` summary.
+        ``groups`` is an iterable of mappings ``{"facet", "value", "source"?, "tickers"}``.
+        Duplicate ``(ticker, facet, value, source)`` rows are ignored. This is a
+        ONE-TIME bootstrap from the (now demoted) config — purely additive: it
+        never deletes or replaces existing tags, so ``user``/``legacy`` edits made
+        in the app always survive a re-import. The old config rows are cleaned up
+        once by the schema migration, not here. Returns ``{"tags_added": N}``.
 
-        EXPLICIT importer — only call from a gated write action, never a read
-        path (mirrors :meth:`import_lists`).
+        EXPLICIT importer — only call from a gated write action, never a read path.
         """
         now = _now()
         tags_added = 0
         with self._write_lock, self._connect() as conn:
-            for src in (replace_sources or []):
-                conn.execute("DELETE FROM ticker_tags WHERE source = ?", (src,))
             for spec in groups:
-                tag = (spec.get("tag") or "").strip()
-                if not tag:
+                value = (spec.get("value") or "").strip()
+                facet = (spec.get("facet") or "").strip()
+                if not value or not facet:
                     continue
                 src = (spec.get("source") or "user").strip() or "user"
                 for t in _dedup_norm(spec.get("tickers") or []):
                     cur = conn.execute(
-                        "INSERT OR IGNORE INTO ticker_tags (ticker, tag, source, created_at) "
-                        "VALUES (?, ?, ?, ?)",
-                        (t, tag, src, now),
+                        "INSERT OR IGNORE INTO ticker_tags (ticker, facet, value, source, created_at) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (t, facet, value, src, now),
                     )
                     tags_added += cur.rowcount
             conn.commit()
         return {"tags_added": tags_added}
+
+    # --- profile settings (small key/value bag) --------------------------
+
+    def get_setting(self, key: str) -> Optional[str]:
+        with self._connect() as conn:
+            r = conn.execute(
+                "SELECT value FROM profile_settings WHERE key = ?", (key,)
+            ).fetchone()
+        return r["value"] if r else None
+
+    def set_setting(self, key: str, value: Optional[str]) -> None:
+        with self._write_lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO profile_settings (key, value, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+                "updated_at = excluded.updated_at",
+                (key, value, _now()),
+            )
+            conn.commit()
 
     def list_notes(self, ticker: str) -> list[Note]:
         t = _norm(ticker)
@@ -598,6 +701,20 @@ class ProfileStateStore:
             cur = conn.execute("DELETE FROM watchlists WHERE id = ?", (list_id,))
             conn.commit()
             return cur.rowcount > 0
+
+    def delete_non_custom_lists(self) -> int:
+        """Delete every non-``custom`` list (and its memberships, via cascade).
+
+        The de-mess: config-seeded tier/holdings/interested/theme/imported_profile
+        lists are retired — classification now lives in tags, and the only lists
+        are user work-lists (``custom``). Inventory is sourced from the active
+        universe catalog, so dropping these memberships never loses a tracked
+        ticker. Idempotent; returns the number of lists removed.
+        """
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM watchlists WHERE kind != 'custom'")
+            conn.commit()
+            return cur.rowcount
 
     def add_member(self, list_id: int, ticker: str) -> None:
         """Add a ticker to a specific list (reactivates an archived membership)."""

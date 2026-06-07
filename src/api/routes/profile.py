@@ -27,10 +27,21 @@ from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
-from src.profile_state import ProfileStateStore, _infer_kind, _norm
+from src.profile_state import (
+    EDITABLE_TAG_SOURCES,
+    ProfileStateStore,
+    _infer_kind,
+    _norm,
+)
 from src.tools.analysis_tools import get_universe_summaries, get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
-from src.universe_config import config_tag_groups, tier_named_lists
+from src.universe_config import (
+    active_universe_tickers,
+    config_tag_seeds,
+    tier_priority_map,
+)
+
+DEFAULT_WATCHLIST_KEY = "default_watchlist_id"
 
 router = APIRouter(tags=["profile"])
 
@@ -139,8 +150,9 @@ def cockpit_watchlist(
 
 
 class ImportBody(BaseModel):
-    include_groups: bool = True  # user_profile legacy visual/reference groups
-    include_tiers: bool = True   # config/tickers_core.json tier categories (the ~130 universe)
+    include_groups: bool = True  # user_profile theme groups → legacy:theme tags
+    include_tiers: bool = True   # tickers_core categories → legacy:category + provenance tags
+    migrate_tier_priority: bool = False  # OPT-IN: T1/T2/T3 → priority (fill-only)
 
 
 @router.post("/profile/import-universe")
@@ -149,18 +161,24 @@ def import_universe(
     dal: DataAccessLayer = Depends(get_dal),
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    """Seed the multi-list substrate from existing categories (EXPLICIT + gated).
+    """De-mess bootstrap: seed CLASSIFICATION TAGS from config, drop the legacy
+    config-seeded lists (EXPLICIT + gated).
 
-    Sources (both on by default): legacy user_profile groups (via the overview)
-    and the ``tickers_core.json`` tiers. Additive and archive-preserving — safe
-    to re-run; it never resurrects an archived membership or duplicates a list.
-    Legacy groups are tagged ``imported_profile`` so app-created custom lists
-    remain the only source for the self-selected cockpit rail.
+    The classification model is two-dimensional (facet × source). ``tickers_core``
+    is now just a *seed*, not the authority:
+      - theme groups (``theme:量子計算``) → ``legacy:theme`` tags (editable);
+      - ``tickers_core`` categories → ``legacy:category`` + read-only
+        ``provenance`` tags (Seeking Alpha / Alpha Picks);
+      - Tier is retired (→ optional ``migrate_tier_priority``);
+      - ``core_holdings`` / ``interested`` groups are NOT preserved (they only
+        re-polluted the UI; inventory comes from the active-universe catalog).
+
+    Lists are now user-only work lists, so this DELETES every non-``custom`` list
+    (config tier/holdings/interested/theme seeds). Tag seeding is purely additive
+    — ``user``/``legacy`` edits made in the app always survive a re-run.
     """
     opts = body or ImportBody()
-    named: list[dict] = []
     tag_groups: list[dict] = []
-    replace_sources: list[str] = []
     if opts.include_groups:
         overview = get_watchlist_overview(dal)
         by_group: dict[str, list[str]] = {}
@@ -169,34 +187,42 @@ def import_universe(
             t = _norm(r.get("ticker"))
             if t:
                 by_group.setdefault(group, []).append(t)
-        named.extend(
-            {"name": g, "kind": "imported_profile", "tickers": ts}
-            for g, ts in by_group.items()
-        )
-        # Theme groups also seed the decoupled classification axis as config:theme
-        # tags ("theme:量子計算" → tag "量子計算"); non-theme groups stay lists only.
-        replace_sources.append("config:theme")
+        # ONLY theme groups carry classification value → legacy:theme (editable).
+        # holdings/interested groups are intentionally dropped (not preserved).
         for g, ts in by_group.items():
             if _infer_kind(g) == "theme":
-                tag = g.split(":", 1)[1].strip() if ":" in g else g.strip()
-                if tag:
-                    tag_groups.append({"tag": tag, "source": "config:theme", "tickers": ts})
+                value = g.split(":", 1)[1].strip() if ":" in g else g.strip()
+                if value:
+                    tag_groups.append(
+                        {"facet": "theme", "value": value, "source": "legacy", "tickers": ts}
+                    )
     if opts.include_tiers:
-        named.extend(tier_named_lists())
-        tag_groups.extend(config_tag_groups())  # config:tier + config:category
-        replace_sources.extend(["config:tier", "config:category"])
+        tag_groups.extend(config_tag_seeds())  # legacy:category + provenance
 
     require_profile_state_write(
         "import_universe",
-        {"groups": opts.include_groups, "tiers": opts.include_tiers, "lists": len(named)},
+        {
+            "groups": opts.include_groups,
+            "tiers": opts.include_tiers,
+            "migrate_tier_priority": opts.migrate_tier_priority,
+        },
     )
-    summary = store.import_lists(named)
-    # Tags are config-authoritative: re-seeding REPLACES the config:* families we
-    # build here so config edits/removals propagate; source="user" tags survive.
-    tag_summary = store.seed_tags(tag_groups, replace_sources=replace_sources)
+    lists_removed = store.delete_non_custom_lists()
+    tag_summary = store.seed_tags(tag_groups)
+
+    priority_migrated = 0
+    if opts.migrate_tier_priority:
+        prio_map = tier_priority_map()
+        existing = store.get_priorities(list(prio_map))  # only tickers with a priority
+        for t, prio in prio_map.items():
+            if t not in existing:  # fill-only: never overwrite a user-set priority
+                store.set_priority(t, prio)
+                priority_migrated += 1
+
     return {
-        "imported": summary,
+        "lists_removed": lists_removed,
         "tags": tag_summary,
+        "priority_migrated": priority_migrated,
         "lists": [asdict(li) for li in store.list_watchlists()],
     }
 
@@ -221,7 +247,10 @@ def universe(
     as_of = overview.get("date")
     summaries = get_universe_summaries(dal)  # {TICKER: {latest_close, change_pct, ...}}
 
-    tickers = sorted(set(store.all_tickers()) | set(by_ticker))
+    # Active-universe direct: inventory = active config catalog ⊕ list-only
+    # additions ⊕ overview — decoupled from list membership, so retiring the tier
+    # lists never shrinks 全部標的.
+    tickers = sorted(set(active_universe_tickers()) | set(store.all_tickers()) | set(by_ticker))
     agg = store.get_aggregate(tickers)
     prios = store.get_priorities(tickers)  # user override wins
     tags = store.get_tags(tickers)
@@ -459,7 +488,8 @@ def delete_ticker_note(
 
 
 class TagBody(BaseModel):
-    tag: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+    facet: str = "theme"  # user tags are research themes by default
 
 
 @router.post("/profile/tickers/{ticker}/tags")
@@ -468,30 +498,46 @@ def add_ticker_tag(
     body: TagBody,
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    """Attach a USER tag (source='user') to a ticker.
+    """Attach a USER tag (``source='user'``) to a ticker on a given facet
+    (default ``theme``).
 
-    Only user tags can be created here; the ``config:*`` families are owned by
-    ``import-universe`` re-seeding. A user tag whose label collides with a config
-    tag is stored as a distinct ``source='user'`` row by design.
+    Only user tags can be created here; ``legacy`` tags come from the config
+    bootstrap and ``provider``/``system`` tags are external facts. A user tag
+    whose ``(facet, value)`` collides with a read-only tag is stored as a
+    distinct ``source='user'`` row by design.
     """
-    require_profile_state_write("add_tag", {"ticker": ticker, "tag": body.tag})
+    require_profile_state_write(
+        "add_tag", {"ticker": ticker, "facet": body.facet, "value": body.value}
+    )
     try:
-        store.add_tag(ticker, body.tag, source="user")
+        store.add_tag(ticker, body.value, facet=body.facet, source="user")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return _ticker_state_payload(store, ticker)
 
 
-@router.delete("/profile/tickers/{ticker}/tags/{tag}")
+@router.delete("/profile/tickers/{ticker}/tags")
 def remove_ticker_tag(
     ticker: str,
-    tag: str,
+    value: str,
+    facet: str = "theme",
+    source: str = "user",
     store: ProfileStateStore = Depends(get_profile_store),
 ):
-    """Detach a USER tag from a ticker. ``config:*`` tags are NOT removable via
-    the API (``remove_tag`` defaults to user-only), so a 404 here means there was
-    no user tag by that label."""
-    require_profile_state_write("remove_tag", {"ticker": ticker, "tag": tag})
-    if not store.remove_tag(ticker, tag):  # user-only by default
-        raise HTTPException(status_code=404, detail="user tag not found")
-    return {"removed": True, "ticker": _norm(ticker), "tag": tag}
+    """Detach an EDITABLE tag (``user`` or ``legacy``) from a ticker.
+
+    ``value`` / ``facet`` / ``source`` are query params (so a value containing
+    ``/`` is safe — no path-segment fragility). Read-only families
+    (``system`` / ``provider:*`` / ``sec`` / ``broker``) are external facts and
+    are rejected with 400; a 404 means no such editable tag existed.
+    """
+    if source not in EDITABLE_TAG_SOURCES:
+        raise HTTPException(
+            status_code=400, detail=f"source '{source}' is read-only and cannot be removed"
+        )
+    require_profile_state_write(
+        "remove_tag", {"ticker": ticker, "facet": facet, "value": value, "source": source}
+    )
+    if not store.remove_tag(ticker, value, facet=facet, source=source):
+        raise HTTPException(status_code=404, detail="editable tag not found")
+    return {"removed": True, "ticker": _norm(ticker), "facet": facet, "value": value, "source": source}

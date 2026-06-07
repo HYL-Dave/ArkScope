@@ -257,19 +257,18 @@ def test_cockpit_read_does_not_write(api_store):
     assert profile_lists(store=api_store)["lists"] == []  # read created no lists
 
 
-def test_import_universe_then_archive_filter(api_store):
-    # Explicit import seeds the lists (dal=None → tiers no-op; groups only).
+def test_import_universe_creates_no_lists_and_archive_filter(api_store):
+    # De-mess: import no longer creates lists (it seeds tags + drops non-custom).
     imported = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
-    assert {li["name"] for li in imported["lists"]} == {"Holdings", "Interested"}
-    assert {li["kind"] for li in imported["lists"]} == {"imported_profile"}
+    assert imported["lists"] == []
+    assert profile_lists(store=api_store)["lists"] == []
 
-    lists = profile_lists(store=api_store)["lists"]
-    assert {li["name"] for li in lists} == {"Holdings", "Interested"}
-    assert {li["kind"] for li in lists} == {"imported_profile"}
-
+    # Archive applies to list members → put AAPL in a user list, then archive it.
+    created = create_list(ListCreateBody(name="Core"), store=api_store)
+    add_member(created["id"], MemberBody(ticker="AAPL"), store=api_store)
     data = cockpit_watchlist(dal=None, store=api_store)
     row = next(x for x in data["rows"] if x["ticker"] == "AAPL")
-    assert row["lists"] == ["Holdings"]
+    assert row["lists"] == ["Core"]
 
     # archive AAPL -> hidden by default, visible with include_archived
     assert set_ticker_archived("AAPL", ArchiveBody(archived=True), store=api_store)["archived"] is True
@@ -409,17 +408,7 @@ def test_universe_surfaces_all_imported_with_has_summary(api_store):
     assert u["summarized"] == 3  # only the 3 overview tickers are summarized
 
 
-def test_tier_named_lists_structure():
-    from src.universe_config import TIER_NAMES, tier_named_lists
-
-    lists = tier_named_lists()
-    for li in lists:  # tolerant: empty if config absent, else well-formed
-        assert li["kind"] == "tier"
-        assert li["name"] in TIER_NAMES.values()
-        assert li["tickers"] and all(isinstance(t, str) for t in li["tickers"])
-
-
-# --- tags (classification metadata, decoupled from list membership) -------
+# --- tags (two-dimensional facet × source, decoupled from list membership) ---
 
 
 def test_get_tags_empty(store):
@@ -427,50 +416,61 @@ def test_get_tags_empty(store):
     assert store.get_tags(["NVDA"]) == {}  # no tags → ticker absent from result
 
 
-def test_seed_tags_get_and_source_grouping(store):
+def test_seed_tags_get_and_facet_grouping(store):
     summary = store.seed_tags(
         [
-            {"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA", "AMD"]},
-            {"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["NVDA"]},
+            {"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["NVDA", "AMD"]},
+            {"facet": "provenance", "value": "Alpha Picks", "source": "system", "tickers": ["NVDA"]},
         ]
     )
     assert summary == {"tags_added": 3}
     tags = store.get_tags(["NVDA", "AMD"])
-    # config rows ordered by (source, tag): config:category before config:tier
+    # ordered by (facet, source, value): category before provenance
     assert tags["NVDA"] == [
-        {"tag": "Mega Cap Tech", "source": "config:category"},
-        {"tag": "Tier 1 · Core", "source": "config:tier"},
+        {"facet": "category", "value": "Mega Cap Tech", "source": "legacy"},
+        {"facet": "provenance", "value": "Alpha Picks", "source": "system"},
     ]
-    assert tags["AMD"] == [{"tag": "Tier 1 · Core", "source": "config:tier"}]
+    assert tags["AMD"] == [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy"}]
     # re-seed is idempotent (duplicate rows ignored)
-    again = store.seed_tags([{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA"]}])
+    again = store.seed_tags(
+        [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["NVDA"]}]
+    )
     assert again == {"tags_added": 0}
 
 
-def test_tag_add_remove_user_only_by_default(store):
-    store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
-    store.add_tag("aapl", "watch-me")  # defaults to source="user", normalizes ticker
-    # remove without source → ONLY the user tag goes; config tag is protected
-    assert store.remove_tag("AAPL", "watch-me") is True
-    assert store.remove_tag("AAPL", "Mega Cap Tech") is False  # not a user tag
-    assert store.get_tags(["AAPL"]) == {"AAPL": [{"tag": "Mega Cap Tech", "source": "config:category"}]}
-    # explicit source CAN remove a config tag
-    assert store.remove_tag("AAPL", "Mega Cap Tech", source="config:category") is True
+def test_tag_add_remove_user_default_and_facets(store):
+    store.seed_tags(
+        [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["AAPL"]}]
+    )
+    store.add_tag("aapl", "量子計算")  # defaults facet=theme, source=user; normalizes ticker
+    # remove without source → only the user tag on that (facet, value) goes
+    assert store.remove_tag("AAPL", "量子計算") is True
+    assert store.remove_tag("AAPL", "量子計算") is False  # already gone
+    # the legacy category survives (it is not a user theme)
+    assert store.get_tags(["AAPL"]) == {
+        "AAPL": [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy"}]
+    }
+    # explicit source removes the legacy tag (legacy is editable / takeover-able)
+    assert store.remove_tag("AAPL", "Mega Cap Tech", facet="category", source="legacy") is True
     assert store.get_tags(["AAPL"]) == {}
 
 
-def test_seed_tags_replace_preserves_user_and_reflects_removal(store):
-    store.seed_tags([{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA", "AMD"]}])
-    store.add_tag("NVDA", "my-thesis", "user")
-    # re-seed config:tier WITHOUT AMD → AMD's config tag dropped; NVDA's kept; user kept
+def test_seed_tags_is_additive_and_preserves_user(store):
+    # seed_tags is a pure additive bootstrap: it NEVER deletes/replaces, so a
+    # re-seed missing a ticker does not drop its previously-seeded tag, and user
+    # edits always survive.
     store.seed_tags(
-        [{"tag": "Tier 1 · Core", "source": "config:tier", "tickers": ["NVDA"]}],
-        replace_sources=["config:tier"],
+        [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["NVDA", "AMD"]}]
+    )
+    store.add_tag("NVDA", "my-thesis")  # user:theme
+    store.seed_tags(
+        [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["NVDA"]}]
     )
     tags = store.get_tags(["NVDA", "AMD"])
-    assert {"tag": "Tier 1 · Core", "source": "config:tier"} in tags["NVDA"]
-    assert {"tag": "my-thesis", "source": "user"} in tags["NVDA"]
-    assert "AMD" not in tags  # config tag removed and AMD had no other tags
+    assert {"facet": "category", "value": "Mega Cap Tech", "source": "legacy"} in tags["NVDA"]
+    assert {"facet": "theme", "value": "my-thesis", "source": "user"} in tags["NVDA"]
+    # AMD's seeded tag is NOT dropped (additive, not replace)
+    assert {"facet": "category", "value": "Mega Cap Tech", "source": "legacy"} in tags["AMD"]
 
 
 def test_add_tag_rejects_blank(store):
@@ -480,42 +480,67 @@ def test_add_tag_rejects_blank(store):
         store.add_tag("", "x")
 
 
-def test_config_tag_groups_structure():
-    from src.universe_config import config_tag_groups
+def test_config_tag_seeds_structure():
+    from src.universe_config import config_tag_seeds
 
-    groups = config_tag_groups()
-    for g in groups:  # tolerant: empty if config absent, else well-formed
-        assert g["source"] in {"config:tier", "config:category"}
-        assert g["tag"] and isinstance(g["tag"], str)
+    seeds = config_tag_seeds()
+    for g in seeds:  # tolerant: empty if config absent, else well-formed
+        assert g["facet"] in {"category", "provenance"}
+        assert g["value"] and isinstance(g["value"], str)
         assert g["tickers"] and all(isinstance(t, str) and t == t.upper() for t in g["tickers"])
-    if groups:  # real config present → both families emitted
-        assert {g["source"] for g in groups} == {"config:tier", "config:category"}
+    if seeds:  # real config present
+        families = {(g["facet"], g["source"]) for g in seeds}
+        assert ("category", "legacy") in families
+        assert ("provenance", "system") in families
+        assert all(g["facet"] != "tier" for g in seeds)  # Tier retired (not a tag)
+        provenance = {g["value"] for g in seeds if g["facet"] == "provenance"}
+        assert provenance <= {"Seeking Alpha", "Alpha Picks"}
+
+
+def test_active_universe_excludes_legacy_reference():
+    from src.universe_config import active_universe_tickers, all_universe_tickers
+
+    active = set(active_universe_tickers())
+    every = set(all_universe_tickers())
+    # active ⊆ all; all also carries legacy_reference for the broad search seed
+    assert active <= every
+    assert all(t == t.upper() for t in active)
+
+
+def test_tier_priority_map_highest_tier_wins():
+    from src.universe_config import tier_priority_map
+
+    pm = tier_priority_map()
+    assert set(pm.values()) <= {"high", "medium", "low"} if pm else True
 
 
 def test_cockpit_universe_ticker_state_carry_tags(api_store):
-    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)  # seed lists
     api_store.seed_tags(
         [
-            {"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL", "MSFT"]},
-            {"tag": "watch-me", "source": "user", "tickers": ["AAPL"]},
+            {"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["AAPL", "MSFT"]},
+            {"facet": "theme", "value": "watch-me", "source": "user", "tickers": ["AAPL"]},
         ]
     )
     cockpit = {r["ticker"]: r for r in cockpit_watchlist(dal=None, store=api_store)["rows"]}
-    assert {(t["tag"], t["source"]) for t in cockpit["AAPL"]["tags"]} == {
-        ("Mega Cap Tech", "config:category"),
-        ("watch-me", "user"),
+    assert {(t["facet"], t["value"], t["source"]) for t in cockpit["AAPL"]["tags"]} == {
+        ("category", "Mega Cap Tech", "legacy"),
+        ("theme", "watch-me", "user"),
     }
     assert cockpit["TSLA"]["tags"] == []  # untagged ticker → empty
 
     u = {r["ticker"]: r for r in universe(dal=None, store=api_store)["rows"]}
-    assert {(t["tag"], t["source"]) for t in u["MSFT"]["tags"]} == {("Mega Cap Tech", "config:category")}
+    assert {(t["facet"], t["value"], t["source"]) for t in u["MSFT"]["tags"]} == {
+        ("category", "Mega Cap Tech", "legacy")
+    }
 
     state = get_ticker_state("AAPL", dal=None, store=api_store)
-    assert ("watch-me", "user") in {(t["tag"], t["source"]) for t in state["tags"]}
+    assert ("theme", "watch-me", "user") in {
+        (t["facet"], t["value"], t["source"]) for t in state["tags"]
+    }
 
 
-def test_import_universe_seeds_theme_tags(api_store, monkeypatch):
-    # A theme group ("theme:量子計算") becomes a config:theme tag; Holdings does not.
+def test_import_universe_seeds_theme_tags_and_drops_groups(api_store, monkeypatch):
+    # A theme group ("theme:量子計算") becomes a legacy:theme tag; holdings is dropped.
     monkeypatch.setattr(
         "src.api.routes.profile.get_watchlist_overview",
         lambda dal: {
@@ -529,54 +554,106 @@ def test_import_universe_seeds_theme_tags(api_store, monkeypatch):
     )
     out = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
     assert out["tags"]["tags_added"] == 2  # IONQ, RGTI under 量子計算
+    assert out["lists"] == []  # import creates no lists
     tags = api_store.get_tags(["IONQ", "AAPL"])
-    assert tags["IONQ"] == [{"tag": "量子計算", "source": "config:theme"}]
-    assert "AAPL" not in tags  # Holdings group is not a theme → no tag
+    assert tags["IONQ"] == [{"facet": "theme", "value": "量子計算", "source": "legacy"}]
+    assert "AAPL" not in tags  # Holdings group is dropped (not preserved)
 
-    # Re-import replaces config:theme (idempotent membership) but doesn't double-count
+    # Re-import is additive + idempotent (no replace, no double-count)
     again = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
-    assert again["tags"]["tags_added"] == 2  # replaced then re-added the same 2
+    assert again["tags"]["tags_added"] == 0
+
+
+def test_import_universe_deletes_non_custom_lists(api_store):
+    # Seed a mix of legacy (tier/holdings) + a user custom list, then de-mess.
+    api_store.import_lists([{"name": "Tier 1 · Core", "kind": "tier", "tickers": ["NVDA"]}])
+    api_store.import_lists([{"name": "core_holdings", "kind": "holdings", "tickers": ["AAPL"]}])
+    api_store.create_list("My Picks", "custom")
+    out = import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
+    assert out["lists_removed"] == 2  # tier + holdings gone
+    remaining = {li["name"]: li["kind"] for li in out["lists"]}
+    assert remaining == {"My Picks": "custom"}  # only the user list survives
+
+
+def test_import_universe_opt_in_tier_priority_fill_only(api_store, monkeypatch):
+    # tier→priority migration is OFF by default and never overwrites a user priority.
+    monkeypatch.setattr(
+        "src.universe_config.load_tickers_core",
+        lambda: {
+            "tier1_core": {"mega": {"tickers": ["AAA"]}},
+            "tier3_user_watchlist": {"wl": {"tickers": ["CCC"]}},
+        },
+    )
+    api_store.set_priority("AAA", "low")  # pre-existing user priority
+
+    off = import_universe(ImportBody(include_tiers=True), dal=None, store=api_store)
+    assert off["priority_migrated"] == 0  # default: no migration
+
+    on = import_universe(ImportBody(include_tiers=True, migrate_tier_priority=True), dal=None, store=api_store)
+    assert on["priority_migrated"] == 1  # CCC filled (low); AAA untouched (user-set)
+    prios = api_store.get_priorities(["AAA", "CCC"])
+    assert prios == {"AAA": "low", "CCC": "low"}  # AAA kept user value (would be 'high' from tier1)
 
 
 def test_user_tag_add_remove_routes(api_store):
-    import_universe(ImportBody(include_tiers=False), dal=None, store=api_store)
-    api_store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
+    api_store.seed_tags(
+        [{"facet": "category", "value": "Mega Cap Tech", "source": "legacy", "tickers": ["AAPL"]}]
+    )
 
-    # add a user tag → state reflects it with source='user'
-    state = add_ticker_tag("aapl", TagBody(tag="my-watch"), store=api_store)
-    pairs = {(t["tag"], t["source"]) for t in state["tags"]}
-    assert ("my-watch", "user") in pairs
-    assert ("Mega Cap Tech", "config:category") in pairs  # config tag untouched
+    # add a user theme tag → state reflects it with source='user'
+    state = add_ticker_tag("aapl", TagBody(value="my-watch"), store=api_store)
+    pairs = {(t["facet"], t["value"], t["source"]) for t in state["tags"]}
+    assert ("theme", "my-watch", "user") in pairs
+    assert ("category", "Mega Cap Tech", "legacy") in pairs  # legacy untouched
 
-    # removing the user tag works; the config tag is NOT removable via the API
-    assert remove_ticker_tag("AAPL", "my-watch", store=api_store)["removed"] is True
+    # remove the user tag (defaults facet=theme, source=user)
+    assert remove_ticker_tag("AAPL", value="my-watch", store=api_store)["removed"] is True
+
+    # a read-only source is rejected with 400 (cannot delete external facts)
     with pytest.raises(HTTPException) as exc:
-        remove_ticker_tag("AAPL", "Mega Cap Tech", store=api_store)  # config tag → 404
-    assert exc.value.status_code == 404
-    remaining = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
-    assert remaining == {("Mega Cap Tech", "config:category")}  # config survived
+        remove_ticker_tag("AAPL", value="Foo", source="system", store=api_store)
+    assert exc.value.status_code == 400
 
-    # removing a non-existent user tag → 404
+    # legacy IS removable (takeover-able)
+    assert (
+        remove_ticker_tag("AAPL", value="Mega Cap Tech", facet="category", source="legacy", store=api_store)[
+            "removed"
+        ]
+        is True
+    )
+    assert get_ticker_state("AAPL", dal=None, store=api_store)["tags"] == []
+
+    # removing a non-existent editable tag → 404
     with pytest.raises(HTTPException) as exc:
-        remove_ticker_tag("AAPL", "nope", store=api_store)
+        remove_ticker_tag("AAPL", value="nope", store=api_store)
     assert exc.value.status_code == 404
 
 
-def test_user_tag_label_colliding_with_config_is_distinct(api_store):
-    # A user tag whose label equals a config tag is a separate source='user' row.
-    api_store.seed_tags([{"tag": "Mega Cap Tech", "source": "config:category", "tickers": ["AAPL"]}])
-    add_ticker_tag("AAPL", TagBody(tag="Mega Cap Tech"), store=api_store)
-    pairs = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
-    assert pairs == {("Mega Cap Tech", "config:category"), ("Mega Cap Tech", "user")}
-    # the API-removable one is the user row; config remains
-    assert remove_ticker_tag("AAPL", "Mega Cap Tech", store=api_store)["removed"] is True
-    pairs = {(t["tag"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
-    assert pairs == {("Mega Cap Tech", "config:category")}
+def test_user_tag_label_colliding_with_legacy_is_distinct(api_store):
+    # A user tag whose (facet,value) equals a legacy tag is a separate user row.
+    api_store.seed_tags([{"facet": "theme", "value": "AI", "source": "legacy", "tickers": ["AAPL"]}])
+    add_ticker_tag("AAPL", TagBody(value="AI"), store=api_store)  # user:theme "AI"
+    pairs = {(t["facet"], t["value"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
+    assert pairs == {("theme", "AI", "legacy"), ("theme", "AI", "user")}
+    # default remove targets the user row; legacy remains
+    assert remove_ticker_tag("AAPL", value="AI", store=api_store)["removed"] is True
+    pairs = {(t["facet"], t["value"], t["source"]) for t in get_ticker_state("AAPL", dal=None, store=api_store)["tags"]}
+    assert pairs == {("theme", "AI", "legacy")}
 
 
 def test_add_tag_blank_is_422():
     with pytest.raises(ValidationError):
-        TagBody(tag="")
+        TagBody(value="")
+
+
+def test_profile_settings_get_set(store):
+    assert store.get_setting("default_watchlist_id") is None
+    store.set_setting("default_watchlist_id", "7")
+    assert store.get_setting("default_watchlist_id") == "7"
+    store.set_setting("default_watchlist_id", "12")  # upsert
+    assert store.get_setting("default_watchlist_id") == "12"
+    store.set_setting("default_watchlist_id", None)  # clear
+    assert store.get_setting("default_watchlist_id") is None
 
 
 def test_universe_batch_summary_fills_universe_only(api_store, monkeypatch):

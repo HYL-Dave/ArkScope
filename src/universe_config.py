@@ -14,12 +14,25 @@ import json
 from pathlib import Path
 from typing import Any
 
-# Friendly names for the tickers_core tiers. ``legacy_reference`` is intentionally
-# omitted from the default import.
+# The active tickers_core tiers (``legacy_reference`` is intentionally omitted —
+# it is the old reference dump, not part of the active tracked universe).
+#
+# Tier is RETIRED as a list/tag concept (it duplicated research priority — if a
+# user wants tiers they create Tier 1/2/3 as their own custom lists). These keys
+# now serve two roles only: scoping the active universe (``active_universe_tickers``)
+# and a one-time, opt-in tier→priority migration (``tier_priority_map``).
 TIER_NAMES = {
     "tier1_core": "Tier 1 · Core",
     "tier2_expanded": "Tier 2 · Expanded",
     "tier3_user_watchlist": "Tier 3 · Watchlist",
+}
+
+# One-time tier→priority migration (opt-in). Higher tier = higher research
+# priority; the first (highest) tier a ticker appears in wins.
+_TIER_PRIORITY = {
+    "tier1_core": "high",
+    "tier2_expanded": "medium",
+    "tier3_user_watchlist": "low",
 }
 
 
@@ -70,33 +83,84 @@ def all_universe_tickers() -> list[str]:
     return sorted(seen)
 
 
+def active_universe_tickers() -> list[str]:
+    """The ACTIVE tracked universe — every ticker across the curated tiers
+    (:data:`TIER_NAMES`), EXCLUDING ``legacy_reference``, sorted.
+
+    This is the inventory base for 全部標的 ("active-universe direct"): the
+    universe is sourced from the config catalog, decoupled from list membership,
+    so retiring the tier *lists* never shrinks the inventory. Distinct from
+    :func:`all_universe_tickers` (which also includes ``legacy_reference`` to make
+    the broad search catalog as complete as possible).
+    """
+    core = load_tickers_core()
+    seen: set[str] = set()
+    for tier_key in TIER_NAMES:
+        tier = core.get(tier_key)
+        if not isinstance(tier, dict):
+            continue
+        for cat_key, cat_val in tier.items():
+            if cat_key.startswith("_"):
+                continue
+            for t in _category_tickers(cat_val):
+                seen.add(t.upper())
+    return sorted(seen)
+
+
+def tier_priority_map() -> dict[str, str]:
+    """One-time tier→priority mapping (``{TICKER: high|medium|low}``) for the
+    opt-in migration. Higher tier wins when a ticker appears in several."""
+    core = load_tickers_core()
+    out: dict[str, str] = {}
+    for tier_key, prio in _TIER_PRIORITY.items():
+        tier = core.get(tier_key)
+        if not isinstance(tier, dict):
+            continue
+        for cat_key, cat_val in tier.items():
+            if cat_key.startswith("_"):
+                continue
+            for t in _category_tickers(cat_val):
+                out.setdefault(t.upper(), prio)  # first (highest) tier wins
+    return out
+
+
 def _prettify_category(key: str) -> str:
-    """``mega_cap_tech`` → ``Mega Cap Tech`` (display tag for a tickers_core category)."""
+    """``mega_cap_tech`` → ``Mega Cap Tech`` (display label for a tickers_core category)."""
     return " ".join(w.capitalize() for w in str(key).replace("-", "_").split("_") if w)
 
 
-def config_tag_groups() -> list[dict]:
-    """Classification tag groups derived from ``tickers_core.json``.
+# Category keys whose membership encodes PROVENANCE (where a ticker came from),
+# not a sector — these become read-only ``provenance`` tags, not categories.
+_ALPHA_PICKS_KEY = "sa_alpha_picks_auto"
+_SEEKING_PREFIX = "seeking_picks_"
 
-    Each named tier contributes two tag families per category:
-      - a ``config:tier`` tag (e.g. "Tier 1 · Core"), and
-      - a ``config:category`` tag (e.g. "Mega Cap Tech").
-    ``legacy_reference`` is excluded (mirrors :func:`tier_named_lists`). Returns
-    a list of ``{tag, source, tickers}`` aggregated per ``(source, tag)``; empty
-    when the config is missing. Feeds ``ProfileStateStore.seed_tags`` so the
-    tag axis stays decoupled from list membership.
+
+def config_tag_seeds() -> list[dict]:
+    """Bootstrap classification tags derived from ``tickers_core.json``.
+
+    Tier is intentionally NOT emitted (retired → priority). Each active-tier
+    category contributes, by its nature:
+      - ``seeking_picks_*`` → a read-only ``provenance`` "Seeking Alpha" tag PLUS
+        a ``legacy:category`` for the sector hint (e.g. "Financials");
+      - ``sa_alpha_picks_auto`` → a read-only ``provenance`` "Alpha Picks" tag;
+      - any other category → a ``legacy:category`` tag (e.g. "Mega Cap Tech"),
+        editable/takeover-able until a real provider category supersedes it.
+
+    Returns ``{facet, value, source, tickers}`` aggregated per ``(facet, value,
+    source)``; ``[]`` when the config is missing. Feeds
+    :meth:`ProfileStateStore.seed_tags` (additive bootstrap).
     """
     core = load_tickers_core()
-    groups: dict[tuple[str, str], list[str]] = {}
+    groups: dict[tuple[str, str, str], list[str]] = {}
 
-    def _add(source: str, tag: str, tickers: list[str]) -> None:
-        bucket = groups.setdefault((source, tag), [])
+    def _add(facet: str, value: str, source: str, tickers: list[str]) -> None:
+        bucket = groups.setdefault((facet, value, source), [])
         for t in tickers:
             u = t.upper()
             if u not in bucket:
                 bucket.append(u)
 
-    for tier_key, tier_name in TIER_NAMES.items():
+    for tier_key in TIER_NAMES:
         tier = core.get(tier_key)
         if not isinstance(tier, dict):
             continue
@@ -106,31 +170,17 @@ def config_tag_groups() -> list[dict]:
             tickers = _category_tickers(cat_val)
             if not tickers:
                 continue
-            _add("config:tier", tier_name, tickers)
-            _add("config:category", _prettify_category(cat_key), tickers)
+            if cat_key == _ALPHA_PICKS_KEY:
+                _add("provenance", "Alpha Picks", "system", tickers)
+            elif cat_key.startswith(_SEEKING_PREFIX):
+                _add("provenance", "Seeking Alpha", "system", tickers)
+                sector = _prettify_category(cat_key[len(_SEEKING_PREFIX):])
+                if sector:
+                    _add("category", sector, "legacy", tickers)
+            else:
+                _add("category", _prettify_category(cat_key), "legacy", tickers)
 
     return [
-        {"tag": tag, "source": source, "tickers": tickers}
-        for (source, tag), tickers in groups.items()
+        {"facet": facet, "value": value, "source": source, "tickers": tickers}
+        for (facet, value, source), tickers in groups.items()
     ]
-
-
-def tier_named_lists() -> list[dict]:
-    """Flatten each tier into one named list ``{name, kind='tier', tickers}``.
-
-    Best-effort: a missing/odd config simply yields fewer (or no) tier lists.
-    """
-    core = load_tickers_core()
-    out: list[dict] = []
-    for tier_key, list_name in TIER_NAMES.items():
-        tier = core.get(tier_key)
-        if not isinstance(tier, dict):
-            continue
-        tickers: list[str] = []
-        for cat_key, cat_val in tier.items():
-            if cat_key.startswith("_"):
-                continue
-            tickers.extend(_category_tickers(cat_val))
-        if tickers:
-            out.append({"name": list_name, "kind": "tier", "tickers": tickers})
-    return out
