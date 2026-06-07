@@ -489,14 +489,17 @@ table.wl tbody tr.archived td {
   gap: 6px;
   align-items: center;
 }
-.tag-add input {
-  width: 130px;
+.tag-add input,
+.tag-add select {
   font-size: 12px;
   padding: 2px 7px;
   background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--fg);
+}
+.tag-add input {
+  width: 180px;
 }
 .detail-tags {
   display: flex;
@@ -505,14 +508,22 @@ table.wl tbody tr.archived td {
   gap: 10px;
   padding: 8px 0 2px;
 }
-.universe-migrate {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.rowx {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 12px;
   cursor: pointer;
 }
-.universe-migrate input {
-  cursor: pointer;
+.rowx:hover:not(:disabled) {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.rowx:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---- detail tabs as buttons (override .rightpanel button accent) ---- */

@@ -8,6 +8,7 @@ import {
   addNote,
   addTickerTag,
   deleteNote,
+  getTagCatalog,
   getTickerState,
   getNotes,
   getPriceChange,
@@ -281,8 +282,21 @@ function TagManager({
   onChanged: () => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [facet, setFacet] = useState("theme"); // user tags: theme or category
+  const [catalog, setCatalog] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      setCatalog((await getTagCatalog()).catalog);
+    } catch {
+      /* picker just falls back to free-text */
+    }
+  }, []);
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
 
   async function add() {
     const value = draft.trim();
@@ -290,9 +304,10 @@ function TagManager({
     setBusy(true);
     setErr(null);
     try {
-      await addTickerTag(ticker, value); // user theme tag (facet defaults to theme)
+      await addTickerTag(ticker, value, facet); // user tag on the chosen facet
       setDraft("");
       onChanged();
+      void loadCatalog(); // a new value becomes pickable next time
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -314,6 +329,7 @@ function TagManager({
     }
   }
 
+  const listId = `tagvals-${ticker}`;
   return (
     <div className="detail-tags">
       <span className="chips tagchips">
@@ -336,8 +352,13 @@ function TagManager({
         {tags.length === 0 && <span className="muted tiny">尚無標籤</span>}
       </span>
       <span className="tag-add">
+        <select value={facet} disabled={busy} onChange={(e) => setFacet(e.target.value)} title="標籤類型">
+          <option value="theme">主題</option>
+          <option value="category">板塊/類別</option>
+        </select>
         <input
-          placeholder="＋主題標籤"
+          list={listId}
+          placeholder="＋標籤（可挑現有或新建）"
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
@@ -345,6 +366,11 @@ function TagManager({
             if (e.key === "Enter") void add();
           }}
         />
+        <datalist id={listId}>
+          {(catalog[facet] ?? []).map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
         <button className="btn-ghost tiny" disabled={busy || !draft.trim()} onClick={() => void add()}>
           新增
         </button>

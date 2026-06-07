@@ -10,6 +10,7 @@ import {
   getProfileLists,
   getUniverse,
   importUniverse,
+  setTickerHidden,
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
@@ -24,7 +25,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [listFilter, setListFilter] = useState<string>("__all__");
   const [tagFilters, setTagFilters] = useState<Record<string, string>>({}); // facet -> value ("" = all)
   const [importing, setImporting] = useState(false);
-  const [migratePriority, setMigratePriority] = useState(false);
+  const [busyTicker, setBusyTicker] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -48,10 +49,9 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await importUniverse({ migrate_tier_priority: migratePriority });
+      const r = await importUniverse({});
       const bits = [`新增 ${r.tags.tags_added} 個分類標籤`];
       if (r.lists_removed > 0) bits.push(`移除 ${r.lists_removed} 個舊清單`);
-      if (r.priority_migrated > 0) bits.push(`初始化 ${r.priority_migrated} 檔 priority`);
       let msg = `匯入完成：${bits.join("、")}。`;
       if (!r.groups_ok) msg += " ⚠ 主題來源暫時無法連線，已略過 theme 標籤。";
       setImportMsg(msg);
@@ -60,6 +60,21 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       setImportMsg(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function removeFromUniverse(ticker: string) {
+    if (busyTicker) return;
+    // No restore UI (per the model decision), so confirm before suppressing.
+    if (!window.confirm(`從「全部標的」移除 ${ticker}？（用於已下市/重複的代號）`)) return;
+    setBusyTicker(ticker);
+    try {
+      await setTickerHidden(ticker, true);
+      await load();
+    } catch (e) {
+      setImportMsg(`移除失敗：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusyTicker(null);
     }
   }
 
@@ -111,14 +126,6 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           </span>
         )}
         <span className="spacer" />
-        <label className="muted tiny universe-migrate" title="用舊 tier 當作 priority 初始值（只填尚未設定的，不覆蓋）">
-          <input
-            type="checkbox"
-            checked={migratePriority}
-            onChange={(e) => setMigratePriority(e.target.checked)}
-          />
-          以舊 tier 初始化 priority
-        </label>
         <button className="btn-ghost" onClick={() => void runImport()} disabled={importing}>
           {importing ? "匯入中…" : "⤓ 匯入分類"}
         </button>
@@ -185,6 +192,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 <th className="num">News</th>
                 <th>Lists</th>
                 <th>Tags</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -214,6 +222,17 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                     </span>
                   </td>
                   <td><TagChips tags={r.tags} /></td>
+                  <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="rowx"
+                      title="從全部標的移除（已下市/重複代號）"
+                      disabled={busyTicker === r.ticker}
+                      onClick={() => void removeFromUniverse(r.ticker)}
+                    >
+                      {busyTicker === r.ticker ? "…" : "✕"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

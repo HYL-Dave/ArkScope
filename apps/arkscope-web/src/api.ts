@@ -258,7 +258,6 @@ export interface UniverseResponse {
 export interface ImportResult {
   lists_removed: number;
   tags: { tags_added: number };
-  priority_migrated: number;
   groups_ok: boolean; // false → theme-group import skipped (DAL/overview unreachable)
   lists: { id: number; name: string; kind: string; total_count: number; active_count: number }[];
 }
@@ -617,9 +616,22 @@ export function searchSymbols(q: string, limit = 10): Promise<{ q: string; resul
 // Seeds lists from user_profile groups + tickers_core tiers. The groups source
 // runs the overview (per-ticker price), so allow a generous timeout.
 export function importUniverse(
-  body: { include_groups?: boolean; include_tiers?: boolean; migrate_tier_priority?: boolean } = {},
+  body: { include_groups?: boolean; include_tiers?: boolean } = {},
 ): Promise<ImportResult> {
   return sendJSON<ImportResult>("/profile/import-universe", "POST", body, 60_000);
+}
+
+// Suppress (or restore) a dead/duplicate ticker from the 全部標的 inventory.
+export function setTickerHidden(
+  ticker: string,
+  hidden: boolean,
+): Promise<{ ticker: string; hidden: boolean }> {
+  return sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/hidden`, "POST", { hidden });
+}
+
+// Distinct tag values per facet, for the detail-page "pick from existing" classifier.
+export function getTagCatalog(): Promise<{ catalog: Record<string, string[]> }> {
+  return getJSON<{ catalog: Record<string, string[]> }>("/profile/tags/catalog");
 }
 
 export function setArchived(ticker: string, archived: boolean): Promise<TickerAggregate> {
