@@ -318,6 +318,44 @@ def profile_lists(
     return {"lists": [asdict(li) for li in store.list_watchlists(include_archived=include_archived)]}
 
 
+def _default_watchlist_id(store: ProfileStateStore) -> int | None:
+    """The configured default 自選股 list id, or None if unset / stale (the list
+    was deleted). 自選股 opens this list instead of always landing on All Active."""
+    raw = store.get_setting(DEFAULT_WATCHLIST_KEY)
+    val = int(raw) if raw and raw.isdigit() else None
+    if val is not None and not any(li.id == val for li in store.list_watchlists(include_archived=True)):
+        return None  # the default list was deleted → report unset (UI falls back)
+    return val
+
+
+@router.get("/profile/settings/default-watchlist")
+def get_default_watchlist(store: ProfileStateStore = Depends(get_profile_store)):
+    """The default 自選股 list (PURE READ). null = unset → UI falls back to the
+    first custom list, else the All-Active view."""
+    return {"default_watchlist_id": _default_watchlist_id(store)}
+
+
+class DefaultWatchlistBody(BaseModel):
+    list_id: int | None = None  # null clears the default
+
+
+@router.put("/profile/settings/default-watchlist")
+def set_default_watchlist(
+    body: DefaultWatchlistBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Pin (or clear, with null) the default 自選股 list."""
+    require_profile_state_write("set_default_watchlist", {"list_id": body.list_id})
+    if body.list_id is not None and not any(
+        li.id == body.list_id for li in store.list_watchlists(include_archived=True)
+    ):
+        raise HTTPException(status_code=404, detail=f"list {body.list_id} not found")
+    store.set_setting(
+        DEFAULT_WATCHLIST_KEY, str(body.list_id) if body.list_id is not None else None
+    )
+    return {"default_watchlist_id": body.list_id}
+
+
 class ListCreateBody(BaseModel):
     name: str = Field(min_length=1)
     kind: str | None = None

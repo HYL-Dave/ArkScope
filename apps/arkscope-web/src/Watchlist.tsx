@@ -4,12 +4,14 @@ import {
   createList,
   deleteList,
   getConsensus,
+  getDefaultWatchlist,
   getProfileLists,
   getUniverse,
   removeMember,
   renameList,
   searchSymbols,
   setArchived,
+  setDefaultWatchlist,
   setPriority,
   type ConsensusSummary,
   type SymbolHit,
@@ -61,6 +63,8 @@ function universeToTab(r: UniverseRow): TabRow {
 export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = all custom lists
+  const [defaultListId, setDefaultListId] = useState<number | null>(null);
+  const initialized = useRef(false); // landing-list selection happens once
   const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("change_7d_pct");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -85,11 +89,37 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
 
   const loadLists = useCallback(async () => {
     try {
-      setLists((await getProfileLists(false)).lists);
+      const [listsRes, def] = await Promise.all([getProfileLists(false), getDefaultWatchlist()]);
+      setLists(listsRes.lists);
+      setDefaultListId(def.default_watchlist_id);
+      // First load only: land on the default list (else the first custom list,
+      // else the All-Active view). Later reloads must NOT override the user's
+      // current selection (e.g. when they click All Active).
+      if (!initialized.current) {
+        initialized.current = true;
+        const custom = listsRes.lists.filter((l) => l.kind === "custom");
+        const def_id = def.default_watchlist_id;
+        const target =
+          def_id != null && custom.some((l) => l.id === def_id)
+            ? def_id
+            : custom[0]?.id ?? null;
+        setSelectedId(target);
+      }
     } catch {
       /* rail degrades to the aggregate custom-list view only */
     }
   }, []);
+
+  const onSetDefault = useCallback(async (listId: number) => {
+    // Toggle: pin this list as default, or clear if it already is.
+    const next = defaultListId === listId ? null : listId;
+    setDefaultListId(next); // optimistic
+    try {
+      await setDefaultWatchlist(next);
+    } catch {
+      setDefaultListId(defaultListId); // revert on failure
+    }
+  }, [defaultListId]);
 
   const loadUniverse = useCallback(async () => {
     const id = ++universeReq.current;
@@ -405,6 +435,13 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
               <div key={li.id} className={`wl-railitem ${selectedId === li.id ? "active" : ""}`}>
                 <button className="wl-railname" onClick={() => setSelectedId(li.id)} title={`${li.kind} · ${li.active_count} active`}>
                   {li.name} <span className="wl-railcount">{li.active_count}</span>
+                </button>
+                <button
+                  className={`wl-railbtn wl-raildefault ${defaultListId === li.id ? "on" : ""}`}
+                  title={defaultListId === li.id ? "目前的預設清單（點擊取消）" : "設為進入自選股的預設清單"}
+                  onClick={() => void onSetDefault(li.id)}
+                >
+                  {defaultListId === li.id ? "★" : "☆"}
                 </button>
                 <button className="wl-railbtn" title="改名" onClick={() => { setRenamingId(li.id); setRenameName(li.name); }}>✎</button>
                 <button className="wl-railbtn" title="刪除清單" onClick={() => void onDeleteList(li)}>🗑</button>

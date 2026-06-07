@@ -634,6 +634,16 @@ export function getTagCatalog(): Promise<{ catalog: Record<string, string[]> }> 
   return getJSON<{ catalog: Record<string, string[]> }>("/profile/tags/catalog");
 }
 
+// Default 自選股 list — 自選股 opens it instead of always landing on All Active.
+export function getDefaultWatchlist(): Promise<{ default_watchlist_id: number | null }> {
+  return getJSON<{ default_watchlist_id: number | null }>("/profile/settings/default-watchlist");
+}
+export function setDefaultWatchlist(
+  listId: number | null,
+): Promise<{ default_watchlist_id: number | null }> {
+  return sendJSON("/profile/settings/default-watchlist", "PUT", { list_id: listId });
+}
+
 export function setArchived(ticker: string, archived: boolean): Promise<TickerAggregate> {
   return sendJSON<TickerAggregate>(
     `/profile/tickers/${encodeURIComponent(ticker)}/archive`,

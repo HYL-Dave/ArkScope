@@ -1619,6 +1619,11 @@ button.wl-railitem.active,
 .wl-railedit .wl-railbtn {
   opacity: 1;
 }
+/* the pinned-default star stays visible (and gold) even without hover */
+.wl-raildefault.on {
+  opacity: 1;
+  color: var(--wait);
+}
 .wl-railbtn:hover {
   color: var(--fg);
   background: rgba(255, 255, 255, 0.08);

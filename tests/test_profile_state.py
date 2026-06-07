@@ -726,6 +726,31 @@ def test_tags_v1_to_v2_migration(tmp_path):
     ]
 
 
+def test_default_watchlist_get_set_stale_and_404(api_store):
+    from src.api.routes.profile import (
+        DefaultWatchlistBody,
+        get_default_watchlist,
+        set_default_watchlist,
+    )
+
+    assert get_default_watchlist(store=api_store)["default_watchlist_id"] is None  # unset
+    li = create_list(ListCreateBody(name="Core"), store=api_store)
+    set_default_watchlist(DefaultWatchlistBody(list_id=li["id"]), store=api_store)
+    assert get_default_watchlist(store=api_store)["default_watchlist_id"] == li["id"]
+
+    with pytest.raises(HTTPException) as exc:  # unknown list → 404
+        set_default_watchlist(DefaultWatchlistBody(list_id=999999), store=api_store)
+    assert exc.value.status_code == 404
+
+    delete_list(li["id"], store=api_store)  # default list deleted → reported null (stale)
+    assert get_default_watchlist(store=api_store)["default_watchlist_id"] is None
+
+    li2 = create_list(ListCreateBody(name="B"), store=api_store)
+    set_default_watchlist(DefaultWatchlistBody(list_id=li2["id"]), store=api_store)
+    set_default_watchlist(DefaultWatchlistBody(list_id=None), store=api_store)  # clear
+    assert get_default_watchlist(store=api_store)["default_watchlist_id"] is None
+
+
 def test_profile_settings_get_set(store):
     assert store.get_setting("default_watchlist_id") is None
     store.set_setting("default_watchlist_id", "7")
