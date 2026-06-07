@@ -14,7 +14,7 @@ import {
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
-import { allActiveRows } from "./watchlist-derive";
+import { allActiveRows, customListNameSet } from "./watchlist-derive";
 import type { StatusState } from "./Dashboard";
 import { CardModal } from "./AICard";
 
@@ -45,9 +45,13 @@ export function HomeView({
         getProfileLists(false),
         getCards(undefined, 8),
       ]);
-      const rows = allActiveRows(u.rows, l.lists);
-      setActive(rows);
-      setArchivedCount(rows.filter((r) => r.archived).length);
+      setActive(allActiveRows(u.rows, l.lists)); // active members only (movers)
+      // Archived custom-list members have no ACTIVE membership, so count them
+      // from all_lists (else the "已封存" sub would always read 0).
+      const names = customListNameSet(l.lists);
+      setArchivedCount(
+        u.rows.filter((r) => r.archived && r.all_lists.some((n) => names.has(n))).length,
+      );
       setAsOf(u.as_of);
       setCards(c.cards);
       setErr(null);
@@ -72,7 +76,7 @@ export function HomeView({
         <div className="home">
           <section className="home-overview">
             <OvTile label="自選股" value={active ? rows.length : "—"}
-              sub={active ? `${active.length} 檔 · ${archivedCount} 已封存` : "loading…"} />
+              sub={active ? `共 ${rows.length + archivedCount} · ${archivedCount} 已封存` : "loading…"} />
             <OvTile label="告警" value="—" sub="尚未啟用" />
             <OvTile label="資料來源" value={dsCount ?? "—"}
               sub={status.kind === "ready" ? `${status.status.tools_registered} tools` : "—"} />
