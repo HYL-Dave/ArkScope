@@ -249,6 +249,7 @@ export interface UniverseResponse {
 
 export interface ImportResult {
   imported: { lists_created: number; memberships_added: number };
+  tags: { tags_added: number };
   lists: { id: number; name: string; kind: string; total_count: number; active_count: number }[];
 }
 

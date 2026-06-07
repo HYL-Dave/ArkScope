@@ -429,6 +429,78 @@ table.wl tbody tr.archived td {
   padding: 1px 8px;
 }
 
+/* ---- classification tags (decoupled from list membership) ---- */
+.tagchips {
+  margin-top: 0;
+}
+.tagchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.6;
+  border-radius: 10px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tagchip--tier {
+  color: var(--accent);
+  border-color: rgba(88, 166, 255, 0.4);
+  background: rgba(88, 166, 255, 0.08);
+}
+.tagchip--cat {
+  color: #56d4c4;
+  border-color: rgba(86, 212, 196, 0.38);
+  background: rgba(86, 212, 196, 0.08);
+}
+.tagchip--theme {
+  color: #c08cf5;
+  border-color: rgba(192, 140, 245, 0.4);
+  background: rgba(192, 140, 245, 0.08);
+}
+.tagchip--user {
+  color: var(--ok);
+  border-color: rgba(63, 185, 80, 0.42);
+  background: rgba(63, 185, 80, 0.08);
+}
+/* removable variant (detail editor) — only user tags get the × */
+.tagchip .tagchip-x {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.65;
+}
+.tagchip .tagchip-x:hover {
+  opacity: 1;
+}
+.tag-add {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.tag-add input {
+  width: 130px;
+  font-size: 12px;
+  padding: 2px 7px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+}
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 2px;
+}
+
 /* ---- detail tabs as buttons (override .rightpanel button accent) ---- */
 .detail-tabs button.tab {
   background: transparent;

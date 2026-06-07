@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getUniverse, importUniverse, type UniverseRow } from "./api";
+import { TAG_FACETS, TagChips } from "./tags";
 
 export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
@@ -13,6 +14,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [err, setErr] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [listFilter, setListFilter] = useState<string>("__all__");
+  const [tagFilters, setTagFilters] = useState<Record<string, string>>({}); // source -> value ("" = all)
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
 
@@ -38,7 +40,8 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     try {
       const r = await importUniverse({});
       setImportMsg(
-        `匯入完成：新增 ${r.imported.lists_created} 個清單、${r.imported.memberships_added} 筆成員。`,
+        `匯入完成：新增 ${r.imported.lists_created} 個清單、${r.imported.memberships_added} 筆成員、` +
+          `${r.tags.tags_added} 個分類標籤。`,
       );
       await load();
     } catch (e) {
@@ -55,14 +58,36 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     return [...s].sort();
   }, [rows]);
 
+  // Distinct tag values per facet source, for the Tier/Category/Theme/User
+  // dropdowns. A facet with no values is hidden (e.g. User before any are added).
+  const tagValues = useMemo(() => {
+    const by: Record<string, Set<string>> = {};
+    for (const f of TAG_FACETS) by[f.source] = new Set();
+    (rows ?? []).forEach((r) => (r.tags ?? []).forEach((t) => by[t.source]?.add(t.tag)));
+    const out: Record<string, string[]> = {};
+    for (const f of TAG_FACETS) out[f.source] = [...by[f.source]].sort();
+    return out;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toUpperCase();
     return (rows ?? []).filter((r) => {
       if (q && !r.ticker.toUpperCase().includes(q)) return false;
       if (listFilter !== "__all__" && !r.lists.includes(listFilter)) return false;
+      // Tag facets are ANDed across sources; within a source the selected value
+      // must be present on the row.
+      for (const f of TAG_FACETS) {
+        const sel = tagFilters[f.source];
+        if (sel && !(r.tags ?? []).some((t) => t.source === f.source && t.tag === sel)) return false;
+      }
       return true;
     });
-  }, [rows, query, listFilter]);
+  }, [rows, query, listFilter, tagFilters]);
+
+  const activeTagFilters = useMemo(
+    () => Object.values(tagFilters).filter(Boolean).length,
+    [tagFilters],
+  );
 
   return (
     <main className="main">
@@ -107,6 +132,27 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
+            {TAG_FACETS.map((f) =>
+              tagValues[f.source].length > 0 ? (
+                <select
+                  key={f.source}
+                  className="universe-select"
+                  value={tagFilters[f.source] ?? ""}
+                  onChange={(e) => setTagFilters((prev) => ({ ...prev, [f.source]: e.target.value }))}
+                  title={`依 ${f.label} tag 篩選`}
+                >
+                  <option value="">{f.label}（全部）</option>
+                  {tagValues[f.source].map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : null,
+            )}
+            {activeTagFilters > 0 && (
+              <button className="btn-ghost tiny" onClick={() => setTagFilters({})} title="清除 tag 篩選">
+                清除標籤 ✕
+              </button>
+            )}
             <span className="muted tiny">{filtered.length} / {rows.length}</span>
           </div>
 
@@ -118,6 +164,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 <th className="num">7d %</th>
                 <th className="num">News</th>
                 <th>Lists</th>
+                <th>Tags</th>
               </tr>
             </thead>
             <tbody>
@@ -146,6 +193,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                       {r.lists.length > 4 && <span className="muted tiny">+{r.lists.length - 4}</span>}
                     </span>
                   </td>
+                  <td><TagChips tags={r.tags} /></td>
                 </tr>
               ))}
             </tbody>

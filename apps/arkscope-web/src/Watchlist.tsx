@@ -13,9 +13,11 @@ import {
   setPriority,
   type ConsensusSummary,
   type SymbolHit,
+  type TagRef,
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
+import { TagChips } from "./tags";
 
 // One normalized row the table renders. The single source is the universe
 // (profile-state substrate); the aggregate view is the union of active
@@ -29,6 +31,7 @@ interface TabRow {
   archived: boolean;
   note_count: number;
   has_summary: boolean;
+  tags: TagRef[];
 }
 
 type SortKey = "ticker" | "latest_close" | "change_7d_pct" | "news_count_7d" | "priority";
@@ -51,6 +54,7 @@ function universeToTab(r: UniverseRow): TabRow {
     archived: r.archived,
     note_count: r.note_count,
     has_summary: r.has_summary,
+    tags: r.tags ?? [],
   };
 }
 
@@ -480,6 +484,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                     <Th k="news_count_7d" label="News" num {...thProps} />
                     <th className="wl-consensus" title="Finnhub analyst consensus (daily-cached)">Consensus</th>
                     <Th k="priority" label="Priority" {...thProps} />
+                    <th>Tags</th>
                     <th className="wl-actions">Actions</th>
                   </tr>
                 </thead>
@@ -513,6 +518,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                           <option value="low">low</option>
                         </select>
                       </td>
+                      <td><TagChips tags={r.tags} max={4} /></td>
                       <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
                         <span className="rowactions">
                           <button type="button" title="Open detail" onClick={() => onOpenTicker(r.ticker)}>↗</button>

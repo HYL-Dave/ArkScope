@@ -6,15 +6,19 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addNote,
+  addTickerTag,
   deleteNote,
   getTickerState,
   getNotes,
   getPriceChange,
+  removeTickerTag,
   type Note,
   type PriceChange,
+  type TagRef,
   type TickerAggregate,
 } from "./api";
 import { AICardTab } from "./AICard";
+import { isUserTag, sourceClass, sourceLabel } from "./tags";
 
 type Tab = "overview" | "notes" | "ai";
 
@@ -61,6 +65,10 @@ export function TickerDetailView({
         )}
         {stateErr && <span className="refresh-err tiny">{stateErr}</span>}
       </div>
+
+      {state && (
+        <TagManager ticker={ticker} tags={state.tags ?? []} onChanged={() => void refreshState()} />
+      )}
 
       <div className="detail-tabs">
         <button type="button" className={`tab ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>
@@ -256,6 +264,95 @@ function NotesTab({ ticker, onChanged }: { ticker: string; onChanged?: () => voi
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// Tag management surface. config:* tags render read-only (owned by import);
+// only source="user" tags get a × remove. A small "＋標籤" input adds user tags.
+function TagManager({
+  ticker,
+  tags,
+  onChanged,
+}: {
+  ticker: string;
+  tags: TagRef[];
+  onChanged: () => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function add() {
+    const tag = draft.trim();
+    if (!tag || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await addTickerTag(ticker, tag);
+      setDraft("");
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(tag: string) {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await removeTickerTag(ticker, tag);
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="detail-tags">
+      <span className="chips tagchips">
+        {tags.map((t) => (
+          <span
+            key={`${t.source}:${t.tag}`}
+            className={sourceClass(t.source)}
+            title={`${sourceLabel(t.source)} · ${t.tag}`}
+          >
+            {t.tag}
+            {isUserTag(t) && (
+              <button
+                type="button"
+                className="tagchip-x"
+                title="移除標籤"
+                disabled={busy}
+                onClick={() => void remove(t.tag)}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        {tags.length === 0 && <span className="muted tiny">尚無標籤</span>}
+      </span>
+      <span className="tag-add">
+        <input
+          placeholder="＋標籤"
+          value={draft}
+          disabled={busy}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void add();
+          }}
+        />
+        <button className="btn-ghost tiny" disabled={busy || !draft.trim()} onClick={() => void add()}>
+          新增
+        </button>
+      </span>
+      {err && <span className="refresh-err tiny">{err}</span>}
     </div>
   );
 }
