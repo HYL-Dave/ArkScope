@@ -99,10 +99,15 @@ class CardRunStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
-            # Migration: add translations_json to a pre-existing table (idempotent).
+            # Migration: add translations_json to a pre-existing table. Tolerant
+            # of the same concurrent-first-construct race the WAL line guards: a
+            # duplicate-column error just means another constructor added it.
             cols = {r[1] for r in conn.execute("PRAGMA table_info(ai_card_runs)").fetchall()}
             if "translations_json" not in cols:
-                conn.execute("ALTER TABLE ai_card_runs ADD COLUMN translations_json TEXT")
+                try:
+                    conn.execute("ALTER TABLE ai_card_runs ADD COLUMN translations_json TEXT")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     @staticmethod

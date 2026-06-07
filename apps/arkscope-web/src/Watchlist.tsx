@@ -176,10 +176,19 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   // per session. Replaces the old ArkScope LLM "sentiment" column.
   const [consensus, setConsensus] = useState<Record<string, ConsensusCell>>({});
   const consensusRequested = useRef<Set<string>>(new Set());
+  // Membership-stable key: a pure re-sort or an optimistic priority patch must
+  // NOT tear down in-flight consensus fetches (that orphaned cells on "…"
+  // forever). The key changes only when the SET of visible tickers changes.
+  const visibleKey = useMemo(
+    () => Array.from(new Set(sorted.map((r) => r.ticker))).sort().join(","),
+    [sorted],
+  );
   useEffect(() => {
-    const todo = sorted.map((r) => r.ticker).filter((t) => !consensusRequested.current.has(t));
+    const visible = visibleKey ? visibleKey.split(",") : [];
+    const todo = visible.filter((t) => !consensusRequested.current.has(t));
     if (todo.length === 0) return;
     let cancelled = false;
+    const completed = new Set<string>();
     todo.forEach((t) => consensusRequested.current.add(t));
     setConsensus((prev) => {
       const next = { ...prev };
@@ -193,8 +202,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           const t = todo[i++];
           try {
             const c = await getConsensus(t);
+            completed.add(t);
             if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "ok", data: c } }));
           } catch {
+            completed.add(t);
             if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "err" } }));
           }
         }
@@ -203,8 +214,13 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     })();
     return () => {
       cancelled = true;
+      // Roll back tickers that never resolved so a genuine membership change
+      // re-fetches them instead of stranding them on "…".
+      todo.forEach((t) => {
+        if (!completed.has(t)) consensusRequested.current.delete(t);
+      });
     };
-  }, [sorted]);
+  }, [visibleKey]);
 
   function toggleSort(k: SortKey) {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -282,7 +298,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     if (!name) return;
     setErr(null);
     try {
-      const li = await createList(name);
+      // Force kind="custom" — else the backend infers kind from the name
+      // (_infer_kind: "holdings"/"interest"/"theme"/colon) and a reserved-name
+      // list would land non-custom and vanish from this custom-only rail.
+      const li = await createList(name, "custom");
       setCreating(false);
       setNewName("");
       await loadLists();
