@@ -355,6 +355,7 @@ function TagManager({
         <select value={facet} disabled={busy} onChange={(e) => setFacet(e.target.value)} title="標籤類型">
           <option value="theme">主題</option>
           <option value="category">板塊/類別</option>
+          <option value="provenance">來源</option>
         </select>
         <input
           list={listId}

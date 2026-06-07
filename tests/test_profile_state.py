@@ -491,7 +491,8 @@ def test_config_tag_seeds_structure():
     if seeds:  # real config present
         families = {(g["facet"], g["source"]) for g in seeds}
         assert ("category", "legacy") in families
-        assert ("provenance", "system") in families
+        assert ("provenance", "legacy") in families  # provenance is editable (not read-only system)
+        assert all(g["source"] != "system" for g in seeds)  # config seed is all legacy/editable
         assert all(g["facet"] != "tier" for g in seeds)  # Tier retired (not a tag)
         provenance = {g["value"] for g in seeds if g["facet"] == "provenance"}
         assert provenance <= {"Seeking Alpha", "Alpha Picks"}
@@ -604,6 +605,22 @@ def test_suppression_does_not_clobber_priority(store):
     assert store.get_hidden_tickers() == {"NVDA"}
     store.set_priority("NVDA", "low")  # priority update must not clear hidden_at
     assert store.get_hidden_tickers() == {"NVDA"}
+
+
+def test_provenance_system_normalized_to_legacy_editable(tmp_path):
+    # A previously-seeded read-only 'system' provenance becomes editable 'legacy'
+    # on store init (provenance is user-managed: added → closed).
+    db = tmp_path / "prov.db"
+    s = ProfileStateStore(db)
+    s.seed_tags([{"facet": "provenance", "value": "Alpha Picks", "source": "system", "tickers": ["NVDA"]}])
+    assert s.get_tags(["NVDA"])["NVDA"] == [
+        {"facet": "provenance", "value": "Alpha Picks", "source": "system"}
+    ]
+    # re-open → _ensure_schema normalizes system→legacy
+    ProfileStateStore(db)
+    assert s.get_tags(["NVDA"])["NVDA"] == [
+        {"facet": "provenance", "value": "Alpha Picks", "source": "legacy"}
+    ]
 
 
 def test_tag_catalog_groups_distinct_values_by_facet(api_store):

@@ -230,6 +230,17 @@ class ProfileStateStore:
                     conn.execute("ALTER TABLE ticker_meta ADD COLUMN hidden_at TEXT")
                 except sqlite3.OperationalError:
                     pass
+            # Provenance is user-editable (lifecycle: added → closed), so a
+            # previously-seeded read-only 'system' provenance becomes editable
+            # 'legacy'. Idempotent (0 rows after the first run); read-only
+            # 'system' is reserved for a future authoritative crawl pipeline.
+            conn.execute(
+                "UPDATE OR IGNORE ticker_tags SET source = 'legacy' "
+                "WHERE facet = 'provenance' AND source = 'system'"
+            )
+            conn.execute(
+                "DELETE FROM ticker_tags WHERE facet = 'provenance' AND source = 'system'"
+            )
             conn.commit()
 
     @staticmethod

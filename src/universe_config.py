@@ -115,11 +115,15 @@ def config_tag_seeds() -> list[dict]:
 
     Tier is intentionally NOT emitted (retired → priority). Each active-tier
     category contributes, by its nature:
-      - ``seeking_picks_*`` → a read-only ``provenance`` "Seeking Alpha" tag PLUS
-        a ``legacy:category`` for the sector hint (e.g. "Financials");
-      - ``sa_alpha_picks_auto`` → a read-only ``provenance`` "Alpha Picks" tag;
-      - any other category → a ``legacy:category`` tag (e.g. "Mega Cap Tech"),
-        editable/takeover-able until a real provider category supersedes it.
+      - ``seeking_picks_*`` → a ``provenance`` "Seeking Alpha" tag PLUS a
+        ``legacy:category`` for the sector hint (e.g. "Financials");
+      - ``sa_alpha_picks_auto`` → a ``provenance`` "Alpha Picks" tag;
+      - any other category → a ``legacy:category`` tag (e.g. "Mega Cap Tech").
+    All config-seeded tags are ``legacy`` (editable / takeover-able) — they are a
+    bootstrap, not authority. Provenance is editable too (the user manages its
+    lifecycle, e.g. "added" → "closed"); the read-only ``system``/``provider``
+    sources are reserved for genuinely automated/authoritative data (a future
+    crawl pipeline or provider industry feed).
 
     Returns ``{facet, value, source, tickers}`` aggregated per ``(facet, value,
     source)``; ``[]`` when the config is missing. Feeds
@@ -146,9 +150,9 @@ def config_tag_seeds() -> list[dict]:
             if not tickers:
                 continue
             if cat_key == _ALPHA_PICKS_KEY:
-                _add("provenance", "Alpha Picks", "system", tickers)
+                _add("provenance", "Alpha Picks", "legacy", tickers)
             elif cat_key.startswith(_SEEKING_PREFIX):
-                _add("provenance", "Seeking Alpha", "system", tickers)
+                _add("provenance", "Seeking Alpha", "legacy", tickers)
                 sector = _prettify_category(cat_key[len(_SEEKING_PREFIX):])
                 if sector:
                     _add("category", sector, "legacy", tickers)
