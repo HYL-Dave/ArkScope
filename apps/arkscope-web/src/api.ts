@@ -196,6 +196,7 @@ export interface TickerAggregate {
   list_ids: number[];
   archived: boolean;
   note_count: number;
+  priority: string | null;
 }
 
 // --- universe (full tracked inventory) ---
@@ -559,6 +560,25 @@ export function setPriority(
   return sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/priority`, "POST", { priority });
 }
 
+// --- analyst consensus (credible, provider-native rating; daily-cached) ---
+
+export interface ConsensusSummary {
+  ticker?: string;
+  rating: string | null; // Strong Buy | Buy | Hold | Sell | Strong Sell | null
+  score: number | null;
+  buy_ratio: number | null;
+  total: number;
+  counts: Record<string, number>;
+  price_target: unknown;
+  period: string | null;
+  source: string;
+  cached?: boolean;
+}
+export function getConsensus(ticker: string): Promise<ConsensusSummary> {
+  // First hit may fetch Finnhub (throttled); cached daily server-side.
+  return getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000);
+}
+
 // --- symbol search (local-first autocomplete; NOT fuzzy) ---
 
 export interface SymbolHit {
@@ -584,6 +604,10 @@ export function setArchived(ticker: string, archived: boolean): Promise<TickerAg
     "POST",
     { archived },
   );
+}
+
+export function getTickerState(ticker: string): Promise<TickerAggregate> {
+  return getJSON<TickerAggregate>(`/profile/tickers/${encodeURIComponent(ticker)}/state`);
 }
 
 export function getNotes(ticker: string): Promise<{ ticker: string; notes: Note[] }> {

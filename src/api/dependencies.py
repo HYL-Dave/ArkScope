@@ -60,6 +60,19 @@ def get_credential_store():
     return CredentialStore(_local_state_db_path())
 
 
+@lru_cache(maxsize=1)
+def get_consensus_cache():
+    """Singleton daily cache of analyst consensus (Finnhub) — a local DATA cache
+    (its own data/cache/ SQLite), NOT user state. Overridable via
+    ``ARKSCOPE_CONSENSUS_DB``."""
+    from src.analyst_consensus import AnalystConsensusCache
+
+    path = os.environ.get("ARKSCOPE_CONSENSUS_DB") or str(
+        Path(__file__).resolve().parents[2] / "data" / "cache" / "analyst_consensus.db"
+    )
+    return AnalystConsensusCache(path)
+
+
 def _local_state_db_path() -> str:
     return os.environ.get("ARKSCOPE_PROFILE_DB") or str(
         Path(__file__).resolve().parents[2] / "data" / "profile_state.db"

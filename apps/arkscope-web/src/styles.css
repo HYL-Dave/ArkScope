@@ -1704,3 +1704,16 @@ button.wl-railitem.active,
   gap: 8px;
   padding: 24px 0;
 }
+
+/* ---- analyst consensus column ---- */
+.wl-consensus {
+  white-space: nowrap;
+}
+.consensus-tag {
+  font-size: 11px;
+  font-weight: 600;
+}
+.consensus-tag.muted {
+  color: var(--muted);
+  font-weight: 400;
+}

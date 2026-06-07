@@ -3,6 +3,7 @@ import {
   addMember,
   createList,
   deleteList,
+  getConsensus,
   getProfileLists,
   getUniverse,
   removeMember,
@@ -32,6 +33,10 @@ interface TabRow {
 type SortKey = "ticker" | "latest_close" | "change_7d_pct" | "news_count_7d" | "priority";
 type SortDir = "asc" | "desc";
 type Priority = "high" | "medium" | "low";
+type ConsensusCell =
+  | { state: "loading" }
+  | { state: "err" }
+  | { state: "ok"; rating: string | null };
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
@@ -149,6 +154,41 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   const isLoading = universe === null;
   const archivedCount = useMemo(() => rows.filter((r) => r.archived).length, [rows]);
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
+
+  // Analyst consensus, lazy per visible row + daily-cached server-side. Fetched
+  // with bounded concurrency (Finnhub is throttled); each ticker requested once
+  // per session. Replaces the old ArkScope LLM "sentiment" column.
+  const [consensus, setConsensus] = useState<Record<string, ConsensusCell>>({});
+  const consensusRequested = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const todo = sorted.map((r) => r.ticker).filter((t) => !consensusRequested.current.has(t));
+    if (todo.length === 0) return;
+    let cancelled = false;
+    todo.forEach((t) => consensusRequested.current.add(t));
+    setConsensus((prev) => {
+      const next = { ...prev };
+      todo.forEach((t) => (next[t] = { state: "loading" }));
+      return next;
+    });
+    (async () => {
+      let i = 0;
+      const worker = async () => {
+        while (i < todo.length && !cancelled) {
+          const t = todo[i++];
+          try {
+            const c = await getConsensus(t);
+            if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "ok", rating: c.rating } }));
+          } catch {
+            if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "err" } }));
+          }
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]); // concurrency 3
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sorted]);
 
   function toggleSort(k: SortKey) {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -382,6 +422,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                     <Th k="latest_close" label="Price" num {...thProps} />
                     <Th k="change_7d_pct" label="Chg 7d" num {...thProps} />
                     <Th k="news_count_7d" label="News" num {...thProps} />
+                    <th className="wl-consensus" title="Finnhub analyst consensus (daily-cached)">Consensus</th>
                     <Th k="priority" label="Priority" {...thProps} />
                     <th className="wl-actions">Actions</th>
                   </tr>
@@ -402,6 +443,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
                       <td className="num">{r.news_count_7d}</td>
+                      <td className="wl-consensus">{renderConsensus(consensus[r.ticker])}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <select
                           className={`prio-select p-${r.priority || "none"}`}
@@ -493,6 +535,16 @@ function sortRows(rows: TabRow[], key: SortKey, dir: SortDir): TabRow[] {
     return (av - bv) * mul;
   });
 }
+const _CONSENSUS_CLASS: Record<string, string> = {
+  "Strong Buy": "up", "Buy": "up", "Hold": "muted", "Sell": "down", "Strong Sell": "down",
+};
+function renderConsensus(c: ConsensusCell | undefined) {
+  if (!c || c.state === "loading") return <span className="muted tiny">…</span>;
+  if (c.state === "err") return <span className="muted tiny">—</span>;
+  if (!c.rating) return <span className="muted tiny" title="無分析師覆蓋">—</span>;
+  return <span className={`consensus-tag ${_CONSENSUS_CLASS[c.rating] ?? "muted"}`}>{c.rating}</span>;
+}
+
 function fmtNum(v: number | null): string { return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function fmtPct(v: number | null): string { return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`; }
 function changeClass(v: number | null): string { return v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : ""; }
