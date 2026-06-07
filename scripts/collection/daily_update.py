@@ -15,8 +15,8 @@ Daily Data Update Script - 每日資料更新統一入口
     # 更新所有新聞資料 (不包含股價)
     python daily_update.py --news
 
-    # 更新所有資料 (包含股價，需要 IBKR 連線)
-    python daily_update.py --all
+    # 更新所有新聞 + 股價 (股價需顯式 scope，--all 不會自動猜)
+    python daily_update.py --all --scope active-universe
 
     # 只更新 Polygon 新聞
     python daily_update.py --polygon
@@ -27,8 +27,9 @@ Daily Data Update Script - 每日資料更新統一入口
     # 只更新 IBKR 新聞 (需要 TWS/Gateway)
     python daily_update.py --ibkr-news
 
-    # 只更新 IBKR 股價 (需要 TWS/Gateway)
-    python daily_update.py --ibkr-prices
+    # 只更新 IBKR 股價 (需 TWS/Gateway + 顯式 scope)
+    python daily_update.py --ibkr-prices --scope active-universe   # 讀 profile DB（唯讀）
+    python daily_update.py --ibkr-prices --tickers AAPL,MSFT,NVDA  # 或顯式清單
 
     # 模擬執行 (不實際收集)
     python daily_update.py --all --dry-run
@@ -40,15 +41,21 @@ Daily Data Update Script - 每日資料更新統一入口
     python daily_update.py --news --quiet
 
     # 收集後自動同步到 DB
-    python daily_update.py --ibkr-prices --sync-db
+    python daily_update.py --ibkr-prices --scope active-universe --sync-db
 
-    # 更新所有新聞並同步到 DB
+    # 更新所有新聞並同步到 DB（不含 scores）
     python daily_update.py --news --sync-db
+
+    # 同步多模型 news_scores 到 DB（opt-in，已與 --news/--sync-db 脫鉤）
+    python daily_update.py --scores
+
+定位 (2026-06): 這是「手動 / cron 的 backfill runner」，不是桌面 app 的持續同步器。
+    它只寫遠端 PG，不寫任何 config（已移除舊的 user_profile.yaml → tickers_core.json
+    回寫），也不碰本地 profile DB（--scope active-universe 僅唯讀讀取）。
 
 重要限制 — 新 Ticker 的歷史資料:
     --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
-    新加入 tickers_core.json 的 ticker（如 SA Alpha Picks auto-sync 的新股）
-    不會被自動補抓歷史新聞，只會從「當前最新時間點之後」開始收集。
+    新加入的 ticker 不會被自動補抓歷史新聞，只會從「當前最新時間點之後」開始收集。
 
     補抓方式 (Polygon 為例，Finnhub 只有 7 天歷史影響不大):
         python scripts/collection/collect_polygon_news.py \\
@@ -63,7 +70,7 @@ import logging
 import argparse
 from datetime import datetime, date
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 # Setup logging
 logging.basicConfig(
@@ -76,110 +83,9 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).parent
 CONFIG_DIR = SCRIPT_DIR.parent.parent / "config"
 
-
-def _extract_watchlist_tickers(profile: dict) -> Set[str]:
-    """Extract all unique tickers from user_profile.yaml watchlists."""
-    tickers: Set[str] = set()
-    watchlists = profile.get("watchlists", {})
-
-    # core_holdings, interested
-    for group in ("core_holdings", "interested"):
-        group_data = watchlists.get(group, {})
-        tickers.update(group_data.get("tickers", []))
-
-    # custom_themes
-    for theme in watchlists.get("custom_themes", []):
-        tickers.update(theme.get("tickers", []))
-
-    # options_preferences.tickers_for_options
-    options = profile.get("options_preferences", {})
-    tickers.update(options.get("tickers_for_options", []))
-
-    return tickers
-
-
-def _get_all_tickers_core(config: dict) -> Set[str]:
-    """Get all tickers already in tickers_core.json."""
-    all_tickers: Set[str] = set()
-    for tier_key in ("tier1_core", "tier2_expanded", "tier3_user_watchlist"):
-        tier = config.get(tier_key, {})
-        for category in tier.values():
-            if isinstance(category, dict) and "tickers" in category:
-                all_tickers.update(category["tickers"])
-    return all_tickers
-
-
-def sync_watchlist_tickers(dry_run: bool = False) -> List[str]:
-    """
-    Sync tickers from user_profile.yaml watchlists into tickers_core.json.
-
-    Reads all watchlist tickers from user_profile.yaml (and .local.yaml if exists),
-    checks which ones are missing from tickers_core.json, and adds them to
-    tier3_user_watchlist.watchlist_auto_sync.
-
-    Returns:
-        List of newly added tickers.
-    """
-    try:
-        import yaml
-    except ImportError:
-        logger.warning("PyYAML not installed, skipping watchlist sync")
-        return []
-
-    # Load user profile (local override first)
-    profile = {}
-    for filename in ("user_profile.local.yaml", "user_profile.yaml"):
-        path = CONFIG_DIR / filename
-        if path.exists():
-            with open(path) as f:
-                profile = yaml.safe_load(f) or {}
-            break
-
-    if not profile:
-        return []
-
-    watchlist_tickers = _extract_watchlist_tickers(profile)
-    if not watchlist_tickers:
-        return []
-
-    # Load tickers_core.json
-    core_path = CONFIG_DIR / "tickers_core.json"
-    if not core_path.exists():
-        logger.warning(f"tickers_core.json not found: {core_path}")
-        return []
-
-    with open(core_path) as f:
-        config = json.load(f)
-
-    existing = _get_all_tickers_core(config)
-    missing = sorted(watchlist_tickers - existing)
-
-    if not missing:
-        return []
-
-    if dry_run:
-        logger.info(f"[DRY RUN] Would add {len(missing)} tickers from watchlist: {missing}")
-        return missing
-
-    # Add to tier3_user_watchlist.watchlist_auto_sync
-    tier3 = config.setdefault("tier3_user_watchlist", {})
-    auto_sync = tier3.get("watchlist_auto_sync", {})
-
-    existing_auto = set(auto_sync.get("tickers", []))
-    merged = sorted(existing_auto | set(missing))
-
-    tier3["watchlist_auto_sync"] = {
-        "_description": "Auto-synced from user_profile.yaml watchlists",
-        "_last_synced": date.today().isoformat(),
-        "tickers": merged,
-    }
-
-    with open(core_path, "w") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-
-    logger.info(f"Synced {len(missing)} new tickers from watchlist: {missing}")
-    return missing
+# Repo root on sys.path so `--scope active-universe` can read the local
+# profile-state DB (scripts/collection/ -> scripts/ -> repo root). Read-only.
+sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
 
 
 def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) -> tuple:
@@ -583,18 +489,59 @@ def update_ibkr_news(dry_run: bool = False) -> bool:
     return success
 
 
-def update_ibkr_prices(dry_run: bool = False) -> bool:
-    """Run IBKR price incremental update."""
+def _resolve_price_scope(args) -> List[str]:
+    """Resolve the EXPLICIT IBKR-price ticker scope (Q7: no implicit tier sweep).
+
+    Returns the tickers from ``--tickers``, or — for ``--scope active-universe`` —
+    the local profile-state active universe via a READ-ONLY read of
+    ``profile_state.db`` (it never writes ``user_profile.yaml`` /
+    ``tickers_core.json``). Returns ``[]`` when no scope was given; callers must
+    NOT fall back to the retired ``--tier all`` universe.
+    """
+    if args.tickers:
+        return [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    if args.scope == "active-universe":
+        try:
+            from src.profile_state import ProfileStateStore
+            db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+                SCRIPT_DIR.parent.parent / "data" / "profile_state.db"
+            )
+            tickers = ProfileStateStore(db_path).all_tickers()  # read-only
+            logger.info(f"--scope active-universe → {len(tickers)} tickers from profile DB")
+            return tickers
+        except Exception as e:
+            logger.error(f"--scope active-universe: could not read profile DB ({e})")
+            return []
+    return []
+
+
+def update_ibkr_prices(tickers: List[str], dry_run: bool = False) -> bool:
+    """Run IBKR price incremental update for an EXPLICIT ticker scope.
+
+    The retired ``--tier all`` default is gone (it expanded the three retired
+    tiers). The caller passes an explicit ticker list resolved from ``--tickers``
+    or ``--scope active-universe``; ``--all`` never implicitly sweeps a universe.
+    """
     logger.info("\n" + "=" * 50)
     logger.info("UPDATING IBKR PRICES")
     logger.info("=" * 50)
+
+    if not tickers:
+        logger.warning(
+            "Skipping IBKR prices: no explicit scope. "
+            "Pass --tickers <list> or --scope active-universe."
+        )
+        return False
 
     script = SCRIPT_DIR / "collect_ibkr_prices.py"
     if not script.exists():
         logger.error(f"Script not found: {script}")
         return False
 
-    cmd = [sys.executable, str(script), "--incremental", "--minute-only", "--tier", "all"]
+    cmd = [
+        sys.executable, str(script), "--incremental", "--minute-only",
+        "--tickers", ",".join(tickers),
+    ]
 
     if dry_run:
         cmd.append("--dry-run")
@@ -625,6 +572,7 @@ def sync_to_db(
     sync_news: bool = False,
     sync_prices: bool = False,
     sync_iv: bool = False,
+    sync_scores: bool = False,
     dry_run: bool = False,
 ) -> Dict[str, bool]:
     """
@@ -636,6 +584,7 @@ def sync_to_db(
         sync_news: Sync news data (polygon, finnhub, ibkr news)
         sync_prices: Sync price data (ibkr prices)
         sync_iv: Sync IV history data
+        sync_scores: Sync multi-model news_scores (opt-in; decoupled from news)
         dry_run: Show what would be done without executing
 
     Returns:
@@ -663,7 +612,9 @@ def sync_to_db(
         success, _ = run_command(cmd, dry_run=False)  # Always run, script handles dry-run
         results['db_sync_news'] = success
 
-        # Also sync multi-model scores (incremental upsert)
+    if sync_scores:
+        # Multi-model news_scores — opt-in, decoupled from the news sync above
+        # (was previously force-pushed on every --news --sync-db).
         logger.info("\nSyncing news scores to database...")
         cmd = [sys.executable, str(migrate_script), "--scores"]
         if dry_run:
@@ -748,6 +699,12 @@ Note: IBKR sources require TWS/Gateway running.
                        help='Suppress subprocess output (for cron/background)')
     parser.add_argument('--sync-db', action='store_true',
                        help='Sync collected data to database after collection')
+    parser.add_argument('--scores', action='store_true',
+                       help='Sync multi-model news_scores to DB (opt-in; decoupled from --news/--sync-db)')
+    parser.add_argument('--tickers', type=str, default=None,
+                       help='Explicit comma-separated ticker scope for IBKR prices (overrides --scope)')
+    parser.add_argument('--scope', choices=['active-universe'], default=None,
+                       help='IBKR-price scope: active-universe reads the local profile DB (read-only)')
 
     args = parser.parse_args()
 
@@ -757,9 +714,10 @@ Note: IBKR sources require TWS/Gateway running.
     args.iv_history = getattr(args, 'iv_history', False)
     args.sync_db = getattr(args, 'sync_db', False)
 
-    # Default to status if no action specified
+    # Default to status if no action specified (--scores is an action: it pushes
+    # scores to the DB on its own).
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
-                args.ibkr_news, args.ibkr_prices, args.iv_history]):
+                args.ibkr_news, args.ibkr_prices, args.iv_history, args.scores]):
         args.status = True
 
     if args.status:
@@ -780,8 +738,8 @@ Note: IBKR sources require TWS/Gateway running.
     if args.parallel:
         logger.info("*** PARALLEL MODE - Running sources concurrently ***")
 
-    # Sync watchlist tickers into tickers_core.json before collection
-    sync_watchlist_tickers(dry_run=args.dry_run)
+    # (Removed: the old user_profile.yaml → tickers_core.json writeback. Lists
+    # now live in the local profile DB; this batch runner never mutates config.)
 
     # Determine which sources to update
     update_polygon_flag = args.all or args.news or args.polygon
@@ -789,6 +747,9 @@ Note: IBKR sources require TWS/Gateway running.
     update_ibkr_news_flag = args.all or args.news or args.ibkr_news
     update_ibkr_prices_flag = args.all or args.ibkr_prices
     update_iv_history_flag = args.all or args.iv_history
+
+    # Resolve the EXPLICIT price scope once (Q7: --all never guesses a universe).
+    price_tickers = _resolve_price_scope(args) if update_ibkr_prices_flag else []
 
     # Parallel execution for news sources (Polygon + Finnhub only, IBKR needs dedicated connection)
     if args.parallel and (update_polygon_flag or update_finnhub_flag):
@@ -812,8 +773,13 @@ Note: IBKR sources require TWS/Gateway running.
         # IBKR runs separately (needs dedicated connection)
         if update_ibkr_news_flag:
             results['ibkr_news'] = update_ibkr_news(args.dry_run)
-        if update_ibkr_prices_flag:
-            results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
+        if update_ibkr_prices_flag and price_tickers:
+            results['ibkr_prices'] = update_ibkr_prices(price_tickers, args.dry_run)
+        elif update_ibkr_prices_flag:
+            logger.warning(
+                "IBKR prices requested but no scope — skipping (not failing). "
+                "Add --tickers <list> or --scope active-universe."
+            )
         if update_iv_history_flag:
             results['iv_history'] = update_iv_history(args.dry_run)
 
@@ -828,24 +794,31 @@ Note: IBKR sources require TWS/Gateway running.
         if update_ibkr_news_flag:
             results['ibkr_news'] = update_ibkr_news(args.dry_run)
 
-        if update_ibkr_prices_flag:
-            results['ibkr_prices'] = update_ibkr_prices(args.dry_run)
+        if update_ibkr_prices_flag and price_tickers:
+            results['ibkr_prices'] = update_ibkr_prices(price_tickers, args.dry_run)
+        elif update_ibkr_prices_flag:
+            logger.warning(
+                "IBKR prices requested but no scope — skipping (not failing). "
+                "Add --tickers <list> or --scope active-universe."
+            )
 
         if update_iv_history_flag:
             results['iv_history'] = update_iv_history(args.dry_run)
 
-    # Sync to database if requested
-    if args.sync_db:
-        # Determine what to sync based on what was collected
-        sync_news = update_polygon_flag or update_finnhub_flag or update_ibkr_news_flag
-        sync_prices = update_ibkr_prices_flag
-        sync_iv = update_iv_history_flag
+    # Sync to database if requested. --sync-db syncs what was COLLECTED;
+    # --scores is an independent opt-in (scores no longer ride on --news).
+    if args.sync_db or args.scores:
+        sync_news = args.sync_db and (update_polygon_flag or update_finnhub_flag or update_ibkr_news_flag)
+        sync_prices = args.sync_db and update_ibkr_prices_flag and bool(price_tickers)
+        sync_iv = args.sync_db and update_iv_history_flag
+        sync_scores = args.scores  # opt-in, on its own flag
 
-        if sync_news or sync_prices or sync_iv:
+        if sync_news or sync_prices or sync_iv or sync_scores:
             sync_results = sync_to_db(
                 sync_news=sync_news,
                 sync_prices=sync_prices,
                 sync_iv=sync_iv,
+                sync_scores=sync_scores,
                 dry_run=args.dry_run,
             )
             results.update(sync_results)
