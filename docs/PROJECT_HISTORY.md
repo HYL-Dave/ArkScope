@@ -17,7 +17,7 @@ that LLM sentiment/risk signals on financial news could improve RL trading agent
 
 The GitHub repo was renamed to **ArkScope** on 2026-04-15 (Phase 1); the local
 directory + code/docs references followed on 2026-05-31 (Phase 2). See
-`docs/design/ARKSCOPE_RENAME_PHASE2.md`. Fork-lineage detail (FinRL_DeepSeek
+git history + memory project_rename_arkscope.md. Fork-lineage detail (FinRL_DeepSeek
 import-path + env-version changes) lives in `training/UPSTREAM.md`.
 
 ## Open Data
