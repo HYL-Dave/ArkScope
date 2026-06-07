@@ -70,8 +70,10 @@ export function TickerDetailView({
   );
 }
 
-const PRICE_WINDOWS = [5, 7, 30, 90, 365] as const;
-const PRICE_WINDOW_LABEL: Record<number, string> = { 5: "5D", 7: "7D", 30: "30D", 90: "90D", 365: "1Y" };
+const PRICE_WINDOWS = [5, 7, 30, 90, 365, 3650] as const;
+const PRICE_WINDOW_LABEL: Record<number, string> = {
+  5: "5D", 7: "7D", 30: "30D", 90: "90D", 365: "1Y", 3650: "Max",
+};
 
 function OverviewTab({ ticker, row }: { ticker: string; row?: CockpitRow | null }) {
   const [pc, setPc] = useState<PriceChange | null>(null);
