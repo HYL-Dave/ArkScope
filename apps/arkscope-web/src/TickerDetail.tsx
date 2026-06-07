@@ -11,6 +11,7 @@ import {
   getTickerState,
   getNotes,
   getPriceChange,
+  isEditableTag,
   removeTickerTag,
   type Note,
   type PriceChange,
@@ -18,7 +19,7 @@ import {
   type TickerAggregate,
 } from "./api";
 import { AICardTab } from "./AICard";
-import { isUserTag, sourceClass, sourceLabel } from "./tags";
+import { tagClass, tagKey, tagTitle } from "./tags";
 
 type Tab = "overview" | "notes" | "ai";
 
@@ -284,12 +285,12 @@ function TagManager({
   const [err, setErr] = useState<string | null>(null);
 
   async function add() {
-    const tag = draft.trim();
-    if (!tag || busy) return;
+    const value = draft.trim();
+    if (!value || busy) return;
     setBusy(true);
     setErr(null);
     try {
-      await addTickerTag(ticker, tag);
+      await addTickerTag(ticker, value); // user theme tag (facet defaults to theme)
       setDraft("");
       onChanged();
     } catch (e) {
@@ -299,12 +300,12 @@ function TagManager({
     }
   }
 
-  async function remove(tag: string) {
+  async function remove(t: TagRef) {
     if (busy) return;
     setBusy(true);
     setErr(null);
     try {
-      await removeTickerTag(ticker, tag);
+      await removeTickerTag(ticker, t.value, t.facet, t.source);
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -317,19 +318,15 @@ function TagManager({
     <div className="detail-tags">
       <span className="chips tagchips">
         {tags.map((t) => (
-          <span
-            key={`${t.source}:${t.tag}`}
-            className={sourceClass(t.source)}
-            title={`${sourceLabel(t.source)} · ${t.tag}`}
-          >
-            {t.tag}
-            {isUserTag(t) && (
+          <span key={tagKey(t)} className={tagClass(t)} title={tagTitle(t)}>
+            {t.value}
+            {isEditableTag(t) && (
               <button
                 type="button"
                 className="tagchip-x"
                 title="移除標籤"
                 disabled={busy}
-                onClick={() => void remove(t.tag)}
+                onClick={() => void remove(t)}
               >
                 ×
               </button>
@@ -340,7 +337,7 @@ function TagManager({
       </span>
       <span className="tag-add">
         <input
-          placeholder="＋標籤"
+          placeholder="＋主題標籤"
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}

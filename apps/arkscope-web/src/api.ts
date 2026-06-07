@@ -163,11 +163,19 @@ export interface PriceChange {
 
 // --- cockpit watchlist + profile-state (lifecycle) ---
 
-// Classification tag, decoupled from list membership. source ∈
-// user | config:tier | config:theme | config:category (provider:* later).
+// Classification tag, two-dimensional + decoupled from list membership.
+//   facet  = semantic axis: category | theme | provenance | sector | industry
+//   source = authority/origin: user | legacy | system | provider:* | sec | broker
+// Editable = {user, legacy}; the rest are read-only external facts.
 export interface TagRef {
-  tag: string;
+  facet: string;
+  value: string;
   source: string;
+}
+
+const EDITABLE_TAG_SOURCES = new Set(["user", "legacy"]);
+export function isEditableTag(t: TagRef): boolean {
+  return EDITABLE_TAG_SOURCES.has(t.source);
 }
 
 export interface CockpitRow {
@@ -248,8 +256,9 @@ export interface UniverseResponse {
 }
 
 export interface ImportResult {
-  imported: { lists_created: number; memberships_added: number };
+  lists_removed: number;
   tags: { tags_added: number };
+  priority_migrated: number;
   lists: { id: number; name: string; kind: string; total_count: number; active_count: number }[];
 }
 
@@ -607,7 +616,7 @@ export function searchSymbols(q: string, limit = 10): Promise<{ q: string; resul
 // Seeds lists from user_profile groups + tickers_core tiers. The groups source
 // runs the overview (per-ticker price), so allow a generous timeout.
 export function importUniverse(
-  body: { include_groups?: boolean; include_tiers?: boolean } = {},
+  body: { include_groups?: boolean; include_tiers?: boolean; migrate_tier_priority?: boolean } = {},
 ): Promise<ImportResult> {
   return sendJSON<ImportResult>("/profile/import-universe", "POST", body, 60_000);
 }
@@ -641,22 +650,31 @@ export function deleteNote(ticker: string, noteId: number): Promise<{ deleted: b
   );
 }
 
-// User tags only (source='user'). config:* tags are seeded by import-universe
-// and are NOT creatable/removable here. Returns the refreshed ticker state.
-export function addTickerTag(ticker: string, tag: string): Promise<TickerAggregate> {
+// Adds a USER tag (source='user') on a facet (default theme). legacy/provider/
+// system tags are seeded/owned elsewhere. Returns the refreshed ticker state.
+export function addTickerTag(
+  ticker: string,
+  value: string,
+  facet = "theme",
+): Promise<TickerAggregate> {
   return sendJSON<TickerAggregate>(
     `/profile/tickers/${encodeURIComponent(ticker)}/tags`,
     "POST",
-    { tag },
+    { value, facet },
   );
 }
 
+// Removes an EDITABLE tag (user|legacy). value/facet/source are query params so a
+// value containing '/' is safe. Read-only sources are rejected server-side (400).
 export function removeTickerTag(
   ticker: string,
-  tag: string,
-): Promise<{ removed: boolean; ticker: string; tag: string }> {
-  return sendJSON<{ removed: boolean; ticker: string; tag: string }>(
-    `/profile/tickers/${encodeURIComponent(ticker)}/tags/${encodeURIComponent(tag)}`,
+  value: string,
+  facet = "theme",
+  source = "user",
+): Promise<{ removed: boolean; ticker: string; facet: string; value: string; source: string }> {
+  const q = new URLSearchParams({ value, facet, source });
+  return sendJSON(
+    `/profile/tickers/${encodeURIComponent(ticker)}/tags?${q.toString()}`,
     "DELETE",
   );
 }

@@ -1,43 +1,51 @@
-// Shared tag-chip rendering + source helpers (slice 2b).
+// Shared tag-chip rendering + facet helpers (two-dimensional tag model).
 //
-// Tags are classification metadata decoupled from list membership. The source
-// determines the chip's colour and facet. config:* tags are owned by
-// import-universe (read-only in the UI); only source="user" tags are editable.
+// A tag has a facet (semantic axis) and a source (authority/origin). Filtering is
+// by facet (Category / Theme / Provenance); colour is by facet, with user tags
+// given a distinct accent. Only editable tags (user/legacy) get a remove
+// affordance — provenance/provider/system are read-only external facts.
 
-import { type TagRef } from "./api";
+import { isEditableTag, type TagRef } from "./api";
 
-// Stable facet ordering — config families first, then user.
-export const TAG_FACETS: { source: string; label: string }[] = [
-  { source: "config:tier", label: "Tier" },
-  { source: "config:category", label: "Category" },
-  { source: "config:theme", label: "Theme" },
-  { source: "user", label: "User" },
+// Facet axes used for the filter dropdowns, in display order. Industry/sector
+// (provider-sourced) join later (slice 3); unknown facets fall through.
+export const TAG_FACETS: { facet: string; label: string }[] = [
+  { facet: "category", label: "Category" },
+  { facet: "theme", label: "Theme" },
+  { facet: "provenance", label: "Provenance" },
+  { facet: "industry", label: "Industry" },
+  { facet: "sector", label: "Sector" },
 ];
 
-export function sourceClass(source: string): string {
-  switch (source) {
-    case "config:tier":
-      return "tagchip tagchip--tier";
-    case "config:category":
+export function facetLabel(facet: string): string {
+  return TAG_FACETS.find((f) => f.facet === facet)?.label ?? facet;
+}
+
+// Chip class: user tags pop (editable, "mine"); others are coloured by facet.
+export function tagClass(t: TagRef): string {
+  if (t.source === "user") return "tagchip tagchip--user";
+  switch (t.facet) {
+    case "category":
       return "tagchip tagchip--cat";
-    case "config:theme":
+    case "theme":
       return "tagchip tagchip--theme";
-    case "user":
-      return "tagchip tagchip--user";
+    case "provenance":
+      return "tagchip tagchip--prov";
+    case "industry":
+    case "sector":
+      return "tagchip tagchip--ind";
     default:
-      return "tagchip"; // provider:* etc. (slice 3) fall back to the base style
+      return "tagchip";
   }
 }
 
-export function sourceLabel(source: string): string {
-  const f = TAG_FACETS.find((x) => x.source === source);
-  if (f) return f.label;
-  if (source.startsWith("provider:")) return "Industry";
-  return source;
+export function tagTitle(t: TagRef): string {
+  const ro = isEditableTag(t) ? "" : " · 唯讀";
+  return `${facetLabel(t.facet)} · ${t.value} (${t.source})${ro}`;
 }
 
-export function isUserTag(t: TagRef): boolean {
-  return t.source === "user";
+export function tagKey(t: TagRef): string {
+  return `${t.facet}:${t.value}:${t.source}`;
 }
 
 // Read-only chip row for table cells. Caps the count with a "+N" overflow.
@@ -48,15 +56,15 @@ export function TagChips({ tags, max = 5 }: { tags?: TagRef[]; max?: number }) {
   return (
     <span className="chips tagchips">
       {shown.map((t) => (
-        <span
-          key={`${t.source}:${t.tag}`}
-          className={sourceClass(t.source)}
-          title={`${sourceLabel(t.source)} · ${t.tag}`}
-        >
-          {t.tag}
+        <span key={tagKey(t)} className={tagClass(t)} title={tagTitle(t)}>
+          {t.value}
         </span>
       ))}
-      {extra > 0 && <span className="muted tiny" title={tags.slice(max).map((t) => t.tag).join(", ")}>+{extra}</span>}
+      {extra > 0 && (
+        <span className="muted tiny" title={tags.slice(max).map((t) => t.value).join(", ")}>
+          +{extra}
+        </span>
+      )}
     </span>
   );
 }

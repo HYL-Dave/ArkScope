@@ -8,11 +8,13 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getCards,
-  getCockpitWatchlist,
+  getProfileLists,
+  getUniverse,
   type CardSummary,
-  type CockpitRow,
-  type CockpitWatchlist,
+  type UniverseRow,
+  type WatchlistSummary,
 } from "./api";
+import { allActiveRows } from "./watchlist-derive";
 import type { StatusState } from "./Dashboard";
 import { CardModal } from "./AICard";
 
@@ -27,15 +29,26 @@ export function HomeView({
   onNavigate: (view: NavTarget) => void;
   onOpenTicker: (ticker: string) => void;
 }) {
-  const [wl, setWl] = useState<CockpitWatchlist | null>(null);
+  const [active, setActive] = useState<UniverseRow[] | null>(null);
+  const [asOf, setAsOf] = useState<string | null>(null);
+  const [archivedCount, setArchivedCount] = useState(0);
   const [cards, setCards] = useState<CardSummary[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [w, c] = await Promise.all([getCockpitWatchlist(false), getCards(undefined, 8)]);
-      setWl(w);
+      // Home mirrors 自選股: the All-Active set over custom work-lists (NOT the
+      // old cockpit-17 overview), so the first screen and the watchlist agree.
+      const [u, l, c] = await Promise.all([
+        getUniverse(true),
+        getProfileLists(false),
+        getCards(undefined, 8),
+      ]);
+      const rows = allActiveRows(u.rows, l.lists);
+      setActive(rows);
+      setArchivedCount(rows.filter((r) => r.archived).length);
+      setAsOf(u.as_of);
       setCards(c.cards);
       setErr(null);
     } catch (e) {
@@ -48,7 +61,7 @@ export function HomeView({
   }, [load]);
 
   const dsCount = status.kind === "ready" ? Object.keys(status.status.data_sources).length : null;
-  const rows = wl?.rows ?? [];
+  const rows = (active ?? []).filter((r) => !r.archived);
   const movers = [...rows]
     .sort((a, b) => moverWeight(b) - moverWeight(a))
     .slice(0, 8);
@@ -58,12 +71,12 @@ export function HomeView({
       <main className="main">
         <div className="home">
           <section className="home-overview">
-            <OvTile label="自選股" value={wl ? wl.shown : "—"}
-              sub={wl ? `${wl.total} 檔 · ${wl.archived_count} 已封存` : "loading…"} />
+            <OvTile label="自選股" value={active ? rows.length : "—"}
+              sub={active ? `${active.length} 檔 · ${archivedCount} 已封存` : "loading…"} />
             <OvTile label="告警" value="—" sub="尚未啟用" />
             <OvTile label="資料來源" value={dsCount ?? "—"}
               sub={status.kind === "ready" ? `${status.status.tools_registered} tools` : "—"} />
-            <OvTile label="資料時間" value={wl?.as_of ? fmtDate(wl.as_of) : "—"} sub="watchlist as-of" />
+            <OvTile label="資料時間" value={asOf ? fmtDate(asOf) : "—"} sub="watchlist as-of" />
           </section>
 
           {err && (
@@ -78,8 +91,10 @@ export function HomeView({
               <h2>自選股動態 <span className="muted tiny">top movers · 7d</span></h2>
               <button className="btn-ghost" onClick={() => onNavigate("Watchlist")}>查看全部 →</button>
             </div>
-            {rows.length === 0 ? (
-              <p className="muted">尚無自選股資料。</p>
+            {active === null ? (
+              <p className="muted">載入中…</p>
+            ) : rows.length === 0 ? (
+              <p className="muted">尚無自選股。到「自選股」建立清單並加入標的。</p>
             ) : (
               <table className="home-table">
                 <thead>
@@ -156,7 +171,7 @@ function OvTile({ label, value, sub }: { label: string; value: number | string; 
 
 // --- local presentation helpers (kept self-contained for this v0 shell) ---
 
-function moverWeight(r: CockpitRow): number {
+function moverWeight(r: UniverseRow): number {
   return r.change_7d_pct == null ? -1 : Math.abs(r.change_7d_pct);
 }
 function fmtNum(v: number | null): string {

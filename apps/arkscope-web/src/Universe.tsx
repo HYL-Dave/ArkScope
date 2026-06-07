@@ -1,28 +1,38 @@
 // Universe / 全部標的 — the full tracked-ticker inventory (distinct from the
-// curated cockpit watchlist). This is where you see EVERY ticker the system
-// knows about, whether or not you're actively watching it: search, filter by
-// list/tier/group, see which have a market summary, and import the universe
-// from existing categories. Daily research lives in 自選股; this is inventory.
+// curated 自選股 watchlist). This is where you see EVERY tracked ticker, whether
+// or not you're actively watching it: search, filter by your work-lists and by
+// classification facets (Category / Theme / Provenance), see which have a market
+// summary, and bootstrap classification tags from config. Daily research lives
+// in 自選股; this is inventory.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getUniverse, importUniverse, type UniverseRow } from "./api";
+import {
+  getProfileLists,
+  getUniverse,
+  importUniverse,
+  type UniverseRow,
+  type WatchlistSummary,
+} from "./api";
 import { TAG_FACETS, TagChips } from "./tags";
 
 export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [rows, setRows] = useState<UniverseRow[] | null>(null);
+  const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [meta, setMeta] = useState<{ total: number; summarized: number; archived: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [listFilter, setListFilter] = useState<string>("__all__");
-  const [tagFilters, setTagFilters] = useState<Record<string, string>>({}); // source -> value ("" = all)
+  const [tagFilters, setTagFilters] = useState<Record<string, string>>({}); // facet -> value ("" = all)
   const [importing, setImporting] = useState(false);
+  const [migratePriority, setMigratePriority] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const u = await getUniverse(true);
+      const [u, l] = await Promise.all([getUniverse(true), getProfileLists(false)]);
       setRows(u.rows);
+      setLists(l.lists);
       setMeta({ total: u.total, summarized: u.summarized, archived: u.archived_count });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -38,11 +48,11 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await importUniverse({});
-      setImportMsg(
-        `匯入完成：新增 ${r.imported.lists_created} 個清單、${r.imported.memberships_added} 筆成員、` +
-          `${r.tags.tags_added} 個分類標籤。`,
-      );
+      const r = await importUniverse({ migrate_tier_priority: migratePriority });
+      const bits = [`新增 ${r.tags.tags_added} 個分類標籤`];
+      if (r.lists_removed > 0) bits.push(`移除 ${r.lists_removed} 個舊清單`);
+      if (r.priority_migrated > 0) bits.push(`初始化 ${r.priority_migrated} 檔 priority`);
+      setImportMsg(`匯入完成：${bits.join("、")}。`);
       await load();
     } catch (e) {
       setImportMsg(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);
@@ -51,21 +61,21 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     }
   }
 
-  // List filter options = union of all list names across the universe.
-  const allLists = useMemo(() => {
-    const s = new Set<string>();
-    (rows ?? []).forEach((r) => r.lists.forEach((l) => s.add(l)));
-    return [...s].sort();
-  }, [rows]);
+  // List filter = the user's work-lists (custom), aligned with the 自選股 rail —
+  // classification (tier/theme/etc.) lives in tag facets, not lists.
+  const customListNames = useMemo(
+    () => lists.filter((l) => l.kind === "custom").map((l) => l.name).sort(),
+    [lists],
+  );
 
-  // Distinct tag values per facet source, for the Tier/Category/Theme/User
-  // dropdowns. A facet with no values is hidden (e.g. User before any are added).
+  // Distinct tag values per facet, for the Category/Theme/Provenance dropdowns.
+  // A facet with no values is hidden.
   const tagValues = useMemo(() => {
     const by: Record<string, Set<string>> = {};
-    for (const f of TAG_FACETS) by[f.source] = new Set();
-    (rows ?? []).forEach((r) => (r.tags ?? []).forEach((t) => by[t.source]?.add(t.tag)));
+    for (const f of TAG_FACETS) by[f.facet] = new Set();
+    (rows ?? []).forEach((r) => (r.tags ?? []).forEach((t) => by[t.facet]?.add(t.value)));
     const out: Record<string, string[]> = {};
-    for (const f of TAG_FACETS) out[f.source] = [...by[f.source]].sort();
+    for (const f of TAG_FACETS) out[f.facet] = [...by[f.facet]].sort();
     return out;
   }, [rows]);
 
@@ -74,11 +84,10 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     return (rows ?? []).filter((r) => {
       if (q && !r.ticker.toUpperCase().includes(q)) return false;
       if (listFilter !== "__all__" && !r.lists.includes(listFilter)) return false;
-      // Tag facets are ANDed across sources; within a source the selected value
-      // must be present on the row.
+      // Facets are ANDed; within a facet the selected value must be present.
       for (const f of TAG_FACETS) {
-        const sel = tagFilters[f.source];
-        if (sel && !(r.tags ?? []).some((t) => t.source === f.source && t.tag === sel)) return false;
+        const sel = tagFilters[f.facet];
+        if (sel && !(r.tags ?? []).some((t) => t.facet === f.facet && t.value === sel)) return false;
       }
       return true;
     });
@@ -100,15 +109,24 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           </span>
         )}
         <span className="spacer" />
+        <label className="muted tiny universe-migrate" title="用舊 tier 當作 priority 初始值（只填尚未設定的，不覆蓋）">
+          <input
+            type="checkbox"
+            checked={migratePriority}
+            onChange={(e) => setMigratePriority(e.target.checked)}
+          />
+          以舊 tier 初始化 priority
+        </label>
         <button className="btn-ghost" onClick={() => void runImport()} disabled={importing}>
-          {importing ? "匯入中…" : "⤓ 匯入清單"}
+          {importing ? "匯入中…" : "⤓ 匯入分類"}
         </button>
         <button className="btn-ghost" onClick={() => void load()}>↻ Refresh</button>
       </div>
 
       <p className="muted tiny universe-hint">
-        從 user_profile groups 和 tickers_core tiers 匯入清單；可重複執行，不會恢復已 archive 的項目。
-        「全部標的」管理系統追蹤的所有標的與清單成員；「自選股」是日常研究 cockpit。兩者共用同一套 profile-state 清單。
+        庫存來自 active universe 設定（不受清單增減影響）。「匯入分類」會從 config 種入分類標籤
+        （category / theme / 來源），並移除舊的 config 清單；可重複執行，使用者自訂的標籤不會被覆蓋。
+        分類用標籤管理，清單只放你的工作清單（與「自選股」同一組）。
       </p>
       {importMsg && <p className="tiny universe-importmsg">{importMsg}</p>}
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -127,30 +145,30 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
               value={listFilter}
               onChange={(e) => setListFilter(e.target.value)}
             >
-              <option value="__all__">所有清單（{allLists.length}）</option>
-              {allLists.map((l) => (
+              <option value="__all__">所有清單（{customListNames.length}）</option>
+              {customListNames.map((l) => (
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
             {TAG_FACETS.map((f) =>
-              tagValues[f.source].length > 0 ? (
+              tagValues[f.facet].length > 0 ? (
                 <select
-                  key={f.source}
+                  key={f.facet}
                   className="universe-select"
-                  value={tagFilters[f.source] ?? ""}
-                  onChange={(e) => setTagFilters((prev) => ({ ...prev, [f.source]: e.target.value }))}
-                  title={`依 ${f.label} tag 篩選`}
+                  value={tagFilters[f.facet] ?? ""}
+                  onChange={(e) => setTagFilters((prev) => ({ ...prev, [f.facet]: e.target.value }))}
+                  title={`依 ${f.label} 篩選`}
                 >
                   <option value="">{f.label}（全部）</option>
-                  {tagValues[f.source].map((v) => (
+                  {tagValues[f.facet].map((v) => (
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>
               ) : null,
             )}
             {activeTagFilters > 0 && (
-              <button className="btn-ghost tiny" onClick={() => setTagFilters({})} title="清除 tag 篩選">
-                清除標籤 ✕
+              <button className="btn-ghost tiny" onClick={() => setTagFilters({})} title="清除分類篩選">
+                清除分類 ✕
               </button>
             )}
             <span className="muted tiny">{filtered.length} / {rows.length}</span>
@@ -200,7 +218,7 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           </table>
           {filtered.length === 0 && (
             <p className="muted tiny">
-              {rows.length === 0 ? "尚無標的。按「匯入清單」從現有分類種入。" : "沒有符合的標的。"}
+              {rows.length === 0 ? "尚無標的。按「匯入分類」從現有設定種入。" : "沒有符合的標的。"}
             </p>
           )}
         </>
