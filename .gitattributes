@@ -6,11 +6,12 @@ data_sources/PAID_SUBSCRIPTION_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_EVALUATION.md filter=git-crypt diff=git-crypt
 data_sources/*_VALUE.md filter=git-crypt diff=git-crypt
 
-# 內部設計與特徵文件
-docs/design/** filter=git-crypt diff=git-crypt
-docs/features/** filter=git-crypt diff=git-crypt
+# 內部設計與特徵文件：2026-06-08 已解鎖為公開明文（見 docs/PUBLICATION_REVIEW.md）。
+# 解鎖前已 sanitize（內部 IP/路徑泛化、洩漏密碼 redact）。歷史 commit 仍是加密 blob。
+#   docs/design/**  — unlocked 2026-06-08
+#   docs/features/** — unlocked 2026-06-08
 
-# 策略決策文件 (個人/內部使用)
+# 策略決策文件 (個人/內部使用) — 仍加密，逐份審後再決定是否公開
 docs/strategy/** filter=git-crypt diff=git-crypt
 
 # 未來可以加入更多模式，例如：
