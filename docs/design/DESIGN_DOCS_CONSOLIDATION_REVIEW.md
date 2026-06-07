@@ -189,7 +189,7 @@ sentence rationale + key facts extracted (if any) + destination doc.)
 
 **Absorption**: 12 個主要章節 100% 被 canonical 取代或證實不適用：(a) 三層 framing → local-first 5-layer 架構取代（SPEC grep 0 命中）；(b) 數據源優先級 → `DATA_SOURCES_EVALUATION.md:15`「IBKR 主力 (2025-12 新增)」；(c) IBKR 新聞特性 (Dow Jones/0.5s/1月) → `IBKR_GUIDE.md:452-518` 更詳細；(d) Finnhub 7-day → Group 1 已抽至 `DATA_SOURCE_QUIRKS.md`；(e) Quiver → `DATA_SOURCES_EVALUATION.md:1219-1222` 明確記錄 2026/01 程式碼已刪除；(f) Schema-first / Agent-trading 分離 → workbench 已無交易層，前提消失；(g) 4-provider router、雙層情緒、Reactive/Analytical 代碼示例均未落地 src/；(h) LLM 訂閱 (gpt-5-mini primary) 已升級至 Opus 4.6 / gpt-5.4；(i) Phase 1-4 路線圖被 `PROJECT_PRIORITY_MAP.md` 取代。
 
-**Why pure delete (not archive)**: 
+**Why pure delete (not archive)**:
 - archive verdict 在 tracker 定義是「rejected approach / contested decision history / paused-but-may-resume plan」；本檔是「過時 prose 願景」，沒有 contested decision。
 - **內含主動誤導資訊**：L941 寫 Quiver「✅ 已整合」，實際程式碼 2026/01 已刪。archive 不能解決誤導 — 任何 future reader 仍會誤以為仍是參考，除非每位讀者都先檢查 commit message 知道是 frozen snapshot。
 - 抽取替代方案不適用：所有可抽取的具體 facts 都已在 IBKR_GUIDE / DATA_SOURCES_EVALUATION / DATA_SOURCE_QUIRKS 中以更具體形式存在，**0 個** residual。
@@ -205,7 +205,7 @@ sentence rationale + key facts extracted (if any) + destination doc.)
 
 **Absorption**: 13 章逐項驗證：(a) §1-4「三大主體 / 主體關係 / 工具層 / 數據流」→ SPEC + AUDIT 0 grep 命中，被 local-first 5-layer 完全取代；(b) §5 目錄結構 (`src/agent/`、`.mindful/`) 沒落地（實際 `src/agents/`、`src/workbench/`）；(c) §6 Dexter 模式 20+ 借鑑 → `AI_AGENT_ARCHITECTURE_PATTERNS.md` (active, audit keep) 完整收錄 18+ patterns；(d) §7 Supabase 儲存 → SPEC §4 改為 SQLite (workbench.db + sa_cache.db) + transient DuckDB，Supabase 方向正式退場；(e) §8 Phase 1-5 路線圖 → `PROJECT_PRIORITY_MAP.md` 取代；(f) §9 三層記憶 (Working/Episodic/Semantic) future → episodic 已實作 (sql/004 + `data/agent_memory/`, AUDIT L93)，三層 framing 沒採用；(g) §10.1-10.4 動態工具聚合 / 條件式 Compaction / 三層數據優先順序 / 擴展 Scratchpad → PATTERNS doc + 實作的 ContextManager 取代；(h) §12 完整數據源全景 → `DATA_SOURCES_EVALUATION.md` 取代；(i) §13 user_profile.yaml → SPEC / AUDIT 多次引用為 canonical 元素。
 
-**Why pure delete (not archive, not extract → canonical)**: 
+**Why pure delete (not archive, not extract → canonical)**:
 - **§10.5/§10.6/§11 看似候選 residuals 已被驗證為「已落地」**：
   - §10.6 核心教訓「真相來源是數據本身、不是 stats JSON」**已體現在 `src/tools/freshness.py` + `src/tools/backends/db_backend.py:1077-1131` 的 `query_health_stats()` 設計**：直接 `SELECT MAX(published_at) FROM news`、`MAX(datetime) FROM prices`、`MAX(date) FROM iv_history` — 完全不依賴任何 stats JSON / metadata file。Code 是 lesson 的真正載體。
   - §10.5 Dexter 實測觀察 + 2026-02-07/14/23 changelog → `AI_AGENT_ARCHITECTURE_PATTERNS.md` 已將 patterns 吸收。Dexter 持續演進的 changelog 是外部資訊歷史，git history (`git show <pre-delete>:`) 可取回。
@@ -230,7 +230,7 @@ sentence rationale + key facts extracted (if any) + destination doc.)
 
 **Absorption**: 12 章逐項：(a) §0 兩種行為模式 → SPEC v1 是 read-only UI prototype，無 continuous 模式，**與 local-first 直接矛盾**（audit L116 對 SERVICE_FIRST_EXPANSION_PLAN 用詞「Direct contradiction with current direction」同樣定性適用）；(b) §2 進程模型 / §3 啟動順序 / §9 systemd → SPEC L102 (FastAPI+Jinja2+HTMX) + AUDIT §A/B/C daemon model **deferred**；(c) §4 排程 + §10 技術選型 → SPEC L735「APScheduler/Celery/Dramatiq/Prefect 選擇 deferred 直到 model 決定」；(d) §5 API 層 → `src/api/` 已 active 演進，prose 清單不是 source of truth；(e) §6 Worker pattern + BaseWorker → **沒落地**（`src/workers/` 不存在；`src/service/` 只有 `job_runs_store.py` + `macro_calendar_health.py` 等 SA-related，無 BaseWorker class）；(f) §7.2 FreshnessRegistry「真相來源是數據本身」原則 → 已實作 `src/tools/freshness.py` + `db_backend.query_health_stats()` 直接 `SELECT MAX(...)` 而非讀 stats JSON（與 #4 同處驗證）；(g) §7.3 `.mindful/` 目錄 → SPEC §4 改為 profile dir + `workbench.db` / `sa_cache.db` / `data/`；(h) §8 錯誤恢復降級 + 冪等性 → 通用工程實踐，不需要 prose 保留；(i) §11 Phase 0-4 + §12 MVS → `PROJECT_PRIORITY_MAP.md` 取代。
 
-**Why pure delete (not archive)**: 
+**Why pure delete (not archive)**:
 - Audit verdict 預設 archive（L118），但與 #4 同邏輯——避免 archive 路徑保留 997 行的過時 framing（systemd / Worker pattern / `.mindful/` / Supabase 規劃 / Phase 0-4 / MVS）持續污染。
 - **0 個 non-recoverable assets**：freshness lesson 已落地為 code；Worker pattern 從未實作；API 端點清單 active 演進中；通用工程實踐（錯誤降級 / 冪等）需要時直接寫不需要 prose；§11 Phase plan 被 priority map 取代。
 - **整體 framing 與 local-first 直接矛盾**：「Service-first 持續模式 + multi-client + 24/7 service」vs.「單人 local research workbench, UI 關閉時可選 daemon」是兩個方向。Audit 本身用 superseded 字眼。
@@ -251,7 +251,7 @@ sentence rationale + key facts extracted (if any) + destination doc.)
 
 **Absorption**: 10 章逐項：(a) §1-2 「service core with multiple clients」整體 framing → audit L116 用詞「**Direct contradiction with current direction**」，local-first 反轉成「single-user local research workbench」；(b) §3-4 Service Boundary + First Slice (SA endpoints + jobs control) → **S1 已落地為 code**：`src/api/routes/seeking_alpha.py` (3.9KB) + `src/api/routes/jobs.py` (5.3KB) + `src/service/jobs.py` (28.7KB) + `tests/test_service_api_slice.py` (200 行) — 已 verified；(c) §6 Phase S2「persist job run history in DB」→ `PROJECT_PRIORITY_MAP.md` **P0.2 self-contained 取代** (含 `job_runs` + `job_definitions` schema、acceptance criteria、week 1 sequencing、dependency 圖 P0.2 → P1.5 → P2.3)；(d) §6 Phase S3 (web control plane) → local-first workbench UI 取代；(e) §6 Phase S4 (multi-client / OpenClaw / Discord 統一) → 方向已被 local-first 反轉；(f) §7 Design Rules → product-level API 設計通則，可從 src/api/routes/ 推導；(g) §8-9 Immediate Tasks + S1 實作狀態 → code + git log 是 source of truth；(h) §10 S2 前置 → priority map dependency graph 已涵蓋。
 
-**Why pure delete (not archive)**: 
+**Why pure delete (not archive)**:
 - Audit verdict 預設 archive（L116），但 audit 用詞「**Direct contradiction with current direction**」是 Group 2 最強——archive 路徑會持續污染 future direction 判斷（即使體量 232 行小）。
 - **0 個 non-recoverable assets**：S1 已落地為 code (source of truth)、S2 已被 priority map P0.2 self-contained 取代、S3-S4 方向反轉。
 - 與 #4/#5 推理一致：directional contradiction 文件不適合 archive。Archive 適用於「rejected approach / contested decision history / paused-but-may-resume plan」，但「Direct contradiction」是更強的反向定性。
@@ -272,7 +272,7 @@ sentence rationale + key facts extracted (if any) + destination doc.)
 
 **Absorption**: (a) PAUSED rationale → `RL_COLLAPSE_FINDINGS.md` (353 行專用 canonical doc, 含 VecNormalize 修復、OOS NOT proven、Decision Record §11、resume criteria) + `PROJECT_PRIORITY_MAP.md` P3.1 (paused + resume gate: reward redesign + walk-forward + multi-seed agreement + baseline outperformance threshold pre-committed)。本檔 L4-6 的 PAUSED banner 是 pointer, 不是 source of truth。(b) Phase 0-6 plans 全是 PG-based schema (rl_predictions / technical_indicators / rl_portfolio 表) → local-first 架構已換 SQLite + DuckDB, RL 如果恢復需 full rewrite 而非 resume。(c) Phase 5 OpenClaw 整合 → local-first 反轉了 multi-client 方向。(d) train/serve 一致性注意事項 (ticker 排序 / stockstats / sentiment 填充) → code-derivable (training/envs/ + prepare_training_data.py)。
 
-**Why pure delete (not archive)**: 
+**Why pure delete (not archive)**:
 - 本檔定位不是「RL 暫停等待復活」而是「RL productionization 這條線不再是 ArkScope 主軸」。未來自動化定位 = ArkScope-owned local agent + scheduler first；外部 operator (Codex app / Claude cowork) second。OpenClaw integration + API service + PG schema 路線完全不一致。
 - 如果 RL 恢復(priority map P3.1 gate)，starting point 是 `RL_COLLAPSE_FINDINGS.md` (canonical) + 基於 local-first 架構的新 design，不是本檔的 PG-based Phase 0-6。
 - archive verdict (tracker 定義: paused-but-may-resume plan) 表面適用，但實質上 resume criteria 在 RL_COLLAPSE_FINDINGS + P3.1，不在本檔。

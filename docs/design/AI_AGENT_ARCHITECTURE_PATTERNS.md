@@ -82,7 +82,7 @@ export class Agent {
 
     while (iteration < this.maxIterations) {
       iteration++;
-      
+
       // 調用 LLM (帶工具綁定)
       const response = await this.callModel(currentPrompt);
 
@@ -163,7 +163,7 @@ export class Scratchpad {
     const hash = createHash('md5').update(query).digest('hex').slice(0, 12);
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '');
     this.filepath = join('.dexter/scratchpad', `${timestamp}_${hash}.jsonl`);
-    
+
     // 記錄初始查詢
     this.append({ type: 'init', content: query, timestamp: new Date().toISOString() });
   }
@@ -277,7 +277,7 @@ Result: ${result.slice(0, 2000)}
 
 Provide a 1-2 sentence summary of the key information.
   `;
-  
+
   // 使用快速模型生成摘要
   return await callLlm(prompt, { model: getFastModel() });
 }
@@ -519,7 +519,7 @@ export function useAgentRunner() {
     try {
       for await (const event of agent.run(query)) {
         if (signal?.aborted) break;
-        
+
         setEvents(prev => [...prev, event]);
 
         if (event.type === 'done') {
@@ -787,13 +787,13 @@ canCallTool(toolName: string, query?: string): { allowed: boolean; warning?: str
 // 將查詢文字分詞後計算 Jaccard 相似度
 private findSimilarQuery(newQuery: string, previousQueries: string[]): string | null {
   const newWords = this.tokenize(newQuery);
-  
+
   for (const prevQuery of previousQueries) {
     const prevWords = this.tokenize(prevQuery);
     const intersection = [...newWords].filter(w => prevWords.has(w)).length;
     const union = new Set([...newWords, ...prevWords]).size;
     const similarity = intersection / union;  // Jaccard similarity
-    
+
     if (similarity >= 0.7) {  // 閾值
       return prevQuery;
     }
@@ -858,7 +858,7 @@ formatToolUsageForPrompt(): string | null {
 ```
 啟動時: 掃描三級目錄 → 讀取 YAML frontmatter (name + description)
                      → 注入系統提示詞 (輕量)
-                     
+
 調用時: 根據 name 載入完整 SKILL.md body → 執行多步工作流
 
 目錄優先級:
