@@ -1671,3 +1671,36 @@ button.wl-railitem.active,
   font: inherit;
   font-size: 12px;
 }
+
+/* ---- priority select (in-table) ---- */
+.prio-select {
+  background: var(--panel2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.prio-select:hover {
+  border-color: var(--accent);
+}
+.prio-select.p-high {
+  color: #ffb86b;
+  border-color: rgba(255, 184, 107, 0.4);
+}
+.prio-select.p-medium {
+  color: var(--accent);
+  border-color: rgba(88, 166, 255, 0.4);
+}
+.prio-select.p-low {
+  color: var(--muted);
+}
+.wl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px 0;
+}

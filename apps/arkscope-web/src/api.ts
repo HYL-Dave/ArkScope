@@ -552,6 +552,13 @@ export function removeMember(
   return sendJSON(`/profile/lists/${listId}/members/${encodeURIComponent(ticker)}`, "DELETE");
 }
 
+export function setPriority(
+  ticker: string,
+  priority: "high" | "medium" | "low" | null,
+): Promise<{ ticker: string; priority: string | null }> {
+  return sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/priority`, "POST", { priority });
+}
+
 // --- symbol search (local-first autocomplete; NOT fuzzy) ---
 
 export interface SymbolHit {

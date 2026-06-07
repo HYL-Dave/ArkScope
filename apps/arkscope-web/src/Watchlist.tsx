@@ -3,61 +3,52 @@ import {
   addMember,
   createList,
   deleteList,
-  getCockpitWatchlist,
   getProfileLists,
   getUniverse,
   removeMember,
   renameList,
   searchSymbols,
   setArchived,
-  type CockpitRow,
+  setPriority,
   type SymbolHit,
   type UniverseRow,
   type WatchlistSummary,
 } from "./api";
 
-// One normalized row the table renders, regardless of source (cockpit DTO for
-// "All Active" vs universe rows for a specific list). `cockpit` is set only for
-// All-Active rows so a click can hand the full cockpit row to the detail page.
+// One normalized row the table renders. The single source is the universe
+// (profile-state substrate); "All Active" is the union of active memberships
+// across the user's lists — NOT a separate curated source.
 interface TabRow {
   ticker: string;
   latest_close: number | null;
   change_7d_pct: number | null;
   news_count_7d: number;
-  sentiment_mean: number | null;
   priority: string;
   archived: boolean;
   note_count: number;
   has_summary: boolean;
-  cockpit?: CockpitRow;
 }
 
-interface Snapshot<T> {
-  rows: T[];
-  asOf: string | null;
-}
-
-type SortKey = "ticker" | "latest_close" | "change_7d_pct" | "news_count_7d" | "sentiment_mean" | "priority";
+type SortKey = "ticker" | "latest_close" | "change_7d_pct" | "news_count_7d" | "priority";
 type SortDir = "asc" | "desc";
+type Priority = "high" | "medium" | "low";
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-function cockpitToTab(r: CockpitRow): TabRow {
-  return { ticker: r.ticker, latest_close: r.latest_close, change_7d_pct: r.change_7d_pct,
-    news_count_7d: r.news_count_7d, sentiment_mean: r.sentiment_mean, priority: r.priority ?? "",
-    archived: r.archived, note_count: r.note_count, has_summary: true, cockpit: r };
-}
 function universeToTab(r: UniverseRow): TabRow {
-  return { ticker: r.ticker, latest_close: r.latest_close, change_7d_pct: r.change_7d_pct,
-    news_count_7d: r.news_count_7d, sentiment_mean: r.sentiment_mean, priority: r.priority ?? "",
-    archived: r.archived, note_count: r.note_count, has_summary: r.has_summary };
+  return {
+    ticker: r.ticker,
+    latest_close: r.latest_close,
+    change_7d_pct: r.change_7d_pct,
+    news_count_7d: r.news_count_7d,
+    priority: r.priority ?? "",
+    archived: r.archived,
+    note_count: r.note_count,
+    has_summary: r.has_summary,
+  };
 }
 
-export function WatchlistView({
-  onOpenTicker,
-}: {
-  onOpenTicker: (ticker: string, row?: CockpitRow) => void;
-}) {
+export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [lists, setLists] = useState<WatchlistSummary[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null); // null = All Active
   const [showArchived, setShowArchived] = useState(false);
@@ -67,17 +58,10 @@ export function WatchlistView({
   const [err, setErr] = useState<string | null>(null);
   const [busyTicker, setBusyTicker] = useState<string | null>(null);
 
-  // Cached, tab-independent sources (see B-slice-3 fix); rows are derived.
-  const [cockpit, setCockpit] = useState<Snapshot<CockpitRow> | null>(null);
-  const [universe, setUniverse] = useState<Snapshot<UniverseRow> | null>(null);
-  const cockpitReq = useRef(0);
+  // Single cached source: the universe (all imported tickers + their membership
+  // & market summary). Tab + showArchived + sort are pure client-side derivation.
+  const [universe, setUniverse] = useState<{ rows: UniverseRow[]; asOf: string | null } | null>(null);
   const universeReq = useRef(0);
-  const inflight = useRef(0);
-  const beginLoad = useCallback(() => { inflight.current += 1; setRefreshing(true); }, []);
-  const endLoad = useCallback(() => {
-    inflight.current = Math.max(0, inflight.current - 1);
-    if (inflight.current === 0) setRefreshing(false);
-  }, []);
 
   // Rail editing + add-ticker state
   const [creating, setCreating] = useState(false);
@@ -87,7 +71,7 @@ export function WatchlistView({
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState<SymbolHit[] | null>(null);
   const [addBusy, setAddBusy] = useState(false);
-  const searchReq = useRef(0); // drop stale debounced-search responses
+  const searchReq = useRef(0);
 
   const loadLists = useCallback(async () => {
     try {
@@ -97,23 +81,9 @@ export function WatchlistView({
     }
   }, []);
 
-  const loadCockpit = useCallback(async () => {
-    const id = ++cockpitReq.current;
-    beginLoad();
-    setErr(null);
-    try {
-      const d = await getCockpitWatchlist(true);
-      if (id === cockpitReq.current) setCockpit({ rows: d.rows, asOf: d.as_of });
-    } catch (e) {
-      if (id === cockpitReq.current) setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      endLoad();
-    }
-  }, [beginLoad, endLoad]);
-
   const loadUniverse = useCallback(async () => {
     const id = ++universeReq.current;
-    beginLoad();
+    setRefreshing(true);
     setErr(null);
     try {
       const u = await getUniverse(true);
@@ -121,21 +91,17 @@ export function WatchlistView({
     } catch (e) {
       if (id === universeReq.current) setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      endLoad();
+      if (id === universeReq.current) setRefreshing(false);
     }
-  }, [beginLoad, endLoad]);
+  }, []);
 
   useEffect(() => {
     void loadLists();
-    void loadCockpit();
-  }, [loadLists, loadCockpit]);
-
-  useEffect(() => {
-    if (selectedId !== null && universe === null) void loadUniverse();
-  }, [selectedId, universe, loadUniverse]);
+    void loadUniverse();
+  }, [loadLists, loadUniverse]);
 
   const selectedList = selectedId === null ? null : lists.find((l) => l.id === selectedId) ?? null;
-  // If the selected list vanished (deleted), fall back to All Active.
+  // If the selected list vanished (deleted/renamed away), fall back to All Active.
   useEffect(() => {
     if (selectedId !== null && lists.length && !lists.some((l) => l.id === selectedId)) {
       setSelectedId(null);
@@ -158,19 +124,29 @@ export function WatchlistView({
     return () => window.clearTimeout(t);
   }, [addQuery]);
 
+  // Rows are derived from the universe. All Active = rows with ≥1 active list
+  // membership (or any membership when showing archived) — so it auto-populates
+  // from your lists and is honestly empty for a new user.
   const { rows, asOf } = useMemo<{ rows: TabRow[]; asOf: string | null }>(() => {
-    if (selectedList === null) {
-      const src = cockpit?.rows ?? [];
-      return { rows: src.filter((r) => showArchived || !r.archived).map(cockpitToTab), asOf: cockpit?.asOf ?? null };
-    }
     const src = universe?.rows ?? [];
+    const asOfVal = universe?.asOf ?? null;
+    if (selectedList === null) {
+      return {
+        rows: src
+          .filter((r) => (showArchived ? r.all_lists.length > 0 : r.lists.length > 0))
+          .map(universeToTab),
+        asOf: asOfVal,
+      };
+    }
     return {
-      rows: src.filter((r) => (showArchived ? r.all_lists : r.lists).includes(selectedList.name)).map(universeToTab),
-      asOf: universe?.asOf ?? null,
+      rows: src
+        .filter((r) => (showArchived ? r.all_lists : r.lists).includes(selectedList.name))
+        .map(universeToTab),
+      asOf: asOfVal,
     };
-  }, [selectedList, showArchived, cockpit, universe]);
+  }, [selectedList, showArchived, universe]);
 
-  const isLoading = selectedList === null ? cockpit === null : universe === null;
+  const isLoading = universe === null;
   const archivedCount = useMemo(() => rows.filter((r) => r.archived).length, [rows]);
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
 
@@ -180,9 +156,9 @@ export function WatchlistView({
   }
 
   const reloadAfterMutation = useCallback(async () => {
-    await Promise.all([loadUniverse(), loadCockpit()]);
+    await loadUniverse();
     void loadLists();
-  }, [loadUniverse, loadCockpit, loadLists]);
+  }, [loadUniverse, loadLists]);
 
   const onArchiveToggle = useCallback(
     async (row: TabRow) => {
@@ -211,6 +187,22 @@ export function WatchlistView({
     [selectedList, reloadAfterMutation],
   );
 
+  const onSetPriority = useCallback(
+    async (ticker: string, priority: Priority | null) => {
+      // optimistic: patch the cached universe row so sort/display update at once
+      setUniverse((prev) =>
+        prev ? { ...prev, rows: prev.rows.map((r) => (r.ticker === ticker ? { ...r, priority } : r)) } : prev,
+      );
+      try {
+        await setPriority(ticker, priority);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+        void loadUniverse(); // revert to server truth on failure
+      }
+    },
+    [loadUniverse],
+  );
+
   async function submitNewList() {
     const name = newName.trim();
     if (!name) return;
@@ -231,15 +223,11 @@ export function WatchlistView({
     try {
       await renameList(id, name);
       setRenamingId(null);
-      // Reload universe too: cached rows' membership names still hold the OLD
-      // name, and filtering keys off the (new) list name — without this the
-      // current list's rows vanish until a manual refresh.
-      await reloadAfterMutation();
+      await reloadAfterMutation(); // membership names in cached rows update too
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   }
 
   async function onDeleteList(li: WatchlistSummary) {
-    // window.confirm is supported in Electron (window.prompt is not).
     const ok = window.confirm(
       `刪除清單「${li.name}」？\n\n只移除這個清單與其成員關係 —— 不會刪除標的本身或任何市場資料，標的仍保留在其他清單中。`,
     );
@@ -266,9 +254,8 @@ export function WatchlistView({
   }
 
   const thProps = { sortKey, sortDir, toggleSort };
-  const hasData = selectedList === null ? cockpit !== null : universe !== null;
   const title = selectedList === null ? "All Active" : selectedList.name;
-  const normQuery = addQuery.trim().toUpperCase(); // for direct-add (symbol not in catalog)
+  const normQuery = addQuery.trim().toUpperCase();
 
   return (
     <main className="main">
@@ -294,6 +281,7 @@ export function WatchlistView({
           <button
             className={`wl-railitem ${selectedId === null ? "active" : ""}`}
             onClick={() => setSelectedId(null)}
+            title="所有清單中 active 的標的聯集"
           >
             All Active
           </button>
@@ -318,11 +306,7 @@ export function WatchlistView({
                 <button className="wl-railname" onClick={() => setSelectedId(li.id)} title={`${li.kind} · ${li.active_count} active`}>
                   {li.name} <span className="wl-railcount">{li.active_count}</span>
                 </button>
-                <button
-                  className="wl-railbtn"
-                  title="改名"
-                  onClick={() => { setRenamingId(li.id); setRenameName(li.name); }}
-                >✎</button>
+                <button className="wl-railbtn" title="改名" onClick={() => { setRenamingId(li.id); setRenameName(li.name); }}>✎</button>
                 <button className="wl-railbtn" title="刪除清單" onClick={() => void onDeleteList(li)}>🗑</button>
               </div>
             ),
@@ -356,9 +340,7 @@ export function WatchlistView({
                 placeholder={`加入標的到「${selectedList.name}」… 輸入代號或公司名（Enter 直接加入）`}
                 value={addQuery}
                 onChange={(e) => setAddQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && normQuery) void onAddSymbol(normQuery);
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && normQuery) void onAddSymbol(normQuery); }}
                 disabled={addBusy}
               />
               {addQuery.trim() && (
@@ -375,11 +357,8 @@ export function WatchlistView({
                         </button>
                       ))}
                       {addResults.length === 0 && (
-                        <div className="muted tiny wl-addhint">
-                          目錄無相符（精確/前綴比對，非模糊）。
-                        </div>
+                        <div className="muted tiny wl-addhint">目錄無相符（精確/前綴比對，非模糊）。</div>
                       )}
-                      {/* Direct-add: any symbol, even if not in the catalog. */}
                       <button className="wl-addrow wl-adddirect" disabled={addBusy} onClick={() => void onAddSymbol(normQuery)}>
                         ＋ 直接加入代號 <span className="mono strong">{normQuery}</span>
                       </button>
@@ -392,6 +371,8 @@ export function WatchlistView({
 
           {isLoading ? (
             <p className="muted">Loading…</p>
+          ) : sorted.length === 0 ? (
+            <EmptyState selectedList={selectedList} hasLists={lists.length > 0} showArchived={showArchived} onCreate={() => setCreating(true)} />
           ) : (
             <>
               <table className="wl">
@@ -401,7 +382,6 @@ export function WatchlistView({
                     <Th k="latest_close" label="Price" num {...thProps} />
                     <Th k="change_7d_pct" label="Chg 7d" num {...thProps} />
                     <Th k="news_count_7d" label="News" num {...thProps} />
-                    <Th k="sentiment_mean" label="Sentiment" num {...thProps} />
                     <Th k="priority" label="Priority" {...thProps} />
                     <th className="wl-actions">Actions</th>
                   </tr>
@@ -411,7 +391,7 @@ export function WatchlistView({
                     <tr
                       key={r.ticker}
                       className={`${r.archived ? "archived" : ""} ${r.has_summary ? "" : "no-summary"}`}
-                      onClick={() => onOpenTicker(r.ticker, r.cockpit)}
+                      onClick={() => onOpenTicker(r.ticker)}
                     >
                       <td className="mono strong">
                         {r.ticker}
@@ -422,11 +402,22 @@ export function WatchlistView({
                       <td className="num">{fmtNum(r.latest_close)}</td>
                       <td className={`num ${changeClass(r.change_7d_pct)}`}>{fmtPct(r.change_7d_pct)}</td>
                       <td className="num">{r.news_count_7d}</td>
-                      <td className="num">{fmtSent(r.sentiment_mean)}</td>
-                      <td>{r.priority ? <span className={`badge p-${r.priority}`}>{r.priority}</span> : <span className="muted">—</span>}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <select
+                          className={`prio-select p-${r.priority || "none"}`}
+                          value={r.priority}
+                          onChange={(e) => void onSetPriority(r.ticker, (e.target.value || null) as Priority | null)}
+                          title="設定優先級"
+                        >
+                          <option value="">—</option>
+                          <option value="high">high</option>
+                          <option value="medium">medium</option>
+                          <option value="low">low</option>
+                        </select>
+                      </td>
                       <td className="wl-actions" onClick={(e) => e.stopPropagation()}>
                         <span className="rowactions">
-                          <button type="button" title="Open detail" onClick={() => onOpenTicker(r.ticker, r.cockpit)}>↗</button>
+                          <button type="button" title="Open detail" onClick={() => onOpenTicker(r.ticker)}>↗</button>
                           {selectedList && (
                             <button type="button" title={`從「${selectedList.name}」移除`} disabled={busyTicker === r.ticker} onClick={() => void onRemoveFromList(r)}>
                               {busyTicker === r.ticker ? "…" : "✕"}
@@ -441,15 +432,9 @@ export function WatchlistView({
                   ))}
                 </tbody>
               </table>
-              {sorted.length === 0 && (
-                <p className="muted tiny">
-                  {selectedList ? "這個清單還沒有標的 — 用上方搜尋加入。" : "沒有標的。"}
-                  {!showArchived && rows.length === 0 && archivedCount === 0 ? "" : ""}
-                </p>
-              )}
               <p className="muted tiny">
-                ↗ 開詳情 · {selectedList ? "✕ 從此清單移除 · " : ""}🗄 全域封存（所有清單）。
-                {selectedList ? " 刪除清單只移除清單關係，不刪標的或市場資料。" : ""}
+                ↗ 開詳情 · {selectedList ? "✕ 從此清單移除 · " : ""}🗄 全域封存（所有清單）· Priority 下拉可設定。
+                {selectedList === null && " 「All Active」= 你所有清單中 active 標的的聯集；新增請到清單裡加。"}
               </p>
             </>
           )}
@@ -457,6 +442,34 @@ export function WatchlistView({
       </div>
     </main>
   );
+}
+
+function EmptyState({
+  selectedList,
+  hasLists,
+  showArchived,
+  onCreate,
+}: {
+  selectedList: WatchlistSummary | null;
+  hasLists: boolean;
+  showArchived: boolean;
+  onCreate: () => void;
+}) {
+  if (selectedList) {
+    return <p className="muted tiny">這個清單還沒有標的 — 用上方搜尋加入{showArchived ? "" : "（或試試 Show archived）"}。</p>;
+  }
+  if (!hasLists) {
+    return (
+      <div className="wl-empty">
+        <p className="muted">還沒有任何清單。</p>
+        <p className="muted tiny">
+          建立你的第一個清單，或到「全部標的」按「匯入清單」帶入現有分類。
+        </p>
+        <button className="btn-ghost" onClick={onCreate}>＋ 新增清單</button>
+      </div>
+    );
+  }
+  return <p className="muted tiny">你的清單目前沒有 active 標的{showArchived ? "" : "（試試 Show archived）"}。</p>;
 }
 
 function Th({ k, label, num, sortKey, sortDir, toggleSort }: {
@@ -482,5 +495,4 @@ function sortRows(rows: TabRow[], key: SortKey, dir: SortDir): TabRow[] {
 }
 function fmtNum(v: number | null): string { return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 }); }
 function fmtPct(v: number | null): string { return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`; }
-function fmtSent(v: number | null): string { return v == null ? "—" : v.toFixed(2); }
 function changeClass(v: number | null): string { return v == null ? "" : v > 0 ? "up" : v < 0 ? "down" : ""; }
