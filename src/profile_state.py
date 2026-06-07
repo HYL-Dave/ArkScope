@@ -214,12 +214,13 @@ class ProfileStateStore:
         """Migrate a v1 ``ticker_tags(ticker, tag, source)`` table to the
         two-dimensional ``(ticker, facet, value, source)`` model.
 
-        The classification model was redesigned (facet × source); the local DB is
-        gitignored and regenerable, but we migrate in place so any user-added tags
-        survive. Mapping: ``config:tier`` is dropped (Tier retired), ``config:category``
-        → ``legacy:category``, ``config:theme`` → ``legacy:theme``, ``user`` →
-        ``user:theme``; anything else defaults to the ``theme`` facet keeping its
-        source. Idempotent: a no-op once the table is already v2.
+        Only USER tags are preserved (``user`` → ``user`` on the ``theme`` facet) —
+        they are the one irreplaceable thing. All ``config:*`` rows are DROPPED:
+        they were a crude bootstrap artifact (e.g. category "Seeking Picks
+        Industrials") and ``import-universe`` re-seeds the proper model
+        (``legacy:category`` + ``provenance`` + ``legacy:theme``) cleanly, so
+        keeping the old ones would double-tag. The local DB is gitignored and the
+        config classification is fully regenerable. Idempotent: a no-op once v2.
         """
         cols = {r[1] for r in conn.execute("PRAGMA table_info(ticker_tags)").fetchall()}
         if "tag" not in cols or "facet" in cols:
@@ -240,18 +241,9 @@ class ProfileStateStore:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO ticker_tags__v2 (ticker, facet, value, source, created_at)
-                SELECT ticker,
-                       CASE source WHEN 'config:category' THEN 'category'
-                                   WHEN 'config:theme'    THEN 'theme'
-                                   ELSE 'theme' END,
-                       tag,
-                       CASE source WHEN 'config:category' THEN 'legacy'
-                                   WHEN 'config:theme'    THEN 'legacy'
-                                   WHEN 'user'            THEN 'user'
-                                   ELSE source END,
-                       created_at
+                SELECT ticker, 'theme', tag, source, created_at
                 FROM ticker_tags
-                WHERE source != 'config:tier'
+                WHERE source NOT LIKE 'config:%'
                 """
             )
             conn.execute("DROP TABLE ticker_tags")
