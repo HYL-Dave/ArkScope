@@ -17,22 +17,14 @@ from typing import Any
 # The active tickers_core tiers (``legacy_reference`` is intentionally omitted —
 # it is the old reference dump, not part of the active tracked universe).
 #
-# Tier is RETIRED as a list/tag concept (it duplicated research priority — if a
-# user wants tiers they create Tier 1/2/3 as their own custom lists). These keys
-# now serve two roles only: scoping the active universe (``active_universe_tickers``)
-# and a one-time, opt-in tier→priority migration (``tier_priority_map``).
+# Tier is RETIRED as a list/tag/priority concept (it duplicated research priority
+# — if a user wants tiers they create Tier 1/2/3 as their own custom lists). These
+# keys now serve ONE role: scoping the active universe (``active_universe_tickers``
+# / ``config_tag_seeds``).
 TIER_NAMES = {
     "tier1_core": "Tier 1 · Core",
     "tier2_expanded": "Tier 2 · Expanded",
     "tier3_user_watchlist": "Tier 3 · Watchlist",
-}
-
-# One-time tier→priority migration (opt-in). Higher tier = higher research
-# priority; the first (highest) tier a ticker appears in wins.
-_TIER_PRIORITY = {
-    "tier1_core": "high",
-    "tier2_expanded": "medium",
-    "tier3_user_watchlist": "low",
 }
 
 
@@ -105,23 +97,6 @@ def active_universe_tickers() -> list[str]:
             for t in _category_tickers(cat_val):
                 seen.add(t.upper())
     return sorted(seen)
-
-
-def tier_priority_map() -> dict[str, str]:
-    """One-time tier→priority mapping (``{TICKER: high|medium|low}``) for the
-    opt-in migration. Higher tier wins when a ticker appears in several."""
-    core = load_tickers_core()
-    out: dict[str, str] = {}
-    for tier_key, prio in _TIER_PRIORITY.items():
-        tier = core.get(tier_key)
-        if not isinstance(tier, dict):
-            continue
-        for cat_key, cat_val in tier.items():
-            if cat_key.startswith("_"):
-                continue
-            for t in _category_tickers(cat_val):
-                out.setdefault(t.upper(), prio)  # first (highest) tier wins
-    return out
 
 
 def _prettify_category(key: str) -> str:

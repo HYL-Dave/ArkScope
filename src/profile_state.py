@@ -69,6 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_ticker_notes_ticker ON ticker_notes(ticker);
 CREATE TABLE IF NOT EXISTS ticker_meta (
     ticker     TEXT PRIMARY KEY,
     priority   TEXT,
+    hidden_at  TEXT,
     updated_at TEXT NOT NULL
 );
 
@@ -221,6 +222,14 @@ class ProfileStateStore:
             # otherwise error against a pre-existing v1 table (no facet column).
             self._migrate_tags_v2(conn)
             conn.executescript(_SCHEMA)
+            # Idempotent column add for a pre-existing ticker_meta (universe
+            # suppression). CREATE TABLE IF NOT EXISTS above won't alter it.
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(ticker_meta)").fetchall()}
+            if "hidden_at" not in cols:
+                try:
+                    conn.execute("ALTER TABLE ticker_meta ADD COLUMN hidden_at TEXT")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     @staticmethod
@@ -487,6 +496,39 @@ class ProfileStateStore:
             )
             conn.commit()
 
+    # --- universe suppression (hide a tracked ticker from 全部標的) ----------
+
+    def set_universe_hidden(self, ticker: str, hidden: bool) -> None:
+        """Hide (or unhide) a ticker from the 全部標的 inventory.
+
+        The inventory is sourced from the active-universe catalog, so a dead /
+        duplicate ticker (e.g. a delisted symbol, or BRK.B vs BRK B) would
+        otherwise reappear on every load. Suppression is a persistent per-ticker
+        flag in ``ticker_meta`` that survives re-import; it does NOT touch the
+        ``priority`` column on the same row.
+        """
+        t = _norm(ticker)
+        if not t:
+            raise ValueError("ticker is required")
+        val = _now() if hidden else None
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO ticker_meta (ticker, hidden_at, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(ticker) DO UPDATE SET hidden_at = excluded.hidden_at, "
+                "updated_at = excluded.updated_at",
+                (t, val, now),
+            )
+            conn.commit()
+
+    def get_hidden_tickers(self) -> set[str]:
+        """The set of tickers suppressed from the universe inventory."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT ticker FROM ticker_meta WHERE hidden_at IS NOT NULL"
+            ).fetchall()
+        return {r["ticker"] for r in rows}
+
     # --- tags (two-dimensional facet × source, DECOUPLED from list membership) --
 
     def get_tags(self, tickers) -> dict[str, list[dict]]:
@@ -513,6 +555,19 @@ class ProfileStateStore:
             out.setdefault(r["ticker"], []).append(
                 {"facet": r["facet"], "value": r["value"], "source": r["source"]}
             )
+        return out
+
+    def tag_catalog(self) -> dict[str, list[str]]:
+        """Distinct tag values per facet (``{facet: [value, ...]}``) across all
+        tickers — feeds the detail-page "pick from existing" classifier so a user
+        applies an established theme/category instead of retyping it."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT facet, value FROM ticker_tags ORDER BY facet, value"
+            ).fetchall()
+        out: dict[str, list[str]] = {}
+        for r in rows:
+            out.setdefault(r["facet"], []).append(r["value"])
         return out
 
     def add_tag(self, ticker: str, value: str, *, facet: str = "theme", source: str = "user") -> None:

@@ -507,13 +507,6 @@ def test_active_universe_excludes_legacy_reference():
     assert all(t == t.upper() for t in active)
 
 
-def test_tier_priority_map_highest_tier_wins():
-    from src.universe_config import tier_priority_map
-
-    pm = tier_priority_map()
-    assert set(pm.values()) <= {"high", "medium", "low"} if pm else True
-
-
 def test_cockpit_universe_ticker_state_carry_tags(api_store):
     api_store.seed_tags(
         [
@@ -587,24 +580,46 @@ def test_import_universe_deletes_non_custom_lists(api_store):
     assert remaining == {"My Picks": "custom"}  # only the user list survives
 
 
-def test_import_universe_opt_in_tier_priority_fill_only(api_store, monkeypatch):
-    # tier→priority migration is OFF by default and never overwrites a user priority.
-    monkeypatch.setattr(
-        "src.universe_config.load_tickers_core",
-        lambda: {
-            "tier1_core": {"mega": {"tickers": ["AAA"]}},
-            "tier3_user_watchlist": {"wl": {"tickers": ["CCC"]}},
-        },
+def test_universe_suppression_hides_ticker(api_store):
+    from src.api.routes.profile import HiddenBody, set_ticker_hidden
+
+    # A catalog/active-universe ticker shows in 全部標的 until suppressed.
+    api_store.import_lists([{"name": "X", "kind": "custom", "tickers": ["ZZZZ"]}])
+    assert "ZZZZ" in {r["ticker"] for r in universe(dal=None, store=api_store)["rows"]}
+
+    out = set_ticker_hidden("zzzz", HiddenBody(hidden=True), store=api_store)
+    assert out == {"ticker": "ZZZZ", "hidden": True}
+    assert "ZZZZ" not in {r["ticker"] for r in universe(dal=None, store=api_store)["rows"]}
+    assert api_store.get_hidden_tickers() == {"ZZZZ"}
+
+    # unhide brings it back
+    set_ticker_hidden("ZZZZ", HiddenBody(hidden=False), store=api_store)
+    assert "ZZZZ" in {r["ticker"] for r in universe(dal=None, store=api_store)["rows"]}
+
+
+def test_suppression_does_not_clobber_priority(store):
+    store.set_priority("NVDA", "high")
+    store.set_universe_hidden("NVDA", True)
+    assert store.get_priorities(["NVDA"]) == {"NVDA": "high"}  # priority intact
+    assert store.get_hidden_tickers() == {"NVDA"}
+    store.set_priority("NVDA", "low")  # priority update must not clear hidden_at
+    assert store.get_hidden_tickers() == {"NVDA"}
+
+
+def test_tag_catalog_groups_distinct_values_by_facet(api_store):
+    from src.api.routes.profile import tag_catalog
+
+    api_store.seed_tags(
+        [
+            {"facet": "theme", "value": "AI", "source": "user", "tickers": ["NVDA"]},
+            {"facet": "theme", "value": "AI", "source": "legacy", "tickers": ["AMD"]},  # dup value
+            {"facet": "theme", "value": "Space", "source": "user", "tickers": ["RKLB"]},
+            {"facet": "category", "value": "Semis", "source": "legacy", "tickers": ["NVDA"]},
+        ]
     )
-    api_store.set_priority("AAA", "low")  # pre-existing user priority
-
-    off = import_universe(ImportBody(include_tiers=True), dal=None, store=api_store)
-    assert off["priority_migrated"] == 0  # default: no migration
-
-    on = import_universe(ImportBody(include_tiers=True, migrate_tier_priority=True), dal=None, store=api_store)
-    assert on["priority_migrated"] == 1  # CCC filled (low); AAA untouched (user-set)
-    prios = api_store.get_priorities(["AAA", "CCC"])
-    assert prios == {"AAA": "low", "CCC": "low"}  # AAA kept user value (would be 'high' from tier1)
+    cat = tag_catalog(store=api_store)["catalog"]
+    assert cat["theme"] == ["AI", "Space"]  # distinct + sorted, dup collapsed
+    assert cat["category"] == ["Semis"]
 
 
 def test_user_tag_add_remove_routes(api_store):

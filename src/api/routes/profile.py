@@ -35,11 +35,7 @@ from src.profile_state import (
 )
 from src.tools.analysis_tools import get_universe_summaries, get_watchlist_overview
 from src.tools.data_access import DataAccessLayer
-from src.universe_config import (
-    active_universe_tickers,
-    config_tag_seeds,
-    tier_priority_map,
-)
+from src.universe_config import active_universe_tickers, config_tag_seeds
 
 DEFAULT_WATCHLIST_KEY = "default_watchlist_id"
 
@@ -152,7 +148,6 @@ def cockpit_watchlist(
 class ImportBody(BaseModel):
     include_groups: bool = True  # user_profile theme groups → legacy:theme tags
     include_tiers: bool = True   # tickers_core categories → legacy:category + provenance tags
-    migrate_tier_priority: bool = False  # OPT-IN: T1/T2/T3 → priority (fill-only)
 
 
 @router.post("/profile/import-universe")
@@ -169,7 +164,7 @@ def import_universe(
       - theme groups (``theme:量子計算``) → ``legacy:theme`` tags (editable);
       - ``tickers_core`` categories → ``legacy:category`` + read-only
         ``provenance`` tags (Seeking Alpha / Alpha Picks);
-      - Tier is retired (→ optional ``migrate_tier_priority``);
+      - Tier is retired entirely (no list, no tag, no priority migration);
       - ``core_holdings`` / ``interested`` groups are NOT preserved (they only
         re-polluted the UI; inventory comes from the active-universe catalog).
 
@@ -208,28 +203,14 @@ def import_universe(
 
     require_profile_state_write(
         "import_universe",
-        {
-            "groups": opts.include_groups,
-            "tiers": opts.include_tiers,
-            "migrate_tier_priority": opts.migrate_tier_priority,
-        },
+        {"groups": opts.include_groups, "tiers": opts.include_tiers},
     )
     lists_removed = store.delete_non_custom_lists()
     tag_summary = store.seed_tags(tag_groups)
 
-    priority_migrated = 0
-    if opts.migrate_tier_priority:
-        prio_map = tier_priority_map()
-        existing = store.get_priorities(list(prio_map))  # only tickers with a priority
-        for t, prio in prio_map.items():
-            if t not in existing:  # fill-only: never overwrite a user-set priority
-                store.set_priority(t, prio)
-                priority_migrated += 1
-
     return {
         "lists_removed": lists_removed,
         "tags": tag_summary,
-        "priority_migrated": priority_migrated,
         # False when theme-group import was requested but the DAL/overview was
         # unreachable — tiers/category/provenance still seeded.
         "groups_ok": groups_ok,
@@ -259,8 +240,12 @@ def universe(
 
     # Active-universe direct: inventory = active config catalog ⊕ list-only
     # additions ⊕ overview — decoupled from list membership, so retiring the tier
-    # lists never shrinks 全部標的.
-    tickers = sorted(set(active_universe_tickers()) | set(store.all_tickers()) | set(by_ticker))
+    # lists never shrinks 全部標的. User-suppressed tickers (dead/duplicate, e.g.
+    # a delisted symbol) are excluded from the final set so they stay gone.
+    hidden = store.get_hidden_tickers()
+    tickers = sorted(
+        (set(active_universe_tickers()) | set(store.all_tickers()) | set(by_ticker)) - hidden
+    )
     agg = store.get_aggregate(tickers)
     prios = store.get_priorities(tickers)  # user override wins
     tags = store.get_tags(tickers)
@@ -495,6 +480,38 @@ def delete_ticker_note(
     if not store.delete_note(ticker, note_id):
         raise HTTPException(status_code=404, detail="note not found")
     return {"deleted": True, "id": note_id}
+
+
+class HiddenBody(BaseModel):
+    hidden: bool = True
+
+
+@router.post("/profile/tickers/{ticker}/hidden")
+def set_ticker_hidden(
+    ticker: str,
+    body: HiddenBody,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Suppress (or unsuppress) a ticker from the 全部標的 inventory.
+
+    For dead / duplicate symbols (delisted, or BRK.B vs BRK B) that would
+    otherwise reappear every load because inventory is sourced from the active
+    universe catalog. Persistent; survives re-import.
+    """
+    action = "hide_ticker" if body.hidden else "unhide_ticker"
+    require_profile_state_write(action, {"ticker": ticker})
+    try:
+        store.set_universe_hidden(ticker, body.hidden)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ticker": _norm(ticker), "hidden": body.hidden}
+
+
+@router.get("/profile/tags/catalog")
+def tag_catalog(store: ProfileStateStore = Depends(get_profile_store)):
+    """Distinct tag values per facet, for the detail-page "pick from existing"
+    classifier. PURE READ."""
+    return {"catalog": store.tag_catalog()}
 
 
 class TagBody(BaseModel):
