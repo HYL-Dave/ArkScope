@@ -168,15 +168,15 @@ class AnalystConsensusCache:
         get_analyst_consensus), derive, cache, and return. Never raises — a
         fetch failure yields an empty (rating=None) summary, uncached."""
         t = _norm(ticker)
-        cached = self.get(t)
-        if cached is not None:
-            return {**cached, "cached": True}
         try:
+            cached = self.get(t)  # inside try: a SQLite read error must also degrade
+            if cached is not None:
+                return {**cached, "cached": True}
             raw = fetcher(t)
             summary = derive_consensus(raw or {})
             stored = self.put(t, summary)
             return {**stored, "cached": False}
-        except Exception as exc:  # pragma: no cover - defensive (no key / network)
+        except Exception as exc:  # pragma: no cover - defensive (no key / network / sqlite)
             return {
                 "ticker": t, "rating": None, "score": None, "buy_ratio": None, "total": 0,
                 "counts": {}, "price_target": None, "period": None, "source": "finnhub",

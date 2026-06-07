@@ -152,7 +152,14 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   }, [selectedList, showArchived, universe]);
 
   const isLoading = universe === null;
-  const archivedCount = useMemo(() => rows.filter((r) => r.archived).length, [rows]);
+  // Archived-in-this-view count, computed from the universe (not the filtered
+  // rows) so "· N archived" shows even while archived rows are hidden — making
+  // the Show-archived toggle discoverable.
+  const archivedCount = useMemo(() => {
+    const src = universe?.rows ?? [];
+    if (selectedList === null) return src.filter((r) => r.archived && r.all_lists.length > 0).length;
+    return src.filter((r) => r.archived_lists.includes(selectedList.name)).length;
+  }, [universe, selectedList]);
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
 
   // Analyst consensus, lazy per visible row + daily-cached server-side. Fetched
@@ -196,6 +203,20 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   }
 
   const reloadAfterMutation = useCallback(async () => {
+    // Errored consensus cells can be re-fetched (the server never caches a
+    // failure) — drop them so the lazy effect retries on this reload.
+    setConsensus((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const t of Object.keys(next)) {
+        if (next[t].state === "err") {
+          delete next[t];
+          consensusRequested.current.delete(t);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
     await loadUniverse();
     void loadLists();
   }, [loadUniverse, loadLists]);
@@ -235,6 +256,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
       );
       try {
         await setPriority(ticker, priority);
+        // Clearing reverts to the profile-derived priority (user ?? profile), so
+        // the optimistic null would otherwise flip back on a later refresh —
+        // reconcile now to the server's effective value.
+        if (priority === null) void loadUniverse();
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
         void loadUniverse(); // revert to server truth on failure
