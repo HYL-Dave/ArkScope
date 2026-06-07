@@ -316,18 +316,27 @@ python scripts/collection/daily_update.py --status
 # 更新所有新聞 (Polygon + Finnhub + IBKR)
 python scripts/collection/daily_update.py --news
 
-# 更新所有資料 (新聞 + 股價)
-python scripts/collection/daily_update.py --all
+# 更新所有新聞 + 股價（股價需顯式 scope；--all 不會自動猜 universe）
+python scripts/collection/daily_update.py --all --scope active-universe
 
 # 只更新特定來源
 python scripts/collection/daily_update.py --polygon
 python scripts/collection/daily_update.py --finnhub
 python scripts/collection/daily_update.py --ibkr-news    # IBKR 新聞
-python scripts/collection/daily_update.py --ibkr-prices  # IBKR 股價
+# IBKR 股價：需 --scope active-universe（唯讀讀 profile DB）或 --tickers
+python scripts/collection/daily_update.py --ibkr-prices --scope active-universe
+python scripts/collection/daily_update.py --ibkr-prices --tickers AAPL,MSFT
+
+# news_scores 同步到 DB（opt-in，已與 --news/--sync-db 脫鉤）
+python scripts/collection/daily_update.py --scores
 
 # 模擬執行 (不實際收集)
-python scripts/collection/daily_update.py --all --dry-run
+python scripts/collection/daily_update.py --all --scope active-universe --dry-run
 ```
+
+> **2026-06-08 (slice 2)**: `daily_update.py` 是手動/cron 的 **backfill runner**，不再寫任何 config
+> （移除了 `user_profile.yaml → tickers_core.json` 回寫），也退役了 `--tier all`。
+> IBKR 股價改用顯式 `--tickers` 或 `--scope active-universe`（唯讀讀本地 profile DB）。
 
 ### Cron 排程範例
 

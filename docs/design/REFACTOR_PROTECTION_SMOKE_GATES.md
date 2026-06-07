@@ -10,7 +10,10 @@
 
 These paths must keep working through docs cleanup, local-first migration, and module-level refactors:
 
-- `python scripts/collection/daily_update.py --all --sync-db`
+- `python scripts/collection/daily_update.py --all --scope active-universe --sync-db`
+  (since slice 2 / 2026-06-08: IBKR-price collection needs an explicit `--scope active-universe`
+  or `--tickers`; bare `--all` collects news only and skips prices with a warning — `--tier all`
+  and the `tickers_core.json` writeback are retired. `--scores` is a separate opt-in.)
 - Chrome SA Alpha Picks extension -> Native Messaging host -> DB
 - Firefox SA Alpha Picks extension -> Native Messaging host -> DB
 - SA native host stable launcher:
@@ -119,7 +122,9 @@ Expected: both responses have `"status": "ok"` and `ping` returns `project_root=
 Use before/after storage migration cuts, collection refactors, installer changes, or browser-extension recovery.
 
 ```bash
-python scripts/collection/daily_update.py --all --sync-db
+# News + prices (prices need an explicit scope since slice 2). Add --scores to
+# also push news_scores (now a separate opt-in).
+python scripts/collection/daily_update.py --all --scope active-universe --sync-db
 ```
 
 For browser extension validation:
