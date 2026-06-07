@@ -11,6 +11,7 @@ import {
   searchSymbols,
   setArchived,
   setPriority,
+  type ConsensusSummary,
   type SymbolHit,
   type UniverseRow,
   type WatchlistSummary,
@@ -36,7 +37,7 @@ type Priority = "high" | "medium" | "low";
 type ConsensusCell =
   | { state: "loading" }
   | { state: "err" }
-  | { state: "ok"; rating: string | null };
+  | { state: "ok"; data: ConsensusSummary };
 
 const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
@@ -113,6 +114,12 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     }
   }, [lists, selectedId]);
 
+  // 自選股 = the user's CURATED lists only. Tier lists (the tickers_core
+  // inventory imported via import-universe) belong to 全部標的, not here — else
+  // "All Active" would just mirror the whole universe and 全部標的 loses meaning.
+  const railLists = useMemo(() => lists.filter((l) => l.kind !== "tier"), [lists]);
+  const watchlistNames = useMemo(() => new Set(railLists.map((l) => l.name)), [railLists]);
+
   // Debounced symbol search for the add-ticker box (stale responses dropped).
   useEffect(() => {
     const q = addQuery.trim();
@@ -136,9 +143,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
     const src = universe?.rows ?? [];
     const asOfVal = universe?.asOf ?? null;
     if (selectedList === null) {
+      // union of active members across CURATED (non-tier) lists only
       return {
         rows: src
-          .filter((r) => (showArchived ? r.all_lists.length > 0 : r.lists.length > 0))
+          .filter((r) => (showArchived ? r.all_lists : r.lists).some((n) => watchlistNames.has(n)))
           .map(universeToTab),
         asOf: asOfVal,
       };
@@ -149,7 +157,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
         .map(universeToTab),
       asOf: asOfVal,
     };
-  }, [selectedList, showArchived, universe]);
+  }, [selectedList, showArchived, universe, watchlistNames]);
 
   const isLoading = universe === null;
   // Archived-in-this-view count, computed from the universe (not the filtered
@@ -157,9 +165,10 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
   // the Show-archived toggle discoverable.
   const archivedCount = useMemo(() => {
     const src = universe?.rows ?? [];
-    if (selectedList === null) return src.filter((r) => r.archived && r.all_lists.length > 0).length;
+    if (selectedList === null)
+      return src.filter((r) => r.archived && r.all_lists.some((n) => watchlistNames.has(n))).length;
     return src.filter((r) => r.archived_lists.includes(selectedList.name)).length;
-  }, [universe, selectedList]);
+  }, [universe, selectedList, watchlistNames]);
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
 
   // Analyst consensus, lazy per visible row + daily-cached server-side. Fetched
@@ -184,7 +193,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           const t = todo[i++];
           try {
             const c = await getConsensus(t);
-            if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "ok", rating: c.rating } }));
+            if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "ok", data: c } }));
           } catch {
             if (!cancelled) setConsensus((p) => ({ ...p, [t]: { state: "err" } }));
           }
@@ -350,7 +359,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           >
             All Active
           </button>
-          {lists.map((li) =>
+          {railLists.map((li) =>
             renamingId === li.id ? (
               <div key={li.id} className="wl-railedit">
                 <input
@@ -437,7 +446,7 @@ export function WatchlistView({ onOpenTicker }: { onOpenTicker: (ticker: string)
           {isLoading ? (
             <p className="muted">Loading…</p>
           ) : sorted.length === 0 ? (
-            <EmptyState selectedList={selectedList} hasLists={lists.length > 0} showArchived={showArchived} onCreate={() => setCreating(true)} />
+            <EmptyState selectedList={selectedList} hasLists={railLists.length > 0} showArchived={showArchived} onCreate={() => setCreating(true)} />
           ) : (
             <>
               <table className="wl">
@@ -565,9 +574,26 @@ const _CONSENSUS_CLASS: Record<string, string> = {
 };
 function renderConsensus(c: ConsensusCell | undefined) {
   if (!c || c.state === "loading") return <span className="muted tiny">…</span>;
-  if (c.state === "err") return <span className="muted tiny">—</span>;
-  if (!c.rating) return <span className="muted tiny" title="無分析師覆蓋">—</span>;
-  return <span className={`consensus-tag ${_CONSENSUS_CLASS[c.rating] ?? "muted"}`}>{c.rating}</span>;
+  if (c.state === "err") return <span className="muted tiny" title="載入失敗，重新整理可重試">⚠</span>;
+  const d = c.data;
+  // Distinguish missing-key / provider-error / no-coverage (gpt-5.5) — not all "—".
+  if (d.status === "missing_key")
+    return <span className="muted tiny" title="未設定 FINNHUB_API_KEY">🔑</span>;
+  if (d.status === "provider_error")
+    return <span className="muted tiny" title="分析師資料來源錯誤；重新整理可重試">⚠</span>;
+  if (!d.rating)
+    return <span className="muted tiny" title="無分析師覆蓋（或暫時無資料）">—</span>;
+  const cn = d.counts || {};
+  const when = d.fetched_at ? d.fetched_at.slice(0, 10) : "—";
+  const tip =
+    `強力買進 ${cn.strongBuy ?? 0} · 買進 ${cn.buy ?? 0} · 持有 ${cn.hold ?? 0} · ` +
+    `賣出 ${cn.sell ?? 0} · 強力賣出 ${cn.strongSell ?? 0}\n共 ${d.total} 位分析師 · 更新 ${when}` +
+    (d.status === "cached" ? "（快取）" : "");
+  return (
+    <span className={`consensus-tag ${_CONSENSUS_CLASS[d.rating] ?? "muted"}`} title={tip}>
+      {d.rating} <span className="muted tiny">({d.total})</span>
+    </span>
+  );
 }
 
 function fmtNum(v: number | null): string { return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 }); }

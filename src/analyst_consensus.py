@@ -47,13 +47,21 @@ def _norm(ticker: Optional[str]) -> str:
     return (ticker or "").strip().upper()
 
 
-def derive_consensus(raw: dict) -> dict:
-    """Compact, source-labeled summary from get_analyst_consensus output.
+def _empty_summary() -> dict:
+    return {
+        "rating": None, "score": None, "buy_ratio": None, "total": 0,
+        "counts": {}, "price_target": None, "period": None, "source": "finnhub",
+    }
 
-    rating: Strong Buy / Buy / Hold / Sell / Strong Sell / None (no coverage),
-    via the standard 1-5 weighted mean of the current recommendation row.
-    """
-    rec = (raw.get("recommendations") or {}).get("current") or {}
+
+def derive_consensus(current: Optional[dict]) -> dict:
+    """Compact, source-labeled summary from a Finnhub recommendation `current`
+    row ({strongBuy, buy, hold, sell, strongSell, period}).
+
+    rating via the standard 1-5 weighted mean. ``current`` None/empty → an empty
+    summary (total 0) — the caller decides whether that means no-coverage vs a
+    transient failure (and whether to cache)."""
+    rec = current or {}
     sb = int(rec.get("strongBuy", 0) or 0)
     b = int(rec.get("buy", 0) or 0)
     h = int(rec.get("hold", 0) or 0)
@@ -82,10 +90,39 @@ def derive_consensus(raw: dict) -> dict:
         "buy_ratio": round(buy_ratio, 3) if buy_ratio is not None else None,
         "total": total,
         "counts": {"strongBuy": sb, "buy": b, "hold": h, "sell": s, "strongSell": ss},
-        "price_target": raw.get("price_target"),
+        "price_target": None,  # lightweight: cockpit consensus skips price target
         "period": rec.get("period"),
         "source": "finnhub",
     }
+
+
+def fetch_recommendation_consensus(ticker: str) -> dict:
+    """LIGHTWEIGHT consensus for the cockpit: hits ONLY Finnhub
+    /stock/recommendation (1 endpoint), not the full 4-endpoint
+    get_analyst_consensus. Returns the derived summary plus a ``status``:
+
+      ok            — real recommendation data (cache it)
+      no_data       — Finnhub returned nothing (no coverage OR transient 429/
+                      network — indistinguishable; do NOT cache)
+      missing_key   — FINNHUB_API_KEY not set (do NOT cache)
+      provider_error— unexpected error (do NOT cache)
+    """
+    import os
+
+    if not os.environ.get("FINNHUB_API_KEY"):
+        return {**_empty_summary(), "status": "missing_key"}
+    try:
+        from src.tools.analyst_tools import _fetch_recommendations
+
+        rec = _fetch_recommendations(ticker)  # only /stock/recommendation
+    except Exception as exc:  # pragma: no cover - defensive
+        return {**_empty_summary(), "status": "provider_error", "message": str(exc)}
+    current = (rec or {}).get("current")
+    if not current:
+        return {**_empty_summary(), "status": "no_data"}
+    summary = derive_consensus(current)
+    summary["status"] = "ok"
+    return summary
 
 
 class AnalystConsensusCache:
@@ -96,13 +133,22 @@ class AnalystConsensusCache:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.Lock()
         with self._write_lock, self._connect() as conn:
-            conn.execute("PRAGMA journal_mode = WAL")
+            # WAL is an optimization and CANNOT be set while another connection
+            # is open (it ignores busy_timeout and errors immediately). Concurrent
+            # first-construction is possible because functools.lru_cache does NOT
+            # hold its lock during a cache-miss factory call — so make it
+            # best-effort: a failed WAL switch just leaves the default journal.
+            try:
+                conn.execute("PRAGMA journal_mode = WAL")
+            except sqlite3.OperationalError:
+                pass
             conn.executescript(_SCHEMA)
             conn.commit()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")  # wait out brief write locks
         return conn
 
     def _row_to_summary(self, r: sqlite3.Row) -> dict:
@@ -171,14 +217,16 @@ class AnalystConsensusCache:
         try:
             cached = self.get(t)  # inside try: a SQLite read error must also degrade
             if cached is not None:
-                return {**cached, "cached": True}
-            raw = fetcher(t)
-            summary = derive_consensus(raw or {})
-            stored = self.put(t, summary)
-            return {**stored, "cached": False}
-        except Exception as exc:  # pragma: no cover - defensive (no key / network / sqlite)
+                return {**cached, "status": "cached", "cached": True}
+            result = fetcher(t)  # {status, ...summary}
+            # Only cache a real recommendation — never a transient failure, a
+            # missing key, or an ambiguous no-data (it would stick for 24h).
+            if result.get("status") == "ok":
+                stored = self.put(t, result)
+                return {**stored, "status": "ok", "cached": False}
+            return {**_empty_summary(), **result, "ticker": t, "cached": False}
+        except Exception as exc:  # pragma: no cover - defensive (sqlite / fetcher)
             return {
-                "ticker": t, "rating": None, "score": None, "buy_ratio": None, "total": 0,
-                "counts": {}, "price_target": None, "period": None, "source": "finnhub",
-                "cached": False, "error": str(exc),
+                **_empty_summary(), "ticker": t, "status": "provider_error",
+                "message": str(exc), "cached": False,
             }

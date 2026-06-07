@@ -573,6 +573,10 @@ export interface ConsensusSummary {
   period: string | null;
   source: string;
   cached?: boolean;
+  fetched_at?: string;
+  // ok | cached | no_data | missing_key | provider_error
+  status?: string;
+  message?: string;
 }
 export function getConsensus(ticker: string): Promise<ConsensusSummary> {
   // First hit may fetch Finnhub (throttled); cached daily server-side.

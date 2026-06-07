@@ -88,11 +88,16 @@ class CardRunStore:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 5000")  # wait out brief write locks
         return conn
 
     def _ensure_schema(self) -> None:
         with self._write_lock, self._connect() as conn:
-            conn.execute("PRAGMA journal_mode = WAL")
+            # WAL best-effort (errors immediately if another connection is open).
+            try:
+                conn.execute("PRAGMA journal_mode = WAL")
+            except sqlite3.OperationalError:
+                pass
             conn.executescript(_SCHEMA)
             # Migration: add translations_json to a pre-existing table (idempotent).
             cols = {r[1] for r in conn.execute("PRAGMA table_info(ai_card_runs)").fetchall()}

@@ -23,9 +23,12 @@ def analyst_consensus(
     ticker: str,
     cache: AnalystConsensusCache = Depends(get_consensus_cache),
 ):
-    """Analyst consensus for one ticker (cached daily). Never errors — an
-    unreachable/keyless Finnhub yields rating=null."""
+    """Analyst consensus for one ticker (cached daily). Never errors — the
+    response carries a ``status`` (ok / cached / no_data / missing_key /
+    provider_error) so the UI can tell "no coverage" from "key missing" / "API
+    down". LIGHTWEIGHT: hits only Finnhub /stock/recommendation, not the full
+    4-endpoint analyst tool (which stays for detail / AI-card evidence)."""
     ensure_env_loaded()
-    from src.tools.analyst_tools import get_analyst_consensus
+    from src.analyst_consensus import fetch_recommendation_consensus
 
-    return cache.get_or_fetch(ticker, get_analyst_consensus)
+    return cache.get_or_fetch(ticker, fetch_recommendation_consensus)
