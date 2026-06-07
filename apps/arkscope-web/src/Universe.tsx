@@ -52,7 +52,9 @@ export function UniverseView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       const bits = [`新增 ${r.tags.tags_added} 個分類標籤`];
       if (r.lists_removed > 0) bits.push(`移除 ${r.lists_removed} 個舊清單`);
       if (r.priority_migrated > 0) bits.push(`初始化 ${r.priority_migrated} 檔 priority`);
-      setImportMsg(`匯入完成：${bits.join("、")}。`);
+      let msg = `匯入完成：${bits.join("、")}。`;
+      if (!r.groups_ok) msg += " ⚠ 主題來源暫時無法連線，已略過 theme 標籤。";
+      setImportMsg(msg);
       await load();
     } catch (e) {
       setImportMsg(`匯入失敗：${e instanceof Error ? e.message : String(e)}`);

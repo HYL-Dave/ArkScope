@@ -3,16 +3,21 @@ Local user profile-state store (SQLite).
 
 ArkScope keeps market / collection data in PostgreSQL (via the DAL), but the
 user's *research-universe state* — which named lists exist, which tickers
-belong to them, soft archive/restore, and free-text notes — is local-first and
-lives here in a small standalone SQLite database. It is intentionally NOT a DAL
-backend and NOT in the remote PG: the desktop app must manage the research
-universe with no remote-DB dependency.
+belong to them, soft archive/restore, free-text notes, per-ticker priority,
+and classification tags — is local-first and lives here in a small standalone
+SQLite database. It is intentionally NOT a DAL backend and NOT in the remote
+PG: the desktop app must manage the research universe with no remote-DB
+dependency.
 
-The substrate matches ProductSpec §168: watchlists are *multi-list tabs* with
-many-to-many ticker membership and stable ordering. The v0 cockpit UI only
-renders a single aggregate "All Active" view + an Archived filter, but the
-schema already supports multiple named lists / tabs so that surface can grow
-without a migration.
+The substrate (ProductSpec §168) has two decoupled axes:
+  - **lists** — the user's work-lists (``watchlists`` + ``watchlist_memberships``,
+    many-to-many, soft-archivable). The 自選股 rail and the 全部標的 list filter
+    both render the ``custom``-kind lists; classification is NOT a list.
+  - **tags** — two-dimensional classification (``ticker_tags``: facet × source),
+    decoupled from membership: a ticker keeps its tags whether or not it sits in
+    any list. ``user``/``legacy`` tags are editable; ``system``/``provider``/
+    ``sec``/``broker`` are read-only external facts.
+Plus ``ticker_meta`` (priority), ``ticker_notes``, and ``profile_settings``.
 
 This is a thin store over stdlib ``sqlite3`` (no ORM). Every mutation reached
 from the API funnels through the ``profile_state_write`` permission
@@ -182,6 +187,15 @@ class ProfileStateStore:
     occasional concurrent write.
     """
 
+    # Class-level lock serializing schema setup across CONCURRENT first
+    # construction. ``get_profile_store`` is lru_cache'd, but lru_cache does not
+    # hold its lock during the factory call, so a burst of first requests builds
+    # several instances at once — each with its own ``_write_lock``. Without a
+    # shared lock, one instance's tag migration (table briefly without ``facet``)
+    # races another's ``CREATE INDEX … (facet)`` → "no such column: facet". A
+    # class-level lock makes the migration + index creation atomic.
+    _schema_lock = threading.Lock()
+
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +210,7 @@ class ProfileStateStore:
         return conn
 
     def _ensure_schema(self) -> None:
-        with self._write_lock, self._connect() as conn:
+        with self._schema_lock, self._write_lock, self._connect() as conn:
             # WAL best-effort: it errors immediately if another connection is open
             # (concurrent first-construction via lru_cache cache-miss); skip on fail.
             try:
@@ -226,6 +240,7 @@ class ProfileStateStore:
         if "tag" not in cols or "facet" in cols:
             return  # already v2 (or freshly created with the new schema)
         try:
+            conn.execute("DROP TABLE IF EXISTS ticker_tags__v2")  # clean any prior partial
             conn.execute(
                 """
                 CREATE TABLE ticker_tags__v2 (

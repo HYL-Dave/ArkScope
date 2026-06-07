@@ -259,6 +259,7 @@ export interface ImportResult {
   lists_removed: number;
   tags: { tags_added: number };
   priority_migrated: number;
+  groups_ok: boolean; // false → theme-group import skipped (DAL/overview unreachable)
   lists: { id: number; name: string; kind: string; total_count: number; active_count: number }[];
 }
 

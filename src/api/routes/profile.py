@@ -179,25 +179,32 @@ def import_universe(
     """
     opts = body or ImportBody()
     tag_groups: list[dict] = []
+    groups_ok = True
     if opts.include_groups:
-        overview = get_watchlist_overview(dal)
-        by_group: dict[str, list[str]] = {}
-        for r in overview.get("tickers", []):
-            group = (r.get("group") or "Watchlist").strip() or "Watchlist"
-            t = _norm(r.get("ticker"))
-            if t:
-                by_group.setdefault(group, []).append(t)
-        # ONLY theme groups carry classification value → legacy:theme (editable).
-        # holdings/interested groups are intentionally dropped (not preserved).
-        for g, ts in by_group.items():
-            if _infer_kind(g) == "theme":
-                value = g.split(":", 1)[1].strip() if ":" in g else g.strip()
-                if value:
-                    tag_groups.append(
-                        {"facet": "theme", "value": value, "source": "legacy", "tickers": ts}
-                    )
+        # Theme groups come from the overview (DAL/PG). Best-effort: a DB outage
+        # must NOT abort the whole import — the config-file tiers/category/
+        # provenance seed below has no DB dependency and should still run.
+        try:
+            overview = get_watchlist_overview(dal)
+            by_group: dict[str, list[str]] = {}
+            for r in overview.get("tickers", []):
+                group = (r.get("group") or "Watchlist").strip() or "Watchlist"
+                t = _norm(r.get("ticker"))
+                if t:
+                    by_group.setdefault(group, []).append(t)
+            # ONLY theme groups carry classification value → legacy:theme (editable).
+            # holdings/interested groups are intentionally dropped (not preserved).
+            for g, ts in by_group.items():
+                if _infer_kind(g) == "theme":
+                    value = g.split(":", 1)[1].strip() if ":" in g else g.strip()
+                    if value:
+                        tag_groups.append(
+                            {"facet": "theme", "value": value, "source": "legacy", "tickers": ts}
+                        )
+        except Exception:
+            groups_ok = False  # reported back so the UI can note themes were skipped
     if opts.include_tiers:
-        tag_groups.extend(config_tag_seeds())  # legacy:category + provenance
+        tag_groups.extend(config_tag_seeds())  # legacy:category + provenance (config file, no DB)
 
     require_profile_state_write(
         "import_universe",
@@ -223,6 +230,9 @@ def import_universe(
         "lists_removed": lists_removed,
         "tags": tag_summary,
         "priority_migrated": priority_migrated,
+        # False when theme-group import was requested but the DAL/overview was
+        # unreachable — tiers/category/provenance still seeded.
+        "groups_ok": groups_ok,
         "lists": [asdict(li) for li in store.list_watchlists()],
     }
 

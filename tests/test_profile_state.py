@@ -564,6 +564,18 @@ def test_import_universe_seeds_theme_tags_and_drops_groups(api_store, monkeypatc
     assert again["tags"]["tags_added"] == 0
 
 
+def test_import_universe_theme_groups_best_effort(api_store, monkeypatch):
+    # If the overview/DAL is unreachable, theme-group import is skipped but the
+    # config-file tiers/category/provenance seed still runs (groups_ok=False).
+    def _boom(dal):
+        raise RuntimeError("PG down")
+
+    monkeypatch.setattr("src.api.routes.profile.get_watchlist_overview", _boom)
+    out = import_universe(ImportBody(include_groups=True, include_tiers=True), dal=None, store=api_store)
+    assert out["groups_ok"] is False
+    assert out["tags"]["tags_added"] > 0  # config seed (category/provenance) still applied
+
+
 def test_import_universe_deletes_non_custom_lists(api_store):
     # Seed a mix of legacy (tier/holdings) + a user custom list, then de-mess.
     api_store.import_lists([{"name": "Tier 1 · Core", "kind": "tier", "tickers": ["NVDA"]}])
