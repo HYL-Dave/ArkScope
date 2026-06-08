@@ -125,8 +125,27 @@ def _sqlite_group_counts(conn, sql: str) -> Dict[tuple, int]:
 
 _PG_PRICE_CHECKSUM = "SELECT ticker, interval, COUNT(*) FROM prices GROUP BY ticker, interval"
 _SQ_PRICE_CHECKSUM = _PG_PRICE_CHECKSUM
-_PG_NEWS_CHECKSUM = "SELECT source, COUNT(*) FROM news GROUP BY source"
-_SQ_NEWS_CHECKSUM = _PG_NEWS_CHECKSUM
+
+# News integrity fingerprint: per (source, ticker) the row count AND SUM(id). The
+# count catches ticker-level drift within a source; SUM(id) (identical integer
+# arithmetic on PG + SQLite, since id mirrors PG's id) catches id-set drift —
+# missing/extra/shifted articles a bare per-source count would miss.
+_NEWS_CHECKSUM_SQL = (
+    "SELECT source, ticker, COUNT(*), COALESCE(SUM(id), 0) FROM news GROUP BY source, ticker"
+)
+
+
+def _news_checksum(rows) -> Dict[tuple, tuple]:
+    return {(r[0], r[1]): (r[2], r[3]) for r in rows}
+
+
+def _pg_news_checksum(cur) -> Dict[tuple, tuple]:
+    cur.execute(_NEWS_CHECKSUM_SQL)
+    return _news_checksum(cur.fetchall())
+
+
+def _sqlite_news_checksum(conn) -> Dict[tuple, tuple]:
+    return _news_checksum(conn.execute(_NEWS_CHECKSUM_SQL).fetchall())
 
 
 def pg_market_counts() -> dict:
@@ -139,10 +158,11 @@ def pg_market_counts() -> dict:
         price_groups = len(_pg_group_counts(cur, _PG_PRICE_CHECKSUM))
         cur.execute("SELECT COUNT(*) FROM news")
         news_rows = cur.fetchone()[0]
-        news_groups = len(_pg_group_counts(cur, _PG_NEWS_CHECKSUM))
+        cur.execute("SELECT COUNT(DISTINCT source) FROM news")
+        news_sources = cur.fetchone()[0]
         return {
             "prices": {"rows": price_rows, "groups": price_groups},
-            "news": {"rows": news_rows, "groups": news_groups},
+            "news": {"rows": news_rows, "groups": news_sources},
         }
     finally:
         pg.close()
@@ -228,7 +248,7 @@ def bootstrap_market(out_path: Optional[str] = None,
         pg_price_sum = _pg_group_counts(cur, _PG_PRICE_CHECKSUM)
         cur.execute("SELECT COUNT(*) FROM news")
         news_total = cur.fetchone()[0]
-        pg_news_sum = _pg_group_counts(cur, _PG_NEWS_CHECKSUM)
+        pg_news_sum = _pg_news_checksum(cur)
         grand = price_total + news_total
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -257,7 +277,7 @@ def bootstrap_market(out_path: Optional[str] = None,
             local_prices = sconn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
             sq_price_sum = _sqlite_group_counts(sconn, _SQ_PRICE_CHECKSUM)
             local_news = sconn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
-            sq_news_sum = _sqlite_group_counts(sconn, _SQ_NEWS_CHECKSUM)
+            sq_news_sum = _sqlite_news_checksum(sconn)
         finally:
             sconn.close()
     finally:
@@ -298,7 +318,7 @@ def validate_market(out_path: Optional[str] = None) -> dict:
         pg_price_sum = _pg_group_counts(cur, _PG_PRICE_CHECKSUM)
         cur.execute("SELECT COUNT(*) FROM news")
         pg_news_rows = cur.fetchone()[0]
-        pg_news_sum = _pg_group_counts(cur, _PG_NEWS_CHECKSUM)
+        pg_news_sum = _pg_news_checksum(cur)
     finally:
         pg.close()
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -306,7 +326,7 @@ def validate_market(out_path: Optional[str] = None) -> dict:
         lp = conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] if _table_exists(conn, "prices") else 0
         sq_price_sum = _sqlite_group_counts(conn, _SQ_PRICE_CHECKSUM) if _table_exists(conn, "prices") else {}
         ln = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] if _table_exists(conn, "news") else 0
-        sq_news_sum = _sqlite_group_counts(conn, _SQ_NEWS_CHECKSUM) if _table_exists(conn, "news") else {}
+        sq_news_sum = _sqlite_news_checksum(conn) if _table_exists(conn, "news") else {}
     finally:
         conn.close()
     prices_match = lp == pg_price_rows and sq_price_sum == pg_price_sum

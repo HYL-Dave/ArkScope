@@ -33,10 +33,13 @@ def _price_checksum(rows):
 
 
 def _news_checksum(rows):
+    # mirror PG: SELECT source, ticker, COUNT(*), SUM(id) GROUP BY source, ticker
     out = {}
     for r in rows:
-        out[r[6]] = out.get(r[6], 0) + 1  # source is column index 6
-    return [(src, n) for src, n in out.items()]
+        key = (r[6], r[1])  # (source, ticker)
+        cnt, sid = out.get(key, (0, 0))
+        out[key] = (cnt + 1, sid + r[0])  # +1 row, +id
+    return [(src, tk, c, s) for (src, tk), (c, s) in out.items()]
 
 
 class _FakeCursor:
@@ -140,6 +143,19 @@ def test_validate_market(tmp_path, fake_pg):
     r = mda.validate_market(out)
     assert r["match"] is True
     assert r["prices"]["local_rows"] == 3 and r["news"]["local_rows"] == 2
+
+
+def test_news_checksum_catches_id_drift(tmp_path, fake_pg):
+    # Hardening: same per-(source,ticker) COUNT but a different id set must be
+    # caught via SUM(id) — the old per-source count alone would have passed.
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    conn = sqlite3.connect(out)
+    conn.execute("UPDATE news SET id = 999 WHERE id = 1")  # same counts, different SUM(id)
+    conn.commit(); conn.close()
+    r = mda.validate_market(out)
+    assert r["news"]["match"] is False and r["match"] is False
+    assert r["news"]["local_rows"] == r["news"]["pg_rows"]  # counts still equal → only SUM(id) caught it
 
 
 def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
