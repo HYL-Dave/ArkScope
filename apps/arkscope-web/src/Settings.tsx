@@ -446,6 +446,7 @@ function DataStorageSection() {
           {busy === "bootstrap" && job && (
             <p className="muted tiny" style={{ marginTop: 8 }}>
               建立中… {job.progress.written.toLocaleString()} / {job.progress.total.toLocaleString()} ({pct}%)
+              {" "}— 進度在後端執行；建立期間請勿關閉 app（關閉會中斷，需重新建立）。
             </p>
           )}
           {busy !== "bootstrap" && job && job.status === "done" && job.result && (
