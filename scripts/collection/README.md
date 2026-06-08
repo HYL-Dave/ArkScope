@@ -343,10 +343,10 @@ python scripts/collection/daily_update.py --all --scope active-universe --dry-ru
 ```bash
 # crontab -e
 # 每天 UTC 6:00 更新新聞 (~1-2 分鐘)
-0 6 * * * cd /mnt/md0/PycharmProjects/ArkScope && python scripts/collection/daily_update.py --news
+0 6 * * * cd <repo-root> && python scripts/collection/daily_update.py --news
 
-# 每天 UTC 22:00 更新股價 (美股收盤後，需要 IBKR 連線)
-0 22 * * * cd /mnt/md0/PycharmProjects/ArkScope && python scripts/collection/daily_update.py --ibkr
+# 每天 UTC 22:00 更新股價 (美股收盤後，需要 IBKR 連線；股價需顯式 scope)
+0 22 * * * cd <repo-root> && python scripts/collection/daily_update.py --ibkr-prices --scope active-universe
 ```
 
 ---
@@ -354,6 +354,12 @@ python scripts/collection/daily_update.py --all --scope active-universe --dry-ru
 ## 股價收集 (IBKR)
 
 ### collect_ibkr_prices.py
+
+> **`--tier` = legacy/debug only.** The `tier1/tier2/tier3` model is retired in the app
+> (classification now lives in tags; universe = active-universe direct). The `--tier`
+> examples below still work at this low level, but the supported path is `--tickers <list>`,
+> or via `daily_update.py --ibkr-prices --scope active-universe` (reads the profile DB).
+> Don't reintroduce `--tier all` into the daily runner.
 
 **用途**: 從 IBKR 收集歷史股價 (需要 TWS 或 IB Gateway 運行中)
 

@@ -31,8 +31,8 @@ Daily Data Update Script - 每日資料更新統一入口
     python daily_update.py --ibkr-prices --scope active-universe   # 讀 profile DB（唯讀）
     python daily_update.py --ibkr-prices --tickers AAPL,MSFT,NVDA  # 或顯式清單
 
-    # 模擬執行 (不實際收集)
-    python daily_update.py --all --dry-run
+    # 模擬執行 (印出指令，不碰 IBKR/DB)
+    python daily_update.py --all --scope active-universe --dry-run
 
     # 平行執行 (Polygon + Finnhub 同時跑，節省時間)
     python daily_update.py --news --parallel
@@ -427,7 +427,7 @@ def show_status():
         logger.info("   - Run: python daily_update.py --ibkr-news (requires TWS/Gateway)")
 
     if not ibkr_prices['exists'] or (ibkr_prices['latest_date'] and (today - ibkr_prices['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --ibkr-prices (requires TWS/Gateway)")
+        logger.info("   - Run: python daily_update.py --ibkr-prices --scope active-universe (requires TWS/Gateway)")
 
     if polygon['exists'] and finnhub['exists'] and ibkr_news['exists']:
         if (polygon['latest_date'] and (today - polygon['latest_date']).days <= 1 and
@@ -493,24 +493,32 @@ def _resolve_price_scope(args) -> List[str]:
     """Resolve the EXPLICIT IBKR-price ticker scope (Q7: no implicit tier sweep).
 
     Returns the tickers from ``--tickers``, or — for ``--scope active-universe`` —
-    the local profile-state active universe via a READ-ONLY read of
-    ``profile_state.db`` (it never writes ``user_profile.yaml`` /
-    ``tickers_core.json``). Returns ``[]`` when no scope was given; callers must
-    NOT fall back to the retired ``--tier all`` universe.
+    the active universe from the local profile DB via a **physically read-only**
+    SQLite connection (``mode=ro``): it opens the DB read-only, runs one SELECT,
+    and never instantiates the store / triggers schema-migration / writes any
+    config. Returns ``[]`` when no scope was given; callers must NOT fall back to
+    the retired ``--tier all`` universe.
     """
     if args.tickers:
         return [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
     if args.scope == "active-universe":
+        import sqlite3
+        db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+            SCRIPT_DIR.parent.parent / "data" / "profile_state.db"
+        )
         try:
-            from src.profile_state import ProfileStateStore
-            db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
-                SCRIPT_DIR.parent.parent / "data" / "profile_state.db"
-            )
-            tickers = ProfileStateStore(db_path).all_tickers()  # read-only
-            logger.info(f"--scope active-universe → {len(tickers)} tickers from profile DB")
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            try:
+                rows = conn.execute(
+                    "SELECT DISTINCT ticker FROM watchlist_memberships ORDER BY ticker"
+                ).fetchall()
+            finally:
+                conn.close()
+            tickers = [r[0] for r in rows]
+            logger.info(f"--scope active-universe → {len(tickers)} tickers (read-only profile DB)")
             return tickers
-        except Exception as e:
-            logger.error(f"--scope active-universe: could not read profile DB ({e})")
+        except sqlite3.OperationalError as e:
+            logger.error(f"--scope active-universe: could not read profile DB read-only ({e})")
             return []
     return []
 
@@ -543,10 +551,8 @@ def update_ibkr_prices(tickers: List[str], dry_run: bool = False) -> bool:
         "--tickers", ",".join(tickers),
     ]
 
-    if dry_run:
-        cmd.append("--dry-run")
-
-    success, output = run_command(cmd, dry_run=False)  # Always run, script handles dry-run
+    # dry-run prints the command and returns — never spawns the collector / IBKR.
+    success, output = run_command(cmd, dry_run)
 
     return success
 
@@ -607,9 +613,7 @@ def sync_to_db(
     if sync_news:
         logger.info("\nSyncing news articles to database...")
         cmd = [sys.executable, str(migrate_script), "--news"]
-        if dry_run:
-            cmd.append("--dry-run")
-        success, _ = run_command(cmd, dry_run=False)  # Always run, script handles dry-run
+        success, _ = run_command(cmd, dry_run)  # dry-run: print only, never touches DB
         results['db_sync_news'] = success
 
     if sync_scores:
@@ -617,25 +621,19 @@ def sync_to_db(
         # (was previously force-pushed on every --news --sync-db).
         logger.info("\nSyncing news scores to database...")
         cmd = [sys.executable, str(migrate_script), "--scores"]
-        if dry_run:
-            cmd.append("--dry-run")
-        success, _ = run_command(cmd, dry_run=False)
+        success, _ = run_command(cmd, dry_run)  # dry-run: print only, never touches DB
         results['db_sync_scores'] = success
 
     if sync_prices:
         logger.info("\nSyncing prices to database...")
         cmd = [sys.executable, str(migrate_script), "--prices"]
-        if dry_run:
-            cmd.append("--dry-run")
-        success, _ = run_command(cmd, dry_run=False)
+        success, _ = run_command(cmd, dry_run)  # dry-run: print only, never touches DB
         results['db_sync_prices'] = success
 
     if sync_iv:
         logger.info("\nSyncing IV history to database...")
         cmd = [sys.executable, str(migrate_script), "--iv"]
-        if dry_run:
-            cmd.append("--dry-run")
-        success, _ = run_command(cmd, dry_run=False)
+        success, _ = run_command(cmd, dry_run)  # dry-run: print only, never touches DB
         results['db_sync_iv'] = success
 
     return results
@@ -653,32 +651,35 @@ Examples:
     # Update all news (Polygon + Finnhub + IBKR news)
     python daily_update.py --news
 
-    # Update everything (news + prices)
-    python daily_update.py --all
+    # Update all news + prices (prices need an explicit scope; --all won't guess)
+    python daily_update.py --all --scope active-universe
 
     # Update specific source
     python daily_update.py --polygon
     python daily_update.py --finnhub
     python daily_update.py --ibkr-news     # High-quality: Dow Jones, Briefing, The Fly
-    python daily_update.py --ibkr-prices   # Intraday price data
+    python daily_update.py --ibkr-prices --scope active-universe   # read-only profile DB
+    python daily_update.py --ibkr-prices --tickers AAPL,MSFT       # or explicit list
+    python daily_update.py --iv-history    # heavy, opt-in (NOT included in --all)
 
-    # Dry run (show what would be done)
-    python daily_update.py --all --dry-run
+    # Dry run (prints commands; never touches IBKR/DB)
+    python daily_update.py --all --scope active-universe --dry-run
 
     # Collect and sync to DB in one step
-    python daily_update.py --ibkr-prices --sync-db
-    python daily_update.py --news --sync-db
-    python daily_update.py --all --sync-db
+    python daily_update.py --ibkr-prices --scope active-universe --sync-db
+    python daily_update.py --news --sync-db          # news only (scores NOT included)
+    python daily_update.py --scores                  # sync news_scores (opt-in, separate)
 
 Note: IBKR sources require TWS/Gateway running.
       --sync-db requires DATABASE_URL in config/.env
+      Backfill runner: writes no config; --scope active-universe reads the profile DB read-only.
         """
     )
 
     parser.add_argument('--status', action='store_true',
                        help='Show current data status for all sources')
     parser.add_argument('--all', action='store_true',
-                       help='Update all sources (news + prices)')
+                       help='Update all news sources + prices (prices need --scope/--tickers; IV is separate)')
     parser.add_argument('--news', action='store_true',
                        help='Update all news sources (Polygon + Finnhub + IBKR news)')
     parser.add_argument('--polygon', action='store_true',
@@ -746,7 +747,8 @@ Note: IBKR sources require TWS/Gateway running.
     update_finnhub_flag = args.all or args.news or args.finnhub
     update_ibkr_news_flag = args.all or args.news or args.ibkr_news
     update_ibkr_prices_flag = args.all or args.ibkr_prices
-    update_iv_history_flag = args.all or args.iv_history
+    # IV history is a heavy/opt-in step — NOT swept by --all (needs --iv-history).
+    update_iv_history_flag = args.iv_history
 
     # Resolve the EXPLICIT price scope once (Q7: --all never guesses a universe).
     price_tickers = _resolve_price_scope(args) if update_ibkr_prices_flag else []
