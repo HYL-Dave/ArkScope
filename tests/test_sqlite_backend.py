@@ -110,8 +110,10 @@ def test_empty_and_missing(market_db, tmp_path):
 
 def test_get_available_tickers(market_db):
     db, _ = market_db
-    assert SqliteBackend(db).get_available_tickers("prices") == ["AAPL"]
-    assert SqliteBackend(db).get_available_tickers("news") == []  # slice 3a = prices only
+    b = SqliteBackend(db)
+    assert b.get_available_tickers("prices") == ["AAPL"]
+    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]  # 3b: news local too
+    assert b.get_available_tickers("fundamentals") == []        # not migrated → empty
 
 
 # --- news (3b): unscored reads + FTS5 search ---------------------------------
@@ -212,8 +214,9 @@ def test_available_tickers_routing(market_db, monkeypatch):
     db, _ = market_db
     monkeypatch.setattr(DatabaseBackend, "get_available_tickers", lambda self, data_type: ["PGONLY"])
     b = _make(db)
-    assert b.get_available_tickers("prices") == ["AAPL"]   # local
-    assert b.get_available_tickers("news") == ["PGONLY"]   # → PG (super)
+    assert b.get_available_tickers("prices") == ["AAPL"]            # local
+    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]      # local (3b)
+    assert b.get_available_tickers("fundamentals") == ["PGONLY"]    # → PG (super)
 
 
 def test_inherited_vs_overridden_methods(market_db):

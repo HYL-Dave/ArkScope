@@ -75,9 +75,9 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         )
 
     def get_available_tickers(self, data_type: str):
-        if data_type == "prices":
+        if data_type in ("prices", "news"):  # both domains are local-first now
             try:
-                local = self._market.get_available_tickers("prices")
+                local = self._market.get_available_tickers(data_type)
                 if local:
                     return local
             except Exception:

@@ -193,15 +193,16 @@ class SqliteBackend:
             conn.close()
 
     def get_available_tickers(self, data_type: str) -> List[str]:
-        """Distinct tickers with price data (slice 3a serves only ``prices``)."""
-        if data_type != "prices":
+        """Distinct tickers for a local domain (``prices`` 3a / ``news`` 3b)."""
+        table = {"prices": "prices", "news": "news"}.get(data_type)  # whitelist → safe f-string
+        if table is None:
             return []
         try:
             conn = self._connect()
         except sqlite3.OperationalError:
             return []
         try:
-            rows = conn.execute("SELECT DISTINCT ticker FROM prices ORDER BY ticker").fetchall()
+            rows = conn.execute(f"SELECT DISTINCT ticker FROM {table} ORDER BY ticker").fetchall()
             return [r[0] for r in rows]
         except sqlite3.OperationalError:
             return []
