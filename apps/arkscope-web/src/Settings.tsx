@@ -11,10 +11,12 @@ import {
   setUseLocalMarket,
   testModelAccess,
   updateCredential,
+  updateMarketData,
   validateMarketData,
   type MarketDataJob,
   type MarketDataStatus,
   type MarketDataValidate,
+  type SyncMeta,
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelOption,
@@ -311,10 +313,21 @@ export function SettingsView({
   );
 }
 
+function syncLine(status: MarketDataStatus): string {
+  const fmt = (m: SyncMeta | null) => {
+    if (!m) return "—";
+    if (m.last_error) return `錯誤（${m.last_error.slice(0, 40)}）`;
+    const ts = m.last_success ? m.last_success.slice(0, 16).replace("T", " ") : "—";
+    return `+${m.rows_added.toLocaleString()} @ ${ts}`;
+  };
+  if (!status.sync.prices && !status.sync.news) return "尚未增量更新";
+  return `價格 ${fmt(status.sync.prices)} · 新聞 ${fmt(status.sync.news)}`;
+}
+
 function DataStorageSection() {
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"" | "bootstrap" | "validate" | "toggle">("");
+  const [busy, setBusy] = useState<"" | "bootstrap" | "update" | "validate" | "toggle">("");
   const [job, setJob] = useState<MarketDataJob | null>(null);
   const [validation, setValidation] = useState<MarketDataValidate | null>(null);
 
@@ -337,6 +350,27 @@ function DataStorageSection() {
     setErr(null);
     try {
       let j = await bootstrapMarketData();
+      setJob(j);
+      while (j.status === "running") {
+        await new Promise((r) => setTimeout(r, 1000));
+        j = await getMarketDataJob(j.id);
+        setJob(j);
+      }
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function runUpdate() {
+    if (busy) return;
+    setBusy("update");
+    setValidation(null);
+    setErr(null);
+    try {
+      let j = await updateMarketData();
       setJob(j);
       while (j.status === "running") {
         await new Promise((r) => setTimeout(r, 1000));
@@ -412,6 +446,8 @@ function DataStorageSection() {
             <dd>{exists ? `${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? "—"}` : "—"}</dd>
             <dt>新聞</dt>
             <dd>{exists ? `${nw!.row_count.toLocaleString()} 篇 · ${nw!.source_count} 來源 · 最新 ${nw!.latest_published ?? "—"}` : "—"}</dd>
+            <dt>最近增量更新</dt>
+            <dd>{syncLine(status)}</dd>
             <dt>本地路由</dt>
             <dd>
               {status.routing_enabled
@@ -426,6 +462,9 @@ function DataStorageSection() {
           <div className="settings-actions" style={{ marginTop: 12 }}>
             <button className="btn-ghost" onClick={() => void runBootstrap()} disabled={!!busy}>
               {busy === "bootstrap" ? "建立中…" : exists ? "重建本地市場庫（價格＋新聞）" : "建立本地市場庫（價格＋新聞）"}
+            </button>
+            <button className="btn-ghost" onClick={() => void runUpdate()} disabled={!!busy || !exists}>
+              {busy === "update" ? "更新中…" : "增量更新"}
             </button>
             <button
               className="btn-ghost"
@@ -451,15 +490,17 @@ function DataStorageSection() {
               {" "}— 進度在後端執行；建立期間請勿關閉 app（關閉會中斷，需重新建立）。
             </p>
           )}
-          {busy !== "bootstrap" && job && job.status === "done" && job.result && (
+          {busy === "update" && <p className="muted tiny" style={{ marginTop: 8 }}>增量更新中…（補抓最新資料）</p>}
+          {!busy && job && job.status === "done" && job.result && (
             <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
-              ✓ 建立完成：價格 {job.result.prices.rows.toLocaleString()} 列、
-              新聞 {job.result.news.rows.toLocaleString()} 篇，校驗一致。
+              {job.kind === "update_market"
+                ? `✓ 增量更新完成：價格 +${(job.result.prices.rows_added ?? 0).toLocaleString()} 列、新聞 +${(job.result.news.rows_added ?? 0).toLocaleString()} 篇。`
+                : `✓ 建立完成：價格 ${(job.result.prices.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news.rows ?? 0).toLocaleString()} 篇，校驗一致。`}
             </p>
           )}
-          {busy !== "bootstrap" && job && job.status === "error" && (
+          {!busy && job && job.status === "error" && (
             <p className="tiny refresh-err" style={{ marginTop: 8 }}>
-              建立失敗：{job.error}（既有資料庫已保留）
+              {job.kind === "update_market" ? "增量更新失敗" : "建立失敗"}：{job.error}（既有資料庫已保留）
             </p>
           )}
           {validation && (

@@ -756,29 +756,42 @@ export function translateCard(
 
 // --- market-data local-DB lifecycle (slices 3a prices + 3b news) ---
 
+export interface SyncMeta {
+  last_success: string | null;
+  last_error: string | null;
+  rows_added: number;
+  updated_at: string;
+}
+
 export interface MarketDataStatus {
   market_db: string;
   exists: boolean;
   prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
   news: { row_count: number; source_count: number; latest_published: string | null };
+  sync: { prices: SyncMeta | null; news: SyncMeta | null };
   use_local_market_setting: boolean;
   env_override: boolean;
   routing_enabled: boolean;
   pg_fallback_active: boolean;
 }
 
+// One job result covers both bootstrap (rows/total/match) and update
+// (rows_added/ok) — fields are optional and read per job.kind.
 interface DomainResult {
-  rows: number;
-  total: number;
-  match: boolean;
+  rows?: number;
+  total?: number;
+  match?: boolean;
+  rows_added?: number;
+  ok?: boolean;
+  error?: string | null;
 }
 
 export interface MarketDataJob {
   id: string;
-  kind: string;
+  kind: string; // "bootstrap_market" | "update_market"
   status: "running" | "done" | "error";
   progress: { written: number; total: number };
-  result: { match: boolean; prices: DomainResult; news: DomainResult } | null;
+  result: { match?: boolean; ok?: boolean; prices: DomainResult; news: DomainResult } | null;
   error: string | null;
 }
 
@@ -802,6 +815,11 @@ export function getMarketDataStatus(): Promise<MarketDataStatus> {
 // Full rebuild of the local market DB (prices + news). Returns a job to poll.
 export function bootstrapMarketData(): Promise<MarketDataJob> {
   return sendJSON<MarketDataJob>("/market-data/bootstrap", "POST");
+}
+
+// Incremental delta refresh (append-only; prices + news). Returns a job to poll.
+export function updateMarketData(): Promise<MarketDataJob> {
+  return sendJSON<MarketDataJob>("/market-data/update", "POST");
 }
 
 export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
