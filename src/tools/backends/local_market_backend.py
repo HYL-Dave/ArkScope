@@ -1,6 +1,6 @@
 """
 LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domain
-from a local SQLite (slice 3a), with PostgreSQL fallback.
+from a local SQLite (3a prices + 3b news), with PostgreSQL fallback.
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
 on ``isinstance(backend, DatabaseBackend)`` in ~30 places to decide "is this a
@@ -8,12 +8,16 @@ SQL/DB backend" (batch summaries, news, sentiment, freshness, …). A wrapper th
 merely forwarded calls would FAIL those isinstance checks → every DB-only path
 short-circuits to empty/file behavior → the cockpit shows wrong/empty data. By
 subclassing, this IS a DatabaseBackend (isinstance passes, ``_get_conn`` + all ~41
-methods inherited and hit PG); we override ONLY the market-domain reads to go
-local-first. Everything else — Seeking-Alpha, news, reports, memories — is the
-inherited PG behaviour, unchanged.
+methods inherited and hit PG); we override ONLY the migrated market-domain reads
+to go local-first. Everything else — Seeking-Alpha, reports, memories, news
+SCORES — is the inherited PG behaviour, unchanged.
 
-Slice 3a routes PRICES only; ``query_prices`` falls back to PG (``super()``) on a
-local miss/empty so a not-yet/partially-migrated DB still reads correctly.
+Overridden, local-first with PG fallback on empty/miss:
+  - ``query_prices`` (3a);
+  - ``query_news`` (3b, UNSCORED — scored_only/model requests fall back to PG,
+    where news_scores live), ``query_news_search`` (3b, FTS5);
+  - ``get_available_tickers('prices'|'news')``.
+``query_news_stats`` is NOT overridden — it needs scores, so it stays on PG.
 """
 
 from __future__ import annotations

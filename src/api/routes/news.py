@@ -18,7 +18,7 @@ router = APIRouter(prefix="/news", tags=["news"])
 def news_for_ticker(
     ticker: str,
     days: int = Query(30, ge=1, le=9999),
-    source: str = Query("auto", pattern="^(auto|ibkr|polygon)$"),
+    source: str = Query("auto", pattern="^(auto|ibkr|polygon|finnhub)$"),
     dal: DataAccessLayer = Depends(get_dal),
 ):
     """Get recent news articles for a ticker."""

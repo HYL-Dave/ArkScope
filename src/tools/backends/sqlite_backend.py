@@ -42,7 +42,7 @@ _NEWS_SEARCH_COLS = ["date", "ticker", "title", "source", "url", "publisher",
 
 
 class SqliteBackend:
-    """Local market-data backend over ``market_data.db`` (prices, slice 3a)."""
+    """Local market-data backend over ``market_data.db`` (3a prices + 3b news/FTS5)."""
 
     def __init__(self, db_path: str | Path):
         self.db_path = str(db_path)
