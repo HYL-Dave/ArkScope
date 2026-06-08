@@ -1,13 +1,14 @@
 """
-SqliteBackend — local-first market-data backend (slice 3a: PRICES only).
+SqliteBackend — local-first market-data backend (3a prices + 3b news).
 
 Part of the PostgreSQL → local SQLite migration (see
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
 serves the *market_data* domain from a local ``market_data.db`` (SQLite, WAL).
 It is NOT a full ``DataBackend`` — only the methods used by
 :class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
-implemented (slice 3a = ``query_prices`` + ``get_available_tickers('prices')``).
-Everything else stays on PostgreSQL.
+implemented: 3a = ``query_prices``; 3b = ``query_news`` (unscored) +
+``query_news_search`` (FTS5); plus ``get_available_tickers('prices'|'news')``.
+Score-dependent reads (news_scores deferred) and everything else stay on PostgreSQL.
 
 Reads open the DB **read-only** (``mode=ro``); writes are done only by the
 migration script, never here. The on-disk ``datetime`` is stored as the same

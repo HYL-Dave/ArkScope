@@ -1,6 +1,19 @@
 # Visualization Scripts
 
-視覺化和互動查詢工具。
+> ⚠️ **DEPRECATED / prototype reference (2026-06-09).** These are the OLD
+> Streamlit/CLI prototypes (`news_dashboard.py`, `data_loader.py`,
+> `fundamentals_query.py`) — **NOT** the official product path. The official
+> direction is the **Electron/React app + FastAPI sidecar**; news, prices,
+> fundamentals, and charts belong **in the app**, served from the local-first
+> stores (e.g. 3b local news + FTS5). Nothing tracked imports these scripts.
+>
+> Plan: keep as reference only → absorb the still-valuable logic (fundamentals
+> query shapes, news-dashboard aggregation ideas) into the App/API → then delete
+> or move to `legacy/`. Do **not** build new features here or tell users to run them.
+> The real next news feature is an in-app **新聞·事件** surface over the migrated
+> local news + FTS5.
+
+視覺化和互動查詢工具（歷史原型，見上方棄用說明）。
 
 ## 檔案結構
 

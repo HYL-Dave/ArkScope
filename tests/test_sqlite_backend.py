@@ -1,4 +1,4 @@
-"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend routing (slice 3a)."""
+"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend (3a prices + 3b news)."""
 
 from __future__ import annotations
 
