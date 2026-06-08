@@ -20,8 +20,10 @@ from src.market_data_admin import (
     env_routing_enabled,
     get_job,
     local_market_stats,
+    read_sync_meta,
     resolve_market_db_path,
     start_bootstrap_job,
+    start_update_job,
     validate_market,
 )
 from src.profile_state import ProfileStateStore
@@ -53,6 +55,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "exists": stats["exists"],
         "prices": stats["prices"],
         "news": stats["news"],
+        "sync": read_sync_meta(path),  # per-domain incremental status (last_success/error/rows_added)
         "use_local_market_setting": setting_on,
         "env_override": env_on,
         "routing_enabled": routing_enabled,
@@ -72,6 +75,16 @@ def bootstrap_route():
     """
     require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
     return start_bootstrap_job()
+
+
+@router.post("/market-data/update")
+def update_route():
+    """Start (or attach to) a background INCREMENTAL update (delta since latest;
+    prices + news). Append-only to the live DB — routing can stay active. A
+    provider/PG failure in one domain is recorded (last_error), not fatal.
+    Requires an existing local DB (bootstrap first)."""
+    require_db_write("market_update", {"db": resolve_market_db_path()})
+    return start_update_job()
 
 
 @router.get("/market-data/jobs/{job_id}")

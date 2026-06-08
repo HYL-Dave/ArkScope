@@ -158,6 +158,64 @@ def test_news_checksum_catches_id_drift(tmp_path, fake_pg):
     assert r["news"]["local_rows"] == r["news"]["pg_rows"]  # counts still equal → only SUM(id) caught it
 
 
+_NEW_PRICE = ("AAPL", "2026-06-01T09:30:00+0000", "15min", 102.0, 104.0, 101.0, 103.0, 1200)
+_NEW_NEWS = (3, "AAPL", "Apple new product launch", "big reveal", "http://d", "Reuters",
+             "polygon", "2026-06-02T10:00:00+0000", "h3")
+
+
+def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)  # 3 prices, 2 news
+    # PG now has one extra bar + one extra article (INSERT OR IGNORE dedups the rest)
+    monkeypatch.setattr(mda, "_pg_conn",
+                        lambda: _FakePG(_PRICE_ROWS + [_NEW_PRICE], _NEWS_ROWS + [_NEW_NEWS]))
+    res = mda.incremental_update(out)
+    assert res["ok"] is True
+    assert res["prices"]["rows_added"] == 1 and res["news"]["rows_added"] == 1
+    stats = mda.local_market_stats(out)
+    assert stats["prices"]["row_count"] == 4 and stats["news"]["row_count"] == 3
+    # FTS kept in sync → the new article is searchable
+    conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM news_fts WHERE news_fts MATCH 'product'").fetchone()[0]
+    finally:
+        conn.close()
+    assert n == 1
+    meta = mda.read_sync_meta(out)
+    assert meta["prices"]["rows_added"] == 1 and meta["prices"]["last_success"]
+    assert meta["news"]["rows_added"] == 1 and meta["news"]["last_error"] is None
+
+
+def test_incremental_update_idempotent(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    res = mda.incremental_update(out)  # nothing newer → 0 added each
+    assert res["prices"]["rows_added"] == 0 and res["news"]["rows_added"] == 0
+
+
+def test_incremental_update_missing_db(tmp_path):
+    res = mda.incremental_update(str(tmp_path / "nope.db"))
+    assert res["ok"] is False and "bootstrap" in res["error"]
+
+
+def test_incremental_provider_failure_not_fatal(tmp_path, fake_pg, monkeypatch):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+
+    def _boom():
+        raise RuntimeError("PG down")
+
+    monkeypatch.setattr(mda, "_pg_conn", _boom)
+    res = mda.incremental_update(out)  # must NOT raise
+    assert res["ok"] is False
+    assert res["prices"]["ok"] is False and "PG down" in res["prices"]["error"]
+    assert res["news"]["ok"] is False  # other domain also recorded, not crashed
+    meta = mda.read_sync_meta(out)
+    assert meta["prices"]["last_error"] and "PG down" in meta["prices"]["last_error"]
+    # existing data untouched
+    assert mda.local_market_stats(out)["prices"]["row_count"] == 3
+
+
 def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
     job = mda.start_bootstrap_job(out)

@@ -70,23 +70,50 @@ CREATE VIRTUAL TABLE IF NOT EXISTS news_fts
                tokenize='porter unicode61');
 """
 
-_PG_PRICES_SELECT = """
-    SELECT
-        ticker,
-        TO_CHAR(datetime AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
-        interval, open, high, low, close, volume
-    FROM prices
-    ORDER BY ticker, interval, datetime
+# Per-domain incremental-sync status. Lives in market_data.db; reset on a full
+# bootstrap (fresh DB), updated by each incremental run.
+_META_SCHEMA = """
+CREATE TABLE IF NOT EXISTS market_sync_meta (
+    domain       TEXT PRIMARY KEY,   -- 'prices' | 'news'
+    last_success TEXT,
+    last_error   TEXT,
+    rows_added   INTEGER DEFAULT 0,
+    updated_at   TEXT NOT NULL
+);
 """
 
-_PG_NEWS_SELECT = """
-    SELECT
-        id, ticker, title, description, url, publisher, source,
-        TO_CHAR(published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS published_at,
-        article_hash
-    FROM news
-    ORDER BY id
+_PRICE_INSERT = ("INSERT OR IGNORE INTO prices "
+                 "(ticker, datetime, interval, open, high, low, close, volume) "
+                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+_NEWS_INSERT = ("INSERT OR IGNORE INTO news "
+                "(id, ticker, title, description, url, publisher, source, published_at, article_hash) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+
+_PG_PRICES_COLS = """
+    ticker,
+    TO_CHAR(datetime AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
+    interval, open, high, low, close, volume
 """
+_PG_NEWS_COLS = """
+    id, ticker, title, description, url, publisher, source,
+    TO_CHAR(published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS published_at,
+    article_hash
+"""
+_PG_PRICES_SELECT = f"SELECT {_PG_PRICES_COLS} FROM prices ORDER BY ticker, interval, datetime"
+# Incremental: only bars newer than the local max (UTC). Param = local-max string.
+_PG_PRICES_SELECT_INCR = (f"SELECT {_PG_PRICES_COLS} FROM prices "
+                          "WHERE datetime > %s::timestamptz ORDER BY ticker, interval, datetime")
+_PG_NEWS_SELECT = f"SELECT {_PG_NEWS_COLS} FROM news ORDER BY id"
+# Incremental: only articles inserted after the local max id (monotonic PG id =
+# ingestion order; catches new articles regardless of published_at backfilling).
+_PG_NEWS_SELECT_INCR = f"SELECT {_PG_NEWS_COLS} FROM news WHERE id > %s ORDER BY id"
+
+
+def _now() -> str:
+    """UTC ISO-8601 timestamp (seconds). Imported lazily to keep this off the hot path."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def resolve_market_db_path() -> str:
@@ -257,20 +284,11 @@ def bootstrap_market(out_path: Optional[str] = None,
         try:
             sconn.executescript(_PRICES_SCHEMA)
             sconn.executescript(_NEWS_SCHEMA)
-            _copy_table(
-                cur, sconn, _PG_PRICES_SELECT,
-                "INSERT OR IGNORE INTO prices "
-                "(ticker, datetime, interval, open, high, low, close, volume) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                price_total, progress_cb, 0, grand, batch,
-            )
-            _copy_table(
-                cur, sconn, _PG_NEWS_SELECT,
-                "INSERT OR IGNORE INTO news "
-                "(id, ticker, title, description, url, publisher, source, published_at, article_hash) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                news_total, progress_cb, price_total, grand, batch,
-            )
+            sconn.executescript(_META_SCHEMA)
+            _copy_table(cur, sconn, _PG_PRICES_SELECT, _PRICE_INSERT,
+                        price_total, progress_cb, 0, grand, batch)
+            _copy_table(cur, sconn, _PG_NEWS_SELECT, _NEWS_INSERT,
+                        news_total, progress_cb, price_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
             sconn.commit()
 
@@ -339,6 +357,118 @@ def validate_market(out_path: Optional[str] = None) -> dict:
     }
 
 
+# --- incremental update (delta since latest) ----------------------------------
+
+def _record_sync_meta(sconn, domain: str, rows_added: int, error: Optional[str]) -> None:
+    now = _now()
+    last_success = None if error else now
+    sconn.execute(
+        "INSERT INTO market_sync_meta (domain, last_success, last_error, rows_added, updated_at) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(domain) DO UPDATE SET "
+        "  last_success = COALESCE(excluded.last_success, market_sync_meta.last_success), "
+        "  last_error = excluded.last_error, rows_added = excluded.rows_added, "
+        "  updated_at = excluded.updated_at",
+        (domain, last_success, error, rows_added, now),
+    )
+    sconn.commit()
+
+
+def _incr_domain(sconn, domain: str, local_max_sql: str, pg_select_incr: str,
+                 pg_select_full: str, insert_sql: str, batch: int) -> dict:
+    """One domain's delta append (PG newer-than-local). Provider failure is NOT
+    fatal: it is recorded to market_sync_meta.last_error and returned, not raised."""
+    try:
+        local_max = sconn.execute(local_max_sql).fetchone()[0]
+        pg = _pg_conn()
+        try:
+            cur = pg.cursor()
+            if local_max in (None, 0, ""):
+                cur.execute(pg_select_full)
+            else:
+                cur.execute(pg_select_incr, (local_max,))
+            before = sconn.total_changes
+            while True:
+                rows = cur.fetchmany(batch)
+                if not rows:
+                    break
+                sconn.executemany(insert_sql, rows)
+            added = sconn.total_changes - before
+            sconn.commit()
+        finally:
+            pg.close()
+        # keep the FTS index in sync for newly-inserted news rows
+        if domain == "news" and added:
+            sconn.execute(
+                "INSERT INTO news_fts(rowid, title, description) "
+                "SELECT id, title, description FROM news WHERE id > ?",
+                (local_max or 0,),
+            )
+            sconn.commit()
+        _record_sync_meta(sconn, domain, rows_added=added, error=None)
+        return {"ok": True, "rows_added": added, "error": None}
+    except Exception as e:  # noqa: BLE001 — provider down etc. must not be fatal
+        logger.warning(f"incremental {domain} update failed: {e}")
+        try:
+            _record_sync_meta(sconn, domain, rows_added=0, error=str(e))
+        except sqlite3.OperationalError:
+            pass
+        return {"ok": False, "rows_added": 0, "error": str(e)}
+
+
+def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> dict:
+    """Append-only delta refresh of the local market DB (prices + news) from PG —
+    only rows newer than the local max (prices: datetime; news: id). Writes in
+    place to the live WAL DB (no atomic swap), so routing can stay active. A
+    provider/PG failure in one domain is recorded, not fatal to the other.
+
+    Requires an existing local DB (bootstrap first). Returns per-domain results."""
+    path = out_path or resolve_market_db_path()
+    if not Path(path).exists():
+        return {"ok": False, "error": "local market DB does not exist — run a bootstrap first",
+                "prices": None, "news": None}
+    sconn = sqlite3.connect(path, timeout=10.0)
+    try:
+        try:
+            sconn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
+        sconn.execute("PRAGMA busy_timeout = 10000")
+        sconn.executescript(_META_SCHEMA)  # tolerate a pre-meta DB
+        prices = _incr_domain(sconn, "prices", "SELECT MAX(datetime) FROM prices",
+                              _PG_PRICES_SELECT_INCR, _PG_PRICES_SELECT, _PRICE_INSERT, batch)
+        news = _incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
+                            _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
+    finally:
+        sconn.close()
+    return {"ok": prices["ok"] and news["ok"], "prices": prices, "news": news}
+
+
+def read_sync_meta(out_path: Optional[str] = None) -> dict:
+    """Per-domain incremental-sync status (read-only). {} entries if never run."""
+    path = out_path or resolve_market_db_path()
+    out = {"prices": None, "news": None}
+    if not Path(path).exists():
+        return out
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        return out
+    try:
+        if not _table_exists(conn, "market_sync_meta"):
+            return out
+        for r in conn.execute(
+            "SELECT domain, last_success, last_error, rows_added, updated_at FROM market_sync_meta"
+        ).fetchall():
+            out[r[0]] = {"last_success": r[1], "last_error": r[2],
+                         "rows_added": r[3], "updated_at": r[4]}
+    except sqlite3.OperationalError:
+        pass
+    finally:
+        conn.close()
+    return out
+
+
 # --- in-process job runner (single sidecar) -----------------------------------
 
 _JOBS: Dict[str, dict] = {}
@@ -373,6 +503,38 @@ def start_bootstrap_job(out_path: Optional[str] = None) -> dict:
             _JOBS[job_id]["error"] = str(e)
 
     threading.Thread(target=_run, name=f"bootstrap-{job_id}", daemon=True).start()
+    return dict(_JOBS[job_id])
+
+
+def start_update_job(out_path: Optional[str] = None) -> dict:
+    """Start a background incremental update (idempotent while running)."""
+    path = out_path or resolve_market_db_path()
+    with _JOBS_LOCK:
+        for j in _JOBS.values():
+            if j["kind"] == "update_market" and j["status"] == "running":
+                return dict(j)
+        job_id = uuid.uuid4().hex[:12]
+        job = {"id": job_id, "kind": "update_market", "status": "running",
+               "progress": {"written": 0, "total": 0}, "result": None, "error": None}
+        _JOBS[job_id] = job
+
+    def _run():
+        try:
+            res = incremental_update(path)
+            _JOBS[job_id]["result"] = res
+            # incremental is best-effort per domain (provider down ≠ fatal); the
+            # job is "error" only if BOTH domains failed, else "done".
+            _JOBS[job_id]["status"] = "done" if res.get("ok") or (
+                (res.get("prices") or {}).get("ok") or (res.get("news") or {}).get("ok")
+            ) else "error"
+            if not res.get("ok"):
+                errs = [d.get("error") for d in (res.get("prices"), res.get("news")) if d and d.get("error")]
+                _JOBS[job_id]["error"] = res.get("error") or "; ".join(e for e in errs if e) or None
+        except Exception as e:  # noqa: BLE001
+            _JOBS[job_id]["status"] = "error"
+            _JOBS[job_id]["error"] = str(e)
+
+    threading.Thread(target=_run, name=f"update-{job_id}", daemon=True).start()
     return dict(_JOBS[job_id])
 
 
