@@ -1,12 +1,20 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   addCredential,
+  bootstrapMarketPrices,
   deleteCredential,
   discoverModels,
+  getMarketDataJob,
+  getMarketDataStatus,
   getModelCatalog,
   saveModelRoutes,
+  setUseLocalMarket,
   testModelAccess,
   updateCredential,
+  validateMarketData,
+  type MarketDataJob,
+  type MarketDataStatus,
+  type MarketDataValidate,
   type ModelCatalog,
   type ModelDiscoveryResult,
   type ModelOption,
@@ -23,7 +31,7 @@ const TASK_LABELS: Record<ModelTask, string> = {
   card_translation: "卡片翻譯",
 };
 
-type SettingsSection = "models" | "providers" | "data_sources" | "permissions";
+type SettingsSection = "models" | "providers" | "data_storage" | "data_sources" | "permissions";
 
 const SETTINGS_SECTIONS: Array<{
   id: SettingsSection;
@@ -41,6 +49,12 @@ const SETTINGS_SECTIONS: Array<{
     id: "providers",
     title: "Providers",
     description: "Anthropic / OpenAI key 狀態與可用模型來源。",
+    enabled: true,
+  },
+  {
+    id: "data_storage",
+    title: "Data Storage",
+    description: "本地市場資料庫（價格）建立、驗證、啟用；PG 為 fallback。",
     enabled: true,
   },
   {
@@ -287,11 +301,176 @@ export function SettingsView({
                   setSection("models");
                 }}
               />
+            ) : section === "data_storage" ? (
+              <DataStorageSection />
             ) : null}
           </section>
         </div>
       )}
     </main>
+  );
+}
+
+function DataStorageSection() {
+  const [status, setStatus] = useState<MarketDataStatus | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"" | "bootstrap" | "validate" | "toggle">("");
+  const [job, setJob] = useState<MarketDataJob | null>(null);
+  const [validation, setValidation] = useState<MarketDataValidate | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setStatus(await getMarketDataStatus());
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function runBootstrap() {
+    if (busy) return;
+    setBusy("bootstrap");
+    setValidation(null);
+    setErr(null);
+    try {
+      let j = await bootstrapMarketPrices();
+      setJob(j);
+      while (j.status === "running") {
+        await new Promise((r) => setTimeout(r, 1000));
+        j = await getMarketDataJob(j.id);
+        setJob(j);
+      }
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function runValidate() {
+    if (busy) return;
+    setBusy("validate");
+    setErr(null);
+    try {
+      setValidation(await validateMarketData());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function toggle(enabled: boolean) {
+    if (busy) return;
+    setBusy("toggle");
+    setErr(null);
+    try {
+      await setUseLocalMarket(enabled);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const p = status?.prices;
+  const pct =
+    job && job.progress.total > 0
+      ? Math.round((job.progress.written / job.progress.total) * 100)
+      : 0;
+
+  return (
+    <div>
+      <div className="settings-section-head">
+        <div>
+          <h2>本地市場資料庫 · Market Data</h2>
+          <p className="muted tiny">
+            把市場價格從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
+            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、新聞、報告）仍在 PG。
+          </p>
+        </div>
+        <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
+      </div>
+
+      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+
+      {!status ? (
+        <p className="muted">載入中…</p>
+      ) : (
+        <div className="settings-panel">
+          <dl className="ds-kv">
+            <dt>本地價格庫</dt>
+            <dd>{p?.exists ? "已建立" : "尚未建立"}</dd>
+            <dt>列數 / 標的</dt>
+            <dd>{p?.exists ? `${p.row_count.toLocaleString()} 列 · ${p.ticker_count} 檔` : "—"}</dd>
+            <dt>最新資料</dt>
+            <dd>{p?.latest_datetime ?? "—"}</dd>
+            <dt>本地路由</dt>
+            <dd>
+              {status.routing_enabled
+                ? "啟用中（PG fallback）"
+                : status.use_local_market_setting
+                  ? "設定已開，待建立資料庫"
+                  : "關閉（使用 PG）"}
+              {status.env_override && "（env 強制開啟）"}
+            </dd>
+          </dl>
+
+          <div className="settings-actions" style={{ marginTop: 12 }}>
+            <button className="btn-ghost" onClick={() => void runBootstrap()} disabled={!!busy}>
+              {busy === "bootstrap" ? "建立中…" : p?.exists ? "重建本地價格庫" : "建立本地價格庫"}
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => void runValidate()}
+              disabled={!!busy || !p?.exists}
+            >
+              {busy === "validate" ? "驗證中…" : "驗證本地資料"}
+            </button>
+            <label className="ds-toggle">
+              <input
+                type="checkbox"
+                checked={status.use_local_market_setting}
+                disabled={!!busy}
+                onChange={(e) => void toggle(e.target.checked)}
+              />
+              使用本地 market data
+            </label>
+          </div>
+
+          {busy === "bootstrap" && job && (
+            <p className="muted tiny" style={{ marginTop: 8 }}>
+              建立中… {job.progress.written.toLocaleString()} / {job.progress.total.toLocaleString()} ({pct}%)
+            </p>
+          )}
+          {busy !== "bootstrap" && job && job.status === "done" && job.result && (
+            <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
+              ✓ 建立完成：{job.result.rows.toLocaleString()} 列、{job.result.groups} 群組，校驗一致。
+            </p>
+          )}
+          {busy !== "bootstrap" && job && job.status === "error" && (
+            <p className="tiny refresh-err" style={{ marginTop: 8 }}>
+              建立失敗：{job.error}（既有資料庫已保留）
+            </p>
+          )}
+          {validation && (
+            <p
+              className="tiny"
+              style={{ marginTop: 8, color: validation.match ? "var(--ok)" : "var(--bad)" }}
+            >
+              {validation.match
+                ? `✓ 驗證一致：本地 ${validation.local_rows.toLocaleString()} 列 = PG ${(validation.pg_rows ?? 0).toLocaleString()} 列`
+                : `✗ 驗證不一致：本地 ${validation.local_rows.toLocaleString()} vs PG ${(validation.pg_rows ?? 0).toLocaleString()} — 建議重建`}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

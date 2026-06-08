@@ -508,6 +508,31 @@ table.wl tbody tr.archived td {
   gap: 10px;
   padding: 8px 0 2px;
 }
+.ds-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  font-size: 13px;
+  margin: 0;
+}
+.ds-kv dt {
+  color: var(--muted);
+}
+.ds-kv dd {
+  margin: 0;
+}
+.ds-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ds-toggle input {
+  cursor: pointer;
+}
+
 .rowx {
   border: 1px solid var(--border);
   background: transparent;

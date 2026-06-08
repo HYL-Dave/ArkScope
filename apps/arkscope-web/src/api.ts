@@ -753,3 +753,58 @@ export function translateCard(
 ): Promise<{ run_id: number; lang: string; card: ResultCard; cached: boolean }> {
   return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, 120_000);
 }
+
+// --- market-data local-DB lifecycle (slice 3a.1) ---
+
+export interface MarketDataStatus {
+  market_db: string;
+  prices: {
+    exists: boolean;
+    row_count: number;
+    ticker_count: number;
+    latest_datetime: string | null;
+  };
+  use_local_market_setting: boolean;
+  env_override: boolean;
+  routing_enabled: boolean;
+  pg_fallback_active: boolean;
+}
+
+export interface MarketDataJob {
+  id: string;
+  kind: string;
+  status: "running" | "done" | "error";
+  progress: { written: number; total: number };
+  result: { rows: number; total: number; groups: number; match: boolean } | null;
+  error: string | null;
+}
+
+export interface MarketDataValidate {
+  exists: boolean;
+  match: boolean;
+  local_rows: number;
+  pg_rows: number | null;
+  local_groups?: number;
+  pg_groups?: number;
+}
+
+export function getMarketDataStatus(): Promise<MarketDataStatus> {
+  return getJSON<MarketDataStatus>("/market-data/status");
+}
+
+export function bootstrapMarketPrices(): Promise<MarketDataJob> {
+  return sendJSON<MarketDataJob>("/market-data/bootstrap-prices", "POST");
+}
+
+export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
+  return getJSON<MarketDataJob>(`/market-data/jobs/${encodeURIComponent(jobId)}`);
+}
+
+// Validation runs two PG aggregates over the full prices table — allow time.
+export function validateMarketData(): Promise<MarketDataValidate> {
+  return sendJSON<MarketDataValidate>("/market-data/validate", "POST", undefined, 60_000);
+}
+
+export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_setting: boolean }> {
+  return sendJSON("/market-data/settings", "PUT", { enabled });
+}
