@@ -208,7 +208,14 @@ Implement as a small pure-Python/pandas (or SQL-window) module in the FastAPI si
 
 ## 7. `daily_update.py` new positioning + old-model pollution to remove
 
-**File:** `scripts/collection/daily_update.py` (881 lines). It is a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`; it writes no DB itself, touches **remote PG only**, has **no SQLite/`profile_state.db` writes, and no RL/reward/PPO references anywhere** (verified full-file).
+> **✅ IMPLEMENTED 2026-06-08** (commits `a765c85` + follow-up `c70b83d`). All three
+> couplings below are removed; the script is now a backfill runner with explicit
+> `--scope active-universe` / `--tickers`, opt-in `--scores`, and dry-run that never
+> touches DB/IBKR. **The `line NNN` references below are PRE-slice-2 (the audit
+> snapshot); the code has since shifted — they document what *was* found, not current
+> line numbers.**
+
+**File:** `scripts/collection/daily_update.py` (was 881 lines). It is a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`; it writes no DB itself, touches **remote PG only**, has **no SQLite/`profile_state.db` writes, and no RL/reward/PPO references anywhere** (verified full-file).
 
 ### New positioning
 Reframe as a **manual / on-demand backfill runner** — explicitly *not* the desktop app's continuous-sync engine. The always-on workbench sidecar's continuous sync of *user state* is a separate concern and must not be layered onto this batch runner. Position it as: *"run by hand or by cron to backfill historical market/news data into Parquet + remote PG."*
@@ -300,7 +307,7 @@ Source repo confirmed at `<workspace>/daily_stock_analysis`. The provider/fallba
 | Slice | Scope | Depends on |
 |---|---|---|
 | **Slice 1 (this slice)** | This decision doc + the docs inventory it sits beside. Establishes the three modes, the DB split target, and the daily_update repositioning as the shared plan of record. No code change. | — |
-| **Slice 2 — `daily_update.py` cleanup** (NEXT) | Remove the three old-model couplings: delete `sync_watchlist_tickers` call `:784` + dead helpers `:80-182` (a); replace `--tier all` `:597` with **explicit** `--tickers` / `--scope active-universe` (read-only read of `profile_state.db`, no config writeback) (b); make `--scores` `:668` a **fully separate opt-in** step (c). Keep Polygon/Finnhub/IBKR-news collectors unchanged. Reframe `--all` so heavy steps (IV `:618`, full prices, scores) are opt-in and `--all` never implicitly guesses a scope. | Slice 1; **Q6/Q7 LOCKED ✓** |
+| **Slice 2 — `daily_update.py` cleanup** ✅ DONE (`a765c85`+`c70b83d`) | Removed the three old-model couplings: `sync_watchlist_tickers` writeback (a); `--tier all` → explicit `--tickers` / `--scope active-universe` (physically read-only `mode=ro` read of `profile_state.db`, no config writeback) (b); `--scores` is a fully separate opt-in (c). Polygon/Finnhub/IBKR-news collectors unchanged. `--all` excludes IV + never guesses a price scope; dry-run never touches DB/IBKR. | Slice 1; **Q6/Q7 LOCKED ✓** |
 | **Slice 3a — market_data local-first (NO SA)** | Add the **domain-routing** DAL (§3d) + `SqliteBackend`; migrate Phase 1 (`market_data` — regenerable) to `market_data.db` (SQLite, WAL) with row-count + checksum validation; keep PG fallback. **SA stays on PG; app records stay on PG.** Weekday-safe (no extension impact). | Slice 2; Q2/Q3 |
 | **Slice 3b — SA capture cutover** | Move `sa_*` PG → `sa_capture.db`. **Requires a quiet window (§5g): target Saturday US-closed (2026-06-13).** Dry-run on a DB copy first; port partial-index `ON CONFLICT` upserts; verify row-count + checksum + an extension→native-host smoke before flipping the SA domain route. | Slice 3a; §5g |
 | **Slice 4 — Charting + price tiers** | Widen interval enum (`1m`/`5m`/native `1d`); persist adjusted `1d` (`adj_close`); reusable `date_trunc` rollup; deterministic-indicator module in the sidecar; (optional) Tier 0 realtime stream. | Slice 3a; Q1/Q4/Q5 |
