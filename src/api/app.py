@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     from .routes.analysis_cards import router as analysis_cards_router
     from .routes.symbols import router as symbols_router
     from .routes.consensus import router as consensus_router
+    from .routes.market_data import router as market_data_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_cards_router)
     app.include_router(symbols_router)
     app.include_router(consensus_router)
+    app.include_router(market_data_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the

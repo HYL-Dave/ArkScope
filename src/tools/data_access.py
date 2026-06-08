@@ -208,25 +208,50 @@ class DataAccessLayer:
 
     def _maybe_wrap_local_market(self, pg_backend):
         """Opt-in: route the *market_data* domain (slice 3a: prices) to a local
-        SQLite DB with PG fallback. Active only when ``ARKSCOPE_USE_LOCAL_MARKET``
-        is truthy AND the market DB exists — otherwise pure-PG behavior is
-        unchanged (zero risk by default; unset the env to roll back instantly)."""
+        SQLite DB with PG fallback. Active only when local-market is enabled —
+        via the persisted ``use_local_market`` app setting OR the
+        ``ARKSCOPE_USE_LOCAL_MARKET`` env override — AND the market DB exists.
+        Otherwise pure-PG behavior is unchanged (zero risk by default; flip the
+        Settings toggle off / unset the env to roll back instantly)."""
         import os
 
-        flag = os.environ.get("ARKSCOPE_USE_LOCAL_MARKET", "").strip().lower()
-        if flag not in ("1", "true", "yes", "on"):
-            return pg_backend
         market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
             str(self._base / "data" / "market_data.db") if self._base else None
         )
-        if not market_db or not Path(market_db).exists():
-            logger.info("ARKSCOPE_USE_LOCAL_MARKET set but market_data.db missing — staying on PG")
+        if not self._local_market_enabled() or not market_db or not Path(market_db).exists():
             return pg_backend
         from src.tools.backends.sqlite_backend import SqliteBackend
         from src.tools.backends.composite_backend import CompositeBackend
 
         logger.info(f"Routing market_data → local SQLite {market_db} (PG fallback)")
         return CompositeBackend(primary=pg_backend, market=SqliteBackend(market_db))
+
+    def _local_market_enabled(self) -> bool:
+        """True if local-market routing is enabled — env override OR the persisted
+        ``use_local_market`` setting in profile_state.db. The setting is read with a
+        light read-only SQLite query (no ProfileStateStore import / no migration)."""
+        import os
+        import sqlite3
+
+        truthy = ("1", "true", "yes", "on")
+        if os.environ.get("ARKSCOPE_USE_LOCAL_MARKET", "").strip().lower() in truthy:
+            return True
+        profile_db = os.environ.get("ARKSCOPE_PROFILE_DB") or (
+            str(self._base / "data" / "profile_state.db") if self._base else None
+        )
+        if not profile_db or not Path(profile_db).exists():
+            return False
+        try:
+            conn = sqlite3.connect(f"file:{profile_db}?mode=ro", uri=True)
+            try:
+                row = conn.execute(
+                    "SELECT value FROM profile_settings WHERE key = 'use_local_market'"
+                ).fetchone()
+            finally:
+                conn.close()
+            return bool(row) and str(row[0]).strip().lower() in truthy
+        except sqlite3.OperationalError:
+            return False
 
     @property
     def backend_type(self) -> str:
