@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   addCredential,
-  bootstrapMarketPrices,
+  bootstrapMarketData,
   deleteCredential,
   discoverModels,
   getMarketDataJob,
@@ -336,7 +336,7 @@ function DataStorageSection() {
     setValidation(null);
     setErr(null);
     try {
-      let j = await bootstrapMarketPrices();
+      let j = await bootstrapMarketData();
       setJob(j);
       while (j.status === "running") {
         await new Promise((r) => setTimeout(r, 1000));
@@ -378,7 +378,9 @@ function DataStorageSection() {
     }
   }
 
-  const p = status?.prices;
+  const exists = status?.exists ?? false;
+  const pr = status?.prices;
+  const nw = status?.news;
   const pct =
     job && job.progress.total > 0
       ? Math.round((job.progress.written / job.progress.total) * 100)
@@ -390,8 +392,8 @@ function DataStorageSection() {
         <div>
           <h2>本地市場資料庫 · Market Data</h2>
           <p className="muted tiny">
-            把市場價格從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
-            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、新聞、報告）仍在 PG。
+            把市場價格與新聞從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
+            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、報告、分數）仍在 PG。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
@@ -404,12 +406,12 @@ function DataStorageSection() {
       ) : (
         <div className="settings-panel">
           <dl className="ds-kv">
-            <dt>本地價格庫</dt>
-            <dd>{p?.exists ? "已建立" : "尚未建立"}</dd>
-            <dt>列數 / 標的</dt>
-            <dd>{p?.exists ? `${p.row_count.toLocaleString()} 列 · ${p.ticker_count} 檔` : "—"}</dd>
-            <dt>最新資料</dt>
-            <dd>{p?.latest_datetime ?? "—"}</dd>
+            <dt>本地市場庫</dt>
+            <dd>{exists ? "已建立" : "尚未建立"}</dd>
+            <dt>價格</dt>
+            <dd>{exists ? `${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? "—"}` : "—"}</dd>
+            <dt>新聞</dt>
+            <dd>{exists ? `${nw!.row_count.toLocaleString()} 篇 · ${nw!.source_count} 來源 · 最新 ${nw!.latest_published ?? "—"}` : "—"}</dd>
             <dt>本地路由</dt>
             <dd>
               {status.routing_enabled
@@ -423,12 +425,12 @@ function DataStorageSection() {
 
           <div className="settings-actions" style={{ marginTop: 12 }}>
             <button className="btn-ghost" onClick={() => void runBootstrap()} disabled={!!busy}>
-              {busy === "bootstrap" ? "建立中…" : p?.exists ? "重建本地價格庫" : "建立本地價格庫"}
+              {busy === "bootstrap" ? "建立中…" : exists ? "重建本地市場庫（價格＋新聞）" : "建立本地市場庫（價格＋新聞）"}
             </button>
             <button
               className="btn-ghost"
               onClick={() => void runValidate()}
-              disabled={!!busy || !p?.exists}
+              disabled={!!busy || !exists}
             >
               {busy === "validate" ? "驗證中…" : "驗證本地資料"}
             </button>
@@ -451,7 +453,8 @@ function DataStorageSection() {
           )}
           {busy !== "bootstrap" && job && job.status === "done" && job.result && (
             <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
-              ✓ 建立完成：{job.result.rows.toLocaleString()} 列、{job.result.groups} 群組，校驗一致。
+              ✓ 建立完成：價格 {job.result.prices.rows.toLocaleString()} 列、
+              新聞 {job.result.news.rows.toLocaleString()} 篇，校驗一致。
             </p>
           )}
           {busy !== "bootstrap" && job && job.status === "error" && (
@@ -464,9 +467,11 @@ function DataStorageSection() {
               className="tiny"
               style={{ marginTop: 8, color: validation.match ? "var(--ok)" : "var(--bad)" }}
             >
-              {validation.match
-                ? `✓ 驗證一致：本地 ${validation.local_rows.toLocaleString()} 列 = PG ${(validation.pg_rows ?? 0).toLocaleString()} 列`
-                : `✗ 驗證不一致：本地 ${validation.local_rows.toLocaleString()} vs PG ${(validation.pg_rows ?? 0).toLocaleString()} — 建議重建`}
+              {validation.match ? "✓ 驗證一致" : "✗ 驗證不一致（建議重建）"}：
+              價格 {(validation.prices?.local_rows ?? 0).toLocaleString()}/{(validation.prices?.pg_rows ?? 0).toLocaleString()}
+              {validation.prices?.match ? " ✓" : " ✗"} · 新聞{" "}
+              {(validation.news?.local_rows ?? 0).toLocaleString()}/{(validation.news?.pg_rows ?? 0).toLocaleString()}
+              {validation.news?.match ? " ✓" : " ✗"}
             </p>
           )}
         </div>

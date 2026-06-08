@@ -754,20 +754,23 @@ export function translateCard(
   return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, 120_000);
 }
 
-// --- market-data local-DB lifecycle (slice 3a.1) ---
+// --- market-data local-DB lifecycle (slices 3a prices + 3b news) ---
 
 export interface MarketDataStatus {
   market_db: string;
-  prices: {
-    exists: boolean;
-    row_count: number;
-    ticker_count: number;
-    latest_datetime: string | null;
-  };
+  exists: boolean;
+  prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
+  news: { row_count: number; source_count: number; latest_published: string | null };
   use_local_market_setting: boolean;
   env_override: boolean;
   routing_enabled: boolean;
   pg_fallback_active: boolean;
+}
+
+interface DomainResult {
+  rows: number;
+  total: number;
+  match: boolean;
 }
 
 export interface MarketDataJob {
@@ -775,32 +778,37 @@ export interface MarketDataJob {
   kind: string;
   status: "running" | "done" | "error";
   progress: { written: number; total: number };
-  result: { rows: number; total: number; groups: number; match: boolean } | null;
+  result: { match: boolean; prices: DomainResult; news: DomainResult } | null;
   error: string | null;
+}
+
+interface DomainValidate {
+  local_rows: number;
+  pg_rows: number;
+  match: boolean;
 }
 
 export interface MarketDataValidate {
   exists: boolean;
   match: boolean;
-  local_rows: number;
-  pg_rows: number | null;
-  local_groups?: number;
-  pg_groups?: number;
+  prices?: DomainValidate;
+  news?: DomainValidate;
 }
 
 export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
 }
 
-export function bootstrapMarketPrices(): Promise<MarketDataJob> {
-  return sendJSON<MarketDataJob>("/market-data/bootstrap-prices", "POST");
+// Full rebuild of the local market DB (prices + news). Returns a job to poll.
+export function bootstrapMarketData(): Promise<MarketDataJob> {
+  return sendJSON<MarketDataJob>("/market-data/bootstrap", "POST");
 }
 
 export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
   return getJSON<MarketDataJob>(`/market-data/jobs/${encodeURIComponent(jobId)}`);
 }
 
-// Validation runs two PG aggregates over the full prices table — allow time.
+// Validation runs PG aggregates over the full prices + news tables — allow time.
 export function validateMarketData(): Promise<MarketDataValidate> {
   return sendJSON<MarketDataValidate>("/market-data/validate", "POST", undefined, 60_000);
 }
