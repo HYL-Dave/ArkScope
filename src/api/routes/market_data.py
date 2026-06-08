@@ -73,10 +73,20 @@ def bootstrap_prices_route():
 
 @router.get("/market-data/jobs/{job_id}")
 def market_data_job(job_id: str):
-    """Poll a market-data background job (e.g. bootstrap)."""
+    """Poll a market-data background job (e.g. bootstrap).
+
+    When a bootstrap finishes successfully the market DB has just appeared/changed,
+    so we drop the lru_cache'd DAL → the next read re-evaluates routing (covers the
+    enable-before-build order without a restart). Idempotent; the client stops
+    polling at done, so this fires ~once.
+    """
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
+    if job.get("kind") == "bootstrap_prices" and job.get("status") == "done":
+        from src.api.dependencies import get_dal
+
+        get_dal.cache_clear()
     return job
 
 
@@ -102,4 +112,9 @@ def set_local_market(
     """
     require_profile_state_write("set_use_local_market", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_MARKET_KEY, "true" if body.enabled else "false")
+    # The DAL reads this setting at construction and is an lru_cache singleton, so
+    # drop it → the next request rebuilds the DAL with the new routing (no restart).
+    from src.api.dependencies import get_dal
+
+    get_dal.cache_clear()
     return {"use_local_market_setting": body.enabled}

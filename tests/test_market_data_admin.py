@@ -170,3 +170,31 @@ def test_job_not_found_404():
     with pytest.raises(HTTPException) as exc:
         market_data_job("nonexistent")
     assert exc.value.status_code == 404
+
+
+def test_toggle_invalidates_dal_cache(store, monkeypatch):
+    # Toggling the setting must drop the lru_cache'd DAL so routing re-evaluates
+    # on the next request (no sidecar restart needed).
+    from src.api.routes.market_data import set_local_market, LocalMarketToggle
+    from src.api import dependencies
+
+    cleared = {"n": 0}
+    monkeypatch.setattr(dependencies.get_dal, "cache_clear", lambda: cleared.__setitem__("n", cleared["n"] + 1))
+    set_local_market(LocalMarketToggle(enabled=True), store=store)
+    assert cleared["n"] == 1
+
+
+def test_bootstrap_done_poll_invalidates_dal_cache(monkeypatch):
+    # A completed bootstrap poll drops the DAL cache (covers enable-before-build).
+    import src.market_data_admin as _mda
+    from src.api.routes import market_data as md
+    from src.api import dependencies
+
+    monkeypatch.setattr(_mda, "get_job", lambda jid: {
+        "id": jid, "kind": "bootstrap_prices", "status": "done",
+        "progress": {"written": 1, "total": 1}, "result": {"match": True}, "error": None})
+    monkeypatch.setattr(md, "get_job", _mda.get_job)
+    cleared = {"n": 0}
+    monkeypatch.setattr(dependencies.get_dal, "cache_clear", lambda: cleared.__setitem__("n", cleared["n"] + 1))
+    md.market_data_job("abc")
+    assert cleared["n"] == 1
