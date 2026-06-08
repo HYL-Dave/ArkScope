@@ -191,6 +191,7 @@ class DataAccessLayer:
                 sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
                 self._backend = DatabaseBackend(dsn=env_dsn, sslmode=sslmode)
                 logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
+                self._backend = self._maybe_wrap_local_market(self._backend)
             else:
                 self._backend = FileBackend(base_path=self._base)
         elif db_dsn:
@@ -204,6 +205,28 @@ class DataAccessLayer:
         # Simple TTL cache: key -> (data, timestamp)
         self._cache: Dict[str, tuple] = {}
         self._cache_ttl_seconds: int = 3600  # 1 hour default
+
+    def _maybe_wrap_local_market(self, pg_backend):
+        """Opt-in: route the *market_data* domain (slice 3a: prices) to a local
+        SQLite DB with PG fallback. Active only when ``ARKSCOPE_USE_LOCAL_MARKET``
+        is truthy AND the market DB exists — otherwise pure-PG behavior is
+        unchanged (zero risk by default; unset the env to roll back instantly)."""
+        import os
+
+        flag = os.environ.get("ARKSCOPE_USE_LOCAL_MARKET", "").strip().lower()
+        if flag not in ("1", "true", "yes", "on"):
+            return pg_backend
+        market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
+            str(self._base / "data" / "market_data.db") if self._base else None
+        )
+        if not market_db or not Path(market_db).exists():
+            logger.info("ARKSCOPE_USE_LOCAL_MARKET set but market_data.db missing — staying on PG")
+            return pg_backend
+        from src.tools.backends.sqlite_backend import SqliteBackend
+        from src.tools.backends.composite_backend import CompositeBackend
+
+        logger.info(f"Routing market_data → local SQLite {market_db} (PG fallback)")
+        return CompositeBackend(primary=pg_backend, market=SqliteBackend(market_db))
 
     @property
     def backend_type(self) -> str:
