@@ -189,9 +189,7 @@ class DataAccessLayer:
             if env_dsn:
                 from src.tools.db_config import load_sslmode
                 sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
-                self._backend = DatabaseBackend(dsn=env_dsn, sslmode=sslmode)
-                logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
-                self._backend = self._maybe_wrap_local_market(self._backend)
+                self._backend = self._make_db_backend(env_dsn, sslmode)
             else:
                 self._backend = FileBackend(base_path=self._base)
         elif db_dsn:
@@ -206,25 +204,29 @@ class DataAccessLayer:
         self._cache: Dict[str, tuple] = {}
         self._cache_ttl_seconds: int = 3600  # 1 hour default
 
-    def _maybe_wrap_local_market(self, pg_backend):
-        """Opt-in: route the *market_data* domain (slice 3a: prices) to a local
-        SQLite DB with PG fallback. Active only when local-market is enabled —
-        via the persisted ``use_local_market`` app setting OR the
-        ``ARKSCOPE_USE_LOCAL_MARKET`` env override — AND the market DB exists.
-        Otherwise pure-PG behavior is unchanged (zero risk by default; flip the
-        Settings toggle off / unset the env to roll back instantly)."""
+    def _make_db_backend(self, dsn: str, sslmode: str):
+        """Construct the PG backend — or, when local-market is enabled AND the
+        market DB exists, a ``LocalMarketDatabaseBackend`` (a DatabaseBackend
+        SUBCLASS that serves prices from local SQLite with PG fallback). Using a
+        subclass keeps ``isinstance(backend, DatabaseBackend)`` True everywhere, so
+        the DB-only code paths (summaries / news / sentiment / freshness) behave
+        exactly as on plain PG — only prices read local-first.
+
+        Enabled via the persisted ``use_local_market`` setting OR the
+        ``ARKSCOPE_USE_LOCAL_MARKET`` env override; default = plain PG (zero risk;
+        flip the Settings toggle off / unset the env to roll back instantly)."""
         import os
 
         market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
             str(self._base / "data" / "market_data.db") if self._base else None
         )
-        if not self._local_market_enabled() or not market_db or not Path(market_db).exists():
-            return pg_backend
-        from src.tools.backends.sqlite_backend import SqliteBackend
-        from src.tools.backends.composite_backend import CompositeBackend
+        if self._local_market_enabled() and market_db and Path(market_db).exists():
+            from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
 
-        logger.info(f"Routing market_data → local SQLite {market_db} (PG fallback)")
-        return CompositeBackend(primary=pg_backend, market=SqliteBackend(market_db))
+            logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, PG fallback)")
+            return LocalMarketDatabaseBackend(dsn, sslmode, market_db=market_db)
+        logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
+        return DatabaseBackend(dsn=dsn, sslmode=sslmode)
 
     def _local_market_enabled(self) -> bool:
         """True if local-market routing is enabled — env override OR the persisted

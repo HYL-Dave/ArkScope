@@ -1,4 +1,4 @@
-"""Tests for the local market-data SqliteBackend + CompositeBackend routing (slice 3a)."""
+"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend routing (slice 3a)."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
+from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.backends.sqlite_backend import SqliteBackend
-from src.tools.backends.composite_backend import CompositeBackend
+from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
 
 _COLS = ["datetime", "open", "high", "low", "close", "volume"]
 
@@ -99,61 +100,61 @@ def test_get_available_tickers(market_db):
     assert SqliteBackend(db).get_available_tickers("news") == []  # slice 3a = prices only
 
 
-# --- CompositeBackend routing -------------------------------------------------
+# --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
+
+_PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
 
 
-class _FakePG:
-    """Stand-in primary (PG) recording which methods were hit."""
-
-    def __init__(self):
-        self.calls = []
-
-    def query_prices(self, ticker, interval="15min", days=30):
-        self.calls.append(("query_prices", ticker))
-        return pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
-
-    def get_available_tickers(self, data_type):
-        self.calls.append(("get_available_tickers", data_type))
-        return ["PGONLY"]
-
-    def query_sa_picks(self, *a, **k):
-        self.calls.append(("query_sa_picks", a))
-        return ["sa-result"]
-
-    def close(self):
-        self.calls.append(("close", None))
+def _make(db):
+    # Constructing does NOT connect to PG (DatabaseBackend connects lazily).
+    return LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db)
 
 
-def test_composite_prices_local_when_present(market_db):
+def test_is_databasebackend_subclass(market_db):
+    # REGRESSION (the "enable local market → all data wrong" bug): the DAL/agents
+    # branch on isinstance(backend, DatabaseBackend) in ~30 places to gate every
+    # DB-only path (batch summaries / news / sentiment / freshness). The
+    # local-market backend MUST satisfy isinstance or those paths silently fall to
+    # empty/file behaviour and the cockpit shows wrong/empty data.
     db, _ = market_db
-    pg = _FakePG()
-    comp = CompositeBackend(primary=pg, market=SqliteBackend(db))
-    df = comp.query_prices("AAPL", interval="15min", days=30)
+    assert isinstance(_make(db), DatabaseBackend) is True
+
+
+def test_prices_local_when_present(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_prices",
+        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1],
+    )
+    df = _make(db).query_prices("AAPL", interval="15min", days=30)
     assert len(df) == 8 and "PGSENTINEL" not in df["datetime"].values
-    assert pg.calls == []  # PG never touched when local has data
+    assert hit == []  # PG (super) never hit when local has data
 
 
-def test_composite_prices_fallback_to_pg(market_db):
+def test_prices_fallback_to_pg(market_db, monkeypatch):
     db, _ = market_db
-    pg = _FakePG()
-    comp = CompositeBackend(primary=pg, market=SqliteBackend(db))
-    df = comp.query_prices("UNKNOWN", days=30)  # not in local → PG fallback
-    assert df.iloc[0]["datetime"] == "PGSENTINEL"
-    assert ("query_prices", "UNKNOWN") in pg.calls
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_prices",
+        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1],
+    )
+    df = _make(db).query_prices("UNKNOWN", days=30)  # not in local → PG fallback
+    assert df.iloc[0]["datetime"] == "PGSENTINEL" and hit == ["UNKNOWN"]
 
 
-def test_composite_forwards_non_market_methods(market_db):
+def test_available_tickers_routing(market_db, monkeypatch):
     db, _ = market_db
-    pg = _FakePG()
-    comp = CompositeBackend(primary=pg, market=SqliteBackend(db))
-    # SA (and any non-market method) → primary via __getattr__
-    assert comp.query_sa_picks("x") == ["sa-result"]
-    assert ("query_sa_picks", ("x",)) in pg.calls
+    monkeypatch.setattr(DatabaseBackend, "get_available_tickers", lambda self, data_type: ["PGONLY"])
+    b = _make(db)
+    assert b.get_available_tickers("prices") == ["AAPL"]   # local
+    assert b.get_available_tickers("news") == ["PGONLY"]   # → PG (super)
 
 
-def test_composite_available_tickers_routing(market_db):
+def test_non_market_methods_are_inherited_pg(market_db):
+    # Non-overridden methods ARE DatabaseBackend's (inheritance, not forwarding) —
+    # so SA/news/reports/etc. run exactly as on plain PG.
     db, _ = market_db
-    pg = _FakePG()
-    comp = CompositeBackend(primary=pg, market=SqliteBackend(db))
-    assert comp.get_available_tickers("prices") == ["AAPL"]   # local
-    assert comp.get_available_tickers("news") == ["PGONLY"]   # → PG
+    b = _make(db)
+    assert type(b).query_news is DatabaseBackend.query_news
+    assert type(b).query_prices is not DatabaseBackend.query_prices  # overridden

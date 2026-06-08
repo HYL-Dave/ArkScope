@@ -4,9 +4,10 @@ SqliteBackend — local-first market-data backend (slice 3a: PRICES only).
 Part of the PostgreSQL → local SQLite migration (see
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
 serves the *market_data* domain from a local ``market_data.db`` (SQLite, WAL).
-It is NOT a full ``DataBackend`` — only the methods routed to it by
-:class:`CompositeBackend` are implemented (slice 3a = ``query_prices`` +
-``get_available_tickers('prices')``). Everything else stays on PostgreSQL.
+It is NOT a full ``DataBackend`` — only the methods used by
+:class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
+implemented (slice 3a = ``query_prices`` + ``get_available_tickers('prices')``).
+Everything else stays on PostgreSQL.
 
 Reads open the DB **read-only** (``mode=ro``); writes are done only by the
 migration script, never here. The on-disk ``datetime`` is stored as the same
@@ -50,7 +51,7 @@ class SqliteBackend:
         Returns native rows at the requested interval; for 1d/1h with no native
         rows, rolls up from stored 15min bars (first-open / max-high / min-low /
         last-close / sum-volume) — same definition as the PG path. Empty frame on
-        any miss (the CompositeBackend then falls back to PG).
+        any miss (LocalMarketDatabaseBackend then falls back to PG).
         """
         ticker = ticker.upper()
         db_interval = _INTERVAL_MAP.get(interval, interval)
