@@ -21,7 +21,7 @@ def _dt(day: date, hour: int, minute: int) -> str:
 
 @pytest.fixture()
 def market_db(tmp_path):
-    """A market_data.db with 15min bars for AAPL across 2 hours of one recent day."""
+    """A market_data.db with 15min bars + a small news corpus (with FTS5)."""
     day = date.today() - timedelta(days=2)  # safely inside a 30-day window
     db = tmp_path / "market_data.db"
     conn = sqlite3.connect(db)
@@ -32,18 +32,32 @@ def market_db(tmp_path):
             open REAL, high REAL, low REAL, close REAL, volume INTEGER,
             PRIMARY KEY (ticker, datetime, interval)
         );
+        CREATE TABLE news (
+            id INTEGER PRIMARY KEY, ticker TEXT, title TEXT, description TEXT,
+            url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT
+        );
+        CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news', content_rowid='id', tokenize='porter unicode61');
         """
     )
-    # 8 × 15min bars: 09:00..10:45. open ramps 100,101,...; highs/lows spread.
     bars = []
     for i in range(8):
         hour = 9 + i // 4
         minute = (i % 4) * 15
         o = 100 + i
         bars.append(("AAPL", _dt(day, hour, minute), "15min", o, o + 2, o - 1, o + 0.5, 1000 + i))
-    conn.executemany(
-        "INSERT INTO prices VALUES (?,?,?,?,?,?,?,?)", bars
-    )
+    conn.executemany("INSERT INTO prices VALUES (?,?,?,?,?,?,?,?)", bars)
+
+    pub = f"{day.isoformat()}T12:00:00+0000"
+    news = [
+        (1, "AAPL", "Apple earnings beat estimates", "strong iPhone demand", "http://a",
+         "Reuters", "polygon", pub, "h1"),
+        (2, "NVDA", "Nvidia unveils new AI chip", "datacenter growth", "http://b",
+         "Bloomberg", "finnhub", pub, "h2"),
+        (3, "AAPL", "Apple services revenue grows", "App Store momentum", "http://c",
+         "WSJ", "polygon", pub, "h3"),
+    ]
+    conn.executemany("INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)", news)
+    conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
     conn.commit()
     conn.close()
     return str(db), day
@@ -100,6 +114,57 @@ def test_get_available_tickers(market_db):
     assert SqliteBackend(db).get_available_tickers("news") == []  # slice 3a = prices only
 
 
+# --- news (3b): unscored reads + FTS5 search ---------------------------------
+
+_NEWS_COLS = ["date", "ticker", "title", "source", "url", "publisher",
+              "sentiment_score", "risk_score", "scored_model", "description"]
+
+
+def test_query_news_unscored(market_db):
+    db, _ = market_db
+    b = SqliteBackend(db)
+    df = b.query_news(ticker="aapl", days=30, scored_only=False)
+    assert list(df.columns) == _NEWS_COLS
+    assert len(df) == 2  # two AAPL articles
+    assert set(df["ticker"]) == {"AAPL"}
+    assert df["sentiment_score"].isna().all()  # local has no scores
+
+
+def test_query_news_scored_returns_empty(market_db):
+    # scored_only / model can't be served locally → empty (caller falls back to PG)
+    db, _ = market_db
+    b = SqliteBackend(db)
+    assert b.query_news(ticker="AAPL", scored_only=True).empty
+    assert b.query_news(ticker="AAPL", scored_only=False, model="gpt_5").empty
+
+
+def test_query_news_search_fts5(market_db):
+    db, _ = market_db
+    b = SqliteBackend(db)
+    # FTS match (>=3 chars) — "Nvidia" only in the NVDA article
+    df = b.query_news_search(query="Nvidia", days=30, scored_only=False)
+    assert len(df) == 1 and df.iloc[0]["ticker"] == "NVDA"
+    # multi-hit term
+    df = b.query_news_search(query="Apple", days=30, scored_only=False)
+    assert len(df) == 2 and set(df["ticker"]) == {"AAPL"}
+    # scored_only → empty (PG fallback)
+    assert b.query_news_search(query="Apple", scored_only=True).empty
+
+
+def test_query_news_search_like_fallback_short_query(market_db):
+    # <3 chars → LIKE fallback (no FTS); "AI" appears in the Nvidia article body/title
+    db, _ = market_db
+    df = SqliteBackend(db).query_news_search(query="AI", days=30, scored_only=False)
+    assert len(df) >= 1 and "NVDA" in set(df["ticker"])
+
+
+def test_query_news_search_malicious_fts_query_is_safe(market_db):
+    # FTS5 operator characters must not raise (phrase-quoted)
+    db, _ = market_db
+    df = SqliteBackend(db).query_news_search(query='Apple OR "x', days=30, scored_only=False)
+    assert isinstance(df, pd.DataFrame)  # no sqlite OperationalError
+
+
 # --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
 
 _PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
@@ -151,10 +216,29 @@ def test_available_tickers_routing(market_db, monkeypatch):
     assert b.get_available_tickers("news") == ["PGONLY"]   # → PG (super)
 
 
-def test_non_market_methods_are_inherited_pg(market_db):
-    # Non-overridden methods ARE DatabaseBackend's (inheritance, not forwarding) —
-    # so SA/news/reports/etc. run exactly as on plain PG.
+def test_inherited_vs_overridden_methods(market_db):
+    # query_prices/query_news/query_news_search are overridden (local-first);
+    # everything else (SA/reports/memories/stats) is inherited PG behaviour.
     db, _ = market_db
     b = _make(db)
-    assert type(b).query_news is DatabaseBackend.query_news
-    assert type(b).query_prices is not DatabaseBackend.query_prices  # overridden
+    assert type(b).query_prices is not DatabaseBackend.query_prices
+    assert type(b).query_news is not DatabaseBackend.query_news
+    assert type(b).query_news_search is not DatabaseBackend.query_news_search
+    assert type(b).query_news_stats is DatabaseBackend.query_news_stats  # NOT overridden (needs scores)
+
+
+def test_news_local_unscored_scored_falls_back(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_news",
+        lambda self, **k: (hit.append(k.get("scored_only")),
+                           pd.DataFrame([("PGNEWS",)], columns=["ticker"]))[1],
+    )
+    b = _make(db)
+    # unscored → local (2 AAPL articles), PG not hit
+    df = b.query_news(ticker="AAPL", days=30, scored_only=False)
+    assert len(df) == 2 and hit == []
+    # scored → local empty → PG fallback
+    df = b.query_news(ticker="AAPL", days=30, scored_only=True)
+    assert df.iloc[0]["ticker"] == "PGNEWS" and hit == [True]

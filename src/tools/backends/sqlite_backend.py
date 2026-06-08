@@ -23,7 +23,7 @@ import logging
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 _PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
 _INTERVAL_MAP = {"1h": "1h", "hourly": "1h", "1d": "1d", "daily": "1d", "15min": "15min"}
+
+# query_news / query_news_search output shapes (match DatabaseBackend). Local news
+# has NO scores (news_scores deferred) → score columns are always NULL here.
+_NEWS_COLS = ["date", "ticker", "title", "source", "url", "publisher",
+              "sentiment_score", "risk_score", "scored_model", "description"]
+_NEWS_SEARCH_COLS = ["date", "ticker", "title", "source", "url", "publisher",
+                     "sentiment_score", "risk_score", "description"]
 
 
 class SqliteBackend:
@@ -110,6 +117,80 @@ class SqliteBackend:
         agg.index = [k + suffix for k in agg.index]
         out = agg.reset_index().rename(columns={"index": "datetime"})
         return out[_PRICE_COLS]
+
+    # --- news (3b): article corpus, NO scores; FTS5 full-text search ---------
+
+    def query_news(self, ticker: Optional[str] = None, days: int = 30, source: str = "auto",
+                   scored_only: bool = True, model: Optional[str] = None) -> pd.DataFrame:
+        """Local news articles (UNSCORED). Score-dependent requests
+        (``scored_only`` / a specific ``model``) cannot be served locally → return
+        empty so LocalMarketDatabaseBackend falls back to PG (where news_scores live)."""
+        empty = pd.DataFrame(columns=_NEWS_COLS)
+        if scored_only or model:
+            return empty
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conds, params = ["published_at >= ?"], [cutoff]
+        if ticker:
+            conds.append("ticker = ?")
+            params.append(ticker.upper())
+        if source != "auto":
+            conds.append("source = ?")
+            params.append(source)
+        sql = (
+            "SELECT substr(published_at, 1, 10) AS date, ticker, title, source, url, publisher, "
+            "NULL AS sentiment_score, NULL AS risk_score, NULL AS scored_model, description "
+            f"FROM news WHERE {' AND '.join(conds)} ORDER BY published_at DESC"
+        )
+        return self._news_df(sql, params, _NEWS_COLS)
+
+    def query_news_search(self, query: str = "", ticker: Optional[str] = None, days: int = 30,
+                          limit: int = 20, scored_only: bool = True) -> pd.DataFrame:
+        """Local full-text news search via SQLite FTS5 (bm25 ranking), with a LIKE
+        fallback for <3-char queries — mirroring the PG tsvector + ILIKE-fallback
+        path. Scored requests → empty (PG fallback)."""
+        empty = pd.DataFrame(columns=_NEWS_SEARCH_COLS)
+        if scored_only:
+            return empty
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        cols = ("substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
+                "n.publisher, NULL AS sentiment_score, NULL AS risk_score, n.description")
+        q = (query or "").strip()
+        conds, params = ["n.published_at >= ?"], [cutoff]
+        if ticker:
+            conds.append("n.ticker = ?")
+            params.append(ticker.upper())
+        if len(q) >= 3:
+            # phrase-quote to neutralize FTS5 operator syntax (quotes, AND/OR, …)
+            match = '"' + q.replace('"', '""') + '"'
+            sql = (
+                f"SELECT {cols} FROM news_fts f JOIN news n ON n.id = f.rowid "
+                f"WHERE news_fts MATCH ? AND {' AND '.join(conds)} "
+                "ORDER BY bm25(news_fts), n.published_at DESC LIMIT ?"
+            )
+            params = [match, *params, limit]
+        else:
+            if q:  # short query → LIKE fallback
+                conds.append("(n.title LIKE ? OR n.description LIKE ?)")
+                params += [f"%{q}%", f"%{q}%"]
+            sql = (f"SELECT {cols} FROM news n WHERE {' AND '.join(conds)} "
+                   "ORDER BY n.published_at DESC LIMIT ?")
+            params.append(limit)
+        return self._news_df(sql, params, _NEWS_SEARCH_COLS)
+
+    def _news_df(self, sql: str, params: list, cols: list) -> pd.DataFrame:
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return pd.DataFrame(columns=cols)
+        try:
+            rows = conn.execute(sql, params).fetchall()
+            return pd.DataFrame([tuple(r) for r in rows], columns=cols) if rows \
+                else pd.DataFrame(columns=cols)
+        except sqlite3.OperationalError as e:
+            logger.warning(f"SqliteBackend news query failed ({e})")
+            return pd.DataFrame(columns=cols)
+        finally:
+            conn.close()
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """Distinct tickers with price data (slice 3a serves only ``prices``)."""

@@ -4,7 +4,7 @@ Market-data lifecycle routes (slice 3a.1) — local SQLite bootstrap/status/vali
 Productizes the PG → local market_data.db migration so the desktop app owns it
 (no CLI required): status, a background bootstrap job the UI can poll, validation,
 and a persisted "use local market" toggle (stored in profile_settings, read by the
-DAL at construction). Slice 3a.1 = PRICES only. See
+DAL at construction). Domains: 3a PRICES + 3b NEWS (articles + FTS5). See
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §8.
 """
 
@@ -19,10 +19,10 @@ from src.market_data_admin import (
     USE_LOCAL_MARKET_KEY,
     env_routing_enabled,
     get_job,
-    local_prices_stats,
+    local_market_stats,
     resolve_market_db_path,
     start_bootstrap_job,
-    validate_prices,
+    validate_market,
 )
 from src.profile_state import ProfileStateStore
 
@@ -39,18 +39,20 @@ def _setting_enabled(store: ProfileStateStore) -> bool:
 def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Local market-data status (PURE READ; does not touch PG).
 
-    Reports the local prices DB stats, whether routing is enabled (persisted
+    Reports the local prices + news stats, whether routing is enabled (persisted
     setting or env override), and whether PG fallback is therefore active.
     """
     path = resolve_market_db_path()
-    stats = local_prices_stats(path)
+    stats = local_market_stats(path)
     setting_on = _setting_enabled(store)
     env_on = env_routing_enabled()
     # Routing only actually engages when enabled AND the DB exists (DAL guards this).
     routing_enabled = (setting_on or env_on) and stats["exists"]
     return {
         "market_db": path,
-        "prices": stats,
+        "exists": stats["exists"],
+        "prices": stats["prices"],
+        "news": stats["news"],
         "use_local_market_setting": setting_on,
         "env_override": env_on,
         "routing_enabled": routing_enabled,
@@ -59,15 +61,16 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     }
 
 
-@router.post("/market-data/bootstrap-prices")
-def bootstrap_prices_route():
-    """Start (or attach to) a background full rebuild of the local prices DB.
+@router.post("/market-data/bootstrap")
+def bootstrap_route():
+    """Start (or attach to) a background full rebuild of the local market DB
+    (prices + news).
 
     Returns the job; poll ``GET /market-data/jobs/{id}`` for progress. Idempotent
     while running. The rebuild validates before atomically swapping in, so a
     failure never destroys an existing good DB.
     """
-    require_db_write("market_bootstrap_prices", {"db": resolve_market_db_path()})
+    require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
     return start_bootstrap_job()
 
 
@@ -83,7 +86,7 @@ def market_data_job(job_id: str):
     job = get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
-    if job.get("kind") == "bootstrap_prices" and job.get("status") == "done":
+    if job.get("kind") == "bootstrap_market" and job.get("status") == "done":
         from src.api.dependencies import get_dal
 
         get_dal.cache_clear()
@@ -92,8 +95,8 @@ def market_data_job(job_id: str):
 
 @router.post("/market-data/validate")
 def validate_route():
-    """Validate the local prices DB against PG (row count + per-group checksum)."""
-    return validate_prices()
+    """Validate the local market DB against PG (row count + checksum, prices + news)."""
+    return validate_market()
 
 
 class LocalMarketToggle(BaseModel):

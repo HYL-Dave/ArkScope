@@ -10,40 +10,58 @@ import pytest
 import src.market_data_admin as mda
 from src.profile_state import ProfileStateStore
 
-# --- a minimal fake PG (no live DB needed) -----------------------------------
+# --- a minimal fake PG serving BOTH domains (no live DB needed) ---------------
 
-_ROWS = [
+_PRICE_ROWS = [
     ("AAPL", "2026-06-01T09:00:00+0000", "15min", 100.0, 102.0, 99.0, 101.0, 1000),
     ("AAPL", "2026-06-01T09:15:00+0000", "15min", 101.0, 103.0, 100.0, 102.0, 1100),
     ("NVDA", "2026-06-01T09:00:00+0000", "15min", 900.0, 905.0, 899.0, 904.0, 2000),
 ]
+_NEWS_ROWS = [
+    (1, "AAPL", "Apple beat estimates", "iPhone demand", "http://a", "Reuters",
+     "polygon", "2026-06-01T12:00:00+0000", "h1"),
+    (2, "NVDA", "Nvidia new chip", "datacenter", "http://b", "Bloomberg",
+     "finnhub", "2026-06-01T12:00:00+0000", "h2"),
+]
 
 
-def _checksum(rows):
+def _price_checksum(rows):
     out = {}
     for r in rows:
         out[(r[0], r[2])] = out.get((r[0], r[2]), 0) + 1
     return [(t, iv, n) for (t, iv), n in out.items()]
 
 
+def _news_checksum(rows):
+    out = {}
+    for r in rows:
+        out[r[6]] = out.get(r[6], 0) + 1  # source is column index 6
+    return [(src, n) for src, n in out.items()]
+
+
 class _FakeCursor:
-    def __init__(self, rows, total):
-        self._rows, self._total, self._mode, self._it = rows, total, None, None
+    def __init__(self, prices, news, price_total=None, news_total=None):
+        self._p, self._n = prices, news
+        self._pt = price_total if price_total is not None else len(prices)
+        self._nt = news_total if news_total is not None else len(news)
+        self._mode, self._it, self._val = None, None, None
 
     def execute(self, sql, params=None):
         s = " ".join(sql.split())
-        if "COUNT(*) FROM prices" in s and "GROUP BY" not in s:
-            self._mode = "count"
-        elif "GROUP BY ticker, interval" in s:
-            self._mode = "checksum"
+        is_news = "FROM news" in s
+        rows = self._n if is_news else self._p
+        if "GROUP BY" in s:
+            self._mode, self._val = "all", (_news_checksum(rows) if is_news else _price_checksum(rows))
+        elif "COUNT(*)" in s:
+            self._mode, self._val = "one", (self._nt if is_news else self._pt,)
         else:
-            self._mode, self._it = "select", iter(self._rows)
+            self._mode, self._it = "select", iter(rows)
 
     def fetchone(self):
-        return (self._total,) if self._mode == "count" else None
+        return self._val if self._mode == "one" else None
 
     def fetchall(self):
-        return _checksum(self._rows) if self._mode == "checksum" else []
+        return list(self._val) if self._mode == "all" else []
 
     def fetchmany(self, n):
         out = []
@@ -56,8 +74,8 @@ class _FakeCursor:
 
 
 class _FakePG:
-    def __init__(self, rows, total):
-        self._c = _FakeCursor(rows, total)
+    def __init__(self, prices, news, price_total=None, news_total=None):
+        self._c = _FakeCursor(prices, news, price_total, news_total)
 
     def cursor(self):
         return self._c
@@ -68,49 +86,60 @@ class _FakePG:
 
 @pytest.fixture()
 def fake_pg(monkeypatch):
-    """Patch _pg_conn → fake serving _ROWS with a matching total (happy path)."""
-    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_ROWS, len(_ROWS)))
+    """Patch _pg_conn → fake serving prices + news (happy path)."""
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, _NEWS_ROWS))
 
 
 # --- admin core ---------------------------------------------------------------
 
 def test_local_stats_missing(tmp_path):
-    s = mda.local_prices_stats(str(tmp_path / "nope.db"))
-    assert s == {"exists": False, "row_count": 0, "ticker_count": 0, "latest_datetime": None}
+    s = mda.local_market_stats(str(tmp_path / "nope.db"))
+    assert s["exists"] is False
+    assert s["prices"]["row_count"] == 0 and s["news"]["row_count"] == 0
 
 
-def test_bootstrap_builds_and_validates(tmp_path, fake_pg):
+def test_bootstrap_builds_prices_and_news(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    res = mda.bootstrap_prices(out)
-    assert res["match"] is True and res["rows"] == 3 and res["groups"] == 2
-    # tmp swapped in; no leftover .building
-    assert not (tmp_path / "market_data.db.building").exists()
-    stats = mda.local_prices_stats(out)
-    assert stats == {"exists": True, "row_count": 3, "ticker_count": 2,
-                     "latest_datetime": "2026-06-01T09:15:00+0000"}
+    res = mda.bootstrap_market(out)
+    assert res["match"] is True
+    assert res["prices"]["rows"] == 3 and res["news"]["rows"] == 2
+    assert not (tmp_path / "market_data.db.building").exists()  # swapped in
+    stats = mda.local_market_stats(out)
+    assert stats["exists"] is True
+    assert stats["prices"]["row_count"] == 3 and stats["prices"]["ticker_count"] == 2
+    assert stats["news"]["row_count"] == 2 and stats["news"]["source_count"] == 2
+    # FTS5 was rebuilt → news is searchable
+    conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM news_fts WHERE news_fts MATCH 'Nvidia'").fetchone()[0]
+    finally:
+        conn.close()
+    assert n == 1
 
 
 def test_bootstrap_mismatch_keeps_existing_db(tmp_path, monkeypatch):
     out = str(tmp_path / "market_data.db")
-    # pre-existing good DB with a sentinel row
+    # pre-existing good DB with a sentinel price row
     conn = sqlite3.connect(out)
-    conn.executescript(mda._SCHEMA)
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.executescript(mda._NEWS_SCHEMA)
     conn.execute("INSERT INTO prices VALUES ('OLD','2020-01-01T00:00:00+0000','15min',1,1,1,1,1)")
     conn.commit(); conn.close()
-    # PG claims more rows than it yields → validation mismatch
-    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_ROWS, len(_ROWS) + 99))
-    res = mda.bootstrap_prices(out)
-    assert res["match"] is False
+    # PG claims more price rows than it yields → validation mismatch
+    monkeypatch.setattr(mda, "_pg_conn",
+                        lambda: _FakePG(_PRICE_ROWS, _NEWS_ROWS, price_total=len(_PRICE_ROWS) + 99))
+    res = mda.bootstrap_market(out)
+    assert res["match"] is False and res["prices"]["match"] is False
     assert not (tmp_path / "market_data.db.building").exists()  # discarded
-    # existing DB untouched — still the sentinel row only
-    assert mda.local_prices_stats(out)["row_count"] == 1
+    assert mda.local_market_stats(out)["prices"]["row_count"] == 1  # existing untouched
 
 
-def test_validate_prices(tmp_path, fake_pg):
+def test_validate_market(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_prices(out)
-    r = mda.validate_prices(out)
-    assert r["match"] is True and r["local_rows"] == 3 and r["pg_rows"] == 3
+    mda.bootstrap_market(out)
+    r = mda.validate_market(out)
+    assert r["match"] is True
+    assert r["prices"]["local_rows"] == 3 and r["news"]["local_rows"] == 2
 
 
 def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
@@ -139,7 +168,8 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
                         lambda: str(tmp_path / "nope.db"))
     monkeypatch.setattr("src.api.routes.market_data.env_routing_enabled", lambda: False)
     out = market_data_status(store=store)
-    assert out["prices"]["exists"] is False
+    assert out["exists"] is False
+    assert out["prices"]["row_count"] == 0 and out["news"]["row_count"] == 0
     assert out["use_local_market_setting"] is False
     assert out["routing_enabled"] is False  # no DB + setting off
 
@@ -191,7 +221,7 @@ def test_bootstrap_done_poll_invalidates_dal_cache(monkeypatch):
     from src.api import dependencies
 
     monkeypatch.setattr(_mda, "get_job", lambda jid: {
-        "id": jid, "kind": "bootstrap_prices", "status": "done",
+        "id": jid, "kind": "bootstrap_market", "status": "done",
         "progress": {"written": 1, "total": 1}, "result": {"match": True}, "error": None})
     monkeypatch.setattr(md, "get_job", _mda.get_job)
     cleared = {"n": 0}

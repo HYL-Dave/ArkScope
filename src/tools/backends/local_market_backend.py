@@ -44,6 +44,36 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             return df
         return super().query_prices(ticker, interval=interval, days=days)  # PG authority/fallback
 
+    def query_news(self, ticker=None, days=30, source="auto", scored_only=True, model=None):
+        # Score-free local reads only; scored_only / a specific model → local empty
+        # → PG (super) where news_scores live.
+        try:
+            df = self._market.query_news(
+                ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
+            )
+        except Exception as e:
+            logger.warning(f"local query_news failed ({e}); falling back to PG")
+            df = None
+        if df is not None and not df.empty:
+            return df
+        return super().query_news(
+            ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
+        )
+
+    def query_news_search(self, query="", ticker=None, days=30, limit=20, scored_only=True):
+        try:
+            df = self._market.query_news_search(
+                query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
+            )
+        except Exception as e:
+            logger.warning(f"local query_news_search failed ({e}); falling back to PG")
+            df = None
+        if df is not None and not df.empty:
+            return df
+        return super().query_news_search(
+            query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
+        )
+
     def get_available_tickers(self, data_type: str):
         if data_type == "prices":
             try:
