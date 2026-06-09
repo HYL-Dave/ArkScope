@@ -685,8 +685,15 @@ export function getIvAnalysis(ticker: string): Promise<IVAnalysis> {
   return getJSON<IVAnalysis>(`/options/${encodeURIComponent(ticker)}`, 20_000);
 }
 
-export function getIvHistory(ticker: string): Promise<IVHistoryPoint[]> {
-  return getJSON<IVHistoryPoint[]>(`/options/${encodeURIComponent(ticker)}/history`, 20_000);
+// The history table is a separate request from the IV summary, so it carries its
+// OWN source_path (the two can diverge across a bootstrap/toggle boundary).
+export interface IVHistoryResult {
+  points: IVHistoryPoint[];
+  source_path: SourcePath;
+}
+
+export function getIvHistory(ticker: string): Promise<IVHistoryResult> {
+  return getJSON<IVHistoryResult>(`/options/${encodeURIComponent(ticker)}/history`, 20_000);
 }
 
 // STORED-ONLY fundamentals: DAL local-first + PG, with NO external SEC/Financial-

@@ -115,9 +115,11 @@ class TestOptionsEndpoints:
         r = client.get("/options/AMD/history")
         assert r.status_code == 200
         data = r.json()
-        assert isinstance(data, list)
-        assert len(data) >= 1
-        assert "atm_iv" in data[0]
+        # {points, source_path}: the table is its own request → own provenance
+        assert data["source_path"] in ("local", "pg_fallback", "pg", "file", "none")
+        assert isinstance(data["points"], list)
+        assert len(data["points"]) >= 1
+        assert "atm_iv" in data["points"][0]
 
     def test_greeks(self, client):
         r = client.get("/options/greeks/calculate?S=150&K=155&T=0.25&sigma=0.30")
@@ -351,6 +353,26 @@ def test_iv_analysis_source_path_mapping(monkeypatch):
     monkeypatch.setattr(opt, "get_iv_analysis",
                         lambda dal, ticker: IVAnalysisResult(ticker=ticker, history_days=0))
     assert opt.iv_analysis("NVDA", dal=_FakeDALBT("DatabaseBackend"))["source_path"] == "none"  # empty
+
+
+def test_iv_history_source_path_mapping(monkeypatch):
+    """/options/{ticker}/history carries its OWN source_path (separate request from
+    the summary — the table must never borrow the summary call's provenance)."""
+    from src.api.routes import options as opt
+    from src.tools.backends import provenance
+    from src.tools.schemas import IVHistoryPoint
+
+    pts = [IVHistoryPoint(date="2026-06-01", atm_iv=0.3)]
+    monkeypatch.setattr(opt, "get_iv_history_data", lambda dal, ticker: pts)
+    monkeypatch.setattr(provenance, "read", lambda d: "local")
+    out = opt.iv_history("NVDA", dal=_FakeDALBT("LocalMarketDatabaseBackend"))
+    assert out["source_path"] == "local" and out["points"][0]["atm_iv"] == 0.3
+
+    monkeypatch.setattr(provenance, "read", lambda d: None)  # not recorded → by backend type
+    assert opt.iv_history("NVDA", dal=_FakeDALBT("FileBackend"))["source_path"] == "file"
+    monkeypatch.setattr(opt, "get_iv_history_data", lambda dal, ticker: [])
+    out = opt.iv_history("NVDA", dal=_FakeDALBT("DatabaseBackend"))
+    assert out["source_path"] == "none" and out["points"] == []
 
 
 def test_fundamentals_stored_source_path_mapping(monkeypatch):

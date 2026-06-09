@@ -38,9 +38,17 @@ def iv_history(
     ticker: str,
     dal: DataAccessLayer = Depends(get_dal),
 ):
-    """Get raw IV history data points."""
+    """Raw IV history data points, with this request's OWN ``source_path``.
+
+    The 數據 tab fetches the IV summary and this history in separate requests; each
+    read gets its own true origin so the table is never labeled with the summary
+    call's provenance (they can diverge across a bootstrap/toggle boundary).
+    Returns ``{points: [...], source_path: local | pg_fallback | pg | file | none}``.
+    """
+    provenance.reset()
     points = get_iv_history_data(dal, ticker=ticker)
-    return [p.model_dump() for p in points]
+    source = provenance.read("iv") or provenance.fallback(dal.backend_type, not points)
+    return {"points": [p.model_dump() for p in points], "source_path": source}
 
 
 @router.get("/greeks/calculate")

@@ -22,7 +22,7 @@ import {
   type FinancialStatement,
   type FundamentalsResult,
   type IVAnalysis,
-  type IVHistoryPoint,
+  type IVHistoryResult,
   type MarketDataCoverage,
   type MarketDataStatus,
   type Note,
@@ -193,7 +193,7 @@ function OverviewTab({ ticker }: { ticker: string }) {
 // routing is on and fall back to PG otherwise.
 function DataTab({ ticker }: { ticker: string }) {
   const [iv, setIv] = useState<IVAnalysis | null>(null);
-  const [ivHist, setIvHist] = useState<IVHistoryPoint[] | null>(null);
+  const [ivHist, setIvHist] = useState<IVHistoryResult | null>(null);
   const [fund, setFund] = useState<FundamentalsResult | null>(null);
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
   const [coverage, setCoverage] = useState<MarketDataCoverage | null>(null);
@@ -239,7 +239,7 @@ function DataTab({ ticker }: { ticker: string }) {
       : status.use_local_market_setting
         ? "設定已開，待建立本地庫（目前用 PG）"
         : "關閉（使用 PG）";
-  const recentHist = ivHist ? ivHist.slice(-30).reverse() : []; // newest first, cap 30
+  const recentHist = ivHist ? ivHist.points.slice(-30).reverse() : []; // newest first, cap 30
 
   return (
     <div className="detail-data">
@@ -279,7 +279,8 @@ function DataTab({ ticker }: { ticker: string }) {
         )}
         {recentHist.length > 0 && (
           <details className="detail-raw">
-            <summary>IV 歷史（最近 {recentHist.length} 筆）</summary>
+            {/* the history table is its own request → label it with its OWN source */}
+            <summary>IV 歷史（最近 {recentHist.length} 筆 · 來源 {sourceLabel(ivHist?.source_path)}）</summary>
             <table className="data-table">
               <thead>
                 <tr><th>日期</th><th>ATM IV</th><th>HV30</th><th>VRP</th><th>Spot</th><th>Quotes</th></tr>
