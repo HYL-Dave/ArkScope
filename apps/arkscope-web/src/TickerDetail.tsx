@@ -8,7 +8,7 @@ import {
   addNote,
   addTickerTag,
   deleteNote,
-  getFundamentals,
+  getStoredFundamentals,
   getIvAnalysis,
   getIvHistory,
   getMarketDataCoverage,
@@ -206,7 +206,7 @@ function DataTab({ ticker }: { ticker: string }) {
     const results = await Promise.allSettled([
       getIvAnalysis(ticker),
       getIvHistory(ticker),
-      getFundamentals(ticker),
+      getStoredFundamentals(ticker),
       getMarketDataStatus(),
       getMarketDataCoverage(ticker),
     ]);

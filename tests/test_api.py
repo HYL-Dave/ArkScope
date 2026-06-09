@@ -285,3 +285,40 @@ class TestAnalysisEndpoint:
         assert response.report.startswith("# NVDA")
         assert response.saved_report_id == 99
         assert response.saved_report_path == "data/reports/nvda.md"
+
+
+# ============================================================
+# Fundamentals: stored-only mode must NOT trigger a provider fetch
+# ============================================================
+
+def test_fundamentals_stored_mode_no_provider_fetch(monkeypatch):
+    """`/fundamentals/{ticker}?stored=true` must read ONLY the stored snapshot via the
+    DAL and never enter the SEC/Financial-Datasets fetch chain (the read-only 數據 tab
+    depends on this). Default (stored=false) still runs the full analysis."""
+    from src.api.routes import fundamentals as fr
+    from src.tools.schemas import FundamentalsResult
+
+    calls = {"analysis": 0, "dal": 0}
+
+    class _FakeDAL:
+        def get_fundamentals(self, ticker):
+            calls["dal"] += 1
+            return FundamentalsResult(ticker=ticker.upper(), snapshot_date="2026-06-01",
+                                      market_cap=1.0, snapshot={"market_cap": 1.0})
+
+    def _spy_analysis(dal, ticker):
+        calls["analysis"] += 1
+        return FundamentalsResult(ticker=ticker.upper(), data_source="sec_edgar")
+
+    monkeypatch.setattr(fr, "get_fundamentals_analysis", _spy_analysis)
+    dal = _FakeDAL()
+
+    # stored=true → DAL stored path only; the fetch-capable analysis is NEVER called
+    out = fr.fundamentals("AAPL", stored=True, dal=dal)
+    assert calls["analysis"] == 0 and calls["dal"] == 1
+    assert out["data_source"] == "ibkr" and out["snapshot_date"] == "2026-06-01"
+
+    # default (stored=false) → full analysis path (provider fallback)
+    out2 = fr.fundamentals("AAPL", stored=False, dal=dal)
+    assert calls["analysis"] == 1
+    assert out2["data_source"] == "sec_edgar"

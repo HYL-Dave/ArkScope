@@ -682,9 +682,12 @@ export function getIvHistory(ticker: string): Promise<IVHistoryPoint[]> {
   return getJSON<IVHistoryPoint[]>(`/options/${encodeURIComponent(ticker)}/history`, 20_000);
 }
 
-export function getFundamentals(ticker: string): Promise<FundamentalsResult> {
-  // May hit SEC EDGAR on a cache miss (cached server-side); allow time.
-  return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}`, 30_000);
+// STORED-ONLY fundamentals: DAL local-first + PG, with NO external SEC/Financial-
+// Datasets fetch (?stored=true) — for the read-only 數據 tab, so opening/refreshing it
+// never triggers a provider fetch. The full /fundamentals/{ticker} (provider fallback)
+// stays for agents/analysis.
+export function getStoredFundamentals(ticker: string): Promise<FundamentalsResult> {
+  return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?stored=true`);
 }
 
 export function getMarketDataCoverage(ticker: string): Promise<MarketDataCoverage> {
