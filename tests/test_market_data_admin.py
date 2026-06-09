@@ -186,6 +186,50 @@ def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
     assert meta["news"]["rows_added"] == 1 and meta["news"]["last_error"] is None
 
 
+_NEW_TICKER_BAR = ("TSLA", "2026-05-01T09:00:00+0000", "15min", 200.0, 202.0, 199.0, 201.0, 500)
+
+
+def test_incremental_prices_query_is_group_aware(tmp_path, fake_pg, monkeypatch):
+    # The prices delta must be per-(ticker,interval), NOT a single global datetime>max.
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    captured = {}
+
+    class _CapCursor(_FakeCursor):
+        def execute(self, sql, params=None):
+            s = " ".join(sql.split())
+            if "FROM prices p" in s:  # the PG delta query
+                captured["sql"], captured["params"] = s, params
+            super().execute(sql, params)
+
+    class _CapPG(_FakePG):
+        def __init__(self):
+            self._c = _CapCursor(_PRICE_ROWS, _NEWS_ROWS)
+
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _CapPG())
+    mda.incremental_update(out)
+    assert "LEFT JOIN (VALUES" in captured["sql"]
+    assert "v.maxdt IS NULL OR p.datetime > v.maxdt" in captured["sql"]
+    assert len(captured["params"]) == 2 * 3  # one (ticker,interval,max) triple per local group
+
+
+def test_incremental_prices_catches_new_ticker(tmp_path, fake_pg, monkeypatch):
+    # A NEW ticker whose bars are OLDER than the global max — the old global
+    # datetime>max would skip it; per-group catches it (v.maxdt IS NULL → all rows).
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    monkeypatch.setattr(mda, "_pg_conn",
+                        lambda: _FakePG(_PRICE_ROWS + [_NEW_TICKER_BAR], _NEWS_ROWS))
+    res = mda.incremental_update(out)
+    assert res["prices"]["rows_added"] == 1
+    conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
+    try:
+        n = conn.execute("SELECT COUNT(*) FROM prices WHERE ticker = 'TSLA'").fetchone()[0]
+    finally:
+        conn.close()
+    assert n == 1
+
+
 def test_incremental_update_idempotent(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
     mda.bootstrap_market(out)

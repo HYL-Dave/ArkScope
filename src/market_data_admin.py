@@ -100,9 +100,12 @@ _PG_NEWS_COLS = """
     article_hash
 """
 _PG_PRICES_SELECT = f"SELECT {_PG_PRICES_COLS} FROM prices ORDER BY ticker, interval, datetime"
-# Incremental: only bars newer than the local max (UTC). Param = local-max string.
-_PG_PRICES_SELECT_INCR = (f"SELECT {_PG_PRICES_COLS} FROM prices "
-                          "WHERE datetime > %s::timestamptz ORDER BY ticker, interval, datetime")
+# `p.`-qualified for the group-aware incremental JOIN (disambiguates ticker/interval).
+_PG_PRICES_COLS_P = """
+    p.ticker,
+    TO_CHAR(p.datetime AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
+    p.interval, p.open, p.high, p.low, p.close, p.volume
+"""
 _PG_NEWS_SELECT = f"SELECT {_PG_NEWS_COLS} FROM news ORDER BY id"
 # Incremental: only articles inserted after the local max id (monotonic PG id =
 # ingestion order; catches new articles regardless of published_at backfilling).
@@ -416,6 +419,57 @@ def _incr_domain(sconn, domain: str, local_max_sql: str, pg_select_incr: str,
         return {"ok": False, "rows_added": 0, "error": str(e)}
 
 
+def _incr_prices(sconn, batch: int) -> dict:
+    """Prices delta, PER (ticker, interval) — NOT a single global datetime>max.
+
+    A global max would skip a newly-added ticker entirely (its historical bars are
+    older than other tickers' current max) — the hole this fixes. We pass each
+    local group's max into PG via a VALUES join: groups present locally pull only
+    ``datetime > their max``; groups absent locally (new ticker/interval) pull all
+    their rows (``v.maxdt IS NULL``). Provider failure is recorded, not fatal."""
+    try:
+        groups = sconn.execute(
+            "SELECT ticker, interval, MAX(datetime) FROM prices GROUP BY ticker, interval"
+        ).fetchall()
+        pg = _pg_conn()
+        try:
+            cur = pg.cursor()
+            if not groups:
+                cur.execute(_PG_PRICES_SELECT)  # empty local prices → full pull
+            else:
+                values = ",".join(["(%s,%s,%s::timestamptz)"] * len(groups))
+                params: list = []
+                for ticker, interval, maxdt in groups:
+                    params += [ticker, interval, maxdt]
+                cur.execute(
+                    f"SELECT {_PG_PRICES_COLS_P} FROM prices p "
+                    f"LEFT JOIN (VALUES {values}) AS v(ticker, interval, maxdt) "
+                    "  ON p.ticker = v.ticker AND p.interval = v.interval "
+                    "WHERE v.maxdt IS NULL OR p.datetime > v.maxdt "
+                    "ORDER BY p.ticker, p.interval, p.datetime",
+                    params,
+                )
+            before = sconn.total_changes
+            while True:
+                rows = cur.fetchmany(batch)
+                if not rows:
+                    break
+                sconn.executemany(_PRICE_INSERT, rows)
+            added = sconn.total_changes - before
+            sconn.commit()
+        finally:
+            pg.close()
+        _record_sync_meta(sconn, "prices", rows_added=added, error=None)
+        return {"ok": True, "rows_added": added, "error": None}
+    except Exception as e:  # noqa: BLE001 — provider down etc. must not be fatal
+        logger.warning(f"incremental prices update failed: {e}")
+        try:
+            _record_sync_meta(sconn, "prices", rows_added=0, error=str(e))
+        except sqlite3.OperationalError:
+            pass
+        return {"ok": False, "rows_added": 0, "error": str(e)}
+
+
 def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> dict:
     """Append-only delta refresh of the local market DB (prices + news) from PG —
     only rows newer than the local max (prices: datetime; news: id). Writes in
@@ -435,8 +489,7 @@ def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> di
             pass
         sconn.execute("PRAGMA busy_timeout = 10000")
         sconn.executescript(_META_SCHEMA)  # tolerate a pre-meta DB
-        prices = _incr_domain(sconn, "prices", "SELECT MAX(datetime) FROM prices",
-                              _PG_PRICES_SELECT_INCR, _PG_PRICES_SELECT, _PRICE_INSERT, batch)
+        prices = _incr_prices(sconn, batch)  # per-(ticker,interval); catches new tickers
         news = _incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
                             _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
     finally:
