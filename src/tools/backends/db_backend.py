@@ -1130,6 +1130,8 @@ class DatabaseBackend:
         except Exception as e:
             stats["financial_cache"] = {"rows": [], "error": str(e)}
 
+        return stats
+
     # ================================================================
     # Seeking Alpha Alpha Picks (Phase 11c)
     # ================================================================
