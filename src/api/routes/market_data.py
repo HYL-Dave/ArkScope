@@ -22,6 +22,7 @@ from src.market_data_admin import (
     env_routing_enabled,
     get_job,
     local_market_stats,
+    local_ticker_coverage,
     read_sync_meta,
     resolve_market_db_path,
     start_bootstrap_job,
@@ -111,6 +112,18 @@ def market_data_job(job_id: str):
 
         get_dal.cache_clear()
     return job
+
+
+@router.get("/market-data/coverage/{ticker}")
+def market_data_coverage(ticker: str):
+    """Per-domain LOCAL coverage for ``ticker`` (PURE READ; routing-independent).
+
+    Reports whether the local market DB actually holds rows for this ticker in each
+    domain — a fact about the local DB, NOT a claim about where a given read was
+    served (per-call local-vs-PG provenance is a separate future signal). Powers the
+    detail page's honest "本地覆蓋：有/無" hint.
+    """
+    return local_ticker_coverage(ticker)
 
 
 @router.post("/market-data/validate")

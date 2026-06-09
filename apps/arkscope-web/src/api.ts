@@ -602,6 +602,95 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
   return getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000);
 }
 
+// --- ticker detail: IV + fundamentals (local-first via DAL routing) ---
+// These read through the DAL, so they automatically hit the local market DB when
+// routing is enabled and fall back to PG otherwise. Shapes mirror the Python
+// IVAnalysisResult / IVHistoryPoint / FundamentalsResult schemas.
+
+export interface IVAnalysis {
+  ticker: string;
+  current_iv: number | null;
+  hv_30d: number | null;
+  vrp: number | null;
+  iv_rank: number | null;
+  iv_percentile: number | null;
+  spot_price: number | null;
+  history_days: number;
+  signal: string | null; // HIGH_IV_SELL | LOW_IV_BUY | NEUTRAL
+}
+
+export interface IVHistoryPoint {
+  date: string;
+  atm_iv: number;
+  hv_30d: number | null;
+  vrp: number | null;
+  spot_price: number | null;
+  num_quotes: number | null;
+}
+
+export interface FinancialStatement {
+  report_period: string;
+  fiscal_period: string | null;
+  period_type: string; // annual | quarterly
+  data: Record<string, number | null>;
+}
+
+export interface FundamentalsResult {
+  ticker: string;
+  snapshot_date: string | null;
+  data_source: string; // ibkr | sec_edgar | none
+  market_cap: number | null;
+  pe_ratio: number | null;
+  forward_pe: number | null;
+  ps_ratio: number | null;
+  pb_ratio: number | null;
+  roe: number | null;
+  roa: number | null;
+  debt_to_equity: number | null;
+  current_ratio: number | null;
+  revenue_growth: number | null;
+  earnings_growth: number | null;
+  dividend_yield: number | null;
+  beta: number | null;
+  gross_margin: number | null;
+  operating_margin: number | null;
+  net_margin: number | null;
+  free_cash_flow: number | null;
+  cash_and_equivalents: number | null;
+  total_debt: number | null;
+  income_statements: FinancialStatement[] | null;
+  balance_sheet: FinancialStatement[] | null;
+  cash_flow_statements: FinancialStatement[] | null;
+  snapshot: Record<string, unknown> | null;
+}
+
+// True local-DB coverage for a ticker (routing-independent fact, NOT per-call
+// provenance) — powers the detail page's honest "本地覆蓋：有/無" hint.
+export interface MarketDataCoverage {
+  exists: boolean;
+  prices: boolean;
+  news: boolean;
+  iv: boolean;
+  fundamentals: boolean;
+}
+
+export function getIvAnalysis(ticker: string): Promise<IVAnalysis> {
+  return getJSON<IVAnalysis>(`/options/${encodeURIComponent(ticker)}`, 20_000);
+}
+
+export function getIvHistory(ticker: string): Promise<IVHistoryPoint[]> {
+  return getJSON<IVHistoryPoint[]>(`/options/${encodeURIComponent(ticker)}/history`, 20_000);
+}
+
+export function getFundamentals(ticker: string): Promise<FundamentalsResult> {
+  // May hit SEC EDGAR on a cache miss (cached server-side); allow time.
+  return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}`, 30_000);
+}
+
+export function getMarketDataCoverage(ticker: string): Promise<MarketDataCoverage> {
+  return getJSON<MarketDataCoverage>(`/market-data/coverage/${encodeURIComponent(ticker)}`, 8_000);
+}
+
 // --- symbol search (local-first autocomplete; NOT fuzzy) ---
 
 export interface SymbolHit {

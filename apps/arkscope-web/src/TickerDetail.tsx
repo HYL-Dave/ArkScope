@@ -8,12 +8,23 @@ import {
   addNote,
   addTickerTag,
   deleteNote,
+  getFundamentals,
+  getIvAnalysis,
+  getIvHistory,
+  getMarketDataCoverage,
+  getMarketDataStatus,
   getTagCatalog,
   getTickerState,
   getNotes,
   getPriceChange,
   isEditableTag,
   removeTickerTag,
+  type FinancialStatement,
+  type FundamentalsResult,
+  type IVAnalysis,
+  type IVHistoryPoint,
+  type MarketDataCoverage,
+  type MarketDataStatus,
   type Note,
   type PriceChange,
   type TagRef,
@@ -22,7 +33,7 @@ import {
 import { AICardTab } from "./AICard";
 import { tagClass, tagKey, tagTitle } from "./tags";
 
-type Tab = "overview" | "notes" | "ai";
+type Tab = "overview" | "data" | "notes" | "ai";
 
 export function TickerDetailView({
   ticker,
@@ -76,6 +87,9 @@ export function TickerDetailView({
         <button type="button" className={`tab ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>
           總覽
         </button>
+        <button type="button" className={`tab ${tab === "data" ? "active" : ""}`} onClick={() => setTab("data")}>
+          數據
+        </button>
         <button type="button" className={`tab ${tab === "notes" ? "active" : ""}`} onClick={() => setTab("notes")}>
           筆記{state && state.note_count > 0 ? `（${state.note_count}）` : ""}
         </button>
@@ -86,6 +100,8 @@ export function TickerDetailView({
 
       {tab === "overview" ? (
         <OverviewTab ticker={ticker} />
+      ) : tab === "data" ? (
+        <DataTab ticker={ticker} />
       ) : tab === "notes" ? (
         <NotesTab ticker={ticker} onChanged={refreshState} />
       ) : (
@@ -168,6 +184,192 @@ function OverviewTab({ ticker }: { ticker: string }) {
         </div>
       </section>
     </div>
+  );
+}
+
+// 數據 tab: IV + fundamentals, read-only (re-calls the endpoints — no provider
+// fetch). All reads go through the DAL, so they hit the local market DB when
+// routing is on and fall back to PG otherwise.
+function DataTab({ ticker }: { ticker: string }) {
+  const [iv, setIv] = useState<IVAnalysis | null>(null);
+  const [ivHist, setIvHist] = useState<IVHistoryPoint[] | null>(null);
+  const [fund, setFund] = useState<FundamentalsResult | null>(null);
+  const [status, setStatus] = useState<MarketDataStatus | null>(null);
+  const [coverage, setCoverage] = useState<MarketDataCoverage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errs, setErrs] = useState<string[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErrs([]);
+    // Independent reads: one failure (e.g. no IV data) must not blank the others.
+    const results = await Promise.allSettled([
+      getIvAnalysis(ticker),
+      getIvHistory(ticker),
+      getFundamentals(ticker),
+      getMarketDataStatus(),
+      getMarketDataCoverage(ticker),
+    ]);
+    const [rIv, rHist, rFund, rStatus, rCov] = results;
+    setIv(rIv.status === "fulfilled" ? rIv.value : null);
+    setIvHist(rHist.status === "fulfilled" ? rHist.value : null);
+    setFund(rFund.status === "fulfilled" ? rFund.value : null);
+    setStatus(rStatus.status === "fulfilled" ? rStatus.value : null);
+    setCoverage(rCov.status === "fulfilled" ? rCov.value : null);
+    const labels = ["IV", "IV 歷史", "基本面", "狀態", "覆蓋"];
+    setErrs(
+      results.flatMap((r, i) =>
+        r.status === "rejected"
+          ? [`${labels[i]}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`]
+          : [],
+      ),
+    );
+    setLoading(false);
+  }, [ticker]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const routingLabel = !status
+    ? "—"
+    : status.routing_enabled
+      ? "啟用中（本地優先，缺資料回 PG）"
+      : status.use_local_market_setting
+        ? "設定已開，待建立本地庫（目前用 PG）"
+        : "關閉（使用 PG）";
+  const recentHist = ivHist ? ivHist.slice(-30).reverse() : []; // newest first, cap 30
+
+  return (
+    <div className="detail-data">
+      <section className="detail-col">
+        <div className="detail-pricehead">
+          <h4 className="detail-section">資料來源 / 新鮮度</h4>
+          <button className="btn-ghost" onClick={() => void load()} disabled={loading}>
+            {loading ? "讀取中…" : "↻ 重新整理"}
+          </button>
+        </div>
+        <dl className="kv">
+          <Kv k="本地市場資料" v={routingLabel} />
+          <Kv k="本地覆蓋 · IV" v={coverage ? (coverage.iv ? "有" : "無") : "—"} />
+          <Kv k="本地覆蓋 · 基本面" v={coverage ? (coverage.fundamentals ? "有" : "無") : "—"} />
+        </dl>
+        <p className="muted tiny">
+          「本地覆蓋」= 本地市場庫是否存有此標的的列；本次讀取實際走本地或 PG 的逐筆來源標記為後續功能。
+        </p>
+        {errs.length > 0 && <p className="muted tiny">部分資料無法載入：{errs.join("；")}</p>}
+      </section>
+
+      <section className="detail-col">
+        <h4 className="detail-section">隱含波動率 IV{iv?.signal ? ` · ${iv.signal}` : ""}</h4>
+        {loading && !iv && <p className="muted tiny">loading…</p>}
+        {iv && (
+          <dl className="kv">
+            <Kv k="Current ATM IV" v={fmtNum(iv.current_iv)} />
+            <Kv k="HV 30d" v={fmtNum(iv.hv_30d)} />
+            <Kv k="VRP (IV−HV)" v={fmtNum(iv.vrp)} />
+            <Kv k="IV rank" v={fmtNum(iv.iv_rank)} />
+            <Kv k="IV percentile" v={fmtNum(iv.iv_percentile)} />
+            <Kv k="Spot" v={fmtNum(iv.spot_price)} />
+            <Kv k="History days" v={String(iv.history_days)} />
+          </dl>
+        )}
+        {recentHist.length > 0 && (
+          <details className="detail-raw">
+            <summary>IV 歷史（最近 {recentHist.length} 筆）</summary>
+            <table className="data-table">
+              <thead>
+                <tr><th>日期</th><th>ATM IV</th><th>HV30</th><th>VRP</th><th>Spot</th><th>Quotes</th></tr>
+              </thead>
+              <tbody>
+                {recentHist.map((p) => (
+                  <tr key={p.date}>
+                    <td>{p.date}</td>
+                    <td>{fmtNum(p.atm_iv)}</td>
+                    <td>{fmtNum(p.hv_30d)}</td>
+                    <td>{fmtNum(p.vrp)}</td>
+                    <td>{fmtNum(p.spot_price)}</td>
+                    <td>{p.num_quotes ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+        {!loading && iv && iv.history_days === 0 && <p className="muted tiny">無 IV 資料。</p>}
+      </section>
+
+      <section className="detail-col">
+        <h4 className="detail-section">
+          基本面{fund && fund.data_source !== "none" ? ` · ${fund.data_source}` : ""}
+        </h4>
+        {loading && !fund && <p className="muted tiny">loading…</p>}
+        {fund && (
+          <>
+            <dl className="kv">
+              <Kv k="Snapshot date" v={fund.snapshot_date ?? "—"} />
+              <Kv k="Market cap" v={fmtNum(fund.market_cap)} />
+              <Kv k="P/E" v={fmtNum(fund.pe_ratio)} />
+              <Kv k="Forward P/E" v={fmtNum(fund.forward_pe)} />
+              <Kv k="P/S" v={fmtNum(fund.ps_ratio)} />
+              <Kv k="P/B" v={fmtNum(fund.pb_ratio)} />
+              <Kv k="ROE" v={fmtNum(fund.roe)} />
+              <Kv k="ROA" v={fmtNum(fund.roa)} />
+              <Kv k="D/E" v={fmtNum(fund.debt_to_equity)} />
+              <Kv k="Current ratio" v={fmtNum(fund.current_ratio)} />
+              <Kv k="Gross margin" v={fmtNum(fund.gross_margin)} />
+              <Kv k="Operating margin" v={fmtNum(fund.operating_margin)} />
+              <Kv k="Net margin" v={fmtNum(fund.net_margin)} />
+              <Kv k="Revenue growth" v={fmtNum(fund.revenue_growth)} />
+              <Kv k="Earnings growth" v={fmtNum(fund.earnings_growth)} />
+              <Kv k="Dividend yield" v={fmtNum(fund.dividend_yield)} />
+              <Kv k="Beta" v={fmtNum(fund.beta)} />
+              <Kv k="Free cash flow" v={fmtNum(fund.free_cash_flow)} />
+              <Kv k="Cash & equiv." v={fmtNum(fund.cash_and_equivalents)} />
+              <Kv k="Total debt" v={fmtNum(fund.total_debt)} />
+            </dl>
+            <StatementsBlock title="Income statements" rows={fund.income_statements} />
+            <StatementsBlock title="Balance sheet" rows={fund.balance_sheet} />
+            <StatementsBlock title="Cash flow" rows={fund.cash_flow_statements} />
+            {fund.snapshot && Object.keys(fund.snapshot).length > 0 && (
+              <details className="detail-raw">
+                <summary>Raw snapshot</summary>
+                <pre className="raw-json">{JSON.stringify(fund.snapshot, null, 2)}</pre>
+              </details>
+            )}
+          </>
+        )}
+        {!loading && fund && fund.data_source === "none" && <p className="muted tiny">無基本面資料。</p>}
+      </section>
+    </div>
+  );
+}
+
+// One financial-statement type rendered as metric-rows × period-columns (newest
+// first). Collapsed by default; null/empty → nothing.
+function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatement[] | null }) {
+  if (!rows || rows.length === 0) return null;
+  const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.data))));
+  return (
+    <details className="detail-raw">
+      <summary>{title}（{rows.length} 期）</summary>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>指標</th>
+            {rows.map((r) => <th key={r.report_period}>{r.fiscal_period ?? r.report_period}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map((k) => (
+            <tr key={k}>
+              <td>{k}</td>
+              {rows.map((r) => <td key={r.report_period}>{fmtNum(r.data[k] ?? null)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }
 

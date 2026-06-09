@@ -492,6 +492,20 @@ def test_bootstrap_clean_state_after_rebuild_with_stale_sidecars(tmp_path, fake_
     assert SqliteBackend(out).get_financial_cache("CARRIED") == {"v": 1}
 
 
+def test_local_ticker_coverage(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    # missing DB → exists False, all domains False
+    cov = mda.local_ticker_coverage("AAPL", out)
+    assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "iv", "fundamentals"))
+    mda.bootstrap_market(out)  # fake serves AAPL+NVDA across all domains
+    cov = mda.local_ticker_coverage("aapl", out)  # case-insensitive
+    assert cov["exists"] is True
+    assert cov["prices"] and cov["news"] and cov["iv"] and cov["fundamentals"]
+    absent = mda.local_ticker_coverage("ZZZZ", out)  # tracked DB, untracked ticker
+    assert absent["exists"] is True
+    assert not (absent["prices"] or absent["news"] or absent["iv"] or absent["fundamentals"])
+
+
 def test_incremental_update_leaves_financial_cache_intact(tmp_path, fake_pg):
     # contract: the incremental updater does NOT touch financial_cache.
     from src.tools.backends.sqlite_backend import SqliteBackend

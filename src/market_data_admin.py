@@ -362,6 +362,35 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
         conn.close()
 
 
+def local_ticker_coverage(ticker: str, out_path: Optional[str] = None) -> dict:
+    """Whether the LOCAL market DB has any rows for ``ticker`` per domain (read-only,
+    routing-independent — a fact about the local DB, NOT a claim about where a given
+    read was served from). Powers the detail page's honest "本地覆蓋：有/無" hint;
+    per-call provenance (local vs PG-fallback) is a separate future signal."""
+    path = out_path or resolve_market_db_path()
+    cov = {"exists": False, "prices": False, "news": False, "iv": False, "fundamentals": False}
+    if not Path(path).exists():
+        return cov
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        return cov
+    t = ticker.upper()
+    try:
+        cov["exists"] = True
+        for domain, table in (("prices", "prices"), ("news", "news"),
+                              ("iv", "iv_history"), ("fundamentals", "fundamentals")):
+            if _table_exists(conn, table):
+                cov[domain] = conn.execute(
+                    f"SELECT 1 FROM {table} WHERE ticker = ? LIMIT 1", (t,)
+                ).fetchone() is not None
+    except sqlite3.OperationalError:
+        pass
+    finally:
+        conn.close()
+    return cov
+
+
 # --- bootstrap (full rebuild of prices + news + iv + fundamentals) + validate -
 
 def _copy_table(cur, sconn, select_sql: str, insert_sql: str, total: int,
