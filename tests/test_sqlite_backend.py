@@ -1,4 +1,5 @@
-"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend (3a prices + 3b news)."""
+"""Tests for the local market-data SqliteBackend + LocalMarketDatabaseBackend
+(3a prices + 3b news + 3c-A iv_history/fundamentals)."""
 
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ def _dt(day: date, hour: int, minute: int) -> str:
 
 @pytest.fixture()
 def market_db(tmp_path):
-    """A market_data.db with 15min bars + a small news corpus (with FTS5)."""
+    """A market_data.db with 15min bars + news (FTS5) + iv_history + fundamentals."""
     day = date.today() - timedelta(days=2)  # safely inside a 30-day window
     db = tmp_path / "market_data.db"
     conn = sqlite3.connect(db)
@@ -37,6 +38,13 @@ def market_db(tmp_path):
             url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT
         );
         CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news', content_rowid='id', tokenize='porter unicode61');
+        CREATE TABLE iv_history (
+            id INTEGER PRIMARY KEY, ticker TEXT, date TEXT,
+            atm_iv REAL, hv_30d REAL, vrp REAL, spot_price REAL, num_quotes INTEGER
+        );
+        CREATE TABLE fundamentals (
+            id INTEGER PRIMARY KEY, ticker TEXT, snapshot_date TEXT, data TEXT
+        );
         """
     )
     bars = []
@@ -58,6 +66,23 @@ def market_db(tmp_path):
     ]
     conn.executemany("INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)", news)
     conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
+
+    # iv_history: two AAPL snapshots (ASC order check) + one NVDA
+    iv = [
+        (1, "AAPL", "2026-05-01", 0.25, 0.20, 0.05, 101.0, 12),
+        (2, "AAPL", "2026-05-02", 0.26, 0.21, 0.05, 102.0, 14),
+        (3, "NVDA", "2026-05-01", 0.45, 0.40, 0.05, 904.0, 30),
+    ]
+    conn.executemany("INSERT INTO iv_history VALUES (?,?,?,?,?,?,?,?)", iv)
+    # fundamentals: AAPL has two snapshots — latest (DESC) must win; reports JSON shape
+    fund = [
+        (1, "AAPL", "2026-05-01", '{"reports": {"ReportSnapshot": {"Name": "STALE"}}}'),
+        (2, "AAPL", "2026-05-02",
+         '{"reports": {"ReportSnapshot": {"Name": "Apple Inc"}, '
+         '"ReportsFinSummary": {"rev": 1}, "ReportsOwnership": {"inst": 0.6}}}'),
+        (3, "NVDA", "2026-05-01", '{"reports": {"ReportSnapshot": {"Name": "NVIDIA"}}}'),
+    ]
+    conn.executemany("INSERT INTO fundamentals VALUES (?,?,?,?)", fund)
     conn.commit()
     conn.close()
     return str(db), day
@@ -112,8 +137,10 @@ def test_get_available_tickers(market_db):
     db, _ = market_db
     b = SqliteBackend(db)
     assert b.get_available_tickers("prices") == ["AAPL"]
-    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]  # 3b: news local too
-    assert b.get_available_tickers("fundamentals") == []        # not migrated → empty
+    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]          # 3b: news local
+    assert b.get_available_tickers("iv_history") == ["AAPL", "NVDA"]    # 3c-A
+    assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # 3c-A
+    assert b.get_available_tickers("options") == []                     # unknown → empty
 
 
 # --- news (3b): unscored reads + FTS5 search ---------------------------------
@@ -167,6 +194,48 @@ def test_query_news_search_malicious_fts_query_is_safe(market_db):
     assert isinstance(df, pd.DataFrame)  # no sqlite OperationalError
 
 
+# --- iv_history + fundamentals (3c-A) ----------------------------------------
+
+_IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
+
+
+def test_query_iv_history(market_db):
+    db, _ = market_db
+    df = SqliteBackend(db).query_iv_history("aapl")  # case-insensitive
+    assert list(df.columns) == _IV_COLS
+    assert len(df) == 2
+    assert list(df["date"]) == ["2026-05-01", "2026-05-02"]  # ASC order
+    assert df.iloc[0]["atm_iv"] == 0.25 and df.iloc[-1]["spot_price"] == 102.0
+
+
+def test_query_iv_history_empty(market_db, tmp_path):
+    db, _ = market_db
+    assert SqliteBackend(db).query_iv_history("NOPE").empty            # unknown ticker
+    assert list(SqliteBackend(db).query_iv_history("NOPE").columns) == _IV_COLS
+    assert SqliteBackend(str(tmp_path / "nope.db")).query_iv_history("AAPL").empty  # no DB
+
+
+def test_query_fundamentals_latest_snapshot(market_db):
+    db, _ = market_db
+    out = SqliteBackend(db).query_fundamentals("aapl")
+    assert out["ticker"] == "AAPL"
+    assert out["collected_at"] == "2026-05-02"            # latest snapshot wins (DESC)
+    assert out["snapshot"] == {"Name": "Apple Inc"}       # not the STALE one
+    assert out["fin_summary"] == {"rev": 1}
+    assert out["ownership"] == {"inst": 0.6}
+
+
+def test_query_fundamentals_partial_and_empty(market_db, tmp_path):
+    db, _ = market_db
+    # NVDA snapshot has only ReportSnapshot → fin_summary/ownership default to {}
+    nvda = SqliteBackend(db).query_fundamentals("NVDA")
+    assert nvda["snapshot"] == {"Name": "NVIDIA"}
+    assert nvda["fin_summary"] == {} and nvda["ownership"] == {}
+    # unknown ticker / missing DB → empty dict (caller falls back to PG)
+    assert SqliteBackend(db).query_fundamentals("NOPE") == {}
+    assert SqliteBackend(str(tmp_path / "nope.db")).query_fundamentals("AAPL") == {}
+
+
 # --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
 
 _PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
@@ -214,19 +283,48 @@ def test_available_tickers_routing(market_db, monkeypatch):
     db, _ = market_db
     monkeypatch.setattr(DatabaseBackend, "get_available_tickers", lambda self, data_type: ["PGONLY"])
     b = _make(db)
-    assert b.get_available_tickers("prices") == ["AAPL"]            # local
-    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]      # local (3b)
-    assert b.get_available_tickers("fundamentals") == ["PGONLY"]    # → PG (super)
+    assert b.get_available_tickers("prices") == ["AAPL"]              # local
+    assert b.get_available_tickers("news") == ["AAPL", "NVDA"]        # local (3b)
+    assert b.get_available_tickers("iv_history") == ["AAPL", "NVDA"]  # local (3c-A)
+    assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # local (3c-A)
+    assert b.get_available_tickers("options") == ["PGONLY"]          # non-local → PG (super)
+
+
+def test_iv_history_local_then_pg_fallback(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    pg = pd.DataFrame([("2020-01-01", 0.1, 0.1, 0.0, 1.0, 1)], columns=_IV_COLS)
+    monkeypatch.setattr(DatabaseBackend, "query_iv_history",
+                        lambda self, ticker: (hit.append(ticker), pg)[1])
+    b = _make(db)
+    df = b.query_iv_history("AAPL")          # local has AAPL → PG not hit
+    assert len(df) == 2 and hit == []
+    df = b.query_iv_history("UNKNOWN")        # local empty → PG fallback
+    assert df.iloc[0]["date"] == "2020-01-01" and hit == ["UNKNOWN"]
+
+
+def test_fundamentals_local_then_pg_fallback(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(DatabaseBackend, "query_fundamentals",
+                        lambda self, ticker: (hit.append(ticker), {"ticker": ticker, "snapshot": "PG"})[1])
+    b = _make(db)
+    out = b.query_fundamentals("AAPL")        # local hit → PG not hit
+    assert out["snapshot"] == {"Name": "Apple Inc"} and hit == []
+    out = b.query_fundamentals("UNKNOWN")      # local empty {} → PG fallback
+    assert out["snapshot"] == "PG" and hit == ["UNKNOWN"]
 
 
 def test_inherited_vs_overridden_methods(market_db):
-    # query_prices/query_news/query_news_search are overridden (local-first);
-    # everything else (SA/reports/memories/stats) is inherited PG behaviour.
+    # market-domain reads are overridden (local-first); everything else
+    # (SA/reports/memories/stats/financial_cache) is inherited PG behaviour.
     db, _ = market_db
     b = _make(db)
     assert type(b).query_prices is not DatabaseBackend.query_prices
     assert type(b).query_news is not DatabaseBackend.query_news
     assert type(b).query_news_search is not DatabaseBackend.query_news_search
+    assert type(b).query_iv_history is not DatabaseBackend.query_iv_history       # 3c-A
+    assert type(b).query_fundamentals is not DatabaseBackend.query_fundamentals   # 3c-A
     assert type(b).query_news_stats is DatabaseBackend.query_news_stats  # NOT overridden (needs scores)
 
 

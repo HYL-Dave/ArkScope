@@ -1,6 +1,7 @@
 """
 LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domain
-from a local SQLite (3a prices + 3b news), with PostgreSQL fallback.
+from a local SQLite (3a prices + 3b news + 3c-A iv/fundamentals), with PostgreSQL
+fallback.
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
 on ``isinstance(backend, DatabaseBackend)`` in ~30 places to decide "is this a
@@ -10,13 +11,14 @@ short-circuits to empty/file behavior → the cockpit shows wrong/empty data. By
 subclassing, this IS a DatabaseBackend (isinstance passes, ``_get_conn`` + all ~41
 methods inherited and hit PG); we override ONLY the migrated market-domain reads
 to go local-first. Everything else — Seeking-Alpha, reports, memories, news
-SCORES — is the inherited PG behaviour, unchanged.
+SCORES, ``financial_cache`` (3c-C) — is the inherited PG behaviour, unchanged.
 
 Overridden, local-first with PG fallback on empty/miss:
   - ``query_prices`` (3a);
   - ``query_news`` (3b, UNSCORED — scored_only/model requests fall back to PG,
     where news_scores live), ``query_news_search`` (3b, FTS5);
-  - ``get_available_tickers('prices'|'news')``.
+  - ``query_iv_history`` + ``query_fundamentals`` (3c-A);
+  - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
 ``query_news_stats`` is NOT overridden — it needs scores, so it stays on PG.
 """
 
@@ -78,8 +80,28 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
         )
 
+    def query_iv_history(self, ticker: str) -> pd.DataFrame:
+        try:
+            df = self._market.query_iv_history(ticker)
+        except Exception as e:
+            logger.warning(f"local query_iv_history failed ({e}); falling back to PG")
+            df = None
+        if df is not None and not df.empty:
+            return df
+        return super().query_iv_history(ticker)
+
+    def query_fundamentals(self, ticker: str) -> dict:
+        try:
+            data = self._market.query_fundamentals(ticker)
+        except Exception as e:
+            logger.warning(f"local query_fundamentals failed ({e}); falling back to PG")
+            data = None
+        if data:  # non-empty dict → local hit
+            return data
+        return super().query_fundamentals(ticker)
+
     def get_available_tickers(self, data_type: str):
-        if data_type in ("prices", "news"):  # both domains are local-first now
+        if data_type in ("prices", "news", "iv_history", "fundamentals"):  # all local-first now
             try:
                 local = self._market.get_available_tickers(data_type)
                 if local:

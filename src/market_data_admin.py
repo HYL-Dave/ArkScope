@@ -7,15 +7,18 @@ desktop UI can trigger + poll a bootstrap instead of asking the user to run a CL
 (DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md §3/§4/§8).
 
 Domains migrated:
-  - 3a  PRICES — the OHLCV bars (15min stored; 1h/1d rolled up on read).
-  - 3b  NEWS   — article corpus (NO scores; news_scores deferred) + an FTS5 index
-                 for local full-text search. Score-dependent reads fall back to PG.
+  - 3a   PRICES        — the OHLCV bars (15min stored; 1h/1d rolled up on read).
+  - 3b   NEWS          — article corpus (NO scores; news_scores deferred) + an FTS5
+                         index for local full-text search. Scored reads fall back to PG.
+  - 3c-A IV_HISTORY    — daily IV/HV/VRP snapshots (id-keyed, id-based incremental).
+  - 3c-A FUNDAMENTALS  — ReportSnapshot JSON snapshots (id-keyed, id-based incremental).
+``financial_cache`` is deferred to 3c-C (designed local-primary, not migrated here).
 
-The bootstrap builds BOTH domains into a single ``.building`` temp file and
+The bootstrap builds ALL domains into a single ``.building`` temp file and
 atomically swaps it in only after row-count + checksum validation passes, so a
 failed rebuild never destroys an existing good DB. ``scripts/migrate_market_to_sqlite.py``
 is a thin CLI over this module; the app uses the API. Incremental (delta) updates
-are a later slice — this only does full bootstrap.
+append rows newer than the local max in place to the live WAL DB (no swap).
 """
 
 from __future__ import annotations
@@ -74,7 +77,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS news_fts
 # bootstrap (fresh DB), updated by each incremental run.
 _META_SCHEMA = """
 CREATE TABLE IF NOT EXISTS market_sync_meta (
-    domain       TEXT PRIMARY KEY,   -- 'prices' | 'news'
+    domain       TEXT PRIMARY KEY,   -- 'prices' | 'news' | 'iv' | 'fundamentals'
     last_success TEXT,
     last_error   TEXT,
     rows_added   INTEGER DEFAULT 0,
@@ -110,6 +113,36 @@ _PG_NEWS_SELECT = f"SELECT {_PG_NEWS_COLS} FROM news ORDER BY id"
 # Incremental: only articles inserted after the local max id (monotonic PG id =
 # ingestion order; catches new articles regardless of published_at backfilling).
 _PG_NEWS_SELECT_INCR = f"SELECT {_PG_NEWS_COLS} FROM news WHERE id > %s ORDER BY id"
+
+# 3c-A: IV history + fundamentals (read-mostly snapshots; id-keyed like news, so
+# incremental is id-based). financial_cache deferred (3c-C, local-primary design).
+_IV_SCHEMA = """
+CREATE TABLE IF NOT EXISTS iv_history (
+    id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, date TEXT NOT NULL,  -- 'YYYY-MM-DD'
+    atm_iv REAL, hv_30d REAL, vrp REAL, spot_price REAL, num_quotes INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_iv_ticker_date ON iv_history(ticker, date);
+"""
+_FUND_SCHEMA = """
+CREATE TABLE IF NOT EXISTS fundamentals (
+    id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, snapshot_date TEXT NOT NULL,  -- 'YYYY-MM-DD'
+    data TEXT NOT NULL   -- ReportSnapshot JSON (text; JSONB in PG)
+);
+CREATE INDEX IF NOT EXISTS idx_fund_ticker_date ON fundamentals(ticker, snapshot_date);
+"""
+
+_IV_INSERT = ("INSERT OR IGNORE INTO iv_history "
+              "(id, ticker, date, atm_iv, hv_30d, vrp, spot_price, num_quotes) "
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+_PG_IV_COLS = ("id, ticker, TO_CHAR(date, 'YYYY-MM-DD') AS date, "
+               "atm_iv, hv_30d, vrp, spot_price, num_quotes")
+_PG_IV_SELECT = f"SELECT {_PG_IV_COLS} FROM iv_history ORDER BY id"
+_PG_IV_SELECT_INCR = f"SELECT {_PG_IV_COLS} FROM iv_history WHERE id > %s ORDER BY id"
+
+_FUND_INSERT = "INSERT OR IGNORE INTO fundamentals (id, ticker, snapshot_date, data) VALUES (?, ?, ?, ?)"
+_PG_FUND_COLS = "id, ticker, TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_date, data::text"
+_PG_FUND_SELECT = f"SELECT {_PG_FUND_COLS} FROM fundamentals ORDER BY id"
+_PG_FUND_SELECT_INCR = f"SELECT {_PG_FUND_COLS} FROM fundamentals WHERE id > %s ORDER BY id"
 
 
 def _now() -> str:
@@ -178,6 +211,25 @@ def _sqlite_news_checksum(conn) -> Dict[tuple, tuple]:
     return _news_checksum(conn.execute(_NEWS_CHECKSUM_SQL).fetchall())
 
 
+# Per-ticker (count, SUM(id)) fingerprint for id-keyed domains (iv, fundamentals).
+# Identical SQL on PG + SQLite.
+_IV_CHECKSUM_SQL = "SELECT ticker, COUNT(*), COALESCE(SUM(id), 0) FROM iv_history GROUP BY ticker"
+_FUND_CHECKSUM_SQL = "SELECT ticker, COUNT(*), COALESCE(SUM(id), 0) FROM fundamentals GROUP BY ticker"
+
+
+def _ticker_idsum(rows) -> Dict[str, tuple]:
+    return {r[0]: (r[1], r[2]) for r in rows}
+
+
+def _pg_ticker_idsum(cur, sql: str) -> Dict[str, tuple]:
+    cur.execute(sql)
+    return _ticker_idsum(cur.fetchall())
+
+
+def _sqlite_ticker_idsum(conn, sql: str) -> Dict[str, tuple]:
+    return _ticker_idsum(conn.execute(sql).fetchall())
+
+
 def pg_market_counts() -> dict:
     """PG-side row + group counts per domain (the validation target / --dry-run)."""
     pg = _pg_conn()
@@ -190,9 +242,15 @@ def pg_market_counts() -> dict:
         news_rows = cur.fetchone()[0]
         cur.execute("SELECT COUNT(DISTINCT source) FROM news")
         news_sources = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM iv_history")
+        iv_rows = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM fundamentals")
+        fund_rows = cur.fetchone()[0]
         return {
             "prices": {"rows": price_rows, "groups": price_groups},
             "news": {"rows": news_rows, "groups": news_sources},
+            "iv": {"rows": iv_rows},
+            "fundamentals": {"rows": fund_rows},
         }
     finally:
         pg.close()
@@ -213,6 +271,8 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
         "exists": False,
         "prices": {"row_count": 0, "ticker_count": 0, "latest_datetime": None},
         "news": {"row_count": 0, "source_count": 0, "latest_published": None},
+        "iv": {"row_count": 0, "ticker_count": 0, "latest_date": None},
+        "fundamentals": {"row_count": 0, "ticker_count": 0, "latest_date": None},
     }
     if not Path(path).exists():
         return empty
@@ -221,9 +281,7 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
     except sqlite3.OperationalError:
         return {**empty, "exists": True}
     try:
-        out = {"exists": True,
-               "prices": {"row_count": 0, "ticker_count": 0, "latest_datetime": None},
-               "news": {"row_count": 0, "source_count": 0, "latest_published": None}}
+        out = {**{k: dict(v) for k, v in empty.items() if k != "exists"}, "exists": True}
         if _table_exists(conn, "prices"):
             out["prices"] = {
                 "row_count": conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0],
@@ -235,6 +293,18 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
                 "row_count": conn.execute("SELECT COUNT(*) FROM news").fetchone()[0],
                 "source_count": conn.execute("SELECT COUNT(DISTINCT source) FROM news").fetchone()[0],
                 "latest_published": conn.execute("SELECT MAX(published_at) FROM news").fetchone()[0],
+            }
+        if _table_exists(conn, "iv_history"):
+            out["iv"] = {
+                "row_count": conn.execute("SELECT COUNT(*) FROM iv_history").fetchone()[0],
+                "ticker_count": conn.execute("SELECT COUNT(DISTINCT ticker) FROM iv_history").fetchone()[0],
+                "latest_date": conn.execute("SELECT MAX(date) FROM iv_history").fetchone()[0],
+            }
+        if _table_exists(conn, "fundamentals"):
+            out["fundamentals"] = {
+                "row_count": conn.execute("SELECT COUNT(*) FROM fundamentals").fetchone()[0],
+                "ticker_count": conn.execute("SELECT COUNT(DISTINCT ticker) FROM fundamentals").fetchone()[0],
+                "latest_date": conn.execute("SELECT MAX(snapshot_date) FROM fundamentals").fetchone()[0],
             }
         return out
     except sqlite3.OperationalError:
@@ -264,10 +334,10 @@ def _copy_table(cur, sconn, select_sql: str, insert_sql: str, total: int,
 def bootstrap_market(out_path: Optional[str] = None,
                      progress_cb: Optional[Callable[[int, int], None]] = None,
                      batch: int = 20000) -> dict:
-    """Full rebuild of the local market DB (prices + news) from PG. Builds to a
-    ``.building`` temp and atomically swaps it in ONLY if BOTH domains validate
-    (row-count + group checksum), so a failed rebuild leaves any existing DB
-    untouched. Returns a per-domain result dict with an overall ``match``."""
+    """Full rebuild of the local market DB (prices + news + iv + fundamentals) from
+    PG. Builds to a ``.building`` temp and atomically swaps it in ONLY if ALL
+    domains validate (row-count + checksum), so a failed rebuild leaves any
+    existing DB untouched. Returns a per-domain result dict with overall ``match``."""
     path = out_path or resolve_market_db_path()
     tmp = path + ".building"
     pg = _pg_conn()
@@ -279,19 +349,28 @@ def bootstrap_market(out_path: Optional[str] = None,
         cur.execute("SELECT COUNT(*) FROM news")
         news_total = cur.fetchone()[0]
         pg_news_sum = _pg_news_checksum(cur)
-        grand = price_total + news_total
+        cur.execute("SELECT COUNT(*) FROM iv_history")
+        iv_total = cur.fetchone()[0]
+        pg_iv_sum = _pg_ticker_idsum(cur, _IV_CHECKSUM_SQL)
+        cur.execute("SELECT COUNT(*) FROM fundamentals")
+        fund_total = cur.fetchone()[0]
+        pg_fund_sum = _pg_ticker_idsum(cur, _FUND_CHECKSUM_SQL)
+        grand = price_total + news_total + iv_total + fund_total
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(tmp).unlink(missing_ok=True)
         sconn = sqlite3.connect(tmp)
         try:
-            sconn.executescript(_PRICES_SCHEMA)
-            sconn.executescript(_NEWS_SCHEMA)
-            sconn.executescript(_META_SCHEMA)
+            for schema in (_PRICES_SCHEMA, _NEWS_SCHEMA, _IV_SCHEMA, _FUND_SCHEMA, _META_SCHEMA):
+                sconn.executescript(schema)
             _copy_table(cur, sconn, _PG_PRICES_SELECT, _PRICE_INSERT,
                         price_total, progress_cb, 0, grand, batch)
             _copy_table(cur, sconn, _PG_NEWS_SELECT, _NEWS_INSERT,
                         news_total, progress_cb, price_total, grand, batch)
+            _copy_table(cur, sconn, _PG_IV_SELECT, _IV_INSERT,
+                        iv_total, progress_cb, price_total + news_total, grand, batch)
+            _copy_table(cur, sconn, _PG_FUND_SELECT, _FUND_INSERT,
+                        fund_total, progress_cb, price_total + news_total + iv_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
             sconn.commit()
 
@@ -299,6 +378,10 @@ def bootstrap_market(out_path: Optional[str] = None,
             sq_price_sum = _sqlite_group_counts(sconn, _SQ_PRICE_CHECKSUM)
             local_news = sconn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
             sq_news_sum = _sqlite_news_checksum(sconn)
+            local_iv = sconn.execute("SELECT COUNT(*) FROM iv_history").fetchone()[0]
+            sq_iv_sum = _sqlite_ticker_idsum(sconn, _IV_CHECKSUM_SQL)
+            local_fund = sconn.execute("SELECT COUNT(*) FROM fundamentals").fetchone()[0]
+            sq_fund_sum = _sqlite_ticker_idsum(sconn, _FUND_CHECKSUM_SQL)
         finally:
             sconn.close()
     finally:
@@ -306,7 +389,9 @@ def bootstrap_market(out_path: Optional[str] = None,
 
     prices_match = local_prices == price_total and sq_price_sum == pg_price_sum
     news_match = local_news == news_total and sq_news_sum == pg_news_sum
-    match = prices_match and news_match
+    iv_match = local_iv == iv_total and sq_iv_sum == pg_iv_sum
+    fund_match = local_fund == fund_total and sq_fund_sum == pg_fund_sum
+    match = prices_match and news_match and iv_match and fund_match
     if match:
         os.replace(tmp, path)  # atomic swap-in
         try:
@@ -323,11 +408,14 @@ def bootstrap_market(out_path: Optional[str] = None,
         "match": match,
         "prices": {"rows": local_prices, "total": price_total, "match": prices_match},
         "news": {"rows": local_news, "total": news_total, "match": news_match},
+        "iv": {"rows": local_iv, "total": iv_total, "match": iv_match},
+        "fundamentals": {"rows": local_fund, "total": fund_total, "match": fund_match},
     }
 
 
 def validate_market(out_path: Optional[str] = None) -> dict:
-    """Compare local prices + news vs PG (row count + group checksum per domain)."""
+    """Compare local vs PG per domain (prices + news + iv + fundamentals): row
+    count + checksum (prices/news group sums; iv/fundamentals per-ticker id sums)."""
     path = out_path or resolve_market_db_path()
     if not Path(path).exists():
         return {"exists": False, "match": False}
@@ -340,6 +428,12 @@ def validate_market(out_path: Optional[str] = None) -> dict:
         cur.execute("SELECT COUNT(*) FROM news")
         pg_news_rows = cur.fetchone()[0]
         pg_news_sum = _pg_news_checksum(cur)
+        cur.execute("SELECT COUNT(*) FROM iv_history")
+        pg_iv_rows = cur.fetchone()[0]
+        pg_iv_sum = _pg_ticker_idsum(cur, _IV_CHECKSUM_SQL)
+        cur.execute("SELECT COUNT(*) FROM fundamentals")
+        pg_fund_rows = cur.fetchone()[0]
+        pg_fund_sum = _pg_ticker_idsum(cur, _FUND_CHECKSUM_SQL)
     finally:
         pg.close()
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -348,15 +442,23 @@ def validate_market(out_path: Optional[str] = None) -> dict:
         sq_price_sum = _sqlite_group_counts(conn, _SQ_PRICE_CHECKSUM) if _table_exists(conn, "prices") else {}
         ln = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] if _table_exists(conn, "news") else 0
         sq_news_sum = _sqlite_news_checksum(conn) if _table_exists(conn, "news") else {}
+        liv = conn.execute("SELECT COUNT(*) FROM iv_history").fetchone()[0] if _table_exists(conn, "iv_history") else 0
+        sq_iv_sum = _sqlite_ticker_idsum(conn, _IV_CHECKSUM_SQL) if _table_exists(conn, "iv_history") else {}
+        lf = conn.execute("SELECT COUNT(*) FROM fundamentals").fetchone()[0] if _table_exists(conn, "fundamentals") else 0
+        sq_fund_sum = _sqlite_ticker_idsum(conn, _FUND_CHECKSUM_SQL) if _table_exists(conn, "fundamentals") else {}
     finally:
         conn.close()
     prices_match = lp == pg_price_rows and sq_price_sum == pg_price_sum
     news_match = ln == pg_news_rows and sq_news_sum == pg_news_sum
+    iv_match = liv == pg_iv_rows and sq_iv_sum == pg_iv_sum
+    fund_match = lf == pg_fund_rows and sq_fund_sum == pg_fund_sum
     return {
         "exists": True,
-        "match": prices_match and news_match,
+        "match": prices_match and news_match and iv_match and fund_match,
         "prices": {"local_rows": lp, "pg_rows": pg_price_rows, "match": prices_match},
         "news": {"local_rows": ln, "pg_rows": pg_news_rows, "match": news_match},
+        "iv": {"local_rows": liv, "pg_rows": pg_iv_rows, "match": iv_match},
+        "fundamentals": {"local_rows": lf, "pg_rows": pg_fund_rows, "match": fund_match},
     }
 
 
@@ -471,16 +573,17 @@ def _incr_prices(sconn, batch: int) -> dict:
 
 
 def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> dict:
-    """Append-only delta refresh of the local market DB (prices + news) from PG —
-    only rows newer than the local max (prices: datetime; news: id). Writes in
-    place to the live WAL DB (no atomic swap), so routing can stay active. A
-    provider/PG failure in one domain is recorded, not fatal to the other.
+    """Append-only delta refresh of the local market DB (prices + news + iv +
+    fundamentals) from PG — only rows newer than the local max (prices: per
+    (ticker,interval) datetime; news/iv/fundamentals: id). Writes in place to the
+    live WAL DB (no atomic swap), so routing can stay active. A provider/PG failure
+    in one domain is recorded, not fatal to the others.
 
     Requires an existing local DB (bootstrap first). Returns per-domain results."""
     path = out_path or resolve_market_db_path()
     if not Path(path).exists():
         return {"ok": False, "error": "local market DB does not exist — run a bootstrap first",
-                "prices": None, "news": None}
+                "prices": None, "news": None, "iv": None, "fundamentals": None}
     sconn = sqlite3.connect(path, timeout=10.0)
     try:
         try:
@@ -489,18 +592,25 @@ def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> di
             pass
         sconn.execute("PRAGMA busy_timeout = 10000")
         sconn.executescript(_META_SCHEMA)  # tolerate a pre-meta DB
+        sconn.executescript(_IV_SCHEMA)    # tolerate a pre-iv/fundamentals DB
+        sconn.executescript(_FUND_SCHEMA)
         prices = _incr_prices(sconn, batch)  # per-(ticker,interval); catches new tickers
         news = _incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
                             _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
+        iv = _incr_domain(sconn, "iv", "SELECT COALESCE(MAX(id), 0) FROM iv_history",
+                          _PG_IV_SELECT_INCR, _PG_IV_SELECT, _IV_INSERT, batch)
+        fundamentals = _incr_domain(sconn, "fundamentals", "SELECT COALESCE(MAX(id), 0) FROM fundamentals",
+                                    _PG_FUND_SELECT_INCR, _PG_FUND_SELECT, _FUND_INSERT, batch)
     finally:
         sconn.close()
-    return {"ok": prices["ok"] and news["ok"], "prices": prices, "news": news}
+    return {"ok": prices["ok"] and news["ok"] and iv["ok"] and fundamentals["ok"],
+            "prices": prices, "news": news, "iv": iv, "fundamentals": fundamentals}
 
 
 def read_sync_meta(out_path: Optional[str] = None) -> dict:
     """Per-domain incremental-sync status (read-only). {} entries if never run."""
     path = out_path or resolve_market_db_path()
-    out = {"prices": None, "news": None}
+    out = {"prices": None, "news": None, "iv": None, "fundamentals": None}
     if not Path(path).exists():
         return out
     try:

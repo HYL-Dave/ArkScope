@@ -23,6 +23,19 @@ _NEWS_ROWS = [
     (2, "NVDA", "Nvidia new chip", "datacenter", "http://b", "Bloomberg",
      "finnhub", "2026-06-01T12:00:00+0000", "h2"),
 ]
+# 3c-A: iv_history (id, ticker, date, atm_iv, hv_30d, vrp, spot_price, num_quotes)
+_IV_ROWS = [
+    (1, "AAPL", "2026-06-01", 0.25, 0.20, 0.05, 101.0, 12),
+    (2, "AAPL", "2026-06-02", 0.26, 0.21, 0.05, 102.0, 14),
+    (3, "NVDA", "2026-06-01", 0.45, 0.40, 0.05, 904.0, 30),
+]
+# 3c-A: fundamentals (id, ticker, snapshot_date, data::text — ReportSnapshot JSON)
+_FUND_ROWS = [
+    (1, "AAPL", "2026-06-01",
+     '{"reports": {"ReportSnapshot": {"Name": "Apple Inc"}, '
+     '"ReportsFinSummary": {"rev": 1}, "ReportsOwnership": {"inst": 0.6}}}'),
+    (2, "NVDA", "2026-06-01", '{"reports": {"ReportSnapshot": {"Name": "NVIDIA"}}}'),
+]
 
 
 def _price_checksum(rows):
@@ -42,21 +55,50 @@ def _news_checksum(rows):
     return [(src, tk, c, s) for (src, tk), (c, s) in out.items()]
 
 
+def _ticker_idsum_checksum(rows):
+    # mirror PG for iv/fundamentals: SELECT ticker, COUNT(*), SUM(id) GROUP BY ticker
+    # (id is col 0, ticker is col 1 in both row shapes).
+    out = {}
+    for r in rows:
+        cnt, sid = out.get(r[1], (0, 0))
+        out[r[1]] = (cnt + 1, sid + r[0])
+    return [(tk, c, s) for tk, (c, s) in out.items()]
+
+
 class _FakeCursor:
-    def __init__(self, prices, news, price_total=None, news_total=None):
+    def __init__(self, prices, news, price_total=None, news_total=None,
+                 iv=None, fund=None, iv_total=None, fund_total=None):
         self._p, self._n = prices, news
+        self._iv = _IV_ROWS if iv is None else iv
+        self._f = _FUND_ROWS if fund is None else fund
         self._pt = price_total if price_total is not None else len(prices)
         self._nt = news_total if news_total is not None else len(news)
+        self._ivt = iv_total if iv_total is not None else len(self._iv)
+        self._ft = fund_total if fund_total is not None else len(self._f)
         self._mode, self._it, self._val = None, None, None
+
+    @staticmethod
+    def _domain(s):
+        if "FROM iv_history" in s:
+            return "iv"
+        if "FROM fundamentals" in s:
+            return "fundamentals"
+        if "FROM news" in s:
+            return "news"
+        return "prices"
 
     def execute(self, sql, params=None):
         s = " ".join(sql.split())
-        is_news = "FROM news" in s
-        rows = self._n if is_news else self._p
-        if "GROUP BY" in s:
-            self._mode, self._val = "all", (_news_checksum(rows) if is_news else _price_checksum(rows))
+        dom = self._domain(s)
+        rows = {"prices": self._p, "news": self._n, "iv": self._iv, "fundamentals": self._f}[dom]
+        if "GROUP BY" in s:  # checked before COUNT(*): checksum SQL contains both
+            checksum = {"prices": _price_checksum, "news": _news_checksum,
+                        "iv": _ticker_idsum_checksum, "fundamentals": _ticker_idsum_checksum}[dom]
+            self._mode, self._val = "all", checksum(rows)
         elif "COUNT(*)" in s:
-            self._mode, self._val = "one", (self._nt if is_news else self._pt,)
+            total = {"prices": self._pt, "news": self._nt,
+                     "iv": self._ivt, "fundamentals": self._ft}[dom]
+            self._mode, self._val = "one", (total,)
         else:
             self._mode, self._it = "select", iter(rows)
 
@@ -77,8 +119,10 @@ class _FakeCursor:
 
 
 class _FakePG:
-    def __init__(self, prices, news, price_total=None, news_total=None):
-        self._c = _FakeCursor(prices, news, price_total, news_total)
+    def __init__(self, prices, news, price_total=None, news_total=None,
+                 iv=None, fund=None, iv_total=None, fund_total=None):
+        self._c = _FakeCursor(prices, news, price_total, news_total,
+                              iv=iv, fund=fund, iv_total=iv_total, fund_total=fund_total)
 
     def cursor(self):
         return self._c
@@ -89,7 +133,7 @@ class _FakePG:
 
 @pytest.fixture()
 def fake_pg(monkeypatch):
-    """Patch _pg_conn → fake serving prices + news (happy path)."""
+    """Patch _pg_conn → fake serving prices + news + iv + fundamentals (happy path)."""
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, _NEWS_ROWS))
 
 
@@ -156,6 +200,73 @@ def test_news_checksum_catches_id_drift(tmp_path, fake_pg):
     r = mda.validate_market(out)
     assert r["news"]["match"] is False and r["match"] is False
     assert r["news"]["local_rows"] == r["news"]["pg_rows"]  # counts still equal → only SUM(id) caught it
+
+
+# --- 3c-A: iv_history + fundamentals ------------------------------------------
+
+def test_bootstrap_builds_iv_and_fundamentals(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    res = mda.bootstrap_market(out)
+    assert res["match"] is True
+    assert res["iv"]["rows"] == 3 and res["iv"]["match"] is True
+    assert res["fundamentals"]["rows"] == 2 and res["fundamentals"]["match"] is True
+    stats = mda.local_market_stats(out)
+    assert stats["iv"]["row_count"] == 3 and stats["iv"]["ticker_count"] == 2
+    assert stats["iv"]["latest_date"] == "2026-06-02"
+    assert stats["fundamentals"]["row_count"] == 2 and stats["fundamentals"]["ticker_count"] == 2
+
+
+def test_validate_iv_and_fundamentals(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    r = mda.validate_market(out)
+    assert r["match"] is True
+    assert r["iv"]["local_rows"] == 3 and r["iv"]["match"] is True
+    assert r["fundamentals"]["local_rows"] == 2 and r["fundamentals"]["match"] is True
+
+
+def test_iv_checksum_catches_id_drift(tmp_path, fake_pg):
+    # Same per-ticker COUNT but a different id set must be caught via SUM(id).
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    conn = sqlite3.connect(out)
+    conn.execute("UPDATE iv_history SET id = 99 WHERE id = 1")  # same count, different SUM(id)
+    conn.commit(); conn.close()
+    r = mda.validate_market(out)
+    assert r["iv"]["match"] is False and r["match"] is False
+    assert r["iv"]["local_rows"] == r["iv"]["pg_rows"]  # counts equal → only SUM(id) caught it
+
+
+def test_fundamentals_checksum_catches_id_drift(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    conn = sqlite3.connect(out)
+    conn.execute("UPDATE fundamentals SET id = 99 WHERE id = 1")
+    conn.commit(); conn.close()
+    r = mda.validate_market(out)
+    assert r["fundamentals"]["match"] is False and r["match"] is False
+    assert r["fundamentals"]["local_rows"] == r["fundamentals"]["pg_rows"]
+
+
+_NEW_IV = (4, "AAPL", "2026-06-03", 0.27, 0.22, 0.05, 103.0, 16)
+_NEW_FUND = (3, "TSLA", "2026-06-02", '{"reports": {"ReportSnapshot": {"Name": "Tesla"}}}')
+
+
+def test_incremental_iv_and_fundamentals_add_new_rows(tmp_path, fake_pg, monkeypatch):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)  # 3 iv, 2 fundamentals
+    # PG now has one extra iv snapshot + one extra fundamentals row (id-based delta;
+    # INSERT OR IGNORE dedups the existing ids the fake re-serves).
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(
+        _PRICE_ROWS, _NEWS_ROWS, iv=_IV_ROWS + [_NEW_IV], fund=_FUND_ROWS + [_NEW_FUND]))
+    res = mda.incremental_update(out)
+    assert res["ok"] is True
+    assert res["iv"]["rows_added"] == 1 and res["fundamentals"]["rows_added"] == 1
+    stats = mda.local_market_stats(out)
+    assert stats["iv"]["row_count"] == 4 and stats["fundamentals"]["row_count"] == 3
+    meta = mda.read_sync_meta(out)
+    assert meta["iv"]["rows_added"] == 1 and meta["iv"]["last_success"]
+    assert meta["fundamentals"]["rows_added"] == 1 and meta["fundamentals"]["last_error"] is None
 
 
 _NEW_PRICE = ("AAPL", "2026-06-01T09:30:00+0000", "15min", 102.0, 104.0, 101.0, 103.0, 1200)
@@ -264,7 +375,12 @@ def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
     job = mda.start_bootstrap_job(out)
     assert job["status"] in ("running", "done")
-    for _ in range(50):
+    # Wait on a wall-clock DEADLINE, not a fixed iteration count: the daemon job's
+    # work (4 domains → copy + commit + validate + atomic swap + WAL reopen) is real
+    # disk I/O, so under contention it can take a few seconds. A generous deadline
+    # stays reliable while still failing fast if the job genuinely hangs.
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
         j = mda.get_job(job["id"])
         if j["status"] != "running":
             break

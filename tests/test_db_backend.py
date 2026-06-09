@@ -191,9 +191,15 @@ class TestPricesDB:
 @requires_db
 class TestDALBackendSwitch:
     def test_dal_auto_mode(self):
-        """DAL with db_dsn='auto' reads from .env."""
+        """DAL with db_dsn='auto' reads from .env → a PG-backed DatabaseBackend.
+
+        Hermetic to local-market routing: when the persisted ``use_local_market``
+        toggle is on AND ``market_data.db`` exists, auto mode layers a
+        ``LocalMarketDatabaseBackend`` on top — still a ``DatabaseBackend`` subclass
+        (and NOT a FileBackend) — so assert the instance type, not the exact name.
+        """
         dal = DataAccessLayer(db_dsn="auto")
-        assert dal.backend_type == "DatabaseBackend"
+        assert isinstance(dal._backend, DatabaseBackend)
 
     def test_dal_default_is_file(self):
         """DAL with no db_dsn uses FileBackend."""

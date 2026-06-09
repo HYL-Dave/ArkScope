@@ -1,5 +1,5 @@
 """
-SqliteBackend — local-first market-data backend (3a prices + 3b news).
+SqliteBackend — local-first market-data backend (3a prices + 3b news + 3c iv/fund).
 
 Part of the PostgreSQL → local SQLite migration (see
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
@@ -7,8 +7,10 @@ serves the *market_data* domain from a local ``market_data.db`` (SQLite, WAL).
 It is NOT a full ``DataBackend`` — only the methods used by
 :class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
 implemented: 3a = ``query_prices``; 3b = ``query_news`` (unscored) +
-``query_news_search`` (FTS5); plus ``get_available_tickers('prices'|'news')``.
-Score-dependent reads (news_scores deferred) and everything else stay on PostgreSQL.
+``query_news_search`` (FTS5); 3c-A = ``query_iv_history`` + ``query_fundamentals``;
+plus ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
+Score-dependent reads (news_scores deferred), ``financial_cache`` (3c-C), and
+everything else stay on PostgreSQL.
 
 Reads open the DB **read-only** (``mode=ro``); writes are done only by the
 migration script, never here. The on-disk ``datetime`` is stored as the same
@@ -20,6 +22,7 @@ SQLite), matching the FileBackend resample contract.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from datetime import date, timedelta
@@ -32,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 _PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
 _INTERVAL_MAP = {"1h": "1h", "hourly": "1h", "1d": "1d", "daily": "1d", "15min": "15min"}
+# query_iv_history output shape (match DatabaseBackend exactly).
+_IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
 
 # query_news / query_news_search output shapes (match DatabaseBackend). Local news
 # has NO scores (news_scores deferred) → score columns are always NULL here.
@@ -193,9 +198,71 @@ class SqliteBackend:
         finally:
             conn.close()
 
+    # --- iv history + fundamentals (3c-A): read-mostly snapshots -------------
+
+    def query_iv_history(self, ticker: str) -> pd.DataFrame:
+        """Local IV history for ``ticker`` (ordered by date ASC) — same columns as
+        the PG path. Empty frame on any miss (caller falls back to PG)."""
+        empty = pd.DataFrame(columns=_IV_COLS)
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return empty
+        try:
+            rows = conn.execute(
+                "SELECT date, atm_iv, hv_30d, vrp, spot_price, num_quotes FROM iv_history "
+                "WHERE ticker = ? ORDER BY date ASC",
+                (ticker.upper(),),
+            ).fetchall()
+            return pd.DataFrame([tuple(r) for r in rows], columns=_IV_COLS) if rows else empty
+        except sqlite3.OperationalError as e:
+            logger.warning(f"SqliteBackend.query_iv_history({ticker}): {e}")
+            return empty
+        finally:
+            conn.close()
+
+    def query_fundamentals(self, ticker: str) -> dict:
+        """Latest local fundamentals snapshot for ``ticker``. Returns the same dict
+        shape as the PG path (``snapshot`` / ``fin_summary`` / ``ownership`` pulled
+        out of the stored ReportSnapshot JSON). Empty ``{}`` on any miss (PG fallback)."""
+        ticker = ticker.upper()
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return {}
+        try:
+            row = conn.execute(
+                "SELECT data, snapshot_date FROM fundamentals "
+                "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 1",
+                (ticker,),
+            ).fetchone()
+        except sqlite3.OperationalError as e:
+            logger.warning(f"SqliteBackend.query_fundamentals({ticker}): {e}")
+            return {}
+        finally:
+            conn.close()
+        if row is None:
+            return {}
+        try:
+            data = json.loads(row["data"]) if isinstance(row["data"], str) else row["data"]
+        except (ValueError, TypeError):
+            return {}
+        reports = data.get("reports", data) if isinstance(data, dict) else {}
+        if not isinstance(reports, dict):
+            reports = {}
+        return {
+            "ticker": ticker,
+            "collected_at": row["snapshot_date"] or "",
+            "snapshot": reports.get("ReportSnapshot", {}),
+            "fin_summary": reports.get("ReportsFinSummary", {}),
+            "ownership": reports.get("ReportsOwnership", {}),
+        }
+
     def get_available_tickers(self, data_type: str) -> List[str]:
-        """Distinct tickers for a local domain (``prices`` 3a / ``news`` 3b)."""
-        table = {"prices": "prices", "news": "news"}.get(data_type)  # whitelist → safe f-string
+        """Distinct tickers for a local domain (prices 3a / news 3b / iv_history /
+        fundamentals 3c-A)."""
+        table = {"prices": "prices", "news": "news",
+                 "iv_history": "iv_history", "fundamentals": "fundamentals"}.get(data_type)
         if table is None:
             return []
         try:
