@@ -607,6 +607,11 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
 // routing is enabled and fall back to PG otherwise. Shapes mirror the Python
 // IVAnalysisResult / IVHistoryPoint / FundamentalsResult schemas.
 
+// source_path = TRUE per-call origin of the underlying read (local market DB vs PG /
+// file). pg_fallback = local-first miss → PG; pg = PG primary (routing off);
+// file = file-backed dev config; none = no data anywhere.
+export type SourcePath = "local" | "pg_fallback" | "pg" | "file" | "none";
+
 export interface IVAnalysis {
   ticker: string;
   current_iv: number | null;
@@ -617,6 +622,7 @@ export interface IVAnalysis {
   spot_price: number | null;
   history_days: number;
   signal: string | null; // HIGH_IV_SELL | LOW_IV_BUY | NEUTRAL
+  source_path?: SourcePath;
 }
 
 export interface IVHistoryPoint {
@@ -662,6 +668,7 @@ export interface FundamentalsResult {
   balance_sheet: FinancialStatement[] | null;
   cash_flow_statements: FinancialStatement[] | null;
   snapshot: Record<string, unknown> | null;
+  source_path?: SourcePath; // present on the stored-only read (數據 tab)
 }
 
 // True local-DB coverage for a ticker (routing-independent fact, NOT per-call

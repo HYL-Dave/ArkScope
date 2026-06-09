@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import List
 
 from src.api.dependencies import get_dal
+from src.tools.backends import provenance
 from src.tools.data_access import DataAccessLayer
 from src.tools.options_tools import (
     get_iv_analysis,
@@ -20,9 +21,16 @@ def iv_analysis(
     ticker: str,
     dal: DataAccessLayer = Depends(get_dal),
 ):
-    """Full IV environment analysis: rank, percentile, VRP, signal."""
+    """Full IV environment analysis: rank, percentile, VRP, signal.
+
+    Adds ``source_path`` (local | pg_fallback | pg | file | none) — the TRUE origin
+    of the underlying IV-history read (recorded by the local-first backend; otherwise
+    derived from the backend type). Read-only; no provider fetch.
+    """
+    provenance.reset()
     result = get_iv_analysis(dal, ticker=ticker)
-    return result.model_dump()
+    source = provenance.read("iv") or provenance.fallback(dal.backend_type, not result.history_days)
+    return {**result.model_dump(), "source_path": source}
 
 
 @router.get("/{ticker}/history")

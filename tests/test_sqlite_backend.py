@@ -420,6 +420,39 @@ def test_financial_cache_pg_fallback_and_promotion(market_db, monkeypatch):
     assert b._market.get_financial_cache("mk_NVDA") == {"v": "fromPG"}
 
 
+def test_provenance_iv_recorded(market_db, monkeypatch):
+    # LocalMarketDatabaseBackend records the TRUE per-call origin of the IV read.
+    from src.tools.backends import provenance
+    db, _ = market_db
+    b = _make(db)
+    provenance.reset(); b.query_iv_history("AAPL")           # local has AAPL
+    assert provenance.read("iv") == "local"
+    monkeypatch.setattr(  # local miss → PG returns data → pg_fallback
+        DatabaseBackend, "query_iv_history",
+        lambda self, t: pd.DataFrame([["2026-01-01", 0.3, 0.2, 0.1, 1.0, 5]], columns=_IV_COLS))
+    provenance.reset(); b.query_iv_history("UNKNOWN")
+    assert provenance.read("iv") == "pg_fallback"
+    monkeypatch.setattr(  # local miss → PG empty → none
+        DatabaseBackend, "query_iv_history", lambda self, t: pd.DataFrame(columns=_IV_COLS))
+    provenance.reset(); b.query_iv_history("UNKNOWN")
+    assert provenance.read("iv") == "none"
+
+
+def test_provenance_fundamentals_recorded(market_db, monkeypatch):
+    from src.tools.backends import provenance
+    db, _ = market_db
+    b = _make(db)
+    provenance.reset(); b.query_fundamentals("AAPL")          # local has AAPL
+    assert provenance.read("fundamentals") == "local"
+    monkeypatch.setattr(DatabaseBackend, "query_fundamentals",
+                        lambda self, t: {"ticker": t, "snapshot": {"x": 1}})
+    provenance.reset(); b.query_fundamentals("UNKNOWN")
+    assert provenance.read("fundamentals") == "pg_fallback"
+    monkeypatch.setattr(DatabaseBackend, "query_fundamentals", lambda self, t: {})
+    provenance.reset(); b.query_fundamentals("UNKNOWN")
+    assert provenance.read("fundamentals") == "none"
+
+
 def test_inherited_vs_overridden_methods(market_db):
     # market-domain reads + the local-primary financial_cache are overridden;
     # everything else (SA/reports/memories/stats) is inherited PG behaviour.

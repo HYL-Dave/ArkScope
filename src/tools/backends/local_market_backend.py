@@ -34,6 +34,7 @@ import logging
 
 import pandas as pd
 
+from . import provenance
 from .db_backend import DatabaseBackend
 from .sqlite_backend import SqliteBackend
 
@@ -93,8 +94,11 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             logger.warning(f"local query_iv_history failed ({e}); falling back to PG")
             df = None
         if df is not None and not df.empty:
+            provenance.record("iv", "local")
             return df
-        return super().query_iv_history(ticker)
+        pg = super().query_iv_history(ticker)
+        provenance.record("iv", "pg_fallback" if pg is not None and not pg.empty else "none")
+        return pg
 
     def query_fundamentals(self, ticker: str) -> dict:
         try:
@@ -103,8 +107,11 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             logger.warning(f"local query_fundamentals failed ({e}); falling back to PG")
             data = None
         if data:  # non-empty dict → local hit
+            provenance.record("fundamentals", "local")
             return data
-        return super().query_fundamentals(ticker)
+        pg = super().query_fundamentals(ticker)
+        provenance.record("fundamentals", "pg_fallback" if pg else "none")
+        return pg
 
     # --- financial_cache (3c-C): local-primary (set local-only; get local-first +
     #     PG fallback + read-through promotion) -----------------------------------

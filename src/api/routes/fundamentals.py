@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import List, Optional
 
 from src.api.dependencies import get_dal
+from src.tools.backends import provenance
 from src.tools.data_access import DataAccessLayer
 from src.tools.analysis_tools import get_fundamentals_analysis, get_sec_filings
 
@@ -32,10 +33,14 @@ def fundamentals(
     fetch. Empty result (data_source 'none') when nothing is stored locally/PG.
     """
     if stored:
+        provenance.reset()
         result = dal.get_fundamentals(ticker)
         if result.snapshot_date:
             result.data_source = "ibkr"  # stored IBKR snapshot origin (mirrors analysis step 1)
-        return result.model_dump()
+        # TRUE per-call origin of the stored read (local | pg_fallback | pg | file | none).
+        source = provenance.read("fundamentals") or provenance.fallback(
+            dal.backend_type, not result.snapshot_date)
+        return {**result.model_dump(), "source_path": source}
     result = get_fundamentals_analysis(dal, ticker=ticker)
     return result.model_dump()
 

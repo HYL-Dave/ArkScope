@@ -301,6 +301,8 @@ def test_fundamentals_stored_mode_no_provider_fetch(monkeypatch):
     calls = {"analysis": 0, "dal": 0}
 
     class _FakeDAL:
+        backend_type = "LocalMarketDatabaseBackend"  # for the source_path fallback
+
         def get_fundamentals(self, ticker):
             calls["dal"] += 1
             return FundamentalsResult(ticker=ticker.upper(), snapshot_date="2026-06-01",
@@ -322,3 +324,53 @@ def test_fundamentals_stored_mode_no_provider_fetch(monkeypatch):
     out2 = fr.fundamentals("AAPL", stored=False, dal=dal)
     assert calls["analysis"] == 1
     assert out2["data_source"] == "sec_edgar"
+
+
+class _FakeDALBT:
+    """Minimal DAL stub exposing backend_type for the source_path fallback."""
+    def __init__(self, backend_type):
+        self.backend_type = backend_type
+
+
+def test_iv_analysis_source_path_mapping(monkeypatch):
+    """/options/{ticker} reports source_path: recorded provenance passes through; when
+    nothing is recorded it maps by backend type to pg / file (data) or none (empty)."""
+    from src.api.routes import options as opt
+    from src.tools.backends import provenance
+    from src.tools.schemas import IVAnalysisResult
+
+    monkeypatch.setattr(opt, "get_iv_analysis",
+                        lambda dal, ticker: IVAnalysisResult(ticker=ticker, history_days=8, current_iv=0.3))
+    monkeypatch.setattr(provenance, "read", lambda d: "local")  # recorded → passes through
+    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("LocalMarketDatabaseBackend"))["source_path"] == "local"
+
+    monkeypatch.setattr(provenance, "read", lambda d: None)  # not recorded → by backend type
+    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("DatabaseBackend"))["source_path"] == "pg"
+    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("FileBackend"))["source_path"] == "file"
+
+    monkeypatch.setattr(opt, "get_iv_analysis",
+                        lambda dal, ticker: IVAnalysisResult(ticker=ticker, history_days=0))
+    assert opt.iv_analysis("NVDA", dal=_FakeDALBT("DatabaseBackend"))["source_path"] == "none"  # empty
+
+
+def test_fundamentals_stored_source_path_mapping(monkeypatch):
+    """/fundamentals/{ticker}?stored=true reports source_path the same way."""
+    from src.api.routes import fundamentals as fr
+    from src.tools.backends import provenance
+    from src.tools.schemas import FundamentalsResult
+
+    class _DAL(_FakeDALBT):
+        def get_fundamentals(self, ticker):
+            return FundamentalsResult(ticker=ticker.upper(), snapshot_date="2026-06-01")
+
+    monkeypatch.setattr(provenance, "read", lambda d: "pg_fallback")
+    out = fr.fundamentals("AAPL", stored=True, dal=_DAL("LocalMarketDatabaseBackend"))
+    assert out["source_path"] == "pg_fallback"
+
+    class _EmptyDAL(_FakeDALBT):
+        def get_fundamentals(self, ticker):
+            return FundamentalsResult(ticker=ticker.upper())  # no snapshot_date
+
+    monkeypatch.setattr(provenance, "read", lambda d: None)
+    out = fr.fundamentals("AAPL", stored=True, dal=_EmptyDAL("FileBackend"))
+    assert out["source_path"] == "none"  # empty → none regardless of backend type

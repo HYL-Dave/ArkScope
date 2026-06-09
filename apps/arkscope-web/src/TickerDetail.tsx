@@ -26,6 +26,7 @@ import {
   type MarketDataCoverage,
   type MarketDataStatus,
   type Note,
+  type SourcePath,
   type PriceChange,
   type TagRef,
   type TickerAggregate,
@@ -251,11 +252,13 @@ function DataTab({ ticker }: { ticker: string }) {
         </div>
         <dl className="kv">
           <Kv k="本地市場資料" v={routingLabel} />
-          <Kv k="本地覆蓋 · IV" v={coverage ? (coverage.iv ? "有" : "無") : "—"} />
-          <Kv k="本地覆蓋 · 基本面" v={coverage ? (coverage.fundamentals ? "有" : "無") : "—"} />
+          <Kv k="IV · 本次來源" v={sourceLabel(iv?.source_path)} />
+          <Kv k="IV · 本地覆蓋" v={coverage ? (coverage.iv ? "有" : "無") : "—"} />
+          <Kv k="基本面 · 本次來源" v={sourceLabel(fund?.source_path)} />
+          <Kv k="基本面 · 本地覆蓋" v={coverage ? (coverage.fundamentals ? "有" : "無") : "—"} />
         </dl>
         <p className="muted tiny">
-          「本地覆蓋」= 本地市場庫是否存有此標的的列；本次讀取實際走本地或 PG 的逐筆來源標記為後續功能。
+          「本次來源」= 此次讀取的真實來源（本地命中 / PG 回退 / PG / 無）；「本地覆蓋」= 本地市場庫是否存有此標的的列。
         </p>
         {errs.length > 0 && <p className="muted tiny">部分資料無法載入：{errs.join("；")}</p>}
       </section>
@@ -596,6 +599,16 @@ function Kv({ k, v, cls }: { k: string; v: string; cls?: string }) {
 
 function fmtNum(v: number | null): string {
   return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function sourceLabel(s: SourcePath | undefined): string {
+  switch (s) {
+    case "local": return "本地";
+    case "pg_fallback": return "PG（本地缺→回退）";
+    case "pg": return "PG";
+    case "file": return "本地檔案";
+    case "none": return "無資料";
+    default: return "—";
+  }
 }
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
