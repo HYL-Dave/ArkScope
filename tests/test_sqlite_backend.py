@@ -279,6 +279,32 @@ def test_financial_cache_missing_table_is_safe(tmp_path):
     assert SqliteBackend(str(db)).get_financial_cache("k") is None
 
 
+def test_set_financial_cache_serialized_by_lock(market_db):
+    # set_financial_cache must take _CACHE_WRITE_LOCK so it serializes against a
+    # bootstrap's read-old→swap→write-carried section (else a cache write racing a
+    # rebuild is dropped). Deterministic proof: hold the lock → the write blocks;
+    # release → it completes.
+    import threading
+    import time as _time
+    import src.market_data_admin as mda
+    db, _ = market_db
+    b = SqliteBackend(db)
+    done = threading.Event()
+
+    def writer():
+        b.set_financial_cache("LOCKED", "AAPL", {"v": 1})
+        done.set()
+
+    with mda._CACHE_WRITE_LOCK:                 # simulate bootstrap holding it
+        t = threading.Thread(target=writer, daemon=True)
+        t.start()
+        assert not done.wait(timeout=0.5)       # blocked while we hold the lock
+        assert b.get_financial_cache("LOCKED") is None  # nothing written yet
+    assert done.wait(timeout=5)                 # released → completes
+    t.join(timeout=5)
+    assert b.get_financial_cache("LOCKED") == {"v": 1}
+
+
 # --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
 
 _PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)

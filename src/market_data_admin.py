@@ -170,6 +170,14 @@ _FIN_CACHE_INSERT = ("INSERT OR REPLACE INTO financial_cache "
                      "(cache_key, source, ticker, data, fetched_at, expires_at) "
                      "VALUES (?, ?, ?, ?, ?, ?)")
 
+# Serializes the local-primary financial_cache write against a bootstrap's
+# read-old → swap → write-carried critical section, so a set_financial_cache that
+# races a full rebuild is queued (then writes to the swapped-in DB) instead of being
+# silently dropped when the old inode is replaced. Held only across the (fast) swap,
+# never the multi-minute build. Same-process (single sidecar): bootstrap runs on a
+# daemon thread, set_financial_cache on FastAPI worker threads. See SqliteBackend.
+_CACHE_WRITE_LOCK = threading.Lock()
+
 
 def _now() -> str:
     """UTC ISO-8601 timestamp (seconds). Imported lazily to keep this off the hot path."""
@@ -372,31 +380,29 @@ def _copy_table(cur, sconn, select_sql: str, insert_sql: str, total: int,
     return written
 
 
-def _carry_over_fin_cache(src_path: str, dst_conn) -> int:
-    """Preserve the LOCAL-PRIMARY financial_cache across a full rebuild: copy its rows
-    from the existing live DB into the freshly-built temp. financial_cache is NOT a PG
-    mirror (set writes local-only), so a rebuild must not silently drop locally-cached
-    provider/paid data. No-op if the old DB / table is absent (first build, pre-3c-C)."""
-    if not Path(src_path).exists():
-        return 0
+def _read_fin_cache_rows(path: str) -> list:
+    """Read the LOCAL-PRIMARY financial_cache rows from an existing DB (read-only).
+    Used to carry the cache over a full rebuild — financial_cache is NOT a PG mirror
+    (set writes local-only), so a rebuild must not silently drop locally-cached
+    provider/paid data. ``[]`` if the DB / table is absent (first build, pre-3c-C).
+    Read + the subsequent swap + re-write run under ``_CACHE_WRITE_LOCK`` so a
+    concurrent set_financial_cache cannot be lost in the swap window."""
+    if not Path(path).exists():
+        return []
     try:
-        src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
+        src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     except sqlite3.OperationalError:
-        return 0
+        return []
     try:
         if not _table_exists(src, "financial_cache"):
-            return 0
-        rows = src.execute(
+            return []
+        return src.execute(
             "SELECT cache_key, source, ticker, data, fetched_at, expires_at FROM financial_cache"
         ).fetchall()
     except sqlite3.OperationalError:
-        return 0
+        return []
     finally:
         src.close()
-    if rows:
-        dst_conn.executemany(_FIN_CACHE_INSERT, rows)
-        dst_conn.commit()
-    return len(rows)
 
 
 def bootstrap_market(out_path: Optional[str] = None,
@@ -441,10 +447,7 @@ def bootstrap_market(out_path: Optional[str] = None,
             _copy_table(cur, sconn, _PG_FUND_SELECT, _FUND_INSERT,
                         fund_total, progress_cb, price_total + news_total + iv_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
-            # financial_cache is local-primary, NOT mirrored from PG → carry over the
-            # existing local rows so a rebuild never drops locally-cached data.
-            fin_cache_carried = _carry_over_fin_cache(path, sconn)
-            sconn.commit()
+            sconn.commit()  # financial_cache is carried over under-lock at swap time
 
             local_prices = sconn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
             sq_price_sum = _sqlite_group_counts(sconn, _SQ_PRICE_CHECKSUM)
@@ -464,28 +467,53 @@ def bootstrap_market(out_path: Optional[str] = None,
     iv_match = local_iv == iv_total and sq_iv_sum == pg_iv_sum
     fund_match = local_fund == fund_total and sq_fund_sum == pg_fund_sum
     match = prices_match and news_match and iv_match and fund_match
+    fin_cache_carried = 0
     if match:
-        os.replace(tmp, path)  # atomic swap-in
-        # CRITICAL: drop the OLD inode's WAL sidecars as part of the swap. ``tmp`` was
-        # built with a rollback journal (self-contained, no WAL of its own), but a
-        # ``market_data.db-wal``/``-shm`` may exist from the live DB's writers — since
-        # 3c-C, ``set_financial_cache`` opens a WAL connection on the live file at
-        # arbitrary times. SQLite associates those sidecars by FILENAME, not inode, so
-        # a stale WAL left at swap time would be replayed onto the freshly-built NEW
-        # inode → silent stale-data corruption that escapes the pre-swap validation.
-        # Removing them while no connection is open is safe; the swapped-in file is
-        # self-contained. (A cache write racing the swap is best-effort + TTL'd +
-        # re-fetchable — an acceptable loss vs. corrupting a just-validated rebuild.)
-        Path(path + "-wal").unlink(missing_ok=True)
-        Path(path + "-shm").unlink(missing_ok=True)
-        try:
-            wconn = sqlite3.connect(path)
+        # Hold _CACHE_WRITE_LOCK across read-old → write-into-tmp → swap (NOT the
+        # multi-minute build): financial_cache is local-primary, so the carry-over
+        # must capture the OLD cache and land it in the NEW DB atomically w.r.t.
+        # set_financial_cache. The lock queues a racing cache write so it lands in the
+        # swapped-in DB rather than being dropped with the old inode. Window held is
+        # just the swap (small cache + os.replace), ~ms.
+        with _CACHE_WRITE_LOCK:
+            carried_rows = _read_fin_cache_rows(path)  # old cache (committed state)
+            # Write the carried cache INTO tmp BEFORE the swap. tmp is private to this
+            # build (no other connection touches it — unlike the live `path`, which an
+            # overlapping incremental_update may write), so there is no SQLITE_BUSY
+            # race, and the swap only happens once the cache is safely in the new file.
+            # financial_cache is best-effort/TTL'd → a (rare) carry-over failure is
+            # logged + reported as carried=0, not allowed to abort a validated rebuild.
             try:
-                wconn.execute("PRAGMA journal_mode = WAL")
-            finally:
-                wconn.close()
-        except sqlite3.OperationalError:
-            pass
+                if carried_rows:
+                    cconn = sqlite3.connect(tmp, timeout=10.0)
+                    try:
+                        cconn.execute("PRAGMA busy_timeout = 10000")
+                        cconn.executemany(_FIN_CACHE_INSERT, carried_rows)
+                        cconn.commit()
+                    finally:
+                        cconn.close()
+                fin_cache_carried = len(carried_rows)  # only after a successful write
+            except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
+                logger.warning("financial_cache carry-over failed (%s); cache will "
+                               "re-populate via promotion/re-fetch", e)
+            os.replace(tmp, path)  # atomic swap-in (cache already inside the new file)
+            # CRITICAL: drop the OLD inode's WAL sidecars as part of the swap. ``tmp``
+            # was built with a rollback journal (self-contained, no WAL of its own),
+            # but a ``market_data.db-wal``/``-shm`` may exist from the live DB's
+            # writers (since 3c-C, set_financial_cache opens a WAL connection on the
+            # live file). SQLite associates those sidecars by FILENAME, not inode, so a
+            # stale WAL left at swap time would be replayed onto the freshly-built NEW
+            # inode → silent stale-data corruption escaping the pre-swap validation.
+            Path(path + "-wal").unlink(missing_ok=True)
+            Path(path + "-shm").unlink(missing_ok=True)
+            try:
+                wconn = sqlite3.connect(path)
+                try:
+                    wconn.execute("PRAGMA journal_mode = WAL")
+                finally:
+                    wconn.close()
+            except sqlite3.OperationalError:
+                pass
     else:
         Path(tmp).unlink(missing_ok=True)  # keep any existing good DB intact
     return {

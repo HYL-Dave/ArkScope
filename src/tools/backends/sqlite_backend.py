@@ -312,36 +312,41 @@ class SqliteBackend:
         """LOCAL-only financial_cache write — the single writable entry point of this
         backend. ``fetched_at``/``expires_at`` may be passed explicitly to promote an
         existing PG row verbatim (preserving its TTL); otherwise derived from
-        ``ttl_days`` at now. Best-effort: returns False on any failure."""
+        ``ttl_days`` at now. Best-effort: returns False on any failure.
+
+        Serialized against a bootstrap rebuild via ``_CACHE_WRITE_LOCK`` so a write
+        racing the swap is queued (lands in the swapped-in DB) rather than dropped
+        with the old inode."""
         from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
         if fetched_at is None:
             fetched_at = now.isoformat(timespec="seconds")
         if expires_at is None:
             expires_at = (now + timedelta(days=ttl_days)).isoformat(timespec="seconds")
-        from src.market_data_admin import _FIN_CACHE_SCHEMA
-        try:
-            conn = self._connect_rw()
-        except sqlite3.OperationalError:
-            return False
-        try:
-            conn.executescript(_FIN_CACHE_SCHEMA)  # tolerate a pre-3c-C DB
-            conn.execute(
-                "INSERT INTO financial_cache "
-                "(cache_key, source, ticker, data, fetched_at, expires_at) "
-                "VALUES (?, ?, ?, ?, ?, ?) "
-                "ON CONFLICT(cache_key) DO UPDATE SET "
-                "  source=excluded.source, ticker=excluded.ticker, data=excluded.data, "
-                "  fetched_at=excluded.fetched_at, expires_at=excluded.expires_at",
-                (cache_key, source, ticker.upper(), json.dumps(data), fetched_at, expires_at),
-            )
-            conn.commit()
-            return True
-        except (sqlite3.OperationalError, sqlite3.IntegrityError, TypeError, ValueError) as e:
-            logger.warning(f"SqliteBackend.set_financial_cache({cache_key}): {e}")
-            return False
-        finally:
-            conn.close()
+        from src.market_data_admin import _FIN_CACHE_SCHEMA, _CACHE_WRITE_LOCK
+        with _CACHE_WRITE_LOCK:
+            try:
+                conn = self._connect_rw()
+            except sqlite3.OperationalError:
+                return False
+            try:
+                conn.executescript(_FIN_CACHE_SCHEMA)  # tolerate a pre-3c-C DB
+                conn.execute(
+                    "INSERT INTO financial_cache "
+                    "(cache_key, source, ticker, data, fetched_at, expires_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(cache_key) DO UPDATE SET "
+                    "  source=excluded.source, ticker=excluded.ticker, data=excluded.data, "
+                    "  fetched_at=excluded.fetched_at, expires_at=excluded.expires_at",
+                    (cache_key, source, ticker.upper(), json.dumps(data), fetched_at, expires_at),
+                )
+                conn.commit()
+                return True
+            except (sqlite3.OperationalError, sqlite3.IntegrityError, TypeError, ValueError) as e:
+                logger.warning(f"SqliteBackend.set_financial_cache({cache_key}): {e}")
+                return False
+            finally:
+                conn.close()
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """Distinct tickers for a local domain (prices 3a / news 3b / iv_history /
