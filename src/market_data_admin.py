@@ -313,7 +313,7 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
         conn.close()
 
 
-# --- bootstrap (full rebuild of prices + news) + validate ---------------------
+# --- bootstrap (full rebuild of prices + news + iv + fundamentals) + validate -
 
 def _copy_table(cur, sconn, select_sql: str, insert_sql: str, total: int,
                 progress_cb, base: int, grand_total: int, batch: int) -> int:
@@ -685,13 +685,15 @@ def start_update_job(out_path: Optional[str] = None) -> dict:
         try:
             res = incremental_update(path)
             _JOBS[job_id]["result"] = res
-            # incremental is best-effort per domain (provider down ≠ fatal); the
-            # job is "error" only if BOTH domains failed, else "done".
-            _JOBS[job_id]["status"] = "done" if res.get("ok") or (
-                (res.get("prices") or {}).get("ok") or (res.get("news") or {}).get("ok")
-            ) else "error"
+            # incremental is best-effort PER DOMAIN (provider down ≠ fatal); the job
+            # is "error" only if NO domain succeeded (e.g. missing DB / PG fully
+            # down), else "done". Consider all 4 domains, not just prices/news, so an
+            # iv/fundamentals failure is surfaced in job["error"] too.
+            domains = [res.get("prices"), res.get("news"), res.get("iv"), res.get("fundamentals")]
+            any_ok = any((d or {}).get("ok") for d in domains)
+            _JOBS[job_id]["status"] = "done" if res.get("ok") or any_ok else "error"
             if not res.get("ok"):
-                errs = [d.get("error") for d in (res.get("prices"), res.get("news")) if d and d.get("error")]
+                errs = [(d or {}).get("error") for d in domains]
                 _JOBS[job_id]["error"] = res.get("error") or "; ".join(e for e in errs if e) or None
         except Exception as e:  # noqa: BLE001
             _JOBS[job_id]["status"] = "error"

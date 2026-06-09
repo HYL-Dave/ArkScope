@@ -389,6 +389,46 @@ def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
     assert j["status"] == "done" and j["result"]["match"] is True
 
 
+def _drain_update_job(out, monkeypatch, fake_result):
+    """Run start_update_job with incremental_update stubbed to fake_result; poll to done."""
+    mda._JOBS.clear()  # hermetic: don't attach to a prior test's running update job
+    monkeypatch.setattr(mda, "incremental_update", lambda path, batch=20000: fake_result)
+    job = mda.start_update_job(out)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        j = mda.get_job(job["id"])
+        if j["status"] != "running":
+            break
+        time.sleep(0.05)
+    return mda.get_job(job["id"])
+
+
+def test_update_job_surfaces_iv_or_fundamentals_failure(tmp_path, monkeypatch):
+    # start_update_job must weigh ALL 4 domains: prices/news ok but iv failed → still
+    # "done" (best-effort), and the iv error is surfaced in job["error"] (the old
+    # 2-domain predicate ignored iv/fundamentals entirely).
+    j = _drain_update_job(str(tmp_path / "m.db"), monkeypatch, {
+        "ok": False,
+        "prices": {"ok": True, "rows_added": 5, "error": None},
+        "news": {"ok": True, "rows_added": 2, "error": None},
+        "iv": {"ok": False, "rows_added": 0, "error": "IV provider down"},
+        "fundamentals": {"ok": True, "rows_added": 1, "error": None},
+    })
+    assert j["status"] == "done"
+    assert j["error"] and "IV provider down" in j["error"]
+
+
+def test_update_job_all_domains_fail_is_error(tmp_path, monkeypatch):
+    j = _drain_update_job(str(tmp_path / "m.db"), monkeypatch, {
+        "ok": False,
+        "prices": {"ok": False, "rows_added": 0, "error": "PG down"},
+        "news": {"ok": False, "rows_added": 0, "error": "PG down"},
+        "iv": {"ok": False, "rows_added": 0, "error": "PG down"},
+        "fundamentals": {"ok": False, "rows_added": 0, "error": "PG down"},
+    })
+    assert j["status"] == "error" and "PG down" in j["error"]
+
+
 # --- routes -------------------------------------------------------------------
 
 @pytest.fixture()

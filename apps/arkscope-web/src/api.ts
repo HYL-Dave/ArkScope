@@ -754,7 +754,7 @@ export function translateCard(
   return sendJSON(`/analysis/cards/${runId}/translate`, "POST", { lang }, 120_000);
 }
 
-// --- market-data local-DB lifecycle (slices 3a prices + 3b news) ---
+// --- market-data local-DB lifecycle (3a prices + 3b news + 3c-A iv/fundamentals) ---
 
 export interface SyncMeta {
   last_success: string | null;
@@ -763,12 +763,20 @@ export interface SyncMeta {
   updated_at: string;
 }
 
+// iv/fundamentals are id-keyed snapshot domains → date-only "latest" (no time).
 export interface MarketDataStatus {
   market_db: string;
   exists: boolean;
   prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
   news: { row_count: number; source_count: number; latest_published: string | null };
-  sync: { prices: SyncMeta | null; news: SyncMeta | null };
+  iv: { row_count: number; ticker_count: number; latest_date: string | null };
+  fundamentals: { row_count: number; ticker_count: number; latest_date: string | null };
+  sync: {
+    prices: SyncMeta | null;
+    news: SyncMeta | null;
+    iv: SyncMeta | null;
+    fundamentals: SyncMeta | null;
+  };
   use_local_market_setting: boolean;
   env_override: boolean;
   routing_enabled: boolean;
@@ -791,7 +799,16 @@ export interface MarketDataJob {
   kind: string; // "bootstrap_market" | "update_market"
   status: "running" | "done" | "error";
   progress: { written: number; total: number };
-  result: { match?: boolean; ok?: boolean; prices: DomainResult; news: DomainResult } | null;
+  // Per-domain results are null on the incremental missing-DB early return
+  // (bootstrap them first); bootstrap + a normal update always populate all four.
+  result: {
+    match?: boolean;
+    ok?: boolean;
+    prices: DomainResult | null;
+    news: DomainResult | null;
+    iv: DomainResult | null;
+    fundamentals: DomainResult | null;
+  } | null;
   error: string | null;
 }
 
@@ -806,18 +823,22 @@ export interface MarketDataValidate {
   match: boolean;
   prices?: DomainValidate;
   news?: DomainValidate;
+  iv?: DomainValidate;
+  fundamentals?: DomainValidate;
 }
 
 export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
 }
 
-// Full rebuild of the local market DB (prices + news). Returns a job to poll.
+// Full rebuild of the local market DB (prices + news + iv + fundamentals).
+// Returns a job to poll.
 export function bootstrapMarketData(): Promise<MarketDataJob> {
   return sendJSON<MarketDataJob>("/market-data/bootstrap", "POST");
 }
 
-// Incremental delta refresh (append-only; prices + news). Returns a job to poll.
+// Incremental delta refresh (append-only; prices + news + iv + fundamentals).
+// Returns a job to poll.
 export function updateMarketData(): Promise<MarketDataJob> {
   return sendJSON<MarketDataJob>("/market-data/update", "POST");
 }
@@ -826,7 +847,7 @@ export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
   return getJSON<MarketDataJob>(`/market-data/jobs/${encodeURIComponent(jobId)}`);
 }
 
-// Validation runs PG aggregates over the full prices + news tables — allow time.
+// Validation runs PG aggregates over all domains (prices/news/iv/fundamentals) — allow time.
 export function validateMarketData(): Promise<MarketDataValidate> {
   return sendJSON<MarketDataValidate>("/market-data/validate", "POST", undefined, 60_000);
 }

@@ -56,7 +56,7 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "data_storage",
     title: "Data Storage",
-    description: "本地市場資料庫（價格）建立、驗證、啟用；PG 為 fallback。",
+    description: "本地市場庫（價格＋新聞＋IV＋基本面）建立、驗證、啟用；PG 為 fallback。",
     enabled: true,
   },
   {
@@ -320,8 +320,9 @@ function syncLine(status: MarketDataStatus): string {
     const ts = m.last_success ? m.last_success.slice(0, 16).replace("T", " ") : "—";
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };
-  if (!status.sync.prices && !status.sync.news) return "尚未增量更新";
-  return `價格 ${fmt(status.sync.prices)} · 新聞 ${fmt(status.sync.news)}`;
+  const s = status.sync;
+  if (!s.prices && !s.news && !s.iv && !s.fundamentals) return "尚未增量更新";
+  return `價格 ${fmt(s.prices)} · 新聞 ${fmt(s.news)} · IV ${fmt(s.iv)} · 基本面 ${fmt(s.fundamentals)}`;
 }
 
 function DataStorageSection() {
@@ -415,6 +416,8 @@ function DataStorageSection() {
   const exists = status?.exists ?? false;
   const pr = status?.prices;
   const nw = status?.news;
+  const iv = status?.iv;
+  const fd = status?.fundamentals;
   const pct =
     job && job.progress.total > 0
       ? Math.round((job.progress.written / job.progress.total) * 100)
@@ -426,8 +429,8 @@ function DataStorageSection() {
         <div>
           <h2>本地市場資料庫 · Market Data</h2>
           <p className="muted tiny">
-            把市場價格與新聞從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
-            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、報告、分數）仍在 PG。
+            把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
+            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、報告、分數、financial_cache）仍在 PG。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
@@ -446,6 +449,10 @@ function DataStorageSection() {
             <dd>{exists ? `${pr!.row_count.toLocaleString()} 列 · ${pr!.ticker_count} 檔 · 最新 ${pr!.latest_datetime ?? "—"}` : "—"}</dd>
             <dt>新聞</dt>
             <dd>{exists ? `${nw!.row_count.toLocaleString()} 篇 · ${nw!.source_count} 來源 · 最新 ${nw!.latest_published ?? "—"}` : "—"}</dd>
+            <dt>IV</dt>
+            <dd>{exists ? `${iv!.row_count.toLocaleString()} 列 · ${iv!.ticker_count} 檔 · 最新 ${iv!.latest_date ?? "—"}` : "—"}</dd>
+            <dt>基本面</dt>
+            <dd>{exists ? `${fd!.row_count.toLocaleString()} 列 · ${fd!.ticker_count} 檔 · 最新 ${fd!.latest_date ?? "—"}` : "—"}</dd>
             <dt>最近增量更新</dt>
             <dd>{syncLine(status)}</dd>
             <dt>本地路由</dt>
@@ -461,7 +468,7 @@ function DataStorageSection() {
 
           <div className="settings-actions" style={{ marginTop: 12 }}>
             <button className="btn-ghost" onClick={() => void runBootstrap()} disabled={!!busy}>
-              {busy === "bootstrap" ? "建立中…" : exists ? "重建本地市場庫（價格＋新聞）" : "建立本地市場庫（價格＋新聞）"}
+              {busy === "bootstrap" ? "建立中…" : exists ? "重建本地市場庫" : "建立本地市場庫"}
             </button>
             <button className="btn-ghost" onClick={() => void runUpdate()} disabled={!!busy || !exists}>
               {busy === "update" ? "更新中…" : "增量更新"}
@@ -494,8 +501,8 @@ function DataStorageSection() {
           {!busy && job && job.status === "done" && job.result && (
             <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
               {job.kind === "update_market"
-                ? `✓ 增量更新完成：價格 +${(job.result.prices.rows_added ?? 0).toLocaleString()} 列、新聞 +${(job.result.news.rows_added ?? 0).toLocaleString()} 篇。`
-                : `✓ 建立完成：價格 ${(job.result.prices.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news.rows ?? 0).toLocaleString()} 篇，校驗一致。`}
+                ? `✓ 增量更新完成：價格 +${(job.result.prices?.rows_added ?? 0).toLocaleString()} 列、新聞 +${(job.result.news?.rows_added ?? 0).toLocaleString()} 篇、IV +${(job.result.iv?.rows_added ?? 0).toLocaleString()}、基本面 +${(job.result.fundamentals?.rows_added ?? 0).toLocaleString()}。`
+                : `✓ 建立完成：價格 ${(job.result.prices?.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news?.rows ?? 0).toLocaleString()} 篇、IV ${(job.result.iv?.rows ?? 0).toLocaleString()}、基本面 ${(job.result.fundamentals?.rows ?? 0).toLocaleString()}，校驗一致。`}
             </p>
           )}
           {!busy && job && job.status === "error" && (
@@ -508,11 +515,21 @@ function DataStorageSection() {
               className="tiny"
               style={{ marginTop: 8, color: validation.match ? "var(--ok)" : "var(--bad)" }}
             >
-              {validation.match ? "✓ 驗證一致" : "✗ 驗證不一致（建議重建）"}：
-              價格 {(validation.prices?.local_rows ?? 0).toLocaleString()}/{(validation.prices?.pg_rows ?? 0).toLocaleString()}
-              {validation.prices?.match ? " ✓" : " ✗"} · 新聞{" "}
-              {(validation.news?.local_rows ?? 0).toLocaleString()}/{(validation.news?.pg_rows ?? 0).toLocaleString()}
-              {validation.news?.match ? " ✓" : " ✗"}
+              {validation.match ? "✓ 驗證一致" : "✗ 驗證不一致（建議重建）"}：{" "}
+              {(
+                [
+                  ["價格", validation.prices],
+                  ["新聞", validation.news],
+                  ["IV", validation.iv],
+                  ["基本面", validation.fundamentals],
+                ] as const
+              ).map(([label, dv], i) => (
+                <span key={label}>
+                  {i > 0 ? " · " : ""}
+                  {label} {(dv?.local_rows ?? 0).toLocaleString()}/{(dv?.pg_rows ?? 0).toLocaleString()}
+                  {dv?.match ? " ✓" : " ✗"}
+                </span>
+              ))}
             </p>
           )}
         </div>
