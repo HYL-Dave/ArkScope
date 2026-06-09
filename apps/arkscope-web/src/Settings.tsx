@@ -418,6 +418,7 @@ function DataStorageSection() {
   const nw = status?.news;
   const iv = status?.iv;
   const fd = status?.fundamentals;
+  const fc = status?.financial_cache;
   const pct =
     job && job.progress.total > 0
       ? Math.round((job.progress.written / job.progress.total) * 100)
@@ -430,7 +431,8 @@ function DataStorageSection() {
           <h2>本地市場資料庫 · Market Data</h2>
           <p className="muted tiny">
             把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
-            缺資料自動 fallback 回 PG。其他資料（Seeking Alpha、報告、分數、financial_cache）仍在 PG。
+            缺資料自動 fallback 回 PG。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
+            其他資料（Seeking Alpha、報告、分數）仍在 PG。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
@@ -453,6 +455,12 @@ function DataStorageSection() {
             <dd>{exists ? `${iv!.row_count.toLocaleString()} 列 · ${iv!.ticker_count} 檔 · 最新 ${iv!.latest_date ?? "—"}` : "—"}</dd>
             <dt>基本面</dt>
             <dd>{exists ? `${fd!.row_count.toLocaleString()} 列 · ${fd!.ticker_count} 檔 · 最新 ${fd!.latest_date ?? "—"}` : "—"}</dd>
+            <dt>財務快取</dt>
+            <dd>
+              {exists
+                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${fc!.latest_fetched_at ?? "—"}（local-primary，不對 PG 驗證）`
+                : "—"}
+            </dd>
             <dt>最近增量更新</dt>
             <dd>{syncLine(status)}</dd>
             <dt>本地路由</dt>
@@ -502,7 +510,7 @@ function DataStorageSection() {
             <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
               {job.kind === "update_market"
                 ? `✓ 增量更新完成：價格 +${(job.result.prices?.rows_added ?? 0).toLocaleString()} 列、新聞 +${(job.result.news?.rows_added ?? 0).toLocaleString()} 篇、IV +${(job.result.iv?.rows_added ?? 0).toLocaleString()}、基本面 +${(job.result.fundamentals?.rows_added ?? 0).toLocaleString()}。`
-                : `✓ 建立完成：價格 ${(job.result.prices?.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news?.rows ?? 0).toLocaleString()} 篇、IV ${(job.result.iv?.rows ?? 0).toLocaleString()}、基本面 ${(job.result.fundamentals?.rows ?? 0).toLocaleString()}，校驗一致。`}
+                : `✓ 建立完成：價格 ${(job.result.prices?.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news?.rows ?? 0).toLocaleString()} 篇、IV ${(job.result.iv?.rows ?? 0).toLocaleString()}、基本面 ${(job.result.fundamentals?.rows ?? 0).toLocaleString()}，校驗一致；財務快取保留 ${(job.result.financial_cache?.carried_over ?? 0).toLocaleString()} 列。`}
             </p>
           )}
           {!busy && job && job.status === "error" && (

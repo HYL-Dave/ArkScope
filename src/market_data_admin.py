@@ -12,7 +12,10 @@ Domains migrated:
                          index for local full-text search. Scored reads fall back to PG.
   - 3c-A IV_HISTORY    — daily IV/HV/VRP snapshots (id-keyed, id-based incremental).
   - 3c-A FUNDAMENTALS  — ReportSnapshot JSON snapshots (id-keyed, id-based incremental).
-``financial_cache`` is deferred to 3c-C (designed local-primary, not migrated here).
+  - 3c-C FINANCIAL_CACHE — LOCAL-PRIMARY provider/SEC cache (NOT a PG mirror): set
+                 writes local-only, get is local-first w/ PG fallback + read-through
+                 promotion. Preserved across rebuilds (carry-over), not validated vs
+                 PG, untouched by the incremental updater. See SqliteBackend get/set.
 
 The bootstrap builds ALL domains into a single ``.building`` temp file and
 atomically swaps it in only after row-count + checksum validation passes, so a
@@ -115,7 +118,7 @@ _PG_NEWS_SELECT = f"SELECT {_PG_NEWS_COLS} FROM news ORDER BY id"
 _PG_NEWS_SELECT_INCR = f"SELECT {_PG_NEWS_COLS} FROM news WHERE id > %s ORDER BY id"
 
 # 3c-A: IV history + fundamentals (read-mostly snapshots; id-keyed like news, so
-# incremental is id-based). financial_cache deferred (3c-C, local-primary design).
+# incremental is id-based). financial_cache (3c-C, local-primary) is defined below.
 _IV_SCHEMA = """
 CREATE TABLE IF NOT EXISTS iv_history (
     id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, date TEXT NOT NULL,  -- 'YYYY-MM-DD'
@@ -143,6 +146,29 @@ _FUND_INSERT = "INSERT OR IGNORE INTO fundamentals (id, ticker, snapshot_date, d
 _PG_FUND_COLS = "id, ticker, TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_date, data::text"
 _PG_FUND_SELECT = f"SELECT {_PG_FUND_COLS} FROM fundamentals ORDER BY id"
 _PG_FUND_SELECT_INCR = f"SELECT {_PG_FUND_COLS} FROM fundamentals WHERE id > %s ORDER BY id"
+
+# 3c-C: financial_cache — LOCAL-PRIMARY (NOT a PG mirror). SqliteBackend.set writes
+# here; .get is local-first with PG fallback + read-through promotion. cache_key-keyed
+# with a TTL via expires_at (UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00' strings, which are
+# lexicographically comparable so expiry is a string compare). Because it is
+# local-primary it is PRESERVED across a full rebuild (carry-over), NOT validated
+# against PG, and NOT touched by the incremental updater. (financial_datasets_client's
+# own paid-path cache stays PG+file for now — unified in a later slice.)
+_FIN_CACHE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS financial_cache (
+    cache_key   TEXT PRIMARY KEY,
+    source      TEXT NOT NULL DEFAULT 'financial_datasets',
+    ticker      TEXT NOT NULL,
+    data        TEXT NOT NULL,        -- JSON (JSONB in PG)
+    fetched_at  TEXT NOT NULL,        -- UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00'
+    expires_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fin_cache_ticker ON financial_cache(ticker);
+CREATE INDEX IF NOT EXISTS idx_fin_cache_expires ON financial_cache(expires_at);
+"""
+_FIN_CACHE_INSERT = ("INSERT OR REPLACE INTO financial_cache "
+                     "(cache_key, source, ticker, data, fetched_at, expires_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?)")
 
 
 def _now() -> str:
@@ -273,6 +299,9 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
         "news": {"row_count": 0, "source_count": 0, "latest_published": None},
         "iv": {"row_count": 0, "ticker_count": 0, "latest_date": None},
         "fundamentals": {"row_count": 0, "ticker_count": 0, "latest_date": None},
+        # local-primary cache (3c-C): valid vs expired by expires_at, plus latest fetch
+        "financial_cache": {"row_count": 0, "valid_count": 0, "expired_count": 0,
+                            "latest_fetched_at": None},
     }
     if not Path(path).exists():
         return empty
@@ -306,6 +335,18 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
                 "ticker_count": conn.execute("SELECT COUNT(DISTINCT ticker) FROM fundamentals").fetchone()[0],
                 "latest_date": conn.execute("SELECT MAX(snapshot_date) FROM fundamentals").fetchone()[0],
             }
+        if _table_exists(conn, "financial_cache"):
+            now = _now()  # same UTC ISO-seconds format the cache stores expires_at in
+            total = conn.execute("SELECT COUNT(*) FROM financial_cache").fetchone()[0]
+            valid = conn.execute(
+                "SELECT COUNT(*) FROM financial_cache WHERE expires_at > ?", (now,)
+            ).fetchone()[0]
+            out["financial_cache"] = {
+                "row_count": total,
+                "valid_count": valid,
+                "expired_count": total - valid,
+                "latest_fetched_at": conn.execute("SELECT MAX(fetched_at) FROM financial_cache").fetchone()[0],
+            }
         return out
     except sqlite3.OperationalError:
         return {**empty, "exists": True}
@@ -329,6 +370,33 @@ def _copy_table(cur, sconn, select_sql: str, insert_sql: str, total: int,
         if progress_cb:
             progress_cb(base + written, grand_total)
     return written
+
+
+def _carry_over_fin_cache(src_path: str, dst_conn) -> int:
+    """Preserve the LOCAL-PRIMARY financial_cache across a full rebuild: copy its rows
+    from the existing live DB into the freshly-built temp. financial_cache is NOT a PG
+    mirror (set writes local-only), so a rebuild must not silently drop locally-cached
+    provider/paid data. No-op if the old DB / table is absent (first build, pre-3c-C)."""
+    if not Path(src_path).exists():
+        return 0
+    try:
+        src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        return 0
+    try:
+        if not _table_exists(src, "financial_cache"):
+            return 0
+        rows = src.execute(
+            "SELECT cache_key, source, ticker, data, fetched_at, expires_at FROM financial_cache"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return 0
+    finally:
+        src.close()
+    if rows:
+        dst_conn.executemany(_FIN_CACHE_INSERT, rows)
+        dst_conn.commit()
+    return len(rows)
 
 
 def bootstrap_market(out_path: Optional[str] = None,
@@ -361,7 +429,8 @@ def bootstrap_market(out_path: Optional[str] = None,
         Path(tmp).unlink(missing_ok=True)
         sconn = sqlite3.connect(tmp)
         try:
-            for schema in (_PRICES_SCHEMA, _NEWS_SCHEMA, _IV_SCHEMA, _FUND_SCHEMA, _META_SCHEMA):
+            for schema in (_PRICES_SCHEMA, _NEWS_SCHEMA, _IV_SCHEMA, _FUND_SCHEMA,
+                           _FIN_CACHE_SCHEMA, _META_SCHEMA):
                 sconn.executescript(schema)
             _copy_table(cur, sconn, _PG_PRICES_SELECT, _PRICE_INSERT,
                         price_total, progress_cb, 0, grand, batch)
@@ -372,6 +441,9 @@ def bootstrap_market(out_path: Optional[str] = None,
             _copy_table(cur, sconn, _PG_FUND_SELECT, _FUND_INSERT,
                         fund_total, progress_cb, price_total + news_total + iv_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
+            # financial_cache is local-primary, NOT mirrored from PG → carry over the
+            # existing local rows so a rebuild never drops locally-cached data.
+            fin_cache_carried = _carry_over_fin_cache(path, sconn)
             sconn.commit()
 
             local_prices = sconn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
@@ -394,6 +466,18 @@ def bootstrap_market(out_path: Optional[str] = None,
     match = prices_match and news_match and iv_match and fund_match
     if match:
         os.replace(tmp, path)  # atomic swap-in
+        # CRITICAL: drop the OLD inode's WAL sidecars as part of the swap. ``tmp`` was
+        # built with a rollback journal (self-contained, no WAL of its own), but a
+        # ``market_data.db-wal``/``-shm`` may exist from the live DB's writers — since
+        # 3c-C, ``set_financial_cache`` opens a WAL connection on the live file at
+        # arbitrary times. SQLite associates those sidecars by FILENAME, not inode, so
+        # a stale WAL left at swap time would be replayed onto the freshly-built NEW
+        # inode → silent stale-data corruption that escapes the pre-swap validation.
+        # Removing them while no connection is open is safe; the swapped-in file is
+        # self-contained. (A cache write racing the swap is best-effort + TTL'd +
+        # re-fetchable — an acceptable loss vs. corrupting a just-validated rebuild.)
+        Path(path + "-wal").unlink(missing_ok=True)
+        Path(path + "-shm").unlink(missing_ok=True)
         try:
             wconn = sqlite3.connect(path)
             try:
@@ -410,6 +494,8 @@ def bootstrap_market(out_path: Optional[str] = None,
         "news": {"rows": local_news, "total": news_total, "match": news_match},
         "iv": {"rows": local_iv, "total": iv_total, "match": iv_match},
         "fundamentals": {"rows": local_fund, "total": fund_total, "match": fund_match},
+        # local-primary; carried over (not validated against PG, not part of `match`)
+        "financial_cache": {"carried_over": fin_cache_carried},
     }
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from pathlib import Path
 
 import pytest
 
@@ -427,6 +428,81 @@ def test_update_job_all_domains_fail_is_error(tmp_path, monkeypatch):
         "fundamentals": {"ok": False, "rows_added": 0, "error": "PG down"},
     })
     assert j["status"] == "error" and "PG down" in j["error"]
+
+
+# --- 3c-C: financial_cache (local-primary; carry-over on rebuild) -------------
+
+def test_bootstrap_creates_empty_financial_cache(tmp_path, fake_pg):
+    out = str(tmp_path / "market_data.db")
+    res = mda.bootstrap_market(out)
+    assert res["match"] is True
+    assert res["financial_cache"]["carried_over"] == 0  # first build → nothing to carry
+    assert mda.local_market_stats(out)["financial_cache"]["row_count"] == 0
+
+
+def test_bootstrap_carries_over_financial_cache(tmp_path, fake_pg):
+    # financial_cache is local-primary (NOT mirrored from PG); a full rebuild must
+    # preserve its rows across the atomic swap rather than dropping them.
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)  # build once → empty financial_cache table exists
+    sb = SqliteBackend(out)
+    sb.set_financial_cache("metrics_AAPL", "AAPL", {"pe": 30}, expires_at="2099-01-01T00:00:00+00:00")
+    sb.set_financial_cache("metrics_NVDA", "NVDA", {"pe": 60}, expires_at="2099-01-01T00:00:00+00:00")
+    res = mda.bootstrap_market(out)  # rebuild → rows must survive
+    assert res["match"] is True and res["financial_cache"]["carried_over"] == 2
+    assert sb.get_financial_cache("metrics_AAPL") == {"pe": 30}
+    assert sb.get_financial_cache("metrics_NVDA") == {"pe": 60}
+
+
+def test_local_stats_financial_cache_counts(tmp_path, fake_pg):
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    sb = SqliteBackend(out)
+    sb.set_financial_cache("valid", "AAPL", {"x": 1}, expires_at="2099-01-01T00:00:00+00:00")
+    sb.set_financial_cache("expired", "AAPL", {"x": 2}, expires_at="2000-01-01T00:00:00+00:00")
+    fc = mda.local_market_stats(out)["financial_cache"]
+    assert fc["row_count"] == 2 and fc["valid_count"] == 1 and fc["expired_count"] == 1
+    assert fc["latest_fetched_at"] is not None
+
+
+def test_bootstrap_clean_state_after_rebuild_with_stale_sidecars(tmp_path, fake_pg):
+    # 3c-C made set_financial_cache a live WAL writer, so a stale `market_data.db-wal`
+    # can exist at swap time. os.replace swaps only the main file by inode, but SQLite
+    # keys -wal/-shm by FILENAME → a stale WAL could be replayed onto the freshly-built
+    # NEW inode (silent stale-data corruption escaping the pre-swap validation), which
+    # is why bootstrap unlinks the old sidecars as part of the swap.
+    # NOTE: this is an INVARIANT guard, not a fix-discriminating test — the full
+    # replay corruption needs a salt-matched valid WAL injected at the exact mid-swap
+    # instant (not craftable black-box; verified manually). Here we assert the
+    # post-rebuild invariant: a rebuild over a DB with pre-existing sidecars yields a
+    # validated DB, no leftover sidecars, and intact carry-over.
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    SqliteBackend(out).set_financial_cache("CARRIED", "AAPL", {"v": 1},
+                                           expires_at="2099-01-01T00:00:00+00:00")
+    Path(out + "-wal").write_bytes(b"stale-wal-bytes")  # sidecars present at rebuild
+    Path(out + "-shm").write_bytes(b"stale-shm-bytes")
+    res = mda.bootstrap_market(out)
+    assert res["match"] is True
+    assert not Path(out + "-wal").exists() and not Path(out + "-shm").exists()
+    assert res["financial_cache"]["carried_over"] == 1
+    assert SqliteBackend(out).get_financial_cache("CARRIED") == {"v": 1}
+
+
+def test_incremental_update_leaves_financial_cache_intact(tmp_path, fake_pg):
+    # contract: the incremental updater does NOT touch financial_cache.
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    sb = SqliteBackend(out)
+    sb.set_financial_cache("k", "AAPL", {"v": 1}, expires_at="2099-01-01T00:00:00+00:00")
+    res = mda.incremental_update(out)
+    assert res["ok"] is True
+    assert sb.get_financial_cache("k") == {"v": 1}  # untouched
+    assert mda.local_market_stats(out)["financial_cache"]["row_count"] == 1
 
 
 # --- routes -------------------------------------------------------------------

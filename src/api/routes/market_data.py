@@ -5,9 +5,9 @@ Productizes the PG → local market_data.db migration so the desktop app owns it
 (no CLI required): status, a background bootstrap job the UI can poll, validation,
 and a persisted "use local market" toggle (stored in profile_settings, read by the
 DAL at construction). Domains: 3a PRICES + 3b NEWS (articles + FTS5) + 3c-A
-IV_HISTORY + FUNDAMENTALS. (financial_cache is deferred to 3c-C, local-primary —
-not part of the local market DB.) See
-``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §8.
+IV_HISTORY + FUNDAMENTALS + 3c-C FINANCIAL_CACHE (local-primary: status reports its
+rows/valid/expired, but it is NOT validated against PG and NOT touched by the
+incremental updater). See ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §8.
 """
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ def _setting_enabled(store: ProfileStateStore) -> bool:
 def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Local market-data status (PURE READ; does not touch PG).
 
-    Reports the local per-domain stats (prices + news + iv + fundamentals), whether
-    routing is enabled (persisted setting or env override), and whether PG fallback
-    is therefore active.
+    Reports the local per-domain stats (prices + news + iv + fundamentals + the
+    local-primary financial_cache), whether routing is enabled (persisted setting or
+    env override), and whether PG fallback is therefore active.
     """
     path = resolve_market_db_path()
     stats = local_market_stats(path)
@@ -60,6 +60,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "news": stats["news"],
         "iv": stats["iv"],
         "fundamentals": stats["fundamentals"],
+        "financial_cache": stats["financial_cache"],  # 3c-C local-primary cache (rows/valid/expired)
         "sync": read_sync_meta(path),  # per-domain incremental status (last_success/error/rows_added)
         "use_local_market_setting": setting_on,
         "env_override": env_on,
@@ -75,8 +76,9 @@ def bootstrap_route():
     (prices + news + iv + fundamentals).
 
     Returns the job; poll ``GET /market-data/jobs/{id}`` for progress. Idempotent
-    while running. The rebuild validates ALL domains before atomically swapping in,
-    so a failure never destroys an existing good DB.
+    while running. The rebuild validates ALL (PG-mirrored) domains before atomically
+    swapping in, so a failure never destroys an existing good DB. The local-primary
+    financial_cache is carried over (preserved), not rebuilt from PG.
     """
     require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
     return start_bootstrap_job()

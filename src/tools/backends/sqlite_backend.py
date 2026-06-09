@@ -1,5 +1,5 @@
 """
-SqliteBackend — local-first market-data backend (3a prices + 3b news + 3c iv/fund).
+SqliteBackend — local-first market-data backend (3a prices + 3b news + 3c iv/fund/cache).
 
 Part of the PostgreSQL → local SQLite migration (see
 ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §3/§4). This backend
@@ -8,16 +8,18 @@ It is NOT a full ``DataBackend`` — only the methods used by
 :class:`~src.tools.backends.local_market_backend.LocalMarketDatabaseBackend` are
 implemented: 3a = ``query_prices``; 3b = ``query_news`` (unscored) +
 ``query_news_search`` (FTS5); 3c-A = ``query_iv_history`` + ``query_fundamentals``;
+3c-C = ``get_financial_cache`` + ``set_financial_cache`` (LOCAL-PRIMARY cache);
 plus ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
-Score-dependent reads (news_scores deferred), ``financial_cache`` (3c-C), and
-everything else stay on PostgreSQL.
+Score-dependent reads (news_scores deferred) and everything else stay on PostgreSQL.
 
-Reads open the DB **read-only** (``mode=ro``); writes are done only by the
-migration script, never here. The on-disk ``datetime`` is stored as the same
-UTC string PostgreSQL emits (``YYYY-MM-DDTHH:MM:SS+0000``) so 15min rows pass
-through unchanged and 1h/1d roll up by string-prefix grouping in pandas — the
-SQLite analogue of the PG ``date_trunc`` aggregation (no ``date_trunc`` in
-SQLite), matching the FileBackend resample contract.
+Reads open the DB **read-only** (``mode=ro``); the data tables are written only by
+the migration/lifecycle (market_data_admin), never here — with ONE exception:
+``set_financial_cache`` is the local-primary cache's single writable path (opens a
+WAL + busy_timeout connection). The on-disk ``datetime`` is stored as the same UTC
+string PostgreSQL emits (``YYYY-MM-DDTHH:MM:SS+0000``) so 15min rows pass through
+unchanged and 1h/1d roll up by string-prefix grouping in pandas — the SQLite
+analogue of the PG ``date_trunc`` aggregation (no ``date_trunc`` in SQLite),
+matching the FileBackend resample contract.
 """
 
 from __future__ import annotations
@@ -258,6 +260,88 @@ class SqliteBackend:
             "fin_summary": reports.get("ReportsFinSummary", {}),
             "ownership": reports.get("ReportsOwnership", {}),
         }
+
+    # --- financial_cache (3c-C): the ONE writable path, local-primary -----------
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        # Same format the cache stores expires_at in → string compare is chronological.
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    def _connect_rw(self) -> sqlite3.Connection:
+        """Writable connection — used ONLY by ``set_financial_cache`` (every other
+        method here is read-only). WAL + busy_timeout so a cache write is safe
+        alongside the read-only routing reads."""
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        conn.execute("PRAGMA busy_timeout = 10000")
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.OperationalError:
+            pass
+        return conn
+
+    def get_financial_cache(self, cache_key: str) -> Optional[dict]:
+        """LOCAL financial_cache read (cache_key-keyed), expiry-checked against now.
+        Returns None on miss / expired / missing table (pre-3c-C DB) so
+        LocalMarketDatabaseBackend can fall back to PG."""
+        try:
+            conn = self._connect()  # read-only
+        except sqlite3.OperationalError:
+            return None
+        try:
+            row = conn.execute(
+                "SELECT data FROM financial_cache WHERE cache_key = ? AND expires_at > ?",
+                (cache_key, self._utc_now_iso()),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return None  # table absent (pre-3c-C DB) etc.
+        finally:
+            conn.close()
+        if row is None:
+            return None
+        try:
+            return json.loads(row["data"]) if isinstance(row["data"], str) else row["data"]
+        except (ValueError, TypeError):
+            return None
+
+    def set_financial_cache(self, cache_key: str, ticker: str, data: dict,
+                            ttl_days: int = 90, source: str = "sec_edgar",
+                            *, fetched_at: Optional[str] = None,
+                            expires_at: Optional[str] = None) -> bool:
+        """LOCAL-only financial_cache write — the single writable entry point of this
+        backend. ``fetched_at``/``expires_at`` may be passed explicitly to promote an
+        existing PG row verbatim (preserving its TTL); otherwise derived from
+        ``ttl_days`` at now. Best-effort: returns False on any failure."""
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        if fetched_at is None:
+            fetched_at = now.isoformat(timespec="seconds")
+        if expires_at is None:
+            expires_at = (now + timedelta(days=ttl_days)).isoformat(timespec="seconds")
+        from src.market_data_admin import _FIN_CACHE_SCHEMA
+        try:
+            conn = self._connect_rw()
+        except sqlite3.OperationalError:
+            return False
+        try:
+            conn.executescript(_FIN_CACHE_SCHEMA)  # tolerate a pre-3c-C DB
+            conn.execute(
+                "INSERT INTO financial_cache "
+                "(cache_key, source, ticker, data, fetched_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(cache_key) DO UPDATE SET "
+                "  source=excluded.source, ticker=excluded.ticker, data=excluded.data, "
+                "  fetched_at=excluded.fetched_at, expires_at=excluded.expires_at",
+                (cache_key, source, ticker.upper(), json.dumps(data), fetched_at, expires_at),
+            )
+            conn.commit()
+            return True
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, TypeError, ValueError) as e:
+            logger.warning(f"SqliteBackend.set_financial_cache({cache_key}): {e}")
+            return False
+        finally:
+            conn.close()
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """Distinct tickers for a local domain (prices 3a / news 3b / iv_history /

@@ -251,6 +251,34 @@ def test_query_fundamentals_same_day_tiebreak_by_id(market_db):
     assert out["snapshot"] == {"Name": "newer same-day"}  # higher id wins
 
 
+# --- financial_cache (3c-C): local-primary read/write -------------------------
+
+def test_financial_cache_roundtrip(market_db):
+    db, _ = market_db
+    b = SqliteBackend(db)
+    assert b.get_financial_cache("metrics_AAPL") is None              # miss
+    assert b.set_financial_cache("metrics_AAPL", "aapl", {"standard": {"pe": 30}}) is True
+    assert b.get_financial_cache("metrics_AAPL") == {"standard": {"pe": 30}}
+    # upsert overwrites in place (same cache_key)
+    assert b.set_financial_cache("metrics_AAPL", "aapl", {"standard": {"pe": 31}}) is True
+    assert b.get_financial_cache("metrics_AAPL") == {"standard": {"pe": 31}}
+
+
+def test_financial_cache_expiry(market_db):
+    db, _ = market_db
+    b = SqliteBackend(db)
+    # explicit past expiry → reads as a miss (caller falls back to PG)
+    assert b.set_financial_cache("k", "AAPL", {"x": 1}, expires_at="2000-01-01T00:00:00+00:00") is True
+    assert b.get_financial_cache("k") is None
+
+
+def test_financial_cache_missing_table_is_safe(tmp_path):
+    # a pre-3c-C DB without the financial_cache table → get returns None (no raise)
+    db = tmp_path / "bare.db"
+    sqlite3.connect(str(db)).close()
+    assert SqliteBackend(str(db)).get_financial_cache("k") is None
+
+
 # --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
 
 _PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)
@@ -330,9 +358,45 @@ def test_fundamentals_local_then_pg_fallback(market_db, monkeypatch):
     assert out["snapshot"] == "PG" and hit == ["UNKNOWN"]
 
 
+def test_financial_cache_set_is_local_only(market_db, monkeypatch):
+    # local-PRIMARY: set writes the local cache and must NEVER write PG.
+    db, _ = market_db
+    pg_set = []
+    monkeypatch.setattr(DatabaseBackend, "set_financial_cache",
+                        lambda self, *a, **k: pg_set.append(1) or True)
+    b = _make(db)
+    assert b.set_financial_cache("mk", "AAPL", {"v": 1}, ttl_days=30, source="sec_edgar") is True
+    assert pg_set == []                                       # PG never written
+    assert b._market.get_financial_cache("mk") == {"v": 1}    # written local
+
+
+def test_financial_cache_get_local_first(market_db, monkeypatch):
+    db, _ = market_db
+    pg_get = []
+    monkeypatch.setattr(DatabaseBackend, "get_financial_cache",
+                        lambda self, k: pg_get.append(k) or {"v": "PG"})
+    b = _make(db)
+    b._market.set_financial_cache("mk", "AAPL", {"v": "LOCAL"})
+    assert b.get_financial_cache("mk") == {"v": "LOCAL"} and pg_get == []  # PG skipped on local hit
+
+
+def test_financial_cache_pg_fallback_and_promotion(market_db, monkeypatch):
+    # local miss → PG fallback → read-through promote into local (preserving PG TTL).
+    db, _ = market_db
+    monkeypatch.setattr(DatabaseBackend, "get_financial_cache", lambda self, k: {"v": "fromPG"})
+    monkeypatch.setattr(
+        LocalMarketDatabaseBackend, "_pg_financial_cache_row",
+        lambda self, ck: ("sec_edgar", "NVDA", "2026-06-01T00:00:00+00:00", "2099-01-01T00:00:00+00:00"),
+    )
+    b = _make(db)
+    assert b.get_financial_cache("mk_NVDA") == {"v": "fromPG"}        # PG fallback
+    # promoted into local with PG's (future) expiry → now a local hit
+    assert b._market.get_financial_cache("mk_NVDA") == {"v": "fromPG"}
+
+
 def test_inherited_vs_overridden_methods(market_db):
-    # market-domain reads are overridden (local-first); everything else
-    # (SA/reports/memories/stats/financial_cache) is inherited PG behaviour.
+    # market-domain reads + the local-primary financial_cache are overridden;
+    # everything else (SA/reports/memories/stats) is inherited PG behaviour.
     db, _ = market_db
     b = _make(db)
     assert type(b).query_prices is not DatabaseBackend.query_prices
@@ -340,6 +404,8 @@ def test_inherited_vs_overridden_methods(market_db):
     assert type(b).query_news_search is not DatabaseBackend.query_news_search
     assert type(b).query_iv_history is not DatabaseBackend.query_iv_history       # 3c-A
     assert type(b).query_fundamentals is not DatabaseBackend.query_fundamentals   # 3c-A
+    assert type(b).get_financial_cache is not DatabaseBackend.get_financial_cache  # 3c-C
+    assert type(b).set_financial_cache is not DatabaseBackend.set_financial_cache  # 3c-C
     assert type(b).query_news_stats is DatabaseBackend.query_news_stats  # NOT overridden (needs scores)
 
 

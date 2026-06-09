@@ -11,7 +11,7 @@ short-circuits to empty/file behavior → the cockpit shows wrong/empty data. By
 subclassing, this IS a DatabaseBackend (isinstance passes, ``_get_conn`` + all ~41
 methods inherited and hit PG); we override ONLY the migrated market-domain reads
 to go local-first. Everything else — Seeking-Alpha, reports, memories, news
-SCORES, ``financial_cache`` (3c-C) — is the inherited PG behaviour, unchanged.
+SCORES — is the inherited PG behaviour, unchanged.
 
 Overridden, local-first with PG fallback on empty/miss:
   - ``query_prices`` (3a);
@@ -19,6 +19,12 @@ Overridden, local-first with PG fallback on empty/miss:
     where news_scores live), ``query_news_search`` (3b, FTS5);
   - ``query_iv_history`` + ``query_fundamentals`` (3c-A);
   - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
+
+financial_cache (3c-C) is LOCAL-PRIMARY, not a mirror:
+  - ``set_financial_cache`` writes the LOCAL cache ONLY (never PG);
+  - ``get_financial_cache`` is local-first, falls back to PG for legacy rows, and
+    READ-THROUGH PROMOTES a valid PG hit into the local cache (free, preserving its
+    TTL) so PG cache migrates local over time.
 ``query_news_stats`` is NOT overridden — it needs scores, so it stays on PG.
 """
 
@@ -99,6 +105,66 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         if data:  # non-empty dict → local hit
             return data
         return super().query_fundamentals(ticker)
+
+    # --- financial_cache (3c-C): local-primary (set local-only; get local-first +
+    #     PG fallback + read-through promotion) -----------------------------------
+
+    def get_financial_cache(self, cache_key: str):
+        try:
+            local = self._market.get_financial_cache(cache_key)
+        except Exception as e:
+            logger.warning(f"local get_financial_cache failed ({e}); falling back to PG")
+            local = None
+        if local is not None:
+            return local
+        # PG fallback (legacy rows) + read-through promotion into local (free, not a
+        # paid call) so old PG cache migrates local over time.
+        data = super().get_financial_cache(cache_key)
+        if data is not None:
+            try:
+                row = self._pg_financial_cache_row(cache_key)
+                if row:
+                    source, ticker, fetched_at, expires_at = row
+                    self._market.set_financial_cache(
+                        cache_key, ticker, data, source=source,
+                        fetched_at=fetched_at, expires_at=expires_at,
+                    )
+            except Exception as e:
+                logger.debug(f"financial_cache promotion skipped for {cache_key}: {e}")
+        return data
+
+    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+        # local-PRIMARY: write the LOCAL cache only, never PG.
+        try:
+            return self._market.set_financial_cache(
+                cache_key, ticker, data, ttl_days=ttl_days, source=source
+            )
+        except Exception as e:
+            logger.warning(f"local set_financial_cache failed ({e})")
+            return False
+
+    def _pg_financial_cache_row(self, cache_key: str):
+        """Full valid PG cache row for read-through promotion:
+        ``(source, ticker, fetched_at_iso, expires_at_iso)`` or None. Timestamps are
+        formatted to the same UTC ISO-seconds string the local cache stores."""
+        from datetime import timezone
+
+        conn = self._get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT source, ticker, fetched_at, expires_at FROM financial_data_cache "
+                "WHERE cache_key = %s AND expires_at > NOW()",
+                (cache_key,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        source, ticker, fetched_dt, expires_dt = row
+
+        def _fmt(dt):
+            return dt.astimezone(timezone.utc).isoformat(timespec="seconds") if dt else None
+
+        return (source or "financial_datasets", ticker or "", _fmt(fetched_dt), _fmt(expires_dt))
 
     def get_available_tickers(self, data_type: str):
         if data_type in ("prices", "news", "iv_history", "fundamentals"):  # all local-first now

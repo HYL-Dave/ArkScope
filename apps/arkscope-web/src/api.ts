@@ -771,6 +771,13 @@ export interface MarketDataStatus {
   news: { row_count: number; source_count: number; latest_published: string | null };
   iv: { row_count: number; ticker_count: number; latest_date: string | null };
   fundamentals: { row_count: number; ticker_count: number; latest_date: string | null };
+  // 3c-C local-primary cache (not a PG mirror): valid vs expired by TTL, latest fetch.
+  financial_cache: {
+    row_count: number;
+    valid_count: number;
+    expired_count: number;
+    latest_fetched_at: string | null;
+  };
   sync: {
     prices: SyncMeta | null;
     news: SyncMeta | null;
@@ -808,6 +815,8 @@ export interface MarketDataJob {
     news: DomainResult | null;
     iv: DomainResult | null;
     fundamentals: DomainResult | null;
+    // bootstrap only: rows of the local-primary cache carried over across the rebuild
+    financial_cache?: { carried_over: number };
   } | null;
   error: string | null;
 }
