@@ -232,8 +232,9 @@ class SqliteBackend:
             return {}
         try:
             row = conn.execute(
+                # id DESC tiebreaks same-day snapshots → deterministic latest (== PG path)
                 "SELECT data, snapshot_date FROM fundamentals "
-                "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 1",
+                "WHERE ticker = ? ORDER BY snapshot_date DESC, id DESC LIMIT 1",
                 (ticker,),
             ).fetchone()
         except sqlite3.OperationalError as e:

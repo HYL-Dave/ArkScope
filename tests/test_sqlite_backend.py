@@ -236,6 +236,21 @@ def test_query_fundamentals_partial_and_empty(market_db, tmp_path):
     assert SqliteBackend(str(tmp_path / "nope.db")).query_fundamentals("AAPL") == {}
 
 
+def test_query_fundamentals_same_day_tiebreak_by_id(market_db):
+    # Two snapshots on the SAME snapshot_date → the higher id wins deterministically
+    # (ORDER BY snapshot_date DESC, id DESC), matching the PG path.
+    db, _ = market_db
+    conn = sqlite3.connect(db)
+    conn.executemany("INSERT INTO fundamentals VALUES (?,?,?,?)", [
+        (10, "TIE", "2026-05-05", '{"reports": {"ReportSnapshot": {"Name": "older same-day"}}}'),
+        (11, "TIE", "2026-05-05", '{"reports": {"ReportSnapshot": {"Name": "newer same-day"}}}'),
+    ])
+    conn.commit()
+    conn.close()
+    out = SqliteBackend(db).query_fundamentals("TIE")
+    assert out["snapshot"] == {"Name": "newer same-day"}  # higher id wins
+
+
 # --- LocalMarketDatabaseBackend routing (a DatabaseBackend SUBCLASS) ----------
 
 _PG_SENTINEL = pd.DataFrame([("PGSENTINEL", 1, 1, 1, 1, 1)], columns=_COLS)

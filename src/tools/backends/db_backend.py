@@ -656,7 +656,7 @@ class DatabaseBackend:
             SELECT data, TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_date
             FROM fundamentals
             WHERE ticker = %s
-            ORDER BY snapshot_date DESC
+            ORDER BY snapshot_date DESC, id DESC
             LIMIT 1
         """
 
