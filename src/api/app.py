@@ -25,9 +25,22 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
     # Keep startup cheap. The desktop shell polls /healthz while launching; that
     # readiness path must not depend on DB availability or expensive data scans.
+    # The data scheduler is a single asyncio task that is near-free while every
+    # source is disabled (the default) — it must be IN-PROCESS (the app owns
+    # scheduling; single-sidecar locks like _CACHE_WRITE_LOCK assume one process).
+    import asyncio
+
+    from src.service.data_scheduler import scheduler_loop
+
+    sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
     # Shutdown
+    sched_task.cancel()
+    try:
+        await sched_task
+    except (asyncio.CancelledError, Exception):  # noqa: BLE001 — shutdown best-effort
+        pass
     if get_dal.cache_info().currsize:
         get_dal().clear_cache()
     logger.info("ArkScope API shutdown")
@@ -62,6 +75,7 @@ def create_app() -> FastAPI:
     from .routes.symbols import router as symbols_router
     from .routes.consensus import router as consensus_router
     from .routes.market_data import router as market_data_router
+    from .routes.schedule import router as schedule_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -82,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(symbols_router)
     app.include_router(consensus_router)
     app.include_router(market_data_router)
+    app.include_router(schedule_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the
