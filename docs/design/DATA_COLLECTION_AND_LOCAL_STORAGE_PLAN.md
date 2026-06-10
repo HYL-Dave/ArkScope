@@ -53,6 +53,8 @@ Per-source cadence, retention, health surface, and cost gate. Provider-level dat
 
 **Cost-gate vocabulary:** `free` (no marginal cost) · `metered` (per-call API cost, must show usage) · `manual-approval` (operator must explicitly enable per run — reserved for paid backfills, e.g. Financial Datasets bulk pulls).
 
+> **Open analysis (carried from the deleted `scripts/comparison/compare_sec_vs_financial_datasets.py`, 2026-06-11):** the QUESTION it asked stays relevant — what can SEC EDGAR provide/derive vs what the paid Financial Datasets API returns (field coverage, statement depth, freshness)? The one-off script is gone (git-recoverable); redo the gap analysis in-app when the fundamentals providers are wired into the workbench surface, to decide when the paid fallback is actually worth a metered call.
+
 **Provider-health vocabulary (surfaced in the ops view):** `connected` · `stale` (last_success older than TTL) · `maintenance` (provider/Gateway intentionally down or unreachable) + timestamps `last_success` / `last_error`. These map directly onto the DSA `ProviderRun` telemetry and `CircuitBreaker` state (§9).
 
 ---
