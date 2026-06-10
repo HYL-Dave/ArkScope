@@ -167,7 +167,22 @@ async function createWindow() {
 
   const devUrl = process.env.ARKSCOPE_WEB_DEV_URL;
   if (devUrl) {
-    await win.loadURL(devUrl);
+    try {
+      await win.loadURL(devUrl);
+    } catch (e) {
+      // Dev server not up (was an unhandled rejection + blank window). Show a
+      // hint instead; `npm run dev:desktop` now auto-starts vite, so this only
+      // fires when the dev server died or the port is taken.
+      await win.loadFile(path.join(__dirname, "error.html"), {
+        search:
+          "msg=" +
+          encodeURIComponent(
+            `Vite dev server unreachable at ${devUrl} (${e.code || e.message}).\n` +
+              "npm run dev:desktop starts it automatically; if you launched electron " +
+              "directly, run `npm run dev:web` first or unset ARKSCOPE_WEB_DEV_URL.",
+          ),
+      });
+    }
   } else {
     await win.loadFile(WEB_DIST);
   }
