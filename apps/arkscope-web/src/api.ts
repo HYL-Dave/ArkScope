@@ -971,6 +971,44 @@ export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_
   return sendJSON("/market-data/settings", "PUT", { enabled });
 }
 
+// --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
+
+export interface NewsFeedItem {
+  published_at: string; // full UTC timestamp
+  ticker: string;
+  title: string;
+  url: string | null;
+  publisher: string | null;
+  source: string; // polygon | finnhub | ibkr
+  description: string | null;
+}
+
+export interface NewsFeedResponse {
+  available: boolean; // false = no local news table AND PG unavailable
+  items: NewsFeedItem[];
+  total: number;
+  sources: Record<string, number>;
+  days: Record<string, number>; // YYYY-MM-DD → count (same filters)
+}
+
+export function getNewsFeed(params: {
+  q?: string;
+  ticker?: string;
+  source?: string;
+  days?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<NewsFeedResponse> {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.ticker) sp.set("ticker", params.ticker);
+  if (params.source && params.source !== "auto") sp.set("source", params.source);
+  if (params.days) sp.set("days", String(params.days));
+  if (params.limit) sp.set("limit", String(params.limit));
+  if (params.offset) sp.set("offset", String(params.offset));
+  return getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000);
+}
+
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a

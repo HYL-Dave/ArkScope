@@ -579,6 +579,15 @@ class DataAccessLayer:
             date_range=date_range,
         )
 
+    def get_news_feed(self, q=None, ticker=None, source=None, days=30,
+                      limit=50, offset=0) -> dict:
+        """Score-free news feed (新聞·事件 surface) — local-first via the backend.
+        FileBackend has no feed → empty shape."""
+        if hasattr(self._backend, "query_news_feed"):
+            return self._backend.query_news_feed(
+                q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
+        return {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+
     def get_iv_history(self, ticker: str) -> List[IVHistoryPoint]:
         """Query IV history and return structured result."""
         df = self._backend.query_iv_history(ticker)

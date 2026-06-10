@@ -168,8 +168,7 @@ class SqliteBackend:
             conds.append("n.ticker = ?")
             params.append(ticker.upper())
         if len(q) >= 3:
-            # phrase-quote to neutralize FTS5 operator syntax (quotes, AND/OR, …)
-            match = '"' + q.replace('"', '""') + '"'
+            match = self._fts_match(q)
             sql = (
                 f"SELECT {cols} FROM news_fts f JOIN news n ON n.id = f.rowid "
                 f"WHERE news_fts MATCH ? AND {' AND '.join(conds)} "
@@ -184,6 +183,75 @@ class SqliteBackend:
                    "ORDER BY n.published_at DESC LIMIT ?")
             params.append(limit)
         return self._news_df(sql, params, _NEWS_SEARCH_COLS)
+
+    @staticmethod
+    def _fts_match(q: str) -> str:
+        """Tokenized-AND FTS5 MATCH expression: each whitespace token is quoted
+        (neutralizing operator syntax — quotes, AND/OR, parens) and AND-joined.
+        Parity with PG ``plainto_tsquery`` (which ANDs lexemes) instead of the
+        narrower exact-phrase match the first version used."""
+        tokens = [t.replace('"', '""') for t in q.split()]
+        return " AND ".join(f'"{t}"' for t in tokens)
+
+    def query_news_feed(self, q: Optional[str] = None, ticker: Optional[str] = None,
+                        source: Optional[str] = None, days: int = 30,
+                        limit: int = 50, offset: int = 0) -> dict:
+        """Score-free local news feed for the 新聞·事件 surface: FULL
+        ``published_at`` timestamps, newest first, paginated, with window facets
+        (total / per-source / per-day counts over the SAME filters). Search uses
+        FTS5 tokenized-AND (≥3 chars) or LIKE for shorter queries.
+
+        ``available`` is False when the local DB/table is missing (pre-3b DB) so
+        the router can fall back to PG; an available-but-empty result is an
+        honest zero, NOT a fallback trigger."""
+        empty = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return empty
+        try:
+            cutoff = (date.today() - timedelta(days=days)).isoformat()
+            conds, params = ["n.published_at >= ?"], [cutoff]
+            base_from = "news n"
+            if ticker:
+                conds.append("n.ticker = ?")
+                params.append(ticker.upper())
+            if source and source != "auto":
+                conds.append("n.source = ?")
+                params.append(source)
+            ql = (q or "").strip()
+            if len(ql) >= 3:
+                base_from = "news_fts f JOIN news n ON n.id = f.rowid"
+                conds.insert(0, "news_fts MATCH ?")
+                params.insert(0, self._fts_match(ql))
+            elif ql:
+                conds.append("(n.title LIKE ? OR n.description LIKE ?)")
+                params += [f"%{ql}%", f"%{ql}%"]
+            where = " AND ".join(conds)
+
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM {base_from} WHERE {where}", params).fetchone()[0]
+            sources = dict(conn.execute(
+                f"SELECT n.source, COUNT(*) FROM {base_from} WHERE {where} "
+                "GROUP BY n.source", params).fetchall())
+            day_counts = dict(conn.execute(
+                f"SELECT substr(n.published_at, 1, 10), COUNT(*) FROM {base_from} "
+                f"WHERE {where} GROUP BY 1 ORDER BY 1", params).fetchall())
+            rows = conn.execute(
+                f"SELECT n.published_at, n.ticker, n.title, n.url, n.publisher, "
+                f"n.source, n.description FROM {base_from} WHERE {where} "
+                "ORDER BY n.published_at DESC LIMIT ? OFFSET ?",
+                [*params, max(1, min(200, limit)), max(0, offset)]).fetchall()
+            items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
+                      "url": r[3], "publisher": r[4], "source": r[5],
+                      "description": r[6]} for r in rows]
+            return {"available": True, "items": items, "total": total,
+                    "sources": sources, "days": day_counts}
+        except sqlite3.OperationalError as e:
+            logger.warning(f"SqliteBackend.query_news_feed: {e}")
+            return empty
+        finally:
+            conn.close()
 
     def _news_df(self, sql: str, params: list, cols: list) -> pd.DataFrame:
         try:

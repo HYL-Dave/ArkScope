@@ -483,3 +483,74 @@ def test_news_local_unscored_scored_falls_back(market_db, monkeypatch):
     # scored → local empty → PG fallback
     df = b.query_news(ticker="AAPL", days=30, scored_only=True)
     assert df.iloc[0]["ticker"] == "PGNEWS" and hit == [True]
+
+
+# --- 新聞·事件 feed (score-free browse/search + facets) ------------------------
+
+def test_fts_search_is_tokenized_and(market_db):
+    # Multi-word queries AND the tokens (parity with PG plainto_tsquery) instead
+    # of the old exact-phrase match: "earnings apple" matches "Apple earnings
+    # beat estimates" even though the words are not adjacent / ordered.
+    db, _ = market_db
+    b = SqliteBackend(db)
+    df = b.query_news_search(query="earnings apple", days=30, scored_only=False)
+    assert len(df) == 1 and df.iloc[0]["ticker"] == "AAPL"
+    # operator characters still neutralized per token
+    df2 = b.query_news_search(query='apple OR "x AND (', days=30, scored_only=False)
+    assert isinstance(df2, pd.DataFrame)  # no OperationalError
+
+
+def test_news_feed_browse_and_facets(market_db):
+    db, day = market_db
+    f = SqliteBackend(db).query_news_feed(days=30)
+    assert f["available"] is True and f["total"] == 3
+    assert f["sources"] == {"polygon": 2, "finnhub": 1}
+    assert f["days"] == {day.isoformat(): 3}
+    assert len(f["items"]) == 3
+    # newest first, FULL timestamps
+    assert f["items"][0]["published_at"].endswith("+0000")
+    assert "T" in f["items"][0]["published_at"]
+
+
+def test_news_feed_filters_and_pagination(market_db):
+    db, _ = market_db
+    b = SqliteBackend(db)
+    f = b.query_news_feed(ticker="AAPL", days=30)
+    assert f["total"] == 2 and {i["ticker"] for i in f["items"]} == {"AAPL"}
+    f = b.query_news_feed(source="finnhub", days=30)
+    assert f["total"] == 1 and f["items"][0]["source"] == "finnhub"
+    page = b.query_news_feed(days=30, limit=2, offset=2)
+    assert page["total"] == 3 and len(page["items"]) == 1  # last page
+
+
+def test_news_feed_search(market_db):
+    db, _ = market_db
+    f = SqliteBackend(db).query_news_feed(q="nvidia chip", days=30)
+    assert f["total"] == 1 and f["items"][0]["ticker"] == "NVDA"
+    assert f["sources"] == {"finnhub": 1}  # facets respect the query
+
+
+def test_news_feed_missing_table_not_available(tmp_path):
+    db = tmp_path / "bare.db"
+    sqlite3.connect(str(db)).close()
+    f = SqliteBackend(str(db)).query_news_feed()
+    assert f["available"] is False and f["items"] == []
+
+
+def test_news_feed_local_authoritative_vs_pre3b_fallback(market_db, monkeypatch):
+    # Local DB with a news table is AUTHORITATIVE: zero matches is an honest
+    # zero, not a PG-fallback trigger. Only available=False (pre-3b DB) falls back.
+    db, _ = market_db
+    pg_called = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_news_feed",
+        lambda self, **k: (pg_called.append(1),
+                           {"available": True, "items": [], "total": 99,
+                            "sources": {}, "days": {}})[1])
+    b = _make(db)
+    f = b.query_news_feed(q="zzz_no_match_zzz", days=30)
+    assert f["total"] == 0 and pg_called == []   # honest zero, PG not consulted
+
+    b2 = LocalMarketDatabaseBackend("postgresql://fake/db", market_db="/nonexistent/x.db")
+    f2 = b2.query_news_feed(days=30)
+    assert f2["total"] == 99 and pg_called == [1]  # pre-3b → PG fallback

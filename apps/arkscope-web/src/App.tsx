@@ -3,6 +3,7 @@ import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api"
 import { DashboardView, type StatusState } from "./Dashboard";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
+import { NewsView } from "./News";
 import { TickerDetailView } from "./TickerDetail";
 import { UniverseView } from "./Universe";
 import { WatchlistView } from "./Watchlist";
@@ -25,7 +26,7 @@ const NAV = [
 ] as const;
 type Nav = (typeof NAV)[number];
 
-const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "System", "Settings"];
+const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "News", "System", "Settings"];
 
 const LABELS: Record<Nav, string> = {
   Home: "工作台",
@@ -152,6 +153,8 @@ export function App() {
           <WatchlistView onOpenTicker={openTicker} />
         ) : view === "Universe" ? (
           <UniverseView onOpenTicker={openTicker} />
+        ) : view === "News" ? (
+          <NewsView onOpenTicker={openTicker} />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
         ) : view === "Settings" ? (

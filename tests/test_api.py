@@ -103,6 +103,25 @@ class TestPriceEndpoints:
 # Options
 # ============================================================
 
+class TestNewsFeed:
+    def test_feed_route_not_captured_by_ticker_route(self, client):
+        # /news/feed is declared BEFORE /news/{ticker} — must return the feed
+        # shape, not a ticker-news lookup for ticker="feed".
+        r = client.get("/news/feed?days=7&limit=3")
+        assert r.status_code == 200
+        data = r.json()
+        assert set(data.keys()) == {"available", "items", "total", "sources", "days"}
+        if data["available"] and data["items"]:
+            it = data["items"][0]
+            assert {"published_at", "ticker", "title", "source"} <= set(it.keys())
+
+    def test_feed_search_and_filters(self, client):
+        r = client.get("/news/feed?q=earnings&ticker=NVDA&days=90&limit=5")
+        assert r.status_code == 200
+        data = r.json()
+        assert all(i["ticker"] == "NVDA" for i in data["items"])
+
+
 class TestOptionsEndpoints:
     def test_iv_analysis(self, client):
         r = client.get("/options/AMD")

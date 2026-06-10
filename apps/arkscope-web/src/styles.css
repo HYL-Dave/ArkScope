@@ -1938,3 +1938,62 @@ button.wl-railitem.active,
 
 .ds-keyinput { width: 180px; }
 .ds-config td { vertical-align: top; }
+
+/* ---- 新聞·事件 surface ---- */
+.news-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0 10px;
+  flex-wrap: wrap;
+}
+.news-toolbar input,
+.news-toolbar select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12.5px;
+}
+.news-search { width: 280px; }
+.news-ticker { width: 90px; text-transform: uppercase; }
+.news-stats { margin: 0 0 6px; }
+.news-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.news-item {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+.news-time { flex: 0 0 38px; }
+.news-ticker-chip {
+  flex: 0 0 auto;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  color: var(--accent);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 7px;
+  cursor: pointer;
+}
+.news-ticker-chip:hover { background: rgba(88, 166, 255, 0.22); }
+.news-title {
+  color: var(--fg);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+a.news-title:hover { color: var(--accent); text-decoration: underline; }
+.news-meta { flex: 0 0 auto; white-space: nowrap; }

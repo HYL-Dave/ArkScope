@@ -410,6 +410,65 @@ class DatabaseBackend:
             return pd.DataFrame(columns=empty_cols)
         return df
 
+    def query_news_feed(self, q: Optional[str] = None, ticker: Optional[str] = None,
+                        source: Optional[str] = None, days: int = 30,
+                        limit: int = 50, offset: int = 0) -> dict:
+        """Score-free news feed (新聞·事件 surface) — the PG counterpart of
+        SqliteBackend.query_news_feed: same shape (items with FULL published_at,
+        newest first, paginated; total / per-source / per-day facets over the same
+        filters). Search = tsvector plainto_tsquery (≥3 chars, when available)
+        with an ILIKE fallback — the AND-of-terms semantics the local FTS5
+        tokenized-AND mirrors."""
+        empty = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conds = ["n.published_at >= %s"]
+        params: list = [cutoff]
+        if ticker:
+            conds.append("n.ticker = %s")
+            params.append(ticker.upper())
+        if source and source != "auto":
+            conds.append("n.source = %s")
+            params.append(source)
+        ql = (q or "").strip()
+        if len(ql) >= 3 and self._has_search_vector():
+            conds.append("n.search_vector @@ plainto_tsquery('english', %s)")
+            params.append(ql)
+        elif ql:
+            conds.append("(n.title ILIKE %s OR n.description ILIKE %s)")
+            params += [f"%{ql}%", f"%{ql}%"]
+        where = " AND ".join(conds)
+
+        try:
+            conn = self._get_conn()
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT COUNT(*) FROM news n WHERE {where}", params)
+                total = cur.fetchone()[0]
+                cur.execute(
+                    f"SELECT n.source, COUNT(*) FROM news n WHERE {where} "
+                    "GROUP BY n.source", params)
+                sources = dict(cur.fetchall())
+                cur.execute(
+                    "SELECT TO_CHAR(n.published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD'), "
+                    f"COUNT(*) FROM news n WHERE {where} GROUP BY 1 ORDER BY 1", params)
+                day_counts = dict(cur.fetchall())
+                cur.execute(
+                    "SELECT TO_CHAR(n.published_at AT TIME ZONE 'UTC', "
+                    "'YYYY-MM-DD\"T\"HH24:MI:SS+0000') AS published_at, "
+                    "n.ticker, n.title, n.url, n.publisher, n.source, n.description "
+                    f"FROM news n WHERE {where} "
+                    "ORDER BY n.published_at DESC LIMIT %s OFFSET %s",
+                    [*params, max(1, min(200, limit)), max(0, offset)])
+                rows = cur.fetchall()
+            items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
+                      "url": r[3], "publisher": r[4], "source": r[5],
+                      "description": r[6]} for r in rows]
+            return {"available": True, "items": items, "total": total,
+                    "sources": sources, "days": day_counts}
+        except psycopg2.Error as e:
+            logger.error(f"query_news_feed failed: {e}")
+            self._conn = None
+            return empty
+
     def query_news_search(
         self,
         query: str = "",

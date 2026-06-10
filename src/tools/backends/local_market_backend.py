@@ -87,6 +87,22 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
         )
 
+    def query_news_feed(self, q=None, ticker=None, source=None, days=30,
+                        limit=50, offset=0):
+        # Local-first feed (新聞·事件): the local DB is authoritative when it has a
+        # news table — an empty result there is an honest zero, NOT a fallback
+        # trigger. PG only serves pre-3b DBs (available=False).
+        try:
+            local = self._market.query_news_feed(
+                q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
+        except Exception as e:
+            logger.warning(f"local query_news_feed failed ({e}); falling back to PG")
+            local = {"available": False}
+        if local.get("available"):
+            return local
+        return super().query_news_feed(
+            q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
+
     def query_iv_history(self, ticker: str) -> pd.DataFrame:
         try:
             df = self._market.query_iv_history(ticker)
