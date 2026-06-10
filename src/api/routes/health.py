@@ -22,6 +22,22 @@ def healthz():
     return {"status": "ok"}
 
 
+@router.get("/providers/health")
+def providers_health(dal: DataAccessLayer = Depends(get_dal)):
+    """Per-provider health (slice 3e-A) — PURE READ, no provider fetches.
+
+    Aggregates every persisted health signal (news/prices/iv freshness,
+    financial_cache stats, sa_refresh_meta, job_runs, market_sync_meta) into one
+    ProviderRun-compatible DTO per provider with a unified status vocabulary
+    (connected | stale | maintenance | no_signal | missing_key | disabled).
+    Disabled-by-config is a state in the body, never a 503. Key info is
+    presence + source only (read-only; keys stay in config/.env).
+    """
+    from src.service.provider_health import compute_provider_health
+
+    return compute_provider_health(dal)
+
+
 @router.get("/status")
 def status(
     dal: DataAccessLayer = Depends(get_dal),

@@ -970,3 +970,40 @@ export function validateMarketData(): Promise<MarketDataValidate> {
 export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_setting: boolean }> {
   return sendJSON("/market-data/settings", "PUT", { enabled });
 }
+
+// --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
+// Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
+// in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a
+// state, never an HTTP error. Key info is presence+source only (keys stay in
+// config/.env; no entry UI — that is its own future slice).
+
+export type ProviderStatus =
+  | "connected" | "stale" | "maintenance" | "no_signal" | "missing_key" | "disabled";
+
+export interface ProviderHealth {
+  id: string;
+  label: string;
+  kind: string; // market | news | macro | fundamentals | capture
+  key_present: boolean;
+  key_source: string; // env | config/.env | missing | not_required
+  key_vars: string[];
+  enabled: boolean | null; // null = no toggle exists for this provider
+  status: ProviderStatus;
+  last_success_at: string | null;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  detail: string;
+  signals: Record<string, unknown>;
+}
+
+export interface ProvidersHealthResponse {
+  generated_at: string;
+  providers: ProviderHealth[];
+  jobs: Record<string, Record<string, unknown>>; // latest job_runs row per job_name
+  local_market: { db_exists: boolean; sync: Record<string, SyncMeta | null> };
+  notes: string[]; // per-section degradation notes, if any
+}
+
+export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
+  return getJSON<ProvidersHealthResponse>("/providers/health", 20_000);
+}

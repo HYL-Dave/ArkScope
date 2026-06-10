@@ -1119,13 +1119,16 @@ class DatabaseBackend:
         except Exception as e:
             stats["iv_history"] = {"rows": [], "error": str(e)}
 
-        # Financial cache: cached vs expired counts per source
+        # Financial cache: cached vs expired counts + latest fetch per source.
+        # (Consumers index rows positionally [0..2]; the appended MAX(fetched_at)
+        # at [3] is additive — provider_health reads it, freshness ignores it.)
         try:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT source, "
                     "COUNT(*) FILTER (WHERE expires_at > NOW()) AS cached, "
-                    "COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired "
+                    "COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired, "
+                    "MAX(fetched_at) AS latest_fetched "
                     "FROM financial_data_cache GROUP BY source"
                 )
                 stats["financial_cache"] = {"rows": cur.fetchall(), "error": None}
