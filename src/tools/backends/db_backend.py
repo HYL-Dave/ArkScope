@@ -1101,10 +1101,12 @@ class DatabaseBackend:
         except Exception as e:
             stats["news"] = {"rows": [], "error": str(e)}
 
-        # Prices: latest 1d bar timestamp
+        # Prices: latest bar timestamp across ALL stored intervals. Do NOT filter
+        # interval='1d' — only 15min bars are stored (1h/1d are derived on read),
+        # so that filter returns NULL and freshness reports prices permanently stale.
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT MAX(datetime) FROM prices WHERE interval='1d'")
+                cur.execute("SELECT MAX(datetime) FROM prices")
                 stats["prices"] = {"rows": cur.fetchall(), "error": None}
         except Exception as e:
             stats["prices"] = {"rows": [], "error": str(e)}
