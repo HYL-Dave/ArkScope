@@ -80,41 +80,31 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.isoformat() if dt else None
 
 
-def _env_file_keys() -> set:
-    """Key NAMES present in config/.env (never reads values into the response)."""
-    path = _REPO_ROOT / "config" / ".env"
-    keys = set()
-    try:
-        if path.exists():
-            for raw in path.read_text(encoding="utf-8").splitlines():
-                line = raw.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                name, _, value = line.partition("=")
-                if name.strip() and value.strip():
-                    keys.add(name.strip())
-    except OSError as e:
-        logger.debug(f"env file scan failed: {e}")
-    return keys
-
-
-def _key_info(file_keys: set, *names: str) -> Dict[str, Any]:
+def _key_info(loaded_from_file: frozenset, *names: str) -> Dict[str, Any]:
     """READ-ONLY key presence for one provider (F5). ``present`` requires ALL
-    ``names``; source is config/.env when any name lives in the file, else env."""
+    ``names``. Source is the EFFECTIVE origin: ensure_env_loaded() is
+    set-if-absent, so a key it loaded came from config/.env and any other present
+    key came from the real environment (which wins even if the file also names
+    it). ``mixed`` when a multi-var key (IBKR host+port) spans both."""
     present = all(os.getenv(n) for n in names)
     if not present:
         return {"present": False, "source": "missing", "vars": list(names)}
-    source = "config/.env" if any(n in file_keys for n in names) else "env"
-    return {"present": True, "source": source, "vars": list(names)}
+    sources = {"config/.env" if n in loaded_from_file else "env" for n in names}
+    return {"present": True,
+            "source": sources.pop() if len(sources) == 1 else "mixed",
+            "vars": list(names)}
 
 
 def _status(*, key_present: bool, enabled: Optional[bool],
             last_success_at: Optional[datetime], threshold_hours: Optional[float],
             now: datetime, weekend_maintenance: bool = False) -> str:
-    if not key_present:
-        return "missing_key"
+    # disabled OUTRANKS missing_key: a provider the user explicitly turned off is
+    # "disabled" regardless of credentials — surfacing missing_key for it would
+    # nag about a key the user does not want used.
     if enabled is False:
         return "disabled"
+    if not key_present:
+        return "missing_key"
     if last_success_at is None:
         return "no_signal"
     if threshold_hours is None:
@@ -136,9 +126,11 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
     # Keys live in config/.env, not the system environment (project convention) —
     # make sure they are loaded before any os.getenv presence check (idempotent).
+    loaded_file_keys: frozenset = frozenset()
     try:
-        from src.env_keys import ensure_env_loaded
+        from src.env_keys import ensure_env_loaded, keys_loaded_from_file
         ensure_env_loaded()
+        loaded_file_keys = keys_loaded_from_file()
     except Exception as e:
         notes.append(f"env load failed: {e}")
 
@@ -180,7 +172,6 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     except Exception as e:
         notes.append(f"fd enabled check failed: {e}")
 
-    file_keys = _env_file_keys()
 
     # --- per-source decomposition ---------------------------------------------
     # news rows: (source, latest, recent_count) per provider
@@ -252,7 +243,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                        default=None)
     _add(
         "ibkr", "IBKR Gateway", "market",
-        _key_info(file_keys, "IBKR_HOST", "IBKR_PORT"),
+        _key_info(loaded_file_keys, "IBKR_HOST", "IBKR_PORT"),
         last_success=ibkr_success,
         weekend_maintenance=True,
         detail=(f"prices latest {_iso(prices_latest) or '—'} · iv latest "
@@ -266,7 +257,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         n = news_by_src.get(pid, {})
         _add(
             pid, label, "news",
-            _key_info(file_keys, f"{pid.upper()}_API_KEY"),
+            _key_info(loaded_file_keys, f"{pid.upper()}_API_KEY"),
             last_success=n.get("latest"),
             detail=f"news latest {_iso(n.get('latest')) or '—'} · 7d {n.get('recent_7d', 0)}",
             signals={"news_latest": _iso(n.get("latest")), "news_recent_7d": n.get("recent_7d", 0)},
@@ -275,7 +266,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     fred = _job_signal("fetch_fred")
     _add(
         "fred", "FRED", "macro",
-        _key_info(file_keys, "FRED_API_KEY"),
+        _key_info(loaded_file_keys, "FRED_API_KEY"),
         last_success=fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
         detail=f"latest fred job success {_iso(fred['last_success']) or '—'}",
@@ -295,7 +286,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     fd = fin_by_src.get("financial_datasets", {})
     _add(
         "financial_datasets", "Financial Datasets (paid)", "fundamentals",
-        _key_info(file_keys, "FINANCIAL_DATASETS_API_KEY"),
+        _key_info(loaded_file_keys, "FINANCIAL_DATASETS_API_KEY"),
         enabled=fd_enabled,
         last_success=fd.get("latest_fetched") if fd.get("cached") else None,
         detail=f"cache {fd.get('cached', 0)} valid · {fd.get('expired', 0)} expired",

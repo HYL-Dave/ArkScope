@@ -49,12 +49,13 @@ def _stats(news_rows=(), prices_latest=None, iv_latest=None, fin_rows=()):
 def hermetic(monkeypatch):
     """Isolate from the real machine: env keys, config/.env scan, local market DB."""
     # ensure_env_loaded is set-if-absent from the REAL config/.env — neutralize it
-    # (mark already-loaded) so the delenv below cannot be undone mid-test.
+    # (mark already-loaded, empty loader-tracking) so the delenv below cannot be
+    # undone mid-test and key_source defaults to "env" for setenv'd keys.
     monkeypatch.setattr("src.env_keys._loaded", True)
+    monkeypatch.setattr("src.env_keys._loaded_keys", set())
     for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
                 "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setattr("src.service.provider_health._env_file_keys", lambda: set())
     monkeypatch.setattr("src.market_data_admin.read_sync_meta", lambda *a, **k: {})
     monkeypatch.setattr("src.tools.analysis_tools._is_fd_enabled", lambda dal: False)
 
@@ -131,15 +132,30 @@ def test_sec_edgar_ttl_governed_never_stale():
     assert "12 valid" in p["detail"]
 
 
-def test_key_source_env_vs_file(monkeypatch):
-    monkeypatch.setenv("POLYGON_API_KEY", "k")
-    monkeypatch.setenv("FINNHUB_API_KEY", "k")
-    monkeypatch.setattr("src.service.provider_health._env_file_keys",
-                        lambda: {"FINNHUB_API_KEY"})
+def test_key_source_reports_effective_origin(monkeypatch):
+    # The loader is set-if-absent, so the EFFECTIVE source of a present key is:
+    # loaded-by-the-loader → config/.env; otherwise → real env (env wins even when
+    # the file also names it). Multi-var keys spanning both → mixed.
+    monkeypatch.setenv("POLYGON_API_KEY", "k")    # real env (not loader-set)
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")    # below: marked loader-set
+    monkeypatch.setenv("IBKR_HOST", "h")          # env...
+    monkeypatch.setenv("IBKR_PORT", "4001")       # ...but PORT marked loader-set → mixed
+    monkeypatch.setattr("src.env_keys._loaded_keys", {"FINNHUB_API_KEY", "IBKR_PORT"})
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
     assert _by_id(out, "polygon")["key_source"] == "env"
     assert _by_id(out, "finnhub")["key_source"] == "config/.env"
+    assert _by_id(out, "ibkr")["key_source"] == "mixed"
     assert _by_id(out, "fred")["key_source"] == "missing"
+
+
+def test_disabled_outranks_missing_key(monkeypatch):
+    # FD disabled AND key missing → product semantics say "disabled" (the user
+    # turned it off; nagging missing_key for an unwanted provider is wrong).
+    monkeypatch.delenv("FINANCIAL_DATASETS_API_KEY", raising=False)
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY),
+               "financial_datasets")
+    assert p["key_present"] is False
+    assert p["status"] == "disabled"
 
 
 def test_sa_capture_error_and_success_merge():

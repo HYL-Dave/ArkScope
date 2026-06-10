@@ -14,6 +14,12 @@ import os
 from pathlib import Path
 
 _loaded = False
+# Keys THIS loader actually set from config/.env (i.e. absent from the real env
+# at load time). A key present in os.environ but NOT in this set came from the
+# real environment — which is the EFFECTIVE source, since the loader never
+# clobbers (set-if-absent). Lets read-only credential displays report the true
+# effective origin instead of guessing from file contents.
+_loaded_keys: set = set()
 
 
 def ensure_env_loaded() -> None:
@@ -34,4 +40,11 @@ def ensure_env_loaded() -> None:
             # Only set if not already present — never clobber a real env var.
             if key and value and key not in os.environ:
                 os.environ[key] = value
+                _loaded_keys.add(key)
     _loaded = True
+
+
+def keys_loaded_from_file() -> frozenset:
+    """Key names ensure_env_loaded() set from config/.env (effective file-sourced
+    keys). Present-but-not-listed keys are real environment variables."""
+    return frozenset(_loaded_keys)
