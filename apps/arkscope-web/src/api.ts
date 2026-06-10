@@ -1043,3 +1043,48 @@ export function runScheduleNow(
 ): Promise<{ source: string; status: string; job_name?: string; reason?: string }> {
   return sendJSON(`/schedule/run/${encodeURIComponent(source)}`, "POST", undefined, 8_000);
 }
+
+// --- app-managed provider keys / connection settings -------------------------
+// Secrets never come back readable (masked only). Saving re-applies the env
+// bridge immediately — the sidecar is the parent of every collector subprocess,
+// so the change reaches all call sites without a restart. Effective precedence:
+// real env var > app value > config/.env.
+
+export interface ProviderConfigField {
+  field: string; // api_key | host | port
+  label: string;
+  secret: boolean;
+  env_var: string;
+  app_value_set: boolean;
+  app_value_masked: string | null;
+  effective_source: string; // app | env | config/.env | missing
+}
+
+export interface ProviderConfigEntry {
+  fields: ProviderConfigField[];
+  testable: boolean;
+  default_available: boolean; // key-free + extension-free (e.g. SEC EDGAR)
+}
+
+export function getProvidersConfig(): Promise<{ providers: Record<string, ProviderConfigEntry> }> {
+  return getJSON<{ providers: Record<string, ProviderConfigEntry> }>("/providers/config", 8_000);
+}
+
+export function putProviderConfig(
+  provider: string,
+  fields: Record<string, string | null>,
+): Promise<ProviderConfigEntry> {
+  return sendJSON(`/providers/config/${encodeURIComponent(provider)}`, "PUT", { fields }, 8_000);
+}
+
+export interface ProviderTestResult {
+  provider: string;
+  ok: boolean | null; // null = no live test offered (paid-per-call / extension)
+  latency_ms: number | null;
+  detail: string;
+}
+
+export function testProvider(provider: string): Promise<ProviderTestResult> {
+  // one explicit cheap probe; IBKR = TCP socket, key providers = one free call
+  return sendJSON(`/providers/test/${encodeURIComponent(provider)}`, "POST", undefined, 15_000);
+}

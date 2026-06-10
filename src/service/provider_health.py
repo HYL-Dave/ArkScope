@@ -80,16 +80,23 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.isoformat() if dt else None
 
 
-def _key_info(loaded_from_file: frozenset, *names: str) -> Dict[str, Any]:
+def _key_info(loaded_from_file: frozenset, app_keys: frozenset, *names: str) -> Dict[str, Any]:
     """READ-ONLY key presence for one provider (F5). ``present`` requires ALL
-    ``names``. Source is the EFFECTIVE origin: ensure_env_loaded() is
-    set-if-absent, so a key it loaded came from config/.env and any other present
-    key came from the real environment (which wins even if the file also names
-    it). ``mixed`` when a multi-var key (IBKR host+port) spans both."""
+    ``names``. Source is the EFFECTIVE origin per var: ``app`` (injected by the
+    app's data-provider store) > ``config/.env`` (set by the loader) > ``env``
+    (real environment variable — present but set by neither). ``mixed`` when a
+    multi-var key (IBKR host+port) spans different origins."""
     present = all(os.getenv(n) for n in names)
     if not present:
         return {"present": False, "source": "missing", "vars": list(names)}
-    sources = {"config/.env" if n in loaded_from_file else "env" for n in names}
+    sources = set()
+    for n in names:
+        if n in app_keys:
+            sources.add("app")
+        elif n in loaded_from_file:
+            sources.add("config/.env")
+        else:
+            sources.add("env")
     return {"present": True,
             "source": sources.pop() if len(sources) == 1 else "mixed",
             "vars": list(names)}
@@ -127,12 +134,18 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     # Keys live in config/.env, not the system environment (project convention) —
     # make sure they are loaded before any os.getenv presence check (idempotent).
     loaded_file_keys: frozenset = frozenset()
+    app_keys: frozenset = frozenset()
     try:
         from src.env_keys import ensure_env_loaded, keys_loaded_from_file
         ensure_env_loaded()
         loaded_file_keys = keys_loaded_from_file()
     except Exception as e:
         notes.append(f"env load failed: {e}")
+    try:
+        from src.data_provider_config import app_applied_keys
+        app_keys = app_applied_keys()
+    except Exception as e:  # noqa: BLE001
+        notes.append(f"app key tracking failed: {e}")
 
     # --- signal collection (each best-effort) ---------------------------------
     stats: Dict[str, Any] = {}
@@ -243,7 +256,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                        default=None)
     _add(
         "ibkr", "IBKR Gateway", "market",
-        _key_info(loaded_file_keys, "IBKR_HOST", "IBKR_PORT"),
+        _key_info(loaded_file_keys, app_keys, "IBKR_HOST", "IBKR_PORT"),
         last_success=ibkr_success,
         weekend_maintenance=True,
         detail=(f"prices latest {_iso(prices_latest) or '—'} · iv latest "
@@ -257,7 +270,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         n = news_by_src.get(pid, {})
         _add(
             pid, label, "news",
-            _key_info(loaded_file_keys, f"{pid.upper()}_API_KEY"),
+            _key_info(loaded_file_keys, app_keys, f"{pid.upper()}_API_KEY"),
             last_success=n.get("latest"),
             detail=f"news latest {_iso(n.get('latest')) or '—'} · 7d {n.get('recent_7d', 0)}",
             signals={"news_latest": _iso(n.get("latest")), "news_recent_7d": n.get("recent_7d", 0)},
@@ -266,7 +279,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     fred = _job_signal("fetch_fred")
     _add(
         "fred", "FRED", "macro",
-        _key_info(loaded_file_keys, "FRED_API_KEY"),
+        _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
         last_success=fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
         detail=f"latest fred job success {_iso(fred['last_success']) or '—'}",
@@ -286,7 +299,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     fd = fin_by_src.get("financial_datasets", {})
     _add(
         "financial_datasets", "Financial Datasets (paid)", "fundamentals",
-        _key_info(loaded_file_keys, "FINANCIAL_DATASETS_API_KEY"),
+        _key_info(loaded_file_keys, app_keys, "FINANCIAL_DATASETS_API_KEY"),
         enabled=fd_enabled,
         last_success=fd.get("latest_fetched") if fd.get("cached") else None,
         detail=f"cache {fd.get('cached', 0)} valid · {fd.get('expired', 0)} expired",

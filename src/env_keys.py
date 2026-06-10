@@ -48,3 +48,28 @@ def keys_loaded_from_file() -> frozenset:
     """Key names ensure_env_loaded() set from config/.env (effective file-sourced
     keys). Present-but-not-listed keys are real environment variables."""
     return frozenset(_loaded_keys)
+
+
+def reload_var_from_file(name: str) -> bool:
+    """Re-resolve ONE var from config/.env, overwriting os.environ.
+
+    Used when an app-managed override is cleared: the var falls back to its
+    config/.env value (tracked as file-sourced), or is removed entirely when the
+    file doesn't define it. Returns True if the var is now set."""
+    env_path = Path(__file__).resolve().parents[1] / "config" / ".env"
+    value = None
+    if env_path.exists():
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            if key.strip() == name:
+                value = val.strip().strip('"').strip("'")
+    if value:
+        os.environ[name] = value
+        _loaded_keys.add(name)
+        return True
+    os.environ.pop(name, None)
+    _loaded_keys.discard(name)
+    return False

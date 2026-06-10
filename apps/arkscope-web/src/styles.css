@@ -1935,3 +1935,6 @@ button.wl-railitem.active,
   font-size: 10px;
   font-weight: 500;
 }
+
+.ds-keyinput { width: 180px; }
+.ds-config td { vertical-align: top; }

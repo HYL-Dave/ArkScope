@@ -7,11 +7,14 @@ import {
   getMarketDataJob,
   getMarketDataStatus,
   getModelCatalog,
+  getProvidersConfig,
   getProvidersHealth,
   getSchedule,
+  putProviderConfig,
   putSchedule,
   runScheduleNow,
   saveModelRoutes,
+  testProvider,
   setUseLocalMarket,
   testModelAccess,
   updateCredential,
@@ -20,6 +23,7 @@ import {
   type MarketDataJob,
   type MarketDataStatus,
   type MarketDataValidate,
+  type ProviderConfigEntry,
   type ProvidersHealthResponse,
   type ScheduleSourceState,
   type SyncMeta,
@@ -573,15 +577,20 @@ function shortTs(iso: string | null | undefined): string {
 function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
+  const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
+  const [testResults, setTestResults] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    const [rs, rh] = await Promise.allSettled([getSchedule(), getProvidersHealth()]);
+    const [rs, rh, rc] = await Promise.allSettled([
+      getSchedule(), getProvidersHealth(), getProvidersConfig()]);
     if (rs.status === "fulfilled") setSchedule(rs.value.sources);
     if (rh.status === "fulfilled") setHealth(rh.value);
-    const bad = [rs, rh].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (rc.status === "fulfilled") setCfg(rc.value.providers);
+    const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
@@ -643,6 +652,42 @@ function DataSourcesSection() {
     }
   }
 
+  async function saveField(provider: string, field: string, value: string | null) {
+    if (busy) return;
+    setBusy(`${provider}.${field}`);
+    try {
+      await putProviderConfig(provider, { [field]: value });
+      setKeyDrafts((d) => ({ ...d, [`${provider}.${field}`]: "" }));
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function runTest(provider: string) {
+    if (busy) return;
+    setBusy(`test.${provider}`);
+    setTestResults((t) => ({ ...t, [provider]: "測試中…" }));
+    try {
+      const r = await testProvider(provider);
+      setTestResults((t) => ({
+        ...t,
+        [provider]:
+          r.ok === true
+            ? `✓ ${r.detail}${r.latency_ms != null ? ` · ${r.latency_ms}ms` : ""}`
+            : r.ok === false
+              ? `✗ ${r.detail}`
+              : `— ${r.detail}`,
+      }));
+    } catch (e) {
+      setTestResults((t) => ({ ...t, [provider]: `✗ ${e instanceof Error ? e.message : String(e)}` }));
+    } finally {
+      setBusy("");
+    }
+  }
+
   function jobOutcome(jobName: string): string {
     const row = health?.jobs?.[jobName] as
       | { status?: string; finished_at?: string; error?: string }
@@ -692,6 +737,101 @@ function DataSourcesSection() {
                   <td className="muted">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="settings-panel" style={{ marginTop: 16 }}>
+        <h4 className="detail-section">連線與金鑰</h4>
+        <p className="muted tiny">
+          App 管理各 provider 的金鑰與連線設定（存本地、僅顯示遮罩值）。IB Gateway 本體在你啟動的那台機器上
+          — 這裡填的是「連去哪」（host / port）。儲存即生效（毋須重啟）；優先序：環境變數 ＞ App 設定 ＞
+          config/.env。SEC EDGAR 免金鑰、預設可用。
+        </p>
+        {!cfg ? (
+          <p className="muted tiny">loading…</p>
+        ) : (
+          <table className="data-table ds-config">
+            <thead>
+              <tr><th>Provider</th><th>欄位</th><th>目前值（來源）</th><th>設定</th><th>連線測試</th></tr>
+            </thead>
+            <tbody>
+              {Object.entries(cfg)
+                .filter(([, c]) => c.fields.length > 0 || c.testable)
+                .map(([pid, c]) => {
+                  const label = health?.providers.find((p) => p.id === pid)?.label ?? pid;
+                  const rows = c.fields.length > 0 ? c.fields : [null];
+                  return rows.map((f, i) => (
+                    <tr key={`${pid}.${f?.field ?? "_"}`}>
+                      {i === 0 && (
+                        <td rowSpan={rows.length}>
+                          {label}
+                          {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
+                        </td>
+                      )}
+                      <td>{f ? f.label : "—"}</td>
+                      <td>
+                        {f
+                          ? f.effective_source === "missing"
+                            ? <span className="ds-chip ds-missing_key">未設定</span>
+                            : <>
+                                <span className="mono">{f.app_value_set ? f.app_value_masked : "（外部）"}</span>
+                                <span className="muted tiny">（{f.effective_source}）</span>
+                              </>
+                          : "—"}
+                      </td>
+                      <td>
+                        {f && (
+                          <>
+                            <input
+                              className="ds-interval ds-keyinput"
+                              type={f.secret ? "password" : "text"}
+                              placeholder={f.secret ? "貼上金鑰…" : f.label}
+                              value={keyDrafts[`${pid}.${f.field}`] ?? ""}
+                              disabled={busy === `${pid}.${f.field}`}
+                              onChange={(e) =>
+                                setKeyDrafts((d) => ({ ...d, [`${pid}.${f.field}`]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                const v = keyDrafts[`${pid}.${f.field}`];
+                                if (e.key === "Enter" && v) void saveField(pid, f.field, v);
+                              }}
+                            />
+                            {keyDrafts[`${pid}.${f.field}`] && (
+                              <button className="btn-ghost tiny"
+                                onClick={() => void saveField(pid, f.field, keyDrafts[`${pid}.${f.field}`])}>
+                                儲存
+                              </button>
+                            )}
+                            {f.app_value_set && (
+                              <button className="btn-ghost tiny"
+                                onClick={() => void saveField(pid, f.field, null)}>
+                                清除
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      {i === 0 && (
+                        <td rowSpan={rows.length}>
+                          {c.testable ? (
+                            <>
+                              <button className="btn-ghost" disabled={!!busy}
+                                onClick={() => void runTest(pid)}>
+                                測試
+                              </button>
+                              {testResults[pid] && (
+                                <div className="muted tiny">{testResults[pid]}</div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="muted tiny">不提供（按次計費）</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ));
+                })}
             </tbody>
           </table>
         )}

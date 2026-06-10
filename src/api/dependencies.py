@@ -61,6 +61,15 @@ def get_credential_store():
 
 
 @lru_cache(maxsize=1)
+def get_data_provider_store():
+    """Singleton DATA-provider config store (API keys / IBKR host+port — same
+    ignored local SQLite DB). Values are injected into os.environ via apply_env."""
+    from src.data_provider_config import DataProviderConfigStore
+
+    return DataProviderConfigStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_consensus_cache():
     """Singleton daily cache of analyst consensus (Finnhub) — a local DATA cache
     (its own data/cache/ SQLite), NOT user state. Overridable via

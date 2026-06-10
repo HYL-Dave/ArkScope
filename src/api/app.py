@@ -32,6 +32,18 @@ async def lifespan(app: FastAPI):
 
     from src.service.data_scheduler import scheduler_loop
 
+    # Apply app-managed provider keys / IBKR host+port into os.environ BEFORE the
+    # scheduler exists: the sidecar is the parent of every collector subprocess, so
+    # one injection here reaches all call sites (in-process getenv + children).
+    try:
+        from src.data_provider_config import apply_env
+
+        from .dependencies import get_data_provider_store
+
+        apply_env(get_data_provider_store())
+    except Exception as e:  # noqa: BLE001 — config bridge must not block startup
+        logger.warning(f"data-provider env bridge failed: {e}")
+
     sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
@@ -76,6 +88,7 @@ def create_app() -> FastAPI:
     from .routes.consensus import router as consensus_router
     from .routes.market_data import router as market_data_router
     from .routes.schedule import router as schedule_router
+    from .routes.providers_config import router as providers_config_router
 
     app.include_router(news_router)
     app.include_router(prices_router)
@@ -97,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(consensus_router)
     app.include_router(market_data_router)
     app.include_router(schedule_router)
+    app.include_router(providers_config_router)
 
     # --- Desktop-shell sidecar hardening (opt-in; no effect on existing flows) ---
     # Optional localhost token, enforced ONLY when ARKSCOPE_API_TOKEN is set (the
