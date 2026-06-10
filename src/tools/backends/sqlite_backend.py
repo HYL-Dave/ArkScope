@@ -327,7 +327,11 @@ class SqliteBackend:
         with _CACHE_WRITE_LOCK:
             try:
                 conn = self._connect_rw()
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError as e:
+                # must not be silent: a False here can mean a PAID response goes
+                # uncached upstream (FinancialDatasetsClient warns + file-falls-back)
+                logger.warning(f"SqliteBackend.set_financial_cache({cache_key}): "
+                               f"cannot open DB for write ({e})")
                 return False
             try:
                 conn.executescript(_FIN_CACHE_SCHEMA)  # tolerate a pre-3c-C DB

@@ -230,12 +230,16 @@ def get_fundamentals_analysis(
             ticker, "sec_edgar", income_stmts, balance_sheets, cashflow_stmts,
         )
 
-    # 3. Financial Datasets API (paid, cached)
+    # 3. Financial Datasets API (paid, cached — local-primary via the DAL backend)
     if _is_fd_enabled(dal):
         try:
             from data_sources.financial_datasets_client import FinancialDatasetsClient
             cache_days = _get_fd_cache_days(dal)
-            fd = FinancialDatasetsClient(cache_days=cache_days)
+            # Route the paid cache through the DAL backend (LocalMarketDatabaseBackend
+            # → local-primary; plain DatabaseBackend → PG): one unified financial
+            # cache instead of the client's own PG connection + file writes.
+            backend = getattr(dal, "_backend", None)
+            fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend)
 
             n = 4 if period == "quarterly" else 2
             fd_income = fd.get_income_statements(ticker, period=period, limit=n)

@@ -152,8 +152,9 @@ _PG_FUND_SELECT_INCR = f"SELECT {_PG_FUND_COLS} FROM fundamentals WHERE id > %s 
 # with a TTL via expires_at (UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00' strings, which are
 # lexicographically comparable so expiry is a string compare). Because it is
 # local-primary it is PRESERVED across a full rebuild (carry-over), NOT validated
-# against PG, and NOT touched by the incremental updater. (financial_datasets_client's
-# own paid-path cache stays PG+file for now — unified in a later slice.)
+# against PG, and NOT touched by the incremental updater. (financial_datasets_client
+# routes its paid-path cache through here via cache_backend — source
+# 'financial_datasets'; standalone/no-backend usage keeps its legacy env-PG+file.)
 _FIN_CACHE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS financial_cache (
     cache_key   TEXT PRIMARY KEY,

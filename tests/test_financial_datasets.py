@@ -287,3 +287,114 @@ class TestBuildResult:
         result = _build_result_from_statements("AAPL", "sec_edgar", [], [], [])
         assert result.ticker == "AAPL"
         assert result.snapshot_date is None
+
+# ============================================================
+# cache_backend mode (3c-C unification: paid cache → local-primary)
+# ============================================================
+
+class _FakeCacheBackend:
+    """Duck-typed DAL backend: get/set_financial_cache."""
+
+    def __init__(self, store=None):
+        self.store = dict(store or {})
+        self.set_calls = []
+
+    def get_financial_cache(self, cache_key):
+        return self.store.get(cache_key)
+
+    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+        self.set_calls.append({"cache_key": cache_key, "ticker": ticker,
+                               "ttl_days": ttl_days, "source": source})
+        self.store[cache_key] = data
+        return True
+
+
+class TestCacheBackendMode:
+
+    @patch("data_sources.financial_datasets_client.requests.get")
+    def test_backend_hit_skips_api(self, mock_get, tmp_path):
+        backend = _FakeCacheBackend({"income_AAPL_annual": MOCK_INCOME_RESPONSE})
+        with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+        mock_get.assert_not_called()
+        assert len(stmts) == 1 and stmts[0].revenue == 416161000000.0
+
+    @patch("data_sources.financial_datasets_client.requests.get")
+    def test_api_result_written_to_backend_only(self, mock_get, tmp_path, monkeypatch):
+        # backend+file miss → API → the write goes ONLY to the backend (no file, and
+        # the client's own env-PG path must not be touched even if DATABASE_URL set).
+        monkeypatch.setenv("DATABASE_URL", "postgresql://must-not-be-used/db")
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = MOCK_INCOME_RESPONSE
+        mock_resp.raise_for_status = MagicMock()
+        mock_get.return_value = mock_resp
+        backend = _FakeCacheBackend()
+        with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            client._db_upsert = lambda *a, **k: (_ for _ in ()).throw(AssertionError("env-PG used"))
+            stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+        assert len(stmts) == 1
+        assert backend.set_calls == [{"cache_key": "income_AAPL_annual", "ticker": "AAPL",
+                                      "ttl_days": 180, "source": "financial_datasets"}]
+        assert list(tmp_path.glob("*.json")) == []  # no new file writes in backend mode
+
+    @patch("data_sources.financial_datasets_client.requests.get")
+    def test_file_hit_promoted_to_backend(self, mock_get, tmp_path):
+        # backend miss + fresh legacy file → returned, API not called, AND promoted
+        # into the backend with the file's remaining TTL (file cache migrates local).
+        fetched = datetime.now(timezone.utc) - timedelta(days=30)  # 30d into a 180d TTL
+        (tmp_path / "income_AAPL_annual.json").write_text(json.dumps({
+            "fetched_at": fetched.isoformat(),
+            "expires_at": (fetched + timedelta(days=180)).isoformat(),
+            "ticker": "AAPL",
+            "data": MOCK_INCOME_RESPONSE,
+        }))
+        backend = _FakeCacheBackend()
+        with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+        mock_get.assert_not_called()
+        assert len(stmts) == 1
+        assert len(backend.set_calls) == 1
+        promo = backend.set_calls[0]
+        assert promo["source"] == "financial_datasets" and promo["ticker"] == "AAPL"
+        assert promo["ttl_days"] == 150  # 180 - 30 elapsed → remaining TTL preserved
+
+    def test_backend_without_cache_methods_is_ignored(self):
+        # e.g. a FileBackend (no get/set_financial_cache) → legacy mode, not a crash
+        client = FinancialDatasetsClient(api_key="k", cache_backend=object())
+        assert client._cache_backend is None
+
+    @patch("data_sources.financial_datasets_client.requests.get")
+    def test_backend_write_failure_falls_back_to_file(self, mock_get, tmp_path, caplog):
+        # Single-sink risk (review finding): if the backend write fails, the PAID
+        # response must still be cached SOMEWHERE — legacy file fallback — and the
+        # next call must hit it (no re-pay). Healthy path stays file-write-free
+        # (test_api_result_written_to_backend_only).
+        import logging
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = MOCK_INCOME_RESPONSE
+        mock_resp.raise_for_status = MagicMock()
+        mock_get.return_value = mock_resp
+
+        class _RejectingBackend(_FakeCacheBackend):
+            def set_financial_cache(self, *a, **k):
+                super().set_financial_cache(*a, **k)
+                self.store.clear()        # simulate: write reported ok=False, nothing stored
+                return False
+
+        backend = _RejectingBackend()
+        with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            with caplog.at_level(logging.WARNING):
+                stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+            assert len(stmts) == 1
+            assert mock_get.call_count == 1
+            # paid response landed in the file fallback + the failure is observable
+            assert (tmp_path / "income_AAPL_annual.json").exists()
+            assert "NOT cached by the backend" in caplog.text
+            # second call: backend still misses → FILE serves it → NO second paid call
+            stmts2 = client.get_income_statements("AAPL", period="annual", limit=1)
+        assert len(stmts2) == 1
+        assert mock_get.call_count == 1  # still one paid call total
