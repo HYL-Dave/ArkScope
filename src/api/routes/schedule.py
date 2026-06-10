@@ -68,7 +68,7 @@ def run_now(source: str):
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
     d = SOURCES[source]
-    if d.collector is not None:  # provider fetch + PG write
+    if d.collector is not None or d.adapter is not None:  # provider fetch + PG write
         require_db_write("schedule_run_now", {"source": source})
     if _SOURCE_LOCKS[source].locked():
         return {"source": source, "status": "skipped", "reason": "already running"}

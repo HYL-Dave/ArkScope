@@ -51,16 +51,26 @@ from dataclasses import dataclass, asdict
 import requests
 import pandas as pd
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('collect_finnhub_news.log', encoding='utf-8')
-    ]
-)
 logger = logging.getLogger(__name__)
+
+# Anchor all storage paths to the repo root (resolved from this file), NOT the
+# cwd — the app sidecar calls run_incremental() in-process from an arbitrary cwd,
+# and the CLI becomes cwd-independent too (was a cwd-relative scan/write).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _setup_cli_logging() -> None:
+    """CLI-only logging config — deliberately NOT at import time, so the app can
+    import this module (in-process adapter) without the root-logger
+    reconfiguration / cwd-relative FileHandler side effects."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('collect_finnhub_news.log', encoding='utf-8')
+        ]
+    )
 
 
 # =============================================================================
@@ -74,8 +84,8 @@ class FinnhubConfig:
     request_delay: float = 1.0  # 1 second between requests
     requests_per_minute: int = 60
 
-    # Storage paths
-    data_dir: Path = Path("data/news/raw/finnhub")
+    # Storage paths (repo-root anchored — see _REPO_ROOT note above)
+    data_dir: Path = _REPO_ROOT / "data/news/raw/finnhub"
 
     # Retry settings
     max_retries: int = 3
@@ -509,10 +519,11 @@ def collect_news(
         start_date = oldest_allowed
 
     # Load API key
+    # Raise instead of sys.exit so in-process callers (the app scheduler)
+    # record a FAILED run; the CLI catches this and exits 1.
     api_key = load_env()
     if not api_key:
-        logger.error("FINNHUB_API_KEY not found in config/.env or environment")
-        sys.exit(1)
+        raise RuntimeError("FINNHUB_API_KEY not found in config/.env or environment")
 
     # Initialize
     config = FinnhubConfig()
@@ -580,6 +591,74 @@ def collect_news(
 # CLI
 # =============================================================================
 
+def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
+                           stats: dict) -> Path:
+    """Persist the run stats JSON (shared by the default and incremental paths)."""
+    stats_path = _REPO_ROOT / "data/news/metadata/finnhub_collection_stats.json"
+    stats_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(stats_path, 'w') as f:
+        json.dump({
+            'completed_at': datetime.now().isoformat(),
+            'tickers': tickers,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            **stats,
+        }, f, indent=2)
+    return stats_path
+
+
+def run_incremental(tickers_arg: Optional[str] = None,
+                    end_date: Optional[date] = None) -> dict:
+    """The --incremental path as a CALLABLE — used by main() and, in-process, by
+    the app scheduler (the provider adapter). Identical semantics to the CLI:
+    window = since the latest stored article, capped at 7 days (Finnhub free-tier
+    history limit); with no existing data, the last 7 days.
+
+    Returns {"mode": "up_to_date"|"incremental"|"recent_7d", "new_articles": int}.
+    Raises on missing API key (callers decide exit semantics)."""
+    import math
+
+    config = FinnhubConfig()
+    storage = StorageManager(config.data_dir)
+    end_date = end_date or date.today()
+    latest_ts = storage.get_latest_timestamp()
+
+    if latest_ts:
+        # Handle timezone: latest_ts may be timezone-aware (UTC)
+        if latest_ts.tzinfo is not None:
+            latest_ts = latest_ts.replace(tzinfo=None)
+        now = datetime.now()
+        hours_behind = (now - latest_ts).total_seconds() / 3600
+        days_behind = math.ceil(hours_behind / 24)  # Round up to full days
+
+        # Cap at 7 days (Finnhub API limitation)
+        days_to_fetch = min(days_behind, 7)
+
+        if days_to_fetch <= 0:
+            logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
+            return {"mode": "up_to_date", "new_articles": 0}
+
+        start_date = end_date - timedelta(days=days_to_fetch)
+        logger.info("INCREMENTAL MODE (dynamic days)")
+        logger.info(f"  Latest article: {latest_ts.isoformat()}")
+        logger.info(f"  Hours behind: {hours_behind:.1f}h → fetching {days_to_fetch} days")
+        logger.info(f"  Date range: {start_date} to {end_date}")
+        mode = "incremental"
+    else:
+        # No existing data, fetch full 7 days
+        start_date = end_date - timedelta(days=7)
+        logger.info(f"No existing data. Fetching last 7 days ({start_date} to {end_date})")
+        mode = "recent_7d"
+
+    logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
+
+    tickers = load_tickers(tickers_arg)
+    stats = collect_news(tickers, start_date, end_date)
+    stats_path = _save_collection_stats(tickers, start_date, end_date, stats)
+    logger.info(f"\nStats saved to: {stats_path}")
+    return {"mode": mode, "new_articles": stats.get('total_articles', 0)}
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Collect news from Finnhub API (recent only, ~7 days)',
@@ -611,6 +690,7 @@ For historical news, use collect_polygon_news.py instead.
                             'NOTE: new tickers without history will only get recent data.')
 
     args = parser.parse_args()
+    _setup_cli_logging()
 
     # Handle --status mode first
     if args.status:
@@ -641,42 +721,17 @@ For historical news, use collect_polygon_news.py instead.
     if args.end:
         end_date = date.fromisoformat(args.end)
 
-    # For incremental mode, dynamically calculate days based on latest article
-    # Finnhub API only provides ~7 days of history, so we cap at 7 days
+    # Handle --incremental mode (extracted to run_incremental so the app can call
+    # it in-process; CLI semantics preserved, except a missing API key now exits 1
+    # instead of crashing with a bare SystemExit from collect_news)
     if args.incremental:
-        import math
-        config = FinnhubConfig()
-        storage = StorageManager(config.data_dir)
-        latest_ts = storage.get_latest_timestamp()
-
-        if latest_ts:
-            # Calculate time since latest article
-            # Handle timezone: latest_ts may be timezone-aware (UTC)
-            if latest_ts.tzinfo is not None:
-                latest_ts = latest_ts.replace(tzinfo=None)
-            now = datetime.now()
-            hours_behind = (now - latest_ts).total_seconds() / 3600
-            days_behind = math.ceil(hours_behind / 24)  # Round up to full days
-
-            # Cap at 7 days (Finnhub API limitation)
-            days_to_fetch = min(days_behind, 7)
-
-            if days_to_fetch <= 0:
-                logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
-                return
-
-            start_date = end_date - timedelta(days=days_to_fetch)
-            logger.info(f"INCREMENTAL MODE (dynamic days)")
-            logger.info(f"  Latest article: {latest_ts.isoformat()}")
-            logger.info(f"  Hours behind: {hours_behind:.1f}h → fetching {days_to_fetch} days")
-            logger.info(f"  Date range: {start_date} to {end_date}")
-        else:
-            # No existing data, fetch full 7 days
-            start_date = end_date - timedelta(days=7)
-            logger.info(f"No existing data. Fetching last 7 days ({start_date} to {end_date})")
-
-        logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
-    elif args.start:
+        try:
+            run_incremental(args.tickers, end_date=end_date)
+        except RuntimeError as e:
+            logger.error(str(e))
+            sys.exit(1)
+        return
+    if args.start:
         start_date = date.fromisoformat(args.start)
     else:
         start_date = end_date - timedelta(days=args.days)
@@ -685,20 +740,13 @@ For historical news, use collect_polygon_news.py instead.
     tickers = load_tickers(args.tickers)
 
     # Collect
-    stats = collect_news(tickers, start_date, end_date)
+    try:
+        stats = collect_news(tickers, start_date, end_date)
+    except RuntimeError as e:  # e.g. missing API key
+        logger.error(str(e))
+        sys.exit(1)
 
-    # Save stats
-    stats_path = Path("data/news/metadata/finnhub_collection_stats.json")
-    stats_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(stats_path, 'w') as f:
-        json.dump({
-            'completed_at': datetime.now().isoformat(),
-            'tickers': tickers,
-            'start_date': start_date.isoformat(),
-            'end_date': end_date.isoformat(),
-            **stats,
-        }, f, indent=2)
-
+    stats_path = _save_collection_stats(tickers, start_date, end_date, stats)
     logger.info(f"\nStats saved to: {stats_path}")
 
 

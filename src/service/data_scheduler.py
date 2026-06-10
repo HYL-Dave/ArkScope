@@ -6,12 +6,13 @@ no cron, not even as a transition. Each SOURCE is independent (they always were;
 daily_update just ran them serially), with its OWN enable flag + interval set in
 Settings, executing in parallel where safe.
 
-Sources v1 (collector subprocesses = the exact commands the user runs manually
-today; adapter-ization into in-process functions is the planned follow-up):
-  - polygon_news / finnhub_news      — independent, can run concurrently
-  - ibkr_news / ibkr_prices / iv_history — serialized behind ONE shared IBKR lock
-    (one Gateway session; avoids client-id collisions — the same reason
-    daily_update never parallelized IBKR)
+Sources v1:
+  - polygon_news / finnhub_news      — IN-PROCESS adapters (the collector modules
+    are import-safe; run_incremental() returns structured stats like new_articles
+    instead of an opaque exit code); independent, can run concurrently
+  - ibkr_news / ibkr_prices / iv_history — collector SUBPROCESSES, serialized
+    behind ONE shared IBKR lock (one Gateway session; client-id hygiene + the
+    ib_insync asyncio loop is safer in its own process)
   - local_incremental                 — app-native PG → local market_data.db delta
     (market_data_admin.incremental_update)
 
@@ -67,12 +68,18 @@ _ERROR_TAIL = 600
 class SourceDef:
     name: str
     label: str
-    collector: Optional[List[str]]      # argv after sys.executable; None = app-native
+    collector: Optional[List[str]]      # argv after sys.executable; None = no subprocess
     sync_flag: Optional[str]            # migrate_to_supabase flag, None = no PG sync
     ibkr: bool = False                  # serialize behind the shared IBKR lock
     needs_price_scope: bool = False     # resolve active-universe tickers at run time
     default_interval_min: int = 60
     description: str = ""
+    # In-process provider adapter: (module, function) resolved lazily at run time.
+    # The news collectors are import-safe modules now — calling run_incremental()
+    # in-process gives structured stats (new_articles) instead of an opaque exit
+    # code, with zero logic duplication. IBKR sources deliberately STAY subprocess:
+    # process isolation is a feature there (ib_insync asyncio + client-id hygiene).
+    adapter: Optional[tuple] = None
 
 
 SOURCES: Dict[str, SourceDef] = {
@@ -80,15 +87,17 @@ SOURCES: Dict[str, SourceDef] = {
     for s in (
         SourceDef(
             "polygon_news", "Polygon 新聞",
-            ["collect_polygon_news.py", "--incremental"], "--news",
+            None, "--news",
+            adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
             default_interval_min=60,
-            description="Polygon news incremental → PG → local mirror",
+            description="Polygon news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
-            ["collect_finnhub_news.py", "--incremental"], "--news",
+            None, "--news",
+            adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
             default_interval_min=60,
-            description="Finnhub news incremental → PG → local mirror",
+            description="Finnhub news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
             "ibkr_news", "IBKR 新聞",
@@ -268,7 +277,18 @@ def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]
         ok = True
         error: Optional[str] = None
         try:
-            if d.collector is not None:
+            collected = False
+            if d.adapter is not None:
+                # In-process provider adapter (import-safe collector module);
+                # resolved lazily so tests can monkeypatch the module function and
+                # the sidecar pays the import only when the source actually runs.
+                import importlib
+
+                mod = importlib.import_module(d.adapter[0])
+                fn = getattr(mod, d.adapter[1])
+                result["collect"] = fn()  # raises on failure (e.g. missing key)
+                collected = True
+            elif d.collector is not None:
                 argv = [sys.executable, str(_COLLECT_DIR / d.collector[0]), *d.collector[1:]]
                 if d.needs_price_scope:
                     tickers = _resolve_price_scope()
@@ -280,13 +300,14 @@ def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]
                 result["collect"] = step
                 if step["returncode"] != 0:
                     raise RuntimeError(f"collector failed: {step.get('error_tail', '')[:200]}")
+                collected = True
 
-                if d.sync_flag:
-                    with _SYNC_LOCK:
-                        sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
-                    result["sync"] = sync
-                    if sync["returncode"] != 0:
-                        raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
+            if collected and d.sync_flag:
+                with _SYNC_LOCK:
+                    sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
+                result["sync"] = sync
+                if sync["returncode"] != 0:
+                    raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
 
             result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
@@ -400,7 +421,7 @@ def status_snapshot() -> Dict[str, Any]:
             "label": d.label,
             "description": d.description,
             "ibkr": d.ibkr,
-            "provider_fetch": d.collector is not None,
+            "provider_fetch": (d.collector is not None) or (d.adapter is not None),
             "enabled": cfg["enabled"],
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,

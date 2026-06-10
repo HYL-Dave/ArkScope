@@ -55,16 +55,26 @@ from dataclasses import dataclass, asdict
 import requests
 import pandas as pd
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('collect_polygon_news.log', encoding='utf-8')
-    ]
-)
 logger = logging.getLogger(__name__)
+
+# Anchor all storage paths to the repo root (resolved from this file), NOT the
+# cwd — the app sidecar calls run_incremental() in-process from an arbitrary cwd,
+# and the CLI becomes cwd-independent too (was a cwd-relative scan/write).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _setup_cli_logging() -> None:
+    """CLI-only logging config — deliberately NOT at import time, so the app can
+    import this module (in-process adapter) without the root-logger
+    reconfiguration / cwd-relative FileHandler side effects."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('collect_polygon_news.log', encoding='utf-8')
+        ]
+    )
 
 
 # =============================================================================
@@ -81,9 +91,9 @@ class CollectionConfig:
     # Pagination
     articles_per_request: int = 1000  # Max allowed by Polygon
 
-    # Storage paths
-    data_dir: Path = Path("data/news/raw/polygon")
-    checkpoint_dir: Path = Path("data/news/metadata")
+    # Storage paths (repo-root anchored — see _REPO_ROOT note above)
+    data_dir: Path = _REPO_ROOT / "data/news/raw/polygon"
+    checkpoint_dir: Path = _REPO_ROOT / "data/news/metadata"
 
     # Default date range for full history
     default_start: date = date(2022, 1, 1)  # 3 years back
@@ -725,11 +735,11 @@ def collect_news(
     Returns:
         Collection statistics dictionary.
     """
-    # Load API key
+    # Load API key (raise instead of sys.exit so in-process callers — the app
+    # scheduler — record a FAILED run; the CLI catches this and exits 1)
     api_key = load_env()
     if not api_key:
-        logger.error("POLYGON_API_KEY not found in config/.env or environment")
-        sys.exit(1)
+        raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
 
     # Initialize
     config = CollectionConfig()
@@ -856,6 +866,108 @@ def estimate_time(tickers: List[str], months: int) -> str:
 # CLI
 # =============================================================================
 
+def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
+                           stats: dict) -> Path:
+    """Persist the run stats JSON (shared by the full and incremental paths)."""
+    stats_path = _REPO_ROOT / "data/news/metadata/collection_stats.json"
+    stats_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(stats_path, 'w') as f:
+        json.dump({
+            'completed_at': datetime.now().isoformat(),
+            'tickers': tickers,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            **stats,
+        }, f, indent=2)
+    return stats_path
+
+
+def run_incremental(tickers_arg: Optional[str] = None,
+                    end_date: Optional[date] = None) -> dict:
+    """The --incremental path as a CALLABLE — used by main() and, in-process, by
+    the app scheduler (the provider adapter). Identical semantics to the CLI:
+    fetch from 1s after the latest stored article; with NO existing data it falls
+    back to the full default-range collection (same as the CLI fallthrough).
+
+    Returns a stats dict: {"mode": "up_to_date"|"incremental"|"full_fallback",
+    "new_articles": int}. Raises on missing API key (callers decide exit
+    semantics)."""
+    config = CollectionConfig()
+    storage = StorageManager(config.data_dir)
+    end_date = end_date or date.today()
+    latest_ts = storage.get_latest_timestamp()
+
+    if not latest_ts:
+        # Same fallback the CLI does: no existing data → full default-range run.
+        start_date = config.default_start
+        logger.info(f"No existing data found. Starting full collection from {start_date}")
+        tickers = load_tickers(tickers_arg)
+        stats = collect_news(tickers, start_date, end_date, resume=False)
+        _save_collection_stats(tickers, start_date, end_date, stats)
+        return {"mode": "full_fallback", "new_articles": stats.get('total_articles', 0)}
+
+    # Use timestamp precision: start from 1 second after latest article
+    start_timestamp = latest_ts + timedelta(seconds=1)
+    start_date = start_timestamp.date()
+
+    # Handle timezone: start_timestamp may be timezone-aware (UTC)
+    if start_timestamp.tzinfo is not None:
+        start_timestamp = start_timestamp.replace(tzinfo=None)
+    now = datetime.now()
+    if start_timestamp > now:
+        logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
+        return {"mode": "up_to_date", "new_articles": 0}
+
+    logger.info("INCREMENTAL MODE (timestamp precision)")
+    logger.info(f"  Latest article: {latest_ts.isoformat()}")
+    logger.info(f"  Fetching from:  {start_timestamp.isoformat()}")
+
+    api_key = load_env()
+    if not api_key:
+        raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
+
+    collector = PolygonNewsCollector(api_key, config)
+    tickers = load_tickers(tickers_arg)
+    collected_at = datetime.now()
+
+    logger.info(f"Tickers: {len(tickers)} stocks")
+
+    for i, ticker in enumerate(tickers):
+        progress = (i + 1) / len(tickers) * 100
+        logger.info(f"[{progress:.1f}%] {ticker}")
+
+        # Fetch with timestamp precision
+        raw_articles = collector.fetch_news_range(
+            ticker, start_date, end_date,
+            start_timestamp=start_timestamp
+        )
+
+        if raw_articles:
+            articles = [collector.parse_article(a, collected_at) for a in raw_articles]
+            ticker_articles = [a for a in articles if a.ticker.upper() == ticker.upper()]
+
+            # Group by month and save
+            from collections import defaultdict
+            by_month = defaultdict(list)
+            for article in ticker_articles:
+                pub_date = article.published_at[:10]
+                year, month = int(pub_date[:4]), int(pub_date[5:7])
+                by_month[(year, month)].append(article)
+
+            for (year, month), month_articles in by_month.items():
+                saved = storage.save_articles(month_articles, year, month)
+                collector.stats['total_articles'] += saved
+
+    logger.info("\n" + "=" * 60)
+    logger.info(f"Incremental update complete: {collector.stats['total_articles']} new articles")
+    logger.info("=" * 60)
+
+    stats_path = _save_collection_stats(tickers, start_date, end_date, collector.stats)
+    logger.info(f"Stats saved to: {stats_path}")
+    return {"mode": "incremental",
+            "new_articles": collector.stats.get('total_articles', 0)}
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Collect news from Polygon.io API',
@@ -894,6 +1006,7 @@ Examples:
                        help='Show current data status without collecting')
 
     args = parser.parse_args()
+    _setup_cli_logging()
 
     # Handle --status mode first
     if args.status:
@@ -931,91 +1044,17 @@ Examples:
     if args.end:
         end_date = date.fromisoformat(args.end)
 
-    # Handle --incremental mode
+    # Handle --incremental mode (extracted to run_incremental so the app can call
+    # it in-process; CLI semantics preserved, except a missing API key now exits 1
+    # instead of silently exiting 0 — deliberate fix)
     if args.incremental:
-        config = CollectionConfig()
-        storage = StorageManager(config.data_dir)
-        latest_ts = storage.get_latest_timestamp()
-
-        if latest_ts:
-            # Use timestamp precision: start from 1 second after latest article
-            start_timestamp = latest_ts + timedelta(seconds=1)
-            start_date = start_timestamp.date()
-
-            # Check if already up to date
-            # Handle timezone: start_timestamp may be timezone-aware (UTC)
-            if start_timestamp.tzinfo is not None:
-                start_timestamp = start_timestamp.replace(tzinfo=None)
-            now = datetime.now()
-            if start_timestamp > now:
-                logger.info(f"Data is already up to date (latest: {latest_ts.isoformat()})")
-                return
-
-            logger.info(f"INCREMENTAL MODE (timestamp precision)")
-            logger.info(f"  Latest article: {latest_ts.isoformat()}")
-            logger.info(f"  Fetching from:  {start_timestamp.isoformat()}")
-
-            # Run incremental collection with timestamp precision
-            api_key = load_env()
-            if not api_key:
-                logger.error("POLYGON_API_KEY not found")
-                return
-
-            collector = PolygonNewsCollector(api_key, config)
-            tickers = load_tickers(args.tickers)
-            collected_at = datetime.now()
-
-            logger.info(f"Tickers: {len(tickers)} stocks")
-
-            for i, ticker in enumerate(tickers):
-                progress = (i + 1) / len(tickers) * 100
-                logger.info(f"[{progress:.1f}%] {ticker}")
-
-                # Fetch with timestamp precision
-                raw_articles = collector.fetch_news_range(
-                    ticker, start_date, end_date,
-                    start_timestamp=start_timestamp
-                )
-
-                if raw_articles:
-                    articles = [collector.parse_article(a, collected_at) for a in raw_articles]
-                    ticker_articles = [a for a in articles if a.ticker.upper() == ticker.upper()]
-
-                    # Group by month and save
-                    from collections import defaultdict
-                    by_month = defaultdict(list)
-                    for article in ticker_articles:
-                        pub_date = article.published_at[:10]
-                        year, month = int(pub_date[:4]), int(pub_date[5:7])
-                        by_month[(year, month)].append(article)
-
-                    for (year, month), month_articles in by_month.items():
-                        saved = storage.save_articles(month_articles, year, month)
-                        collector.stats['total_articles'] += saved
-
-            logger.info("\n" + "=" * 60)
-            logger.info(f"Incremental update complete: {collector.stats['total_articles']} new articles")
-            logger.info("=" * 60)
-
-            # Save stats (same as full collection path)
-            stats_path = Path("data/news/metadata/collection_stats.json")
-            stats_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(stats_path, 'w') as f:
-                json.dump({
-                    'completed_at': datetime.now().isoformat(),
-                    'tickers': tickers,
-                    'start_date': start_date.isoformat(),
-                    'end_date': end_date.isoformat(),
-                    **collector.stats,
-                }, f, indent=2)
-            logger.info(f"Stats saved to: {stats_path}")
-
-            return
-        else:
-            # No existing data, use default full history start
-            start_date = date(2022, 1, 1)
-            logger.info(f"No existing data found. Starting full collection from {start_date}")
-    elif args.full_history:
+        try:
+            run_incremental(args.tickers, end_date=end_date)
+        except RuntimeError as e:
+            logger.error(str(e))
+            sys.exit(1)
+        return
+    if args.full_history:
         start_date = date(2022, 1, 1)
     elif args.days:
         start_date = end_date - timedelta(days=args.days)
@@ -1047,20 +1086,13 @@ Examples:
         time.sleep(3)
 
     # Start collection
-    stats = collect_news(tickers, start_date, end_date, resume=args.resume)
+    try:
+        stats = collect_news(tickers, start_date, end_date, resume=args.resume)
+    except RuntimeError as e:  # e.g. missing API key
+        logger.error(str(e))
+        sys.exit(1)
 
-    # Save final stats
-    stats_path = Path("data/news/metadata/collection_stats.json")
-    stats_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(stats_path, 'w') as f:
-        json.dump({
-            'completed_at': datetime.now().isoformat(),
-            'tickers': tickers,
-            'start_date': start_date.isoformat(),
-            'end_date': end_date.isoformat(),
-            **stats,
-        }, f, indent=2)
-
+    stats_path = _save_collection_stats(tickers, start_date, end_date, stats)
     logger.info(f"\nStats saved to: {stats_path}")
 
 

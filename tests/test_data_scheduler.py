@@ -16,13 +16,20 @@ _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
 @pytest.fixture(autouse=True)
 def hermetic(tmp_path, monkeypatch):
     """Fresh profile store per test; reset scheduler runtime state; never touch
-    the real DAL / subprocesses / local market DB."""
+    the real DAL / subprocesses / local market DB — and CRITICALLY, stub both
+    in-process news adapters so no test can fire a real provider API call."""
     store = ProfileStateStore(tmp_path / "profile_state.db")
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     # default stubs: no real subprocess, no real local refresh, no telemetry
     monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
     monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
+    import scripts.collection.collect_finnhub_news as cfn
+    import scripts.collection.collect_polygon_news as cpn
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
+    monkeypatch.setattr(cfn, "run_incremental",
+                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
 
     class _NoStore:
         def create_run(self, *a, **k):
@@ -82,7 +89,11 @@ def test_tick_fires_only_enabled_and_due():
 
 # --- run_source ------------------------------------------------------------------
 
-def test_run_source_success_collect_sync_refresh(monkeypatch):
+def test_run_source_adapter_success_sync_refresh(monkeypatch):
+    # polygon_news runs IN-PROCESS via the adapter; only the PG sync is a subprocess.
+    import scripts.collection.collect_polygon_news as cpn
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: {"mode": "incremental", "new_articles": 3})
     calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (calls.append(argv), {"returncode": 0})[1])
@@ -101,12 +112,37 @@ def test_run_source_success_collect_sync_refresh(monkeypatch):
     monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", lambda dal: _Store())
     res = ds.run_source("polygon_news", trigger_source="api")
     assert res["status"] == "succeeded"
+    assert res["collect"] == {"mode": "incremental", "new_articles": 3}  # structured stats
     assert res["local_refresh"] == {"ok": True}
-    assert len(calls) == 2                                  # collector + PG sync
-    assert "collect_polygon_news.py" in calls[0][1]
-    assert "--news" in calls[1]
+    assert len(calls) == 1 and "--news" in calls[0]         # ONLY the PG sync subprocess
     assert finished == {"name": "collect.polygon_news", "trigger": "api",
                         "status": "succeeded"}
+
+
+def test_run_source_subprocess_success_collect_sync_refresh(monkeypatch):
+    # IBKR sources stay subprocess: collector + PG sync = two child processes.
+    calls = []
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
+    res = ds.run_source("ibkr_news")
+    assert res["status"] == "succeeded"
+    assert len(calls) == 2
+    assert "collect_ibkr_news.py" in calls[0][1]
+    assert "--news" in calls[1]
+
+
+def test_run_source_adapter_failure_short_circuits(monkeypatch):
+    # adapter raising (e.g. missing API key) → failed, PG sync never attempted
+    import scripts.collection.collect_finnhub_news as cfn
+    monkeypatch.setattr(cfn, "run_incremental",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            RuntimeError("FINNHUB_API_KEY not found")))
+    calls = []
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
+    res = ds.run_source("finnhub_news")
+    assert res["status"] == "failed" and "FINNHUB_API_KEY" in res["error"]
+    assert calls == []                                      # PG sync never attempted
 
 
 def test_run_source_collector_failure_short_circuits(monkeypatch):
@@ -117,7 +153,7 @@ def test_run_source_collector_failure_short_circuits(monkeypatch):
         return {"returncode": 1, "error_tail": "boom"}
 
     monkeypatch.setattr(ds, "_run_subprocess", _sub)
-    res = ds.run_source("finnhub_news")
+    res = ds.run_source("ibkr_news")
     assert res["status"] == "failed" and "collector failed" in res["error"]
     assert len(calls) == 1                                  # PG sync never attempted
 
