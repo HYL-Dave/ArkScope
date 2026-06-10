@@ -13,7 +13,12 @@ These paths must keep working through docs cleanup, local-first migration, and m
 - `python scripts/collection/daily_update.py --all --scope active-universe --sync-db`
   (since slice 2 / 2026-06-08: IBKR-price collection needs an explicit `--scope active-universe`
   or `--tickers`; bare `--all` collects news only and skips prices with a warning — `--tier all`
-  and the `tickers_core.json` writeback are retired. `--scores` is a separate opt-in.)
+  and the `tickers_core.json` writeback are retired. `--scores` is a separate opt-in.
+  Since slice 3e-B / 2026-06-10: each step ADDITIONALLY records a best-effort terminal
+  `job_runs` row (`daily_update.<step>`, trigger_source='cli') + one `daily_update.run`
+  summary row — purely additive telemetry for the app's ops view; flags, step semantics
+  and exit codes are unchanged, recording failures are swallowed, and `--dry-run`
+  records nothing / never touches the DB.)
 - Chrome SA Alpha Picks extension -> Native Messaging host -> DB
 - Firefox SA Alpha Picks extension -> Native Messaging host -> DB
 - SA native host stable launcher:

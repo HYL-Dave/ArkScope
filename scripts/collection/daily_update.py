@@ -68,7 +68,7 @@ import json
 import subprocess
 import logging
 import argparse
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -208,6 +208,61 @@ def run_commands_parallel(commands: list, dry_run: bool = False) -> Dict[str, bo
             time.sleep(0.1)
 
     return results
+
+
+class _RunTelemetry:
+    """Best-effort job_runs telemetry for the backfill runner (slice 3e-B).
+
+    Before this, a failed collection run left ZERO queryable trace (the only
+    signal was the process exit code). Each step now lands one terminal-state
+    ``job_runs`` row (``daily_update.<step>``, trigger_source='cli') via
+    record_completed_run — the same terminal-only pattern the Chrome extension
+    uses. STRICTLY additive: never raises, never alters flags/exit-code
+    semantics, and is fully disabled on --dry-run (dry runs must not touch the
+    DB — protected contract). The app's provider-health/ops views read these
+    rows; the runner itself behaves byte-identically.
+    """
+
+    def __init__(self, enabled: bool, payload: Dict):
+        self._store = None
+        self._payload = payload
+        if not enabled:
+            return
+        try:
+            from src.service.job_runs_store import JobRunsStore
+            from src.tools.data_access import DataAccessLayer
+
+            store = JobRunsStore(DataAccessLayer(db_dsn="auto"))
+            if store.is_available():
+                self._store = store
+            else:
+                logger.debug("job telemetry: no DB backend — runs will not be recorded")
+        except Exception as e:  # noqa: BLE001 — telemetry must never break the runner
+            logger.debug(f"job telemetry unavailable: {e}")
+
+    def record(self, step: str, ok: bool, started_at: datetime,
+               finished_at: Optional[datetime] = None) -> None:
+        if self._store is None:
+            return
+        try:
+            self._store.record_completed_run(
+                f"daily_update.{step}",
+                status="succeeded" if ok else "failed",
+                started_at=started_at,
+                finished_at=finished_at or datetime.now(timezone.utc),
+                trigger_source="cli",
+                payload=self._payload,
+                error=None if ok else "step failed (non-zero exit); see runner output",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"job telemetry record failed for {step}: {e}")
+
+    def timed(self, step: str, fn, *args, **kwargs) -> bool:
+        """Run one step, record its outcome with real timing, return it unchanged."""
+        t0 = datetime.now(timezone.utc)
+        ok = fn(*args, **kwargs)
+        self.record(step, bool(ok), t0)
+        return ok
 
 
 def get_polygon_status() -> Dict:
@@ -753,6 +808,18 @@ Note: IBKR sources require TWS/Gateway running.
     # Resolve the EXPLICIT price scope once (Q7: --all never guesses a universe).
     price_tickers = _resolve_price_scope(args) if update_ibkr_prices_flag else []
 
+    # 3e-B: best-effort per-step job_runs telemetry. Additive only — disabled on
+    # --dry-run (dry runs never touch the DB), never changes flags or exit codes.
+    telem = _RunTelemetry(enabled=not args.dry_run, payload={
+        "flags": {k: bool(getattr(args, k, False)) for k in (
+            "all", "news", "polygon", "finnhub", "ibkr_news", "ibkr_prices",
+            "iv_history", "sync_db", "scores", "parallel")},
+        "scope": args.scope,
+        "tickers": args.tickers,
+        "price_ticker_count": len(price_tickers),
+    })
+    run_started = datetime.now(timezone.utc)
+
     # Parallel execution for news sources (Polygon + Finnhub only, IBKR needs dedicated connection)
     if args.parallel and (update_polygon_flag or update_finnhub_flag):
         commands = []
@@ -769,35 +836,40 @@ Note: IBKR sources require TWS/Gateway running.
 
         if commands:
             logger.info(f"\nStarting {len(commands)} news collectors in parallel...")
+            t_par = datetime.now(timezone.utc)
             parallel_results = run_commands_parallel(commands, args.dry_run)
             results.update(parallel_results)
+            for name, ok in parallel_results.items():  # block-window timing
+                telem.record(name, bool(ok), t_par)
 
         # IBKR runs separately (needs dedicated connection)
         if update_ibkr_news_flag:
-            results['ibkr_news'] = update_ibkr_news(args.dry_run)
+            results['ibkr_news'] = telem.timed('ibkr_news', update_ibkr_news, args.dry_run)
         if update_ibkr_prices_flag and price_tickers:
-            results['ibkr_prices'] = update_ibkr_prices(price_tickers, args.dry_run)
+            results['ibkr_prices'] = telem.timed(
+                'ibkr_prices', update_ibkr_prices, price_tickers, args.dry_run)
         elif update_ibkr_prices_flag:
             logger.warning(
                 "IBKR prices requested but no scope — skipping (not failing). "
                 "Add --tickers <list> or --scope active-universe."
             )
         if update_iv_history_flag:
-            results['iv_history'] = update_iv_history(args.dry_run)
+            results['iv_history'] = telem.timed('iv_history', update_iv_history, args.dry_run)
 
     else:
         # Sequential execution (default)
         if update_polygon_flag:
-            results['polygon'] = update_polygon(args.dry_run)
+            results['polygon'] = telem.timed('polygon', update_polygon, args.dry_run)
 
         if update_finnhub_flag:
-            results['finnhub'] = update_finnhub(args.dry_run)
+            results['finnhub'] = telem.timed('finnhub', update_finnhub, args.dry_run)
 
         if update_ibkr_news_flag:
-            results['ibkr_news'] = update_ibkr_news(args.dry_run)
+            results['ibkr_news'] = telem.timed('ibkr_news', update_ibkr_news, args.dry_run)
 
         if update_ibkr_prices_flag and price_tickers:
-            results['ibkr_prices'] = update_ibkr_prices(price_tickers, args.dry_run)
+            results['ibkr_prices'] = telem.timed(
+                'ibkr_prices', update_ibkr_prices, price_tickers, args.dry_run)
         elif update_ibkr_prices_flag:
             logger.warning(
                 "IBKR prices requested but no scope — skipping (not failing). "
@@ -805,7 +877,7 @@ Note: IBKR sources require TWS/Gateway running.
             )
 
         if update_iv_history_flag:
-            results['iv_history'] = update_iv_history(args.dry_run)
+            results['iv_history'] = telem.timed('iv_history', update_iv_history, args.dry_run)
 
     # Sync to database if requested. --sync-db syncs what was COLLECTED;
     # --scores is an independent opt-in (scores no longer ride on --news).
@@ -816,6 +888,7 @@ Note: IBKR sources require TWS/Gateway running.
         sync_scores = args.scores  # opt-in, on its own flag
 
         if sync_news or sync_prices or sync_iv or sync_scores:
+            t_sync = datetime.now(timezone.utc)
             sync_results = sync_to_db(
                 sync_news=sync_news,
                 sync_prices=sync_prices,
@@ -824,6 +897,8 @@ Note: IBKR sources require TWS/Gateway running.
                 dry_run=args.dry_run,
             )
             results.update(sync_results)
+            for name, ok in sync_results.items():  # block-window timing
+                telem.record(name, bool(ok), t_sync)
         else:
             logger.info("No data types to sync (nothing was collected)")
 
@@ -844,6 +919,9 @@ Note: IBKR sources require TWS/Gateway running.
     # Show final status
     if not args.dry_run:
         show_status()
+
+    # Whole-run summary row (the "last backfill" line the ops view shows).
+    telem.record("run", all(results.values()), run_started)
 
     # Exit code
     if all(results.values()):

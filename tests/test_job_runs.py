@@ -451,9 +451,18 @@ def test_run_job_continues_when_create_run_returns_none():
 
 
 def test_jobs_history_endpoint_returns_rows_from_store():
+    # Isolation: override BOTH get_dal and get_registry via dependency_overrides —
+    # the supported FastAPI mechanism — so neither the route nor anything resolved
+    # during the request can touch the real DAL/registry. (An earlier attempt
+    # patched "src.api.app.get_dal", which does not exist at module level.)
     from fastapi.testclient import TestClient
     from src.api.app import create_app
-    from src.api.dependencies import get_dal
+    from src.api.dependencies import get_dal, get_registry
+
+    fake_dal = MagicMock()
+    fake_dal.get_available_tickers.return_value = []
+    fake_registry = MagicMock()
+    fake_registry.list_all.return_value = []
 
     fake_rows = [
         {
@@ -469,7 +478,8 @@ def test_jobs_history_endpoint_returns_rows_from_store():
     ]
 
     app = create_app()
-    app.dependency_overrides[get_dal] = lambda: MagicMock()
+    app.dependency_overrides[get_dal] = lambda: fake_dal
+    app.dependency_overrides[get_registry] = lambda: fake_registry
     try:
         with patch.object(JobRunsStore, "list_runs", return_value=fake_rows):
             with TestClient(app) as client:
@@ -487,10 +497,16 @@ def test_jobs_history_endpoint_returns_rows_from_store():
 def test_jobs_history_endpoint_returns_empty_when_unavailable():
     from fastapi.testclient import TestClient
     from src.api.app import create_app
-    from src.api.dependencies import get_dal
+    from src.api.dependencies import get_dal, get_registry
+
+    fake_dal = MagicMock(_backend=None)
+    fake_dal.get_available_tickers.return_value = []
+    fake_registry = MagicMock()
+    fake_registry.list_all.return_value = []
 
     app = create_app()
-    app.dependency_overrides[get_dal] = lambda: MagicMock(_backend=None)
+    app.dependency_overrides[get_dal] = lambda: fake_dal
+    app.dependency_overrides[get_registry] = lambda: fake_registry
     try:
         with TestClient(app) as client:
             r = client.get("/jobs/history")
@@ -736,3 +752,83 @@ def test_record_extension_job_dispatched_via_handle_message():
 
     helper.assert_called_once()
     assert result["run_id"] == 1
+
+
+# ---------------------------------------------------------------------------
+# daily_update per-step telemetry (slice 3e-B)
+# ---------------------------------------------------------------------------
+
+
+def _load_daily_update():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "collection" / "daily_update.py"
+    spec = importlib.util.spec_from_file_location("_daily_update_under_test", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_run_telemetry_disabled_is_inert(monkeypatch):
+    # --dry-run path: enabled=False must not construct a DAL or record anything.
+    from datetime import datetime, timezone
+    mod = _load_daily_update()
+    monkeypatch.setattr(
+        "src.tools.data_access.DataAccessLayer",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("DAL touched on dry-run")))
+    t = mod._RunTelemetry(enabled=False, payload={})
+    assert t._store is None
+    t.record("x", True, datetime.now(timezone.utc))  # no-op, no raise
+    assert t.timed("y", lambda: True) is True        # passthrough unchanged
+
+
+def test_run_telemetry_records_terminal_rows(monkeypatch):
+    mod = _load_daily_update()
+    calls = []
+
+    class _FakeStore:
+        def __init__(self, dal):
+            pass
+
+        def is_available(self):
+            return True
+
+        def record_completed_run(self, name, **kw):
+            calls.append((name, kw))
+            return 1
+
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", _FakeStore)
+    monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
+    t = mod._RunTelemetry(enabled=True, payload={"scope": "active-universe"})
+    assert t.timed("polygon", lambda: True) is True
+    assert t.timed("finnhub", lambda: False) is False
+    assert [c[0] for c in calls] == ["daily_update.polygon", "daily_update.finnhub"]
+    ok_kw, fail_kw = calls[0][1], calls[1][1]
+    assert ok_kw["status"] == "succeeded" and ok_kw["trigger_source"] == "cli"
+    assert ok_kw["error"] is None and ok_kw["payload"] == {"scope": "active-universe"}
+    assert fail_kw["status"] == "failed" and "exit" in fail_kw["error"]
+    assert ok_kw["started_at"] <= ok_kw["finished_at"]
+
+
+def test_run_telemetry_store_failure_never_breaks_the_step(monkeypatch):
+    # Telemetry is strictly additive: a recording failure must not alter the
+    # step result or raise (the protected runner's exit-code semantics depend
+    # only on the steps themselves).
+    mod = _load_daily_update()
+
+    class _BoomStore:
+        def __init__(self, dal):
+            pass
+
+        def is_available(self):
+            return True
+
+        def record_completed_run(self, *a, **k):
+            raise RuntimeError("PG down")
+
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", _BoomStore)
+    monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
+    t = mod._RunTelemetry(enabled=True, payload={})
+    assert t.timed("x", lambda: True) is True
+    assert t.timed("y", lambda: False) is False
