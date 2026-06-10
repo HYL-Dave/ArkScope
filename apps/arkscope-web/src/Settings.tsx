@@ -886,7 +886,12 @@ function DataSourcesSection() {
                   </td>
                   <td>
                     {s.running ? (
-                      <span className="ds-chip ds-running">執行中…</span>
+                      <span className="ds-chip ds-running">
+                        執行中…
+                        {s.progress
+                          ? ` ${s.progress.done}/${s.progress.total}（${s.progress.current}，${Math.round((s.progress.done / Math.max(1, s.progress.total)) * 100)}%）`
+                          : ""}
+                      </span>
                     ) : (
                       <button
                         className="btn-ghost"

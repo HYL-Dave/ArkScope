@@ -462,7 +462,7 @@ def load_tickers(tickers_arg: Optional[str] = None) -> List[str]:
     if tickers_arg:
         return [t.strip().upper() for t in tickers_arg.split(',')]
 
-    config_path = Path("config/tickers_core.json")
+    config_path = _REPO_ROOT / "config/tickers_core.json"
     if config_path.exists():
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -506,6 +506,7 @@ def collect_news(
     tickers: List[str],
     start_date: date,
     end_date: date,
+    progress_cb=None,
 ) -> dict:
     """Main collection function."""
 
@@ -541,6 +542,8 @@ def collect_news(
     all_articles = []
 
     for i, ticker in enumerate(tickers):
+        if progress_cb is not None:
+            progress_cb(i + 1, len(tickers), ticker)  # app progress (best-effort)
         progress = (i + 1) / len(tickers) * 100
         logger.info(f"[{progress:.1f}%] {ticker}")
 
@@ -608,7 +611,8 @@ def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
 
 
 def run_incremental(tickers_arg: Optional[str] = None,
-                    end_date: Optional[date] = None) -> dict:
+                    end_date: Optional[date] = None,
+                    progress_cb=None) -> dict:
     """The --incremental path as a CALLABLE — used by main() and, in-process, by
     the app scheduler (the provider adapter). Identical semantics to the CLI:
     window = since the latest stored article, capped at 7 days (Finnhub free-tier
@@ -653,7 +657,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
     logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
 
     tickers = load_tickers(tickers_arg)
-    stats = collect_news(tickers, start_date, end_date)
+    stats = collect_news(tickers, start_date, end_date, progress_cb=progress_cb)
     stats_path = _save_collection_stats(tickers, start_date, end_date, stats)
     logger.info(f"\nStats saved to: {stats_path}")
     return {"mode": mode, "new_articles": stats.get('total_articles', 0)}

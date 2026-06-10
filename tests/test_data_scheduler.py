@@ -252,3 +252,44 @@ def test_run_now_fires_background_and_skips_running(monkeypatch):
     out2 = run_now("polygon_news")            # still holding the source lock
     assert out2["status"] == "skipped"
     release.set()
+
+
+def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
+    # News adapters receive the ACTIVE UNIVERSE as the explicit ticker list (the
+    # collectors' own default is the legacy tickers_core.json) + a progress_cb
+    # that feeds the live progress the UI shows.
+    import scripts.collection.collect_polygon_news as cpn
+    seen = {}
+
+    def _fake_run(tickers_arg=None, progress_cb=None, **kw):
+        seen["tickers_arg"] = tickers_arg
+        progress_cb(3, 10, "AAPL")           # simulate mid-run progress
+        snap = ds.status_snapshot()["polygon_news"]  # while still inside the run
+        seen["live_progress"] = snap["progress"]
+        return {"mode": "incremental", "new_articles": 1}
+
+    monkeypatch.setattr(cpn, "run_incremental", _fake_run)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
+    res = ds.run_source("polygon_news")
+    assert res["status"] == "succeeded" and res["ticker_count"] == 2
+    assert seen["tickers_arg"] == "AAPL,NVDA"
+    assert seen["live_progress"] == {"done": 3, "total": 10, "current": "AAPL"}
+    # progress cleared after the run
+    assert ds.status_snapshot()["polygon_news"]["progress"] is None
+
+
+def test_adapter_universe_unavailable_falls_back_to_default(monkeypatch):
+    # profile DB unavailable → adapter runs with the collector's default list
+    # (no tickers_arg), with a warning — collection must not die.
+    import scripts.collection.collect_finnhub_news as cfn
+    seen = {}
+
+    def _fake_run(tickers_arg=None, progress_cb=None, **kw):
+        seen["tickers_arg"] = tickers_arg
+        return {"mode": "up_to_date", "new_articles": 0}
+
+    monkeypatch.setattr(cfn, "run_incremental", _fake_run)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
+    res = ds.run_source("finnhub_news")
+    assert res["status"] == "succeeded"
+    assert seen["tickers_arg"] is None

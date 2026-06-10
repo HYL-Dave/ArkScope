@@ -79,7 +79,7 @@ def test_finnhub_incremental_window_capped_at_7_days(monkeypatch):
     # 30 days behind → window capped at 7 (Finnhub free-tier history limit)
     seen = {}
 
-    def _fake_collect(tickers, start_date, end_date):
+    def _fake_collect(tickers, start_date, end_date, progress_cb=None):
         seen["window_days"] = (end_date - start_date).days
         return {"total_articles": 5}
 

@@ -1023,6 +1023,9 @@ export interface ScheduleSourceState {
   interval_minutes: number;
   default_interval_minutes: number;
   running: boolean;
+  // rough live progress (ticker N of TOTAL) — only in-process adapter sources
+  // report it; subprocess sources stay indeterminate
+  progress: { done: number; total: number; current: string } | null;
   last_attempt_at: string | null;
   job_name: string; // collect.<source>
 }

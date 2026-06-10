@@ -646,7 +646,7 @@ def load_tickers(tickers_arg: Optional[str] = None, tiers: Optional[str] = None)
         return [t.strip().upper() for t in tickers_arg.split(',')]
 
     # Load from config
-    config_path = Path("config/tickers_core.json")
+    config_path = _REPO_ROOT / "config/tickers_core.json"
     if config_path.exists():
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -883,7 +883,8 @@ def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
 
 
 def run_incremental(tickers_arg: Optional[str] = None,
-                    end_date: Optional[date] = None) -> dict:
+                    end_date: Optional[date] = None,
+                    progress_cb=None) -> dict:
     """The --incremental path as a CALLABLE — used by main() and, in-process, by
     the app scheduler (the provider adapter). Identical semantics to the CLI:
     fetch from 1s after the latest stored article; with NO existing data it falls
@@ -935,6 +936,8 @@ def run_incremental(tickers_arg: Optional[str] = None,
     for i, ticker in enumerate(tickers):
         progress = (i + 1) / len(tickers) * 100
         logger.info(f"[{progress:.1f}%] {ticker}")
+        if progress_cb is not None:
+            progress_cb(i + 1, len(tickers), ticker)  # app progress (best-effort)
 
         # Fetch with timestamp precision
         raw_articles = collector.fetch_news_range(

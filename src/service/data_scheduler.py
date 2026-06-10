@@ -74,6 +74,11 @@ class SourceDef:
     needs_price_scope: bool = False     # resolve active-universe tickers at run time
     default_interval_min: int = 60
     description: str = ""
+    # Pass the ACTIVE UNIVERSE (profile DB, read-only) as the explicit ticker
+    # list — the collectors' own default is the LEGACY config/tickers_core.json
+    # tiers; the universe is the in-app authority (best-effort: falls back to the
+    # collector default with a warning when the profile DB is unavailable).
+    universe_tickers: bool = False
     # In-process provider adapter: (module, function) resolved lazily at run time.
     # The news collectors are import-safe modules now — calling run_incremental()
     # in-process gives structured stats (new_articles) instead of an opaque exit
@@ -89,14 +94,14 @@ SOURCES: Dict[str, SourceDef] = {
             "polygon_news", "Polygon 新聞",
             None, "--news",
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
-            default_interval_min=60,
+            universe_tickers=True, default_interval_min=60,
             description="Polygon news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
             None, "--news",
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
-            default_interval_min=60,
+            universe_tickers=True, default_interval_min=60,
             description="Finnhub news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
@@ -144,6 +149,22 @@ _LOCAL_REFRESH_LOCK = threading.Lock()  # one incremental_update at a time (skip
 # in-memory last-attempt per source (UTC); seeded from job_runs on scheduler start
 _LAST_ATTEMPT: Dict[str, datetime] = {}
 _LAST_ATTEMPT_LOCK = threading.Lock()
+
+# live per-source progress, fed by the in-process adapters' progress_cb (the
+# rough estimate the UI shows: ticker N of TOTAL — only adapter sources have it;
+# subprocess sources stay indeterminate)
+_PROGRESS: Dict[str, Dict[str, Any]] = {}
+_PROGRESS_LOCK = threading.Lock()
+
+
+def _set_progress(source: str, done: int, total: int, current: str) -> None:
+    with _PROGRESS_LOCK:
+        _PROGRESS[source] = {"done": done, "total": total, "current": current}
+
+
+def _clear_progress(source: str) -> None:
+    with _PROGRESS_LOCK:
+        _PROGRESS.pop(source, None)
 
 
 def job_name(source: str) -> str:
@@ -286,7 +307,20 @@ def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]
 
                 mod = importlib.import_module(d.adapter[0])
                 fn = getattr(mod, d.adapter[1])
-                result["collect"] = fn()  # raises on failure (e.g. missing key)
+                kwargs: Dict[str, Any] = {
+                    "progress_cb": lambda done, total, current: _set_progress(
+                        source, done, total, current),
+                }
+                if d.universe_tickers:
+                    tickers = _resolve_price_scope()
+                    if tickers:
+                        kwargs["tickers_arg"] = ",".join(tickers)
+                        result["ticker_count"] = len(tickers)
+                    else:
+                        logger.warning(
+                            f"{source}: active universe unavailable — falling back "
+                            "to the collector's default list")
+                result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
                 collected = True
             elif d.collector is not None:
                 argv = [sys.executable, str(_COLLECT_DIR / d.collector[0]), *d.collector[1:]]
@@ -325,6 +359,7 @@ def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]
                 logger.debug(f"scheduler telemetry finish failed: {e}")
         return result
     finally:
+        _clear_progress(source)
         if ibkr_held:
             _IBKR_LOCK.release()
         lock.release()
@@ -415,6 +450,8 @@ def status_snapshot() -> Dict[str, Any]:
     out = {}
     with _LAST_ATTEMPT_LOCK:
         attempts = dict(_LAST_ATTEMPT)
+    with _PROGRESS_LOCK:
+        progress = {k: dict(v) for k, v in _PROGRESS.items()}
     for source, d in SOURCES.items():
         cfg = source_config(source)
         out[source] = {
@@ -426,6 +463,7 @@ def status_snapshot() -> Dict[str, Any]:
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,
             "running": _SOURCE_LOCKS[source].locked(),
+            "progress": progress.get(source),
             "last_attempt_at": attempts.get(source).isoformat() if attempts.get(source) else None,
             "job_name": job_name(source),
         }
