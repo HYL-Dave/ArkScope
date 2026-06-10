@@ -11,9 +11,13 @@ SEC metrics path):
     ``cache_backend.get_financial_cache`` — which LocalMarketDatabaseBackend makes
     LOCAL-PRIMARY (local market DB first, PG legacy fallback + read-through
     promotion) — then the legacy file cache (read-only; a hit is promoted into the
-    backend with its remaining TTL), then the API. Writes go ONLY to
+    backend with its remaining TTL), then the API. Writes go to
     ``cache_backend.set_financial_cache`` (local-primary; never the client's own PG
-    connection, no new file writes).
+    connection). The healthy path writes no files — but if the backend write FAILS
+    (False/raise), the legacy file cache is written as a deliberate fallback: the
+    response is PAID, and with a single sink a silent write failure would mean every
+    subsequent call re-pays. Do NOT remove that fallback; the next read self-heals
+    it into the backend via the file→backend promotion.
   - ``cache_backend=None`` (standalone scripts/tests): legacy behavior unchanged —
     env-``DATABASE_URL`` PG → file → API, writes to PG + file.
 
