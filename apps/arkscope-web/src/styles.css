@@ -1497,6 +1497,34 @@ table.wl tbody tr.archived td {
   border-radius: 6px;
 }
 
+/* ---- Data Sources (provider health chips + per-source schedule) ---- */
+.ds-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ds-connected { color: #3fb950; border-color: #2ea04366; background: #2ea04314; }
+.ds-stale { color: #d29922; border-color: #d2992266; background: #d2992214; }
+.ds-maintenance { color: #58a6ff; border-color: #58a6ff66; background: #58a6ff14; }
+.ds-no_signal { color: var(--muted); }
+.ds-missing_key { color: #f85149; border-color: #f8514966; background: #f8514914; }
+.ds-disabled { color: var(--muted); text-decoration: line-through; }
+.ds-running { color: #58a6ff; border-color: #58a6ff66; background: #58a6ff14; }
+.ds-schedule td { vertical-align: middle; }
+.ds-interval {
+  width: 72px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.btn-ghost.tiny { font-size: 11px; padding: 2px 8px; margin-left: 6px; }
+
 /* ---- Universe (full inventory) ---- */
 .universe-hint {
   margin: 2px 0 8px;

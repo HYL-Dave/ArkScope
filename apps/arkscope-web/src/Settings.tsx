@@ -7,6 +7,10 @@ import {
   getMarketDataJob,
   getMarketDataStatus,
   getModelCatalog,
+  getProvidersHealth,
+  getSchedule,
+  putSchedule,
+  runScheduleNow,
   saveModelRoutes,
   setUseLocalMarket,
   testModelAccess,
@@ -16,6 +20,8 @@ import {
   type MarketDataJob,
   type MarketDataStatus,
   type MarketDataValidate,
+  type ProvidersHealthResponse,
+  type ScheduleSourceState,
   type SyncMeta,
   type ModelCatalog,
   type ModelDiscoveryResult,
@@ -62,8 +68,8 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "data_sources",
     title: "Data Sources",
-    description: "IBKR、SA、Polygon、Finnhub 等資料源設定。",
-    enabled: false,
+    description: "資料源健康狀態 + 每來源獨立排程（app 直接發起，免 cron）。",
+    enabled: true,
   },
   {
     id: "permissions",
@@ -305,6 +311,8 @@ export function SettingsView({
               />
             ) : section === "data_storage" ? (
               <DataStorageSection />
+            ) : section === "data_sources" ? (
+              <DataSourcesSection />
             ) : null}
           </section>
         </div>
@@ -542,6 +550,225 @@ function DataStorageSection() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---- Data Sources: provider health + per-source app-owned scheduling (3e) ----
+
+const PROVIDER_STATUS_LABEL: Record<string, string> = {
+  connected: "正常",
+  stale: "過期",
+  maintenance: "維護中",
+  no_signal: "無訊號",
+  missing_key: "缺金鑰",
+  disabled: "已停用",
+};
+
+function shortTs(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return iso.slice(5, 16).replace("T", " "); // "MM-DD HH:mm"
+}
+
+function DataSourcesSection() {
+  const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
+  const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    const [rs, rh] = await Promise.allSettled([getSchedule(), getProvidersHealth()]);
+    if (rs.status === "fulfilled") setSchedule(rs.value.sources);
+    if (rh.status === "fulfilled") setHealth(rh.value);
+    const bad = [rs, rh].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    setErr(bad.length
+      ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
+      : null);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Run-now / scheduled runs flip `running` server-side — poll while any is active.
+  const anyRunning = !!schedule && Object.values(schedule).some((s) => s.running);
+  useEffect(() => {
+    if (!anyRunning) return;
+    const t = window.setInterval(() => void load(), 5_000);
+    return () => window.clearInterval(t);
+  }, [anyRunning, load]);
+
+  async function setEnabled(source: string, enabled: boolean) {
+    if (busy) return;
+    setBusy(source);
+    try {
+      await putSchedule(source, { enabled });
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function applyInterval(source: string) {
+    const raw = drafts[source];
+    const n = Number(raw);
+    if (!raw || !Number.isFinite(n)) return;
+    if (busy) return;
+    setBusy(source);
+    try {
+      await putSchedule(source, { interval_minutes: Math.round(n) });
+      setDrafts((d) => ({ ...d, [source]: "" }));
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function runNow(source: string) {
+    if (busy) return;
+    setBusy(source);
+    try {
+      const r = await runScheduleNow(source);
+      if (r.status === "skipped") setErr(`${source}: ${r.reason ?? "已在執行"}`);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function jobOutcome(jobName: string): string {
+    const row = health?.jobs?.[jobName] as
+      | { status?: string; finished_at?: string; error?: string }
+      | undefined;
+    if (!row) return "—";
+    const ts = shortTs(row.finished_at ?? null);
+    if (row.status === "succeeded") return `✓ ${ts}`;
+    if (row.status === "failed") return `✗ ${ts}${row.error ? `（${String(row.error).slice(0, 60)}）` : ""}`;
+    if (row.status === "running") return "執行中…";
+    return row.status ?? "—";
+  }
+
+  return (
+    <div>
+      <div className="settings-section-head">
+        <div>
+          <h2>資料來源 · Data Sources</h2>
+          <p className="muted tiny">
+            App 直接發起資料抓取（免 cron）。每個來源獨立排程：自己的開關與間隔、平行執行
+            （IBKR 三項共用 Gateway 鎖序列化）。一次執行 = 抓取 → 同步 PG → 更新本地鏡像。
+            預設全部停用。
+          </p>
+        </div>
+        <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>
+          ↻ 重新整理{anyRunning ? "（執行中，自動更新）" : ""}
+        </button>
+      </div>
+
+      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+
+      <div className="settings-panel">
+        <h4 className="detail-section">Provider 健康</h4>
+        {!health ? (
+          <p className="muted tiny">loading…</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr><th>Provider</th><th>狀態</th><th>金鑰</th><th>最近成功</th><th>最近錯誤</th></tr>
+            </thead>
+            <tbody>
+              {health.providers.map((p) => (
+                <tr key={p.id}>
+                  <td title={p.detail}>{p.label}</td>
+                  <td><span className={`ds-chip ds-${p.status}`}>{PROVIDER_STATUS_LABEL[p.status] ?? p.status}</span></td>
+                  <td>{p.key_source === "not_required" ? "免金鑰" : p.key_source}</td>
+                  <td>{shortTs(p.last_success_at)}</td>
+                  <td className="muted">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="settings-panel" style={{ marginTop: 16 }}>
+        <h4 className="detail-section">排程（每來源獨立）</h4>
+        {!schedule ? (
+          <p className="muted tiny">loading…</p>
+        ) : (
+          <table className="data-table ds-schedule">
+            <thead>
+              <tr>
+                <th>來源</th><th>排程</th><th>間隔（分）</th><th>立即執行</th><th>最近一次</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(schedule).map(([id, s]) => (
+                <tr key={id}>
+                  <td title={s.description}>
+                    {s.label}
+                    {s.ibkr && <span className="muted tiny"> · IBKR</span>}
+                    {!s.provider_fetch && <span className="muted tiny"> · 本地</span>}
+                  </td>
+                  <td>
+                    <label className="ds-toggle">
+                      <input
+                        type="checkbox"
+                        checked={s.enabled}
+                        disabled={busy === id}
+                        onChange={(e) => void setEnabled(id, e.target.checked)}
+                      />
+                      {s.enabled ? "開" : "關"}
+                    </label>
+                  </td>
+                  <td>
+                    <input
+                      className="ds-interval"
+                      type="number"
+                      min={5}
+                      placeholder={String(s.interval_minutes)}
+                      value={drafts[id] ?? ""}
+                      disabled={busy === id}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [id]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") void applyInterval(id); }}
+                    />
+                    {drafts[id] && (
+                      <button className="btn-ghost tiny" onClick={() => void applyInterval(id)}>
+                        套用
+                      </button>
+                    )}
+                  </td>
+                  <td>
+                    {s.running ? (
+                      <span className="ds-chip ds-running">執行中…</span>
+                    ) : (
+                      <button
+                        className="btn-ghost"
+                        disabled={!!busy}
+                        onClick={() => void runNow(id)}
+                      >
+                        ▶ Run
+                      </button>
+                    )}
+                  </td>
+                  <td className="muted tiny">{jobOutcome(s.job_name)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="muted tiny" style={{ marginTop: 8 }}>
+          注意：已開啟排程的來源請勿同時手動跑 daily_update／collector（IBKR 類尤其 —
+          兩個進程會搶同一個 Gateway）。排程內建保護：同來源不重疊、IBKR 序列化、
+          啟動時讀取 job_runs 接續（手動剛跑過不會立即重抓）。
+        </p>
+      </div>
     </div>
   );
 }

@@ -1007,3 +1007,39 @@ export interface ProvidersHealthResponse {
 export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
   return getJSON<ProvidersHealthResponse>("/providers/health", 20_000);
 }
+
+// --- per-source data-collection schedule (3e-D; app-owned, no cron) ---
+// All sources are DISABLED by default; enabling one makes the sidecar collect →
+// PG sync → local-mirror refresh on its own interval. Run-now is fire-and-return;
+// poll getSchedule() for the per-source running flag and the job_runs row
+// (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.
+
+export interface ScheduleSourceState {
+  label: string;
+  description: string;
+  ibkr: boolean;
+  provider_fetch: boolean; // false = app-native (no external fetch)
+  enabled: boolean;
+  interval_minutes: number;
+  default_interval_minutes: number;
+  running: boolean;
+  last_attempt_at: string | null;
+  job_name: string; // collect.<source>
+}
+
+export function getSchedule(): Promise<{ sources: Record<string, ScheduleSourceState> }> {
+  return getJSON<{ sources: Record<string, ScheduleSourceState> }>("/schedule", 8_000);
+}
+
+export function putSchedule(
+  source: string,
+  body: { enabled?: boolean; interval_minutes?: number },
+): Promise<{ source: string; enabled: boolean; interval_minutes: number }> {
+  return sendJSON(`/schedule/${encodeURIComponent(source)}`, "PUT", body, 8_000);
+}
+
+export function runScheduleNow(
+  source: string,
+): Promise<{ source: string; status: string; job_name?: string; reason?: string }> {
+  return sendJSON(`/schedule/run/${encodeURIComponent(source)}`, "POST", undefined, 8_000);
+}
