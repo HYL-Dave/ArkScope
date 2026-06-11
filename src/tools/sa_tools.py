@@ -9,8 +9,10 @@ All require DAL. Alpha Picks tools are category="portfolio"; market news + comme
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -265,42 +267,57 @@ def list_high_value_comments(
         limit = max(1, min(int(limit), 50))
         min_score = float(min_score)
 
-        conn = backend._get_conn()
-        params: List[Any] = [window_days, min_score, _CURRENT_VERSION]
-        ticker_clause = ""
-        if ticker:
-            ticker_clause = " AND %s = ANY(s.ticker_mentions)"
-            params.append(ticker.upper())
-        params.append(limit)
+        # 3d prep-3 dispatch: SA-local mode is duck-typed via backend._sa_db
+        # (None/absent = PG mode, existing SQL untouched). Raw _get_conn()
+        # bypasses the DatabaseBackend method layer, so after the SA cutover
+        # this PG query would silently read the FROZEN PG — route it locally.
+        sa_db = getattr(backend, "_sa_db", None)
+        if sa_db is not None:
+            rows = _query_high_value_comments_local(
+                sa_db,
+                window_days=window_days,
+                min_score=min_score,
+                rule_set_version=_CURRENT_VERSION,
+                ticker=ticker,
+                limit=limit,
+            )
+        else:
+            conn = backend._get_conn()
+            params: List[Any] = [window_days, min_score, _CURRENT_VERSION]
+            ticker_clause = ""
+            if ticker:
+                ticker_clause = " AND %s = ANY(s.ticker_mentions)"
+                params.append(ticker.upper())
+            params.append(limit)
 
-        sql = f"""
-            SELECT
-                c.id AS comment_row_id,
-                c.article_id,
-                c.comment_id,
-                c.commenter,
-                c.upvotes,
-                c.comment_date,
-                LEFT(c.comment_text, 300) AS preview,
-                s.high_value_score,
-                s.ticker_mentions,
-                s.candidate_mentions,
-                s.keyword_buckets,
-                s.needs_verification,
-                s.rule_set_version
-            FROM sa_comment_signals s
-            JOIN sa_article_comments c ON c.id = s.comment_row_id
-            WHERE c.comment_date >= NOW() - (%s || ' days')::INTERVAL
-              AND s.high_value_score >= %s
-              AND s.rule_set_version = %s
-              {ticker_clause}
-            ORDER BY s.high_value_score DESC, c.comment_date DESC
-            LIMIT %s
-        """
-        from psycopg2 import extras as _pg_extras
-        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-            cur.execute(sql, tuple(params))
-            rows = cur.fetchall()
+            sql = f"""
+                SELECT
+                    c.id AS comment_row_id,
+                    c.article_id,
+                    c.comment_id,
+                    c.commenter,
+                    c.upvotes,
+                    c.comment_date,
+                    LEFT(c.comment_text, 300) AS preview,
+                    s.high_value_score,
+                    s.ticker_mentions,
+                    s.candidate_mentions,
+                    s.keyword_buckets,
+                    s.needs_verification,
+                    s.rule_set_version
+                FROM sa_comment_signals s
+                JOIN sa_article_comments c ON c.id = s.comment_row_id
+                WHERE c.comment_date >= NOW() - (%s || ' days')::INTERVAL
+                  AND s.high_value_score >= %s
+                  AND s.rule_set_version = %s
+                  {ticker_clause}
+                ORDER BY s.high_value_score DESC, c.comment_date DESC
+                LIMIT %s
+            """
+            from psycopg2 import extras as _pg_extras
+            with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
+                cur.execute(sql, tuple(params))
+                rows = cur.fetchall()
 
         comments: List[Dict[str, Any]] = []
         for r in rows:
@@ -324,3 +341,107 @@ def list_high_value_comments(
     except Exception as e:
         logger.error("list_high_value_comments error: %s", e)
         return {"error": str(e), "comments": [], "count": 0}
+
+
+def _query_high_value_comments_local(
+    sa_db: str,
+    *,
+    window_days: int,
+    min_score: float,
+    rule_set_version: str,
+    ticker: Optional[str],
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """SQLite (sa_capture.db) variant of the high-value-comments query (3d prep-3).
+
+    PG-isms translated (runbook §1):
+      - ``%s = ANY(s.ticker_mentions)`` → junction membership on
+        sa_signal_ticker_mentions (TEXT[] columns were replaced by junctions, L8);
+      - ``NOW() - (N || ' days')::INTERVAL`` → Python-computed canonical cutoff
+        (comment_date is canonical UTC ISO TEXT; lexicographic == time order);
+      - LEFT(s, n) → substr(s, 1, n); RealDictCursor → sqlite3.Row.
+
+    Returns rows in the PG dict shape: ticker_mentions / candidate_mentions are
+    re-assembled into Python LISTS from the junction tables (psycopg2 TEXT[]
+    parity), keyword_buckets json.loads'd (jsonb parity), needs_verification a
+    Python bool. RULE_SET_VERSION filter + ordering semantics are identical.
+    """
+    from src import sa_capture_store as store
+
+    cutoff = store.canon_ts(
+        datetime.now(timezone.utc) - timedelta(days=window_days)
+    )
+    params: List[Any] = [cutoff, min_score, rule_set_version]
+    ticker_clause = ""
+    if ticker:
+        ticker_clause = (
+            " AND EXISTS (SELECT 1 FROM sa_signal_ticker_mentions tm "
+            "WHERE tm.comment_row_id = s.comment_row_id AND tm.ticker = ?)"
+        )
+        params.append(ticker.upper())
+    params.append(limit)
+
+    conn = store.connect(sa_db, read_only=True)
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT
+                c.id AS comment_row_id,
+                c.article_id,
+                c.comment_id,
+                c.commenter,
+                c.upvotes,
+                c.comment_date,
+                substr(c.comment_text, 1, 300) AS preview,
+                s.high_value_score,
+                s.keyword_buckets,
+                s.needs_verification,
+                s.rule_set_version
+            FROM sa_comment_signals s
+            JOIN sa_article_comments c ON c.id = s.comment_row_id
+            WHERE c.comment_date >= ?
+              AND s.high_value_score >= ?
+              AND s.rule_set_version = ?
+              {ticker_clause}
+            ORDER BY s.high_value_score DESC, c.comment_date DESC
+            LIMIT ?
+            """,
+            tuple(params),
+        ).fetchall()
+
+        # Re-assemble the TEXT[] columns as Python lists (one query per junction,
+        # not N+1) — returned dicts must carry LISTS like psycopg2 did.
+        row_ids = [r["comment_row_id"] for r in rows]
+        mentions: Dict[str, Dict[int, List[str]]] = {"ticker": {}, "candidate": {}}
+        if row_ids:
+            placeholders = ",".join("?" * len(row_ids))
+            for kind, table in (
+                ("ticker", "sa_signal_ticker_mentions"),
+                ("candidate", "sa_signal_candidate_mentions"),
+            ):
+                for jr in conn.execute(
+                    f"SELECT comment_row_id, ticker FROM {table} "
+                    f"WHERE comment_row_id IN ({placeholders}) ORDER BY rowid",
+                    tuple(row_ids),
+                ):
+                    mentions[kind].setdefault(
+                        jr["comment_row_id"], []
+                    ).append(jr["ticker"])
+
+        out: List[Dict[str, Any]] = []
+        for r in rows:
+            d = dict(r)
+            rid = d["comment_row_id"]
+            d["ticker_mentions"] = mentions["ticker"].get(rid, [])
+            d["candidate_mentions"] = mentions["candidate"].get(rid, [])
+            kb = d.get("keyword_buckets")
+            if isinstance(kb, str):
+                try:
+                    d["keyword_buckets"] = json.loads(kb)
+                except ValueError:
+                    pass
+            d["needs_verification"] = bool(d["needs_verification"])
+            out.append(d)
+        return out
+    finally:
+        conn.close()

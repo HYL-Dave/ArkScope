@@ -97,6 +97,18 @@ def run_backfill(
         seen this run, for sanity checking).
     """
     backend = getattr(dal, "_backend", None)
+    # Locked 3d L3: this job is the PAUSED second writer during the SA cutover.
+    # Its raw psycopg2 writes would land in the FROZEN PG (split-brain) while
+    # reads come from sa_capture.db. Loud guard — NOT a silent skip — so an
+    # accidental UI/job trigger fails visibly until follow-up #1 ports it.
+    # (_sa_db is duck-typed as the sa_capture.db path string; the isinstance
+    # check keeps non-str test doubles / mock attributes from tripping this.)
+    sa_db = getattr(backend, "_sa_db", None)
+    if isinstance(sa_db, str) and sa_db:
+        raise RuntimeError(
+            "extract_sa_comment_signals is not yet ported to sa_capture.db — "
+            "locked 3d follow-up #1; do not run while use_local_sa is on"
+        )
     if backend is None or not hasattr(backend, "_get_conn"):
         return {
             "error": "DB unavailable (DAL is not on DatabaseBackend)",

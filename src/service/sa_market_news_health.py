@@ -149,6 +149,9 @@ def evaluate_health(
     last_fetched_at = _coerce_dt(stats.get("last_fetched_at"))
     last_published_at = _coerce_dt(stats.get("last_published_at"))
     extension_last_success_at = _coerce_dt(stats.get("extension_last_success_at"))
+    # 3d health split: set only by the SA-local branch of _run_health_query
+    # when PG (job_runs) is unreachable; PG-mode stats never carry this key.
+    pipeline_signal_degraded = bool(stats.get("pipeline_signal_unavailable"))
     rows_24h_fetched = int(stats.get("rows_24h_fetched") or 0)
     items_24h_published = int(stats.get("items_24h_published") or 0)
     items_7d = int(stats.get("items_7d") or 0)
@@ -194,6 +197,16 @@ def evaluate_health(
             f"Last successful pipeline activity ({signal_label}) was "
             f"{_humanize_seconds(pipeline_age_seconds)} ago "
             f"(threshold {_humanize_seconds(thresholds['last_fetch_warning_seconds'])}).",
+        ))
+
+    if pipeline_signal_degraded:
+        # Capture-side severity still computes from local metrics; surface the
+        # missing extension-run telemetry as a warning, never a crash (L6).
+        reasons.append(_Reason(
+            SEVERITY_WARNING,
+            "pipeline_signal_unavailable",
+            "Extension-run signal (job_runs on PG) is unreachable — pipeline "
+            "freshness degraded to capture-side fetched_at only.",
         ))
 
     freshness_block = {
@@ -285,7 +298,12 @@ def evaluate_health(
 
     # ---- aggregate severity ---------------------------------------------
     overall = max(
-        (last_fetch_status, items_24h_status, detail_status),
+        (
+            last_fetch_status,
+            items_24h_status,
+            detail_status,
+            SEVERITY_WARNING if pipeline_signal_degraded else SEVERITY_OK,
+        ),
         key=lambda s: _SEVERITY_RANK[s],
     )
 
@@ -337,6 +355,31 @@ _EXTENSION_RUN_SQL = """
     WHERE job_name = %(job_name)s
 """
 
+# SQLite (sa_capture.db) twin of _HEALTH_SQL — slice 3d prep-3 health split.
+# Dialect sweep (runbook §1): COUNT(*) FILTER (WHERE …) → SUM(CASE …);
+# ``%(now)s::timestamptz - INTERVAL`` → Python-computed canonical TEXT cutoffs
+# passed positionally (timestamps on disk are canonical UTC ISO strings, so
+# the >= compares are lexicographic == time order). COALESCE(…, 0) restores
+# COUNT's 0-on-empty-table behavior (SUM over zero rows is NULL).
+_HEALTH_SQL_SQLITE = """
+    SELECT
+        MAX(fetched_at)   AS last_fetched_at,
+        MAX(published_at) AS last_published_at,
+        COALESCE(SUM(CASE WHEN fetched_at >= ? THEN 1 ELSE 0 END), 0)
+            AS rows_24h_fetched,
+        COALESCE(SUM(CASE WHEN published_at >= ? THEN 1 ELSE 0 END), 0)
+            AS items_24h_published,
+        COALESCE(SUM(CASE WHEN COALESCE(published_at, fetched_at) >= ?
+                          THEN 1 ELSE 0 END), 0)
+            AS items_7d,
+        COALESCE(SUM(CASE WHEN COALESCE(published_at, fetched_at) >= ?
+                           AND body_markdown IS NOT NULL
+                           AND body_markdown <> ''
+                          THEN 1 ELSE 0 END), 0)
+            AS detail_present_7d
+    FROM sa_market_news
+"""
+
 
 def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
     """Aggregate sa_market_news + read latest extension run from job_runs.
@@ -345,7 +388,31 @@ def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
     extension-run lookup gracefully degrades (returns ``None``) when
     ``job_runs`` is missing or unreachable. This way pre-P0.2 deployments
     still get a usable health report.
+
+    3d prep-3 split (runbook L6): when the backend is in SA-local mode
+    (``backend._sa_db`` set), the capture-domain metrics come from
+    sa_capture.db while the extension-run signal ALWAYS stays on PG
+    (job_runs is locked PG). A PG outage in that mode must NOT take the
+    capture-side health down: it degrades to signal=None plus a
+    warning-severity ``pipeline_signal_unavailable`` reason instead of
+    crashing the endpoint. PG mode (``_sa_db`` absent) is unchanged.
     """
+    sa_db = getattr(backend, "_sa_db", None)
+    if sa_db is not None:
+        out = _query_capture_stats_local(sa_db, now=now)
+        try:
+            out["extension_last_success_at"] = _query_extension_run_pg(backend)
+        except Exception as exc:
+            logger.warning(
+                "sa_market_news health: extension_last_success_at lookup failed "
+                "(job_runs/PG degraded): %s",
+                exc,
+            )
+            out["extension_last_success_at"] = None
+            out["pipeline_signal_unavailable"] = True
+        return out
+
+    # ---- PG mode (pre-cutover): unchanged --------------------------------
     from psycopg2 import extras as _pg_extras
 
     conn = backend._get_conn()
@@ -370,6 +437,33 @@ def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
     out = dict(market_row)
     out["extension_last_success_at"] = extension_last_success_at
     return out
+
+
+def _query_capture_stats_local(sa_db: str, *, now: datetime) -> Dict[str, Any]:
+    """Capture-domain health metrics from sa_capture.db (read-only)."""
+    from src import sa_capture_store as store
+
+    cutoff_24h = store.canon_ts(now - timedelta(hours=24))
+    cutoff_7d = store.canon_ts(now - timedelta(days=7))
+    conn = store.connect(sa_db, read_only=True)
+    try:
+        row = conn.execute(
+            _HEALTH_SQL_SQLITE, (cutoff_24h, cutoff_24h, cutoff_7d, cutoff_7d)
+        ).fetchone()
+        return dict(row) if row is not None else {}
+    finally:
+        conn.close()
+
+
+def _query_extension_run_pg(backend: Any) -> Any:
+    """Latest succeeded extension run — ALWAYS from PG job_runs (locked L6)."""
+    from psycopg2 import extras as _pg_extras
+
+    conn = backend._get_conn()
+    with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
+        cur.execute(_EXTENSION_RUN_SQL, {"job_name": EXTENSION_JOB_NAME})
+        row = cur.fetchone() or {}
+        return row.get("extension_last_success_at")
 
 
 def _db_unavailable_report(

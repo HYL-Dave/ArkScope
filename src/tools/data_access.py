@@ -1166,9 +1166,19 @@ class DataAccessLayer:
 
         Checks: no canonical, no detail_report, AND no matching article in sa_articles
         (exact/prefix ticker match on analysis/removal type).
+
+        3d prep-3 dispatch (extension HOT PATH — runs in every save_articles_meta):
+        SA-local mode is duck-typed via ``backend._sa_db`` (None/absent = PG mode,
+        SQL below untouched). This raw ``_get_conn()`` bypasses the backend method
+        layer, so post-cutover it would silently read the FROZEN PG. The pure-read
+        SQLite variant lives in ``_compute_unresolved_symbols_local`` (the backend's
+        ``audit_unresolved_symbols`` is a different, WRITING audit — not reused here).
         """
         if not isinstance(self._backend, DatabaseBackend):
             return []
+        sa_db = getattr(self._backend, "_sa_db", None)
+        if sa_db is not None:
+            return self._compute_unresolved_symbols_local(sa_db)
         conn = self._backend._get_conn()
         try:
             with conn.cursor() as cur:
@@ -1194,6 +1204,42 @@ class DataAccessLayer:
                     if not cur.fetchone():
                         unresolved.append(symbol)
                 return unresolved
+        except Exception as e:
+            logger.warning("_compute_unresolved_symbols failed: %s", e)
+            return []
+
+    def _compute_unresolved_symbols_local(self, sa_db: str) -> List[str]:
+        """SQLite (sa_capture.db) variant of _compute_unresolved_symbols.
+
+        Pure read-only twin of the PG SQL above (same candidate filter, same
+        exact/prefix article match): %s → ?, ``is_stale = false`` → ``= 0``.
+        Best-effort like the PG branch — failures log and return [].
+        """
+        try:
+            from src import sa_capture_store as store
+
+            conn = store.connect(sa_db, read_only=True)
+            try:
+                candidates = [r[0] for r in conn.execute(
+                    "SELECT DISTINCT symbol FROM sa_alpha_picks "
+                    "WHERE portfolio_status = 'current' AND is_stale = 0 "
+                    "AND canonical_article_id IS NULL "
+                    "AND detail_report IS NULL"
+                ).fetchall()]
+                unresolved = []
+                for symbol in candidates:
+                    row = conn.execute(
+                        "SELECT 1 FROM sa_articles "
+                        "WHERE (ticker = ? OR (ticker LIKE ? AND LENGTH(ticker) <= LENGTH(?) * 2)) "
+                        "AND article_type IN ('analysis', 'removal') "
+                        "LIMIT 1",
+                        (symbol, symbol + "%", symbol),
+                    ).fetchone()
+                    if not row:
+                        unresolved.append(symbol)
+                return unresolved
+            finally:
+                conn.close()
         except Exception as e:
             logger.warning("_compute_unresolved_symbols failed: %s", e)
             return []
