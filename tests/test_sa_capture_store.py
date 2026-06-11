@@ -69,7 +69,9 @@ def test_reopen_fast_path_no_ddl(db, tmp_path):
 
 
 def test_concurrent_schema_creation_two_processes(tmp_path):
-    # two REAL processes race first-run DDL — BEGIN IMMEDIATE must serialize them
+    # two REAL processes race first-run DDL — safety comes from the DDL being
+    # fully idempotent (NOT from serialization; executescript commits the
+    # BEGIN IMMEDIATE — see ensure_schema docstring). This exercises the race.
     path = str(tmp_path / "race.db")
     code = (
         "import sys; sys.path.insert(0, '.');"

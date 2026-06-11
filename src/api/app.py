@@ -44,15 +44,24 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001 — config bridge must not block startup
         logger.warning(f"data-provider env bridge failed: {e}")
 
-    sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
+    # Test hygiene: TestClient(create_app()) runs this lifespan, and the scheduler's
+    # seed/tick threads reach the real PG/network — tests/conftest.py disables it so
+    # unit tests stay hermetic (a stalled seed thread otherwise hangs pytest at the
+    # executor's atexit join in PG-less environments).
+    sched_task = None
+    if os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower() not in ("1", "true", "yes", "on"):
+        sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
+    else:
+        logger.info("data scheduler disabled via ARKSCOPE_DISABLE_SCHEDULER")
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
     yield
     # Shutdown
-    sched_task.cancel()
-    try:
-        await sched_task
-    except (asyncio.CancelledError, Exception):  # noqa: BLE001 — shutdown best-effort
-        pass
+    if sched_task is not None:
+        sched_task.cancel()
+        try:
+            await sched_task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001 — shutdown best-effort
+            pass
     if get_dal.cache_info().currsize:
         get_dal().clear_cache()
     logger.info("ArkScope API shutdown")

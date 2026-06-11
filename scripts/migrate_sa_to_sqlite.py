@@ -6,6 +6,10 @@ Modeled on migrate_market_to_sqlite.py: builds into ``<out>.building``, validate
 BEFORE os.replace (mismatch discards the tmp, never the existing store), unlinks
 stale WAL/SHM sidecars across the swap.
 
+Validation = COUNT+SUM(id) fingerprints + FULL-TABLE content digests (all 6
+tables + 3 junctions, sha256 over PK-ordered canonicalized rows) + independent
+row diffs for sa_alpha_picks/sa_refresh_meta + foreign_key_check/integrity_check.
+
 AUTHORITY GUARD: unlike market_data.db this store becomes the WRITE AUTHORITY at
 cutover — a post-flip rebuild from PG would DESTROY captures PG never saw. The
 build path therefore REFUSES to run while ``use_local_sa`` is enabled, with no
@@ -22,6 +26,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -160,6 +165,85 @@ def _copy_all(cur, sconn) -> dict:
 
 
 # --- validation (identical-aggregate-both-sides; NEVER fetched_at-based) ----------
+#
+# Two layers:
+#   1. COUNT+SUM(id) fingerprints — cheap, and cut-4 reuses the PG side as the
+#      "PG frozen" check, so they stay.
+#   2. Full-table content digests (ALL 6 tables + 3 junctions): SHA-256 over every
+#      row, ordered by PK, with the PG side passed through the SAME _canon
+#      transform the copy uses. Catches what count/sum can't — text corruption,
+#      timestamp-format drift, NULL↔'' swaps, junction membership permutations
+#      that preserve cardinality. Boundary (be honest): re-running the same
+#      transform cannot catch a bug IN the transform itself — that is covered by
+#      the independent sa_alpha_picks/sa_refresh_meta row diffs below (raw SQL,
+#      no _canon) and the cut-4 read-back smoke.
+
+
+def _row_digest_update(h, values) -> None:
+    # json per row: unambiguous (length/type-safe), deterministic in CPython
+    # (shortest-roundtrip float repr; dict order preserved from psycopg2 load,
+    # which is also exactly what _canon(_JSON) stored at copy time).
+    h.update(json.dumps(values, ensure_ascii=False, default=str).encode())
+    h.update(b"\n")
+
+
+def _content_digests_pg(cur) -> "tuple[dict, dict]":
+    """Per-table sha256 of canonicalized rows + the scalar column list per table
+    (the SQLite side must select the IDENTICAL list in the IDENTICAL order)."""
+    digests, col_lists = {}, {}
+    for table, id_col, canon_map in _TABLES:
+        pg_cols = _pg_columns(cur, table)
+        array_names = {a[0] for a in _ARRAY_COLS.get(table, [])}
+        scalar_cols = [c for c in pg_cols if c not in array_names]
+        col_lists[table] = scalar_cols
+        # COLLATE "C" = UTF-8 byte order == SQLite BINARY; PG's locale collation
+        # orders dotted tickers ('BRK.A') differently and would skew the digest.
+        order = f'{id_col}' if id_col else 'scope COLLATE "C"'  # PK either way
+        cur.execute(f"SELECT {', '.join(scalar_cols)} FROM {table} ORDER BY {order}")
+        h = hashlib.sha256()
+        for row in cur.fetchall():
+            values = [
+                _canon(canon_map.get(c, ""), v) if c in canon_map else v
+                for c, v in zip(scalar_cols, row)
+            ]
+            _row_digest_update(h, values)
+        digests[table] = h.hexdigest()
+    for table, specs in _ARRAY_COLS.items():
+        src_id = "id" if table != "sa_comment_signals" else "comment_row_id"
+        for arr_col, junc, _fk, _src in specs:
+            # DISTINCT mirrors the copy's INSERT OR IGNORE collapse of in-array dupes;
+            # subquery because ORDER BY <alias> COLLATE … can't reference an alias
+            cur.execute(
+                f"SELECT pid, t FROM (SELECT DISTINCT {src_id} AS pid, "
+                f"unnest({arr_col}) AS t FROM {table}) sub "
+                f'ORDER BY pid, t COLLATE "C"')
+            h = hashlib.sha256()
+            for row in cur.fetchall():
+                _row_digest_update(h, list(row))
+            digests[junc] = h.hexdigest()
+    return digests, col_lists
+
+
+def _content_digests_sqlite(conn, col_lists) -> dict:
+    """Same digests from SQLite, selecting the PG-derived column lists verbatim —
+    a column missing locally raises OperationalError (schema drift is loud)."""
+    digests = {}
+    for table, id_col, _ in _TABLES:
+        order = id_col or "scope"
+        cols = col_lists[table]
+        h = hashlib.sha256()
+        for row in conn.execute(
+                f"SELECT {', '.join(cols)} FROM {table} ORDER BY {order}"):
+            _row_digest_update(h, list(row))
+        digests[table] = h.hexdigest()
+    for table, specs in _ARRAY_COLS.items():
+        for _arr, junc, junc_fk, _src in specs:
+            h = hashlib.sha256()
+            for row in conn.execute(
+                    f"SELECT {junc_fk}, ticker FROM {junc} ORDER BY {junc_fk}, ticker"):
+                _row_digest_update(h, list(row))
+            digests[junc] = h.hexdigest()
+    return digests
 
 def _fingerprints_pg(cur) -> dict:
     out = {}
@@ -219,12 +303,14 @@ def validate(out_path: str) -> bool:
         cur = pg.cursor()
         pg_fp = _fingerprints_pg(cur)
         pg_picks, pg_meta = _content_rows_pg(cur)
+        pg_dig, col_lists = _content_digests_pg(cur)
     finally:
         pg.close()
     conn = connect(out_path, read_only=True)
     try:
         sq_fp = _fingerprints_sqlite(conn)
         sq_picks, sq_meta = _content_rows_sqlite(conn)
+        sq_dig = _content_digests_sqlite(conn, col_lists)
         fk = conn.execute("PRAGMA foreign_key_check").fetchall()
         integ = conn.execute("PRAGMA integrity_check").fetchone()[0]
     finally:
@@ -234,6 +320,11 @@ def validate(out_path: str) -> bool:
         match = pg_fp[key] == sq_fp.get(key)
         ok &= match
         print(f"  {key:32s} pg={pg_fp[key]} sqlite={sq_fp.get(key)} {'✓' if match else '✗'}")
+    for key in pg_dig:
+        match = pg_dig[key] == sq_dig.get(key)
+        ok &= match
+        print(f"  {key + ' digest':32s} {pg_dig[key][:12]}… "
+              f"{'✓' if match else '✗ (content drift: ' + str(sq_dig.get(key))[:12] + '…)'}")
     picks_match, meta_match = pg_picks == sq_picks, pg_meta == sq_meta
     ok &= picks_match and meta_match
     print(f"  {'sa_alpha_picks content':32s} {'✓' if picks_match else '✗ (row-level diff)'}")

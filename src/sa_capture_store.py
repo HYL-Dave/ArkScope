@@ -13,7 +13,8 @@ browser message, and the sidecar/CLI may read concurrently — so in-process
 locks provide zero exclusion here. Every connection therefore self-arms:
 WAL + busy_timeout + PRAGMA foreign_keys=ON (the sa_comment_signals ON DELETE
 CASCADE is load-bearing for comment dedupe), and schema setup is cross-process
-safe (PRAGMA user_version fast-path; BEGIN IMMEDIATE serializes first-run DDL).
+safe (PRAGMA user_version fast-path; first-run DDL is fully idempotent — see
+the precise guarantee in ensure_schema's docstring: it is NOT serialized).
 
 Type conventions (runbook §1 / SPEC §4.1.4):
   - TIMESTAMPTZ → TEXT, ONE canonical format: UTC ISO-8601 seconds
