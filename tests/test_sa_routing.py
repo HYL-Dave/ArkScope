@@ -114,3 +114,17 @@ def test_rollback_is_instant_per_construction(env):
     assert isinstance(_make(env), _StubSABackend)
     env.profile.set_setting("use_local_sa", "false")   # rollback = flip back
     assert isinstance(_make(env), _StubPG)
+
+
+def test_migration_cli_refuses_rebuild_post_flip(env, monkeypatch):
+    # runbook L1/L5: after the flip sa_capture.db is the AUTHORITY — a rebuild from
+    # PG would destroy captures PG never saw. The build path must refuse, no override.
+    import scripts.migrate_sa_to_sqlite as mig
+    env.profile.set_setting("use_local_sa", "true")
+    monkeypatch.setattr(sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db)])
+    assert mig.main() == 2  # refused
+
+    env.profile.set_setting("use_local_sa", "false")  # deliberate rollback → allowed
+    monkeypatch.setattr(mig, "_pg_conn", lambda: (_ for _ in ()).throw(RuntimeError("no PG in test")))
+    with pytest.raises(RuntimeError):
+        mig.main()  # passes the guard, fails only at the (stubbed) PG connect
