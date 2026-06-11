@@ -315,8 +315,17 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
     Fast path: PRAGMA user_version == SCHEMA_VERSION → return (one pragma read per
     message — keeps the fresh-process host under the extension's 2s telemetry
-    budget). Slow path: BEGIN IMMEDIATE serializes concurrent first-run DDL across
-    processes; the loser of the race re-checks user_version inside the lock."""
+    budget).
+
+    Slow path — PRECISE guarantee (do not overstate): BEGIN IMMEDIATE only
+    serializes the version RE-CHECK; sqlite3's executescript() COMMITS that open
+    transaction before running the script (empirically verified), so the DDL
+    itself executes statement-by-statement OUTSIDE any explicit transaction and
+    two processes MAY interleave it. Safety therefore comes from the DDL being
+    fully IDEMPOTENT (CREATE IF NOT EXISTS / INSERT OR IGNORE / PRAGMA), which the
+    two-real-process race test exercises. ⚠️ A future SCHEMA_VERSION bump with
+    NON-idempotent migration statements must add real cross-process exclusion
+    (flock, like data_scheduler._FileLock) — this function does not provide it."""
     if conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION:
         return
     conn.execute("BEGIN IMMEDIATE")
