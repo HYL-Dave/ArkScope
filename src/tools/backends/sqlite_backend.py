@@ -24,8 +24,10 @@ matching the FileBackend resample contract.
 
 from __future__ import annotations
 
+import html as _html
 import json
 import logging
+import re
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
@@ -39,6 +41,20 @@ _PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
 _INTERVAL_MAP = {"1h": "1h", "hourly": "1h", "1d": "1d", "daily": "1d", "15min": "15min"}
 # query_iv_history output shape (match DatabaseBackend exactly).
 _IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def clean_snippet(text, limit: int = 280):
+    """Plain-text excerpt for feed previews: strip HTML tags, decode entities,
+    collapse whitespace, truncate. IBKR (DJ-N etc.) descriptions are stored as
+    raw ~500-char HTML fragments — rendered verbatim they read as markup junk.
+    Read-time cleanup only; the stored mirror stays verbatim."""
+    if not text:
+        return text
+    out = _html.unescape(_TAG_RE.sub(" ", text))
+    out = re.sub(r"\s+", " ", out).strip()
+    return out[:limit] + ("…" if len(out) > limit else "")
 
 # query_news / query_news_search output shapes (match DatabaseBackend). Local news
 # has NO scores (news_scores deferred) → score columns are always NULL here.
@@ -237,14 +253,19 @@ class SqliteBackend:
             day_counts = dict(conn.execute(
                 f"SELECT substr(n.published_at, 1, 10), COUNT(*) FROM {base_from} "
                 f"WHERE {where} GROUP BY 1 ORDER BY 1", params).fetchall())
+            # Searching → RELEVANCE order (bm25, title weighted 10x over
+            # description so passing mentions in summaries rank below real title
+            # hits); browsing → chronological. bm25 is ascending-better in FTS5.
+            order = ("bm25(news_fts, 10.0, 1.0), n.published_at DESC"
+                     if base_from.startswith("news_fts") else "n.published_at DESC")
             rows = conn.execute(
                 f"SELECT n.published_at, n.ticker, n.title, n.url, n.publisher, "
                 f"n.source, n.description FROM {base_from} WHERE {where} "
-                "ORDER BY n.published_at DESC LIMIT ? OFFSET ?",
+                f"ORDER BY {order} LIMIT ? OFFSET ?",
                 [*params, max(1, min(200, limit)), max(0, offset)]).fetchall()
             items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
                       "url": r[3], "publisher": r[4], "source": r[5],
-                      "description": r[6]} for r in rows]
+                      "description": clean_snippet(r[6])} for r in rows]
             return {"available": True, "items": items, "total": total,
                     "sources": sources, "days": day_counts}
         except sqlite3.OperationalError as e:

@@ -554,3 +554,61 @@ def test_news_feed_local_authoritative_vs_pre3b_fallback(market_db, monkeypatch)
     b2 = LocalMarketDatabaseBackend("postgresql://fake/db", market_db="/nonexistent/x.db")
     f2 = b2.query_news_feed(days=30)
     assert f2["total"] == 99 and pg_called == [1]  # pre-3b → PG fallback
+
+
+def test_news_feed_search_relevance_title_weighted(tmp_path):
+    # Title hits must outrank passing mentions in descriptions (weighted bm25) —
+    # the user's "nvidia earnings" precision complaint: newest-first put
+    # description-only mentions on top.
+    db = tmp_path / "rank.db"
+    conn = sqlite3.connect(db)
+    conn.executescript("""
+        CREATE TABLE news (
+            id INTEGER PRIMARY KEY, ticker TEXT, title TEXT, description TEXT,
+            url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT);
+        CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news',
+            content_rowid='id', tokenize='porter unicode61');
+    """)
+    day = (date.today() - timedelta(days=1)).isoformat()
+    conn.executemany("INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)", [
+        # NEWER article: tokens only as a passing mention in the description
+        (1, "MU", "Micron upgraded on memory cycle",
+         "analysts note nvidia earnings momentum spills over", "http://m",
+         "X", "finnhub", f"{day}T18:00:00+0000", "m1"),
+        # OLDER article: tokens in the TITLE — must rank first
+        (2, "NVDA", "Nvidia earnings preview: data center in focus",
+         "what to expect", "http://n", "Y", "polygon", f"{day}T08:00:00+0000", "n1"),
+    ])
+    conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
+    conn.commit(); conn.close()
+
+    f = SqliteBackend(str(db)).query_news_feed(q="nvidia earnings", days=30)
+    assert f["total"] == 2
+    assert f["items"][0]["ticker"] == "NVDA"   # title match first despite being older
+    assert f["items"][1]["ticker"] == "MU"
+
+
+def test_news_feed_description_html_cleaned(tmp_path):
+    # IBKR (DJ-N) descriptions are stored as raw HTML fragments — the feed must
+    # return a readable plain-text snippet (read-time cleanup, stored data verbatim).
+    db = tmp_path / "html.db"
+    conn = sqlite3.connect(db)
+    conn.executescript("""
+        CREATE TABLE news (
+            id INTEGER PRIMARY KEY, ticker TEXT, title TEXT, description TEXT,
+            url TEXT, publisher TEXT, source TEXT, published_at TEXT, article_hash TEXT);
+        CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news',
+            content_rowid='id', tokenize='porter unicode61');
+    """)
+    day = (date.today() - timedelta(days=1)).isoformat()
+    conn.execute("INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)",
+                 (1, "RIVN", "Rivian starts Model 3 era",
+                  "<p>&#10;  By Al Root </p>&#10;<p>&#10;  Rivian has started.</p>",
+                  "http://r", "DJ-N", "ibkr", f"{day}T12:00:00+0000", "r1"))
+    conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
+    conn.commit(); conn.close()
+
+    f = SqliteBackend(str(db)).query_news_feed(days=30)
+    desc = f["items"][0]["description"]
+    assert "<" not in desc and "&#10;" not in desc
+    assert desc == "By Al Root Rivian has started."

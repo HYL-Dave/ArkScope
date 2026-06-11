@@ -430,13 +430,22 @@ class DatabaseBackend:
             conds.append("n.source = %s")
             params.append(source)
         ql = (q or "").strip()
-        if len(ql) >= 3 and self._has_search_vector():
+        use_fts = len(ql) >= 3 and self._has_search_vector()
+        if use_fts:
             conds.append("n.search_vector @@ plainto_tsquery('english', %s)")
             params.append(ql)
         elif ql:
             conds.append("(n.title ILIKE %s OR n.description ILIKE %s)")
             params += [f"%{ql}%", f"%{ql}%"]
         where = " AND ".join(conds)
+
+        # Searching → RELEVANCE order (ts_rank; the SQLite twin uses
+        # title-weighted bm25); browsing → chronological.
+        order, order_params = "n.published_at DESC", []
+        if use_fts:
+            order = ("ts_rank(n.search_vector, plainto_tsquery('english', %s)) DESC, "
+                     "n.published_at DESC")
+            order_params = [ql]
 
         try:
             conn = self._get_conn()
@@ -456,12 +465,13 @@ class DatabaseBackend:
                     "'YYYY-MM-DD\"T\"HH24:MI:SS+0000') AS published_at, "
                     "n.ticker, n.title, n.url, n.publisher, n.source, n.description "
                     f"FROM news n WHERE {where} "
-                    "ORDER BY n.published_at DESC LIMIT %s OFFSET %s",
-                    [*params, max(1, min(200, limit)), max(0, offset)])
+                    f"ORDER BY {order} LIMIT %s OFFSET %s",
+                    [*params, *order_params, max(1, min(200, limit)), max(0, offset)])
                 rows = cur.fetchall()
+            from .sqlite_backend import clean_snippet
             items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
                       "url": r[3], "publisher": r[4], "source": r[5],
-                      "description": r[6]} for r in rows]
+                      "description": clean_snippet(r[6])} for r in rows]
             return {"available": True, "items": items, "total": total,
                     "sources": sources, "days": day_counts}
         except psycopg2.Error as e:

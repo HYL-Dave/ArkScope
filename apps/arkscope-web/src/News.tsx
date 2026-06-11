@@ -50,13 +50,19 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
     void load(0, false);
   }, [load]);
 
-  // group items by date for date-header rendering
+  // Browse (chronological) → group by date for date headers. Search results are
+  // RELEVANCE-ordered — dates interleave, so render one flat list with the date
+  // inline instead of fragmented repeating headers.
   const groups: Array<{ date: string; rows: NewsFeedItem[] }> = [];
-  for (const it of items) {
-    const d = it.published_at.slice(0, 10);
-    const last = groups[groups.length - 1];
-    if (last && last.date === d) last.rows.push(it);
-    else groups.push({ date: d, rows: [it] });
+  if (q) {
+    groups.push({ date: "", rows: items });
+  } else {
+    for (const it of items) {
+      const d = it.published_at.slice(0, 10);
+      const last = groups[groups.length - 1];
+      if (last && last.date === d) last.rows.push(it);
+      else groups.push({ date: d, rows: [it] });
+    }
   }
 
   return (
@@ -110,7 +116,7 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
           {Object.entries(feed.sources).map(([s, n]) => (
             <span key={s}> · {s} {n.toLocaleString()}</span>
           ))}
-          {q && <span> · 搜尋「{q}」</span>}
+          {q && <span> · 搜尋「{q}」（按相關性排序，標題加權）</span>}
         </p>
       )}
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -119,32 +125,38 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
       )}
 
       {groups.map((g) => (
-        <section key={g.date}>
-          <h4 className="detail-section">{g.date}</h4>
+        <section key={g.date || "search"}>
+          {g.date && <h4 className="detail-section">{g.date}</h4>}
           <ul className="news-list">
             {g.rows.map((it, i) => (
               <li key={`${it.url ?? it.title}-${i}`} className="news-item">
-                <span className="muted mono tiny news-time">
-                  {it.published_at.slice(11, 16)}
-                </span>
-                <button
-                  className="news-ticker-chip"
-                  onClick={() => onOpenTicker(it.ticker)}
-                  title={`開啟 ${it.ticker}`}
-                >
-                  {it.ticker}
-                </button>
-                {it.url ? (
-                  <a className="news-title" href={it.url} target="_blank" rel="noreferrer"
-                     title={it.description ?? undefined}>
-                    {it.title}
-                  </a>
-                ) : (
-                  <span className="news-title" title={it.description ?? undefined}>{it.title}</span>
+                <div className="news-row">
+                  <span className="muted mono tiny news-time">
+                    {q
+                      ? it.published_at.slice(5, 16).replace("T", " ")
+                      : it.published_at.slice(11, 16)}
+                  </span>
+                  <button
+                    className="news-ticker-chip"
+                    onClick={() => onOpenTicker(it.ticker)}
+                    title={`開啟 ${it.ticker}`}
+                  >
+                    {it.ticker}
+                  </button>
+                  {it.url ? (
+                    <a className="news-title" href={it.url} target="_blank" rel="noreferrer">
+                      {it.title}
+                    </a>
+                  ) : (
+                    <span className="news-title">{it.title}</span>
+                  )}
+                  <span className="muted tiny news-meta">
+                    {it.publisher ? `${it.publisher} · ` : ""}{it.source}
+                  </span>
+                </div>
+                {it.description && (
+                  <div className="news-desc muted tiny">{it.description}</div>
                 )}
-                <span className="muted tiny news-meta">
-                  {it.publisher ? `${it.publisher} · ` : ""}{it.source}
-                </span>
               </li>
             ))}
           </ul>
