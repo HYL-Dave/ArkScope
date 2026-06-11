@@ -205,22 +205,45 @@ class DataAccessLayer:
         self._cache_ttl_seconds: int = 3600  # 1 hour default
 
     def _make_db_backend(self, dsn: str, sslmode: str):
-        """Construct the PG backend — or, when local-market is enabled AND the
-        market DB exists, a ``LocalMarketDatabaseBackend`` (a DatabaseBackend
-        SUBCLASS that serves prices from local SQLite with PG fallback). Using a
-        subclass keeps ``isinstance(backend, DatabaseBackend)`` True everywhere, so
-        the DB-only code paths (summaries / news / sentiment / freshness) behave
-        exactly as on plain PG — only prices read local-first.
+        """Construct the PG backend, layered with the enabled local routings.
+        Subclasses keep ``isinstance(backend, DatabaseBackend)`` True everywhere, so
+        DB-only code paths behave exactly as on plain PG.
 
-        Enabled via the persisted ``use_local_market`` setting OR the
-        ``ARKSCOPE_USE_LOCAL_MARKET`` env override; default = plain PG (zero risk;
-        flip the Settings toggle off / unset the env to roll back instantly)."""
+        Selection matrix (each toggle: persisted profile_settings key OR env
+        override, AND the corresponding local DB file exists):
+          - SA on              → SACaptureDatabaseBackend (3d): sa_* domain served
+            from data/sa_capture.db — HARD cutover, no PG fallback for sa_*; it
+            extends LocalMarketDatabaseBackend, so when local-market is ALSO on the
+            same instance serves both routings (market_db="" keeps market inert).
+          - market on, SA off  → LocalMarketDatabaseBackend (3a-3c): market reads
+            local-first with PG fallback.
+          - both off           → plain DatabaseBackend.
+        Default = plain PG; flips are instant per fresh DAL construction (the
+        native host builds one per message), sidecar needs get_dal.cache_clear()."""
         import os
 
         market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
             str(self._base / "data" / "market_data.db") if self._base else None
         )
-        if self._local_market_enabled() and market_db and Path(market_db).exists():
+        market_on = self._local_market_enabled() and market_db and Path(market_db).exists()
+
+        sa_db = None
+        if self._local_sa_enabled():
+            from src.sa_capture_store import resolve_sa_db_path
+
+            candidate = resolve_sa_db_path()
+            if Path(candidate).exists():  # enabling before migration keeps PG (safe)
+                sa_db = candidate
+
+        if sa_db:
+            from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
+
+            logger.info(
+                f"Using SACaptureDatabaseBackend (sa_capture → {sa_db}, HARD local"
+                f"{'; market_data → ' + market_db if market_on else ''})")
+            return SACaptureDatabaseBackend(
+                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "")
+        if market_on:
             from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
 
             logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, PG fallback)")
@@ -228,15 +251,15 @@ class DataAccessLayer:
         logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
         return DatabaseBackend(dsn=dsn, sslmode=sslmode)
 
-    def _local_market_enabled(self) -> bool:
-        """True if local-market routing is enabled — env override OR the persisted
-        ``use_local_market`` setting in profile_state.db. The setting is read with a
-        light read-only SQLite query (no ProfileStateStore import / no migration)."""
+    def _profile_setting_truthy(self, key: str, env_var: str) -> bool:
+        """Shared toggle reader: env override OR the persisted profile_settings key,
+        via a light read-only SQLite query (no ProfileStateStore import / no
+        migration — fresh native-host processes re-read this every spawn)."""
         import os
         import sqlite3
 
         truthy = ("1", "true", "yes", "on")
-        if os.environ.get("ARKSCOPE_USE_LOCAL_MARKET", "").strip().lower() in truthy:
+        if os.environ.get(env_var, "").strip().lower() in truthy:
             return True
         profile_db = os.environ.get("ARKSCOPE_PROFILE_DB") or (
             str(self._base / "data" / "profile_state.db") if self._base else None
@@ -247,13 +270,20 @@ class DataAccessLayer:
             conn = sqlite3.connect(f"file:{profile_db}?mode=ro", uri=True)
             try:
                 row = conn.execute(
-                    "SELECT value FROM profile_settings WHERE key = 'use_local_market'"
+                    "SELECT value FROM profile_settings WHERE key = ?", (key,)
                 ).fetchone()
             finally:
                 conn.close()
             return bool(row) and str(row[0]).strip().lower() in truthy
         except sqlite3.OperationalError:
             return False
+
+    def _local_market_enabled(self) -> bool:
+        return self._profile_setting_truthy("use_local_market", "ARKSCOPE_USE_LOCAL_MARKET")
+
+    def _local_sa_enabled(self) -> bool:
+        """3d flip toggle: SA capture domain → local sa_capture.db (hard cutover)."""
+        return self._profile_setting_truthy("use_local_sa", "ARKSCOPE_USE_LOCAL_SA")
 
     @property
     def backend_type(self) -> str:
