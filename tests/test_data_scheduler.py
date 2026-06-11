@@ -21,6 +21,9 @@ def hermetic(tmp_path, monkeypatch):
     store = ProfileStateStore(tmp_path / "profile_state.db")
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
+    # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
+    # (a live sidecar's flocks would make these tests skip spuriously, and vice versa)
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     # default stubs: no real subprocess, no real local refresh, no telemetry
     monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
     monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
@@ -208,6 +211,96 @@ def test_run_source_never_raises(monkeypatch):
     assert res["status"] == "failed" and "disk gone" in res["error"]
 
 
+# --- cross-process locks (CLI ⟷ sidecar) -----------------------------------------
+
+def _hold_flock(tmp_path, name):
+    """Simulate ANOTHER PROCESS holding a lock: flock(2) conflicts between separate
+    open-file-descriptions even within one process, so a second raw fd stands in
+    for the CLI. Caller closes the handle to release."""
+    import fcntl
+    path = tmp_path / "locks" / f"{name}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(path, "a+")
+    fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    return fh
+
+
+def test_run_source_skips_when_running_in_another_process(tmp_path):
+    # threading.Lock can't see across processes — the file-lock twin must.
+    fh = _hold_flock(tmp_path, "source_polygon_news")
+    try:
+        res = ds.run_source("polygon_news")
+        assert res["status"] == "skipped" and "another process" in res["reason"]
+        assert not ds._SOURCE_LOCKS["polygon_news"].locked()  # in-process lock released
+    finally:
+        fh.close()
+    assert ds.run_source("polygon_news")["status"] == "succeeded"  # released → runs
+
+
+def test_ibkr_gateway_serializes_across_processes(tmp_path, monkeypatch):
+    monkeypatch.setattr(ds, "_IBKR_LOCK_TIMEOUT_S", 0.05)
+    fh = _hold_flock(tmp_path, "ibkr_gateway")
+    try:
+        res = ds.run_source("ibkr_news")
+        assert res["status"] == "skipped" and "another process" in res["reason"]
+        assert not ds._IBKR_LOCK.locked()                      # in-process twin released
+        # non-IBKR source unaffected by the gateway lock
+        assert ds.run_source("polygon_news")["status"] == "succeeded"
+    finally:
+        fh.close()
+
+
+def test_run_source_releases_file_locks(tmp_path):
+    # after a normal run the flock must be free for the next process
+    assert ds.run_source("polygon_news")["status"] == "succeeded"
+    fh = _hold_flock(tmp_path, "source_polygon_news")  # would raise if still held
+    fh.close()
+
+
+# --- collect-only semantics (skip_sync) -------------------------------------------
+
+def test_skip_sync_is_true_collect_only(monkeypatch):
+    # CLI without --sync-db: Parquet only — NO PG sync subprocess AND no local
+    # mirror refresh (PG unchanged → nothing to mirror).
+    sync_calls = []
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(AssertionError("refresh must not run")))
+    res = ds.run_source("polygon_news", trigger_source="cli", skip_sync=True)
+    assert res["status"] == "succeeded"
+    assert sync_calls == []                                   # no PG sync
+    assert "skipped" in res["local_refresh"]                  # no local refresh
+    # default (scheduler/API) path still refreshes
+    monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
+    res = ds.run_source("polygon_news")
+    assert res["local_refresh"] == {"ok": True}
+
+
+# --- startup seed must not depend on PG -------------------------------------------
+
+def test_seed_skipped_fast_when_pg_unreachable(monkeypatch):
+    import time as _time
+    monkeypatch.setattr(ds, "_pg_reachable", lambda timeout=3.0: False)
+    constructed = []
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore",
+                        lambda dal: constructed.append(1))
+    t0 = _time.monotonic()
+    ds._seed_last_attempts()                                  # must return, not hang
+    assert _time.monotonic() - t0 < 1.0
+    assert constructed == []                                  # PG never touched
+
+
+def test_pg_reachable_probe_is_bounded(monkeypatch):
+    # closed local port → refused immediately → False (never the ~2min TCP hang)
+    import time as _time
+    monkeypatch.setattr("src.tools.db_config.load_database_url",
+                        lambda p: "postgresql://u:p@127.0.0.1:9/db")
+    t0 = _time.monotonic()
+    assert ds._pg_reachable(timeout=1.0) is False
+    assert _time.monotonic() - t0 < 5.0
+
+
 # --- routes ----------------------------------------------------------------------
 
 def test_get_schedule_snapshot_shape():
@@ -312,3 +405,16 @@ def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
     assert seen["tickers_arg"] == "AAPL,NVDA"
     assert calls == []          # skip_sync: NO PG sync subprocess
+
+
+def test_run_now_choke_point_covers_all_sources(monkeypatch):
+    # finding-4 regression: local_incremental writes market_data.db, so Run now
+    # must pass require_db_write for EVERY source — not just provider fetches.
+    from src.api.routes import schedule as sr
+    gated = []
+    monkeypatch.setattr(sr, "require_db_write", lambda action, ctx: gated.append(ctx["source"]))
+    monkeypatch.setattr(sr, "run_source", lambda *a, **k: {"status": "succeeded"})
+    for source in ("local_incremental", "polygon_news"):
+        out = sr.run_now(source)
+        assert out["status"] == "started"
+    assert gated == ["local_incremental", "polygon_news"]

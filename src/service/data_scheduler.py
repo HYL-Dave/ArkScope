@@ -28,7 +28,13 @@ Write-contention guarantees (the user's explicit SQLite concern):
     INSERT OR IGNORE) — serialized here by a skip-if-busy lock, and
     financial_cache writes are already serialized by _CACHE_WRITE_LOCK;
   - per-source locks make same-source runs skip (never queue), so a slow run
-    cannot pile up behind itself.
+    cannot pile up behind itself;
+  - CROSS-PROCESS: every lock above has a file-lock twin (flock(2) under
+    data/locks/). threading.Lock only serializes threads of ONE process, but the
+    daily_update CLI is a separate process running this same run_source — without
+    the file locks a CLI run could double-fetch a source the app scheduler is
+    already collecting (worst: two IBKR sessions fighting the same Gateway).
+    flock auto-releases on process death, so a crashed run never wedges the lock.
 
 Config (locked fork F3): namespaced profile_settings keys —
 ``schedule.<source>.enabled`` ("true"/"false", DEFAULT FALSE: nothing fetches
@@ -48,6 +54,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -146,6 +153,83 @@ _IBKR_LOCK = threading.Lock()    # one Gateway session — IBKR jobs never overl
 _SYNC_LOCK = threading.Lock()    # one migrate_to_supabase at a time
 _LOCAL_REFRESH_LOCK = threading.Lock()  # one incremental_update at a time (skip-if-busy)
 
+
+# --- cross-process lock twins (sidecar ⟷ daily_update CLI) ---------------------
+
+def _lock_dir() -> Path:
+    """Lock-file directory (env-overridable so tests never collide with a live
+    sidecar's locks)."""
+    return Path(os.environ.get("ARKSCOPE_LOCK_DIR") or (_REPO_ROOT / "data" / "locks"))
+
+
+class _FileLock:
+    """flock(2) twin of a threading.Lock: serializes the sidecar against the
+    daily_update CLI (separate PROCESSES calling the same run_source — a
+    threading.Lock cannot see across them). The kernel releases flock when the
+    fd closes OR the process dies, so a crashed run never wedges the lock.
+
+    Each instance is only ever acquired while its threading twin is held, so the
+    instance itself needs no thread-safety. Non-POSIX (no fcntl) degrades to
+    in-process-only locking with a one-time warning."""
+
+    _warned = False
+
+    def __init__(self, name: str):
+        self._name = name
+        self._fh = None
+
+    def acquire(self, timeout: float = 0.0, poll: float = 5.0) -> bool:
+        """timeout 0 → single non-blocking try; >0 → poll until the deadline."""
+        try:
+            import fcntl
+        except ImportError:  # non-POSIX
+            if not _FileLock._warned:
+                logger.warning("fcntl unavailable — cross-process locks degraded "
+                               "to in-process only")
+                _FileLock._warned = True
+            return True
+        path = _lock_dir() / f"{self._name}.lock"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fh = open(path, "a+")
+        except OSError as e:
+            # A broken lock dir must not brick collection: degrade, don't skip.
+            logger.warning(f"file lock {path.name} unavailable ({e}); "
+                           "cross-process exclusion degraded for this run")
+            return True
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._fh = fh
+                return True
+            except OSError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    fh.close()
+                    return False
+                time.sleep(min(poll, max(0.1, remaining)))
+
+    def release(self) -> None:
+        if self._fh is None:
+            return
+        try:
+            import fcntl
+
+            fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
+        except Exception:  # noqa: BLE001 — close below still drops the lock
+            pass
+        try:
+            self._fh.close()
+        finally:
+            self._fh = None
+
+
+_SOURCE_FLOCKS: Dict[str, _FileLock] = {name: _FileLock(f"source_{name}") for name in SOURCES}
+_IBKR_FLOCK = _FileLock("ibkr_gateway")
+_SYNC_FLOCK = _FileLock("pg_sync")
+_LOCAL_REFRESH_FLOCK = _FileLock("local_refresh")
+
 # in-memory last-attempt per source (UTC); seeded from job_runs on scheduler start
 _LAST_ATTEMPT: Dict[str, datetime] = {}
 _LAST_ATTEMPT_LOCK = threading.Lock()
@@ -229,18 +313,23 @@ def _resolve_price_scope() -> List[str]:
 
 
 def _local_refresh() -> Dict[str, Any]:
-    """PG → local market_data.db delta. Skip-if-busy: concurrent refreshes are
-    idempotent (INSERT OR IGNORE) but wasteful."""
+    """PG → local market_data.db delta. Skip-if-busy (in-process AND cross-process):
+    concurrent refreshes are idempotent (INSERT OR IGNORE) but wasteful."""
     if not _LOCAL_REFRESH_LOCK.acquire(blocking=False):
         return {"skipped": "local refresh already running"}
     try:
-        from src.market_data_admin import incremental_update, resolve_market_db_path
+        if not _LOCAL_REFRESH_FLOCK.acquire():
+            return {"skipped": "local refresh already running in another process"}
+        try:
+            from src.market_data_admin import incremental_update, resolve_market_db_path
 
-        if not Path(resolve_market_db_path()).exists():
-            return {"skipped": "no local market DB (bootstrap first)"}
-        res = incremental_update()
-        return {"ok": res.get("ok"), "domains": {
-            k: (v or {}).get("rows_added") for k, v in res.items() if isinstance(v, dict)}}
+            if not Path(resolve_market_db_path()).exists():
+                return {"skipped": "no local market DB (bootstrap first)"}
+            res = incremental_update()
+            return {"ok": res.get("ok"), "domains": {
+                k: (v or {}).get("rows_added") for k, v in res.items() if isinstance(v, dict)}}
+        finally:
+            _LOCAL_REFRESH_FLOCK.release()
     finally:
         _LOCAL_REFRESH_LOCK.release()
 
@@ -249,8 +338,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                tickers: Optional[List[str]] = None,
                skip_sync: bool = False) -> Dict[str, Any]:
     """Execute one source end-to-end (collect → PG sync → local refresh) with
-    telemetry. Same-source overlap SKIPS (never queues); IBKR sources serialize
-    behind the shared Gateway lock. Never raises."""
+    telemetry. Same-source overlap SKIPS (never queues) — in-process AND
+    cross-process (CLI vs sidecar); IBKR sources serialize behind the shared
+    Gateway lock (also cross-process). ``skip_sync=True`` = TRUE collect-only:
+    Parquet only, no PG sync and no local-mirror refresh (PG was not updated, so
+    a refresh would be a pointless delta). Never raises."""
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
@@ -258,8 +350,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
         return {"source": source, "status": "skipped", "reason": "already running"}
+    flock = _SOURCE_FLOCKS[source]
+    if not flock.acquire():  # cross-process twin: the CLI may be running this source
+        lock.release()
+        return {"source": source, "status": "skipped",
+                "reason": "already running in another process"}
 
     ibkr_held = False
+    ibkr_flock_held = False
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started
@@ -269,6 +367,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             if not ibkr_held:
                 return {"source": source, "status": "skipped",
                         "reason": "IBKR gateway busy (lock timeout)"}
+            # cross-process Gateway serialization (one TWS/Gateway session total)
+            ibkr_flock_held = _IBKR_FLOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
+            if not ibkr_flock_held:
+                return {"source": source, "status": "skipped",
+                        "reason": "IBKR gateway busy in another process (lock timeout)"}
 
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None
@@ -327,12 +430,24 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
 
             if collected and d.sync_flag and not skip_sync:
                 with _SYNC_LOCK:
-                    sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
+                    # cross-process: a CLI sync may be mid-flight — queue behind it
+                    # (in-process semantics are queue-not-skip too), bounded.
+                    if not _SYNC_FLOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S):
+                        raise RuntimeError("PG sync lock busy in another process (timeout)")
+                    try:
+                        sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
+                    finally:
+                        _SYNC_FLOCK.release()
                 result["sync"] = sync
                 if sync["returncode"] != 0:
                     raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
 
-            result["local_refresh"] = _local_refresh()
+            if skip_sync:
+                # TRUE collect-only (CLI without --sync-db): PG untouched → a local
+                # mirror refresh would pull nothing; do not touch PG or the local DB.
+                result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
+            else:
+                result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
             ok = False
             error = str(e)[:_ERROR_TAIL]
@@ -349,16 +464,50 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         return result
     finally:
         _clear_progress(source)
+        if ibkr_flock_held:
+            _IBKR_FLOCK.release()
         if ibkr_held:
             _IBKR_LOCK.release()
+        flock.release()
         lock.release()
 
 
 # --- supervisor loop -------------------------------------------------------------
 
+def _pg_reachable(timeout: float = 3.0) -> bool:
+    """Fast TCP probe of the PG host before the seed touches job_runs.
+
+    psycopg2.connect has NO default timeout — an unreachable/filtered PG host can
+    hang for the full OS TCP retry window (~2 min), and the seed must never make
+    app startup or the scheduler loop depend on PG availability."""
+    try:
+        from src.tools.db_config import load_database_url
+
+        dsn = load_database_url(_REPO_ROOT / "config" / ".env")
+        if not dsn:
+            return False
+        import socket
+
+        from psycopg2.extensions import parse_dsn
+
+        params = parse_dsn(dsn)
+        host = params.get("host") or "localhost"
+        port = int(params.get("port") or 5432)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:  # noqa: BLE001 — any failure = treat as unreachable
+        return False
+
+
 def _seed_last_attempts() -> None:
     """Continuity across restarts: seed last-attempt from job_runs (scheduler runs
-    AND manual daily_update step runs via the alias map)."""
+    AND manual daily_update step runs via the alias map). STRICTLY best-effort:
+    bounded by the TCP probe above + the wait_for in scheduler_loop — losing the
+    seed only means a source may fire one interval early after a restart."""
+    if not _pg_reachable():
+        logger.info("scheduler seed skipped: PG unreachable (starting without "
+                    "last-attempt continuity)")
+        return
     try:
         from src.api.dependencies import get_dal
         from src.service.job_runs_store import JobRunsStore
@@ -424,7 +573,14 @@ async def scheduler_loop() -> None:
         ensure_env_loaded()  # collector subprocesses inherit the keys
     except Exception:  # noqa: BLE001
         pass
-    await asyncio.to_thread(_seed_last_attempts)
+    # Bounded: the loop must start even if PG hangs past the probe (belt and
+    # suspenders — an abandoned seed thread finishes harmlessly in the background).
+    try:
+        await asyncio.wait_for(asyncio.to_thread(_seed_last_attempts), timeout=15)
+    except asyncio.TimeoutError:
+        logger.warning("scheduler seed timed out — starting without last-attempt continuity")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"scheduler seed failed ({e}) — starting without continuity")
     logger.info("data scheduler started (all sources opt-in via Settings)")
     while True:
         try:

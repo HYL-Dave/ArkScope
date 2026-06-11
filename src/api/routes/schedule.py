@@ -67,9 +67,11 @@ def run_now(source: str):
     """
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
-    d = SOURCES[source]
-    if d.collector is not None or d.adapter is not None:  # provider fetch + PG write
-        require_db_write("schedule_run_now", {"source": source})
+    # EVERY source writes a database when run — provider sources end in PG sync +
+    # local mirror refresh, and local_incremental writes market_data.db directly —
+    # so the choke-point applies unconditionally (was provider-fetch-only, which
+    # let local_incremental bypass require_db_write).
+    require_db_write("schedule_run_now", {"source": source})
     if _SOURCE_LOCKS[source].locked():
         return {"source": source, "status": "skipped", "reason": "already running"}
     threading.Thread(target=run_source, args=(source, "api"),

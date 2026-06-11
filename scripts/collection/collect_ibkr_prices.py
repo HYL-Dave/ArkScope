@@ -10,27 +10,26 @@ Data Collection Strategy (per plan):
 Requirements:
 - IBKR TWS or IB Gateway running locally
 - ib_insync library: pip install ib_insync
-- config/tickers_core.json for stock list
+
+Ticker scope (3e-E contract): EXPLICIT — ``--tickers AAPL,MSFT`` or
+``--scope active-universe`` (reads the local profile DB, read-only).
+config/tickers_core.json is retired as a runtime default; ``--tier`` remains
+ONLY as an explicit legacy/debug escape hatch over that seed file.
 
 Usage:
-    # Daily bars for RL training (replaces yfinance)
-    python collect_ibkr_prices.py --daily --tier all
-    python collect_ibkr_prices.py --daily --daily-start 2022-01-01 --tier all
-
-    # Intraday collection
-    python collect_ibkr_prices.py --output data/prices/
+    # Intraday collection (the supported paths)
     python collect_ibkr_prices.py --tickers AAPL,MSFT --output data/prices/
-    python collect_ibkr_prices.py --tier tier1_core --output data/prices/
-    python collect_ibkr_prices.py --hourly-only --output data/prices/
-    python collect_ibkr_prices.py --minute-only --output data/prices/
+    python collect_ibkr_prices.py --scope active-universe --minute-only
+    python collect_ibkr_prices.py --hourly-only --tickers AAPL
+
+    # Daily bars (RL training history)
+    python collect_ibkr_prices.py --daily --daily-start 2022-01-01 --scope active-universe
 
 Resume from interruption:
-    python collect_ibkr_prices.py --resume
-    python collect_ibkr_prices.py --daily --resume --tier all
+    python collect_ibkr_prices.py --resume --scope active-universe
 
 Incremental update (daily):
-    python collect_ibkr_prices.py --incremental
-    python collect_ibkr_prices.py --incremental --tier all
+    python collect_ibkr_prices.py --incremental --minute-only --scope active-universe
 
 Checkpoint file is saved at: data/prices/ibkr_checkpoint.json
 """

@@ -99,15 +99,8 @@ python scripts/collection/collect_polygon_news.py --full-history
 
 ### 第四步：未來每日更新 (排程)
 
-收集完成後，建議設定每日排程：
-```bash
-# crontab -e
-# 每天 UTC 6:00 收集 Finnhub (快)
-0 6 * * * cd /path/to/project && python scripts/collection/collect_finnhub_news.py
-
-# 每天 UTC 7:00 收集 Polygon 前一天 (慢)
-0 7 * * * cd /path/to/project && python scripts/collection/collect_polygon_news.py --days 1
-```
+收集完成後，在 **app Settings → Data Sources** 對各 source 設 enable + interval —
+app/sidecar 內建的 data scheduler 是唯一排程器（不要用 cron；見下方「排程」一節）。
 
 ---
 
@@ -334,19 +327,25 @@ python scripts/collection/daily_update.py --scores
 python scripts/collection/daily_update.py --all --scope active-universe --dry-run
 ```
 
-> **2026-06-08 (slice 2)**: `daily_update.py` 是手動/cron 的 **backfill runner**，不再寫任何 config
+> **2026-06-08 (slice 2)**: `daily_update.py` 是手動的 **backfill runner**，不再寫任何 config
 > （移除了 `user_profile.yaml → tickers_core.json` 回寫），也退役了 `--tier all`。
 > IBKR 股價改用顯式 `--tickers` 或 `--scope active-universe`（唯讀讀本地 profile DB）。
 
-### Cron 排程範例
+### 排程 — app 是唯一 scheduler（3e-D/E，不要用 cron）
+
+排程由 app/sidecar 內建的 data scheduler 負責：**Settings → Data Sources** 對每個
+source 設 enable + interval（預設全關，逐源 opt-in）。每次排程執行 = collect →
+PG sync → 本地鏡像，與此 CLI 完全同一條 `run_source()` 路徑、同一組**跨進程鎖**
+（`data/locks/`，flock）、同一份 `job_runs` 遙測（`collect.<source>`）。
+
+此 CLI 保留給**手動 backfill / debug**：app 沒開時補資料、或用顯式 `--tickers`
+補特定標的的歷史。CLI 與 app 重疊跑同一 source 會被鎖 skip（不會雙抓）；
+不加 `--sync-db` 是純收集（只寫 Parquet，不碰 PG 與本地鏡像）。
 
 ```bash
-# crontab -e
-# 每天 UTC 6:00 更新新聞 (~1-2 分鐘)
-0 6 * * * cd <repo-root> && python scripts/collection/daily_update.py --news
-
-# 每天 UTC 22:00 更新股價 (美股收盤後，需要 IBKR 連線；股價需顯式 scope)
-0 22 * * * cd <repo-root> && python scripts/collection/daily_update.py --ibkr-prices --scope active-universe
+# 手動 backfill 範例（收集 + 入 PG + 本地鏡像）
+python scripts/collection/daily_update.py --news --scope active-universe --sync-db
+python scripts/collection/daily_update.py --ibkr-prices --scope active-universe --sync-db
 ```
 
 ---
@@ -374,8 +373,9 @@ pip install ib_insync
 | 參數 | 說明 |
 |------|------|
 | `--output DIR` | 輸出目錄 (預設: data/prices/) |
-| `--tickers AAPL,MSFT` | 指定股票 |
-| `--tier tier1_core` | 使用 config 股票層級 |
+| `--tickers AAPL,MSFT` | 指定股票（支援路徑） |
+| `--scope active-universe` | 讀本地 profile DB 的 active universe（唯讀） |
+| `--tier tier1_core` | ⚠️ LEGACY：讀退役的 tickers_core.json（debug 限定） |
 | `--port 7497` | IBKR 連接埠 |
 | `--hourly-only` | 只收 2023 年 1 小時資料 |
 | `--minute-only` | 只收 2024+ 年 15 分鐘資料 |
@@ -403,8 +403,8 @@ python scripts/collection/collect_ibkr_prices.py --minute-only
 # 指定 port (TWS paper: 7497, TWS live: 7496, GW paper: 4002, GW live: 4001)
 python scripts/collection/collect_ibkr_prices.py --port 4001
 
-# 載入所有股票 (tier1 + tier2)
-python scripts/collection/collect_ibkr_prices.py --tier all
+# 顯式 scope（支援路徑：--tickers 或 --scope active-universe）
+python scripts/collection/collect_ibkr_prices.py --incremental --minute-only --scope active-universe
 
 # 查看現有資料狀態
 python scripts/collection/collect_ibkr_prices.py --status
@@ -419,10 +419,10 @@ python scripts/collection/collect_ibkr_prices.py --incremental --minute-only
 
 ```bash
 # 開始收集 (會自動儲存 checkpoint)
-python scripts/collection/collect_ibkr_prices.py --tier all
+python scripts/collection/collect_ibkr_prices.py --scope active-universe
 
 # 按 Ctrl+C 中斷後，用 --resume 繼續
-python scripts/collection/collect_ibkr_prices.py --tier all --resume
+python scripts/collection/collect_ibkr_prices.py --scope active-universe --resume
 
 # 清除 checkpoint 重新開始
 python scripts/collection/collect_ibkr_prices.py --clear-checkpoint

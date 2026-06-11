@@ -49,6 +49,10 @@ def test_dry_run_without_sync_db_collect_only():
     assert r.returncode == 0
     assert "polygon_news" in out and "ibkr_prices" not in out
     assert "db sync" not in out              # collect-only: PG sync skipped
+    # TRUE collect-only: the plan must not promise a local mirror refresh either
+    # (PG untouched → nothing to mirror; run_source skips it when skip_sync=True)
+    assert "local mirror refresh" not in out
+    assert "collect (only)" in out
 
 
 def test_no_scope_errors():
