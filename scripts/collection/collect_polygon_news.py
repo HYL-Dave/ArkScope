@@ -633,53 +633,35 @@ class StorageManager:
 # Main Collection Logic
 # =============================================================================
 
-def load_tickers(tickers_arg: Optional[str] = None, tiers: Optional[str] = None) -> List[str]:
-    """
-    Load tickers from config or argument.
+def _scope_error(prog: str) -> RuntimeError:
+    return RuntimeError(
+        "explicit ticker scope required: --tickers AAPL,MSFT,... or --scope "
+        "active-universe (reads the local profile DB read-only). "
+        "config/tickers_core.json is a bootstrap/seed file, no longer a runtime "
+        f"default. Example: python {prog} --incremental --scope active-universe")
 
-    Args:
-        tickers_arg: Comma-separated ticker list (overrides config)
-        tiers: Comma-separated tier names (e.g., "tier1,tier2,tier3")
-               Default: all tiers based on settings
-    """
+
+def load_tickers(tickers_arg: Optional[str] = None,
+                 scope: Optional[str] = None) -> List[str]:
+    """Resolve the EXPLICIT ticker scope (3e-E, aligned with daily_update's Q7
+    lock: no implicit universe guessing). ``tickers_arg`` = comma-separated
+    list; ``scope='active-universe'`` = the local profile DB (read-only), the
+    in-app authority. Bare calls raise — the legacy tickers_core.json tiers
+    default is retired from runtime."""
     if tickers_arg:
-        return [t.strip().upper() for t in tickers_arg.split(',')]
+        return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
+    if scope == "active-universe":
+        if str(_REPO_ROOT) not in sys.path:  # script-mode: src/ not importable yet
+            sys.path.insert(0, str(_REPO_ROOT))
+        from src.universe_scope import resolve_active_universe
 
-    # Load from config
-    config_path = _REPO_ROOT / "config/tickers_core.json"
-    if config_path.exists():
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-
-        settings = config.get('settings', {})
-
-        # Determine which tiers to include
-        if tiers:
-            tier_names = [t.strip() for t in tiers.split(',')]
-        else:
-            # Use settings to determine tiers
-            tier_names = ['tier1_core']
-            if settings.get('include_tier2', True):
-                tier_names.append('tier2_expanded')
-            if settings.get('include_tier3', True):
-                tier_names.append('tier3_user_watchlist')
-
-        tickers = set()  # Use set to avoid duplicates
-
-        for tier_name in tier_names:
-            tier_data = config.get(tier_name, {})
-            for category in tier_data.values():
-                if isinstance(category, dict) and 'tickers' in category:
-                    tickers.update(category['tickers'])
-
-        tickers = sorted(list(tickers))
-
-        if tickers:
-            logger.info(f"Loaded {len(tickers)} tickers from {', '.join(tier_names)}")
-            return tickers
-
-    # Fallback to key stocks
-    return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
+        tickers = resolve_active_universe()
+        if not tickers:
+            raise RuntimeError(
+                "active-universe scope is empty/unavailable (profile DB) — "
+                "fix the profile DB or pass --tickers explicitly")
+        return tickers
+    raise _scope_error(Path(__file__).name)
 
 
 def load_env() -> str:
@@ -884,7 +866,8 @@ def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
 
 def run_incremental(tickers_arg: Optional[str] = None,
                     end_date: Optional[date] = None,
-                    progress_cb=None) -> dict:
+                    progress_cb=None,
+                    scope: Optional[str] = None) -> dict:
     """The --incremental path as a CALLABLE — used by main() and, in-process, by
     the app scheduler (the provider adapter). Identical semantics to the CLI:
     fetch from 1s after the latest stored article; with NO existing data it falls
@@ -902,7 +885,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
         # Same fallback the CLI does: no existing data → full default-range run.
         start_date = config.default_start
         logger.info(f"No existing data found. Starting full collection from {start_date}")
-        tickers = load_tickers(tickers_arg)
+        tickers = load_tickers(tickers_arg, scope=scope)
         stats = collect_news(tickers, start_date, end_date, resume=False)
         _save_collection_stats(tickers, start_date, end_date, stats)
         return {"mode": "full_fallback", "new_articles": stats.get('total_articles', 0)}
@@ -928,7 +911,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
         raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
 
     collector = PolygonNewsCollector(api_key, config)
-    tickers = load_tickers(tickers_arg)
+    tickers = load_tickers(tickers_arg, scope=scope)
     collected_at = datetime.now()
 
     logger.info(f"Tickers: {len(tickers)} stocks")
@@ -998,6 +981,8 @@ Examples:
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD), default: today')
     parser.add_argument('--days', type=int, help='Days back from today')
     parser.add_argument('--full-history', action='store_true', help='Collect 3 years of history')
+    parser.add_argument('--scope', choices=['active-universe'], default=None,
+                       help='Ticker scope: active-universe reads the local profile DB (read-only)')
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers (default: tier1 from config)')
     parser.add_argument('--resume', action='store_true', help='Resume from last checkpoint')
     parser.add_argument('--estimate', action='store_true', help='Estimate time without collecting')
@@ -1052,7 +1037,7 @@ Examples:
     # instead of silently exiting 0 — deliberate fix)
     if args.incremental:
         try:
-            run_incremental(args.tickers, end_date=end_date)
+            run_incremental(args.tickers, end_date=end_date, scope=args.scope)
         except RuntimeError as e:
             logger.error(str(e))
             sys.exit(1)
@@ -1068,7 +1053,11 @@ Examples:
         start_date = end_date - timedelta(days=30)
 
     # Load tickers
-    tickers = load_tickers(args.tickers)
+    try:
+        tickers = load_tickers(args.tickers, scope=args.scope)
+    except RuntimeError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     # Generate months for estimate
     months = generate_months(start_date, end_date)

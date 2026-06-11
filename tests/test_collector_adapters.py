@@ -72,7 +72,7 @@ def test_finnhub_missing_key_raises(monkeypatch):
                         lambda self: datetime.now() - timedelta(days=2))
     monkeypatch.setattr(cfn, "load_env", lambda: "")
     with pytest.raises(RuntimeError, match="FINNHUB_API_KEY"):
-        cfn.run_incremental()
+        cfn.run_incremental(tickers_arg="AAPL")
 
 
 def test_finnhub_incremental_window_capped_at_7_days(monkeypatch):
@@ -86,8 +86,26 @@ def test_finnhub_incremental_window_capped_at_7_days(monkeypatch):
     monkeypatch.setattr(cfn.StorageManager, "get_latest_timestamp",
                         lambda self: datetime.now() - timedelta(days=30))
     monkeypatch.setattr(cfn, "collect_news", _fake_collect)
-    monkeypatch.setattr(cfn, "load_tickers", lambda arg=None: ["AAPL"])
+    monkeypatch.setattr(cfn, "load_tickers", lambda arg=None, scope=None: ["AAPL"])
     monkeypatch.setattr(cfn, "_save_collection_stats", lambda *a, **k: "/dev/null")
     out = cfn.run_incremental()
     assert out == {"mode": "incremental", "new_articles": 5}
     assert seen["window_days"] == 7
+
+
+def test_load_tickers_requires_explicit_scope():
+    # 3e-E: bare load_tickers raises (legacy tickers_core default retired);
+    # csv parsing + active-universe scope are the only two paths.
+    for mod, env in ((cpn, "polygon"), (cfn, "finnhub")):
+        with pytest.raises(RuntimeError, match="explicit ticker scope"):
+            mod.load_tickers()
+        assert mod.load_tickers("aapl, nvda") == ["AAPL", "NVDA"]
+
+
+def test_load_tickers_active_universe(monkeypatch):
+    import src.universe_scope as us
+    monkeypatch.setattr(us, "resolve_active_universe", lambda: ["AAPL", "MSFT"])
+    assert cpn.load_tickers(scope="active-universe") == ["AAPL", "MSFT"]
+    monkeypatch.setattr(us, "resolve_active_universe", lambda: [])
+    with pytest.raises(RuntimeError, match="empty/unavailable"):
+        cpn.load_tickers(scope="active-universe")

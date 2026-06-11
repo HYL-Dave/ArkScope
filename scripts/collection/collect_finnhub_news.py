@@ -457,27 +457,35 @@ class StorageManager:
 # Main Collection Logic
 # =============================================================================
 
-def load_tickers(tickers_arg: Optional[str] = None) -> List[str]:
-    """Load tickers from config or argument."""
+def _scope_error(prog: str) -> RuntimeError:
+    return RuntimeError(
+        "explicit ticker scope required: --tickers AAPL,MSFT,... or --scope "
+        "active-universe (reads the local profile DB read-only). "
+        "config/tickers_core.json is a bootstrap/seed file, no longer a runtime "
+        f"default. Example: python {prog} --incremental --scope active-universe")
+
+
+def load_tickers(tickers_arg: Optional[str] = None,
+                 scope: Optional[str] = None) -> List[str]:
+    """Resolve the EXPLICIT ticker scope (3e-E, aligned with daily_update's Q7
+    lock: no implicit universe guessing). ``tickers_arg`` = comma-separated
+    list; ``scope='active-universe'`` = the local profile DB (read-only), the
+    in-app authority. Bare calls raise — the legacy tickers_core.json tiers
+    default is retired from runtime."""
     if tickers_arg:
-        return [t.strip().upper() for t in tickers_arg.split(',')]
+        return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
+    if scope == "active-universe":
+        if str(_REPO_ROOT) not in sys.path:  # script-mode: src/ not importable yet
+            sys.path.insert(0, str(_REPO_ROOT))
+        from src.universe_scope import resolve_active_universe
 
-    config_path = _REPO_ROOT / "config/tickers_core.json"
-    if config_path.exists():
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-
-        tier1 = config.get('tier1_core', {})
-        tickers = []
-        for category in tier1.values():
-            if isinstance(category, dict) and 'tickers' in category:
-                tickers.extend(category['tickers'])
-
-        if tickers:
-            logger.info(f"Loaded {len(tickers)} tier1 tickers from config")
-            return tickers
-
-    return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
+        tickers = resolve_active_universe()
+        if not tickers:
+            raise RuntimeError(
+                "active-universe scope is empty/unavailable (profile DB) — "
+                "fix the profile DB or pass --tickers explicitly")
+        return tickers
+    raise _scope_error(Path(__file__).name)
 
 
 def load_env() -> str:
@@ -612,7 +620,8 @@ def _save_collection_stats(tickers: List[str], start_date: date, end_date: date,
 
 def run_incremental(tickers_arg: Optional[str] = None,
                     end_date: Optional[date] = None,
-                    progress_cb=None) -> dict:
+                    progress_cb=None,
+                    scope: Optional[str] = None) -> dict:
     """The --incremental path as a CALLABLE — used by main() and, in-process, by
     the app scheduler (the provider adapter). Identical semantics to the CLI:
     window = since the latest stored article, capped at 7 days (Finnhub free-tier
@@ -656,7 +665,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
 
     logger.info("Note: Existing historical data will be preserved, duplicates filtered.")
 
-    tickers = load_tickers(tickers_arg)
+    tickers = load_tickers(tickers_arg, scope=scope)
     stats = collect_news(tickers, start_date, end_date, progress_cb=progress_cb)
     stats_path = _save_collection_stats(tickers, start_date, end_date, stats)
     logger.info(f"\nStats saved to: {stats_path}")
@@ -686,6 +695,8 @@ For historical news, use collect_polygon_news.py instead.
     parser.add_argument('--start', type=str, help='Start date (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD), default: today')
     parser.add_argument('--days', type=int, default=7, help='Days back from today (default: 7)')
+    parser.add_argument('--scope', choices=['active-universe'], default=None,
+                       help='Ticker scope: active-universe reads the local profile DB (read-only)')
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers')
     parser.add_argument('--status', action='store_true',
                        help='Show current data status without collecting')
@@ -730,7 +741,7 @@ For historical news, use collect_polygon_news.py instead.
     # instead of crashing with a bare SystemExit from collect_news)
     if args.incremental:
         try:
-            run_incremental(args.tickers, end_date=end_date)
+            run_incremental(args.tickers, end_date=end_date, scope=args.scope)
         except RuntimeError as e:
             logger.error(str(e))
             sys.exit(1)
@@ -741,7 +752,11 @@ For historical news, use collect_polygon_news.py instead.
         start_date = end_date - timedelta(days=args.days)
 
     # Load tickers
-    tickers = load_tickers(args.tickers)
+    try:
+        tickers = load_tickers(args.tickers, scope=args.scope)
+    except RuntimeError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     # Collect
     try:

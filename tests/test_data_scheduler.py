@@ -278,18 +278,37 @@ def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
     assert ds.status_snapshot()["polygon_news"]["progress"] is None
 
 
-def test_adapter_universe_unavailable_falls_back_to_default(monkeypatch):
-    # profile DB unavailable → adapter runs with the collector's default list
-    # (no tickers_arg), with a warning — collection must not die.
+def test_adapter_universe_unavailable_fails_loud(monkeypatch):
+    # 3e-E: the collectors' legacy tickers_core default is retired — no scope
+    # means the run FAILS (fail loud), never silently-collect-something-else.
     import scripts.collection.collect_finnhub_news as cfn
+    monkeypatch.setattr(cfn, "run_incremental",
+                        lambda **kw: (_ for _ in ()).throw(
+                            AssertionError("adapter must not run without scope")))
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
+    res = ds.run_source("finnhub_news")
+    assert res["status"] == "failed"
+    assert "scope" in res["error"]
+
+
+def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
+    # The daily_update thin wrapper passes an explicit ticker list (--tickers)
+    # and collect-only mode (no --sync-db → skip_sync) through run_source.
+    import scripts.collection.collect_polygon_news as cpn
     seen = {}
 
     def _fake_run(tickers_arg=None, progress_cb=None, **kw):
         seen["tickers_arg"] = tickers_arg
-        return {"mode": "up_to_date", "new_articles": 0}
+        return {"mode": "incremental", "new_articles": 1}
 
-    monkeypatch.setattr(cfn, "run_incremental", _fake_run)
-    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
-    res = ds.run_source("finnhub_news")
-    assert res["status"] == "succeeded"
-    assert seen["tickers_arg"] is None
+    monkeypatch.setattr(cpn, "run_incremental", _fake_run)
+    monkeypatch.setattr(ds, "_resolve_price_scope",
+                        lambda: (_ for _ in ()).throw(AssertionError("must not resolve")))
+    calls = []
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
+    res = ds.run_source("polygon_news", trigger_source="cli",
+                        tickers=["AAPL", "NVDA"], skip_sync=True)
+    assert res["status"] == "succeeded" and res["ticker_count"] == 2
+    assert seen["tickers_arg"] == "AAPL,NVDA"
+    assert calls == []          # skip_sync: NO PG sync subprocess

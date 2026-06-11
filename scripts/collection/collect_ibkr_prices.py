@@ -554,9 +554,14 @@ def main():
         help='Comma-separated list of tickers (overrides --tier)'
     )
     parser.add_argument(
-        '--tier', type=str, default='tier1_core',
+        '--scope', choices=['active-universe'], default=None,
+        help='Ticker scope: active-universe reads the local profile DB (read-only)'
+    )
+    parser.add_argument(
+        '--tier', type=str, default=None,
         choices=['tier1_core', 'tier2_expanded', 'all'],
-        help='Ticker tier from config (default: tier1_core)'
+        help='LEGACY seed-file tier (explicit opt-in only; tickers_core.json is '
+             'no longer a runtime default)'
     )
     parser.add_argument(
         '--config', type=str, default='config/tickers_core.json',
@@ -636,11 +641,24 @@ def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Load tickers
+    # Load tickers — explicit scope required (3e-E): --tickers > --scope >
+    # explicit legacy --tier; bare runs error instead of silently reading the
+    # seed file.
     if args.tickers:
         tickers = [t.strip().upper() for t in args.tickers.split(',')]
-    else:
+    elif args.scope == 'active-universe':
+        from src.universe_scope import resolve_active_universe
+        tickers = resolve_active_universe()
+        if not tickers:
+            logger.error("active-universe scope is empty/unavailable (profile DB)")
+            sys.exit(1)
+    elif args.tier:
         tickers = load_tickers_from_config(args.config, args.tier)
+    else:
+        logger.error(
+            "explicit ticker scope required: --tickers A,B,... or --scope "
+            "active-universe (or legacy --tier as an explicit opt-in)")
+        sys.exit(1)
 
     logger.info(f"Loaded {len(tickers)} tickers: {tickers[:10]}{'...' if len(tickers) > 10 else ''}")
 

@@ -56,31 +56,6 @@ logger = logging.getLogger(__name__)
 IV_HISTORY_DIR = project_root / 'data' / 'options' / 'iv_history'
 
 
-def get_watchlist_tickers() -> List[str]:
-    """Load tickers from user_profile.yaml watchlists."""
-    profile_path = project_root / 'config' / 'user_profile.yaml'
-    if not profile_path.exists():
-        return ['NVDA', 'AMD']  # Sensible defaults
-
-    with open(profile_path) as f:
-        config = yaml.safe_load(f)
-
-    tickers = set()
-
-    watchlists = config.get('watchlists', {})
-    for key in ['core_holdings', 'interested']:
-        wl = watchlists.get(key, {})
-        tickers.update(wl.get('tickers', []))
-
-    # Also check options_preferences
-    opts = config.get('options_preferences', {})
-    opt_tickers = opts.get('tickers_for_options', [])
-    if opt_tickers:
-        tickers.update(opt_tickers)
-
-    return sorted(tickers) if tickers else ['NVDA', 'AMD']
-
-
 def load_local_prices(ticker: str, days: int = 40) -> Optional[pd.DataFrame]:
     """Load local historical price data for HV calculation."""
     # Try daily data (parquet or csv)
@@ -299,7 +274,9 @@ def main():
         description='Collect daily ATM IV history for IV percentile rank analysis'
     )
     parser.add_argument('--tickers', nargs='+',
-                        help='Tickers to collect (default: from user_profile.yaml)')
+                        help='Tickers to collect (space- or comma-separated)')
+    parser.add_argument('--scope', choices=['active-universe'], default=None,
+                        help='Ticker scope: active-universe reads the local profile DB (read-only)')
     parser.add_argument('--status', action='store_true',
                         help='Show current IV history status')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -314,7 +291,22 @@ def main():
         show_status()
         return
 
-    tickers = [t.upper() for t in args.tickers] if args.tickers else get_watchlist_tickers()
+    # Explicit scope required (3e-E): --tickers accepts space- or comma-separated
+    # (the scheduler passes one csv token); the user_profile.yaml watchlist
+    # default is retired.
+    if args.tickers:
+        tickers = [t.strip().upper() for chunk in args.tickers
+                   for t in chunk.split(',') if t.strip()]
+    elif args.scope == 'active-universe':
+        from src.universe_scope import resolve_active_universe
+        tickers = resolve_active_universe()
+        if not tickers:
+            logger.error("active-universe scope is empty/unavailable (profile DB)")
+            sys.exit(1)
+    else:
+        logger.error("explicit ticker scope required: --tickers A,B,... or "
+                     "--scope active-universe")
+        sys.exit(1)
 
     logger.info(f"Collecting ATM IV for {len(tickers)} tickers: {', '.join(tickers)}")
 

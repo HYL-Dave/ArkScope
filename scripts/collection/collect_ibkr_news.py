@@ -668,37 +668,28 @@ class IBKRNewsCollector:
 # Main Collection Logic
 # =============================================================================
 
-def load_tickers(tickers_arg: Optional[str] = None) -> List[str]:
-    """Load tickers from config or argument."""
+def load_tickers(tickers_arg: Optional[str] = None,
+                 scope: Optional[str] = None) -> List[str]:
+    """Resolve the EXPLICIT ticker scope (3e-E, Q7-aligned: no implicit universe
+    guessing). ``tickers_arg`` = comma-separated list; ``scope='active-universe'``
+    = the local profile DB (read-only). Bare calls raise — the legacy
+    tickers_core.json tiers default is retired from runtime."""
     if tickers_arg:
-        return [t.strip().upper() for t in tickers_arg.split(',')]
+        return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
+    if scope == "active-universe":
+        from src.universe_scope import resolve_active_universe  # repo root on sys.path above
 
-    config_path = Path("config/tickers_core.json")
-    if config_path.exists():
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-
-        settings = config.get('settings', {})
-        tier_names = ['tier1_core']
-        if settings.get('include_tier2', True):
-            tier_names.append('tier2_expanded')
-        if settings.get('include_tier3', True):
-            tier_names.append('tier3_user_watchlist')
-
-        tickers = set()
-        for tier_name in tier_names:
-            tier_data = config.get(tier_name, {})
-            for category in tier_data.values():
-                if isinstance(category, dict) and 'tickers' in category:
-                    tickers.update(category['tickers'])
-
-        tickers = sorted(list(tickers))
-        if tickers:
-            logger.info(f"Loaded {len(tickers)} tickers from config")
-            return tickers
-
-    # Fallback to key stocks
-    return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
+        tickers = resolve_active_universe()
+        if not tickers:
+            raise RuntimeError(
+                "active-universe scope is empty/unavailable (profile DB) — "
+                "fix the profile DB or pass --tickers explicitly")
+        return tickers
+    raise RuntimeError(
+        "explicit ticker scope required: --tickers AAPL,MSFT,... or --scope "
+        "active-universe (reads the local profile DB read-only). "
+        "config/tickers_core.json is a bootstrap/seed file, no longer a runtime "
+        "default.")
 
 
 def collect_news(
@@ -1108,6 +1099,8 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     parser.add_argument('--end', type=str, help='End date (YYYY-MM-DD), default: today')
     parser.add_argument('--days', type=int, default=7, help='Days back from today (default: 7)')
     parser.add_argument('--tickers', type=str, help='Comma-separated tickers')
+    parser.add_argument('--scope', choices=['active-universe'], default=None,
+                       help='Ticker scope: active-universe reads the local profile DB (read-only)')
     parser.add_argument('--host', type=str, default=None,
                        help='IB Gateway host (default: from config/.env)')
     parser.add_argument('--port', type=int, default=None,
@@ -1250,8 +1243,12 @@ Note: IBKR provides ~1 month of news history with highest quality sources
     else:
         start_date = end_date - timedelta(days=args.days)
 
-    # Load tickers
-    tickers = load_tickers(args.tickers)
+    # Load tickers (explicit scope required — 3e-E)
+    try:
+        tickers = load_tickers(args.tickers, scope=args.scope)
+    except RuntimeError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     logger.info(f"Tickers: {len(tickers)} stocks")
     logger.info(f"Date range: {start_date} to {end_date}")

@@ -107,7 +107,7 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "ibkr_news", "IBKR 新聞",
             ["collect_ibkr_news.py", "--incremental"], "--news", ibkr=True,
-            default_interval_min=120,
+            needs_price_scope=True, default_interval_min=120,
             description="IBKR news incremental (Gateway) → PG → local mirror",
         ),
         SourceDef(
@@ -119,7 +119,7 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "iv_history", "IV 歷史",
             ["collect_iv_history.py"], "--iv", ibkr=True,
-            default_interval_min=1440,
+            needs_price_scope=True, default_interval_min=1440,
             description="ATM IV snapshot (heavy; Gateway) → PG → local mirror",
         ),
         SourceDef(
@@ -221,24 +221,11 @@ def _run_subprocess(argv: List[str]) -> Dict[str, Any]:
 
 
 def _resolve_price_scope() -> List[str]:
-    """Active-universe tickers from the local profile DB — physically read-only
-    (same contract as daily_update's --scope active-universe)."""
-    import sqlite3
+    """Active-universe tickers — delegates to the ONE shared resolver
+    (src.universe_scope), same contract as the collectors' --scope flag."""
+    from src.universe_scope import resolve_active_universe
 
-    db_path = os.environ.get("ARKSCOPE_PROFILE_DB") or str(
-        _REPO_ROOT / "data" / "profile_state.db")
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-        try:
-            rows = conn.execute(
-                "SELECT DISTINCT ticker FROM watchlist_memberships ORDER BY ticker"
-            ).fetchall()
-        finally:
-            conn.close()
-        return [r[0] for r in rows]
-    except sqlite3.OperationalError as e:
-        logger.warning(f"scheduler: active-universe scope unavailable ({e})")
-        return []
+    return resolve_active_universe()
 
 
 def _local_refresh() -> Dict[str, Any]:
@@ -258,7 +245,9 @@ def _local_refresh() -> Dict[str, Any]:
         _LOCAL_REFRESH_LOCK.release()
 
 
-def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]:
+def run_source(source: str, trigger_source: str = "scheduler", *,
+               tickers: Optional[List[str]] = None,
+               skip_sync: bool = False) -> Dict[str, Any]:
     """Execute one source end-to-end (collect → PG sync → local refresh) with
     telemetry. Same-source overlap SKIPS (never queues); IBKR sources serialize
     behind the shared Gateway lock. Never raises."""
@@ -312,31 +301,31 @@ def run_source(source: str, trigger_source: str = "scheduler") -> Dict[str, Any]
                         source, done, total, current),
                 }
                 if d.universe_tickers:
-                    tickers = _resolve_price_scope()
-                    if tickers:
-                        kwargs["tickers_arg"] = ",".join(tickers)
-                        result["ticker_count"] = len(tickers)
-                    else:
-                        logger.warning(
-                            f"{source}: active universe unavailable — falling back "
-                            "to the collector's default list")
+                    scope = tickers if tickers is not None else _resolve_price_scope()
+                    if not scope:
+                        # 3e-E: the collectors' legacy tickers_core default is
+                        # retired — no scope means FAIL, not silently-collect-other.
+                        raise RuntimeError(
+                            "active-universe scope empty/unavailable (profile DB)")
+                    kwargs["tickers_arg"] = ",".join(scope)
+                    result["ticker_count"] = len(scope)
                 result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
                 collected = True
             elif d.collector is not None:
                 argv = [sys.executable, str(_COLLECT_DIR / d.collector[0]), *d.collector[1:]]
                 if d.needs_price_scope:
-                    tickers = _resolve_price_scope()
-                    if not tickers:
+                    scope = tickers if tickers is not None else _resolve_price_scope()
+                    if not scope:
                         raise RuntimeError("no active-universe scope (profile DB empty/unavailable)")
-                    argv += ["--tickers", ",".join(tickers)]
-                    result["ticker_count"] = len(tickers)
+                    argv += ["--tickers", ",".join(scope)]
+                    result["ticker_count"] = len(scope)
                 step = _run_subprocess(argv)
                 result["collect"] = step
                 if step["returncode"] != 0:
                     raise RuntimeError(f"collector failed: {step.get('error_tail', '')[:200]}")
                 collected = True
 
-            if collected and d.sync_flag:
+            if collected and d.sync_flag and not skip_sync:
                 with _SYNC_LOCK:
                     sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
                 result["sync"] = sync

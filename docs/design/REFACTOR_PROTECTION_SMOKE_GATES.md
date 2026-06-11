@@ -11,14 +11,24 @@
 These paths must keep working through docs cleanup, local-first migration, and module-level refactors:
 
 - `python scripts/collection/daily_update.py --all --scope active-universe --sync-db`
-  (since slice 2 / 2026-06-08: IBKR-price collection needs an explicit `--scope active-universe`
-  or `--tickers`; bare `--all` collects news only and skips prices with a warning — `--tier all`
-  and the `tickers_core.json` writeback are retired. `--scores` is a separate opt-in.
-  Since slice 3e-B / 2026-06-10: each step ADDITIONALLY records a best-effort terminal
-  `job_runs` row (`daily_update.<step>`, trigger_source='cli') + one `daily_update.run`
-  summary row — purely additive telemetry for the app's ops view; flags, step semantics
-  and exit codes are unchanged, recording failures are swallowed, and `--dry-run`
-  records nothing / never touches the DB.)
+  — protection level since 3e-E / F6 (2026-06-11): **flag-compatible + same effects**,
+  NOT byte-identical. daily_update is now a thin CLI wrapper over the app scheduler
+  core (`src/service/data_scheduler.run_source`): same flag set, same per-source step
+  set (collect → PG sync → local mirror refresh), exit 0/1 semantics, `--dry-run`
+  prints the plan and never touches IBKR/DB/job_runs. What changed by design:
+  per-step telemetry is now the scheduler's `collect.<source>` rows
+  (trigger_source='cli') plus one `daily_update.run` summary row; news sources run
+  in-process (adapters), IBKR sources stay subprocesses; runs share the app's
+  per-source/IBKR locks (an app-scheduled run in the same sidecar makes the CLI
+  skip, not double-fetch — separate processes still can't see each other's locks).
+  The gate when refactoring: `--help` exits 0, the protected command's `--dry-run`
+  lists the same sources, no-scope invocations error with exit 1, and a real run
+  produces the same collected/synced data.
+  (History: slice 2 / 2026-06-08 retired `--tier all` + the tickers_core writeback
+  and made price scope explicit; 3e-B / 2026-06-10 added per-step telemetry;
+  3e-E / 2026-06-11 extended the explicit-scope requirement to EVERY source —
+  `config/tickers_core.json` no longer serves any runtime default, in daily_update
+  or in the collectors themselves. `--scores` stays a separate opt-in subprocess.)
 - Chrome SA Alpha Picks extension -> Native Messaging host -> DB
 - Firefox SA Alpha Picks extension -> Native Messaging host -> DB
 - SA native host stable launcher:
@@ -83,6 +93,9 @@ bash -n extensions/sa_alpha_picks/install_firefox.sh
 bash -n training/scripts/run_polygon_production.sh
 bash -n training/scripts/run_feature_comparison.sh
 python scripts/collection/daily_update.py --help
+# Plan-only (must list polygon_news/finnhub_news/ibkr_news/ibkr_prices and exit 0
+# without touching IBKR/DB/job_runs):
+python scripts/collection/daily_update.py --all --scope active-universe --sync-db --dry-run
 ```
 
 ### Level 2 -- SA/native-host/API/DB-touching changes
