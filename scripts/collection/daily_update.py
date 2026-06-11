@@ -452,7 +452,9 @@ Note: IBKR sources require TWS/Gateway running.
       Without --sync-db a run is TRUE collect-only (Parquet only — no PG sync,
       no local-mirror refresh).
       Explicit scope (--tickers / --scope active-universe) is required —
-      config/tickers_core.json no longer serves any runtime default.
+      config/tickers_core.json serves no runtime default in this path (legacy
+      touchpoints remain elsewhere: SA native-host ticker sync writes tier3;
+      orphan collectors + --tier debug flags still read it).
         """
     )
 

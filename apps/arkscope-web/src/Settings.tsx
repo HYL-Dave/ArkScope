@@ -902,16 +902,22 @@ function DataSourcesSection() {
                       </button>
                     )}
                   </td>
-                  <td className="muted tiny">{jobOutcome(s.job_name)}</td>
+                  <td className="muted tiny">
+                    {jobOutcome(s.job_name)}
+                    {/* a skip writes no job_runs row — last_result is its only trace */}
+                    {s.last_result?.status === "skipped" && (
+                      <span className="refresh-err"> · 已跳過：{s.last_result.reason}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
         <p className="muted tiny" style={{ marginTop: 8 }}>
-          注意：已開啟排程的來源請勿同時手動跑 daily_update／collector（IBKR 類尤其 —
-          兩個進程會搶同一個 Gateway）。排程內建保護：同來源不重疊、IBKR 序列化、
-          啟動時讀取 job_runs 接續（手動剛跑過不會立即重抓）。
+          保護機制：同來源不重疊、IBKR Gateway 序列化、啟動時讀 job_runs 接續（手動剛跑過
+          不會立即重抓）— 且鎖為<strong>跨進程</strong>（data/locks/）：app 與 CLI 重疊跑
+          同一來源會被跳過（顯示於「最近一次」），不會雙抓。
         </p>
       </div>
     </div>

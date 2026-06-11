@@ -3,9 +3,17 @@ universe_scope — THE ticker-scope resolver (3e-E).
 
 The active Universe in the local profile DB is the single runtime authority for
 "which tickers" (locked: config files are bootstrap/seed, not authority;
-config/tickers_core.json no longer serves any runtime default). Every consumer —
-the app scheduler, daily_update --scope active-universe, and the collectors' own
---scope flag — resolves through this one read-only query.
+config/tickers_core.json no longer serves any runtime default IN THIS PATH —
+the scheduler, daily_update, and the maintained collectors). Every consumer
+resolves through this one read-only query.
+
+Remaining tickers_core.json touchpoints OUTSIDE this path (scoped, not zero):
+  - sa_native_host._try_ticker_sync WRITES the tier3 ``sa_alpha_picks_auto``
+    bucket on every SA refresh (live, protected extension path — slated for
+    retirement in slice 3d when SA moves to sa_capture.db);
+  - legacy/orphan standalone readers (collect_ibkr_fundamentals,
+    collect_alphavantage_news, collect_eodhd_news) and the collectors'
+    explicit ``--tier`` debug escape hatch.
 
 Self-contained on purpose (sqlite3 + os only): collectors lazy-import this from
 script context where heavier src imports are unwelcome.

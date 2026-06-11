@@ -21,6 +21,7 @@ def hermetic(tmp_path, monkeypatch):
     store = ProfileStateStore(tmp_path / "profile_state.db")
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
+    monkeypatch.setattr(ds, "_LAST_RESULT", {})
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
     # (a live sidecar's flocks would make these tests skip spuriously, and vice versa)
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
@@ -418,3 +419,22 @@ def test_run_now_choke_point_covers_all_sources(monkeypatch):
         out = sr.run_now(source)
         assert out["status"] == "started"
     assert gated == ["local_incremental", "polygon_news"]
+
+
+def test_last_result_surfaces_skips_in_snapshot(tmp_path):
+    # finding-1 regression: Run now is fire-and-return, and a skip writes NO
+    # job_runs row — last_result in the snapshot is the UI's only trace of it.
+    monkey_fh = _hold_flock(tmp_path, "source_polygon_news")  # "CLI" holds the lock
+    try:
+        res = ds.run_source("polygon_news")
+        assert res["status"] == "skipped"
+    finally:
+        monkey_fh.close()
+    snap = ds.status_snapshot()["polygon_news"]
+    assert snap["last_result"]["status"] == "skipped"
+    assert "another process" in snap["last_result"]["reason"]
+    assert snap["last_result"]["at"]                      # timestamped
+    # a subsequent successful run overwrites the skip
+    assert ds.run_source("polygon_news")["status"] == "succeeded"
+    snap = ds.status_snapshot()["polygon_news"]
+    assert snap["last_result"]["status"] == "succeeded"

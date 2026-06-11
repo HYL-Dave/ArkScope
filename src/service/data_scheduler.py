@@ -234,6 +234,20 @@ _LOCAL_REFRESH_FLOCK = _FileLock("local_refresh")
 _LAST_ATTEMPT: Dict[str, datetime] = {}
 _LAST_ATTEMPT_LOCK = threading.Lock()
 
+# last run_source OUTCOME per source — including SKIPS, which write no job_runs
+# row. Run-now is fire-and-return: the route answers "started" before the thread
+# decides, so without this a cross-process skip ("CLI already running it") would
+# be invisible to the UI (no job row, running=false → looks like nothing happened).
+_LAST_RESULT: Dict[str, Dict[str, Any]] = {}
+_LAST_RESULT_LOCK = threading.Lock()
+
+
+def _record_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    with _LAST_RESULT_LOCK:
+        _LAST_RESULT[result.get("source", "?")] = {
+            **result, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    return result
+
 # live per-source progress, fed by the in-process adapters' progress_cb (the
 # rough estimate the UI shows: ticker N of TOTAL — only adapter sources have it;
 # subprocess sources stay indeterminate)
@@ -340,21 +354,29 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     """Execute one source end-to-end (collect → PG sync → local refresh) with
     telemetry. Same-source overlap SKIPS (never queues) — in-process AND
     cross-process (CLI vs sidecar); IBKR sources serialize behind the shared
-    Gateway lock (also cross-process). ``skip_sync=True`` = TRUE collect-only:
-    Parquet only, no PG sync and no local-mirror refresh (PG was not updated, so
-    a refresh would be a pointless delta). Never raises."""
+    Gateway lock (also cross-process). ``skip_sync=True`` = TRUE collect-only for
+    DATA stores: Parquet only, no PG sync and no local-mirror refresh (PG was not
+    updated, so a refresh would be a pointless delta).
+
+    DELIBERATE exception: job_runs TELEMETRY still runs for collect-only — it is
+    metadata (not data), best-effort/swallowed, bounded by connect_timeout, and
+    load-bearing: the scheduler seeds last-attempt from these rows, so a manual
+    collect-only run SUPPRESSES an immediate scheduled re-fetch of the same
+    source. Disabling it for collect-only would re-open the double-provider-fetch
+    window it exists to close. Never raises."""
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
-        return {"source": source, "status": "skipped", "reason": "already running"}
+        return _record_result(
+            {"source": source, "status": "skipped", "reason": "already running"})
     flock = _SOURCE_FLOCKS[source]
     if not flock.acquire():  # cross-process twin: the CLI may be running this source
         lock.release()
-        return {"source": source, "status": "skipped",
-                "reason": "already running in another process"}
+        return _record_result({"source": source, "status": "skipped",
+                               "reason": "already running in another process"})
 
     ibkr_held = False
     ibkr_flock_held = False
@@ -365,13 +387,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         if d.ibkr:
             ibkr_held = _IBKR_LOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_held:
-                return {"source": source, "status": "skipped",
-                        "reason": "IBKR gateway busy (lock timeout)"}
+                return _record_result({"source": source, "status": "skipped",
+                                       "reason": "IBKR gateway busy (lock timeout)"})
             # cross-process Gateway serialization (one TWS/Gateway session total)
             ibkr_flock_held = _IBKR_FLOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_flock_held:
-                return {"source": source, "status": "skipped",
-                        "reason": "IBKR gateway busy in another process (lock timeout)"}
+                return _record_result(
+                    {"source": source, "status": "skipped",
+                     "reason": "IBKR gateway busy in another process (lock timeout)"})
 
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None
@@ -461,7 +484,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                                  message=None if ok else error, error=error, result=result)
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"scheduler telemetry finish failed: {e}")
-        return result
+        return _record_result(result)
     finally:
         _clear_progress(source)
         if ibkr_flock_held:
@@ -597,6 +620,8 @@ def status_snapshot() -> Dict[str, Any]:
         attempts = dict(_LAST_ATTEMPT)
     with _PROGRESS_LOCK:
         progress = {k: dict(v) for k, v in _PROGRESS.items()}
+    with _LAST_RESULT_LOCK:
+        last_results = {k: dict(v) for k, v in _LAST_RESULT.items()}
     for source, d in SOURCES.items():
         cfg = source_config(source)
         out[source] = {
@@ -610,6 +635,9 @@ def status_snapshot() -> Dict[str, Any]:
             "running": _SOURCE_LOCKS[source].locked(),
             "progress": progress.get(source),
             "last_attempt_at": attempts.get(source).isoformat() if attempts.get(source) else None,
+            # last run_source outcome INCLUDING skips (skips write no job_runs row;
+            # without this a cross-process "CLI is running it" skip is invisible)
+            "last_result": last_results.get(source),
             "job_name": job_name(source),
         }
     return out

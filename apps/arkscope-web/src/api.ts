@@ -1065,6 +1065,10 @@ export interface ScheduleSourceState {
   // report it; subprocess sources stay indeterminate
   progress: { done: number; total: number; current: string } | null;
   last_attempt_at: string | null;
+  // last run_source outcome INCLUDING skips — a skip (e.g. "the CLI is already
+  // running this source", cross-process) writes no job_runs row, so this field is
+  // the only way the UI can see it after a fire-and-return Run now.
+  last_result: { source: string; status: string; reason?: string; at?: string } | null;
   job_name: string; // collect.<source>
 }
 

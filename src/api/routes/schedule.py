@@ -62,8 +62,12 @@ def run_now(source: str):
 
     Fire-and-return: a collection can take minutes (IBKR over the universe), so
     the run executes on a background thread; the UI polls GET /schedule for the
-    per-source ``running`` flag and the job_runs row for the outcome. Skips if
-    the source is already running.
+    per-source ``running`` flag, ``last_result`` (every outcome INCLUDING skips —
+    a cross-process skip writes no job_runs row, so this is the only place the UI
+    can see "the CLI is already running this source"), and the job_runs row.
+    "started" therefore means accepted-and-dispatched, not running-for-sure: the
+    in-process lock check below is a fast path only; the thread re-checks both
+    locks (in-process + cross-process flock) and may record a skip.
     """
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
