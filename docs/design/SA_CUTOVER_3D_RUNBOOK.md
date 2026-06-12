@@ -83,6 +83,70 @@ Rehearsal 實測（對 `/tmp/rehearsal_sa.db` copy）：
 
 週六 cut-2 注意：rehearsal copy 已是用過的工件，**正式 cutover 必須重新 build**（`python scripts/migrate_sa_to_sqlite.py` → data/sa_capture.db）。
 
+## 3.5 Day Sheet（6/13 當天逐條指令；6/12 preflight 已全部演練過）
+
+> 6/12 preflight 發現並排除：**本機沒有 pg_dump**（server PG 17.8，Ubuntu 24.04 預設 client 16 也不相容）→ 凍結改用 `scripts/sa_pg_freeze.py`（psycopg2 COPY → CSV + 指紋 manifest，零安裝，實測 1.2s/~64MB）。
+
+**cut-0 前置確認**
+```bash
+python - <<'EOF'
+import sqlite3, pathlib
+p = pathlib.Path("data/profile_state.db")
+row = sqlite3.connect(f"file:{p}?mode=ro", uri=True).execute(
+    "SELECT value FROM profile_settings WHERE key='use_local_sa'").fetchone() if p.exists() else None
+print(f"use_local_sa = {row[0] if row else '(unset)'}   sa_capture.db exists = {pathlib.Path('data/sa_capture.db').exists()}")
+EOF
+# 期望：(unset) + False
+```
+
+**cut-1**（user：關兩瀏覽器×兩 auto-sync toggle，不瀏覽 SA）
+```bash
+tail -n 0 -f data/logs/sa_native_host.log          # 30min 零新行
+python scripts/migrate_sa_to_sqlite.py --dry-run | tee /tmp/cut1_baseline.txt   # 當天基線（9 指紋）
+python scripts/sa_pg_freeze.py --out data/backups/sa_pg_freeze_20260613         # 凍結物
+```
+
+**cut-2**
+```bash
+python scripts/migrate_sa_to_sqlite.py    # build→驗證(9指紋+9digest+content+FK/integrity)→swap；PG 已 quiesce，驗證即是對 cut-1 基線
+# 印出的 pg= 數字必須 == /tmp/cut1_baseline.txt
+python - <<'EOF'
+import sqlite3
+c = sqlite3.connect("file:data/sa_capture.db?mode=ro", uri=True)
+a = c.execute("SELECT COUNT(*) FROM sa_articles").fetchone()[0]
+b = c.execute("SELECT COUNT(*) FROM sa_alpha_picks WHERE portfolio_status='closed' AND closed_date IS NULL").fetchone()[0]
+print(f"articles={a} (>0?)   closed_missing_closed_date={b} (=0?)")
+assert a > 0 and b == 0
+EOF
+```
+
+**cut-3 flip**
+```bash
+python -c "from src.profile_state import ProfileStateStore; ProfileStateStore('data/profile_state.db').set_setting('use_local_sa','true')"
+# 重啟 sidecar + 任何開著的 agent CLI（第三個 DAL 持有者）
+python - <<'EOF'
+import json, struct, subprocess, os
+msg = json.dumps({"action": "ping"}).encode()
+p = subprocess.run([os.path.expanduser("~/.local/share/arkscope/native-hosts/sa_alpha_picks_host.sh")],
+                   input=struct.pack("=I", len(msg)) + msg, capture_output=True, timeout=30)
+n = struct.unpack("=I", p.stdout[:4])[0]; print(json.loads(p.stdout[4:4+n]))
+EOF
+grep "Using SACaptureDatabaseBackend" data/logs/sa_native_host.log | tail -1   # HARD local 證據行
+```
+
+**cut-4 / cut-5**
+```bash
+python -m pytest tests/test_sa_tools.py tests/test_job_runs.py -q   # Level-2 gate（已 hermetic，不碰真 PG）
+# user：Chrome、Firefox 各一次 supervised Quick Refresh（§3 cut-4 驗證項）
+python scripts/migrate_sa_to_sqlite.py --dry-run | diff /tmp/cut1_baseline.txt -   # PG byte-frozen：必須零 diff
+```
+
+**回滾（任何 gate 失敗）**
+```bash
+python -c "from src.profile_state import ProfileStateStore; ProfileStateStore('data/profile_state.db').set_setting('use_local_sa','false')"
+# 重啟 sidecar；下一個 host spawn 即寫回 PG（fresh-process 模型）；驗證 host log 回到 LocalMarketDatabaseBackend/PG
+```
+
 ## 5. 明確 OUT OF SCOPE（3d 不做）
 
 - port `extract_sa_comment_signals`（follow-up #1；port 前禁止觸發）
