@@ -136,7 +136,11 @@ grep "Using SACaptureDatabaseBackend" data/logs/sa_native_host.log | tail -1   #
 
 **cut-4 / cut-5**
 ```bash
-python -m pytest tests/test_sa_tools.py tests/test_job_runs.py -q   # Level-2 gate（已 hermetic，不碰真 PG）
+python -m pytest tests/test_sa_tools.py tests/test_job_runs.py -q   # Level-2 gate
+# hermetic：test_job_runs 的兩個 /jobs/history endpoint 測試用 TestClient「不帶 with」→ 不跑 lifespan
+# → 不起 data scheduler、不跑 provider-env bridge、不碰 PG（conftest 另關 scheduler 作 defense-in-depth）。
+# 史：先前只靠 conftest 關 scheduler 的修法在「PG 完全不可達」的 sandbox 仍會 hang（gpt-5.5 複查發現）；
+# 改成 lifespan-free endpoint 測試後與環境無關（trap-PG DSN 全檔 43 passed 實證）。
 # user：Chrome、Firefox 各一次 supervised Quick Refresh（§3 cut-4 驗證項）
 python scripts/migrate_sa_to_sqlite.py --dry-run | diff /tmp/cut1_baseline.txt -   # PG byte-frozen：必須零 diff
 ```

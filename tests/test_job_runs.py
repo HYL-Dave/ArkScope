@@ -481,9 +481,15 @@ def test_jobs_history_endpoint_returns_rows_from_store():
     app.dependency_overrides[get_dal] = lambda: fake_dal
     app.dependency_overrides[get_registry] = lambda: fake_registry
     try:
+        # TestClient WITHOUT the `with` context manager — deliberately do NOT run
+        # the app lifespan. This route only needs the overridden get_dal; running
+        # the lifespan would start the data scheduler (whose seed thread reaches
+        # PG) and the provider-env bridge, which hang pytest at the thread-pool
+        # join in a PG-unreachable environment. Route unit tests stay lifespan-free
+        # (env-independent); the lifespan itself is covered by app-level tests.
         with patch.object(JobRunsStore, "list_runs", return_value=fake_rows):
-            with TestClient(app) as client:
-                r = client.get("/jobs/history?name=foo&limit=10&offset=0")
+            client = TestClient(app)
+            r = client.get("/jobs/history?name=foo&limit=10&offset=0")
         assert r.status_code == 200
         data = r.json()
         assert data["count"] == 1
@@ -508,8 +514,8 @@ def test_jobs_history_endpoint_returns_empty_when_unavailable():
     app.dependency_overrides[get_dal] = lambda: fake_dal
     app.dependency_overrides[get_registry] = lambda: fake_registry
     try:
-        with TestClient(app) as client:
-            r = client.get("/jobs/history")
+        client = TestClient(app)  # no `with`: stay lifespan-free (see note above)
+        r = client.get("/jobs/history")
         assert r.status_code == 200
         data = r.json()
         assert data["count"] == 0
