@@ -10,7 +10,7 @@
 |---|------|------|
 | L1 | 命名/語意 | **Plan 命名 + SPEC 語意**：`data/sa_capture.db` + `ARKSCOPE_SA_DB` 路徑覆寫（與 market_data.db 慣例一致；SPEC 的 `sa_cache.db`/profile-dir 命名在此 **waive**）；但授權語意照 SPEC LOCK #9：**hard cutover，flip 後 SA 域禁止 PG 讀 fallback**。鏡像式 fallback 在「寫入目標」是錯的——PG 在 flip 時凍結，fallback 只會復活 stale 列、掩蓋漏改的 reader。回滾 = 翻回 toggle，不是 fallback。 |
 | L2 | tickers_core 回寫 | `_try_ticker_sync` **cutover 週末不動**（它讀 DAL 拿 picks，DB-agnostic，對 SQLite 照常運作）。退休 + 替代品（provenance seeding 改讀 sa_capture.db）= 獨立 follow-up 刀。 |
-| L3 | comment signals | 36,255 列 **verbatim 遷移**（保 id / extracted_at / rule_set_version；SUM(id) 驗證）。cutover 前**暫停** `extract_sa_comment_signals`（raw psycopg2 第二寫者）；flip 後先讀舊 signals。**Layer A DONE（2026-06-13, 504166d）**：SA-local 模式已 port 回 sa_capture.db（store choke-point + batch-atomic）；目前仍只**手動 supervised 觸發、未進排程**（Layer B = agent focus tool 落地後再考慮排程）。 |
+| L3 | comment signals | 36,255 列 **verbatim 遷移**（保 id / extracted_at / rule_set_version；SUM(id) 驗證）。cutover 前**暫停** `extract_sa_comment_signals`（raw psycopg2 第二寫者）；flip 後先讀舊 signals。**Layer A + B DONE（504166d / cff3466 / fd313a9）**：SA-local 已 port 回 sa_capture.db（store choke-point + batch-atomic）+ `get_sa_comment_focus` agent 工具；backlog 已抽完（3,541 筆，2026-06-13，signals 36,255→39,846、pending=0、PG 仍凍結）。job 仍只**手動觸發、未進排程**（自動增量排程另議）。 |
 | L4 | 瀏覽器 | Chrome + Firefox **都要 quiesce + smoke**（兩邊都註冊了 native host manifest）。退休 Firefox manifest = follow-up，不混進 3d。 |
 | L5 | PG 舊列 | 凍結唯讀保留作回滾基準。**3d 絕不刪**；重訪時機 = 跨機遷移 resume gate 之後。 |
 | L6 | job_runs | 留 PG（既鎖 Q3）。`record_extension_job` 改**明確 best-effort**（PG 斷線 capture 仍成功，telemetry 降級）。health 拆兩半：capture 指標 → SQLite、extension-run 訊號 → PG，PG 不可達時優雅降級。 |
