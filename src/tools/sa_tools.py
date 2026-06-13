@@ -461,6 +461,7 @@ def _empty_focus(window_days, min_score, *, error=None, rule_set_version=None,
         "min_score": min_score,
         "rule_set_version": rule_set_version,
         "signal_type": _FOCUS_SIGNAL_TYPE,
+        "generated_at": None,  # contract: key always present (success path sets it)
         "comment_count": 0,
         "top_tickers": [],
         "top_keyword_buckets": [],
@@ -503,18 +504,20 @@ def get_sa_comment_focus(
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
 
-    backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
-        return _empty_focus(
-            window_days, min_score, empty_reason="backend_unavailable",
-            error="DB unavailable; SA comment focus requires the database backend.")
-
     try:
         from src.sa.comment_signals import RULE_SET_VERSION as ver
 
+        # clamp BEFORE any return so every path (incl. degraded) echoes clamped params
         window_days = max(1, min(int(window_days), 90))
         limit = max(1, min(int(limit), 50))
         min_score = max(0.0, float(min_score))
+
+        backend = getattr(dal, "_backend", None)
+        if backend is None or not hasattr(backend, "_get_conn"):
+            return _empty_focus(
+                window_days, min_score, rule_set_version=ver,
+                empty_reason="backend_unavailable",
+                error="DB unavailable; SA comment focus requires the database backend.")
 
         sa_db = getattr(backend, "_sa_db", None)
         if sa_db is None:
@@ -558,7 +561,7 @@ def _focus_local(
     rule_set_version: str,
     limit: int,
     sample_per: int = 2,
-    kw_cap: int = 1000,
+    kw_cap: int = 900,  # < 999 so the IN(...) placeholder list is safe on pre-3.32 SQLite too
 ) -> Dict[str, Any]:
     """SQLite aggregation for get_sa_comment_focus. Counts come from SQL GROUP BY
     over the junction tables (accurate — NOT capped to a top-N comment sample);

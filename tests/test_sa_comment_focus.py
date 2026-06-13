@@ -172,3 +172,35 @@ def test_focus_clamps_params(tmp_path):
     assert res["window_days"] == 90
     assert res["min_score"] == 0.0
     assert len(res["top_tickers"]) <= 50
+
+
+def test_focus_multi_ticker_counted_once_each_and_sample_cap(tmp_path):
+    """A comment mentioning two universe tickers +1's BOTH (count-once-per-ticker);
+    a ticker with >2 mentions still yields at most sample_per(=2) samples."""
+    db = tmp_path / "sa.db"
+    conn = store.connect(str(db))
+    try:
+        conn.execute(
+            "INSERT INTO sa_articles (id, article_id, url, title) "
+            "VALUES (1, 'A1', 'https://x/A1', 'T1')")
+        cd = _ts(2)
+        conn.executemany(
+            "INSERT INTO sa_article_comments "
+            "(id, article_id, comment_id, comment_text, upvotes, comment_date) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                (1, "A1", "c1", "NVDA earnings beat, strong guidance", 30, cd),
+                (2, "A1", "c2", "NVDA margin expansion is real", 10, cd),
+                (3, "A1", "c3", "NVDA downgrade rating risk", 5, cd),
+                (4, "A1", "c4", "NVDA and AMD both look strong into earnings", 8, cd),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    res = _focus(db, window_days=14, min_score=0.0, limit=10)
+    tk = {t["ticker"]: t for t in res["top_tickers"]}
+    assert tk["NVDA"]["mention_count"] == 4   # c1, c2, c3, c4
+    assert tk["AMD"]["mention_count"] == 1    # only c4 (the multi-ticker comment)
+    assert len(tk["NVDA"]["samples"]) == 2    # sample_per cap holds with 4 mentions

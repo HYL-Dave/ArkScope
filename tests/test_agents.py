@@ -161,6 +161,7 @@ class TestAnthropicToolSchemas:
             "get_sa_article_detail",
             "get_sa_market_news",
             "list_high_value_comments",
+            "get_sa_comment_focus",
             "get_signal_factors",
             "get_economic_calendar",
             "get_macro_value",
@@ -522,7 +523,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 51
+        assert len(schemas) == 52
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -536,7 +537,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 51
+        assert len(schemas) == 52
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema
