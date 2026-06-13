@@ -1009,6 +1009,50 @@ export function getNewsFeed(params: {
   return getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000);
 }
 
+// --- Seeking Alpha evidence feed (Layer C-1) — unified SA articles + market-news ---
+export interface SAFeedItem {
+  type: "article" | "market_news";
+  id: string;
+  title: string;
+  tickers: string[];
+  published_at: string;
+  url: string | null;
+  source: string; // "seeking_alpha"
+  snippet: string | null;
+  has_detail: boolean;
+  comments_count: number;
+  detail_route: string | null; // present → open internally; null → fall back to url
+}
+
+export interface SAFeedResponse {
+  available: boolean; // false = degraded (e.g. SA not local-first), NOT an error
+  days: number;
+  query: string | null;
+  total: number;
+  items: SAFeedItem[];
+  by_type: Record<string, number>;
+  by_day: Record<string, number>;
+  empty_reason: string | null;
+}
+
+export function getSAFeed(params: {
+  q?: string;
+  ticker?: string;
+  item_type?: string; // article | market_news
+  days?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<SAFeedResponse> {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.ticker) sp.set("ticker", params.ticker);
+  if (params.item_type) sp.set("item_type", params.item_type);
+  if (params.days) sp.set("days", String(params.days));
+  if (params.limit) sp.set("limit", String(params.limit));
+  if (params.offset) sp.set("offset", String(params.offset));
+  return getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000);
+}
+
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a
