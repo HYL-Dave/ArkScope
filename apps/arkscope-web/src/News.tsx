@@ -5,7 +5,7 @@
 //     sa_capture.db). Score-free. Read-only: no provider fetches.
 // (Layer C-1: SA is a source/filter inside this surface, not a new page.)
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getNewsFeed, type NewsFeedItem, type NewsFeedResponse,
   getSAFeed, type SAFeedItem, type SAFeedResponse,
@@ -26,7 +26,8 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
   const [mode, setMode] = useState<Mode>("market");
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
-  const [ticker, setTicker] = useState("");
+  const [tickerInput, setTickerInput] = useState(""); // typed value
+  const [ticker, setTicker] = useState("");           // applied filter (on Enter)
   const [source, setSource] = useState<string>("auto"); // market providers
   const [saType, setSaType] = useState<string>("");      // SA item_type
   const [days, setDays] = useState<number>(7);
@@ -39,31 +40,39 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
   const [saFeed, setSaFeed] = useState<SAFeedResponse | null>(null);
   const [saItems, setSaItems] = useState<SAFeedItem[]>([]);
 
+  // Monotonic request token: rapid source/ticker/days/load-more changes fire
+  // overlapping requests; only the latest may commit state, so a slow older
+  // response can never overwrite a newer feed/items/offset/loading.
+  const reqRef = useRef(0);
   const load = useCallback(
     async (nextOffset: number, append: boolean) => {
+      const myReq = ++reqRef.current;
       setLoading(true);
       setErr(null);
       try {
-        const tk = ticker.trim().toUpperCase() || undefined;
+        const tk = ticker || undefined; // already trimmed+uppercased on apply
         if (mode === "sa") {
           const f = await getSAFeed({
             q: q || undefined, ticker: tk, item_type: saType || undefined,
             days, limit: PAGE, offset: nextOffset,
           });
+          if (myReq !== reqRef.current) return; // stale → drop
           setSaFeed(f);
           setSaItems((prev) => (append ? [...prev, ...f.items] : f.items));
         } else {
           const f = await getNewsFeed({
             q: q || undefined, ticker: tk, source, days, limit: PAGE, offset: nextOffset,
           });
+          if (myReq !== reqRef.current) return; // stale → drop
           setFeed(f);
           setItems((prev) => (append ? [...prev, ...f.items] : f.items));
         }
         setOffset(nextOffset);
       } catch (e) {
+        if (myReq !== reqRef.current) return;
         setErr(e instanceof Error ? e.message : String(e));
       } finally {
-        setLoading(false);
+        if (myReq === reqRef.current) setLoading(false);
       }
     },
     [mode, q, ticker, source, saType, days],
@@ -98,10 +107,10 @@ export function NewsView({ onOpenTicker }: { onOpenTicker: (ticker: string) => v
         />
         <input
           className="news-ticker"
-          placeholder="Ticker"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") void load(0, false); }}
+          placeholder="Ticker（Enter）"
+          value={tickerInput}
+          onChange={(e) => setTickerInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") setTicker(tickerInput.trim().toUpperCase()); }}
         />
         {mode === "sa" ? (
           <select value={saType} onChange={(e) => setSaType(e.target.value)} title="SA 類型">
@@ -282,7 +291,7 @@ function SAFeedBody({
               )}
               <span className="muted tiny news-meta">
                 SA{it.comments_count > 0 ? ` · 💬 ${it.comments_count.toLocaleString()}` : ""}
-                {it.has_detail ? " · 詳情" : ""}
+                {it.url ? " · 原文 ↗" : ""}
               </span>
             </div>
             {it.snippet && <div className="news-desc muted tiny">{it.snippet}</div>}
