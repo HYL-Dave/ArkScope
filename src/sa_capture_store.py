@@ -33,6 +33,7 @@ Type conventions (runbook §1 / SPEC §4.1.4):
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
@@ -345,3 +346,70 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         except sqlite3.OperationalError:
             pass
         raise
+
+
+# ---------------------------------------------------------------------------
+# Comment-signal extraction API (the SQLite write CHOKE-POINT, slice follow-up #1)
+#
+# All sa_comment_signals writes for sa_capture.db go through upsert_comment_signal
+# so rule re-runs, the scheduler/job trigger, and tests share ONE path (instead of
+# SQL scattered through comment_signal_backfill). The PG equivalents stay in
+# comment_signal_backfill (raw psycopg2) for non-local mode; this is the local twin.
+# ---------------------------------------------------------------------------
+
+
+def count_pending_signals(conn: sqlite3.Connection, rule_set_version: str) -> int:
+    """Comments with NO signal at THIS rule_set_version (re-extractable on a bump)."""
+    return int(conn.execute(
+        "SELECT COUNT(*) FROM sa_article_comments c WHERE NOT EXISTS ("
+        " SELECT 1 FROM sa_comment_signals s"
+        " WHERE s.comment_row_id = c.id AND s.rule_set_version = ?)",
+        (rule_set_version,)).fetchone()[0])
+
+
+def fetch_pending_comments(conn: sqlite3.Connection, *, last_id: int, limit: int,
+                           rule_set_version: str) -> list:
+    """Keyset page (id > last_id) of comments pending at this rule_set_version.
+    Returns rows of (id, article_id, comment_id, comment_text, upvotes)."""
+    return conn.execute(
+        "SELECT c.id, c.article_id, c.comment_id, c.comment_text, c.upvotes"
+        " FROM sa_article_comments c WHERE c.id > ? AND NOT EXISTS ("
+        " SELECT 1 FROM sa_comment_signals s"
+        " WHERE s.comment_row_id = c.id AND s.rule_set_version = ?)"
+        " ORDER BY c.id LIMIT ?",
+        (last_id, rule_set_version, limit)).fetchall()
+
+
+def upsert_comment_signal(conn: sqlite3.Connection, *, row_id: int, article_id: str,
+                          comment_id: str, signals) -> None:
+    """Write one comment's signal: scalar row + BOTH mention junctions.
+
+    ⚠️ Runs inside the CALLER's transaction (caller wraps a batch in ``with conn:``)
+    so the scalar upsert and the junction delete/reinsert commit together — a crash
+    can never leave a half-updated comment (scalar without its mentions). Does NOT
+    commit. ``keyword_buckets`` → JSON TEXT; TEXT[]→junction (ON CONFLICT DO UPDATE
+    on the scalar does NOT cascade, so mentions are explicitly delete-then-reinsert).
+    """
+    conn.execute(
+        "INSERT INTO sa_comment_signals"
+        " (comment_row_id, article_id, comment_id, keyword_buckets, high_value_score,"
+        "  needs_verification, rule_set_version, extracted_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT(comment_row_id) DO UPDATE SET"
+        "  article_id=excluded.article_id, comment_id=excluded.comment_id,"
+        "  keyword_buckets=excluded.keyword_buckets, high_value_score=excluded.high_value_score,"
+        "  needs_verification=excluded.needs_verification, rule_set_version=excluded.rule_set_version,"
+        "  extracted_at=excluded.extracted_at",
+        (row_id, article_id, comment_id, json.dumps(signals.keyword_buckets),
+         float(signals.high_value_score), 1 if signals.needs_verification else 0,
+         signals.rule_set_version, now_ts()))
+    conn.execute("DELETE FROM sa_signal_ticker_mentions WHERE comment_row_id = ?", (row_id,))
+    if signals.ticker_mentions:
+        conn.executemany(
+            "INSERT OR IGNORE INTO sa_signal_ticker_mentions (comment_row_id, ticker) VALUES (?, ?)",
+            [(row_id, t) for t in signals.ticker_mentions])
+    conn.execute("DELETE FROM sa_signal_candidate_mentions WHERE comment_row_id = ?", (row_id,))
+    if signals.candidate_mentions:
+        conn.executemany(
+            "INSERT OR IGNORE INTO sa_signal_candidate_mentions (comment_row_id, ticker) VALUES (?, ?)",
+            [(row_id, t) for t in signals.candidate_mentions])

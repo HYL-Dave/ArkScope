@@ -470,13 +470,28 @@ class TestHealthSplit:
 # ---------------------------------------------------------------------------
 
 
-class TestBackfillGuard:
-    def test_raises_in_sa_local_mode(self, local_dal, pg_calls):
+class TestBackfillRouting:
+    def test_routes_to_sqlite_not_pg(self, local_dal, pg_calls, sa_db):
+        # follow-up #1: the locked-3d RuntimeError guard is GONE — SA-local mode now
+        # extracts into sa_capture.db via the store choke-point, never touching PG.
+        from src import sa_capture_store as scs
         from src.sa.comment_signal_backfill import run_backfill
 
-        with pytest.raises(RuntimeError, match="not yet ported to sa_capture.db"):
-            run_backfill(local_dal)
-        assert not pg_calls, "guard must fire before any PG access"
+        # a fresh rule_set_version makes every seeded comment pending → forces writes
+        res = run_backfill(local_dal, rule_set_version="test-port")
+        assert "error" not in res
+        assert res["rule_set_version"] == "test-port"
+        assert res["extracted_count"] >= 1
+        assert not pg_calls, "SA-local extraction must never touch PG"
+
+        conn = scs.connect(sa_db, read_only=True)
+        try:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM sa_comment_signals WHERE rule_set_version = 'test-port'"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        assert n == res["extracted_count"]
 
     def test_pg_mode_proceeds(self, pg_calls):
         from src.sa.comment_signal_backfill import run_backfill

@@ -51,7 +51,25 @@ def build_ticker_universe(dal: Any) -> Set[str]:
         logger.warning("build_ticker_universe: watchlist read failed: %s", exc)
 
     backend = getattr(dal, "_backend", None)
-    if backend is not None and hasattr(backend, "_get_conn"):
+    sa_db = getattr(backend, "_sa_db", None)
+    if isinstance(sa_db, str) and sa_db:
+        # SA-local: read Alpha Picks symbols from sa_capture.db, NOT the frozen PG.
+        try:
+            from src import sa_capture_store as store
+
+            conn = store.connect(sa_db, read_only=True)
+            try:
+                rows = conn.execute(
+                    "SELECT DISTINCT symbol FROM sa_alpha_picks WHERE symbol IS NOT NULL"
+                ).fetchall()
+            finally:
+                conn.close()
+            for row in rows:
+                if row[0]:
+                    universe.add(row[0].upper())
+        except Exception as exc:
+            logger.warning("build_ticker_universe: alpha picks (sqlite) read failed: %s", exc)
+    elif backend is not None and hasattr(backend, "_get_conn"):
         try:
             conn = backend._get_conn()
             with conn.cursor() as cur:
@@ -97,17 +115,16 @@ def run_backfill(
         seen this run, for sanity checking).
     """
     backend = getattr(dal, "_backend", None)
-    # Locked 3d L3: this job is the PAUSED second writer during the SA cutover.
-    # Its raw psycopg2 writes would land in the FROZEN PG (split-brain) while
-    # reads come from sa_capture.db. Loud guard — NOT a silent skip — so an
-    # accidental UI/job trigger fails visibly until follow-up #1 ports it.
-    # (_sa_db is duck-typed as the sa_capture.db path string; the isinstance
-    # check keeps non-str test doubles / mock attributes from tripping this.)
+    # follow-up #1 (was the locked-3d L3 paused second writer): when use_local_sa is
+    # on, route to the sa_capture.db (SQLite) twin. Writes go through the
+    # sa_capture_store choke-point — never the frozen PG, so no split-brain.
+    # (_sa_db is duck-typed as the sa_capture.db path string; the isinstance check
+    # keeps non-str test doubles / mock attributes from tripping this.)
     sa_db = getattr(backend, "_sa_db", None)
     if isinstance(sa_db, str) and sa_db:
-        raise RuntimeError(
-            "extract_sa_comment_signals is not yet ported to sa_capture.db — "
-            "locked 3d follow-up #1; do not run while use_local_sa is on"
+        return _run_backfill_sqlite(
+            dal, sa_db, batch_size=batch_size,
+            max_extracted=max_extracted, rule_set_version=rule_set_version,
         )
     if backend is None or not hasattr(backend, "_get_conn"):
         return {
@@ -181,7 +198,87 @@ def run_backfill(
 
 
 # ---------------------------------------------------------------------------
-# Internals
+# SA-local twin (follow-up #1): extract into sa_capture.db via the store choke-point
+# ---------------------------------------------------------------------------
+
+
+def _run_backfill_sqlite(
+    dal: Any,
+    sa_db: str,
+    *,
+    batch_size: int,
+    max_extracted: Optional[int],
+    rule_set_version: str,
+) -> Dict[str, Any]:
+    """SA-local twin of run_backfill — same loop shape, but reads/writes
+    sa_capture.db through the sa_capture_store signal API. Each batch is one
+    transaction (``with conn:``) so scalar + junction writes commit together;
+    a crash rolls back the whole batch (re-extracted on rerun), never a
+    half-updated comment. Never opens a PG connection."""
+    from src import sa_capture_store as store
+
+    universe = build_ticker_universe(dal)
+    extractor = CommentSignalExtractor(
+        universe=universe, rule_set_version=rule_set_version,
+    )
+    conn = store.connect(sa_db)
+    try:
+        total_pending = store.count_pending_signals(conn, rule_set_version)
+        if total_pending == 0:
+            return {
+                "extracted_count": 0,
+                "total_pending": 0,
+                "universe_size": len(universe),
+                "rule_set_version": rule_set_version,
+                "batch_count": 0,
+                "sample_high_score": 0.0,
+            }
+
+        extracted = 0
+        batch_count = 0
+        sample_high_score = 0.0
+        last_id = 0
+        cap_reached = False
+
+        while not cap_reached:
+            rows = store.fetch_pending_comments(
+                conn, last_id=last_id, limit=batch_size,
+                rule_set_version=rule_set_version,
+            )
+            if not rows:
+                break
+
+            with conn:  # batch-atomic (refinement #3)
+                for row in rows:
+                    row_id, article_id, comment_id, text, upvotes = row
+                    signals = extractor.extract(text or "", upvotes=upvotes or 0)
+                    store.upsert_comment_signal(
+                        conn, row_id=row_id, article_id=article_id,
+                        comment_id=comment_id, signals=signals,
+                    )
+                    extracted += 1
+                    sample_high_score = max(sample_high_score, signals.high_value_score)
+                    last_id = max(last_id, row_id)
+                    if max_extracted is not None and extracted >= max_extracted:
+                        cap_reached = True
+                        break
+
+            batch_count += 1
+
+        return {
+            "extracted_count": extracted,
+            "total_pending": total_pending,
+            "universe_size": len(universe),
+            "rule_set_version": rule_set_version,
+            "batch_count": batch_count,
+            "sample_high_score": sample_high_score,
+        }
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Internals (PG mode)
 # ---------------------------------------------------------------------------
 
 
