@@ -114,6 +114,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sa_article_detail as _get_sa_article_detail,
         get_sa_market_news as _get_sa_market_news,
         list_high_value_comments as _list_high_value_comments,
+        get_sa_comment_focus as _get_sa_comment_focus,
     )
     from src.tools.sa_digest_tools import (
         get_sa_digest as _get_sa_digest,
@@ -1004,6 +1005,30 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "list_high_value_comments")
 
     @function_tool
+    def tool_get_sa_comment_focus(
+        window_days: int = 14,
+        min_score: float = 2.0,
+        limit: int = 10,
+    ) -> str:
+        """What the SA comment crowd is focused on lately — cross-ticker, deterministic.
+
+        Rule-based aggregation over sa_comment_signals (NOT LLM sentiment):
+        top_tickers ranked by recent high-value comment attention
+        (sum_score desc, mention_count desc), top_keyword_buckets driving it,
+        and candidate_watch (off-universe tickers gaining mentions). Each sample
+        is traceable (comment/article ids + url). Use for portfolio-wide
+        'what is SA discussing recently' questions; use tool_get_sa_digest for a
+        single ticker. Returns empty_reason so empty != 'no attention'.
+        """
+        result = _get_sa_comment_focus(
+            dal,
+            window_days=window_days,
+            min_score=min_score,
+            limit=limit,
+        )
+        return _serialize_result(result, "get_sa_comment_focus")
+
+    @function_tool
     def tool_get_sa_digest(
         ticker: str,
         days: int = 14,
@@ -1128,6 +1153,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
         tool_list_high_value_comments,
+        tool_get_sa_comment_focus,
         tool_get_sa_digest,
         # macro_calendar (P1.2 commit 6)
         tool_get_economic_calendar,

@@ -445,3 +445,250 @@ def _query_high_value_comments_local(
         return out
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Cross-ticker comment FOCUS (follow-up #1 Layer B) — an agent research primitive
+# ---------------------------------------------------------------------------
+
+_FOCUS_SIGNAL_TYPE = "deterministic_rule_based (NOT LLM sentiment)"
+
+
+def _empty_focus(window_days, min_score, *, error=None, rule_set_version=None,
+                 empty_reason=None):
+    out = {
+        "window_days": window_days,
+        "min_score": min_score,
+        "rule_set_version": rule_set_version,
+        "signal_type": _FOCUS_SIGNAL_TYPE,
+        "comment_count": 0,
+        "top_tickers": [],
+        "top_keyword_buckets": [],
+        "candidate_watch": [],
+        "data_quality": {},
+        "empty_reason": empty_reason,
+    }
+    if error:
+        out["error"] = error
+    return out
+
+
+def get_sa_comment_focus(
+    dal: Any,
+    window_days: int = 14,
+    min_score: float = 2.0,
+    limit: int = 10,
+) -> Dict:
+    """What the SA comment crowd is focused on lately — cross-ticker, DETERMINISTIC.
+
+    A rule-based aggregation over sa_comment_signals (NOT LLM sentiment): ranks
+    tickers by recent high-value-comment attention, the keyword buckets driving
+    the discussion, and off-universe *candidate* tickers gaining mentions. Built
+    for an agent answering "what is Seeking Alpha discussing recently" — every
+    figure is traceable to comment/article ids (+ url) so the agent can cite it.
+
+    Args:
+        window_days: lookback over ``comment_date`` (1..90, default 14).
+        min_score: ``high_value_score`` floor (default 2.0; clamped >= 0).
+        limit: max tickers / candidates / buckets returned (1..50, default 10).
+
+    Returns (keys always present; empty sources → [] with an ``empty_reason``):
+        window_days, min_score, rule_set_version, signal_type, generated_at,
+        comment_count, top_tickers[], top_keyword_buckets[], candidate_watch[],
+        data_quality{}, empty_reason. Ranking is deterministic
+        (sum_score desc, mention_count desc, ticker asc). Each sample carries
+        comment_row_id, comment_id, article_id, url, comment_date,
+        high_value_score, preview.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+
+    backend = getattr(dal, "_backend", None)
+    if backend is None or not hasattr(backend, "_get_conn"):
+        return _empty_focus(
+            window_days, min_score, empty_reason="backend_unavailable",
+            error="DB unavailable; SA comment focus requires the database backend.")
+
+    try:
+        from src.sa.comment_signals import RULE_SET_VERSION as ver
+
+        window_days = max(1, min(int(window_days), 90))
+        limit = max(1, min(int(limit), 50))
+        min_score = max(0.0, float(min_score))
+
+        sa_db = getattr(backend, "_sa_db", None)
+        if sa_db is None:
+            # Post-3d-cutover primitive: SA is local-first, so focus reads
+            # sa_capture.db directly. PG mode = pre-flip / rollback only.
+            return _empty_focus(
+                window_days, min_score, rule_set_version=ver,
+                empty_reason="requires_local_sa",
+                error="get_sa_comment_focus requires the local sa_capture.db "
+                      "(use_local_sa); SA is local-first after the 3d cutover.")
+
+        from src import sa_capture_store as store
+
+        data = _focus_local(
+            sa_db, window_days=window_days, min_score=min_score,
+            rule_set_version=ver, limit=limit,
+        )
+        return {
+            "window_days": window_days,
+            "min_score": min_score,
+            "rule_set_version": ver,
+            "signal_type": _FOCUS_SIGNAL_TYPE,
+            "generated_at": store.now_ts(),
+            "comment_count": data["comment_count"],
+            "top_tickers": data["top_tickers"],
+            "top_keyword_buckets": data["top_keyword_buckets"],
+            "candidate_watch": data["candidate_watch"],
+            "data_quality": data["data_quality"],
+            "empty_reason": data["empty_reason"],
+        }
+    except Exception as e:
+        logger.error("get_sa_comment_focus error: %s", e)
+        return _empty_focus(window_days, min_score, empty_reason="error", error=str(e))
+
+
+def _focus_local(
+    sa_db: str,
+    *,
+    window_days: int,
+    min_score: float,
+    rule_set_version: str,
+    limit: int,
+    sample_per: int = 2,
+    kw_cap: int = 1000,
+) -> Dict[str, Any]:
+    """SQLite aggregation for get_sa_comment_focus. Counts come from SQL GROUP BY
+    over the junction tables (accurate — NOT capped to a top-N comment sample);
+    keyword buckets are parsed from the window's high-value signals (capped at
+    kw_cap for memory). Reads only sa_capture.db."""
+    from src import sa_capture_store as store
+
+    cutoff = store.canon_ts(datetime.now(timezone.utc) - timedelta(days=window_days))
+    where = ("c.comment_date >= ? AND s.high_value_score >= ? "
+             "AND s.rule_set_version = ?")
+    wp = (cutoff, min_score, rule_set_version)
+
+    conn = store.connect(sa_db, read_only=True)
+    try:
+        comment_count = conn.execute(
+            f"SELECT COUNT(*) FROM sa_comment_signals s "
+            f"JOIN sa_article_comments c ON c.id = s.comment_row_id WHERE {where}",
+            wp).fetchone()[0]
+        comments_in_window = conn.execute(
+            "SELECT COUNT(*) FROM sa_article_comments WHERE comment_date >= ?",
+            (cutoff,)).fetchone()[0]
+        pending_in_window = conn.execute(
+            "SELECT COUNT(*) FROM sa_article_comments c WHERE c.comment_date >= ? "
+            "AND NOT EXISTS (SELECT 1 FROM sa_comment_signals s "
+            "WHERE s.comment_row_id = c.id AND s.rule_set_version = ?)",
+            (cutoff, rule_set_version)).fetchone()[0]
+
+        def _agg(junction):
+            return conn.execute(
+                f"SELECT m.ticker, COUNT(*) n, ROUND(SUM(s.high_value_score), 2) sm, "
+                f"ROUND(AVG(s.high_value_score), 2) av FROM {junction} m "
+                f"JOIN sa_comment_signals s ON s.comment_row_id = m.comment_row_id "
+                f"JOIN sa_article_comments c ON c.id = s.comment_row_id WHERE {where} "
+                f"GROUP BY m.ticker ORDER BY sm DESC, n DESC, m.ticker ASC LIMIT ?",
+                wp + (limit,)).fetchall()
+
+        def _samples(junction, syms):
+            out = {s: [] for s in syms}
+            if not syms:
+                return out
+            ph = ",".join("?" * len(syms))
+            for r in conn.execute(
+                f"SELECT m.ticker, c.id comment_row_id, c.comment_id, s.article_id, "
+                f"c.comment_date, s.high_value_score, substr(c.comment_text, 1, 200) preview, "
+                f"a.url FROM {junction} m "
+                f"JOIN sa_comment_signals s ON s.comment_row_id = m.comment_row_id "
+                f"JOIN sa_article_comments c ON c.id = s.comment_row_id "
+                f"LEFT JOIN sa_articles a ON a.article_id = s.article_id "
+                f"WHERE m.ticker IN ({ph}) AND {where} "
+                f"ORDER BY m.ticker, s.high_value_score DESC, c.comment_date DESC, c.id DESC",
+                tuple(syms) + wp,
+            ):
+                lst = out[r["ticker"]]
+                if len(lst) < sample_per:
+                    lst.append({
+                        "comment_row_id": r["comment_row_id"],
+                        "comment_id": r["comment_id"],
+                        "article_id": r["article_id"],
+                        "url": r["url"],
+                        "comment_date": r["comment_date"],
+                        "high_value_score": float(r["high_value_score"]),
+                        "preview": r["preview"],
+                    })
+            return out
+
+        def _rows(agg, junction):
+            samples = _samples(junction, [r["ticker"] for r in agg])
+            return [{
+                "ticker": r["ticker"],
+                "mention_count": r["n"],
+                "sum_score": float(r["sm"]),
+                "avg_score": float(r["av"]),
+                "samples": samples.get(r["ticker"], []),
+            } for r in agg]
+
+        top_tickers = _rows(_agg("sa_signal_ticker_mentions"), "sa_signal_ticker_mentions")
+        candidate_watch = _rows(_agg("sa_signal_candidate_mentions"), "sa_signal_candidate_mentions")
+
+        # keyword buckets: parse JSON of the window's high-value signals (capped),
+        # associating each bucket with the tickers mentioned in the same comments.
+        kb_rows = conn.execute(
+            f"SELECT s.comment_row_id, s.keyword_buckets FROM sa_comment_signals s "
+            f"JOIN sa_article_comments c ON c.id = s.comment_row_id WHERE {where} "
+            f"ORDER BY s.high_value_score DESC, s.comment_row_id DESC LIMIT ?",
+            wp + (kw_cap,)).fetchall()
+        kb_ids = [r["comment_row_id"] for r in kb_rows]
+        ment: Dict[int, List[str]] = {}
+        if kb_ids:
+            ph = ",".join("?" * len(kb_ids))
+            for jr in conn.execute(
+                f"SELECT comment_row_id, ticker FROM sa_signal_ticker_mentions "
+                f"WHERE comment_row_id IN ({ph})", tuple(kb_ids)):
+                ment.setdefault(jr["comment_row_id"], []).append(jr["ticker"])
+        buckets: Dict[str, Dict[str, Any]] = {}
+        for r in kb_rows:
+            try:
+                kb = json.loads(r["keyword_buckets"] or "{}")
+            except ValueError:
+                kb = {}
+            tks = ment.get(r["comment_row_id"], [])
+            for name in kb:
+                b = buckets.setdefault(name, {"count": 0, "tickers": set()})
+                b["count"] += 1
+                b["tickers"].update(tks)
+        top_keyword_buckets = sorted(
+            ({"bucket": k, "comment_count": v["count"], "tickers": sorted(v["tickers"])}
+             for k, v in buckets.items()),
+            key=lambda x: (-x["comment_count"], x["bucket"]))[:limit]
+
+        empty_reason = None
+        if comment_count == 0:
+            if pending_in_window > 0:
+                empty_reason = "extraction_backlog_pending"
+            elif comments_in_window > 0:
+                empty_reason = "no_comment_above_min_score"
+            else:
+                empty_reason = "no_comments_in_window"
+
+        return {
+            "comment_count": comment_count,
+            "top_tickers": top_tickers,
+            "candidate_watch": candidate_watch,
+            "top_keyword_buckets": top_keyword_buckets,
+            "data_quality": {
+                "comments_in_window": comments_in_window,
+                "scored_at_min_score": comment_count,
+                "pending_extraction_in_window": pending_in_window,
+                "keyword_scan_capped_at": kw_cap if len(kb_rows) >= kw_cap else None,
+            },
+            "empty_reason": empty_reason,
+        }
+    finally:
+        conn.close()

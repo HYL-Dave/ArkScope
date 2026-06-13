@@ -147,7 +147,7 @@ class TestBridgeIntegration:
         """Registry has 51 tools (incl. P1.2 macro_calendar + P1.3 get_sa_digest)."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 51
+        assert len(registry.list_all()) == 52
 
     def test_analysis_category_6(self):
         """Analysis category has 12 tools (incl. P1.2 get_economic_calendar + get_macro_value)."""

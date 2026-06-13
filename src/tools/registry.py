@@ -944,7 +944,7 @@ class ToolRegistry:
         from .sa_tools import (
             get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
             get_sa_articles, get_sa_article_detail, get_sa_market_news,
-            list_high_value_comments,
+            list_high_value_comments, get_sa_comment_focus,
         )
         from .sa_digest_tools import get_sa_digest
 
@@ -1132,6 +1132,38 @@ class ToolRegistry:
                 ToolParameter("limit", "integer",
                               "Max comments returned (1-50, default 20)",
                               required=False, default=20),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_comment_focus",
+            description=(
+                "Cross-ticker view of what the Seeking Alpha COMMENT crowd is "
+                "focused on lately — a deterministic, rule-based aggregation over "
+                "sa_comment_signals (NOT LLM sentiment). Answers 'what is SA "
+                "discussing recently': ranks top_tickers by recent high-value "
+                "comment attention (sum_score desc, mention_count desc), the "
+                "top_keyword_buckets driving it, and candidate_watch (off-universe "
+                "tickers gaining mentions). Every figure is traceable — each sample "
+                "carries comment_row_id/comment_id/article_id/url/score/preview. "
+                "Use this for portfolio-wide community-attention questions; use "
+                "get_sa_digest for ONE ticker. Reads the local sa_capture.db. "
+                "Returns empty_reason (e.g. extraction_backlog_pending, "
+                "no_comment_above_min_score) so empty != 'no attention'."
+            ),
+            function=get_sa_comment_focus,
+            category="news",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("window_days", "integer",
+                              "Lookback over comment_date (1-90, default 14)",
+                              required=False, default=14),
+                ToolParameter("min_score", "number",
+                              "high_value_score floor (default 2.0, clamped >= 0)",
+                              required=False, default=2.0),
+                ToolParameter("limit", "integer",
+                              "Max tickers / candidates / buckets (1-50, default 10)",
+                              required=False, default=10),
             ],
         ))
 

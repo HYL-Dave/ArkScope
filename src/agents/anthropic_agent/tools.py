@@ -1127,6 +1127,30 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             },
         },
         {
+            "name": "get_sa_comment_focus",
+            "description": (
+                "Cross-ticker view of what the SA COMMENT crowd is focused on lately "
+                "— deterministic, rule-based aggregation over sa_comment_signals (NOT "
+                "LLM sentiment). Answers 'what is Seeking Alpha discussing recently': "
+                "top_tickers ranked by recent high-value comment attention "
+                "(sum_score desc, mention_count desc), top_keyword_buckets driving it, "
+                "candidate_watch (off-universe tickers gaining mentions). Every figure "
+                "traceable — samples carry comment_row_id/comment_id/article_id/url/"
+                "score/preview. Use for portfolio-wide attention questions; use "
+                "get_sa_digest for ONE ticker. Returns empty_reason (e.g. "
+                "extraction_backlog_pending) so empty != 'no attention'."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "window_days": {"type": "integer", "description": "Lookback over comment_date (1-90, default 14)"},
+                    "min_score": {"type": "number", "description": "high_value_score floor (default 2.0, clamped >= 0)"},
+                    "limit": {"type": "integer", "description": "Max tickers / candidates / buckets (1-50, default 10)"},
+                },
+                "required": [],
+            },
+        },
+        {
             "name": "get_sa_digest",
             "description": (
                 "Return a deterministic SA evidence pack for one ticker. Composes "
@@ -1357,7 +1381,7 @@ def execute_tool(
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
-        list_high_value_comments,
+        list_high_value_comments, get_sa_comment_focus,
     )
     from src.tools.sa_digest_tools import get_sa_digest
 
@@ -1637,6 +1661,12 @@ def execute_tool(
             ticker=tool_input.get("ticker"),
             min_score=tool_input.get("min_score", 2.0),
             limit=tool_input.get("limit", 20),
+        ),
+        "get_sa_comment_focus": lambda: get_sa_comment_focus(
+            dal,
+            window_days=tool_input.get("window_days", 14),
+            min_score=tool_input.get("min_score", 2.0),
+            limit=tool_input.get("limit", 10),
         ),
         "get_sa_digest": lambda: get_sa_digest(
             dal,
