@@ -167,7 +167,7 @@ UI：`Settings.tsx` 文案改為「SA capture 已切本地 SQLite（hard cutover
 
 ## 5. 明確 OUT OF SCOPE（3d 不做）
 
-- port `extract_sa_comment_signals`（follow-up #1 — **Layer A DONE 504166d**：SQLite 抽取已接回；job 仍只**手動觸發、未進排程**；Layer B = agent cross-ticker focus tool 進行中）
+- ~~port `extract_sa_comment_signals`~~ → **follow-up #1 DONE**：Layer A (504166d) SQLite 抽取接回 store choke-point + Layer B (cff3466/fd313a9) `get_sa_comment_focus` agent 跨-ticker focus 工具（雙 bridge 註冊、對抗驗證過）。**job 仍只手動觸發、未進排程**（自動增量排程 = 另議的獨立決定）。
 - tickers_core 回寫退休 + provenance seeding 替代（follow-up #2）
 - Firefox manifest 退休（follow-up #3）
 - 刪 PG sa_* 舊列（resume gate 後重訪）
