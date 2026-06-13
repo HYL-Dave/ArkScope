@@ -1151,6 +1151,31 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             },
         },
         {
+            "name": "get_sa_feed",
+            "description": (
+                "Unified Seeking Alpha evidence feed — SA analysis articles + "
+                "market-news items in ONE newest-first, paginated list with per-type/"
+                "per-day facets. Score-free; reads the local sa_capture.db. Pull recent "
+                "SA coverage for a ticker or topic as evidence (cite item url / "
+                "detail_route). q uses FTS5 (short/symbol queries fall back to LIKE); "
+                "ticker filters by mention; item_type = article | market_news. For "
+                "per-ticker comment attention use get_sa_comment_focus; for one "
+                "article's body+comments use get_sa_article_detail."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "Search terms (FTS5; short/symbol → LIKE)"},
+                    "ticker": {"type": "string", "description": "Filter by mentioned ticker"},
+                    "item_type": {"type": "string", "enum": ["article", "market_news"], "description": "Filter item type"},
+                    "days": {"type": "integer", "description": "Lookback window (1-3650, default 30)"},
+                    "limit": {"type": "integer", "description": "Max items (1-200, default 50)"},
+                    "offset": {"type": "integer", "description": "Pagination offset (default 0)"},
+                },
+                "required": [],
+            },
+        },
+        {
             "name": "get_sa_digest",
             "description": (
                 "Return a deterministic SA evidence pack for one ticker. Composes "
@@ -1381,7 +1406,7 @@ def execute_tool(
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
-        list_high_value_comments, get_sa_comment_focus,
+        list_high_value_comments, get_sa_comment_focus, get_sa_feed,
     )
     from src.tools.sa_digest_tools import get_sa_digest
 
@@ -1667,6 +1692,15 @@ def execute_tool(
             window_days=tool_input.get("window_days", 14),
             min_score=tool_input.get("min_score", 2.0),
             limit=tool_input.get("limit", 10),
+        ),
+        "get_sa_feed": lambda: get_sa_feed(
+            dal,
+            q=tool_input.get("q"),
+            ticker=tool_input.get("ticker"),
+            item_type=tool_input.get("item_type"),
+            days=tool_input.get("days", 30),
+            limit=tool_input.get("limit", 50),
+            offset=tool_input.get("offset", 0),
         ),
         "get_sa_digest": lambda: get_sa_digest(
             dal,

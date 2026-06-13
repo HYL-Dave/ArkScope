@@ -14,6 +14,7 @@ from src.tools.sa_tools import (
     get_sa_alpha_picks,
     get_sa_article_detail,
     get_sa_articles,
+    get_sa_feed,
     get_sa_market_news,
     get_sa_pick_detail,
 )
@@ -33,6 +34,28 @@ def _unwrap_sa_result(result: dict) -> dict:
         if "not found" in text.lower():
             raise HTTPException(status_code=404, detail=text)
         raise HTTPException(status_code=500, detail=text)
+    return result
+
+
+@router.get("/feed")
+def sa_feed(
+    q: Optional[str] = Query(None, description="search terms (FTS5; short/symbol → LIKE)"),
+    ticker: Optional[str] = Query(None),
+    item_type: Optional[str] = Query(None, pattern="^(article|market_news)$"),
+    days: int = Query(30, ge=1, le=3650),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    dal=Depends(get_dal),
+):
+    """Unified Seeking Alpha evidence feed (articles + market news) for the 新聞·事件
+    surface — newest first, paginated, with total + per-type/per-day facets over the
+    same filters. Degraded states (e.g. SA not local-first) return available=False
+    with an empty_reason, NOT an HTTP error — only the feature-disabled case is 503.
+    """
+    result = get_sa_feed(dal, q=q, ticker=ticker, item_type=item_type,
+                         days=days, limit=limit, offset=offset)
+    if result.get("message") == _DISABLED_MSG:
+        raise HTTPException(status_code=503, detail=result["message"])
     return result
 
 

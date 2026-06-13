@@ -263,7 +263,7 @@ class TestBridgeIntegration:
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
         # +2 for macro_calendar (P1.2 commit 6) + 1 for sa_digest (P1.3 commit 2).
-        assert len(registry.list_all()) == 52
+        assert len(registry.list_all()) == 53
 
     def test_analysis_category_count(self):
         """Analysis category includes get_economic_calendar + get_macro_value."""

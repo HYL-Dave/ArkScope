@@ -944,7 +944,7 @@ class ToolRegistry:
         from .sa_tools import (
             get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
             get_sa_articles, get_sa_article_detail, get_sa_market_news,
-            list_high_value_comments, get_sa_comment_focus,
+            list_high_value_comments, get_sa_comment_focus, get_sa_feed,
         )
         from .sa_digest_tools import get_sa_digest
 
@@ -1164,6 +1164,42 @@ class ToolRegistry:
                 ToolParameter("limit", "integer",
                               "Max tickers / candidates / buckets (1-50, default 10)",
                               required=False, default=10),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="get_sa_feed",
+            description=(
+                "Unified Seeking Alpha evidence feed — SA analysis articles + "
+                "market-news items in ONE newest-first, paginated list with "
+                "per-type/per-day facets. Score-free; reads the local sa_capture.db. "
+                "Use to pull recent SA coverage for a ticker or topic as evidence, "
+                "then cite item url / detail_route. q uses FTS5 (short or symbol "
+                "queries fall back to LIKE); ticker filters by mention; item_type = "
+                "article | market_news. Each item: type, title, tickers, "
+                "published_at, url, snippet, has_detail, comments_count, detail_route. "
+                "For per-ticker comment attention use get_sa_comment_focus; for one "
+                "article's body+comments use get_sa_article_detail."
+            ),
+            function=get_sa_feed,
+            category="news",
+            requires_dal=True,
+            parameters=[
+                ToolParameter("q", "string",
+                              "Search terms (FTS5; short/symbol queries → LIKE)",
+                              required=False),
+                ToolParameter("ticker", "string",
+                              "Filter by mentioned ticker", required=False),
+                ToolParameter("item_type", "string", "Filter item type",
+                              required=False, enum=["article", "market_news"]),
+                ToolParameter("days", "integer",
+                              "Lookback window (1-3650, default 30)",
+                              required=False, default=30),
+                ToolParameter("limit", "integer",
+                              "Max items (1-200, default 50)",
+                              required=False, default=50),
+                ToolParameter("offset", "integer",
+                              "Pagination offset (default 0)", required=False, default=0),
             ],
         ))
 

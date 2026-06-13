@@ -809,7 +809,7 @@ class TestBridgeIntegration:
     def test_registry_count(self):
         """Registry total (incl. P1.2 macro_calendar tools)."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 52
+        assert len(registry.list_all()) == 53
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (1 + 3 SA picks + 2 SA articles)."""
@@ -820,13 +820,13 @@ class TestBridgeIntegration:
         """OpenAI schema should match registry count."""
         registry = create_default_registry()
         schema = registry.to_openai_schema()
-        assert len(schema) == 52
+        assert len(schema) == 53
 
     def test_anthropic_schema_count(self):
         """Anthropic schema should match registry count."""
         registry = create_default_registry()
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 52
+        assert len(schema) == 53
 
     def test_sa_tool_names_in_registry(self):
         """SA tool names should exist in registry."""
@@ -842,7 +842,7 @@ class TestBridgeIntegration:
         """Anthropic bridge should have registry (52) + delegate_to_subagent."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 53
+        assert len(tools) == 54
 
     def test_openai_bridge_includes_sa_market_news(self):
         """Anthropic bridge includes SA market-news schema."""
@@ -2039,7 +2039,7 @@ class TestRegistryV3:
     def test_registry_count(self):
         """Registry total (incl. P1.2 macro_calendar tools)."""
         registry = create_default_registry()
-        assert len(registry.list_all()) == 52
+        assert len(registry.list_all()) == 53
 
     def test_portfolio_category_6(self):
         """Portfolio category should have 6 tools (4 + 2 SA articles)."""
@@ -2049,7 +2049,7 @@ class TestRegistryV3:
     def test_news_category_count(self):
         """News category should include SA market-news + list_high_value_comments."""
         registry = create_default_registry()
-        assert len(registry.list_by_category("news")) == 9
+        assert len(registry.list_by_category("news")) == 10
 
     def test_new_tool_names_in_registry(self):
         """New SA article tool names should exist in registry."""

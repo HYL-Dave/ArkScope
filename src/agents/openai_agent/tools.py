@@ -115,6 +115,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_sa_market_news as _get_sa_market_news,
         list_high_value_comments as _list_high_value_comments,
         get_sa_comment_focus as _get_sa_comment_focus,
+        get_sa_feed as _get_sa_feed,
     )
     from src.tools.sa_digest_tools import (
         get_sa_digest as _get_sa_digest,
@@ -1029,6 +1030,35 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_sa_comment_focus")
 
     @function_tool
+    def tool_get_sa_feed(
+        q: str = "",
+        ticker: str = "",
+        item_type: str = "",
+        days: int = 30,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> str:
+        """Unified Seeking Alpha evidence feed — SA analysis articles + market news.
+
+        Newest-first, paginated, with per-type/per-day facets. Score-free; reads
+        the local sa_capture.db. Pull recent SA coverage for a ticker or topic as
+        evidence (cite item url / detail_route). q uses FTS5 (short/symbol → LIKE);
+        ticker filters by mention; item_type = article | market_news. For
+        per-ticker comment attention use tool_get_sa_comment_focus; for one
+        article's body + comments use tool_get_sa_article_detail.
+        """
+        result = _get_sa_feed(
+            dal,
+            q=q or None,
+            ticker=ticker or None,
+            item_type=item_type or None,
+            days=days,
+            limit=limit,
+            offset=offset,
+        )
+        return _serialize_result(result, "get_sa_feed")
+
+    @function_tool
     def tool_get_sa_digest(
         ticker: str,
         days: int = 14,
@@ -1154,6 +1184,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_market_news,
         tool_list_high_value_comments,
         tool_get_sa_comment_focus,
+        tool_get_sa_feed,
         tool_get_sa_digest,
         # macro_calendar (P1.2 commit 6)
         tool_get_economic_calendar,

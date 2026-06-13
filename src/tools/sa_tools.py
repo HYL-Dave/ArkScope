@@ -718,3 +718,192 @@ def _focus_local(
         }
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# SA evidence FEED (Layer C-1) — unified articles + market-news for the News
+# surface and as an agent evidence primitive. A DEDICATED UNION query (not a
+# 2-reader compose) so total / facets / pagination are accurate.
+# ---------------------------------------------------------------------------
+
+
+def _empty_feed(days, *, error=None, empty_reason=None):
+    out = {
+        "available": False,
+        "days": days,
+        "query": None,
+        "total": 0,
+        "items": [],
+        "by_type": {},
+        "by_day": {},
+        "empty_reason": empty_reason,
+    }
+    if error:
+        out["error"] = error
+    return out
+
+
+def get_sa_feed(
+    dal: Any,
+    q: Optional[str] = None,
+    ticker: Optional[str] = None,
+    item_type: Optional[str] = None,
+    days: int = 30,
+    limit: int = 50,
+    offset: int = 0,
+) -> Dict:
+    """Unified, paginated Seeking Alpha evidence feed (SA articles + market news).
+
+    Score-free, newest-first, with accurate total + per-type/per-day facets over
+    the same filters — for the News (新聞·事件) surface and as an agent evidence
+    primitive (NO summary; the agent composes). Reads the local sa_capture.db
+    (SA is local-first after the 3d cutover; PG mode degrades clearly).
+
+    Args:
+        q: search terms. Empty → pure time sort. len < 3 or any non-alphanumeric
+           char → LIKE fallback (SA is full of short tickers/abbrevs that FTS
+           tokenizes poorly). Otherwise FTS5 (tokenized AND).
+        ticker: filter by mention — article.ticker column / market-news junction
+           (NOT text search).
+        item_type: 'article' | 'market_news' | None (both).
+        days: published window 1..3650 (default 30).
+        limit: 1..200 (default 50). offset: >= 0.
+
+    Returns: {available, days, query, total, items[], by_type{}, by_day{},
+        empty_reason}. Each item: {type, id, title, tickers[], published_at, url,
+        source, snippet, has_detail, comments_count, detail_route}.
+    """
+    if not _is_sa_enabled():
+        return {"message": _DISABLED_MSG}
+    try:
+        days = max(1, min(int(days), 3650))
+        limit = max(1, min(int(limit), 200))
+        offset = max(0, int(offset))
+        item_type = item_type if item_type in ("article", "market_news") else None
+        q = (q or "").strip() or None
+        tkr = ticker.strip().upper() if ticker else None
+
+        backend = getattr(dal, "_backend", None)
+        if backend is None or not hasattr(backend, "_get_conn"):
+            return _empty_feed(days, empty_reason="backend_unavailable",
+                               error="DB unavailable; SA feed requires the database backend.")
+        sa_db = getattr(backend, "_sa_db", None)
+        if sa_db is None:
+            return _empty_feed(days, empty_reason="requires_local_sa",
+                               error="get_sa_feed requires the local sa_capture.db "
+                                     "(use_local_sa); SA is local-first after the 3d cutover.")
+        return _sa_feed_local(sa_db, q=q, ticker=tkr, item_type=item_type,
+                              days=days, limit=limit, offset=offset)
+    except Exception as e:
+        logger.error("get_sa_feed error: %s", e)
+        return _empty_feed(30, empty_reason="error", error=str(e))
+
+
+def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[str, Any]:
+    """SQLite feed: UNION of normalized sa_articles + sa_market_news. The window
+    cutoff is applied PER COLUMN TYPE — published_date (DATE) vs published_at
+    (TIMESTAMP) — so a date-only article is not dropped by a timestamp cutoff."""
+    from src import sa_capture_store as store
+
+    now = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_date = store.canon_date(now)
+    cutoff_ts = store.canon_ts(now)
+
+    # q routing: simple = plain alphanumeric/CJK + spaces (isalnum covers CJK).
+    simple = bool(q) and len(q) >= 3 and all(c.isalnum() or c.isspace() for c in q)
+    fts_match = " ".join(f'"{t}"' for t in q.split()) if simple else None
+    like = None if (q is None or simple) else f"%{q}%"
+
+    def _branch(kind):
+        if kind == "article":
+            where, params = ["published_date >= ?"], [cutoff_date]
+            if ticker:
+                where.append("ticker = ?"); params.append(ticker)
+            if fts_match is not None:
+                where.append("id IN (SELECT rowid FROM sa_articles_fts WHERE sa_articles_fts MATCH ?)")
+                params.append(fts_match)
+            elif like is not None:
+                where.append("(title LIKE ? OR body_markdown LIKE ?)"); params += [like, like]
+            sql = ("SELECT 'article' type, id row_id, article_id item_id, title, "
+                   "ticker single_ticker, published_date published_at, url, "
+                   "substr(COALESCE(NULLIF(body_markdown,''), title), 1, 200) snippet, "
+                   "CASE WHEN COALESCE(body_markdown,'')!='' THEN 1 ELSE 0 END has_detail, "
+                   "COALESCE(comments_count,0) comments_count "
+                   f"FROM sa_articles WHERE {' AND '.join(where)}")
+            return sql, params
+        where, params = ["published_at >= ?"], [cutoff_ts]
+        if ticker:
+            where.append("id IN (SELECT news_row_id FROM sa_market_news_tickers WHERE ticker = ?)")
+            params.append(ticker)
+        if fts_match is not None:
+            where.append("id IN (SELECT rowid FROM sa_market_news_fts WHERE sa_market_news_fts MATCH ?)")
+            params.append(fts_match)
+        elif like is not None:
+            where.append("(title LIKE ? OR summary LIKE ?)"); params += [like, like]
+        sql = ("SELECT 'market_news' type, id row_id, news_id item_id, title, "
+               "NULL single_ticker, published_at, url, "
+               "substr(COALESCE(NULLIF(summary,''), NULLIF(body_markdown,''), title), 1, 200) snippet, "
+               "CASE WHEN COALESCE(body_markdown,'')!='' THEN 1 ELSE 0 END has_detail, "
+               "COALESCE(comments_count,0) comments_count "
+               f"FROM sa_market_news WHERE {' AND '.join(where)}")
+        return sql, params
+
+    kinds = ["article", "market_news"] if item_type is None else [item_type]
+    parts = [_branch(k) for k in kinds]
+    base = " UNION ALL ".join(s for s, _ in parts)
+    bp = [p for _, ps in parts for p in ps]
+
+    conn = store.connect(sa_db, read_only=True)
+    try:
+        total = conn.execute(f"SELECT COUNT(*) FROM ({base})", bp).fetchone()[0]
+        by_type = {r[0]: r[1] for r in conn.execute(
+            f"SELECT type, COUNT(*) FROM ({base}) GROUP BY type", bp)}
+        by_day = {r[0]: r[1] for r in conn.execute(
+            f"SELECT substr(published_at,1,10) d, COUNT(*) FROM ({base}) GROUP BY d ORDER BY d DESC", bp)}
+        rows = conn.execute(
+            f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
+            bp + [limit, offset]).fetchall()
+
+        news_ids = [r["row_id"] for r in rows if r["type"] == "market_news"]
+        news_tk: Dict[int, List[str]] = {}
+        if news_ids:
+            ph = ",".join("?" * len(news_ids))
+            for jr in conn.execute(
+                f"SELECT news_row_id, ticker FROM sa_market_news_tickers WHERE news_row_id IN ({ph})",
+                news_ids):
+                news_tk.setdefault(jr["news_row_id"], []).append(jr["ticker"])
+
+        items = []
+        for r in rows:
+            if r["type"] == "article":
+                tickers = [r["single_ticker"]] if r["single_ticker"] else []
+                detail_route = f"/sa/articles/{r['item_id']}" if r["has_detail"] else None
+            else:
+                tickers = sorted(news_tk.get(r["row_id"], []))
+                detail_route = None  # no /sa/market-news/{id} endpoint in C-1 → click uses url
+            items.append({
+                "type": r["type"],
+                "id": r["item_id"],
+                "title": r["title"],
+                "tickers": tickers,
+                "published_at": r["published_at"],
+                "url": r["url"],
+                "source": "seeking_alpha",
+                "snippet": r["snippet"],
+                "has_detail": bool(r["has_detail"]),
+                "comments_count": r["comments_count"],
+                "detail_route": detail_route,
+            })
+
+        return {
+            "available": True,
+            "days": days,
+            "query": q,
+            "total": total,
+            "items": items,
+            "by_type": by_type,
+            "by_day": by_day,
+            "empty_reason": "no_items_in_window" if total == 0 else None,
+        }
+    finally:
+        conn.close()
