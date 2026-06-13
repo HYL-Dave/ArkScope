@@ -127,6 +127,7 @@ def test_focus_keyword_buckets_aggregated(tmp_path):
     # earnings comments mention NVDA (c1) and AMD (c5) → tickers aggregated
     assert "NVDA" in buckets["earnings"]["tickers"] or "AMD" in buckets["earnings"]["tickers"]
     assert buckets["earnings"]["comment_count"] >= 1
+    assert "candidate_tickers" in buckets["earnings"]  # off-universe split present (always)
 
 
 def test_focus_empty_reason_backlog_pending(tmp_path):
@@ -204,3 +205,36 @@ def test_focus_multi_ticker_counted_once_each_and_sample_cap(tmp_path):
     assert tk["NVDA"]["mention_count"] == 4   # c1, c2, c3, c4
     assert tk["AMD"]["mention_count"] == 1    # only c4 (the multi-ticker comment)
     assert len(tk["NVDA"]["samples"]) == 2    # sample_per cap holds with 4 mentions
+
+
+def test_focus_bucket_candidate_tickers_and_broad_count(tmp_path):
+    """top_keyword_buckets carries off-universe candidate_tickers; a comment naming
+    >= 8 tickers is flagged in data_quality.broad_comment_count (radar-style)."""
+    db = tmp_path / "sa.db"
+    conn = store.connect(str(db))
+    try:
+        conn.execute(
+            "INSERT INTO sa_articles (id, article_id, url, title) "
+            "VALUES (1, 'A1', 'https://x/A1', 'T1')")
+        cd = _ts(2)
+        conn.executemany(
+            "INSERT INTO sa_article_comments "
+            "(id, article_id, comment_id, comment_text, upvotes, comment_date) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                # off-universe XYZ + earnings bucket → XYZ in earnings.candidate_tickers
+                (1, "A1", "c1", "XYZ earnings beat consensus estimate", 5, cd),
+                # radar round-up naming 8 off-universe tickers + earnings → broad
+                (2, "A1", "c2", "Weekly radar AAAA BBBB CCCC DDDD EEEE FFFF GGGG HHHH earnings", 3, cd),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    res = _focus(db, window_days=14, min_score=0.0, limit=10)
+    buckets = {b["bucket"]: b for b in res["top_keyword_buckets"]}
+    assert "earnings" in buckets
+    assert "XYZ" in buckets["earnings"]["candidate_tickers"]   # off-universe in bucket view
+    assert buckets["earnings"]["tickers"] == []                # no universe ticker here
+    assert res["data_quality"]["broad_comment_count"] >= 1     # c2 names >= 8 tickers

@@ -452,6 +452,11 @@ def _query_high_value_comments_local(
 # ---------------------------------------------------------------------------
 
 _FOCUS_SIGNAL_TYPE = "deterministic_rule_based (NOT LLM sentiment)"
+# A comment naming >= this many distinct tickers (universe + candidate) is
+# "radar-style" — one such comment props up many tickers' rankings at once.
+# data_quality.broad_comment_count surfaces how many are in the window so an
+# agent can tell a broad-based focus from a few multi-ticker round-up posts.
+_FOCUS_BROAD_COMMENT_TICKERS = 8
 
 
 def _empty_focus(window_days, min_score, *, error=None, rule_set_version=None,
@@ -499,7 +504,10 @@ def get_sa_comment_focus(
         data_quality{}, empty_reason. Ranking is deterministic
         (sum_score desc, mention_count desc, ticker asc). Each sample carries
         comment_row_id, comment_id, article_id, url, comment_date,
-        high_value_score, preview.
+        high_value_score, preview. Each top_keyword_buckets entry carries
+        {bucket, comment_count, tickers, candidate_tickers} (off-universe
+        mentions kept separate). data_quality.broad_comment_count flags
+        radar-style multi-ticker round-up comments that can skew the ranking.
     """
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
@@ -649,25 +657,36 @@ def _focus_local(
             wp + (kw_cap,)).fetchall()
         kb_ids = [r["comment_row_id"] for r in kb_rows]
         ment: Dict[int, List[str]] = {}
+        ment_cand: Dict[int, List[str]] = {}
         if kb_ids:
             ph = ",".join("?" * len(kb_ids))
-            for jr in conn.execute(
-                f"SELECT comment_row_id, ticker FROM sa_signal_ticker_mentions "
-                f"WHERE comment_row_id IN ({ph})", tuple(kb_ids)):
-                ment.setdefault(jr["comment_row_id"], []).append(jr["ticker"])
+            for tbl, acc in (("sa_signal_ticker_mentions", ment),
+                             ("sa_signal_candidate_mentions", ment_cand)):
+                for jr in conn.execute(
+                    f"SELECT comment_row_id, ticker FROM {tbl} "
+                    f"WHERE comment_row_id IN ({ph})", tuple(kb_ids)):
+                    acc.setdefault(jr["comment_row_id"], []).append(jr["ticker"])
         buckets: Dict[str, Dict[str, Any]] = {}
+        broad_comment_count = 0
         for r in kb_rows:
+            rid = r["comment_row_id"]
             try:
                 kb = json.loads(r["keyword_buckets"] or "{}")
             except ValueError:
                 kb = {}
-            tks = ment.get(r["comment_row_id"], [])
+            tks = ment.get(rid, [])
+            cands = ment_cand.get(rid, [])
+            if len(tks) + len(cands) >= _FOCUS_BROAD_COMMENT_TICKERS:
+                broad_comment_count += 1  # radar-style multi-ticker comment
             for name in kb:
-                b = buckets.setdefault(name, {"count": 0, "tickers": set()})
+                b = buckets.setdefault(name, {"count": 0, "tickers": set(), "cand": set()})
                 b["count"] += 1
                 b["tickers"].update(tks)
+                b["cand"].update(cands)  # off-universe discussion is complete in the bucket view
         top_keyword_buckets = sorted(
-            ({"bucket": k, "comment_count": v["count"], "tickers": sorted(v["tickers"])}
+            ({"bucket": k, "comment_count": v["count"],
+              "tickers": sorted(v["tickers"]),
+              "candidate_tickers": sorted(v["cand"])}
              for k, v in buckets.items()),
             key=lambda x: (-x["comment_count"], x["bucket"]))[:limit]
 
@@ -689,6 +708,10 @@ def _focus_local(
                 "comments_in_window": comments_in_window,
                 "scored_at_min_score": comment_count,
                 "pending_extraction_in_window": pending_in_window,
+                # how many scanned high-value comments name >= 8 tickers (radar-style
+                # round-ups that inflate many rankings at once) — lets the agent tell
+                # a broad-based focus from a few multi-ticker posts.
+                "broad_comment_count": broad_comment_count,
                 "keyword_scan_capped_at": kw_cap if len(kb_rows) >= kw_cap else None,
             },
             "empty_reason": empty_reason,
