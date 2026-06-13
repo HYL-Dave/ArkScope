@@ -54,6 +54,8 @@ contents were removed 2026-06-07, recoverable via git.)
 |---|---|---|---|
 | `SA_ALPHA_PICKS_CONTENT_CAPTURE.md` | **SA Article Capture** | REFERENCE | How the extension scrapes SA articles → markdown via the native host. |
 | `SA_COMMENT_INTELLIGENCE_PLAN.md` | **SA Comment Intelligence** | SHIPPED (stage 1) | Turning SA comments into community signal. |
+| `SA_CUTOVER_3D_RUNBOOK.md` | **SA Cutover 3d Runbook** | SHIPPED | PG → `data/sa_capture.db` hard cutover (executed 2026-06-13) + follow-up #1 (comment-signal port, `get_sa_comment_focus`, v1.2 stopwords). |
+| `SA_EVIDENCE_FEED_C1_SPEC.md` | **SA Evidence Feed (C-1)** | PLAN | `GET /sa/feed` + `get_sa_feed` tool + News-surface SA filter; locked plan, execute in one clean round. |
 | `SA_EXTENSION_ROADMAP.md` | **SA Extension Roadmap** | ACTIVE | Incremental roadmap for SA extension data coverage. |
 
 ## SHIPPED — feature delivered, spec kept as reference
