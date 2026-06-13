@@ -47,6 +47,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `DESKTOP_APP_CARRYOVER_ANALYSIS.md` | **Desktop Carryover Matrix** | ACTIVE | 87-component preserve/adapt/concept/defer/drop matrix for the migration. |
 | `DESKTOP_SHELL_SPIKE_PLAN.md` | **Desktop Shell Spike Plan** | ACTIVE | Electron+React shell over the FastAPI sidecar (repo layout, lifecycle). |
 | `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · PG migration · price tiers · daily_update repositioning. |
+| `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DEFERRED | Source DB vs canonical DB principle; records why multi-DB splitting is deferred until real writer/streaming pressure appears. |
 
 ## Seeking-Alpha pipeline (PROTECTED ingestion path — must not break)
 | File | Read as | Status | One-line |
