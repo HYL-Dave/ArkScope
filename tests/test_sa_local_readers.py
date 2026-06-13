@@ -9,8 +9,9 @@ Covers (per the prep-3 contract):
   (c) health split: capture metrics from SQLite while the job_runs lookup
       stays PG — a PG outage degrades to a warning-severity
       ``pipeline_signal_unavailable`` reason, never a crash;
-  (d) the comment_signal_backfill guard (locked L3) raises in SA-local mode
-      and not in PG mode.
+  (d) comment_signal_backfill ROUTES to the sa_capture.db store in SA-local mode
+      (follow-up #1 Layer A — the locked-L3 raise guard is gone) and to PG
+      otherwise; the SA-local path never crosses to PG.
 
 Hermetic: tmp_path sa_capture.db seeded via sa_capture_store.connect();
 the only "PG" is a poisoned/mocked _get_conn.
