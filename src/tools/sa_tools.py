@@ -760,9 +760,10 @@ def get_sa_feed(
     (SA is local-first after the 3d cutover; PG mode degrades clearly).
 
     Args:
-        q: search terms. Empty → pure time sort. len < 3 or any non-alphanumeric
-           char → LIKE fallback (SA is full of short tickers/abbrevs that FTS
-           tokenizes poorly). Otherwise FTS5 (tokenized AND).
+        q: search terms. Empty → pure time sort. len < 3 (incl. 2-char CJK) or any
+           non-alphanumeric char → LIKE substring fallback (SA is full of short
+           tickers/abbrevs that FTS tokenizes poorly; %/_ are escaped). Otherwise
+           FTS5 (tokenized AND) over the sa_*_fts mirrors.
         ticker: filter by mention — article.ticker column / market-news junction
            (NOT text search).
         item_type: 'article' | 'market_news' | None (both).
@@ -812,7 +813,13 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
     # q routing: simple = plain alphanumeric/CJK + spaces (isalnum covers CJK).
     simple = bool(q) and len(q) >= 3 and all(c.isalnum() or c.isspace() for c in q)
     fts_match = " ".join(f'"{t}"' for t in q.split()) if simple else None
-    like = None if (q is None or simple) else f"%{q}%"
+    # LIKE fallback: escape % / _ / \ so a literal symbol in q is matched literally
+    # (q routes here precisely BECAUSE it has such chars), via ESCAPE '\' below.
+    if q is None or simple:
+        like = None
+    else:
+        esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{esc}%"
 
     def _branch(kind):
         if kind == "article":
@@ -823,7 +830,8 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
                 where.append("id IN (SELECT rowid FROM sa_articles_fts WHERE sa_articles_fts MATCH ?)")
                 params.append(fts_match)
             elif like is not None:
-                where.append("(title LIKE ? OR body_markdown LIKE ?)"); params += [like, like]
+                where.append("(title LIKE ? ESCAPE '\\' OR body_markdown LIKE ? ESCAPE '\\')")
+                params += [like, like]
             sql = ("SELECT 'article' type, id row_id, article_id item_id, title, "
                    "ticker single_ticker, published_date published_at, url, "
                    "substr(COALESCE(NULLIF(body_markdown,''), title), 1, 200) snippet, "
@@ -839,7 +847,8 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
             where.append("id IN (SELECT rowid FROM sa_market_news_fts WHERE sa_market_news_fts MATCH ?)")
             params.append(fts_match)
         elif like is not None:
-            where.append("(title LIKE ? OR summary LIKE ?)"); params += [like, like]
+            where.append("(title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\')")
+            params += [like, like]
         sql = ("SELECT 'market_news' type, id row_id, news_id item_id, title, "
                "NULL single_ticker, published_at, url, "
                "substr(COALESCE(NULLIF(summary,''), NULLIF(body_markdown,''), title), 1, 200) snippet, "

@@ -186,3 +186,40 @@ def test_feed_clamps_params(tmp_path):
     res = _feed(db, days=99999, limit=99999, offset=-5)
     assert res["days"] == 3650
     assert len(res["items"]) <= 200
+
+
+def test_route_handler_happy_and_disabled(tmp_path, monkeypatch):
+    """Spec §5: handler-level route smoke (NOT TestClient — see feedback_route_unit_tests)."""
+    from fastapi import HTTPException
+
+    from src.api.routes.seeking_alpha import sa_feed
+
+    db = tmp_path / "sa.db"; _seed(db)
+    dal, _ = _dal(db)
+    res = sa_feed(q=None, ticker=None, item_type=None, days=30, limit=50, offset=0, dal=dal)
+    assert res["available"] is True and res["total"] == 4 and len(res["items"]) == 4
+
+    monkeypatch.setattr(sa_tools, "_is_sa_enabled", lambda: False)  # feature-disabled → 503
+    with pytest.raises(HTTPException) as ei:
+        sa_feed(q=None, ticker=None, item_type=None, days=30, limit=50, offset=0, dal=dal)
+    assert ei.value.status_code == 503
+
+
+def test_like_escapes_sql_wildcards(tmp_path):
+    """A literal % in q must match literally, not as a SQL LIKE wildcard."""
+    db = tmp_path / "sa.db"
+    conn = store.connect(str(db))
+    try:
+        conn.executemany(
+            "INSERT INTO sa_articles (id, article_id, url, title, published_date) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [
+                (1, "P1", "https://x/p1", "Margins up 50% this quarter", _d(1)),
+                (2, "P2", "https://x/p2", "Revenue hit 5000 units", _d(1)),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    res = _feed(db, days=30, q="50%")  # '%' → LIKE path; escaped → literal '50%'
+    assert {i["id"] for i in res["items"]} == {"P1"}  # '5000' must NOT wildcard-match
