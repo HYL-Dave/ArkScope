@@ -147,6 +147,20 @@ python -c "from src.profile_state import ProfileStateStore; ProfileStateStore('d
 # 重啟 sidecar；下一個 host spawn 即寫回 PG（fresh-process 模型）；驗證 host log 回到 LocalMarketDatabaseBackend/PG
 ```
 
+## 4.6 Cutover 執行結果（2026-06-13，cut-1 → cut-5 全過）
+
+實際執行 = runbook §3.5 day sheet 逐條跑，每個 gate 停下驗證。
+
+- **cut-0/cut-1 quiesce+基線**：使用者於 09:52 後關閉兩瀏覽器×四個 auto-sync toggle（09:52 是暫停前最後一筆 `sa_market_news_refresh`）。30 分鐘 log 觀測 **QUIET**（10:11→10:41 零變動；實際從 09:52 起靜默 49 分鐘）。baseline_t0：picks 109 / meta 2 / articles 392 / comments 39,841 / market_news 18,572 / signals 36,255 / junctions 18,269·19,784·24,237。**baseline_t1 == baseline_t0**（資料層靜止）。postgres MCP 獨立路徑重算九項全等。freeze → `data/backups/sa_pg_freeze_20260613`（6 CSV ~64MB + 指紋 manifest 對齊）。
+- **cut-2 建庫+驗證**：`migrate_sa_to_sqlite.py` build → 9 fingerprint + **9 content digest** + content + FK + integrity 全 ✓ → swap 進 `data/sa_capture.db`（~84MB）。不變量：articles=392(>0)、closed 缺 closed_date=0。
+- **cut-3 flip**：`use_local_sa=true`。無 sidecar/CLI 需重啟（fresh-process 模型）。framed-JSON ping + recent_ids → host log 出現 `Using SACaptureDatabaseBackend (… HARD local)`；in-process reader `query_sa_picks()`=109、DB ground truth=109。
+- **cut-4 extension smoke（Chrome + Firefox 各一次 supervised Quick Refresh）**：兩瀏覽器全部動作路由 HARD local；`auto_upgrade=False`；refresh current 47 + closed 61、兩 scope `ok` **0→1**、`last_error` 清空（health 自癒）；comments net_new=1（Chrome）後冪等；`sa_alpha_picks` 109→109（in-place upsert，無新列）；6 個 current symbol 重複 = 合法不同-picked_date 雙筆 pick（PG verbatim、真實 key 零違規，非 cutover 產物）；job_runs run_id 6482/6485 落 **PG**（L6 接縫）；**PG sa_* 六表全程 byte-frozen == 基線**。
+- **cut-5 reader 稽核（in-process，覆蓋 6 個 /sa endpoint + digest + high-value + health split）**：全部從 SQLite 服務、無錯誤；`market-news/health` **severity=ok**；`high-value-comments` 預設視窗回 0 = extract job 暫停（signals 最新 `extracted_at=2026-04-25`）的預期效應，放寬視窗即回資料（local dispatch 正常）；reads 後 PG 仍凍結。
+
+UI：`Settings.tsx` 文案改為「SA capture 已切本地 SQLite（hard cutover，無 PG fallback）；報告與分數仍在 PG」。
+
+**待辦（cut-6 soak / follow-up）**：使用者重開兩瀏覽器 auto-sync 進 soak；週末 ET alarm 窗口無人值守跑；週一開盤前最終 health 檢查。其餘 follow-up 見 §5（port comment extraction job 是 #1，port 前禁觸發）。
+
 ## 5. 明確 OUT OF SCOPE（3d 不做）
 
 - port `extract_sa_comment_signals`（follow-up #1；port 前禁止觸發）

@@ -444,7 +444,7 @@ function DataStorageSection() {
           <p className="muted tiny">
             把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
             缺資料自動 fallback 回 PG。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
-            其他資料（Seeking Alpha、報告、分數）仍在 PG。
+            Seeking Alpha capture 已切到本地 SQLite（hard cutover 2026-06-13，無 PG 讀 fallback）；報告與分數仍在 PG。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
