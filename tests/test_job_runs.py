@@ -451,18 +451,13 @@ def test_run_job_continues_when_create_run_returns_none():
 
 
 def test_jobs_history_endpoint_returns_rows_from_store():
-    # Isolation: override BOTH get_dal and get_registry via dependency_overrides —
-    # the supported FastAPI mechanism — so neither the route nor anything resolved
-    # during the request can touch the real DAL/registry. (An earlier attempt
-    # patched "src.api.app.get_dal", which does not exist at module level.)
-    from fastapi.testclient import TestClient
-    from src.api.app import create_app
-    from src.api.dependencies import get_dal, get_registry
+    # Route-unit isolation: call the handler directly instead of TestClient.
+    # This endpoint only needs the injected DAL; ASGI/TestClient would exercise
+    # Starlette/AnyIO plumbing and can hang in sandboxed environments.
+    from src.api.routes.jobs import jobs_history
 
     fake_dal = MagicMock()
     fake_dal.get_available_tickers.return_value = []
-    fake_registry = MagicMock()
-    fake_registry.list_all.return_value = []
 
     fake_rows = [
         {
@@ -477,51 +472,25 @@ def test_jobs_history_endpoint_returns_rows_from_store():
         }
     ]
 
-    app = create_app()
-    app.dependency_overrides[get_dal] = lambda: fake_dal
-    app.dependency_overrides[get_registry] = lambda: fake_registry
-    try:
-        # TestClient WITHOUT the `with` context manager — deliberately do NOT run
-        # the app lifespan. This route only needs the overridden get_dal; running
-        # the lifespan would start the data scheduler (whose seed thread reaches
-        # PG) and the provider-env bridge, which hang pytest at the thread-pool
-        # join in a PG-unreachable environment. Route unit tests stay lifespan-free
-        # (env-independent); the lifespan itself is covered by app-level tests.
-        with patch.object(JobRunsStore, "list_runs", return_value=fake_rows):
-            client = TestClient(app)
-            r = client.get("/jobs/history?name=foo&limit=10&offset=0")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["count"] == 1
-        assert data["limit"] == 10
-        assert data["offset"] == 0
-        assert data["runs"][0]["job_name"] == "foo"
-    finally:
-        app.dependency_overrides.clear()
+    with patch.object(JobRunsStore, "list_runs", return_value=fake_rows):
+        response = jobs_history(name="foo", limit=10, offset=0, dal=fake_dal)
+    data = response.model_dump()
+    assert data["count"] == 1
+    assert data["limit"] == 10
+    assert data["offset"] == 0
+    assert data["runs"][0]["job_name"] == "foo"
 
 
 def test_jobs_history_endpoint_returns_empty_when_unavailable():
-    from fastapi.testclient import TestClient
-    from src.api.app import create_app
-    from src.api.dependencies import get_dal, get_registry
+    from src.api.routes.jobs import jobs_history
 
     fake_dal = MagicMock(_backend=None)
     fake_dal.get_available_tickers.return_value = []
-    fake_registry = MagicMock()
-    fake_registry.list_all.return_value = []
 
-    app = create_app()
-    app.dependency_overrides[get_dal] = lambda: fake_dal
-    app.dependency_overrides[get_registry] = lambda: fake_registry
-    try:
-        client = TestClient(app)  # no `with`: stay lifespan-free (see note above)
-        r = client.get("/jobs/history")
-        assert r.status_code == 200
-        data = r.json()
-        assert data["count"] == 0
-        assert data["runs"] == []
-    finally:
-        app.dependency_overrides.clear()
+    response = jobs_history(name=None, limit=50, offset=0, dal=fake_dal)
+    data = response.model_dump()
+    assert data["count"] == 0
+    assert data["runs"] == []
 
 
 # ---------------------------------------------------------------------------
