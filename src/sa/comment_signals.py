@@ -38,7 +38,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, Iterable, List, Optional, Set
 
-RULE_SET_VERSION = "v1.1"
+RULE_SET_VERSION = "v1.2"
+# v1.2 (2026-06-14): COMMON_STOPWORDS += AND/NOT/NONE/IMHO/LOL/DAILY/WATCH/ER/
+#                   IBD/UK/NYSE/REIT — language/platform/process words leaking
+#                   into candidate_mentions. NOT added: DD/DB/AU/SB/SA (real or
+#                   ambiguous tickers → catalog/context, see follow-up). Requires
+#                   re-extract; readers gate on rule_set_version so they pick it up.
 # v1.1 (2026-04-25): word-boundary hedge matching (no "mighty"→"might"
 #                   false positive), "May" as month name skipped when
 #                   followed by a date, dot-suffix tickers (BRK.B / BF.A).
@@ -74,6 +79,11 @@ COMMON_STOPWORDS: FrozenSet[str] = frozenset({
     "RIP", "OP", "LP", "LLC", "INC", "CORP", "ETN", "DOW", "SP",
     "CEO", "CFO", "COO", "CTO", "CIO", "VP", "SVP",
     "AP", "AB",
+    # v1.2 (2026-06-14): language / platform / process words that were leaking into
+    # candidate_mentions (not real tickers in context). DELIBERATELY EXCLUDES
+    # DD / DB / AU / SB / SA — real or ambiguous symbols → catalog/context, not a blacklist.
+    "AND", "NOT", "NONE", "IMHO", "LOL", "DAILY", "WATCH",
+    "ER", "IBD", "UK", "NYSE", "REIT",
 })
 
 KEYWORD_BUCKETS: Dict[str, List[str]] = {

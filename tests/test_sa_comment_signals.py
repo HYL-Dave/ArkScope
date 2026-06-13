@@ -426,3 +426,30 @@ def test_backfill_max_extracted_caps_inside_batch():
     result = run_backfill(dal, batch_size=10, max_extracted=3)
     # Cap must apply inside the batch — only 3 rows extracted, not 10.
     assert result["extracted_count"] == 3
+
+
+# ---------------------------------------------------------------------------
+# v1.2 rule evolution (2026-06-14): stopword additions — auditable lock
+# ---------------------------------------------------------------------------
+
+
+def test_rule_set_version_is_v12():
+    assert RULE_SET_VERSION == "v1.2"
+
+
+def test_v12_stopwords_not_candidates():
+    """Language/platform/process words added in v1.2 must NOT become candidates."""
+    ext = CommentSignalExtractor(universe=())  # empty universe → token is candidate-or-stopword
+    for word in ["AND", "NOT", "NONE", "IMHO", "LOL", "DAILY", "WATCH",
+                 "ER", "IBD", "UK", "NYSE", "REIT"]:
+        sig = ext.extract(f"{word} is right here")
+        assert word not in sig.candidate_mentions, f"{word} leaked into candidate_mentions"
+        assert word not in sig.ticker_mentions
+
+
+def test_v12_does_not_overblacklist_real_or_ambiguous_tickers():
+    """DD/DB/AU/SB stay candidates — deliberately NOT blacklisted (left to catalog/context)."""
+    ext = CommentSignalExtractor(universe=())
+    for sym in ["DD", "DB", "AU", "SB"]:
+        sig = ext.extract(f"{sym} looks interesting here")
+        assert sym in sig.candidate_mentions, f"{sym} should remain a candidate, not be dropped"
