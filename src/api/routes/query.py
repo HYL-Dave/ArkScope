@@ -72,18 +72,33 @@ def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, t
         logger.warning("research persist (user turn) failed, continuing: %s", e)
 
 
-def _persist_assistant_turn(store, *, thread_id, done_data, tool_calls, elapsed) -> None:
-    """Best-effort assistant persistence (#3 tool_calls from the trace, #4 safe)."""
+def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed) -> None:
+    """Best-effort assistant persistence on a `done` terminal (#3 tool_calls from
+    the trace, #4 safe). accumulate_tool_calls runs INSIDE the guard (SF1)."""
     try:
         store.append_message(
             thread_id=thread_id, role="assistant",
             content=done_data.get("answer", "") or "",
             provider=done_data.get("provider"), model=done_data.get("model"),
-            tools_used=done_data.get("tools_used"), tool_calls=tool_calls,
+            tools_used=done_data.get("tools_used"), tool_calls=accumulate_tool_calls(collected),
             token_usage=done_data.get("token_usage"), elapsed_seconds=elapsed,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
         logger.warning("research persist (assistant turn) failed, continuing: %s", e)
+
+
+def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed) -> None:
+    """Best-effort persistence of a NON-`done` terminal (agent error / stream
+    exception) as an is_error assistant turn — so reload doesn't show a dangling
+    user question with no reply (MUST-FIX 2). Partial trace preserved."""
+    try:
+        store.append_message(
+            thread_id=thread_id, role="assistant", content=content or "(error)",
+            provider=provider, model=model, tool_calls=accumulate_tool_calls(collected),
+            elapsed_seconds=elapsed, is_error=True,
+        )
+    except Exception as e:  # noqa: BLE001 — best-effort by design
+        logger.warning("research persist (error turn) failed, continuing: %s", e)
 
 
 class QueryResponse(BaseModel):
@@ -201,6 +216,7 @@ async def query_agent_stream(
             )
         collected: list[tuple[str, dict]] = []  # (#3) tool_start/tool_end trace
         done_data: Optional[dict] = None
+        error_content: Optional[str] = None  # set on a non-done terminal (MUST-FIX 2)
         t0 = _time.monotonic()
         try:
             if provider == "openai":
@@ -221,19 +237,26 @@ async def query_agent_stream(
                         collected.append((etype, event.data))
                     elif etype == "done":
                         done_data = event.data
+                    elif etype == "error":
+                        error_content = event.data.get("error") or event.data.get("message")
                 yield event.to_sse()
         except Exception as e:
             from src.agents.shared.events import AgentEvent, EventType
             logger.error(f"Stream error: {e}")
+            error_content = str(e)
             yield AgentEvent(EventType.error, {"message": str(e)}).to_sse()
         finally:
-            # Persist the assistant turn iff it completed (done seen). Best-effort.
-            if persist and done_data is not None:
-                _persist_assistant_turn(
-                    store, thread_id=request.thread_id, done_data=done_data,
-                    tool_calls=accumulate_tool_calls(collected),
-                    elapsed=round(_time.monotonic() - t0, 3),
-                )
+            # Persist the terminal turn. done → assistant; a non-done terminal
+            # (agent error / stream exception) → an is_error turn so reload never
+            # shows a dangling user question (MUST-FIX 2). Both best-effort (#4).
+            # A pure client disconnect (no done, no error) leaves only the user
+            # turn — see spec §6b (only resolved turns survive reload).
+            if persist:
+                elapsed = round(_time.monotonic() - t0, 3)
+                if done_data is not None:
+                    _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed)
+                elif error_content is not None:
+                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=request.model, elapsed=elapsed)
 
     return StreamingResponse(
         event_generator(),

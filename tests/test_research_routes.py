@@ -72,12 +72,14 @@ def test_accumulate_duplicate_tool_two_distinct_rows():
 
 
 # --- persistence helpers (raw question; best-effort) ---
+# tool_calls are accumulated INSIDE the helper from the raw (type, data) events
+# (`collected`), so the accumulation runs under the best-effort guard (SF1).
 def test_persist_user_then_assistant_roundtrip(store):
     q._persist_user_turn(store, thread_id="t1", question="最近焦點？", ticker="NVDA", provider="anthropic", model="m", title="最近焦點？")
     q._persist_assistant_turn(
         store, thread_id="t1",
         done_data={"answer": "ans", "provider": "anthropic", "model": "m", "tools_used": ["get_sa_feed"], "token_usage": {"total_tokens": 5, "turn_count": 1}},
-        tool_calls=[{"name": "get_sa_feed", "input": {"ticker": "NVDA"}, "result_preview": "5"}],
+        collected=[("tool_start", {"tool": "get_sa_feed", "input": {"ticker": "NVDA"}}), ("tool_end", {"tool": "get_sa_feed", "summary": "5"})],
         elapsed=2.0,
     )
     msgs = store.list_messages("t1")
@@ -85,7 +87,24 @@ def test_persist_user_then_assistant_roundtrip(store):
     assert msgs[0].content == "最近焦點？" and msgs[0].tickers == ["NVDA"]  # RAW question, NOT prefixed
     assert msgs[1].tool_calls == [{"name": "get_sa_feed", "input": {"ticker": "NVDA"}, "result_preview": "5"}]
     assert msgs[1].tools_used == ["get_sa_feed"] and msgs[1].elapsed_seconds == 2.0
+    assert msgs[1].is_error is False
     assert store.get_thread("t1").title == "最近焦點？"
+
+
+def test_persist_error_turn_marks_is_error_and_preserves_partial_trace(store):
+    # MUST-FIX 2: a non-`done` terminal (agent error) persists an assistant turn
+    # so reload doesn't show a dangling user question with no reply.
+    q._persist_user_turn(store, thread_id="t1", question="q", ticker=None, provider="anthropic", model="m", title="q")
+    q._persist_error_turn(
+        store, thread_id="t1", content="RuntimeError: db down",
+        collected=[("tool_start", {"tool": "get_sa_feed", "input": {"x": 1}}), ("tool_end", {"tool": "get_sa_feed", "summary": "r"})],
+        provider="anthropic", model="m", elapsed=1.5,
+    )
+    msgs = store.list_messages("t1")
+    assert [m.role for m in msgs] == ["user", "assistant"]
+    a = msgs[1]
+    assert a.is_error is True and a.content == "RuntimeError: db down"
+    assert a.tool_calls == [{"name": "get_sa_feed", "input": {"x": 1}, "result_preview": "r"}]  # partial trace kept
 
 
 def test_persist_is_best_effort_swallows_store_errors():
@@ -98,7 +117,8 @@ def test_persist_is_best_effort_swallows_store_errors():
 
     # Must NOT raise — a persistence failure can never break the SSE answer (#4).
     q._persist_user_turn(Broken(), thread_id="t1", question="q", ticker=None, provider="a", model="m", title="q")
-    q._persist_assistant_turn(Broken(), thread_id="t1", done_data={"answer": "a"}, tool_calls=[], elapsed=1.0)
+    q._persist_assistant_turn(Broken(), thread_id="t1", done_data={"answer": "a"}, collected=[], elapsed=1.0)
+    q._persist_error_turn(Broken(), thread_id="t1", content="boom", collected=[], provider="a", model="m", elapsed=1.0)
 
 
 # --- GET routes (handler-direct) ---
@@ -116,6 +136,7 @@ def test_list_messages_route_roundtrip(store):
     res = r.list_research_messages(thread_id="t1", store=store)
     assert res["thread_id"] == "t1" and len(res["messages"]) == 1
     assert res["messages"][0]["role"] == "user" and res["messages"][0]["tickers"] == ["NVDA"]
+    assert res["messages"][0]["is_error"] is False  # serialized for the client mapper
 
 
 def test_list_messages_404_for_missing(store):

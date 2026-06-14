@@ -24,6 +24,7 @@ import {
 } from "./api";
 import {
   initialState,
+  MAX_TURNS_SENTINEL,
   reduce,
   selectFooter,
   type Message,
@@ -44,7 +45,9 @@ const toClientMessage = (m: ResearchMessageDTO): Message => ({
   tools_used: m.tools_used ?? [], tool_calls: m.tool_calls ?? [],
   token_usage: m.token_usage, tickers: m.tickers,
   elapsed_seconds: m.elapsed_seconds, created_at: m.created_at,
-  isError: false, maxTurns: false,
+  isError: m.is_error ?? false, // persisted error turns (MUST-FIX 2) restore as error bubbles
+  // store has no maxTurns column — re-derive the badge the same way the reducer does (SF2)
+  maxTurns: m.provider === "anthropic" && m.content === MAX_TURNS_SENTINEL,
 });
 
 const PROVIDER_IDS = ["anthropic", "openai"] as const;

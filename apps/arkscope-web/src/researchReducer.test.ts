@@ -612,18 +612,32 @@ describe("reducer · hydrate", () => {
     role, content, tools_used: [], tool_calls: [], tickers: null, created_at: "x",
   });
 
-  it("seeds threads + messagesByThread, no active thread, clears any pending/terminal", () => {
-    const seeded = run(submit({ question: "stale", threadId: "t9" }), f("thinking", { turn: 1, model: "m" }));
+  it("on a pristine state, hydrate loads persisted threads (active stays null)", () => {
+    const s = reduce(initialState, {
+      kind: "hydrate",
+      threads: [mkThread("ta", "alpha"), mkThread("tb", "beta")],
+      messagesByThread: { ta: [mkMsg("user", "qa"), mkMsg("assistant", "aa")], tb: [mkMsg("user", "qb")] },
+    });
+    expect(s.threads.map((t) => t.id).sort()).toEqual(["ta", "tb"]);
+    expect(s.messagesByThread["ta"]).toHaveLength(2);
+    expect(s.activeThreadId).toBeNull(); // user picks from the list
+    expect(s.pending).toBeNull();
+  });
+
+  it("MERGES persisted threads WITHOUT clobbering an in-flight turn (mount-fetch race guard)", () => {
+    // A slow mount hydrate must not wipe a turn the user already started.
+    const seeded = run(submit({ question: "in-flight", threadId: "t9" }), f("thinking", { turn: 1, model: "m" }));
+    expect(seeded.pending).not.toBeNull();
     const s = reduce(seeded, {
       kind: "hydrate",
       threads: [mkThread("ta", "alpha"), mkThread("tb", "beta")],
       messagesByThread: { ta: [mkMsg("user", "qa"), mkMsg("assistant", "aa")], tb: [mkMsg("user", "qb")] },
     });
-    expect(s.threads.map((t) => t.id)).toEqual(["ta", "tb"]);
-    expect(s.messagesByThread["ta"]).toHaveLength(2);
-    expect(s.activeThreadId).toBeNull(); // user picks from the list
-    expect(s.pending).toBeNull();
-    expect(s.terminal).toBeNull();
+    expect(s.activeThreadId).toBe("t9"); // in-flight selection preserved
+    expect(s.pending).not.toBeNull(); // live turn preserved (NOT wiped)
+    expect(s.threads.map((t) => t.id).sort()).toEqual(["t9", "ta", "tb"]); // union by id
+    expect(s.messagesByThread["t9"]).toHaveLength(1); // in-session user msg kept
+    expect(s.messagesByThread["ta"]).toHaveLength(2); // persisted merged in
   });
 
   it("after hydrate, selectThread opens a restored thread and submit appends to it", () => {

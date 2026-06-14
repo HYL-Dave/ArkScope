@@ -297,18 +297,21 @@ export function reduce(state: State, action: Action): State {
       return { ...state, activeThreadId: null, pending: null, footer: null, terminal: null };
     case "selectThread":
       return { ...state, activeThreadId: action.threadId, pending: null, footer: null, terminal: null };
-    case "hydrate":
-      // Reload restore: load persisted threads/messages; no active thread (the
-      // user picks from the list), drop any live turn.
+    case "hydrate": {
+      // Reload restore. MERGE (not replace) so a slow mount-fetch landing after
+      // the user already started a turn can't clobber the in-flight pending /
+      // active selection (the mount-fetch race). Union threads by id, newest
+      // activity first; in-session messages win over persisted for the same id.
+      const seen = new Set(state.threads.map((t) => t.id));
+      const threads = [...state.threads, ...action.threads.filter((t) => !seen.has(t.id))].sort(
+        (a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0),
+      );
       return {
-        ...state,
-        threads: action.threads,
-        messagesByThread: action.messagesByThread,
-        activeThreadId: null,
-        pending: null,
-        footer: null,
-        terminal: null,
+        ...state, // preserves activeThreadId / pending / footer / terminal
+        threads,
+        messagesByThread: { ...action.messagesByThread, ...state.messagesByThread },
       };
+    }
     default:
       return state; // unreachable for known kinds; guards against a silent undefined
   }

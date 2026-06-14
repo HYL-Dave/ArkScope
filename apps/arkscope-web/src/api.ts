@@ -519,7 +519,7 @@ export interface ResearchMessageDTO {
   provider: string | null; model: string | null;
   tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
-  elapsed_seconds: number | null; created_at: string;
+  elapsed_seconds: number | null; is_error: boolean; created_at: string;
 }
 export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThreadDTO[] }> {
   return getJSON<{ threads: ResearchThreadDTO[] }>(`/research/threads?limit=${limit}`, 8_000);

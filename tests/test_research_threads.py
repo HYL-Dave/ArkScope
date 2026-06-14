@@ -73,6 +73,17 @@ def test_append_minimal_assistant_tolerates_none_json_fields(store):
     m = store.append_message(thread_id="th-x", role="assistant", content="direct answer")
     assert m.tools_used == [] and m.tool_calls == []
     assert m.token_usage is None and m.tickers is None and m.elapsed_seconds is None
+    assert m.is_error is False  # default
+
+
+def test_append_message_is_error_roundtrips(store):
+    store.ensure_thread(id="t1", title="q")
+    err = store.append_message(thread_id="t1", role="assistant", content="RuntimeError: boom", is_error=True)
+    assert err.is_error is True
+    ok = store.append_message(thread_id="t1", role="user", content="hi")
+    assert ok.is_error is False
+    # survives a fresh read (column persisted, not just on the returned object)
+    assert [m.is_error for m in store.list_messages("t1")] == [True, False]
 
 
 def test_append_bumps_thread_updated_at(store):

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS research_messages (
     token_usage_json TEXT,
     tickers_json    TEXT,
     elapsed_seconds REAL,
+    is_error        INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_research_messages_thread ON research_messages(thread_id, id);
@@ -94,6 +95,7 @@ class ResearchMessage:
     token_usage: Optional[dict]
     tickers: Optional[list]
     elapsed_seconds: Optional[float]
+    is_error: bool
     created_at: str
 
 
@@ -120,6 +122,15 @@ class ResearchThreadStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
+            # Migration: add is_error to a pre-existing research_messages table.
+            # Tolerant of the concurrent-first-construct race (duplicate column =
+            # another constructor added it), per CardRunStore's pattern.
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(research_messages)").fetchall()}
+            if "is_error" not in cols:
+                try:
+                    conn.execute("ALTER TABLE research_messages ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     # --- row mappers -----------------------------------------------------
@@ -142,6 +153,7 @@ class ResearchThreadStore:
             token_usage=_loads(r["token_usage_json"]),
             tickers=_loads(r["tickers_json"]),
             elapsed_seconds=r["elapsed_seconds"],
+            is_error=bool(r["is_error"]),
             created_at=r["created_at"],
         )
 
@@ -184,6 +196,7 @@ class ResearchThreadStore:
         token_usage: Optional[dict] = None,
         tickers: Optional[list] = None,
         elapsed_seconds: Optional[float] = None,
+        is_error: bool = False,
         now: Optional[str] = None,
     ) -> ResearchMessage:
         ts = now or _now()
@@ -192,8 +205,9 @@ class ResearchThreadStore:
                 """
                 INSERT INTO research_messages
                     (thread_id, role, content, provider, model, tools_used_json,
-                     tool_calls_json, token_usage_json, tickers_json, elapsed_seconds, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
+                     is_error, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     thread_id, role, content, provider, model,
@@ -201,7 +215,7 @@ class ResearchThreadStore:
                     json.dumps(tool_calls) if tool_calls is not None else None,
                     json.dumps(token_usage) if token_usage is not None else None,
                     json.dumps(tickers) if tickers is not None else None,
-                    elapsed_seconds, ts,
+                    elapsed_seconds, 1 if is_error else 0, ts,
                 ),
             )
             # Bump the parent thread's activity so list_threads orders it first.
