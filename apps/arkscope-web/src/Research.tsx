@@ -21,6 +21,7 @@ import { getQueryProviders, getRuntimeConfig, streamQuery, type RuntimeConfig } 
 import {
   initialState,
   reduce,
+  selectFooter,
   type Message,
   type ToolTraceRow,
   type TraceRow,
@@ -137,6 +138,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     ? state.pending.trace
     : (lastAssistant?.tool_calls ?? []).map((c) => ({ kind: "tool", name: c.name, input: c.input, result_preview: c.result_preview, chars: undefined, done: true } as ToolTraceRow));
   const pendingPresentation = state.pending ? PRESENTATION[state.pending.provider as ProviderId] : null;
+  const footer = selectFooter(state); // derived from the active thread, survives thread-switch
   const noProvider = !booting && availableIds.length === 0;
   const needChooser = !provider && availableIds.length > 1;
 
@@ -274,10 +276,10 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
               {traceRows.map((r, i) => <TraceRowView key={i} row={r} />)}
             </ul>
           )}
-          {state.footer && (
+          {footer && (
             <div className="research-trace-footer muted tiny">
-              {typeof state.footer.total_tokens === "number" && <span>tokens {state.footer.total_tokens.toLocaleString()}</span>}
-              {typeof state.footer.turn_count === "number" && <span> · turns {state.footer.turn_count}</span>}
+              {typeof footer.total_tokens === "number" && <span>tokens {footer.total_tokens.toLocaleString()}</span>}
+              {typeof footer.turn_count === "number" && <span> · turns {footer.turn_count}</span>}
             </div>
           )}
         </aside>

@@ -258,6 +258,25 @@ function onStreamError(state: State, a: Extract<Action, { kind: "streamError" }>
   return commit(state, p, terminalMsg(p, a.error, ts), "error", ts);
 }
 
+/**
+ * Trace-pane footer (total_tokens · turn_count) for display. Derived from the
+ * ACTIVE thread's last assistant message rather than `state.footer`, so that
+ * switching threads restores that thread's footer (state.footer is the live
+ * current-turn value and is cleared on selectThread/newThread). null while a
+ * turn is pending or the active thread has no completed assistant turn yet.
+ */
+export function selectFooter(state: State): { total_tokens?: number; turn_count?: number } | null {
+  if (state.pending) return null;
+  const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === "assistant") {
+      const u = msgs[i].token_usage;
+      return u ? { total_tokens: u.total_tokens, turn_count: u.turn_count } : null;
+    }
+  }
+  return null;
+}
+
 export function reduce(state: State, action: Action): State {
   switch (action.kind) {
     case "submit":

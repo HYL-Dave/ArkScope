@@ -4,6 +4,7 @@ import {
   initialState,
   MAX_TURNS_SENTINEL,
   reduce,
+  selectFooter,
   type Action,
   type Message,
   type State,
@@ -590,6 +591,48 @@ describe("reducer · thread navigation", () => {
     expect(a.activeThreadId).toBeNull();
     // no assistant bubble fabricated from the dropped pending
     expect(a.messagesByThread["thread-1"]).toHaveLength(1); // user only
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GROUP 6 — selectFooter (footer derives from the ACTIVE thread's last
+// assistant turn, so switching threads restores its footer; fixes gpt-5.5 #1)
+// ---------------------------------------------------------------------------
+describe("selectFooter", () => {
+  const turn = (q: string, total: number, turns: number, ts = 0): Action[] => [
+    submit({ question: q, provider: "anthropic", model: "m", ts }),
+    f("done", { answer: "a", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: total, turn_count: turns } }, ts),
+  ];
+
+  it("returns null while a turn is pending", () => {
+    const s = run(submit({ question: "q", provider: "anthropic", model: "m" }), f("thinking", { turn: 1, model: "m" }));
+    expect(selectFooter(s)).toBeNull();
+  });
+
+  it("returns null when there is no active thread", () => {
+    expect(selectFooter(initialState)).toBeNull();
+  });
+
+  it("derives total_tokens+turn_count from the active thread's last assistant message", () => {
+    const s = run(...turn("first", 1500, 2));
+    expect(selectFooter(s)).toEqual({ total_tokens: 1500, turn_count: 2 });
+  });
+
+  it("returns null when the active thread has no assistant message yet (user-only)", () => {
+    const s = run(submit({ question: "q", provider: "anthropic", model: "m" }), { kind: "abort" });
+    expect(selectFooter(s)).toBeNull(); // aborted → pending cleared, only the user message remains
+  });
+
+  it("restores the SWITCHED-to thread's footer (the bug: footer was cleared on selectThread)", () => {
+    const s0 = run(
+      ...turn("first thread", 1500, 2),
+      { kind: "newThread" },
+      ...turn("second thread", 9000, 5),
+    );
+    expect(selectFooter(s0)).toEqual({ total_tokens: 9000, turn_count: 5 }); // active = thread-2
+    const s1 = reduce(s0, { kind: "selectThread", threadId: "thread-1" });
+    expect(s1.footer).toBeNull(); // reducer still clears its live footer on switch…
+    expect(selectFooter(s1)).toEqual({ total_tokens: 1500, turn_count: 2 }); // …but the selector restores it
   });
 });
 
