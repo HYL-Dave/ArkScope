@@ -227,7 +227,8 @@ async def query_agent_stream(
                 stream = run_query_stream(question=agent_question, model=request.model, dal=dal)
             else:
                 from src.agents.shared.events import AgentEvent, EventType
-                yield AgentEvent(EventType.error, {"message": f"Unknown provider: {provider}"}).to_sse()
+                error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)
+                yield AgentEvent(EventType.error, {"message": error_content}).to_sse()
                 return
 
             async for event in stream:

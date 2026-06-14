@@ -153,3 +153,22 @@ def test_list_messages_422_for_blank_thread_id(store):
     with pytest.raises(HTTPException) as ei:
         r.list_research_messages(thread_id="   ", store=store)
     assert ei.value.status_code == 422
+
+
+def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
+    """An unknown provider returns early without ever calling the agent — but the
+    user turn was persisted eagerly, so the error terminal must persist an
+    is_error assistant turn too (same invariant as MUST-FIX 2; no dangling turn)."""
+    import asyncio
+
+    req = q.QueryRequest(question="q", provider="bad", model=None, thread_id="t1", ticker=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)  # dal unused on this path
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    msgs = store.list_messages("t1")
+    assert [m.role for m in msgs] == ["user", "assistant"]
+    assert msgs[1].is_error is True and "Unknown provider" in msgs[1].content

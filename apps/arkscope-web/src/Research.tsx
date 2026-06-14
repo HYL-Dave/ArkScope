@@ -1,4 +1,4 @@
-// AI 研究 — the evidence-first research console (Layer C-2a, ephemeral).
+// AI 研究 — the evidence-first research console (Layer C-2, persisted).
 //
 // Thin UI over the pure researchReducer (the conversation authority). The UI
 // owns ONLY the AbortController + lifecycle discipline:
@@ -7,8 +7,10 @@
 //   • on normal close → streamEnd (reducer no-ops if done already finalized);
 //   • on a thrown read → abort if it was deliberate, else streamError;
 //   • a superseded stream (a newer turn took over abortRef) never commits.
-// No persistence (threads vanish on reload); DTO field names already match the
-// future C-2b columns so persistence slots in without reshaping state.
+// Persistence (C-2b): /query/stream best-effort-persists each turn to the local
+// ResearchThreadStore; on mount this fetches + `hydrate`s the threads/messages
+// (merge, so a late hydrate can't clobber a live turn). Threads survive reload;
+// the provider pick is per-session (re-chosen after reload), not persisted.
 //
 // Provider selection is USER-CHOSEN — no global default. Settings routing isn't
 // built yet, so: 1 provider available → auto-select; >1 → chooser (no pre-pick);
