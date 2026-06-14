@@ -2008,3 +2008,76 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
   -webkit-box-orient: vertical;
   line-height: 1.45;
 }
+
+/* ── AI 研究 (Layer C-2a): 3-pane evidence-first console ─────────────── */
+.main.research { display: flex; flex-direction: column; overflow: hidden; }
+.research-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 320px;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
+}
+.research-threads, .research-trace {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+.research-convo {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.research-threadlist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.research-threaditem {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: 7px 8px; text-align: left; color: var(--fg); cursor: pointer; font: inherit;
+}
+.research-threaditem:hover { background: rgba(88, 166, 255, 0.08); }
+.research-threaditem.active { background: rgba(88, 166, 255, 0.14); border-color: var(--border); }
+.research-threadtitle { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+.research-messages { flex: 1; overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 4px; }
+.research-empty { margin: auto 0; text-align: center; }
+.research-suggest { display: flex; flex-direction: column; gap: 6px; align-items: stretch; margin-top: 14px; max-width: 460px; margin-left: auto; margin-right: auto; }
+
+.research-bubble { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; max-width: 90%; }
+.research-bubble.user { align-self: flex-end; background: rgba(88, 166, 255, 0.10); }
+.research-bubble.assistant { align-self: flex-start; background: var(--panel); }
+.research-bubble.error { border-color: var(--bad); background: rgba(248, 81, 73, 0.08); }
+.research-bubble.pending { align-self: flex-start; background: transparent; border-style: dashed; }
+.research-bubble-meta { margin-bottom: 4px; }
+.research-model { color: var(--accent); }
+.research-bubble-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.research-interim { white-space: pre-wrap; font-style: italic; margin-bottom: 6px; }
+.research-bubble-tickers { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+.research-thinking { display: flex; align-items: center; gap: 8px; }
+.research-spinner { width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: research-spin 0.8s linear infinite; }
+@keyframes research-spin { to { transform: rotate(360deg); } }
+
+.research-input { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 8px; }
+.research-providerbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.research-inputrow { display: flex; gap: 8px; align-items: flex-start; }
+.research-textarea {
+  flex: 1; resize: vertical; min-height: 38px;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; font: inherit; line-height: 1.45;
+}
+.research-textarea:focus { outline: none; border-color: var(--accent); }
+
+.research-trace-head { border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 8px; }
+.research-tracelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.research-trace-tool { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.research-trace-tool.open { border-style: dashed; }
+.research-trace-tool-head { display: flex; align-items: baseline; gap: 4px; }
+.research-trace-input { margin-top: 4px; word-break: break-all; opacity: 0.8; }
+.research-trace-preview { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+.research-trace-think { padding: 4px 2px; white-space: pre-wrap; }
+.research-trace-footer { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 8px; }

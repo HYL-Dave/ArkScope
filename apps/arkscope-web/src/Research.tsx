@@ -1,0 +1,327 @@
+// AI 研究 — the evidence-first research console (Layer C-2a, ephemeral).
+//
+// Thin UI over the pure researchReducer (the conversation authority). The UI
+// owns ONLY the AbortController + lifecycle discipline:
+//   • submit is disabled while a turn is pending (and aborts defensively first);
+//   • 新對話 / thread-switch abort the live stream, dispatch abort, then nav;
+//   • on normal close → streamEnd (reducer no-ops if done already finalized);
+//   • on a thrown read → abort if it was deliberate, else streamError;
+//   • a superseded stream (a newer turn took over abortRef) never commits.
+// No persistence (threads vanish on reload); DTO field names already match the
+// future C-2b columns so persistence slots in without reshaping state.
+//
+// Provider selection is USER-CHOSEN — no global default. Settings routing isn't
+// built yet, so: 1 provider available → auto-select; >1 → chooser (no pre-pick);
+// 0 → disable input. Per-provider trace behaviour comes from a descriptor map,
+// not an OpenAI/Anthropic binary, so compatible providers can slot in later.
+
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+
+import { getQueryProviders, getRuntimeConfig, streamQuery, type RuntimeConfig } from "./api";
+import {
+  initialState,
+  reduce,
+  type Message,
+  type ToolTraceRow,
+  type TraceRow,
+} from "./researchReducer";
+
+const PROVIDER_IDS = ["anthropic", "openai"] as const;
+type ProviderId = (typeof PROVIDER_IDS)[number];
+
+// trace_mode drives the live-trace vs silent-until-done affordance; copy stays
+// neutral. A new OpenAI-compatible provider is a row here, not a render rewrite.
+const PRESENTATION: Record<ProviderId, { label: string; trace_mode: "live" | "post_run"; trace_note: string; auth_mode_label: string }> = {
+  anthropic: { label: "Anthropic", trace_mode: "live", trace_note: "即時工具追蹤", auth_mode_label: "API key / setup-token" },
+  openai: { label: "OpenAI", trace_mode: "post_run", trace_note: "完成後一次顯示工具追蹤", auth_mode_label: "OAuth / API key" },
+};
+
+// Suggested prompts scoped to the C-1 SA primitives (get_sa_feed / get_sa_comment_focus).
+const SUGGESTED = [
+  { ticker: "SMCI", text: "最近 SA 對 SMCI 有什麼新文章和評論焦點？" },
+  { ticker: "CLS", text: "CLS 過去 14 天的 SA 評論焦點與情緒變化？" },
+  { ticker: "MXL", text: "MXL 的高價值留言在吵什麼？焦點是什麼？" },
+  { ticker: "NVDA", text: "NVDA 最新 SA 動態與評論焦點重點整理。" },
+];
+
+export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
+  const [state, dispatch] = useReducer(reduce, initialState);
+  const [question, setQuestion] = useState("");
+  const [tickerInput, setTickerInput] = useState("");
+  const [provider, setProvider] = useState<ProviderId | null>(null); // user-chosen, session-scoped
+  const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
+  const [sdk, setSdk] = useState<Record<string, boolean> | null>(null);
+  const [booting, setBooting] = useState(true);
+
+  const abortRef = useRef<AbortController | null>(null);
+
+  // --- provider availability = SDK present (/query/providers) AND key set ----
+  const availability = useMemo(() => {
+    return PROVIDER_IDS.map((id) => {
+      const hasKey = runtime ? runtime[id].key_set : false;
+      const hasSdk = sdk ? sdk[id] !== false : false; // missing entry → treat as unavailable
+      return { id, available: hasKey && hasSdk, model: runtime ? runtime[id].model : "" };
+    });
+  }, [runtime, sdk]);
+  const availableIds = availability.filter((a) => a.available).map((a) => a.id);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const [rc, qp] = await Promise.all([getRuntimeConfig(), getQueryProviders()]);
+        if (!alive) return;
+        setRuntime(rc);
+        setSdk(Object.fromEntries(Object.entries(qp.providers).map(([k, v]) => [k, !!v.available])));
+      } catch {
+        if (alive) { setRuntime(null); setSdk(null); }
+      } finally {
+        if (alive) setBooting(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Auto-select ONLY when exactly one provider is available and none is chosen
+  // yet — never pre-pick when several are available (that's a user decision).
+  useEffect(() => {
+    if (provider === null && availableIds.length === 1) setProvider(availableIds[0] as ProviderId);
+  }, [provider, availableIds]);
+
+  // Abort any in-flight stream on unmount.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // --- streaming runner: reducer is the authority; UI owns the controller ----
+  const runStream = useCallback(async (sentQuestion: string, p: ProviderId) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      for await (const frame of streamQuery({ question: sentQuestion, provider: p }, controller.signal)) {
+        if (abortRef.current !== controller) return; // superseded by a newer turn
+        dispatch({ kind: "frame", frame, ts: Date.now() });
+      }
+      if (abortRef.current === controller) dispatch({ kind: "streamEnd", ts: Date.now() });
+    } catch (e) {
+      if (abortRef.current !== controller) return; // superseded — its terminal already ran
+      if (controller.signal.aborted) dispatch({ kind: "abort", ts: Date.now() });
+      else dispatch({ kind: "streamError", error: e instanceof Error ? e.message : String(e), ts: Date.now() });
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+    }
+  }, []);
+
+  const submit = useCallback(() => {
+    const q = question.trim();
+    if (!q || !provider || state.pending) return; // disabled while pending (defensive)
+    const ticker = tickerInput.trim().toUpperCase() || null;
+    const sent = ticker ? `針對 ${ticker}：${q}` : q; // ticker folded in client-side (C-2a)
+    dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now() });
+    setQuestion("");
+    void runStream(sent, provider);
+  }, [question, tickerInput, provider, state.pending, runStream]);
+
+  // Abort the live stream + drop the pending turn (reducer abort), per the
+  // integration contract — used by Stop, 新對話, and thread-switch.
+  const stopStream = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    dispatch({ kind: "abort", ts: Date.now() });
+  }, []);
+  const newThread = useCallback(() => { stopStream(); dispatch({ kind: "newThread" }); }, [stopStream]);
+  const selectThread = useCallback((id: string) => { stopStream(); dispatch({ kind: "selectThread", threadId: id }); }, [stopStream]);
+
+  // --- derived view state ----------------------------------------------------
+  const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
+  const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+  const traceRows: TraceRow[] = state.pending
+    ? state.pending.trace
+    : (lastAssistant?.tool_calls ?? []).map((c) => ({ kind: "tool", name: c.name, input: c.input, result_preview: c.result_preview, chars: undefined, done: true } as ToolTraceRow));
+  const pendingPresentation = state.pending ? PRESENTATION[state.pending.provider as ProviderId] : null;
+  const noProvider = !booting && availableIds.length === 0;
+  const needChooser = !provider && availableIds.length > 1;
+
+  return (
+    <main className="main research">
+      <div className="surface-head">
+        <h1 className="surface-title">AI 研究</h1>
+        <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定（本地·ephemeral）</span>
+      </div>
+
+      <div className="research-grid">
+        {/* ── Left: thread list ───────────────────────────────────────── */}
+        <aside className="research-threads">
+          <button className="btn-ghost small" onClick={newThread}>＋ 新對話</button>
+          {state.threads.length === 0 ? (
+            <p className="muted tiny" style={{ marginTop: 10 }}>尚無對話。</p>
+          ) : (
+            <ul className="research-threadlist">
+              {state.threads.map((t) => (
+                <li key={t.id}>
+                  <button
+                    className={`research-threaditem ${t.id === state.activeThreadId ? "active" : ""}`}
+                    onClick={() => selectThread(t.id)}
+                    title={t.title}
+                  >
+                    <span className="research-threadtitle">{t.title || "（未命名）"}</span>
+                    {t.ticker && <span className="list-chip tiny">{t.ticker}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+
+        {/* ── Center: conversation ────────────────────────────────────── */}
+        <section className="research-convo">
+          <div className="research-messages">
+            {msgs.length === 0 && !state.pending ? (
+              <div className="research-empty">
+                <p className="muted">問一個開放式問題，看 agent 如何用工具調查並整理證據。</p>
+                <div className="research-suggest">
+                  {SUGGESTED.map((s) => (
+                    <button key={s.text} className="btn-ghost small" onClick={() => { setQuestion(s.text); setTickerInput(s.ticker); }}>
+                      {s.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              msgs.map((m, i) => <Bubble key={i} m={m} onOpenTicker={onOpenTicker} />)
+            )}
+
+            {state.pending && (
+              <div className="research-bubble assistant pending">
+                {state.pending.interimText && <div className="research-interim muted">{state.pending.interimText}</div>}
+                {state.pending.thinkingActive && (
+                  <div className="research-thinking muted tiny">
+                    <span className="research-spinner" />
+                    {pendingPresentation?.trace_mode === "post_run"
+                      ? `${PRESENTATION[state.pending.provider as ProviderId]?.label ?? state.pending.provider} 執行中，完成後一次顯示工具追蹤…`
+                      : "思考中…"}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* input + provider control */}
+          <div className="research-input">
+            {booting ? (
+              <p className="muted tiny">載入 provider…</p>
+            ) : noProvider ? (
+              <p className="muted">尚未設定可用的 AI provider（API key）。請到「設定」頁設定後再使用。</p>
+            ) : (
+              <>
+                <div className="research-providerbar">
+                  {needChooser ? (
+                    <>
+                      <span className="muted tiny">選擇 provider：</span>
+                      {availability.filter((a) => a.available).map((a) => (
+                        <button key={a.id} className="btn-ghost small" onClick={() => setProvider(a.id as ProviderId)} title={PRESENTATION[a.id as ProviderId].auth_mode_label}>
+                          {PRESENTATION[a.id as ProviderId].label} · {PRESENTATION[a.id as ProviderId].trace_note}
+                        </button>
+                      ))}
+                    </>
+                  ) : provider ? (
+                    <>
+                      <span className="list-chip prov">{PRESENTATION[provider].label} / {availability.find((a) => a.id === provider)?.model || "?"}</span>
+                      <span className="muted tiny">{PRESENTATION[provider].trace_note}</span>
+                      {availableIds.length > 1 && (
+                        <button className="btn-ghost tiny" onClick={() => setProvider(null)} title="切換 provider">切換</button>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+                <div className="research-inputrow">
+                  <input
+                    className="news-ticker"
+                    placeholder="Ticker（選填）"
+                    value={tickerInput}
+                    onChange={(e) => setTickerInput(e.target.value)}
+                  />
+                  <textarea
+                    className="research-textarea"
+                    placeholder="輸入問題…（Enter 送出，Shift+Enter 換行）"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+                    rows={2}
+                  />
+                  {state.pending ? (
+                    <button className="btn-ghost danger" onClick={stopStream}>停止</button>
+                  ) : (
+                    <button className="btn-ghost" onClick={submit} disabled={!provider || !question.trim()}>送出</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ── Right: evidence / tool trace ────────────────────────────── */}
+        <aside className="research-trace">
+          <div className="research-trace-head">
+            <h3 className="surface-title tiny">證據·工具追蹤</h3>
+          </div>
+          {traceRows.length === 0 ? (
+            <p className="muted tiny">
+              {state.pending?.thinkingActive && pendingPresentation?.trace_mode === "post_run"
+                ? `${PRESENTATION[state.pending!.provider as ProviderId]?.label} 完成後一次顯示。`
+                : "尚無工具呼叫。"}
+            </p>
+          ) : (
+            <ul className="research-tracelist">
+              {traceRows.map((r, i) => <TraceRowView key={i} row={r} />)}
+            </ul>
+          )}
+          {state.footer && (
+            <div className="research-trace-footer muted tiny">
+              {typeof state.footer.total_tokens === "number" && <span>tokens {state.footer.total_tokens.toLocaleString()}</span>}
+              {typeof state.footer.turn_count === "number" && <span> · turns {state.footer.turn_count}</span>}
+            </div>
+          )}
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function Bubble({ m, onOpenTicker }: { m: Message; onOpenTicker: (t: string) => void }) {
+  const cls = `research-bubble ${m.role}${m.isError ? " error" : ""}`;
+  return (
+    <div className={cls}>
+      {m.role === "assistant" && (m.model || m.maxTurns) && (
+        <div className="research-bubble-meta muted tiny">
+          {m.model && <span className="research-model">{m.provider}/{m.model}</span>}
+          {m.maxTurns && <span className="research-maxturns"> · 已達工具呼叫上限</span>}
+          {typeof m.elapsed_seconds === "number" && <span> · {m.elapsed_seconds.toFixed(1)}s</span>}
+        </div>
+      )}
+      <div className="research-bubble-body">{m.content || (m.role === "assistant" ? "（空回應）" : "")}</div>
+      {m.tickers && m.tickers.length > 0 && (
+        <div className="research-bubble-tickers">
+          {m.tickers.map((t) => (
+            <button key={t} className="news-ticker-chip" onClick={() => onOpenTicker(t)} title={`開啟 ${t}`}>{t}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TraceRowView({ row }: { row: TraceRow }) {
+  if (row.kind === "thinking") {
+    return <li className="research-trace-think muted tiny">💭 {row.text}</li>;
+  }
+  return (
+    <li className={`research-trace-tool ${row.done ? "done" : "open"}`}>
+      <div className="research-trace-tool-head">
+        <span className="mono">{row.name}</span>
+        {!row.done && <span className="muted tiny"> …執行中</span>}
+        {typeof row.chars === "number" && <span className="muted tiny"> · {row.chars}c</span>}
+      </div>
+      {row.input !== undefined && <div className="research-trace-input mono tiny muted">{JSON.stringify(row.input)}</div>}
+      {row.result_preview && <div className="research-trace-preview tiny muted">{row.result_preview}</div>}
+    </li>
+  );
+}

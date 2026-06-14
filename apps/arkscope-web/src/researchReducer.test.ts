@@ -548,6 +548,51 @@ describe("reducer · terminal & races", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// GROUP 5 — thread navigation (left pane: + 新對話 / switch thread)
+// ---------------------------------------------------------------------------
+describe("reducer · thread navigation", () => {
+  const done1 = f("done", { answer: "a1", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } });
+
+  it("newThread resets active to null + clears pending/terminal/footer, preserving threads & messages", () => {
+    const s = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" });
+    expect(s.activeThreadId).toBeNull();
+    expect(s.pending).toBeNull();
+    expect(s.terminal).toBeNull();
+    expect(s.footer).toBeNull();
+    expect(s.threads).toHaveLength(1); // preserved
+    expect(s.messagesByThread["thread-1"]).toHaveLength(2); // user + assistant preserved
+  });
+
+  it("submit after newThread creates a fresh second thread (no append to the first)", () => {
+    const s = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" }, submit({ question: "second", provider: "anthropic", model: "m" }));
+    expect(s.threads).toHaveLength(2);
+    expect(s.activeThreadId).toBe("thread-2");
+    expect(s.threads[1].title).toBe("second");
+    expect(s.messagesByThread["thread-2"]).toHaveLength(1); // only the new user msg
+    expect(s.messagesByThread["thread-1"]).toHaveLength(2); // untouched
+  });
+
+  it("selectThread switches the active thread, preserving both threads' messages", () => {
+    const s0 = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" }, submit({ question: "second", provider: "anthropic", model: "m" }), f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }));
+    const s = reduce(s0, { kind: "selectThread", threadId: "thread-1" });
+    expect(s.activeThreadId).toBe("thread-1");
+    expect(s.pending).toBeNull();
+    expect(msgs(s)).toHaveLength(2); // thread-1's user+assistant
+    expect(s.messagesByThread["thread-2"]).toHaveLength(2); // thread-2 preserved
+  });
+
+  it("newThread/selectThread clear an in-flight pending (defensive; UI aborts first)", () => {
+    const mid = run(submit({ question: "q", provider: "anthropic", model: "m" }), f("thinking", { turn: 1, model: "m" }), f("tool_start", { tool: "get_sa_feed", input: {} }));
+    expect(mid.pending).not.toBeNull();
+    const a = reduce(mid, { kind: "newThread" });
+    expect(a.pending).toBeNull();
+    expect(a.activeThreadId).toBeNull();
+    // no assistant bubble fabricated from the dropped pending
+    expect(a.messagesByThread["thread-1"]).toHaveLength(1); // user only
+  });
+});
+
 // Smoke: the sentinel constant is exported for the max-turns group.
 it("exports the exact max-turns sentinel", () => {
   expect(MAX_TURNS_SENTINEL).toBe("Maximum tool calls reached. Please try a simpler query.");

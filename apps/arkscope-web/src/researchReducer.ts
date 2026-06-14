@@ -96,7 +96,9 @@ export type Action =
   | { kind: "frame"; frame: SSEFrame; ts: number }
   | { kind: "abort"; ts?: number }
   | { kind: "streamEnd"; ts?: number }
-  | { kind: "streamError"; error: string; ts?: number };
+  | { kind: "streamError"; error: string; ts?: number }
+  | { kind: "newThread" } // + 新對話: next submit starts a fresh thread (UI aborts first)
+  | { kind: "selectThread"; threadId: string }; // left-pane switch (UI aborts first)
 
 // The exact max-turns sentinel (Anthropic-only; agent.py:516). EXACT equality.
 export const MAX_TURNS_SENTINEL = "Maximum tool calls reached. Please try a simpler query.";
@@ -268,5 +270,12 @@ export function reduce(state: State, action: Action): State {
       return onStreamEnd(state, action);
     case "streamError":
       return onStreamError(state, action);
+    case "newThread":
+      // Drop active thread + any in-flight pending; threads/messages preserved.
+      return { ...state, activeThreadId: null, pending: null, footer: null, terminal: null };
+    case "selectThread":
+      return { ...state, activeThreadId: action.threadId, pending: null, footer: null, terminal: null };
+    default:
+      return state; // unreachable for known kinds; guards against a silent undefined
   }
 }

@@ -499,6 +499,15 @@ export function getRuntimeConfig(): Promise<RuntimeConfig> {
   return getJSON<RuntimeConfig>("/config/runtime", 8_000);
 }
 
+// Agent SDK availability per provider (NOT key presence — that's runtime.key_set).
+// Used by the AI Research surface to gate the provider chooser.
+export interface QueryProviders {
+  providers: Record<string, { available: boolean; sdk_version?: string; install?: string }>;
+}
+export function getQueryProviders(): Promise<QueryProviders> {
+  return getJSON<QueryProviders>("/query/providers", 8_000);
+}
+
 export function getModelCatalog(): Promise<ModelCatalog> {
   return getJSON<ModelCatalog>("/config/model-catalog", 8_000);
 }
