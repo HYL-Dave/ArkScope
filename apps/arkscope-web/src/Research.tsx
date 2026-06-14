@@ -17,15 +17,35 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
-import { getQueryProviders, getRuntimeConfig, streamQuery, type RuntimeConfig } from "./api";
+import {
+  getQueryProviders, getResearchThreads, getResearchMessages,
+  getRuntimeConfig, streamQuery,
+  type ResearchMessageDTO, type ResearchThreadDTO, type RuntimeConfig,
+} from "./api";
 import {
   initialState,
   reduce,
   selectFooter,
   type Message,
+  type Thread,
   type ToolTraceRow,
   type TraceRow,
 } from "./researchReducer";
+
+// Map persisted DTOs → the in-memory reducer shapes (field names already align,
+// spec §6a). Persisted turns are completed/non-error by construction (we only
+// persist on `done`), so isError/maxTurns default false.
+const toClientThread = (t: ResearchThreadDTO): Thread => ({
+  id: t.id, title: t.title, ticker: t.ticker, provider: t.provider, model: t.model,
+  created_at: t.created_at, updated_at: t.updated_at,
+});
+const toClientMessage = (m: ResearchMessageDTO): Message => ({
+  role: m.role, content: m.content, provider: m.provider, model: m.model,
+  tools_used: m.tools_used ?? [], tool_calls: m.tool_calls ?? [],
+  token_usage: m.token_usage, tickers: m.tickers,
+  elapsed_seconds: m.elapsed_seconds, created_at: m.created_at,
+  isError: false, maxTurns: false,
+});
 
 const PROVIDER_IDS = ["anthropic", "openai"] as const;
 type ProviderId = (typeof PROVIDER_IDS)[number];
@@ -88,6 +108,27 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   useEffect(() => {
     if (provider === null && availableIds.length === 1) setProvider(availableIds[0] as ProviderId);
   }, [provider, availableIds]);
+
+  // Reload hydration (C-2b): on mount, restore persisted threads + their
+  // messages from the store into the reducer. Best-effort — an empty/failed
+  // fetch just starts clean. (v1 eager-loads each thread's messages; fine for a
+  // local single-user store, revisit with lazy-per-thread if thread counts grow.)
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const { threads } = await getResearchThreads();
+        const entries = await Promise.all(
+          threads.map(async (t) => [t.id, (await getResearchMessages(t.id)).messages.map(toClientMessage)] as const),
+        );
+        if (!alive || threads.length === 0) return;
+        dispatch({ kind: "hydrate", threads: threads.map(toClientThread), messagesByThread: Object.fromEntries(entries) });
+      } catch {
+        /* hydration is best-effort; a clean empty start is fine */
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // Abort any in-flight stream on unmount.
   useEffect(() => () => abortRef.current?.abort(), []);

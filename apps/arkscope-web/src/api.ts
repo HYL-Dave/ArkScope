@@ -508,6 +508,26 @@ export function getQueryProviders(): Promise<QueryProviders> {
   return getJSON<QueryProviders>("/query/providers", 8_000);
 }
 
+// AI 研究 persisted threads/messages (C-2b) — for reload hydration.
+export interface ResearchThreadDTO {
+  id: string; title: string; ticker: string | null;
+  provider: string | null; model: string | null;
+  created_at: string; updated_at: string;
+}
+export interface ResearchMessageDTO {
+  role: "user" | "assistant"; content: string;
+  provider: string | null; model: string | null;
+  tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
+  token_usage: Record<string, number> | null; tickers: string[] | null;
+  elapsed_seconds: number | null; created_at: string;
+}
+export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThreadDTO[] }> {
+  return getJSON<{ threads: ResearchThreadDTO[] }>(`/research/threads?limit=${limit}`, 8_000);
+}
+export function getResearchMessages(threadId: string): Promise<{ thread_id: string; messages: ResearchMessageDTO[] }> {
+  return getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000);
+}
+
 export function getModelCatalog(): Promise<ModelCatalog> {
   return getJSON<ModelCatalog>("/config/model-catalog", 8_000);
 }
