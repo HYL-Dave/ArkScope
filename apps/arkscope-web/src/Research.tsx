@@ -115,11 +115,14 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     const q = question.trim();
     if (!q || !provider || state.pending) return; // disabled while pending (defensive)
     const ticker = tickerInput.trim().toUpperCase() || null;
+    // Client-owned thread id: reuse the active thread to continue, else a fresh
+    // uuid for a new conversation (agreed reducer↔store id model).
+    const threadId = state.activeThreadId ?? crypto.randomUUID();
     const sent = ticker ? `針對 ${ticker}：${q}` : q; // ticker folded in client-side (C-2a)
-    dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now() });
+    dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now(), threadId });
     setQuestion("");
     void runStream(sent, provider);
-  }, [question, tickerInput, provider, state.pending, runStream]);
+  }, [question, tickerInput, provider, state.pending, state.activeThreadId, runStream]);
 
   // Abort the live stream + drop the pending turn (reducer abort), per the
   // integration contract — used by Stop, 新對話, and thread-switch.

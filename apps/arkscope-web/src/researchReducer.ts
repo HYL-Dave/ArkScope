@@ -92,13 +92,16 @@ export interface State {
 
 // ---- Action union (ts is epoch MS; submit + frame carry ts so elapsed is pure)
 export type Action =
-  | { kind: "submit"; question: string; provider: Provider; model: string | null; ticker?: string | null; ts: number }
+  // threadId is CLIENT-OWNED (UI generates a stable uuid at 新對話, reuses the
+  // active thread's id to continue). New thread iff no thread with that id exists.
+  | { kind: "submit"; question: string; provider: Provider; model: string | null; ticker?: string | null; ts: number; threadId: string }
   | { kind: "frame"; frame: SSEFrame; ts: number }
   | { kind: "abort"; ts?: number }
   | { kind: "streamEnd"; ts?: number }
   | { kind: "streamError"; error: string; ts?: number }
   | { kind: "newThread" } // + 新對話: next submit starts a fresh thread (UI aborts first)
-  | { kind: "selectThread"; threadId: string }; // left-pane switch (UI aborts first)
+  | { kind: "selectThread"; threadId: string } // left-pane switch (UI aborts first)
+  | { kind: "hydrate"; threads: Thread[]; messagesByThread: Record<string, Message[]> }; // reload restore (C-2b)
 
 // The exact max-turns sentinel (Anthropic-only; agent.py:516). EXACT equality.
 export const MAX_TURNS_SENTINEL = "Maximum tool calls reached. Please try a simpler query.";
@@ -141,8 +144,8 @@ function commit(state: State, p: PendingTurn, msg: Message, terminal: State["ter
 }
 
 function onSubmit(state: State, a: Extract<Action, { kind: "submit" }>): State {
-  const isNew = state.activeThreadId === null;
-  const threadId = isNew ? `thread-${state.threads.length + 1}` : state.activeThreadId!;
+  const threadId = a.threadId; // client-owned; new iff not already present
+  const isNew = !state.threads.some((t) => t.id === threadId);
   const createdIso = iso(a.ts);
   const tickers = normTickers(a.ticker);
   const userMsg: Message = {
@@ -294,6 +297,18 @@ export function reduce(state: State, action: Action): State {
       return { ...state, activeThreadId: null, pending: null, footer: null, terminal: null };
     case "selectThread":
       return { ...state, activeThreadId: action.threadId, pending: null, footer: null, terminal: null };
+    case "hydrate":
+      // Reload restore: load persisted threads/messages; no active thread (the
+      // user picks from the list), drop any live turn.
+      return {
+        ...state,
+        threads: action.threads,
+        messagesByThread: action.messagesByThread,
+        activeThreadId: null,
+        pending: null,
+        footer: null,
+        terminal: null,
+      };
     default:
       return state; // unreachable for known kinds; guards against a silent undefined
   }

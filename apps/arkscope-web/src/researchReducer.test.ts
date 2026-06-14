@@ -18,7 +18,7 @@ function run(...actions: Action[]): State {
   return actions.reduce((s, a) => reduce(s, a), initialState);
 }
 const submit = (o: Partial<Action> & { question: string }): Action =>
-  ({ kind: "submit", ts: 0, provider: "anthropic", model: "m", ...o } as Action);
+  ({ kind: "submit", ts: 0, provider: "anthropic", model: "m", threadId: "t1", ...o } as Action);
 const f = (type: string, data: unknown = {}, ts = 0): Action => ({ kind: "frame", frame: { type, data }, ts });
 const iso = (ms: number) => new Date(ms).toISOString();
 const msgs = (s: State): Message[] => s.messagesByThread[s.activeThreadId!] ?? [];
@@ -29,9 +29,10 @@ const assistant = (s: State): Message => msgs(s)[msgs(s).length - 1];
 // ---------------------------------------------------------------------------
 describe("reducer · anthropic live", () => {
   it("submit commits user msg, opens pending, sets thinkingActive, creates+titles thread", () => {
-    const s = run(submit({ question: "NVDA 最新 SA 動態與評論焦點重點整理。", provider: "anthropic", model: "claude-opus-4-8", ticker: "nvda", ts: 1000 }));
+    const s = run(submit({ question: "NVDA 最新 SA 動態與評論焦點重點整理。", provider: "anthropic", model: "claude-opus-4-8", ticker: "nvda", ts: 1000, threadId: "th-uuid-1" }));
     expect(s.threads).toHaveLength(1);
-    expect(s.activeThreadId).toBe(s.threads[0].id);
+    expect(s.activeThreadId).toBe("th-uuid-1"); // client-supplied id, not an internal thread-N
+    expect(s.threads[0].id).toBe("th-uuid-1");
     const t = s.threads[0];
     expect(t.title).toBe("NVDA 最新 SA 動態與評論焦點重點整理。");
     expect(t.provider).toBe("anthropic");
@@ -556,41 +557,86 @@ describe("reducer · thread navigation", () => {
   const done1 = f("done", { answer: "a1", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } });
 
   it("newThread resets active to null + clears pending/terminal/footer, preserving threads & messages", () => {
-    const s = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" });
+    const s = run(submit({ question: "first", threadId: "t1" }), done1, { kind: "newThread" });
     expect(s.activeThreadId).toBeNull();
     expect(s.pending).toBeNull();
     expect(s.terminal).toBeNull();
     expect(s.footer).toBeNull();
     expect(s.threads).toHaveLength(1); // preserved
-    expect(s.messagesByThread["thread-1"]).toHaveLength(2); // user + assistant preserved
+    expect(s.messagesByThread["t1"]).toHaveLength(2); // user + assistant preserved
   });
 
-  it("submit after newThread creates a fresh second thread (no append to the first)", () => {
-    const s = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" }, submit({ question: "second", provider: "anthropic", model: "m" }));
+  it("submit after newThread creates a fresh thread under the new client id (no append to the first)", () => {
+    const s = run(submit({ question: "first", threadId: "t1" }), done1, { kind: "newThread" }, submit({ question: "second", threadId: "t2" }));
     expect(s.threads).toHaveLength(2);
-    expect(s.activeThreadId).toBe("thread-2");
-    expect(s.threads[1].title).toBe("second");
-    expect(s.messagesByThread["thread-2"]).toHaveLength(1); // only the new user msg
-    expect(s.messagesByThread["thread-1"]).toHaveLength(2); // untouched
+    expect(s.activeThreadId).toBe("t2");
+    expect(s.threads.find((t) => t.id === "t2")!.title).toBe("second");
+    expect(s.messagesByThread["t2"]).toHaveLength(1); // only the new user msg
+    expect(s.messagesByThread["t1"]).toHaveLength(2); // untouched
+  });
+
+  it("re-submitting the active thread's id appends (multi-turn), does not create a new thread", () => {
+    const s = run(submit({ question: "first", threadId: "t1" }), done1, submit({ question: "follow-up", threadId: "t1" }));
+    expect(s.threads).toHaveLength(1);
+    expect(s.messagesByThread["t1"]).toHaveLength(3); // user, assistant, user
   });
 
   it("selectThread switches the active thread, preserving both threads' messages", () => {
-    const s0 = run(submit({ question: "first", provider: "anthropic", model: "m" }), done1, { kind: "newThread" }, submit({ question: "second", provider: "anthropic", model: "m" }), f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }));
-    const s = reduce(s0, { kind: "selectThread", threadId: "thread-1" });
-    expect(s.activeThreadId).toBe("thread-1");
+    const s0 = run(submit({ question: "first", threadId: "t1" }), done1, { kind: "newThread" }, submit({ question: "second", threadId: "t2" }), f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }));
+    const s = reduce(s0, { kind: "selectThread", threadId: "t1" });
+    expect(s.activeThreadId).toBe("t1");
     expect(s.pending).toBeNull();
-    expect(msgs(s)).toHaveLength(2); // thread-1's user+assistant
-    expect(s.messagesByThread["thread-2"]).toHaveLength(2); // thread-2 preserved
+    expect(msgs(s)).toHaveLength(2); // t1's user+assistant
+    expect(s.messagesByThread["t2"]).toHaveLength(2); // t2 preserved
   });
 
   it("newThread/selectThread clear an in-flight pending (defensive; UI aborts first)", () => {
-    const mid = run(submit({ question: "q", provider: "anthropic", model: "m" }), f("thinking", { turn: 1, model: "m" }), f("tool_start", { tool: "get_sa_feed", input: {} }));
+    const mid = run(submit({ question: "q", threadId: "t1" }), f("thinking", { turn: 1, model: "m" }), f("tool_start", { tool: "get_sa_feed", input: {} }));
     expect(mid.pending).not.toBeNull();
     const a = reduce(mid, { kind: "newThread" });
     expect(a.pending).toBeNull();
     expect(a.activeThreadId).toBeNull();
     // no assistant bubble fabricated from the dropped pending
-    expect(a.messagesByThread["thread-1"]).toHaveLength(1); // user only
+    expect(a.messagesByThread["t1"]).toHaveLength(1); // user only
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GROUP 7 — hydrate (reload restores persisted threads + messages, C-2b)
+// ---------------------------------------------------------------------------
+describe("reducer · hydrate", () => {
+  const mkThread = (id: string, title: string): import("./researchReducer").Thread => ({
+    id, title, ticker: null, provider: "anthropic", model: "m", created_at: "x", updated_at: "y",
+  });
+  const mkMsg = (role: "user" | "assistant", content: string): Message => ({
+    role, content, tools_used: [], tool_calls: [], tickers: null, created_at: "x",
+  });
+
+  it("seeds threads + messagesByThread, no active thread, clears any pending/terminal", () => {
+    const seeded = run(submit({ question: "stale", threadId: "t9" }), f("thinking", { turn: 1, model: "m" }));
+    const s = reduce(seeded, {
+      kind: "hydrate",
+      threads: [mkThread("ta", "alpha"), mkThread("tb", "beta")],
+      messagesByThread: { ta: [mkMsg("user", "qa"), mkMsg("assistant", "aa")], tb: [mkMsg("user", "qb")] },
+    });
+    expect(s.threads.map((t) => t.id)).toEqual(["ta", "tb"]);
+    expect(s.messagesByThread["ta"]).toHaveLength(2);
+    expect(s.activeThreadId).toBeNull(); // user picks from the list
+    expect(s.pending).toBeNull();
+    expect(s.terminal).toBeNull();
+  });
+
+  it("after hydrate, selectThread opens a restored thread and submit appends to it", () => {
+    const h = reduce(initialState, {
+      kind: "hydrate",
+      threads: [mkThread("ta", "alpha")],
+      messagesByThread: { ta: [mkMsg("user", "qa"), mkMsg("assistant", "aa")] },
+    });
+    const sel = reduce(h, { kind: "selectThread", threadId: "ta" });
+    expect(msgs(sel)).toHaveLength(2);
+    const cont = reduce(sel, submit({ question: "follow-up in restored thread", threadId: "ta" }));
+    expect(cont.threads).toHaveLength(1); // appended, not a new thread
+    expect(cont.messagesByThread["ta"]).toHaveLength(3);
   });
 });
 
@@ -599,8 +645,8 @@ describe("reducer · thread navigation", () => {
 // assistant turn, so switching threads restores its footer; fixes gpt-5.5 #1)
 // ---------------------------------------------------------------------------
 describe("selectFooter", () => {
-  const turn = (q: string, total: number, turns: number, ts = 0): Action[] => [
-    submit({ question: q, provider: "anthropic", model: "m", ts }),
+  const turn = (q: string, total: number, turns: number, ts = 0, threadId = "t1"): Action[] => [
+    submit({ question: q, provider: "anthropic", model: "m", ts, threadId }),
     f("done", { answer: "a", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: total, turn_count: turns } }, ts),
   ];
 
@@ -625,12 +671,12 @@ describe("selectFooter", () => {
 
   it("restores the SWITCHED-to thread's footer (the bug: footer was cleared on selectThread)", () => {
     const s0 = run(
-      ...turn("first thread", 1500, 2),
+      ...turn("first thread", 1500, 2, 0, "t1"),
       { kind: "newThread" },
-      ...turn("second thread", 9000, 5),
+      ...turn("second thread", 9000, 5, 0, "t2"),
     );
-    expect(selectFooter(s0)).toEqual({ total_tokens: 9000, turn_count: 5 }); // active = thread-2
-    const s1 = reduce(s0, { kind: "selectThread", threadId: "thread-1" });
+    expect(selectFooter(s0)).toEqual({ total_tokens: 9000, turn_count: 5 }); // active = t2
+    const s1 = reduce(s0, { kind: "selectThread", threadId: "t1" });
     expect(s1.footer).toBeNull(); // reducer still clears its live footer on switch…
     expect(selectFooter(s1)).toEqual({ total_tokens: 1500, turn_count: 2 }); // …but the selector restores it
   });
