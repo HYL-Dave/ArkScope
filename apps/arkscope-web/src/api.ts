@@ -406,7 +406,7 @@ function authHeaders(): Record<string, string> {
  * Throws on a non-ok / bodyless response so the caller can surface an error.
  */
 export async function* streamQuery(
-  body: { question: string; provider: string; model?: string },
+  body: { question: string; provider: string; model?: string; thread_id?: string; ticker?: string | null },
   signal?: AbortSignal,
 ): AsyncGenerator<SSEFrame> {
   const res = await fetch(`${apiBase}/query/stream`, {

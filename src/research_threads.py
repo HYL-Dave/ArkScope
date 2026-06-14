@@ -52,6 +52,15 @@ CREATE INDEX IF NOT EXISTS idx_research_messages_thread ON research_messages(thr
 """
 
 
+MAX_THREAD_ID = 200
+
+
+def valid_thread_id(tid: Optional[str]) -> bool:
+    """Client-owned thread id must be non-blank and bounded (route gate + the
+    stream-hook persistence gate both use this)."""
+    return bool(tid) and bool(tid.strip()) and len(tid) <= MAX_THREAD_ID
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 

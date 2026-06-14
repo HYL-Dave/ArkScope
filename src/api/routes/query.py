@@ -13,10 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..dependencies import get_dal
+from ..dependencies import get_dal, get_thread_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["query"])
+
+TITLE_MAX = 60  # thread title = first question, truncated (matches the client reducer)
 
 
 class QueryRequest(BaseModel):
@@ -24,6 +26,64 @@ class QueryRequest(BaseModel):
     question: str
     provider: str = "openai"  # "openai" | "anthropic"
     model: Optional[str] = None  # Override default model
+    # C-2b persistence (optional): the AI 研究 surface sends a client-owned thread
+    # id + an optional ticker context. The agent is prompted with the composed
+    # question; the RAW question is what gets persisted (criterion #2).
+    thread_id: Optional[str] = None
+    ticker: Optional[str] = None
+
+
+def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
+    """Server-side prompt framing — the agent sees the ticker context; the store
+    keeps the raw question (so history is clean, not prefixed)."""
+    t = (ticker or "").strip().upper()
+    return f"針對 {t}：{question}" if t else question
+
+
+def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:
+    """Reconstruct the chronological tool_calls from the (type, data) stream of
+    tool_start/tool_end events — server-side mirror of the client reducer, so a
+    reloaded turn shows the real trace (NOT the deduped done.tools_used, #3).
+
+    tool_start opens a row (name+input); tool_end completes the most-recent open
+    row (result_preview); a tool_end with no open row (OpenAI name-only batch)
+    appends an already-closed name-only row.
+    """
+    rows: list[dict] = []
+    for etype, data in events:
+        if etype == "tool_start":
+            rows.append({"name": data.get("tool"), "input": data.get("input"), "result_preview": None, "_done": False})
+        elif etype == "tool_end":
+            target = next((r for r in reversed(rows) if not r["_done"]), None)
+            if target is not None:
+                target["result_preview"] = data.get("summary")
+                target["_done"] = True
+            else:
+                rows.append({"name": data.get("tool"), "input": None, "result_preview": data.get("summary"), "_done": True})
+    return [{"name": r["name"], "input": r["input"], "result_preview": r["result_preview"]} for r in rows]
+
+
+def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, title) -> None:
+    """Best-effort: a persistence failure must never break the SSE answer (#4)."""
+    try:
+        store.ensure_thread(id=thread_id, title=title, ticker=(ticker or None), provider=provider, model=model)
+        store.append_message(thread_id=thread_id, role="user", content=question, tickers=[ticker] if ticker else None)
+    except Exception as e:  # noqa: BLE001 — best-effort by design
+        logger.warning("research persist (user turn) failed, continuing: %s", e)
+
+
+def _persist_assistant_turn(store, *, thread_id, done_data, tool_calls, elapsed) -> None:
+    """Best-effort assistant persistence (#3 tool_calls from the trace, #4 safe)."""
+    try:
+        store.append_message(
+            thread_id=thread_id, role="assistant",
+            content=done_data.get("answer", "") or "",
+            provider=done_data.get("provider"), model=done_data.get("model"),
+            tools_used=done_data.get("tools_used"), tool_calls=tool_calls,
+            token_usage=done_data.get("token_usage"), elapsed_seconds=elapsed,
+        )
+    except Exception as e:  # noqa: BLE001 — best-effort by design
+        logger.warning("research persist (assistant turn) failed, continuing: %s", e)
 
 
 class QueryResponse(BaseModel):
@@ -106,6 +166,7 @@ async def query_agent(
 async def query_agent_stream(
     request: QueryRequest,
     dal=Depends(get_dal),
+    store=Depends(get_thread_store),
 ):
     """
     Execute a query with Server-Sent Events for live progress.
@@ -122,36 +183,57 @@ async def query_agent_stream(
         - done: Final answer with full result
     """
     provider = request.provider.lower()
+    # #2: the agent sees the ticker-framed question; the store keeps the raw one.
+    agent_question = _compose_agent_question(request.question, request.ticker)
+    # C-2b persistence gated on a valid client-owned thread id (#5). Invalid →
+    # just don't persist (never error the stream — #4).
+    from src.research_threads import valid_thread_id
+    persist = valid_thread_id(request.thread_id)
 
     async def event_generator():
+        import time as _time
+
+        if persist:
+            _persist_user_turn(
+                store, thread_id=request.thread_id, question=request.question,
+                ticker=request.ticker, provider=provider, model=request.model,
+                title=request.question[:TITLE_MAX],
+            )
+        collected: list[tuple[str, dict]] = []  # (#3) tool_start/tool_end trace
+        done_data: Optional[dict] = None
+        t0 = _time.monotonic()
         try:
             if provider == "openai":
                 from src.agents.openai_agent.agent import run_query_stream
-                stream = run_query_stream(
-                    question=request.question,
-                    model=request.model,
-                    dal=dal,
-                )
+                stream = run_query_stream(question=agent_question, model=request.model, dal=dal)
             elif provider == "anthropic":
                 from src.agents.anthropic_agent.agent import run_query_stream
-                stream = run_query_stream(
-                    question=request.question,
-                    model=request.model,
-                    dal=dal,
-                )
+                stream = run_query_stream(question=agent_question, model=request.model, dal=dal)
             else:
                 from src.agents.shared.events import AgentEvent, EventType
-                yield AgentEvent(EventType.error, {
-                    "message": f"Unknown provider: {provider}",
-                }).to_sse()
+                yield AgentEvent(EventType.error, {"message": f"Unknown provider: {provider}"}).to_sse()
                 return
 
             async for event in stream:
+                if persist:
+                    etype = getattr(event.type, "value", event.type)
+                    if etype in ("tool_start", "tool_end"):
+                        collected.append((etype, event.data))
+                    elif etype == "done":
+                        done_data = event.data
                 yield event.to_sse()
         except Exception as e:
             from src.agents.shared.events import AgentEvent, EventType
             logger.error(f"Stream error: {e}")
             yield AgentEvent(EventType.error, {"message": str(e)}).to_sse()
+        finally:
+            # Persist the assistant turn iff it completed (done seen). Best-effort.
+            if persist and done_data is not None:
+                _persist_assistant_turn(
+                    store, thread_id=request.thread_id, done_data=done_data,
+                    tool_calls=accumulate_tool_calls(collected),
+                    elapsed=round(_time.monotonic() - t0, 3),
+                )
 
     return StreamingResponse(
         event_generator(),

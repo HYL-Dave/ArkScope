@@ -93,11 +93,13 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   useEffect(() => () => abortRef.current?.abort(), []);
 
   // --- streaming runner: reducer is the authority; UI owns the controller ----
-  const runStream = useCallback(async (sentQuestion: string, p: ProviderId) => {
+  // Sends the RAW question + ticker + thread_id; the server frames the agent
+  // prompt and persists the raw question (criterion #2).
+  const runStream = useCallback(async (body: { question: string; provider: ProviderId; thread_id: string; ticker: string | null }) => {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      for await (const frame of streamQuery({ question: sentQuestion, provider: p }, controller.signal)) {
+      for await (const frame of streamQuery(body, controller.signal)) {
         if (abortRef.current !== controller) return; // superseded by a newer turn
         dispatch({ kind: "frame", frame, ts: Date.now() });
       }
@@ -118,10 +120,9 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     // Client-owned thread id: reuse the active thread to continue, else a fresh
     // uuid for a new conversation (agreed reducer↔store id model).
     const threadId = state.activeThreadId ?? crypto.randomUUID();
-    const sent = ticker ? `針對 ${ticker}：${q}` : q; // ticker folded in client-side (C-2a)
     dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now(), threadId });
     setQuestion("");
-    void runStream(sent, provider);
+    void runStream({ question: q, provider, thread_id: threadId, ticker }); // raw question; server frames + persists
   }, [question, tickerInput, provider, state.pending, state.activeThreadId, runStream]);
 
   // Abort the live stream + drop the pending turn (reducer abort), per the

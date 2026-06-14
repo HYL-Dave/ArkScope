@@ -53,6 +53,15 @@ def get_card_store():
 
 
 @lru_cache(maxsize=1)
+def get_thread_store():
+    """Singleton local store for AI 研究 conversation threads/messages (same local
+    SQLite). Threads live alongside profile state in the local DB, never PG."""
+    from src.research_threads import ResearchThreadStore
+
+    return ResearchThreadStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_credential_store():
     """Singleton local LLM credential store (same ignored local SQLite DB)."""
     from src.model_credentials import CredentialStore
