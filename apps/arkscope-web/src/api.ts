@@ -4,6 +4,8 @@
 // running in the desktop shell, or fall back to a dev default when running the
 // Vite dev server in a plain browser.
 
+import { SSEFrameParser, type SSEFrame } from "./sse";
+
 export interface ApiStatus {
   status: string;
   timestamp: string;
@@ -391,6 +393,48 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 
 function authHeaders(): Record<string, string> {
   return apiToken ? { "x-arkscope-token": apiToken } : {};
+}
+
+/**
+ * Stream an agent query over POST /query/stream as SSE frames (C-2).
+ *
+ * Deliberately does NOT use fetchWithTimeout — a turn runs 1–4 min and that
+ * helper's 15s AbortController would kill the stream. The caller owns aborting
+ * via `signal` (thread-switch / unmount / Stop). Frame parsing lives in the
+ * unit-tested SSEFrameParser; this drives fetch + the ReadableStream reader and
+ * flushes the UTF-8 decoder for multibyte chars split across network chunks.
+ * Throws on a non-ok / bodyless response so the caller can surface an error.
+ */
+export async function* streamQuery(
+  body: { question: string; provider: string; model?: string },
+  signal?: AbortSignal,
+): AsyncGenerator<SSEFrame> {
+  const res = await fetch(`${apiBase}/query/stream`, {
+    method: "POST",
+    headers: { ...authHeaders(), "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`query stream failed: HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const parser = new SSEFrameParser();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const frame of parser.push(decoder.decode(value, { stream: true }))) {
+        yield frame;
+      }
+    }
+    const tail = decoder.decode(); // flush any trailing multibyte bytes
+    if (tail) for (const frame of parser.push(tail)) yield frame;
+    for (const frame of parser.flush()) yield frame;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 async function fetchWithTimeout(
