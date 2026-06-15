@@ -680,6 +680,13 @@ def run_query_sync(
         raise
 
 
+def _compose_stream_input(history: list, question: str):
+    """OpenAI Runner input (C-2c multi-turn): a message-list (prior history + this
+    turn) when there is context, else the bare question string — keeping
+    single-turn behaviour byte-identical. The Agents SDK accepts both forms."""
+    return [*history, {"role": "user", "content": question}] if history else question
+
+
 async def run_query_stream(
     question: str,
     model: Optional[str] = None,
@@ -767,10 +774,8 @@ async def run_query_stream(
     session = _make_compaction_session() if config.server_compaction else None
 
     effective_max_turns = config.max_tool_calls
-    # With prior history, pass a message-list input (history + this user turn);
-    # otherwise the bare question string (unchanged single-turn behaviour).
     runner_kwargs = dict(
-        input=([*_hist, {"role": "user", "content": question}] if _hist else question),
+        input=_compose_stream_input(_hist, question),
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
     )
