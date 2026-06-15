@@ -298,6 +298,32 @@ def import_oauth_credential(
     }
 
 
+@router.post("/config/credentials/{credential_id}/probe")
+def probe_oauth_credential(
+    credential_id: str,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Run the P3 probe for a claude_code_oauth credential: verify `claude -p`
+    works with the stored token AND that the raw Anthropic SDK rejects it as an
+    API key. Returns redacted ProbeResults — the token is NEVER echoed."""
+    from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+    from src.research_threads import valid_thread_id  # reuse the id validator
+
+    store = _credential_store(store)
+    if not valid_thread_id(credential_id):
+        raise HTTPException(status_code=422, detail="invalid credential_id")
+    cred = store.get(credential_id)
+    if cred is None or cred.auth_type not in ("chatgpt_oauth", "claude_code_oauth"):
+        raise HTTPException(status_code=404, detail="OAuth credential not found")
+    if not (cred.provider == "anthropic" and cred.auth_type == "claude_code_oauth"):
+        raise HTTPException(status_code=400, detail="probe currently supports only anthropic claude_code_oauth")
+    record = token_store.load(provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id)
+    if record is None or not record.access_token:
+        raise HTTPException(status_code=404, detail="no stored token for this credential")
+    return run_claude_code_oauth_probe(record.access_token)
+
+
 @router.put("/config/credentials/{credential_id}")
 def update_credential(
     credential_id: str,

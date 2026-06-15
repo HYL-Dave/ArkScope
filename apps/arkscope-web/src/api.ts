@@ -568,8 +568,9 @@ export function importOAuthCredential(body: {
 
 export function addCredential(body: {
   provider: ModelProvider;
-  // user-settable subset (api_key_pool is env-derived, not created via the form)
-  auth_type: "api_key" | "chatgpt_oauth" | "claude_code_oauth";
+  // DIRECT API keys only — the backend rejects OAuth modes here (use
+  // importOAuthCredential, which routes the token to the token-store).
+  auth_type: "api_key";
   alias: string;
   secret: string;
   make_active: boolean;

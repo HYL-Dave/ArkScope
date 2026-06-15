@@ -116,6 +116,43 @@ def test_import_rejects_blank_token(stores):
     assert cred.list() == []
 
 
+def test_probe_route_runs_p3_and_never_echoes_token(stores, monkeypatch):
+    # Import a fake token, then probe it. The probe is monkeypatched (no real
+    # claude -p / network); the response carries redacted ProbeResults only.
+    cred, tok = stores
+    res = cr.import_oauth_credential(_body(), store=cred, token_store=tok)
+    cid = res["credential"]["id"]
+
+    import src.auth_drivers.claude_oauth_probe as probe_mod
+    captured = {}
+
+    def fake_probe(token, **kw):
+        captured["token"] = token  # the route must pass the stored token
+        return {"passed": True, "probes": [{"name": "P3a", "passed": True, "expected": "x", "observed": "ok", "error": None}]}
+
+    monkeypatch.setattr(probe_mod, "run_claude_code_oauth_probe", fake_probe)
+    out = cr.probe_oauth_credential(cid, store=cred, token_store=tok)
+    assert out["passed"] is True and out["probes"][0]["name"] == "P3a"
+    assert captured["token"] == _TOKEN  # the real stored token reached the probe
+    assert _TOKEN not in json.dumps(out)  # but never came back in the response
+
+
+def test_probe_route_404_when_no_token(stores):
+    cred, tok = stores
+    # a credential row with no token in the store → 404
+    c = cred.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="orphan")
+    with pytest.raises(HTTPException) as ei:
+        cr.probe_oauth_credential(f"local:{c.id}", store=cred, token_store=tok)
+    assert ei.value.status_code == 404
+
+
+def test_probe_route_422_for_blank_id(stores):
+    cred, tok = stores
+    with pytest.raises(HTTPException) as ei:
+        cr.probe_oauth_credential("   ", store=cred, token_store=tok)
+    assert ei.value.status_code == 422
+
+
 def test_generic_credentials_route_still_rejects_oauth(stores):
     # regression: the API-key endpoint must STILL refuse OAuth modes (no second
     # door into llm_credentials.secret).
