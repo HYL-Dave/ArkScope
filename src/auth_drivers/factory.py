@@ -103,6 +103,15 @@ def build_driver(
             f"auth_mode {auth_mode!r} is not valid for provider {provider!r} "
             f"(allowed: {sorted(_ALLOWED_MODES[provider])})"
         )
+    # S2: api_key / api_key_pool resolve to a real driver. OAuth modes stay the
+    # gated placeholder until S3 (chatgpt_oauth) / S4 (claude_code_oauth).
+    if auth_mode in ("api_key", "api_key_pool"):
+        from .api_key_drivers import AnthropicApiKeyDriver, OpenAIApiKeyDriver
+
+        secret = getattr(credential, "secret", None)
+        cid = f"local:{credential.id}" if credential is not None and getattr(credential, "id", None) is not None else None
+        cls = OpenAIApiKeyDriver if provider == "openai" else AnthropicApiKeyDriver
+        return cls(api_key=secret, auth_mode=auth_mode, credential_id=cid)
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
     )

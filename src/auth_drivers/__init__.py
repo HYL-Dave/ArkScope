@@ -11,6 +11,11 @@ from .protocol import (
     ResearchProviderDriver,
     TokenUsage,
 )
+from .api_key_drivers import (
+    AnthropicApiKeyDriver,
+    MissingCredentialError,
+    OpenAIApiKeyDriver,
+)
 from .factory import NotImplementedDriver, build_driver
 from .token_store import (
     KeyringTokenStore,
@@ -20,11 +25,14 @@ from .token_store import (
 )
 
 __all__ = [
+    "AnthropicApiKeyDriver",
     "AuthDriver",
     "AuthMode",
     "DiscoveredModel",
     "KeyringTokenStore",
+    "MissingCredentialError",
     "NotImplementedDriver",
+    "OpenAIApiKeyDriver",
     "build_driver",
     "LLMRequest",
     "LLMResponse",

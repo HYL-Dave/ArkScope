@@ -35,12 +35,29 @@ _INVALID_COMBOS = [
 ]
 
 
-# --- routing: every VALID (provider, auth_mode) yields a driver placeholder ---
+_OAUTH_COMBOS = [("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")]
+_APIKEY_COMBOS = [("openai", "api_key"), ("openai", "api_key_pool"),
+                  ("anthropic", "api_key"), ("anthropic", "api_key_pool")]
+
+
+# --- routing: every VALID (provider, auth_mode) yields a driver carrying identity
 @pytest.mark.parametrize("provider,auth_mode", _VALID_COMBOS)
-def test_build_driver_returns_placeholder_carrying_identity(provider, auth_mode):
+def test_build_driver_carries_identity(provider, auth_mode):
     d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
-    assert isinstance(d, NotImplementedDriver)
     assert d.provider == provider and d.auth_mode == auth_mode
+
+
+@pytest.mark.parametrize("provider,auth_mode", _OAUTH_COMBOS)
+def test_oauth_modes_are_gated_placeholders(provider, auth_mode):
+    d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
+    assert isinstance(d, NotImplementedDriver)  # real OAuth driver is S3/S4
+
+
+@pytest.mark.parametrize("provider,auth_mode", _APIKEY_COMBOS)
+def test_api_key_modes_are_real_drivers_not_placeholders(provider, auth_mode):
+    # S2: api_key/api_key_pool now resolve to a REAL driver (not the placeholder).
+    d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
+    assert not isinstance(d, NotImplementedDriver)
 
 
 @pytest.mark.parametrize("provider,auth_mode", _INVALID_COMBOS)
@@ -52,14 +69,14 @@ def test_build_driver_rejects_cross_provider_oauth(provider, auth_mode):
     assert auth_mode in str(ei.value) and provider in str(ei.value)
 
 
-# --- the placeholder is inert: calling it raises NotImplementedError (slice ref)
-def test_api_key_placeholder_not_callable_yet():
-    d = build_driver(provider="openai", auth_mode="api_key", credential=_cred())
+# --- OAuth placeholder is inert: calling it raises NotImplementedError (slice ref)
+def test_oauth_placeholder_not_callable_yet():
+    d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     import asyncio
 
     with pytest.raises(NotImplementedError) as ei:
         asyncio.run(d.call_llm(None))
-    assert "S2" in str(ei.value)  # api_key drivers come in S2
+    assert "S3" in str(ei.value)  # chatgpt_oauth real driver comes in S3
 
 
 def test_oauth_modes_reference_their_probe_slice():
@@ -108,13 +125,13 @@ def test_token_store_optional_and_injected(tmp_path):
     assert d1.token_store is ts
 
 
-# --- conforms to BOTH contracts (the factory is a research-driver factory) ---
+# --- the OAuth placeholder conforms to BOTH contracts -----------------------
 def test_placeholder_conforms_to_authdriver_and_research_driver():
     from src.auth_drivers import AuthDriver, ResearchProviderDriver
 
-    d = build_driver(provider="openai", auth_mode="api_key", credential=_cred())
+    d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     assert isinstance(d, AuthDriver)
-    assert isinstance(d, ResearchProviderDriver)  # has discover_models() + test()
+    assert isinstance(d, ResearchProviderDriver)  # placeholder has discover_models() + test()
 
 
 def test_discover_and_test_are_gated_with_slice_message():
