@@ -11,6 +11,7 @@ from .protocol import (
     ResearchProviderDriver,
     TokenUsage,
 )
+from .factory import NotImplementedDriver, build_driver
 from .token_store import (
     KeyringTokenStore,
     PlaintextTokenStore,
@@ -23,6 +24,8 @@ __all__ = [
     "AuthMode",
     "DiscoveredModel",
     "KeyringTokenStore",
+    "NotImplementedDriver",
+    "build_driver",
     "LLMRequest",
     "LLMResponse",
     "ModelDiscoveryResult",
