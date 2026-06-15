@@ -200,9 +200,12 @@ def add_credential(
 ):
     store = _credential_store(store)
     auth_type = body.auth_type.strip()
-    # Explicit modes are the target; legacy oauth/setup_token still accepted and
-    # normalized by store.add() (deprecated write-aliases).
-    if auth_type not in {"api_key", "chatgpt_oauth", "claude_code_oauth", "oauth", "setup_token"}:
+    # This route is for DIRECT API keys only. OAuth/setup-token modes carry a token
+    # that must go to the token-store (not llm_credentials.secret), so they are
+    # rejected here — use the dedicated OAuth import route.
+    if auth_type in {"chatgpt_oauth", "claude_code_oauth", "oauth", "setup_token"}:
+        raise HTTPException(status_code=400, detail=f"auth_type {auth_type!r} must use the OAuth import route, not this API-key endpoint")
+    if auth_type != "api_key":
         raise HTTPException(status_code=400, detail=f"unsupported auth_type: {auth_type}")
     require_profile_state_write(
         "credential_add",

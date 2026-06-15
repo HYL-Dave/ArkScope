@@ -135,9 +135,9 @@ def test_resolve_api_credential_picks_api_key(store, clean_env):
 
 
 def test_resolve_api_credential_ignores_non_apikey_rows(store, clean_env):
-    # CURRENT-BASELINE: an 'oauth' row does NOT resolve as a usable API credential
-    # (only api_key/api_key_pool). S1's normalization revisits this.
-    o = store.add(provider="anthropic", auth_type="oauth", alias="o", secret="tok-value-1234", make_active=False)
+    # an OAuth row (created via add_oauth_credential — secret stays in the
+    # token-store) does NOT resolve as a usable API credential.
+    o = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="o", make_active=False)
     assert _resolve_api_credential("anthropic", f"local:{o.id}", store) is None
 
 
@@ -153,36 +153,21 @@ def test_route_rejects_unknown_auth_type(store):
     assert ei.value.status_code == 400
 
 
-def test_route_accepts_explicit_oauth_modes(store, monkeypatch, clean_env):
-    # S1: the explicit modes are now accepted by the allow-set; bogus still 400.
+def test_route_rejects_oauth_modes_with_import_hint(store, monkeypatch, clean_env):
+    # HARDENED: the generic add route is for DIRECT API keys only. OAuth/legacy
+    # modes are rejected (use the OAuth import route) so a token can't reach
+    # llm_credentials.secret via the API. Nothing is persisted on rejection.
     from fastapi import HTTPException
 
     from src.api.routes import config_routes as cr
 
     monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: None)
-    for provider, mode in (("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")):
-        body = cr.CredentialCreate(provider=provider, auth_type=mode, alias="o", secret="tok-value-1234", make_active=True)
-        res = cr.add_credential(body, store=store)
-        assert res["credential"]["auth_type"] == mode
-    bad = cr.CredentialCreate(provider="openai", auth_type="bogus", alias="k", secret="sk-x", make_active=True)
-    with pytest.raises(HTTPException) as ei:
-        cr.add_credential(bad, store=store)
-    assert ei.value.status_code == 400
-
-
-def test_route_legacy_alias_accepted_but_stored_explicit(store, monkeypatch, clean_env):
-    # Option-1 compatibility (gpt-5.5): the route still ACCEPTS legacy
-    # oauth/setup_token input, but add() normalizes it — the stored/returned value
-    # is NEVER a legacy string. Tighten to explicit-only once the UI fully moves.
-    from src.api.routes import config_routes as cr
-
-    monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: None)
-    r1 = cr.add_credential(cr.CredentialCreate(provider="openai", auth_type="oauth", alias="o", secret="tok-value-1234", make_active=True), store=store)
-    assert r1["credential"]["auth_type"] == "chatgpt_oauth"  # legacy openai 'oauth' → explicit
-    r2 = cr.add_credential(cr.CredentialCreate(provider="anthropic", auth_type="setup_token", alias="s", secret="tok-value-1234", make_active=True), store=store)
-    assert r2["credential"]["auth_type"] == "claude_code_oauth"
-    # never persisted as a legacy value
-    assert all(c.auth_type in {"api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"} for c in store.list())
+    for mode in ("chatgpt_oauth", "claude_code_oauth", "oauth", "setup_token"):
+        body = cr.CredentialCreate(provider="anthropic", auth_type=mode, alias="o", secret="tok-value-1234", make_active=True)
+        with pytest.raises(HTTPException) as ei:
+            cr.add_credential(body, store=store)
+        assert ei.value.status_code == 400 and "import" in str(ei.value.detail).lower()
+    assert store.list() == []  # NOTHING persisted — no token leaked into the DB
 
 
 def test_route_accepts_api_key(store, monkeypatch, clean_env):
@@ -216,28 +201,24 @@ def test_read_normalizes_legacy_auth_types(store):
     assert modes["o2"] == "chatgpt_oauth"      # openai oauth → chatgpt_oauth
 
 
-def test_write_normalizes_and_validates_auth_type(store):
-    c1 = store.add(provider="anthropic", auth_type="oauth", alias="a", secret="tok-1234", make_active=False)
-    assert store.get(f"local:{c1.id}").auth_type == "claude_code_oauth"
-    c2 = store.add(provider="anthropic", auth_type="setup_token", alias="b", secret="tok-1234", make_active=False)
-    assert store.get(f"local:{c2.id}").auth_type == "claude_code_oauth"
-    c3 = store.add(provider="openai", auth_type="oauth", alias="c", secret="tok-1234", make_active=False)
-    assert store.get(f"local:{c3.id}").auth_type == "chatgpt_oauth"
+def test_add_rejects_oauth_modes_and_bogus(store):
+    # HARDENED: add() is for DIRECT API keys only. OAuth/legacy modes must use
+    # add_oauth_credential() (so a token can't land in llm_credentials.secret).
+    for mode in ("oauth", "setup_token", "chatgpt_oauth", "claude_code_oauth"):
+        with pytest.raises(ValueError):
+            store.add(provider="anthropic", auth_type=mode, alias="a", secret="tok-1234")
     with pytest.raises(ValueError):
         store.add(provider="openai", auth_type="bogus", alias="d", secret="x")
+    # api_key still works
+    assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxx").auth_type == "api_key"
 
 
-def test_oauth_metadata_columns_roundtrip(store):
-    c = store.add(
-        provider="openai", auth_type="chatgpt_oauth", alias="o", secret="tok-1234",
-        expires_at="2027-06-15T00:00:00+00:00", account_label="acct-123",
-    )
-    got = store.get(f"local:{c.id}")
-    assert got.expires_at == "2027-06-15T00:00:00+00:00" and got.account_label == "acct-123"
-    # api_key rows leave the OAuth metadata null
+def test_api_key_rows_leave_oauth_metadata_null(store):
+    # api_key rows carry no OAuth metadata. (OAuth metadata roundtrip is covered
+    # by test_add_oauth_credential_has_null_secret via add_oauth_credential.)
     k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxxxx")
     kg = store.get(f"local:{k.id}")
-    assert kg.expires_at is None and kg.account_label is None
+    assert kg.expires_at is None and kg.account_label is None and kg.secret == "sk-xxxxxxxxxxxx"
 
 
 # --- S4-prep: add_oauth_credential — secret stays NULL (token in token-store) ---
@@ -256,6 +237,33 @@ def test_add_oauth_credential_rejects_api_key_mode(store):
     # legacy aliases normalize then are accepted as OAuth
     c = store.add_oauth_credential(provider="anthropic", auth_mode="setup_token", alias="s")
     assert store.get(f"local:{c.id}").auth_type == "claude_code_oauth"
+
+
+def test_add_oauth_credential_rejects_cross_provider(store):
+    # provider-specific matrix (matches the factory): a provider's wrong OAuth mode
+    # must not create an invalid row the factory would later reject.
+    with pytest.raises(ValueError):
+        store.add_oauth_credential(provider="openai", auth_mode="claude_code_oauth", alias="x")
+    with pytest.raises(ValueError):
+        store.add_oauth_credential(provider="anthropic", auth_mode="chatgpt_oauth", alias="x")
+    # the correct pairings work
+    assert store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="o").auth_type == "chatgpt_oauth"
+    assert store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="a").auth_type == "claude_code_oauth"
+
+
+def test_update_secret_rejected_on_oauth_row(store):
+    # an OAuth row's token lives in the token-store; update() must NOT let a secret
+    # be written into the OAuth credential row.
+    oc = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="c")
+    with pytest.raises(ValueError):
+        store.update(f"local:{oc.id}", secret="tok-injected-1234")
+    assert store.get(f"local:{oc.id}").secret is None  # still NULL
+    # non-secret updates (alias/active) on an OAuth row are fine
+    upd = store.update(f"local:{oc.id}", alias="renamed")
+    assert upd.alias == "renamed" and upd.secret is None
+    # api_key rows can still update their secret
+    k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-aaaaaaaaaa11")
+    assert store.update(f"local:{k.id}", secret="sk-bbbbbbbbbb22").secret == "sk-bbbbbbbbbb22"
 
 
 def test_provider_credentials_oauth_local_row_no_secret_no_crash(store, clean_env):

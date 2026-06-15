@@ -262,11 +262,14 @@ class CredentialStore:
         expires_at: str | None = None,
         account_label: str | None = None,
     ) -> StoredCredential:
-        # Normalize legacy/generic → explicit on write, then validate (the stored
-        # value is always an explicit mode going forward).
+        # add() is for DIRECT API keys ONLY. OAuth/setup-token modes must go
+        # through add_oauth_credential() so a token can never land in
+        # llm_credentials.secret (it belongs in the token-store).
         auth_type = _normalize_auth_type(str(auth_type), provider)  # type: ignore[assignment]
-        if auth_type not in _VALID_AUTH_MODES:
-            raise ValueError(f"unsupported auth_type: {auth_type}")
+        if auth_type not in ("api_key", "api_key_pool"):
+            raise ValueError(
+                f"add() is for direct API keys; use add_oauth_credential() for {auth_type}"
+            )
         alias = alias.strip() or f"{provider} key"
         secret = secret.strip()
         if not secret:
@@ -303,6 +306,11 @@ class CredentialStore:
         auth_mode = _normalize_auth_type(str(auth_mode), provider)  # type: ignore[assignment]
         if auth_mode not in ("chatgpt_oauth", "claude_code_oauth"):
             raise ValueError(f"add_oauth_credential requires an OAuth mode, got: {auth_mode}")
+        # Provider-specific matrix (matches the driver factory): reject a
+        # provider's wrong OAuth mode rather than create an invalid row.
+        _expected = {"chatgpt_oauth": "openai", "claude_code_oauth": "anthropic"}[auth_mode]
+        if provider != _expected:
+            raise ValueError(f"auth_mode {auth_mode!r} is not valid for provider {provider!r} (expected {_expected!r})")
         alias = alias.strip() or f"{provider} {auth_mode}"
         now = _now()
         with self._write_lock, self._connect() as conn:
@@ -331,6 +339,13 @@ class CredentialStore:
         existing = self.get(credential_id)
         if not existing:
             return None
+        # An OAuth row's token lives in the token-store, never here — reject any
+        # attempt to write a secret onto it (alias/active updates are fine).
+        if secret is not None and existing.auth_type not in ("api_key", "api_key_pool"):
+            raise ValueError(
+                f"cannot set secret on a {existing.auth_type} credential; "
+                "its token lives in the token-store"
+            )
         now = _now()
         with self._write_lock, self._connect() as conn:
             if active is True:
