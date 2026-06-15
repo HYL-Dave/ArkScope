@@ -174,6 +174,7 @@ async def run_query_stream(
     effort: Optional[str] = None,
     thinking: Optional[bool] = None,
     attachments: list | None = None,
+    history: list | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a natural language query, yielding events as the agent progresses.
@@ -225,16 +226,26 @@ async def run_query_stream(
     if config.freshness_in_prompt:
         freshness_summary = _get_freshness_summary(dal) or ""
     effective_prompt = build_system_prompt(freshness_summary)
+    # Multi-turn (C-2c): prior thread turns seed the conversation. They are
+    # context only — note that time-sensitive facts must still be re-fetched.
+    _hist = [{"role": h["role"], "content": h["content"]} for h in (history or [])]
+    if _hist:
+        effective_prompt = (
+            effective_prompt
+            + "\n\n[多輪脈絡] 以下對話歷史僅供理解使用者意圖與指代；價格、新聞、SA、"
+            "基本面等時效性事實一律以工具即時查詢為準，歷史內容可能已過期。"
+        )
     cached_system = _prepare_cached_system(effective_prompt)
 
-    # Initial message (with optional attachment content blocks)
+    # Initial messages = prior thread history (if any) + this turn's user message
+    # (with optional attachment content blocks).
     if attachments:
         from ..shared.attachments import AttachmentManager
         content_blocks = AttachmentManager.to_anthropic_blocks(attachments)
         content_blocks.append({"type": "text", "text": question})
-        messages: List[dict] = [{"role": "user", "content": content_blocks}]
+        messages: List[dict] = [*_hist, {"role": "user", "content": content_blocks}]
     else:
-        messages: List[dict] = [{"role": "user", "content": question}]
+        messages: List[dict] = [*_hist, {"role": "user", "content": question}]
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)

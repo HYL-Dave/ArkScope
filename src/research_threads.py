@@ -62,6 +62,32 @@ def valid_thread_id(tid: Optional[str]) -> bool:
     return bool(tid) and bool(tid.strip()) and len(tid) <= MAX_THREAD_ID
 
 
+def build_thread_history(store, thread_id: str, policy: str = "full_thread") -> list[dict]:
+    """Provider-neutral prompt-context history for a thread (C-2c, plan §4/§5).
+
+    Returns the prior conversation as ``[{role, content}, ...]`` to seed the
+    agent — content ONLY (no tool_calls/token_usage/tickers/metadata leak into
+    context). The persisted transcript is never mutated; this is prompt-context
+    selection, not memory deletion.
+
+    - ``full_thread`` (default): every prior NON-error, non-empty user/assistant
+      message, in order. No silent truncation.
+    - ``no_history``: explicit opt-out → ``[]``.
+    - ``recent_messages`` / ``summary_plus_recent``: reserved (plan §5) — raise,
+      so a cap/summary can't ship implicitly before it's designed.
+    """
+    if policy == "no_history":
+        return []
+    if policy != "full_thread":
+        raise ValueError(f"unsupported history policy (reserved, not yet built): {policy}")
+    out: list[dict] = []
+    for m in store.list_messages(thread_id):
+        if getattr(m, "is_error", False) or not m.content:
+            continue
+        out.append({"role": m.role, "content": m.content})
+    return out
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 

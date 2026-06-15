@@ -110,3 +110,63 @@ def test_list_threads_respects_limit(store):
 def test_local_only_no_pg(store):
     assert store.db_path.endswith(".db")
     assert not hasattr(store, "_pg_conn") and not hasattr(store, "_get_conn")
+
+
+# --- C-2c: build_thread_history — provider-neutral prompt-context builder ----
+# Policy plan (AI_RESEARCH_CONTEXT_MEMORY_PLAN.md §4/§5): full_thread default,
+# no silent truncation, completed non-error turns only, {role,content} only.
+def test_build_thread_history_full_thread_roundtrips_role_content_in_order(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="最近 SA 對 SMCI 的焦點？", tickers=["SMCI"])
+    store.append_message(thread_id="t1", role="assistant", content="SMCI: 3 看多 2 看空。", tool_calls=[{"name": "get_sa_feed"}], token_usage={"total_tokens": 9})
+    hist = build_thread_history(store, "t1")  # default policy = full_thread
+    # {role, content} ONLY — no tool_calls/token_usage/tickers/metadata leak into context
+    assert hist == [
+        {"role": "user", "content": "最近 SA 對 SMCI 的焦點？"},
+        {"role": "assistant", "content": "SMCI: 3 看多 2 看空。"},
+    ]
+
+
+def test_build_thread_history_skips_error_turns(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="RuntimeError: db down", is_error=True)
+    store.append_message(thread_id="t1", role="user", content="q2")
+    store.append_message(thread_id="t1", role="assistant", content="real answer")
+    hist = build_thread_history(store, "t1")
+    assert hist == [
+        {"role": "user", "content": "q1"},      # the error assistant is skipped
+        {"role": "user", "content": "q2"},
+        {"role": "assistant", "content": "real answer"},
+    ]
+
+
+def test_build_thread_history_skips_empty_content(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="")  # empty answer → not useful context
+    assert build_thread_history(store, "t1") == [{"role": "user", "content": "q1"}]
+
+
+def test_build_thread_history_no_history_policy_and_empty_thread(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    assert build_thread_history(store, "t1", policy="no_history") == []  # explicit opt-out
+    assert build_thread_history(store, "nope") == []  # missing thread → empty, no error
+
+
+def test_build_thread_history_rejects_unimplemented_policy(store):
+    from src.research_threads import build_thread_history
+
+    # recent_messages / summary_plus_recent are reserved keys (plan §5) but must
+    # NOT be silently honored as a cap in this cut — raise so it can't ship implicitly.
+    with pytest.raises(ValueError):
+        build_thread_history(store, "t1", policy="recent_messages")

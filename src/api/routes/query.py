@@ -202,12 +202,16 @@ async def query_agent_stream(
     agent_question = _compose_agent_question(request.question, request.ticker)
     # C-2b persistence gated on a valid client-owned thread id (#5). Invalid →
     # just don't persist (never error the stream — #4).
-    from src.research_threads import valid_thread_id
+    from src.research_threads import build_thread_history, valid_thread_id
     persist = valid_thread_id(request.thread_id)
 
     async def event_generator():
         import time as _time
 
+        # Multi-turn (C-2c): prior thread turns seed the agent. Fetch BEFORE
+        # persisting this turn's user message so it isn't duplicated. full_thread
+        # policy, no silent truncation (AI_RESEARCH_CONTEXT_MEMORY_PLAN.md §4).
+        history = build_thread_history(store, request.thread_id) if persist else []
         if persist:
             _persist_user_turn(
                 store, thread_id=request.thread_id, question=request.question,
@@ -221,10 +225,10 @@ async def query_agent_stream(
         try:
             if provider == "openai":
                 from src.agents.openai_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=request.model, dal=dal)
+                stream = run_query_stream(question=agent_question, model=request.model, dal=dal, history=history)
             elif provider == "anthropic":
                 from src.agents.anthropic_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=request.model, dal=dal)
+                stream = run_query_stream(question=agent_question, model=request.model, dal=dal, history=history)
             else:
                 from src.agents.shared.events import AgentEvent, EventType
                 error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)

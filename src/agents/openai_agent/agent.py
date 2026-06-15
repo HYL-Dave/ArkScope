@@ -685,6 +685,7 @@ async def run_query_stream(
     model: Optional[str] = None,
     dal: Optional[Any] = None,
     reasoning_effort: Optional[ReasoningEffort] = None,
+    history: list | None = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a query yielding events for progress tracking.
@@ -727,6 +728,15 @@ async def run_query_stream(
     # Build effective prompt: always includes RL status; freshness only when flag is on
     effective_prompt = _build_effective_prompt(dal, config)
 
+    # Multi-turn (C-2c): prior thread turns are context only — note staleness.
+    _hist = [{"role": h["role"], "content": h["content"]} for h in (history or [])]
+    if _hist:
+        effective_prompt = (
+            effective_prompt
+            + "\n\n[多輪脈絡] 以下對話歷史僅供理解使用者意圖與指代；價格、新聞、SA、"
+            "基本面等時效性事實一律以工具即時查詢為準，歷史內容可能已過期。"
+        )
+
     # Create agent with reasoning settings
     agent = _build_agent(
         model_name, tools, reasoning_effort=effort,
@@ -757,8 +767,10 @@ async def run_query_stream(
     session = _make_compaction_session() if config.server_compaction else None
 
     effective_max_turns = config.max_tool_calls
+    # With prior history, pass a message-list input (history + this user turn);
+    # otherwise the bare question string (unchanged single-turn behaviour).
     runner_kwargs = dict(
-        input=question,
+        input=([*_hist, {"role": "user", "content": question}] if _hist else question),
         max_turns=effective_max_turns,
         auto_previous_response_id=True,
     )
