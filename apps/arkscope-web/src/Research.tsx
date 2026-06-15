@@ -58,8 +58,10 @@ type ProviderId = (typeof PROVIDER_IDS)[number];
 // trace_mode drives the live-trace vs silent-until-done affordance; copy stays
 // neutral. A new OpenAI-compatible provider is a row here, not a render rewrite.
 const PRESENTATION: Record<ProviderId, { label: string; trace_mode: "live" | "post_run"; trace_note: string; auth_mode_label: string }> = {
-  anthropic: { label: "Anthropic", trace_mode: "live", trace_note: "即時工具追蹤", auth_mode_label: "API key / setup-token" },
-  openai: { label: "OpenAI", trace_mode: "post_run", trace_note: "完成後一次顯示工具追蹤", auth_mode_label: "OAuth / API key" },
+  // auth_mode_label reflects what's WIRED today (API key). setup-token / OAuth
+  // are planned auth modes (auth-driver slices S3/S4), not yet usable here.
+  anthropic: { label: "Anthropic", trace_mode: "live", trace_note: "即時工具追蹤", auth_mode_label: "API key（setup-token 計畫中）" },
+  openai: { label: "OpenAI", trace_mode: "post_run", trace_note: "完成後一次顯示工具追蹤", auth_mode_label: "API key（OAuth 計畫中）" },
 };
 
 // Suggested prompts scoped to the C-1 SA primitives (get_sa_feed / get_sa_comment_focus).

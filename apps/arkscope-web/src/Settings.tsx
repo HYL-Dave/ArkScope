@@ -1271,8 +1271,8 @@ function ProviderSection({
                 ))}
               </div>
               <p className="muted tiny">
-                v0 不在 UI 寫入 API key，只讀取本機 env/config/.env/key pool。OAuth/setup-token 先作為 credential 類型顯示，
-                但未當成 direct API key 使用。
+                可在此新增本機 API key credential（存於本機 profile DB）；env/config/.env 與 key pool 為唯讀來源。
+                OAuth / setup-token 目前僅顯示為 credential 類型，匯入入口與訂閱登入尚在規劃中（auth-driver slice）。
               </p>
             </div>
           );
