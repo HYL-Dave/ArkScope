@@ -238,3 +238,53 @@ def test_oauth_metadata_columns_roundtrip(store):
     k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxxxx")
     kg = store.get(f"local:{k.id}")
     assert kg.expires_at is None and kg.account_label is None
+
+
+# --- S4-prep: add_oauth_credential — secret stays NULL (token in token-store) ---
+def test_add_oauth_credential_has_null_secret(store):
+    c = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="my claude",
+                                   expires_at="2027-06-16T00:00:00+00:00", account_label="Pro plan")
+    got = store.get(f"local:{c.id}")
+    assert got.secret is None  # the real token lives in the token-store, NOT here
+    assert got.auth_type == "claude_code_oauth" and got.active is True
+    assert got.expires_at == "2027-06-16T00:00:00+00:00" and got.account_label == "Pro plan"
+
+
+def test_add_oauth_credential_rejects_api_key_mode(store):
+    with pytest.raises(ValueError):
+        store.add_oauth_credential(provider="openai", auth_mode="api_key", alias="x")
+    # legacy aliases normalize then are accepted as OAuth
+    c = store.add_oauth_credential(provider="anthropic", auth_mode="setup_token", alias="s")
+    assert store.get(f"local:{c.id}").auth_type == "claude_code_oauth"
+
+
+def test_provider_credentials_oauth_local_row_no_secret_no_crash(store, clean_env):
+    store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="my claude")
+    inv = provider_credentials(store)
+    row = next(c for c in inv["anthropic"] if c.id.startswith("local:") and c.auth_type == "claude_code_oauth")
+    assert row.masked is None  # no secret to mask
+    assert row.can_discover_models is False and row.editable is True
+
+
+def test_secret_nullable_migration_preserves_existing_rows(tmp_path):
+    import sqlite3
+
+    from src.model_credentials import CredentialStore
+
+    p = tmp_path / "profile_state.db"
+    # an OLD-schema db: secret NOT NULL, with an existing api_key row
+    c = sqlite3.connect(str(p))
+    c.executescript(
+        "CREATE TABLE llm_credentials (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, "
+        "auth_type TEXT NOT NULL DEFAULT 'api_key', alias TEXT NOT NULL, secret TEXT NOT NULL, "
+        "active INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);"
+        "INSERT INTO llm_credentials (provider,auth_type,alias,secret,active,created_at,updated_at) "
+        "VALUES ('openai','api_key','old','sk-existing',1,'t','t');"
+    )
+    c.commit(); c.close()
+    store = CredentialStore(p)  # construction triggers the secret-nullable rebuild
+    rows = store.list()
+    assert len(rows) == 1 and rows[0].alias == "old" and rows[0].secret == "sk-existing" and rows[0].active is True
+    # and a NULL-secret OAuth row now inserts without a NOT NULL violation
+    oc = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="c")
+    assert store.get(f"local:{oc.id}").secret is None

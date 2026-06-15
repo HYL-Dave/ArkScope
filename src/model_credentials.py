@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS llm_credentials (
     provider   TEXT NOT NULL,
     auth_type  TEXT NOT NULL DEFAULT 'api_key',
     alias      TEXT NOT NULL,
-    secret     TEXT NOT NULL,
+    secret     TEXT,
     active     INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -132,7 +132,7 @@ class StoredCredential:
     provider: Provider
     auth_type: CredentialAuthType
     alias: str
-    secret: str
+    secret: str | None  # NULL for OAuth rows — the token lives in the token-store
     active: bool
     created_at: str
     updated_at: str
@@ -181,6 +181,35 @@ class CredentialStore:
                         conn.execute(f"ALTER TABLE llm_credentials ADD COLUMN {col} TEXT")
                     except sqlite3.OperationalError:
                         pass
+            # Relax secret NOT NULL → nullable (OAuth rows store the real token in
+            # the token-store, not here). SQLite can't ALTER a column constraint,
+            # so rebuild only when an existing table still has secret NOT NULL.
+            info = conn.execute("PRAGMA table_info(llm_credentials)").fetchall()
+            secret_notnull = any(r[1] == "secret" and r[3] == 1 for r in info)
+            if secret_notnull:
+                conn.executescript(
+                    """
+                    CREATE TABLE llm_credentials_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        provider TEXT NOT NULL,
+                        auth_type TEXT NOT NULL DEFAULT 'api_key',
+                        alias TEXT NOT NULL,
+                        secret TEXT,
+                        active INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        expires_at TEXT,
+                        account_label TEXT
+                    );
+                    INSERT INTO llm_credentials_new
+                        (id, provider, auth_type, alias, secret, active, created_at, updated_at, expires_at, account_label)
+                        SELECT id, provider, auth_type, alias, secret, active, created_at, updated_at, expires_at, account_label
+                        FROM llm_credentials;
+                    DROP TABLE llm_credentials;
+                    ALTER TABLE llm_credentials_new RENAME TO llm_credentials;
+                    """
+                )
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_llm_credentials_provider ON llm_credentials(provider)")
             conn.commit()
         try:
             os.chmod(self.db_path, 0o600)
@@ -251,6 +280,39 @@ class CredentialStore:
                 "(provider, auth_type, alias, secret, active, created_at, updated_at, expires_at, account_label) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (provider, auth_type, alias, secret, 1 if make_active else 0, now, now, expires_at, account_label),
+            )
+            conn.commit()
+            new_id = cur.lastrowid
+        got = self.get(f"local:{new_id}")
+        assert got is not None
+        return got
+
+    def add_oauth_credential(
+        self,
+        *,
+        provider: Provider,
+        auth_mode: CredentialAuthType,
+        alias: str,
+        make_active: bool = True,
+        expires_at: str | None = None,
+        account_label: str | None = None,
+    ) -> StoredCredential:
+        """Create an OAuth credential row carrying ONLY metadata — secret stays
+        NULL. The real token lives in the token-store keyed by the returned
+        credential_id (never in this DB). For chatgpt_oauth / claude_code_oauth."""
+        auth_mode = _normalize_auth_type(str(auth_mode), provider)  # type: ignore[assignment]
+        if auth_mode not in ("chatgpt_oauth", "claude_code_oauth"):
+            raise ValueError(f"add_oauth_credential requires an OAuth mode, got: {auth_mode}")
+        alias = alias.strip() or f"{provider} {auth_mode}"
+        now = _now()
+        with self._write_lock, self._connect() as conn:
+            if make_active:
+                conn.execute("UPDATE llm_credentials SET active = 0 WHERE provider = ?", (provider,))
+            cur = conn.execute(
+                "INSERT INTO llm_credentials "
+                "(provider, auth_type, alias, secret, active, created_at, updated_at, expires_at, account_label) "
+                "VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)",
+                (provider, auth_mode, alias, 1 if make_active else 0, now, now, expires_at, account_label),
             )
             conn.commit()
             new_id = cur.lastrowid
@@ -368,7 +430,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 label=row.alias,
                 source="profile_state.db",
                 available=True,
-                masked=_mask_secret(row.secret),
+                masked=_mask_secret(row.secret) if row.secret else None,  # OAuth rows have no secret here
                 active=row.active,
                 editable=True,
                 can_discover_models=can_use,
