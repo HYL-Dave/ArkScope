@@ -135,6 +135,22 @@ def test_logout_clears(monkeypatch):
     assert d.is_authenticated is False
 
 
+def test_logout_is_instance_local_not_credential_deletion(tmp_path):
+    # logout() clears THIS driver instance's cached key/client; it does NOT delete
+    # the stored credential. A store-backed driver re-resolves → stays authed.
+    from src.model_credentials import CredentialStore
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    cred = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-realkeyvalue9")
+    d = OpenAIApiKeyDriver(api_key="sk-realkeyvalue9", credential_id=f"local:{cred.id}", store=store)
+    d.client()
+    _run(d.logout())
+    # the credential row is untouched (logout != delete)
+    assert store.get(f"local:{cred.id}") is not None
+    # and because the credential still exists, the store-backed driver re-resolves
+    assert d.is_authenticated is True
+
+
 # --- contract conformance ---------------------------------------------------
 def test_conforms_to_both_contracts():
     d = OpenAIApiKeyDriver(api_key="sk-x")

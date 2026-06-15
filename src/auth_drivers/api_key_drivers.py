@@ -19,7 +19,6 @@ here; tests mock the SDK / the delegated functions. Design: LLM_AUTH_DRIVER_PLAN
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Optional
 
 from src import model_credentials as _mc
@@ -68,6 +67,9 @@ class _ApiKeyDriver:
         return None
 
     async def logout(self) -> None:
+        # INSTANCE-LOCAL: clears this driver's cached key/client only. It does NOT
+        # delete the stored credential — a store-backed driver re-resolves and
+        # stays authenticated. Credential deletion is a CredentialStore concern.
         self._api_key = None
         self._client = None
 
@@ -76,12 +78,15 @@ class _ApiKeyDriver:
         return {"provider": self.provider, "auth_mode": self.auth_mode, "status": "unknown"}
 
     # --- model discovery / test → DELEGATE (parity) ----------------------
+    # Synchronous delegation (NOT asyncio.to_thread): discover/test are not a hot
+    # path and the goal here is Settings parity. Revisit threadpool offloading at
+    # S5 if/when these run on the async server request path.
     async def discover_models(self):
-        return await asyncio.to_thread(_mc.discover_models, self.provider, self._credential_id, self._store)
+        return _mc.discover_models(self.provider, self._credential_id, self._store)
 
     async def test(self, model: Optional[str] = None, effort: str = "default"):
         model = model or _default_model(self.provider)
-        return await asyncio.to_thread(_mc.test_model, self.provider, model, effort, self._credential_id, self._store)
+        return _mc.test_model(self.provider, model, effort, self._credential_id, self._store)
 
     # --- client accessor (STANDARD host) — consumed by S5 ----------------
     def client(self) -> Any:
