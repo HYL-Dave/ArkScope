@@ -170,6 +170,21 @@ def test_route_accepts_explicit_oauth_modes(store, monkeypatch, clean_env):
     assert ei.value.status_code == 400
 
 
+def test_route_legacy_alias_accepted_but_stored_explicit(store, monkeypatch, clean_env):
+    # Option-1 compatibility (gpt-5.5): the route still ACCEPTS legacy
+    # oauth/setup_token input, but add() normalizes it — the stored/returned value
+    # is NEVER a legacy string. Tighten to explicit-only once the UI fully moves.
+    from src.api.routes import config_routes as cr
+
+    monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: None)
+    r1 = cr.add_credential(cr.CredentialCreate(provider="openai", auth_type="oauth", alias="o", secret="tok-value-1234", make_active=True), store=store)
+    assert r1["credential"]["auth_type"] == "chatgpt_oauth"  # legacy openai 'oauth' → explicit
+    r2 = cr.add_credential(cr.CredentialCreate(provider="anthropic", auth_type="setup_token", alias="s", secret="tok-value-1234", make_active=True), store=store)
+    assert r2["credential"]["auth_type"] == "claude_code_oauth"
+    # never persisted as a legacy value
+    assert all(c.auth_type in {"api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"} for c in store.list())
+
+
 def test_route_accepts_api_key(store, monkeypatch, clean_env):
     from src.api.routes import config_routes as cr
 

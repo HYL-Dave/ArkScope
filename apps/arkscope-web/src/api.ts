@@ -89,10 +89,14 @@ export interface ModelCatalog {
   custom_allowed: boolean;
 }
 
+// Explicit auth modes (backend normalizes legacy oauth/setup_token → these; it
+// never returns the legacy values). Matches src/model_credentials.CredentialAuthType.
+export type CredentialAuthType = "api_key" | "api_key_pool" | "chatgpt_oauth" | "claude_code_oauth";
+
 export interface ProviderCredential {
   id: string;
   provider: ModelProvider;
-  auth_type: "api_key" | "api_key_pool" | "oauth" | "setup_token";
+  auth_type: CredentialAuthType;
   label: string;
   source: string;
   available: boolean;
@@ -549,7 +553,8 @@ export function listCredentials(): Promise<{ credentials: Record<ModelProvider, 
 
 export function addCredential(body: {
   provider: ModelProvider;
-  auth_type: "api_key" | "oauth" | "setup_token";
+  // user-settable subset (api_key_pool is env-derived, not created via the form)
+  auth_type: "api_key" | "chatgpt_oauth" | "claude_code_oauth";
   alias: string;
   secret: string;
   make_active: boolean;
