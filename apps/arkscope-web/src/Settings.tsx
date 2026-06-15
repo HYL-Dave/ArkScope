@@ -1438,7 +1438,12 @@ function CredentialList({
 
   async function runProbe(id: string) {
     setProbing(id);
-    setProbeResults((prev) => ({ ...prev, [id]: undefined as unknown as ProbeResponse }));
+    // clear any stale result; the `probing` state drives the loading label
+    setProbeResults((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     try {
       const res = await probeCredential(id);
       setProbeResults((prev) => ({ ...prev, [id]: res }));
