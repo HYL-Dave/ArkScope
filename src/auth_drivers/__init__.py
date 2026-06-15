@@ -11,16 +11,26 @@ from .protocol import (
     ResearchProviderDriver,
     TokenUsage,
 )
+from .token_store import (
+    KeyringTokenStore,
+    PlaintextTokenStore,
+    StoredTokenRecord,
+    get_token_store,
+)
 
 __all__ = [
     "AuthDriver",
     "AuthMode",
     "DiscoveredModel",
+    "KeyringTokenStore",
     "LLMRequest",
     "LLMResponse",
     "ModelDiscoveryResult",
     "ModelTestResult",
+    "PlaintextTokenStore",
     "Provider",
     "ResearchProviderDriver",
+    "StoredTokenRecord",
     "TokenUsage",
+    "get_token_store",
 ]
