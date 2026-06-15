@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import {
   addCredential,
   importOAuthCredential,
+  probeCredential,
+  type ProbeResponse,
   bootstrapMarketData,
   deleteCredential,
   discoverModels,
@@ -1429,49 +1431,103 @@ function CredentialList({
   onSetActive: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  // Per-row probe state (claude_code_oauth only). Local — the probe result is
+  // ephemeral and never leaves this view.
+  const [probing, setProbing] = useState<string | null>(null);
+  const [probeResults, setProbeResults] = useState<Record<string, ProbeResponse | { error: string }>>({});
+
+  async function runProbe(id: string) {
+    setProbing(id);
+    setProbeResults((prev) => ({ ...prev, [id]: undefined as unknown as ProbeResponse }));
+    try {
+      const res = await probeCredential(id);
+      setProbeResults((prev) => ({ ...prev, [id]: res }));
+    } catch (e) {
+      setProbeResults((prev) => ({ ...prev, [id]: { error: e instanceof Error ? e.message : String(e) } }));
+    } finally {
+      setProbing(null);
+    }
+  }
+
   return (
     <div className="credential-list">
-      {credentials.map((cred) => (
-        <div className="credential-row" key={cred.id}>
-          <div>
-            <strong>{cred.active ? "★ " : ""}{cred.label}</strong>
-            <span>{cred.auth_type} · {cred.source}</span>
-          </div>
-          <span className={`key-pill ${cred.available ? "ok" : "missing"}`}>
-            {cred.available ? cred.masked ?? "available" : "missing"}
-          </span>
-          <p>{cred.notes}</p>
-          {cred.editable && (
-            <div className="credential-actions">
-              <input
-                value={renames[cred.id] ?? cred.label}
-                onChange={(e) => onRenameDraft(cred.id, e.target.value)}
-                aria-label={`${cred.label} alias`}
-              />
-              <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
-                儲存 alias
-              </button>
-              <button
-                type="button"
-                className="btn-ghost small"
-                disabled={cred.active}
-                onClick={() => onSetActive(cred.id)}
-              >
-                設為 active
-              </button>
-              <button
-                type="button"
-                className="btn-ghost small danger"
-                onClick={() => {
-                  if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
-                }}
-              >
-                刪除
-              </button>
+      {credentials.map((cred) => {
+        const isLocalOAuth = cred.id.startsWith("local:") && cred.auth_type === "claude_code_oauth";
+        const probe = probeResults[cred.id];
+        return (
+          <div className="credential-row" key={cred.id}>
+            <div>
+              <strong>{cred.active ? "★ " : ""}{cred.label}</strong>
+              <span>{cred.auth_type} · {cred.source}</span>
             </div>
-          )}
-        </div>
-      ))}
+            <span className={`key-pill ${cred.available ? "ok" : "missing"}`}>
+              {cred.available ? cred.masked ?? "available" : "missing"}
+            </span>
+            <p>{cred.notes}</p>
+            {cred.editable && (
+              <div className="credential-actions">
+                <input
+                  value={renames[cred.id] ?? cred.label}
+                  onChange={(e) => onRenameDraft(cred.id, e.target.value)}
+                  aria-label={`${cred.label} alias`}
+                />
+                <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
+                  儲存 alias
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost small"
+                  disabled={cred.active}
+                  onClick={() => onSetActive(cred.id)}
+                >
+                  設為 active
+                </button>
+                {isLocalOAuth && (
+                  <button
+                    type="button"
+                    className="btn-ghost small"
+                    disabled={probing === cred.id}
+                    onClick={() => void runProbe(cred.id)}
+                  >
+                    {probing === cred.id ? "測試中…（最久約 2 分鐘）" : "測試 setup-token"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-ghost small danger"
+                  onClick={() => {
+                    if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
+                  }}
+                >
+                  刪除
+                </button>
+              </div>
+            )}
+            {probe && <ProbeResultView probe={probe} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProbeResultView({ probe }: { probe: ProbeResponse | { error: string } }) {
+  if ("error" in probe) {
+    return <p className="error-text tiny">probe 失敗：{probe.error}</p>;
+  }
+  return (
+    <div className="probe-result">
+      <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
+        {probe.passed ? "✓ setup-token 驗證通過" : "✗ setup-token 驗證未通過"}
+      </p>
+      <ul className="probe-list">
+        {probe.probes.map((p) => (
+          <li key={p.name} className="tiny">
+            <span className={p.passed ? "ok-text" : "warn-text"}>{p.passed ? "✓" : "✗"}</span>{" "}
+            {p.name} — {p.error ? p.error : p.observed}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

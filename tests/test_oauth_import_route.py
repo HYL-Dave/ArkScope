@@ -146,11 +146,22 @@ def test_probe_route_404_when_no_token(stores):
     assert ei.value.status_code == 404
 
 
-def test_probe_route_422_for_blank_id(stores):
+@pytest.mark.parametrize("bad_id", ["   ", "abc", "local:notint", "local:", "thread-1", ""])
+def test_probe_route_422_for_malformed_credential_id(stores, bad_id):
+    # a credential id must be local:<int> — malformed ids are 422 (bad request),
+    # not 404, and must NOT depend on the thread-id validator.
     cred, tok = stores
     with pytest.raises(HTTPException) as ei:
-        cr.probe_oauth_credential("   ", store=cred, token_store=tok)
+        cr.probe_oauth_credential(bad_id, store=cred, token_store=tok)
     assert ei.value.status_code == 422
+
+
+def test_probe_route_404_for_wellformed_but_missing_id(stores):
+    # a well-formed-but-nonexistent id is 404 (not found), distinct from 422
+    cred, tok = stores
+    with pytest.raises(HTTPException) as ei:
+        cr.probe_oauth_credential("local:9999", store=cred, token_store=tok)
+    assert ei.value.status_code == 404
 
 
 def test_generic_credentials_route_still_rejects_oauth(stores):

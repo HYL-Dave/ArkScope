@@ -566,6 +566,25 @@ export function importOAuthCredential(body: {
   return sendJSON<{ credential: ProviderCredential }>("/config/credentials/oauth/import", "POST", body, 8_000);
 }
 
+// P3 probe result for a claude_code_oauth credential. Redacted by the backend —
+// never contains the token.
+export interface ProbeResult {
+  name: string;
+  passed: boolean;
+  expected: string;
+  observed: string;
+  error: string | null;
+}
+export interface ProbeResponse {
+  passed: boolean;
+  probes: ProbeResult[];
+}
+// The live probe runs `claude -p` + a raw-SDK rejection check — it can take a
+// while, so use a generous timeout (well above the 15s default).
+export function probeCredential(credentialId: string): Promise<ProbeResponse> {
+  return sendJSON<ProbeResponse>(`/config/credentials/${encodeURIComponent(credentialId)}/probe`, "POST", undefined, 150_000);
+}
+
 export function addCredential(body: {
   provider: ModelProvider;
   // DIRECT API keys only — the backend rejects OAuth modes here (use

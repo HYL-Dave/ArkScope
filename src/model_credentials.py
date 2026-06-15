@@ -398,6 +398,12 @@ def _parse_local_id(credential_id: str | None) -> int | None:
         return None
 
 
+def valid_credential_id(credential_id: str | None) -> bool:
+    """A local credential id must be ``local:<int>``. Use this (not a thread-id
+    rule) to validate a credential id at the route boundary."""
+    return _parse_local_id(credential_id) is not None
+
+
 def _split_key_pool(raw: str | None) -> list[str]:
     if not raw:
         return []

@@ -308,11 +308,11 @@ def probe_oauth_credential(
     works with the stored token AND that the raw Anthropic SDK rejects it as an
     API key. Returns redacted ProbeResults — the token is NEVER echoed."""
     from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
-    from src.research_threads import valid_thread_id  # reuse the id validator
+    from src.model_credentials import valid_credential_id
 
     store = _credential_store(store)
-    if not valid_thread_id(credential_id):
-        raise HTTPException(status_code=422, detail="invalid credential_id")
+    if not valid_credential_id(credential_id):  # must be local:<int>, not a thread-id rule
+        raise HTTPException(status_code=422, detail="invalid credential_id (expected local:<int>)")
     cred = store.get(credential_id)
     if cred is None or cred.auth_type not in ("chatgpt_oauth", "claude_code_oauth"):
         raise HTTPException(status_code=404, detail="OAuth credential not found")
