@@ -19,13 +19,22 @@ from typing import Any, Optional
 
 from .protocol import LLMRequest, LLMResponse
 
-_PROVIDERS = frozenset({"openai", "anthropic"})
 # auth_mode → the slice that builds the real driver + the message hint.
 _MODE_SLICE = {
     "api_key": "S2 (standard api_key drivers, parity)",
     "api_key_pool": "S2 (standard api_key drivers, parity)",
     "chatgpt_oauth": "S3 — requires probe P2 (ChatGPT-backend compatibility)",
     "claude_code_oauth": "S4 — requires probe P3 (Claude Agent SDK / claude -p)",
+}
+
+# Provider-specific allowed modes — NOT a cartesian product. The product matrix
+# is api_key + the provider's OWN OAuth mode; api_key_pool stays as an
+# internal/env-compat mode (NOT a primary "create credential" UI mode). A
+# provider's wrong OAuth mode (openai+claude_code_oauth, anthropic+chatgpt_oauth)
+# is rejected, never silently accepted.
+_ALLOWED_MODES = {
+    "openai": frozenset({"api_key", "api_key_pool", "chatgpt_oauth"}),
+    "anthropic": frozenset({"api_key", "api_key_pool", "claude_code_oauth"}),
 }
 
 
@@ -67,6 +76,14 @@ class NotImplementedDriver:
     async def logout(self) -> None:
         raise self._todo()
 
+    # ResearchProviderDriver surface (so Settings discovery/test wires onto the
+    # same contract in S2/S3/S4 without another contract change).
+    async def discover_models(self):
+        raise self._todo()
+
+    async def test(self):
+        raise self._todo()
+
 
 def build_driver(
     *,
@@ -77,10 +94,15 @@ def build_driver(
 ) -> NotImplementedDriver:
     """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
     placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
-    if provider not in _PROVIDERS:
-        raise ValueError(f"unknown provider: {provider!r} (expected one of {sorted(_PROVIDERS)})")
+    if provider not in _ALLOWED_MODES:
+        raise ValueError(f"unknown provider: {provider!r} (expected one of {sorted(_ALLOWED_MODES)})")
     if auth_mode not in _MODE_SLICE:
         raise ValueError(f"unknown auth_mode: {auth_mode!r} (expected one of {sorted(_MODE_SLICE)})")
+    if auth_mode not in _ALLOWED_MODES[provider]:
+        raise ValueError(
+            f"auth_mode {auth_mode!r} is not valid for provider {provider!r} "
+            f"(allowed: {sorted(_ALLOWED_MODES[provider])})"
+        )
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
     )

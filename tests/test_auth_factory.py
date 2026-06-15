@@ -23,13 +23,33 @@ def _cred(provider="openai", auth_type="api_key", cid="local:1"):
     )
 
 
-# --- routing: every valid (provider, auth_mode) yields a driver placeholder ---
-@pytest.mark.parametrize("provider", ["openai", "anthropic"])
-@pytest.mark.parametrize("auth_mode", ["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"])
+# Provider-specific valid modes (S1.2): the product matrix is api_key +
+# the provider's OWN OAuth mode; api_key_pool is an internal/env-compat mode.
+_VALID_COMBOS = [
+    ("openai", "api_key"), ("openai", "api_key_pool"), ("openai", "chatgpt_oauth"),
+    ("anthropic", "api_key"), ("anthropic", "api_key_pool"), ("anthropic", "claude_code_oauth"),
+]
+_INVALID_COMBOS = [
+    ("openai", "claude_code_oauth"),   # OpenAI can't use Claude's OAuth
+    ("anthropic", "chatgpt_oauth"),    # Anthropic can't use ChatGPT's OAuth
+]
+
+
+# --- routing: every VALID (provider, auth_mode) yields a driver placeholder ---
+@pytest.mark.parametrize("provider,auth_mode", _VALID_COMBOS)
 def test_build_driver_returns_placeholder_carrying_identity(provider, auth_mode):
     d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
     assert isinstance(d, NotImplementedDriver)
     assert d.provider == provider and d.auth_mode == auth_mode
+
+
+@pytest.mark.parametrize("provider,auth_mode", _INVALID_COMBOS)
+def test_build_driver_rejects_cross_provider_oauth(provider, auth_mode):
+    # the matrix is provider-specific — a provider's wrong OAuth mode is rejected,
+    # not silently accepted (the old cartesian-product bug).
+    with pytest.raises(ValueError) as ei:
+        build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
+    assert auth_mode in str(ei.value) and provider in str(ei.value)
 
 
 # --- the placeholder is inert: calling it raises NotImplementedError (slice ref)
@@ -88,9 +108,21 @@ def test_token_store_optional_and_injected(tmp_path):
     assert d1.token_store is ts
 
 
-# --- conforms to the AuthDriver contract (structural) -----------------------
-def test_placeholder_conforms_to_authdriver():
-    from src.auth_drivers import AuthDriver
+# --- conforms to BOTH contracts (the factory is a research-driver factory) ---
+def test_placeholder_conforms_to_authdriver_and_research_driver():
+    from src.auth_drivers import AuthDriver, ResearchProviderDriver
 
     d = build_driver(provider="openai", auth_mode="api_key", credential=_cred())
     assert isinstance(d, AuthDriver)
+    assert isinstance(d, ResearchProviderDriver)  # has discover_models() + test()
+
+
+def test_discover_and_test_are_gated_with_slice_message():
+    import asyncio
+
+    d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
+    with pytest.raises(NotImplementedError) as ei1:
+        asyncio.run(d.discover_models())
+    with pytest.raises(NotImplementedError) as ei2:
+        asyncio.run(d.test())
+    assert "S3" in str(ei1.value) and "S3" in str(ei2.value)  # names the gating slice
