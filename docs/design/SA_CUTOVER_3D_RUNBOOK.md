@@ -163,7 +163,7 @@ python -c "from src.profile_state import ProfileStateStore; ProfileStateStore('d
 
 UI：`Settings.tsx` 文案改為「SA capture 已切本地 SQLite（hard cutover，無 PG fallback）；報告與分數仍在 PG」。
 
-**待辦（cut-6 soak / follow-up）**：使用者重開兩瀏覽器 auto-sync 進 soak；週末 ET alarm 窗口無人值守跑；週一開盤前最終 health 檢查。其餘 follow-up 見 §5（port comment extraction job = #1，**Layer A 已完成**）。
+**cut-6 final health（2026-06-15 20:43–20:45 CST，週一開盤前）**：PASS。PG `sa_*` 仍 byte-frozen 對齊 cut-1 基線：picks 109 / meta 2 / articles 392 / comments 39,841 / market_news 18,572 / signals 36,255 / junctions 18,269·19,784·24,237。Local `data/sa_capture.db` 持續成長且健康：comments 39,871（+30）、market_news 18,702（+130）、signals 39,853（v1.2 backlog 已抽完）、`PRAGMA integrity_check=ok`、`foreign_key_check=0`。Native-host log：HARD local (`SACaptureDatabaseBackend`) 持續寫入，`SQLITE_BUSY` / `database is locked` / `OperationalError` 全 0。Provider health：`seeking_alpha=connected`，market-news health `severity=ok`，7d 1,229 筆、detail completeness 85.76%，extension pipeline signal age 約 8 分鐘。`job_runs`：`sa_market_news_refresh` / `sa_alpha_picks_refresh` / `extract_sa_comment_signals` 都有 succeeded terminal row。cut-6 closed。
 
 ## 5. 明確 OUT OF SCOPE（3d 不做）
 

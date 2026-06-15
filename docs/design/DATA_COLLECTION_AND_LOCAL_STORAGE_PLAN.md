@@ -11,7 +11,9 @@
 
 ArkScope collects data in **three distinct modes** that today are blurred together inside one batch script and one remote database. This doc separates them and pins down storage.
 
-**Decision (summary):** Collection is split into (1) **manual backfill** (heavy, on-demand historical pulls), (2) **incremental-scheduled** (the protected news/price ingestion that keeps the cockpit fresh), and (3) **realtime-display** (ephemeral live quotes for the chart edge — *not yet implemented*, snapshot-only today). User state moves to a **three-way local SQLite split** — `profile_state.db` (precious user work), `market_data.db` (regenerable provider mirror, DuckDB candidate), `sa_capture.db` (isolated Seeking-Alpha capture) — while **remote PostgreSQL** (`<postgres-host>:<port>`) stays the source of truth until one verified cross-machine migration passes (the workbench resume gate). `daily_update.py` is reframed as a **manual/cron backfill runner** and three specific old-tier-model couplings are removed. Price data adopts a **3-tier granularity model** (ephemeral realtime / short-retention intraday / permanent adjusted daily) with all chart indicators computed **deterministically from OHLCV, never by the LLM**. The Seeking-Alpha extension → native-host path is a **protected ingestion pipeline** and must keep working byte-for-byte through the migration.
+**Decision (summary):** Collection is split into (1) **manual backfill** (heavy, on-demand historical pulls), (2) **incremental-scheduled** (the protected news/price ingestion that keeps the cockpit fresh), and (3) **realtime-display** (ephemeral live quotes for the chart edge — *not yet implemented*, snapshot-only today). User state moves to a **three-way local SQLite split** — `profile_state.db` (precious user work), `market_data.db` (regenerable provider mirror, DuckDB candidate), `sa_capture.db` (isolated Seeking-Alpha capture). **Remote PostgreSQL** (`<postgres-host>:<port>`) is now an explicit **transitional archive/import backend**, not the desired runtime architecture. The product end state is: app reads and writes local stores directly; PG is only a legacy import/export/archive path. `daily_update.py` is reframed as a transitional/manual backfill runner while app-owned scheduling and provider adapters take over. Price data adopts a **3-tier granularity model** (ephemeral realtime / short-retention intraday / permanent adjusted daily) with all chart indicators computed **deterministically from OHLCV, never by the LLM**. The Seeking-Alpha extension → native-host path is a **protected ingestion pipeline** and must keep working byte-for-byte through the migration.
+
+**2026-06-15 runtime-retirement clarification:** the PG → SQLite mirror was a migration bridge, not the product architecture. `scripts/migrate_market_to_sqlite.py`, `scripts/migrate_sa_to_sqlite.py`, and `scripts/migrate_to_supabase.py` are cutover/operator tools, not app features. They stay until every runtime writer has a local authority and rollback/export is proven; after that they move to legacy/archive or are deleted.
 
 **What is explicitly NOT in scope here:** the RL-trading line (retired), continuous *user-state* sync (a separate desktop concern, must not be layered onto the batch runner), and v2 knowledge-graph / analysis-pipeline work (deferred per SPEC §11).
 
@@ -21,12 +23,12 @@ ArkScope collects data in **three distinct modes** that today are blurred togeth
 
 | Mode | What it is | Providers / jobs | Trigger | Persistence target |
 |---|---|---|---|---|
-| **A. Backfill (manual / on-demand)** | Heavy historical pulls to seed or repair the data store. Expensive, Gateway/PG-dependent, run by hand or cron. | IBKR prices (full history), IV / options history, full-universe fundamentals, daily-adjusted history (`fetch_adjusted_prices`) | Explicit flag or operator action (never swept in automatically — see §7) | Parquet + remote PG today → `market_data.db` after migration |
-| **B. Incremental-scheduled** | The protected freshness path: small `--incremental` deltas that keep cards/charts current. | **Polygon news**, **Finnhub news**, **IBKR news** (Gateway-gated), 15min IBKR price deltas; LLM sentiment/risk scoring (`news_scores`) | Scheduled (cron) or `daily_update.py --news`; cockpit-driven refresh | Parquet + remote PG (`news`, `news_scores`, `prices`) today → split DBs after migration |
+| **A. Backfill (manual / on-demand)** | Heavy historical pulls to seed or repair the data store. Expensive, Gateway/provider-dependent, run explicitly by the operator or app. | IBKR prices (full history), IV / options history, full-universe fundamentals, daily-adjusted history (`fetch_adjusted_prices`) | Explicit flag or operator action (never swept in automatically — see §7) | Local domain stores; legacy PG import path only during transition |
+| **B. Incremental-scheduled** | The protected freshness path: small deltas that keep cards/charts current. | **Polygon news**, **Finnhub news**, **IBKR news** (Gateway-gated), 15min IBKR price deltas; LLM sentiment/risk scoring (`news_scores`) | App-owned scheduler; cron/manual CLI only as transitional/advanced fallback | Local domain stores; PG → local mirror only while R2 is incomplete |
 | **C. Realtime-display (ephemeral)** | The live edge of the chart: forming candle, blinking last price, intraday % change. | IBKR live market data | Continuous while a symbol is open in the UI | **In-memory only** (no persist by default) |
 
 **Status notes:**
-- Modes A and B both exist today and run through `scripts/collection/daily_update.py` (subprocess orchestrator, 881 lines) → sibling `collect_*.py` → `scripts/migrate_to_supabase.py` → remote PG. All current DB writes are **remote PG only**; no local SQLite, no RL writeback (verified across the full file).
+- Historical audit snapshot: Modes A and B originally ran through `scripts/collection/daily_update.py` (subprocess orchestrator) → sibling `collect_*.py` → `scripts/migrate_to_supabase.py` → remote PG. That is no longer the product target. Current direction is app-owned scheduling + provider adapters that write local domain stores; any remaining PG path is transitional and tracked by §4a.
 - **Mode C is NOT implemented.** Today the only "realtime" is a one-shot snapshot: `data_sources/ibkr_source.py:926` (`get_current_quote` → `reqMktData(contract, '', True, False)` with `snapshot=True`, then a blocking 2s sleep). **There is no `reqRealTimeBars`, no `reqTickByTick`, no `pendingTickersEvent` subscription anywhere** — a continuous live stream is new code to build.
 
 ---
@@ -100,7 +102,7 @@ Written **exclusively** by the extension → native-host path, independent of th
 | `cal_economic_events`, `cal_earnings_events`, `cal_ipo_events` + `*_revisions` | **market_data.db** | remote PG | `store.py:219/303/388` |
 | `news`, `news_scores`, `news_latest_scores` | **market_data.db** | remote PG | `db_backend.py:334,354,398` |
 | `sa_alpha_picks`, `sa_refresh_meta`, `sa_market_news`, `sa_articles`, `sa_article_comments`, `sa_comment_signals` | **sa_capture.db** | remote PG | `db_backend.py:1200,1226,1405,1624,1699`; `comment_signal_backfill.py:223` |
-| `agent_queries`, `agent_memories`, `research_reports`, `job_runs` | **stays remote PG initially** (app records; revisit) | remote PG | `db_backend.py:1001,859/931,752/807`; `job_runs_store.py` |
+| `agent_queries`, `agent_memories`, `research_reports`, `job_runs` | **transitional PG / mixed local** (retire under §4a R1/R3) | remote PG + local stores where already migrated | `db_backend.py:1001,859/931,752/807`; `job_runs_store.py` |
 | `symbol_catalog` (ticker→name) | **JSON file** (`data/cache/sec_company_tickers.json`, not a DB) | reference data | `symbol_catalog.py:10-12` |
 
 **Backend mechanics:** introduce a `SqliteBackend`/`LocalBackend` implementing the existing `DataBackend` protocol (`db_backend.py:248`) alongside `DatabaseBackend`. The DAL already abstracts backend choice (`data_access.py:166-197`), so call sites in `sa_tools.py`, card/report tools, and the native host **do not change** — only the backend the DAL constructs.
@@ -117,7 +119,7 @@ backend by **data domain**, not one global backend.
 | profile (lists/tags/priority/notes/cards/credentials) | `profile_state.db` (SQLite) — already local |
 | market (prices/news/fundamentals/IV/macro/calendar/consensus) | `market_data.db` (SQLite) |
 | SA capture (`sa_*`) | **PG for now** → `sa_capture.db` only at the §5g quiet-window cutover |
-| app records (`agent_queries`/`agent_memories`/`research_reports`/`job_runs`) | **stays PG** (revisit later) |
+| app records (`agent_queries`/`agent_memories`/`research_reports`/`job_runs`) | **transitional PG** → local app-state store in the PG-retirement track (§4a) |
 
 This routing is what lets slice 3a (market → local) ship **without** touching SA,
 and lets SA keep writing PG on weekdays. Each domain keeps its own
@@ -127,7 +129,11 @@ and lets SA keep writing PG on weekdays. Each domain keeps its own
 
 ## 4. PostgreSQL → local migration strategy (phased)
 
-PG stays the source of truth until **one verified cross-machine migration passes** (matches the workbench resume gate). Cutover order = lowest blast radius first.
+PG was kept as the source of truth during the early migration because it was the only complete runtime store. That is a transitional stance, not the target. The retirement rule is:
+
+> A domain may stop depending on PG only when its reads **and writes** have a local authority, failures are observable, and a rollback/export/import path exists.
+
+Cutover order = lowest blast radius first.
 
 | Phase | Tables moving | Why this order | What stays in PG meanwhile |
 |---|---|---|---|
@@ -138,7 +144,31 @@ PG stays the source of truth until **one verified cross-machine migration passes
 
 **PG-ism translation checklist (apply during every port):** `NOW()` → `CURRENT_TIMESTAMP`; `psycopg2.extras.Json` → `json.dumps`; `%s` → `?`; `RealDictCursor` → `sqlite3.Row`; partial-index upserts recreated as real partial indexes.
 
-**Path resolution:** env override (`ARKSCOPE_MARKET_DB`, `ARKSCOPE_SA_DB`, reuse `ARKSCOPE_PROFILE_DB`) → default under `data/`, resolved next to `_local_state_db_path` (`dependencies.py:76-79`). `DatabaseBackend` is kept as an optional/legacy backend behind the same protocol throughout, so PG remains a live fallback.
+**Path resolution:** env override (`ARKSCOPE_MARKET_DB`, `ARKSCOPE_SA_DB`, reuse `ARKSCOPE_PROFILE_DB`) → default under `data/`, resolved next to `_local_state_db_path` (`dependencies.py:76-79`). `DatabaseBackend` is kept as a legacy/import backend behind the same protocol while domains migrate. Live fallback is allowed only as an explicit transition mechanism; after hard cutover, fallback must be disabled so stale PG data cannot mask split-brain.
+
+### 4a. PG runtime retirement track (explicit)
+
+This is separate from the "one DB vs many DBs" decision. Adding more SQLite files is an implementation tool; **removing PG runtime dependency is the product requirement**.
+
+**Required gates before PG can leave runtime:**
+1. **All runtime reads are local-first or hard-local** for their domain.
+2. **All runtime writes have a local authority**; no app/scheduler/extension path writes only to PG.
+3. **Provider/source → local update paths exist.** PG → local incremental mirror is transitional and must be replaced by provider adapters writing local state directly.
+4. **App records are local or deliberately retired:** `job_runs`, provider health, research threads, reports, memories, and agent query history must not require PG for normal use.
+5. **SQLite write failures are observable and non-lossy:** bounded transactions, WAL, `busy_timeout`, file/process locks where needed, explicit retry/skip semantics, and telemetry for dropped/skipped runs. "It only locks briefly" is acceptable only when no data is silently lost and the user can see stale/failed status.
+6. **Provider-growth review passes:** every new provider/collector declares whether it writes through the app-owned scheduler/write path or requires its own source DB/inbox (`LOCAL_STORAGE_TOPOLOGY.md` §3).
+7. **Cross-machine smoke passes:** copy the local profile/data directory to a second machine and run the app without PG.
+8. **Rollback/export/import story exists:** legacy PG import can rebuild local state, but daily runtime must not need PG.
+
+**Retirement phases:**
+| Phase | Goal | Main work |
+|---|---|---|
+| **R0 — inventory + guardrails** | Know every remaining PG runtime caller. | `rg`/AST gate for `DatabaseBackend`, raw `psycopg2`, `migrate_to_supabase.py`, and direct DSN use; mark each caller as runtime / migration / test / legacy. |
+| **R1 — local app telemetry** | Remove PG from health/scheduler observability. | Move `job_runs` and provider-health run records to a local app-state store (likely `profile_state.db` or a small `app_state.db` if write pressure proves real). |
+| **R2 — provider adapters write local** | Replace PG → local mirror. | Scheduler sources write to local domain stores directly; `incremental_update()` becomes provider/source → local, not PG → local. For each source, apply the provider-growth rule: in-process low-frequency sources may write canonical DB directly; independent/high-frequency/bursty sources get a source DB or inbox first. |
+| **R3 — local app records** | Remove PG from agent/research product use. | Ensure research threads, reports, memories, and agent query records are local and exportable. |
+| **R4 — disable live PG fallback** | Stop stale fallback masking bugs. | Domain-by-domain hard local mode, with explicit operator import fallback only. |
+| **R5 — retire scripts** | Remove migration scripts from runtime. | Move `scripts/migrate_market_to_sqlite.py`, `scripts/migrate_sa_to_sqlite.py`, and `scripts/migrate_to_supabase.py` to `scripts/legacy/` or delete after documented recovery alternatives exist. |
 
 ---
 
@@ -164,7 +194,9 @@ Per-scope capture health: `last_attempt` / `last_success` / `snapshot_ts` / `row
 - **Independently-evolving schema:** SA has the richest, fastest-changing schema (lifecycle, market news, threaded comments with parent re-parenting `db_backend.py:1764`, derived signals). Its own file lets that schema migrate without risking the user's hand-curated `profile_state.db`.
 
 ### 5g. Cutover window (the SA extension is always running)
-The extension → native-host path writes continuously while the user browses SA. Re-pointing its DB target (PG → `sa_capture.db`) needs a **quiet window** so no capture lands mid-cutover. Decision (2026-06-07): do the `sa_capture` (Phase 2) cutover **on a Saturday with US markets closed (target 2026-06-13)** as a one-shot, *unless* the move is proven fast + clean enough to do safely in a weekday morning. Since the DB-split code (slice 3) is not built yet, Saturday is the realistic target; the dry run + validation (row-count + checksum) happen on a copy first. Phase 1 (`market_data`, regenerable) carries no such constraint and can cut over any time.
+The extension → native-host path writes continuously while the user browses SA. Re-pointing its DB target (PG → `sa_capture.db`) needed a **quiet window** so no capture landed mid-cutover. Decision (2026-06-07): do the `sa_capture` cutover on a Saturday with US markets closed (target 2026-06-13), after a dry run + row-count/checksum validation on a copy.
+
+**Status 2026-06-15:** cutover executed successfully; `sa_capture.db` is the live SA runtime store, PG `sa_*` tables are frozen rollback/archive baseline. See `SA_CUTOVER_3D_RUNBOOK.md`.
 
 ---
 
@@ -217,15 +249,15 @@ Implement as a small pure-Python/pandas (or SQL-window) module in the FastAPI si
 > snapshot); the code has since shifted — they document what *was* found, not current
 > line numbers.**
 
-**File:** `scripts/collection/daily_update.py` (was 881 lines). It is a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`; it writes no DB itself, touches **remote PG only**, has **no SQLite/`profile_state.db` writes, and no RL/reward/PPO references anywhere** (verified full-file).
+**File:** `scripts/collection/daily_update.py` (historically 881 lines before the 3e-E step-down). It used to be a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`, touching **remote PG only**. Current direction: keep it as a compatibility/backfill wrapper over the same app-owned source runners and local write paths; no RL/reward/PPO references belong here.
 
 ### New positioning
-Reframe as a **manual / on-demand backfill runner** — explicitly *not* the desktop app's continuous-sync engine. The always-on workbench sidecar's continuous sync of *user state* is a separate concern and must not be layered onto this batch runner. Position it as: *"run by hand or by cron to backfill historical market/news data into Parquet + remote PG."*
+Reframe as a **manual / on-demand backfill runner / legacy compatibility wrapper** — explicitly *not* the desktop app's continuous-sync engine. The always-on workbench sidecar owns product scheduling. During the transition, the CLI can still run operational backfills, but it must converge toward the same provider adapters and local write paths as the app.
 
 Principles:
-- **Keep the protected ingestion collectors LIVE and unchanged:** Polygon (`:546`), Finnhub (`:563`), IBKR news (`:580`) incremental fetches stay. This script remains a thin orchestrator over them.
+- **Keep the protected ingestion collectors LIVE while adapting their writer boundary:** Polygon, Finnhub, and IBKR news collection must keep working, but the runtime write target migrates toward local authority via the app scheduler/provider adapters.
 - **Make heavy/stateful steps opt-in, not bundled under `--all`:** IV history (`:618`), full-universe IBKR prices (`:597`), and `--scores` DB push (`:668`) each require their own explicit flag.
-- **Clarify the DB boundary:** all writes go to remote PG via `migrate_to_supabase.py` — correct for market/collection data, must stay out of local user-state DB.
+- **Clarify the DB boundary:** remote-PG sync via `migrate_to_supabase.py` is transitional. Product runtime writes must end in local domain stores; local user-state DBs remain separate from regenerable market/provider data.
 
 ### Old-model pollution to REMOVE (cited)
 
@@ -317,8 +349,9 @@ Source repo confirmed at `<workspace>/daily_stock_analysis`. The provider/fallba
 | **Slice 3c-A — IV + fundamentals local** ✅ DONE (`7523006`) | `iv_history` + `fundamentals` → local (id-keyed; id-based incremental; per-ticker COUNT+SUM(id) checksum). SqliteBackend `query_iv_history`/`query_fundamentals` (same shapes as PG) + LocalMarketDatabaseBackend overrides (local-first, PG fallback) + `bootstrap_market`/`validate_market`/`incremental_update` extended. Verified real data: 24 iv / 130 fundamentals MATCH + per-ticker read parity (0 mismatches). | Slice 3b |
 | **Slice 3c-B — surface IV/fundamentals in Settings + API** ✅ DONE (`d64f00c`) | `/market-data/status` + TS types + Settings "Data Storage" panel report all 4 domains (row/ticker/latest, sync, per-domain validate ✓/✗). Also fixed `start_update_job` to weigh all 4 domains (was prices/news only). | Slice 3c-A |
 | **Slice 3c-C — financial_cache LOCAL-PRIMARY** ✅ DONE (`95a5241` + mutex follow-up) | `financial_cache` is local-primary, NOT a PG mirror: SqliteBackend `get_financial_cache` (local, expiry-checked) + `set_financial_cache` (local-only write, the one writable path; WAL+busy_timeout); LocalMarketDatabaseBackend get = local-first → PG fallback → read-through promotion (preserves PG source+TTL), set = local-only never PG. `bootstrap_market` carries the cache over the atomic swap under `_CACHE_WRITE_LOCK` (read-old→swap→write-carried, serialized vs set_financial_cache so a racing write isn't dropped) + clears stale `-wal`/`-shm` sidecars. Not validated vs PG, untouched by incremental. **`financial_datasets_client.py` rewire ✅ DONE:** the paid client takes `cache_backend` (the DAL backend) — reads go backend (local-first/PG-fallback/promotion) → legacy file (read-only; hits promoted into the backend w/ remaining TTL) → API; writes go to `set_financial_cache(source='financial_datasets')` (no own-PG writes; healthy path writes no files, but a FAILED backend write logs a WARNING and falls back to the legacy file — deliberate paid-cost protection, do not remove; next read promotes it back into the backend). Standalone (no backend) keeps legacy env-PG+file behavior. | Slice 3c-A |
-| **Slice 3d — SA capture cutover** | Move `sa_*` PG → `sa_capture.db`. **Requires a quiet window (§5g): target a Saturday US-closed.** Dry-run on a DB copy first; port partial-index `ON CONFLICT` upserts; verify row-count + checksum + an extension→native-host smoke before flipping the SA domain route. (Was mislabeled "Slice 3b" — renamed to avoid clashing with news.) | Slice 3a; §5g |
-| **Slice 3e — Settings / schedule controller** (user's "3d"; forks locked 2026-06-10) | **Target architecture (locked): the app/sidecar is the ONLY scheduler owner long-term; cron is transitional/deprecated "advanced fallback", not the product shape. IB Gateway = primary realtime/near-realtime source.** Sub-slices: **3e-A** provider-health read model + `GET /providers/health` (merge job_runs / sa_refresh_meta / market_sync_meta / financial_cache stats / freshness + read-only key presence incl. IBKR host/port; unified `connected\|stale\|maintenance(IBKR weekend ≠ error)\|…` vocabulary; **DTO ProviderRun-COMPATIBLE but 3e ports NOTHING from DSA — Slice 5 owns the §9 borrow**); **3e-B** daily_update per-step job_runs telemetry (protected CLI byte-identical); **3e-C** Settings Data Sources READ-ONLY panel (chips + key presence + job log + SA health; **no credential entry — that is its own future slice** needing secret storage + store→env bridge); **3e-D** app-owned scheduler core (config in namespaced profile_settings: `schedule.<source>.mode/interval`, `provider.<name>.enabled`; **FD paid toggle stays YAML for now**) + first batch SAFE app-native jobs only (local incremental, macro/calendar, consensus cache, health probe; FD on-demand only; in-process asyncio — `_CACHE_WRITE_LOCK` assumes single process); **3e-E** daily_update step-down (scope TBD). Post-3e: collectors → provider ADAPTERS callable by the scheduler, then daily_update inverts into a thin CLI wrapper over the app job API. Realtime selector renders greyed until Slice 4 (Q1). | Slice 3c |
+| **Slice 3d — SA capture cutover** ✅ DONE | `sa_*` PG → `sa_capture.db` hard cutover completed 2026-06-13; follow-up #1 ported `extract_sa_comment_signals` to SQLite and added `get_sa_comment_focus`; C-1 added `/sa/feed` + News-surface SA filter. PG `sa_*` is frozen as rollback/archive baseline, not live runtime. | Slice 3a; §5g |
+| **Slice 3e — Settings / schedule controller** ✅ SUBSTRATE DONE | App/sidecar is the scheduler owner; cron is transitional/advanced fallback. Shipped provider health, per-step job telemetry, Settings Data Sources panel, app-managed provider credentials, per-source scheduler, adapterized news collectors, explicit Universe scope, and `daily_update.py` as a thin wrapper over the app run-source path. Remaining work belongs to PG-retirement R1/R2 and future provider telemetry depth (Slice 5), not to cron-first architecture. | Slice 3c |
+| **Slice 3f — PG runtime retirement** | Execute §4a: inventory remaining PG callers, move `job_runs`/provider telemetry local, convert provider adapters from PG→local mirror to source→local writes, localize/retire app records, disable live PG fallback, then move/delete migration scripts after recovery alternatives exist. Provider-growth rule decides whether each new source writes canonical DB directly or gets a source DB/inbox. | Slice 3e; stable local stores |
 | **Slice 4 — Charting + price tiers** | Widen interval enum (`1m`/`5m`/native `1d`); persist adjusted `1d` (`adj_close`); reusable rollup; deterministic-indicator module in the sidecar; (optional) Tier 0 realtime stream. | Slice 3a; Q1/Q4/Q5 |
 | **Slice 5 — Provider health + signals surface** | **Owns the FULL DSA borrow (§9)** — quote dataclass / enrichment / circuit breaker / `ProviderRun` telemetry / capability filtering (3e deliberately ports none of it; 3e-A's health DTO is ProviderRun-compatible so this plugs in); deepen the §8 ops health view with per-call telemetry + circuit-breaker state; integrate with the multi-factor signals subsystem (kept-but-adapt). | Slice 3e; §9 |
 

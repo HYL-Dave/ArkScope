@@ -46,8 +46,9 @@ contents were removed 2026-06-07, recoverable via git.)
 | `DESKTOP_APP_VISION_DRAFT.md` | **Desktop App Vision** | ACTIVE | UI/UX + product-surface intent above the SPEC. |
 | `DESKTOP_APP_CARRYOVER_ANALYSIS.md` | **Desktop Carryover Matrix** | ACTIVE | 87-component preserve/adapt/concept/defer/drop matrix for the migration. |
 | `DESKTOP_SHELL_SPIKE_PLAN.md` | **Desktop Shell Spike Plan** | ACTIVE | Electron+React shell over the FastAPI sidecar (repo layout, lifecycle). |
-| `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · PG migration · price tiers · daily_update repositioning. |
-| `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DEFERRED | Source DB vs canonical DB principle; records why multi-DB splitting is deferred until real writer/streaming pressure appears. |
+| `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · explicit PG runtime-retirement track · price tiers · scheduler/data-update repositioning. |
+| `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DECISION | Source DB vs canonical DB principle; provider-growth review rule for deciding when a new source needs its own DB/inbox. |
+| `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md` | **AI Research Context & Memory Plan** | ACTIVE | C-2c thread-context principles: complete transcript, no silent truncation, configurable memory policies, strategy/skill/tool extensibility roadmap. |
 
 ## Seeking-Alpha pipeline (PROTECTED ingestion path — must not break)
 | File | Read as | Status | One-line |
@@ -55,7 +56,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `SA_ALPHA_PICKS_CONTENT_CAPTURE.md` | **SA Article Capture** | REFERENCE | How the extension scrapes SA articles → markdown via the native host. |
 | `SA_COMMENT_INTELLIGENCE_PLAN.md` | **SA Comment Intelligence** | SHIPPED (stage 1) | Turning SA comments into community signal. |
 | `SA_CUTOVER_3D_RUNBOOK.md` | **SA Cutover 3d Runbook** | SHIPPED | PG → `data/sa_capture.db` hard cutover (executed 2026-06-13) + follow-up #1 (comment-signal port, `get_sa_comment_focus`, v1.2 stopwords). |
-| `SA_EVIDENCE_FEED_C1_SPEC.md` | **SA Evidence Feed (C-1)** | PLAN | `GET /sa/feed` + `get_sa_feed` tool + News-surface SA filter; locked plan, execute in one clean round. |
+| `SA_EVIDENCE_FEED_C1_SPEC.md` | **SA Evidence Feed (C-1)** | SHIPPED | `GET /sa/feed` + `get_sa_feed` tool + News-surface SA filter. |
 | `SA_EXTENSION_ROADMAP.md` | **SA Extension Roadmap** | ACTIVE | Incremental roadmap for SA extension data coverage. |
 
 ## SHIPPED — feature delivered, spec kept as reference
