@@ -70,6 +70,16 @@ def get_credential_store():
 
 
 @lru_cache(maxsize=1)
+def get_oauth_token_store():
+    """Singleton OAuth token store for LLM subscription auth (keyring-first, with
+    a flagged plaintext dev fallback). Holds the real OAuth/setup tokens — NEVER
+    the credential DB. See src/auth_drivers/token_store.py."""
+    from src.auth_drivers import get_token_store
+
+    return get_token_store()
+
+
+@lru_cache(maxsize=1)
 def get_data_provider_store():
     """Singleton DATA-provider config store (API keys / IBKR host+port — same
     ignored local SQLite DB). Values are injected into os.environ via apply_env."""

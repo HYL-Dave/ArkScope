@@ -1,9 +1,11 @@
 """Config and overview routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.api.dependencies import get_credential_store, get_dal
+from src.api.dependencies import get_credential_store, get_dal, get_oauth_token_store
 from src.api.permissions import require_profile_state_write
 from src.agents.config import save_local_override, task_route
 from src.model_credentials import (
@@ -25,6 +27,7 @@ from src.tools.data_access import DataAccessLayer
 from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
 
 router = APIRouter(tags=["config"])
+logger = logging.getLogger(__name__)
 
 
 def _credential_store(store) -> CredentialStore:
@@ -226,6 +229,71 @@ def add_credential(
             c.model_dump()
             for c in provider_credentials(store)[body.provider]
             if c.id == f"local:{cred.id}"
+        )
+    }
+
+
+class OAuthImport(BaseModel):
+    provider: Provider
+    auth_mode: str = "claude_code_oauth"
+    alias: str
+    token: str
+    account_label: str | None = None
+    expires_at: str | None = None
+    make_active: bool = True
+
+
+@router.post("/config/credentials/oauth/import")
+def import_oauth_credential(
+    body: OAuthImport,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Import a subscription OAuth/setup token. v1: anthropic + claude_code_oauth
+    (Claude setup-token) ONLY. Creates a metadata row (secret NULL) then saves the
+    token to the token-store; rolls the row back if the token-store write fails.
+    The response returns masked metadata only — the token is NEVER echoed."""
+    from src.auth_drivers import StoredTokenRecord
+    from src.model_credentials import _normalize_auth_type
+
+    store = _credential_store(store)
+    provider = body.provider
+    auth_mode = _normalize_auth_type(body.auth_mode.strip(), provider)
+    # v1 scope: Claude setup-token only. (OpenAI chatgpt_oauth import = S3.)
+    if not (provider == "anthropic" and auth_mode == "claude_code_oauth"):
+        raise HTTPException(status_code=400, detail="v1 import supports only anthropic + claude_code_oauth (Claude setup-token)")
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="token is required")
+
+    # NOTE: the token is deliberately NOT included in the write-gate detail.
+    require_profile_state_write("oauth_credential_import", {"provider": provider, "auth_mode": auth_mode, "alias": body.alias})
+
+    try:
+        cred = store.add_oauth_credential(
+            provider=provider, auth_mode=auth_mode, alias=body.alias,
+            expires_at=body.expires_at, account_label=body.account_label, make_active=body.make_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    cid = f"local:{cred.id}"
+    try:
+        token_store.save(
+            provider=provider, auth_mode=auth_mode, credential_id=cid,
+            record=StoredTokenRecord(access_token=token, expires_at=body.expires_at, account_label=body.account_label),
+        )
+    except Exception:  # noqa: BLE001 — roll back so no half-built credential remains
+        store.delete(cid)
+        logger.warning("oauth token-store save failed for %s/%s; rolled back credential row", provider, auth_mode)
+        raise HTTPException(status_code=502, detail="failed to store the token securely; nothing was saved")
+
+    # masked metadata only — never the token / token-store payload
+    return {
+        "credential": next(
+            c.model_dump()
+            for c in provider_credentials(store)[provider]
+            if c.id == cid
         )
     }
 
