@@ -123,3 +123,36 @@ def test_factory_auto_falls_back_to_plaintext_when_keyring_unusable(tmp_path, mo
     s = get_token_store(dev_path=tmp_path / "t.json")
     assert isinstance(s, PlaintextTokenStore)
     assert s.status(**_KEY)["backend"] == "plaintext_dev"  # fallback is visible in status
+
+
+# --- Piece 2.1 hardening ----------------------------------------------------
+def test_factory_explicit_keyring_unavailable_fails_loud(monkeypatch):
+    # EXPLICIT keyring must NOT silently degrade — fail loud (auto still falls back).
+    monkeypatch.delenv("ARKSCOPE_TOKEN_STORE", raising=False)
+    monkeypatch.setattr(KeyringTokenStore, "usable", staticmethod(lambda: False))
+    with pytest.raises(RuntimeError):
+        get_token_store(prefer="keyring")
+    monkeypatch.setenv("ARKSCOPE_TOKEN_STORE", "keyring")
+    with pytest.raises(RuntimeError):
+        get_token_store()
+
+
+def test_plaintext_write_is_atomic_no_temp_leftover(tmp_path):
+    store = PlaintextTokenStore(tmp_path / "auth_tokens.json")
+    store.save(record=_REC, **_KEY)
+    store.save(record=StoredTokenRecord(access_token="AT2"), provider="anthropic", auth_mode="claude_code_oauth", credential_id="local:2")
+    # atomic temp+replace leaves only the target file (no half-written .tmp)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["auth_tokens.json"]
+    import json as _json
+
+    with open(store.path, encoding="utf-8") as f:
+        _json.load(f)  # always valid JSON after rewrites
+    assert stat.S_IMODE(os.stat(store.path).st_mode) == 0o600
+
+
+def test_status_never_includes_metadata(plain):
+    rec = StoredTokenRecord(access_token="AT", metadata={"id_token": "SECRET-ID-TOKEN", "account_id": "acct-xyz"})
+    plain.save(record=rec, **_KEY)
+    st = plain.status(**_KEY)
+    assert "metadata" not in st
+    assert "SECRET-ID-TOKEN" not in repr(st) and "acct-xyz" not in repr(st)

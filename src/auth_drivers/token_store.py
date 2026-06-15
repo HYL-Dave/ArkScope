@@ -30,7 +30,9 @@ class StoredTokenRecord:
     expires_at: Optional[str] = None  # ISO; None for non-expiring (e.g. setup-token status)
     plan_type: Optional[str] = None
     account_label: Optional[str] = None  # redacted display only (NOT raw email/PII)
-    metadata: dict = field(default_factory=dict)  # provider extras (non-display)
+    # provider internals (id_token, account_id, …). NEVER render/log raw — status()
+    # deliberately excludes it; treat as opaque/secret in any future UI/debug surface.
+    metadata: dict = field(default_factory=dict)
 
 
 def _token_key(provider: str, auth_mode: str, credential_id: str) -> str:
@@ -82,8 +84,23 @@ class PlaintextTokenStore:
             return {}
 
     def _write_all(self, data: dict) -> None:
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        # Atomic: write a 0600 temp file in the same dir, then os.replace — a crash
+        # never leaves a half-written token file (matters once refresh writes land).
+        import tempfile
+
+        directory = os.path.dirname(self.path) or "."
+        fd, tmp = tempfile.mkstemp(dir=directory, prefix=".auth_tokens.", suffix=".tmp")
+        try:
+            os.chmod(tmp, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            os.replace(tmp, self.path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
         try:
             os.chmod(self.path, 0o600)
         except OSError:
@@ -194,6 +211,13 @@ def get_token_store(*, prefer: str | None = None, dev_path: str | Path | None = 
     if choice == "plaintext":
         return PlaintextTokenStore(dev_path or _default_dev_path())
     if choice == "keyring":
+        # Explicit request must NOT silently degrade to plaintext — fail loud.
+        if not KeyringTokenStore.usable():
+            raise RuntimeError(
+                "keyring token store requested but no usable OS keyring backend is "
+                "available — install/configure a system keyring, or use the plaintext "
+                "dev store (ARKSCOPE_TOKEN_STORE=plaintext)."
+            )
         return KeyringTokenStore()
     if KeyringTokenStore.usable():
         return KeyringTokenStore()
