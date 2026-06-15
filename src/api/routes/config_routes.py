@@ -200,7 +200,9 @@ def add_credential(
 ):
     store = _credential_store(store)
     auth_type = body.auth_type.strip()
-    if auth_type not in {"api_key", "oauth", "setup_token"}:
+    # Explicit modes are the target; legacy oauth/setup_token still accepted and
+    # normalized by store.add() (deprecated write-aliases).
+    if auth_type not in {"api_key", "chatgpt_oauth", "claude_code_oauth", "oauth", "setup_token"}:
         raise HTTPException(status_code=400, detail=f"unsupported auth_type: {auth_type}")
     require_profile_state_write(
         "credential_add",

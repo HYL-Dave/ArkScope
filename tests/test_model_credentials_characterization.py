@@ -105,17 +105,15 @@ def test_provider_credentials_local_api_key_row(store, clean_env):
     assert local.masked and "sk-realkeyvalue9" not in (local.masked or "")  # secret never leaked
 
 
-def test_provider_credentials_legacy_oauth_setup_token_placeholders(store, clean_env):
-    # CURRENT-BASELINE: the env placeholder rows carry the legacy auth_type values.
-    # S1 normalizes these to chatgpt_oauth / claude_code_oauth — this test updates then.
+def test_provider_credentials_placeholders_use_explicit_modes(store, clean_env):
+    # S1: env placeholder rows now carry the EXPLICIT modes (no generic oauth).
     inv = provider_credentials(store)
     oa = {c.id: c for c in inv["openai"]}
     an = {c.id: c for c in inv["anthropic"]}
-    assert oa["openai:OPENAI_OAUTH_TOKEN"].auth_type == "oauth"
-    assert an["anthropic:ANTHROPIC_OAUTH_TOKEN"].auth_type == "oauth"
-    assert an["anthropic:ANTHROPIC_SETUP_TOKEN"].auth_type == "setup_token"
-    # placeholders are not directly usable
-    assert oa["openai:OPENAI_OAUTH_TOKEN"].can_discover_models is False
+    assert oa["openai:OPENAI_OAUTH_TOKEN"].auth_type == "chatgpt_oauth"
+    assert an["anthropic:ANTHROPIC_OAUTH_TOKEN"].auth_type == "claude_code_oauth"
+    assert an["anthropic:ANTHROPIC_SETUP_TOKEN"].auth_type == "claude_code_oauth"
+    assert oa["openai:OPENAI_OAUTH_TOKEN"].can_discover_models is False  # still not a direct key
 
 
 # --- discovery / test on the api_key path (no-network paths) -----------------
@@ -155,18 +153,21 @@ def test_route_rejects_unknown_auth_type(store):
     assert ei.value.status_code == 400
 
 
-def test_route_currently_rejects_explicit_oauth_modes(store):
-    # CURRENT-BASELINE: allow-set = {api_key, oauth, setup_token}. The explicit
-    # modes are NOT accepted yet — S1 flips this to accept them.
+def test_route_accepts_explicit_oauth_modes(store, monkeypatch, clean_env):
+    # S1: the explicit modes are now accepted by the allow-set; bogus still 400.
     from fastapi import HTTPException
 
-    from src.api.routes.config_routes import CredentialCreate, add_credential
+    from src.api.routes import config_routes as cr
 
-    for mode in ("chatgpt_oauth", "claude_code_oauth"):
-        body = CredentialCreate(provider="openai", auth_type=mode, alias="k", secret="sk-x", make_active=True)
-        with pytest.raises(HTTPException) as ei:
-            add_credential(body, store=store)
-        assert ei.value.status_code == 400
+    monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: None)
+    for provider, mode in (("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")):
+        body = cr.CredentialCreate(provider=provider, auth_type=mode, alias="o", secret="tok-value-1234", make_active=True)
+        res = cr.add_credential(body, store=store)
+        assert res["credential"]["auth_type"] == mode
+    bad = cr.CredentialCreate(provider="openai", auth_type="bogus", alias="k", secret="sk-x", make_active=True)
+    with pytest.raises(HTTPException) as ei:
+        cr.add_credential(bad, store=store)
+    assert ei.value.status_code == 400
 
 
 def test_route_accepts_api_key(store, monkeypatch, clean_env):
@@ -176,3 +177,49 @@ def test_route_accepts_api_key(store, monkeypatch, clean_env):
     body = cr.CredentialCreate(provider="openai", auth_type="api_key", alias="k", secret="sk-realkeyvalue9", make_active=True)
     res = cr.add_credential(body, store=store)
     assert res["credential"]["auth_type"] == "api_key" and res["credential"]["id"].startswith("local:")
+
+
+# ===========================================================================
+# S1 NEW behavior: explicit auth modes, legacy normalization, OAuth metadata
+# ===========================================================================
+def test_read_normalizes_legacy_auth_types(store):
+    # Pre-existing legacy rows (inserted raw to bypass add()'s write-normalize)
+    # must normalize to provider-specific explicit modes ON READ.
+    import sqlite3
+
+    now = "2026-01-01T00:00:00+00:00"
+    with sqlite3.connect(store.db_path) as conn:
+        for prov, at, alias in [("anthropic", "setup_token", "s"), ("anthropic", "oauth", "o"), ("openai", "oauth", "o2")]:
+            conn.execute(
+                "INSERT INTO llm_credentials (provider,auth_type,alias,secret,active,created_at,updated_at) "
+                "VALUES (?,?,?,?,0,?,?)", (prov, at, alias, "tok", now, now),
+            )
+        conn.commit()
+    modes = {c.alias: c.auth_type for c in store.list()}
+    assert modes["s"] == "claude_code_oauth"   # setup_token → claude_code_oauth
+    assert modes["o"] == "claude_code_oauth"   # anthropic oauth → claude_code_oauth
+    assert modes["o2"] == "chatgpt_oauth"      # openai oauth → chatgpt_oauth
+
+
+def test_write_normalizes_and_validates_auth_type(store):
+    c1 = store.add(provider="anthropic", auth_type="oauth", alias="a", secret="tok-1234", make_active=False)
+    assert store.get(f"local:{c1.id}").auth_type == "claude_code_oauth"
+    c2 = store.add(provider="anthropic", auth_type="setup_token", alias="b", secret="tok-1234", make_active=False)
+    assert store.get(f"local:{c2.id}").auth_type == "claude_code_oauth"
+    c3 = store.add(provider="openai", auth_type="oauth", alias="c", secret="tok-1234", make_active=False)
+    assert store.get(f"local:{c3.id}").auth_type == "chatgpt_oauth"
+    with pytest.raises(ValueError):
+        store.add(provider="openai", auth_type="bogus", alias="d", secret="x")
+
+
+def test_oauth_metadata_columns_roundtrip(store):
+    c = store.add(
+        provider="openai", auth_type="chatgpt_oauth", alias="o", secret="tok-1234",
+        expires_at="2027-06-15T00:00:00+00:00", account_label="acct-123",
+    )
+    got = store.get(f"local:{c.id}")
+    assert got.expires_at == "2027-06-15T00:00:00+00:00" and got.account_label == "acct-123"
+    # api_key rows leave the OAuth metadata null
+    k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxxxx")
+    kg = store.get(f"local:{k.id}")
+    assert kg.expires_at is None and kg.account_label is None

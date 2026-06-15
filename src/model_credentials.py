@@ -24,8 +24,28 @@ from pydantic import BaseModel
 from src.env_keys import ensure_env_loaded
 from src.model_routing import MODEL_CATALOG, Provider
 
-CredentialAuthType = Literal["api_key", "api_key_pool", "oauth", "setup_token"]
+CredentialAuthType = Literal["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"]
 DiscoveryStatus = Literal["ok", "missing_credential", "unsupported", "error"]
+
+# Explicit modes (the target). Legacy generic values are normalized to these on
+# read AND write (S1); they are NOT a stored long-term form.
+_VALID_AUTH_MODES = frozenset({"api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"})
+
+
+def _normalize_auth_type(auth_type: str, provider: str) -> str:
+    """Map legacy/generic auth_type → an explicit mode (do NOT conflate the two
+    OpenAI OAuth realities or the Anthropic setup-token path into a bare 'oauth').
+
+    - ``setup_token`` → ``claude_code_oauth`` (Claude Agent SDK / claude -p).
+    - ``oauth`` → provider-specific: anthropic ⇒ ``claude_code_oauth``,
+      otherwise ⇒ ``chatgpt_oauth`` (the in-app ChatGPT-backend OAuth path).
+    - explicit modes pass through unchanged.
+    """
+    if auth_type == "setup_token":
+        return "claude_code_oauth"
+    if auth_type == "oauth":
+        return "claude_code_oauth" if provider == "anthropic" else "chatgpt_oauth"
+    return auth_type
 
 
 class ProviderCredential(BaseModel):
@@ -87,7 +107,9 @@ CREATE TABLE IF NOT EXISTS llm_credentials (
     secret     TEXT NOT NULL,
     active     INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    expires_at    TEXT,
+    account_label TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_llm_credentials_provider ON llm_credentials(provider);
@@ -114,6 +136,10 @@ class StoredCredential:
     active: bool
     created_at: str
     updated_at: str
+    # OAuth metadata (nullable; redacted display only — the live OAuth token does
+    # NOT live in `secret` long-term, it goes to the token-store, S1-piece-2).
+    expires_at: str | None = None
+    account_label: str | None = None
 
 
 class CredentialStore:
@@ -146,6 +172,15 @@ class CredentialStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
+            # Idempotent migration: add expires_at/account_label to a pre-existing
+            # table (tolerant of the concurrent-first-construct race).
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(llm_credentials)").fetchall()}
+            for col in ("expires_at", "account_label"):
+                if col not in cols:
+                    try:
+                        conn.execute(f"ALTER TABLE llm_credentials ADD COLUMN {col} TEXT")
+                    except sqlite3.OperationalError:
+                        pass
             conn.commit()
         try:
             os.chmod(self.db_path, 0o600)
@@ -154,15 +189,19 @@ class CredentialStore:
 
     @staticmethod
     def _row(row: sqlite3.Row) -> StoredCredential:
+        keys = row.keys()
         return StoredCredential(
             id=int(row["id"]),
             provider=row["provider"],
-            auth_type=row["auth_type"],
+            # legacy oauth/setup_token rows normalize to explicit modes on read
+            auth_type=_normalize_auth_type(row["auth_type"], row["provider"]),
             alias=row["alias"],
             secret=row["secret"],
             active=bool(row["active"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            expires_at=row["expires_at"] if "expires_at" in keys else None,
+            account_label=row["account_label"] if "account_label" in keys else None,
         )
 
     def list(self, provider: Provider | None = None) -> list[StoredCredential]:
@@ -191,7 +230,14 @@ class CredentialStore:
         alias: str,
         secret: str,
         make_active: bool = True,
+        expires_at: str | None = None,
+        account_label: str | None = None,
     ) -> StoredCredential:
+        # Normalize legacy/generic → explicit on write, then validate (the stored
+        # value is always an explicit mode going forward).
+        auth_type = _normalize_auth_type(str(auth_type), provider)  # type: ignore[assignment]
+        if auth_type not in _VALID_AUTH_MODES:
+            raise ValueError(f"unsupported auth_type: {auth_type}")
         alias = alias.strip() or f"{provider} key"
         secret = secret.strip()
         if not secret:
@@ -202,9 +248,9 @@ class CredentialStore:
                 conn.execute("UPDATE llm_credentials SET active = 0 WHERE provider = ?", (provider,))
             cur = conn.execute(
                 "INSERT INTO llm_credentials "
-                "(provider, auth_type, alias, secret, active, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (provider, auth_type, alias, secret, 1 if make_active else 0, now, now),
+                "(provider, auth_type, alias, secret, active, created_at, updated_at, expires_at, account_label) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (provider, auth_type, alias, secret, 1 if make_active else 0, now, now, expires_at, account_label),
             )
             conn.commit()
             new_id = cur.lastrowid
@@ -390,20 +436,20 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
         (
             "openai",
             "OPENAI_OAUTH_TOKEN",
-            "oauth",
-            "OAuth token placeholder. Not used for direct OpenAI API model discovery/test in v0.",
+            "chatgpt_oauth",
+            "ChatGPT-OAuth token placeholder (compatibility backend). Not a direct OpenAI API key; discovery/test wired in a later auth-driver slice.",
         ),
         (
             "anthropic",
             "ANTHROPIC_OAUTH_TOKEN",
-            "oauth",
-            "OAuth token placeholder. Not used for direct Anthropic API model discovery/test in v0.",
+            "claude_code_oauth",
+            "Claude OAuth token placeholder (Agent SDK / claude -p). Not a direct Anthropic API key; wired in a later auth-driver slice.",
         ),
         (
             "anthropic",
             "ANTHROPIC_SETUP_TOKEN",
-            "setup_token",
-            "Setup-token placeholder for future Claude flows; not a direct API key in v0.",
+            "claude_code_oauth",
+            "claude setup-token placeholder (Agent SDK / claude -p). Not a direct API key; wired in a later auth-driver slice.",
         ),
     ]:
         value = os.environ.get(env_name, "").strip()
