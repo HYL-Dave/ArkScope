@@ -19,6 +19,10 @@ from typing import Any, AsyncIterator, Literal, Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.agents.shared.events import AgentEvent  # the stream event vocabulary — reused
+# Reuse the EXISTING discovery/test result DTOs (not weaker parallel shapes) so
+# S1/S2 drivers and the Settings/API layer need no conversion. These are keyed by
+# credential_id → each is inherently PER (provider, auth_mode).
+from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult
 
 # Distinct, explicit auth modes (plan §5.1). Do NOT collapse the two OpenAI OAuth
 # realities or the Anthropic setup-token path into a generic "oauth".
@@ -55,11 +59,6 @@ class LLMResponse(_StrictModel):
     raw_response: Any = None
 
 
-class ModelInfo(_StrictModel):
-    id: str
-    provider: str
-
-
 @runtime_checkable
 class AuthDriver(Protocol):
     """Provider/auth-mode-neutral client+strategy. One driver per (provider, auth_mode)."""
@@ -90,8 +89,15 @@ class AuthDriver(Protocol):
 
 @runtime_checkable
 class ResearchProviderDriver(AuthDriver, Protocol):
-    """ArkScope's research-surface driver: adds model discovery + a verify test."""
+    """ArkScope's research-surface driver: adds model discovery + a verify test.
 
-    async def discover_models(self) -> list[ModelInfo]: ...
+    Discovery and test are PER (provider, auth_mode) — a driver instance is one
+    auth mode, so its results are auth-mode-specific. NEVER assume parity across
+    auth modes: the api_key model/capability set differs from chatgpt_oauth
+    (nonstandard ChatGPT-backend list) and from claude_code_oauth. Both methods
+    return the canonical model_credentials result DTOs (keyed by credential_id).
+    """
 
-    async def test(self) -> dict[str, Any]: ...
+    async def discover_models(self) -> ModelDiscoveryResult: ...
+
+    async def test(self) -> ModelTestResult: ...

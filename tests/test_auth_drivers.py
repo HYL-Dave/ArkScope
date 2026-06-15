@@ -16,9 +16,11 @@ from pydantic import ValidationError
 from src.agents.shared.events import AgentEvent, EventType
 from src.auth_drivers import (
     AuthDriver,
+    DiscoveredModel,
     LLMRequest,
     LLMResponse,
-    ModelInfo,
+    ModelDiscoveryResult,
+    ModelTestResult,
     ResearchProviderDriver,
     TokenUsage,
 )
@@ -78,11 +80,16 @@ class _StubDriver:
 
 
 class _ResearchStub(_StubDriver):
-    async def discover_models(self) -> list[ModelInfo]:
-        return [ModelInfo(id="gpt-5.4", provider="openai")]
+    # discover_models / test reuse the existing model_credentials result DTOs
+    # (not weaker parallel shapes) so Settings/API need no conversion layer.
+    async def discover_models(self) -> ModelDiscoveryResult:
+        return ModelDiscoveryResult(
+            provider="openai", credential_id="local:1", status="ok",
+            models=[DiscoveredModel(id="gpt-5.4", provider="openai", label="GPT-5.4", source="seed")],
+        )
 
-    async def test(self) -> dict:
-        return {"ok": True, "provider": "openai", "auth_mode": "api_key"}
+    async def test(self) -> ModelTestResult:
+        return ModelTestResult(provider="openai", credential_id="local:1", model="gpt-5.4", effort="medium", status="ok")
 
 
 class _Incomplete:
@@ -122,3 +129,43 @@ def test_contract_reuses_canonical_event_vocab_not_a_parallel_type():
     assert {e.value for e in EventType} == {
         "thinking", "thinking_content", "text", "tool_start", "tool_end", "error", "done",
     }
+
+
+# --- availability/capability is PER auth_mode, never assumed shared ----------
+# (api_key and OAuth expose different model sets; a driver instance IS one
+# (provider, auth_mode), so its discovery/test result is auth-mode-specific.)
+class _ApiKeyStub(_StubDriver):
+    auth_mode = "api_key"
+
+    async def discover_models(self) -> ModelDiscoveryResult:
+        return ModelDiscoveryResult(
+            provider="openai", credential_id="local:1", status="ok",
+            models=[DiscoveredModel(id="gpt-4o", provider="openai", label="GPT-4o", source="provider_api")],
+        )
+
+    async def test(self) -> ModelTestResult:
+        return ModelTestResult(provider="openai", credential_id="local:1", model="gpt-4o", effort="none", status="ok")
+
+
+class _OAuthStub(_StubDriver):
+    auth_mode = "chatgpt_oauth"
+
+    async def discover_models(self) -> ModelDiscoveryResult:
+        return ModelDiscoveryResult(
+            provider="openai", credential_id="local:2", status="ok",
+            models=[DiscoveredModel(id="gpt-5.4", provider="openai", label="GPT-5.4 (codex backend)", source="provider_api")],
+        )
+
+    async def test(self) -> ModelTestResult:
+        return ModelTestResult(provider="openai", credential_id="local:2", model="gpt-5.4", effort="none", status="ok")
+
+
+def test_discovery_and_test_are_per_auth_mode_not_shared():
+    a = asyncio.run(_ApiKeyStub().discover_models())
+    o = asyncio.run(_OAuthStub().discover_models())
+    # distinct credential rows → distinct results; the available model sets differ
+    assert a.credential_id != o.credential_id
+    assert {m.id for m in a.models} != {m.id for m in o.models}
+    # both still conform to the research-driver contract
+    assert isinstance(_ApiKeyStub(), ResearchProviderDriver)
+    assert isinstance(_OAuthStub(), ResearchProviderDriver)
