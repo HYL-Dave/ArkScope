@@ -68,6 +68,22 @@ def _detect_provider(model: str) -> str:
 #       (2) 按實際用量計費，設高不多花錢
 #       (3) code gen 有 retry 機制，但 token 截斷無法修正
 
+# Modern reasoning models DEPRECATE the `temperature` sampling param and return
+# 400 `invalid_request_error` on it (Anthropic 4.x, OpenAI gpt-5.x). Only legacy
+# families still accept it. Code gen's determinism otherwise comes from
+# effort/thinking + a self-test retry loop, so dropping temperature is safe.
+_TEMPERATURE_DEPRECATED = (
+    "gpt-5", "claude-opus-4", "claude-sonnet-4", "claude-haiku-4", "claude-fable",
+)
+
+
+def _maybe_temperature(model: str) -> dict:
+    """Return ``{"temperature": 0.0}`` only for models that still accept it; ``{}``
+    for modern reasoning models that 400 on the deprecated param."""
+    m = (model or "").lower()
+    return {} if any(p in m for p in _TEMPERATURE_DEPRECATED) else {"temperature": 0.0}
+
+
 def _call_openai(messages: List[dict], model: str, system: str) -> str:
     """Call OpenAI chat completion API with reasoning from config.
 
@@ -92,7 +108,7 @@ def _call_openai(messages: List[dict], model: str, system: str) -> str:
         from openai.types.shared import Reasoning
         kwargs["reasoning"] = Reasoning(effort=effort)
     else:
-        kwargs["temperature"] = 0.0
+        kwargs.update(_maybe_temperature(model))  # omit on models that deprecate it
 
     client = OpenAI()
     response = client.chat.completions.create(**kwargs)
@@ -137,7 +153,9 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
     if thinking_param:
         kwargs["thinking"] = thinking_param
     else:
-        kwargs["temperature"] = 0.0  # thinking 模式不支援 temperature
+        # thinking off → temperature would apply, but modern 4.x models deprecate
+        # it (400). Only set it for models that still accept it.
+        kwargs.update(_maybe_temperature(model))
 
     client = Anthropic()
     with client.messages.stream(**kwargs) as stream:

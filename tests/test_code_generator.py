@@ -19,10 +19,29 @@ from src.tools.code_generator import (
     _build_cli_prompt,
     _call_codex_cli,
     _call_claude_cli,
+    _maybe_temperature,
     VALID_BACKENDS,
     generate_and_execute,
 )
 from src.tools.code_executor import CodeExecutionResult
+
+
+# ============================================================
+# temperature param construction — modern reasoning models DEPRECATE
+# `temperature` (Anthropic 4.x / OpenAI gpt-5.x 400 on it). Code gen must omit
+# it for those, keep it for legacy models. (Regression: live OpenAI code-gen hit
+# `400 invalid_request_error: temperature is deprecated for this model`.)
+# ============================================================
+# The ACTIVE models (the only ones worth testing — older models aren't used and
+# aren't cheaper) ALL deprecate temperature, so code gen must omit it for every
+# one of them. The helper keeps a defensive legacy fallback, but that path is for
+# models we don't run.
+@pytest.mark.parametrize("model", [
+    "claude-sonnet-4-6", "claude-opus-4-8", "gpt-5.4", "gpt-5.5", "gpt-5.4-mini",
+    "us.anthropic.claude-opus-4-8",  # Bedrock-style prefix still matches
+])
+def test_maybe_temperature_omitted_for_active_models(model):
+    assert _maybe_temperature(model) == {}
 
 
 # ============================================================
