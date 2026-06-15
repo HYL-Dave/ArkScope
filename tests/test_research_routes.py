@@ -155,6 +155,73 @@ def test_list_messages_422_for_blank_thread_id(store):
     assert ei.value.status_code == 422
 
 
+@pytest.mark.parametrize("provider,module", [
+    ("anthropic", "src.agents.anthropic_agent.agent"),
+    ("openai", "src.agents.openai_agent.agent"),
+])
+def test_query_stream_threads_history_into_provider(store, monkeypatch, provider, module):
+    """C-2c: /query/stream must fetch prior thread turns and pass them as
+    `history` to the provider's run_query_stream — fetched BEFORE persisting this
+    turn's user message (so the current turn is not duplicated). Mocks the
+    provider (cheap; no real agent)."""
+    import asyncio
+
+    store.ensure_thread(id="t1", title="prev")
+    store.append_message(thread_id="t1", role="user", content="prev q")
+    store.append_message(thread_id="t1", role="assistant", content="prev a")
+
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history):
+        captured["question"] = question
+        captured["history"] = history
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": provider, "model": "m", "token_usage": {}})
+
+    monkeypatch.setattr(f"{module}.run_query_stream", fake_stream)
+
+    req = q.QueryRequest(question="follow up", provider=provider, model=None, thread_id="t1", ticker="NVDA")
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    # history = ONLY the 2 prior turns ({role,content}), NOT the current "follow up"
+    assert captured["history"] == [
+        {"role": "user", "content": "prev q"},
+        {"role": "assistant", "content": "prev a"},
+    ]
+    # agent receives the ticker-framed question; the store keeps the raw one
+    assert captured["question"] == "針對 NVDA：follow up"
+    assert store.list_messages("t1")[-1].content == "ok"  # assistant turn persisted after
+
+
+def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
+    """Without a (valid) thread_id, no persistence and history=[] (single-turn)."""
+    import asyncio
+
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history):
+        captured["history"] = history
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": "anthropic", "model": "m", "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", fake_stream)
+    req = q.QueryRequest(question="hi", provider="anthropic", model=None, thread_id=None, ticker=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    assert captured["history"] == []
+    assert store.list_threads() == []  # nothing persisted without a thread_id
+
+
 def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
     """An unknown provider returns early without ever calling the agent — but the
     user turn was persisted eagerly, so the error terminal must persist an
