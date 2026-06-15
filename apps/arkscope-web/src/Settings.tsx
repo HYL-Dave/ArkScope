@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   addCredential,
+  importOAuthCredential,
   bootstrapMarketData,
   deleteCredential,
   discoverModels,
@@ -1095,6 +1096,11 @@ function ProviderSection({
   const [renames, setRenames] = useState<Record<string, string>>({});
   const [providerMsg, setProviderMsg] = useState<string | null>(null);
   const [providerErr, setProviderErr] = useState<string | null>(null);
+  // Claude setup-token import (anthropic only). The token is held in form state
+  // only until submit, then cleared — it never persists in React beyond that.
+  const [claudeAlias, setClaudeAlias] = useState("");
+  const [claudeLabel, setClaudeLabel] = useState("");
+  const [claudeToken, setClaudeToken] = useState("");
 
   async function addKey(provider: ModelProvider) {
     const alias = (newAlias[provider] ?? "").trim();
@@ -1118,6 +1124,34 @@ function ProviderSection({
       setProviderMsg(`${provider} key 已新增並設為 active。`);
       await onRefresh();
     } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function importClaudeToken() {
+    const token = claudeToken.trim();
+    if (!token) {
+      setProviderErr("Claude setup-token 不可為空");
+      return;
+    }
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await importOAuthCredential({
+        provider: "anthropic",
+        auth_mode: "claude_code_oauth",
+        alias: claudeAlias.trim() || "Claude subscription",
+        token,
+        account_label: claudeLabel.trim() || undefined,
+        make_active: true,
+      });
+      setClaudeToken(""); // clear the token from state immediately on success
+      setClaudeAlias("");
+      setClaudeLabel("");
+      setProviderMsg("Claude setup-token 已匯入（存入 token-store，未存入 credential DB）。");
+      await onRefresh();
+    } catch (e) {
+      setClaudeToken(""); // also clear on failure — don't keep the token around
       setProviderErr(e instanceof Error ? e.message : String(e));
     }
   }
@@ -1226,6 +1260,44 @@ function ProviderSection({
                   新增並設為 active
                 </button>
               </div>
+              {provider === "anthropic" && (
+                <div className="credential-add-box oauth-import-box">
+                  <p className="muted tiny" style={{ marginBottom: 8 }}>
+                    匯入 Claude setup-token（訂閱登入）。<strong>這不是 Anthropic API key。</strong>
+                    Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
+                    用終端機 <code className="mono">claude setup-token</code> 產生後貼上。
+                  </p>
+                  <label className="field">
+                    <span>顯示名稱（可留空）</span>
+                    <input
+                      value={claudeAlias}
+                      placeholder="Claude subscription"
+                      onChange={(e) => setClaudeAlias(e.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>顯示名稱／帳號標籤（可留空）</span>
+                    <input
+                      value={claudeLabel}
+                      placeholder="例如 Pro / Max"
+                      onChange={(e) => setClaudeLabel(e.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Claude setup-token</span>
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={claudeToken}
+                      placeholder="貼上 claude setup-token 產生的 token"
+                      onChange={(e) => setClaudeToken(e.target.value)}
+                    />
+                  </label>
+                  <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken()}>
+                    匯入 setup-token
+                  </button>
+                </div>
+              )}
               <CredentialList
                 credentials={credentials}
                 renames={renames}
@@ -1272,7 +1344,9 @@ function ProviderSection({
               </div>
               <p className="muted tiny">
                 可在此新增本機 API key credential（存於本機 profile DB）；env/config/.env 與 key pool 為唯讀來源。
-                OAuth / setup-token 目前僅顯示為 credential 類型，匯入入口與訂閱登入尚在規劃中（auth-driver slice）。
+                {provider === "anthropic"
+                  ? " Claude setup-token 可由上方匯入（token 存 token-store/keyring，不進 credential DB）；OpenAI ChatGPT OAuth 匯入規劃中。"
+                  : " OpenAI ChatGPT OAuth 匯入規劃中（auth-driver slice）。"}
               </p>
             </div>
           );

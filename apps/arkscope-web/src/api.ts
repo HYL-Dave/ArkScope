@@ -551,6 +551,21 @@ export function listCredentials(): Promise<{ credentials: Record<ModelProvider, 
   return getJSON<{ credentials: Record<ModelProvider, ProviderCredential[]> }>("/config/credentials", 8_000);
 }
 
+// Import a subscription OAuth/setup token. v1: anthropic + claude_code_oauth
+// (Claude setup-token). The token goes to the token-store/keyring — NOT the
+// credential secret column — so this is a DIFFERENT endpoint from addCredential.
+export function importOAuthCredential(body: {
+  provider: ModelProvider;
+  auth_mode: "claude_code_oauth" | "chatgpt_oauth";
+  alias: string;
+  token: string;
+  account_label?: string;
+  expires_at?: string;
+  make_active: boolean;
+}): Promise<{ credential: ProviderCredential }> {
+  return sendJSON<{ credential: ProviderCredential }>("/config/credentials/oauth/import", "POST", body, 8_000);
+}
+
 export function addCredential(body: {
   provider: ModelProvider;
   // user-settable subset (api_key_pool is env-derived, not created via the form)
