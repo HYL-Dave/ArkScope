@@ -219,6 +219,45 @@ def test_add_rejects_oauth_modes_and_bogus(store):
     assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxx").auth_type == "api_key"
 
 
+@pytest.mark.parametrize("bad", ["sk-a\nINJECT=evil", "sk-a\rfoo", "sk-a\tb"])
+def test_add_rejects_control_chars_in_secret(store, bad):
+    # a newline in a secret would break the .env export line (truncating the
+    # secret + injecting a spurious KEY=value); reject control chars at the
+    # store boundary so a corrupt/injected secret never persists.
+    with pytest.raises(ValueError):
+        store.add(provider="openai", auth_type="api_key", alias="k", secret=bad)
+
+
+@pytest.mark.parametrize("bad_alias", ["a\nINJECT=evil", "a\rb", "a\tb"])
+def test_add_rejects_control_chars_in_alias(store, bad_alias):
+    # a newline in an alias would break OUT of its '# comment' line on export and
+    # inject an arbitrary env var into the .env; reject at the boundary.
+    with pytest.raises(ValueError):
+        store.add(provider="openai", auth_type="api_key", alias=bad_alias, secret="sk-okkey1234")
+
+
+def test_add_rejects_quote_wrapped_secret(store):
+    # a fully quote-wrapped secret is silently de-quoted by the loader on
+    # re-import (round-trip corruption); reject so the stored form is canonical.
+    with pytest.raises(ValueError):
+        store.add(provider="openai", auth_type="api_key", alias="k", secret='"sk-wrapped123"')
+    # an interior quote (not a wrapping pair) is fine
+    assert store.add(provider="openai", auth_type="api_key", alias="k2", secret='sk-mid"quote9').secret == 'sk-mid"quote9'
+
+
+def test_add_oauth_rejects_control_chars_in_alias(store):
+    with pytest.raises(ValueError):
+        store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="x\nINJECT=evil")
+
+
+def test_update_rejects_control_chars(store):
+    k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-okkey1234")
+    with pytest.raises(ValueError):
+        store.update(f"local:{k.id}", secret="sk-a\nINJECT=evil")
+    with pytest.raises(ValueError):
+        store.update(f"local:{k.id}", alias="a\nINJECT=evil")
+
+
 def test_add_rejects_api_key_pool(store):
     # api_key_pool is an env-compat READ representation only (provider_credentials
     # still renders pool inventory rows from a comma-separated env var). A STORED

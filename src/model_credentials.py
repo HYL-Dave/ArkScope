@@ -143,6 +143,24 @@ class StoredCredential:
     account_label: str | None = None
 
 
+def _ensure_no_control_chars(value: str, what: str) -> None:
+    """Reject C0 control chars (newline/CR/tab/…). They would let a value break a
+    .env export line: a newline in a secret truncates it and injects spurious
+    lines; a newline in an alias breaks out of its ``# comment`` and injects an
+    arbitrary ``KEY=value`` on re-import."""
+    if any(ord(ch) < 0x20 for ch in value):
+        raise ValueError(f"{what} must not contain control characters (newline/tab/etc.)")
+
+
+def _validate_secret(secret: str) -> None:
+    """Store-boundary guard for an api_key secret: no control chars, and not
+    fully quote-wrapped (the loader de-quotes a wrapped value on re-import, which
+    would silently corrupt the secret across an export round-trip)."""
+    _ensure_no_control_chars(secret, "secret")
+    if unquote_env_value(secret) != secret:
+        raise ValueError("secret must not be wrapped in quotes — remove the surrounding quotes")
+
+
 class CredentialStore:
     """Local SQLite credential store.
 
@@ -283,6 +301,8 @@ class CredentialStore:
         secret = secret.strip()
         if not secret:
             raise ValueError("secret is required")
+        _ensure_no_control_chars(alias, "alias")
+        _validate_secret(secret)
         now = _now()
         with self._write_lock, self._connect() as conn:
             if make_active:
@@ -321,6 +341,9 @@ class CredentialStore:
         if provider != _expected:
             raise ValueError(f"auth_mode {auth_mode!r} is not valid for provider {provider!r} (expected {_expected!r})")
         alias = alias.strip() or f"{provider} {auth_mode}"
+        _ensure_no_control_chars(alias, "alias")
+        if account_label:
+            _ensure_no_control_chars(account_label, "account_label")
         now = _now()
         with self._write_lock, self._connect() as conn:
             if make_active:
@@ -369,11 +392,13 @@ class CredentialStore:
             if alias is not None:
                 clean_alias = alias.strip()
                 if clean_alias:
+                    _ensure_no_control_chars(clean_alias, "alias")
                     sets.append("alias = ?")
                     params.append(clean_alias)
             if secret is not None:
                 clean_secret = secret.strip()
                 if clean_secret:
+                    _validate_secret(clean_secret)
                     sets.append("secret = ?")
                     params.append(clean_secret)
             if active is not None:

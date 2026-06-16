@@ -14,6 +14,7 @@ import pytest
 
 from src.auth_drivers import PlaintextTokenStore
 from src.auth_drivers.token_store import StoredTokenRecord
+from src.env_keys import unquote_env_value
 from src.model_credentials import (
     CredentialStore,
     export_env_credentials,
@@ -27,13 +28,15 @@ def store(tmp_path):
 
 
 def _parse_env(text: str) -> dict[str, str]:
-    # mimic a .env load: skip blank/comment lines, split on first '='
+    # mimic the PRODUCTION loader (src.env_keys.ensure_env_loaded): skip
+    # blank/comment lines, partition on first '=', then unquote_env_value — NOT a
+    # weaker v.strip(), so the round-trip is asserted the way it actually loads.
     env: dict[str, str] = {}
     for line in text.splitlines():
         s = line.strip()
         if s and not s.startswith("#") and "=" in s:
             k, _, v = s.partition("=")
-            env[k.strip()] = v.strip()
+            env[k.strip()] = unquote_env_value(v)
     return env
 
 
@@ -71,6 +74,23 @@ def test_export_excludes_oauth_token(store, tmp_path):
     assert "setup-tok-SECRET-zzz" not in text  # token never exported
     assert "ANTHROPIC_API_KEY" not in text  # OAuth is not written as a key
     assert "my claude" in text and "not exported" in text  # only a commented stub
+
+
+def test_export_never_emits_an_oauth_rows_secret(store):
+    # defense-in-depth: even a LEGACY OAuth row with an (illegally) non-NULL
+    # secret column must never be promoted to a key var — export filters api_key
+    # rows by `and r.secret` and OAuth rows by auth_type only (comment stub).
+    with store._connect() as conn:
+        conn.execute(
+            "INSERT INTO llm_credentials "
+            "(provider, auth_type, alias, secret, active, created_at, updated_at) "
+            "VALUES (?,?,?,?,0,?,?)",
+            ("anthropic", "claude_code_oauth", "legacy oauth", "tok-LEAK-should-not-appear", "t", "t"),
+        )
+        conn.commit()
+    text = export_env_credentials(store)
+    assert "tok-LEAK-should-not-appear" not in text  # OAuth secret never exported as a key
+    assert "ANTHROPIC_API_KEY" not in text
 
 
 def test_export_roundtrips_secrets_and_active(store, tmp_path):
