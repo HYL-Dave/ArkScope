@@ -152,7 +152,7 @@ no token bytes ever appear in the exported file).
 ## 6. Adversarial-review must-fixes (folded in)
 
 1. ✅ **Export dedup** — suppress env rows when an active DB row exists; one-row test (§5).
-2. ✅ **Scoring key safe move** — `--api-keys-file` ALREADY exists (`score_ibkr_news.py:746`); its *default* reads `OPENAI_API_KEYS` and the common documented invocations pass no key flag. Removing the distinct scoring key would make default runs silently fall back to `OPENAI_API_KEY` (the duplicate account, lost rotation, no error). So **either** change the scorer's default to read a scorer-private key file **or** keep the scoring key out of the inventory by another mechanism — **plus a regression test on a default `--mode sentiment` run**. (Open question §10 picks the path.)
+2. ✅ **Scoring key safe move** — `--api-keys-file` ALREADY exists (`score_ibkr_news.py:746`); its *default* reads `OPENAI_API_KEYS` and the common documented invocations pass no key flag. Removing the distinct scoring key would make default runs silently fall back to `OPENAI_API_KEY` (the duplicate account, lost rotation, no error). So **either** change the scorer's default to read a scorer-private key file **or** keep the scoring key out of the inventory by another mechanism — **plus a regression test on a default `--mode sentiment` run**. (§10.2 decision: scorer-private `config/scoring_keys.txt`, read as default-when-present.)
 3. ✅ **Enforce no `api_key_pool` DB rows** — reject in `add()` (§4.2).
 4. ✅ **Factual corrections** — `set_default_openai_client` exists (call it); 7 sync Anthropic sites, exclude `model_credentials.py:722` (§3).
 5. ✅ **Single-pass import dedup** (§4.1, §5).
@@ -194,7 +194,7 @@ token-store.
 
 | Slice | Scope | Status |
 |---|---|---|
-| **0** `.env` unquote hygiene | `unquote_env_value` + route ALL production loaders (env_keys, cli, db_config via helper; collectors/training inlined) | ✅ `074e227` + full production sweep. ⚠️ 9 test-local `load_env` helpers left as separate hygiene |
+| **0** `.env` unquote hygiene | `unquote_env_value` + route ALL production loaders (env_keys, cli, db_config via helper; collectors/training inlined) | ✅ `074e227` (helper + EODHD) + sweep `41b4aaf` (rest of production). ⚠️ 9 test-local `load_env` helpers left as separate hygiene |
 | **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
 | **(hygiene)** dead-config removal | Supabase block + reader-less FMP value removed from gitignored `.env`; secret-bearing backup DELETED | ✅ done (`.env` ignored, no commit). ⚠️ user must revoke Supabase service-role key + DB pw server-side |
 | **3** import ←`.env` + migration shim | single-pass explode+dedup → named rows; reject `api_key_pool` in `add()`; scoring-key default fix + regression test | ⏳ gated on approval |
