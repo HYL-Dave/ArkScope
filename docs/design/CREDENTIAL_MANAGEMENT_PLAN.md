@@ -94,7 +94,9 @@ process-global can't express "this construction uses account B").
 ## 4. OpenAI multi-key plan (kills the `[0]/[1]` confusion)
 
 The `OPENAI_API_KEYS` comma-pool → **≥2 first-class `api_key` rows**, each with a
-stable editable **alias** (never positional `OPENAI_API_KEYS[idx]`).
+stable editable **alias** (never positional `OPENAI_API_KEYS[idx]`). **Alias
+default = source-aware** (gpt-5.5, not generic A/B): `OPENAI_API_KEY` → "OpenAI
+primary"; the distinct pool key → "OpenAI scoring/free-tier" — editable in Settings.
 
 1. **Explode + dedup on import** (single pass — review fix): gather every key
    from `OPENAI_API_KEY` + `OPENAI_API_KEYS` into one list, collapse to a dict
@@ -192,9 +194,9 @@ token-store.
 
 | Slice | Scope | Status |
 |---|---|---|
-| **0** `.env` unquote hygiene | `unquote_env_value` + route loaders | ✅ `074e227` |
+| **0** `.env` unquote hygiene | `unquote_env_value` + route ALL production loaders (env_keys, cli, db_config via helper; collectors/training inlined) | ✅ `074e227` + full production sweep. ⚠️ 9 test-local `load_env` helpers left as separate hygiene |
 | **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
-| **(hygiene)** Supabase dead-config removal | gitignored `.env`; separate from this design | ✅ done (no commit; `.env` ignored) |
+| **(hygiene)** dead-config removal | Supabase block + reader-less FMP value removed from gitignored `.env`; secret-bearing backup DELETED | ✅ done (`.env` ignored, no commit). ⚠️ user must revoke Supabase service-role key + DB pw server-side |
 | **3** import ←`.env` + migration shim | single-pass explode+dedup → named rows; reject `api_key_pool` in `add()`; scoring-key default fix + regression test | ⏳ gated on approval |
 | **4** export →`.env` | canonical lines; env-row dedup fix; OAuth-exclusion security test | ⏳ after 3 |
 | **5** Settings: named rows + set-active (key↔key & key↔OAuth) + alias edit + provenance | route unit tests (handler-direct, fake DAL) | ⏳ after 3 |
@@ -202,25 +204,21 @@ token-store.
 
 ---
 
-## 10. Open questions (need your call)
+## 10. Decisions (resolved with gpt-5.5 — locked for Slices 3–6)
 
-1. **Alias defaults** — when exploding `OPENAI_API_KEYS`, default to
-   `OpenAI free-tier A/B`, or you'll name them yourself in Settings after import?
-   (Editable either way.)
-2. **Scoring-key path** — confirm the batch scorer should own its key in a
-   private file (NOT the Settings inventory). Path? e.g. `config/scoring_keys.txt`
-   (gitignored). I will change the scorer's *default* to read it (else default
-   runs silently fall back to the wrong account).
-3. **Secret rotation** — `SUPABASE_SERVICE_ROLE_KEY` + the plaintext DB password
-   that were on `config/.env:127/132` are removed from the file but must be
-   treated as **compromised**: revoke on the Supabase side (I can't). Confirm done.
-4. **api_key at-rest** — keep api_key secrets plaintext in `llm_credentials`
-   (`0o600`, = today's `.env` exposure), or add a follow-up slice to move them
-   onto the keyring the token-store already uses?
-5. **External readers of `OPENAI_API_KEYS`** — any tool besides the scorer reads
-   the comma form directly? (It won't exist post-migration.)
-6. **OAuth portability** — ever need to move a Claude setup-token between machines
-   without re-running `claude setup-token`? If yes I add an explicit `0o600`
-   token-bundle export (default OFF); else it's left out entirely.
-7. **Mid-session OpenAI switch** — switching the active OpenAI key applies to the
-   NEXT `Runner.run`, not an in-flight query. Acceptable?
+1. **Alias defaults** — ✅ source-aware, NOT generic A/B: `OPENAI_API_KEY` →
+   "OpenAI primary"; the distinct pool key → "OpenAI scoring/free-tier". Editable.
+2. **Scoring-key path** — ✅ scorer owns its key in `config/scoring_keys.txt`
+   (gitignored), read by `score_ibkr_news.py` as the **default when present**
+   (before the `OPENAI_API_KEY` fallback). Regression test: a default
+   `--mode sentiment` run picks that file, not `OPENAI_API_KEY`.
+3. **Secret rotation** — ✅ backup DELETED + Supabase/FMP values removed from
+   `.env` this turn. ⚠️ remaining USER action: revoke `SUPABASE_SERVICE_ROLE_KEY`
+   + the old DB password on the Supabase side (I can't reach it).
+4. **api_key at-rest** — ✅ keep plaintext `0o600` DB for now; keyring-for-api_key
+   is a later hardening slice AFTER S5 wire-in is stable.
+5. **Mid-session OpenAI switch** — ✅ next-query only; never mutate an in-flight Runner.
+6. **OAuth portability** — ✅ default NO (re-auth with `claude setup-token` on the
+   new machine); a `0o600` token-bundle export stays explicit + OFF by default.
+7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
+   key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
