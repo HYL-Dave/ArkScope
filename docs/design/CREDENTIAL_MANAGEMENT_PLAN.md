@@ -198,7 +198,7 @@ token-store.
 | **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
 | **(hygiene)** dead-config removal | Supabase block + reader-less FMP value removed from gitignored `.env`; secret-bearing backup DELETED | ✅ done (`.env` ignored, no commit). ⚠️ user must revoke Supabase service-role key + DB pw server-side |
 | **3** import ←`.env` core | reject `api_key_pool` in `add()` `7e55624` (C3a); `import_env_credentials()` single-pass explode+dedup → named rows `519820c` (C3b); scorer defaults to `config/scoring_keys.txt` `b877fb2` (C3c). Pre-commit `ed22355` (gitignore scoring_keys). | ✅ core done (TDD, 122 tests). ⏳ route/CLI/first-run **shim** + the real apply step (write `scoring_keys.txt`, edit real `.env`, run import on profile DB → counts/labels only) deferred to the wire-in |
-| **4** export →`.env` | canonical lines; env-row dedup fix; OAuth-exclusion security test | ⏳ after 3 |
+| **4** export →`.env` + round-trip | env-vs-DB dedup `0fca212` (C4a); `export_env_credentials` + importer reads `ARKSCOPE_*` `b8ee880` (C4b/C4c). Format = **interop** (user-chosen): active → bare `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, extras → `ARKSCOPE_<PROVIDER>_KEY__<slug>`, OAuth → commented stub (no token; export has no token-store access). Aliases on own comment line (loader doesn't strip inline `#`). | ✅ core done (TDD, 140 tests). ⏳ thin file-writer (chmod 0600) + CLI/route wiring deferred to the shim |
 | **5** Settings: named rows + set-active (key↔key & key↔OAuth) + alias edit + provenance | route unit tests (handler-direct, fake DAL) | ⏳ after 3 |
 | **6** **S5 WIRE-IN** (LAST) | `client_sync()` + resolver + 7-site swap + per-run OpenAI client; OAuth branch | ⏳ HARD-GATED: user approval + parity/probes; flips live loop off implicit-env |
 
@@ -222,3 +222,26 @@ token-store.
    new machine); a `0o600` token-bundle export stays explicit + OFF by default.
 7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
    key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
+
+---
+
+## 11. Slice 4 known round-trip behaviors (verified, accepted)
+
+Two empirical skeptics attacked the exporter; **security verdict: export cannot
+leak a token** (it takes only the store — no token-store access — and renders
+OAuth rows as comment stubs; proven against a token in a separate store and a
+legacy non-NULL-secret OAuth row). Findings fixed in `f196da3` (control-char +
+quote-wrapped rejection at the store boundary). Two behaviors are **accepted by
+design**, documented so they aren't mistaken for bugs:
+
+- **Active key's alias normalizes on re-import.** The active key is exported to
+  the bare `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` var (the interop choice) — a
+  vanilla env var has no alias — so on re-import it becomes "`<Provider> primary`".
+  **Secrets and which-key-is-active round-trip faithfully**; only the active
+  key's display name is lost. *Optional enhancement if wanted:* emit a parseable
+  `ARKSCOPE_ACTIVE_<PROVIDER>_ALIAS=<alias>` data line and have import apply it —
+  deferred unless you want it (adds a var to the interop format).
+- **A none-active store auto-activates the first key on import** (C3b's documented
+  behavior: set active iff the provider has none). So export(none-active) → import
+  yields one active. Acceptable since a real store always has one active per
+  provider; flagged for awareness.
