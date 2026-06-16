@@ -74,3 +74,35 @@ def test_scoring_file_strips_and_drops_blanks(tmp_path):
     scoring = _write(tmp_path / "scoring_keys.txt", "sk-a ", "", "  ", "sk-b")
     keys, source = resolve_scoring_keys(scoring_keys_path=scoring, env={})
     assert keys == ["sk-a", "sk-b"] and source == "scoring_keys.txt"
+
+
+def test_scoring_path_that_is_a_directory_falls_through(tmp_path):
+    # a path that exists but is NOT a regular file (dir / unreadable) must fall
+    # through to env, not crash on open() — guard with is_file(), not exists().
+    d = tmp_path / "scoring_keys.txt"
+    d.mkdir()
+    keys, source = resolve_scoring_keys(scoring_keys_path=d, env={"OPENAI_API_KEY": "sk-env1"})
+    assert keys == ["sk-env1"] and source == "OPENAI_API_KEY"
+
+
+def test_default_path_resolves_to_project_root(tmp_path, monkeypatch):
+    # exercise the IMPLICIT defaults main() relies on: scoring_keys_path=None ->
+    # PROJECT_ROOT/config/scoring_keys.txt, env=None -> live os.environ.
+    import scripts.scoring.score_ibkr_news as m
+
+    monkeypatch.setattr(m, "PROJECT_ROOT", tmp_path)
+    (tmp_path / "config").mkdir()
+    _write(tmp_path / "config" / "scoring_keys.txt", "sk-fromfile1")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fromenv1")
+    keys, source = m.resolve_scoring_keys()  # no args → both defaults
+    assert keys == ["sk-fromfile1"] and source == "scoring_keys.txt"  # default path beats live env
+
+
+def test_default_env_used_when_no_default_file(tmp_path, monkeypatch):
+    import scripts.scoring.score_ibkr_news as m
+
+    monkeypatch.setattr(m, "PROJECT_ROOT", tmp_path)  # no config/scoring_keys.txt here
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fromenv2")
+    monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
+    keys, source = m.resolve_scoring_keys()  # env=None binds to live os.environ
+    assert keys == ["sk-fromenv2"] and source == "OPENAI_API_KEY"

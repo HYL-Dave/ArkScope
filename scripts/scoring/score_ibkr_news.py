@@ -121,7 +121,7 @@ def resolve_scoring_keys(
         return _read_lines(api_keys_file), "api-keys-file"
     if api_key:
         return [api_key], "api-key"
-    if scoring_keys_path and Path(scoring_keys_path).exists():
+    if scoring_keys_path and Path(scoring_keys_path).is_file():
         keys = _read_lines(scoring_keys_path)
         if keys:
             return keys, "scoring_keys.txt"
