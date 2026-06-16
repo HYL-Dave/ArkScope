@@ -143,6 +143,22 @@ def test_write_env_export_summary_never_carries_a_token(store, tmp_path):
     assert "tok-SECRET-zzz" not in (tmp_path / "x.env").read_text()
 
 
+def test_write_env_export_refuses_to_write_through_a_symlink(store, tmp_path):
+    # a symlink at the final path component must NOT be followed — else the
+    # export writes the user's secrets THROUGH it, clobbering an arbitrary file
+    # and relaxing it to 0600. O_NOFOLLOW makes the open fail fast.
+    victim = tmp_path / "victim.conf"
+    victim.write_text("KEEP-THIS=1\n")
+    os.chmod(victim, 0o644)
+    link = tmp_path / "creds.env"
+    os.symlink(str(victim), str(link))
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-x111", make_active=True)
+    with pytest.raises((ValueError, OSError)):
+        write_env_export(str(link), store=store)
+    assert victim.read_text() == "KEEP-THIS=1\n"  # victim untouched
+    assert stat.S_IMODE(os.stat(victim).st_mode) == 0o644  # perms not relaxed
+
+
 def test_export_roundtrips_secrets_and_active(store, tmp_path):
     store.add(provider="openai", auth_type="api_key", alias="OpenAI primary", secret="sk-active111", make_active=True)
     store.add(provider="openai", auth_type="api_key", alias="scoring", secret="sk-extra222", make_active=False)

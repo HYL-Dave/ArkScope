@@ -82,6 +82,22 @@ def test_export_env_route_rejects_blank_path(store, _gate):
     assert ei.value.status_code == 400
 
 
+def test_export_env_route_refuses_symlink_to_arbitrary_file(store, tmp_path, _gate):
+    # a symlink to ANY file (not just config/.env) must be refused — the route's
+    # config/.env realpath-guard is not enough; an islink check covers the rest.
+    victim = tmp_path / "victim.conf"
+    victim.write_text("KEEP=1\n")
+    os.chmod(victim, 0o644)
+    link = tmp_path / "out.env"
+    os.symlink(str(victim), str(link))
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-x111", make_active=True)
+    with pytest.raises(HTTPException) as ei:
+        cr.export_env_route(cr.ExportEnvRequest(path=str(link)), store=store)
+    assert ei.value.status_code == 400
+    assert victim.read_text() == "KEEP=1\n"  # victim untouched
+    assert _gate == []  # refused before the write gate
+
+
 def test_export_env_route_refuses_symlink_to_live_env(store, tmp_path, monkeypatch, _gate):
     # a symlink whose TARGET is the live env must be refused too (realpath, not
     # abspath) — else write_env_export would write THROUGH it and clobber the

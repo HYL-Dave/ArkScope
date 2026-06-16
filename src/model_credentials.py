@@ -794,9 +794,15 @@ def write_env_export(path: str, store: CredentialStore | None = None) -> dict:
     text = export_env_credentials(store)
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
-    # O_CREAT with mode 0600 sets perms only on CREATION; the explicit chmod
-    # after covers a pre-existing file whose perms O_CREAT would not change.
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # O_NOFOLLOW: refuse to write THROUGH a symlink at the final component — else
+    # the export's real secrets would clobber the link target and relax it to
+    # 0600. O_CREAT mode 0600 sets perms on CREATION (no world-readable window);
+    # the chmod after covers a pre-existing regular file O_CREAT would not change.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise ValueError(f"refusing to write export to a symlink/invalid path: {path}") from exc
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
@@ -807,7 +813,8 @@ def write_env_export(path: str, store: CredentialStore | None = None) -> dict:
         for line in text.splitlines()
         if line.strip() and not line.strip().startswith("#") and "=" in line
     ]
-    return {"path": os.path.abspath(path), "key_count": len(vars_written), "vars": vars_written}
+    # realpath so the reported target reflects a resolved (e.g. symlinked-parent) path
+    return {"path": os.path.realpath(path), "key_count": len(vars_written), "vars": vars_written}
 
 
 def _resolve_api_credential(
