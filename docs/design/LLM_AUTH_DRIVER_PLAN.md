@@ -121,7 +121,7 @@ ArkScope's `llm_credentials` table (`model_credentials.py:81-94`) **already** ha
 
 ## 6. Settings UI shape (multi-credential profiles)
 
-Reuse the existing surface: `GET /config/runtime`, `GET/POST/PUT/DELETE /config/credentials`, `provider_credentials()` masked inventory, and the placeholder env rows already rendered (`OPENAI_OAUTH_TOKEN`, `ANTHROPIC_OAUTH_TOKEN`, `ANTHROPIC_SETUP_TOKEN`).
+Reuse the existing surface: `GET /config/runtime`, `GET/POST/PUT/DELETE /config/credentials`, `provider_credentials()` masked inventory, and the lone remaining placeholder env row `OPENAI_OAUTH_TOKEN` (S3 signpost). The two Anthropic env placeholders were removed once the Claude setup-token import shipped — the Claude path now renders as an import-created `local:` `claude_code_oauth` row (token in the token-store), not an env row.
 
 **Per-provider credential list, each row labeled by auth_mode (echoing the driver matrix):**
 

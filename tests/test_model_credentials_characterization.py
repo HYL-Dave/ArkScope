@@ -106,14 +106,19 @@ def test_provider_credentials_local_api_key_row(store, clean_env):
 
 
 def test_provider_credentials_placeholders_use_explicit_modes(store, clean_env):
-    # S1: env placeholder rows now carry the EXPLICIT modes (no generic oauth).
+    # The OpenAI ChatGPT-OAuth placeholder stays as the lone S3 signpost (OpenAI
+    # has no import route yet). The two Anthropic env placeholders are REMOVED:
+    # the working Claude setup-token path renders as an import-created local: row
+    # (see test_provider_credentials_oauth_local_row_no_secret_no_crash), so the
+    # env rows were redundant + misleading.
     inv = provider_credentials(store)
     oa = {c.id: c for c in inv["openai"]}
     an = {c.id: c for c in inv["anthropic"]}
     assert oa["openai:OPENAI_OAUTH_TOKEN"].auth_type == "chatgpt_oauth"
-    assert an["anthropic:ANTHROPIC_OAUTH_TOKEN"].auth_type == "claude_code_oauth"
-    assert an["anthropic:ANTHROPIC_SETUP_TOKEN"].auth_type == "claude_code_oauth"
     assert oa["openai:OPENAI_OAUTH_TOKEN"].can_discover_models is False  # still not a direct key
+    # the two Anthropic env placeholders are gone (superseded by the token-store import row)
+    assert "anthropic:ANTHROPIC_OAUTH_TOKEN" not in an
+    assert "anthropic:ANTHROPIC_SETUP_TOKEN" not in an
 
 
 # --- discovery / test on the api_key path (no-network paths) -----------------

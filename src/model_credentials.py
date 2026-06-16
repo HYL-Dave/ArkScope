@@ -515,24 +515,18 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
     add_api_key("anthropic", "ANTHROPIC_API_KEY", "Anthropic API key")
     add_key_pool("anthropic", "ANTHROPIC_API_KEYS")
 
+    # Lone S3 signpost: OpenAI ChatGPT-OAuth has no import route yet, so — unlike
+    # the Claude setup-token, which now lands as an import-created local: row via
+    # the token-store — there is no live local: row to supersede it. The two
+    # Anthropic env placeholders (ANTHROPIC_OAUTH_TOKEN / ANTHROPIC_SETUP_TOKEN)
+    # were removed: they advertised env vars nothing reads while the real Claude
+    # path is the token-store import (see add_oauth_credential / import route).
     for provider, env_name, auth_type, notes in [
         (
             "openai",
             "OPENAI_OAUTH_TOKEN",
             "chatgpt_oauth",
-            "ChatGPT-OAuth token placeholder (compatibility backend). Not a direct OpenAI API key; discovery/test wired in a later auth-driver slice.",
-        ),
-        (
-            "anthropic",
-            "ANTHROPIC_OAUTH_TOKEN",
-            "claude_code_oauth",
-            "Claude OAuth token placeholder (Agent SDK / claude -p). Not a direct Anthropic API key; wired in a later auth-driver slice.",
-        ),
-        (
-            "anthropic",
-            "ANTHROPIC_SETUP_TOKEN",
-            "claude_code_oauth",
-            "claude setup-token placeholder (Agent SDK / claude -p). Not a direct API key; wired in a later auth-driver slice.",
+            "Planned ChatGPT-OAuth (S3); not read as a credential yet.",
         ),
     ]:
         value = os.environ.get(env_name, "").strip()
