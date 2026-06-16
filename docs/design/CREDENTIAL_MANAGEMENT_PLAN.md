@@ -200,7 +200,8 @@ token-store.
 | **3** import ←`.env` core | reject `api_key_pool` in `add()` `7e55624` (C3a); `import_env_credentials()` single-pass explode+dedup → named rows `519820c` (C3b); scorer defaults to `config/scoring_keys.txt` `b877fb2` (C3c). Pre-commit `ed22355` (gitignore scoring_keys). | ✅ core done (TDD, 122 tests). ⏳ route/CLI/first-run **shim** + the real apply step (write `scoring_keys.txt`, edit real `.env`, run import on profile DB → counts/labels only) deferred to the wire-in |
 | **4** export →`.env` + round-trip | env-vs-DB dedup `0fca212` (C4a); `export_env_credentials` + importer reads `ARKSCOPE_*` `b8ee880` (C4b/C4c). Format = **interop** (user-chosen): active → bare `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, extras → `ARKSCOPE_<PROVIDER>_KEY__<slug>`, OAuth → commented stub (no token; export has no token-store access). Aliases on own comment line (loader doesn't strip inline `#`). | ✅ core done (TDD, 140 tests). ⏳ thin file-writer (chmod 0600) + CLI/route wiring deferred to the shim |
 | **4-hardening** legacy pool inert | `5a68a11`: a stored `api_key_pool` row no longer resolves / shows usable / exports (resolve+inventory+export all api_key-only); env-compat `[idx]` read path intact | ✅ done (TDD, 153 tests; verified inert across resolve/discover/test/inventory/export) |
-| **shim** (gpt-5.5 reorder: BEFORE Slice 5) | export file-writer (chmod 0600) + import/export/**apply** route or CLI so the real profile DB can hold named rows. **apply touches the real `.env` + real profile DB → needs explicit user go; counts/labels output only, no keys.** | ⏳ next; plumbing (file-writer + routes) is pure-code TDD, apply is user-gated |
+| **shim part 1** (plumbing) | `6244605`+`71af447`: `write_env_export` (0600, secure-create + tighten existing) returns counts/labels; `import_env_credentials(dry_run=)` preview; `POST /config/credentials/import-env {dry_run}` (real write gated) + `POST /config/credentials/export-env {path}` (0600, realpath clobber-guard vs live `config/.env`); responses carry no secret. `env_keys.env_file_path()` helper. | ✅ done (TDD, 163 tests; temp file/fake env/temp DB only — real data untouched) |
+| **shim part 2** (apply) | run the import against the real profile DB + write the real scoring_keys.txt + drop the migrated key from real `config/.env` | ⛔ **USER-GATED** — counts/labels output only; preview first via `import-env {dry_run:true}` |
 | **5** Settings: named rows + set-active (key↔key & key↔OAuth) + alias edit + provenance | route unit tests (handler-direct, fake DAL); + partial-unique `(provider) WHERE active=1` index | ⏳ after the shim |
 | **6** **S5 WIRE-IN** (LAST) | `client_sync()` + resolver + 7-site swap + per-run OpenAI client; OAuth branch | ⏳ HARD-GATED: user approval + parity/probes; flips live loop off implicit-env |
 
@@ -224,6 +225,29 @@ token-store.
    new machine); a `0o600` token-bundle export stays explicit + OFF by default.
 7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
    key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
+
+---
+
+## 12. Future direction — per-purpose credential binding (user request, not yet built)
+
+User wants **different features to use different keys, and to optionally share a
+key** ("不同功能…不同的 key…也要允許…相同的 key"). This generalizes today's
+per-provider single-active flag into a **purpose → credential** map:
+
+```
+purpose       -> credential
+research       -> OpenAI primary (or an OAuth credential)
+scoring        -> OpenAI scoring   (config/scoring_keys.txt is the FIRST instance today)
+fundamentals   -> (shared) OpenAI primary
+```
+
+- The scoring-key file split (C3c) is the first concrete instance of per-purpose keys.
+- Same credential allowed for multiple purposes; unset purpose → falls back to the
+  provider's active key.
+- Interacts with the S5 driver resolution (`resolve_active_driver` would become
+  `resolve_driver(provider, purpose)`).
+- **Design slice AFTER Settings GUI (Slice 5) + the live-loop wire-in (Slice 6)** —
+  recorded so it isn't lost; not in the current sequence.
 
 ---
 
