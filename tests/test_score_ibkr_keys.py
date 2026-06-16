@@ -98,6 +98,16 @@ def test_default_path_resolves_to_project_root(tmp_path, monkeypatch):
     assert keys == ["sk-fromfile1"] and source == "scoring_keys.txt"  # default path beats live env
 
 
+def test_whole_quoted_pool_env_fallback(tmp_path):
+    # the OPENAI_API_KEYS fallback must also unwrap a whole-value-quoted pool
+    # before splitting (parity with the credential importer's _split_key_pool).
+    keys, source = resolve_scoring_keys(
+        scoring_keys_path=tmp_path / "absent.txt",
+        env={"OPENAI_API_KEYS": '"sk-a,sk-b"'},
+    )
+    assert keys == ["sk-a", "sk-b"] and source == "OPENAI_API_KEYS"  # no boundary quotes
+
+
 def test_default_env_used_when_no_default_file(tmp_path, monkeypatch):
     import scripts.scoring.score_ibkr_news as m
 

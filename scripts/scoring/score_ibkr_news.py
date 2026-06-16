@@ -77,6 +77,8 @@ import openai
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.env_keys import unquote_env_value  # lightweight, no heavy deps
+
 # Load environment variables from config/.env automatically
 try:
     from dotenv import load_dotenv
@@ -127,7 +129,10 @@ def resolve_scoring_keys(
             return keys, "scoring_keys.txt"
     pool = env.get("OPENAI_API_KEYS")
     if pool:
-        keys = [k.strip() for k in pool.split(",") if k.strip()]
+        # unwrap a whole-value quote (OPENAI_API_KEYS="sk-a,sk-b") before the
+        # split, mirroring the credential importer's _split_key_pool.
+        pool = unquote_env_value(pool)
+        keys = [k for part in pool.split(",") if (k := unquote_env_value(part))]
         if keys:
             return keys, "OPENAI_API_KEYS"
     single = env.get("OPENAI_API_KEY")

@@ -90,15 +90,28 @@ def test_import_handles_both_providers(store):
     assert res["openai"]["activated"] and res["anthropic"]["activated"]
 
 
-def test_import_unquotes_pool_entries(store):
-    # per-entry-quoted pool values must store CLEAN secrets (no literal quotes) —
-    # pool entries get the same unquoting as the single var.
-    import_env_credentials(store, env={"OPENAI_API_KEYS": '"sk-q111","sk-q222"'})
+def test_import_unquotes_whole_pool(store):
+    # WHOLE-VALUE quoting (the form .env.template documents as correct:
+    # OPENAI_API_KEYS="sk-a,sk-b") must unwrap the outer quotes BEFORE the comma
+    # split, so the commas inside are seen and the secrets carry no boundary
+    # quote. (Per-entry quoting "a","b" is invalid dotenv and is not supported.)
+    import_env_credentials(store, env={"OPENAI_API_KEYS": '"sk-q111,sk-q222"'})
     assert {r.secret for r in _openai(store)} == {"sk-q111", "sk-q222"}
 
 
-def test_import_dedups_quoted_pool_against_unquoted_single(store):
-    # a key listed as the unquoted single AND a quoted pool entry must dedup to 1
+def test_import_whole_quoted_pool_dedups_against_single(store):
+    # gpt-5.5's exact regression: single=sk-a, pool='"sk-a,sk-b"' → 2 rows, no
+    # boundary quotes, the unquoted single's "OpenAI primary" wins the collision.
+    import_env_credentials(store, env={"OPENAI_API_KEY": "sk-a", "OPENAI_API_KEYS": '"sk-a,sk-b"'})
+    rows = _openai(store)
+    assert len(rows) == 2
+    assert {r.secret for r in rows} == {"sk-a", "sk-b"}  # not {'"sk-a', 'sk-b"', 'sk-a'}
+    primary = next(r for r in rows if r.secret == "sk-a")
+    assert primary.alias == "OpenAI primary"
+
+
+def test_import_single_quoted_pool_dedups_against_single(store):
+    # a single-entry whole-quoted pool that equals the single var dedups to 1
     import_env_credentials(store, env={"OPENAI_API_KEY": "sk-same1", "OPENAI_API_KEYS": '"sk-same1"'})
     rows = _openai(store)
     assert len(rows) == 1 and rows[0].secret == "sk-same1" and rows[0].alias == "OpenAI primary"

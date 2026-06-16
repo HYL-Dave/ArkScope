@@ -415,9 +415,19 @@ def valid_credential_id(credential_id: str | None) -> bool:
 
 
 def _split_key_pool(raw: str | None) -> list[str]:
+    """Split a comma-separated key pool into clean secrets.
+
+    Unwraps a WHOLE-VALUE quote (``OPENAI_API_KEYS="sk-a,sk-b"`` — the form
+    .env.template documents as correct) BEFORE splitting, so the commas inside
+    the quotes are seen; then unquotes + drops empties per entry. This is the
+    single shared parser for the importer, the credential inventory, and
+    _resolve_api_credential, so they all handle quoting identically. (Per-entry
+    quoting, ``"a","b"``, is invalid dotenv and is not supported.)
+    """
     if not raw:
         return []
-    return [part.strip() for part in raw.split(",") if part.strip()]
+    raw = unquote_env_value(raw)
+    return [part for piece in raw.split(",") if (part := unquote_env_value(piece))]
 
 
 def _seed_models(provider: Provider) -> list[DiscoveredModel]:
@@ -604,13 +614,10 @@ def import_env_credentials(
         single = unquote_env_value(env.get(single_var, ""))
         if single:
             candidates.append((single, f"{label} primary"))
-        for raw in _split_key_pool(env.get(pool_var)):
-            # unquote each pool entry the SAME way as the single var, else a
-            # per-entry-quoted value would store a key with literal quotes and
-            # miss dedup against the unquoted single var.
-            sec = unquote_env_value(raw)
-            if sec:
-                candidates.append((sec, None))  # alias assigned after dedup
+        for sec in _split_key_pool(env.get(pool_var)):
+            # _split_key_pool already unquotes (whole-value + per-entry) and drops
+            # empties, so the secret here matches the unquoted single var for dedup.
+            candidates.append((sec, None))  # alias assigned after dedup
 
         # single-pass dedup by exact secret — first occurrence keeps its alias.
         deduped: dict[str, str | None] = {}
