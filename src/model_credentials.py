@@ -10,6 +10,7 @@ direct API credentials until their provider-specific flow is implemented.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -625,6 +626,17 @@ def import_env_credentials(
         single = unquote_env_value(env.get(single_var, ""))
         if single:
             candidates.append((single, f"{label} primary"))
+        # additional exported keys round-trip under ARKSCOPE_<PROVIDER>_KEY__<slug>
+        # (export writes the active key to the bare var above, extras here). The
+        # alias is recovered from the slug; processed before the pool so a named
+        # alias wins over a positional "pool N" on a secret collision.
+        prefix = _EXPORT_PREFIX[provider]
+        for env_key in sorted(env):
+            if env_key.startswith(prefix):
+                sec = unquote_env_value(env[env_key])
+                if sec:
+                    alias = env_key[len(prefix):].replace("_", " ").strip() or f"{label} key"
+                    candidates.append((sec, alias))
         for sec in _split_key_pool(env.get(pool_var)):
             # _split_key_pool already unquotes (whole-value + per-entry) and drops
             # empties, so the secret here matches the unquoted single var for dedup.
@@ -664,6 +676,74 @@ def import_env_credentials(
         summary[provider] = {"added": added, "skipped": skipped, "activated": activated}
 
     return summary
+
+
+_EXPORT_BARE: dict[Provider, str] = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+_EXPORT_PREFIX: dict[Provider, str] = {
+    "openai": "ARKSCOPE_OPENAI_KEY__",
+    "anthropic": "ARKSCOPE_ANTHROPIC_KEY__",
+}
+
+
+def _alias_slug(alias: str) -> str:
+    """A safe env-var suffix from an alias: lowercase, non-alnum → underscore."""
+    return re.sub(r"[^a-z0-9]+", "_", alias.lower()).strip("_") or "key"
+
+
+def export_env_credentials(store: CredentialStore | None = None) -> str:
+    """Render the api_key credentials as a portable .env block (interop format).
+
+    The ACTIVE api_key per provider → the bare ``OPENAI_API_KEY`` /
+    ``ANTHROPIC_API_KEY`` var (so a vanilla SDK and the scorer still work);
+    additional keys → explicit ``ARKSCOPE_<PROVIDER>_KEY__<alias_slug>`` vars.
+    OAuth credentials are machine-local (their token lives in the token-store,
+    never here) and are emitted ONLY as a commented stub — this function takes
+    just the credential store, has NO token-store access, and so cannot leak a
+    token. Each alias rides on its OWN comment line (never inline, because the
+    loader does not strip inline ``#`` comments and would fold one into the secret).
+    """
+    store = store or CredentialStore()
+    rows = store.list()
+    lines = [
+        "# --- ArkScope LLM credentials (exported) ---",
+        "# Re-import with: arkscope creds import --from-env",
+        "# Private file: keep gitignored + chmod 0600. OAuth/setup tokens are",
+        "# machine-local (token-store/keyring) and are intentionally NOT exported.",
+        "",
+    ]
+    for provider in ("openai", "anthropic"):
+        prows = [r for r in rows if r.provider == provider]
+        api_rows = [r for r in prows if r.auth_type in ("api_key", "api_key_pool") and r.secret]
+        oauth_rows = [r for r in prows if r.auth_type in ("chatgpt_oauth", "claude_code_oauth")]
+        if not api_rows and not oauth_rows:
+            continue
+        block: list[str] = []
+        active_api = next((r for r in api_rows if r.active), None)
+        if active_api:
+            block.append(f"# active: {active_api.alias}")
+            block.append(f"{_EXPORT_BARE[provider]}={active_api.secret}")
+        used: set[str] = set()
+        for r in api_rows:
+            if r is active_api:
+                continue
+            slug = base = _alias_slug(r.alias)
+            n = 2
+            while slug in used:
+                slug = f"{base}_{n}"
+                n += 1
+            used.add(slug)
+            block.append(f"# {r.alias}")
+            block.append(f"{_EXPORT_PREFIX[provider]}{slug}={r.secret}")
+        for r in oauth_rows:
+            tag = " (was active)" if r.active else ""
+            block.append(
+                f"# OAuth credential '{r.alias}'{tag} [{r.auth_type}] is machine-local "
+                f"(token-store/keyring) and is not exported — re-authenticate on the new machine."
+            )
+        lines.append(f"# {provider}")
+        lines.extend(block)
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _resolve_api_credential(
