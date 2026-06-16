@@ -237,10 +237,19 @@ token-store.
 
 ---
 
-## 13. Apply plan (decided 2026-06-17; gated on explicit user "go" + the flag)
+## 13. Apply — ✅ EXECUTED 2026-06-17 (user said go; verified)
 
-Dry-run preview ran clean (read-only, DB unchanged). The real apply, when the
-user says go, sets `ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1` (session-only) and:
+Ran with `ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1` (session-only, not persisted) +
+DB-file & `.env` rollback backups (both gitignored, 0600). **All 3 verifications
+passed:** `config/scoring_keys.txt` = 0600 + gitignored + 2 keys; `.env` has
+`OPENAI_API_KEY` (and `ANTHROPIC_API_KEY`/`DATABASE_URL`) but NOT
+`OPENAI_API_KEYS`; inventory = **2 named openai rows (`local:2` active +
+`local:3` inactive), no `[0]/[1]`**, Anthropic api_key (`local:4`) inactive,
+Claude OAuth (`local:1`) active; scorer reads `scoring_keys.txt` (2 keys,
+rotation preserved). All touched files gitignored → no commit. Rollback backups:
+`data/profile_state.db.preapply-backup-*` + `config/.env.preapply-backup-*`.
+
+The plan that was executed, for reference:
 
 1. **Backup-export** the current DB to a separate 0600 file (NOT the live `.env`).
 2. **Import** the current `.env` → profile DB: openai dedups to **2 named rows**
