@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
+from src.env_keys import unquote_env_value
+
 
 def load_database_url(env_path: Path) -> Optional[str]:
     """Load DATABASE_URL (primary) or SUPABASE_DB_URL (legacy) from .env file.
@@ -27,11 +29,11 @@ def load_database_url(env_path: Path) -> Optional[str]:
                 if line.startswith("#"):
                     continue
                 if line.startswith("DATABASE_URL="):
-                    val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    val = unquote_env_value(line.split("=", 1)[1])
                     if val and val.startswith("postgresql"):
                         dsn = val
                 elif line.startswith("SUPABASE_DB_URL=") and dsn is None:
-                    val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    val = unquote_env_value(line.split("=", 1)[1])
                     if val and val.startswith("postgresql"):
                         dsn = val
     except Exception:
@@ -47,7 +49,7 @@ def load_sslmode(env_path: Path, dsn: str) -> str:
                 for line in f:
                     line = line.strip()
                     if line.startswith("DB_SSLMODE=") and not line.startswith("#"):
-                        return line.split("=", 1)[1].strip().strip('"').strip("'")
+                        return unquote_env_value(line.split("=", 1)[1])
         except Exception:
             pass
     return infer_sslmode(dsn)

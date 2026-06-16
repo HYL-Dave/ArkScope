@@ -679,7 +679,10 @@ def load_env() -> str:
                     if line and not line.startswith('#') and '=' in line:
                         key, value = line.split('=', 1)
                         key = key.strip()
-                        value = value.strip().strip('"').strip("'")
+                        # unquote: strip quotes first, then whitespace (mirrors src.env_keys.unquote_env_value)
+                        value = value.strip()
+                        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                            value = value[1:-1].strip()
                         if key == 'POLYGON_API_KEY' and not value.startswith('your_'):
                             return value
 

@@ -57,7 +57,11 @@ def _load_env_file_once() -> None:
                 if not s or s.startswith("#") or "=" not in s:
                     continue
                 k, _, v = s.partition("=")
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+                # unquote: strip quotes first, then whitespace (mirrors src.env_keys.unquote_env_value)
+                v = v.strip()
+                while len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+                    v = v[1:-1].strip()
+                os.environ.setdefault(k.strip(), v)
         os.environ["_FINNHUB_CAL_CLIENT_ENV_LOADED"] = "1"
     except Exception as exc:
         logger.debug("Finnhub calendar client .env load failed: %s", exc)

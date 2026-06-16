@@ -331,7 +331,11 @@ def _fetch_ibkr_daily(tickers, start_date, end_date):
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     k, v = line.split('=', 1)
-                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    k = k.strip()
+                    # unquote: strip quotes first, then whitespace (mirrors src.env_keys.unquote_env_value)
+                    v = v.strip()
+                    while len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+                        v = v[1:-1].strip()
                     if k.startswith('IBKR_') and k not in os.environ:
                         os.environ[k] = v
 
