@@ -218,6 +218,19 @@ def test_add_rejects_oauth_modes_and_bogus(store):
     assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-xxxxxxxxxx").auth_type == "api_key"
 
 
+def test_add_rejects_api_key_pool(store):
+    # api_key_pool is an env-compat READ representation only (provider_credentials
+    # still renders pool inventory rows from a comma-separated env var). A STORED
+    # local:N pool row is UNRESOLVABLE: _resolve_api_credential derives a pool
+    # secret by parsing an index off the credential id and indexing the env var,
+    # which a DB row has no source for. So pool keys must be stored as individual
+    # api_key rows; add() rejects the pool mode outright.
+    with pytest.raises(ValueError):
+        store.add(provider="openai", auth_type="api_key_pool", alias="p", secret="sk-poolkey12345")
+    # api_key still works (regression)
+    assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-singlekey999").auth_type == "api_key"
+
+
 def test_api_key_rows_leave_oauth_metadata_null(store):
     # api_key rows carry no OAuth metadata. (OAuth metadata roundtrip is covered
     # by test_add_oauth_credential_has_null_secret via add_oauth_credential.)

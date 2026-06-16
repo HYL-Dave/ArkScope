@@ -262,11 +262,19 @@ class CredentialStore:
         expires_at: str | None = None,
         account_label: str | None = None,
     ) -> StoredCredential:
-        # add() is for DIRECT API keys ONLY. OAuth/setup-token modes must go
-        # through add_oauth_credential() so a token can never land in
-        # llm_credentials.secret (it belongs in the token-store).
+        # add() stores a single DIRECT API key ONLY. OAuth/setup-token modes must
+        # go through add_oauth_credential() so a token can never land in
+        # llm_credentials.secret (it belongs in the token-store). api_key_pool is
+        # an env-compat READ representation only — a STORED local:N pool row is
+        # unresolvable (_resolve_api_credential indexes an env var off the id),
+        # so pool keys must be stored as individual api_key rows.
         auth_type = _normalize_auth_type(str(auth_type), provider)  # type: ignore[assignment]
-        if auth_type not in ("api_key", "api_key_pool"):
+        if auth_type == "api_key_pool":
+            raise ValueError(
+                "add() does not store api_key_pool rows; store each pooled key as "
+                "its own api_key credential (the pool is an env-only read view)"
+            )
+        if auth_type != "api_key":
             raise ValueError(
                 f"add() is for direct API keys; use add_oauth_credential() for {auth_type}"
             )
