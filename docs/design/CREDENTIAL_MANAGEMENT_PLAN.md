@@ -215,6 +215,15 @@ token-store.
    (gitignored), read by `score_ibkr_news.py` as the **default when present**
    (before the `OPENAI_API_KEY` fallback). Regression test: a default
    `--mode sentiment` run picks that file, not `OPENAI_API_KEY`.
+8. **`scoring_keys.txt` contents** (decided 2026-06-17) — **BOTH** `OPENAI_API_KEYS`
+   entries go into `config/scoring_keys.txt`, not just the distinct one. Rationale:
+   `OPENAI_API_KEYS` was the scorer's rotation pool (2 keys); putting both in the
+   file is the **semantic-equivalent migration** (keeps batch-scoring capacity;
+   moving only the distinct key would silently halve rotation). The research key
+   `OPENAI_API_KEY` thus serves BOTH research (as `OpenAI primary` in the DB) and
+   scoring (in the file) — the first concrete "same key, multiple purposes" case
+   (§12). When per-purpose binding (§12) lands, scoring can be pulled back into
+   the DB with an explicit `purpose=scoring` tag.
 3. **Secret rotation** — ✅ backup DELETED + Supabase/FMP values removed from
    `.env` this turn. ⚠️ remaining USER action: revoke `SUPABASE_SERVICE_ROLE_KEY`
    + the old DB password on the Supabase side (I can't reach it).
@@ -225,6 +234,33 @@ token-store.
    new machine); a `0o600` token-bundle export stays explicit + OFF by default.
 7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
    key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
+
+---
+
+## 13. Apply plan (decided 2026-06-17; gated on explicit user "go" + the flag)
+
+Dry-run preview ran clean (read-only, DB unchanged). The real apply, when the
+user says go, sets `ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1` (session-only) and:
+
+1. **Backup-export** the current DB to a separate 0600 file (NOT the live `.env`).
+2. **Import** the current `.env` → profile DB: openai dedups to **2 named rows**
+   `OpenAI primary`(=`OPENAI_API_KEY`, active) + `OpenAI pool 1`(the distinct
+   pool key, inactive); `Anthropic primary` (inactive — Claude OAuth stays active,
+   import never steals active).
+3. **Write `config/scoring_keys.txt`** (0600, gitignored) with **BOTH**
+   `OPENAI_API_KEYS` entries (decision §10.8).
+4. **Edit `.env`**: remove the `OPENAI_API_KEYS` line, **keep `OPENAI_API_KEY`**.
+
+All steps report **counts/labels only — never a key value.**
+
+**Pre/post-apply verifications (user-required, must all hold):**
+- `config/scoring_keys.txt` mode is `0600` AND gitignored (`git check-ignore`).
+- `.env` no longer has `OPENAI_API_KEYS`; still has `OPENAI_API_KEY`.
+- Settings inventory: OpenAI = **2 named local rows, no `OPENAI_API_KEYS[0]/[1]`**;
+  Anthropic API key **inactive**, Claude OAuth **active**.
+
+Then **Slice 5** (Settings GUI) — the real GUI hand-test point. **Slice 6** stays
+hard-gated.
 
 ---
 
