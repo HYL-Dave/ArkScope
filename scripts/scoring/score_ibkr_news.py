@@ -86,6 +86,55 @@ try:
 except ImportError:
     pass  # python-dotenv not installed, rely on environment variables
 
+
+def resolve_scoring_keys(
+    *,
+    api_keys_file: "str | None" = None,
+    api_key: "str | None" = None,
+    scoring_keys_path: "Path | None" = None,
+    env: "dict | None" = None,
+) -> "tuple[list[str], str]":
+    """Resolve OpenAI keys for the batch scorer, in priority order:
+
+      1. --api-keys-file (explicit flag)
+      2. --api-key (explicit flag)
+      3. config/scoring_keys.txt (scorer-private default, when present + non-empty)
+      4. OPENAI_API_KEYS (comma-separated rotation pool)
+      5. OPENAI_API_KEY (single)
+
+    Returns ``(keys, source_label)``; the label is for logging, never a secret.
+    The scoring_keys.txt default keeps the scoring key out of the interactive
+    credential inventory: once it migrates out of OPENAI_API_KEYS, a default run
+    reads the private file instead of silently falling back to OPENAI_API_KEY (a
+    now-different account — lost rotation, no error).
+    """
+    if env is None:
+        env = os.environ
+    if scoring_keys_path is None:
+        scoring_keys_path = PROJECT_ROOT / "config" / "scoring_keys.txt"
+
+    def _read_lines(path) -> "list[str]":
+        with open(path) as fh:
+            return [line.strip() for line in fh if line.strip()]
+
+    if api_keys_file:
+        return _read_lines(api_keys_file), "api-keys-file"
+    if api_key:
+        return [api_key], "api-key"
+    if scoring_keys_path and Path(scoring_keys_path).exists():
+        keys = _read_lines(scoring_keys_path)
+        if keys:
+            return keys, "scoring_keys.txt"
+    pool = env.get("OPENAI_API_KEYS")
+    if pool:
+        keys = [k.strip() for k in pool.split(",") if k.strip()]
+        if keys:
+            return keys, "OPENAI_API_KEYS"
+    single = env.get("OPENAI_API_KEY")
+    if single:
+        return [single], "OPENAI_API_KEY"
+    return [], "none"
+
 # =============================================================================
 # API Key Management (multi-key rotation + daily token limit)
 # =============================================================================
@@ -797,24 +846,12 @@ def main():
     global ALLOW_FLEX
     ALLOW_FLEX = args.allow_flex
 
-    keys = []
-    if args.api_keys_file:
-        with open(args.api_keys_file) as f:
-            keys = [line.strip() for line in f if line.strip()]
-    elif args.api_key:
-        keys = [args.api_key]
-    else:
-        # Check OPENAI_API_KEYS first (comma-separated, for rotation)
-        env_keys = os.getenv("OPENAI_API_KEYS")
-        if env_keys:
-            keys = [k.strip() for k in env_keys.split(",") if k.strip()]
-            logging.info(f"Loaded {len(keys)} API keys from OPENAI_API_KEYS env var")
-        else:
-            # Fallback to single OPENAI_API_KEY
-            env_key = os.getenv("OPENAI_API_KEY")
-            if env_key:
-                keys = [env_key]
-                logging.info("Loaded 1 API key from OPENAI_API_KEY env var")
+    keys, key_source = resolve_scoring_keys(
+        api_keys_file=args.api_keys_file,
+        api_key=args.api_key,
+    )
+    if keys:
+        logging.info(f"Loaded {len(keys)} API key(s) from {key_source}")
 
     if not keys and not args.dry_run:
         parser.error("No OpenAI API key provided")
