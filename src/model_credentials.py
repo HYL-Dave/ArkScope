@@ -347,12 +347,14 @@ class CredentialStore:
         existing = self.get(credential_id)
         if not existing:
             return None
-        # An OAuth row's token lives in the token-store, never here — reject any
-        # attempt to write a secret onto it (alias/active updates are fine).
-        if secret is not None and existing.auth_type not in ("api_key", "api_key_pool"):
+        # A secret can only be written onto a plain api_key row (mirrors add()/
+        # C3a). OAuth tokens live in the token-store, and api_key_pool is an
+        # env-compat-only representation whose stored form is unresolvable — both
+        # reject secret writes. alias/active updates remain fine for any row.
+        if secret is not None and existing.auth_type != "api_key":
             raise ValueError(
                 f"cannot set secret on a {existing.auth_type} credential; "
-                "its token lives in the token-store"
+                "use a plain api_key row (OAuth tokens live in the token-store)"
             )
         now = _now()
         with self._write_lock, self._connect() as conn:
@@ -602,8 +604,13 @@ def import_env_credentials(
         single = unquote_env_value(env.get(single_var, ""))
         if single:
             candidates.append((single, f"{label} primary"))
-        for sec in _split_key_pool(env.get(pool_var)):
-            candidates.append((sec, None))  # alias assigned after dedup
+        for raw in _split_key_pool(env.get(pool_var)):
+            # unquote each pool entry the SAME way as the single var, else a
+            # per-entry-quoted value would store a key with literal quotes and
+            # miss dedup against the unquoted single var.
+            sec = unquote_env_value(raw)
+            if sec:
+                candidates.append((sec, None))  # alias assigned after dedup
 
         # single-pass dedup by exact secret — first occurrence keeps its alias.
         deduped: dict[str, str | None] = {}

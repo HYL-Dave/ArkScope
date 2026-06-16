@@ -231,6 +231,26 @@ def test_add_rejects_api_key_pool(store):
     assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-singlekey999").auth_type == "api_key"
 
 
+def test_update_rejects_secret_on_api_key_pool_row(store):
+    # update() must MIRROR add()/C3a: a secret can only be written onto a plain
+    # api_key row. api_key_pool is an env-compat-only representation and a stored
+    # local:N pool row is unresolvable, so writing a secret onto one is rejected.
+    # add() now refuses to create a pool row, so craft a legacy one directly.
+    with store._connect() as conn:
+        conn.execute(
+            "INSERT INTO llm_credentials "
+            "(provider, auth_type, alias, secret, active, created_at, updated_at) "
+            "VALUES (?,?,?,?,0,?,?)",
+            ("openai", "api_key_pool", "legacy-pool", "sk-old00000000", "t", "t"),
+        )
+        conn.commit()
+    pool_row = next(c for c in store.list() if c.auth_type == "api_key_pool")
+    with pytest.raises(ValueError):
+        store.update(f"local:{pool_row.id}", secret="sk-new00000000")
+    # alias/active updates on the pool row are still allowed (no secret write)
+    assert store.update(f"local:{pool_row.id}", alias="renamed").alias == "renamed"
+
+
 def test_api_key_rows_leave_oauth_metadata_null(store):
     # api_key rows carry no OAuth metadata. (OAuth metadata roundtrip is covered
     # by test_add_oauth_credential_has_null_secret via add_oauth_credential.)

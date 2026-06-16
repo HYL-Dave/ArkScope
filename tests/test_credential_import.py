@@ -90,6 +90,36 @@ def test_import_handles_both_providers(store):
     assert res["openai"]["activated"] and res["anthropic"]["activated"]
 
 
+def test_import_unquotes_pool_entries(store):
+    # per-entry-quoted pool values must store CLEAN secrets (no literal quotes) —
+    # pool entries get the same unquoting as the single var.
+    import_env_credentials(store, env={"OPENAI_API_KEYS": '"sk-q111","sk-q222"'})
+    assert {r.secret for r in _openai(store)} == {"sk-q111", "sk-q222"}
+
+
+def test_import_dedups_quoted_pool_against_unquoted_single(store):
+    # a key listed as the unquoted single AND a quoted pool entry must dedup to 1
+    import_env_credentials(store, env={"OPENAI_API_KEY": "sk-same1", "OPENAI_API_KEYS": '"sk-same1"'})
+    rows = _openai(store)
+    assert len(rows) == 1 and rows[0].secret == "sk-same1" and rows[0].alias == "OpenAI primary"
+
+
+def test_import_drops_pool_entries_that_unquote_to_empty(store):
+    import_env_credentials(store, env={"OPENAI_API_KEYS": '"",sk-real1'})
+    assert {r.secret for r in _openai(store)} == {"sk-real1"}  # the "" entry produced no row
+
+
+def test_import_does_not_steal_active_from_oauth_row(store):
+    # a working OAuth credential (e.g. a Claude setup-token) the user set active
+    # must NOT be silently deactivated by an api_key import — switching is an
+    # explicit user action in Settings, never an import side effect.
+    store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="my claude", make_active=True)
+    res = import_env_credentials(store, env={"ANTHROPIC_API_KEY": "sk-ant-new1"})
+    active = [c for c in store.list() if c.provider == "anthropic" and c.active]
+    assert len(active) == 1 and active[0].auth_type == "claude_code_oauth"  # OAuth stays active
+    assert res["anthropic"]["activated"] is None  # import added the key but did not activate it
+
+
 def test_import_summary_carries_no_secret(store):
     env = {"OPENAI_API_KEY": "sk-secretval123", "OPENAI_API_KEYS": "sk-poolsecret456"}
     res = import_env_credentials(store, env=env)
