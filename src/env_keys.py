@@ -22,6 +22,11 @@ _loaded = False
 _loaded_keys: set = set()
 
 
+def env_file_path() -> Path:
+    """The repo's ``config/.env`` path, resolved from this file (cwd-independent)."""
+    return Path(__file__).resolve().parents[1] / "config" / ".env"
+
+
 def unquote_env_value(value: str) -> str:
     """Unwrap an env value: strip surrounding quotes FIRST, then whitespace.
 
@@ -43,7 +48,7 @@ def ensure_env_loaded() -> None:
     if _loaded:
         return
     # src/env_keys.py -> parents[1] == repo root, regardless of cwd.
-    env_path = Path(__file__).resolve().parents[1] / "config" / ".env"
+    env_path = env_file_path()
     if env_path.exists():
         for raw in env_path.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
@@ -71,7 +76,7 @@ def reload_var_from_file(name: str) -> bool:
     Used when an app-managed override is cleared: the var falls back to its
     config/.env value (tracked as file-sourced), or is removed entirely when the
     file doesn't define it. Returns True if the var is now set."""
-    env_path = Path(__file__).resolve().parents[1] / "config" / ".env"
+    env_path = env_file_path()
     value = None
     if env_path.exists():
         for raw in env_path.read_text(encoding="utf-8").splitlines():

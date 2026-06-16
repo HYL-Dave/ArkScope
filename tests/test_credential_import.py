@@ -133,6 +133,22 @@ def test_import_does_not_steal_active_from_oauth_row(store):
     assert res["anthropic"]["activated"] is None  # import added the key but did not activate it
 
 
+def test_import_dry_run_does_not_write_but_previews(store):
+    res = import_env_credentials(store, env={"OPENAI_API_KEY": "sk-x111"}, dry_run=True)
+    assert store.list() == []  # nothing persisted
+    assert res["openai"]["added"] == ["OpenAI primary"]  # but the preview shows what WOULD be added
+    assert res["openai"]["activated"] == "OpenAI primary"
+
+
+def test_import_dry_run_matches_real_import(store):
+    env = {"OPENAI_API_KEY": "sk-x111", "OPENAI_API_KEYS": "sk-y222"}
+    dry = import_env_credentials(store, env=env, dry_run=True)
+    assert store.list() == []
+    real = import_env_credentials(store, env=env, dry_run=False)
+    assert dry == real  # preview == actual outcome
+    assert len(store.list()) == 2
+
+
 def test_import_summary_carries_no_secret(store):
     env = {"OPENAI_API_KEY": "sk-secretval123", "OPENAI_API_KEYS": "sk-poolsecret456"}
     res = import_env_credentials(store, env=env)

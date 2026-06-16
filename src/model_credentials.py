@@ -621,6 +621,7 @@ def import_env_credentials(
     store: CredentialStore | None = None,
     *,
     env: dict[str, str] | None = None,
+    dry_run: bool = False,
 ) -> dict[Provider, dict]:
     """Import api_key credentials from a .env-style mapping into named DB rows.
 
@@ -638,6 +639,8 @@ def import_env_credentials(
 
     Returns a per-provider summary of {added: [aliases], skipped: int,
     activated: alias|None} — labels and counts only, NEVER any secret value.
+    With ``dry_run=True`` nothing is written; the returned summary still reports
+    exactly what a real import WOULD do (a safe preview for the apply step).
     """
     if env is None:
         ensure_env_loaded()
@@ -690,13 +693,14 @@ def import_env_credentials(
                 skipped += 1
                 continue
             make_active = not has_active and activated is None
-            store.add(
-                provider=provider,
-                auth_type="api_key",
-                alias=alias,
-                secret=sec,
-                make_active=make_active,
-            )
+            if not dry_run:
+                store.add(
+                    provider=provider,
+                    auth_type="api_key",
+                    alias=alias,
+                    secret=sec,
+                    make_active=make_active,
+                )
             added.append(alias)
             if make_active:
                 activated = alias
@@ -778,6 +782,32 @@ def export_env_credentials(store: CredentialStore | None = None) -> str:
         lines.extend(block)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def write_env_export(path: str, store: CredentialStore | None = None) -> dict:
+    """Write the exported .env block to ``path`` with owner-only (0600) perms —
+    it contains real api_key secrets. Returns a counts/labels summary (the var
+    NAMES written + a count), NEVER a secret. Creates parent dirs; the file is
+    created 0600 from the start (no world-readable window) and an existing file
+    is tightened to 0600 too.
+    """
+    text = export_env_credentials(store)
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    # O_CREAT with mode 0600 sets perms only on CREATION; the explicit chmod
+    # after covers a pre-existing file whose perms O_CREAT would not change.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+    finally:
+        os.chmod(path, 0o600)
+    vars_written = [
+        line.split("=", 1)[0].strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#") and "=" in line
+    ]
+    return {"path": os.path.abspath(path), "key_count": len(vars_written), "vars": vars_written}
 
 
 def _resolve_api_credential(

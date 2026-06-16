@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import pytest
 
+import os
+import stat
+
 from src.auth_drivers import PlaintextTokenStore
 from src.auth_drivers.token_store import StoredTokenRecord
 from src.env_keys import unquote_env_value
@@ -19,6 +22,7 @@ from src.model_credentials import (
     CredentialStore,
     export_env_credentials,
     import_env_credentials,
+    write_env_export,
 )
 
 
@@ -107,6 +111,36 @@ def test_export_skips_legacy_api_key_pool_row(store):
     text = export_env_credentials(store)
     assert "sk-legacypool999" not in text  # legacy pool secret never exported as a key
     assert "OPENAI_API_KEY=" not in text
+
+
+def test_write_env_export_is_0600_and_contains_keys(store, tmp_path):
+    store.add(provider="openai", auth_type="api_key", alias="OpenAI primary", secret="sk-active111", make_active=True)
+    path = tmp_path / "creds_export.env"
+    summary = write_env_export(str(path), store=store)
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600  # owner-only (it holds real secrets)
+    assert "OPENAI_API_KEY=sk-active111" in path.read_text()  # file has the secret — that's its purpose
+    # the returned SUMMARY is counts/labels only — never a secret
+    assert summary["key_count"] == 1 and "OPENAI_API_KEY" in summary["vars"]
+    assert "sk-active111" not in repr(summary)
+
+
+def test_write_env_export_tightens_existing_world_readable_file(store, tmp_path):
+    path = tmp_path / "pre.env"
+    path.write_text("stale")
+    os.chmod(path, 0o644)  # pre-existing, group/world readable
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-x111", make_active=True)
+    write_env_export(str(path), store=store)
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600  # tightened
+
+
+def test_write_env_export_summary_never_carries_a_token(store, tmp_path):
+    c = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="my claude", make_active=True)
+    tok = PlaintextTokenStore(tmp_path / "tok.json")
+    tok.save(provider="anthropic", auth_mode="claude_code_oauth", credential_id=f"local:{c.id}",
+             record=StoredTokenRecord(access_token="tok-SECRET-zzz"))
+    summary = write_env_export(str(tmp_path / "x.env"), store=store)
+    assert "tok-SECRET-zzz" not in repr(summary)
+    assert "tok-SECRET-zzz" not in (tmp_path / "x.env").read_text()
 
 
 def test_export_roundtrips_secrets_and_active(store, tmp_path):

@@ -1,6 +1,7 @@
 """Config and overview routes."""
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -8,11 +9,15 @@ from pydantic import BaseModel
 from src.api.dependencies import get_credential_store, get_dal, get_oauth_token_store
 from src.api.permissions import require_profile_state_write
 from src.agents.config import save_local_override, task_route
+from src.env_keys import env_file_path
 from src.model_credentials import (
     CredentialStore,
     discover_models,
+    export_env_credentials,
+    import_env_credentials,
     provider_credentials,
     test_model,
+    write_env_export,
 )
 from src.model_routing import (
     Provider,
@@ -231,6 +236,51 @@ def add_credential(
             if c.id == f"local:{cred.id}"
         )
     }
+
+
+class ImportEnvRequest(BaseModel):
+    dry_run: bool = False
+
+
+@router.post("/config/credentials/import-env")
+def import_env_route(
+    body: ImportEnvRequest,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Import api_key credentials from the process env (config/.env) into named
+    DB rows (explode pools, dedup by secret). ``dry_run=True`` previews without
+    writing. Returns counts/labels per provider only — never a secret."""
+    store = _credential_store(store)
+    if not body.dry_run:
+        require_profile_state_write("credential_import_env", {"dry_run": False})
+    summary = import_env_credentials(store, dry_run=body.dry_run)
+    return {"dry_run": body.dry_run, "providers": summary}
+
+
+class ExportEnvRequest(BaseModel):
+    path: str
+
+
+@router.post("/config/credentials/export-env")
+def export_env_route(
+    body: ExportEnvRequest,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Write the api_key credentials to a portable .env file (0600). REFUSES to
+    overwrite the live config/.env — that file holds non-credential keys (data
+    sources, DB) this export does not emit, so writing there would destroy them.
+    Returns counts/labels only — never a secret (the file holds the secrets)."""
+    store = _credential_store(store)
+    path = body.path.strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path is required")
+    if os.path.abspath(path) == os.path.abspath(str(env_file_path())):
+        raise HTTPException(
+            status_code=400,
+            detail="refusing to overwrite the live config/.env (it holds non-credential keys); choose a separate export path",
+        )
+    require_profile_state_write("credential_export_env", {"path": path})
+    return write_env_export(path, store=store)
 
 
 class OAuthImport(BaseModel):
