@@ -21,7 +21,7 @@ from typing import Literal
 import httpx
 from pydantic import BaseModel
 
-from src.env_keys import ensure_env_loaded
+from src.env_keys import ensure_env_loaded, unquote_env_value
 from src.model_routing import MODEL_CATALOG, Provider
 
 CredentialAuthType = Literal["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"]
@@ -556,6 +556,89 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
         )
 
     return out
+
+
+# env vars the importer reads, per provider: (single key, comma-pool). OAuth/
+# setup-token env names are intentionally excluded — those are not api_key rows.
+_IMPORT_ENV_KEYS: list[tuple[Provider, str, str, str]] = [
+    ("openai", "OPENAI_API_KEY", "OPENAI_API_KEYS", "OpenAI"),
+    ("anthropic", "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEYS", "Anthropic"),
+]
+
+
+def import_env_credentials(
+    store: CredentialStore | None = None,
+    *,
+    env: dict[str, str] | None = None,
+) -> dict[Provider, dict]:
+    """Import api_key credentials from a .env-style mapping into named DB rows.
+
+    For each provider, gather the single key (e.g. ``OPENAI_API_KEY``) FIRST then
+    the comma-pool (``OPENAI_API_KEYS``), single-pass dedup by EXACT secret (first
+    occurrence wins its alias), and ADD one ``api_key`` row per distinct secret —
+    never a positional ``[idx]`` label, never a stored ``api_key_pool`` row. The
+    single key gets the alias ``"<Provider> primary"``; surviving pool keys get
+    ``"<Provider> pool N"`` in encounter order.
+
+    Additive + idempotent: a secret already present for the provider is SKIPPED
+    (row count and any user-edited alias/active are left untouched). At most ONE
+    row per provider is set active, and only if the provider has no active row
+    yet (existing active is never stolen).
+
+    Returns a per-provider summary of {added: [aliases], skipped: int,
+    activated: alias|None} — labels and counts only, NEVER any secret value.
+    """
+    if env is None:
+        ensure_env_loaded()
+        env = dict(os.environ)
+    store = store or CredentialStore()
+
+    existing = store.list()
+    summary: dict[Provider, dict] = {}
+
+    for provider, single_var, pool_var, label in _IMPORT_ENV_KEYS:
+        # candidates in priority order: single var first, then pool entries.
+        candidates: list[tuple[str, str | None]] = []
+        single = unquote_env_value(env.get(single_var, ""))
+        if single:
+            candidates.append((single, f"{label} primary"))
+        for sec in _split_key_pool(env.get(pool_var)):
+            candidates.append((sec, None))  # alias assigned after dedup
+
+        # single-pass dedup by exact secret — first occurrence keeps its alias.
+        deduped: dict[str, str | None] = {}
+        for sec, alias in candidates:
+            if sec not in deduped:
+                deduped[sec] = alias
+        pool_n = 0
+        for sec, alias in list(deduped.items()):
+            if alias is None:
+                pool_n += 1
+                deduped[sec] = f"{label} pool {pool_n}"
+
+        present = {c.secret for c in existing if c.provider == provider}
+        has_active = any(c.active for c in existing if c.provider == provider)
+        added: list[str] = []
+        skipped = 0
+        activated: str | None = None
+        for sec, alias in deduped.items():
+            if sec in present:
+                skipped += 1
+                continue
+            make_active = not has_active and activated is None
+            store.add(
+                provider=provider,
+                auth_type="api_key",
+                alias=alias,
+                secret=sec,
+                make_active=make_active,
+            )
+            added.append(alias)
+            if make_active:
+                activated = alias
+        summary[provider] = {"added": added, "skipped": skipped, "activated": activated}
+
+    return summary
 
 
 def _resolve_api_credential(
