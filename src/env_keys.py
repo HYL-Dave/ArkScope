@@ -22,6 +22,21 @@ _loaded = False
 _loaded_keys: set = set()
 
 
+def unquote_env_value(value: str) -> str:
+    """Unwrap an env value: strip surrounding quotes FIRST, then whitespace.
+
+    Order matters — a leading/trailing space INSIDE the quotes (as in
+    config/.env's ``EODHD_API_KEY``) is only removed if the quotes come off
+    before the whitespace. The loop tolerates outer whitespace and accidental
+    double-wrapping; an unmatched or lone quote is left intact so a value that
+    legitimately begins with a quote is not corrupted.
+    """
+    s = value.strip()
+    while len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
+        s = s[1:-1].strip()
+    return s
+
+
 def ensure_env_loaded() -> None:
     """Load ``config/.env`` into ``os.environ`` once. No-op if already loaded."""
     global _loaded
@@ -36,7 +51,7 @@ def ensure_env_loaded() -> None:
                 continue
             key, _, value = line.partition("=")
             key = key.strip()
-            value = value.strip().strip('"').strip("'")
+            value = unquote_env_value(value)
             # Only set if not already present — never clobber a real env var.
             if key and value and key not in os.environ:
                 os.environ[key] = value
@@ -65,7 +80,7 @@ def reload_var_from_file(name: str) -> bool:
                 continue
             key, _, val = line.partition("=")
             if key.strip() == name:
-                value = val.strip().strip('"').strip("'")
+                value = unquote_env_value(val)
     if value:
         os.environ[name] = value
         _loaded_keys.add(name)

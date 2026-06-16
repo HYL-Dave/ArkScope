@@ -47,6 +47,8 @@ from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
+from src.env_keys import unquote_env_value
+
 
 def _load_env():
     """Load API keys from config/.env into environment."""
@@ -63,7 +65,7 @@ def _load_env():
                 continue
             key, _, value = line.partition("=")
             key = key.strip()
-            value = value.strip().strip('"').strip("'")
+            value = unquote_env_value(value)
             # Only set if not already in environment
             if key and value and key not in os.environ:
                 os.environ[key] = value

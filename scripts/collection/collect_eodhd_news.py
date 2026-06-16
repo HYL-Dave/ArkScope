@@ -551,7 +551,13 @@ def load_env() -> str:
                     if line and not line.startswith('#') and '=' in line:
                         key, value = line.split('=', 1)
                         key = key.strip()
-                        value = value.strip().strip('"').strip("'")
+                        # Strip surrounding quotes FIRST, then whitespace, so a
+                        # leading space INSIDE the quotes is removed (mirrors
+                        # src.env_keys.unquote_env_value; inlined to keep this
+                        # collector runnable standalone without src on the path).
+                        value = value.strip()
+                        while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                            value = value[1:-1].strip()
                         if key == 'EODHD_API_KEY' and not value.startswith('your_'):
                             return value
 
