@@ -300,6 +300,33 @@ def test_provider_credentials_keeps_env_key_not_in_db(store, clean_env, monkeypa
     assert "openai:OPENAI_API_KEY" in ids  # a DISTINCT env key still surfaces
 
 
+def _insert_legacy_pool_row(store, *, secret="sk-legacypool999", active=1):
+    with store._connect() as conn:
+        conn.execute(
+            "INSERT INTO llm_credentials "
+            "(provider, auth_type, alias, secret, active, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("openai", "api_key_pool", "legacy pool", secret, active, "t", "t"),
+        )
+        conn.commit()
+    return next(r for r in store.list() if r.auth_type == "api_key_pool")
+
+
+def test_legacy_local_pool_row_not_resolved_as_direct_key(store, clean_env):
+    # C3a blocks NEW pool rows; a crafted LEGACY local api_key_pool row must also
+    # be inert on READ — a stored pool row is unresolvable (its secret is not an
+    # env-indexable pool), so it must not resolve as a direct key.
+    row = _insert_legacy_pool_row(store)
+    assert _resolve_api_credential("openai", f"local:{row.id}", store=store) is None
+
+
+def test_legacy_local_pool_row_marked_unusable_in_inventory(store, clean_env):
+    row = _insert_legacy_pool_row(store)
+    inv = {c.id: c for c in provider_credentials(store)["openai"]}
+    c = inv[f"local:{row.id}"]
+    assert c.can_discover_models is False and c.can_test_models is False  # not a usable direct key
+
+
 def test_update_rejects_secret_on_api_key_pool_row(store):
     # update() must MIRROR add()/C3a: a secret can only be written onto a plain
     # api_key row. api_key_pool is an env-compat-only representation and a stored

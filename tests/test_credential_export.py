@@ -93,6 +93,22 @@ def test_export_never_emits_an_oauth_rows_secret(store):
     assert "ANTHROPIC_API_KEY" not in text
 
 
+def test_export_skips_legacy_api_key_pool_row(store):
+    # a crafted LEGACY local api_key_pool row must NOT be exported as a key
+    # (stored pool rows are retired/unresolvable; only auth_type=api_key exports).
+    with store._connect() as conn:
+        conn.execute(
+            "INSERT INTO llm_credentials "
+            "(provider, auth_type, alias, secret, active, created_at, updated_at) "
+            "VALUES (?,?,?,?,1,?,?)",
+            ("openai", "api_key_pool", "legacy pool", "sk-legacypool999", "t", "t"),
+        )
+        conn.commit()
+    text = export_env_credentials(store)
+    assert "sk-legacypool999" not in text  # legacy pool secret never exported as a key
+    assert "OPENAI_API_KEY=" not in text
+
+
 def test_export_roundtrips_secrets_and_active(store, tmp_path):
     store.add(provider="openai", auth_type="api_key", alias="OpenAI primary", secret="sk-active111", make_active=True)
     store.add(provider="openai", auth_type="api_key", alias="scoring", secret="sk-extra222", make_active=False)

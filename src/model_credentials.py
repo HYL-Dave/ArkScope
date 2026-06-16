@@ -493,7 +493,9 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
     # show as two inventory rows (the duplicate the rework set out to kill).
     db_secrets_by_provider: dict[Provider, set[str]] = {"anthropic": set(), "openai": set()}
     for row in store.list():
-        can_use = row.auth_type in ("api_key", "api_key_pool")
+        # only a plain api_key is a usable direct key; a stored api_key_pool row
+        # is a retired/legacy artifact (C3a blocks new ones) and is unresolvable.
+        can_use = row.auth_type == "api_key"
         if row.secret:
             db_secrets_by_provider[row.provider].add(row.secret)
         local_by_provider[row.provider].append(
@@ -726,6 +728,11 @@ def export_env_credentials(store: CredentialStore | None = None) -> str:
     just the credential store, has NO token-store access, and so cannot leak a
     token. Each alias rides on its OWN comment line (never inline, because the
     loader does not strip inline ``#`` comments and would fold one into the secret).
+
+    Re-import preserves each SECRET and which key is ACTIVE; aliases may normalize
+    (the active key returns as ``<Provider> primary`` since it exports to the bare
+    var; extras via the alias slug). It is a secret+active round-trip, not a
+    byte-faithful alias round-trip.
     """
     store = store or CredentialStore()
     rows = store.list()
@@ -738,7 +745,9 @@ def export_env_credentials(store: CredentialStore | None = None) -> str:
     ]
     for provider in ("openai", "anthropic"):
         prows = [r for r in rows if r.provider == provider]
-        api_rows = [r for r in prows if r.auth_type in ("api_key", "api_key_pool") and r.secret]
+        # only plain api_key rows export as keys; a stored api_key_pool row is a
+        # retired/unresolvable legacy artifact (C3a) and is not exported.
+        api_rows = [r for r in prows if r.auth_type == "api_key" and r.secret]
         oauth_rows = [r for r in prows if r.auth_type in ("chatgpt_oauth", "claude_code_oauth")]
         if not api_rows and not oauth_rows:
             continue
@@ -779,7 +788,9 @@ def _resolve_api_credential(
     ensure_env_loaded()
     store = store or CredentialStore()
     local = store.get(credential_id) if credential_id else None
-    if local and local.provider == provider and local.auth_type in ("api_key", "api_key_pool"):
+    # only a plain api_key local row resolves as a direct key; a stored
+    # api_key_pool row is retired/unresolvable (C3a), so it falls through to None.
+    if local and local.provider == provider and local.auth_type == "api_key":
         return _ResolvedCredential(
             id=f"local:{local.id}",
             provider=provider,
