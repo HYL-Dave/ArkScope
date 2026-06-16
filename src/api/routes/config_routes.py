@@ -274,7 +274,9 @@ def export_env_route(
     path = body.path.strip()
     if not path:
         raise HTTPException(status_code=400, detail="path is required")
-    if os.path.abspath(path) == os.path.abspath(str(env_file_path())):
+    # realpath (not abspath) so a symlink whose target is config/.env — or a
+    # ../-relative path — is also refused; abspath would let it write through.
+    if os.path.realpath(path) == os.path.realpath(str(env_file_path())):
         raise HTTPException(
             status_code=400,
             detail="refusing to overwrite the live config/.env (it holds non-credential keys); choose a separate export path",

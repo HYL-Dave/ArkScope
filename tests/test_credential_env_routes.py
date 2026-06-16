@@ -80,3 +80,20 @@ def test_export_env_route_rejects_blank_path(store, _gate):
     with pytest.raises(HTTPException) as ei:
         cr.export_env_route(cr.ExportEnvRequest(path="   "), store=store)
     assert ei.value.status_code == 400
+
+
+def test_export_env_route_refuses_symlink_to_live_env(store, tmp_path, monkeypatch, _gate):
+    # a symlink whose TARGET is the live env must be refused too (realpath, not
+    # abspath) — else write_env_export would write THROUGH it and clobber the
+    # live env. Point env_file_path at a temp 'live env' so the real one is never
+    # at risk even if the guard regresses.
+    fake_live = tmp_path / "live.env"
+    fake_live.write_text("DATABASE_URL=keep-me\n")
+    monkeypatch.setattr(cr, "env_file_path", lambda: fake_live)
+    link = tmp_path / "sneaky.env"
+    os.symlink(str(fake_live), str(link))
+    with pytest.raises(HTTPException) as ei:
+        cr.export_env_route(cr.ExportEnvRequest(path=str(link)), store=store)
+    assert ei.value.status_code == 400
+    assert _gate == []  # refused before any write
+    assert fake_live.read_text() == "DATABASE_URL=keep-me\n"  # live env untouched
