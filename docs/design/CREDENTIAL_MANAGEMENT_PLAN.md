@@ -1,0 +1,226 @@
+# Credential Management Plan — file-vs-DB, manual switch, export/import
+
+**Status:** DESIGN (awaiting user approval before Slices 3–6). Slices 0–1 +
+Supabase hygiene already landed (see §9). Companion to
+`LLM_AUTH_DRIVER_PLAN.md` (the driver/auth-mode matrix); this doc covers *where
+credentials live*, *how the user switches them*, and *the `.env` round-trip*.
+
+**Origin:** user wants ≥2 independent keys per provider (multiple accounts, each
+with a daily free-tier limit) with **manual switching** (key↔key AND key↔OAuth),
+and asked whether credential deps should keep living in the `.env` *file* or move
+to the *DB*, while preserving **export→`.env` / import←`.env`** for portability.
+Derived from a 3-approach design panel + adversarial review (verdict
+`needs-revision`; all must-fixes folded in below).
+
+---
+
+## 1. Decision: Approach 3 (Hybrid), corrected
+
+**DB is authoritative for SELECTION (which credential is active) + holds api_key
+secrets; the token-store holds OAuth tokens; `.env` is a supported
+import/export format AND a day-one fallback; the live loop resolves the active
+credential through the `AuthDriver`.**
+
+Chosen over the alternatives **against the code as-built**:
+
+- It matches what already exists: `_resolve_api_credential` (`model_credentials.py:559`)
+  is **already** DB-row-first → env-fallback, and `api_key_drivers._resolve_secret`
+  already calls it. "DB-authoritative selection, `.env` as live fallback +
+  portability port" is the as-built contract — not net-new.
+- **Reject Approach 1** (TOML as source of truth): introduces a *third* secret
+  store + fussy format-preserving write-back on every set-active, and contradicts
+  the "DB holds selection" framing. Salvage only its **alias ergonomics** (below).
+- **Reject Approach 2** (DB-canonical, `.env` demoted to port-only): drops the
+  shipped set-if-absent env fallback, so an empty DB would break today's behavior.
+  Approach 3 keeps the fallback → day-one nothing breaks. Borrow its export
+  varname scheme.
+
+**Honest residual posture:** api_key secrets stay **plaintext-at-rest** in
+`llm_credentials.secret` (DB `0o600`) — same exposure class as today's `.env`,
+NOT a hardening win. Only OAuth gets keyring-first (token-store). Moving api_key
+secrets onto the keyring is a deliberate **later** pass (open question §10).
+
+---
+
+## 2. What each store holds
+
+| Store | Holds | Notes |
+|---|---|---|
+| `llm_credentials` (SQLite `profile_state.db`) | api_key metadata **+ secret**, `active` flag, alias | single-active-per-provider invariant already enforced (`model_credentials.py:353`); `0o600` |
+| token-store (keyring → plaintext `0o600` dev fallback) | OAuth / setup tokens | `add_oauth_credential` inserts `secret=NULL`; token NEVER in `llm_credentials.secret` (guarded at `:322`/`:344`) |
+| `config/.env` | import source + export target + **fallback** for api_key | data-source keys (FINNHUB/POLYGON/…) stay here untouched, out of the credential model |
+
+---
+
+## 3. Live-loop resolution — the S5 crux (corrected)
+
+One new resolver: `resolve_active_driver(provider) -> AuthDriver` =
+`ensure_env_loaded()` → read the active `llm_credentials` row for the provider →
+`build_driver(provider, auth_mode=row.auth_type, credential=row, token_store=…)`.
+The driver owns the secret; **loop bodies, `AgentEvent` vocab, and `query.py`
+persistence are untouched.** Wire-in touches ONLY client construction.
+
+**Do NOT mutate `os.environ`** (that's the implicitness we're removing, and a
+process-global can't express "this construction uses account B").
+
+- **Anthropic — pass `api_key=` to a SYNC client.** The live sites are
+  **synchronous** (`Anthropic()` → `client.messages.stream`/`.beta.messages.stream`,
+  `client.messages.create`). ⚠️ **Mandatory amendment:** the S2 driver currently
+  returns `AsyncAnthropic` (`api_key_drivers.py:135`) — wrong for these sites. Add
+  a **`client_sync()`** accessor that builds `Anthropic(api_key=<resolved>)`.
+  **There are 7 live bare `Anthropic()` sites** to swap (review-corrected count):
+  `agent.py:215`, `cli.py:611`, `subagent.py:406`, `summary_callers.py:96`,
+  `card_synthesis.py:145` & `:463`, `code_generator.py:160`.
+  **EXCLUDE `model_credentials.py:722`** — it already injects `api_key=` and is a
+  *dependency of the resolver* (swapping it would be circular).
+  For `claude_code_oauth`, `client_sync()` cannot return an `Anthropic()` at all
+  (probe P3b proves the token is rejected as `x-api-key`) — the call site
+  **branches on `driver.auth_mode`**: `api_key` → in-process sync SDK; OAuth →
+  `driver.stream_llm()` via `claude -p`/Agent SDK (generalize
+  `code_generator._call_claude_cli`), yielding the SAME `AgentEvent` vocab.
+
+- **OpenAI — register the driver's client as the SDK default.** The Agents-SDK
+  `Runner` takes no client arg; the only injection point is the SDK global.
+  ✅ **Review correction:** `set_default_openai_client` / `set_default_openai_key`
+  **already exist** in the installed SDK — S5 just *calls* the existing setter,
+  it does not author it. Use `set_default_openai_client(resolve_active_driver('openai').client())`
+  (a *client*, not a key, so a future `chatgpt_oauth` driver can swap `base_url`).
+  **Set per-run, immediately before `Runner.run`** — it's a process-global; an
+  in-flight `Runner` must not have it swapped underneath. (Orthogonal to the
+  existing `set_default_openai_responses_transport` global.)
+
+---
+
+## 4. OpenAI multi-key plan (kills the `[0]/[1]` confusion)
+
+The `OPENAI_API_KEYS` comma-pool → **≥2 first-class `api_key` rows**, each with a
+stable editable **alias** (never positional `OPENAI_API_KEYS[idx]`).
+
+1. **Explode + dedup on import** (single pass — review fix): gather every key
+   from `OPENAI_API_KEY` + `OPENAI_API_KEYS` into one list, collapse to a dict
+   keyed by **exact secret** (first source/alias wins), UPSERT each distinct
+   secret once. The verified duplicate (`OPENAI_API_KEYS[1] == OPENAI_API_KEY`)
+   collapses to ONE row. First imported row per provider set active iff none is.
+2. **Retire `api_key_pool` to read-only compat.** The factory already collapses
+   `api_key_pool` → the `api_key` driver, so no driver change. ⚠️ **Review fix —
+   enforce, don't assert:** make `CredentialStore.add()` **reject**
+   `auth_type='api_key_pool'` (a stored `local:N` pool row is unresolvable —
+   `_resolve_api_credential:587-592` parses a pool *index* off the id and indexes
+   an env var). Pool stays only as an env-compat *read* representation.
+3. **Daily-free-tier rotation = explicit manual set-active** between named rows
+   ("A exhausted → click B"), NOT an opaque round-robin — exactly what was asked.
+
+---
+
+## 5. Export / import (corrected for the duplicate-row bug)
+
+Net-new (no exporter/importer exists today). DB is source of truth; `.env` is the
+portable port + fallback.
+
+**Import ←`.env`** (`creds import --from-env` + first-run shim): parse via the
+Slice-0 `unquote_env_value`; single-pass explode+dedup (§4.1); idempotent UPSERT
+keyed by `(provider, secret)` (re-import updates alias / keeps active, never
+dups). OAuth env *placeholders* are NOT imported as credentials; an actual OAuth
+*token* sitting in `.env` triggers a one-time "import into the token-store?"
+prompt, never a silent `llm_credentials` row.
+
+**Export →`.env`** (`creds export --env`): regenerate from DB api_key rows. ONE
+canonical individually-quoted line per key — no comma-pools, no `[idx]`.
+
+🔴 **MAJOR review fix — do not regenerate the duplicate.** Exporting the active
+key to bare `OPENAI_API_KEY` while `provider_credentials()` *unconditionally*
+appends env-derived rows makes the same secret show as TWO inventory rows (the
+exact confusion we're killing). **Fix (load-bearing, ship before export):** when
+an active DB api_key row exists for a provider, **suppress/dedup the env-derived
+rows by secret** in `provider_credentials()` (a cosmetic provenance label is not
+enough). Test: a post-export reload shows each secret as **exactly one** row.
+
+**OAuth excluded from plaintext export — by design.** A token in a flat `.env` is
+the exact leak class we already got burned by, and violates "tokens live only in
+the token-store, never echoed." Export emits a **commented stub** per OAuth row
+("machine-local; re-run `claude setup-token` on the new box"). Portability for
+OAuth = re-auth on the target machine. (An explicit, separate, `0o600` token
+bundle is possible but default-OFF and deferred — open question §10.)
+Exported `.env` is gitignored + `chmod 0600` + header warning; the exporter has
+**no code path that reads token-store material** (asserted by a security test:
+no token bytes ever appear in the exported file).
+
+---
+
+## 6. Adversarial-review must-fixes (folded in)
+
+1. ✅ **Export dedup** — suppress env rows when an active DB row exists; one-row test (§5).
+2. ✅ **Scoring key safe move** — `--api-keys-file` ALREADY exists (`score_ibkr_news.py:746`); its *default* reads `OPENAI_API_KEYS` and the common documented invocations pass no key flag. Removing the distinct scoring key would make default runs silently fall back to `OPENAI_API_KEY` (the duplicate account, lost rotation, no error). So **either** change the scorer's default to read a scorer-private key file **or** keep the scoring key out of the inventory by another mechanism — **plus a regression test on a default `--mode sentiment` run**. (Open question §10 picks the path.)
+3. ✅ **Enforce no `api_key_pool` DB rows** — reject in `add()` (§4.2).
+4. ✅ **Factual corrections** — `set_default_openai_client` exists (call it); 7 sync Anthropic sites, exclude `model_credentials.py:722` (§3).
+5. ✅ **Single-pass import dedup** (§4.1, §5).
+6. ✅ **Supabase out of scope** — done as standalone hygiene (§9), not gated to this feature.
+7. ✅ `client_sync()` amendment kept as the verified strong catch (§3).
+
+---
+
+## 7. Settings surface (manual switch)
+
+Already present: `CredentialList` + `onSetActive` → `PUT /config/credentials/{id}
+{active:true}` (`config_routes.py:344`). Add: per-row **alias edit**;
+**set-active that works identically across `api_key` and `claude_code_oauth`
+rows** (one single-active operation = the key↔OAuth switch); per-row **Verify**
+(`driver.test()`); an **env-fallback provenance label** ("served from DB
+credential; `.env` is fallback only") to kill stale-shadow confusion. Optional:
+partial unique index `(provider) WHERE active=1` to harden the invariant against
+races. No auth_type *mutation* — switching mode = pick a different row + set
+active (mode is immutable per credential; create/import the other mode first).
+
+---
+
+## 8. What was actually wrong with the old `.env` format (answering the "why")
+
+- Comma-pool `OPENAI_API_KEYS` is positional, dedup-blind, and quote-fragile
+  (`python-dotenv` can't parse `"a","b"`), so the same key became both the single
+  `OPENAI_API_KEY` row and pool `[1]`.
+- It was read ONLY by the Settings display — "which pool key is active" was never
+  real (the live loop never consumed the pool).
+- OAuth env placeholders advertised env vars nothing reads, clashing with the real
+  token-store import path.
+The hybrid model fixes all three at the root: one named row per key, dedup by
+secret, active is a real DB flag the live loop honors, OAuth lives only in the
+token-store.
+
+---
+
+## 9. Sequencing (gated, TDD, well-split commits)
+
+| Slice | Scope | Status |
+|---|---|---|
+| **0** `.env` unquote hygiene | `unquote_env_value` + route loaders | ✅ `074e227` |
+| **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
+| **(hygiene)** Supabase dead-config removal | gitignored `.env`; separate from this design | ✅ done (no commit; `.env` ignored) |
+| **3** import ←`.env` + migration shim | single-pass explode+dedup → named rows; reject `api_key_pool` in `add()`; scoring-key default fix + regression test | ⏳ gated on approval |
+| **4** export →`.env` | canonical lines; env-row dedup fix; OAuth-exclusion security test | ⏳ after 3 |
+| **5** Settings: named rows + set-active (key↔key & key↔OAuth) + alias edit + provenance | route unit tests (handler-direct, fake DAL) | ⏳ after 3 |
+| **6** **S5 WIRE-IN** (LAST) | `client_sync()` + resolver + 7-site swap + per-run OpenAI client; OAuth branch | ⏳ HARD-GATED: user approval + parity/probes; flips live loop off implicit-env |
+
+---
+
+## 10. Open questions (need your call)
+
+1. **Alias defaults** — when exploding `OPENAI_API_KEYS`, default to
+   `OpenAI free-tier A/B`, or you'll name them yourself in Settings after import?
+   (Editable either way.)
+2. **Scoring-key path** — confirm the batch scorer should own its key in a
+   private file (NOT the Settings inventory). Path? e.g. `config/scoring_keys.txt`
+   (gitignored). I will change the scorer's *default* to read it (else default
+   runs silently fall back to the wrong account).
+3. **Secret rotation** — `SUPABASE_SERVICE_ROLE_KEY` + the plaintext DB password
+   that were on `config/.env:127/132` are removed from the file but must be
+   treated as **compromised**: revoke on the Supabase side (I can't). Confirm done.
+4. **api_key at-rest** — keep api_key secrets plaintext in `llm_credentials`
+   (`0o600`, = today's `.env` exposure), or add a follow-up slice to move them
+   onto the keyring the token-store already uses?
+5. **External readers of `OPENAI_API_KEYS`** — any tool besides the scorer reads
+   the comma form directly? (It won't exist post-migration.)
+6. **OAuth portability** — ever need to move a Claude setup-token between machines
+   without re-running `claude setup-token`? If yes I add an explicit `0o600`
+   token-bundle export (default OFF); else it's left out entirely.
+7. **Mid-session OpenAI switch** — switching the active OpenAI key applies to the
+   NEXT `Runner.run`, not an in-flight query. Acceptable?
