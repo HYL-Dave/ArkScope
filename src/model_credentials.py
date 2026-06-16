@@ -461,8 +461,15 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
     out: dict[Provider, list[ProviderCredential]] = {"anthropic": [], "openai": []}
 
     local_by_provider: dict[Provider, list[ProviderCredential]] = {"anthropic": [], "openai": []}
+    # Secrets already stored as (authoritative, editable) DB rows — used to dedup
+    # the env-derived rows below. The interop .env export writes the active key to
+    # bare OPENAI_API_KEY AND it is a DB row, so without this the same secret would
+    # show as two inventory rows (the duplicate the rework set out to kill).
+    db_secrets_by_provider: dict[Provider, set[str]] = {"anthropic": set(), "openai": set()}
     for row in store.list():
         can_use = row.auth_type in ("api_key", "api_key_pool")
+        if row.secret:
+            db_secrets_by_provider[row.provider].add(row.secret)
         local_by_provider[row.provider].append(
             ProviderCredential(
                 id=f"local:{row.id}",
@@ -488,6 +495,8 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
 
     def add_api_key(provider: Provider, env_name: str, label: str) -> None:
         value = os.environ.get(env_name, "").strip()
+        if value and value in db_secrets_by_provider[provider]:
+            return  # deduped: this secret is already an authoritative, editable DB row
         has_local_active = any(c.active for c in local_by_provider[provider])
         out[provider].append(
             ProviderCredential(
@@ -510,6 +519,8 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
 
     def add_key_pool(provider: Provider, env_name: str) -> None:
         for idx, value in enumerate(_split_key_pool(os.environ.get(env_name))):
+            if value in db_secrets_by_provider[provider]:
+                continue  # deduped against an authoritative DB row
             has_local_active = any(c.active for c in local_by_provider[provider])
             out[provider].append(
                 ProviderCredential(

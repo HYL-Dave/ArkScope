@@ -15,6 +15,7 @@ import pytest
 
 from src.model_credentials import (
     CredentialStore,
+    _mask_secret,
     _resolve_api_credential,
     discover_models,
     provider_credentials,
@@ -229,6 +230,35 @@ def test_add_rejects_api_key_pool(store):
         store.add(provider="openai", auth_type="api_key_pool", alias="p", secret="sk-poolkey12345")
     # api_key still works (regression)
     assert store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-singlekey999").auth_type == "api_key"
+
+
+def test_provider_credentials_dedups_env_key_matching_a_db_row(store, clean_env, monkeypatch):
+    # Interop export writes the active key to bare OPENAI_API_KEY AND it is a DB
+    # row. The inventory must show that secret ONCE (the editable DB row), not
+    # also as a second read-only env row — else the duplicate-row confusion the
+    # whole credential rework set out to kill comes back.
+    store.add(provider="openai", auth_type="api_key", alias="OpenAI primary", secret="sk-shared99999", make_active=True)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-shared99999")
+    ids = [c.id for c in provider_credentials(store)["openai"]]
+    assert "openai:OPENAI_API_KEY" not in ids  # env row suppressed (secret already a DB row)
+    assert any(i.startswith("local:") for i in ids)  # the DB row remains
+
+
+def test_provider_credentials_dedups_pool_entry_matching_a_db_row(store, clean_env, monkeypatch):
+    store.add(provider="openai", auth_type="api_key", alias="primary", secret="sk-inboth111", make_active=True)
+    monkeypatch.setenv("OPENAI_API_KEYS", "sk-inboth111,sk-poolonly222")
+    oa = provider_credentials(store)["openai"]
+    masks = [c.masked for c in oa if c.auth_type == "api_key_pool"]
+    # the pool entry equal to the DB secret is deduped; the distinct pool key stays
+    assert _mask_secret("sk-inboth111") not in masks
+    assert _mask_secret("sk-poolonly222") in masks
+
+
+def test_provider_credentials_keeps_env_key_not_in_db(store, clean_env, monkeypatch):
+    store.add(provider="openai", auth_type="api_key", alias="primary", secret="sk-indb1111", make_active=True)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-onlyinenv222")
+    ids = [c.id for c in provider_credentials(store)["openai"]]
+    assert "openai:OPENAI_API_KEY" in ids  # a DISTINCT env key still surfaces
 
 
 def test_update_rejects_secret_on_api_key_pool_row(store):
