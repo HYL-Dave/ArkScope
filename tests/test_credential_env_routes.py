@@ -27,6 +27,10 @@ def store(tmp_path):
 
 @pytest.fixture(autouse=True)
 def _gate(monkeypatch):
+    # default-DISABLED apply boundary for every test (the real switch is opt-in);
+    # require_profile_state_write is a no-op audit log today, so the apply flag is
+    # the actual code-enforced gate.
+    monkeypatch.delenv("ARKSCOPE_CREDENTIAL_APPLY_ENABLED", raising=False)
     calls = []
     monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: calls.append((a, k)))
     return calls
@@ -50,7 +54,18 @@ def test_import_env_route_dry_run_previews_without_writing(store, monkeypatch, _
     assert _gate == []  # write gate NOT invoked for a preview
 
 
+def test_import_env_route_refuses_real_write_when_apply_disabled(store, monkeypatch, _hermetic_env, _gate):
+    # apply disabled by default (the _gate fixture clears the flag) — a real
+    # (non-dry-run) import must be refused 403 with NO write, NO gate call.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-routeimport1")
+    with pytest.raises(HTTPException) as ei:
+        cr.import_env_route(cr.ImportEnvRequest(dry_run=False), store=store)
+    assert ei.value.status_code == 403
+    assert store.list() == [] and _gate == []  # nothing written, gate not reached
+
+
 def test_import_env_route_real_writes_and_gates(store, monkeypatch, _hermetic_env, _gate):
+    monkeypatch.setenv("ARKSCOPE_CREDENTIAL_APPLY_ENABLED", "1")  # explicitly enable apply
     monkeypatch.setenv("OPENAI_API_KEY", "sk-routeimport2")
     res = cr.import_env_route(cr.ImportEnvRequest(dry_run=False), store=store)
     assert res["dry_run"] is False and len(store.list()) == 1
@@ -58,7 +73,18 @@ def test_import_env_route_real_writes_and_gates(store, monkeypatch, _hermetic_en
     assert "sk-routeimport2" not in json.dumps(res)  # response is labels/counts, no secret
 
 
-def test_export_env_route_writes_0600_and_returns_labels(store, tmp_path, _gate):
+def test_export_env_route_refused_when_apply_disabled(store, tmp_path, _gate):
+    # apply disabled by default — a real file write must be refused 403, no file.
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-x111", make_active=True)
+    path = tmp_path / "out.env"
+    with pytest.raises(HTTPException) as ei:
+        cr.export_env_route(cr.ExportEnvRequest(path=str(path)), store=store)
+    assert ei.value.status_code == 403
+    assert not path.exists() and _gate == []  # nothing written, gate not reached
+
+
+def test_export_env_route_writes_0600_and_returns_labels(store, tmp_path, monkeypatch, _gate):
+    monkeypatch.setenv("ARKSCOPE_CREDENTIAL_APPLY_ENABLED", "1")  # explicitly enable apply
     store.add(provider="openai", auth_type="api_key", alias="primary", secret="sk-routeexp1", make_active=True)
     path = tmp_path / "out.env"
     res = cr.export_env_route(cr.ExportEnvRequest(path=str(path)), store=store)

@@ -35,6 +35,16 @@ router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
 
 
+def _credential_apply_enabled() -> bool:
+    """Code-enforced apply boundary. Real credential writes — a non-dry-run
+    import into the profile DB, and writing an export file — are REFUSED unless
+    ``ARKSCOPE_CREDENTIAL_APPLY_ENABLED`` is truthy. The spec's permission engine
+    is still a no-op audit log (src/api/permissions.py), so this flag is the
+    actual gate that keeps the apply step explicit/opt-in; dry-run previews stay
+    allowed so the user can inspect before enabling."""
+    return os.environ.get("ARKSCOPE_CREDENTIAL_APPLY_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _credential_store(store) -> CredentialStore:
     return store if isinstance(store, CredentialStore) else get_credential_store()
 
@@ -252,6 +262,11 @@ def import_env_route(
     writing. Returns counts/labels per provider only — never a secret."""
     store = _credential_store(store)
     if not body.dry_run:
+        if not _credential_apply_enabled():
+            raise HTTPException(
+                status_code=403,
+                detail="credential apply is disabled; preview with dry_run=true, or set ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1 to enable the real import",
+            )
         require_profile_state_write("credential_import_env", {"dry_run": False})
     summary = import_env_credentials(store, dry_run=body.dry_run)
     return {"dry_run": body.dry_run, "providers": summary}
@@ -284,6 +299,11 @@ def export_env_route(
         raise HTTPException(
             status_code=400,
             detail="refusing to overwrite the live config/.env (it holds non-credential keys); choose a separate export path",
+        )
+    if not _credential_apply_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="credential export is disabled; set ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1 to enable writing the export file",
         )
     require_profile_state_write("credential_export_env", {"path": path})
     return write_env_export(path, store=store)
