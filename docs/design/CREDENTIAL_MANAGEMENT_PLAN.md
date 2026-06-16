@@ -197,7 +197,7 @@ token-store.
 | **0** `.env` unquote hygiene | `unquote_env_value` + route ALL production loaders (env_keys, cli, db_config via helper; collectors/training inlined) | ✅ `074e227` (helper + EODHD) + sweep `41b4aaf` (rest of production). ⚠️ 9 test-local `load_env` helpers left as separate hygiene |
 | **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
 | **(hygiene)** dead-config removal | Supabase block + reader-less FMP value removed from gitignored `.env`; secret-bearing backup DELETED | ✅ done (`.env` ignored, no commit). ⚠️ user must revoke Supabase service-role key + DB pw server-side |
-| **3** import ←`.env` + migration shim | single-pass explode+dedup → named rows; reject `api_key_pool` in `add()`; scoring-key default fix + regression test | ⏳ gated on approval |
+| **3** import ←`.env` core | reject `api_key_pool` in `add()` `7e55624` (C3a); `import_env_credentials()` single-pass explode+dedup → named rows `519820c` (C3b); scorer defaults to `config/scoring_keys.txt` `b877fb2` (C3c). Pre-commit `ed22355` (gitignore scoring_keys). | ✅ core done (TDD, 122 tests). ⏳ route/CLI/first-run **shim** + the real apply step (write `scoring_keys.txt`, edit real `.env`, run import on profile DB → counts/labels only) deferred to the wire-in |
 | **4** export →`.env` | canonical lines; env-row dedup fix; OAuth-exclusion security test | ⏳ after 3 |
 | **5** Settings: named rows + set-active (key↔key & key↔OAuth) + alias edit + provenance | route unit tests (handler-direct, fake DAL) | ⏳ after 3 |
 | **6** **S5 WIRE-IN** (LAST) | `client_sync()` + resolver + 7-site swap + per-run OpenAI client; OAuth branch | ⏳ HARD-GATED: user approval + parity/probes; flips live loop off implicit-env |
