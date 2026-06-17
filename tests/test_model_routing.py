@@ -31,7 +31,7 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert "gpt-5.5" in ids
     assert "default" in {x["id"] for x in res["effort_options"]["anthropic"]}
     assert "minimal" in {x["id"] for x in res["effort_options"]["openai"]}
-    assert set(res["routes"]) == {"card_synthesis", "card_translation"}
+    assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
 
 
 def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):

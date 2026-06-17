@@ -32,11 +32,12 @@ export interface RuntimeConfig {
   };
   card_synthesis: TaskRoute;
   card_translation: TaskRoute;
+  ai_research: TaskRoute;
   data_keys: Record<string, boolean>;
 }
 
 export type ModelProvider = "anthropic" | "openai";
-export type ModelTask = "card_synthesis" | "card_translation";
+export type ModelTask = "card_synthesis" | "card_translation" | "ai_research";
 
 export interface TaskRoute {
   task: ModelTask;

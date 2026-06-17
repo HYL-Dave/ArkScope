@@ -45,6 +45,23 @@ def test_unconfigured_uses_provider_default_tier(clean_env):
     assert resolve_research_route("anthropic") == ("claude-sonnet-4-6", None)  # anthropic default tier
 
 
+def test_catalog_tasks_include_ai_research():
+    # B2: the seed catalog must expose ai_research so Settings (which loops
+    # catalog.tasks) renders the AI 研究 route row.
+    from src.model_routing import catalog
+    assert "ai_research" in [t.id for t in catalog().tasks]
+
+
+def test_config_routes_expose_ai_research_route(tmp_path):
+    # B2: /config/model-catalog + /config/runtime must return an ai_research
+    # route (the UI reads routes[task.id] for each catalog task).
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import CredentialStore
+    store = CredentialStore(tmp_path / "p.db")
+    assert "ai_research" in cr.model_catalog(store=store)["routes"]
+    assert "ai_research" in cr.runtime_config(store=store)
+
+
 def test_configured_route_for_matching_provider(clean_env):
     c = AgentConfig()
     c.ai_research_provider = "openai"

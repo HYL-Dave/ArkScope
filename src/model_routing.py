@@ -85,6 +85,13 @@ TASKS: list[TaskInfo] = [
         default_provider="anthropic",
         recommended_model="claude-sonnet-4-6",
     ),
+    TaskInfo(
+        id="ai_research",
+        label="AI 研究 (Research)",
+        description="The interactive AI 研究 surface. Unset → the request provider's default-tier model; set a cheaper model/effort here (e.g. gpt-5.4-mini / low) for routine research.",
+        default_provider="openai",
+        recommended_model="gpt-5.4-mini",
+    ),
 ]
 
 

@@ -44,6 +44,7 @@ import {
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
   card_translation: "卡片翻譯",
+  ai_research: "AI 研究",
 };
 
 type SettingsSection = "models" | "providers" | "data_storage" | "data_sources" | "permissions";

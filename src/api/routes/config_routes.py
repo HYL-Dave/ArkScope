@@ -167,6 +167,7 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
         # Per-task model routing (so the UI can show what each operation uses).
         "card_synthesis": task_route("card_synthesis").model_dump(),
         "card_translation": task_route("card_translation").model_dump(),
+        "ai_research": task_route("ai_research").model_dump(),
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),
@@ -190,6 +191,7 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
         "routes": {
             "card_synthesis": task_route("card_synthesis").model_dump(),
             "card_translation": task_route("card_translation").model_dump(),
+            "ai_research": task_route("ai_research").model_dump(),
         },
         "credentials": {
             provider: [c.model_dump() for c in creds]
