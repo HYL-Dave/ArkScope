@@ -99,12 +99,13 @@ def _build_anthropic_tools_list(config) -> list:
 
 # ── Model capability detection ──────────────────────────────────
 
-_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
-_EFFORT_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
+_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6"}
+_EFFORT_MODELS = {"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6"}
 
 # 各模型最大 output tokens（API 硬限制）
 # 用於 thinking 模式自動設定 max_tokens
 _MODEL_MAX_OUTPUT = {
+    "claude-opus-4-8": 128000,
     "claude-opus-4-7": 128000,
     "claude-sonnet-4-6": 64000,
 }

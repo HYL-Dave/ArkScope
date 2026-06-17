@@ -36,13 +36,13 @@ ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 class AgentConfig(BaseModel):
     """Agent model and behavior configuration."""
 
-    # OpenAI models
-    openai_model: str = "gpt-5.5"
+    # OpenAI models — default tier = everyday/cheaper, advanced = frontier
+    openai_model: str = "gpt-5.4"
     openai_model_advanced: str = "gpt-5.5"
 
-    # Anthropic models
-    anthropic_model: str = "claude-opus-4-7"
-    anthropic_model_advanced: str = "claude-opus-4-7"
+    # Anthropic models — default tier = everyday/cheaper, advanced = frontier
+    anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_model_advanced: str = "claude-opus-4-8"
 
     # Per-task model routing (minimal; full Settings UI later). Empty string =
     # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
