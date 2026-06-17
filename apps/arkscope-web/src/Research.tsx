@@ -199,6 +199,17 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       <div className="surface-head">
         <h1 className="surface-title">AI 研究</h1>
         <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定（本地·ephemeral）</span>
+        {runtime?.ai_research && (
+          runtime.ai_research.source !== "default" ? (
+            <span className="muted tiny">
+              研究模型：{runtime.ai_research.provider} · {runtime.ai_research.model}
+              {runtime.ai_research.effort && runtime.ai_research.effort !== "default" ? ` · ${runtime.ai_research.effort}` : ""}
+              {`（套用於 ${runtime.ai_research.provider} 查詢；其他 provider 用預設層）`}
+            </span>
+          ) : (
+            <span className="muted tiny">研究模型：未設定 — 各 provider 用預設層（設定 → 模型可指定，例如 OpenAI · gpt-5.4-mini · low）</span>
+          )
+        )}
       </div>
 
       <div className="research-grid">
