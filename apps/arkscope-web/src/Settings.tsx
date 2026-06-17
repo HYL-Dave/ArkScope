@@ -1462,12 +1462,18 @@ function CredentialList({
         return (
           <div className="credential-row" key={cred.id}>
             <div>
-              <strong>{cred.active ? "★ " : ""}{cred.label}</strong>
-              <span>{cred.auth_type} · {cred.source}</span>
+              <strong>{cred.label}</strong>
+              {cred.active && <span className="active-badge">使用中</span>}
+              <span>{cred.auth_type}</span>
             </div>
             <span className={`key-pill ${cred.available ? "ok" : "missing"}`}>
               {cred.available ? cred.masked ?? "available" : "missing"}
             </span>
+            <p className="muted tiny">
+              {cred.id.startsWith("local:")
+                ? "本機 Settings credential（profile DB · 可編輯、可設為 active）"
+                : ".env／環境變數 fallback（唯讀；DB credential 才是主要選擇面）"}
+            </p>
             <p>{cred.notes}</p>
             {cred.editable && (
               <div className="credential-actions">
