@@ -229,6 +229,22 @@ class CredentialStore:
                     """
                 )
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_llm_credentials_provider ON llm_credentials(provider)")
+            # Slice 5 — single-active-per-provider DB backstop. HEAL any
+            # pre-existing violation first (keep the highest-id active row per
+            # provider, zero the rest) BEFORE creating the partial unique index,
+            # else the index creation would fail on legacy multi-active data.
+            conn.execute(
+                """
+                UPDATE llm_credentials SET active = 0
+                WHERE active = 1 AND id NOT IN (
+                    SELECT MAX(id) FROM llm_credentials WHERE active = 1 GROUP BY provider
+                )
+                """
+            )
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_llm_credentials_one_active "
+                "ON llm_credentials(provider) WHERE active = 1"
+            )
             conn.commit()
         try:
             os.chmod(self.db_path, 0o600)

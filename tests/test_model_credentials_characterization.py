@@ -11,6 +11,8 @@ schema-delta step; the api_key CRUD / discovery / _resolve ones must STAY green.
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from src.model_credentials import (
@@ -406,6 +408,50 @@ def test_provider_credentials_oauth_local_row_no_secret_no_crash(store, clean_en
     row = next(c for c in inv["anthropic"] if c.id.startswith("local:") and c.auth_type == "claude_code_oauth")
     assert row.masked is None  # no secret to mask
     assert row.can_discover_models is False and row.editable is True
+
+
+def test_partial_unique_index_present(store):
+    # Slice 5 safety backstop: a DB-level UNIQUE(provider) WHERE active=1 index.
+    with store._connect() as conn:
+        idx = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()}
+    assert "idx_llm_credentials_one_active" in idx
+
+
+def test_db_blocks_two_active_same_provider(store):
+    store.add(provider="openai", auth_type="api_key", alias="a", secret="sk-aaaa11111", make_active=True)
+    store.add(provider="openai", auth_type="api_key", alias="b", secret="sk-bbbb22222", make_active=False)
+    inactive = next(r for r in store.list(provider="openai") if not r.active)
+    # a raw write that would make a SECOND openai row active is blocked by the index
+    with pytest.raises(sqlite3.IntegrityError):
+        with store._connect() as conn:
+            conn.execute("UPDATE llm_credentials SET active=1 WHERE id=?", (inactive.id,))
+            conn.commit()
+
+
+def test_init_heals_preexisting_double_active_then_indexes(tmp_path):
+    # a legacy DB with TWO active rows for one provider (no index yet) must be
+    # healed to one active on construction BEFORE the unique index is added,
+    # else the index creation would fail on the violating data.
+    p = tmp_path / "legacy.db"
+    conn = sqlite3.connect(p)
+    conn.executescript(
+        """
+        CREATE TABLE llm_credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL,
+            auth_type TEXT NOT NULL DEFAULT 'api_key', alias TEXT NOT NULL, secret TEXT,
+            active INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            expires_at TEXT, account_label TEXT);
+        """
+    )
+    conn.execute("INSERT INTO llm_credentials (provider,auth_type,alias,secret,active,created_at,updated_at) VALUES ('openai','api_key','a','sk-aaaa11111',1,'t','t')")
+    conn.execute("INSERT INTO llm_credentials (provider,auth_type,alias,secret,active,created_at,updated_at) VALUES ('openai','api_key','b','sk-bbbb22222',1,'t','t')")
+    conn.commit()
+    conn.close()
+    store = CredentialStore(p)  # _ensure_schema heals then indexes
+    assert len([r for r in store.list(provider="openai") if r.active]) == 1  # healed to one
+    with store._connect() as conn:
+        idx = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()}
+    assert "idx_llm_credentials_one_active" in idx
 
 
 def test_secret_nullable_migration_preserves_existing_rows(tmp_path):

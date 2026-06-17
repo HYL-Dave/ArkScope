@@ -108,6 +108,28 @@ def test_export_env_route_rejects_blank_path(store, _gate):
     assert ei.value.status_code == 400
 
 
+def test_update_route_key_to_key_switch_keeps_single_active(store, _gate):
+    # set-active across two api_key rows (key↔key) must leave exactly one active.
+    a = store.add(provider="openai", auth_type="api_key", alias="A", secret="sk-aaaa11111", make_active=True)
+    b = store.add(provider="openai", auth_type="api_key", alias="B", secret="sk-bbbb22222", make_active=False)
+    cr.update_credential(f"local:{b.id}", cr.CredentialUpdate(active=True), store=store)
+    act = [r for r in store.list(provider="openai") if r.active]
+    assert len(act) == 1 and act[0].id == b.id  # switched to B, A deactivated (index holds)
+
+
+def test_update_route_key_oauth_switch_both_directions(store, _gate):
+    # set-active across an api_key and a Claude OAuth row (key↔OAuth), both ways,
+    # always single active for the provider.
+    oauth = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
+    key = store.add(provider="anthropic", auth_type="api_key", alias="A key", secret="sk-ant-aaaa111", make_active=False)
+    cr.update_credential(f"local:{key.id}", cr.CredentialUpdate(active=True), store=store)
+    act = [r for r in store.list(provider="anthropic") if r.active]
+    assert len(act) == 1 and act[0].id == key.id  # OAuth deactivated, key active
+    cr.update_credential(f"local:{oauth.id}", cr.CredentialUpdate(active=True), store=store)
+    act = [r for r in store.list(provider="anthropic") if r.active]
+    assert len(act) == 1 and act[0].id == oauth.id and act[0].auth_type == "claude_code_oauth"  # back to OAuth
+
+
 def test_export_env_route_refuses_symlink_to_arbitrary_file(store, tmp_path, _gate):
     # a symlink to ANY file (not just config/.env) must be refused — the route's
     # config/.env realpath-guard is not enough; an islink check covers the rest.
