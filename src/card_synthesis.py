@@ -191,7 +191,8 @@ def _synthesize_openai(
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort
-        client = OpenAI()
+        from src.auth_drivers.live_resolver import live_openai_client
+        client = live_openai_client()
         resp = client.chat.completions.create(
             model=model,
             max_completion_tokens=_MAX_TOKENS,
@@ -509,7 +510,8 @@ def _translate_openai(
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["reasoning_effort"] = selected_effort
-        client = OpenAI()
+        from src.auth_drivers.live_resolver import live_openai_client
+        client = live_openai_client()
         resp = client.chat.completions.create(
             model=model,
             max_completion_tokens=4096,

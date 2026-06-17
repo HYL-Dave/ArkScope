@@ -110,7 +110,8 @@ def _call_openai(messages: List[dict], model: str, system: str) -> str:
     else:
         kwargs.update(_maybe_temperature(model))  # omit on models that deprecate it
 
-    client = OpenAI()
+    from src.auth_drivers.live_resolver import live_openai_client
+    client = live_openai_client()
     response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content or ""
 

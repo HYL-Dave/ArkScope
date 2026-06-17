@@ -90,6 +90,22 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     return Anthropic()  # env fallback (ANTHROPIC_API_KEY) — unchanged behavior
 
 
+def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:
+    """A SYNC ``OpenAI`` client for the direct (non-Agents-SDK) OpenAI call sites
+    (card synthesis, code-gen). db_api_key → built from the active row via the
+    driver; OAuth-active or none → env fallback (bare ``OpenAI()`` reads
+    ``OPENAI_API_KEY``), with the OAuth-pending case logged."""
+    from openai import OpenAI
+
+    store = store or CredentialStore()
+    res = resolve_live_auth("openai", store=store)
+    if res.source == "db_api_key":
+        cred = store.get(res.credential_id)
+        return build_driver(provider="openai", auth_mode="api_key", credential=cred).client_sync()
+    _signal_fallback(res)
+    return OpenAI()  # env fallback (OPENAI_API_KEY)
+
+
 def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> LiveAuthResolution:
     """Register the SDK default OpenAI client from the active credential.
 
@@ -108,4 +124,15 @@ def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> Live
         set_default_openai_client(build_driver(provider="openai", auth_mode="api_key", credential=cred).client())
     else:
         _signal_fallback(res)
+        # The SDK default client is a STICKY process-global; a prior db_api_key
+        # run may have left a DB-credential client set. Reset to an env-backed
+        # client so this fallback deterministically uses OPENAI_API_KEY, not the
+        # stale DB credential. If env has no key, leave the default (no OpenAI
+        # auth to fall back to, and AsyncOpenAI() would raise at construction).
+        import os
+
+        if os.environ.get("OPENAI_API_KEY", "").strip():
+            from openai import AsyncOpenAI
+
+            set_default_openai_client(AsyncOpenAI())
     return res

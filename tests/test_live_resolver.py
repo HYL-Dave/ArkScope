@@ -89,9 +89,42 @@ def test_apply_openai_live_client_sets_default_for_db_key(store, monkeypatch):
     assert res.source == "db_api_key" and "client" in captured  # SDK default registered
 
 
-def test_apply_openai_live_client_oauth_does_not_set_default(store, monkeypatch):
-    captured = {}
-    monkeypatch.setattr(lr, "set_default_openai_client", lambda c: captured.setdefault("client", c))
+def test_apply_openai_fallback_resets_sticky_global_to_env(store, monkeypatch):
+    # the SDK default client is a sticky process-global: after a db_api_key run
+    # set it, a later fallback MUST reset it to an env client — not leave the
+    # stale DB client (finding #1). With OPENAI_API_KEY present, the fallback
+    # calls set_default_openai_client again (env-backed), not just logs.
+    calls = []
+    monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    lr._warned.clear()
+    store.add(provider="openai", auth_type="api_key", alias="primary", secret="sk-dbkey111", make_active=True)
+    lr.apply_openai_live_client(store=store)  # call 1: DB client set
+    store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)  # OAuth now active
+    res = lr.apply_openai_live_client(store=store)  # call 2: must RESET to env
+    assert res.source == "oauth_pending_env_fallback"
+    assert len(calls) == 2  # reset to an env client, NOT left stale
+
+
+def test_apply_openai_fallback_no_env_leaves_default(store, monkeypatch):
+    # if env has no key, there is no OpenAI auth to fall back to — leave the
+    # default (constructing AsyncOpenAI() would raise); only log.
+    calls = []
+    monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    lr._warned.clear()
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.apply_openai_live_client(store=store)
-    assert res.source == "oauth_pending_env_fallback" and "client" not in captured  # left SDK default (env)
+    assert res.source == "oauth_pending_env_fallback" and calls == []  # nothing set (no env key)
+
+
+def test_live_openai_client_uses_db_api_key(store):
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-fake1111", make_active=True)
+    assert isinstance(lr.live_openai_client(store=store), OpenAI)
+
+
+def test_live_openai_client_oauth_falls_back_to_env(store, monkeypatch):
+    store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    lr._warned.clear()
+    assert isinstance(lr.live_openai_client(store=store), OpenAI)  # sync env client
