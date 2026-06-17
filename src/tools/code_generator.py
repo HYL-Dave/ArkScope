@@ -90,7 +90,6 @@ def _call_openai(messages: List[dict], model: str, system: str) -> str:
     Code generation 一律給模型最大 output 空間 — reasoning tokens + visible output
     都從 max_completion_tokens 扣，設高不多花錢（按實際用量計費）。
     """
-    from openai import OpenAI
     from ..agents.config import get_agent_config
     from ..agents.openai_agent.agent import _get_openai_max_output
 
@@ -122,7 +121,6 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
     Code generation 一律給模型最大 output 空間 — thinking 開啟時 budget 從中扣，
     關閉時也直接給 model max（code 長度不可預測，不限制自由度）。
     """
-    from anthropic import Anthropic
     from ..agents.config import get_agent_config
     from ..agents.anthropic_agent.agent import (
         _get_model_max_output,

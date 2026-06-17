@@ -111,8 +111,10 @@ def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> Live
 
     Call once per run BEFORE ``Runner.run`` (the Agents-SDK Runner takes no client
     arg; the global default is the only injection point). db_api_key → set the
-    default to a client built from the active row; OAuth-active or none → leave the
-    SDK default (which reads ``OPENAI_API_KEY`` from env), logging the OAuth case.
+    default to a client built from the active row. On fallback we NEVER leave a
+    stale global: with ``OPENAI_API_KEY`` present → reset to an env-backed client;
+    without → set a non-usable client so a previously-set DB credential is not
+    silently reused (OpenAI calls then fail clearly rather than on the wrong key).
 
     NOTE: ``set_default_openai_client`` is a PROCESS-GLOBAL. Set it immediately
     before ``Runner.run``; concurrent OpenAI runs in one process share it.
@@ -125,14 +127,16 @@ def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> Live
     else:
         _signal_fallback(res)
         # The SDK default client is a STICKY process-global; a prior db_api_key
-        # run may have left a DB-credential client set. Reset to an env-backed
-        # client so this fallback deterministically uses OPENAI_API_KEY, not the
-        # stale DB credential. If env has no key, leave the default (no OpenAI
-        # auth to fall back to, and AsyncOpenAI() would raise at construction).
+        # run may have left a DB-credential client set. NEVER leave it stale on
+        # fallback: with OPENAI_API_KEY → reset to an env client; without → set a
+        # non-usable client so a prior credential is not silently reused (calls
+        # then fail clearly — there is genuinely no usable OpenAI auth).
         import os
 
-        if os.environ.get("OPENAI_API_KEY", "").strip():
-            from openai import AsyncOpenAI
+        from openai import AsyncOpenAI
 
+        if os.environ.get("OPENAI_API_KEY", "").strip():
             set_default_openai_client(AsyncOpenAI())
+        else:
+            set_default_openai_client(AsyncOpenAI(api_key="ARKSCOPE-NO-OPENAI-CREDENTIAL"))
     return res

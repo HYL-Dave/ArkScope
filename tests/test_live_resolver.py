@@ -106,16 +106,16 @@ def test_apply_openai_fallback_resets_sticky_global_to_env(store, monkeypatch):
     assert len(calls) == 2  # reset to an env client, NOT left stale
 
 
-def test_apply_openai_fallback_no_env_leaves_default(store, monkeypatch):
-    # if env has no key, there is no OpenAI auth to fall back to — leave the
-    # default (constructing AsyncOpenAI() would raise); only log.
+def test_apply_openai_fallback_no_env_neutralizes_stale_global(store, monkeypatch):
+    # with no env key, the fallback must NOT leave a stale DB global — it sets a
+    # non-usable client so a prior credential is never silently reused (finding #1).
     calls = []
     monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     lr._warned.clear()
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.apply_openai_live_client(store=store)
-    assert res.source == "oauth_pending_env_fallback" and calls == []  # nothing set (no env key)
+    assert res.source == "oauth_pending_env_fallback" and len(calls) == 1  # neutralized, not left stale
 
 
 def test_live_openai_client_uses_db_api_key(store):

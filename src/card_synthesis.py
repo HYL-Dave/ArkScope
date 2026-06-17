@@ -136,7 +136,6 @@ def _synthesize_anthropic(
     model: str,
     effort: str = "default",
 ) -> tuple[CardSynthesis, dict[str, Any]]:
-    from anthropic import Anthropic
 
     def run_once(selected_effort: str) -> CardSynthesis:
         kwargs: dict[str, Any] = {}
@@ -185,7 +184,6 @@ def _synthesize_openai(
     model: str,
     effort: str = "default",
 ) -> tuple[CardSynthesis, dict[str, Any]]:
-    from openai import OpenAI
 
     def run_once(selected_effort: str) -> CardSynthesis:
         kwargs: dict[str, Any] = {}
@@ -456,7 +454,6 @@ def _translate_anthropic(
     target: str,
     effort: str = "default",
 ) -> dict:
-    from anthropic import Anthropic
 
     def run_once(selected_effort: str) -> dict:
         kwargs: dict[str, Any] = {}
@@ -504,7 +501,6 @@ def _translate_openai(
     target: str,
     effort: str = "default",
 ) -> dict:
-    from openai import OpenAI
 
     def run_once(selected_effort: str) -> dict:
         kwargs: dict[str, Any] = {}
