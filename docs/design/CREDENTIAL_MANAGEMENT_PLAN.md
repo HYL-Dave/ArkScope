@@ -18,8 +18,9 @@ Derived from a 3-approach design panel + adversarial review (verdict
 
 **DB is authoritative for SELECTION (which credential is active) + holds api_key
 secrets; the token-store holds OAuth tokens; `.env` is a supported
-import/export format AND a day-one fallback; the live loop resolves the active
-credential through the `AuthDriver`.**
+import/export format AND a day-one fallback; the live loop **will** resolve the
+active credential through the `AuthDriver` (the S5/Slice-6 wire-in — NOT yet
+wired; today the live agents still read keys from `os.environ`).**
 
 Chosen over the alternatives **against the code as-built**:
 
@@ -185,7 +186,8 @@ active (mode is immutable per credential; create/import the other mode first).
 - OAuth env placeholders advertised env vars nothing reads, clashing with the real
   token-store import path.
 The hybrid model fixes all three at the root: one named row per key, dedup by
-secret, active is a real DB flag the live loop honors, OAuth lives only in the
+secret, active is a real DB flag the live loop **will** honor once wired (Slice 6;
+today it drives the Settings inventory, not the live agents), OAuth lives only in the
 token-store.
 
 ---
