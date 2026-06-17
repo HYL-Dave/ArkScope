@@ -274,7 +274,7 @@ async def query_agent_stream(
                 if done_data is not None:
                     _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed)
                 elif error_content is not None:
-                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=request.model, elapsed=elapsed)
+                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, elapsed=elapsed)
 
     return StreamingResponse(
         event_generator(),
