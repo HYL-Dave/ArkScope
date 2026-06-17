@@ -133,14 +133,20 @@ async def query_agent(
         - "Generate a morning brief"
     """
     provider = request.provider.lower()
+    # No explicit model → the AI 研究 route (or the provider's default tier).
+    model, effort = request.model, None
+    if model is None and provider in ("openai", "anthropic"):
+        from src.agents.config import resolve_research_route
+        model, effort = resolve_research_route(provider)
 
     if provider == "openai":
         try:
             from src.agents.openai_agent import run_query
             result = await run_query(
                 question=request.question,
-                model=request.model,
+                model=model,
                 dal=dal,
+                reasoning_effort=effort,
             )
         except ImportError as e:
             raise HTTPException(
@@ -156,8 +162,9 @@ async def query_agent(
             from src.agents.anthropic_agent import run_query
             result = run_query(
                 question=request.question,
-                model=request.model,
+                model=model,
                 dal=dal,
+                effort=effort,
             )
         except ImportError as e:
             raise HTTPException(
@@ -212,10 +219,16 @@ async def query_agent_stream(
         # persisting this turn's user message so it isn't duplicated. full_thread
         # policy, no silent truncation (AI_RESEARCH_CONTEXT_MEMORY_PLAN.md §4).
         history = build_thread_history(store, request.thread_id) if persist else []
+        # No explicit model → the AI 研究 route (or the provider's default tier).
+        # Resolve BEFORE persisting so the thread records the model actually used.
+        res_model, res_effort = request.model, None
+        if res_model is None and provider in ("openai", "anthropic"):
+            from src.agents.config import resolve_research_route
+            res_model, res_effort = resolve_research_route(provider)
         if persist:
             _persist_user_turn(
                 store, thread_id=request.thread_id, question=request.question,
-                ticker=request.ticker, provider=provider, model=request.model,
+                ticker=request.ticker, provider=provider, model=res_model,
                 title=request.question[:TITLE_MAX],
             )
         collected: list[tuple[str, dict]] = []  # (#3) tool_start/tool_end trace
@@ -225,10 +238,10 @@ async def query_agent_stream(
         try:
             if provider == "openai":
                 from src.agents.openai_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=request.model, dal=dal, history=history)
+                stream = run_query_stream(question=agent_question, model=res_model, dal=dal, reasoning_effort=res_effort, history=history)
             elif provider == "anthropic":
                 from src.agents.anthropic_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=request.model, dal=dal, history=history)
+                stream = run_query_stream(question=agent_question, model=res_model, dal=dal, effort=res_effort, history=history)
             else:
                 from src.agents.shared.events import AgentEvent, EventType
                 error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)

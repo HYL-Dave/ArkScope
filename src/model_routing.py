@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Provider = Literal["anthropic", "openai"]
-TaskId = Literal["card_synthesis", "card_translation"]
+TaskId = Literal["card_synthesis", "card_translation", "ai_research"]
 RouteSource = Literal["env", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 

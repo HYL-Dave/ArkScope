@@ -52,6 +52,12 @@ class AgentConfig(BaseModel):
     card_translation_provider: str = ""  # "" → anthropic unless model infers otherwise
     card_translation_model: str = ""  # "" → a fast model (Sonnet)
     card_translation_effort: str = ""  # "" → provider default
+    # AI 研究 (Research) surface route. Empty = use the request provider's
+    # default-tier agent model (today's behavior). Honored only when its provider
+    # matches the request provider (see resolve_research_route).
+    ai_research_provider: str = ""
+    ai_research_model: str = ""
+    ai_research_effort: str = ""
 
     # Reasoning (GPT-5.x / o-series)
     reasoning_effort: ReasoningEffort = "xhigh"
@@ -252,6 +258,12 @@ def get_agent_config() -> AgentConfig:
         config.card_translation_model = llm_prefs["card_translation_model"]
     if "card_translation_effort" in llm_prefs:
         config.card_translation_effort = llm_prefs["card_translation_effort"]
+    if "ai_research_provider" in llm_prefs:
+        config.ai_research_provider = llm_prefs["ai_research_provider"]
+    if "ai_research_model" in llm_prefs:
+        config.ai_research_model = llm_prefs["ai_research_model"]
+    if "ai_research_effort" in llm_prefs:
+        config.ai_research_effort = llm_prefs["ai_research_effort"]
     if "reasoning_effort" in llm_prefs:
         config.reasoning_effort = llm_prefs["reasoning_effort"]
     if "max_tool_calls" in llm_prefs:
@@ -376,6 +388,11 @@ _TASK_ENV = {
         "ARKSCOPE_CARD_TRANSLATION_MODEL",
         "ARKSCOPE_CARD_TRANSLATION_EFFORT",
     ),
+    "ai_research": (
+        "ARKSCOPE_AI_RESEARCH_PROVIDER",
+        "ARKSCOPE_AI_RESEARCH_MODEL",
+        "ARKSCOPE_AI_RESEARCH_EFFORT",
+    ),
 }
 
 
@@ -397,6 +414,12 @@ def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str
             config.card_translation_provider,
             config.card_translation_model,
             config.card_translation_effort,
+        )
+    if task == "ai_research":
+        return (
+            config.ai_research_provider,
+            config.ai_research_model,
+            config.ai_research_effort,
         )
     raise ValueError(f"unknown task: {task}")
 
@@ -439,6 +462,10 @@ def task_route(task: TaskId) -> TaskRoute:
             model = config.openai_model_advanced
         elif task == "card_translation" and provider == "anthropic":
             model = _DEFAULT_TRANSLATION_MODEL
+        elif task == "ai_research" and provider == "anthropic":
+            model = config.anthropic_model       # Research default tier (not advanced)
+        elif task == "ai_research" and provider == "openai":
+            model = config.openai_model
         else:
             model = default_model_for(provider, task)
 
@@ -469,3 +496,19 @@ def task_model(task: TaskId) -> str:
 def task_provider(task: TaskId) -> Provider:
     """Resolve the provider for a per-task LLM operation."""
     return task_route(task).provider
+
+
+def resolve_research_route(provider: Provider) -> tuple[str, Optional[str]]:
+    """Model + effort the AI 研究 surface should use for ``provider`` when the
+    request specifies neither. Honors a configured ``ai_research`` route ONLY when
+    its provider matches the request provider; otherwise the request provider's
+    default-tier agent model (today's behavior). A 'default'/empty effort → None
+    (the agent uses its own default). The Research page picks the provider, so the
+    model/effort are resolved for THAT provider, not forced to the route's."""
+    route = task_route("ai_research")
+    if route.provider == provider and route.source != "default":
+        effort = None if route.effort in ("", "default") else route.effort
+        return route.model, effort
+    config = get_agent_config()
+    model = config.anthropic_model if provider == "anthropic" else config.openai_model
+    return model, None

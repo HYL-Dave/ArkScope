@@ -172,9 +172,10 @@ def test_query_stream_threads_history_into_provider(store, monkeypatch, provider
 
     captured = {}
 
-    async def fake_stream(*, question, model, dal, history):
+    async def fake_stream(*, question, model, dal, history, **kwargs):
         captured["question"] = question
         captured["history"] = history
+        captured["model"] = model  # B1: resolved from the ai_research route when request.model is None
         from src.agents.shared.events import AgentEvent, EventType
         yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": provider, "model": "m", "token_usage": {}})
 
@@ -195,6 +196,7 @@ def test_query_stream_threads_history_into_provider(store, monkeypatch, provider
     ]
     # agent receives the ticker-framed question; the store keeps the raw one
     assert captured["question"] == "針對 NVDA：follow up"
+    assert captured["model"]  # B1: request.model=None → resolved to the provider's research model (not None)
     assert store.list_messages("t1")[-1].content == "ok"  # assistant turn persisted after
 
 
@@ -204,7 +206,7 @@ def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
 
     captured = {}
 
-    async def fake_stream(*, question, model, dal, history):
+    async def fake_stream(*, question, model, dal, history, **kwargs):
         captured["history"] = history
         from src.agents.shared.events import AgentEvent, EventType
         yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": "anthropic", "model": "m", "token_usage": {}})
