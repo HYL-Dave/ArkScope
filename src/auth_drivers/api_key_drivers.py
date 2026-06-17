@@ -53,6 +53,7 @@ class _ApiKeyDriver:
         self._credential_id = credential_id
         self._store = store
         self._client = client
+        self._sync_client = None
 
     # --- auth state ------------------------------------------------------
     @property
@@ -106,7 +107,21 @@ class _ApiKeyDriver:
             return None
         return r.secret if r else None
 
+    def client_sync(self) -> Any:
+        """A SYNCHRONOUS SDK client (STANDARD host). The live Anthropic call
+        sites construct a sync ``Anthropic()`` (not ``AsyncAnthropic``), so the
+        wire-in needs a sync client from the driver — ``client()`` returns async."""
+        if self._sync_client is None:
+            key = self._api_key or self._resolve_secret()
+            if not key:
+                raise MissingCredentialError(f"no API key configured for {self.provider}")
+            self._sync_client = self._make_sync_client(key)
+        return self._sync_client
+
     def _make_client(self, api_key: str) -> Any:  # pragma: no cover - overridden
+        raise NotImplementedError
+
+    def _make_sync_client(self, api_key: str) -> Any:  # pragma: no cover - overridden
         raise NotImplementedError
 
     # --- LLM-call primitives gated to S5 ---------------------------------
@@ -125,6 +140,11 @@ class OpenAIApiKeyDriver(_ApiKeyDriver):
 
         return AsyncOpenAI(api_key=api_key)  # default base_url = api.openai.com (STANDARD)
 
+    def _make_sync_client(self, api_key: str) -> Any:
+        from openai import OpenAI
+
+        return OpenAI(api_key=api_key)
+
 
 class AnthropicApiKeyDriver(_ApiKeyDriver):
     provider = "anthropic"
@@ -133,6 +153,11 @@ class AnthropicApiKeyDriver(_ApiKeyDriver):
         from anthropic import AsyncAnthropic
 
         return AsyncAnthropic(api_key=api_key)  # default base_url = api.anthropic.com
+
+    def _make_sync_client(self, api_key: str) -> Any:
+        from anthropic import Anthropic
+
+        return Anthropic(api_key=api_key)  # default base_url = api.anthropic.com
 
 
 def _default_model(provider: str) -> str:
