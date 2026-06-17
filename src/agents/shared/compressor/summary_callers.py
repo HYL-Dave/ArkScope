@@ -93,7 +93,8 @@ class AnthropicSummaryCaller:
             raise RuntimeError(
                 "anthropic SDK not installed — cannot run Layer 5 summary call"
             ) from exc
-        self._client = Anthropic()
+        from src.auth_drivers.live_resolver import live_anthropic_client
+        self._client = live_anthropic_client()
         return self._client
 
     def __call__(

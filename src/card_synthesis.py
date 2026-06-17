@@ -142,7 +142,8 @@ def _synthesize_anthropic(
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
-        client = Anthropic()
+        from src.auth_drivers.live_resolver import live_anthropic_client
+        client = live_anthropic_client()
         resp = client.messages.create(
             model=model,
             max_tokens=_MAX_TOKENS,
@@ -460,7 +461,8 @@ def _translate_anthropic(
         kwargs: dict[str, Any] = {}
         if selected_effort != "default":
             kwargs["output_config"] = {"effort": selected_effort}
-        client = Anthropic()
+        from src.auth_drivers.live_resolver import live_anthropic_client
+        client = live_anthropic_client()
         resp = client.messages.create(
             model=model,
             max_tokens=4096,

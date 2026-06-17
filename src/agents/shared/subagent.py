@@ -403,7 +403,8 @@ def _run_anthropic_subagent(
     from ..shared.token_tracker import TokenTracker
 
     agent_config = get_agent_config()
-    client = Anthropic()
+    from src.auth_drivers.live_resolver import live_anthropic_client
+    client = live_anthropic_client()
 
     # Filter tools to subagent's allowed subset
     all_tools = get_anthropic_tools()

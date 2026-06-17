@@ -24,6 +24,22 @@ from src.model_credentials import CredentialStore
 
 logger = logging.getLogger(__name__)
 
+# The OAuth→env fallback must be EXPLICIT but not spammy: WARNING once per
+# (provider, source) per process; thereafter DEBUG. The structured
+# LiveAuthResolution remains the queryable surface for the UI/Settings.
+_warned: set = set()
+
+
+def _signal_fallback(res: "LiveAuthResolution") -> None:
+    if not res.note:
+        return
+    key = f"{res.provider}:{res.source}"
+    if key in _warned:
+        logger.debug("%s", res.note)
+    else:
+        _warned.add(key)
+        logger.warning("%s", res.note)
+
 
 @dataclass(frozen=True)
 class LiveAuthResolution:
@@ -70,8 +86,7 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     if res.source == "db_api_key":
         cred = store.get(res.credential_id)
         return build_driver(provider="anthropic", auth_mode="api_key", credential=cred).client_sync()
-    if res.note:
-        logger.warning("%s", res.note)
+    _signal_fallback(res)
     return Anthropic()  # env fallback (ANTHROPIC_API_KEY) — unchanged behavior
 
 
@@ -91,6 +106,6 @@ def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> Live
     if res.source == "db_api_key":
         cred = store.get(res.credential_id)
         set_default_openai_client(build_driver(provider="openai", auth_mode="api_key", credential=cred).client())
-    elif res.note:
-        logger.warning("%s", res.note)
+    else:
+        _signal_fallback(res)
     return res

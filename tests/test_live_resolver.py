@@ -73,6 +73,7 @@ def test_live_anthropic_client_uses_db_api_key(store):
 def test_live_anthropic_client_oauth_falls_back_to_env_with_warning(store, monkeypatch, caplog):
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-envfake")  # so the env-fallback Anthropic() can construct
+    lr._warned.clear()  # reset the once-per-process throttle so the WARNING fires here
     with caplog.at_level("WARNING"):
         c = lr.live_anthropic_client(store=store)
     assert isinstance(c, Anthropic)

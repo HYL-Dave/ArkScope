@@ -157,7 +157,8 @@ def _call_anthropic(messages: List[dict], model: str, system: str) -> str:
         # it (400). Only set it for models that still accept it.
         kwargs.update(_maybe_temperature(model))
 
-    client = Anthropic()
+    from src.auth_drivers.live_resolver import live_anthropic_client
+    client = live_anthropic_client()
     with client.messages.stream(**kwargs) as stream:
         response = stream.get_final_message()
 

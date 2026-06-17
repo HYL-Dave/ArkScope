@@ -610,7 +610,8 @@ def run_anthropic_interactive(
 
     config = get_agent_config()
     model_name = model or config.anthropic_model
-    client = Anthropic()
+    from src.auth_drivers.live_resolver import live_anthropic_client
+    client = live_anthropic_client()
     tools = get_anthropic_tools()
 
     # Hosted server tools — single source of truth in shared/server_tools.py.

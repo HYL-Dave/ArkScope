@@ -211,8 +211,10 @@ async def run_query_stream(
     config = get_agent_config()
     model_name = model or config.anthropic_model
 
-    # Initialize client
-    client = Anthropic()
+    # Initialize client from the ACTIVE credential (api_key wire-in; OAuth-active
+    # falls back to env ANTHROPIC_API_KEY with an explicit log — Slice 6).
+    from src.auth_drivers.live_resolver import live_anthropic_client
+    client = live_anthropic_client()
 
     # Build tool list including any hosted server tools (single wiring
     # point — see ``_build_anthropic_tools_list`` docstring).
