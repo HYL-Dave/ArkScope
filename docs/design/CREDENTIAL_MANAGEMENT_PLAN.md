@@ -5,6 +5,11 @@ Supabase hygiene already landed (see §9). Companion to
 `LLM_AUTH_DRIVER_PLAN.md` (the driver/auth-mode matrix); this doc covers *where
 credentials live*, *how the user switches them*, and *the `.env` round-trip*.
 
+**Config-authority scope:** this doc is the LLM credential implementation plan.
+The cross-cutting rules for DB-first Settings, file/env fallback, and retirement
+gates live in `CONFIG_AUTHORITY_PLAN.md`; this plan should follow that authority
+when deciding whether `.env`, DB, token-store, or Settings owns a behavior.
+
 **Origin:** user wants ≥2 independent keys per provider (multiple accounts, each
 with a daily free-tier limit) with **manual switching** (key↔key AND key↔OAuth),
 and asked whether credential deps should keep living in the `.env` *file* or move

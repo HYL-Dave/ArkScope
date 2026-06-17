@@ -14,8 +14,9 @@
    - First stop for any "what's next?" or "what's the current active sequence?" question.
 2. **`docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md`** — pre-spec audit (north star + 5-layer architecture + 5 axes + Hermes-capability gap). Informs the spec; does not itself lock product decisions.
 3. **`docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`** — once landed, becomes canonical for local-first product shape (positioning, deployment, storage, sync, page IA, bidirectional DTOs, scheduler interfaces, migration plan).
-4. **`docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md`** — preserved as-is; **paused** as of 2026-05-02 pending the workbench v1 resume gate.
-5. **`docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`** — protects current data collection and browser extension runtime paths during large refactors; do not use it to preserve stale product framing.
+4. **`docs/design/CONFIG_AUTHORITY_PLAN.md`** — canonical rules for DB-first Settings authority, file/env fallback roles, and config retirement gates.
+5. **`docs/design/PHASE_C_UNIFIED_RUNNER_SPEC.md`** — preserved as-is; **paused** as of 2026-05-02 pending the workbench v1 resume gate.
+6. **`docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`** — protects current data collection and browser extension runtime paths during large refactors; do not use it to preserve stale product framing.
 
 If any of those conflict with each other, newer-dated entries in priority map §10 win.
 

@@ -24,8 +24,9 @@ contents were removed 2026-06-07, recoverable via git.)
 ### Authority hierarchy (on conflict)
 1. **`LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`** — architecture / storage / sync / migration.
 2. **`ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`** — product identity / AI-output contract / permissions.
-3. **`ARKSCOPE_PROVIDER_CATALOG.md`** — per-provider facts. · **`ARKSCOPE_TOOL_CATALOG.md`** — tool facts.
-4. Everything else defers to the above.
+3. **`CONFIG_AUTHORITY_PLAN.md`** — config source-of-truth rules, file/env retirement gates.
+4. **`ARKSCOPE_PROVIDER_CATALOG.md`** — per-provider facts. · **`ARKSCOPE_TOOL_CATALOG.md`** — tool facts.
+5. Everything else defers to the above.
 
 ---
 
@@ -36,6 +37,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` | **Local-First Architecture Spec** | v1 architecture + storage + sync + page-IA + migration contract (9 locks). Wins architecture conflicts. |
 | `ARKSCOPE_PROVIDER_CATALOG.md` | **Provider Catalog** | Per-provider data/latency/streaming/cost/auth/limits → drives Settings provider config. |
 | `ARKSCOPE_TOOL_CATALOG.md` | **Tool Catalog** | Live ToolRegistry inventory (~51 tools) with keep/adapt/retire verdicts. |
+| `CONFIG_AUTHORITY_PLAN.md` | **Config Authority Plan** | DB-first Settings authority, file/env fallback roles, and retirement gates for config migration. |
 | `CURRENT_PROJECT_CONTEXT.md` | **Project Context** | Pointer index for an assistant arriving at the repo; canonical sources in read order. |
 | `PROJECT_PRIORITY_MAP.md` | **Priority Map** | Backlog total order + newest-first decision log. First stop for "what's next?". |
 | `REFACTOR_PROTECTION_SMOKE_GATES.md` | **Refactor-Protection Gates** | Guardrail protecting operational ingestion + extension runtime paths during refactors/migration. |
