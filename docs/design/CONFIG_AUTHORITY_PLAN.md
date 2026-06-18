@@ -201,11 +201,14 @@ These are not technical debt. They are bootstrap and rescue controls.
    Research and Anthropic fallback is explicit.
 4. **Slice 7 Claude OAuth Research driver**: make `claude_code_oauth` an actual
    Research runtime, not only a Settings/probe row.
-5. **LLM config authority audit**: list every remaining LLM/model/profile/env
+5. **AI Research run lifecycle**: follow `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md` so
+   Settings owns the default AI Research route while the Research surface can
+   make explicit per-run model/effort overrides.
+6. **LLM config authority audit**: list every remaining LLM/model/profile/env
    setting and classify it by §2.
-6. **LLM file-retirement pass**: retire or relabel legacy `.env`/YAML fields only
+7. **LLM file-retirement pass**: retire or relabel legacy `.env`/YAML fields only
    after §3 gates pass.
-7. **Data-source config audit**: repeat the same process for provider keys,
+8. **Data-source config audit**: repeat the same process for provider keys,
    schedules, source enablement, and alert settings.
 
 ---

@@ -1,7 +1,7 @@
 # Layer C-2 — AI 研究 / AI Research (Chat surface)
 
-> **Status:** SHIPPED through C-2b (2026-06-15): C-2a streaming surface + C-2b persisted threads/messages are implemented. This document remains the contract reference for the SSE/event reducer/UI shape. **C-2c multi-turn context and memory policy is not solved here**; see `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md`.
-> **Original scope:** enable the existing **AI 研究** nav surface and reuse `POST /query/stream`. C-2a added a 3-pane evidence-first chat (thread-list / conversation / evidence-trace). C-2b added local thread persistence. The next work is history/context injection, not another UI shell.
+> **Status:** SHIPPED through C-2b (2026-06-15): C-2a streaming surface + C-2b persisted threads/messages are implemented. This document remains the contract reference for the SSE/event reducer/UI shape. **C-2c multi-turn context and memory policy is not solved here**; see `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md`. **Post-shipped run lifecycle / per-run model override / background execution is now planned in `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md`.**
+> **Original scope:** enable the existing **AI 研究** nav surface and reuse `POST /query/stream`. C-2a added a 3-pane evidence-first chat (thread-list / conversation / evidence-trace). C-2b added local thread persistence. Later history/context injection and run lifecycle work are documented separately, not by expanding this shipped spec.
 > **Predecessors:** C-1 `get_sa_feed` + `get_sa_comment_focus` + News surface — done. `POST /query/stream`, `EventType`/`AgentEvent.to_sse()`, `GET /query/providers`, `GET /config/runtime` — all exist.
 
 ## 1. Why

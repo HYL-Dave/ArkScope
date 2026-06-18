@@ -51,6 +51,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · explicit PG runtime-retirement track · price tiers · scheduler/data-update repositioning. |
 | `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DECISION | Source DB vs canonical DB principle; provider-growth review rule for deciding when a new source needs its own DB/inbox. |
 | `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md` | **AI Research Context & Memory Plan** | ACTIVE | C-2c thread-context principles: complete transcript, no silent truncation, configurable memory policies, strategy/skill/tool extensibility roadmap. |
+| `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md` | **AI Research Run Lifecycle Plan** | ACTIVE | Next AI Research architecture: server-owned runs, per-run model selection, attach/replay trace, independent thread execution, and Slice 6/7 ordering. |
 
 ## Seeking-Alpha pipeline (PROTECTED ingestion path — must not break)
 | File | Read as | Status | One-line |
