@@ -62,9 +62,11 @@ def delete_research_thread(
     thread_id: str,
     store=Depends(get_thread_store),
 ) -> dict:
-    """Delete one persisted thread and its messages from the local store."""
+    """Delete one persisted thread and its messages from the local store.
+
+    DELETE is idempotent for a valid id: a stale UI row or already-deleted
+    thread returns deleted=false instead of surfacing a product-level error.
+    """
     if not valid_thread_id(thread_id):
         raise HTTPException(status_code=422, detail="invalid thread_id")
-    if not store.delete_thread(thread_id):
-        raise HTTPException(status_code=404, detail="thread not found")
-    return {"thread_id": thread_id, "deleted": True}
+    return {"thread_id": thread_id, "deleted": store.delete_thread(thread_id)}

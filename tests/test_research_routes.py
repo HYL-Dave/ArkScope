@@ -166,12 +166,9 @@ def test_delete_thread_route_removes_thread_and_messages(store):
     assert store.list_messages("t1") == []
 
 
-def test_delete_thread_route_404_for_missing(store):
-    from fastapi import HTTPException
-
-    with pytest.raises(HTTPException) as ei:
-        r.delete_research_thread(thread_id="nope", store=store)
-    assert ei.value.status_code == 404
+def test_delete_thread_route_is_idempotent_for_missing(store):
+    res = r.delete_research_thread(thread_id="nope", store=store)
+    assert res == {"thread_id": "nope", "deleted": False}
 
 
 def test_delete_thread_route_422_for_blank_thread_id(store):

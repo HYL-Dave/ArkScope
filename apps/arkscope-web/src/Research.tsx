@@ -86,6 +86,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [booting, setBooting] = useState(true);
   const [autoRouteSelection, setAutoRouteSelection] = useState(true);
   const [threadError, setThreadError] = useState<string | null>(null);
+  const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -138,6 +139,10 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setAutoRouteSelection(true);
     setProvider(null);
   }, [configuredRouteKey]);
+
+  useEffect(() => {
+    if (state.pending) setThreadMenuId(null);
+  }, [state.pending]);
 
   // Reload hydration (C-2b): on mount, restore persisted threads + their
   // messages from the store into the reducer. Best-effort — an empty/failed
@@ -206,19 +211,25 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const newThread = useCallback(() => {
     if (state.pending) return;
     setThreadError(null);
+    setThreadMenuId(null);
     dispatch({ kind: "newThread" });
   }, [state.pending]);
   const selectThread = useCallback((id: string) => {
     if (state.pending) return;
     setThreadError(null);
+    setThreadMenuId(null);
     dispatch({ kind: "selectThread", threadId: id });
   }, [state.pending]);
-  const deleteThread = useCallback(async (id: string) => {
+  const deleteThread = useCallback(async (thread: Thread) => {
     if (state.pending) return;
+    const title = thread.title || "（未命名）";
+    const ok = window.confirm(`刪除「${title}」？\n\n這會移除此對話的本地訊息與這個 thread 的上下文記憶。`);
+    if (!ok) return;
     setThreadError(null);
     try {
-      await deleteResearchThread(id);
-      dispatch({ kind: "deleteThread", threadId: id });
+      await deleteResearchThread(thread.id);
+      dispatch({ kind: "deleteThread", threadId: thread.id });
+      setThreadMenuId(null);
     } catch (e) {
       setThreadError(e instanceof Error ? e.message : String(e));
     }
@@ -297,14 +308,26 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                       {t.ticker && <span className="list-chip tiny">{t.ticker}</span>}
                     </button>
                     <button
-                      className="research-threaddelete"
-                      onClick={() => void deleteThread(t.id)}
+                      className="research-threadmenu-btn"
+                      onClick={() => setThreadMenuId((open) => (open === t.id ? null : t.id))}
                       disabled={!!state.pending}
-                      title={state.pending ? "目前回應執行中，請先停止或等待完成" : "刪除對話"}
-                      aria-label={`刪除對話 ${t.title || t.id}`}
+                      title={state.pending ? "目前回應執行中，請先停止或等待完成" : "更多操作"}
+                      aria-label={`開啟對話操作 ${t.title || t.id}`}
+                      aria-expanded={threadMenuId === t.id}
                     >
-                      ×
+                      …
                     </button>
+                    {threadMenuId === t.id && !state.pending && (
+                      <div className="research-threadmenu" role="menu">
+                        <button
+                          className="research-threadmenu-item danger"
+                          onClick={() => void deleteThread(t)}
+                          role="menuitem"
+                        >
+                          刪除對話
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </li>
               ))}
