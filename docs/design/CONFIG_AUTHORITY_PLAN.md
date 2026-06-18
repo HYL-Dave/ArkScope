@@ -100,7 +100,10 @@ Current status:
 
 Next gate:
 
-- Complete AI Research model-route UI and Slice 6 live test.
+- AI Research model-route UI: DONE (Slice B1 backend + B2 full-stack — `ai_research`
+  is in TaskId/TASKS/`/config/runtime`/`/config/model-catalog`, Settings → Models
+  renders+saves it, and the Research header + send-area chip show the resolved
+  route). Remaining gate = the **Slice 6 cheap live test** (real-surface run).
 - Complete Slice 7 so `claude_code_oauth` can actually run Research through the
   subscription path, not env fallback.
 

@@ -12,10 +12,12 @@
 // (merge, so a late hydrate can't clobber a live turn). Threads survive reload;
 // the provider pick is per-session (re-chosen after reload), not persisted.
 //
-// Provider selection is USER-CHOSEN — no global default. Settings routing isn't
-// built yet, so: 1 provider available → auto-select; >1 → chooser (no pre-pick);
-// 0 → disable input. Per-provider trace behaviour comes from a descriptor map,
-// not an OpenAI/Anthropic binary, so compatible providers can slot in later.
+// Provider selection is USER-CHOSEN — no global default: 1 provider available →
+// auto-select; >1 → chooser (no pre-pick); 0 → disable input. The model/effort
+// per query is the ai_research route (Settings → Models, Slice B2), resolved for
+// the chosen provider — see researchModelFor. Per-provider trace behaviour comes
+// from a descriptor map, not an OpenAI/Anthropic binary, so compatible providers
+// can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -193,12 +195,26 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const footer = selectFooter(state); // derived from the active thread, survives thread-switch
   const noProvider = !booting && availableIds.length === 0;
   const needChooser = !provider && availableIds.length > 1;
+  // The model/effort a query will ACTUALLY use for a provider: the configured
+  // ai_research route when its provider matches, else the provider's default-tier
+  // model (= resolve_research_route's fallback). Keeps the send-area chip honest
+  // vs the header (don't show the default tier when a cheaper route is set).
+  const researchModelFor = (pid: string): string => {
+    const r = runtime?.ai_research;
+    if (r && r.provider === pid && r.source !== "default") return r.model;
+    return availability.find((a) => a.id === pid)?.model || "?";
+  };
+  const researchEffortFor = (pid: string): string | null => {
+    const r = runtime?.ai_research;
+    if (r && r.provider === pid && r.source !== "default" && r.effort && r.effort !== "default") return r.effort;
+    return null;
+  };
 
   return (
     <main className="main research">
       <div className="surface-head">
         <h1 className="surface-title">AI 研究</h1>
-        <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定（本地·ephemeral）</span>
+        <span className="muted tiny">工具追蹤與證據整理，支援即時或完成後顯示，依 provider 而定；對話保存於本地（reload 後保留），即時工具追蹤為 ephemeral</span>
         {runtime?.ai_research && (
           runtime.ai_research.source !== "default" ? (
             <span className="muted tiny">
@@ -289,7 +305,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                     </>
                   ) : provider ? (
                     <>
-                      <span className="list-chip prov">{PRESENTATION[provider].label} / {availability.find((a) => a.id === provider)?.model || "?"}</span>
+                      <span className="list-chip prov">{PRESENTATION[provider].label} / {researchModelFor(provider)}{researchEffortFor(provider) ? ` · ${researchEffortFor(provider)}` : ""}</span>
                       <span className="muted tiny">{PRESENTATION[provider].trace_note}</span>
                       {availableIds.length > 1 && (
                         <button className="btn-ghost tiny" onClick={() => setProvider(null)} title="切換 provider">切換</button>
