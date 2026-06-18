@@ -26,6 +26,7 @@ import {
   getRuntimeConfig, streamQuery,
   type ResearchMessageDTO, type ResearchThreadDTO, type RuntimeConfig,
 } from "./api";
+import { MarkdownView } from "./MarkdownView";
 import {
   initialState,
   MAX_TURNS_SENTINEL,
@@ -378,7 +379,15 @@ function Bubble({ m, onOpenTicker }: { m: Message; onOpenTicker: (t: string) => 
           {typeof m.elapsed_seconds === "number" && <span> · {m.elapsed_seconds.toFixed(1)}s</span>}
         </div>
       )}
-      <div className="research-bubble-body">{m.content || (m.role === "assistant" ? "（空回應）" : "")}</div>
+      <div className="research-bubble-body">
+        {m.role === "assistant" && !m.isError && !m.maxTurns && m.content ? (
+          // assistant answers are Markdown (safe renderer); user/error/maxTurns
+          // stay literal text (don't reinterpret a raw question or error string).
+          <MarkdownView source={m.content} />
+        ) : (
+          m.content || (m.role === "assistant" ? "（空回應）" : "")
+        )}
+      </div>
       {m.tickers && m.tickers.length > 0 && (
         <div className="research-bubble-tickers">
           {m.tickers.map((t) => (
