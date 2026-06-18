@@ -55,3 +55,16 @@ def list_research_messages(
     if store.get_thread(thread_id) is None:
         raise HTTPException(status_code=404, detail="thread not found")
     return {"thread_id": thread_id, "messages": [_message_dict(m) for m in store.list_messages(thread_id)]}
+
+
+@router.delete("/research/threads/{thread_id}")
+def delete_research_thread(
+    thread_id: str,
+    store=Depends(get_thread_store),
+) -> dict:
+    """Delete one persisted thread and its messages from the local store."""
+    if not valid_thread_id(thread_id):
+        raise HTTPException(status_code=422, detail="invalid thread_id")
+    if not store.delete_thread(thread_id):
+        raise HTTPException(status_code=404, detail="thread not found")
+    return {"thread_id": thread_id, "deleted": True}

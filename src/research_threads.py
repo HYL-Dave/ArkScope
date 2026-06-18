@@ -251,6 +251,13 @@ class ResearchThreadStore:
             r = conn.execute("SELECT * FROM research_messages WHERE id = ?", (mid,)).fetchone()
         return self._message(r)
 
+    def delete_thread(self, thread_id: str) -> bool:
+        """Delete one persisted research conversation and all of its messages."""
+        with self._write_lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM research_threads WHERE id = ?", (thread_id,))
+            conn.commit()
+        return cur.rowcount > 0
+
     # --- reads -----------------------------------------------------------
 
     def get_thread(self, thread_id: str) -> Optional[ResearchThread]:

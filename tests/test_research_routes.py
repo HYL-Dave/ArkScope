@@ -155,6 +155,33 @@ def test_list_messages_422_for_blank_thread_id(store):
     assert ei.value.status_code == 422
 
 
+def test_delete_thread_route_removes_thread_and_messages(store):
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="hi")
+
+    res = r.delete_research_thread(thread_id="t1", store=store)
+
+    assert res == {"thread_id": "t1", "deleted": True}
+    assert store.get_thread("t1") is None
+    assert store.list_messages("t1") == []
+
+
+def test_delete_thread_route_404_for_missing(store):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as ei:
+        r.delete_research_thread(thread_id="nope", store=store)
+    assert ei.value.status_code == 404
+
+
+def test_delete_thread_route_422_for_blank_thread_id(store):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as ei:
+        r.delete_research_thread(thread_id="   ", store=store)
+    assert ei.value.status_code == 422
+
+
 @pytest.mark.parametrize("provider,module", [
     ("anthropic", "src.agents.anthropic_agent.agent"),
     ("openai", "src.agents.openai_agent.agent"),

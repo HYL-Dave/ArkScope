@@ -405,7 +405,7 @@ function authHeaders(): Record<string, string> {
  *
  * Deliberately does NOT use fetchWithTimeout — a turn runs 1–4 min and that
  * helper's 15s AbortController would kill the stream. The caller owns aborting
- * via `signal` (thread-switch / unmount / Stop). Frame parsing lives in the
+ * via `signal` (unmount / explicit Stop). Frame parsing lives in the
  * unit-tested SSEFrameParser; this drives fetch + the ReadableStream reader and
  * flushes the UTF-8 decoder for multibyte chars split across network chunks.
  * Throws on a non-ok / bodyless response so the caller can surface an error.
@@ -531,6 +531,9 @@ export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThrea
 }
 export function getResearchMessages(threadId: string): Promise<{ thread_id: string; messages: ResearchMessageDTO[] }> {
   return getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000);
+}
+export function deleteResearchThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
+  return sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, "DELETE", undefined, 8_000);
 }
 
 export function getModelCatalog(): Promise<ModelCatalog> {

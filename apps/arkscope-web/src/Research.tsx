@@ -2,8 +2,9 @@
 //
 // Thin UI over the pure researchReducer (the conversation authority). The UI
 // owns ONLY the AbortController + lifecycle discipline:
-//   • submit is disabled while a turn is pending (and aborts defensively first);
-//   • 新對話 / thread-switch abort the live stream, dispatch abort, then nav;
+//   • submit is disabled while a turn is pending;
+//   • 新對話 / thread-switch / delete are disabled while pending so a live
+//     stream cannot be accidentally interrupted by navigation;
 //   • on normal close → streamEnd (reducer no-ops if done already finalized);
 //   • on a thrown read → abort if it was deliberate, else streamError;
 //   • a superseded stream (a newer turn took over abortRef) never commits.
@@ -13,16 +14,16 @@
 // the provider pick is per-session (re-chosen after reload), not persisted.
 //
 // Provider selection is USER-CHOSEN — no global default: 1 provider available →
-// auto-select; >1 → chooser (no pre-pick); 0 → disable input. The model/effort
-// per query is the ai_research route (Settings → Models, Slice B2), resolved for
-// the chosen provider — see researchModelFor. Per-provider trace behaviour comes
-// from a descriptor map, not an OpenAI/Anthropic binary, so compatible providers
-// can slot in later.
+// auto-select; configured AI 研究 route → auto-select that route; 0 → disable
+// input. The model/effort per query is the ai_research route (Settings → Models,
+// Slice B2), resolved for the chosen provider — see researchModelFor.
+// Per-provider trace behaviour comes from a descriptor map, not an
+// OpenAI/Anthropic binary, so compatible providers can slot in later.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import {
-  getQueryProviders, getResearchThreads, getResearchMessages,
+  deleteResearchThread, getQueryProviders, getResearchThreads, getResearchMessages,
   getRuntimeConfig, streamQuery,
   type ResearchMessageDTO, type ResearchThreadDTO, type RuntimeConfig,
 } from "./api";
@@ -83,6 +84,8 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [runtime, setRuntime] = useState<RuntimeConfig | null>(null);
   const [sdk, setSdk] = useState<Record<string, boolean> | null>(null);
   const [booting, setBooting] = useState(true);
+  const [autoRouteSelection, setAutoRouteSelection] = useState(true);
+  const [threadError, setThreadError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -95,6 +98,12 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     });
   }, [runtime, sdk]);
   const availableIds = availability.filter((a) => a.available).map((a) => a.id);
+  const configuredProvider = runtime?.ai_research?.source !== "default"
+    ? (runtime?.ai_research?.provider as ProviderId | undefined)
+    : undefined;
+  const configuredRouteKey = runtime?.ai_research
+    ? `${runtime.ai_research.source}:${runtime.ai_research.provider}:${runtime.ai_research.model}:${runtime.ai_research.effort}`
+    : "";
 
   useEffect(() => {
     let alive = true;
@@ -113,11 +122,22 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     return () => { alive = false; };
   }, []);
 
-  // Auto-select ONLY when exactly one provider is available and none is chosen
-  // yet — never pre-pick when several are available (that's a user decision).
+  // Prefer the configured AI 研究 route when available. If the user explicitly
+  // clicks "切換", hold at the chooser until they pick another route.
   useEffect(() => {
-    if (provider === null && availableIds.length === 1) setProvider(availableIds[0] as ProviderId);
-  }, [provider, availableIds]);
+    if (provider !== null) return;
+    if (autoRouteSelection && configuredProvider && availableIds.includes(configuredProvider)) {
+      setProvider(configuredProvider);
+      return;
+    }
+    if (availableIds.length === 1) setProvider(availableIds[0] as ProviderId);
+  }, [provider, availableIds, autoRouteSelection, configuredProvider]);
+
+  // If Settings changes the AI 研究 route, let the page follow the new route.
+  useEffect(() => {
+    setAutoRouteSelection(true);
+    setProvider(null);
+  }, [configuredRouteKey]);
 
   // Reload hydration (C-2b): on mount, restore persisted threads + their
   // messages from the store into the reducer. Best-effort — an empty/failed
@@ -173,18 +193,36 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     const threadId = state.activeThreadId ?? crypto.randomUUID();
     dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now(), threadId });
     setQuestion("");
+    setThreadError(null);
     void runStream({ question: q, provider, thread_id: threadId, ticker }); // raw question; server frames + persists
   }, [question, tickerInput, provider, state.pending, state.activeThreadId, runStream]);
 
-  // Abort the live stream + drop the pending turn (reducer abort), per the
-  // integration contract — used by Stop, 新對話, and thread-switch.
+  // Abort the live stream + drop the pending turn (explicit Stop only).
   const stopStream = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     dispatch({ kind: "abort", ts: Date.now() });
   }, []);
-  const newThread = useCallback(() => { stopStream(); dispatch({ kind: "newThread" }); }, [stopStream]);
-  const selectThread = useCallback((id: string) => { stopStream(); dispatch({ kind: "selectThread", threadId: id }); }, [stopStream]);
+  const newThread = useCallback(() => {
+    if (state.pending) return;
+    setThreadError(null);
+    dispatch({ kind: "newThread" });
+  }, [state.pending]);
+  const selectThread = useCallback((id: string) => {
+    if (state.pending) return;
+    setThreadError(null);
+    dispatch({ kind: "selectThread", threadId: id });
+  }, [state.pending]);
+  const deleteThread = useCallback(async (id: string) => {
+    if (state.pending) return;
+    setThreadError(null);
+    try {
+      await deleteResearchThread(id);
+      dispatch({ kind: "deleteThread", threadId: id });
+    } catch (e) {
+      setThreadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [state.pending]);
 
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
@@ -232,21 +270,42 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       <div className="research-grid">
         {/* ── Left: thread list ───────────────────────────────────────── */}
         <aside className="research-threads">
-          <button className="btn-ghost small" onClick={newThread}>＋ 新對話</button>
+          <button
+            className="btn-ghost small"
+            onClick={newThread}
+            disabled={!!state.pending}
+            title={state.pending ? "目前回應執行中，請先停止或等待完成" : "新增對話"}
+          >
+            ＋ 新對話
+          </button>
+          {state.pending && <p className="muted tiny">回應執行中，完成或停止後可切換／刪除對話。</p>}
+          {threadError && <p className="error-text tiny">{threadError}</p>}
           {state.threads.length === 0 ? (
             <p className="muted tiny" style={{ marginTop: 10 }}>尚無對話。</p>
           ) : (
             <ul className="research-threadlist">
               {state.threads.map((t) => (
                 <li key={t.id}>
-                  <button
-                    className={`research-threaditem ${t.id === state.activeThreadId ? "active" : ""}`}
-                    onClick={() => selectThread(t.id)}
-                    title={t.title}
-                  >
-                    <span className="research-threadtitle">{t.title || "（未命名）"}</span>
-                    {t.ticker && <span className="list-chip tiny">{t.ticker}</span>}
-                  </button>
+                  <div className={`research-threadrow ${t.id === state.activeThreadId ? "active" : ""}`}>
+                    <button
+                      className="research-threaditem"
+                      onClick={() => selectThread(t.id)}
+                      disabled={!!state.pending}
+                      title={state.pending ? "目前回應執行中，請先停止或等待完成" : t.title}
+                    >
+                      <span className="research-threadtitle">{t.title || "（未命名）"}</span>
+                      {t.ticker && <span className="list-chip tiny">{t.ticker}</span>}
+                    </button>
+                    <button
+                      className="research-threaddelete"
+                      onClick={() => void deleteThread(t.id)}
+                      disabled={!!state.pending}
+                      title={state.pending ? "目前回應執行中，請先停止或等待完成" : "刪除對話"}
+                      aria-label={`刪除對話 ${t.title || t.id}`}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -297,10 +356,16 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 <div className="research-providerbar">
                   {needChooser ? (
                     <>
-                      <span className="muted tiny">選擇 provider：</span>
+                      <span className="muted tiny">選擇研究路線：</span>
                       {availability.filter((a) => a.available).map((a) => (
-                        <button key={a.id} className="btn-ghost small" onClick={() => setProvider(a.id as ProviderId)} title={PRESENTATION[a.id as ProviderId].auth_mode_label}>
-                          {PRESENTATION[a.id as ProviderId].label} · {PRESENTATION[a.id as ProviderId].trace_note}
+                        <button
+                          key={a.id}
+                          className="btn-ghost small"
+                          onClick={() => { setAutoRouteSelection(false); setProvider(a.id as ProviderId); }}
+                          title={`${PRESENTATION[a.id as ProviderId].auth_mode_label}；${PRESENTATION[a.id as ProviderId].trace_note}`}
+                        >
+                          {PRESENTATION[a.id as ProviderId].label} / {researchModelFor(a.id)}
+                          {researchEffortFor(a.id) ? ` · ${researchEffortFor(a.id)}` : ""}
                         </button>
                       ))}
                     </>
@@ -309,7 +374,13 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                       <span className="list-chip prov">{PRESENTATION[provider].label} / {researchModelFor(provider)}{researchEffortFor(provider) ? ` · ${researchEffortFor(provider)}` : ""}</span>
                       <span className="muted tiny">{PRESENTATION[provider].trace_note}</span>
                       {availableIds.length > 1 && (
-                        <button className="btn-ghost tiny" onClick={() => setProvider(null)} title="切換 provider">切換</button>
+                        <button
+                          className="btn-ghost tiny"
+                          onClick={() => { setAutoRouteSelection(false); setProvider(null); }}
+                          title="切換研究路線"
+                        >
+                          切換
+                        </button>
                       )}
                     </>
                   ) : null}

@@ -107,6 +107,28 @@ def test_list_threads_respects_limit(store):
     assert len(store.list_threads(limit=3)) == 3
 
 
+def test_delete_thread_removes_messages_and_history_without_touching_other_threads(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="first")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="a1")
+    store.ensure_thread(id="t2", title="second")
+    store.append_message(thread_id="t2", role="user", content="q2")
+
+    assert store.delete_thread("t1") is True
+
+    assert store.get_thread("t1") is None
+    assert store.list_messages("t1") == []
+    assert build_thread_history(store, "t1") == []
+    assert store.get_thread("t2").title == "second"
+    assert [m.content for m in store.list_messages("t2")] == ["q2"]
+
+
+def test_delete_thread_missing_is_false(store):
+    assert store.delete_thread("missing") is False
+
+
 def test_local_only_no_pg(store):
     assert store.db_path.endswith(".db")
     assert not hasattr(store, "_pg_conn") and not hasattr(store, "_get_conn")

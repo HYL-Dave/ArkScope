@@ -590,7 +590,7 @@ describe("reducer · thread navigation", () => {
     expect(s.messagesByThread["t2"]).toHaveLength(2); // t2 preserved
   });
 
-  it("newThread/selectThread clear an in-flight pending (defensive; UI aborts first)", () => {
+  it("newThread/selectThread clear an in-flight pending (defensive; UI blocks first)", () => {
     const mid = run(submit({ question: "q", threadId: "t1" }), f("thinking", { turn: 1, model: "m" }), f("tool_start", { tool: "get_sa_feed", input: {} }));
     expect(mid.pending).not.toBeNull();
     const a = reduce(mid, { kind: "newThread" });
@@ -598,6 +598,45 @@ describe("reducer · thread navigation", () => {
     expect(a.activeThreadId).toBeNull();
     // no assistant bubble fabricated from the dropped pending
     expect(a.messagesByThread["t1"]).toHaveLength(1); // user only
+  });
+
+  it("deleteThread removes an inactive thread and its messages without changing active", () => {
+    const s0 = run(
+      submit({ question: "first", threadId: "t1" }),
+      done1,
+      { kind: "newThread" },
+      submit({ question: "second", threadId: "t2" }),
+      f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }),
+    );
+    const s = reduce(s0, { kind: "deleteThread", threadId: "t1" });
+    expect(s.activeThreadId).toBe("t2");
+    expect(s.threads.map((t) => t.id)).toEqual(["t2"]);
+    expect(s.messagesByThread["t1"]).toBeUndefined();
+    expect(s.messagesByThread["t2"]).toHaveLength(2);
+  });
+
+  it("deleteThread removes the active thread and selects the next remaining thread", () => {
+    const s0 = run(
+      submit({ question: "first", threadId: "t1" }),
+      done1,
+      { kind: "newThread" },
+      submit({ question: "second", threadId: "t2" }),
+      f("done", { answer: "a2", tools_used: [], provider: "anthropic", model: "m", token_usage: { total_tokens: 5, turn_count: 1 } }),
+    );
+    const s = reduce(s0, { kind: "deleteThread", threadId: "t2" });
+    expect(s.activeThreadId).toBe("t1");
+    expect(s.threads.map((t) => t.id)).toEqual(["t1"]);
+    expect(s.messagesByThread["t2"]).toBeUndefined();
+    expect(msgs(s)).toHaveLength(2);
+  });
+
+  it("deleteThread on the last thread clears active selection and footer", () => {
+    const s0 = run(submit({ question: "first", threadId: "t1" }), done1);
+    const s = reduce(s0, { kind: "deleteThread", threadId: "t1" });
+    expect(s.activeThreadId).toBeNull();
+    expect(s.threads).toEqual([]);
+    expect(s.messagesByThread).toEqual({});
+    expect(s.footer).toBeNull();
   });
 });
 
