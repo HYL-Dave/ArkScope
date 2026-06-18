@@ -264,6 +264,28 @@ surface:
 The current Slice 6 implementation is a foundation, but the OpenAI global-client
 pattern is a concurrency risk.
 
+### 7.1a OpenAI Responses transport is separate from Research run streaming
+
+Do not conflate three different streaming layers:
+
+1. **OpenAI Agents SDK Responses transport** — the SDK can talk to OpenAI via
+   HTTP (SDK default) or websocket. ArkScope previously forced websocket for
+   speed, but after a live AI Research verification hit
+   `ConnectionClosedError: no close frame received or sent`, the default is now
+   HTTP with `ARKSCOPE_OPENAI_RESPONSES_TRANSPORT=websocket` as an explicit
+   opt-in.
+2. **ArkScope frontend stream** — the browser reads ArkScope's own
+   `text/event-stream` / SSE frames. This is unchanged by the OpenAI transport
+   choice.
+3. **Future server-owned run attach/replay** — the planned
+   `research_run_events` polling/SSE replay layer. This is also separate from
+   the OpenAI SDK transport.
+
+Websocket may still be appropriate for selected long or tool-heavy OpenAI runs
+after it is explicitly chosen and monitored. It should not be the implicit
+default for the paid live verification path or for correctness-sensitive desktop
+Research runs.
+
 ### 7.2 Per-run auth isolation
 
 The run manager should execute with a credential/client resolved for that run.
@@ -499,4 +521,3 @@ message + tool_calls remain the post-run trace source (§6.4 already says this).
 These do not change the plan's direction or sequencing — they sharpen §7.2 (the
 concurrency story is "isolate", not "serialize"), close the restart gap, and bound
 the event log.
-

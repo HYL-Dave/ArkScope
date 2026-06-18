@@ -93,7 +93,9 @@ process-global can't express "this construction uses account B").
   (a *client*, not a key, so a future `chatgpt_oauth` driver can swap `base_url`).
   **Set per-run, immediately before `Runner.run`** — it's a process-global; an
   in-flight `Runner` must not have it swapped underneath. (Orthogonal to the
-  existing `set_default_openai_responses_transport` global.)
+  existing `set_default_openai_responses_transport` global; ArkScope now leaves
+  that transport at HTTP by default and uses
+  `ARKSCOPE_OPENAI_RESPONSES_TRANSPORT=websocket` only as an explicit opt-in.)
 
 ---
 
