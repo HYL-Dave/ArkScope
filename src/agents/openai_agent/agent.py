@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import traceback as _traceback_mod
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
@@ -30,16 +31,31 @@ from ..shared.token_tracker import TokenTracker
 
 logger = logging.getLogger(__name__)
 
-# ── WebSocket transport (Phase 3 — persistent connections) ─────
-# Keeps a wss:// connection open for tool-call round trips instead of
-# re-establishing HTTP per turn.  ~30-40% faster for 10+ tool-call runs.
-# Falls back silently to HTTP if the SDK version doesn't support it.
-try:
-    from agents import set_default_openai_responses_transport
-    set_default_openai_responses_transport("websocket")
-    logger.info("OpenAI Responses API: WebSocket transport enabled")
-except (ImportError, Exception) as _ws_err:
-    logger.debug("WebSocket transport not available, using HTTP: %s", _ws_err)
+# ── Responses transport ─────────────────────────────────────────
+# Scope: ONLY the OpenAI Agents SDK Responses transport global. This does not
+# affect frontend SSE, Anthropic streaming, market-data websockets, or native
+# host capture. The Agents SDK defaults to HTTP. ArkScope previously forced
+# websocket for speed, but desktop Research runs have seen websocket close-frame
+# failures. Keep websocket available as an explicit opt-in for selected long /
+# tool-heavy runs, while defaulting to HTTP for correctness and easier live
+# verification.
+def _openai_responses_transport_from_env() -> str:
+    raw = os.environ.get("ARKSCOPE_OPENAI_RESPONSES_TRANSPORT", "http").strip().lower()
+    return "websocket" if raw == "websocket" else "http"
+
+
+def _configure_openai_responses_transport(*, set_transport=None) -> None:
+    try:
+        if set_transport is None:
+            from agents import set_default_openai_responses_transport as set_transport
+        transport = _openai_responses_transport_from_env()
+        set_transport(transport)
+        logger.info("OpenAI Responses API transport: %s", transport)
+    except (ImportError, Exception) as _transport_err:
+        logger.debug("OpenAI Responses transport configuration skipped: %s", _transport_err)
+
+
+_configure_openai_responses_transport()
 
 # ── Model output limits ────────────────────────────────────────
 # GPT-5.x 全系列 max output tokens = 128K
