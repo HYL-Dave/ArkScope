@@ -862,7 +862,14 @@ def _resolve_api_credential(
         return None
 
     if selected.auth_type == "api_key":
-        secret = os.environ.get(selected.source, "").strip()
+        local_id = _parse_local_id(selected.id)
+        if local_id is not None:
+            local_row = store.get(selected.id)
+            if not local_row or local_row.provider != provider or local_row.auth_type != "api_key":
+                return None
+            secret = local_row.secret or ""
+        else:
+            secret = os.environ.get(selected.source, "").strip()
     elif selected.auth_type == "api_key_pool":
         try:
             idx = int(selected.id.rsplit(":", 1)[-1])

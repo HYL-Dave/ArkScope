@@ -108,6 +108,18 @@ def test_provider_credentials_local_api_key_row(store, clean_env):
     assert local.masked and "sk-realkeyvalue9" not in (local.masked or "")  # secret never leaked
 
 
+def test_resolve_api_credential_uses_active_local_secret_without_explicit_id(store, clean_env):
+    """Settings → Models test button does not pass a credential id; the active
+    local DB api_key must still resolve to its DB secret, not to an env var named
+    "profile_state.db"."""
+    c = store.add(provider="openai", auth_type="api_key", alias="local-oa", secret="sk-active-db-key")
+    resolved = _resolve_api_credential("openai", credential_id=None, store=store)
+    assert resolved is not None
+    assert resolved.id == f"local:{c.id}"
+    assert resolved.auth_type == "api_key"
+    assert resolved.secret == "sk-active-db-key"
+
+
 def test_provider_credentials_placeholders_use_explicit_modes(store, clean_env):
     # The OpenAI ChatGPT-OAuth placeholder stays as the lone S3 signpost (OpenAI
     # has no import route yet). The two Anthropic env placeholders are REMOVED:
