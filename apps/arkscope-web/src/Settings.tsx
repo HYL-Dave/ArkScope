@@ -40,6 +40,7 @@ import {
   type RuntimeConfig,
   type TaskRoute,
 } from "./api";
+import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -982,29 +983,64 @@ function ModelRoutingSection({
               {effective?.warning && <p className="warn-text">{effective.warning}</p>}
 
               <label className="field">
-                <span>Provider</span>
+                <span>Model</span>
                 <select
-                  value={row.provider}
+                  value={row.custom ? MODEL_OPTION_CUSTOM : encodeModelOption(row.provider, row.model)}
                   onChange={(e) => {
-                    const provider = e.target.value as ModelProvider;
-                    const first = catalog.models.find((m) => m.provider === provider && m.recommended_for.includes(task.id))
-                      ?? catalog.models.find((m) => m.provider === provider);
+                    const v = e.target.value;
+                    if (v === MODEL_OPTION_CUSTOM) {
+                      // switch to custom-id mode; keep the current provider/model as the starting point
+                      onDraft((prev) => ({ ...prev, [task.id]: { ...row, custom: true } }));
+                      return;
+                    }
+                    const dec = decodeModelOption(v);
+                    if (!dec) return;
                     onDraft((prev) => ({
-                        ...prev,
-                        [task.id]: {
-                          provider,
-                          model: first?.id ?? "",
-                          effort: "default",
-                          custom: false,
-                        },
-                      }));
+                      ...prev,
+                      [task.id]: {
+                        provider: dec.provider,
+                        model: dec.model,
+                        // reset effort only when the provider changed (effort sets differ)
+                        effort: dec.provider === row.provider ? row.effort : "default",
+                        custom: false,
+                      },
+                    }));
                   }}
                 >
                   {catalog.providers.map((p) => (
-                    <option key={p} value={p}>{p}</option>
+                    <optgroup key={p} label={p}>
+                      {(modelsByProvider[p] ?? []).map((m) => (
+                        <option key={`${p}:${m.id}`} value={encodeModelOption(p, m.id)}>
+                          {p} · {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
+                  <option value={MODEL_OPTION_CUSTOM}>自訂 model id…</option>
                 </select>
+                <span className="field-help">直接選模型即可，provider 會自動設定；或選「自訂 model id」手動輸入。</span>
               </label>
+
+              {row.custom && (
+                <label className="field">
+                  <span>自訂 model id</span>
+                  <input
+                    value={row.model}
+                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      const inferred = inferProvider(value);
+                      onDraft((prev) => ({
+                        ...prev,
+                        [task.id]: { ...row, provider: inferred ?? row.provider, model: value, custom: true },
+                      }));
+                    }}
+                  />
+                  <span className="field-help">
+                    由 prefix 自動判斷 provider（gpt-… → openai，claude-… → anthropic）；判斷不出時沿用目前 provider（{row.provider}）。
+                  </span>
+                </label>
+              )}
 
               <label className="field">
                 <span>Effort / thinking</span>
@@ -1026,34 +1062,6 @@ function ModelRoutingSection({
                 <span className="field-help">
                   {effortOptions.find((x) => x.id === (row.effort || "default"))?.description ??
                     "Provider default."}
-                </span>
-              </label>
-
-              <label className="field">
-                <span>Model ID</span>
-                <input
-                  list={`models-${task.id}-${row.provider}`}
-                  value={row.model}
-                  placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    onDraft((prev) => ({
-                      ...prev,
-                      [task.id]: {
-                        ...row,
-                        custom: !options.some((m) => m.id === value),
-                        model: value,
-                      },
-                    }));
-                  }}
-                />
-                <datalist id={`models-${task.id}-${row.provider}`}>
-                  {options.map((m) => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </datalist>
-                <span className="field-help">
-                  可以直接輸入 provider 回傳的 model id；Providers 頁 discovery 後可一鍵套用。
                 </span>
               </label>
 
