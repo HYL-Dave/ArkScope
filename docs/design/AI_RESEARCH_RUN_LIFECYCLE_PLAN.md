@@ -346,18 +346,23 @@ Keep the current UI safety patch until the run manager exists:
 
 Do not keep polishing this mode indefinitely.
 
-### Phase 1 — Close Slice 6 live verification
+### Phase 1 — Close Slice 6 live verification — ✅ DONE 2026-06-19
 
-Run the cheap live test now that AI Research model routing exists:
+Cheap live test run via `run_query_stream` (the exact path `/query/stream` calls),
+real API calls, trivial prompts (gpt-5.4-mini + sonnet-4-6):
 
-1. Settings -> Models -> AI Research = OpenAI / cheap model / low effort.
-2. Run an OpenAI AI Research query with active primary key.
-3. Switch active OpenAI credential, run another query.
-4. Run Anthropic with Claude OAuth active and confirm explicit env fallback.
-5. Switch Anthropic API key active, run once, then restore Claude OAuth if
-   desired.
+1. OpenAI on the **active DB-only key** (`local:3`, secret NOT in env) → `OK`,
+   0 tools — proves the websocket→HTTP transport fix on the real Runner path AND
+   that the live loop resolved the **DB** credential (the key is unreachable via
+   env, so success can only mean the DB key was used).
+2. Switched active OpenAI credential → re-query → `OK` (switch affects the live
+   run); active restored.
+3. Anthropic with Claude OAuth active → `OK` + the explicit
+   `oauth_pending_env_fallback` note captured exactly once.
 
-This confirms the current live credential routing before deeper lifecycle work.
+Result: live credential routing confirmed; the websocket close-frame failure is
+resolved on HTTP. Combined with the earlier browser→sidecar GUI testing (which
+surfaced the websocket bug), the full chain is covered. Slice 6 CLOSED.
 
 ### Phase 2 — Decide Slice 7 vs run manager first
 
