@@ -417,3 +417,39 @@ Recommended next: a tiny Agent-SDK auth probe (does `claude_agent_sdk.query` +
 isolation?). If yes → prefer the SDK (in-process tools). If no → fix the CLI
 driver (drop `--bare`, neutral cwd) + an external MCP server. Do NOT build the
 7B tool bridge until this fork is resolved.
+
+### Slice 7B Agent-SDK probe — PASSED (2026-06-19); SDK is the product runtime
+
+Standalone probe (`claude_agent_sdk` 0.2.105, did NOT touch the Research path),
+all 4 conditions met:
+
+1. **Subscription auth, no API key.** `CLAUDE_CODE_OAUTH_TOKEN` set,
+   `ANTHROPIC_API_KEY` popped, `CLAUDE_CONFIG_DIR`=empty → the only possible auth
+   was the subscription token; `query()` completed (`is_error: False`). (Both
+   stored tokens — local:1 + local:6 — independently verified valid; the earlier
+   "Not logged in" was the `--bare` bug, NOT an expired token.)
+2. **Isolation.** `setting_sources=[]` + empty `CLAUDE_CONFIG_DIR` → no
+   superpowers/SessionStart hook in the stream (the $0.17 pollution gone).
+3. **In-process custom tool CALLED.** `create_sdk_mcp_server(tools=[get_sa_feed])`
+   + `allowed_tools=["mcp__ark__get_sa_feed"]` + `permission_mode="bypassPermissions"`
+   → the Python tool function actually executed in-process and its sentinel
+   return became the agent's answer. **No external MCP server / managed subprocess.**
+4. **Event mapping.** SDK messages (AssistantMessage{TextBlock,ToolUseBlock} /
+   UserMessage{ToolResultBlock} / ResultMessage) map to the existing AgentEvent
+   vocab (text / tool_start / tool_end / done; is_error → error).
+
+**Decision:** the Python **Claude Agent SDK is the product runtime** for
+`anthropic/claude_code_oauth`. The 7A `claude -p --bare` driver is superseded
+(its `--bare` can't auth the subscription anyway) — keep it only as an
+experimental/dev-diagnostic or remove it. Its stream→AgentEvent mapping concepts
+carry over to the SDK driver.
+
+**Next (7B build, gated):** rebuild `AnthropicClaudeCodeOAuthDriver` on the Agent
+SDK — `ClaudeAgentOptions(mcp_servers={ark: create_sdk_mcp_server(...)},
+allowed_tools=[...], setting_sources=[], model=..., system_prompt=...,
+permission_mode=...)`, token via `CLAUDE_CODE_OAUTH_TOKEN` (pop
+`ANTHROPIC_API_KEY`), an ArkScope-tools→SDK-tool bridge from the ToolRegistry
+(read-only allowlist first), and message→AgentEvent mapping. Add
+`claude-agent-sdk` to deps. Still gated: the 7B-3 formal design (tool allowlist,
+arg schemas, timeout, secret redaction, disabling Claude Code's built-in
+Bash/Edit) before wiring into Research (7B-4).
