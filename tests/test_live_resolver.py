@@ -2,7 +2,7 @@
 
 resolve_live_auth classifies the active credential per provider: a usable
 db_api_key, or an OAuth row that is NOT yet servable by the live loop
-(oauth_pending_env_fallback — explicit, NEVER silent) which falls back to the
+(oauth_driver_unwired — explicit, NEVER silent) which falls back to the
 env API key, or no active row (env_fallback). live_anthropic_client returns a
 SYNC client (the 7 live Anthropic sites are sync); apply_openai_live_client
 registers the SDK default for an active db_api_key. FAKE keys only.
@@ -52,11 +52,21 @@ def test_resolve_active_db_api_key(store):
     assert res.source == "db_api_key" and res.credential_id and res.note is None
 
 
-def test_resolve_oauth_active_is_explicit_pending_fallback(store):
+def test_resolve_oauth_active_is_oauth_driver_unwired(store):
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
     res = lr.resolve_live_auth("anthropic", store=store)
-    assert res.source == "oauth_pending_env_fallback"
-    assert res.note and "not wired" in res.note.lower()  # explicit, non-silent
+    assert res.source == "oauth_driver_unwired"
+    # anthropic note = the fail-closed message (no false "env API key fallback" claim)
+    assert res.note and "wired yet" in res.note.lower() and "paused" in res.note.lower()
+
+
+def test_resolve_openai_oauth_note_says_env_fallback(store):
+    # OpenAI chatgpt_oauth DOES still fall back to env — its note may say so
+    # (provider-accurate; must NOT inherit the Anthropic fail-closed wording).
+    store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
+    res = lr.resolve_live_auth("openai", store=store)
+    assert res.source == "oauth_driver_unwired"
+    assert "env api key fallback" in res.note.lower() and "paused" not in res.note.lower()
 
 
 def test_resolve_no_active_is_env_fallback(store):
@@ -111,7 +121,7 @@ def test_apply_openai_fallback_resets_sticky_global_to_env(store, monkeypatch):
     lr.apply_openai_live_client(store=store)  # call 1: DB client set
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)  # OAuth now active
     res = lr.apply_openai_live_client(store=store)  # call 2: must RESET to env
-    assert res.source == "oauth_pending_env_fallback"
+    assert res.source == "oauth_driver_unwired"
     assert len(calls) == 2  # reset to an env client, NOT left stale
 
 
@@ -124,7 +134,7 @@ def test_apply_openai_fallback_no_env_neutralizes_stale_global(store, monkeypatc
     lr._warned.clear()
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.apply_openai_live_client(store=store)
-    assert res.source == "oauth_pending_env_fallback" and len(calls) == 1  # neutralized, not left stale
+    assert res.source == "oauth_driver_unwired" and len(calls) == 1  # neutralized, not left stale
 
 
 def test_live_openai_client_uses_db_api_key(store):

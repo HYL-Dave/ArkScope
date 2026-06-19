@@ -33,7 +33,7 @@ class SubscriptionDriverNotWiredError(RuntimeError):
 
 
 # Anthropic-specific, actionable. (resolve_live_auth's .note stays
-# provider-generic — OpenAI chatgpt_oauth also yields oauth_pending_env_fallback
+# provider-generic — OpenAI chatgpt_oauth also yields oauth_driver_unwired
 # and must NOT inherit this Anthropic/Slice-7 wording.)
 _ANTHROPIC_OAUTH_FAILCLOSED_MSG = (
     "Claude OAuth (claude_code_oauth) is the active Anthropic credential, but the "
@@ -64,7 +64,7 @@ class LiveAuthResolution:
     """How the live loop resolved auth for a provider — surfaceable to logs/UI."""
 
     provider: str
-    source: str  # "db_api_key" | "oauth_pending_env_fallback" | "env_fallback"
+    source: str  # "db_api_key" | "oauth_driver_unwired" | "env_fallback"
     credential_id: Optional[str] = None
     note: Optional[str] = None  # human message for the OAuth-pending fallback
 
@@ -80,13 +80,16 @@ def resolve_live_auth(provider: str, *, store: Optional[CredentialStore] = None)
     if active is not None and active.auth_type == "api_key" and active.secret:
         return LiveAuthResolution(provider, "db_api_key", f"local:{active.id}")
     if active is not None and active.auth_type in ("claude_code_oauth", "chatgpt_oauth"):
-        return LiveAuthResolution(
-            provider,
-            "oauth_pending_env_fallback",
-            f"local:{active.id}",
-            f"{provider}: a {active.auth_type} credential is active in Settings, but the Research "
-            f"OAuth driver is not wired yet (Slice 7) — using the env API key fallback.",
+        # The live driver for this OAuth mode isn't wired yet. The CONSEQUENCE
+        # differs by provider — anthropic FAIL-CLOSES (7A-0), openai falls back to
+        # env — so the classifier reports the situation with a provider-accurate
+        # note (no universal "using the env API key fallback" claim, which would
+        # be FALSE for anthropic). 7B will wire the real driver here.
+        note = _ANTHROPIC_OAUTH_FAILCLOSED_MSG if provider == "anthropic" else (
+            f"{provider}: a {active.auth_type} credential is active, but its driver isn't "
+            "wired yet (Slice 7) — using the env API key fallback."
         )
+        return LiveAuthResolution(provider, "oauth_driver_unwired", f"local:{active.id}", note)
     return LiveAuthResolution(provider, "env_fallback")
 
 
@@ -104,7 +107,7 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     if res.source == "db_api_key":
         cred = store.get(res.credential_id)
         return build_driver(provider="anthropic", auth_mode="api_key", credential=cred).client_sync()
-    if res.source == "oauth_pending_env_fallback":
+    if res.source == "oauth_driver_unwired":
         # 7A-0: never silently meter the env API key when the user chose OAuth.
         raise SubscriptionDriverNotWiredError(_ANTHROPIC_OAUTH_FAILCLOSED_MSG)
     return Anthropic()  # genuinely no active credential → env fallback
