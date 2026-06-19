@@ -22,6 +22,7 @@ Behaviors covered (see the module docstring + BUILD REPORT):
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
@@ -691,3 +692,64 @@ def test_streaming_and_ratelimit_events_ignored(monkeypatch):
     events = asyncio.run(_collect(_make_driver(), _REQ))
     kinds = [e.type for e in events]
     assert kinds == [EventType.text, EventType.done]  # StreamEvent produced nothing
+
+
+# ===========================================================================
+# 12. 7B-6 follow-ups: multi-turn history folding + temp-config-dir cleanup
+# ===========================================================================
+def test_compose_input_single_user_returns_bare_content():
+    assert mod._compose_input([{"role": "user", "content": "SA feed for AAPL"}]) == "SA feed for AAPL"
+
+
+def test_compose_input_folds_multi_turn_history_and_drops_system():
+    msgs = [
+        {"role": "system", "content": "you are terse"},
+        {"role": "user", "content": "what about NVDA?"},
+        {"role": "assistant", "content": "NVDA looks strong"},
+        {"role": "user", "content": "and AAPL?"},
+    ]
+    prompt = mod._compose_input(msgs)
+    # every non-system turn is preserved (NOT collapsed to the last — the v1 regression)
+    assert "what about NVDA?" in prompt and "NVDA looks strong" in prompt and "and AAPL?" in prompt
+    assert "you are terse" not in prompt  # system goes to options.system_prompt, not the prompt
+    assert "User:" in prompt and "Assistant:" in prompt  # role-labeled
+
+
+def test_compose_input_empty_is_empty_string():
+    assert mod._compose_input([]) == ""
+    assert mod._compose_input([{"role": "system", "content": "x"}]) == ""
+
+
+def test_stream_removes_temp_config_dir(monkeypatch):
+    # The per-call CLAUDE_CONFIG_DIR temp dir must be rmtree'd on stream teardown
+    # (else /tmp/ark_claude_cfg_* accumulates). Wrap the real mkdtemp to capture it.
+    created = {}
+    real_mkdtemp = mod.tempfile.mkdtemp
+
+    def rec_mkdtemp(*a, **k):
+        d = real_mkdtemp(*a, **k)
+        created["dir"] = d
+        return d
+
+    monkeypatch.setattr(mod.tempfile, "mkdtemp", rec_mkdtemp)
+    _install_fake_query(monkeypatch, [_result_msg()], {})
+    events = asyncio.run(_collect(_make_driver(), _REQ))
+    assert events[-1].type is EventType.done
+    assert created.get("dir") and not os.path.exists(created["dir"])  # cleaned up
+
+
+def test_stream_folds_multi_turn_prompt_into_query(monkeypatch):
+    # Integration: a multi-turn request reaches query() with BOTH turns in the prompt.
+    capture: dict = {}
+    _install_fake_query(monkeypatch, [_result_msg()], capture)
+    req = LLMRequest(
+        model="claude-sonnet-4-6",
+        instructions="terse",
+        input_messages=[
+            {"role": "user", "content": "first question"},
+            {"role": "assistant", "content": "first answer"},
+            {"role": "user", "content": "second question"},
+        ],
+    )
+    asyncio.run(_collect(_make_driver(), req))
+    assert "first question" in capture["prompt"] and "second question" in capture["prompt"]

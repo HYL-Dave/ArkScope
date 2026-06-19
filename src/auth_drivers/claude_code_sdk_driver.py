@@ -41,6 +41,7 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+import shutil
 import tempfile
 from typing import Any, AsyncIterator, Optional
 
@@ -487,13 +488,17 @@ class AnthropicClaudeCodeSdkDriver:
             if not terminal:
                 yield _err(request, "claude agent-sdk stream ended without a result")
         finally:
-            # cancel / GeneratorExit / any exit -> tear down the SDK session.
+            # cancel / GeneratorExit / any exit -> tear down the SDK session FIRST
+            # (the subprocess uses CLAUDE_CONFIG_DIR), then remove the per-call temp
+            # config dir so /tmp/ark_claude_cfg_* does not accumulate over long
+            # AI-研究 use. Both best-effort; teardown must never raise out.
             aclose = getattr(agen, "aclose", None)
             if aclose is not None:
                 try:
                     await aclose()
                 except BaseException:  # noqa: BLE001 — teardown must never raise out
                     pass
+            shutil.rmtree(config_dir, ignore_errors=True)
 
     # --- SDK message -> AgentEvent (§6) ---------------------------------
     def _map(
@@ -646,9 +651,19 @@ class AnthropicClaudeCodeSdkDriver:
 
 
 def _compose_input(input_messages: list[dict]) -> str:
-    """The prompt for query(). v1: the last non-system message's content
-    (multi-turn history folding is a run-manager concern)."""
-    for msg in reversed(input_messages or []):
-        if msg.get("role") != "system" and msg.get("content"):
-            return str(msg["content"])
-    return ""
+    """Fold the conversation into a single prompt string for query().
+
+    The SDK session is ISOLATED (no resume/session_store — §1), so multi-turn
+    history must ride INSIDE the prompt rather than via session continuation.
+    System messages are NOT folded here (they go to options.system_prompt). A lone
+    user turn returns its bare content (clean single-turn); a multi-turn
+    conversation is role-labeled so the model sees the prior exchange. The
+    7B-6 /query/stream consumer passes input_messages=[*history, current-user]; this
+    must NOT silently collapse to the last message (that was the v1 regression)."""
+    turns = [m for m in (input_messages or []) if m.get("role") != "system" and m.get("content")]
+    if not turns:
+        return ""
+    if len(turns) == 1 and turns[0].get("role") == "user":
+        return str(turns[0]["content"])
+    labels = {"user": "User", "assistant": "Assistant"}
+    return "\n\n".join(f"{labels.get(m.get('role'), str(m.get('role')))}: {m['content']}" for m in turns)
