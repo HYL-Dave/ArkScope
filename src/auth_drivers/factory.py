@@ -91,6 +91,8 @@ def build_driver(
     auth_mode: str,
     credential: Any = None,
     token_store: Optional[Any] = None,
+    registry: Any = None,
+    dal: Any = None,
 ) -> NotImplementedDriver:
     """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
     placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
@@ -112,19 +114,20 @@ def build_driver(
         cid = f"local:{credential.id}" if credential is not None and getattr(credential, "id", None) is not None else None
         cls = OpenAIApiKeyDriver if provider == "openai" else AnthropicApiKeyDriver
         return cls(api_key=secret, auth_mode=auth_mode, credential_id=cid)
-    # S4/7A: the Claude-subscription Research driver. chatgpt_oauth (S3) stays the
-    # gated placeholder.
-    # ⚠️ SUPERSEDED (2026-06-19): AnthropicClaudeCodeOAuthDriver is the EXPERIMENTAL
-    # `claude -p --bare` driver, which cannot auth the subscription (`--bare`
-    # ignores CLAUDE_CODE_OAUTH_TOKEN). It is unreachable on the live path today
-    # (live_anthropic_client fail-closes for OAuth-active before the factory). The
-    # 7B build replaces this branch with the Claude Agent SDK driver (in-process
-    # create_sdk_mcp_server tools) per LLM_AUTH_DRIVER_PLAN.md §7B-3. Kept wired
-    # only so the experimental driver stays constructible for dev diagnostics.
+    # S4/7B: the Claude-subscription Research driver = the Agent-SDK driver
+    # (7B-4/7B-5), per LLM_AUTH_DRIVER_PLAN.md §7B-3. chatgpt_oauth (S3) stays the
+    # gated placeholder. NOTE: registry+dal feed the in-process tool bridge; callers
+    # without them (e.g. live_resolver, which only builds api_key drivers) never
+    # reach this branch — the Research-stream consumer (7B-6) passes the real
+    # registry+dal. The superseded experimental `claude -p --bare` driver
+    # (claude_code_oauth_driver.py) stays importable for dev diagnostics but is NO
+    # LONGER returned here (`--bare` cannot read CLAUDE_CODE_OAUTH_TOKEN).
     if provider == "anthropic" and auth_mode == "claude_code_oauth":
-        from .claude_code_oauth_driver import AnthropicClaudeCodeOAuthDriver
+        from .claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
 
-        return AnthropicClaudeCodeOAuthDriver(credential=credential, token_store=token_store)
+        return AnthropicClaudeCodeSdkDriver(
+            credential=credential, token_store=token_store, registry=registry, dal=dal,
+        )
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
     )

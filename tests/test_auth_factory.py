@@ -93,10 +93,12 @@ def test_oauth_modes_reference_their_probe_slice():
     assert "S3" in msg and "probe" in msg.lower()  # message names the gating probe
 
 
-def test_claude_code_oauth_is_a_real_driver_not_placeholder():
-    from src.auth_drivers.claude_code_oauth_driver import AnthropicClaudeCodeOAuthDriver
+def test_claude_code_oauth_is_the_sdk_driver_not_placeholder():
+    # 7B-5: the factory returns the Agent-SDK driver. The experimental 7A
+    # `claude -p --bare` driver is superseded and no longer wired here.
+    from src.auth_drivers.claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
     d = build_driver(provider="anthropic", auth_mode="claude_code_oauth", credential=_cred(auth_type="claude_code_oauth"))
-    assert isinstance(d, AnthropicClaudeCodeOAuthDriver) and not isinstance(d, NotImplementedDriver)
+    assert isinstance(d, AnthropicClaudeCodeSdkDriver) and not isinstance(d, NotImplementedDriver)
 
 
 # --- explicit errors for unknown provider / auth_mode -----------------------
