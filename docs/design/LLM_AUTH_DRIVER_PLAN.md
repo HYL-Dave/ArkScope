@@ -244,3 +244,70 @@ Build the abstraction first; rewiring is the LAST slice and out of this doc's de
 | **Anthropic `claude_code_oauth` driver (C)** — Agent-SDK/`claude -p` route, manual-paste token, no-op refresh, plan/credit status | **DESIGNED-not-proven.** Grounded ONLY in Novelloom's rationale doc + ArkScope's `_call_claude_cli`. No code to borrow. Legitimacy = setup-token path DOCUMENTED, but third-party-credit amounts/policy UNVERIFIED (live re-verify in S4). |
 | Keychain/encrypted at-rest storage (vs Novelloom's plaintext `0600`) | **ArkScope hardening** (local-first + prior leak history). |
 | Agent-SDK monthly credit figures / 2026-06-15 start | **MUST re-verify live** (doc was "still moving", checked 2026-05-16). |
+
+---
+
+## Slice 7A — Claude subscription driver: spike result + contract (2026-06-19)
+
+**Falsifiable question:** can `claude -p` produce output mappable to ArkScope's
+existing `AgentEvent` vocab? **Answer: YES (proven by a live trivial probe).**
+
+`claude -p --output-format stream-json --verbose` emits NDJSON that maps cleanly:
+
+| stream-json line | → `AgentEvent` |
+|---|---|
+| `{"type":"system","subtype":"init"/"hook_*"}` | swallow (setup noise) |
+| `{"type":"assistant",...content:[{"type":"text"}]}` | `text` |
+| `{"type":"assistant",...content:[{"type":"tool_use"}]}` | `tool_start` |
+| `{"type":"user",...content:[{"type":"tool_result"}]}` | `tool_end` |
+| `{"type":"result","subtype":"success","result":…,"usage":…,"total_cost_usd":…}` | `done` (answer + token_usage + cost) |
+| `subtype:"error"` / `is_error:true` / non-zero exit | `error` |
+
+### Two load-bearing findings from the probe (the reason to spike)
+
+1. **Config inheritance is a real hazard.** A bare `claude -p` in this repo
+   inherited the dev `.claude/` config — fired the superpowers `SessionStart`
+   hook (injected ~29K tokens of skill text), used the dev model
+   `claude-opus-4-8`, and **cost $0.17 for a one-word answer.** A production
+   Research run MUST isolate from the interactive config. **Fix: `--bare`**
+   (CLI: "Minimal mode: skip hooks, LSP, plugins") + an explicit `--model` +
+   our own `--system-prompt` (replace, not append) so no dev hook/skill/CLAUDE.md
+   leaks in and the routed model is used.
+2. **Subscription auth confirmed:** the probe ran with `apiKeySource:"none"`
+   (ambient CLI session), proving `claude -p` uses the subscription, not an API
+   key — the whole point of this driver.
+
+### Driver contract (`AnthropicClaudeCodeOAuthDriver`)
+
+- **Invocation:** `claude -p --bare --model <routed> --system-prompt <research
+  prompt> --output-format stream-json --verbose --max-turns <N> <composed input>`.
+- **Auth:** env copy with `CLAUDE_CODE_OAUTH_TOKEN=<token-store token>` set and
+  `ANTHROPIC_API_KEY` popped (mirrors `code_generator._call_claude_cli` +
+  `claude_oauth_probe`). Token loaded from the token-store by credential_id;
+  NEVER from `llm_credentials.secret`, NEVER logged.
+- **`stream_llm(request) -> AsyncIterator[AgentEvent]`:** spawn the subprocess,
+  read stdout line-by-line, parse each NDJSON line, map per the table, yield the
+  existing `AgentEvent`s. A malformed/keepalive line is skipped, not fatal.
+- **Lifecycle:** explicit timeout; cancel = terminate the subprocess; non-zero
+  exit or `is_error` → one `error` event (no dangling). CLI-missing → clear error.
+- **`discover_models`/`test`:** reuse the seed catalog + a trivial `claude -p`
+  ping (no API-key discovery for OAuth).
+
+### Slice 7A scope (this slice — NOT full wire-in)
+
+1. `AnthropicClaudeCodeOAuthDriver` with the invocation + NDJSON→AgentEvent
+   mapper, behind the factory's `claude_code_oauth` branch (replaces the
+   `NotImplementedDriver` placeholder for that mode).
+2. **Fake-subprocess TDD** — feed canned stream-json (incl. the init-noise,
+   text, tool_use/tool_result, result, and error shapes captured by the probe);
+   assert the yielded `AgentEvent` sequence. No live `claude` in unit tests.
+3. The live trivial probe (DONE) is the format proof; keep a thin, opt-in live
+   smoke (gated, not in the default suite).
+
+**7B (next, gated on 7A):** if the driver is clean, wire it into the Anthropic
+branch of `live_anthropic_client` / the Research path so a `claude_code_oauth`
+active row runs Research on the subscription (replacing today's explicit env
+fallback). If the CLI lifecycle proves fragile in the page-owned stream, stop at
+"driver ready" and fold the wire-in into the server-owned run manager instead
+(per `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md`, whose §7.3 already flags the CLI as a
+distinct runtime).
