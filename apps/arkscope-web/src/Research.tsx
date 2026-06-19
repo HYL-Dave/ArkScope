@@ -11,7 +11,8 @@
 // Persistence (C-2b): /query/stream best-effort-persists each turn to the local
 // ResearchThreadStore; on mount this fetches + `hydrate`s the threads/messages
 // (merge, so a late hydrate can't clobber a live turn). Threads survive reload;
-// the provider pick is per-session (re-chosen after reload), not persisted.
+// follow-ups default to the active thread's persisted provider, while new
+// conversations default to the Settings AI 研究 route.
 //
 // Provider selection is USER-CHOSEN — no global default: 1 provider available →
 // auto-select; configured AI 研究 route → auto-select that route; 0 → disable
@@ -28,6 +29,12 @@ import {
   type ResearchMessageDTO, type ResearchThreadDTO, type RuntimeConfig,
 } from "./api";
 import { MarkdownView } from "./MarkdownView";
+import {
+  asResearchProviderId,
+  chooseResearchProvider,
+  RESEARCH_PROVIDER_IDS,
+  type ResearchProviderId,
+} from "./researchProvider";
 import {
   initialState,
   MAX_TURNS_SENTINEL,
@@ -56,8 +63,8 @@ const toClientMessage = (m: ResearchMessageDTO): Message => ({
   maxTurns: m.provider === "anthropic" && m.content === MAX_TURNS_SENTINEL,
 });
 
-const PROVIDER_IDS = ["anthropic", "openai"] as const;
-type ProviderId = (typeof PROVIDER_IDS)[number];
+const PROVIDER_IDS = RESEARCH_PROVIDER_IDS;
+type ProviderId = ResearchProviderId;
 
 // trace_mode drives the live-trace vs silent-until-done affordance; copy stays
 // neutral. A new OpenAI-compatible provider is a row here, not a render rewrite.
@@ -75,6 +82,19 @@ const SUGGESTED = [
   { ticker: "MXL", text: "MXL 的高價值留言在吵什麼？焦點是什麼？" },
   { ticker: "NVDA", text: "NVDA 最新 SA 動態與評論焦點重點整理。" },
 ];
+
+const ACTIVE_THREAD_SESSION_KEY = "arkscope.aiResearch.activeThreadId";
+const readActiveThreadId = (): string | null => {
+  try { return window.sessionStorage.getItem(ACTIVE_THREAD_SESSION_KEY); } catch { return null; }
+};
+const writeActiveThreadId = (id: string | null) => {
+  try {
+    if (id) window.sessionStorage.setItem(ACTIVE_THREAD_SESSION_KEY, id);
+    else window.sessionStorage.removeItem(ACTIVE_THREAD_SESSION_KEY);
+  } catch {
+    /* sessionStorage may be unavailable; the reducer state still works in-session */
+  }
+};
 
 export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) => void }) {
   const [state, dispatch] = useReducer(reduce, initialState);
@@ -98,13 +118,18 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       return { id, available: hasKey && hasSdk, model: runtime ? runtime[id].model : "" };
     });
   }, [runtime, sdk]);
-  const availableIds = availability.filter((a) => a.available).map((a) => a.id);
+  const availableIds = useMemo(() => availability.filter((a) => a.available).map((a) => a.id), [availability]);
   const configuredProvider = runtime?.ai_research?.source !== "default"
-    ? (runtime?.ai_research?.provider as ProviderId | undefined)
+    ? (asResearchProviderId(runtime?.ai_research?.provider) ?? undefined)
     : undefined;
   const configuredRouteKey = runtime?.ai_research
     ? `${runtime.ai_research.source}:${runtime.ai_research.provider}:${runtime.ai_research.model}:${runtime.ai_research.effort}`
     : "";
+  const activeThread = useMemo(
+    () => (state.activeThreadId ? state.threads.find((t) => t.id === state.activeThreadId) ?? null : null),
+    [state.activeThreadId, state.threads],
+  );
+  const activeThreadProvider = asResearchProviderId(activeThread?.provider);
 
   useEffect(() => {
     let alive = true;
@@ -123,16 +148,19 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     return () => { alive = false; };
   }, []);
 
-  // Prefer the configured AI 研究 route when available. If the user explicitly
-  // clicks "切換", hold at the chooser until they pick another route.
+  // Follow-up turns default to the active thread's provider. If no thread is
+  // active, prefer the configured AI 研究 route when available. If the user
+  // explicitly clicks "切換", hold at the chooser until they pick another route.
   useEffect(() => {
-    if (provider !== null) return;
-    if (autoRouteSelection && configuredProvider && availableIds.includes(configuredProvider)) {
-      setProvider(configuredProvider);
-      return;
-    }
-    if (availableIds.length === 1) setProvider(availableIds[0] as ProviderId);
-  }, [provider, availableIds, autoRouteSelection, configuredProvider]);
+    const next = chooseResearchProvider({
+      currentProvider: provider,
+      activeThreadProvider,
+      availableIds,
+      autoRouteSelection,
+      configuredProvider,
+    });
+    if (next !== provider) setProvider(next);
+  }, [provider, activeThreadProvider, availableIds, autoRouteSelection, configuredProvider]);
 
   // If Settings changes the AI 研究 route, let the page follow the new route.
   useEffect(() => {
@@ -157,7 +185,13 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
           threads.map(async (t) => [t.id, (await getResearchMessages(t.id)).messages.map(toClientMessage)] as const),
         );
         if (!alive || threads.length === 0) return;
-        dispatch({ kind: "hydrate", threads: threads.map(toClientThread), messagesByThread: Object.fromEntries(entries) });
+        const savedActive = readActiveThreadId();
+        dispatch({
+          kind: "hydrate",
+          threads: threads.map(toClientThread),
+          messagesByThread: Object.fromEntries(entries),
+          activeThreadId: savedActive && threads.some((t) => t.id === savedActive) ? savedActive : null,
+        });
       } catch {
         /* hydration is best-effort; a clean empty start is fine */
       }
@@ -197,6 +231,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     // uuid for a new conversation (agreed reducer↔store id model).
     const threadId = state.activeThreadId ?? crypto.randomUUID();
     dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now(), threadId });
+    writeActiveThreadId(threadId);
     setQuestion("");
     setThreadError(null);
     void runStream({ question: q, provider, thread_id: threadId, ticker }); // raw question; server frames + persists
@@ -212,12 +247,18 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     if (state.pending) return;
     setThreadError(null);
     setThreadMenuId(null);
+    setAutoRouteSelection(true);
+    setProvider(null);
+    writeActiveThreadId(null);
     dispatch({ kind: "newThread" });
   }, [state.pending]);
   const selectThread = useCallback((id: string) => {
     if (state.pending) return;
     setThreadError(null);
     setThreadMenuId(null);
+    setAutoRouteSelection(true);
+    setProvider(null);
+    writeActiveThreadId(id);
     dispatch({ kind: "selectThread", threadId: id });
   }, [state.pending]);
   const deleteThread = useCallback(async (thread: Thread) => {
@@ -228,12 +269,15 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setThreadError(null);
     try {
       await deleteResearchThread(thread.id);
+      const remaining = state.threads.filter((t) => t.id !== thread.id);
+      const nextActive = state.activeThreadId === thread.id ? (remaining[0]?.id ?? null) : state.activeThreadId;
+      writeActiveThreadId(nextActive);
       dispatch({ kind: "deleteThread", threadId: thread.id });
       setThreadMenuId(null);
     } catch (e) {
       setThreadError(e instanceof Error ? e.message : String(e));
     }
-  }, [state.pending]);
+  }, [state.pending, state.threads, state.activeThreadId]);
 
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];

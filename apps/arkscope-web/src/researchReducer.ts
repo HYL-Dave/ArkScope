@@ -102,7 +102,7 @@ export type Action =
   | { kind: "newThread" } // + 新對話: next submit starts a fresh thread (UI blocks while pending)
   | { kind: "selectThread"; threadId: string } // left-pane switch (UI blocks while pending)
   | { kind: "deleteThread"; threadId: string } // persisted delete succeeded; remove local copy
-  | { kind: "hydrate"; threads: Thread[]; messagesByThread: Record<string, Message[]> }; // reload restore (C-2b)
+  | { kind: "hydrate"; threads: Thread[]; messagesByThread: Record<string, Message[]>; activeThreadId?: string | null }; // reload restore (C-2b)
 
 // The exact max-turns sentinel (Anthropic-only; agent.py:516). EXACT equality.
 export const MAX_TURNS_SENTINEL = "Maximum tool calls reached. Please try a simpler query.";
@@ -315,8 +315,12 @@ export function reduce(state: State, action: Action): State {
       const threads = [...state.threads, ...action.threads.filter((t) => !seen.has(t.id))].sort(
         (a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0),
       );
+      const restoredActive = action.activeThreadId && threads.some((t) => t.id === action.activeThreadId)
+        ? action.activeThreadId
+        : null;
       return {
         ...state, // preserves activeThreadId / pending / footer / terminal
+        activeThreadId: state.activeThreadId ?? restoredActive,
         threads,
         messagesByThread: { ...action.messagesByThread, ...state.messagesByThread },
       };

@@ -663,6 +663,17 @@ describe("reducer · hydrate", () => {
     expect(s.pending).toBeNull();
   });
 
+  it("on navigation remount, hydrate can restore a previously active persisted thread", () => {
+    const s = reduce(initialState, {
+      kind: "hydrate",
+      threads: [mkThread("ta", "alpha"), mkThread("tb", "beta")],
+      messagesByThread: { ta: [mkMsg("user", "qa")], tb: [mkMsg("user", "qb"), mkMsg("assistant", "ab")] },
+      activeThreadId: "tb",
+    });
+    expect(s.activeThreadId).toBe("tb");
+    expect(msgs(s)).toHaveLength(2);
+  });
+
   it("MERGES persisted threads WITHOUT clobbering an in-flight turn (mount-fetch race guard)", () => {
     // A slow mount hydrate must not wipe a turn the user already started.
     const seeded = run(submit({ question: "in-flight", threadId: "t9" }), f("thinking", { turn: 1, model: "m" }));
