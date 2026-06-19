@@ -493,16 +493,19 @@ Headline findings (all grounded; see the design doc for citations):
   (`stream_llm` has 0 consumers outside `auth_drivers/`). Live flip = prerequisite, not a guard flip.
 - **The locked surface is enforced by the bundled CLI binary (2.1.183), not the
   Python SDK 0.2.105** — and the probe only exercised the **fail-OPEN** config
-  (`bypassPermissions`, no `tools=[]`, no hook). So every lock is **designed-locked,
-  not proven-locked**; §9's negative tests are BLOCKING gates re-run on any CLI bump,
-  and the **`bypassPermissions`-honors-the-`PreToolUse`-deny hinge must be spiked FIRST**.
+  (`bypassPermissions`, no `tools=[]`, no hook). §9's negative tests are BLOCKING gates re-run on any CLI bump.
+  **✅ UPDATE 2026-06-19: the permission spike PASSED on Option 2 (`dontAsk` +
+  `tools=[]` + allowlist)** — init `tools` list = only the ArkScope tool (built-ins
+  stripped), `apiKeySource='none'`, CLI 2.1.183. **F1 PROVEN, F10 disproven.** No
+  `bypassPermissions` / no hook needed; the Option-1 hinge is MOOT.
 - **Token-leak vector corrected:** the real path is an **uncaught bridge-handler
   exception** (`query.py:716-721` echoes `str(e)` into model context), not
   `ProcessError.stderr` — the bridge handler needs a hard `try/except BaseException`
   + redaction; redaction (`_redact_bridge` = exact-token ∘ `probe_harness.redact`) is load-bearing, not optional.
-- **`bypassPermissions` is acceptable ONLY** layered under a fail-closed
-  `PreToolUse` deny-gate **and** a CLI-independent Python-side in-process veto in the
-  bridge — never as the sole control (Option 2 = `dontAsk` is the fail-closed fallback if the hinge spike fails).
+- **Permission posture = `dontAsk` (Option 2), VALIDATED 2026-06-19:** fail-closed
+  at the permission layer (anything not allow-listed is auto-denied) over `tools=[]`
+  + the Tier-1 allowlist + the §4 Python-side in-process veto. **`bypassPermissions`
+  is NOT used** — it was the Option-1 fallback, now moot.
 - **6 open questions need a human decision** before build: web-egress posture (default:
   no web v1), the 5 §3 allowlist ambiguities (incl. `get_report` confirmed path
   traversal, `get_portfolio_analysis` holdings PII), `synthesize_signal` policy

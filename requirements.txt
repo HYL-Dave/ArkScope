@@ -25,6 +25,7 @@ httpx
 # Agent SDKs (optional - install for POST /query endpoint)
 openai-agents>=0.7.0
 anthropic>=0.40.0
+claude-agent-sdk==0.2.105  # Claude-subscription Research driver (Slice 7B); PINNED — the bundled CLI it ships is load-bearing (negative-test gates re-run on any bump)
 
 # Database Backend (optional - for Supabase)
 psycopg[binary]>=3.1
