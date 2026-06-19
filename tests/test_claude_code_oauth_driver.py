@@ -120,6 +120,9 @@ def test_invocation_argv_and_bare_and_model():
     asyncio.run(_collect(d, LLMRequest(model="claude-sonnet-4-6", instructions="RESEARCH SYS", input_messages=[{"role": "user", "content": "what is 6*7?"}])))
     argv = cap["argv"]
     assert argv[:3] == ["claude", "-p", "--bare"]                  # isolated from dev .claude/ config
+    # drop the global `user` setting source (the superpowers SessionStart hook
+    # lives there — 7A-2 found --bare alone doesn't strip it)
+    assert "--setting-sources" in argv and argv[argv.index("--setting-sources") + 1] == "project,local"
     assert "--model" in argv and argv[argv.index("--model") + 1] == "claude-sonnet-4-6"
     assert "--system-prompt" in argv and argv[argv.index("--system-prompt") + 1] == "RESEARCH SYS"
     assert "--output-format" in argv and argv[argv.index("--output-format") + 1] == "stream-json"

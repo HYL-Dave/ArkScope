@@ -124,6 +124,10 @@ class AnthropicClaudeCodeOAuthDriver:
 
         argv = [
             "claude", "-p", "--bare",
+            # --bare alone does NOT strip the global ~/.claude SessionStart hook
+            # (7A-2 live smoke: superpowers hook still injected ~29K tokens). Drop
+            # the `user` setting source — the global hooks/plugins live there.
+            "--setting-sources", "project,local",
             "--model", request.model,
             "--system-prompt", request.instructions or "",
             "--output-format", "stream-json", "--verbose",
