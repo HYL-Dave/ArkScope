@@ -112,6 +112,12 @@ def build_driver(
         cid = f"local:{credential.id}" if credential is not None and getattr(credential, "id", None) is not None else None
         cls = OpenAIApiKeyDriver if provider == "openai" else AnthropicApiKeyDriver
         return cls(api_key=secret, auth_mode=auth_mode, credential_id=cid)
+    # S4/7A: the Claude-subscription Research driver (claude -p). chatgpt_oauth
+    # (S3) stays the gated placeholder.
+    if provider == "anthropic" and auth_mode == "claude_code_oauth":
+        from .claude_code_oauth_driver import AnthropicClaudeCodeOAuthDriver
+
+        return AnthropicClaudeCodeOAuthDriver(credential=credential, token_store=token_store)
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
     )

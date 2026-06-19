@@ -35,7 +35,9 @@ _INVALID_COMBOS = [
 ]
 
 
-_OAUTH_COMBOS = [("openai", "chatgpt_oauth"), ("anthropic", "claude_code_oauth")]
+# Only chatgpt_oauth (S3) is still a gated placeholder; anthropic+claude_code_oauth
+# is a REAL driver as of Slice 7A-1 (see test_claude_code_oauth_driver.py).
+_OAUTH_COMBOS = [("openai", "chatgpt_oauth")]
 _APIKEY_COMBOS = [("openai", "api_key"), ("openai", "api_key_pool"),
                   ("anthropic", "api_key"), ("anthropic", "api_key_pool")]
 
@@ -80,14 +82,21 @@ def test_oauth_placeholder_not_callable_yet():
 
 
 def test_oauth_modes_reference_their_probe_slice():
-    for mode, slice_tag in [("chatgpt_oauth", "S3"), ("claude_code_oauth", "S4")]:
-        d = build_driver(provider=("openai" if mode == "chatgpt_oauth" else "anthropic"), auth_mode=mode, credential=_cred(auth_type=mode))
-        import asyncio
+    # Only chatgpt_oauth (S3) is still a gated placeholder; claude_code_oauth (S4)
+    # is now a real driver (7A-1).
+    d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
+    import asyncio
 
-        with pytest.raises(NotImplementedError) as ei:
-            asyncio.run(d.call_llm(None))
-        msg = str(ei.value)
-        assert slice_tag in msg and "probe" in msg.lower()  # message names the gating probe
+    with pytest.raises(NotImplementedError) as ei:
+        asyncio.run(d.call_llm(None))
+    msg = str(ei.value)
+    assert "S3" in msg and "probe" in msg.lower()  # message names the gating probe
+
+
+def test_claude_code_oauth_is_a_real_driver_not_placeholder():
+    from src.auth_drivers.claude_code_oauth_driver import AnthropicClaudeCodeOAuthDriver
+    d = build_driver(provider="anthropic", auth_mode="claude_code_oauth", credential=_cred(auth_type="claude_code_oauth"))
+    assert isinstance(d, AnthropicClaudeCodeOAuthDriver) and not isinstance(d, NotImplementedDriver)
 
 
 # --- explicit errors for unknown provider / auth_mode -----------------------
