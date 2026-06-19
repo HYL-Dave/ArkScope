@@ -20,6 +20,7 @@ machines.
 - **Authoritative doc index (read this first)** → `docs/design/CURRENT_PROJECT_CONTEXT.md`
 - **v1 product contract** (storage / sync / page IA / migration) → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
 - **Where the project came from + open data** → `docs/PROJECT_HISTORY.md`
+- **LLM auth / Claude-subscription Research driver** (design) → `docs/design/LLM_AUTH_DRIVER_PLAN.md` and `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md`
 
 > **Status**: local-first SQLite + DuckDB storage is the target per the spec;
 > **today** the stack still runs PostgreSQL-backed. The migration is sequenced in
