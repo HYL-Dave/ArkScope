@@ -38,6 +38,7 @@ SECURITY (load-bearing, §4/§5/§6):
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import tempfile
@@ -207,13 +208,24 @@ async def _invoke_bridged_tool(
         requires_dal = getattr(tool_def, "requires_dal", True)
 
         async def _run() -> Any:
-            # ArkScope handlers are sync ``function(dal, **kwargs)``; run them off
-            # the event loop so wait_for can actually cancel a blocking call.
+            # Async handlers: await directly (wait_for cancels the coroutine cleanly).
             if asyncio.iscoroutinefunction(fn):
                 return await (fn(dal, **args) if requires_dal else fn(**args))
-            if requires_dal:
-                return await asyncio.to_thread(lambda: fn(dal, **args))
-            return await asyncio.to_thread(lambda: fn(**args))
+            # Sync ArkScope handlers (``function(dal, **kwargs)``) run OFF the loop so
+            # wait_for can interrupt the *await*. Use a DEDICATED single-thread pool,
+            # NOT asyncio.to_thread: to_thread uses the loop's DEFAULT executor, and
+            # asyncio.run() blocks on shutdown_default_executor(wait=True) at teardown
+            # — a flaky hang (worse if a wait_for timeout orphans the worker thread,
+            # which Python cannot kill). A dedicated pool shut down wait=False +
+            # cancel_futures=True leaves the default executor untouched and never
+            # blocks the loop/run on an orphaned call.
+            call = (lambda: fn(dal, **args)) if requires_dal else (lambda: fn(**args))
+            loop = asyncio.get_running_loop()
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="ark-bridge")
+            try:
+                return await loop.run_in_executor(pool, call)
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
 
         # (2) per-tool wall-clock.
         try:
