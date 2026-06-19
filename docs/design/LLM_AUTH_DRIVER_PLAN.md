@@ -46,7 +46,7 @@ This difference is load-bearing for Slice 7B:
 | Runtime | Where the model/tool loop runs | How ArkScope tools are available | Tool bridge needed? |
 |---|---|---|---|
 | **Standard API key** (`openai/api_key`, `anthropic/api_key`) | Inside ArkScope's Python sidecar process | The existing OpenAI/Anthropic agent bridges call ArkScope Python functions directly (`get_sa_feed`, `get_fundamentals_analysis`, `get_price_change`, etc.) | **No** — tools are already in-process |
-| **Claude setup-token** (`anthropic/claude_code_oauth`) | Outside ArkScope, in a `claude -p` subprocess / Claude Code runtime | `claude -p` sees Claude Code's tool world, not ArkScope's Python functions | **Yes** — MCP or an equivalent tool bridge is required |
+| **Claude setup-token** (`anthropic/claude_code_oauth`) | Via the **Claude Agent SDK** — the SDK runs the model/tool loop; ArkScope tools are bridged back **in-process** | The SDK's own runtime sees Claude Code's built-in tools, not ArkScope's Python functions, unless they are bridged in | **Yes** — an **in-process** SDK tool bridge (`create_sdk_mcp_server`), NOT an external MCP server or `claude -p --mcp-config`; see §7B |
 | **OpenAI ChatGPT-OAuth** (`openai/chatgpt_oauth`) | Still the OpenAI SDK shape, but pointed at the ChatGPT backend compatibility host | If the compatibility backend supports function/tool calls, ArkScope can keep owning the tool loop/bridge shape; this must be proven by P2 | **Probe-gated**, not assumed |
 
 The key point: a credential answers only **who pays / how the provider authenticates**.
@@ -327,15 +327,30 @@ existing `AgentEvent` vocab? **Answer: YES (proven by a live trivial probe).**
 3. The live trivial probe (DONE) is the format proof; keep a thin, opt-in live
    smoke (gated, not in the default suite).
 
-**7B (next, gated on 7A):** if the driver is clean, wire it into the Anthropic
+**7B (next, gated on 7A):** ~~if the driver is clean, wire it into the Anthropic
 branch of `live_anthropic_client` / the Research path so a `claude_code_oauth`
 active row runs Research on the subscription (replacing today's explicit env
-fallback). If the CLI lifecycle proves fragile in the page-owned stream, stop at
-"driver ready" and fold the wire-in into the server-owned run manager instead
-(per `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md`, whose §7.3 already flags the CLI as a
-distinct runtime).
+fallback).~~ **CORRECTED 2026-06-19 (7B-3 §8 BLOCKER):** the SDK driver must **NOT**
+be wired into `live_anthropic_client` — that accessor returns a **sync** `Anthropic`
+client consumed at 6 `.messages.create/.stream` sites, and a stream-only async
+driver cannot replace it. Instead the driver attaches to a **NEW Research-stream
+consumer** that calls `stream_llm` (which has **no** live consumer today);
+`live_anthropic_client` **stays fail-closed** for OAuth-active. The
+CLI-vs-run-manager fragility note is moot now that the runtime is the **in-process
+Claude Agent SDK** (not a managed `claude -p` subprocess). See
+`docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md` §8 + §10 OQ-6.
 
-### Slice 7B finding — why MCP / equivalent bridge is required
+### Slice 7B finding — why a tool bridge is required (bridge MECHANISM SUPERSEDED 2026-06-19)
+
+> **SUPERSEDED — bridge mechanism only.** The *conclusion* of this section — a
+> Research turn on the subscription needs a tool bridge to reach ArkScope's
+> tools — still holds. The *mechanism* proposed below (an **external MCP server**
+> exposed to the CLI via `claude -p --mcp-config`) was **NOT adopted**. The
+> Agent-SDK probe (see "Slice 7B Agent-SDK probe — PASSED" below) proved the
+> bridge is the **in-process** `create_sdk_mcp_server` — ArkScope tools are
+> Python functions registered into the SDK and called back inside ArkScope's own
+> process, with **no external MCP server and no `claude -p` subprocess**. Read
+> this section as history; the live bridge is the in-process SDK one.
 
 7A proved subscription auth and stream-json mapping, but it also exposed the
 runtime boundary: `claude -p` runs in Claude Code, not in ArkScope's Python
@@ -362,10 +377,16 @@ read-only ArkScope tools, such as `get_sa_feed` and `get_price_change`, and prov
 4. token and tool results are redacted/sized according to ArkScope's existing
    tool-trace rules.
 
-If an official Claude Agent SDK path later offers a cleaner in-process Python
+~~If an official Claude Agent SDK path later offers a cleaner in-process Python
 tool registration API for setup-token auth, it may replace MCP. Until that is
 proven, MCP is the pragmatic bridge for making subscription Research equivalent
-to API-key Research.
+to API-key Research.~~
+
+**RESOLVED (2026-06-19): it did, and it was adopted.** The Claude Agent SDK's
+`create_sdk_mcp_server` registers ArkScope tools in-process; the probe below
+proved subscription auth + isolation + an in-process tool call + event mapping.
+The external-MCP / `--mcp-config` route above is therefore **not** the bridge —
+the in-process SDK bridge replaced it.
 
 ### Slice 7B auth/runtime RE-SPIKE result (2026-06-19) — `--bare` is wrong; Agent SDK is the likely path
 
@@ -453,3 +474,42 @@ permission_mode=...)`, token via `CLAUDE_CODE_OAUTH_TOKEN` (pop
 `claude-agent-sdk` to deps. Still gated: the 7B-3 formal design (tool allowlist,
 arg schemas, timeout, secret redaction, disabling Claude Code's built-in
 Bash/Edit) before wiring into Research (7B-4).
+
+### Slice 7B-3 — formal design COMPLETE (2026-06-19) → `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md`
+
+The formal tool-bridge/driver design is written and adversarially reviewed (9-agent
+workflow: 4 grounded-research → synthesis → 3 skeptic reviewers → revision). It is
+**DESIGNED-not-proven** and **gated on human + gpt-5.5 review before any build**.
+Headline findings (all grounded; see the design doc for citations):
+
+- **Integration BLOCKER (reshapes 7B-4):** `live_anthropic_client()` is a **sync**
+  `Anthropic` client called at 6 sites via `.messages.create/.stream`
+  (`card_synthesis.py:146,464`; `anthropic_agent/agent.py:367,372`; `subagent.py`,
+  `compressor`, `code_generator`, `cli`). The SDK driver is **async, stream-only**
+  (`stream_llm`, no `.messages`) and **cannot** be dropped into those sites.
+  Plan: build a NEW `AnthropicClaudeCodeSdkDriver` class, repoint only the factory,
+  leave `live_anthropic_client` fail-closed, and **build the Research-stream consumer**
+  (which would call `stream_llm`) — it does NOT exist on the live path yet
+  (`stream_llm` has 0 consumers outside `auth_drivers/`). Live flip = prerequisite, not a guard flip.
+- **The locked surface is enforced by the bundled CLI binary (2.1.183), not the
+  Python SDK 0.2.105** — and the probe only exercised the **fail-OPEN** config
+  (`bypassPermissions`, no `tools=[]`, no hook). So every lock is **designed-locked,
+  not proven-locked**; §9's negative tests are BLOCKING gates re-run on any CLI bump,
+  and the **`bypassPermissions`-honors-the-`PreToolUse`-deny hinge must be spiked FIRST**.
+- **Token-leak vector corrected:** the real path is an **uncaught bridge-handler
+  exception** (`query.py:716-721` echoes `str(e)` into model context), not
+  `ProcessError.stderr` — the bridge handler needs a hard `try/except BaseException`
+  + redaction; redaction (`_redact_bridge` = exact-token ∘ `probe_harness.redact`) is load-bearing, not optional.
+- **`bypassPermissions` is acceptable ONLY** layered under a fail-closed
+  `PreToolUse` deny-gate **and** a CLI-independent Python-side in-process veto in the
+  bridge — never as the sole control (Option 2 = `dontAsk` is the fail-closed fallback if the hinge spike fails).
+- **6 open questions need a human decision** before build: web-egress posture (default:
+  no web v1), the 5 §3 allowlist ambiguities (incl. `get_report` confirmed path
+  traversal, `get_portfolio_analysis` holdings PII), `synthesize_signal` policy
+  exclusion, model-facing redaction residual (OQ-5), Option-1-vs-2 permission posture,
+  and whether the sync `.messages` sites ever get a subscription path (OUT of 7B-3).
+
+Tier-1 allowlist (11 read-only tools): `get_sa_feed`, `get_sa_digest`,
+`get_sa_alpha_picks`, `get_ticker_news`, `get_news_brief`, `search_news_advanced`,
+`get_ticker_prices`, `get_price_change`, `get_fundamentals_analysis`,
+`get_sec_filings`, `get_economic_calendar`.

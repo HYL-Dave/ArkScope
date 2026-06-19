@@ -1,6 +1,18 @@
 """Slice 7A-1 — AnthropicClaudeCodeOAuthDriver: run Research on a Claude
 subscription via `claude -p`, mapping its stream-json to the existing AgentEvent.
 
+⚠️ EXPERIMENTAL / SUPERSEDED (2026-06-19). This driver invokes `claude -p --bare`,
+and the 7B re-spike proved `--bare` does NOT read CLAUDE_CODE_OAUTH_TOKEN — so it
+CANNOT authenticate the subscription (the 7A-2 "Not logged in" was this bug, not
+an expired token). The product runtime for `anthropic/claude_code_oauth` is the
+Python **Claude Agent SDK** (in-process `create_sdk_mcp_server` tools, explicit
+`setting_sources` isolation) — see LLM_AUTH_DRIVER_PLAN.md §"Slice 7B Agent-SDK
+probe — PASSED" and the 7B-3 design. This module is retained ONLY as an
+experimental/dev diagnostic; do NOT treat it as the live driver. The token-store
+injection + stream→AgentEvent mapping concepts carry over to the SDK driver; the
+`live_anthropic_client` path stays fail-closed for OAuth-active (it never reaches
+this driver), and the 7B build repoints the factory off it.
+
 Built on the Slice-7A spike (docs/design/LLM_AUTH_DRIVER_PLAN.md §"Slice 7A"):
 - ISOLATED invocation: `claude -p --bare` (skip the dev .claude/ hooks/plugins/
   skills that otherwise inherit into the subprocess — the spike saw a $0.17 "OK"

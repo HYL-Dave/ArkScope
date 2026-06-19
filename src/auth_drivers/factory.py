@@ -112,8 +112,15 @@ def build_driver(
         cid = f"local:{credential.id}" if credential is not None and getattr(credential, "id", None) is not None else None
         cls = OpenAIApiKeyDriver if provider == "openai" else AnthropicApiKeyDriver
         return cls(api_key=secret, auth_mode=auth_mode, credential_id=cid)
-    # S4/7A: the Claude-subscription Research driver (claude -p). chatgpt_oauth
-    # (S3) stays the gated placeholder.
+    # S4/7A: the Claude-subscription Research driver. chatgpt_oauth (S3) stays the
+    # gated placeholder.
+    # ⚠️ SUPERSEDED (2026-06-19): AnthropicClaudeCodeOAuthDriver is the EXPERIMENTAL
+    # `claude -p --bare` driver, which cannot auth the subscription (`--bare`
+    # ignores CLAUDE_CODE_OAUTH_TOKEN). It is unreachable on the live path today
+    # (live_anthropic_client fail-closes for OAuth-active before the factory). The
+    # 7B build replaces this branch with the Claude Agent SDK driver (in-process
+    # create_sdk_mcp_server tools) per LLM_AUTH_DRIVER_PLAN.md §7B-3. Kept wired
+    # only so the experimental driver stays constructible for dev diagnostics.
     if provider == "anthropic" and auth_mode == "claude_code_oauth":
         from .claude_code_oauth_driver import AnthropicClaudeCodeOAuthDriver
 
