@@ -70,14 +70,23 @@ def test_live_anthropic_client_uses_db_api_key(store):
     assert isinstance(lr.live_anthropic_client(store=store), Anthropic)
 
 
-def test_live_anthropic_client_oauth_falls_back_to_env_with_warning(store, monkeypatch, caplog):
+def test_live_anthropic_client_oauth_fails_closed(store, monkeypatch):
+    # 7A-0: when Claude OAuth is active but the subscription driver isn't wired
+    # yet, do NOT silently bill the env API key — FAIL CLOSED with an actionable
+    # message. (Env key present so the OLD behavior would have silently used it.)
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-envfake")  # so the env-fallback Anthropic() can construct
-    lr._warned.clear()  # reset the once-per-process throttle so the WARNING fires here
-    with caplog.at_level("WARNING"):
-        c = lr.live_anthropic_client(store=store)
-    assert isinstance(c, Anthropic)
-    assert any("not wired" in r.message.lower() for r in caplog.records)  # fallback is LOGGED, not silent
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-envfake")
+    with pytest.raises(lr.SubscriptionDriverNotWiredError) as ei:
+        lr.live_anthropic_client(store=store)
+    msg = str(ei.value)
+    assert "API key" in msg and "Settings" in msg  # names the actionable fix
+    assert "sk-ant-envfake" not in msg  # never leak the env key
+
+
+def test_live_anthropic_client_api_key_active_unaffected(store):
+    # api-key-active anthropic must STILL work (fail-closed is OAuth-only).
+    store.add(provider="anthropic", auth_type="api_key", alias="A", secret="sk-ant-fake1", make_active=True)
+    assert isinstance(lr.live_anthropic_client(store=store), Anthropic)
 
 
 # --- apply_openai_live_client ------------------------------------------------

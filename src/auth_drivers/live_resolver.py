@@ -24,6 +24,24 @@ from src.model_credentials import CredentialStore
 
 logger = logging.getLogger(__name__)
 
+
+class SubscriptionDriverNotWiredError(RuntimeError):
+    """Raised when an OAuth/subscription credential is the ACTIVE one but its
+    live driver isn't wired yet. We FAIL CLOSED rather than silently bill the
+    env API key — picking an OAuth credential must never quietly meter an API
+    key the user didn't intend to spend (Slice 7A-0)."""
+
+
+# Anthropic-specific, actionable. (resolve_live_auth's .note stays
+# provider-generic — OpenAI chatgpt_oauth also yields oauth_pending_env_fallback
+# and must NOT inherit this Anthropic/Slice-7 wording.)
+_ANTHROPIC_OAUTH_FAILCLOSED_MSG = (
+    "Claude OAuth (claude_code_oauth) is the active Anthropic credential, but the "
+    "subscription Research driver isn't wired yet (Slice 7). Anthropic is paused "
+    "rather than silently billing the env API key — switch the active Anthropic "
+    "credential to an API key in Settings, or finish Slice 7."
+)
+
 # The OAuth→env fallback must be EXPLICIT but not spammy: WARNING once per
 # (provider, source) per process; thereafter DEBUG. The structured
 # LiveAuthResolution remains the queryable surface for the UI/Settings.
@@ -75,9 +93,9 @@ def resolve_live_auth(provider: str, *, store: Optional[CredentialStore] = None)
 def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     """A SYNC ``Anthropic`` client for the live Anthropic call sites.
 
-    db_api_key → built from the active row via the driver; OAuth-active or none →
-    env fallback (bare ``Anthropic()`` reads ``ANTHROPIC_API_KEY``), with the
-    OAuth-pending case logged so it is never a silent fallback.
+    db_api_key → built from the active row via the driver. OAuth-active →
+    FAIL CLOSED (the subscription driver isn't wired yet; don't silently bill the
+    env key). No active credential → env fallback (bare ``Anthropic()``).
     """
     from anthropic import Anthropic
 
@@ -86,8 +104,10 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     if res.source == "db_api_key":
         cred = store.get(res.credential_id)
         return build_driver(provider="anthropic", auth_mode="api_key", credential=cred).client_sync()
-    _signal_fallback(res)
-    return Anthropic()  # env fallback (ANTHROPIC_API_KEY) — unchanged behavior
+    if res.source == "oauth_pending_env_fallback":
+        # 7A-0: never silently meter the env API key when the user chose OAuth.
+        raise SubscriptionDriverNotWiredError(_ANTHROPIC_OAUTH_FAILCLOSED_MSG)
+    return Anthropic()  # genuinely no active credential → env fallback
 
 
 def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:

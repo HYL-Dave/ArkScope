@@ -248,6 +248,38 @@ def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
     assert store.list_threads() == []  # nothing persisted without a thread_id
 
 
+def test_anthropic_oauth_failclosed_becomes_error_event_and_persists(store, monkeypatch):
+    """7A-0: a SubscriptionDriverNotWiredError raised from the anthropic stream
+    (OAuth active, subscription driver not wired) must surface as an error EVENT
+    (not a 500 crash) AND persist an is_error turn (no dangling user). This is the
+    integration of live_anthropic_client's fail-closed raise with query.py."""
+    import asyncio
+    from src.auth_drivers.live_resolver import SubscriptionDriverNotWiredError
+
+    async def failing_stream(*, question, model, dal, history, **kwargs):
+        raise SubscriptionDriverNotWiredError(
+            "Claude OAuth is the active Anthropic credential — switch to an API key in Settings, or finish Slice 7."
+        )
+        yield  # noqa: makes this an async generator (raise fires on first __anext__)
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", failing_stream)
+    req = q.QueryRequest(question="q", provider="anthropic", model=None, thread_id="t1", ticker=None)
+
+    frames = []
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for chunk in resp.body_iterator:
+            frames.append(chunk)
+
+    asyncio.run(drive())
+    blob = "".join(frames)
+    assert '"type": "error"' in blob  # converted to an error EVENT, not a crash
+    msgs = store.list_messages("t1")
+    assert [m.role for m in msgs] == ["user", "assistant"]  # no dangling user turn
+    assert msgs[1].is_error is True
+    assert "API key" in msgs[1].content and "Settings" in msgs[1].content  # actionable message persisted
+
+
 def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
     """An unknown provider returns early without ever calling the agent — but the
     user turn was persisted eagerly, so the error terminal must persist an
