@@ -39,6 +39,29 @@ These three are **distinct legitimacy classes, distinct hosts, distinct credenti
 3. **C ≠ D.** `CLAUDE_CODE_OAUTH_TOKEN` is **not** a drop-in `x-api-key`/Bearer for `api.anthropic.com`. The Messages API docs list only `x-api-key` and WIF bearers (minted via `POST /v1/oauth/token`), NOT `CLAUDE_CODE_OAUTH_TOKEN`. C MUST route through the Agent SDK / `claude -p` (ArkScope's working `_call_claude_cli` IS exactly this).
 4. **Novelloom has no Anthropic driver at all.** `model_capabilities.py` lists Anthropic models + effort/thinking validators as a *forward seam only*; `writer_factory` raises `WriterConfigurationError` for `provider != "openai"`. So **everything Anthropic-side (C and D-as-driver) is DESIGNED, grounded only in Novelloom's rationale doc, not its code.**
 
+### API-key runtime vs Claude setup-token runtime
+
+This difference is load-bearing for Slice 7B:
+
+| Runtime | Where the model/tool loop runs | How ArkScope tools are available | Tool bridge needed? |
+|---|---|---|---|
+| **Standard API key** (`openai/api_key`, `anthropic/api_key`) | Inside ArkScope's Python sidecar process | The existing OpenAI/Anthropic agent bridges call ArkScope Python functions directly (`get_sa_feed`, `get_fundamentals_analysis`, `get_price_change`, etc.) | **No** — tools are already in-process |
+| **Claude setup-token** (`anthropic/claude_code_oauth`) | Outside ArkScope, in a `claude -p` subprocess / Claude Code runtime | `claude -p` sees Claude Code's tool world, not ArkScope's Python functions | **Yes** — MCP or an equivalent tool bridge is required |
+| **OpenAI ChatGPT-OAuth** (`openai/chatgpt_oauth`) | Still the OpenAI SDK shape, but pointed at the ChatGPT backend compatibility host | If the compatibility backend supports function/tool calls, ArkScope can keep owning the tool loop/bridge shape; this must be proven by P2 | **Probe-gated**, not assumed |
+
+The key point: a credential answers only **who pays / how the provider authenticates**.
+It does not automatically carry ArkScope's tools into a different runtime.
+
+Standard API-key paths do not have the Claude MCP problem because the model call
+is made by ArkScope's own agent loop. The loop already has the registry/bridge
+objects in memory and can execute tools as normal Python calls.
+
+Claude setup-token is different. `export CLAUDE_CODE_OAUTH_TOKEN=...` is enough
+for `claude -p` to authenticate to the subscription path, but it does not teach
+Claude Code about ArkScope's data tools. Without an MCP server or equivalent
+tool bridge, subscription Research would be a general Claude Code chat with
+Claude Code tools, not an ArkScope financial research agent.
+
 ---
 
 ## 3. Driver matrix
@@ -311,3 +334,86 @@ fallback). If the CLI lifecycle proves fragile in the page-owned stream, stop at
 "driver ready" and fold the wire-in into the server-owned run manager instead
 (per `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md`, whose §7.3 already flags the CLI as a
 distinct runtime).
+
+### Slice 7B finding — why MCP / equivalent bridge is required
+
+7A proved subscription auth and stream-json mapping, but it also exposed the
+runtime boundary: `claude -p` runs in Claude Code, not in ArkScope's Python
+agent process.
+
+That means:
+
+- `CLAUDE_CODE_OAUTH_TOKEN` solves authentication/billing only.
+- It does not expose ArkScope's ToolRegistry to Claude Code.
+- A Research turn through raw `claude -p` can use Claude Code's built-in tools,
+  but not ArkScope's financial tools.
+- Therefore 7B cannot be a simple "swap `live_anthropic_client` to the driver".
+  It needs a tool bridge.
+
+The preferred bridge to probe is MCP because Claude Code already supports MCP
+servers via `--mcp-config`. A minimal 7B probe should expose one or two
+read-only ArkScope tools, such as `get_sa_feed` and `get_price_change`, and prove:
+
+1. `claude -p --mcp-config <temp-config>` can call an ArkScope MCP tool;
+2. stream-json emits `tool_use` / `tool_result` lines that the 7A mapper can
+   preserve as `tool_start` / `tool_end`;
+3. Claude Code built-in file/shell tools are not accidentally expanded into the
+   Research runtime beyond the intended allowlist;
+4. token and tool results are redacted/sized according to ArkScope's existing
+   tool-trace rules.
+
+If an official Claude Agent SDK path later offers a cleaner in-process Python
+tool registration API for setup-token auth, it may replace MCP. Until that is
+proven, MCP is the pragmatic bridge for making subscription Research equivalent
+to API-key Research.
+
+### Slice 7B auth/runtime RE-SPIKE result (2026-06-19) — `--bare` is wrong; Agent SDK is the likely path
+
+A re-spike (gpt-5.5 finding + empirical test + doc verification via the
+claude-code-guide agent) overturned a 7A assumption:
+
+**`claude -p --bare` does NOT read `CLAUDE_CODE_OAUTH_TOKEN`.** Official docs
+(headless.md / authentication.md): *"Bare mode skips OAuth and keychain reads.
+Anthropic authentication must come from `ANTHROPIC_API_KEY` or an `apiKeyHelper`…
+`--bare` does not read `CLAUDE_CODE_OAUTH_TOKEN`."* Empirically confirmed (ambient
+login, `ANTHROPIC_API_KEY` popped, same prompt):
+
+| invocation | result |
+|---|---|
+| `claude -p` **non-bare** + `--setting-sources project,local` | `apiKeySource:none`, answered OK (subscription) |
+| `claude -p` **`--bare`** + same | `apiKeySource:none`, **"Not logged in"**, cost 0 |
+
+Consequences:
+- The 7A driver's `claude -p --bare` (commits c0d783f/cc3998d) **cannot
+  authenticate the subscription** — the 7A-2 "Not logged in" was `--bare`, not
+  (necessarily) an expired token. The driver's stream-json→AgentEvent mapper +
+  token-store injection are still correct and reusable; the **invocation must
+  drop `--bare`**.
+- Isolation: `--setting-sources project,local` drops the global `user` hook but,
+  run in the repo cwd, the *project* `.claude`/CLAUDE.md still loaded (cost $0.14
+  for "OK"). Full isolation needs a neutral cwd or `setting_sources=[]`.
+
+**The Agent SDK is the likely-better runtime** (claude-code-guide, doc-cited):
+the Python `claude_agent_sdk` exposes `create_sdk_mcp_server()` for **in-process
+custom tools** (no external MCP process), `setting_sources=[...]` isolation, and
+an `allowed_tools` allowlist — directly solving "claude -p has no ArkScope
+tools." Caveats: (a) `claude_agent_sdk` is NOT currently a dependency (the
+`claude` binary IS present); (b) subscription auth via `CLAUDE_CODE_OAUTH_TOKEN`
+through the SDK is LIKELY (auth fallback chain) but NOT explicitly documented —
+must be probed.
+
+**Runtime fork to decide before building 7B (the tool bridge):**
+
+| | CLI: `claude -p` (non-bare) + `--mcp-config` | Python Claude Agent SDK |
+|---|---|---|
+| Dependency | `claude` binary (already here) | add `claude-agent-sdk` Python pkg |
+| ArkScope tools | external MCP server process | **in-process** `create_sdk_mcp_server` |
+| Isolation | `--setting-sources` + neutral cwd | `setting_sources=[...]` (explicit) |
+| Subscription auth | proven (non-bare) | likely, undocumented — probe first |
+| Events | stream-json (7A mapper reusable) | iterate messages / `ToolUseBlock` |
+
+Recommended next: a tiny Agent-SDK auth probe (does `claude_agent_sdk.query` +
+`CLAUDE_CODE_OAUTH_TOKEN` authenticate the subscription with `setting_sources`
+isolation?). If yes → prefer the SDK (in-process tools). If no → fix the CLI
+driver (drop `--bare`, neutral cwd) + an external MCP server. Do NOT build the
+7B tool bridge until this fork is resolved.

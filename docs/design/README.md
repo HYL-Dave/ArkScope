@@ -50,6 +50,7 @@ contents were removed 2026-06-07, recoverable via git.)
 | `DESKTOP_SHELL_SPIKE_PLAN.md` | **Desktop Shell Spike Plan** | ACTIVE | Electron+React shell over the FastAPI sidecar (repo layout, lifecycle). |
 | `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` | **Data Collection & Local Storage Plan** | ACTIVE (DRAFT) | 3 collection modes · 3-way SQLite split · explicit PG runtime-retirement track · price tiers · scheduler/data-update repositioning. |
 | `LOCAL_STORAGE_TOPOLOGY.md` | **Local Storage Topology** | DECISION | Source DB vs canonical DB principle; provider-growth review rule for deciding when a new source needs its own DB/inbox. |
+| `LLM_AUTH_DRIVER_PLAN.md` | **LLM Auth Driver Plan** | ACTIVE | API-key vs OAuth/setup-token driver realities, token-store rules, Slice 7 Claude subscription driver, and why Claude setup-token needs a tool bridge. |
 | `AI_RESEARCH_CONTEXT_MEMORY_PLAN.md` | **AI Research Context & Memory Plan** | ACTIVE | C-2c thread-context principles: complete transcript, no silent truncation, configurable memory policies, strategy/skill/tool extensibility roadmap. |
 | `AI_RESEARCH_RUN_LIFECYCLE_PLAN.md` | **AI Research Run Lifecycle Plan** | ACTIVE | Next AI Research architecture: server-owned runs, per-run model selection, attach/replay trace, independent thread execution, and Slice 6/7 ordering. |
 | `AGENT_DATA_GAP_FALLBACK_PLAN.md` | **Agent Data-Gap Fallback Plan** | ACTIVE | Structured absence + deterministic fallback plan for SEC/CIK misses, web-search fallback, and provider data-gap diagnostics. |
