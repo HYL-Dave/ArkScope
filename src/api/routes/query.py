@@ -63,6 +63,69 @@ def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:
     return [{"name": r["name"], "input": r["input"], "result_preview": r["result_preview"]} for r in rows]
 
 
+def _anthropic_subscription_stream(*, credential_id, question, model, effort, dal, history):
+    """7B-6: drive AI 研究 on the Claude SUBSCRIPTION via the in-process Agent-SDK
+    driver, returning an ``AsyncIterator[AgentEvent]`` (the SAME vocabulary
+    ``run_query_stream`` yields, so the downstream SSE / reducer / thread-persistence
+    consume it unchanged).
+
+    Used only when the ACTIVE anthropic credential is ``claude_code_oauth`` — the
+    api-key anthropic and openai paths never reach here. We build the SDK driver
+    for (anthropic, claude_code_oauth): the credential row from CredentialStore,
+    a fully-registered ToolRegistry (the in-process read-only tool bridge), the
+    OAuth token store, and the same DAL the route already holds. The request folds
+    the FULL conversation ([*history, this turn's user message]) — ``_compose_input``
+    in the driver role-labels multi-turn — and reuses the anthropic agent's research
+    system prompt so subscription Research behaves like API-key Research.
+
+    Imports are LOCAL (lazy) to avoid import cycles, mirroring the existing branch.
+    ``effort`` is accepted for signature parity with run_query_stream but the
+    Agent-SDK driver derives effort itself (no per-call effort knob); it is unused
+    here by design.
+    """
+    from src.agents.shared.prompts import build_system_prompt
+    from src.auth_drivers.factory import build_driver
+    from src.auth_drivers.protocol import LLMRequest
+    from src.auth_drivers.token_store import get_token_store
+    from src.model_credentials import CredentialStore
+    from src.tools.registry import ToolRegistry
+
+    cred = CredentialStore().get(credential_id)
+    registry = ToolRegistry()
+    registry.register_all()
+    driver = build_driver(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        credential=cred,
+        token_store=get_token_store(),
+        registry=registry,
+        dal=dal,
+    )
+    # SYSTEM PROMPT (v1): the SAME constant builder the anthropic agent uses
+    # (src/agents/anthropic_agent/agent.py builds build_system_prompt(freshness)).
+    # We pass no freshness summary — matching the agent's freshness-off default —
+    # so subscription Research uses the identical research instructions as API-key.
+    instructions = build_system_prompt()
+    # Multi-turn parity: when prior turns seed the conversation, the API-key
+    # anthropic loop appends a [多輪脈絡] staleness guard to the system prompt
+    # (src/agents/anthropic_agent/agent.py:235-240) telling the model to treat the
+    # history as intent-context only and re-fetch time-sensitive facts via tools.
+    # Mirror it VERBATIM so subscription Research gives the model identical
+    # guidance (the history itself is folded into input_messages below).
+    if history:
+        instructions = (
+            instructions
+            + "\n\n[多輪脈絡] 以下對話歷史僅供理解使用者意圖與指代；價格、新聞、SA、"
+            "基本面等時效性事實一律以工具即時查詢為準，歷史內容可能已過期。"
+        )
+    req = LLMRequest(
+        model=model,
+        instructions=instructions,
+        input_messages=[*history, {"role": "user", "content": question}],
+    )
+    return driver.stream_llm(req)
+
+
 def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, title) -> None:
     """Best-effort: a persistence failure must never break the SSE answer (#4)."""
     try:
@@ -240,8 +303,23 @@ async def query_agent_stream(
                 from src.agents.openai_agent.agent import run_query_stream
                 stream = run_query_stream(question=agent_question, model=res_model, dal=dal, reasoning_effort=res_effort, history=history)
             elif provider == "anthropic":
-                from src.agents.anthropic_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=res_model, dal=dal, effort=res_effort, history=history)
+                # 7B-6: if the ACTIVE anthropic credential is claude_code_oauth, the
+                # API-key loop (run_query_stream → live_anthropic_client) FAIL-CLOSES,
+                # so drive the Claude SUBSCRIPTION via the Agent-SDK driver instead.
+                # Detection = the live resolver classifying the active row as an
+                # OAuth driver (anthropic's only OAuth mode is claude_code_oauth).
+                # Both yield the SAME AgentEvent vocabulary, so the SSE/persist code
+                # below is unchanged. The api-key anthropic case is untouched.
+                from src.auth_drivers.live_resolver import resolve_live_auth
+                _auth = resolve_live_auth("anthropic")
+                if _auth.source == "oauth_driver_unwired":
+                    stream = _anthropic_subscription_stream(
+                        credential_id=_auth.credential_id, question=agent_question,
+                        model=res_model, effort=res_effort, dal=dal, history=history,
+                    )
+                else:
+                    from src.agents.anthropic_agent.agent import run_query_stream
+                    stream = run_query_stream(question=agent_question, model=res_model, dal=dal, effort=res_effort, history=history)
             else:
                 from src.agents.shared.events import AgentEvent, EventType
                 error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)

@@ -2,7 +2,7 @@
 
 **Status: DESIGNED — not built. This artifact is for human + gpt-5.5 review BEFORE any code is written. Revised to fold in three adversarial reviews (tool-surface escape; token/secret leakage + isolation; correctness + grounding).**
 
-> **Provenance:** Produced 2026-06-19 by a 9-agent design workflow (4 grounded-research agents → synthesis → 3 adversarial reviewers → revision), then read and landed by the orchestrator; the load-bearing §8 blocker and the key file:line citations were independently spot-verified. **gpt-5.5-reviewed 2026-06-19: all 6 open questions DECIDED (§10), permission posture reordered to `dontAsk`-FIRST (§7). Still gated on the §9 step-0 permission spike before the 7B-4 build.** Supersedes the experimental 7A `claude -p --bare` driver.
+> **Provenance:** Produced 2026-06-19 by a 9-agent design workflow (4 grounded-research agents → synthesis → 3 adversarial reviewers → revision), then read and landed by the orchestrator; the load-bearing §8 blocker and the key file:line citations were independently spot-verified. **gpt-5.5-reviewed 2026-06-19: all 6 open questions DECIDED (§10), permission posture reordered to `dontAsk`-FIRST (§7). The §9 step-0 permission spike PASSED 2026-06-20, and 7B-4/7B-5/7B-6 are BUILT + LIVE-VALIDATED — see the §8 STATUS UPDATE.** Supersedes the experimental 7A `claude -p --bare` driver.
 
 This is the formal design for the SDK-based Claude-SUBSCRIPTION Research driver. It supersedes the experimental `claude -p --bare` driver (7A). Every decision is grounded in the four research artifacts (R1 tool inventory, R2 AgentEvent contract, R3 SDK API, R4 redaction/timeout/cap conventions) plus re-verified reads of the installed `claude_agent_sdk` 0.2.105 source and the ArkScope codebase. Claims the standalone probe (`/tmp/agent_sdk_probe.py`) did not exercise are tagged **[DESIGNED-not-proven]**.
 
@@ -315,6 +315,28 @@ Therefore the **realistic** token-echo vectors are: **(1) the in-process bridge-
 ---
 
 ## §8 FACTORY / live-path WIRING
+
+> **✅ STATUS UPDATE (2026-06-20 — §8 EXECUTED).** The "Current state" + "Order of
+> operations" below are the as-DESIGNED record; what actually shipped:
+> - **Step 1 (SDK driver) DONE** — `src/auth_drivers/claude_code_sdk_driver.py`
+>   (`5f0ea35`; + executor and temp-dir/history fixes `b558bde` / `de8e8e9`).
+> - **Step 2 (factory repoint) DONE `e52d38f`** — `build_driver(anthropic,
+>   claude_code_oauth)` now returns `AnthropicClaudeCodeSdkDriver` (gained optional
+>   `registry`/`dal` kwargs). The experimental `--bare` driver is **no longer
+>   wired** (kept importable for diagnostics) — so the "**Current state**" line just
+>   below (factory constructs `AnthropicClaudeCodeOAuthDriver`) is **SUPERSEDED**.
+> - **Step 3 (`live_anthropic_client` stays fail-closed) HOLDS** — the sync
+>   `.messages` sites are untouched (OQ-6, out of scope).
+> - **Step 4 (Research-stream consumer) DONE (7B-6)** — it **EXISTS now**:
+>   `_anthropic_subscription_stream` + the `/query/stream` anthropic branch in
+>   `src/api/routes/query.py` route to `driver.stream_llm` when the active anthropic
+>   credential is `claude_code_oauth`. Live-smoked (driver-level + route-helper):
+>   real `get_sa_feed` on the subscription, built-ins absent, no token leak.
+> - **Boundary (explicit):** 7B-6 wires the **streaming** path (`POST /query/stream`)
+>   ONLY — the AI 研究 product surface uses streaming. The legacy **non-streaming**
+>   `POST /query` for an OAuth-active anthropic credential **still fail-closes**
+>   (unchanged); acceptable for now. Wiring non-stream `/query` is a later optional
+>   follow-up.
 
 **Current state (re-verified `factory.py:115-130`):** the `(anthropic, claude_code_oauth)` branch constructs the EXPERIMENTAL `AnthropicClaudeCodeOAuthDriver` (the `--bare` driver), with a comment that it is SUPERSEDED (2026-06-19), cannot auth the subscription, and is kept only "so the experimental driver stays constructible for dev diagnostics."
 

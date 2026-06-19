@@ -204,6 +204,11 @@ def test_query_stream_threads_history_into_provider(store, monkeypatch, provider
         yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": provider, "model": "m", "token_usage": {}})
 
     monkeypatch.setattr(f"{module}.run_query_stream", fake_stream)
+    # 7B-6: pin the anthropic credential to a NON-OAuth resolution so the branch
+    # deterministically uses run_query_stream (the api-key/env path), regardless of
+    # whether the dev machine has a claude_code_oauth credential active. (No-op for
+    # the openai parametrization — the openai branch never consults resolve_live_auth.)
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _apikey_active())
 
     req = q.QueryRequest(question="follow up", provider=provider, model=None, thread_id="t1", ticker="NVDA")
 
@@ -236,6 +241,8 @@ def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
         yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": "anthropic", "model": "m", "token_usage": {}})
 
     monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", fake_stream)
+    # 7B-6: pin to a NON-OAuth resolution so the anthropic branch uses run_query_stream.
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _apikey_active())
     req = q.QueryRequest(question="hi", provider="anthropic", model=None, thread_id=None, ticker=None)
 
     async def drive():
@@ -248,11 +255,17 @@ def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
     assert store.list_threads() == []  # nothing persisted without a thread_id
 
 
-def test_anthropic_oauth_failclosed_becomes_error_event_and_persists(store, monkeypatch):
-    """7A-0: a SubscriptionDriverNotWiredError raised from the anthropic stream
-    (OAuth active, subscription driver not wired) must surface as an error EVENT
-    (not a 500 crash) AND persist an is_error turn (no dangling user). This is the
-    integration of live_anthropic_client's fail-closed raise with query.py."""
+def test_anthropic_run_query_stream_raise_becomes_error_event_and_persists(store, monkeypatch):
+    """A SubscriptionDriverNotWiredError (or any exception) raised from the anthropic
+    run_query_stream must surface as an error EVENT (not a 500 crash) AND persist an
+    is_error turn (no dangling user).
+
+    7B-6 NOTE: an OAuth-active credential no longer reaches run_query_stream — it is
+    intercepted and routed to the subscription driver BEFORE this call (its
+    raise-on-first-step graceful fallback is covered by
+    test_oauth_active_driver_raises_persists_error_turn_no_crash). This test pins the
+    NON-OAuth (api-key/env) path, where run_query_stream is still used; it could
+    still fail-close in that path. The error→event conversion is unchanged."""
     import asyncio
     from src.auth_drivers.live_resolver import SubscriptionDriverNotWiredError
 
@@ -263,6 +276,9 @@ def test_anthropic_oauth_failclosed_becomes_error_event_and_persists(store, monk
         yield  # noqa: makes this an async generator (raise fires on first __anext__)
 
     monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", failing_stream)
+    # 7B-6: pin to a NON-OAuth resolution so the branch uses run_query_stream (the
+    # only path that can still raise SubscriptionDriverNotWiredError post-7B-6).
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _apikey_active())
     req = q.QueryRequest(question="q", provider="anthropic", model=None, thread_id="t1", ticker=None)
 
     frames = []
@@ -297,3 +313,334 @@ def test_unknown_provider_persists_error_turn_not_a_dangling_user(store):
     msgs = store.list_messages("t1")
     assert [m.role for m in msgs] == ["user", "assistant"]
     assert msgs[1].is_error is True and "Unknown provider" in msgs[1].content
+
+
+# =====================================================================
+# 7B-6: AI 研究 on the Claude SUBSCRIPTION (claude_code_oauth-active).
+#
+# When the ACTIVE anthropic credential is claude_code_oauth, /query/stream's
+# anthropic branch must route to the in-process Agent-SDK driver
+# (_anthropic_subscription_stream) INSTEAD of run_query_stream (which fail-closes
+# for OAuth). The shared `stream` is then consumed by the SAME SSE/persist code,
+# so the SSE output + thread persistence behave exactly as for run_query_stream.
+#
+# Handler-direct, NO live: the credential resolution (resolve_live_auth, patched
+# at its source module — the branch imports it lazily) and the driver
+# (q._anthropic_subscription_stream / build_driver) are mocked; nothing hits PG or
+# the network. The api-key-anthropic and openai paths must stay byte-for-byte
+# unchanged in behavior (the subscription path is NOT taken).
+# =====================================================================
+from src.auth_drivers.live_resolver import LiveAuthResolution  # noqa: E402
+
+
+def _oauth_active(provider="anthropic", cid="local:7"):
+    """A resolution as live_resolver returns for an OAuth-active credential."""
+    return LiveAuthResolution(provider, "oauth_driver_unwired", cid, "oauth pending note")
+
+
+def _apikey_active(provider="anthropic", cid="local:3"):
+    return LiveAuthResolution(provider, "db_api_key", cid)
+
+
+async def _canned_events(provider="anthropic", model="claude-sonnet-4-6"):
+    """A canned [tool_start, tool_end, text, done] AgentEvent stream — the SAME
+    vocabulary run_query_stream yields, so downstream consumption is identical."""
+    from src.agents.shared.events import AgentEvent, EventType
+
+    yield AgentEvent(EventType.tool_start, {"tool": "get_ticker_news", "input": {"ticker": "NVDA"}})
+    yield AgentEvent(EventType.tool_end, {"tool": "get_ticker_news", "summary": "3 articles", "chars": 42})
+    yield AgentEvent(EventType.text, {"content": "partial..."})
+    yield AgentEvent(
+        EventType.done,
+        {"answer": "subscription answer", "tools_used": ["get_ticker_news"],
+         "provider": provider, "model": model, "token_usage": {"total_tokens": 9}},
+    )
+
+
+# --- (a) claude_code_oauth active → routes to the SDK driver; SSE + persist fire ---
+def test_oauth_active_anthropic_routes_to_subscription_driver(store, monkeypatch):
+    import asyncio
+
+    store.ensure_thread(id="t1", title="prev")
+    store.append_message(thread_id="t1", role="user", content="prev q")
+    store.append_message(thread_id="t1", role="assistant", content="prev a")
+
+    # Detection: the active anthropic credential is claude_code_oauth. Patched at
+    # the source module (the branch imports it lazily — project convention).
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _oauth_active())
+
+    captured = {}
+
+    def fake_sub_stream(*, credential_id, question, model, effort, dal, history):
+        captured.update(credential_id=credential_id, question=question, model=model,
+                        effort=effort, history=history)
+        return _canned_events(model=model)
+
+    # _anthropic_subscription_stream is a module-level fn in query.py — patch on q.
+    monkeypatch.setattr(q, "_anthropic_subscription_stream", fake_sub_stream)
+
+    # run_query_stream MUST NOT be called on the subscription path.
+    def boom_run_query_stream(**k):  # pragma: no cover - asserts it's never reached
+        raise AssertionError("run_query_stream must NOT be called for claude_code_oauth")
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", boom_run_query_stream)
+
+    req = q.QueryRequest(question="follow up", provider="anthropic", model=None, thread_id="t1", ticker="NVDA")
+
+    frames = []
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for chunk in resp.body_iterator:
+            frames.append(chunk)
+
+    asyncio.run(drive())
+
+    # routed to the subscription helper with the resolved model + full history + framed question
+    assert captured["credential_id"] == "local:7"
+    assert captured["question"] == "針對 NVDA：follow up"
+    assert captured["model"]  # resolved from the ai_research route (request.model=None)
+    assert captured["history"] == [
+        {"role": "user", "content": "prev q"},
+        {"role": "assistant", "content": "prev a"},
+    ]
+    # SSE: the canned events streamed verbatim (same vocab as run_query_stream)
+    blob = "".join(frames)
+    assert '"type": "tool_start"' in blob and '"type": "tool_end"' in blob
+    assert '"type": "done"' in blob and "subscription answer" in blob
+    # thread persistence fired exactly as for run_query_stream (assistant turn + trace)
+    msgs = store.list_messages("t1")
+    assert msgs[-1].role == "assistant" and msgs[-1].content == "subscription answer"
+    assert msgs[-1].is_error is False
+    assert msgs[-1].tool_calls == [
+        {"name": "get_ticker_news", "input": {"ticker": "NVDA"}, "result_preview": "3 articles"}
+    ]
+
+
+# --- (b) API-KEY anthropic active → still run_query_stream (subscription NOT taken) ---
+def test_apikey_active_anthropic_still_uses_run_query_stream(store, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _apikey_active())
+
+    # The subscription helper MUST NOT be called for an api_key-active credential.
+    def boom_sub(**k):  # pragma: no cover - asserts it's never reached
+        raise AssertionError("_anthropic_subscription_stream must NOT run for api_key")
+
+    monkeypatch.setattr(q, "_anthropic_subscription_stream", boom_sub)
+
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, **kwargs):
+        captured["question"] = question
+        captured["history"] = history
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "apikey answer", "tools_used": [], "provider": "anthropic", "model": "m", "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", fake_stream)
+
+    req = q.QueryRequest(question="hi", provider="anthropic", model=None, thread_id="t1", ticker=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    # run_query_stream was used (existing api-key behavior, unchanged)
+    assert captured["question"] == "hi"
+    assert store.list_messages("t1")[-1].content == "apikey answer"
+
+
+# --- (c) openai → unchanged; the subscription path is never consulted ---
+def test_openai_unaffected_by_subscription_branch(store, monkeypatch):
+    import asyncio
+
+    # If the openai branch ever consults the anthropic OAuth detection or helper,
+    # these explode — proving the openai path is behaviorally untouched.
+    def boom_resolve(*a, **k):  # pragma: no cover
+        raise AssertionError("openai branch must NOT call resolve_live_auth")
+
+    def boom_sub(**k):  # pragma: no cover
+        raise AssertionError("openai branch must NOT call _anthropic_subscription_stream")
+
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", boom_resolve)
+    monkeypatch.setattr(q, "_anthropic_subscription_stream", boom_sub)
+
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, **kwargs):
+        captured["question"] = question
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "openai answer", "tools_used": [], "provider": "openai", "model": "m", "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
+
+    req = q.QueryRequest(question="hi", provider="openai", model=None, thread_id="t1", ticker=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    assert captured["question"] == "hi"
+    assert store.list_messages("t1")[-1].content == "openai answer"
+
+
+# --- (d) claude_code_oauth active but the driver raises on first step → error turn ---
+def test_oauth_active_driver_raises_persists_error_turn_no_crash(store, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _oauth_active())
+
+    async def failing_stream():
+        # mirrors the driver raising MissingCredentialError on first __anext__ when
+        # the token is missing (claude_code_sdk_driver._stream).
+        raise RuntimeError("no Claude setup-token stored for this credential")
+        yield  # noqa: makes this an async generator
+
+    def fake_sub_stream(**k):
+        return failing_stream()
+
+    monkeypatch.setattr(q, "_anthropic_subscription_stream", fake_sub_stream)
+
+    req = q.QueryRequest(question="q", provider="anthropic", model=None, thread_id="t1", ticker=None)
+
+    frames = []
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for chunk in resp.body_iterator:
+            frames.append(chunk)
+
+    asyncio.run(drive())  # must NOT crash the route
+    blob = "".join(frames)
+    assert '"type": "error"' in blob  # surfaced as an error EVENT
+    msgs = store.list_messages("t1")
+    assert [m.role for m in msgs] == ["user", "assistant"]  # no dangling user turn
+    assert msgs[1].is_error is True
+    assert "setup-token" in msgs[1].content
+
+
+# --- helper unit: builds the SDK driver with registry+dal+token_store + reused prompt ---
+def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_prompt(monkeypatch):
+    """_anthropic_subscription_stream: cred from CredentialStore.get, a registered
+    ToolRegistry, build_driver(..., registry, dal, token_store), and an LLMRequest
+    whose input_messages = [*history, user] and instructions = the REUSED anthropic
+    research system prompt (build_system_prompt)."""
+    sentinel_token_store = object()
+    sentinel_dal = object()
+    sentinel_cred = object()
+    sentinel_stream = object()
+
+    # CredentialStore() → .get(credential_id) returns our sentinel credential.
+    # Patched at SOURCE modules (the helper imports them lazily — project convention).
+    class FakeStore:
+        def __init__(self, *a, **k):
+            pass
+
+        def get(self, credential_id):
+            assert credential_id == "local:7"
+            return sentinel_cred
+
+    monkeypatch.setattr("src.model_credentials.CredentialStore", FakeStore)
+    monkeypatch.setattr("src.auth_drivers.token_store.get_token_store", lambda: sentinel_token_store)
+
+    # ToolRegistry() with register_all() called.
+    reg_calls = {"register_all": 0}
+
+    class FakeRegistry:
+        def register_all(self):
+            reg_calls["register_all"] += 1
+
+    monkeypatch.setattr("src.tools.registry.ToolRegistry", FakeRegistry)
+
+    captured = {}
+
+    class FakeDriver:
+        def stream_llm(self, req):
+            captured["req"] = req
+            return sentinel_stream
+
+    def fake_build_driver(*, provider, auth_mode, credential, token_store, registry, dal):
+        captured.update(provider=provider, auth_mode=auth_mode, credential=credential,
+                        token_store=token_store, registry=registry, dal=dal)
+        return FakeDriver()
+
+    monkeypatch.setattr("src.auth_drivers.factory.build_driver", fake_build_driver)
+
+    history = [{"role": "user", "content": "prev q"}, {"role": "assistant", "content": "prev a"}]
+    out = q._anthropic_subscription_stream(
+        credential_id="local:7", question="follow up", model="claude-sonnet-4-6",
+        effort=None, dal=sentinel_dal, history=history,
+    )
+
+    assert out is sentinel_stream  # returns driver.stream_llm(req) unconsumed
+    assert reg_calls["register_all"] == 1
+    assert captured["provider"] == "anthropic" and captured["auth_mode"] == "claude_code_oauth"
+    assert captured["credential"] is sentinel_cred
+    assert captured["token_store"] is sentinel_token_store
+    assert captured["dal"] is sentinel_dal
+    assert isinstance(captured["registry"], FakeRegistry)
+    req = captured["req"]
+    assert req.model == "claude-sonnet-4-6"
+    # full conversation folded: history + this turn's user message
+    assert req.input_messages == [
+        {"role": "user", "content": "prev q"},
+        {"role": "assistant", "content": "prev a"},
+        {"role": "user", "content": "follow up"},
+    ]
+    # system prompt REUSED from the anthropic agent (same constant builder), AND —
+    # because history is non-empty — suffixed with the SAME [多輪脈絡] staleness
+    # guard the API-key anthropic loop appends (agent.py:235-240), so subscription
+    # and API-key Research give the model identical multi-turn guidance.
+    from src.agents.shared.prompts import build_system_prompt
+    assert req.instructions == build_system_prompt() + (
+        "\n\n[多輪脈絡] 以下對話歷史僅供理解使用者意圖與指代；價格、新聞、SA、"
+        "基本面等時效性事實一律以工具即時查詢為準，歷史內容可能已過期。"
+    )
+    assert "[多輪脈絡]" in req.instructions
+
+
+def test_anthropic_subscription_stream_no_history_uses_bare_prompt(monkeypatch):
+    """Parity the other way: with EMPTY history the helper must NOT append the
+    [多輪脈絡] guard — instructions == bare build_system_prompt(), matching the
+    API-key loop which only appends the guard when history is non-empty
+    (src/agents/anthropic_agent/agent.py:235-240)."""
+    captured = {}
+
+    class FakeStore:
+        def __init__(self, *a, **k):
+            pass
+
+        def get(self, credential_id):
+            return object()
+
+    class FakeRegistry:
+        def register_all(self):
+            pass
+
+    class FakeDriver:
+        def stream_llm(self, req):
+            captured["req"] = req
+            return object()
+
+    monkeypatch.setattr("src.model_credentials.CredentialStore", FakeStore)
+    monkeypatch.setattr("src.auth_drivers.token_store.get_token_store", lambda: object())
+    monkeypatch.setattr("src.tools.registry.ToolRegistry", FakeRegistry)
+    monkeypatch.setattr(
+        "src.auth_drivers.factory.build_driver",
+        lambda **k: FakeDriver(),
+    )
+
+    q._anthropic_subscription_stream(
+        credential_id="local:7", question="hi", model="claude-sonnet-4-6",
+        effort=None, dal=object(), history=[],
+    )
+
+    from src.agents.shared.prompts import build_system_prompt
+    req = captured["req"]
+    assert req.instructions == build_system_prompt()  # no suffix on single-turn
+    assert "[多輪脈絡]" not in req.instructions
+    assert req.input_messages == [{"role": "user", "content": "hi"}]
