@@ -529,3 +529,21 @@ subscription, built-ins absent, `apiKeySource='none'`, no token leak; GUI hand-t
 became a NEW class, not a rebuild of the superseded `--bare` `AnthropicClaudeCodeOAuthDriver`.
 Full detail: `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md` §8. **NEXT overall = S3 (OpenAI
 `chatgpt_oauth`), probe-first (P1/P2).**
+
+### S3 — OpenAI `chatgpt_oauth` probe runner BUILT (offline TDD) (2026-06-20)
+
+The P1/P2 probe runner is built and unit-tested with a **fake transport** (no live
+call): `src/auth_drivers/chatgpt_oauth_probe.py` + `tests/test_chatgpt_oauth_probe.py`
+(16 tests). It mirrors `claude_oauth_probe.py` — DI'd probe bodies + a monkeypatchable
+`_openai_client` seam + shape-only observations through the `probe_harness` redaction —
+and uses the SYNC `OpenAI` client so it is route-safe. Grounded in Novelloom's PROVEN
+probe/driver: base_url swap to `https://chatgpt.com/backend-api/codex` with the OAuth
+access_token as the SDK api_key and **NO custom headers**; `max_output_tokens` sent RAW
+to measure the backend's 400; a flat Responses-API function tool → `*_call` item; model
+discovery via `extra_query={"client_version": "0.0.0"}` → ids in the nonstandard
+`models` field. **PENDING (gated on user):** the live P1/P2 run needs a real
+ChatGPT/Codex OAuth token in the local store; only after it passes do the factory
+`(openai, chatgpt_oauth)` branch + the Settings import/probe-route widenings
+(`config_routes.py:340` import, `:397` probe) land. The OpenAI-B path carries the
+**"compatibility path, not product path"** label (reverse-engineered, TOS-sensitive) —
+distinct from the Anthropic OAuth path, which is documented/sanctioned.
