@@ -135,16 +135,44 @@ def _err_summary(exc: BaseException) -> str:
     return f"{head}: {msg}"[:160]
 
 
+_AUTH_REJECT_STATUS = (401, 403)
+_AUTH_REJECT_TYPES = ("AuthenticationError", "PermissionDeniedError")
+
+
+def _is_auth_rejection(exc: BaseException) -> bool:
+    """True ONLY for an auth-class rejection (HTTP 401/403). A network/timeout,
+    404 model_not_found, 400 unsupported-parameter, or 429 rate-limit is NOT proof
+    the OAuth token is unusable on the standard API — it is inconclusive, so it must
+    NOT count as a P1a pass (a transient error could otherwise masquerade as the
+    A≠B proof)."""
+    if getattr(exc, "status_code", None) in _AUTH_REJECT_STATUS:
+        return True
+    return type(exc).__name__ in _AUTH_REJECT_TYPES
+
+
+def _rejection_label(exc: BaseException) -> str:
+    """A token-free label for an auth rejection: type + status only (NEVER the
+    message, which a backend may echo a credential into)."""
+    status = getattr(exc, "status_code", None)
+    name = type(exc).__name__
+    return f"{status} {name}" if status else name
+
+
 # --- default probe bodies (record SHAPE only; return (passed, observed)) --------
 def _default_p1_host_distinctness(token: str) -> tuple[bool, str]:
-    """PASS = api.openai.com REJECTS the token AND the codex backend STREAMS text."""
-    # P1a — the standard public API must reject the OAuth token (it is not an sk- key).
+    """PASS = api.openai.com REJECTS the token WITH AN AUTH ERROR (401/403) AND the
+    codex backend STREAMS text. A non-auth error from the standard host (network,
+    404, 400, 429) is inconclusive — explicitly NOT a pass."""
+    # P1a — the standard public API must reject the OAuth token with an AUTH error.
     try:
         _openai_client(token, STANDARD_BASE_URL).responses.create(
             model=_PROBE_MODEL, input=_PING_INPUT, max_output_tokens=16,
         )
-    except Exception as exc:  # noqa: BLE001 — a rejection is the expected outcome
-        std_reject = type(exc).__name__
+    except Exception as exc:  # noqa: BLE001
+        if not _is_auth_rejection(exc):
+            return False, (f"api.openai.com errored but NOT with an auth rejection "
+                           f"({_err_summary(exc)}) — inconclusive, not a pass")
+        std_reject = _rejection_label(exc)
     else:
         return False, ("api.openai.com ACCEPTED the OAuth token as an api_key — "
                        "the A/B host invariant is violated, STOP and re-derive")

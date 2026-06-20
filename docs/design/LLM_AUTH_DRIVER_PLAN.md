@@ -220,7 +220,7 @@ Build the abstraction first; rewiring is the LAST slice and out of this doc's de
 1. **S0 — Contract.** Land `AuthDriver` Protocol + `ResearchProviderDriver` subtype + `LLMRequest/LLMResponse/TokenUsage` + `ArkStreamEvent` (maps to existing `AgentEvent` SSE vocab) as a **PURE INTERFACE + unit tests ONLY** — NOT wired to any route, no production consumer, no behavior change. *(This is the build-first boundary; the agreed next step.)*
 2. **S1 — Factory + CredentialStore delta.** `build_driver(provider, auth_mode, credential)`; rename `auth_type` to explicit modes (§5.1, deprecated aliases on read) + widen the `config_routes.py:203` allow-set; add `expires_at`/`account_label` columns; replace `_resolve_api_credential` stub for OAuth with token-store lookup. **Token storage abstracted (keyring-first); no UI yet.**
 3. **S2 — Standard drivers (A + D).** `OpenAIApiKeyDriver` (borrow Novelloom) + `AnthropicApiKeyDriver` (DESIGNED — wraps ArkScope's existing raw `Anthropic()` path). Prove parity with current behavior via `test()`. Run **P1** here. Default provider stays `api_key`.
-4. **S3 — OpenAI `chatgpt_oauth` (B).** In-app OAuth login + token store + refresh (browser/paste; optional codex-token *import*, no CLI dependency) via keychain-backed `CredentialStore`. Capability matrix. **Run P2 FIRST; only AFTER the probe shows stable streaming + tool-call does the Settings row land** (with the "compatibility / unsupported-by-OpenAI-docs" badge).
+4. **S3 — OpenAI `chatgpt_oauth` (B).** In-app OAuth login + token store + refresh (browser PKCE + localhost callback, manual copy-code fallback; codex-token *import* = **optional dev/bootstrap only — never a runtime fallback or the main UX**; no CLI dependency). Storage: secret → keyring-first token-store, metadata → `CredentialStore` row with `secret`=NULL. Capability matrix. **Run P2 FIRST; only AFTER the probe shows stable streaming + tool-call does the Settings row land** (with the "compatibility / unsupported-by-OpenAI-docs" badge).
 5. **S4 — Anthropic `claude_code_oauth` (C).** Generalize `_call_claude_cli` into a streaming-capable driver; manual-paste token store; status-only refresh; **local `MODEL_CATALOG` seed for discovery**. **Run P3 FIRST + live-re-verify Agent-SDK credit policy; Settings row only after P3 passes** (no "may break" badge; UI shows `status: unknown`/plan, no hardcoded credit figures).
 6. **S5 — Wire-in (SEPARATE plan).** Route the ~7 bare-client call sites + the Agents-SDK default-client setters through `build_driver`. Touch ONLY client construction. **Explicitly NOT designed here** — gated on S0-S4 + probes passing.
 
@@ -547,3 +547,35 @@ ChatGPT/Codex OAuth token in the local store; only after it passes do the factor
 (`config_routes.py:340` import, `:397` probe) land. The OpenAI-B path carries the
 **"compatibility path, not product path"** label (reverse-engineered, TOS-sensitive) —
 distinct from the Anthropic OAuth path, which is documented/sanctioned.
+
+### S3-auth design correction — product path = ArkScope's OWN in-app OAuth (2026-06-20)
+
+Locked after a design pushback (a "import from `~/.codex/auth.json` first" suggestion was a
+drift; §10 S3 + §13 #1 already decided in-app OAuth — this re-affirms + sharpens it):
+- **Product path = ArkScope's OWN in-app OAuth login.** A Settings button starts the flow
+  (PKCE + localhost callback, with a manual copy-code fallback); ArkScope captures
+  access_token / refresh_token / expires_at / account metadata, stores them, and refreshes
+  before each call. This is THE `chatgpt_oauth` path — no Codex CLI install is ever required.
+- **`~/.codex/auth.json` import = optional dev/bootstrap convenience ONLY** — never the main
+  UX, never a runtime fallback. If `chatgpt_oauth` fails at runtime, the product fallback is
+  "use an API key," not Codex CLI (§13 #1).
+- **Storage = the existing two-store split (REUSE; do NOT add a 3rd store).** The secret
+  (access/refresh token, expires_at, account metadata) → the **token-store** (keyring-first;
+  plaintext-JSON `0600` only as the UI-labeled dev fallback). The credential METADATA row
+  (provider, auth_type, alias, active, expires_at, account_label) → SQLite `llm_credentials`
+  with `secret` = **NULL**. NEVER the `llm_credentials.secret` column (§13 #2; the project has
+  a plaintext-secret leak history). This is exactly how the Claude `claude_code_oauth` path
+  already stores tokens, and the write path (`add_oauth_credential` + `token_store.save`,
+  with rollback) is already provider-generic — so **S3's new work is the OAuth login
+  FRONT-END (PKCE/callback/exchange), not storage.**
+- **Build order:** design-correction (this) + P1a auth-class narrowing → in-app OAuth login
+  skeleton → live P1/P2 probe (gated on a real token in the store) → driver + Research
+  wire-in (only after live P1/P2 pass; fallback policy explicit — never a silent paid
+  API-key fallback).
+
+**P1a narrowing — DONE** (`chatgpt_oauth_probe.py`): the standard-host call counts as a
+"rejected" PASS **only** for an auth-class error (HTTP 401/403). A network/timeout, 404
+model_not_found, 400 unsupported-parameter, or 429 rate-limit is **inconclusive → NOT a
+pass** (a transient error must not masquerade as the A≠B proof). The rejection is labelled
+by type+status (never the error message), and all probe output stays redacted. 22 tests in
+`tests/test_chatgpt_oauth_probe.py`.

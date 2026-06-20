@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 import src.auth_drivers.chatgpt_oauth_probe as mod
 from src.auth_drivers.chatgpt_oauth_probe import (
     CHATGPT_BACKEND_BASE_URL,
@@ -33,6 +35,18 @@ _TOK = "chatgpt-oauth-FAKEtok-AbCdEf0123456789ZyXwVu"
 # --- fake transport -----------------------------------------------------------
 class _Boom(Exception):
     pass
+
+
+class _ApiErr(Exception):
+    """A fake OpenAI-SDK-style error carrying an HTTP status_code (for P1a auth classification)."""
+
+    def __init__(self, status_code, msg=""):
+        super().__init__(msg or f"HTTP {status_code}")
+        self.status_code = status_code
+
+
+class _Timeout(Exception):
+    """A fake network/timeout error — no status_code (must NOT count as a P1a pass)."""
 
 
 class _FakePage:
@@ -122,7 +136,7 @@ def test_runner_redacts_token_from_exception():
 def test_default_p1_pass_when_standard_rejects_and_codex_streams(monkeypatch):
     def factory(token, base_url):
         if base_url == STANDARD_BASE_URL:
-            return _FakeClient(on_create=lambda kw: _raise(_Boom("401 invalid_api_key")))
+            return _FakeClient(on_create=lambda kw: _raise(_ApiErr(401, "invalid_api_key")))
         return _FakeClient(on_create=lambda kw: [
             {"type": "response.output_text.delta", "delta": "OK"},
             {"type": "response.completed", "response": {"output": [], "output_text": "OK"}},
@@ -143,12 +157,66 @@ def test_default_p1_fail_when_standard_host_accepts(monkeypatch):
 def test_default_p1_fail_when_codex_stream_errors(monkeypatch):
     def factory(token, base_url):
         if base_url == STANDARD_BASE_URL:
-            return _FakeClient(on_create=lambda kw: _raise(_Boom("401")))
+            return _FakeClient(on_create=lambda kw: _raise(_ApiErr(401)))
         return _FakeClient(on_create=lambda kw: [{"type": "response.failed"}])
 
     monkeypatch.setattr(mod, "_openai_client", factory)
     passed, observed = mod._default_p1_host_distinctness(_TOK)
     assert passed is False and "response.failed" in observed
+
+
+def test_default_p1_pass_on_403_auth_rejection(monkeypatch):
+    def factory(token, base_url):
+        if base_url == STANDARD_BASE_URL:
+            return _FakeClient(on_create=lambda kw: _raise(_ApiErr(403, "unauthorized")))
+        return _FakeClient(on_create=lambda kw: [
+            {"type": "response.output_text.delta", "delta": "OK"},
+            {"type": "response.completed", "response": {"output": []}},
+        ])
+
+    monkeypatch.setattr(mod, "_openai_client", factory)
+    passed, observed = mod._default_p1_host_distinctness(_TOK)
+    assert passed is True
+
+
+@pytest.mark.parametrize("exc", [
+    _ApiErr(404, "model_not_found"),
+    _ApiErr(400, "Unsupported parameter"),
+    _ApiErr(429, "rate_limit_exceeded"),
+    _Timeout("connection timed out"),
+])
+def test_default_p1_fail_when_standard_host_error_is_not_auth(monkeypatch, exc):
+    # A non-auth error from api.openai.com (network/404/400/429) is INCONCLUSIVE —
+    # it must NOT be counted as proof the OAuth token was rejected by the standard API.
+    def factory(token, base_url):
+        if base_url == STANDARD_BASE_URL:
+            return _FakeClient(on_create=lambda kw: _raise(exc))
+        return _FakeClient(on_create=lambda kw: [{"type": "response.completed", "response": {"output": []}}])
+
+    monkeypatch.setattr(mod, "_openai_client", factory)
+    passed, observed = mod._default_p1_host_distinctness(_TOK)
+    assert passed is False
+    assert "inconclusive" in observed.lower() or "not a pass" in observed.lower()
+
+
+def test_default_p1_auth_error_message_with_token_is_redacted(monkeypatch):
+    # If the standard-host auth error message embeds the token, the runner's
+    # ProbeResult must not leak it (P1a labels by type+status, not the message).
+    def factory(token, base_url):
+        if base_url == STANDARD_BASE_URL:
+            return _FakeClient(on_create=lambda kw: _raise(_ApiErr(401, f"invalid key {token}")))
+        return _FakeClient(on_create=lambda kw: [
+            {"type": "response.output_text.delta", "delta": "OK"},
+            {"type": "response.completed", "response": {"output": []}},
+        ])
+
+    monkeypatch.setattr(mod, "_openai_client", factory)
+    res = run_chatgpt_oauth_probe(
+        _TOK, p2a_fn=lambda: (True, "ok"), p2b_fn=lambda: (True, "ok"), p2c_fn=lambda: (True, "ok"),
+    )
+    p1 = next(p for p in res["probes"] if "P1" in p["name"])
+    assert p1["passed"] is True
+    assert _TOK not in json.dumps(res)
 
 
 # --- P2a default body (max_output_tokens → 400) -------------------------------
