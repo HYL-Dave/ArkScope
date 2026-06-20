@@ -634,3 +634,28 @@ wrappers; the loopback HTTP server + Settings UI are thin transport on top):
 seams; the state store + write path use injectable stores. Tests cover state mismatch, expired
 state, exchange-error (400/401) no-fallback, incomplete-token, token-store write-fail rollback,
 no-token-echo, and the refresh path.
+
+### S3 thin transport — backend BUILT + audited (2026-06-20)
+
+Backend transport for the in-app login (the Settings UI is the next slice). Three new
+modules + routes, TDD'd:
+- `chatgpt_oauth_callback_server.py` — ephemeral loopback that captures the one
+  `GET /auth/callback` on **127.0.0.1:1455** (GET-only, exact-path), **explicit fail on
+  port-in-use (no fallback port)**, cancel/timeout. Localhost integration tests.
+- `chatgpt_oauth_manager.py` — `OAuthLoginManager`: `begin()` (mint state+PKCE, spawn the
+  loopback thread, return auth_url) → `status()` poll (pending/success/error/unknown) →
+  `complete_manual()` copy-code fallback. Single-use state ⇒ no double token-exchange;
+  sticky success; results return MASKED metadata only.
+- `config_routes.py` — `POST /config/credentials/openai/oauth/start`, `GET …/status`,
+  `POST …/complete-manual` (bare code or redirect-URL extract + state-match guard); the
+  `…/{id}/probe` route widened to dispatch openai `chatgpt_oauth` → P1/P2. Write-gated;
+  responses never carry a token. `get_oauth_login_manager` singleton (in-memory login state).
+
+**Adversarial transport audit (4 skeptics):** token/PII egress, loopback CSRF/binding, and
+fallback-discipline all **clean** (127.0.0.1-only, 256-bit single-use state is sufficient
+CSRF, no silent fallback port/credential/API-key anywhere). Two real lifecycle defects found
+and FIXED: (1) a bind→register window let a manual completion leave the loopback holding
+:1455 for the full timeout → fixed with a `_cancelled` set checked atomically at registration;
+(2) the singleton's `_results` grew unbounded → fixed with TTL + cap eviction. 187 auth+route
+tests pass, no regressions. **Still held for the next slice:** the Settings UI, then the live
+P1/P2 run (needs a real subscription login through this flow).

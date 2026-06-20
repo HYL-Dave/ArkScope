@@ -80,6 +80,20 @@ def get_oauth_token_store():
 
 
 @lru_cache(maxsize=1)
+def get_oauth_login_manager():
+    """Singleton in-app ChatGPT-OAuth login orchestrator. Holds in-memory login
+    state (pending PKCE/state + results) across the start→status→complete requests,
+    so it MUST be a process singleton. Writes the resulting credential through the
+    same two-store split (CredentialStore metadata + token-store secret)."""
+    from src.auth_drivers.chatgpt_oauth_manager import OAuthLoginManager
+
+    return OAuthLoginManager(
+        credential_store=get_credential_store(),
+        token_store=get_oauth_token_store(),
+    )
+
+
+@lru_cache(maxsize=1)
 def get_data_provider_store():
     """Singleton DATA-provider config store (API keys / IBKR host+port — same
     ignored local SQLite DB). Values are injected into os.environ via apply_env."""

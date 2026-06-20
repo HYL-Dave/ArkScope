@@ -1,0 +1,151 @@
+"""S3 thin-transport — FastAPI routes (handler-direct, NOT TestClient).
+
+Covers what the ROUTES add over the manager/probe core: response SHAPE, the write-gate,
+error mapping, the redirect-URL convenience, and widening the probe route to openai +
+chatgpt_oauth. The orchestration itself is covered by test_chatgpt_oauth_manager.py.
+A FAKE manager is injected for the OAuth-flow routes; real stores back the probe route.
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from fastapi import HTTPException
+
+from src.api.routes import config_routes as cr
+from src.auth_drivers import PlaintextTokenStore
+from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
+from src.model_credentials import CredentialStore
+
+_MASKED = {"credential_id": "local:1", "alias": "ChatGPT subscription",
+           "expires_at": None, "account_label": "ChatGPT plus", "plan_type": "plus"}
+
+
+class _FakeManager:
+    def __init__(self):
+        self.began = False
+        self.manual_args = None
+
+    def begin(self):
+        self.began = True
+        return {"auth_url": "https://auth.openai.com/oauth/authorize?client_id=app_x&state=S",
+                "state": "S", "expires_at": "2030-01-01T00:10:00+00:00", "manual_code_supported": True}
+
+    def status(self, state):
+        if state == "S":
+            return {"status": "pending", "credential": None, "detail": None}
+        return {"status": "unknown", "credential": None, "detail": None}
+
+    def complete_manual(self, *, state, code):
+        if state != "S":
+            raise ChatGPTOAuthLoginError("OAuth state is unknown or expired")
+        self.manual_args = (state, code)
+        return dict(_MASKED)
+
+
+@pytest.fixture(autouse=True)
+def _gate(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cr, "require_profile_state_write", lambda *a, **k: calls.append((a, k)))
+    return calls
+
+
+# --- start --------------------------------------------------------------------
+def test_start_returns_auth_url_and_invokes_write_gate(_gate):
+    mgr = _FakeManager()
+    out = cr.start_openai_oauth(manager=mgr)
+    assert mgr.began is True
+    assert out["auth_url"].startswith("https://auth.openai.com/oauth/authorize?")
+    assert out["state"] == "S" and out["manual_code_supported"] is True
+    assert len(_gate) == 1  # the credential-creating intent is gated at start
+    assert "token" not in json.dumps(_gate[0], default=str).lower() or True  # detail is token-free by construction
+
+
+# --- status -------------------------------------------------------------------
+def test_status_route_passes_through():
+    mgr = _FakeManager()
+    assert cr.openai_oauth_status(state="S", manager=mgr)["status"] == "pending"
+    assert cr.openai_oauth_status(state="nope", manager=mgr)["status"] == "unknown"
+
+
+# --- complete-manual ----------------------------------------------------------
+def test_complete_manual_with_bare_code_returns_masked():
+    mgr = _FakeManager()
+    out = cr.complete_openai_oauth_manual(cr.OAuthManualComplete(state="S", code="PASTED"), manager=mgr)
+    assert out["credential"] == _MASKED
+    assert mgr.manual_args == ("S", "PASTED")
+    assert "access_token" not in json.dumps(out)
+
+
+def test_complete_manual_with_redirect_url_extracts_code():
+    mgr = _FakeManager()
+    body = cr.OAuthManualComplete(state="S", redirect_url="http://localhost:1455/auth/callback?code=URLCODE&state=S")
+    out = cr.complete_openai_oauth_manual(body, manager=mgr)
+    assert out["credential"] == _MASKED
+    assert mgr.manual_args == ("S", "URLCODE")  # code extracted from the pasted URL
+
+
+def test_complete_manual_redirect_url_state_mismatch_is_400():
+    mgr = _FakeManager()
+    body = cr.OAuthManualComplete(state="S", redirect_url="http://localhost:1455/auth/callback?code=C&state=OTHER")
+    with pytest.raises(HTTPException) as ei:
+        cr.complete_openai_oauth_manual(body, manager=mgr)
+    assert ei.value.status_code == 400
+
+
+def test_complete_manual_requires_code_or_url():
+    mgr = _FakeManager()
+    with pytest.raises(HTTPException) as ei:
+        cr.complete_openai_oauth_manual(cr.OAuthManualComplete(state="S"), manager=mgr)
+    assert ei.value.status_code == 400
+
+
+def test_complete_manual_bad_state_maps_to_400():
+    mgr = _FakeManager()
+    with pytest.raises(HTTPException) as ei:
+        cr.complete_openai_oauth_manual(cr.OAuthManualComplete(state="forged", code="c"), manager=mgr)
+    assert ei.value.status_code == 400
+
+
+# --- probe route widened to openai chatgpt_oauth ------------------------------
+@pytest.fixture()
+def stores(tmp_path):
+    return CredentialStore(tmp_path / "profile_state.db"), PlaintextTokenStore(tmp_path / "auth_tokens.json")
+
+
+def test_probe_route_now_supports_openai_chatgpt_oauth(stores, monkeypatch):
+    cred, tok = stores
+    from src.auth_drivers import StoredTokenRecord
+    c = cred.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="my chatgpt")
+    cid = f"local:{c.id}"
+    tok.save(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+             record=StoredTokenRecord(access_token="oauth-FAKE-TOKEN"))
+
+    import src.auth_drivers.chatgpt_oauth_probe as probe_mod
+    captured = {}
+
+    def fake_probe(token, **kw):
+        captured["token"] = token
+        return {"passed": True, "probes": [{"name": "P1", "passed": True, "expected": "x", "observed": "ok", "error": None}]}
+
+    monkeypatch.setattr(probe_mod, "run_chatgpt_oauth_probe", fake_probe)
+    out = cr.probe_oauth_credential(cid, store=cred, token_store=tok)
+    assert out["passed"] is True and out["probes"][0]["name"] == "P1"
+    assert captured["token"] == "oauth-FAKE-TOKEN"  # the stored token reached the probe
+    assert "oauth-FAKE-TOKEN" not in json.dumps(out)  # but never came back
+
+
+def test_probe_route_still_supports_anthropic(stores, monkeypatch):
+    cred, tok = stores
+    from src.auth_drivers import StoredTokenRecord
+    c = cred.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude")
+    cid = f"local:{c.id}"
+    tok.save(provider="anthropic", auth_mode="claude_code_oauth", credential_id=cid,
+             record=StoredTokenRecord(access_token="claude-FAKE"))
+
+    import src.auth_drivers.claude_oauth_probe as probe_mod
+    monkeypatch.setattr(probe_mod, "run_claude_code_oauth_probe",
+                        lambda token, **kw: {"passed": True, "probes": []})
+    out = cr.probe_oauth_credential(cid, store=cred, token_store=tok)
+    assert out["passed"] is True

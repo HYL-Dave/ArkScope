@@ -6,7 +6,12 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.api.dependencies import get_credential_store, get_dal, get_oauth_token_store
+from src.api.dependencies import (
+    get_credential_store,
+    get_dal,
+    get_oauth_login_manager,
+    get_oauth_token_store,
+)
 from src.api.permissions import require_profile_state_write
 from src.agents.config import save_local_override, task_route
 from src.env_keys import env_file_path
@@ -376,16 +381,73 @@ def import_oauth_credential(
     }
 
 
+class OAuthManualComplete(BaseModel):
+    state: str
+    code: str | None = None
+    redirect_url: str | None = None
+
+
+@router.post("/config/credentials/openai/oauth/start")
+def start_openai_oauth(manager=Depends(get_oauth_login_manager)):
+    """Begin an in-app ChatGPT (OpenAI subscription) OAuth login. Returns the
+    authorize URL + state for the browser; the loopback callback (or the manual
+    copy-code fallback) completes it. COMPATIBILITY/EXPERIMENTAL path — the
+    ChatGPT/Codex backend is not the public OpenAI API. The token never appears in
+    any response; only masked metadata is returned on completion (via /status)."""
+    # Gate the credential-creating intent here (request context); the async loopback
+    # completion fulfills this gated start. The detail is token-free by construction.
+    require_profile_state_write("oauth_login_start", {"provider": "openai", "auth_mode": "chatgpt_oauth"})
+    return manager.begin()
+
+
+@router.get("/config/credentials/openai/oauth/status")
+def openai_oauth_status(state: str, manager=Depends(get_oauth_login_manager)):
+    """Poll a login started by /start: {status: pending|success|error|unknown,
+    credential: <masked metadata>|null, detail: <message>|null}. No token."""
+    return manager.status(state)
+
+
+@router.post("/config/credentials/openai/oauth/complete-manual")
+def complete_openai_oauth_manual(body: OAuthManualComplete, manager=Depends(get_oauth_login_manager)):
+    """Copy-code fallback — ONLY for when the localhost callback never arrived. The
+    user pastes the authorization code (or the full redirect URL); this completes the
+    SAME login. It does NOT change the auth mode, store, or validation, and it MUST
+    NOT mask an OAuth/token error (a bad/expired/forged state → 400, no fallback)."""
+    from src.auth_drivers.chatgpt_oauth_login import (
+        ChatGPTOAuthLoginError,
+        extract_code_from_redirect_url,
+    )
+
+    require_profile_state_write("oauth_login_complete_manual", {"provider": "openai", "auth_mode": "chatgpt_oauth"})
+    code = (body.code or "").strip() or None
+    if body.redirect_url:
+        try:
+            parsed = extract_code_from_redirect_url(body.redirect_url)
+        except ChatGPTOAuthLoginError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if parsed.get("state") and parsed["state"] != body.state:
+            raise HTTPException(status_code=400, detail="the redirect URL's state does not match this login")
+        code = parsed["code"]
+    if not code:
+        raise HTTPException(status_code=400, detail="code or redirect_url is required")
+    try:
+        return {"credential": manager.complete_manual(state=body.state, code=code)}
+    except ChatGPTOAuthLoginError as exc:
+        # state/PKCE/exchange failures FAIL — never a silent fallback. The message is
+        # already redacted at the source; map to a 400.
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.post("/config/credentials/{credential_id}/probe")
 def probe_oauth_credential(
     credential_id: str,
     store: CredentialStore = Depends(get_credential_store),
     token_store=Depends(get_oauth_token_store),
 ):
-    """Run the P3 probe for a claude_code_oauth credential: verify `claude -p`
-    works with the stored token AND that the raw Anthropic SDK rejects it as an
-    API key. Returns redacted ProbeResults — the token is NEVER echoed."""
-    from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+    """Run the OAuth probe for a stored credential and return redacted ProbeResults
+    (the token is NEVER echoed):
+      - anthropic claude_code_oauth → P3 (claude -p works + raw SDK rejects the token);
+      - openai chatgpt_oauth → P1/P2 (api.openai.com rejects + ChatGPT-backend floor)."""
     from src.model_credentials import valid_credential_id
 
     store = _credential_store(store)
@@ -394,12 +456,19 @@ def probe_oauth_credential(
     cred = store.get(credential_id)
     if cred is None or cred.auth_type not in ("chatgpt_oauth", "claude_code_oauth"):
         raise HTTPException(status_code=404, detail="OAuth credential not found")
-    if not (cred.provider == "anthropic" and cred.auth_type == "claude_code_oauth"):
-        raise HTTPException(status_code=400, detail="probe currently supports only anthropic claude_code_oauth")
     record = token_store.load(provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id)
     if record is None or not record.access_token:
         raise HTTPException(status_code=404, detail="no stored token for this credential")
-    return run_claude_code_oauth_probe(record.access_token)
+
+    if cred.provider == "anthropic" and cred.auth_type == "claude_code_oauth":
+        from src.auth_drivers.claude_oauth_probe import run_claude_code_oauth_probe
+
+        return run_claude_code_oauth_probe(record.access_token)
+    if cred.provider == "openai" and cred.auth_type == "chatgpt_oauth":
+        from src.auth_drivers.chatgpt_oauth_probe import run_chatgpt_oauth_probe
+
+        return run_chatgpt_oauth_probe(record.access_token)
+    raise HTTPException(status_code=400, detail="probe supports anthropic claude_code_oauth or openai chatgpt_oauth")
 
 
 @router.put("/config/credentials/{credential_id}")
