@@ -3,6 +3,9 @@ import {
   addCredential,
   importOAuthCredential,
   probeCredential,
+  startOpenAIOAuth,
+  openAIOAuthStatus,
+  completeOpenAIOAuthManual,
   type ProbeResponse,
   bootstrapMarketData,
   deleteCredential,
@@ -41,6 +44,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
+import { buildManualCompletion, pollOAuthStatus } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1112,6 +1116,11 @@ function ProviderSection({
   const [claudeAlias, setClaudeAlias] = useState("");
   const [claudeLabel, setClaudeLabel] = useState("");
   const [claudeToken, setClaudeToken] = useState("");
+  // OpenAI ChatGPT in-app OAuth login (openai only). Holds only the public state +
+  // auth_url for an in-flight login; no token ever reaches the UI.
+  const [oauth, setOauth] = useState<{ state: string; authUrl: string; phase: "waiting" | "manual" } | null>(null);
+  const [oauthBusy, setOauthBusy] = useState(false);
+  const [manualValue, setManualValue] = useState("");
 
   async function addKey(provider: ModelProvider) {
     const alias = (newAlias[provider] ?? "").trim();
@@ -1164,6 +1173,77 @@ function ProviderSection({
     } catch (e) {
       setClaudeToken(""); // also clear on failure — don't keep the token around
       setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function copyLoginLink() {
+    if (oauth?.authUrl && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(oauth.authUrl);
+        setProviderMsg("登入連結已複製。");
+      } catch {
+        /* clipboard denied — the browser tab already opened the URL */
+      }
+    }
+  }
+
+  async function startChatGPTLogin() {
+    setProviderErr(null);
+    setProviderMsg(null);
+    setOauthBusy(true);
+    try {
+      const r = await startOpenAIOAuth();
+      setOauth({ state: r.state, authUrl: r.auth_url, phase: "waiting" });
+      // open the browser login; if a popup blocker eats it, the copy-link button is the fallback
+      window.open(r.auth_url, "_blank", "noopener,noreferrer");
+      const res = await pollOAuthStatus(r.state, {
+        statusFn: openAIOAuthStatus,
+        now: () => Date.now(),
+        sleep: (ms) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)),
+      });
+      if (res.kind === "success") {
+        setOauth(null);
+        setProviderMsg("ChatGPT 訂閱已登入（token 存入 token-store，未存入 credential DB）。");
+        await onRefresh();
+      } else if (res.kind === "timeout") {
+        setOauth((o) => (o ? { ...o, phase: "manual" } : o));
+        setProviderErr("等不到瀏覽器回呼（可能 popup 被擋，或本機 :1455 沒收到）。請改用下方手動貼上授權碼。");
+      } else if (res.kind === "error") {
+        // surface the backend reason as-is — NO silent fallback to an API key
+        setOauth((o) => (o ? { ...o, phase: "manual" } : o));
+        setProviderErr(`登入失敗：${res.detail}`);
+      } else {
+        setOauth(null);
+        setProviderErr("登入工作階段不存在或已過期，請重新點「登入 ChatGPT」。");
+      }
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOauthBusy(false);
+    }
+  }
+
+  async function completeChatGPTManual() {
+    if (!oauth) return;
+    const pasted = manualValue.trim();
+    if (!pasted) {
+      setProviderErr("請貼上授權碼或回呼網址");
+      return;
+    }
+    setProviderErr(null);
+    setProviderMsg(null);
+    setOauthBusy(true);
+    try {
+      await completeOpenAIOAuthManual(buildManualCompletion(oauth.state, pasted));
+      setManualValue("");
+      setOauth(null);
+      setProviderMsg("ChatGPT 訂閱已登入（手動完成；token 存入 token-store）。");
+      await onRefresh();
+    } catch (e) {
+      // a bad/expired/forged state or a token-exchange error 400s here — show it, no fallback
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOauthBusy(false);
     }
   }
 
@@ -1307,6 +1387,74 @@ function ProviderSection({
                   <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken()}>
                     匯入 setup-token
                   </button>
+                </div>
+              )}
+              {provider === "openai" && (
+                <div className="credential-add-box oauth-import-box">
+                  <p className="muted tiny" style={{ marginBottom: 8 }}>
+                    登入 ChatGPT 訂閱（OpenAI subscription）。<strong>這不是 OpenAI API key。</strong>
+                    這是<strong>實驗性／相容路徑</strong>（走 ChatGPT 後端，非公開 OpenAI API，可能隨時失效）。
+                    Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
+                  </p>
+                  {!oauth && (
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      disabled={oauthBusy}
+                      onClick={() => void startChatGPTLogin()}
+                    >
+                      {oauthBusy ? "登入中…" : "登入 ChatGPT"}
+                    </button>
+                  )}
+                  {oauth?.phase === "waiting" && (
+                    <div>
+                      <p className="muted tiny">等待瀏覽器登入完成…（已開新分頁）</p>
+                      <button type="button" className="btn-ghost small" onClick={() => void copyLoginLink()}>
+                        複製登入連結
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        onClick={() => setOauth((o) => (o ? { ...o, phase: "manual" } : o))}
+                      >
+                        沒有自動返回？手動貼上授權碼
+                      </button>
+                    </div>
+                  )}
+                  {oauth?.phase === "manual" && (
+                    <div>
+                      <p className="muted tiny">
+                        只在瀏覽器已完成登入、但本機 callback 沒收到時使用。貼上授權碼或整個回呼網址：
+                      </p>
+                      <label className="field">
+                        <span>授權碼／回呼網址</span>
+                        <input
+                          value={manualValue}
+                          autoComplete="off"
+                          placeholder="code 或 http://localhost:1455/auth/callback?code=…"
+                          onChange={(e) => setManualValue(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        disabled={oauthBusy}
+                        onClick={() => void completeChatGPTManual()}
+                      >
+                        {oauthBusy ? "完成中…" : "完成登入"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        onClick={() => {
+                          setOauth(null);
+                          setManualValue("");
+                        }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               <CredentialList
@@ -1466,7 +1614,9 @@ function CredentialList({
   return (
     <div className="credential-list">
       {credentials.map((cred) => {
-        const isLocalOAuth = cred.id.startsWith("local:") && cred.auth_type === "claude_code_oauth";
+        const isLocalOAuth =
+          cred.id.startsWith("local:") &&
+          (cred.auth_type === "claude_code_oauth" || cred.auth_type === "chatgpt_oauth");
         const probe = probeResults[cred.id];
         return (
           <div className="credential-row" key={cred.id}>
@@ -1509,7 +1659,11 @@ function CredentialList({
                     disabled={probing === cred.id}
                     onClick={() => void runProbe(cred.id)}
                   >
-                    {probing === cred.id ? "測試中…（最久約 2 分鐘）" : "測試 setup-token"}
+                    {probing === cred.id
+                      ? "測試中…（最久約 2 分鐘）"
+                      : cred.auth_type === "chatgpt_oauth"
+                        ? "測試 ChatGPT OAuth（會打真實請求）"
+                        : "測試 setup-token"}
                   </button>
                 )}
                 <button
@@ -1538,7 +1692,7 @@ function ProbeResultView({ probe }: { probe: ProbeResponse | { error: string } }
   return (
     <div className="probe-result">
       <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
-        {probe.passed ? "✓ setup-token 驗證通過" : "✗ setup-token 驗證未通過"}
+        {probe.passed ? "✓ OAuth 驗證通過" : "✗ OAuth 驗證未通過"}
       </p>
       <ul className="probe-list">
         {probe.probes.map((p) => (

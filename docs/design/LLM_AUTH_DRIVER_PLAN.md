@@ -657,5 +657,24 @@ CSRF, no silent fallback port/credential/API-key anywhere). Two real lifecycle d
 and FIXED: (1) a bind→register window let a manual completion leave the loopback holding
 :1455 for the full timeout → fixed with a `_cancelled` set checked atomically at registration;
 (2) the singleton's `_results` grew unbounded → fixed with TTL + cap eviction. 187 auth+route
-tests pass, no regressions. **Still held for the next slice:** the Settings UI, then the live
-P1/P2 run (needs a real subscription login through this flow).
+tests pass, no regressions.
+
+### S3 Settings UI — BUILT (2026-06-20)
+
+Frontend login surface in `apps/arkscope-web` (gpt-5.5 commit #2). `api.ts` gains the
+`startOpenAIOAuth` / `openAIOAuthStatus` / `completeOpenAIOAuthManual` clients; the
+flow logic is extracted to `chatgptOAuth.ts` (`pollOAuthStatus` state machine —
+pending→success/error/unknown/timeout; `buildManualCompletion` — code-vs-redirect-URL),
+unit-tested with injected clock/statusFn (no DOM/network), mirroring `researchProvider.ts`.
+`Settings.tsx` ProviderSection gains an OpenAI block: 「登入 ChatGPT」 → `window.open(auth_url)`
++ loopback poll → on success refresh the credential list; a copy-login-link button and a
+NARROW copy-code fallback ("沒有自動返回？手動貼上授權碼" → `complete-manual`); the probe
+button (`測試 ChatGPT OAuth（會打真實請求）`) widened to `chatgpt_oauth`. Copy marks it
+**experimental/compatibility, NOT an API key**; a backend error surfaces as-is (no silent
+fallback); the auth_url is opened/copied, never rendered as text. **14 new vitest +
+111 FE tests pass, tsc + vite build clean.** Test approach = vitest + injected fakes
+(the project has no Playwright; introducing it would be its own infra slice).
+
+**Still HELD (gated on user): the LIVE P1/P2 run** — needs a real ChatGPT subscription
+login through this flow end-to-end; the backend + UI are offline-tested only. A live smoke,
+if added, goes in `scripts/live/` (update its README).

@@ -583,10 +583,42 @@ export interface ProbeResponse {
   passed: boolean;
   probes: ProbeResult[];
 }
-// The live probe runs `claude -p` + a raw-SDK rejection check — it can take a
-// while, so use a generous timeout (well above the 15s default).
+// The live probe runs `claude -p` (Claude) or the P1/P2 ChatGPT-backend checks
+// (OpenAI) — both make real calls and can take a while, so use a generous timeout
+// (well above the 15s default). The response is redacted; it never carries a token.
 export function probeCredential(credentialId: string): Promise<ProbeResponse> {
   return sendJSON<ProbeResponse>(`/config/credentials/${encodeURIComponent(credentialId)}/probe`, "POST", undefined, 150_000);
+}
+
+// --- OpenAI ChatGPT subscription OAuth (in-app login) -------------------------
+// COMPATIBILITY / EXPERIMENTAL path: ArkScope runs its own OAuth against the
+// ChatGPT/Codex backend (NOT the public OpenAI API; NOT an API key). The token is
+// captured by the backend straight into the token-store — it never reaches the UI.
+export interface OAuthStartResult {
+  auth_url: string;
+  state: string;
+  expires_at: string;
+  manual_code_supported: boolean;
+}
+export interface OAuthStatusResult {
+  status: "pending" | "success" | "error" | "unknown";
+  credential: ProviderCredential | null;
+  detail: string | null;
+}
+export function startOpenAIOAuth(): Promise<OAuthStartResult> {
+  return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", undefined, 8_000);
+}
+export function openAIOAuthStatus(state: string): Promise<OAuthStatusResult> {
+  return getJSON<OAuthStatusResult>(`/config/credentials/openai/oauth/status?state=${encodeURIComponent(state)}`, 8_000);
+}
+// Copy-code fallback — ONLY for when the localhost callback never arrived. The
+// backend 400s any state/PKCE/exchange error (no fallback); it never masks a failure.
+export function completeOpenAIOAuthManual(body: {
+  state: string;
+  code?: string;
+  redirect_url?: string;
+}): Promise<{ credential: ProviderCredential }> {
+  return sendJSON<{ credential: ProviderCredential }>("/config/credentials/openai/oauth/complete-manual", "POST", body, 8_000);
 }
 
 export function addCredential(body: {
