@@ -91,7 +91,7 @@ def main() -> bool:
 
     try:
         asyncio.run(asyncio.wait_for(run(), timeout=240))
-    except BaseException as e:  # surface a pre-flight raise (e.g. bridge build) without leaking token
+    except Exception as e:  # surface a pre-flight raise (e.g. bridge build) without leaking token; operator signals (KeyboardInterrupt/SystemExit) propagate
         err_raised = type(e).__name__ + ": " + (str(e).replace(token, "[REDACTED]") if token else str(e))
 
     kinds = [k for k, _ in events]

@@ -74,7 +74,7 @@ Each row = one concrete driver. "Standard vs compat" is the load-bearing column.
 | openai | `chatgpt_oauth` | `OpenAIChatGPTOAuthDriver` | ChatGPT subscription | **In-app** OAuth → `AsyncOpenAI(api_key=<oauth_token>, base_url="chatgpt.com/backend-api/codex")`; force `stream=True`+`store=False`; **strip `max_output_tokens`** | **COMPATIBILITY — UNSUPPORTED by OpenAI API docs** (reverse-eng. ChatGPT backend) | High — TOS-sensitive, borrowed Codex `client_id`, capability-restricted, can break. **Proven in Novelloom; ArkScope does its OWN OAuth, no Codex CLI dependency.** |
 | openai | `codex_cli` *(DEV/DEBUG + import only — NOT a product path)* | `OpenAICodexCliDriver` | ChatGPT subscription | subprocess `codex exec` — **requires a user-installed Codex CLI** | dev/debug harness | **The desktop app must NOT require/bundle Codex CLI.** Product use = none; only an optional "import an existing Codex login's token" convenience + a dev comparison harness. |
 | anthropic | `api_key` | `AnthropicApiKeyDriver` | API per-token | `Anthropic()` / `client.messages.stream()` → `api.anthropic.com` | **STANDARD** | Low-Med — **DESIGNED** (Novelloom has none); but ArkScope's loop already does this raw. |
-| anthropic | `claude_code_oauth` | `AnthropicClaudeCodeOAuthDriver` | Claude subscription (Agent-SDK credit) | Claude Agent SDK / `claude -p` with `CLAUDE_CODE_OAUTH_TOKEN` set, `ANTHROPIC_API_KEY` unset (generalize ArkScope's existing `_call_claude_cli` route) | **DOCUMENTED path; credit policy unverified; DESIGNED-not-proven** | Med-High — no Novelloom precedent; Agent-SDK/CLI route only; credit policy must be live-re-verified. |
+| anthropic | `claude_code_oauth` | `AnthropicClaudeCodeSdkDriver` ✅ BUILT (7B) | Claude subscription (Agent-SDK credit) | **Python Claude Agent SDK** (`claude_agent_sdk.query`) with an **in-process** ToolRegistry→SDK MCP bridge (`create_sdk_mcp_server`), `permission_mode="dontAsk"` + `tools=[]` + Tier-1 allowlist; `CLAUDE_CODE_OAUTH_TOKEN` injected via `options.env`, `ANTHROPIC_API_KEY=""` — **NOT `claude -p`** | **DOCUMENTED path; live-validated on the subscription (`apiKeySource='none'`, no token leak)** | Med — built + smoked; Agent-SDK credit policy still live-re-verify before any UI figure. |
 
 > **`chatgpt_oauth` (B) is THE product OpenAI-subscription path — an IN-APP OAuth driver.** ArkScope itself runs the OAuth login / token capture / refresh / store and talks to the ChatGPT backend with the OpenAI SDK (`base_url` swap). It **borrows the Codex OAuth+backend protocol but does NOT depend on, bundle, or require Codex CLI** — a desktop app must not force a CLI install on the user. **`codex_cli` is NOT a product fallback**: it's a dev/debug harness + an optional "import an already-logged-in Codex token" convenience only. **If `chatgpt_oauth` fails at runtime, the product fallback is "use an API key," never "install Codex CLI."** (Decisions §13.)
 
@@ -516,3 +516,16 @@ Tier-1 allowlist (11 read-only tools): `get_sa_feed`, `get_sa_digest`,
 `get_sa_alpha_picks`, `get_ticker_news`, `get_news_brief`, `search_news_advanced`,
 `get_ticker_prices`, `get_price_change`, `get_fundamentals_analysis`,
 `get_sec_filings`, `get_economic_calendar`.
+
+### 7B-4/5/6 — BUILT + LIVE-VALIDATED (2026-06-20)
+
+The SDK driver shipped as a NEW class **`AnthropicClaudeCodeSdkDriver`**
+(`src/auth_drivers/claude_code_sdk_driver.py`, `5f0ea35`); the factory `(anthropic,
+claude_code_oauth)` branch was repointed to it (`e52d38f`); and the **Research-stream
+consumer now EXISTS** — `_anthropic_subscription_stream` + the `/query/stream` anthropic
+branch (`2a0a383`). Live-smoked (driver-level + route-helper): real `get_sa_feed` on the
+subscription, built-ins absent, `apiKeySource='none'`, no token leak; GUI hand-test passed
+(7B closed 2026-06-20). So the "Next (7B build, gated)" entry above is **DONE** — and it
+became a NEW class, not a rebuild of the superseded `--bare` `AnthropicClaudeCodeOAuthDriver`.
+Full detail: `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md` §8. **NEXT overall = S3 (OpenAI
+`chatgpt_oauth`), probe-first (P1/P2).**
