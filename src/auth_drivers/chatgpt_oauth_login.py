@@ -1,0 +1,371 @@
+"""S3 — in-app ChatGPT/Codex OAuth login (PKCE) core for ArkScope.
+
+ArkScope runs its OWN OAuth flow — no Codex CLI. Grounded in Novelloom's PROVEN
+`chatgpt_oauth_login.py`. This module is the offline-TDD-able CORE:
+
+  start_login()                  -> generate state + PKCE, stash the verifier in a
+                                    short-TTL in-memory state store, return the auth_url.
+  complete_login(state, code)    -> validate state -> exchange code+verifier for tokens
+                                    -> write a CredentialStore metadata row + the token
+                                    to the token-store (rollback on store-write failure)
+                                    -> return masked metadata (NEVER the token).
+  refresh_if_needed(credential_id) -> refresh only when expired (5-min buffer), under a
+                                    per-credential lock; failures RAISE (no silent fallback).
+
+Boundaries (per LLM_AUTH_DRIVER_PLAN.md "OAuth Login Fallback"): state mismatch / expiry,
+PKCE mismatch, token exchange 400/401, incomplete tokens, refresh failure, and token-store
+write failure all FAIL — none is ever masked by a fallback. The loopback HTTP server +
+FastAPI routes + Settings UI are thin transport on top of this core; the copy-code path
+reuses `complete_login` unchanged (it only changes how the code is delivered).
+
+The OAuth `client_id` is the Codex app id (OpenAI exposes no third-party ChatGPT-OAuth
+registration) — this is the documented "compatibility / reverse-engineered" path.
+Token exchange + refresh go through monkeypatchable seams so this core needs no network.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import secrets
+import threading
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
+from urllib import error, request
+from urllib.parse import parse_qs, urlencode, urlparse
+
+from .token_store import StoredTokenRecord
+
+# --- OAuth params (Codex-compatibility — borrowed client registration) ---------
+OAUTH_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"  # Codex app id; no 3rd-party ChatGPT-OAuth app exists
+OAUTH_AUTHORIZATION_URL = "https://auth.openai.com/oauth/authorize"
+OAUTH_TOKEN_URL = "https://auth.openai.com/oauth/token"
+OAUTH_REDIRECT_PORT = 1455
+OAUTH_REDIRECT_URI = f"http://localhost:{OAUTH_REDIRECT_PORT}/auth/callback"  # fixed by the client_id
+OAUTH_SCOPES = "openid profile email offline_access api.connectors.read api.connectors.invoke"
+ORIGINATOR = "arkscope"
+
+PROVIDER = "openai"
+AUTH_MODE = "chatgpt_oauth"
+_STATE_TTL = timedelta(minutes=10)
+_EXPIRY_BUFFER = timedelta(minutes=5)
+
+
+class ChatGPTOAuthLoginError(RuntimeError):
+    """A login/refresh failure. Routes map it to an HTTP error; it NEVER carries a token."""
+
+
+# --- PKCE + state -------------------------------------------------------------
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def generate_pkce_pair() -> tuple[str, str]:
+    """Return (code_verifier, S256 code_challenge)."""
+    verifier = _b64url(secrets.token_bytes(64))
+    challenge = _b64url(hashlib.sha256(verifier.encode("ascii")).digest())
+    return verifier, challenge
+
+
+def generate_state() -> str:
+    return _b64url(secrets.token_bytes(32))
+
+
+def build_authorize_url(*, state: str, code_challenge: str) -> str:
+    params = {
+        "response_type": "code",
+        "client_id": OAUTH_CLIENT_ID,
+        "redirect_uri": OAUTH_REDIRECT_URI,
+        "scope": OAUTH_SCOPES,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "state": state,
+        "id_token_add_organizations": "true",
+        "codex_cli_simplified_flow": "true",
+        "originator": ORIGINATOR,
+    }
+    return f"{OAUTH_AUTHORIZATION_URL}?{urlencode(params)}"
+
+
+@dataclass
+class _PendingLogin:
+    code_verifier: str
+    expires_at: datetime
+
+
+class _StateStore:
+    """Short-TTL in-memory map state -> pending login (holds the PKCE verifier). The
+    verifier NEVER touches the token-store or any response; entries are single-use."""
+
+    def __init__(self) -> None:
+        self._d: dict[str, _PendingLogin] = {}
+
+    def put(self, state: str, code_verifier: str, *, expires_at: datetime) -> None:
+        self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at)
+
+    def pop(self, state: str, *, now: datetime) -> _PendingLogin | None:
+        pending = self._d.pop(state, None)  # single-use: remove on any lookup
+        if pending is None or now >= pending.expires_at:
+            return None
+        return pending
+
+
+_STATE_STORE = _StateStore()
+
+
+def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None) -> dict:
+    """Begin a login: mint state + PKCE, stash the verifier, return the authorize URL.
+    The response is safe to expose — it carries the code_challenge, never the verifier."""
+    now = now or datetime.now(timezone.utc)
+    store = state_store if state_store is not None else _STATE_STORE
+    verifier, challenge = generate_pkce_pair()
+    state = generate_state()
+    expires_at = now + _STATE_TTL
+    store.put(state, verifier, expires_at=expires_at)
+    return {
+        "auth_url": build_authorize_url(state=state, code_challenge=challenge),
+        "state": state,
+        "expires_at": expires_at.isoformat(),
+        "manual_code_supported": True,
+    }
+
+
+def extract_code_from_redirect_url(redirect_url: str) -> dict:
+    """Pull {code, state} out of a pasted redirect URL (copy-code fallback). An OAuth
+    `error` param or a missing code FAILS — it is not swallowed."""
+    params = parse_qs(urlparse(redirect_url).query)
+    if "error" in params:
+        raise ChatGPTOAuthLoginError(f"OAuth error in redirect: {params['error'][0]}")
+    code = params.get("code", [None])[0]
+    if not code:
+        raise ChatGPTOAuthLoginError("the redirect URL is missing the authorization code")
+    return {"code": code, "state": params.get("state", [None])[0]}
+
+
+# --- token exchange / refresh (monkeypatchable seams) -------------------------
+def _http_post(url: str, *, data: bytes, content_type: str, what: str) -> dict:
+    req = request.Request(url, data=data, headers={"Content-Type": content_type}, method="POST")
+    try:
+        with request.urlopen(req, timeout=30) as resp:
+            value = json.loads(resp.read())
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
+        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed ({exc.code}): {detail}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: expected a JSON object")
+    return value
+
+
+def _exchange_authorization_code(*, code: str, code_verifier: str) -> dict:  # seam for tests
+    return _http_post(
+        OAUTH_TOKEN_URL,
+        data=urlencode({
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": OAUTH_REDIRECT_URI,
+            "client_id": OAUTH_CLIENT_ID,
+            "code_verifier": code_verifier,
+        }).encode(),
+        content_type="application/x-www-form-urlencoded",
+        what="token exchange",
+    )
+
+
+def _refresh_token_grant(*, refresh_token: str) -> dict:  # seam for tests
+    return _http_post(
+        OAUTH_TOKEN_URL,
+        data=json.dumps({
+            "client_id": OAUTH_CLIENT_ID,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }).encode(),
+        content_type="application/json",
+        what="refresh",
+    )
+
+
+# --- JWT claim/expiry extraction ----------------------------------------------
+def _str(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _decode_jwt_payload(token: str) -> dict:
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise ChatGPTOAuthLoginError("invalid JWT: expected header.payload.signature")
+    payload = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        value = json.loads(base64.urlsafe_b64decode(payload))
+    except (ValueError, TypeError) as exc:
+        raise ChatGPTOAuthLoginError(f"invalid JWT payload: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ChatGPTOAuthLoginError("invalid JWT payload: expected an object")
+    return value
+
+
+def _extract_access_token_expiry(access_token: str) -> str | None:
+    try:
+        payload = _decode_jwt_payload(access_token)
+    except ChatGPTOAuthLoginError:
+        return None
+    exp = payload.get("exp")
+    if isinstance(exp, (int, float)):
+        return datetime.fromtimestamp(float(exp), tz=timezone.utc).isoformat()
+    return None
+
+
+def _extract_id_token_claims(id_token: str) -> dict:
+    try:
+        payload = _decode_jwt_payload(id_token)
+    except ChatGPTOAuthLoginError:
+        return {}
+    auth_claims = payload.get("https://api.openai.com/auth", {})
+    if not isinstance(auth_claims, dict):
+        auth_claims = {}
+    return {
+        "account_id": _str(auth_claims.get("chatgpt_account_id")),
+        "plan_type": _str(auth_claims.get("chatgpt_plan_type")),
+    }
+
+
+def _account_label(plan_type: str) -> str:
+    # NON-PII display label (no email) — raw account internals stay in the token metadata.
+    return f"ChatGPT {plan_type}".strip() if plan_type else "ChatGPT subscription"
+
+
+def _token_response_to_record(resp: dict) -> tuple[StoredTokenRecord, str, str]:
+    access = _str(resp.get("access_token"))
+    refresh = _str(resp.get("refresh_token"))
+    id_token = _str(resp.get("id_token"))
+    if not access or not refresh:
+        raise ChatGPTOAuthLoginError("OAuth token exchange returned incomplete token data (missing access/refresh token)")
+    claims = _extract_id_token_claims(id_token) if id_token else {}
+    plan_type = claims.get("plan_type", "")
+    label = _account_label(plan_type)
+    record = StoredTokenRecord(
+        access_token=access,
+        refresh_token=refresh,
+        expires_at=_extract_access_token_expiry(access),
+        plan_type=plan_type or None,
+        account_label=label,
+        metadata={"account_id": claims.get("account_id", ""), "id_token": id_token},
+    )
+    return record, plan_type, label
+
+
+def complete_login(
+    *,
+    state: str,
+    code: str,
+    credential_store: Any,
+    token_store: Any,
+    alias: str = "ChatGPT subscription",
+    make_active: bool = True,
+    now: datetime | None = None,
+    state_store: _StateStore | None = None,
+    exchange: Callable[..., dict] | None = None,
+) -> dict:
+    """Finish a login (used by BOTH the loopback callback and the copy-code paste). Returns
+    masked metadata only — the token is NEVER echoed. Any failure raises; nothing is left
+    half-built (a token-store write failure rolls back the credential row)."""
+    now = now or datetime.now(timezone.utc)
+    store = state_store if state_store is not None else _STATE_STORE
+    pending = store.pop(state, now=now)
+    if pending is None:
+        raise ChatGPTOAuthLoginError("OAuth state is unknown or expired — the login was not started here or it timed out")
+
+    exchange = exchange or _exchange_authorization_code
+    resp = exchange(code=code, code_verifier=pending.code_verifier)  # 400/401 raises — NO fallback
+    record, plan_type, label = _token_response_to_record(resp)
+
+    cred = credential_store.add_oauth_credential(
+        provider=PROVIDER, auth_mode=AUTH_MODE, alias=alias, make_active=make_active,
+        expires_at=record.expires_at, account_label=label,
+    )
+    cid = f"local:{cred.id}"
+    try:
+        token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=cid, record=record)
+    except Exception as exc:  # noqa: BLE001 — roll back so no half-built credential remains
+        credential_store.delete(cid)
+        raise ChatGPTOAuthLoginError("failed to store the token securely; nothing was saved") from exc
+
+    return {
+        "credential_id": cid,
+        "alias": cred.alias,
+        "expires_at": cred.expires_at,
+        "account_label": cred.account_label,
+        "plan_type": plan_type,
+    }
+
+
+# --- refresh ------------------------------------------------------------------
+_refresh_locks: dict[str, threading.Lock] = {}
+_refresh_locks_guard = threading.Lock()
+
+
+def _lock_for(credential_id: str) -> threading.Lock:
+    with _refresh_locks_guard:
+        lock = _refresh_locks.get(credential_id)
+        if lock is None:
+            lock = threading.Lock()
+            _refresh_locks[credential_id] = lock
+        return lock
+
+
+def _is_expired(record: StoredTokenRecord, *, now: datetime) -> bool:
+    if not record.expires_at:
+        return False  # unknown expiry — don't auto-refresh; callers force before critical ops
+    try:
+        exp = datetime.fromisoformat(record.expires_at)
+    except ValueError:
+        return False
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    return now >= exp - _EXPIRY_BUFFER
+
+
+def _refresh_response_to_record(resp: dict, prev: StoredTokenRecord) -> StoredTokenRecord:
+    access = _str(resp.get("access_token")) or prev.access_token
+    refresh = _str(resp.get("refresh_token")) or prev.refresh_token
+    id_token = _str(resp.get("id_token")) or _str((prev.metadata or {}).get("id_token"))
+    claims = _extract_id_token_claims(id_token) if id_token else {}
+    plan_type = claims.get("plan_type") or (prev.plan_type or "")
+    return StoredTokenRecord(
+        access_token=access,
+        refresh_token=refresh,
+        expires_at=_extract_access_token_expiry(access),
+        plan_type=plan_type or None,
+        account_label=_account_label(plan_type) if plan_type else (prev.account_label or "ChatGPT subscription"),
+        metadata={"account_id": claims.get("account_id") or (prev.metadata or {}).get("account_id", ""), "id_token": id_token},
+    )
+
+
+def refresh_if_needed(
+    *,
+    credential_id: str,
+    token_store: Any,
+    now: datetime | None = None,
+    force: bool = False,
+    refresh: Callable[..., dict] | None = None,
+) -> StoredTokenRecord:
+    """Return a fresh token record, refreshing iff expired (5-min buffer) or forced. Runs
+    under a per-credential lock so concurrent agents don't double-refresh. A missing
+    refresh_token or a failed refresh RAISES — never a silent fallback to a stale/other token."""
+    now = now or datetime.now(timezone.utc)
+    with _lock_for(credential_id):
+        record = token_store.load(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id)
+        if record is None:
+            raise ChatGPTOAuthLoginError("no stored token for this credential")
+        if not force and not _is_expired(record, now=now):
+            return record
+        if not record.refresh_token:
+            raise ChatGPTOAuthLoginError("cannot refresh: no refresh_token is stored for this credential")
+        refresh = refresh or _refresh_token_grant
+        resp = refresh(refresh_token=record.refresh_token)  # failure raises — NO silent fallback
+        new_record = _refresh_response_to_record(resp, record)
+        token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id, record=new_record)
+        return new_record
