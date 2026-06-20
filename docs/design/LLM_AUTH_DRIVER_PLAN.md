@@ -579,3 +579,58 @@ model_not_found, 400 unsupported-parameter, or 429 rate-limit is **inconclusive 
 pass** (a transient error must not masquerade as the A≠B proof). The rejection is labelled
 by type+status (never the error message), and all probe output stays redacted. 22 tests in
 `tests/test_chatgpt_oauth_probe.py`.
+
+### S3 — in-app OAuth login design + fallback boundaries (Option 2) (2026-06-20)
+
+Product login flow, grounded in Novelloom's proven `chatgpt_oauth_login.py`; ArkScope runs
+its OWN flow (no Codex CLI). Per the user: loopback-localhost primary + a NARROW copy-code
+fallback.
+
+**OAuth params (Codex-compatibility — borrowed client registration):**
+- `client_id = app_EMoamEEZ73f0CkXaXp7hrann` (the Codex app id; OpenAI exposes no third-party
+  ChatGPT-OAuth app registration — THIS borrowing is the "compatibility / reverse-engineered"
+  crux, accepted in §13 #1).
+- authorize `https://auth.openai.com/oauth/authorize`, token `https://auth.openai.com/oauth/token`.
+- `redirect_uri = http://localhost:1455/auth/callback` — FIXED by the borrowed client_id, so
+  the loopback MUST bind `:1455`. scopes `openid profile email offline_access
+  api.connectors.read api.connectors.invoke`; PKCE **S256**; authorize extras
+  `id_token_add_organizations=true`, `codex_cli_simplified_flow=true`, `originator=arkscope`.
+- access_token expiry from its JWT `exp`; account_id/plan/email from id_token claims; refresh
+  = `grant_type=refresh_token` (5-min expiry buffer).
+
+**Routes / structure** (offline-TDD-able CORE in `chatgpt_oauth_login.py`; routes are thin
+wrappers; the loopback HTTP server + Settings UI are thin transport on top):
+1. `POST /config/credentials/openai/oauth/start` → gen state + PKCE verifier/challenge, put
+   {verifier, expires_at} in a short-TTL **in-memory** state store (NEVER the token-store),
+   return `{auth_url, state, expires_at, manual_code_supported: true}`.
+2. `POST .../oauth/callback` (loopback delivers code+state) → validate state → exchange
+   code+verifier → write CredentialStore metadata row + token-store → **no token in the response**.
+3. `POST .../oauth/complete-manual` (paste the redirect URL/code) → the SAME validate →
+   exchange → store path.
+4. `refresh_if_needed(credential_id)` → refresh only when expired (buffer); a per-credential
+   refresh lock serializes concurrent refreshes; on failure the credential status is visible —
+   never a silent fallback.
+
+**OAuth Login Fallback boundaries (the copy-code fallback is NARROW):**
+1. **Primary = loopback localhost** — Settings "登入 ChatGPT" → state+PKCE → open browser →
+   `127.0.0.1:1455/auth/callback` → auto-exchange → store.
+2. **Copy-code handles ONLY callback-transport failure** (the user finished the browser login
+   but ArkScope never got the localhost callback). It is NOT a second auth mode; it changes
+   nothing about provider/token-store/refresh/metadata; the ONLY difference is the auth code
+   arrives by paste instead of by callback.
+3. **Copy-code MUST NOT mask OAuth/token errors — these all FAIL, no fallback:** state mismatch ·
+   PKCE verifier mismatch · token exchange 400/401 · refresh-token missing or refresh failure ·
+   scope/account/workspace mismatch · probe P1/P2 not passing · token-store write failure
+   (→ rollback, fail).
+4. **No fallback to Codex CLI** (no install requirement; `~/.codex/auth.json` import = dev
+   convenience only, not a login fallback).
+5. **No automatic fallback to an API key** — a failed ChatGPT-OAuth login does NOT silently use
+   `OPENAI_API_KEY`; whether runtime API-key fallback is allowed is a later explicit
+   fallback-policy setting. The login flow only obtains a `chatgpt_oauth` token.
+6. **UI:** primary button "登入 ChatGPT"; waiting screen "等待瀏覽器登入完成…"; fallback entry
+   "沒有自動返回？手動貼上授權碼" with copy "只在瀏覽器已完成登入但本機 callback 沒收到時使用".
+
+**Offline TDD (no browser, no OpenAI):** token exchange + refresh go through monkeypatchable
+seams; the state store + write path use injectable stores. Tests cover state mismatch, expired
+state, exchange-error (400/401) no-fallback, incomplete-token, token-store write-fail rollback,
+no-token-echo, and the refresh path.
