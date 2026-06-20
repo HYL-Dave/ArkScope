@@ -116,6 +116,29 @@ describe("pollOAuthStatus", () => {
     expect(res.kind).toBe("timeout");
     expect(statusFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("returns aborted before the first status check when already aborted", async () => {
+    const statusFn = vi.fn().mockResolvedValue(PENDING);
+    const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), shouldAbort: () => true });
+    expect(res.kind).toBe("aborted");
+    expect(statusFn).not.toHaveBeenCalled(); // a superseded login must not keep hitting the backend
+  });
+
+  it("stops with aborted when shouldAbort flips during pending polling", async () => {
+    let aborted = false;
+    const statusFn = vi.fn().mockResolvedValue(PENDING);
+    const clk = fakeClock();
+    const res = await pollOAuthStatus("S", {
+      statusFn,
+      now: clk.now,
+      sleep: async (ms) => { aborted = true; await clk.sleep(ms); }, // manual-success/cancel mid-poll
+      shouldAbort: () => aborted,
+      timeoutMs: 5000,
+      intervalMs: 100,
+    });
+    expect(res.kind).toBe("aborted");
+    expect(statusFn).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("buildManualCompletion", () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   addCredential,
   importOAuthCredential,
@@ -1119,8 +1119,15 @@ function ProviderSection({
   // OpenAI ChatGPT in-app OAuth login (openai only). Holds only the public state +
   // auth_url for an in-flight login; no token ever reaches the UI.
   const [oauth, setOauth] = useState<{ state: string; authUrl: string; phase: "waiting" | "manual" } | null>(null);
-  const [oauthBusy, setOauthBusy] = useState(false);
+  // Split busy state: the long (≤180s) loopback poll must NOT disable the manual
+  // "完成登入" button — otherwise a stuck popup/callback locks out the fallback.
+  const [pollBusy, setPollBusy] = useState(false);
+  const [manualBusy, setManualBusy] = useState(false);
   const [manualValue, setManualValue] = useState("");
+  // Cooperative abort for the in-flight poll, so a manual completion or a cancel
+  // stops it immediately (rather than leaving it to run — and pin pollBusy — for the
+  // full timeout). A per-login token object; the poll closure reads token.aborted.
+  const pollToken = useRef<{ aborted: boolean }>({ aborted: false });
 
   async function addKey(provider: ModelProvider) {
     const alias = (newAlias[provider] ?? "").trim();
@@ -1177,20 +1184,25 @@ function ProviderSection({
   }
 
   async function copyLoginLink() {
-    if (oauth?.authUrl && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(oauth.authUrl);
-        setProviderMsg("登入連結已複製。");
-      } catch {
-        /* clipboard denied — the browser tab already opened the URL */
-      }
+    if (!oauth?.authUrl) return;
+    if (!navigator.clipboard) {
+      setProviderErr("此瀏覽器不支援自動複製，請從新分頁的網址列手動複製登入連結。");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(oauth.authUrl);
+      setProviderMsg("登入連結已複製。");
+    } catch {
+      setProviderErr("無法複製連結（瀏覽器剪貼簿權限被拒）。請從新分頁完成登入，或重新點「登入 ChatGPT」。");
     }
   }
 
   async function startChatGPTLogin() {
     setProviderErr(null);
     setProviderMsg(null);
-    setOauthBusy(true);
+    setPollBusy(true);
+    const token = { aborted: false }; // this login's abort token; manual/cancel flips it
+    pollToken.current = token;
     try {
       const r = await startOpenAIOAuth();
       setOauth({ state: r.state, authUrl: r.auth_url, phase: "waiting" });
@@ -1200,7 +1212,9 @@ function ProviderSection({
         statusFn: openAIOAuthStatus,
         now: () => Date.now(),
         sleep: (ms) => new Promise<void>((resolve) => window.setTimeout(resolve, ms)),
+        shouldAbort: () => token.aborted,
       });
+      if (res.kind === "aborted") return; // a manual completion / cancel superseded this poll
       if (res.kind === "success") {
         setOauth(null);
         setProviderMsg("ChatGPT 訂閱已登入（token 存入 token-store，未存入 credential DB）。");
@@ -1219,8 +1233,14 @@ function ProviderSection({
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setOauthBusy(false);
+      setPollBusy(false);
     }
+  }
+
+  function cancelChatGPTLogin() {
+    pollToken.current.aborted = true; // stop the background poll (frees the 登入 button)
+    setOauth(null);
+    setManualValue("");
   }
 
   async function completeChatGPTManual() {
@@ -1232,9 +1252,10 @@ function ProviderSection({
     }
     setProviderErr(null);
     setProviderMsg(null);
-    setOauthBusy(true);
+    setManualBusy(true);
     try {
       await completeOpenAIOAuthManual(buildManualCompletion(oauth.state, pasted));
+      pollToken.current.aborted = true; // manual won — stop the still-running loopback poll
       setManualValue("");
       setOauth(null);
       setProviderMsg("ChatGPT 訂閱已登入（手動完成；token 存入 token-store）。");
@@ -1243,7 +1264,7 @@ function ProviderSection({
       // a bad/expired/forged state or a token-exchange error 400s here — show it, no fallback
       setProviderErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setOauthBusy(false);
+      setManualBusy(false);
     }
   }
 
@@ -1400,10 +1421,10 @@ function ProviderSection({
                     <button
                       type="button"
                       className="btn-ghost small"
-                      disabled={oauthBusy}
+                      disabled={pollBusy}
                       onClick={() => void startChatGPTLogin()}
                     >
-                      {oauthBusy ? "登入中…" : "登入 ChatGPT"}
+                      {pollBusy ? "登入中…" : "登入 ChatGPT"}
                     </button>
                   )}
                   {oauth?.phase === "waiting" && (
@@ -1438,19 +1459,12 @@ function ProviderSection({
                       <button
                         type="button"
                         className="btn-ghost small"
-                        disabled={oauthBusy}
+                        disabled={manualBusy}
                         onClick={() => void completeChatGPTManual()}
                       >
-                        {oauthBusy ? "完成中…" : "完成登入"}
+                        {manualBusy ? "完成中…" : "完成登入"}
                       </button>
-                      <button
-                        type="button"
-                        className="btn-ghost small"
-                        onClick={() => {
-                          setOauth(null);
-                          setManualValue("");
-                        }}
-                      >
+                      <button type="button" className="btn-ghost small" onClick={cancelChatGPTLogin}>
                         取消
                       </button>
                     </div>

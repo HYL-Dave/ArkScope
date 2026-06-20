@@ -8,7 +8,8 @@ export type PollResult =
   | { kind: "success"; credential: ProviderCredential | null }
   | { kind: "error"; detail: string }
   | { kind: "unknown" }
-  | { kind: "timeout" };
+  | { kind: "timeout" }
+  | { kind: "aborted" };
 
 export interface PollOptions {
   statusFn: (state: string) => Promise<OAuthStatusResult>;
@@ -16,6 +17,10 @@ export interface PollOptions {
   sleep: (ms: number) => Promise<void>;
   timeoutMs?: number;
   intervalMs?: number;
+  // Cooperative cancel: when this returns true the poll stops with {kind:"aborted"}
+  // (e.g. the manual copy-code completion won, or the user cancelled) so a superseded
+  // login neither keeps hitting the backend nor pins the "登入" button busy.
+  shouldAbort?: () => boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 180_000; // generous: the user is logging in via a browser
@@ -26,11 +31,12 @@ const DEFAULT_INTERVAL_MS = 1_500;
 // fallback) / unknown (the login was never tracked or was evicted → stop, don't
 // spin). Timeout returns its own kind so the UI can offer the manual fallback.
 export async function pollOAuthStatus(state: string, opts: PollOptions): Promise<PollResult> {
-  const { statusFn, now, sleep } = opts;
+  const { statusFn, now, sleep, shouldAbort } = opts;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
   const start = now();
   for (;;) {
+    if (shouldAbort?.()) return { kind: "aborted" };
     const s = await statusFn(state);
     if (s.status === "success") return { kind: "success", credential: s.credential };
     if (s.status === "error") return { kind: "error", detail: s.detail ?? "unknown error" };
