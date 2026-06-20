@@ -14,8 +14,11 @@ never masked by a fallback. Tokens never appear in any returned payload.
 from __future__ import annotations
 
 import base64
+import io
 import json
+import threading
 from datetime import datetime, timedelta, timezone
+from urllib.error import HTTPError
 
 import pytest
 
@@ -223,6 +226,24 @@ def test_complete_login_token_store_write_fail_rolls_back():
     assert len(cs.added) == 1 and cs.deleted == ["local:1"] and ts.saved == {}  # row rolled back
 
 
+def test_complete_login_rollback_severs_exception_cause():
+    # The store-write failure must not chain the token_store.save exception (which for
+    # keyring wraps the full serialized record) onto the raised error.
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore(fail_save=True)
+    s = start_login(state_store=ss, now=_NOW)["state"]
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        complete_login(state=s, code="c", credential_store=cs, token_store=ts, state_store=ss,
+                       exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1))
+    assert ei.value.__cause__ is None and ei.value.__suppress_context__ is True
+
+
+def test_pending_login_repr_masks_verifier():
+    # _PendingLogin must never render the PKCE code_verifier in its repr — a future
+    # loopback handler doing logger.debug(pending) / f"{pending}" would otherwise leak it.
+    pending = mod._PendingLogin(code_verifier="SECRET-VERIFIER-VALUE", expires_at=_NOW)
+    assert "SECRET-VERIFIER-VALUE" not in repr(pending)
+
+
 # --- extract_code_from_redirect_url -------------------------------------------
 def test_extract_code_from_redirect_url_ok():
     out = extract_code_from_redirect_url("http://localhost:1455/auth/callback?code=AC&state=ST")
@@ -311,3 +332,73 @@ def test_refresh_if_needed_no_refresh_token_fails():
 def test_refresh_if_needed_missing_credential_fails():
     with pytest.raises(ChatGPTOAuthLoginError):
         refresh_if_needed(credential_id="local:999", token_store=_TokStore(), now=_NOW)
+
+
+# --- HTTP error redaction (must-fix: a backend/proxy could echo the secret) -----
+_LEAKY_BODY = ('{"error":"invalid_grant","refresh_token":"refresh-SECRET-LEAK",'
+               '"code_verifier":"VERIFIER-LEAK-9","code":"AUTHCODE-LEAK"}')
+
+
+def _fake_http_error(body: str):
+    def _urlopen(req, timeout=None):
+        raise HTTPError(OAUTH_TOKEN_URL_FOR_TEST, 400, "Bad Request", {}, io.BytesIO(body.encode()))
+    return _urlopen
+
+
+OAUTH_TOKEN_URL_FOR_TEST = "https://auth.openai.com/oauth/token"
+
+
+def test_token_exchange_http_error_body_is_redacted(monkeypatch):
+    monkeypatch.setattr(mod.request, "urlopen", _fake_http_error(_LEAKY_BODY))
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        mod._exchange_authorization_code(code="AUTHCODE-LEAK", code_verifier="VERIFIER-LEAK-9")
+    msg = str(ei.value)
+    assert "400" in msg  # the status is still useful
+    for secret in ("refresh-SECRET-LEAK", "VERIFIER-LEAK-9", "AUTHCODE-LEAK"):
+        assert secret not in msg
+
+
+def test_refresh_grant_http_error_body_is_redacted(monkeypatch):
+    monkeypatch.setattr(mod.request, "urlopen", _fake_http_error(_LEAKY_BODY))
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        mod._refresh_token_grant(refresh_token="refresh-SECRET-LEAK")
+    assert "refresh-SECRET-LEAK" not in str(ei.value)
+
+
+def test_refresh_if_needed_propagates_redacted_http_error(monkeypatch):
+    # End-to-end: the live refresh path (no injected seam) must not leak the token
+    # body into the raised error a route/UI/log would see.
+    ts = _TokStore()
+    _seed(ts, expires_at="2001-01-01T00:00:00+00:00", refresh="refresh-SECRET-LEAK")
+    monkeypatch.setattr(mod.request, "urlopen", _fake_http_error(_LEAKY_BODY))
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        refresh_if_needed(credential_id="local:1", token_store=ts, now=_NOW, force=True)
+    assert "refresh-SECRET-LEAK" not in str(ei.value)
+
+
+def test_exchange_jwt_in_error_body_is_redacted(monkeypatch):
+    jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsZWFrIn0.QWxhZGRpbnNlY3JldA"
+    monkeypatch.setattr(mod.request, "urlopen", _fake_http_error(f'{{"detail":"{jwt}"}}'))
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        mod._refresh_token_grant(refresh_token="r")
+    assert jwt not in str(ei.value)
+
+
+# --- _StateStore thread-safety (single-use under concurrency) ------------------
+def test_state_store_pop_is_single_use_under_threads():
+    ss = _StateStore()
+    ss.put("s", "verifier", expires_at=_NOW + timedelta(minutes=5))
+    results: list = []
+    barrier = threading.Barrier(8)
+
+    def worker():
+        barrier.wait()  # maximize contention
+        results.append(ss.pop("s", now=_NOW))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    non_none = [r for r in results if r is not None]
+    assert len(non_none) == 1  # exactly one caller gets the pending login

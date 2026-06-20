@@ -28,14 +28,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 from urllib import error, request
 from urllib.parse import parse_qs, urlencode, urlparse
 
+from .probe_harness import redact
 from .token_store import StoredTokenRecord
 
 # --- OAuth params (Codex-compatibility — borrowed client registration) ---------
@@ -91,8 +93,9 @@ def build_authorize_url(*, state: str, code_challenge: str) -> str:
 
 @dataclass
 class _PendingLogin:
-    code_verifier: str
-    expires_at: datetime
+    # repr=False so the PKCE code_verifier never renders in a repr/log/exception
+    code_verifier: str = field(repr=False)
+    expires_at: datetime = field()
 
 
 class _StateStore:
@@ -101,12 +104,15 @@ class _StateStore:
 
     def __init__(self) -> None:
         self._d: dict[str, _PendingLogin] = {}
+        self._lock = threading.Lock()  # FastAPI route + loopback callback may run on different threads
 
     def put(self, state: str, code_verifier: str, *, expires_at: datetime) -> None:
-        self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at)
+        with self._lock:
+            self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at)
 
     def pop(self, state: str, *, now: datetime) -> _PendingLogin | None:
-        pending = self._d.pop(state, None)  # single-use: remove on any lookup
+        with self._lock:
+            pending = self._d.pop(state, None)  # single-use: remove on any lookup
         if pending is None or now >= pending.expires_at:
             return None
         return pending
@@ -137,11 +143,30 @@ def extract_code_from_redirect_url(redirect_url: str) -> dict:
     `error` param or a missing code FAILS — it is not swallowed."""
     params = parse_qs(urlparse(redirect_url).query)
     if "error" in params:
-        raise ChatGPTOAuthLoginError(f"OAuth error in redirect: {params['error'][0]}")
+        raise ChatGPTOAuthLoginError(f"OAuth error in redirect: {redact(params['error'][0])}")
     code = params.get("code", [None])[0]
     if not code:
         raise ChatGPTOAuthLoginError("the redirect URL is missing the authorization code")
     return {"code": code, "state": params.get("state", [None])[0]}
+
+
+# --- error-body redaction (a backend/proxy could echo a secret) ----------------
+# Redact the VALUE of any known-secret field by key, regardless of length/charset —
+# the generic length/entropy heuristics in probe_harness.redact() can miss a short or
+# oddly-shaped echo (e.g. a `code_verifier` value), so this fail-closed key pass runs
+# FIRST, then redact() is the catch-all. Longer keys precede shorter so `code` can't
+# shadow `code_verifier` (the closing quote already anchors it; ordering is belt-and-braces).
+_SECRET_FIELD_RE = re.compile(
+    r'("(?:code_verifier|code_challenge|access_token|refresh_token|id_token|'
+    r'client_secret|authorization|code|secret|token)"\s*:\s*)"[^"]*"',
+    re.I,
+)
+
+
+def _redact_oauth_error(text: str) -> str:
+    """Strip known-secret field values, then fail-closed redact, then bound the length."""
+    scrubbed = _SECRET_FIELD_RE.sub(r'\1"[REDACTED]"', text)
+    return redact(scrubbed)[:200]
 
 
 # --- token exchange / refresh (monkeypatchable seams) -------------------------
@@ -151,10 +176,13 @@ def _http_post(url: str, *, data: bytes, content_type: str, what: str) -> dict:
         with request.urlopen(req, timeout=30) as resp:
             value = json.loads(resp.read())
     except error.HTTPError as exc:
+        # A token-exchange/refresh error body could echo the code/code_verifier/
+        # refresh_token (proxy, mock, or a future backend). Keep the status, but
+        # fail-closed redact the body before it reaches a route/UI/log.
         detail = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
-        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed ({exc.code}): {detail}") from exc
+        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed ({exc.code}): {_redact_oauth_error(detail)}") from None
     except (OSError, json.JSONDecodeError) as exc:
-        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: {exc}") from exc
+        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: {_redact_oauth_error(str(exc))}") from None
     if not isinstance(value, dict):
         raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: expected a JSON object")
     return value
@@ -200,8 +228,10 @@ def _decode_jwt_payload(token: str) -> dict:
     payload = parts[1] + "=" * (-len(parts[1]) % 4)
     try:
         value = json.loads(base64.urlsafe_b64decode(payload))
-    except (ValueError, TypeError) as exc:
-        raise ChatGPTOAuthLoginError(f"invalid JWT payload: {exc}") from exc
+    except (ValueError, TypeError):
+        # static message + `from None`: never interpolate/chain anything derived from the
+        # JWT segment (defense-in-depth; this is swallowed by both callers regardless).
+        raise ChatGPTOAuthLoginError("invalid JWT payload") from None
     if not isinstance(value, dict):
         raise ChatGPTOAuthLoginError("invalid JWT payload: expected an object")
     return value
@@ -289,9 +319,11 @@ def complete_login(
     cid = f"local:{cred.id}"
     try:
         token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=cid, record=record)
-    except Exception as exc:  # noqa: BLE001 — roll back so no half-built credential remains
+    except Exception:  # noqa: BLE001 — roll back so no half-built credential remains
         credential_store.delete(cid)
-        raise ChatGPTOAuthLoginError("failed to store the token securely; nothing was saved") from exc
+        # `from None`: the cause (a token_store.save failure) can wrap the full serialized
+        # record; the message is static, so sever the chain rather than carry that cause.
+        raise ChatGPTOAuthLoginError("failed to store the token securely; nothing was saved") from None
 
     return {
         "credential_id": cid,
@@ -354,7 +386,13 @@ def refresh_if_needed(
 ) -> StoredTokenRecord:
     """Return a fresh token record, refreshing iff expired (5-min buffer) or forced. Runs
     under a per-credential lock so concurrent agents don't double-refresh. A missing
-    refresh_token or a failed refresh RAISES — never a silent fallback to a stale/other token."""
+    refresh_token or a failed refresh RAISES — never a silent fallback to a stale/other token.
+
+    INTERNAL ONLY — the returned StoredTokenRecord carries the live access_token /
+    refresh_token / id_token. A ROUTE MUST NEVER serialize this return value. The
+    chatgpt_oauth driver reads only `record.access_token` for the Bearer header; any
+    Settings/route surface exposes masked metadata only (the credential DTO or
+    `token_store.status()`, which omit the secrets)."""
     now = now or datetime.now(timezone.utc)
     with _lock_for(credential_id):
         record = token_store.load(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id)
