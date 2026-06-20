@@ -1,6 +1,6 @@
 # LLM Auth Driver Plan
 
-> **Status:** DESIGN ONLY (no code). Drafted + gpt-5.5-reviewed, all §13 decisions RESOLVED 2026-06-15. **Next step = S0 (the `AuthDriver` contract — pure interface + unit tests, NOT wired to any route).** Grounded in Novelloom's auth subsystem (`/mnt/md0/PycharmProjects/novelloom/src/novelloom/shared/auth/`, `docs/14_llm_access_and_auth.md`, `docs/19_chatgpt_oauth_backend_compatibility.md`) and ArkScope's current auth surface (`src/model_credentials.py`, `src/tools/code_generator.py`, `src/api/routes/config_routes.py`, `src/agents/{anthropic,openai}_agent/agent.py`, `src/api/routes/query.py`). Authored via an Opus-4.8 workflow (4 grounded readers → synthesis) + a spot-check of the load-bearing Novelloom claims (base_url / token-as-api_key / Protocol shape verified against source).
+> **Status:** PARTIALLY BUILT — was DESIGN-ONLY; drafted + gpt-5.5-reviewed, all §13 decisions RESOLVED 2026-06-15. **Built + unit-tested: S0 contract · S1 factory + `CredentialStore` delta · S2 standard `api_key` drivers (A+D) · S4 Anthropic `claude_code_oauth` SDK subscription driver — plus the 7B AI-研究 Research-stream consumer, live-validated on the Claude subscription (real tool call, built-ins locked, no token leak; commits `5f0ea35`→`9131f7f`).** **NEXT = S3 (OpenAI `chatgpt_oauth`), probe-first (run P2 before any Settings row).** S5 (full agent-loop wire-in) stays a separate future slice. Built code lives in `src/auth_drivers/` (+ `src/api/routes/query.py` for the 7B consumer); the 7B SDK-driver design detail = [SLICE_7B3_SDK_DRIVER_DESIGN.md](SLICE_7B3_SDK_DRIVER_DESIGN.md). Grounded in Novelloom's auth subsystem (`/mnt/md0/PycharmProjects/novelloom/src/novelloom/shared/auth/`, `docs/14_llm_access_and_auth.md`, `docs/19_chatgpt_oauth_backend_compatibility.md`) and ArkScope's current auth surface (`src/model_credentials.py`, `src/tools/code_generator.py`, `src/api/routes/config_routes.py`, `src/agents/{anthropic,openai}_agent/agent.py`, `src/api/routes/query.py`). Authored via an Opus-4.8 workflow (4 grounded readers → synthesis) + a spot-check of the load-bearing Novelloom claims (base_url / token-as-api_key / Protocol shape verified against source).
 >
 > **One-line goal:** Introduce a provider-neutral `AuthDriver` abstraction (borrowed FORM from Novelloom) that becomes the single client/strategy factory for all LLM credentials — built and tested BEFORE any rewiring of the agent loops or C-2 persistence.
 
@@ -238,7 +238,7 @@ Build the abstraction first; rewiring is the LAST slice and out of this doc's de
 ## 12. Out of scope
 
 - Actually rewiring the agent loops / call sites (that is S5, a separate plan).
-- Driver method bodies / real implementation code (DESIGN ONLY).
+- Driver method bodies / real implementation code — **this doc stays design-level**; the bodies were since BUILT in S0–S2/S4 (see `src/auth_drivers/`), but their code is not reproduced here.
 - A `writer_profiles`-style per-task profile table (ArkScope uses `AgentConfig` + `user_profile.yaml`).
 - Real subscription-quota probing (Novelloom proves it's UNKNOWN; we surface honest UNKNOWN + session tallies).
 - Workload-identity federation as a *separate* mode (folded under `api_key`/standard for now; note it exists for A and D).
