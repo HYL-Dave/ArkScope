@@ -1325,35 +1325,33 @@ function ProviderSection({
     }
   }
 
-  async function saveAlias(credentialId: string) {
-    const alias = (renames[credentialId] ?? "").trim();
-    if (!alias) return;
+  async function saveCredentialDetails(
+    credentialId: string,
+    alias: string,
+    accountLabel: string,
+    expiresAt?: string,
+  ) {
     setProviderErr(null);
     setProviderMsg(null);
     try {
-      await updateCredential(credentialId, { alias });
-      setProviderMsg("Alias 已更新。");
-      await onRefresh();
-    } catch (e) {
-      setProviderErr(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function saveMetadata(credentialId: string, accountLabel: string, expiresAt?: string) {
-    setProviderErr(null);
-    setProviderMsg(null);
-    try {
-      const body: { account_label: string; expires_at?: string } = {
+      const cleanAlias = alias.trim();
+      const body: { alias?: string; account_label: string; expires_at?: string } = {
         account_label: accountLabel.trim(),
       };
+      if (cleanAlias) body.alias = cleanAlias;
       if (expiresAt !== undefined) body.expires_at = expiresAt.trim();
       await updateCredential(credentialId, body);
+      setRenames((prev) => {
+        const next = { ...prev };
+        delete next[credentialId];
+        return next;
+      });
       setMetadataDrafts((prev) => {
         const next = { ...prev };
         delete next[credentialId];
         return next;
       });
-      setProviderMsg("Credential metadata 已更新。");
+      setProviderMsg("Credential 顯示資訊已更新。");
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
@@ -1444,8 +1442,8 @@ function ProviderSection({
                   ...prev,
                   [id]: { ...prev[id], [field]: value },
                 }))}
-                onSaveAlias={(id) => void saveAlias(id)}
-                onSaveMetadata={(id, accountLabel, expiresAt) => void saveMetadata(id, accountLabel, expiresAt)}
+                onSaveCredentialDetails={(id, alias, accountLabel, expiresAt) =>
+                  void saveCredentialDetails(id, alias, accountLabel, expiresAt)}
                 onSetActive={(id) => void setActive(id)}
                 onDelete={(id) => void removeKey(id)}
                 onDiscover={(id) => void onDiscover(provider, id)}
@@ -1756,14 +1754,13 @@ function ModelNotes({
   );
 }
 
-function CredentialList({
+export function CredentialList({
   credentials,
   renames,
   metadataDrafts,
   onRenameDraft,
   onMetadataDraft,
-  onSaveAlias,
-  onSaveMetadata,
+  onSaveCredentialDetails,
   onSetActive,
   onDelete,
   onDiscover,
@@ -1774,8 +1771,7 @@ function CredentialList({
   metadataDrafts: Record<string, CredentialMetadataDraft>;
   onRenameDraft: (id: string, alias: string) => void;
   onMetadataDraft: (id: string, field: keyof CredentialMetadataDraft, value: string) => void;
-  onSaveAlias: (id: string) => void;
-  onSaveMetadata: (id: string, accountLabel: string, expiresAt?: string) => void;
+  onSaveCredentialDetails: (id: string, alias: string, accountLabel: string, expiresAt?: string) => void;
   onSetActive: (id: string) => void;
   onDelete: (id: string) => void;
   onDiscover: (id: string) => void;
@@ -1813,6 +1809,7 @@ function CredentialList({
         const probe = probeResults[cred.id];
         const metadataDraft = metadataDrafts[cred.id] ?? {};
         const showExpiry = supportsCredentialExpiry(cred.auth_type);
+        const aliasDraft = renames[cred.id] ?? cred.label;
         const accountLabelDraft = metadataDraft.account_label ?? cred.account_label ?? "";
         // The expiry draft holds the date-picker's native YYYY-MM-DD form; convert
         // the stored ISO for display, and back to a canonical ISO on save.
@@ -1840,13 +1837,10 @@ function CredentialList({
                 {cred.editable && (
                   <>
                     <input
-                      value={renames[cred.id] ?? cred.label}
+                      value={aliasDraft}
                       onChange={(e) => onRenameDraft(cred.id, e.target.value)}
                       aria-label={`${cred.label} alias`}
                     />
-                    <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
-                      儲存 alias
-                    </button>
                     <button
                       type="button"
                       className="btn-ghost small"
@@ -1877,9 +1871,16 @@ function CredentialList({
                     <button
                       type="button"
                       className="btn-ghost small"
-                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, showExpiry ? dateInputToIso(expiresAtDraft) : undefined)}
+                      onClick={() =>
+                        onSaveCredentialDetails(
+                          cred.id,
+                          aliasDraft,
+                          accountLabelDraft,
+                          showExpiry ? dateInputToIso(expiresAtDraft) : undefined,
+                        )
+                      }
                     >
-                      儲存
+                      儲存顯示資訊
                     </button>
                   </div>
                 )}
