@@ -60,13 +60,14 @@ def test_resolve_oauth_active_is_oauth_driver_unwired(store):
     assert res.note and "wired yet" in res.note.lower() and "paused" in res.note.lower()
 
 
-def test_resolve_openai_oauth_note_says_env_fallback(store):
-    # OpenAI chatgpt_oauth DOES still fall back to env — its note may say so
-    # (provider-accurate; must NOT inherit the Anthropic fail-closed wording).
+def test_resolve_openai_oauth_note_says_fail_closed(store):
+    # S3 step 0: OpenAI chatgpt_oauth now FAILS CLOSED (no silent env-key billing).
+    # Its note is openai-specific + says paused, and must NOT claim an env fallback.
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.resolve_live_auth("openai", store=store)
     assert res.source == "oauth_driver_unwired"
-    assert "env api key fallback" in res.note.lower() and "paused" not in res.note.lower()
+    assert res.note and "paused" in res.note.lower()
+    assert "env api key fallback" not in res.note.lower()  # the OLD (now false) claim is gone
 
 
 def test_resolve_no_active_is_env_fallback(store):
@@ -108,33 +109,44 @@ def test_apply_openai_live_client_sets_default_for_db_key(store, monkeypatch):
     assert res.source == "db_api_key" and "client" in captured  # SDK default registered
 
 
-def test_apply_openai_fallback_resets_sticky_global_to_env(store, monkeypatch):
-    # the SDK default client is a sticky process-global: after a db_api_key run
-    # set it, a later fallback MUST reset it to an env client — not leave the
-    # stale DB client (finding #1). With OPENAI_API_KEY present, the fallback
-    # calls set_default_openai_client again (env-backed), not just logs.
+def test_apply_openai_oauth_fails_closed_neutralizing_sticky_global(store, monkeypatch):
+    # S3 step 0: an active chatgpt_oauth credential FAILS CLOSED before Runner.run —
+    # it must NOT silently bill the env API key. It also neutralizes the sticky
+    # process-global FIRST (so a prior db_api_key run is never left usable), THEN raises.
     calls = []
     monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")  # present, but must NOT be used for an oauth-active cred
     lr._warned.clear()
     store.add(provider="openai", auth_type="api_key", alias="primary", secret="sk-dbkey111", make_active=True)
     lr.apply_openai_live_client(store=store)  # call 1: DB client set
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)  # OAuth now active
-    res = lr.apply_openai_live_client(store=store)  # call 2: must RESET to env
-    assert res.source == "oauth_driver_unwired"
-    assert len(calls) == 2  # reset to an env client, NOT left stale
+    with pytest.raises(lr.SubscriptionDriverNotWiredError) as ei:
+        lr.apply_openai_live_client(store=store)  # call 2: neutralize sticky global, then raise
+    assert "API key" in str(ei.value) and "Settings" in str(ei.value)
+    assert "sk-envfake" not in str(ei.value)  # never leak the env key
+    assert len(calls) == 2  # the sticky global was RESET (not left as the db client) before raising
 
 
-def test_apply_openai_fallback_no_env_neutralizes_stale_global(store, monkeypatch):
-    # with no env key, the fallback must NOT leave a stale DB global — it sets a
-    # non-usable client so a prior credential is never silently reused (finding #1).
+def test_apply_openai_env_fallback_no_active_still_uses_env(store, monkeypatch):
+    # A genuine env_fallback (NO active credential at all) is NOT fail-closed —
+    # the env key is the legitimate default when the user chose no credential.
+    calls = []
+    monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    lr._warned.clear()
+    res = lr.apply_openai_live_client(store=store)  # no credentials at all
+    assert res.source == "env_fallback" and len(calls) == 1  # env client set, NO raise
+
+
+def test_apply_openai_env_fallback_no_env_neutralizes_stale_global(store, monkeypatch):
+    # no active credential AND no env key → set a non-usable client so a prior
+    # db_api_key global is never silently reused (finding #1; env_fallback path).
     calls = []
     monkeypatch.setattr(lr, "set_default_openai_client", lambda c: calls.append(c))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     lr._warned.clear()
-    store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.apply_openai_live_client(store=store)
-    assert res.source == "oauth_driver_unwired" and len(calls) == 1  # neutralized, not left stale
+    assert res.source == "env_fallback" and len(calls) == 1  # neutralized, not left stale
 
 
 def test_live_openai_client_uses_db_api_key(store):
@@ -142,8 +154,25 @@ def test_live_openai_client_uses_db_api_key(store):
     assert isinstance(lr.live_openai_client(store=store), OpenAI)
 
 
-def test_live_openai_client_oauth_falls_back_to_env(store, monkeypatch):
+def test_live_openai_client_oauth_fails_closed(store, monkeypatch):
+    # S3 step 0: the sync OpenAI client sites (card synthesis, code-gen) also fail
+    # closed for an active chatgpt_oauth credential — no silent env-key billing.
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")  # present; must NOT be silently used
     lr._warned.clear()
-    assert isinstance(lr.live_openai_client(store=store), OpenAI)  # sync env client
+    with pytest.raises(lr.SubscriptionDriverNotWiredError) as ei:
+        lr.live_openai_client(store=store)
+    assert "API key" in str(ei.value) and "Settings" in str(ei.value)
+    assert "sk-envfake" not in str(ei.value)
+
+
+def test_live_openai_client_api_key_active_unaffected(store):
+    # api-key-active openai must STILL work (fail-closed is OAuth-only).
+    store.add(provider="openai", auth_type="api_key", alias="p", secret="sk-fake1111", make_active=True)
+    assert isinstance(lr.live_openai_client(store=store), OpenAI)
+
+
+def test_live_openai_client_no_active_env_fallback(store, monkeypatch):
+    # genuine env fallback (no active credential) still returns a bare env client.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-envfake")
+    assert isinstance(lr.live_openai_client(store=store), OpenAI)
