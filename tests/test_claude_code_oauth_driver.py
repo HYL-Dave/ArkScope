@@ -261,11 +261,11 @@ def test_conforms_to_authdriver_and_identity():
     assert d.provider == "anthropic" and d.auth_mode == "claude_code_oauth"
 
 
-def test_factory_builds_real_driver_for_claude_code_oauth():
-    from src.auth_drivers.factory import build_driver
-    class _Cred: id = 1
-    drv = build_driver(provider="anthropic", auth_mode="claude_code_oauth", credential=_Cred(), token_store=object())
-    assert isinstance(drv, AnthropicClaudeCodeOAuthDriver)
+# NOTE: the factory→driver wiring for (anthropic, claude_code_oauth) is asserted in
+# test_auth_factory.py::test_claude_code_oauth_is_the_sdk_driver_not_placeholder — it
+# now builds the 7B AnthropicClaudeCodeSdkDriver, NOT this experimental --bare driver
+# (which stays importable for diagnostics only, 7B-5 e52d38f). The stale assertion
+# that the factory builds AnthropicClaudeCodeOAuthDriver was removed here.
 
 
 def test_factory_openai_chatgpt_oauth_still_placeholder():
