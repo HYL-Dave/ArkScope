@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
   addCredential,
   importOAuthCredential,
@@ -1411,12 +1411,11 @@ function ProviderSection({
                 </button>
               </div>
               {/* Low-frequency setup: collapsed once a usable credential exists. */}
-              <details
-                className="cred-setup"
+              <SetupDisclosure
+                provider={provider}
                 open={setupExpanded}
-                onToggle={(e) => setSetupOpen((prev) => ({ ...prev, [provider]: e.currentTarget.open }))}
+                onOpenChange={(p, open) => setSetupOpen((prev) => ({ ...prev, [p]: open }))}
               >
-                <summary>＋ 新增 API key 或登入訂閱</summary>
                 <div className="credential-add-box">
                   <label className="field">
                     <span>新增 API key alias</span>
@@ -1538,7 +1537,7 @@ function ProviderSection({
                     )}
                   </div>
                 )}
-              </details>
+              </SetupDisclosure>
               <div className="provider-links">
                 {sourceUrls.map((url) => (
                   <a key={url} href={url} target="_blank" rel="noreferrer">
@@ -1557,6 +1556,32 @@ function ProviderSection({
         })}
       </div>
     </>
+  );
+}
+
+export function SetupDisclosure({
+  provider,
+  open,
+  onOpenChange,
+  children,
+}: {
+  provider: ModelProvider;
+  open: boolean;
+  onOpenChange: (provider: ModelProvider, open: boolean) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <details
+      className="cred-setup"
+      open={open}
+      onToggle={(e) => {
+        const nextOpen = e.currentTarget.open;
+        onOpenChange(provider, nextOpen);
+      }}
+    >
+      <summary>＋ 新增 API key 或登入訂閱</summary>
+      {children}
+    </details>
   );
 }
 
