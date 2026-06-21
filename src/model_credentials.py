@@ -512,11 +512,13 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
         # only a plain api_key is a usable direct key; a stored api_key_pool row
         # is a retired/legacy artifact (C3a blocks new ones) and is unresolvable.
         can_use = row.auth_type == "api_key"
-        # chatgpt_oauth discovers via the ChatGPT/Codex backend (S3 step 1) — its
-        # model set differs from the api_key catalog, so it IS discoverable even
-        # though it isn't a direct api_key. (Model-test stays api_key-only; the
-        # chatgpt_oauth capability check is the separate P1/P2 probe route.)
-        can_discover = can_use or row.auth_type == "chatgpt_oauth"
+        # OAuth modes are discoverable too (their model set differs from the api_key
+        # catalog): chatgpt_oauth → the LIVE ChatGPT/Codex backend list (S3 step 1);
+        # claude_code_oauth → the seed CANDIDATE list (no live discovery API — the
+        # driver returns seed). The live-vs-seed distinction rides on each result's
+        # `source` field, not this flag. (Model-test stays api_key-only; OAuth
+        # capability is the separate probe route.)
+        can_discover = can_use or row.auth_type in ("chatgpt_oauth", "claude_code_oauth")
         if row.secret:
             db_secrets_by_provider[row.provider].add(row.secret)
         local_by_provider[row.provider].append(
@@ -537,6 +539,8 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                     if can_use
                     else "ChatGPT subscription (OAuth). Lists models from the ChatGPT backend; not a direct API key."
                     if row.auth_type == "chatgpt_oauth"
+                    else "Claude subscription (OAuth). Candidate models from the seed catalog (no live discovery); not a direct API key."
+                    if row.auth_type == "claude_code_oauth"
                     else "Stored for future auth flow support; not used as a direct API key in v0."
                 ),
             )
@@ -597,37 +601,12 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
     add_api_key("anthropic", "ANTHROPIC_API_KEY", "Anthropic API key")
     add_key_pool("anthropic", "ANTHROPIC_API_KEYS")
 
-    # Lone S3 signpost: OpenAI ChatGPT-OAuth has no import route yet, so — unlike
-    # the Claude setup-token, which now lands as an import-created local: row via
-    # the token-store — there is no live local: row to supersede it. The two
-    # Anthropic env placeholders (ANTHROPIC_OAUTH_TOKEN / ANTHROPIC_SETUP_TOKEN)
-    # were removed: they advertised env vars nothing reads while the real Claude
-    # path is the token-store import (see add_oauth_credential / import route).
-    for provider, env_name, auth_type, notes in [
-        (
-            "openai",
-            "OPENAI_OAUTH_TOKEN",
-            "chatgpt_oauth",
-            "Planned ChatGPT-OAuth (S3); not read as a credential yet.",
-        ),
-    ]:
-        value = os.environ.get(env_name, "").strip()
-        out[provider].append(
-            ProviderCredential(
-                id=f"{provider}:{env_name}",
-                provider=provider,  # type: ignore[arg-type]
-                auth_type=auth_type,  # type: ignore[arg-type]
-                label=env_name,
-                source=env_name,
-                available=bool(value),
-                masked=_mask_secret(value) if value else None,
-                active=False,
-                editable=False,
-                can_discover_models=False,
-                can_test_models=False,
-                notes=notes,
-            )
-        )
+    # NO env-var OAuth placeholders. The OpenAI ChatGPT-OAuth signpost
+    # (OPENAI_OAUTH_TOKEN) was removed in the S3 UX cleanup — it is superseded by the
+    # in-app ChatGPT login, which lands as an import-created local: chatgpt_oauth row
+    # via the token-store (same as the Claude setup-token path). An env row for OAuth
+    # only misled (looked like a missing .env credential, duplicated the real row).
+    # The two Anthropic env placeholders were removed earlier for the same reason.
 
     return out
 

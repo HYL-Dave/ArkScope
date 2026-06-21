@@ -232,7 +232,7 @@ token-store.
    moving only the distinct key would silently halve rotation). The research key
    `OPENAI_API_KEY` thus serves BOTH research (as `OpenAI primary` in the DB) and
    scoring (in the file) — the first concrete "same key, multiple purposes" case
-   (§12). When per-purpose binding (§12) lands, scoring can be pulled back into
+   (§13). When per-purpose binding (§13) lands, scoring can be pulled back into
    the DB with an explicit `purpose=scoring` tag.
 3. **Secret rotation** — ✅ backup DELETED + Supabase/FMP values removed from
    `.env` this turn. ⚠️ remaining USER action: revoke `SUPABASE_SERVICE_ROLE_KEY`

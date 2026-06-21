@@ -120,18 +120,16 @@ def test_resolve_api_credential_uses_active_local_secret_without_explicit_id(sto
     assert resolved.secret == "sk-active-db-key"
 
 
-def test_provider_credentials_placeholders_use_explicit_modes(store, clean_env):
-    # The OpenAI ChatGPT-OAuth placeholder stays as the lone S3 signpost (OpenAI
-    # has no import route yet). The two Anthropic env placeholders are REMOVED:
-    # the working Claude setup-token path renders as an import-created local: row
-    # (see test_provider_credentials_oauth_local_row_no_secret_no_crash), so the
-    # env rows were redundant + misleading.
+def test_provider_credentials_no_env_oauth_placeholders(store, clean_env):
+    # S3 UX cleanup: ALL env OAuth placeholders are now removed. The OpenAI
+    # ChatGPT-OAuth signpost (OPENAI_OAUTH_TOKEN) is superseded by the in-app
+    # ChatGPT login → an import-created local: chatgpt_oauth row; the two Anthropic
+    # env placeholders were already removed. Env rows for OAuth misled (looked like a
+    # missing .env credential, duplicated the real local: row).
     inv = provider_credentials(store)
     oa = {c.id: c for c in inv["openai"]}
     an = {c.id: c for c in inv["anthropic"]}
-    assert oa["openai:OPENAI_OAUTH_TOKEN"].auth_type == "chatgpt_oauth"
-    assert oa["openai:OPENAI_OAUTH_TOKEN"].can_discover_models is False  # still not a direct key
-    # the two Anthropic env placeholders are gone (superseded by the token-store import row)
+    assert "openai:OPENAI_OAUTH_TOKEN" not in oa  # removed (superseded by the in-app OAuth row)
     assert "anthropic:ANTHROPIC_OAUTH_TOKEN" not in an
     assert "anthropic:ANTHROPIC_SETUP_TOKEN" not in an
 
@@ -419,7 +417,9 @@ def test_provider_credentials_oauth_local_row_no_secret_no_crash(store, clean_en
     inv = provider_credentials(store)
     row = next(c for c in inv["anthropic"] if c.id.startswith("local:") and c.auth_type == "claude_code_oauth")
     assert row.masked is None  # no secret to mask
-    assert row.can_discover_models is False and row.editable is True
+    # S3 UX cleanup: claude_code_oauth is now discoverable (seed CANDIDATE list — the
+    # row's "查看候選模型"); model-test stays api_key-only.
+    assert row.can_discover_models is True and row.can_test_models is False and row.editable is True
 
 
 def test_partial_unique_index_present(store):
