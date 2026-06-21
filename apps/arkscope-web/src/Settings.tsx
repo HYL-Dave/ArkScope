@@ -44,7 +44,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
-import { credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
+import { activeFirst, credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
@@ -1110,6 +1110,10 @@ function ProviderSection({
   const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
+  // Per-provider disclosure state for the (low-frequency) setup forms. Undefined =
+  // use the smart default (collapsed once the provider has any usable credential);
+  // a user toggle pins it. Keyed by provider so toggling one card doesn't move others.
+  const [setupOpen, setSetupOpen] = useState<Record<string, boolean>>({});
   const [providerMsg, setProviderMsg] = useState<string | null>(null);
   const [providerErr, setProviderErr] = useState<string | null>(null);
   // Claude setup-token import (anthropic only). The token is held in form state
@@ -1328,6 +1332,11 @@ function ProviderSection({
             [];
           const activeCred = credentials.find((c) => c.active && c.available) ?? null;
           const pill = credentialPill(activeCred);
+          // Smart-collapse the setup forms: expanded only when the provider has NO
+          // usable credential (the empty-state where setup IS the task); a user
+          // toggle (setupOpen[provider]) overrides.
+          const hasCredential = credentials.some((c) => c.available);
+          const setupExpanded = setupOpen[provider] ?? !hasCredential;
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
           const discoveryState = discovery[provider];
           const usable = credentials.filter((c) => c.available && c.can_discover_models);
@@ -1357,129 +1366,9 @@ function ProviderSection({
                   <span key={model.id}>{model.id}</span>
                 ))}
               </div>
-              <div className="credential-add-box">
-                <label className="field">
-                  <span>新增 API key alias</span>
-                  <input
-                    value={newAlias[provider] ?? ""}
-                    placeholder={`${provider} primary`}
-                    onChange={(e) => setNewAlias((prev) => ({ ...prev, [provider]: e.target.value }))}
-                  />
-                </label>
-                <label className="field">
-                  <span>新增 API key</span>
-                  <input
-                    type="password"
-                    value={newSecret[provider] ?? ""}
-                    placeholder={provider === "openai" ? "sk-…" : "sk-ant-…"}
-                    onChange={(e) => setNewSecret((prev) => ({ ...prev, [provider]: e.target.value }))}
-                  />
-                </label>
-                <button type="button" className="btn-ghost small" onClick={() => void addKey(provider)}>
-                  新增並設為 active
-                </button>
-              </div>
-              {provider === "anthropic" && (
-                <div className="credential-add-box oauth-import-box">
-                  <p className="muted tiny" style={{ marginBottom: 8 }}>
-                    匯入 Claude setup-token（訂閱登入）。<strong>這不是 Anthropic API key。</strong>
-                    Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
-                    用終端機 <code className="mono">claude setup-token</code> 產生後貼上。
-                  </p>
-                  <label className="field">
-                    <span>顯示名稱（可留空）</span>
-                    <input
-                      value={claudeAlias}
-                      placeholder="Claude subscription"
-                      onChange={(e) => setClaudeAlias(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>顯示名稱／帳號標籤（可留空）</span>
-                    <input
-                      value={claudeLabel}
-                      placeholder="例如 Pro / Max"
-                      onChange={(e) => setClaudeLabel(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Claude setup-token</span>
-                    <input
-                      type="password"
-                      autoComplete="off"
-                      value={claudeToken}
-                      placeholder="貼上 claude setup-token 產生的 token"
-                      onChange={(e) => setClaudeToken(e.target.value)}
-                    />
-                  </label>
-                  <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken()}>
-                    匯入 setup-token
-                  </button>
-                </div>
-              )}
-              {provider === "openai" && (
-                <div className="credential-add-box oauth-import-box">
-                  <p className="muted tiny" style={{ marginBottom: 8 }}>
-                    登入 ChatGPT 訂閱（OpenAI subscription）。<strong>這不是 OpenAI API key。</strong>
-                    這是<strong>ChatGPT backend 相容路徑</strong>（非公開 OpenAI API host；Research 啟用前會用實測確認 backend 行為）。
-                    Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
-                  </p>
-                  {!oauth && (
-                    <button
-                      type="button"
-                      className="btn-ghost small"
-                      disabled={pollBusy}
-                      onClick={() => void startChatGPTLogin()}
-                    >
-                      {pollBusy ? "登入中…" : "登入 ChatGPT"}
-                    </button>
-                  )}
-                  {oauth?.phase === "waiting" && (
-                    <div>
-                      <p className="muted tiny">等待瀏覽器登入完成…（已開新分頁）</p>
-                      <button type="button" className="btn-ghost small" onClick={() => void copyLoginLink()}>
-                        複製登入連結
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-ghost small"
-                        onClick={() => setOauth((o) => (o ? { ...o, phase: "manual" } : o))}
-                      >
-                        沒有自動返回？手動貼上授權碼
-                      </button>
-                    </div>
-                  )}
-                  {oauth?.phase === "manual" && (
-                    <div>
-                      <p className="muted tiny">
-                        只在瀏覽器已完成登入、但本機 callback 沒收到時使用。貼上授權碼或整個回呼網址：
-                      </p>
-                      <label className="field">
-                        <span>授權碼／回呼網址</span>
-                        <input
-                          value={manualValue}
-                          autoComplete="off"
-                          placeholder="code 或 http://localhost:1455/auth/callback?code=…"
-                          onChange={(e) => setManualValue(e.target.value)}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="btn-ghost small"
-                        disabled={manualBusy}
-                        onClick={() => void completeChatGPTManual()}
-                      >
-                        {manualBusy ? "完成中…" : "完成登入"}
-                      </button>
-                      <button type="button" className="btn-ghost small" onClick={cancelChatGPTLogin}>
-                        取消
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* High-frequency first: your credentials + their row actions (active row first). */}
               <CredentialList
-                credentials={credentials}
+                credentials={activeFirst(credentials)}
                 renames={renames}
                 onRenameDraft={(id, alias) => setRenames((prev) => ({ ...prev, [id]: alias }))}
                 onSaveAlias={(id) => void saveAlias(id)}
@@ -1488,6 +1377,13 @@ function ProviderSection({
                 onDiscover={(id) => void onDiscover(provider, id)}
                 discoverLoadingId={discoveryState?.loading ? discoveryState.credentialId ?? null : null}
               />
+              {discoveryState?.result && (
+                <DiscoveryResultView
+                  result={discoveryState.result}
+                  authMode={discoveredAuthMode}
+                  onUse={(model, task) => onUseModel(provider, model, task)}
+                />
+              )}
               <div className="settings-actions">
                 <p className="muted tiny" style={{ width: "100%" }}>
                   進階：指定某個 credential 做 discovery（一般用上方各列的「列模型／查看候選模型」即可）。
@@ -1514,13 +1410,135 @@ function ProviderSection({
                   {discoveryState?.loading ? "讀取中…" : `${discoverButtonLabel(selectedAuthMode)}（此 credential）`}
                 </button>
               </div>
-              {discoveryState?.result && (
-                <DiscoveryResultView
-                  result={discoveryState.result}
-                  authMode={discoveredAuthMode}
-                  onUse={(model, task) => onUseModel(provider, model, task)}
-                />
-              )}
+              {/* Low-frequency setup: collapsed once a usable credential exists. */}
+              <details
+                className="cred-setup"
+                open={setupExpanded}
+                onToggle={(e) => setSetupOpen((prev) => ({ ...prev, [provider]: e.currentTarget.open }))}
+              >
+                <summary>＋ 新增 API key 或登入訂閱</summary>
+                <div className="credential-add-box">
+                  <label className="field">
+                    <span>新增 API key alias</span>
+                    <input
+                      value={newAlias[provider] ?? ""}
+                      placeholder={`${provider} primary`}
+                      onChange={(e) => setNewAlias((prev) => ({ ...prev, [provider]: e.target.value }))}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>新增 API key</span>
+                    <input
+                      type="password"
+                      value={newSecret[provider] ?? ""}
+                      placeholder={provider === "openai" ? "sk-…" : "sk-ant-…"}
+                      onChange={(e) => setNewSecret((prev) => ({ ...prev, [provider]: e.target.value }))}
+                    />
+                  </label>
+                  <button type="button" className="btn-ghost small" onClick={() => void addKey(provider)}>
+                    新增並設為 active
+                  </button>
+                </div>
+                {provider === "anthropic" && (
+                  <div className="credential-add-box oauth-import-box">
+                    <p className="muted tiny" style={{ marginBottom: 8 }}>
+                      匯入 Claude setup-token（訂閱登入）。<strong>這不是 Anthropic API key。</strong>
+                      Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
+                      用終端機 <code className="mono">claude setup-token</code> 產生後貼上。
+                    </p>
+                    <label className="field">
+                      <span>顯示名稱（可留空）</span>
+                      <input
+                        value={claudeAlias}
+                        placeholder="Claude subscription"
+                        onChange={(e) => setClaudeAlias(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>顯示名稱／帳號標籤（可留空）</span>
+                      <input
+                        value={claudeLabel}
+                        placeholder="例如 Pro / Max"
+                        onChange={(e) => setClaudeLabel(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Claude setup-token</span>
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        value={claudeToken}
+                        placeholder="貼上 claude setup-token 產生的 token"
+                        onChange={(e) => setClaudeToken(e.target.value)}
+                      />
+                    </label>
+                    <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken()}>
+                      匯入 setup-token
+                    </button>
+                  </div>
+                )}
+                {provider === "openai" && (
+                  <div className="credential-add-box oauth-import-box">
+                    <p className="muted tiny" style={{ marginBottom: 8 }}>
+                      登入 ChatGPT 訂閱（OpenAI subscription）。<strong>這不是 OpenAI API key。</strong>
+                      這是<strong>ChatGPT backend 相容路徑</strong>（非公開 OpenAI API host；Research 啟用前會用實測確認 backend 行為）。
+                      Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
+                    </p>
+                    {!oauth && (
+                      <button
+                        type="button"
+                        className="btn-ghost small"
+                        disabled={pollBusy}
+                        onClick={() => void startChatGPTLogin()}
+                      >
+                        {pollBusy ? "登入中…" : "登入 ChatGPT"}
+                      </button>
+                    )}
+                    {oauth?.phase === "waiting" && (
+                      <div>
+                        <p className="muted tiny">等待瀏覽器登入完成…（已開新分頁）</p>
+                        <button type="button" className="btn-ghost small" onClick={() => void copyLoginLink()}>
+                          複製登入連結
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost small"
+                          onClick={() => setOauth((o) => (o ? { ...o, phase: "manual" } : o))}
+                        >
+                          沒有自動返回？手動貼上授權碼
+                        </button>
+                      </div>
+                    )}
+                    {oauth?.phase === "manual" && (
+                      <div>
+                        <p className="muted tiny">
+                          只在瀏覽器已完成登入、但本機 callback 沒收到時使用。貼上授權碼或整個回呼網址：
+                        </p>
+                        <label className="field">
+                          <span>授權碼／回呼網址</span>
+                          <input
+                            value={manualValue}
+                            autoComplete="off"
+                            placeholder="code 或 http://localhost:1455/auth/callback?code=…"
+                            onChange={(e) => setManualValue(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="btn-ghost small"
+                          disabled={manualBusy}
+                          onClick={() => void completeChatGPTManual()}
+                        >
+                          {manualBusy ? "完成中…" : "完成登入"}
+                        </button>
+                        <button type="button" className="btn-ghost small" onClick={cancelChatGPTLogin}>
+                          取消
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </details>
               <div className="provider-links">
                 {sourceUrls.map((url) => (
                   <a key={url} href={url} target="_blank" rel="noreferrer">

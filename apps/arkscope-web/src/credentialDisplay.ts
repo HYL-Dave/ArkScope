@@ -41,3 +41,10 @@ export function credentialPill(
 export function discoverButtonLabel(authMode: CredentialAuthType | null): string {
   return authMode === "claude_code_oauth" ? "查看候選模型" : "列模型";
 }
+
+// Active credential first (then the rest in their existing order) so the credential
+// you're using — and its row actions — sit at the top of the card without scrolling.
+// Stable + non-mutating; at most one row is active (single-active per provider).
+export function activeFirst<T extends { active: boolean }>(creds: T[]): T[] {
+  return [...creds].sort((a, b) => Number(b.active) - Number(a.active));
+}

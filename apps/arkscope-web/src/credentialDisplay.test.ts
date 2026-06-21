@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
+import { activeFirst, credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
+
+describe("activeFirst", () => {
+  it("moves the active credential to the front, preserving the rest's order", () => {
+    const rows = [{ id: "a", active: false }, { id: "b", active: true }, { id: "c", active: false }];
+    expect(activeFirst(rows).map((r) => r.id)).toEqual(["b", "a", "c"]);
+  });
+  it("is a no-op when the first is already active or none is active", () => {
+    expect(activeFirst([{ id: "x", active: true }, { id: "y", active: false }]).map((r) => r.id)).toEqual(["x", "y"]);
+    expect(activeFirst([{ id: "x", active: false }, { id: "y", active: false }]).map((r) => r.id)).toEqual(["x", "y"]);
+  });
+  it("does not mutate the input + handles empty", () => {
+    const rows = [{ id: "a", active: false }, { id: "b", active: true }];
+    activeFirst(rows);
+    expect(rows.map((r) => r.id)).toEqual(["a", "b"]);  // original order intact
+    expect(activeFirst([])).toEqual([]);
+  });
+});
 
 describe("discoverySourceLabel", () => {
   it("distinguishes OpenAI API vs ChatGPT backend (both provider_api at the data layer)", () => {

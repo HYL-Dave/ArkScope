@@ -1339,6 +1339,17 @@ table.wl tbody tr.archived td {
   border-radius: 7px;
   padding: 8px;
 }
+.cred-setup {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+.cred-setup > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12.5px;
+  list-style: revert;
+}
 .discovery-box {
   margin: 10px 0;
 }
