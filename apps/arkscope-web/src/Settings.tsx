@@ -56,6 +56,7 @@ import {
   discoverySourceLabel,
 } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
+import { formatSystemTimestamp } from "./timeDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -356,7 +357,7 @@ function syncLine(status: MarketDataStatus): string {
   const fmt = (m: SyncMeta | null) => {
     if (!m) return "—";
     if (m.last_error) return `錯誤（${m.last_error.slice(0, 40)}）`;
-    const ts = m.last_success ? m.last_success.slice(0, 16).replace("T", " ") : "—";
+    const ts = formatSystemTimestamp(m.last_success);
     return `+${m.rows_added.toLocaleString()} @ ${ts}`;
   };
   const s = status.sync;
@@ -472,6 +473,7 @@ function DataStorageSection() {
             把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
             缺資料自動 fallback 回 PG。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
             Seeking Alpha capture 已切到本地 SQLite（hard cutover 2026-06-13，無 PG 讀 fallback）；報告與分數仍在 PG。
+            最新資料時間沿用來源欄位；同步／抓取時間顯示本機時區 + 美股 ET 對照。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
@@ -497,7 +499,7 @@ function DataStorageSection() {
             <dt>財務快取</dt>
             <dd>
               {exists
-                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${fc!.latest_fetched_at ?? "—"}（local-primary，不對 PG 驗證）`
+                ? `${fc!.row_count.toLocaleString()} 列（有效 ${fc!.valid_count} · 過期 ${fc!.expired_count}）· 最新抓取 ${formatSystemTimestamp(fc!.latest_fetched_at)}（local-primary，不對 PG 驗證）`
                 : "—"}
             </dd>
             <dt>最近增量更新</dt>
@@ -597,8 +599,7 @@ const PROVIDER_STATUS_LABEL: Record<string, string> = {
 };
 
 function shortTs(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return iso.slice(5, 16).replace("T", " "); // "MM-DD HH:mm"
+  return formatSystemTimestamp(iso);
 }
 
 function DataSourcesSection() {
