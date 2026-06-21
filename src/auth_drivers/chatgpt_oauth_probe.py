@@ -65,6 +65,7 @@ _P1_NAME = "P1: OAuth token rejected by api.openai.com, accepted (streams) by th
 _P2A_NAME = "P2a: ChatGPT backend 400s max_output_tokens (Unsupported parameter)"
 _P2B_NAME = "P2b: ChatGPT backend returns a function-call output item"
 _P2C_NAME = "P2c: model discovery needs extra_query client_version (ids in nonstandard 'models')"
+_MODEL_OBSERVED_LIMIT = 20
 
 
 def _openai_client(token: str, base_url: str) -> Any:  # seam for tests
@@ -286,7 +287,12 @@ def _default_p2c_model_discovery(token: str) -> tuple[bool, str]:
     page = client.models.list(extra_query={"client_version": _CLIENT_VERSION})
     ids = _model_ids(page)
     if plain_400 and ids:
-        return True, f"plain models.list 400'd; extra_query client_version returned {len(ids)} model ids"
+        shown = ", ".join(ids[:_MODEL_OBSERVED_LIMIT])
+        suffix = f" (+{len(ids) - _MODEL_OBSERVED_LIMIT} more)" if len(ids) > _MODEL_OBSERVED_LIMIT else ""
+        return True, (
+            "plain models.list 400'd; extra_query client_version returned "
+            f"{len(ids)} model ids: {shown}{suffix}"
+        )
     if not plain_400 and ids:
         return False, f"extra_query returned {len(ids)} ids but plain models.list did NOT 400 (deviation)"
     return False, "model discovery returned no ids even with extra_query client_version"

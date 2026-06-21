@@ -2,8 +2,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth } from "./api";
-import type { OAuthStatusResult } from "./api";
-import { buildManualCompletion, pollOAuthStatus } from "./chatgptOAuth";
+import type { OAuthStatusResult, ProbeResult } from "./api";
+import {
+  buildManualCompletion,
+  extractProbeModels,
+  probeDisplayLabel,
+  probeDisplaySummary,
+  pollOAuthStatus,
+} from "./chatgptOAuth";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -158,5 +164,42 @@ describe("buildManualCompletion", () => {
 
   it("trims surrounding whitespace", () => {
     expect(buildManualCompletion("S", "  AUTHCODE  ")).toEqual({ state: "S", code: "AUTHCODE" });
+  });
+});
+
+describe("probe display helpers", () => {
+  const probe = (name: string, observed: string, error: string | null = null): ProbeResult => ({
+    name,
+    passed: error === null,
+    expected: "expected shape",
+    observed,
+    error,
+  });
+
+  it("uses short stable labels for the ChatGPT OAuth probe steps", () => {
+    expect(probeDisplayLabel("P1: OAuth token rejected by api.openai.com")).toBe("Token / backend");
+    expect(probeDisplayLabel("P2a: ChatGPT backend 400s max_output_tokens")).toBe("參數相容性");
+    expect(probeDisplayLabel("P2b: ChatGPT backend returns a function-call output item")).toBe("工具呼叫");
+    expect(probeDisplayLabel("P2c: model discovery needs extra_query")).toBe("可用模型");
+  });
+
+  it("extracts model ids from P2c observed text", () => {
+    expect(
+      extractProbeModels("plain models.list 400'd; extra_query client_version returned 3 model ids: gpt-5.4-mini, gpt-5.5, codex-mini"),
+    ).toEqual(["gpt-5.4-mini", "gpt-5.5", "codex-mini"]);
+  });
+
+  it("summarizes P2c as available models instead of raw probe text", () => {
+    const summary = probeDisplaySummary(probe(
+      "P2c: model discovery needs extra_query",
+      "plain models.list 400'd; extra_query client_version returned 2 model ids: gpt-5.4-mini, gpt-5.5",
+    ));
+    expect(summary.text).toBe("可用模型");
+    expect(summary.models).toEqual(["gpt-5.4-mini", "gpt-5.5"]);
+  });
+
+  it("keeps failed probe detail visible but compact", () => {
+    expect(probeDisplaySummary(probe("P2b: ChatGPT backend returns a function-call output item", "raw observed", "no call")).text)
+      .toBe("no call");
   });
 });

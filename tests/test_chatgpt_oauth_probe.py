@@ -335,7 +335,25 @@ def test_default_p2c_pass_plain_400_then_extra_query_ids(monkeypatch):
     monkeypatch.setattr(mod, "_openai_client", lambda token, base_url: _FakeClient(on_list=on_list))
     passed, observed = mod._default_p2c_model_discovery(_TOK)
     assert passed is True and "id" in observed.lower()
+    assert "gpt-5.4-mini" in observed and "gpt-5.5" in observed
     assert seen.get("client_version")  # extra_query client_version was actually sent
+
+
+def test_default_p2c_observed_caps_long_model_lists(monkeypatch):
+    models = [{"id": f"gpt-test-{i}"} for i in range(25)]
+
+    def on_list(kw):
+        eq = kw.get("extra_query") or {}
+        if "client_version" not in eq:
+            raise _Boom("400 - missing client_version")
+        return _FakePage(models)
+
+    monkeypatch.setattr(mod, "_openai_client", lambda token, base_url: _FakeClient(on_list=on_list))
+    passed, observed = mod._default_p2c_model_discovery(_TOK)
+    assert passed is True
+    assert "gpt-test-0" in observed and "gpt-test-19" in observed
+    assert "gpt-test-20" not in observed
+    assert "+5 more" in observed
 
 
 def test_default_p2c_fail_when_no_ids(monkeypatch):

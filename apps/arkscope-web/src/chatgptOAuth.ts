@@ -2,7 +2,7 @@
 // glue so it is unit-testable without a DOM, a browser, or a real backend (mirrors
 // researchProvider.ts). The Settings component injects the real status client + a
 // real clock/sleep; tests inject fakes.
-import type { OAuthStatusResult, ProviderCredential } from "./api";
+import type { OAuthStatusResult, ProbeResult, ProviderCredential } from "./api";
 
 export type PollResult =
   | { kind: "success"; credential: ProviderCredential | null }
@@ -58,4 +58,40 @@ export function buildManualCompletion(
   const v = pasted.trim();
   const looksLikeUrl = /^https?:\/\//i.test(v) || v.includes("?code=") || v.includes("&code=");
   return looksLikeUrl ? { state, redirect_url: v } : { state, code: v };
+}
+
+export function probeDisplayLabel(name: string): string {
+  if (name.startsWith("P1")) return "Token / backend";
+  if (name.startsWith("P2a")) return "參數相容性";
+  if (name.startsWith("P2b")) return "工具呼叫";
+  if (name.startsWith("P2c")) return "可用模型";
+  return name;
+}
+
+export function extractProbeModels(observed: string): string[] {
+  const match = observed.match(/model ids:\s*(.+)$/i);
+  if (!match) return [];
+  return match[1]
+    .replace(/\s*\(\+\d+\s+more\)\s*$/i, "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+export function probeDisplaySummary(probe: ProbeResult): { text: string; models: string[] } {
+  if (probe.error) return { text: probe.error, models: [] };
+  if (probe.name.startsWith("P1")) {
+    return { text: probe.passed ? "OAuth 不是 public API key；ChatGPT backend 可 streaming" : probe.observed, models: [] };
+  }
+  if (probe.name.startsWith("P2a")) {
+    return { text: probe.passed ? "backend 會拒絕 max_output_tokens；driver 需移除此參數" : probe.observed, models: [] };
+  }
+  if (probe.name.startsWith("P2b")) {
+    return { text: probe.passed ? "function-call streaming 可用" : probe.observed, models: [] };
+  }
+  if (probe.name.startsWith("P2c")) {
+    const models = extractProbeModels(probe.observed);
+    return { text: models.length ? "可用模型" : probe.observed, models };
+  }
+  return { text: probe.observed, models: [] };
 }

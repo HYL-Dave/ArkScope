@@ -47,7 +47,7 @@ This difference is load-bearing for Slice 7B:
 |---|---|---|---|
 | **Standard API key** (`openai/api_key`, `anthropic/api_key`) | Inside ArkScope's Python sidecar process | The existing OpenAI/Anthropic agent bridges call ArkScope Python functions directly (`get_sa_feed`, `get_fundamentals_analysis`, `get_price_change`, etc.) | **No** — tools are already in-process |
 | **Claude setup-token** (`anthropic/claude_code_oauth`) | Via the **Claude Agent SDK** — the SDK runs the model/tool loop; ArkScope tools are bridged back **in-process** | The SDK's own runtime sees Claude Code's built-in tools, not ArkScope's Python functions, unless they are bridged in | **Yes** — an **in-process** SDK tool bridge (`create_sdk_mcp_server`), NOT an external MCP server or `claude -p --mcp-config`; see §7B |
-| **OpenAI ChatGPT-OAuth** (`openai/chatgpt_oauth`) | Still the OpenAI SDK shape, but pointed at the ChatGPT backend compatibility host | If the compatibility backend supports function/tool calls, ArkScope can keep owning the tool loop/bridge shape; this must be proven by P2 | **Probe-gated**, not assumed |
+| **OpenAI ChatGPT-OAuth** (`openai/chatgpt_oauth`) | Still the OpenAI SDK shape, but pointed at the ChatGPT backend compatibility host | If the compatibility backend supports function/tool calls, ArkScope can keep owning the tool loop/bridge shape; this must be proven by P2 | **Compatibility-gated**, not assumed |
 
 The key point: a credential answers only **who pays / how the provider authenticates**.
 It does not automatically carry ArkScope's tools into a different runtime.
@@ -247,7 +247,7 @@ Build the abstraction first; rewiring is the LAST slice and out of this doc's de
 
 ## 13. Decisions (RESOLVED 2026-06-15, gpt-5.5 review)
 
-1. **OpenAI subscription path = in-app `chatgpt_oauth` driver; `codex_cli` is NOT a product path.** Default provider stays **`api_key`**; the subscription path is the **experimental in-app `chatgpt_oauth` driver** — ArkScope itself does the OAuth login / token capture / refresh / store, *borrowing* the Codex OAuth+backend protocol but **NOT depending on or bundling Codex CLI** (a desktop app must never require the user to install Codex CLI). `chatgpt_oauth` only becomes a real default once its probe (P2/S3) shows streaming + tool-call are stable. **`codex_cli` = dev/debug harness + an optional "import an existing Codex login's token" convenience ONLY** — never a product subscription path, never surfaced as "install Codex CLI to use OpenAI OAuth." **If `chatgpt_oauth` fails, the product fallback is "use an API key," NOT Codex CLI.**
+1. **OpenAI subscription path = in-app `chatgpt_oauth` driver; `codex_cli` is NOT a product path.** Default provider stays **`api_key`**; the subscription path is the **compatibility-gated in-app `chatgpt_oauth` driver** — ArkScope itself does the OAuth login / token capture / refresh / store, *borrowing* the Codex OAuth+backend protocol but **NOT depending on or bundling Codex CLI** (a desktop app must never require the user to install Codex CLI). Login + token storage are live-proven; Research wire-in waits for the P1/P2 probe to confirm streaming + tool-call + model-discovery behavior on the ChatGPT backend. **`codex_cli` = dev/debug harness + an optional "import an existing Codex login's token" convenience ONLY** — never a product subscription path, never surfaced as "install Codex CLI to use OpenAI OAuth." **If `chatgpt_oauth` fails, the product fallback is "use an API key," NOT Codex CLI.**
 2. **Token at-rest = keyring first, plaintext `0600` dev-fallback allowed (UI-labeled).** Production target = OS keychain / Secret Service / a `keyring` abstraction; dev fallback = plaintext `0600` **but the UI must label it "local plaintext dev storage."** Do **NOT** make the OAuth token in `llm_credentials.secret` (plaintext column) the long-term home.
 3. **`auth_type` migration = explicit modes.** Rename/extend to `chatgpt_oauth` / `claude_code_oauth`; keep generic `oauth`/`setup_token` ONLY as deprecated read-aliases. No "generic + sub-mode column" (it perpetuates B/C ambiguity).
 4. **Anthropic Agent-SDK credit policy = S4 must live-re-verify.** Today *is* 2026-06-15 (the moving date). **Do NOT write any credit amount / plan allowance into the UI unless confirmed from the official page at that moment.** UI shows `status: unknown` / plan-if-available, never hardcoded figures.
@@ -543,7 +543,7 @@ RAW with the same required `instructions` + low-reasoning shape as the successfu
 Novelloom smoke so the probe measures the backend's 400 rather than a missing-field
 validation error; a flat Responses-API function tool → `*_call` item; model discovery via
 `extra_query={"client_version": "0.0.0"}` → ids in the nonstandard `models` field. The
-OpenAI-B path carries the **"compatibility path, not product path"** label
+OpenAI-B path carries the **"compatibility product path, not public API host"** label
 (reverse-engineered, TOS-sensitive) — distinct from the Anthropic OAuth path, which is
 documented/sanctioned.
 
@@ -561,6 +561,14 @@ and `response.output_item.*` events while `response.completed` omitted `response
 That proves the backend emitted a function call; the failure was the probe parser looking
 only at terminal output. Fixed: P2b now passes on either terminal `*_call` output items OR
 streamed function-call item/argument events.
+
+**Probe display/model inventory polish (2026-06-21):** P2c now includes the discovered
+model ids in the redacted observed text (capped at 20 for readability), and Settings shows
+a compact four-row summary: Token/backend · parameter compatibility · tool call · available
+models. Raw `expected/observed/error` detail is kept behind a disclosure control. The
+button label stays short; the visible explanation says the probe sends minimal diagnostics
+to `api.openai.com` and the ChatGPT backend, never returns a token, and may consume a small
+amount of subscription/backend quota.
 
 ### S3-auth design correction — product path = ArkScope's OWN in-app OAuth (2026-06-20)
 
@@ -670,11 +678,12 @@ Backend transport for the in-app login. Three new modules + routes, TDD'd:
 fallback-discipline all **clean** (127.0.0.1-only, 256-bit single-use state is sufficient
 CSRF, no silent fallback port/credential/API-key anywhere). Two real lifecycle defects found
 and FIXED: (1) a bind→register window let a manual completion leave the loopback holding
-:1455 for the full timeout → fixed with a `_cancelled` set checked atomically at registration;
-(2) the singleton's `_results` grew unbounded → fixed with TTL + cap eviction; (3)
-hand-testing found a browser-redirect race → fixed by binding the loopback before returning
-the auth URL. 187 auth+route tests passed at the original transport gate; later S3 checks
-cover the race fix.
+:1455 for the full timeout; this was first fixed with a cancellation marker, then simplified
+after `begin()` was changed to bind+register before returning the auth URL (the marker became
+dead code and was removed); (2) the singleton's `_results` grew unbounded → fixed with TTL +
+cap eviction; (3) hand-testing found a browser-redirect race → fixed by binding the loopback
+before returning the auth URL. 187 auth+route tests passed at the original transport gate;
+later S3 checks cover the race fix.
 
 ### S3 Settings UI — BUILT (2026-06-20)
 
@@ -683,13 +692,14 @@ Frontend login surface in `apps/arkscope-web` (gpt-5.5 commit #2). `api.ts` gain
 flow logic is extracted to `chatgptOAuth.ts` (`pollOAuthStatus` state machine —
 pending→success/error/unknown/timeout; `buildManualCompletion` — code-vs-redirect-URL),
 unit-tested with injected clock/statusFn (no DOM/network), mirroring `researchProvider.ts`.
-`Settings.tsx` ProviderSection gains an OpenAI block: 「登入 ChatGPT」 → `window.open(auth_url)`
+`Settings.tsx` ProviderSection gains an OpenAI block: 「登入 ChatGPT」 → system-browser open
 + loopback poll → on success refresh the credential list; a copy-login-link button and a
 NARROW copy-code fallback ("沒有自動返回？手動貼上授權碼" → `complete-manual`); the probe
-button (`測試 ChatGPT OAuth（會打真實請求）`) widened to `chatgpt_oauth`. Copy marks it
-**experimental/compatibility, NOT an API key**; a backend error surfaces as-is (no silent
-fallback); the auth_url is opened/copied, never rendered as text. **14 new vitest +
-111 FE tests pass, tsc + vite build clean.** Test approach = vitest + injected fakes
+button (`實測 OAuth`) widened to `chatgpt_oauth`; the probe result explains the real
+diagnostic calls and displays available ChatGPT-backend model ids from P2c. Copy marks it
+**ChatGPT backend compatibility, NOT an API key**; a backend error surfaces as-is (no silent
+fallback); the auth_url is opened/copied, never rendered as text. **20 chatgptOAuth vitest +
+FE tests pass, tsc + vite build clean.** Test approach = vitest + injected fakes
 (the project has no Playwright; introducing it would be its own infra slice).
 
 **Desktop-shell requirement (2026-06-21 hand-test fix):** Electron must open the OAuth

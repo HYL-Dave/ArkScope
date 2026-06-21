@@ -20,7 +20,7 @@ exchange never runs twice. A completed 'success' is sticky — a late loopback t
 cancelled wait can never clobber it.
 
 This is the server-side glue for the FastAPI routes (a singleton per process); the routes
-are thin wrappers. The Settings UI is the next slice.
+are thin wrappers used by the Settings UI.
 """
 
 from __future__ import annotations
@@ -66,7 +66,6 @@ class OAuthLoginManager:
         self._results: dict[str, dict] = {}
         self._result_ts: dict[str, datetime] = {}  # state -> last-update time (for eviction)
         self._servers: dict[str, Any] = {}
-        self._cancelled: set[str] = set()  # states a manual completion asked the loopback to abandon
         self._lock = threading.Lock()
 
     def begin(self) -> dict:
@@ -100,7 +99,7 @@ class OAuthLoginManager:
         bad/expired/forged state (the route maps that to a 4xx) — never a fallback."""
         credential = self._complete(state=state, code=code)
         self._finish(state, status="success", credential=credential)
-        self._cancel(state)  # unblock + free the still-waiting loopback (or mark it for abandon)
+        self._cancel(state)  # unblock + free the still-waiting loopback
         return credential
 
     # --- internal ---------------------------------------------------------
@@ -129,10 +128,8 @@ class OAuthLoginManager:
             self._result_ts[state] = self._clock()
 
     def _cancel(self, state: str) -> None:
-        """Ask the loopback for `state` to abandon. Marks it cancelled and cancels it if
-        already live."""
+        """Ask the loopback for `state` to abandon."""
         with self._lock:
-            self._cancelled.add(state)
             server = self._servers.get(state)
         if server is not None:
             try:
@@ -173,5 +170,4 @@ class OAuthLoginManager:
     def _forget_locked(self, state: str) -> None:
         self._results.pop(state, None)
         self._result_ts.pop(state, None)
-        self._cancelled.discard(state)
         self._servers.pop(state, None)

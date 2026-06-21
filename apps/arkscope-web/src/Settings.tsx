@@ -44,7 +44,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
-import { buildManualCompletion, pollOAuthStatus } from "./chatgptOAuth";
+import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1414,7 +1414,7 @@ function ProviderSection({
                 <div className="credential-add-box oauth-import-box">
                   <p className="muted tiny" style={{ marginBottom: 8 }}>
                     登入 ChatGPT 訂閱（OpenAI subscription）。<strong>這不是 OpenAI API key。</strong>
-                    這是<strong>實驗性／相容路徑</strong>（走 ChatGPT 後端，非公開 OpenAI API，可能隨時失效）。
+                    這是<strong>ChatGPT backend 相容路徑</strong>（非公開 OpenAI API host；Research 啟用前會用實測確認 backend 行為）。
                     Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
                   </p>
                   {!oauth && (
@@ -1673,7 +1673,7 @@ function CredentialList({
                     disabled={probing === cred.id}
                     title={
                       cred.auth_type === "chatgpt_oauth"
-                        ? "測試 ChatGPT OAuth（會打真實請求）"
+                        ? "實測 ChatGPT OAuth backend"
                         : "測試 Claude setup-token"
                     }
                     onClick={() => void runProbe(cred.id)}
@@ -1681,7 +1681,7 @@ function CredentialList({
                     {probing === cred.id
                       ? "測試中…"
                       : cred.auth_type === "chatgpt_oauth"
-                        ? "測試 OAuth"
+                        ? "實測 OAuth"
                         : "測試 token"}
                   </button>
                 )}
@@ -1713,13 +1713,33 @@ function ProbeResultView({ probe }: { probe: ProbeResponse | { error: string } }
       <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
         {probe.passed ? "✓ OAuth 驗證通過" : "✗ OAuth 驗證未通過"}
       </p>
+      <p className="probe-note tiny">
+        會向 api.openai.com 與 ChatGPT backend 發出最小診斷請求，確認 token 類型、streaming、工具呼叫與可用模型；不回傳 token，可能消耗少量訂閱額度。
+      </p>
       <ul className="probe-list">
-        {probe.probes.map((p) => (
-          <li key={p.name} className="tiny">
-            <span className={p.passed ? "ok-text" : "warn-text"}>{p.passed ? "✓" : "✗"}</span>{" "}
-            {p.name} — {p.error ? p.error : p.observed}
-          </li>
-        ))}
+        {probe.probes.map((p) => {
+          const summary = probeDisplaySummary(p);
+          return (
+            <li key={p.name} className="tiny">
+              <span className={p.passed ? "ok-text" : "warn-text"}>{p.passed ? "✓" : "✗"}</span>
+              <span className="probe-label">{probeDisplayLabel(p.name)}</span>
+              <span className="probe-summary">{summary.text}</span>
+              {summary.models.length > 0 && (
+                <span className="probe-models">
+                  {summary.models.map((model) => (
+                    <code key={model}>{model}</code>
+                  ))}
+                </span>
+              )}
+              <details className="probe-detail">
+                <summary>細節</summary>
+                <div>expected: {p.expected}</div>
+                <div>observed: {p.observed}</div>
+                {p.error && <div>error: {p.error}</div>}
+              </details>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

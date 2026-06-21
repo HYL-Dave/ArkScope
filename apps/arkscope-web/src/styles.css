@@ -1398,12 +1398,78 @@ table.wl tbody tr.archived td {
 .test-status p {
   margin: 4px 0 0;
 }
+.probe-result {
+  grid-column: 1 / -1;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  border-radius: 7px;
+  padding: 8px;
+}
+.probe-result p {
+  margin: 0 0 6px;
+}
+.probe-note {
+  color: var(--muted);
+}
+.probe-list {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.probe-list li {
+  display: grid;
+  grid-template-columns: auto minmax(96px, max-content) minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+.probe-label {
+  color: var(--fg);
+  font-weight: 600;
+}
+.probe-summary {
+  color: var(--muted);
+  min-width: 0;
+}
+.probe-models {
+  grid-column: 3;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.probe-models code {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--fg);
+  padding: 1px 5px;
+}
+.probe-detail {
+  grid-column: 3;
+  color: var(--muted);
+  min-width: 0;
+}
+.probe-detail div {
+  overflow-wrap: anywhere;
+}
+.probe-detail summary {
+  cursor: pointer;
+}
 .btn-ghost.danger {
   color: var(--bad);
 }
 @media (max-width: 900px) {
   .credential-actions {
     grid-template-columns: 1fr;
+  }
+  .probe-list li {
+    grid-template-columns: auto 1fr;
+  }
+  .probe-summary,
+  .probe-models,
+  .probe-detail {
+    grid-column: 2;
   }
 }
 .error-text {
