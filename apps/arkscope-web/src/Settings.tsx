@@ -1524,17 +1524,19 @@ function ProviderSection({
                         onChange={(e) => setClaudeToken(e.target.value)}
                       />
                     </label>
-                    <label className="credential-add-toggle">
-                      <input
-                        type="checkbox"
-                        checked={claudeImportActive}
-                        onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, anthropic: e.target.checked }))}
-                      />
-                      <span>匯入後設為 active</span>
-                    </label>
-                    <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken(claudeImportActive)}>
-                      匯入 setup-token
-                    </button>
+                    <div className="credential-add-footer">
+                      <label className="credential-add-toggle">
+                        <input
+                          type="checkbox"
+                          checked={claudeImportActive}
+                          onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, anthropic: e.target.checked }))}
+                        />
+                        <span>匯入後設為 active</span>
+                      </label>
+                      <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken(claudeImportActive)}>
+                        匯入 setup-token
+                      </button>
+                    </div>
                   </div>
                 )}
                 {provider === "openai" && (
