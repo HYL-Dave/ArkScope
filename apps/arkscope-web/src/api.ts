@@ -99,6 +99,7 @@ export interface ProviderCredential {
   provider: ModelProvider;
   auth_type: CredentialAuthType;
   label: string;
+  account_label: string | null;
   source: string;
   available: boolean;
   masked: string | null;

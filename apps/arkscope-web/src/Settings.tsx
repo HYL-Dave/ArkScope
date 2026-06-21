@@ -1507,10 +1507,10 @@ function ProviderSection({
                       />
                     </label>
                     <label className="field">
-                      <span>顯示名稱／帳號標籤（可留空）</span>
+                      <span>帳號／方案標籤（可留空）</span>
                       <input
                         value={claudeLabel}
-                        placeholder="例如 Pro / Max"
+                        placeholder="例如 Claude Pro / Max"
                         onChange={(e) => setClaudeLabel(e.target.value)}
                       />
                     </label>
@@ -1772,6 +1772,7 @@ function CredentialList({
           <div className="credential-row" key={cred.id}>
             <div>
               <strong>{cred.label}</strong>
+              {cred.account_label && <span>帳號／方案：{cred.account_label}</span>}
               {cred.active && <span className="active-badge">使用中</span>}
               <span>{cred.auth_type}</span>
             </div>

@@ -377,6 +377,20 @@ def test_add_oauth_credential_has_null_secret(store):
     assert got.expires_at == "2027-06-16T00:00:00+00:00" and got.account_label == "Pro plan"
 
 
+def test_provider_credentials_exposes_oauth_account_label(store):
+    store.add_oauth_credential(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        alias="my claude",
+        account_label="Claude Pro",
+    )
+
+    cred = provider_credentials(store)["anthropic"][0]
+
+    assert cred.label == "my claude"
+    assert cred.account_label == "Claude Pro"
+
+
 def test_add_oauth_credential_rejects_api_key_mode(store):
     with pytest.raises(ValueError):
         store.add_oauth_credential(provider="openai", auth_mode="api_key", alias="x")

@@ -54,6 +54,7 @@ class ProviderCredential(BaseModel):
     provider: Provider
     auth_type: CredentialAuthType
     label: str
+    account_label: str | None = None
     source: str
     available: bool
     masked: str | None = None
@@ -527,6 +528,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 provider=row.provider,
                 auth_type=row.auth_type,
                 label=row.alias,
+                account_label=row.account_label,
                 source="profile_state.db",
                 available=True,
                 masked=_mask_secret(row.secret) if row.secret else None,  # OAuth rows have no secret here
@@ -559,6 +561,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 provider=provider,
                 auth_type="api_key",
                 label=label,
+                account_label=None,
                 source=env_name,
                 available=bool(value),
                 masked=_mask_secret(value) if value else None,
@@ -583,6 +586,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                     provider=provider,
                     auth_type="api_key_pool",
                     label=f"{env_name}[{idx}]",
+                    account_label=None,
                     source=env_name,
                     available=True,
                     masked=_mask_secret(value),
