@@ -296,13 +296,21 @@ Each credential row owns its own checks (you're looking at *that* credential):
 
 | Credential | Row actions | Model source label |
 |---|---|---|
-| OpenAI API key | `列模型` · `測試模型` | OpenAI API · live |
+| OpenAI API key | `列模型` · (測試模型 — see note) | OpenAI API · live |
 | ChatGPT OAuth (chatgpt_oauth) | `列模型` · `實測 OAuth` | ChatGPT backend · live |
-| Anthropic API key | `列模型` · `測試模型` | Anthropic API · live |
+| Anthropic API key | `列模型` · (測試模型 — see note) | Anthropic API · live |
 | Claude OAuth (claude_code_oauth) | `查看候選模型` · `測試 token` | seed · 非即時 discovery |
 
+- **`測試模型` (model-test) is NOT a credential-row action** — it needs a specific
+  model + effort, which the user picks in **Settings → Models** (`測試此模型`, the
+  existing `testModelAccess` button). The api_key ROW exposes `列模型` only; the paid
+  test call stays where model+effort are chosen. (Deferring it to the row would mean a
+  context-less call.) Implemented this way; the table above lists it for completeness.
 - **Provider copy** (`Settings.tsx:1315`): drop "API key" — say "credential model
   discovery / capability test (依 credential 類型而定)".
+- **Provider-card pill** reflects the ACTIVE credential's mode (API key / ChatGPT OAuth /
+  Claude OAuth / 無 credential), not the misleading "key set / no key" (which read an
+  OAuth-only provider as having no credential).
 - **Discovery results** show a **source badge** per result (`OpenAI API` / `ChatGPT
   backend` / `seed`) — data already exists (`DiscoveredModel.source`,
   `ModelDiscoveryResult.source_url`); UI just renders it.

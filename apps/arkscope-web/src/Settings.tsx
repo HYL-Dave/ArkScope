@@ -44,6 +44,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
+import { credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
@@ -1325,7 +1326,8 @@ function ProviderSection({
             catalog.credentials?.[provider] ??
             (provider === "anthropic" ? runtime?.anthropic.credentials : runtime?.openai.credentials) ??
             [];
-          const keySet = credentials.some((c) => c.available && c.can_test_models);
+          const activeCred = credentials.find((c) => c.active && c.available) ?? null;
+          const pill = credentialPill(activeCred);
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
           const discoveryState = discovery[provider];
           const usable = credentials.filter((c) => c.available && c.can_discover_models);
@@ -1334,6 +1336,11 @@ function ProviderSection({
           const selectedCredential = usable.some((c) => c.id === selectedDraft)
             ? selectedDraft ?? null
             : activeUsable?.id ?? usable[0]?.id ?? null;
+          const selectedAuthMode = usable.find((c) => c.id === selectedCredential)?.auth_type ?? null;
+          // auth_mode of the credential that produced the current discovery result
+          const discoveredAuthMode = discoveryState?.result
+            ? credentials.find((c) => c.id === discoveryState.result?.credential_id)?.auth_type ?? null
+            : null;
           return (
             <div className="settings-panel provider-card" key={provider}>
               <div className="settings-panel-head">
@@ -1341,8 +1348,8 @@ function ProviderSection({
                   <h2>{provider}</h2>
                   <p className="muted">{models.length} seed models · direct model id input allowed</p>
                 </div>
-                <span className={`key-pill ${keySet ? "ok" : "missing"}`}>
-                  {keySet ? "key set" : "no key"}
+                <span className={`key-pill ${pill.ok ? "ok" : "missing"}`}>
+                  {pill.label}
                 </span>
               </div>
               <div className="provider-model-list">
@@ -1504,12 +1511,13 @@ function ProviderSection({
                   disabled={!selectedCredential || discoveryState?.loading}
                   onClick={() => void onDiscover(provider, selectedCredential)}
                 >
-                  {discoveryState?.loading ? "讀取模型中…" : "列出此 key 可見模型"}
+                  {discoveryState?.loading ? "讀取中…" : `${discoverButtonLabel(selectedAuthMode)}（此 credential）`}
                 </button>
               </div>
               {discoveryState?.result && (
                 <DiscoveryResultView
                   result={discoveryState.result}
+                  authMode={discoveredAuthMode}
                   onUse={(model, task) => onUseModel(provider, model, task)}
                 />
               )}
@@ -1523,8 +1531,8 @@ function ProviderSection({
               <p className="muted tiny">
                 可在此新增本機 API key credential（存於本機 profile DB）；env/config/.env 與 key pool 為唯讀來源。
                 {provider === "anthropic"
-                  ? " Claude setup-token 可由上方匯入（token 存 token-store/keyring，不進 credential DB）；OpenAI ChatGPT OAuth 匯入規劃中。"
-                  : " OpenAI ChatGPT OAuth 匯入規劃中（auth-driver slice）。"}
+                  ? " Claude setup-token 可由上方匯入（token 存 token-store/keyring，不進 credential DB）。"
+                  : " OpenAI ChatGPT 訂閱可由上方「登入 ChatGPT」（token 存 token-store/keyring，不進 credential DB）。"}
               </p>
             </div>
           );
@@ -1657,24 +1665,28 @@ function CredentialList({
                 : ".env／環境變數 fallback（唯讀；DB credential 才是主要選擇面）"}
             </p>
             <p>{cred.notes}</p>
-            {cred.editable && (
+            {(cred.editable || cred.can_discover_models) && (
               <div className="credential-actions">
-                <input
-                  value={renames[cred.id] ?? cred.label}
-                  onChange={(e) => onRenameDraft(cred.id, e.target.value)}
-                  aria-label={`${cred.label} alias`}
-                />
-                <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
-                  儲存 alias
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost small"
-                  disabled={cred.active}
-                  onClick={() => onSetActive(cred.id)}
-                >
-                  設為 active
-                </button>
+                {cred.editable && (
+                  <>
+                    <input
+                      value={renames[cred.id] ?? cred.label}
+                      onChange={(e) => onRenameDraft(cred.id, e.target.value)}
+                      aria-label={`${cred.label} alias`}
+                    />
+                    <button type="button" className="btn-ghost small" onClick={() => onSaveAlias(cred.id)}>
+                      儲存 alias
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      disabled={cred.active}
+                      onClick={() => onSetActive(cred.id)}
+                    >
+                      設為 active
+                    </button>
+                  </>
+                )}
                 {cred.can_discover_models && (
                   <button
                     type="button"
@@ -1687,11 +1699,7 @@ function CredentialList({
                     }
                     onClick={() => onDiscover(cred.id)}
                   >
-                    {discoverLoadingId === cred.id
-                      ? "讀取中…"
-                      : cred.auth_type === "claude_code_oauth"
-                        ? "查看候選模型"
-                        : "列模型"}
+                    {discoverLoadingId === cred.id ? "讀取中…" : discoverButtonLabel(cred.auth_type)}
                   </button>
                 )}
                 {isLocalOAuth && (
@@ -1713,15 +1721,17 @@ function CredentialList({
                         : "測試 token"}
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="btn-ghost small danger"
-                  onClick={() => {
-                    if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
-                  }}
-                >
-                  刪除
-                </button>
+                {cred.editable && (
+                  <button
+                    type="button"
+                    className="btn-ghost small danger"
+                    onClick={() => {
+                      if (window.confirm(`刪除 ${cred.label}？`)) onDelete(cred.id);
+                    }}
+                  >
+                    刪除
+                  </button>
+                )}
               </div>
             )}
             {probe && <ProbeResultView probe={probe} authType={cred.auth_type} />}
@@ -1780,9 +1790,11 @@ function ProbeResultView({
 
 function DiscoveryResultView({
   result,
+  authMode,
   onUse,
 }: {
   result: ModelDiscoveryResult;
+  authMode: ProviderCredential["auth_type"] | null;
   onUse: (model: string, task: ModelTask) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -1790,13 +1802,12 @@ function DiscoveryResultView({
     model.id.toLowerCase().includes(query.trim().toLowerCase()),
   );
   // Source badge: the credential/auth_mode decides whether these are a LIVE backend
-  // list or seed CANDIDATES — never imply a global catalog (per §11 design).
+  // list (and WHICH backend — OpenAI API vs ChatGPT, both 'provider_api' at the data
+  // layer) or seed CANDIDATES — never imply a global catalog (§11).
   const sources = Array.from(new Set(result.models.map((m) => m.source)));
   const sourceBadge =
     sources.length === 1
-      ? sources[0] === "seed"
-        ? "seed · 非即時 discovery"
-        : "provider API · live"
+      ? discoverySourceLabel(result.provider, authMode, sources[0])
       : sources.join(" / ");
   return (
     <div className="discovery-box">
