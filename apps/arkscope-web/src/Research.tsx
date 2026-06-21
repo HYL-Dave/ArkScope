@@ -24,8 +24,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import {
-  deleteResearchThread, getQueryProviders, getResearchThreads, getResearchMessages,
-  getRuntimeConfig, streamQuery,
+  deleteResearchThread, discoverModels, getModelCatalog, getQueryProviders,
+  getResearchThreads, getResearchMessages, getRuntimeConfig, streamQuery,
+  type CredentialAuthType, type ModelCatalog,
   type ResearchMessageDTO, type ResearchThreadDTO, type RuntimeConfig,
 } from "./api";
 import { MarkdownView } from "./MarkdownView";
@@ -35,6 +36,7 @@ import {
   RESEARCH_PROVIDER_IDS,
   type ResearchProviderId,
 } from "./researchProvider";
+import { activeCredential, defaultModel, effortNote, modelOptions } from "./researchModels";
 import {
   initialState,
   MAX_TURNS_SENTINEL,
@@ -107,6 +109,11 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [autoRouteSelection, setAutoRouteSelection] = useState(true);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
+  // Model/effort picker (Step 3): a per-(provider, active-auth-mode) selection.
+  const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
+  const [discovered, setDiscovered] = useState<Record<string, string[]>>({}); // credentialId → discovered model ids
+  const [selModel, setSelModel] = useState("");
+  const [selEffort, setSelEffort] = useState("default");
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -135,10 +142,11 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     let alive = true;
     void (async () => {
       try {
-        const [rc, qp] = await Promise.all([getRuntimeConfig(), getQueryProviders()]);
+        const [rc, qp, cat] = await Promise.all([getRuntimeConfig(), getQueryProviders(), getModelCatalog()]);
         if (!alive) return;
         setRuntime(rc);
         setSdk(Object.fromEntries(Object.entries(qp.providers).map(([k, v]) => [k, !!v.available])));
+        setCatalog(cat);
       } catch {
         if (alive) { setRuntime(null); setSdk(null); }
       } finally {
@@ -205,7 +213,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   // --- streaming runner: reducer is the authority; UI owns the controller ----
   // Sends the RAW question + ticker + thread_id; the server frames the agent
   // prompt and persists the raw question (criterion #2).
-  const runStream = useCallback(async (body: { question: string; provider: ProviderId; thread_id: string; ticker: string | null }) => {
+  const runStream = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null }) => {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -230,12 +238,16 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     // Client-owned thread id: reuse the active thread to continue, else a fresh
     // uuid for a new conversation (agreed reducer↔store id model).
     const threadId = state.activeThreadId ?? crypto.randomUUID();
-    dispatch({ kind: "submit", question: q, provider, model: null, ticker, ts: Date.now(), threadId });
+    const model = selModel.trim() || null;
+    const effort = selEffort && selEffort !== "default" ? selEffort : undefined;
+    dispatch({ kind: "submit", question: q, provider, model, ticker, ts: Date.now(), threadId });
     writeActiveThreadId(threadId);
     setQuestion("");
     setThreadError(null);
-    void runStream({ question: q, provider, thread_id: threadId, ticker }); // raw question; server frames + persists
-  }, [question, tickerInput, provider, state.pending, state.activeThreadId, runStream]);
+    // raw question; server frames + persists. model/effort = the picker selection
+    // (server falls back to the ai_research route only when model is omitted).
+    void runStream({ question: q, provider, model: model ?? undefined, effort, thread_id: threadId, ticker });
+  }, [question, tickerInput, provider, selModel, selEffort, state.pending, state.activeThreadId, runStream]);
 
   // Abort the live stream + drop the pending turn (explicit Stop only).
   const stopStream = useCallback(() => {
@@ -303,6 +315,50 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     if (r && r.provider === pid && r.source !== "default" && r.effort && r.effort !== "default") return r.effort;
     return null;
   };
+
+  // --- model/effort picker (Step 3): per (provider, ACTIVE auth mode) -----------
+  // The active credential decides the model set: api_key → its provider /models;
+  // chatgpt_oauth → the ChatGPT backend list; claude_code_oauth → the seed. We
+  // discover it via /config/model-discovery (cached per credential id) and fall
+  // back to the configured route model until/if discovery returns.
+  const activeCred = useMemo(
+    () => (provider && runtime ? activeCredential(runtime[provider].credentials) : null),
+    [provider, runtime],
+  );
+  const activeAuthMode: CredentialAuthType | null = activeCred?.auth_type ?? null;
+  const routeModel = provider ? researchModelFor(provider) : "";
+  const routeEffort = provider ? (researchEffortFor(provider) ?? "default") : "default";
+
+  // discover models for the active credential (once per credential id; silent on
+  // failure — the route/seed model stays usable).
+  useEffect(() => {
+    if (!provider || !activeCred || !activeCred.can_discover_models) return;
+    const credId = activeCred.id;
+    if (discovered[credId] !== undefined) return; // already attempted/cached
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await discoverModels(provider, credId);
+        if (alive) setDiscovered((p) => ({ ...p, [credId]: (res.models ?? []).map((m) => m.id) }));
+      } catch {
+        if (alive) setDiscovered((p) => ({ ...p, [credId]: [] })); // mark attempted → fall back to seed/route
+      }
+    })();
+    return () => { alive = false; };
+  }, [provider, activeCred, discovered]);
+
+  const modelOpts = useMemo(() => {
+    const disc = activeCred ? (discovered[activeCred.id] ?? []) : [];
+    return modelOptions(disc, routeModel);
+  }, [activeCred, discovered, routeModel]);
+
+  // keep the selected model valid as the option set / provider changes
+  useEffect(() => { setSelModel((cur) => defaultModel(modelOpts, routeModel, cur)); }, [modelOpts, routeModel]);
+  // reset effort to the route's effort when the provider changes
+  useEffect(() => { setSelEffort(routeEffort); }, [routeEffort, provider]);
+
+  const effortOpts = provider && catalog ? (catalog.effort_options[provider] ?? []) : [];
+  const pickerEffortNote = provider ? effortNote(provider, activeAuthMode, selEffort) : null;
 
   return (
     <main className="main research">
@@ -452,6 +508,28 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                     </>
                   ) : null}
                 </div>
+                {provider && !needChooser && (
+                  <div className="research-pickerbar">
+                    <label className="research-pick">
+                      <span className="muted tiny">模型</span>
+                      <select value={selModel} onChange={(e) => setSelModel(e.target.value)} disabled={!!state.pending}>
+                        {modelOpts.length === 0 && <option value="">（無可用模型）</option>}
+                        {modelOpts.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="research-pick">
+                      <span className="muted tiny">effort</span>
+                      <select value={selEffort} onChange={(e) => setSelEffort(e.target.value)} disabled={!!state.pending}>
+                        {(effortOpts.length ? effortOpts : [{ id: "default", label: "default" }]).map((o) => (
+                          <option key={o.id} value={o.id}>{o.label ?? o.id}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {pickerEffortNote && <span className="warn-text tiny">{pickerEffortNote}</span>}
+                  </div>
+                )}
                 <div className="research-inputrow">
                   <input
                     className="news-ticker"

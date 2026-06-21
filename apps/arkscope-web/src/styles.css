@@ -2209,6 +2209,9 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
 
 .research-input { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 8px; }
 .research-providerbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.research-pickerbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.research-pick { display: inline-flex; align-items: center; gap: 6px; }
+.research-pick select { max-width: 16rem; }
 .research-inputrow { display: flex; gap: 8px; align-items: flex-start; }
 .research-textarea {
   flex: 1; resize: vertical; min-height: 38px;
