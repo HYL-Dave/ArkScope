@@ -252,6 +252,22 @@ def test_default_p2a_sends_max_output_tokens_raw(monkeypatch):
     assert "max_output_tokens" in seen  # not stripped by the probe
 
 
+def test_default_p2a_sends_instructions_and_low_reasoning(monkeypatch):
+    # The ChatGPT backend validates required request fields before it reaches the
+    # unsupported-parameter check. Keep this aligned with the Novelloom smoke
+    # shape so the probe actually measures max_output_tokens, not a missing field.
+    seen = {}
+
+    def on_create(kw):
+        seen.update(kw)
+        raise _Boom("400 Unsupported parameter: max_output_tokens")
+
+    monkeypatch.setattr(mod, "_openai_client", lambda token, base_url: _FakeClient(on_create=on_create))
+    mod._default_p2a_max_output_tokens(_TOK)
+    assert seen["instructions"]
+    assert seen["reasoning"] == {"effort": "low"}
+
+
 # --- P2b default body (function-call output item) -----------------------------
 def test_default_p2b_pass_harvests_function_call(monkeypatch):
     stream = [
@@ -276,6 +292,7 @@ def test_default_p2b_sends_flat_function_tool(monkeypatch):
     mod._default_p2b_function_call(_TOK)
     tools = seen.get("tools")
     assert tools and tools[0]["type"] == "function" and "name" in tools[0] and "function" not in tools[0]
+    assert seen["reasoning"] == {"effort": "low"}
 
 
 def test_default_p2b_fail_when_no_call_item(monkeypatch):
@@ -283,6 +300,7 @@ def test_default_p2b_fail_when_no_call_item(monkeypatch):
     monkeypatch.setattr(mod, "_openai_client", lambda token, base_url: _FakeClient(on_create=lambda kw: stream))
     passed, observed = mod._default_p2b_function_call(_TOK)
     assert passed is False
+    assert "message" in observed
 
 
 # --- P2c default body (model discovery: client_version via extra_query) --------

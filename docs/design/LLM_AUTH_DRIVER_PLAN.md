@@ -533,20 +533,27 @@ Full detail: `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md` §8. **NEXT overall = 
 ### S3 — OpenAI `chatgpt_oauth` probe runner BUILT (offline TDD) (2026-06-20)
 
 The P1/P2 probe runner is built and unit-tested with a **fake transport** (no live
-call): `src/auth_drivers/chatgpt_oauth_probe.py` + `tests/test_chatgpt_oauth_probe.py`
-(16 tests). It mirrors `claude_oauth_probe.py` — DI'd probe bodies + a monkeypatchable
+call): `src/auth_drivers/chatgpt_oauth_probe.py` + `tests/test_chatgpt_oauth_probe.py`.
+It mirrors `claude_oauth_probe.py` — DI'd probe bodies + a monkeypatchable
 `_openai_client` seam + shape-only observations through the `probe_harness` redaction —
 and uses the SYNC `OpenAI` client so it is route-safe. Grounded in Novelloom's PROVEN
 probe/driver: base_url swap to `https://chatgpt.com/backend-api/codex` with the OAuth
-access_token as the SDK api_key and **NO custom headers**; `max_output_tokens` sent RAW
-to measure the backend's 400; a flat Responses-API function tool → `*_call` item; model
-discovery via `extra_query={"client_version": "0.0.0"}` → ids in the nonstandard
-`models` field. **PENDING (gated on user):** the live P1/P2 run needs a real
-ChatGPT/Codex OAuth token in the local store; only after it passes do the factory
-`(openai, chatgpt_oauth)` branch + the Settings import/probe-route widenings
-(`config_routes.py:340` import, `:397` probe) land. The OpenAI-B path carries the
-**"compatibility path, not product path"** label (reverse-engineered, TOS-sensitive) —
-distinct from the Anthropic OAuth path, which is documented/sanctioned.
+access_token as the SDK api_key and **NO custom headers**; `max_output_tokens` is sent
+RAW with the same required `instructions` + low-reasoning shape as the successful
+Novelloom smoke so the probe measures the backend's 400 rather than a missing-field
+validation error; a flat Responses-API function tool → `*_call` item; model discovery via
+`extra_query={"client_version": "0.0.0"}` → ids in the nonstandard `models` field. The
+OpenAI-B path carries the **"compatibility path, not product path"** label
+(reverse-engineered, TOS-sensitive) — distinct from the Anthropic OAuth path, which is
+documented/sanctioned.
+
+**Live P1/P2 first run (2026-06-21, user hand-test):** P1 passed (standard
+`api.openai.com` rejected the OAuth token; ChatGPT backend streamed) and P2c passed
+(models list with `client_version` returned 4 ids). P2a failed because the ArkScope probe
+omitted `instructions` and hit backend request validation before `max_output_tokens`; fixed
+in the probe shape. P2b returned no function-call output item; fixed to align the request
+with Novelloom's low-reasoning shape and to report output/event types on failure. **S3
+driver wire-in remains gated on a re-run of the live probe after these fixes.**
 
 ### S3-auth design correction — product path = ArkScope's OWN in-app OAuth (2026-06-20)
 
@@ -685,6 +692,5 @@ ArkScope `BrowserWindow`. The redirect target is the fixed loopback callback
 `ERR_CONNECTION_REFUSED` and is also a worse login UX. Same-origin ArkScope navigation stays
 inside the shell; cross-origin HTTP(S) navigation opens externally.
 
-**Still HELD (gated on user): the LIVE P1/P2 run** — needs a real ChatGPT subscription
-login through this flow end-to-end; the backend + UI are offline-tested only. A live smoke,
-if added, goes in `scripts/live/` (update its README).
+**Still HELD (gated on user): re-run LIVE P1/P2 after the 2026-06-21 probe-shape fixes.**
+Login + token storage are live-proven; S3 driver wire-in waits for the corrected live probe.

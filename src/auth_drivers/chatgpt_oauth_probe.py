@@ -42,6 +42,7 @@ CHATGPT_BACKEND_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 _PROBE_MODEL = "gpt-5.4-mini"  # cheap; per [[feedback-live-verify-cheap-models]]
 _CLIENT_VERSION = "0.0.0"  # Codex-style discovery param (sent via extra_query, NOT a header)
+_LOW_REASONING = {"effort": "low"}
 _PING_INPUT = [{"role": "user", "content": "ping"}]
 _OK_INPUT = [{"role": "user", "content": "Return exactly OK."}]
 
@@ -204,6 +205,8 @@ def _default_p2a_max_output_tokens(token: str) -> tuple[bool, str]:
     try:
         stream = client.responses.create(
             model=_PROBE_MODEL, input=_PING_INPUT, stream=True, store=False,
+            instructions="Reply with exactly OK.",
+            reasoning=_LOW_REASONING,
             max_output_tokens=8,  # RAW — the driver strips this; the probe measures the backend
         )
         for _event in stream:  # drain in case the 400 surfaces mid-stream
@@ -223,21 +226,32 @@ def _default_p2b_function_call(token: str) -> tuple[bool, str]:
         model=_PROBE_MODEL,
         input=[{"role": "user", "content": "Call lookup_fact with key='x'. Do not answer directly."}],
         instructions="Use the provided function when the user asks for a lookup.",
+        reasoning=_LOW_REASONING,
         tools=_FUNCTION_TOOL, stream=True, store=False,
     )
     terminal = None
+    event_types: list[str] = []
     for event in stream:
         raw = _to_dict(event)
         etype = raw.get("type")
+        if isinstance(etype, str):
+            event_types.append(etype)
         if etype == "response.completed":
             terminal = raw.get("response")
         elif etype in ("response.failed", "response.incomplete"):
             return False, f"stream ended with {etype} before any tool call"
+    output_types: list[str] = []
     for item in _iter_output_items(terminal):
         itype = item.get("type") if isinstance(item, dict) else None
+        if isinstance(itype, str):
+            output_types.append(itype)
         if isinstance(itype, str) and itype.endswith("_call"):
             return True, f"harvested a {itype} output item"
-    return False, "no *_call output item in the response"
+    return (
+        False,
+        "no *_call output item in the response "
+        f"(output_types={output_types or ['<none>']}; event_types={event_types or ['<none>']})",
+    )
 
 
 def _default_p2c_model_discovery(token: str) -> tuple[bool, str]:
