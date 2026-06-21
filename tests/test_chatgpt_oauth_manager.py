@@ -157,6 +157,36 @@ def test_begin_make_active_false_creates_inactive_credential(stores):
     assert row is not None and row.active is False  # logging in did NOT hijack the active credential
 
 
+def test_cancel_login_evicts_pending_so_a_late_callback_creates_nothing(stores):
+    # 取消 must close the gap: after cancel, a late browser callback (loopback still
+    # waiting) must NOT create a credential. cancel_login evicts the pending state, so
+    # the late complete_login pops None → raises → nothing persisted; the server is cancelled.
+    cred, tok = stores
+    gate = threading.Event()
+    captured = {}
+
+    def factory(state):
+        srv = _FakeServer(lambda s: (gate.wait(2.0), ("LATECODE", state))[1])
+        captured["srv"] = srv
+        return srv
+
+    mgr = _mgr(stores, factory)
+    out = mgr.begin()
+    time.sleep(0.05)  # let the loopback thread reach wait_for_code
+    mgr.cancel_login(out["state"])  # evict pending + cancel the server
+    gate.set()  # release the (late) callback delivery
+    st = _wait_status(mgr, out["state"], want_not="pending")
+    assert st["status"] == "error"  # the late completion did not succeed
+    assert cred_count(stores) == 0  # NO credential created after cancel
+    assert captured["srv"].cancelled is True  # loopback torn down (frees :1455)
+
+
+def test_cancel_login_unknown_state_is_noop(stores):
+    mgr = _mgr(stores, lambda state: _FakeServer(_no_callback))
+    mgr.cancel_login("never-started")  # no raise
+    assert cred_count(stores) == 0
+
+
 def test_loopback_start_port_in_use_yields_error_status(stores):
     class _FailStart(_FakeServer):
         def start(self):

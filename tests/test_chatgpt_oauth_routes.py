@@ -38,6 +38,9 @@ class _FakeManager:
             return {"status": "pending", "credential": None, "detail": None}
         return {"status": "unknown", "credential": None, "detail": None}
 
+    def cancel_login(self, state):
+        self.cancelled = state
+
     def complete_manual(self, *, state, code):
         if state != "S":
             raise ChatGPTOAuthLoginError("OAuth state is unknown or expired")
@@ -72,6 +75,12 @@ def test_start_defaults_make_active_false_and_honors_request():
     mgr2 = _FakeManager()
     cr.start_openai_oauth(cr.OAuthStartRequest(make_active=True), manager=mgr2)
     assert mgr2.make_active is True
+
+
+def test_cancel_route_cancels_the_login(_gate):
+    mgr = _FakeManager()
+    out = cr.cancel_openai_oauth(cr.OAuthCancelRequest(state="S"), manager=mgr)
+    assert mgr.cancelled == "S" and out == {"ok": True}
 
 
 # --- status -------------------------------------------------------------------

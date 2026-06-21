@@ -144,7 +144,7 @@ def test_start_login_records_make_active_in_pending():
     ss = _StateStore()
     assert ss._d[start_login(state_store=ss, now=_NOW, make_active=False)["state"]].make_active is False
     assert ss._d[start_login(state_store=ss, now=_NOW, make_active=True)["state"]].make_active is True
-    assert ss._d[start_login(state_store=ss, now=_NOW)["state"]].make_active is True  # default
+    assert ss._d[start_login(state_store=ss, now=_NOW)["state"]].make_active is False  # default OFF (policy)
 
 
 def test_complete_login_uses_pending_make_active_not_an_arg():

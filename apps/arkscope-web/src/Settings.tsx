@@ -5,6 +5,7 @@ import {
   probeCredential,
   startOpenAIOAuth,
   openAIOAuthStatus,
+  cancelOpenAIOAuth,
   completeOpenAIOAuthManual,
   type ProbeResponse,
   bootstrapMarketData,
@@ -1269,6 +1270,10 @@ function ProviderSection({
 
   function cancelChatGPTLogin() {
     pollToken.current.aborted = true; // stop the background poll (frees the 登入 button)
+    const st = oauth?.state;
+    // Also cancel server-side: evict the pending login so a late browser callback can't
+    // still create a credential, and free the loopback port. Best-effort.
+    if (st) void cancelOpenAIOAuth(st).catch(() => {});
     setOauth(null);
     setManualValue("");
   }

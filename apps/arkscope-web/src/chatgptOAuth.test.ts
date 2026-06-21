@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth } from "./api";
+import { cancelOpenAIOAuth, completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth } from "./api";
 import type { OAuthStatusResult, ProbeResult } from "./api";
 import {
   buildManualCompletion,
@@ -77,6 +77,16 @@ describe("OpenAI OAuth api clients", () => {
   it("throws on a non-ok status response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({}) }));
     await expect(openAIOAuthStatus("S")).rejects.toThrow();
+  });
+
+  it("cancelOpenAIOAuth POSTs the state to the cancel route", async () => {
+    const fetchMock = okJson({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    await cancelOpenAIOAuth("S");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/config\/credentials\/openai\/oauth\/cancel$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ state: "S" });
   });
 });
 

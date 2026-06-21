@@ -610,6 +610,11 @@ export function startOpenAIOAuth(makeActive = false): Promise<OAuthStartResult> 
   // when active), so logging in must not auto-switch the active credential.
   return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", { make_active: makeActive }, 8_000);
 }
+// Cancel an in-flight login: evicts the pending state server-side so a late browser
+// callback can't still create a credential (UI cancel alone only stops the FE poll).
+export function cancelOpenAIOAuth(state: string): Promise<{ ok: boolean }> {
+  return sendJSON<{ ok: boolean }>("/config/credentials/openai/oauth/cancel", "POST", { state }, 8_000);
+}
 export function openAIOAuthStatus(state: string): Promise<OAuthStatusResult> {
   return getJSON<OAuthStatusResult>(`/config/credentials/openai/oauth/status?state=${encodeURIComponent(state)}`, 8_000);
 }

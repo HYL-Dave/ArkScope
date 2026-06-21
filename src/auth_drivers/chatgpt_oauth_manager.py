@@ -68,10 +68,11 @@ class OAuthLoginManager:
         self._servers: dict[str, Any] = {}
         self._lock = threading.Lock()
 
-    def begin(self, make_active: bool = True) -> dict:
+    def begin(self, make_active: bool = False) -> dict:
         """Start a login. Returns {auth_url, state, expires_at, manual_code_supported}.
         make_active (carried through the pending state to the loopback callback) decides
-        whether the resulting credential becomes the active one on completion."""
+        whether the resulting credential becomes the active one on completion. Default
+        FALSE (unified-activation policy): callers opt in to switching the active one."""
         now = self._clock()
         started = start_login(state_store=self._state_store, now=now, make_active=make_active)
         state = started["state"]
@@ -95,6 +96,14 @@ class OAuthLoginManager:
     def status(self, state: str) -> dict:
         with self._lock:
             return dict(self._results.get(state, {"status": "unknown", "credential": None, "detail": None}))
+
+    def cancel_login(self, state: str) -> None:
+        """Cancel an in-flight login. EVICT the pending state FIRST — so a late loopback
+        callback's complete_login pops None → raises → no credential is created — then
+        tear down the loopback server (frees :1455). Idempotent; unknown state = no-op."""
+        self._state_store.discard(state)  # the key fix: close the late-callback gap
+        self._finish(state, status="error", detail="login cancelled")
+        self._cancel(state)  # mark cancelled + server.cancel() to unblock wait_for_code
 
     def complete_manual(self, *, state: str, code: str) -> dict:
         """Copy-code fallback: complete the SAME login from a pasted code. Raises on a

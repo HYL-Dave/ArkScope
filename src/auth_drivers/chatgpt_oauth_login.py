@@ -121,15 +121,22 @@ class _StateStore:
             return None
         return pending
 
+    def discard(self, state: str) -> None:
+        # Evict a pending login (cancel): a later loopback callback's complete_login
+        # then pops None → raises → no credential created. Idempotent.
+        with self._lock:
+            self._d.pop(state, None)
+
 
 _STATE_STORE = _StateStore()
 
 
-def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None, make_active: bool = True) -> dict:
+def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None, make_active: bool = False) -> dict:
     """Begin a login: mint state + PKCE, stash the verifier (+ the make_active choice),
     return the authorize URL. The response is safe to expose — it carries the
     code_challenge, never the verifier. `make_active` is carried in the pending state
-    so the loopback callback completion honors it."""
+    so the loopback callback completion honors it. Default FALSE (unified-activation
+    policy): adding a credential never silently switches the active one — callers opt in."""
     now = now or datetime.now(timezone.utc)
     store = state_store if state_store is not None else _STATE_STORE
     verifier, challenge = generate_pkce_pair()

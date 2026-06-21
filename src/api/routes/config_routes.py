@@ -427,6 +427,19 @@ def start_openai_oauth(body: OAuthStartRequest | None = None, manager=Depends(ge
     return manager.begin(make_active=body.make_active if body else False)
 
 
+class OAuthCancelRequest(BaseModel):
+    state: str
+
+
+@router.post("/config/credentials/openai/oauth/cancel")
+def cancel_openai_oauth(body: OAuthCancelRequest, manager=Depends(get_oauth_login_manager)):
+    """Cancel an in-flight ChatGPT OAuth login. Evicts the pending login state server-side
+    so a late browser/loopback callback can no longer create a credential (UI cancel alone
+    only stops the FE poll), and frees the loopback port. Idempotent."""
+    manager.cancel_login(body.state)
+    return {"ok": True}
+
+
 @router.get("/config/credentials/openai/oauth/status")
 def openai_oauth_status(state: str, manager=Depends(get_oauth_login_manager)):
     """Poll a login started by /start: {status: pending|success|error|unknown,
