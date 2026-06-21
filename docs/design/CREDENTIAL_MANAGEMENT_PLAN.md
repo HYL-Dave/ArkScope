@@ -204,7 +204,7 @@ token-store.
 | Slice | Scope | Status |
 |---|---|---|
 | **0** `.env` unquote hygiene | `unquote_env_value` + route ALL production loaders (env_keys, cli, db_config via helper; collectors/training inlined) | ✅ `074e227` (helper + EODHD) + sweep `41b4aaf` (rest of production). ⚠️ 9 test-local `load_env` helpers left as separate hygiene |
-| **1** drop Anthropic OAuth env placeholders | keep `OPENAI_OAUTH_TOKEN` signpost | ✅ `b821633` |
+| **1** drop Anthropic OAuth env placeholders | ~~keep `OPENAI_OAUTH_TOKEN` signpost~~ → superseded by the in-app ChatGPT OAuth row; placeholder removed in the §11 implementation slice | ✅ `b821633` |
 | **(hygiene)** dead-config removal | Supabase block + reader-less FMP value removed from gitignored `.env`; secret-bearing backup DELETED | ✅ done (`.env` ignored, no commit). ⚠️ user must revoke Supabase service-role key + DB pw server-side |
 | **3** import ←`.env` core | reject `api_key_pool` in `add()` `7e55624` (C3a); `import_env_credentials()` single-pass explode+dedup → named rows `519820c` (C3b); scorer defaults to `config/scoring_keys.txt` `b877fb2` (C3c). Pre-commit `ed22355` (gitignore scoring_keys). | ✅ core done (TDD, 122 tests). ⏳ route/CLI/first-run **shim** + the real apply step (write `scoring_keys.txt`, edit real `.env`, run import on profile DB → counts/labels only) deferred to the wire-in |
 | **4** export →`.env` + round-trip | env-vs-DB dedup `0fca212` (C4a); `export_env_credentials` + importer reads `ARKSCOPE_*` `b8ee880` (C4b/C4c). Format = **interop** (user-chosen): active → bare `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`, extras → `ARKSCOPE_<PROVIDER>_KEY__<slug>`, OAuth → commented stub (no token; export has no token-store access). Aliases on own comment line (loader doesn't strip inline `#`). | ✅ core done (TDD, 140 tests). ⏳ thin file-writer (chmod 0600) + CLI/route wiring deferred to the shim |
@@ -214,6 +214,36 @@ token-store.
 | **5** Settings named-row workflow | step1 partial-unique `(provider) WHERE active=1` index + heal-first migration `88c6720`; step2 route switch-guarantee tests (key↔key, key↔OAuth single-active) `88c6720`; step3 Settings polish (active badge + provenance copy) `d91e241`. Index applied to the real DB (idempotent, heal no-op). | ✅ steps 1-3 done (TDD; backend 212+, FE build clean). ⏳ **step 4 = USER GUI hand-test** (rename OAuth alias · set OpenAI pool 1 active↔primary · set Anthropic key active↔Claude OAuth · reload persists · no `[0]/[1]`). UI not yet runtime-verified by me — build-clean + data-verified only. |
 | **6** S5 wire-in (api_key only) | 6a `78f2808` `client_sync()` + `live_resolver`; 6b `1a96d32` swap 7 sync `Anthropic()` sites + OpenAI bootstrap in `_build_agent`; review `22729bf` reset the sticky OpenAI global on fallback (was leaving a stale DB client) + wire the 3 direct `OpenAI()` sites (card_synthesis×2, code_generator) via `live_openai_client()` for full symmetry. **ALL direct LLM client construction (both providers) now honors the active credential / explicit env fallback.** | ✅ **DONE + LIVE-VERIFIED 2026-06-19** (api_key wire-in). Live `run_query_stream` test: OpenAI on the active **DB-only** key (not in env) → answered on HTTP transport (also confirmed the websocket→HTTP fix `3ef8954`); OpenAI active-switch affected the live run; Anthropic Claude-OAuth-active → answered via **explicit env fallback** (note logged once). Anthropic-OAuth-active still runs on the env key, NOT the subscription — that's Slice 7. |
 | **7** Claude-subscription Research driver | the `claude_code_oauth` live path (Agent SDK / `claude -p`): `stream_llm`→AgentEvent, tool-loop/trace parity, history, streaming/cancel, usage/errors, CLI lifecycle, don't mix ArkScope vs Claude-Code tools. | ⏳ separate slice (user-deferred). What actually runs Research on the Claude subscription. |
+
+---
+
+## 10. Decisions (resolved with gpt-5.5 — locked for Slices 3–6)
+
+1. **Alias defaults** — ✅ source-aware, NOT generic A/B: `OPENAI_API_KEY` →
+   "OpenAI primary"; the distinct pool key → "OpenAI scoring/free-tier". Editable.
+2. **Scoring-key path** — ✅ scorer owns its key in `config/scoring_keys.txt`
+   (gitignored), read by `score_ibkr_news.py` as the **default when present**
+   (before the `OPENAI_API_KEY` fallback). Regression test: a default
+   `--mode sentiment` run picks that file, not `OPENAI_API_KEY`.
+8. **`scoring_keys.txt` contents** (decided 2026-06-17) — **BOTH** `OPENAI_API_KEYS`
+   entries go into `config/scoring_keys.txt`, not just the distinct one. Rationale:
+   `OPENAI_API_KEYS` was the scorer's rotation pool (2 keys); putting both in the
+   file is the **semantic-equivalent migration** (keeps batch-scoring capacity;
+   moving only the distinct key would silently halve rotation). The research key
+   `OPENAI_API_KEY` thus serves BOTH research (as `OpenAI primary` in the DB) and
+   scoring (in the file) — the first concrete "same key, multiple purposes" case
+   (§12). When per-purpose binding (§12) lands, scoring can be pulled back into
+   the DB with an explicit `purpose=scoring` tag.
+3. **Secret rotation** — ✅ backup DELETED + Supabase/FMP values removed from
+   `.env` this turn. ⚠️ remaining USER action: revoke `SUPABASE_SERVICE_ROLE_KEY`
+   + the old DB password on the Supabase side (I can't reach it).
+4. **api_key at-rest** — ✅ keep plaintext `0o600` DB for now; keyring-for-api_key
+   is a later hardening slice AFTER S5 wire-in is stable.
+5. **Mid-session OpenAI switch** — ✅ next-query only; never mutate an in-flight Runner.
+6. **OAuth portability** — ✅ default NO (re-auth with `claude setup-token` on the
+   new machine); a `0o600` token-bundle export stays explicit + OFF by default.
+7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
+   key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
 
 ---
 
@@ -301,37 +331,7 @@ viewable on the row (today `can_discover_models=False`, `model_credentials.py:51
 
 ---
 
-## 10. Decisions (resolved with gpt-5.5 — locked for Slices 3–6)
-
-1. **Alias defaults** — ✅ source-aware, NOT generic A/B: `OPENAI_API_KEY` →
-   "OpenAI primary"; the distinct pool key → "OpenAI scoring/free-tier". Editable.
-2. **Scoring-key path** — ✅ scorer owns its key in `config/scoring_keys.txt`
-   (gitignored), read by `score_ibkr_news.py` as the **default when present**
-   (before the `OPENAI_API_KEY` fallback). Regression test: a default
-   `--mode sentiment` run picks that file, not `OPENAI_API_KEY`.
-8. **`scoring_keys.txt` contents** (decided 2026-06-17) — **BOTH** `OPENAI_API_KEYS`
-   entries go into `config/scoring_keys.txt`, not just the distinct one. Rationale:
-   `OPENAI_API_KEYS` was the scorer's rotation pool (2 keys); putting both in the
-   file is the **semantic-equivalent migration** (keeps batch-scoring capacity;
-   moving only the distinct key would silently halve rotation). The research key
-   `OPENAI_API_KEY` thus serves BOTH research (as `OpenAI primary` in the DB) and
-   scoring (in the file) — the first concrete "same key, multiple purposes" case
-   (§12). When per-purpose binding (§12) lands, scoring can be pulled back into
-   the DB with an explicit `purpose=scoring` tag.
-3. **Secret rotation** — ✅ backup DELETED + Supabase/FMP values removed from
-   `.env` this turn. ⚠️ remaining USER action: revoke `SUPABASE_SERVICE_ROLE_KEY`
-   + the old DB password on the Supabase side (I can't reach it).
-4. **api_key at-rest** — ✅ keep plaintext `0o600` DB for now; keyring-for-api_key
-   is a later hardening slice AFTER S5 wire-in is stable.
-5. **Mid-session OpenAI switch** — ✅ next-query only; never mutate an in-flight Runner.
-6. **OAuth portability** — ✅ default NO (re-auth with `claude setup-token` on the
-   new machine); a `0o600` token-bundle export stays explicit + OFF by default.
-7. **External `OPENAI_API_KEYS` readers** — only the scorer (being moved to its own
-   key file). ⚠️ re-confirm before Slice 3 if any other external tool reads the comma form.
-
----
-
-## 13. Apply — ✅ EXECUTED 2026-06-17 (user said go; verified)
+## 12. Apply — ✅ EXECUTED 2026-06-17 (user said go; verified)
 
 Ran with `ARKSCOPE_CREDENTIAL_APPLY_ENABLED=1` (session-only, not persisted) +
 DB-file & `.env` rollback backups (both gitignored, 0600). **All 3 verifications
@@ -367,7 +367,7 @@ hard-gated.
 
 ---
 
-## 12. Future direction — per-purpose credential binding (user request, not yet built)
+## 13. Future direction — per-purpose credential binding (user request, not yet built)
 
 User wants **different features to use different keys, and to optionally share a
 key** ("不同功能…不同的 key…也要允許…相同的 key"). This generalizes today's
@@ -390,7 +390,7 @@ fundamentals   -> (shared) OpenAI primary
 
 ---
 
-## 11. Slice 4 known round-trip behaviors (verified, accepted)
+## 14. Slice 4 known round-trip behaviors (verified, accepted)
 
 Two empirical skeptics attacked the exporter; **security verdict: export cannot
 leak a token** (it takes only the store — no token-store access — and renders
