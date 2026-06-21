@@ -12,6 +12,8 @@ import {
   discoveryResultCredentialLabel,
   discoverySourceLabel,
   supportsCredentialExpiry,
+  isoToDateInput,
+  dateInputToIso,
 } from "./credentialDisplay";
 
 describe("activeFirst", () => {
@@ -63,11 +65,31 @@ describe("credential row metadata display", () => {
     expect(credentialAvailabilityText({ available: false, masked: null })).toBe("缺少");
   });
 
-  it("only shows an expiry editor for OAuth-style credentials", () => {
+  it("shows an expiry editor ONLY for claude_code_oauth (chatgpt_oauth auto-refreshes; api_key has no expiry)", () => {
     expect(supportsCredentialExpiry("api_key")).toBe(false);
     expect(supportsCredentialExpiry("api_key_pool")).toBe(false);
-    expect(supportsCredentialExpiry("chatgpt_oauth")).toBe(true);
-    expect(supportsCredentialExpiry("claude_code_oauth")).toBe(true);
+    expect(supportsCredentialExpiry("chatgpt_oauth")).toBe(false); // token auto-refreshes → no manual expiry
+    expect(supportsCredentialExpiry("claude_code_oauth")).toBe(true); // setup-token: informational, user-set
+  });
+});
+
+describe("expiry date-input conversion", () => {
+  it("isoToDateInput: ISO timestamp → YYYY-MM-DD (date-picker value)", () => {
+    expect(isoToDateInput("2027-06-22T00:00:00+00:00")).toBe("2027-06-22");
+    expect(isoToDateInput("2027-06-22T15:30:00Z")).toBe("2027-06-22");
+  });
+  it("isoToDateInput: empty / null / unparseable → empty string", () => {
+    expect(isoToDateInput("")).toBe("");
+    expect(isoToDateInput(null)).toBe("");
+    expect(isoToDateInput(undefined)).toBe("");
+    expect(isoToDateInput("not-a-date")).toBe("");
+  });
+  it("dateInputToIso: YYYY-MM-DD → canonical UTC-midnight ISO", () => {
+    expect(dateInputToIso("2027-06-22")).toBe("2027-06-22T00:00:00+00:00");
+  });
+  it("dateInputToIso: empty → empty (clears the expiry; allow留空)", () => {
+    expect(dateInputToIso("")).toBe("");
+    expect(dateInputToIso("   ")).toBe("");
   });
 });
 

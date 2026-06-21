@@ -41,8 +41,27 @@ export function credentialAvailabilityText(cred: { available: boolean; masked: s
   return cred.masked ?? "可用";
 }
 
+// Only claude_code_oauth exposes a user-set expiry. chatgpt_oauth's access token is
+// short-lived (~240h JWT) but AUTO-REFRESHES (refresh_if_needed → refresh_token grant),
+// so a manual expiry would be meaningless + overwritten — don't show/edit it. api_key
+// has no expiry. (See chatgpt_oauth_login.refresh_if_needed.)
 export function supportsCredentialExpiry(authMode: CredentialAuthType): boolean {
-  return authMode === "chatgpt_oauth" || authMode === "claude_code_oauth";
+  return authMode === "claude_code_oauth";
+}
+
+// Date-picker conversions for the claude_code_oauth expiry (a <input type="date">
+// speaks YYYY-MM-DD; the store keeps a canonical ISO). Empty round-trips to empty so
+// the field can be cleared (留空).
+export function isoToDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+}
+
+export function dateInputToIso(dateInput: string): string {
+  const v = (dateInput || "").trim();
+  return v ? `${v}T00:00:00+00:00` : "";
 }
 
 // Discover-button label: claude_code_oauth has no live discovery API (seed only) →

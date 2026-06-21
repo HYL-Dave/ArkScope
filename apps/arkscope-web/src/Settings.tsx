@@ -57,6 +57,8 @@ import {
   discoveryResultCredentialLabel,
   discoverySourceLabel,
   supportsCredentialExpiry,
+  isoToDateInput,
+  dateInputToIso,
 } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { formatSystemTimestamp } from "./timeDisplay";
@@ -1812,7 +1814,9 @@ function CredentialList({
         const metadataDraft = metadataDrafts[cred.id] ?? {};
         const showExpiry = supportsCredentialExpiry(cred.auth_type);
         const accountLabelDraft = metadataDraft.account_label ?? cred.account_label ?? "";
-        const expiresAtDraft = metadataDraft.expires_at ?? cred.expires_at ?? "";
+        // The expiry draft holds the date-picker's native YYYY-MM-DD form; convert
+        // the stored ISO for display, and back to a canonical ISO on save.
+        const expiresAtDraft = metadataDraft.expires_at ?? isoToDateInput(cred.expires_at);
         return (
           <div className="credential-row" key={cred.id}>
             <div>
@@ -1863,16 +1867,17 @@ function CredentialList({
                     />
                     {showExpiry && (
                       <input
+                        type="date"
                         value={expiresAtDraft}
-                        placeholder="到期時間 ISO（OAuth，可留空）"
                         aria-label={`${cred.label} expires at`}
+                        title="到期日（可留空）"
                         onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
                       />
                     )}
                     <button
                       type="button"
                       className="btn-ghost small"
-                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, showExpiry ? expiresAtDraft : undefined)}
+                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, showExpiry ? dateInputToIso(expiresAtDraft) : undefined)}
                     >
                       儲存
                     </button>
