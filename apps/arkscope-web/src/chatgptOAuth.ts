@@ -95,3 +95,13 @@ export function probeDisplaySummary(probe: ProbeResult): { text: string; models:
   }
   return { text: probe.observed, models: [] };
 }
+
+export function probeRuntimeNote(authType: ProviderCredential["auth_type"]): string | null {
+  if (authType === "chatgpt_oauth") {
+    return "會向 api.openai.com 與 ChatGPT backend 發出最小診斷請求，確認 token 類型、streaming、工具呼叫與可用模型；不回傳 token，可能消耗少量訂閱額度。";
+  }
+  if (authType === "claude_code_oauth") {
+    return "會執行 claude -p 並向 api.anthropic.com 做最小診斷請求，確認 setup-token 可用且 raw SDK 會拒絕該 token；不回傳 token，可能消耗少量訂閱額度。";
+  }
+  return null;
+}

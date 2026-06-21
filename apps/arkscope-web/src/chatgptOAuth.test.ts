@@ -7,6 +7,7 @@ import {
   buildManualCompletion,
   extractProbeModels,
   probeDisplayLabel,
+  probeRuntimeNote,
   probeDisplaySummary,
   pollOAuthStatus,
 } from "./chatgptOAuth";
@@ -201,5 +202,14 @@ describe("probe display helpers", () => {
   it("keeps failed probe detail visible but compact", () => {
     expect(probeDisplaySummary(probe("P2b: ChatGPT backend returns a function-call output item", "raw observed", "no call")).text)
       .toBe("no call");
+  });
+
+  it("uses auth-mode-specific probe notes", () => {
+    expect(probeRuntimeNote("chatgpt_oauth")).toContain("api.openai.com");
+    expect(probeRuntimeNote("chatgpt_oauth")).toContain("ChatGPT backend");
+    expect(probeRuntimeNote("claude_code_oauth")).toContain("claude -p");
+    expect(probeRuntimeNote("claude_code_oauth")).toContain("api.anthropic.com");
+    expect(probeRuntimeNote("claude_code_oauth")).not.toContain("api.openai.com");
+    expect(probeRuntimeNote("api_key")).toBeNull();
   });
 });

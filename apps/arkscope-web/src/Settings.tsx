@@ -44,7 +44,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
-import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary } from "./chatgptOAuth";
+import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1696,7 +1696,7 @@ function CredentialList({
                 </button>
               </div>
             )}
-            {probe && <ProbeResultView probe={probe} />}
+            {probe && <ProbeResultView probe={probe} authType={cred.auth_type} />}
           </div>
         );
       })}
@@ -1704,18 +1704,23 @@ function CredentialList({
   );
 }
 
-function ProbeResultView({ probe }: { probe: ProbeResponse | { error: string } }) {
+function ProbeResultView({
+  probe,
+  authType,
+}: {
+  probe: ProbeResponse | { error: string };
+  authType: ProviderCredential["auth_type"];
+}) {
   if ("error" in probe) {
     return <p className="error-text tiny">probe 失敗：{probe.error}</p>;
   }
+  const note = probeRuntimeNote(authType);
   return (
     <div className="probe-result">
       <p className={probe.passed ? "ok-text tiny" : "warn-text tiny"}>
         {probe.passed ? "✓ OAuth 驗證通過" : "✗ OAuth 驗證未通過"}
       </p>
-      <p className="probe-note tiny">
-        會向 api.openai.com 與 ChatGPT backend 發出最小診斷請求，確認 token 類型、streaming、工具呼叫與可用模型；不回傳 token，可能消耗少量訂閱額度。
-      </p>
+      {note && <p className="probe-note tiny">{note}</p>}
       <ul className="probe-list">
         {probe.probes.map((p) => {
           const summary = probeDisplaySummary(p);
