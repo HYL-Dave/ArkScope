@@ -128,6 +128,13 @@ def build_driver(
         return AnthropicClaudeCodeSdkDriver(
             credential=credential, token_store=token_store, registry=registry, dal=dal,
         )
+    # S3 step 1: chatgpt_oauth resolves to a real driver for READ-ONLY model discovery
+    # (ChatGPT-backend list, not the api_key seed). Its execution path stays gated
+    # inside the driver (call_llm/stream_llm raise) until S3 step 4.
+    if provider == "openai" and auth_mode == "chatgpt_oauth":
+        from .chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+
+        return OpenAIChatGPTOAuthDriver(credential=credential, token_store=token_store)
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
     )

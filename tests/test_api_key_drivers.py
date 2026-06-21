@@ -173,8 +173,10 @@ def test_build_driver_api_key_returns_real_driver():
     assert isinstance(build_driver(provider="anthropic", auth_mode="api_key", credential=acred), AnthropicApiKeyDriver)
 
 
-def test_build_driver_oauth_still_placeholder():
+def test_build_driver_chatgpt_oauth_is_the_discovery_driver_not_placeholder():
     from src.auth_drivers.factory import NotImplementedDriver
+    from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=None)
-    assert isinstance(d, NotImplementedDriver)  # OAuth real driver is S3/S4
+    # S3 step 1: chatgpt_oauth resolves to a real (discovery) driver, not a placeholder.
+    assert isinstance(d, OpenAIChatGPTOAuthDriver) and not isinstance(d, NotImplementedDriver)

@@ -512,6 +512,11 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
         # only a plain api_key is a usable direct key; a stored api_key_pool row
         # is a retired/legacy artifact (C3a blocks new ones) and is unresolvable.
         can_use = row.auth_type == "api_key"
+        # chatgpt_oauth discovers via the ChatGPT/Codex backend (S3 step 1) — its
+        # model set differs from the api_key catalog, so it IS discoverable even
+        # though it isn't a direct api_key. (Model-test stays api_key-only; the
+        # chatgpt_oauth capability check is the separate P1/P2 probe route.)
+        can_discover = can_use or row.auth_type == "chatgpt_oauth"
         if row.secret:
             db_secrets_by_provider[row.provider].add(row.secret)
         local_by_provider[row.provider].append(
@@ -525,11 +530,13 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 masked=_mask_secret(row.secret) if row.secret else None,  # OAuth rows have no secret here
                 active=row.active,
                 editable=True,
-                can_discover_models=can_use,
+                can_discover_models=can_discover,
                 can_test_models=can_use,
                 notes=(
                     "Local Settings credential. Stored in the ignored local SQLite profile DB."
                     if can_use
+                    else "ChatGPT subscription (OAuth). Lists models from the ChatGPT backend; not a direct API key."
+                    if row.auth_type == "chatgpt_oauth"
                     else "Stored for future auth flow support; not used as a direct API key in v0."
                 ),
             )

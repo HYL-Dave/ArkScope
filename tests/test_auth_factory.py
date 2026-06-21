@@ -35,11 +35,12 @@ _INVALID_COMBOS = [
 ]
 
 
-# Only chatgpt_oauth (S3) is still a gated placeholder; anthropic+claude_code_oauth
-# is a REAL driver as of Slice 7A-1 (see test_claude_code_oauth_driver.py).
-_OAUTH_COMBOS = [("openai", "chatgpt_oauth")]
-_APIKEY_COMBOS = [("openai", "api_key"), ("openai", "api_key_pool"),
-                  ("anthropic", "api_key"), ("anthropic", "api_key_pool")]
+# Every product combo now resolves to a REAL driver: api_key/api_key_pool (S2),
+# anthropic+claude_code_oauth (7B SDK driver), openai+chatgpt_oauth (S3 step 1 —
+# real for discovery; its EXECUTION stays gated inside the driver until step 4).
+# No (provider, auth_mode) in the valid matrix is a NotImplementedDriver anymore.
+_REAL_COMBOS = [("openai", "api_key"), ("openai", "api_key_pool"), ("openai", "chatgpt_oauth"),
+                ("anthropic", "api_key"), ("anthropic", "api_key_pool"), ("anthropic", "claude_code_oauth")]
 
 
 # --- routing: every VALID (provider, auth_mode) yields a driver carrying identity
@@ -49,15 +50,10 @@ def test_build_driver_carries_identity(provider, auth_mode):
     assert d.provider == provider and d.auth_mode == auth_mode
 
 
-@pytest.mark.parametrize("provider,auth_mode", _OAUTH_COMBOS)
-def test_oauth_modes_are_gated_placeholders(provider, auth_mode):
-    d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
-    assert isinstance(d, NotImplementedDriver)  # real OAuth driver is S3/S4
-
-
-@pytest.mark.parametrize("provider,auth_mode", _APIKEY_COMBOS)
-def test_api_key_modes_are_real_drivers_not_placeholders(provider, auth_mode):
-    # S2: api_key/api_key_pool now resolve to a REAL driver (not the placeholder).
+@pytest.mark.parametrize("provider,auth_mode", _REAL_COMBOS)
+def test_all_product_modes_are_real_drivers_not_placeholders(provider, auth_mode):
+    # Every valid product combo resolves to a REAL driver now (incl. chatgpt_oauth,
+    # S3 step 1). NotImplementedDriver is no longer returned for any valid combo.
     d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
     assert not isinstance(d, NotImplementedDriver)
 
@@ -81,16 +77,15 @@ def test_oauth_placeholder_not_callable_yet():
     assert "S3" in str(ei.value)  # chatgpt_oauth real driver comes in S3
 
 
-def test_oauth_modes_reference_their_probe_slice():
-    # Only chatgpt_oauth (S3) is still a gated placeholder; claude_code_oauth (S4)
-    # is now a real driver (7A-1).
+def test_chatgpt_oauth_execution_is_gated_to_step_4():
+    # chatgpt_oauth is a real driver for DISCOVERY (S3 step 1), but its EXECUTION
+    # (call_llm/stream_llm) stays gated until step 4 — the message names the slice.
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     import asyncio
 
     with pytest.raises(NotImplementedError) as ei:
         asyncio.run(d.call_llm(None))
-    msg = str(ei.value)
-    assert "S3" in msg and "probe" in msg.lower()  # message names the gating probe
+    assert "S3" in str(ei.value)  # message names the gating slice (step 4 execution wiring)
 
 
 def test_claude_code_oauth_is_the_sdk_driver_not_placeholder():
@@ -127,13 +122,13 @@ def test_oauth_mode_is_not_api_key_path():
 
 # --- optional token_store injection -----------------------------------------
 def test_token_store_optional_and_injected(tmp_path):
-    # default: no token store
+    # the chatgpt_oauth driver loads its token from the token-store ONLY (never
+    # credential.secret); the factory injects it (the driver holds it privately).
     d0 = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
-    assert d0.token_store is None
-    # injected: carried onto the driver (OAuth drivers will need it in S3/S4)
+    assert d0._token_store is None
     ts = PlaintextTokenStore(tmp_path / "t.json")
     d1 = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"), token_store=ts)
-    assert d1.token_store is ts
+    assert d1._token_store is ts
 
 
 # --- the OAuth placeholder conforms to BOTH contracts -----------------------
@@ -145,12 +140,13 @@ def test_placeholder_conforms_to_authdriver_and_research_driver():
     assert isinstance(d, ResearchProviderDriver)  # placeholder has discover_models() + test()
 
 
-def test_discover_and_test_are_gated_with_slice_message():
+def test_chatgpt_oauth_discovery_is_real_not_gated():
+    # S3 step 1: discover_models/test now RETURN (they no longer raise). With no
+    # token-store, discovery honestly degrades to missing_credential + the seed list.
     import asyncio
 
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
-    with pytest.raises(NotImplementedError) as ei1:
-        asyncio.run(d.discover_models())
-    with pytest.raises(NotImplementedError) as ei2:
-        asyncio.run(d.test())
-    assert "S3" in str(ei1.value) and "S3" in str(ei2.value)  # names the gating slice
+    disc = asyncio.run(d.discover_models())
+    assert disc.provider == "openai" and disc.status == "missing_credential" and len(disc.models) > 0
+    res = asyncio.run(d.test())
+    assert res.status in ("missing_credential", "error")  # honest deferral, never a fake "ok"

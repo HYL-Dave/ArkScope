@@ -268,10 +268,13 @@ def test_conforms_to_authdriver_and_identity():
 # that the factory builds AnthropicClaudeCodeOAuthDriver was removed here.
 
 
-def test_factory_openai_chatgpt_oauth_still_placeholder():
+def test_factory_openai_chatgpt_oauth_is_the_discovery_driver():
+    # S3 step 1: openai+chatgpt_oauth is now a real (discovery) driver, not a
+    # placeholder. (The factory→driver assertion lives in test_auth_factory.py too.)
     from src.auth_drivers.factory import build_driver, NotImplementedDriver
+    from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
     drv = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=None, token_store=object())
-    assert isinstance(drv, NotImplementedDriver)  # S3 unaffected by 7A
+    assert isinstance(drv, OpenAIChatGPTOAuthDriver) and not isinstance(drv, NotImplementedDriver)
 
 
 def test_discover_models_returns_seed_catalog():

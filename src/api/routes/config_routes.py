@@ -519,14 +519,27 @@ def delete_credential(
 def discover_provider_models(
     body: ModelDiscoveryRequest,
     store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
 ):
-    """Live model discovery for a selected provider credential.
+    """Live model discovery for a selected provider credential — PER auth_mode.
 
-    Uses direct API-key credentials only. OAuth/setup-token entries are visible
-    in Settings as credential types but are not used for direct provider API
-    calls until their provider-specific flow is implemented.
+    api_key/api_key_pool → the provider's standard API (`/models`). An OAuth
+    credential is dispatched through its driver instead (the standard provider-API
+    path can't use an OAuth token): openai chatgpt_oauth → the live ChatGPT/Codex
+    backend list (S3 step 1); anthropic claude_code_oauth → the honest seed
+    candidate list. The token is loaded by the driver from the token-store.
     """
     store = _credential_store(store)
+    cred = store.get(body.credential_id) if body.credential_id else None
+    if cred is not None and cred.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
+        import asyncio
+
+        from src.auth_drivers.factory import build_driver
+
+        driver = build_driver(
+            provider=cred.provider, auth_mode=cred.auth_type, credential=cred, token_store=token_store,
+        )
+        return asyncio.run(driver.discover_models()).model_dump()
     return discover_models(body.provider, body.credential_id, store).model_dump()
 
 

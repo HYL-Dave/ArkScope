@@ -136,6 +136,62 @@ def test_probe_route_now_supports_openai_chatgpt_oauth(stores, monkeypatch):
     assert "oauth-FAKE-TOKEN" not in json.dumps(out)  # but never came back
 
 
+def test_model_discovery_dispatches_chatgpt_oauth_to_the_driver(stores, monkeypatch):
+    # S3 step 1: an openai chatgpt_oauth credential discovers via its driver (the
+    # live ChatGPT-backend list), NOT the api_key seed catalog.
+    cred, tok = stores
+    from src.auth_drivers import StoredTokenRecord
+    c = cred.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg")
+    cid = f"local:{c.id}"
+    tok.save(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+             record=StoredTokenRecord(access_token="cg-FAKE-TOKEN"))
+
+    import src.auth_drivers.chatgpt_oauth_driver as drv_mod
+
+    class _Page:
+        models = [{"id": "gpt-5.4-mini"}, {"id": "gpt-5.5"}]
+
+    class _Client:
+        class models:  # noqa: N801
+            @staticmethod
+            def list(**kw):
+                return _Page()
+
+    monkeypatch.setattr(drv_mod, "_discovery_client", lambda token: _Client())
+    out = cr.discover_provider_models(
+        cr.ModelDiscoveryRequest(provider="openai", credential_id=cid), store=cred, token_store=tok,
+    )
+    assert out["status"] == "ok"
+    assert [m["id"] for m in out["models"]] == ["gpt-5.4-mini", "gpt-5.5"]
+    assert all(m["source"] == "provider_api" for m in out["models"])  # live, not seed
+
+
+def test_model_discovery_api_key_uses_module_path_not_driver(stores, monkeypatch):
+    # api_key dispatch is UNCHANGED — it goes through the module discover_models, not
+    # build_driver (no driver dispatch, no network in this test).
+    cred, tok = stores
+    cred.add(provider="openai", auth_type="api_key", alias="k", secret="sk-fake1111", make_active=True)
+    import src.api.routes.config_routes as crmod
+
+    sentinel = {"provider": "openai", "credential_id": "local:1", "status": "ok",
+                "models": [], "error": None, "source_url": None}
+    hit = {}
+
+    class _R:
+        def model_dump(self):
+            return sentinel
+
+    def _fake_discover(p, c, s):
+        hit["v"] = True
+        return _R()
+
+    monkeypatch.setattr(crmod, "discover_models", _fake_discover)
+    out = cr.discover_provider_models(
+        cr.ModelDiscoveryRequest(provider="openai", credential_id="local:1"), store=cred, token_store=tok,
+    )
+    assert hit.get("v") and out == sentinel  # module path used, driver NOT dispatched
+
+
 def test_probe_route_still_supports_anthropic(stores, monkeypatch):
     cred, tok = stores
     from src.auth_drivers import StoredTokenRecord
