@@ -51,7 +51,8 @@ def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):
                 "card_synthesis": RouteUpdate(provider="openai", model="gpt-5.5", effort="high"),
                 "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-4-6"),
             }
-        )
+        ),
+        store=CredentialStore(tmp_path / "profile_state.db"),  # isolate: no active OAuth cred
     )
     assert res["routes"]["card_synthesis"]["provider"] == "openai"
     assert res["routes"]["card_synthesis"]["model"] == "gpt-5.5"
@@ -78,6 +79,72 @@ def test_update_model_routes_rejects_provider_model_mismatch():
     assert exc.value.status_code == 400
 
 
+# --- Step 2: auth-mode-aware capability / route validation -------------------
+def test_route_capability_warnings_claude_oauth_effort_dropped():
+    from src.model_routing import route_capability_warnings
+
+    w = route_capability_warnings("anthropic", "claude-opus-4-8", "high", auth_mode="claude_code_oauth")
+    assert len(w) == 1 and "not be applied" in w[0].lower() and "high" in w[0]
+
+
+def test_route_capability_warnings_claude_oauth_default_effort_silent():
+    from src.model_routing import route_capability_warnings
+
+    # default/no effort → nothing is "dropped", so no warning.
+    assert route_capability_warnings("anthropic", "claude-opus-4-8", "default", auth_mode="claude_code_oauth") == []
+    assert route_capability_warnings("anthropic", "claude-opus-4-8", "", auth_mode="claude_code_oauth") == []
+
+
+def test_route_capability_warnings_chatgpt_oauth_points_at_discovery():
+    from src.model_routing import route_capability_warnings
+
+    w = route_capability_warnings("openai", "gpt-5.4-mini", "default", auth_mode="chatgpt_oauth")
+    assert len(w) == 1 and "discovery" in w[0].lower() and "gpt-5.4-mini" in w[0]
+
+
+def test_route_capability_warnings_api_key_and_none_are_silent():
+    from src.model_routing import route_capability_warnings
+
+    assert route_capability_warnings("openai", "gpt-5.5", "high", auth_mode="api_key") == []
+    assert route_capability_warnings("anthropic", "claude-opus-4-8", "high", auth_mode=None) == []
+
+
+def test_save_route_warns_when_claude_oauth_active_drops_effort(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    cfg_mod.get_agent_config.cache_clear()
+    store = CredentialStore(tmp_path / "profile_state.db")
+    store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
+
+    res = update_model_routes(
+        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="anthropic", model="claude-opus-4-8", effort="high")}),
+        store=store,
+    )
+    w = res["routes"]["ai_research"]["warning"]
+    assert w and "not be applied" in w.lower() and "high" in w  # effort-dropped surfaced, not hidden
+    assert res["routes"]["ai_research"]["effort"] == "high"  # still saved (the driver derives at run time)
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_save_route_chatgpt_oauth_active_points_at_discovery(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    cfg_mod.get_agent_config.cache_clear()
+    store = CredentialStore(tmp_path / "profile_state.db")
+    store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
+
+    res = update_model_routes(
+        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="openai", model="gpt-5.4-mini")}),
+        store=store,
+    )
+    assert "discovery" in (res["routes"]["ai_research"]["warning"] or "").lower()
+    cfg_mod.get_agent_config.cache_clear()
+
+
 def test_invalid_effort_falls_back_to_default(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
 
@@ -94,7 +161,8 @@ def test_invalid_effort_falls_back_to_default(tmp_path, monkeypatch):
                     effort="future-effort",
                 ),
             }
-        )
+        ),
+        store=CredentialStore(tmp_path / "profile_state.db"),  # isolate
     )
     assert res["routes"]["card_translation"]["effort"] == "default"
     assert "future-effort" in res["routes"]["card_translation"]["warning"]

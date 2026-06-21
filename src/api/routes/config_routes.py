@@ -32,6 +32,7 @@ from src.model_routing import (
     is_seed_model,
     is_valid_effort,
     model_provider,
+    route_capability_warnings,
 )
 from src.tools.data_access import DataAccessLayer
 from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
@@ -61,6 +62,16 @@ def _run_coro(coro):
     import asyncio
 
     return asyncio.run(coro)
+
+
+def _active_auth_mode(provider: str, store: CredentialStore) -> str | None:
+    """The active credential's auth_type for ``provider`` (None if none / unresolvable).
+    Best-effort: never let a capability lookup break a route save."""
+    try:
+        active = next((c for c in store.list(provider) if c.active), None)
+        return active.auth_type if active else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 class RouteUpdate(BaseModel):
@@ -585,10 +596,21 @@ def run_provider_model_test(
 
 
 @router.put("/config/model-routes")
-def update_model_routes(body: ModelRoutesUpdate):
-    """Persist per-task provider/model routing in user_profile.local.yaml."""
+def update_model_routes(
+    body: ModelRoutesUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Persist per-task provider/model routing in user_profile.local.yaml.
+
+    Validation is auth-mode-aware (S3 step 2): a saved model/effort is checked against
+    the ACTIVE credential's auth_mode for that provider — e.g. effort is dropped on the
+    Claude subscription, and the ChatGPT-backend model set differs from the API-key
+    catalog. These are non-blocking WARNINGS (the catalog allows custom ids); only a
+    provider/model-prefix mismatch is a hard 400.
+    """
     if not body.routes:
         raise HTTPException(status_code=400, detail="no routes supplied")
+    store = _credential_store(store)
 
     saved: dict[str, TaskRoute] = {}
     for task, update in body.routes.items():
@@ -596,9 +618,9 @@ def update_model_routes(body: ModelRoutesUpdate):
         if not model:
             raise HTTPException(status_code=400, detail=f"{task}: model is required")
         effort = update.effort.strip() or "default"
-        warning = None
+        warnings: list[str] = []
         if not is_valid_effort(update.provider, effort):
-            warning = (
+            warnings.append(
                 f"Configured effort '{effort}' is not known for provider '{update.provider}'; "
                 "saved provider default."
             )
@@ -609,6 +631,13 @@ def update_model_routes(body: ModelRoutesUpdate):
                 status_code=400,
                 detail=f"{task}: model '{model}' looks like {inferred}, not {update.provider}",
             )
+        # auth-mode-aware capability warnings (effort-dropped on subscription, OAuth
+        # model set differs from the api_key catalog). Best-effort, never blocks.
+        warnings.extend(
+            route_capability_warnings(
+                update.provider, model, effort, auth_mode=_active_auth_mode(update.provider, store),
+            )
+        )
         require_profile_state_write(
             "model_route_update",
             {"task": task, "provider": update.provider, "model": model, "effort": effort},
@@ -623,6 +652,6 @@ def update_model_routes(body: ModelRoutesUpdate):
             effort=effort,
             source="profile",
             custom=not is_seed_model(update.provider, model),
-            warning=warning,
+            warning=" ".join(warnings) or None,
         )
     return {"routes": {k: v.model_dump() for k, v in saved.items()}}

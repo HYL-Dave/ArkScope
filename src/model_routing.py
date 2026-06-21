@@ -279,6 +279,35 @@ def is_valid_effort(provider: Provider, effort: str) -> bool:
     return any(option.id == effort for option in EFFORT_OPTIONS[provider])
 
 
+def route_capability_warnings(
+    provider: Provider, model: str, effort: str, *, auth_mode: str | None
+) -> list[str]:
+    """Auth-mode-aware, NON-blocking capability warnings for a saved route. The model
+    catalog is per (provider, auth_mode) — what serves an api_key may differ from what
+    the subscription/OAuth backend serves — so a route saved against the api_key seed can
+    be wrong for the ACTIVE auth mode. ``auth_mode`` = the active credential's auth_type
+    for ``provider`` (None if no active credential / not resolvable). Warnings, not errors:
+    the catalog allows custom ids and discovery may be stale, so we inform, never block."""
+    out: list[str] = []
+    has_effort = (effort or "").strip() not in ("", "default")
+    if auth_mode == "claude_code_oauth" and has_effort:
+        # The Claude-subscription SDK driver derives its own effort — a configured
+        # effort is silently dropped on that path. Surface it instead of pretending.
+        out.append(
+            f"The active Anthropic credential is a Claude subscription (claude_code_oauth), which "
+            f"derives its own reasoning effort — the configured effort '{effort}' will NOT be applied."
+        )
+    if auth_mode == "chatgpt_oauth":
+        # The ChatGPT backend's model set differs from the API-key catalog; seed
+        # membership proves nothing here, so point the user at live discovery.
+        out.append(
+            f"The active OpenAI credential is a ChatGPT subscription (chatgpt_oauth); its available "
+            f"models come from the ChatGPT backend, not the API-key catalog — confirm '{model}' via "
+            f"discovery (列出此 key 可見模型)."
+        )
+    return out
+
+
 def model_provider(model: str) -> Provider | None:
     lowered = model.strip().lower()
     if lowered.startswith("claude-"):
