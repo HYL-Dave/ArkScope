@@ -1312,7 +1312,7 @@ function ProviderSection({
         <div>
           <h2>Provider 狀態</h2>
           <p className="muted">
-            Provider/channel 和 task routing 分開管理。這裡顯示本機 credential 狀態，並可用 API key 做 model discovery / model test。
+            Provider/channel 和 task routing 分開管理。這裡顯示本機 credential 狀態；每個 credential 可依其類型做 model discovery / capability test（API key 與 OAuth 方式各自不同）。
           </p>
         </div>
       </div>
@@ -1478,10 +1478,15 @@ function ProviderSection({
                 onSaveAlias={(id) => void saveAlias(id)}
                 onSetActive={(id) => void setActive(id)}
                 onDelete={(id) => void removeKey(id)}
+                onDiscover={(id) => void onDiscover(provider, id)}
+                discoverLoadingId={discoveryState?.loading ? discoveryState.credentialId ?? null : null}
               />
               <div className="settings-actions">
+                <p className="muted tiny" style={{ width: "100%" }}>
+                  進階：指定某個 credential 做 discovery（一般用上方各列的「列模型／查看候選模型」即可）。
+                </p>
                 <label className="field credential-select">
-                  <span>Discovery/Test credential</span>
+                  <span>credential</span>
                   <select
                     value={selectedCredential ?? ""}
                     onChange={(e) => setSelectedCreds((prev) => ({ ...prev, [provider]: e.target.value }))}
@@ -1594,6 +1599,8 @@ function CredentialList({
   onSaveAlias,
   onSetActive,
   onDelete,
+  onDiscover,
+  discoverLoadingId,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -1601,6 +1608,8 @@ function CredentialList({
   onSaveAlias: (id: string) => void;
   onSetActive: (id: string) => void;
   onDelete: (id: string) => void;
+  onDiscover: (id: string) => void;
+  discoverLoadingId: string | null;
 }) {
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
   // ephemeral and never leaves this view.
@@ -1666,6 +1675,25 @@ function CredentialList({
                 >
                   設為 active
                 </button>
+                {cred.can_discover_models && (
+                  <button
+                    type="button"
+                    className="btn-ghost small"
+                    disabled={discoverLoadingId === cred.id}
+                    title={
+                      cred.auth_type === "claude_code_oauth"
+                        ? "查看候選模型（seed，非即時 discovery）"
+                        : "列出此 credential 後端可見的模型"
+                    }
+                    onClick={() => onDiscover(cred.id)}
+                  >
+                    {discoverLoadingId === cred.id
+                      ? "讀取中…"
+                      : cred.auth_type === "claude_code_oauth"
+                        ? "查看候選模型"
+                        : "列模型"}
+                  </button>
+                )}
                 {isLocalOAuth && (
                   <button
                     type="button"
@@ -1761,10 +1789,20 @@ function DiscoveryResultView({
   const models = result.models.filter((model) =>
     model.id.toLowerCase().includes(query.trim().toLowerCase()),
   );
+  // Source badge: the credential/auth_mode decides whether these are a LIVE backend
+  // list or seed CANDIDATES — never imply a global catalog (per §11 design).
+  const sources = Array.from(new Set(result.models.map((m) => m.source)));
+  const sourceBadge =
+    sources.length === 1
+      ? sources[0] === "seed"
+        ? "seed · 非即時 discovery"
+        : "provider API · live"
+      : sources.join(" / ");
   return (
     <div className="discovery-box">
       <div className="discovery-head">
         <strong>Discovery: {result.status}</strong>
+        {result.models.length > 0 && <span className="source-badge tiny">{sourceBadge}</span>}
         {result.source_url && (
           <a href={result.source_url} target="_blank" rel="noreferrer">
             source
