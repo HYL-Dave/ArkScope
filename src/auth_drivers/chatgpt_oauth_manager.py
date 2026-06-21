@@ -3,9 +3,10 @@
 Orchestrates the in-app ChatGPT OAuth login over the pure core (chatgpt_oauth_login)
 and the ephemeral loopback server (chatgpt_oauth_callback_server):
 
-  begin()           → mint state+PKCE, return the authorize URL, and spawn a background
-                      thread that stands up the loopback server, waits for the redirect,
-                      and completes the login (exchange + store). Returns immediately.
+  begin()           → mint state+PKCE, bind the loopback callback server, return the
+                      authorize URL, and spawn a background thread that waits for the
+                      redirect and completes the login (exchange + store). Binding before
+                      returning avoids a fast-browser redirect race.
   status(state)     → poll: pending | success | error (+ masked credential / detail).
   complete_manual() → the copy-code fallback: complete the SAME login from a pasted code
                       (cancels the still-waiting loopback). Used ONLY when the localhost
@@ -73,11 +74,21 @@ class OAuthLoginManager:
         now = self._clock()
         started = start_login(state_store=self._state_store, now=now)
         state = started["state"]
+        server = self._server_factory(state)
         with self._lock:
             self._prune_locked(now)  # bound the singleton's in-memory result history
             self._results[state] = {"status": "pending", "credential": None, "detail": None}
             self._result_ts[state] = now
-        threading.Thread(target=self._await_callback, args=(state,), daemon=True).start()
+        try:
+            # Bind before returning auth_url. A fast browser redirect can otherwise
+            # hit localhost:1455 before the background thread starts listening.
+            server.start()
+        except ChatGPTOAuthLoginError as exc:
+            self._finish(state, status="error", detail=str(exc))
+            return started
+        with self._lock:
+            self._servers[state] = server
+        threading.Thread(target=self._await_callback, args=(state, server), daemon=True).start()
         return started
 
     def status(self, state: str) -> dict:
@@ -93,25 +104,7 @@ class OAuthLoginManager:
         return credential
 
     # --- internal ---------------------------------------------------------
-    def _await_callback(self, state: str) -> None:
-        try:
-            server = self._server_factory(state)
-            server.start()  # binds :1455 — raises (no fallback) if occupied
-        except ChatGPTOAuthLoginError as exc:
-            self._finish(state, status="error", detail=str(exc))
-            return
-        # Register under the lock AND honor a manual completion that landed during
-        # start() — otherwise the bind→register window would leave the loopback to hold
-        # :1455 for the full timeout after the login already succeeded via paste.
-        with self._lock:
-            if state in self._cancelled:
-                cancelled_early = True
-            else:
-                self._servers[state] = server
-                cancelled_early = False
-        if cancelled_early:
-            self._close(server)
-            return
+    def _await_callback(self, state: str, server: Any) -> None:
         try:
             code, recv_state = server.wait_for_code(self._timeout)
             credential = self._complete(state=recv_state or state, code=code)
@@ -136,8 +129,8 @@ class OAuthLoginManager:
             self._result_ts[state] = self._clock()
 
     def _cancel(self, state: str) -> None:
-        """Ask the loopback for `state` to abandon. Marks it cancelled (so a loopback
-        still inside start() aborts on registration) AND cancels it if already live."""
+        """Ask the loopback for `state` to abandon. Marks it cancelled and cancels it if
+        already live."""
         with self._lock:
             self._cancelled.add(state)
             server = self._servers.get(state)

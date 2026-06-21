@@ -102,6 +102,33 @@ def test_begin_returns_auth_url_and_marks_pending(stores):
     assert mgr.status(out["state"])["status"] in ("pending", "success", "error")
 
 
+def test_begin_waits_until_loopback_is_started_before_returning(stores):
+    # The browser can redirect to localhost immediately after login. Returning the
+    # auth_url before the loopback has actually bound the callback port creates a
+    # race: the redirect can hit :1455 first and get ERR_CONNECTION_REFUSED.
+    class _SlowStartServer(_FakeServer):
+        def __init__(self):
+            super().__init__(_no_callback)
+            self.entered_start = threading.Event()
+            self.release_start = threading.Event()
+
+        def start(self):
+            self.entered_start.set()
+            self.release_start.wait(2)
+            self.started = True
+
+    srv = _SlowStartServer()
+    mgr = _mgr(stores, lambda state: srv)
+    returned = []
+    t = threading.Thread(target=lambda: returned.append(mgr.begin()))
+    t.start()
+    assert srv.entered_start.wait(1) is True
+    assert returned == []  # begin() must not return until start() finishes
+    srv.release_start.set()
+    t.join(1)
+    assert returned and returned[0]["state"]
+
+
 def test_loopback_delivers_code_then_status_success_no_token(stores):
     cred, tok = stores
     mgr = _mgr(stores, lambda state: _FakeServer(lambda s: ("AUTHCODE", state)))
@@ -177,49 +204,6 @@ def test_status_unknown_for_unseen_state(stores):
 def cred_count(stores) -> int:
     cred, _ = stores
     return len(cred.list())
-
-
-# --- lifecycle hardening (from the transport audit) ---------------------------
-class _GatedStartServer:
-    """Loopback whose start() blocks until released — to exercise the window between
-    bind and registration where a manual completion could land."""
-
-    def __init__(self):
-        self.start_gate = threading.Event()
-        self.closed = threading.Event()
-        self.reached_wait = threading.Event()
-        self.cancelled = False
-
-    @property
-    def port(self):
-        return 1455
-
-    def start(self):
-        self.start_gate.wait(2)  # block inside start() until the test releases it
-
-    def wait_for_code(self, timeout):
-        self.reached_wait.set()
-        raise ChatGPTOAuthLoginError("timed out")
-
-    def cancel(self):
-        self.cancelled = True
-
-    def close(self):
-        self.closed.set()
-
-
-def test_manual_completion_during_server_start_frees_port_promptly(stores):
-    # Manual completion lands while the loopback is still inside start() (before it is
-    # registered). The loopback must be cancelled/closed promptly — never left to hold
-    # :1455 for the full timeout — and must NOT proceed into wait_for_code.
-    srv = _GatedStartServer()
-    mgr = _mgr(stores, lambda state: srv)
-    out = mgr.begin()
-    res = mgr.complete_manual(state=out["state"], code="C")  # completes before registration
-    assert res["credential_id"].startswith("local:")
-    srv.start_gate.set()  # release start(); the thread must now see the cancellation
-    assert srv.closed.wait(2) is True  # closed promptly (no 120s wait_for_code hold)
-    assert srv.reached_wait.is_set() is False  # never entered wait_for_code
 
 
 class _Clock:

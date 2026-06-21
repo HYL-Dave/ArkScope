@@ -7,12 +7,13 @@
 // poll /healthz until ready -> load the built web cockpit (or an error screen)
 // -> kill the sidecar cleanly on quit.
 
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, shell } = require("electron");
 const { spawn } = require("node:child_process");
 const net = require("node:net");
 const crypto = require("node:crypto");
 const http = require("node:http");
 const path = require("node:path");
+const { shouldOpenExternal } = require("./navigation");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const WEB_DIST = path.join(__dirname, "..", "arkscope-web", "dist", "index.html");
@@ -133,6 +134,12 @@ function stopSidecar() {
   }, 4000);
 }
 
+function openExternal(url) {
+  shell.openExternal(url).catch((err) => {
+    pushTail(Buffer.from(`[open external error] ${err.message || err}`), "stderr");
+  });
+}
+
 async function createWindow() {
   const port = await findFreePort();
   const token = crypto.randomBytes(24).toString("hex");
@@ -154,6 +161,21 @@ async function createWindow() {
         `--arkscope-api-token=${token}`,
       ],
     },
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (shouldOpenExternal(url, win.webContents.getURL())) {
+      openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    if (shouldOpenExternal(url, win.webContents.getURL())) {
+      event.preventDefault();
+      openExternal(url);
+    }
   });
 
   const ready = await waitForHealth(port, token);

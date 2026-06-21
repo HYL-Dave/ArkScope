@@ -637,15 +637,16 @@ no-token-echo, and the refresh path.
 
 ### S3 thin transport — backend BUILT + audited (2026-06-20)
 
-Backend transport for the in-app login (the Settings UI is the next slice). Three new
-modules + routes, TDD'd:
+Backend transport for the in-app login. Three new modules + routes, TDD'd:
 - `chatgpt_oauth_callback_server.py` — ephemeral loopback that captures the one
   `GET /auth/callback` on **127.0.0.1:1455** (GET-only, exact-path), **explicit fail on
   port-in-use (no fallback port)**, cancel/timeout. Localhost integration tests.
-- `chatgpt_oauth_manager.py` — `OAuthLoginManager`: `begin()` (mint state+PKCE, spawn the
-  loopback thread, return auth_url) → `status()` poll (pending/success/error/unknown) →
-  `complete_manual()` copy-code fallback. Single-use state ⇒ no double token-exchange;
-  sticky success; results return MASKED metadata only.
+- `chatgpt_oauth_manager.py` — `OAuthLoginManager`: `begin()` (mint state+PKCE, **bind
+  the loopback callback server before returning auth_url**, then spawn the wait thread)
+  → `status()` poll (pending/success/error/unknown) → `complete_manual()` copy-code
+  fallback. Single-use state ⇒ no double token-exchange; sticky success; results return
+  MASKED metadata only. Binding first is required: a fast browser redirect can otherwise
+  hit `localhost:1455` before the listener exists and produce `ERR_CONNECTION_REFUSED`.
 - `config_routes.py` — `POST /config/credentials/openai/oauth/start`, `GET …/status`,
   `POST …/complete-manual` (bare code or redirect-URL extract + state-match guard); the
   `…/{id}/probe` route widened to dispatch openai `chatgpt_oauth` → P1/P2. Write-gated;
@@ -656,8 +657,10 @@ fallback-discipline all **clean** (127.0.0.1-only, 256-bit single-use state is s
 CSRF, no silent fallback port/credential/API-key anywhere). Two real lifecycle defects found
 and FIXED: (1) a bind→register window let a manual completion leave the loopback holding
 :1455 for the full timeout → fixed with a `_cancelled` set checked atomically at registration;
-(2) the singleton's `_results` grew unbounded → fixed with TTL + cap eviction. 187 auth+route
-tests pass, no regressions.
+(2) the singleton's `_results` grew unbounded → fixed with TTL + cap eviction; (3)
+hand-testing found a browser-redirect race → fixed by binding the loopback before returning
+the auth URL. 187 auth+route tests passed at the original transport gate; later S3 checks
+cover the race fix.
 
 ### S3 Settings UI — BUILT (2026-06-20)
 
@@ -674,6 +677,13 @@ button (`測試 ChatGPT OAuth（會打真實請求）`) widened to `chatgpt_oaut
 fallback); the auth_url is opened/copied, never rendered as text. **14 new vitest +
 111 FE tests pass, tsc + vite build clean.** Test approach = vitest + injected fakes
 (the project has no Playwright; introducing it would be its own infra slice).
+
+**Desktop-shell requirement (2026-06-21 hand-test fix):** Electron must open the OAuth
+authorize URL in the user's default system browser via `shell.openExternal`, never inside an
+ArkScope `BrowserWindow`. The redirect target is the fixed loopback callback
+`http://localhost:1455/auth/callback`; loading it inside Electron can fail with
+`ERR_CONNECTION_REFUSED` and is also a worse login UX. Same-origin ArkScope navigation stays
+inside the shell; cross-origin HTTP(S) navigation opens externally.
 
 **Still HELD (gated on user): the LIVE P1/P2 run** — needs a real ChatGPT subscription
 login through this flow end-to-end; the backend + UI are offline-tested only. A live smoke,
