@@ -100,7 +100,13 @@ class OAuthLoginManager:
     def cancel_login(self, state: str) -> None:
         """Cancel an in-flight login. EVICT the pending state FIRST — so a late loopback
         callback's complete_login pops None → raises → no credential is created — then
-        tear down the loopback server (frees :1455). Idempotent; unknown state = no-op."""
+        tear down the loopback server (frees :1455). A state this manager never started
+        is a TRUE no-op (no fabricated result); a finished login is left as-is (the
+        _finish sticky-success guard protects a completed one)."""
+        with self._lock:
+            known = state in self._results  # begin() always records the started login here
+        if not known:
+            return
         self._state_store.discard(state)  # the key fix: close the late-callback gap
         self._finish(state, status="error", detail="login cancelled")
         self._cancel(state)  # mark cancelled + server.cancel() to unblock wait_for_code

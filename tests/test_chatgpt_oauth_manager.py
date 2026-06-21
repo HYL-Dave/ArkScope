@@ -184,6 +184,8 @@ def test_cancel_login_evicts_pending_so_a_late_callback_creates_nothing(stores):
 def test_cancel_login_unknown_state_is_noop(stores):
     mgr = _mgr(stores, lambda state: _FakeServer(_no_callback))
     mgr.cancel_login("never-started")  # no raise
+    # a TRUE no-op: an unknown state must NOT fabricate a terminal result entry.
+    assert mgr.status("never-started")["status"] == "unknown"
     assert cred_count(stores) == 0
 
 
