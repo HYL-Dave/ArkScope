@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { activeFirst, credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
+import {
+  activeFirst,
+  addApiKeyButtonLabel,
+  addApiKeySuccessMessage,
+  credentialPill,
+  defaultNewApiKeyMakeActive,
+  discoverButtonLabel,
+  discoverySourceLabel,
+} from "./credentialDisplay";
 
 describe("activeFirst", () => {
   it("moves the active credential to the front, preserving the rest's order", () => {
@@ -50,5 +58,24 @@ describe("discoverButtonLabel", () => {
     expect(discoverButtonLabel("chatgpt_oauth")).toBe("列模型");
     expect(discoverButtonLabel("api_key")).toBe("列模型");
     expect(discoverButtonLabel(null)).toBe("列模型");
+  });
+});
+
+describe("add API key activation copy", () => {
+  it("defaults to active only when the provider has no usable credential", () => {
+    expect(defaultNewApiKeyMakeActive([])).toBe(true);
+    expect(defaultNewApiKeyMakeActive([{ available: false }])).toBe(true);
+    expect(defaultNewApiKeyMakeActive([{ available: true }])).toBe(false);
+    expect(defaultNewApiKeyMakeActive([{ available: false }, { available: true }])).toBe(false);
+  });
+
+  it("labels the submit action by whether the new key will become active", () => {
+    expect(addApiKeyButtonLabel(true)).toBe("新增並設為 active");
+    expect(addApiKeyButtonLabel(false)).toBe("新增 API key");
+  });
+
+  it("reports whether the add switched the active credential", () => {
+    expect(addApiKeySuccessMessage("openai", true)).toBe("openai key 已新增並設為 active。");
+    expect(addApiKeySuccessMessage("openai", false)).toBe("openai key 已新增（未切換 active）。");
   });
 });

@@ -1283,6 +1283,17 @@ table.wl tbody tr.archived td {
 .credential-add-box .field {
   margin: 0 0 8px;
 }
+.credential-add-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.credential-add-toggle input {
+  margin: 0;
+}
 .credential-row {
   border: 1px solid var(--border);
   border-radius: 7px;

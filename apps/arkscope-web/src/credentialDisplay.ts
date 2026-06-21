@@ -48,3 +48,18 @@ export function discoverButtonLabel(authMode: CredentialAuthType | null): string
 export function activeFirst<T extends { active: boolean }>(creds: T[]): T[] {
   return [...creds].sort((a, b) => Number(b.active) - Number(a.active));
 }
+
+// New API keys should only take over automatically in the empty-state. Once a
+// provider already has any usable credential, adding another key is usually
+// staging/rotation and should not silently switch the active row.
+export function defaultNewApiKeyMakeActive(creds: { available: boolean }[]): boolean {
+  return !creds.some((c) => c.available);
+}
+
+export function addApiKeyButtonLabel(makeActive: boolean): string {
+  return makeActive ? "新增並設為 active" : "新增 API key";
+}
+
+export function addApiKeySuccessMessage(provider: ModelProvider, makeActive: boolean): string {
+  return makeActive ? `${provider} key 已新增並設為 active。` : `${provider} key 已新增（未切換 active）。`;
+}

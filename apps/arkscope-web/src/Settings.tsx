@@ -44,7 +44,15 @@ import {
   type TaskRoute,
 } from "./api";
 import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
-import { activeFirst, credentialPill, discoverButtonLabel, discoverySourceLabel } from "./credentialDisplay";
+import {
+  activeFirst,
+  addApiKeyButtonLabel,
+  addApiKeySuccessMessage,
+  credentialPill,
+  defaultNewApiKeyMakeActive,
+  discoverButtonLabel,
+  discoverySourceLabel,
+} from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 
 const TASK_LABELS: Record<ModelTask, string> = {
@@ -1109,6 +1117,7 @@ function ProviderSection({
   const [selectedCreds, setSelectedCreds] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
+  const [newMakeActive, setNewMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
   // Per-provider disclosure state for the (low-frequency) setup forms. Undefined =
   // use the smart default (collapsed once the provider has any usable credential);
@@ -1134,7 +1143,7 @@ function ProviderSection({
   // full timeout). A per-login token object; the poll closure reads token.aborted.
   const pollToken = useRef<{ aborted: boolean }>({ aborted: false });
 
-  async function addKey(provider: ModelProvider) {
+  async function addKey(provider: ModelProvider, makeActive: boolean) {
     const alias = (newAlias[provider] ?? "").trim();
     const secret = (newSecret[provider] ?? "").trim();
     if (!secret) {
@@ -1149,11 +1158,11 @@ function ProviderSection({
         auth_type: "api_key",
         alias: alias || `${provider} key`,
         secret,
-        make_active: true,
+        make_active: makeActive,
       });
       setNewAlias((prev) => ({ ...prev, [provider]: "" }));
       setNewSecret((prev) => ({ ...prev, [provider]: "" }));
-      setProviderMsg(`${provider} key 已新增並設為 active。`);
+      setProviderMsg(addApiKeySuccessMessage(provider, makeActive));
       await onRefresh();
     } catch (e) {
       setProviderErr(e instanceof Error ? e.message : String(e));
@@ -1337,6 +1346,7 @@ function ProviderSection({
           // toggle (setupOpen[provider]) overrides.
           const hasCredential = credentials.some((c) => c.available);
           const setupExpanded = setupOpen[provider] ?? !hasCredential;
+          const makeNewKeyActive = newMakeActive[provider] ?? defaultNewApiKeyMakeActive(credentials);
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
           const discoveryState = discovery[provider];
           const usable = credentials.filter((c) => c.available && c.can_discover_models);
@@ -1434,8 +1444,20 @@ function ProviderSection({
                       onChange={(e) => setNewSecret((prev) => ({ ...prev, [provider]: e.target.value }))}
                     />
                   </label>
-                  <button type="button" className="btn-ghost small" onClick={() => void addKey(provider)}>
-                    新增並設為 active
+                  <label className="credential-add-toggle">
+                    <input
+                      type="checkbox"
+                      checked={makeNewKeyActive}
+                      onChange={(e) => setNewMakeActive((prev) => ({ ...prev, [provider]: e.target.checked }))}
+                    />
+                    <span>新增後設為 active</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn-ghost small"
+                    onClick={() => void addKey(provider, makeNewKeyActive)}
+                  >
+                    {addApiKeyButtonLabel(makeNewKeyActive)}
                   </button>
                 </div>
                 {provider === "anthropic" && (
