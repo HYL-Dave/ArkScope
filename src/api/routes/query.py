@@ -26,6 +26,7 @@ class QueryRequest(BaseModel):
     question: str
     provider: str = "openai"  # "openai" | "anthropic"
     model: Optional[str] = None  # Override default model
+    effort: Optional[str] = None  # reasoning effort when model is explicit (AI 研究 picker)
     # C-2b persistence (optional): the AI 研究 surface sends a client-owned thread
     # id + an optional ticker context. The agent is prompted with the composed
     # question; the RAW question is what gets persisted (criterion #2).
@@ -284,7 +285,11 @@ async def query_agent_stream(
         history = build_thread_history(store, request.thread_id) if persist else []
         # No explicit model → the AI 研究 route (or the provider's default tier).
         # Resolve BEFORE persisting so the thread records the model actually used.
-        res_model, res_effort = request.model, None
+        # Explicit model (the AI 研究 picker) → use request.model + request.effort
+        # directly. No explicit model → the AI 研究 route (or the provider's default
+        # tier). NOTE: effort is still derived by the Claude-subscription driver
+        # itself (it ignores res_effort, by design — surfaced as a save-time warning).
+        res_model, res_effort = request.model, request.effort
         if res_model is None and provider in ("openai", "anthropic"):
             from src.agents.config import resolve_research_route
             res_model, res_effort = resolve_research_route(provider)

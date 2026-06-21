@@ -229,6 +229,36 @@ def test_query_stream_threads_history_into_provider(store, monkeypatch, provider
     assert store.list_messages("t1")[-1].content == "ok"  # assistant turn persisted after
 
 
+def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
+    # S3 step 3a: when the request carries an explicit model + effort (the AI 研究
+    # picker), use them DIRECTLY — do not consult resolve_research_route.
+    import asyncio
+
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, **kwargs):
+        captured["model"] = model
+        captured["effort"] = kwargs.get("reasoning_effort")  # openai kwarg
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": "openai", "model": model, "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
+
+    def _boom(*a, **k):
+        raise AssertionError("resolve_research_route must NOT be called when model is explicit")
+
+    monkeypatch.setattr("src.agents.config.resolve_research_route", _boom)
+    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.4-mini", effort="low", thread_id=None, ticker=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    assert captured["model"] == "gpt-5.4-mini" and captured["effort"] == "low"
+
+
 def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
     """Without a (valid) thread_id, no persistence and history=[] (single-turn)."""
     import asyncio
