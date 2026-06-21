@@ -5,11 +5,13 @@ import {
   addApiKeyButtonLabel,
   addApiKeySuccessMessage,
   credentialPill,
+  credentialAvailabilityText,
   defaultMakeActiveOnAdd,
   discoverButtonLabel,
   discoveryHeaderTitle,
   discoveryResultCredentialLabel,
   discoverySourceLabel,
+  supportsCredentialExpiry,
 } from "./credentialDisplay";
 
 describe("activeFirst", () => {
@@ -51,6 +53,21 @@ describe("credentialPill", () => {
   });
   it("says no credential when none active", () => {
     expect(credentialPill(null)).toEqual({ label: "無 credential", ok: false });
+  });
+});
+
+describe("credential row metadata display", () => {
+  it("uses short availability copy so rows don't stretch on non-secret OAuth credentials", () => {
+    expect(credentialAvailabilityText({ available: true, masked: null })).toBe("可用");
+    expect(credentialAvailabilityText({ available: true, masked: "sk-p...Q2wA" })).toBe("sk-p...Q2wA");
+    expect(credentialAvailabilityText({ available: false, masked: null })).toBe("缺少");
+  });
+
+  it("only shows an expiry editor for OAuth-style credentials", () => {
+    expect(supportsCredentialExpiry("api_key")).toBe(false);
+    expect(supportsCredentialExpiry("api_key_pool")).toBe(false);
+    expect(supportsCredentialExpiry("chatgpt_oauth")).toBe(true);
+    expect(supportsCredentialExpiry("claude_code_oauth")).toBe(true);
   });
 });
 

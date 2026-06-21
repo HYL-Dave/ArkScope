@@ -49,12 +49,14 @@ import {
   activeFirst,
   addApiKeyButtonLabel,
   addApiKeySuccessMessage,
+  credentialAvailabilityText,
   credentialPill,
   defaultMakeActiveOnAdd,
   discoverButtonLabel,
   discoveryHeaderTitle,
   discoveryResultCredentialLabel,
   discoverySourceLabel,
+  supportsCredentialExpiry,
 } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { formatSystemTimestamp } from "./timeDisplay";
@@ -1335,14 +1337,15 @@ function ProviderSection({
     }
   }
 
-  async function saveMetadata(credentialId: string, accountLabel: string, expiresAt: string) {
+  async function saveMetadata(credentialId: string, accountLabel: string, expiresAt?: string) {
     setProviderErr(null);
     setProviderMsg(null);
     try {
-      await updateCredential(credentialId, {
+      const body: { account_label: string; expires_at?: string } = {
         account_label: accountLabel.trim(),
-        expires_at: expiresAt.trim(),
-      });
+      };
+      if (expiresAt !== undefined) body.expires_at = expiresAt.trim();
+      await updateCredential(credentialId, body);
       setMetadataDrafts((prev) => {
         const next = { ...prev };
         delete next[credentialId];
@@ -1770,7 +1773,7 @@ function CredentialList({
   onRenameDraft: (id: string, alias: string) => void;
   onMetadataDraft: (id: string, field: keyof CredentialMetadataDraft, value: string) => void;
   onSaveAlias: (id: string) => void;
-  onSaveMetadata: (id: string, accountLabel: string, expiresAt: string) => void;
+  onSaveMetadata: (id: string, accountLabel: string, expiresAt?: string) => void;
   onSetActive: (id: string) => void;
   onDelete: (id: string) => void;
   onDiscover: (id: string) => void;
@@ -1807,6 +1810,7 @@ function CredentialList({
           (cred.auth_type === "claude_code_oauth" || cred.auth_type === "chatgpt_oauth");
         const probe = probeResults[cred.id];
         const metadataDraft = metadataDrafts[cred.id] ?? {};
+        const showExpiry = supportsCredentialExpiry(cred.auth_type);
         const accountLabelDraft = metadataDraft.account_label ?? cred.account_label ?? "";
         const expiresAtDraft = metadataDraft.expires_at ?? cred.expires_at ?? "";
         return (
@@ -1814,12 +1818,12 @@ function CredentialList({
             <div>
               <strong>{cred.label}</strong>
               {cred.account_label && <span>帳號／方案：{cred.account_label}</span>}
-              {cred.expires_at && <span>到期：{formatSystemTimestamp(cred.expires_at)}</span>}
+              {showExpiry && cred.expires_at && <span>到期：{formatSystemTimestamp(cred.expires_at)}</span>}
               {cred.active && <span className="active-badge">使用中</span>}
               <span>{cred.auth_type}</span>
             </div>
-            <span className={`key-pill ${cred.available ? "ok" : "missing"}`}>
-              {cred.available ? cred.masked ?? "available" : "missing"}
+            <span className={`key-pill credential-status-pill ${cred.available ? "ok" : "missing"}`}>
+              {credentialAvailabilityText(cred)}
             </span>
             <p className="muted tiny">
               {cred.id.startsWith("local:")
@@ -1853,22 +1857,24 @@ function CredentialList({
                   <div className="credential-actions credential-metadata-actions">
                     <input
                       value={accountLabelDraft}
-                      placeholder="帳號／方案標籤（可留空）"
+                      placeholder={showExpiry ? "帳號／方案標籤（可留空）" : "帳號／用途標籤（可留空）"}
                       aria-label={`${cred.label} account label`}
                       onChange={(e) => onMetadataDraft(cred.id, "account_label", e.target.value)}
                     />
-                    <input
-                      value={expiresAtDraft}
-                      placeholder="到期時間 ISO（可留空）"
-                      aria-label={`${cred.label} expires at`}
-                      onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
-                    />
+                    {showExpiry && (
+                      <input
+                        value={expiresAtDraft}
+                        placeholder="到期時間 ISO（OAuth，可留空）"
+                        aria-label={`${cred.label} expires at`}
+                        onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
+                      />
+                    )}
                     <button
                       type="button"
                       className="btn-ghost small"
-                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, expiresAtDraft)}
+                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, showExpiry ? expiresAtDraft : undefined)}
                     >
-                      儲存 metadata
+                      儲存
                     </button>
                   </div>
                 )}

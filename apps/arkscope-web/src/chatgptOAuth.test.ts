@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { cancelOpenAIOAuth, completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth } from "./api";
+import { cancelOpenAIOAuth, completeOpenAIOAuthManual, openAIOAuthStatus, startOpenAIOAuth, updateCredential } from "./api";
 import type { OAuthStatusResult, ProbeResult } from "./api";
 import {
   buildManualCompletion,
@@ -77,6 +77,18 @@ describe("OpenAI OAuth api clients", () => {
   it("throws on a non-ok status response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({}) }));
     await expect(openAIOAuthStatus("S")).rejects.toThrow();
+  });
+
+  it("surfaces backend detail when an update request is rejected", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ detail: "invalid expires_at" }),
+    }));
+
+    await expect(updateCredential("local:7", { account_label: "Claude Max" })).rejects.toThrow(
+      "/config/credentials/local%3A7 returned 400: invalid expires_at",
+    );
   });
 
   it("cancelOpenAIOAuth POSTs the state to the cancel route", async () => {

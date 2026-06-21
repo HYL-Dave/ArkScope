@@ -36,6 +36,15 @@ export function credentialPill(
   }
 }
 
+export function credentialAvailabilityText(cred: { available: boolean; masked: string | null }): string {
+  if (!cred.available) return "缺少";
+  return cred.masked ?? "可用";
+}
+
+export function supportsCredentialExpiry(authMode: CredentialAuthType): boolean {
+  return authMode === "chatgpt_oauth" || authMode === "claude_code_oauth";
+}
+
 // Discover-button label: claude_code_oauth has no live discovery API (seed only) →
 // 查看候選模型; everything else does live 列模型.
 export function discoverButtonLabel(authMode: CredentialAuthType | null): string {

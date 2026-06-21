@@ -473,6 +473,19 @@ async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise
   return (await r.json()) as T;
 }
 
+async function responseErrorMessage(path: string, r: Response): Promise<string> {
+  let detail = "";
+  try {
+    const body = (await r.json()) as { detail?: unknown };
+    if (typeof body.detail === "string" && body.detail.trim()) {
+      detail = `: ${body.detail.trim()}`;
+    }
+  } catch {
+    // Some routes/proxies return non-JSON bodies; the status is still useful.
+  }
+  return `${path} returned ${r.status}${detail}`;
+}
+
 async function sendJSON<T>(
   path: string,
   method: "POST" | "PUT" | "PATCH" | "DELETE",
@@ -484,7 +497,7 @@ async function sendJSON<T>(
     headers: body === undefined ? {} : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`${path} returned ${r.status}`);
+  if (!r.ok) throw new Error(await responseErrorMessage(path, r));
   if (r.status === 204) return undefined as T;
   return (await r.json()) as T;
 }
