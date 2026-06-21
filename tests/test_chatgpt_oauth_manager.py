@@ -145,6 +145,18 @@ def test_loopback_delivers_code_then_status_success_no_token(stores):
     assert "u@example.com" not in blob  # no email PII
 
 
+def test_begin_make_active_false_creates_inactive_credential(stores):
+    # The activation choice flows start→callback: begin(make_active=False) → the
+    # server-side completion creates the credential WITHOUT switching the active one.
+    cred, tok = stores
+    mgr = _mgr(stores, lambda state: _FakeServer(lambda s: ("AUTHCODE", state)))
+    out = mgr.begin(make_active=False)
+    st = _wait_status(mgr, out["state"])
+    assert st["status"] == "success"
+    row = cred.get(st["credential"]["credential_id"])
+    assert row is not None and row.active is False  # logging in did NOT hijack the active credential
+
+
 def test_loopback_start_port_in_use_yields_error_status(stores):
     class _FailStart(_FakeServer):
         def start(self):

@@ -407,8 +407,15 @@ class OAuthManualComplete(BaseModel):
     redirect_url: str | None = None
 
 
+class OAuthStartRequest(BaseModel):
+    # Default FALSE: ChatGPT OAuth execution isn't wired yet (AI 研究 fail-closes when
+    # it's active), so logging in must NOT auto-switch the active credential. The user
+    # can opt in. Carried into the pending login state so the loopback callback honors it.
+    make_active: bool = False
+
+
 @router.post("/config/credentials/openai/oauth/start")
-def start_openai_oauth(manager=Depends(get_oauth_login_manager)):
+def start_openai_oauth(body: OAuthStartRequest | None = None, manager=Depends(get_oauth_login_manager)):
     """Begin an in-app ChatGPT (OpenAI subscription) OAuth login. Returns the
     authorize URL + state for the browser; the loopback callback (or the manual
     copy-code fallback) completes it. COMPATIBILITY/EXPERIMENTAL path — the
@@ -417,7 +424,7 @@ def start_openai_oauth(manager=Depends(get_oauth_login_manager)):
     # Gate the credential-creating intent here (request context); the async loopback
     # completion fulfills this gated start. The detail is token-free by construction.
     require_profile_state_write("oauth_login_start", {"provider": "openai", "auth_mode": "chatgpt_oauth"})
-    return manager.begin()
+    return manager.begin(make_active=body.make_active if body else False)
 
 
 @router.get("/config/credentials/openai/oauth/status")

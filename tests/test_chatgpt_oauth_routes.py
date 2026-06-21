@@ -27,8 +27,9 @@ class _FakeManager:
         self.began = False
         self.manual_args = None
 
-    def begin(self):
+    def begin(self, make_active=True):
         self.began = True
+        self.make_active = make_active
         return {"auth_url": "https://auth.openai.com/oauth/authorize?client_id=app_x&state=S",
                 "state": "S", "expires_at": "2030-01-01T00:10:00+00:00", "manual_code_supported": True}
 
@@ -60,6 +61,17 @@ def test_start_returns_auth_url_and_invokes_write_gate(_gate):
     assert out["state"] == "S" and out["manual_code_supported"] is True
     assert len(_gate) == 1  # the credential-creating intent is gated at start
     assert "token" not in json.dumps(_gate[0], default=str).lower() or True  # detail is token-free by construction
+
+
+def test_start_defaults_make_active_false_and_honors_request():
+    # ChatGPT OAuth execution is unwired (fail-closed), so logging in must NOT
+    # auto-activate by default — but the user can opt in.
+    mgr = _FakeManager()
+    cr.start_openai_oauth(manager=mgr)  # no body
+    assert mgr.make_active is False
+    mgr2 = _FakeManager()
+    cr.start_openai_oauth(cr.OAuthStartRequest(make_active=True), manager=mgr2)
+    assert mgr2.make_active is True
 
 
 # --- status -------------------------------------------------------------------

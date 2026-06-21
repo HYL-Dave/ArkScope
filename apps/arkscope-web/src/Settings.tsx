@@ -49,7 +49,7 @@ import {
   addApiKeyButtonLabel,
   addApiKeySuccessMessage,
   credentialPill,
-  defaultNewApiKeyMakeActive,
+  defaultMakeActiveOnAdd,
   discoverButtonLabel,
   discoveryHeaderTitle,
   discoveryResultCredentialLabel,
@@ -1130,6 +1130,10 @@ function ProviderSection({
   const [newAlias, setNewAlias] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newMakeActive, setNewMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
+  // OAuth/setup-token "set active on add?" choice (per provider). Undefined = the
+  // unified default (Claude: active iff no local DB credential; ChatGPT: always off,
+  // since its execution is unwired and active = fail-closed Research).
+  const [oauthMakeActive, setOauthMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
   // Per-provider disclosure state for the (low-frequency) setup forms. Undefined =
   // use the smart default (collapsed once the provider has any usable credential);
@@ -1181,7 +1185,7 @@ function ProviderSection({
     }
   }
 
-  async function importClaudeToken() {
+  async function importClaudeToken(makeActive: boolean) {
     const token = claudeToken.trim();
     if (!token) {
       setProviderErr("Claude setup-token 不可為空");
@@ -1196,7 +1200,7 @@ function ProviderSection({
         alias: claudeAlias.trim() || "Claude subscription",
         token,
         account_label: claudeLabel.trim() || undefined,
-        make_active: true,
+        make_active: makeActive,
       });
       setClaudeToken(""); // clear the token from state immediately on success
       setClaudeAlias("");
@@ -1223,14 +1227,14 @@ function ProviderSection({
     }
   }
 
-  async function startChatGPTLogin() {
+  async function startChatGPTLogin(makeActive: boolean) {
     setProviderErr(null);
     setProviderMsg(null);
     setPollBusy(true);
     const token = { aborted: false }; // this login's abort token; manual/cancel flips it
     pollToken.current = token;
     try {
-      const r = await startOpenAIOAuth();
+      const r = await startOpenAIOAuth(makeActive);
       setOauth({ state: r.state, authUrl: r.auth_url, phase: "waiting" });
       // open the browser login; if a popup blocker eats it, the copy-link button is the fallback
       window.open(r.auth_url, "_blank", "noopener,noreferrer");
@@ -1358,7 +1362,10 @@ function ProviderSection({
           // toggle (setupOpen[provider]) overrides.
           const hasCredential = credentials.some((c) => c.available);
           const setupExpanded = setupOpen[provider] ?? !hasCredential;
-          const makeNewKeyActive = newMakeActive[provider] ?? defaultNewApiKeyMakeActive(credentials);
+          const makeNewKeyActive = newMakeActive[provider] ?? defaultMakeActiveOnAdd(credentials);
+          // Claude import default = same empty-state rule; ChatGPT default = OFF (unwired).
+          const claudeImportActive = oauthMakeActive.anthropic ?? defaultMakeActiveOnAdd(credentials);
+          const chatgptLoginActive = oauthMakeActive.openai ?? false;
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
           const discoveryState = discovery[provider];
           const usable = credentials.filter((c) => c.available && c.can_discover_models);
@@ -1512,7 +1519,15 @@ function ProviderSection({
                         onChange={(e) => setClaudeToken(e.target.value)}
                       />
                     </label>
-                    <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken()}>
+                    <label className="credential-add-toggle">
+                      <input
+                        type="checkbox"
+                        checked={claudeImportActive}
+                        onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, anthropic: e.target.checked }))}
+                      />
+                      <span>匯入後設為 active</span>
+                    </label>
+                    <button type="button" className="btn-ghost small" onClick={() => void importClaudeToken(claudeImportActive)}>
                       匯入 setup-token
                     </button>
                   </div>
@@ -1525,14 +1540,27 @@ function ProviderSection({
                       Token 會存入本機 token-store/keyring，credential DB 只保存 metadata。
                     </p>
                     {!oauth && (
-                      <button
-                        type="button"
-                        className="btn-ghost small"
-                        disabled={pollBusy}
-                        onClick={() => void startChatGPTLogin()}
-                      >
-                        {pollBusy ? "登入中…" : "登入 ChatGPT"}
-                      </button>
+                      <>
+                        <label className="credential-add-toggle">
+                          <input
+                            type="checkbox"
+                            checked={chatgptLoginActive}
+                            onChange={(e) => setOauthMakeActive((prev) => ({ ...prev, openai: e.target.checked }))}
+                          />
+                          <span>登入後設為 active</span>
+                        </label>
+                        <p className="muted tiny">
+                          目前可做 discovery / probe；AI 研究「執行」尚未接上，設為 active 會讓 OpenAI 研究 fail-closed。
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-ghost small"
+                          disabled={pollBusy}
+                          onClick={() => void startChatGPTLogin(chatgptLoginActive)}
+                        >
+                          {pollBusy ? "登入中…" : "登入 ChatGPT"}
+                        </button>
+                      </>
                     )}
                     {oauth?.phase === "waiting" && (
                       <div>

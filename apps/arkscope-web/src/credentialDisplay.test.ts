@@ -5,7 +5,7 @@ import {
   addApiKeyButtonLabel,
   addApiKeySuccessMessage,
   credentialPill,
-  defaultNewApiKeyMakeActive,
+  defaultMakeActiveOnAdd,
   discoverButtonLabel,
   discoveryHeaderTitle,
   discoveryResultCredentialLabel,
@@ -64,11 +64,11 @@ describe("discoverButtonLabel", () => {
 });
 
 describe("add API key activation copy", () => {
-  it("defaults to active only when the provider has no usable credential", () => {
-    expect(defaultNewApiKeyMakeActive([])).toBe(true);
-    expect(defaultNewApiKeyMakeActive([{ available: false }])).toBe(true);
-    expect(defaultNewApiKeyMakeActive([{ available: true }])).toBe(false);
-    expect(defaultNewApiKeyMakeActive([{ available: false }, { available: true }])).toBe(false);
+  it("defaults to active only when there is no LOCAL DB credential (env fallback rows don't count)", () => {
+    expect(defaultMakeActiveOnAdd([])).toBe(true);
+    expect(defaultMakeActiveOnAdd([{ id: "openai:OPENAI_API_KEY" }])).toBe(true); // env-only → still empty
+    expect(defaultMakeActiveOnAdd([{ id: "local:1" }])).toBe(false); // a DB credential exists
+    expect(defaultMakeActiveOnAdd([{ id: "openai:OPENAI_API_KEY" }, { id: "local:2" }])).toBe(false);
   });
 
   it("labels the submit action by whether the new key will become active", () => {

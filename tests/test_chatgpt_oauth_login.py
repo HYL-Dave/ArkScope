@@ -72,8 +72,9 @@ def _ok_exchange(captured: dict | None = None, *, refresh: str | None = "refresh
 
 
 class _Cred:
-    def __init__(self, cid, alias, expires_at, account_label):
+    def __init__(self, cid, alias, expires_at, account_label, make_active=True):
         self.id, self.alias, self.expires_at, self.account_label = cid, alias, expires_at, account_label
+        self.make_active = make_active
 
 
 class _CredStore:
@@ -85,7 +86,7 @@ class _CredStore:
     def add_oauth_credential(self, *, provider, auth_mode, alias, make_active=True,
                              expires_at=None, account_label=None):
         self._n += 1
-        c = _Cred(self._n, (alias or "").strip() or f"{provider} {auth_mode}", expires_at, account_label)
+        c = _Cred(self._n, (alias or "").strip() or f"{provider} {auth_mode}", expires_at, account_label, make_active)
         self.added.append(c)
         return c
 
@@ -135,6 +136,24 @@ def test_start_login_returns_auth_url_and_stores_verifier():
     pending = ss._d[out["state"]]
     assert pending.code_verifier
     assert pending.code_verifier not in url  # the VERIFIER must never be in the URL (only the challenge)
+
+
+def test_start_login_records_make_active_in_pending():
+    # make_active is chosen at START and stashed in the pending state, so the
+    # server-side loopback callback completion honors it (not a client cosmetic).
+    ss = _StateStore()
+    assert ss._d[start_login(state_store=ss, now=_NOW, make_active=False)["state"]].make_active is False
+    assert ss._d[start_login(state_store=ss, now=_NOW, make_active=True)["state"]].make_active is True
+    assert ss._d[start_login(state_store=ss, now=_NOW)["state"]].make_active is True  # default
+
+
+def test_complete_login_uses_pending_make_active_not_an_arg():
+    # complete_login takes NO make_active arg — it uses the value stashed at start.
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    s = start_login(state_store=ss, now=_NOW, make_active=False)["state"]
+    complete_login(state=s, code="c", credential_store=cs, token_store=ts, state_store=ss,
+                   exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1))
+    assert cs.added[0].make_active is False  # honored the start-time choice (no silent activate)
 
 
 # --- complete_login happy path ------------------------------------------------

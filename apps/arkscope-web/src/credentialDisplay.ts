@@ -49,11 +49,15 @@ export function activeFirst<T extends { active: boolean }>(creds: T[]): T[] {
   return [...creds].sort((a, b) => Number(b.active) - Number(a.active));
 }
 
-// New API keys should only take over automatically in the empty-state. Once a
-// provider already has any usable credential, adding another key is usually
-// staging/rotation and should not silently switch the active row.
-export function defaultNewApiKeyMakeActive(creds: { available: boolean }[]): boolean {
-  return !creds.some((c) => c.available);
+// Unified credential-activation default (API key add AND OAuth/setup-token import):
+// take over automatically ONLY in the empty-state — when this provider has no LOCAL DB
+// credential yet. A .env fallback row does NOT count (adding your first DB credential
+// should take over from the env fallback). Once a DB credential exists, adding/importing
+// another is staging/rotation and must not silently switch the active row.
+// (ChatGPT OAuth opts out of this default — its execution is unwired, so it defaults
+// to NOT active regardless; see the start route.)
+export function defaultMakeActiveOnAdd(creds: { id: string }[]): boolean {
+  return !creds.some((c) => c.id.startsWith("local:"));
 }
 
 export function addApiKeyButtonLabel(makeActive: boolean): string {

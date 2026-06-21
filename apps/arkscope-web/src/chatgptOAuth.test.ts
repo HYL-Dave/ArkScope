@@ -19,7 +19,7 @@ const okJson = (body: unknown) =>
 
 // --- api clients (request shape) ----------------------------------------------
 describe("OpenAI OAuth api clients", () => {
-  it("startOpenAIOAuth POSTs to the start route with no body", async () => {
+  it("startOpenAIOAuth POSTs make_active to the start route (default false)", async () => {
     const fetchMock = okJson({ auth_url: "https://auth.openai.com/x", state: "S", expires_at: "t", manual_code_supported: true });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -28,9 +28,16 @@ describe("OpenAI OAuth api clients", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/config\/credentials\/openai\/oauth\/start$/);
     expect(init.method).toBe("POST");
-    expect(init.body).toBeUndefined();
+    expect(JSON.parse(init.body)).toEqual({ make_active: false }); // default OFF (execution unwired)
     expect(out.state).toBe("S");
     expect(out.manual_code_supported).toBe(true);
+  });
+
+  it("startOpenAIOAuth forwards make_active=true when the user opts in", async () => {
+    const fetchMock = okJson({ auth_url: "x", state: "S", expires_at: "t", manual_code_supported: true });
+    vi.stubGlobal("fetch", fetchMock);
+    await startOpenAIOAuth(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ make_active: true });
   });
 
   it("openAIOAuthStatus GETs the status route with the state url-encoded", async () => {

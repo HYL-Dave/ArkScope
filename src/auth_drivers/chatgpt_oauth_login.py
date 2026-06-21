@@ -96,6 +96,10 @@ class _PendingLogin:
     # repr=False so the PKCE code_verifier never renders in a repr/log/exception
     code_verifier: str = field(repr=False)
     expires_at: datetime = field()
+    # The "set this credential active on completion?" choice is made at START and
+    # carried here, so the SERVER-SIDE loopback callback honors it (it is not a
+    # client cosmetic the callback path could bypass). Unified-activation policy.
+    make_active: bool = field(default=True)
 
 
 class _StateStore:
@@ -106,9 +110,9 @@ class _StateStore:
         self._d: dict[str, _PendingLogin] = {}
         self._lock = threading.Lock()  # FastAPI route + loopback callback may run on different threads
 
-    def put(self, state: str, code_verifier: str, *, expires_at: datetime) -> None:
+    def put(self, state: str, code_verifier: str, *, expires_at: datetime, make_active: bool = True) -> None:
         with self._lock:
-            self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at)
+            self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at, make_active=make_active)
 
     def pop(self, state: str, *, now: datetime) -> _PendingLogin | None:
         with self._lock:
@@ -121,15 +125,17 @@ class _StateStore:
 _STATE_STORE = _StateStore()
 
 
-def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None) -> dict:
-    """Begin a login: mint state + PKCE, stash the verifier, return the authorize URL.
-    The response is safe to expose — it carries the code_challenge, never the verifier."""
+def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None, make_active: bool = True) -> dict:
+    """Begin a login: mint state + PKCE, stash the verifier (+ the make_active choice),
+    return the authorize URL. The response is safe to expose — it carries the
+    code_challenge, never the verifier. `make_active` is carried in the pending state
+    so the loopback callback completion honors it."""
     now = now or datetime.now(timezone.utc)
     store = state_store if state_store is not None else _STATE_STORE
     verifier, challenge = generate_pkce_pair()
     state = generate_state()
     expires_at = now + _STATE_TTL
-    store.put(state, verifier, expires_at=expires_at)
+    store.put(state, verifier, expires_at=expires_at, make_active=make_active)
     return {
         "auth_url": build_authorize_url(state=state, code_challenge=challenge),
         "state": state,
@@ -294,14 +300,15 @@ def complete_login(
     credential_store: Any,
     token_store: Any,
     alias: str = "ChatGPT subscription",
-    make_active: bool = True,
     now: datetime | None = None,
     state_store: _StateStore | None = None,
     exchange: Callable[..., dict] | None = None,
 ) -> dict:
     """Finish a login (used by BOTH the loopback callback and the copy-code paste). Returns
     masked metadata only — the token is NEVER echoed. Any failure raises; nothing is left
-    half-built (a token-store write failure rolls back the credential row)."""
+    half-built (a token-store write failure rolls back the credential row). The
+    make_active choice comes from the pending state (set at start_login), NOT an arg —
+    so the server-side callback completion can't bypass it."""
     now = now or datetime.now(timezone.utc)
     store = state_store if state_store is not None else _STATE_STORE
     pending = store.pop(state, now=now)
@@ -313,7 +320,7 @@ def complete_login(
     record, plan_type, label = _token_response_to_record(resp)
 
     cred = credential_store.add_oauth_credential(
-        provider=PROVIDER, auth_mode=AUTH_MODE, alias=alias, make_active=make_active,
+        provider=PROVIDER, auth_mode=AUTH_MODE, alias=alias, make_active=pending.make_active,
         expires_at=record.expires_at, account_label=label,
     )
     cid = f"local:{cred.id}"

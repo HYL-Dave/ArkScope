@@ -605,8 +605,10 @@ export interface OAuthStatusResult {
   credential: ProviderCredential | null;
   detail: string | null;
 }
-export function startOpenAIOAuth(): Promise<OAuthStartResult> {
-  return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", undefined, 8_000);
+export function startOpenAIOAuth(makeActive = false): Promise<OAuthStartResult> {
+  // make_active default false: ChatGPT OAuth execution is unwired (Research fail-closes
+  // when active), so logging in must not auto-switch the active credential.
+  return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", { make_active: makeActive }, 8_000);
 }
 export function openAIOAuthStatus(state: string): Promise<OAuthStatusResult> {
   return getJSON<OAuthStatusResult>(`/config/credentials/openai/oauth/status?state=${encodeURIComponent(state)}`, 8_000);

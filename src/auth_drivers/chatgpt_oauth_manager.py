@@ -68,10 +68,12 @@ class OAuthLoginManager:
         self._servers: dict[str, Any] = {}
         self._lock = threading.Lock()
 
-    def begin(self) -> dict:
-        """Start a login. Returns {auth_url, state, expires_at, manual_code_supported}."""
+    def begin(self, make_active: bool = True) -> dict:
+        """Start a login. Returns {auth_url, state, expires_at, manual_code_supported}.
+        make_active (carried through the pending state to the loopback callback) decides
+        whether the resulting credential becomes the active one on completion."""
         now = self._clock()
-        started = start_login(state_store=self._state_store, now=now)
+        started = start_login(state_store=self._state_store, now=now, make_active=make_active)
         state = started["state"]
         server = self._server_factory(state)
         with self._lock:
