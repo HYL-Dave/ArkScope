@@ -130,6 +130,22 @@ def test_update_route_key_oauth_switch_both_directions(store, _gate):
     assert len(act) == 1 and act[0].id == oauth.id and act[0].auth_type == "claude_code_oauth"  # back to OAuth
 
 
+def test_update_route_oauth_metadata_label_and_expiry(store, _gate):
+    oauth = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
+
+    out = cr.update_credential(
+        f"local:{oauth.id}",
+        cr.CredentialUpdate(account_label="Claude Max", expires_at="2027-06-16T00:00:00+00:00"),
+        store=store,
+    )
+
+    cred = out["credential"]
+    assert cred["account_label"] == "Claude Max"
+    assert cred["expires_at"] == "2027-06-16T00:00:00+00:00"
+    assert store.get(f"local:{oauth.id}").account_label == "Claude Max"
+    assert "Claude Max" not in json.dumps(_gate, default=str)
+
+
 def test_export_env_route_refuses_symlink_to_arbitrary_file(store, tmp_path, _gate):
     # a symlink to ANY file (not just config/.env) must be refused — the route's
     # config/.env realpath-guard is not enough; an islink check covers the rest.

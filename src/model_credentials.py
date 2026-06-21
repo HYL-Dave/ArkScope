@@ -55,6 +55,7 @@ class ProviderCredential(BaseModel):
     auth_type: CredentialAuthType
     label: str
     account_label: str | None = None
+    expires_at: str | None = None
     source: str
     available: bool
     masked: str | None = None
@@ -384,6 +385,8 @@ class CredentialStore:
         alias: str | None = None,
         secret: str | None = None,
         active: bool | None = None,
+        expires_at: str | None = None,
+        account_label: str | None = None,
     ) -> StoredCredential | None:
         existing = self.get(credential_id)
         if not existing:
@@ -421,6 +424,22 @@ class CredentialStore:
             if active is not None:
                 sets.append("active = ?")
                 params.append(1 if active else 0)
+            if expires_at is not None:
+                clean_expires = expires_at.strip()
+                if clean_expires:
+                    _ensure_no_control_chars(clean_expires, "expires_at")
+                    sets.append("expires_at = ?")
+                    params.append(clean_expires)
+                else:
+                    sets.append("expires_at = NULL")
+            if account_label is not None:
+                clean_label = account_label.strip()
+                if clean_label:
+                    _ensure_no_control_chars(clean_label, "account_label")
+                    sets.append("account_label = ?")
+                    params.append(clean_label)
+                else:
+                    sets.append("account_label = NULL")
             params.append(existing.id)
             conn.execute(f"UPDATE llm_credentials SET {', '.join(sets)} WHERE id = ?", params)
             conn.commit()
@@ -529,6 +548,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 auth_type=row.auth_type,
                 label=row.alias,
                 account_label=row.account_label,
+                expires_at=row.expires_at,
                 source="profile_state.db",
                 available=True,
                 masked=_mask_secret(row.secret) if row.secret else None,  # OAuth rows have no secret here
@@ -562,6 +582,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                 auth_type="api_key",
                 label=label,
                 account_label=None,
+                expires_at=None,
                 source=env_name,
                 available=bool(value),
                 masked=_mask_secret(value) if value else None,
@@ -587,6 +608,7 @@ def provider_credentials(store: CredentialStore | None = None) -> dict[Provider,
                     auth_type="api_key_pool",
                     label=f"{env_name}[{idx}]",
                     account_label=None,
+                    expires_at=None,
                     source=env_name,
                     available=True,
                     masked=_mask_secret(value),

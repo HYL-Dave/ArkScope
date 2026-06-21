@@ -382,6 +382,7 @@ def test_provider_credentials_exposes_oauth_account_label(store):
         provider="anthropic",
         auth_mode="claude_code_oauth",
         alias="my claude",
+        expires_at="2027-06-16T00:00:00+00:00",
         account_label="Claude Pro",
     )
 
@@ -389,6 +390,7 @@ def test_provider_credentials_exposes_oauth_account_label(store):
 
     assert cred.label == "my claude"
     assert cred.account_label == "Claude Pro"
+    assert cred.expires_at == "2027-06-16T00:00:00+00:00"
 
 
 def test_add_oauth_credential_rejects_api_key_mode(store):
@@ -424,6 +426,43 @@ def test_update_secret_rejected_on_oauth_row(store):
     # api_key rows can still update their secret
     k = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-aaaaaaaaaa11")
     assert store.update(f"local:{k.id}", secret="sk-bbbbbbbbbb22").secret == "sk-bbbbbbbbbb22"
+
+
+def test_update_credential_metadata_label_and_expiry(store):
+    oc = store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="c")
+
+    upd = store.update(
+        f"local:{oc.id}",
+        account_label="Claude Max",
+        expires_at="2027-06-16T00:00:00+00:00",
+    )
+
+    assert upd.account_label == "Claude Max"
+    assert upd.expires_at == "2027-06-16T00:00:00+00:00"
+
+    key = store.add(provider="openai", auth_type="api_key", alias="k", secret="sk-aaaaaaaaaa11")
+    key_upd = store.update(
+        f"local:{key.id}",
+        account_label="OpenAI project A",
+        expires_at="2028-01-01T00:00:00+00:00",
+    )
+    assert key_upd.account_label == "OpenAI project A"
+    assert key_upd.expires_at == "2028-01-01T00:00:00+00:00"
+
+
+def test_update_credential_metadata_can_clear_label_and_expiry(store):
+    oc = store.add_oauth_credential(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        alias="c",
+        account_label="Claude Max",
+        expires_at="2027-06-16T00:00:00+00:00",
+    )
+
+    upd = store.update(f"local:{oc.id}", account_label="", expires_at="")
+
+    assert upd.account_label is None
+    assert upd.expires_at is None
 
 
 def test_provider_credentials_oauth_local_row_no_secret_no_crash(store, clean_env):

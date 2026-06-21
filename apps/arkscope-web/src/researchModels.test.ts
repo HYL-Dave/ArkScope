@@ -5,7 +5,7 @@ import { activeCredential, defaultModel, effortNote, modelOptions } from "./rese
 
 const cred = (over: Partial<ProviderCredential>): ProviderCredential => ({
   id: "local:1", provider: "openai", auth_type: "api_key", label: "k", source: "db",
-  account_label: null, available: true, masked: null, active: false, editable: true,
+  account_label: null, expires_at: null, available: true, masked: null, active: false, editable: true,
   can_discover_models: true, can_test_models: true, notes: "", ...over,
 });
 

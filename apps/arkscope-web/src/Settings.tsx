@@ -123,6 +123,11 @@ type TestState = Partial<Record<ModelTask, {
   result: ModelTestResult | null;
 }>>;
 
+type CredentialMetadataDraft = {
+  account_label?: string;
+  expires_at?: string;
+};
+
 export function SettingsView({
   runtime,
   onRuntimeChanged,
@@ -1136,6 +1141,7 @@ function ProviderSection({
   // since its execution is unwired and active = fail-closed Research).
   const [oauthMakeActive, setOauthMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
+  const [metadataDrafts, setMetadataDrafts] = useState<Record<string, CredentialMetadataDraft>>({});
   // Per-provider disclosure state for the (low-frequency) setup forms. Undefined =
   // use the smart default (collapsed once the provider has any usable credential);
   // a user toggle pins it. Keyed by provider so toggling one card doesn't move others.
@@ -1329,6 +1335,26 @@ function ProviderSection({
     }
   }
 
+  async function saveMetadata(credentialId: string, accountLabel: string, expiresAt: string) {
+    setProviderErr(null);
+    setProviderMsg(null);
+    try {
+      await updateCredential(credentialId, {
+        account_label: accountLabel.trim(),
+        expires_at: expiresAt.trim(),
+      });
+      setMetadataDrafts((prev) => {
+        const next = { ...prev };
+        delete next[credentialId];
+        return next;
+      });
+      setProviderMsg("Credential metadata 已更新。");
+      await onRefresh();
+    } catch (e) {
+      setProviderErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function removeKey(credentialId: string) {
     setProviderErr(null);
     setProviderMsg(null);
@@ -1407,8 +1433,14 @@ function ProviderSection({
               <CredentialList
                 credentials={activeFirst(credentials)}
                 renames={renames}
+                metadataDrafts={metadataDrafts}
                 onRenameDraft={(id, alias) => setRenames((prev) => ({ ...prev, [id]: alias }))}
+                onMetadataDraft={(id, field, value) => setMetadataDrafts((prev) => ({
+                  ...prev,
+                  [id]: { ...prev[id], [field]: value },
+                }))}
                 onSaveAlias={(id) => void saveAlias(id)}
+                onSaveMetadata={(id, accountLabel, expiresAt) => void saveMetadata(id, accountLabel, expiresAt)}
                 onSetActive={(id) => void setActive(id)}
                 onDelete={(id) => void removeKey(id)}
                 onDiscover={(id) => void onDiscover(provider, id)}
@@ -1722,8 +1754,11 @@ function ModelNotes({
 function CredentialList({
   credentials,
   renames,
+  metadataDrafts,
   onRenameDraft,
+  onMetadataDraft,
   onSaveAlias,
+  onSaveMetadata,
   onSetActive,
   onDelete,
   onDiscover,
@@ -1731,8 +1766,11 @@ function CredentialList({
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
+  metadataDrafts: Record<string, CredentialMetadataDraft>;
   onRenameDraft: (id: string, alias: string) => void;
+  onMetadataDraft: (id: string, field: keyof CredentialMetadataDraft, value: string) => void;
   onSaveAlias: (id: string) => void;
+  onSaveMetadata: (id: string, accountLabel: string, expiresAt: string) => void;
   onSetActive: (id: string) => void;
   onDelete: (id: string) => void;
   onDiscover: (id: string) => void;
@@ -1768,11 +1806,15 @@ function CredentialList({
           cred.id.startsWith("local:") &&
           (cred.auth_type === "claude_code_oauth" || cred.auth_type === "chatgpt_oauth");
         const probe = probeResults[cred.id];
+        const metadataDraft = metadataDrafts[cred.id] ?? {};
+        const accountLabelDraft = metadataDraft.account_label ?? cred.account_label ?? "";
+        const expiresAtDraft = metadataDraft.expires_at ?? cred.expires_at ?? "";
         return (
           <div className="credential-row" key={cred.id}>
             <div>
               <strong>{cred.label}</strong>
               {cred.account_label && <span>帳號／方案：{cred.account_label}</span>}
+              {cred.expires_at && <span>到期：{formatSystemTimestamp(cred.expires_at)}</span>}
               {cred.active && <span className="active-badge">使用中</span>}
               <span>{cred.auth_type}</span>
             </div>
@@ -1806,6 +1848,29 @@ function CredentialList({
                       設為 active
                     </button>
                   </>
+                )}
+                {cred.editable && (
+                  <div className="credential-actions credential-metadata-actions">
+                    <input
+                      value={accountLabelDraft}
+                      placeholder="帳號／方案標籤（可留空）"
+                      aria-label={`${cred.label} account label`}
+                      onChange={(e) => onMetadataDraft(cred.id, "account_label", e.target.value)}
+                    />
+                    <input
+                      value={expiresAtDraft}
+                      placeholder="到期時間 ISO（可留空）"
+                      aria-label={`${cred.label} expires at`}
+                      onChange={(e) => onMetadataDraft(cred.id, "expires_at", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      onClick={() => onSaveMetadata(cred.id, accountLabelDraft, expiresAtDraft)}
+                    >
+                      儲存 metadata
+                    </button>
+                  </div>
                 )}
                 {cred.can_discover_models && (
                   <button

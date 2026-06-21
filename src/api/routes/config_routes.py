@@ -108,6 +108,8 @@ class CredentialUpdate(BaseModel):
     alias: str | None = None
     secret: str | None = None
     active: bool | None = None
+    expires_at: str | None = None
+    account_label: str | None = None
 
 
 @router.get("/config/watchlist")
@@ -522,13 +524,21 @@ def update_credential(
         raise HTTPException(status_code=400, detail="only local credentials are editable")
     require_profile_state_write(
         "credential_update",
-        {"credential_id": credential_id, "active": body.active, "alias": body.alias},
+        {
+            "credential_id": credential_id,
+            "active": body.active,
+            "alias": body.alias,
+            "expires_at_set": body.expires_at is not None,
+            "account_label_set": body.account_label is not None,
+        },
     )
     cred = store.update(
         credential_id,
         alias=body.alias,
         secret=body.secret,
         active=body.active,
+        expires_at=body.expires_at,
+        account_label=body.account_label,
     )
     if not cred:
         raise HTTPException(status_code=404, detail="credential not found")

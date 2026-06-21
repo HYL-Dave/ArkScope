@@ -100,6 +100,7 @@ export interface ProviderCredential {
   auth_type: CredentialAuthType;
   label: string;
   account_label: string | null;
+  expires_at: string | null;
   source: string;
   available: boolean;
   masked: string | null;
@@ -643,7 +644,7 @@ export function addCredential(body: {
 
 export function updateCredential(
   credentialId: string,
-  body: { alias?: string; secret?: string; active?: boolean },
+  body: { alias?: string; secret?: string; active?: boolean; account_label?: string; expires_at?: string },
 ): Promise<{ credential: ProviderCredential }> {
   return sendJSON<{ credential: ProviderCredential }>(
     `/config/credentials/${encodeURIComponent(credentialId)}`,
