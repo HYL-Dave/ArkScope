@@ -1283,11 +1283,20 @@ table.wl tbody tr.archived td {
 .credential-add-box .field {
   margin: 0 0 8px;
 }
+.credential-add-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
 .credential-add-toggle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin: 2px 0 10px;
+  min-height: 30px;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -1352,14 +1361,20 @@ table.wl tbody tr.archived td {
 }
 .cred-setup {
   margin-top: 10px;
-  border-top: 1px dashed var(--border);
-  padding-top: 8px;
 }
 .cred-setup > summary {
   cursor: pointer;
-  color: var(--muted);
+  color: var(--fg);
   font-size: 12.5px;
+  font-weight: 650;
   list-style: revert;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: color-mix(in srgb, var(--panel2) 82%, var(--accent) 18%);
+}
+.cred-setup > summary:hover {
+  border-color: var(--accent);
 }
 .discovery-box {
   margin: 10px 0;
@@ -1369,9 +1384,17 @@ table.wl tbody tr.archived td {
 }
 .discovery-head {
   display: flex;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 8px;
   margin-bottom: 8px;
+}
+.discovery-head > div:first-child {
+  min-width: 0;
+}
+.discovery-credential {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
 }
 .discovery-head a {
   color: var(--accent);

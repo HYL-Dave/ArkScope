@@ -63,3 +63,13 @@ export function addApiKeyButtonLabel(makeActive: boolean): string {
 export function addApiKeySuccessMessage(provider: ModelProvider, makeActive: boolean): string {
   return makeActive ? `${provider} key 已新增並設為 active。` : `${provider} key 已新增（未切換 active）。`;
 }
+
+export function discoveryHeaderTitle(authMode: CredentialAuthType | null): string {
+  return authMode === "claude_code_oauth" ? "查看候選模型" : "列模型結果";
+}
+
+export function discoveryResultCredentialLabel(
+  credential: { label: string; auth_type: CredentialAuthType } | null,
+): string {
+  return credential ? `來源：${credential.label} / ${credential.auth_type}` : "來源：未指定 credential";
+}

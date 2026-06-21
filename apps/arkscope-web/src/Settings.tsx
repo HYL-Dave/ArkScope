@@ -51,6 +51,8 @@ import {
   credentialPill,
   defaultNewApiKeyMakeActive,
   discoverButtonLabel,
+  discoveryHeaderTitle,
+  discoveryResultCredentialLabel,
   discoverySourceLabel,
 } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
@@ -325,6 +327,13 @@ export function SettingsView({
                       },
                     }));
                   }
+                }}
+                onClearDiscovery={(provider) => {
+                  setDiscovery((prev) => {
+                    const next = { ...prev };
+                    delete next[provider];
+                    return next;
+                  });
                 }}
                 onUseModel={(provider, model, task) => {
                   onDraftForTask(setDraft, task, provider, model);
@@ -1105,6 +1114,7 @@ function ProviderSection({
   discovery,
   onRefresh,
   onDiscover,
+  onClearDiscovery,
   onUseModel,
 }: {
   catalog: ModelCatalog;
@@ -1112,6 +1122,7 @@ function ProviderSection({
   discovery: DiscoveryState;
   onRefresh: () => Promise<void>;
   onDiscover: (provider: ModelProvider, credentialId: string | null) => Promise<void>;
+  onClearDiscovery: (provider: ModelProvider) => void;
   onUseModel: (provider: ModelProvider, model: string, task: ModelTask) => void;
 }) {
   const [selectedCreds, setSelectedCreds] = useState<Partial<Record<ModelProvider, string>>>({});
@@ -1360,6 +1371,9 @@ function ProviderSection({
           const discoveredAuthMode = discoveryState?.result
             ? credentials.find((c) => c.id === discoveryState.result?.credential_id)?.auth_type ?? null
             : null;
+          const discoveredCredential = discoveryState?.result
+            ? credentials.find((c) => c.id === discoveryState.result?.credential_id) ?? null
+            : null;
           return (
             <div className="settings-panel provider-card" key={provider}>
               <div className="settings-panel-head">
@@ -1391,6 +1405,8 @@ function ProviderSection({
                 <DiscoveryResultView
                   result={discoveryState.result}
                   authMode={discoveredAuthMode}
+                  credentialLabel={discoveredCredential?.label ?? null}
+                  onClose={() => onClearDiscovery(provider)}
                   onUse={(model, task) => onUseModel(provider, model, task)}
                 />
               )}
@@ -1444,21 +1460,23 @@ function ProviderSection({
                       onChange={(e) => setNewSecret((prev) => ({ ...prev, [provider]: e.target.value }))}
                     />
                   </label>
-                  <label className="credential-add-toggle">
-                    <input
-                      type="checkbox"
-                      checked={makeNewKeyActive}
-                      onChange={(e) => setNewMakeActive((prev) => ({ ...prev, [provider]: e.target.checked }))}
-                    />
-                    <span>新增後設為 active</span>
-                  </label>
-                  <button
-                    type="button"
-                    className="btn-ghost small"
-                    onClick={() => void addKey(provider, makeNewKeyActive)}
-                  >
-                    {addApiKeyButtonLabel(makeNewKeyActive)}
-                  </button>
+                  <div className="credential-add-footer">
+                    <label className="credential-add-toggle">
+                      <input
+                        type="checkbox"
+                        checked={makeNewKeyActive}
+                        onChange={(e) => setNewMakeActive((prev) => ({ ...prev, [provider]: e.target.checked }))}
+                      />
+                      <span>新增後設為 active</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-ghost small"
+                      onClick={() => void addKey(provider, makeNewKeyActive)}
+                    >
+                      {addApiKeyButtonLabel(makeNewKeyActive)}
+                    </button>
+                  </div>
                 </div>
                 {provider === "anthropic" && (
                   <div className="credential-add-box oauth-import-box">
@@ -1853,13 +1871,17 @@ function ProbeResultView({
   );
 }
 
-function DiscoveryResultView({
+export function DiscoveryResultView({
   result,
   authMode,
+  credentialLabel,
+  onClose,
   onUse,
 }: {
   result: ModelDiscoveryResult;
   authMode: ProviderCredential["auth_type"] | null;
+  credentialLabel: string | null;
+  onClose: () => void;
   onUse: (model: string, task: ModelTask) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -1874,16 +1896,25 @@ function DiscoveryResultView({
     sources.length === 1
       ? discoverySourceLabel(result.provider, authMode, sources[0])
       : sources.join(" / ");
+  const credentialSummary = discoveryResultCredentialLabel(
+    authMode ? { label: credentialLabel ?? "未命名 credential", auth_type: authMode } : null,
+  );
   return (
     <div className="discovery-box">
       <div className="discovery-head">
-        <strong>Discovery: {result.status}</strong>
+        <div>
+          <strong>{discoveryHeaderTitle(authMode)} · {result.status}</strong>
+          <span className="discovery-credential tiny">{credentialSummary}</span>
+        </div>
         {result.models.length > 0 && <span className="source-badge tiny">{sourceBadge}</span>}
         {result.source_url && (
           <a href={result.source_url} target="_blank" rel="noreferrer">
             source
           </a>
         )}
+        <button type="button" className="btn-ghost tiny" onClick={onClose}>
+          關閉
+        </button>
       </div>
       {result.error && <p className="warn-text tiny">{result.error}</p>}
       <label className="field discovery-filter">

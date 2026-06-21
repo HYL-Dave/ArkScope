@@ -7,6 +7,8 @@ import {
   credentialPill,
   defaultNewApiKeyMakeActive,
   discoverButtonLabel,
+  discoveryHeaderTitle,
+  discoveryResultCredentialLabel,
   discoverySourceLabel,
 } from "./credentialDisplay";
 
@@ -77,5 +79,19 @@ describe("add API key activation copy", () => {
   it("reports whether the add switched the active credential", () => {
     expect(addApiKeySuccessMessage("openai", true)).toBe("openai key 已新增並設為 active。");
     expect(addApiKeySuccessMessage("openai", false)).toBe("openai key 已新增（未切換 active）。");
+  });
+});
+
+describe("discovery result header copy", () => {
+  it("labels live vs seed discovery by auth mode", () => {
+    expect(discoveryHeaderTitle("api_key")).toBe("列模型結果");
+    expect(discoveryHeaderTitle("chatgpt_oauth")).toBe("列模型結果");
+    expect(discoveryHeaderTitle("claude_code_oauth")).toBe("查看候選模型");
+  });
+
+  it("shows which credential produced the result", () => {
+    expect(discoveryResultCredentialLabel({ label: "TS_Codex", auth_type: "chatgpt_oauth" })).toBe("來源：TS_Codex / chatgpt_oauth");
+    expect(discoveryResultCredentialLabel({ label: "OpenAI primary", auth_type: "api_key" })).toBe("來源：OpenAI primary / api_key");
+    expect(discoveryResultCredentialLabel(null)).toBe("來源：未指定 credential");
   });
 });
