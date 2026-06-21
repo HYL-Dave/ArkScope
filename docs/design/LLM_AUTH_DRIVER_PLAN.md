@@ -555,6 +555,13 @@ in the probe shape. P2b returned no function-call output item; fixed to align th
 with Novelloom's low-reasoning shape and to report output/event types on failure. **S3
 driver wire-in remains gated on a re-run of the live probe after these fixes.**
 
+**Live P1/P2 second run (2026-06-21, user hand-test):** P1, P2a, and P2c passed. P2b
+still displayed failed, but its event trace included `response.function_call_arguments.*`
+and `response.output_item.*` events while `response.completed` omitted `response.output`.
+That proves the backend emitted a function call; the failure was the probe parser looking
+only at terminal output. Fixed: P2b now passes on either terminal `*_call` output items OR
+streamed function-call item/argument events.
+
 ### S3-auth design correction — product path = ArkScope's OWN in-app OAuth (2026-06-20)
 
 Locked after a design pushback (a "import from `~/.codex/auth.json` first" suggestion was a

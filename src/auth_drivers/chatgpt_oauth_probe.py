@@ -103,6 +103,17 @@ def _iter_output_items(response: Any) -> list:
     return output if isinstance(output, list) else []
 
 
+def _event_output_item(raw: dict) -> dict | None:
+    """Extract an output item from streaming events. ChatGPT backend streams can
+    prove function-call support via response.output_item.* / function_call_arguments
+    events even when response.completed omits response.output."""
+    for key in ("item", "output_item"):
+        item = raw.get(key)
+        if isinstance(item, dict):
+            return item
+    return None
+
+
 def _model_id_of(item: Any):
     if isinstance(item, str):
         return item
@@ -231,15 +242,24 @@ def _default_p2b_function_call(token: str) -> tuple[bool, str]:
     )
     terminal = None
     event_types: list[str] = []
+    stream_call_type: str | None = None
     for event in stream:
         raw = _to_dict(event)
         etype = raw.get("type")
         if isinstance(etype, str):
             event_types.append(etype)
+            if etype.startswith("response.function_call_arguments."):
+                stream_call_type = "function_call"
+        item = _event_output_item(raw)
+        itype = item.get("type") if item else None
+        if isinstance(itype, str) and itype.endswith("_call"):
+            stream_call_type = itype
         if etype == "response.completed":
             terminal = raw.get("response")
         elif etype in ("response.failed", "response.incomplete"):
             return False, f"stream ended with {etype} before any tool call"
+    if stream_call_type:
+        return True, f"stream emitted a {stream_call_type} item/event"
     output_types: list[str] = []
     for item in _iter_output_items(terminal):
         itype = item.get("type") if isinstance(item, dict) else None

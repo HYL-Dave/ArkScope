@@ -280,6 +280,24 @@ def test_default_p2b_pass_harvests_function_call(monkeypatch):
     assert passed is True and "call" in observed.lower()
 
 
+def test_default_p2b_passes_when_stream_emits_function_call_arguments(monkeypatch):
+    # Live 2026-06-21 shape: the backend streamed function-call argument events,
+    # but response.completed did not include a response.output list. That still
+    # proves tool-call support; the probe must not look only at terminal output.
+    stream = [
+        {"type": "response.created"},
+        {"type": "response.output_item.added", "item": {"type": "function_call", "name": "lookup_fact"}},
+        {"type": "response.function_call_arguments.delta", "delta": "{\"key\""},
+        {"type": "response.function_call_arguments.done", "arguments": "{\"key\":\"x\"}"},
+        {"type": "response.output_item.done", "item": {"type": "function_call", "name": "lookup_fact"}},
+        {"type": "response.completed"},
+    ]
+    monkeypatch.setattr(mod, "_openai_client", lambda token, base_url: _FakeClient(on_create=lambda kw: stream))
+    passed, observed = mod._default_p2b_function_call(_TOK)
+    assert passed is True
+    assert "stream" in observed.lower() or "function_call_arguments" in observed
+
+
 def test_default_p2b_sends_flat_function_tool(monkeypatch):
     # Responses-API tool shape is FLAT: {type:function, name, ...} NOT nested under 'function'.
     seen = {}
