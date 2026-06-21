@@ -217,6 +217,90 @@ token-store.
 
 ---
 
+## 11. Credential operations matrix + Settings IA (S3 UX cleanup — design)
+
+**Why:** hand-testing S3 found the model-availability UX confusing — `列出此 key 可見
+模型` exists only in a bottom "Discovery/Test credential" advanced block whose copy says
+"可用 **API key** 做 model discovery" (implies OAuth can't), and the four credential
+types each support a *different* set of checks crammed into one section. Design the
+**check methods per credential FIRST**, then the placement (gpt-5.5: "邊修邊補" is the
+problem). Grounded against HEAD (steps 1/1.1/2/3b landed).
+
+### 11.1 Core principle — model id is NOT split; the credential decides capability
+
+A model id (`gpt-5.4-mini`) is the SAME string whether reached via an OpenAI API key or
+the ChatGPT backend — do **not** show "two gpt-5.4-mini". But the API *surface* differs
+(max_output_tokens 400 on the backend, different /models endpoint, billing, store/stream/
+tool-call/effort compatibility). So: **`(provider, auth_mode)` of the ACTIVE credential
+decides the available models + their capability; the model id is just one field.** UI
+shows the id once, with a **source/auth badge** (OpenAI API / ChatGPT backend / seed).
+Internally, capability is keyed by `(provider, auth_mode, model)` — never a global catalog.
+
+**Terminology (LOCKED — these are distinct operations, don't conflate in UI/code):**
+- **列模型 (list models)** = LIVE discovery against the credential's real backend.
+- **查看候選模型 (view candidate models)** = the seed/catalog candidate list — NOT live
+  (used where no live discovery API exists, e.g. claude_code_oauth).
+- **實測 OAuth (probe OAuth)** = exercise the subscription backend/token capability
+  (P1/P2 for ChatGPT, P3 for Claude) — a health check, not a model list.
+- **測試模型 (test model)** = a paid minimal model *call* with model+effort — **API-key
+  path ONLY** (OAuth modes don't do a raw-SDK test call).
+- **The ACTIVE credential decides** which models + capabilities AI 研究 can use.
+
+### 11.2 Operations matrix (grounded against HEAD)
+
+| Credential | 列模型 (discovery) | 驗證 token/登入 (probe) | 測試模型呼叫 (model-test) | AI 研究 執行 |
+|---|---|---|---|---|
+| **openai api_key** | OpenAI `/models` — LIVE (`source=provider_api`) | — (key-exists; a real call = model-test) | model+effort test call — LIVE | runs |
+| **openai chatgpt_oauth** | ChatGPT-backend list — LIVE (step 1; `source=provider_api`) | **P1/P2 probe** (real backend calls) | **deferred** — execution unwired (would hit the max_output_tokens-400 surface); show "execution 接線後可測" | **fail-closed** (step 0) until step 4 |
+| **anthropic api_key** | Anthropic `/v1/models` — LIVE | — | model+effort test call — LIVE | runs |
+| **anthropic claude_code_oauth** | **seed candidate list only** (no live discovery API; route returns seed) | **P3 probe** (`claude -p` + raw-SDK-reject) | **none** (no raw-SDK model-test — wrong surface/billing) | runs (subscription Research) |
+
+Correction vs the first-pass matrix: chatgpt_oauth 列模型 is now **LIVE** (step 1), not
+"暫不"; claude_code_oauth discovery is reachable but returns **seed** and the UI currently
+**hides** it (`can_discover_models=False`, `model_credentials.py:519`) — the inconsistency
+the hand-test hit.
+
+### 11.3 Settings IA — per-credential row actions (DECIDED)
+
+Each credential row owns its own checks (you're looking at *that* credential):
+
+| Credential | Row actions | Model source label |
+|---|---|---|
+| OpenAI API key | `列模型` · `測試模型` | OpenAI API · live |
+| ChatGPT OAuth (chatgpt_oauth) | `列模型` · `實測 OAuth` | ChatGPT backend · live |
+| Anthropic API key | `列模型` · `測試模型` | Anthropic API · live |
+| Claude OAuth (claude_code_oauth) | `查看候選模型` · `測試 token` | seed · 非即時 discovery |
+
+- **Provider copy** (`Settings.tsx:1315`): drop "API key" — say "credential model
+  discovery / capability test (依 credential 類型而定)".
+- **Discovery results** show a **source badge** per result (`OpenAI API` / `ChatGPT
+  backend` / `seed`) — data already exists (`DiscoveredModel.source`,
+  `ModelDiscoveryResult.source_url`); UI just renders it.
+- **Settings → Models = task routing ONLY** (may show a warning like "active credential is
+  ChatGPT OAuth — confirm models via Providers", per §step-2). No credential checks there.
+- **AI 研究 page = per-turn selection ONLY** — show active credential / auth mode / model
+  source; never credential management.
+
+### 11.4 Resolved decisions (gpt-5.5 + user, 2026-06-21)
+
+1. **claude_code_oauth model affordance** → `查看候選模型` (seed) with a `seed · 非即時
+   discovery` badge — honest "candidates, not a live list" (NOT "raw discovery").
+2. **Bottom "Discovery/Test credential" selector** → KEEP but DEMOTE + rename to
+   "進階：指定 credential 做 discovery/test" (the row-level actions become the main entry;
+   the advanced selector stays for explicitly choosing a credential).
+3. **This slice = DESIGN-ONLY.** This turn commits this design only; user + gpt-5.5 review
+   before any UI build, to lock the credential-check *semantics* once (avoid "邊修邊補"
+   growing inconsistent entry points). Execution wire-in (step 4) stays out regardless.
+
+**Implementation phase (NEXT slice, after review)** — all TDD, no execution wiring:
+remove the `OPENAI_OAUTH_TOKEN` env placeholder (`model_credentials.py:609`; update
+characterization test `:30/:132/:133` + doc notes `LLM_AUTH_DRIVER_PLAN.md:147` and §9
+Slice-1 above); fix the provider copy; add the source badge to discovery results; add
+row-level `列模型`/`查看候選模型` buttons; flip `claude_code_oauth` so its seed candidates are
+viewable on the row (today `can_discover_models=False`, `model_credentials.py:519`).
+
+---
+
 ## 10. Decisions (resolved with gpt-5.5 — locked for Slices 3–6)
 
 1. **Alias defaults** — ✅ source-aware, NOT generic A/B: `OPENAI_API_KEY` →
