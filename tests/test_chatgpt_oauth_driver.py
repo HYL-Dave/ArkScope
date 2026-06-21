@@ -126,6 +126,31 @@ def test_discover_empty_ids_is_error_with_seed(monkeypatch):
     assert res.status == "error" and all(m.source == "seed" for m in res.models)
 
 
+def test_discover_drops_token_or_pii_shaped_ids(monkeypatch):
+    # Defense-in-depth: a hostile/odd backend could reflect a token-/JWT-/email-shaped
+    # string as a "model id". Those must be DROPPED (never surfaced into a picker),
+    # keeping only well-formed model ids.
+    bad = [
+        {"id": "gpt-5.4-mini"},                                   # good
+        {"id": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsZWFrIn0.SIG"},   # JWT-shaped
+        {"id": "user@example.com"},                               # email
+        {"id": "sk-proj-" + "A" * 90},                            # long token
+        {"id": "claude-opus-4-8"},                                # good (cross-provider id still well-formed)
+    ]
+    monkeypatch.setattr(mod, "_discovery_client", lambda token: _FakeClient(lambda kw: _FakePage(bad)))
+    res = _run(_driver().discover_models())
+    ids = [m.id for m in res.models]
+    assert ids == ["gpt-5.4-mini", "claude-opus-4-8"]  # bad shapes dropped, good kept
+    assert all(m.label == m.id for m in res.models)
+
+
+def test_discover_all_ids_garbage_is_error_seed(monkeypatch):
+    monkeypatch.setattr(mod, "_discovery_client",
+                        lambda token: _FakeClient(lambda kw: _FakePage([{"id": "a@b.com"}, {"id": "x" * 200}])))
+    res = _run(_driver().discover_models())
+    assert res.status == "error" and all(m.source == "seed" for m in res.models)  # nothing well-formed → seed
+
+
 def test_discover_plain_list_succeeds_without_extra_query(monkeypatch):
     # if the backend serves a plain models.list (no 400), use it directly.
     monkeypatch.setattr(mod, "_discovery_client",

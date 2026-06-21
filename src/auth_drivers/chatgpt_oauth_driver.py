@@ -20,6 +20,7 @@ Any surfaced error is redacted — the token can never leak into a result.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
@@ -30,6 +31,20 @@ from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PRO
 from .probe_harness import redact
 
 _S3_EXEC = "OpenAI chatgpt_oauth execution isn't wired yet (S3 step 4 — backend request differences)."
+
+# A well-formed model id: starts alphanumeric, then [A-Za-z0-9._:-], ≤80 chars. Real
+# model ids — gpt-5.4-mini, gpt-3.5-turbo, claude-opus-4-8, ft:gpt-..., dated ids —
+# all satisfy it; it rejects spaces / @ / / + = (email + base64/JWT padding). Because
+# a SHORT JWT (eyJ....eyJ....sig) uses only [A-Za-z0-9.], the regex alone can't catch
+# it (version dots like 5.4 are legitimate), so an id is kept ONLY if it ALSO survives
+# the fail-closed redact() unchanged (which catches JWT/base64/high-entropy shapes).
+# Defense-in-depth: a hostile/odd backend can't reflect a token-shaped string into the
+# picker; non-matching discovered ids are DROPPED, not shown.
+_VALID_MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\-]{0,79}$")
+
+
+def _well_formed_ids(ids: list[str]) -> list[str]:
+    return [mid for mid in ids if _VALID_MODEL_ID.fullmatch(mid) and redact(mid) == mid]
 
 
 def _discovery_client(token: str) -> Any:  # seam for tests
@@ -123,7 +138,7 @@ class OpenAIChatGPTOAuthDriver:
                 page = client.models.list()  # may 400 if the backend requires client_version
             except Exception:  # noqa: BLE001 — fall through to the Codex-style extra_query
                 page = client.models.list(extra_query={"client_version": _CLIENT_VERSION})
-            ids = _model_ids(page)
+            ids = _well_formed_ids(_model_ids(page))  # drop token/PII-shaped ids (defense-in-depth)
         except Exception as exc:  # noqa: BLE001 — never raise discovery; degrade to seed
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
