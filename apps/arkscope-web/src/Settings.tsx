@@ -1671,13 +1671,18 @@ function CredentialList({
                     type="button"
                     className="btn-ghost small"
                     disabled={probing === cred.id}
+                    title={
+                      cred.auth_type === "chatgpt_oauth"
+                        ? "測試 ChatGPT OAuth（會打真實請求）"
+                        : "測試 Claude setup-token"
+                    }
                     onClick={() => void runProbe(cred.id)}
                   >
                     {probing === cred.id
-                      ? "測試中…（最久約 2 分鐘）"
+                      ? "測試中…"
                       : cred.auth_type === "chatgpt_oauth"
-                        ? "測試 ChatGPT OAuth（會打真實請求）"
-                        : "測試 setup-token"}
+                        ? "測試 OAuth"
+                        : "測試 token"}
                   </button>
                 )}
                 <button

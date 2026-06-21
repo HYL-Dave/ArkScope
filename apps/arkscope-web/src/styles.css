@@ -1309,9 +1309,15 @@ table.wl tbody tr.archived td {
 .credential-actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto auto auto;
+  grid-template-columns: minmax(180px, 1fr) repeat(auto-fit, minmax(86px, max-content));
   gap: 6px;
   align-items: center;
+}
+.credential-actions .btn-ghost {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .credential-actions input {
   border: 1px solid var(--border);
