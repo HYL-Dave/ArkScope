@@ -54,6 +54,15 @@ def _credential_store(store) -> CredentialStore:
     return store if isinstance(store, CredentialStore) else get_credential_store()
 
 
+def _run_coro(coro):
+    """Drive an async driver method from a SYNC route handler. The ONE place this
+    pattern lives — sync FastAPI routes run in a threadpool (no running loop), so
+    asyncio.run is safe here. Do not scatter asyncio.run across routes."""
+    import asyncio
+
+    return asyncio.run(coro)
+
+
 class RouteUpdate(BaseModel):
     provider: Provider
     model: str
@@ -532,14 +541,19 @@ def discover_provider_models(
     store = _credential_store(store)
     cred = store.get(body.credential_id) if body.credential_id else None
     if cred is not None and cred.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
-        import asyncio
-
+        # API-boundary guard: the requested provider must match the credential's
+        # provider — never silently return another provider's models.
+        if cred.provider != body.provider:
+            raise HTTPException(
+                status_code=400,
+                detail=f"credential {body.credential_id} is provider {cred.provider!r}, not {body.provider!r}",
+            )
         from src.auth_drivers.factory import build_driver
 
         driver = build_driver(
             provider=cred.provider, auth_mode=cred.auth_type, credential=cred, token_store=token_store,
         )
-        return asyncio.run(driver.discover_models()).model_dump()
+        return _run_coro(driver.discover_models()).model_dump()
     return discover_models(body.provider, body.credential_id, store).model_dump()
 
 

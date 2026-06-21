@@ -17,6 +17,7 @@ import pytest
 
 import src.auth_drivers.chatgpt_oauth_driver as mod
 from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
 from src.auth_drivers.token_store import StoredTokenRecord
 
 
@@ -131,6 +132,44 @@ def test_discover_plain_list_succeeds_without_extra_query(monkeypatch):
                         lambda token: _FakeClient(lambda kw: _FakePage([{"id": "gpt-5.5"}])))
     res = _run(_driver().discover_models())
     assert res.status == "ok" and [m.id for m in res.models] == ["gpt-5.5"]
+
+
+# --- Step 1.1: refresh-before-discovery (access tokens rotate) ----------------
+def test_discover_uses_refreshed_token(monkeypatch):
+    # discovery refreshes the (possibly expired) token FIRST, then queries with the
+    # fresh access_token — so "available models" doesn't intermittently degrade.
+    monkeypatch.setattr(mod, "_refresh_login",
+                        lambda *, credential_id, token_store, **kw: StoredTokenRecord(access_token="cg-FRESH"))
+    used = {}
+
+    def client(token):
+        used["token"] = token
+        return _FakeClient(lambda kw: _FakePage([{"id": "gpt-5.5"}]))
+
+    monkeypatch.setattr(mod, "_discovery_client", client)
+    res = _run(_driver().discover_models())
+    assert res.status == "ok" and used["token"] == "cg-FRESH"  # the refreshed token was used
+
+
+def test_discover_refresh_failure_returns_relogin_error_redacted(monkeypatch):
+    tok = "cg-SECRET-TOKEN-xyz789"
+
+    def boom(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError(f"refresh failed (401) {tok}")
+
+    monkeypatch.setattr(mod, "_refresh_login", boom)
+    res = _run(OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(tok)).discover_models())
+    assert res.status == "error" and all(m.source == "seed" for m in res.models)  # honest fallback
+    assert res.error and tok not in res.error  # token never leaks
+    assert "login" in res.error.lower() or "auth" in res.error.lower()  # actionable re-login hint
+
+
+def test_refresh_if_needed_delegates_to_login(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(mod, "_refresh_login",
+                        lambda *, credential_id, token_store, **kw: seen.update(cid=credential_id) or StoredTokenRecord(access_token="x"))
+    _run(_driver().refresh_if_needed())
+    assert seen.get("cid") == "local:7"
 
 
 # --- execution stays gated (S3 step 4) ---------------------------------------

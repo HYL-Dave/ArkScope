@@ -24,6 +24,8 @@ from typing import Any, Optional
 
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
 
+from .chatgpt_oauth_login import ChatGPTOAuthLoginError
+from .chatgpt_oauth_login import refresh_if_needed as _refresh_login
 from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PROBE_MODEL, _model_ids
 from .probe_harness import redact
 
@@ -67,7 +69,12 @@ class OpenAIChatGPTOAuthDriver:
     async def authenticate(self) -> None:  # token arrives via the in-app OAuth login
         return None
 
-    async def refresh_if_needed(self) -> None:  # refresh is wired with execution (S3 step 4)
+    async def refresh_if_needed(self) -> None:
+        # Refresh the rotating ChatGPT access token if expired (the login core handles
+        # the 5-min buffer + the actual grant). No-op when there's nothing to refresh.
+        if self._token_store is None or not self._credential_id:
+            return None
+        _refresh_login(credential_id=self._credential_id, token_store=self._token_store)
         return None
 
     async def get_quota_status(self) -> dict[str, Any]:
@@ -87,9 +94,25 @@ class OpenAIChatGPTOAuthDriver:
 
     # --- ResearchProviderDriver surface ---------------------------------
     async def discover_models(self) -> ModelDiscoveryResult:
-        token = self._load_token()
-        if not token:
+        if self._token_store is None or not self._credential_id or not self._load_token():
             # No token → can't query the backend; the seed is the honest candidate list.
+            return ModelDiscoveryResult(
+                provider="openai", credential_id=self._credential_id,
+                status="missing_credential", models=_seed_models("openai"),
+            )
+        # Refresh the (possibly expired) access token FIRST so "available models" doesn't
+        # intermittently degrade. A refresh failure means the login is stale → surface a
+        # clear re-login hint (redacted), not a silent seed fallback with no reason.
+        try:
+            rec = _refresh_login(credential_id=self._credential_id, token_store=self._token_store)
+            token = rec.access_token if rec else None
+        except ChatGPTOAuthLoginError as exc:
+            return ModelDiscoveryResult(
+                provider="openai", credential_id=self._credential_id,
+                status="error", models=_seed_models("openai"),
+                error=f"re-login needed (token refresh failed): {_err(exc)}",
+            )
+        if not token:
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="missing_credential", models=_seed_models("openai"),

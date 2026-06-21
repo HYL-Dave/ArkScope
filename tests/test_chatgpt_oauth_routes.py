@@ -166,6 +166,19 @@ def test_model_discovery_dispatches_chatgpt_oauth_to_the_driver(stores, monkeypa
     assert all(m["source"] == "provider_api" for m in out["models"])  # live, not seed
 
 
+def test_model_discovery_provider_credential_mismatch_is_400(stores):
+    # Step 1.1: an API-boundary guard — body.provider must match the credential's
+    # provider, else 400 (never return another provider's models).
+    cred, tok = stores
+    c = cred.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg")
+    cid = f"local:{c.id}"
+    with pytest.raises(HTTPException) as ei:
+        cr.discover_provider_models(
+            cr.ModelDiscoveryRequest(provider="anthropic", credential_id=cid), store=cred, token_store=tok,
+        )
+    assert ei.value.status_code == 400
+
+
 def test_model_discovery_api_key_uses_module_path_not_driver(stores, monkeypatch):
     # api_key dispatch is UNCHANGED — it goes through the module discover_models, not
     # build_driver (no driver dispatch, no network in this test).
