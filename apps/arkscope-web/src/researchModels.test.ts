@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProviderCredential } from "./api";
-import { activeCredential, defaultModel, effortNote, modelOptions } from "./researchModels";
+import { activeCredential, defaultModel, effortNote, lastAssistantSelection, modelOptions } from "./researchModels";
 
 const cred = (over: Partial<ProviderCredential>): ProviderCredential => ({
   id: "local:1", provider: "openai", auth_type: "api_key", label: "k", source: "db",
@@ -33,6 +33,9 @@ describe("modelOptions", () => {
   it("is empty when there is neither discovery nor a route model", () => {
     expect(modelOptions([], "")).toEqual([]);
   });
+  it("includes a historical model so old threads can show what was used", () => {
+    expect(modelOptions(["gpt-5.4-mini"], "gpt-5.4", "gpt-5.5")).toEqual(["gpt-5.4-mini", "gpt-5.4", "gpt-5.5"]);
+  });
 });
 
 describe("defaultModel", () => {
@@ -62,5 +65,21 @@ describe("effortNote", () => {
   it("is silent for api_key and other auth modes", () => {
     expect(effortNote("openai", "api_key", "high")).toBeNull();
     expect(effortNote("anthropic", null, "high")).toBeNull();
+  });
+});
+
+describe("lastAssistantSelection", () => {
+  it("returns the newest assistant model and effort", () => {
+    const sel = lastAssistantSelection([
+      { role: "assistant", model: "gpt-5.4-mini", effort: "low" },
+      { role: "user", model: null, effort: null },
+      { role: "assistant", model: "gpt-5.5", effort: "xhigh" },
+    ]);
+    expect(sel).toEqual({ model: "gpt-5.5", effort: "xhigh" });
+  });
+
+  it("returns nulls when no assistant has model metadata", () => {
+    expect(lastAssistantSelection([{ role: "user", model: null, effort: null }])).toEqual({ model: null, effort: null });
+    expect(lastAssistantSelection([{ role: "assistant", model: " ", effort: "default" }])).toEqual({ model: null, effort: null });
   });
 });

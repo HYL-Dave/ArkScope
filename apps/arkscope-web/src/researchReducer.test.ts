@@ -759,6 +759,25 @@ describe("selectFooter", () => {
     expect(selectFooter(s)).toEqual({ total_tokens: 1500, turn_count: 2 });
   });
 
+  it("keeps cache counters from the active thread's last assistant message", () => {
+    const s = run(
+      submit({ question: "q", provider: "openai", model: "gpt-5.5", ts: 0, threadId: "t1" }),
+      f("done", {
+        answer: "a",
+        tools_used: [],
+        provider: "openai",
+        model: "gpt-5.5",
+        token_usage: { total_tokens: 12000, turn_count: 1, cache_read_tokens: 8192, cache_creation_tokens: 1024 },
+      }, 10),
+    );
+    expect(selectFooter(s)).toEqual({
+      total_tokens: 12000,
+      turn_count: 1,
+      cache_read_tokens: 8192,
+      cache_creation_tokens: 1024,
+    });
+  });
+
   it("returns null when the active thread has no assistant message yet (user-only)", () => {
     const s = run(submit({ question: "q", provider: "anthropic", model: "m" }), { kind: "abort" });
     expect(selectFooter(s)).toBeNull(); // aborted → pending cleared, only the user message remains

@@ -95,8 +95,15 @@ export interface State {
   activeThreadId: string | null;
   messagesByThread: Record<string, Message[]>;
   pending: PendingTurn | null;
-  footer: { total_tokens?: number; turn_count?: number } | null;
+  footer: TokenFooter | null;
   terminal: null | "done" | "maxTurns" | "error" | "disconnect" | "aborted";
+}
+
+export interface TokenFooter {
+  total_tokens?: number;
+  turn_count?: number;
+  cache_read_tokens?: number;
+  cache_creation_tokens?: number;
 }
 
 // ---- Action union (ts is epoch MS; submit + frame carry ts so elapsed is pure)
@@ -224,7 +231,7 @@ function onDone(state: State, p: PendingTurn, data: Record<string, unknown>, ts:
   };
   return {
     ...commit(state, p, msg, maxTurns ? "maxTurns" : "done", ts),
-    footer: { total_tokens: token_usage?.total_tokens, turn_count: token_usage?.turn_count },
+    footer: footerFromUsage(token_usage),
   };
 }
 
@@ -296,13 +303,22 @@ function onStreamError(state: State, a: Extract<Action, { kind: "streamError" }>
  * current-turn value and is cleared on selectThread/newThread). null while a
  * turn is pending or the active thread has no completed assistant turn yet.
  */
-export function selectFooter(state: State): { total_tokens?: number; turn_count?: number } | null {
+function footerFromUsage(u: Record<string, number> | null | undefined): TokenFooter | null {
+  if (!u) return null;
+  const footer: TokenFooter = {};
+  if (typeof u.total_tokens === "number") footer.total_tokens = u.total_tokens;
+  if (typeof u.turn_count === "number") footer.turn_count = u.turn_count;
+  if (typeof u.cache_read_tokens === "number") footer.cache_read_tokens = u.cache_read_tokens;
+  if (typeof u.cache_creation_tokens === "number") footer.cache_creation_tokens = u.cache_creation_tokens;
+  return Object.keys(footer).length ? footer : null;
+}
+
+export function selectFooter(state: State): TokenFooter | null {
   if (state.pending) return null;
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
   for (let i = msgs.length - 1; i >= 0; i--) {
     if (msgs[i].role === "assistant") {
-      const u = msgs[i].token_usage;
-      return u ? { total_tokens: u.total_tokens, turn_count: u.turn_count } : null;
+      return footerFromUsage(msgs[i].token_usage);
     }
   }
   return null;

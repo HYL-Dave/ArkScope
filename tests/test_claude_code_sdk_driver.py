@@ -164,7 +164,7 @@ def _install_fake_query(monkeypatch, messages: List[Any], capture: dict):
     return capture
 
 
-def _result_msg(*, is_error=False, subtype="success", result="final answer", usage=None):
+def _result_msg(*, is_error=False, subtype="success", result="final answer", usage=None, model_usage=None):
     return ResultMessage(
         subtype=subtype,
         duration_ms=10,
@@ -175,6 +175,7 @@ def _result_msg(*, is_error=False, subtype="success", result="final answer", usa
         total_cost_usd=0.0123,
         usage=usage if usage is not None else {"input_tokens": 11, "output_tokens": 7},
         result=result,
+        model_usage=model_usage,
     )
 
 
@@ -236,6 +237,57 @@ def test_happy_path_mapping(monkeypatch):
     assert done.data["token_usage"]["output_tokens"] == 7
     assert done.data["token_usage"]["total_tokens"] == 18
     assert done.data["token_usage"]["cost_usd"] == 0.0123
+
+
+def test_result_usage_preserves_cache_token_counters(monkeypatch):
+    capture: dict = {}
+    msgs = [
+        _result_msg(usage={
+            "input_tokens": 10000,
+            "output_tokens": 300,
+            "cache_creation_input_tokens": 2048,
+            "cache_read_input_tokens": 8192,
+        }),
+    ]
+    _install_fake_query(monkeypatch, msgs, capture)
+    events = asyncio.run(_collect(_make_driver(), _REQ))
+
+    usage = events[-1].data["token_usage"]
+    assert usage["input_tokens"] == 10000
+    assert usage["output_tokens"] == 300
+    assert usage["total_tokens"] == 10300
+    assert usage["cache_creation_tokens"] == 2048
+    assert usage["cache_read_tokens"] == 8192
+
+
+def test_result_model_usage_aggregates_cache_tokens_when_top_level_missing(monkeypatch):
+    capture: dict = {}
+    msgs = [
+        _result_msg(
+            usage={},
+            model_usage={
+                "claude-sonnet-4-6": {
+                    "input_tokens": 6000,
+                    "output_tokens": 100,
+                    "cache_read_input_tokens": 4096,
+                },
+                "claude-opus-4-8": {
+                    "input_tokens": 2000,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 1024,
+                },
+            },
+        ),
+    ]
+    _install_fake_query(monkeypatch, msgs, capture)
+    events = asyncio.run(_collect(_make_driver(), _REQ))
+
+    usage = events[-1].data["token_usage"]
+    assert usage["input_tokens"] == 8000
+    assert usage["output_tokens"] == 150
+    assert usage["total_tokens"] == 8150
+    assert usage["cache_creation_tokens"] == 1024
+    assert usage["cache_read_tokens"] == 4096
 
 
 # ===========================================================================

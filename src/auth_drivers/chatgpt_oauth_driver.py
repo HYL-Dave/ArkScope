@@ -117,6 +117,42 @@ def _coerce_result_str(result: Any) -> str:
     return str(result)
 
 
+def _int_token(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _dict_get(obj: Any, key: str) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def _usage_cache_read_tokens(usage: dict[str, Any]) -> int:
+    for details_key in ("prompt_tokens_details", "input_tokens_details"):
+        details = usage.get(details_key)
+        cached = _dict_get(details, "cached_tokens") if details is not None else None
+        if cached:
+            return _int_token(cached)
+    return _int_token(usage.get("cached_tokens"))
+
+
+def _accumulate_token_usage(total: dict[str, int], usage: dict[str, Any]) -> None:
+    in_tokens = _int_token(usage.get("input_tokens") or usage.get("prompt_tokens"))
+    out_tokens = _int_token(usage.get("output_tokens") or usage.get("completion_tokens"))
+    total["input_tokens"] = total.get("input_tokens", 0) + in_tokens
+    total["output_tokens"] = total.get("output_tokens", 0) + out_tokens
+    total["total_tokens"] = total.get("total_tokens", 0) + _int_token(usage.get("total_tokens") or (in_tokens + out_tokens))
+    cache_read = _usage_cache_read_tokens(usage)
+    if cache_read:
+        total["cache_read_tokens"] = total.get("cache_read_tokens", 0) + cache_read
+    cache_create = _int_token(usage.get("cache_creation_input_tokens"))
+    if cache_create:
+        total["cache_creation_tokens"] = total.get("cache_creation_tokens", 0) + cache_create
+
+
 def _ark_input_schema(tool_def: Any) -> dict:
     properties: dict[str, dict] = {}
     required: list[str] = []
@@ -512,11 +548,7 @@ class OpenAIChatGPTOAuthDriver:
             output_items = _response_output_items(response_obj) or call_items
             usage = _to_dict(response_obj).get("usage") if response_obj else None
             if isinstance(usage, dict):
-                in_tokens = int(usage.get("input_tokens") or 0)
-                out_tokens = int(usage.get("output_tokens") or 0)
-                total_usage["input_tokens"] += in_tokens
-                total_usage["output_tokens"] += out_tokens
-                total_usage["total_tokens"] += int(usage.get("total_tokens") or (in_tokens + out_tokens))
+                _accumulate_token_usage(total_usage, usage)
 
             calls = [c for c in (_call_from_item(item, arg_fallback) for item in output_items) if c]
             if calls:

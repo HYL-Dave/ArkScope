@@ -121,6 +121,57 @@ def _redact_bridge(text: Any, token: Optional[str]) -> str:
     return _regex_redact(text)
 
 
+def _int_token(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _usage_get(usage: Any, key: str) -> Any:
+    if isinstance(usage, dict):
+        return usage.get(key)
+    return getattr(usage, key, None)
+
+
+def _aggregate_model_usage(model_usage: Any) -> dict[str, int]:
+    totals = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+    }
+    if not isinstance(model_usage, dict):
+        return totals
+    for usage in model_usage.values():
+        totals["input_tokens"] += _int_token(_usage_get(usage, "input_tokens"))
+        totals["output_tokens"] += _int_token(_usage_get(usage, "output_tokens"))
+        totals["cache_creation_tokens"] += _int_token(_usage_get(usage, "cache_creation_input_tokens"))
+        totals["cache_read_tokens"] += _int_token(_usage_get(usage, "cache_read_input_tokens"))
+    return totals
+
+
+def _result_token_usage(msg: ResultMessage) -> dict[str, Any]:
+    usage = msg.usage or {}
+    model_totals = _aggregate_model_usage(getattr(msg, "model_usage", None))
+    in_tokens = _int_token(_usage_get(usage, "input_tokens")) or model_totals["input_tokens"]
+    out_tokens = _int_token(_usage_get(usage, "output_tokens")) or model_totals["output_tokens"]
+    cache_create = _int_token(_usage_get(usage, "cache_creation_input_tokens")) or model_totals["cache_creation_tokens"]
+    cache_read = _int_token(_usage_get(usage, "cache_read_input_tokens")) or model_totals["cache_read_tokens"]
+    token_usage: dict[str, Any] = {
+        "input_tokens": in_tokens,
+        "output_tokens": out_tokens,
+        "total_tokens": in_tokens + out_tokens,
+    }
+    if isinstance(msg.total_cost_usd, (int, float)):
+        token_usage["cost_usd"] = msg.total_cost_usd
+    if cache_create:
+        token_usage["cache_creation_tokens"] = cache_create
+    if cache_read:
+        token_usage["cache_read_tokens"] = cache_read
+    return token_usage
+
+
 def _scrub_token(text: Any, token: Optional[str]) -> str:
     """Exact-token scrub ONLY (zero false positives) — for model-authored prose
     (intermediate text / thinking / the final answer) where the heavier
@@ -567,9 +618,6 @@ class AnthropicClaudeCodeSdkDriver:
                     or "claude agent reported an error"
                 )
                 return [_err(request, _redact_bridge(err_text, token))]
-            usage = msg.usage or {}
-            in_ = usage.get("input_tokens", 0)
-            out_ = usage.get("output_tokens", 0)
             return [
                 AgentEvent(
                     EventType.done,
@@ -578,12 +626,7 @@ class AnthropicClaudeCodeSdkDriver:
                         "tools_used": sorted(set(tool_names.values())),
                         "provider": "anthropic",
                         "model": request.model,
-                        "token_usage": {
-                            "input_tokens": in_,
-                            "output_tokens": out_,
-                            "total_tokens": in_ + out_,
-                            "cost_usd": msg.total_cost_usd,
-                        },
+                        "token_usage": _result_token_usage(msg),
                     },
                 )
             ]

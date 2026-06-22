@@ -307,6 +307,29 @@ def test_stream_llm_streams_text_done_and_strips_max_output_tokens(monkeypatch):
     assert "previous_response_id" not in sent
 
 
+def test_stream_llm_preserves_openai_cached_token_usage(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.output_text.delta", "delta": "OK"},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ], "usage": {
+            "input_tokens": 9000,
+            "output_tokens": 20,
+            "total_tokens": 9020,
+            "prompt_tokens_details": {"cached_tokens": 8192},
+        }}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    events = _run(_collect(_driver().stream_llm(_req())))
+
+    usage = events[-1].data["token_usage"]
+    assert usage["input_tokens"] == 9000
+    assert usage["output_tokens"] == 20
+    assert usage["total_tokens"] == 9020
+    assert usage["cache_read_tokens"] == 8192
+
+
 def test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id(monkeypatch):
     first = [
         {"type": "response.output_item.added",

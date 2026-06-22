@@ -37,7 +37,7 @@ import {
   RESEARCH_PROVIDER_IDS,
   type ResearchProviderId,
 } from "./researchProvider";
-import { activeCredential, defaultModel, effortNote, modelOptions } from "./researchModels";
+import { activeCredential, defaultModel, effortNote, lastAssistantSelection, modelOptions } from "./researchModels";
 import { shouldEndResearchReplay } from "./researchRunReplay";
 import {
   initialState,
@@ -391,6 +391,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
   const retryCandidate = useMemo(() => lastRetryCandidate(msgs), [msgs]);
   const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+  const lastSelection = useMemo(() => lastAssistantSelection(msgs), [msgs]);
   const traceRows: TraceRow[] = state.pending
     ? state.pending.trace
     : (lastAssistant?.tool_calls ?? []).map((c) => ({ kind: "tool", name: c.name, input: c.input, result_preview: c.result_preview, chars: undefined, done: true } as ToolTraceRow));
@@ -446,13 +447,23 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
   const modelOpts = useMemo(() => {
     const disc = activeCred ? (discovered[activeCred.id] ?? []) : [];
-    return modelOptions(disc, routeModel);
-  }, [activeCred, discovered, routeModel]);
+    return modelOptions(disc, routeModel, lastSelection.model);
+  }, [activeCred, discovered, routeModel, lastSelection.model]);
 
   // keep the selected model valid as the option set / provider changes
   useEffect(() => { setSelModel((cur) => defaultModel(modelOpts, routeModel, cur)); }, [modelOpts, routeModel]);
   // reset effort to the route's effort when the provider changes
   useEffect(() => { setSelEffort(routeEffort); }, [routeEffort, provider]);
+  // When switching to a persisted thread, reflect that thread's latest completed
+  // assistant turn rather than the current Settings default. This is display and
+  // next-send ergonomics only; each answer bubble remains the historical record.
+  useEffect(() => {
+    if (!state.activeThreadId) return;
+    setSelModel(lastSelection.model && modelOpts.includes(lastSelection.model)
+      ? lastSelection.model
+      : defaultModel(modelOpts, routeModel, null));
+    setSelEffort(lastSelection.effort ?? routeEffort);
+  }, [state.activeThreadId, lastSelection.model, lastSelection.effort, modelOpts, routeModel, routeEffort]);
 
   const effortOpts = provider && catalog ? (catalog.effort_options[provider] ?? []) : [];
   const pickerEffortNote = provider ? effortNote(provider, activeAuthMode, selEffort) : null;
@@ -709,6 +720,8 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
             <div className="research-trace-footer muted tiny">
               {typeof footer.total_tokens === "number" && <span>tokens {footer.total_tokens.toLocaleString()}</span>}
               {typeof footer.turn_count === "number" && <span> · turns {footer.turn_count}</span>}
+              {typeof footer.cache_read_tokens === "number" && <span> · cache read {footer.cache_read_tokens.toLocaleString()}</span>}
+              {typeof footer.cache_creation_tokens === "number" && <span> · cache create {footer.cache_creation_tokens.toLocaleString()}</span>}
             </div>
           )}
         </aside>

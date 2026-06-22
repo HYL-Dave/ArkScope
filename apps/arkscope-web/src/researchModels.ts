@@ -10,11 +10,13 @@ export function activeCredential(creds: ProviderCredential[] | undefined): Provi
 
 // Ordered, de-duped, trimmed model options. Discovered (per-auth-mode) models come
 // first; the current route model is ALWAYS included so a saved choice stays
-// selectable even when discovery is empty/stale.
-export function modelOptions(discovered: string[], routeModel: string): string[] {
+// selectable even when discovery is empty/stale. A historical model from the
+// active thread is also included so old conversations can show what was used even
+// after Settings defaults or discovery results change.
+export function modelOptions(discovered: string[], routeModel: string, historicalModel?: string | null): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const m of [...discovered, routeModel]) {
+  for (const m of [...discovered, routeModel, historicalModel ?? ""]) {
     const v = (m || "").trim();
     if (v && !seen.has(v)) {
       seen.add(v);
@@ -42,4 +44,21 @@ export function effortNote(
   void authMode;
   void effort;
   return null;
+}
+
+export interface MinimalResearchMessage {
+  role: string;
+  model?: string | null;
+  effort?: string | null;
+}
+
+export function lastAssistantSelection(messages: MinimalResearchMessage[]): { model: string | null; effort: string | null } {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "assistant") continue;
+    const model = (m.model ?? "").trim() || null;
+    const effort = (m.effort ?? "").trim();
+    return { model, effort: effort && effort !== "default" ? effort : null };
+  }
+  return { model: null, effort: null };
 }
