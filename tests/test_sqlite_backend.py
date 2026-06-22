@@ -160,11 +160,52 @@ def test_query_news_unscored(market_db):
 
 
 def test_query_news_scored_returns_empty(market_db):
-    # scored_only / model can't be served locally → empty (caller falls back to PG)
+    # scored_only / model with NO local sentiment → empty (news_scores RETIRED; honest empty)
     db, _ = market_db
     b = SqliteBackend(db)
     assert b.query_news(ticker="AAPL", scored_only=True).empty
     assert b.query_news(ticker="AAPL", scored_only=False, model="gpt_5").empty
+
+
+def test_query_news_surfaces_local_sentiment_when_present(tmp_path):
+    # news_scores RETIRED → local-first sentiment: when the local news table carries a
+    # 1-5 sentiment_score, scored_only=True returns ONLY the scored rows from LOCAL.
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, title TEXT NOT NULL, "
+        "description TEXT, url TEXT, publisher TEXT, source TEXT NOT NULL, published_at TEXT NOT NULL, "
+        "article_hash TEXT, sentiment_score REAL, sentiment_source TEXT, sentiment_scale TEXT);"
+    )
+    pub = f"{date.today().isoformat()}T00:00:00+0000"
+    conn.execute("INSERT INTO news VALUES (1,'AAPL','scored','d','u','p','polygon',?, 'h1', 4.0, 'llm', '1-5')", (pub,))
+    conn.execute("INSERT INTO news VALUES (2,'AAPL','unscored','d','u','p','polygon',?, 'h2', NULL, NULL, NULL)", (pub,))
+    conn.commit()
+    conn.close()
+    b = SqliteBackend(db)
+
+    scored = b.query_news(ticker="AAPL", scored_only=True)
+    assert len(scored) == 1 and float(scored.iloc[0]["sentiment_score"]) == 4.0  # only the scored row, from local
+    assert b.query_news(ticker="AAPL", scored_only=False).shape[0] == 2          # all rows, score surfaced
+
+
+def test_query_news_scored_no_pg_fallback(market_db, monkeypatch):
+    # news_scores RETIRED: a scored request has NO PG authority → honest local result,
+    # never a PG fallback. (Unscored local-miss MAY still fall back until strict mode.)
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_news",
+        lambda self, ticker=None, days=30, source="auto", scored_only=True, model=None:
+            (hit.append("PG"), _PG_SENTINEL)[1],
+    )
+    b = _make(db)
+    assert b.query_news(ticker="AAPL", scored_only=True).empty   # local has no scores → honest empty
+    assert hit == []                                             # scored → NEVER hits PG
+    b.query_news(ticker="AAPL", scored_only=False, model="gpt_5")
+    assert hit == []                                             # specific model also score-dep → no PG
+    b.query_news(ticker="ZZZZ", scored_only=False)               # unscored local miss → transition fallback
+    assert hit == ["PG"]
 
 
 def test_query_news_search_fts5(market_db):
@@ -500,9 +541,9 @@ def test_news_local_unscored_scored_falls_back(market_db, monkeypatch):
     # unscored → local (2 AAPL articles), PG not hit
     df = b.query_news(ticker="AAPL", days=30, scored_only=False)
     assert len(df) == 2 and hit == []
-    # scored → local empty → PG fallback
+    # scored → news_scores RETIRED → honest local empty, PG NOT hit (no scored authority)
     df = b.query_news(ticker="AAPL", days=30, scored_only=True)
-    assert df.iloc[0]["ticker"] == "PGNEWS" and hit == [True]
+    assert df.empty and hit == []
 
 
 def test_news_stats_local_when_present_does_not_hit_pg(market_db, monkeypatch):
@@ -675,3 +716,97 @@ def test_news_feed_description_html_cleaned(tmp_path):
     desc = f["items"][0]["description"]
     assert "<" not in desc and "&#10;" not in desc
     assert desc == "By Al Root Rivian has started."
+
+
+# --- health_stats local recompute (sub-slice B: PG-exit for provider health) ----
+
+def test_query_health_stats_local_shape(market_db):
+    # SqliteBackend recomputes the same {news,prices,iv_history,financial_cache} shape
+    # query_health_stats returns, from market_data.db — so provider health stops needing PG.
+    db, _ = market_db
+    stats = SqliteBackend(db).query_health_stats()
+    assert set(stats) == {"news", "prices", "iv_history", "financial_cache"}
+    assert all(stats[k]["error"] is None for k in stats)
+    assert stats["prices"]["rows"][0][0] is not None              # MAX(datetime)
+    assert stats["iv_history"]["rows"][0][0] is not None          # MAX(date)
+    news_rows = stats["news"]["rows"]
+    assert news_rows and all(len(r) == 3 for r in news_rows)      # (source, latest, recent_count)
+    assert stats["financial_cache"]["rows"] == []                 # fixture has no fin cache → honest empty
+
+
+def test_health_stats_local_first(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(DatabaseBackend, "query_health_stats", lambda self: (hit.append("PG"), {})[1])
+    stats = _make(db).query_health_stats()
+    assert hit == []                                             # served locally, PG NOT hit
+    assert set(stats) == {"news", "prices", "iv_history", "financial_cache"}
+
+
+# --- review fix: query_news_search + query_news_stats local sentiment (news_scores retired) ---
+
+def _news_db_with_sentiment(tmp_path, rows):
+    """A market_data.db with a sentiment-capable news table + FTS5, populated from rows
+    (id, ticker, title, desc, source, published_at, sentiment_score)."""
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, title TEXT NOT NULL, "
+        "description TEXT, url TEXT, publisher TEXT, source TEXT NOT NULL, published_at TEXT NOT NULL, "
+        "article_hash TEXT, sentiment_score REAL, sentiment_source TEXT, sentiment_scale TEXT);"
+        "CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news', "
+        "content_rowid='id', tokenize='porter unicode61');"
+    )
+    for (nid, tkr, title, desc, src, pub, sent) in rows:
+        conn.execute(
+            "INSERT INTO news (id,ticker,title,description,url,publisher,source,published_at,"
+            "article_hash,sentiment_score,sentiment_source,sentiment_scale) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (nid, tkr, title, desc, "u", "p", src, pub, f"h{nid}", sent,
+             "llm" if sent is not None else None, "1-5" if sent is not None else None),
+        )
+    conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
+    conn.commit()
+    conn.close()
+    return db
+
+
+def test_query_news_search_scored_no_pg_fallback(market_db, monkeypatch):
+    # news_scores RETIRED: scored FTS search has no PG authority → honest empty, never PG.
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend, "query_news_search",
+        lambda self, query="", ticker=None, days=30, limit=20, scored_only=True:
+            (hit.append("PG"), _PG_SENTINEL)[1],
+    )
+    b = _make(db)
+    assert b.query_news_search(query="Apple", scored_only=True).empty   # local has no scores
+    assert hit == []                                                    # scored search → NEVER PG
+    b.query_news_search(query="Apple", scored_only=False)              # unscored local hit
+    assert hit == []                                                    # served locally, no PG
+
+
+def test_query_news_search_surfaces_local_sentiment(tmp_path):
+    pub = f"{date.today().isoformat()}T00:00:00+0000"
+    db = _news_db_with_sentiment(tmp_path, [
+        (1, "AAPL", "Apple soars on earnings", "great quarter", "polygon", pub, 5.0),
+        (2, "AAPL", "Apple unscored note", "no score", "polygon", pub, None),
+    ])
+    b = SqliteBackend(db)
+    scored = b.query_news_search(query="Apple", scored_only=True)
+    assert len(scored) == 1 and float(scored.iloc[0]["sentiment_score"]) == 5.0  # only the scored hit
+    assert b.query_news_search(query="Apple", scored_only=False).shape[0] == 2   # all hits
+
+
+def test_query_news_stats_aggregates_local_sentiment(tmp_path):
+    pub = f"{date.today().isoformat()}T00:00:00+0000"
+    db = _news_db_with_sentiment(tmp_path, [
+        (1, "AAPL", "bull", "d", "polygon", pub, 5.0),   # bullish (>=4)
+        (2, "AAPL", "bear", "d", "polygon", pub, 2.0),   # bearish (<=2)
+        (3, "AAPL", "none", "d", "polygon", pub, None),  # unscored
+    ])
+    row = SqliteBackend(db).query_news_stats(ticker="AAPL").iloc[0]
+    assert row["article_count"] == 3 and row["scored_count"] == 2
+    assert row["avg_sentiment"] == 3.5
+    assert row["bullish_count"] == 1 and row["bearish_count"] == 1

@@ -15,9 +15,12 @@ SCORES — is the inherited PG behaviour, unchanged.
 
 Overridden, local-first with PG fallback on empty/miss:
   - ``query_prices`` (3a);
-  - ``query_news`` (3b, UNSCORED — scored_only/model requests fall back to PG,
-    where news_scores live), ``query_news_search`` (3b, FTS5), and
-    ``query_news_stats`` (score-free scout stats; no PG fallback on local empty);
+  - ``query_news`` (3b) — UNSCORED reads are local-first with PG fallback; a SCORED
+    request (``scored_only`` / a specific ``model``) does NOT fall back to PG —
+    ``news_scores`` is RETIRED (§4 decision 2026-06-23), sentiment is local-first
+    (optional 1-5 ``sentiment_score`` on the local row), so a scored miss is an
+    honest empty. ``query_news_search`` (3b, FTS5) + ``query_news_stats`` (score-free
+    scout stats; no PG fallback on local empty);
   - ``query_iv_history`` + ``query_fundamentals`` (3c-A);
   - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
 
@@ -36,7 +39,7 @@ import pandas as pd
 
 from . import provenance
 from .db_backend import DatabaseBackend
-from .sqlite_backend import SqliteBackend
+from .sqlite_backend import SqliteBackend, _NEWS_COLS, _NEWS_SEARCH_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -58,31 +61,41 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         return super().query_prices(ticker, interval=interval, days=days)  # PG authority/fallback
 
     def query_news(self, ticker=None, days=30, source="auto", scored_only=True, model=None):
-        # Score-free local reads only; scored_only / a specific model → local empty
-        # → PG (super) where news_scores live.
+        # news_scores RETIRED (DATA_COLLECTION plan §4 decision 2026-06-23): sentiment is
+        # local-first (optional 1-5 sentiment_score on the local news row). A SCORED request
+        # (scored_only / specific model) has NO PG authority to fall back to → return the
+        # honest local result, possibly empty. Only an UNSCORED local miss may still use PG
+        # during the market transition (strict mode / R4 disables that later).
         try:
             df = self._market.query_news(
                 ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
             )
         except Exception as e:
-            logger.warning(f"local query_news failed ({e}); falling back to PG")
+            logger.warning(f"local query_news failed ({e})")
             df = None
         if df is not None and not df.empty:
             return df
+        if scored_only or model:
+            return df if df is not None else pd.DataFrame(columns=_NEWS_COLS)
         return super().query_news(
             ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
         )
 
     def query_news_search(self, query="", ticker=None, days=30, limit=20, scored_only=True):
+        # news_scores RETIRED: a SCORED search has no PG authority → honest local result
+        # (possibly empty), never a PG fallback (same contract as query_news). Only an
+        # UNSCORED local miss may still use PG during the market transition.
         try:
             df = self._market.query_news_search(
                 query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
             )
         except Exception as e:
-            logger.warning(f"local query_news_search failed ({e}); falling back to PG")
+            logger.warning(f"local query_news_search failed ({e})")
             df = None
         if df is not None and not df.empty:
             return df
+        if scored_only:
+            return df if df is not None else pd.DataFrame(columns=_NEWS_SEARCH_COLS)
         return super().query_news_search(
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
         )
@@ -199,6 +212,16 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             return dt.astimezone(timezone.utc).isoformat(timespec="seconds") if dt else None
 
         return (source or "financial_datasets", ticker or "", _fmt(fetched_dt), _fmt(expires_dt))
+
+    def query_health_stats(self):
+        # Provider health / freshness reflect what the app actually SERVES — the local
+        # market_data.db — so recompute locally. PG (super) only if the local read itself
+        # errors (transition safety); a source with 0 local rows is an honest local state.
+        try:
+            return self._market.query_health_stats()
+        except Exception as e:
+            logger.warning(f"local query_health_stats failed ({e}); falling back to PG")
+            return super().query_health_stats()
 
     def get_available_tickers(self, data_type: str):
         if data_type in ("prices", "news", "iv_history", "fundamentals"):  # all local-first now

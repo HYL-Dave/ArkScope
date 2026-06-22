@@ -135,10 +135,13 @@ def build_dal_context_builder(
 
     def _news_resolver(request: AnalysisRequest) -> List[Dict[str, Any]]:
         lookback_days = _news_days_for_depth(request.depth)
+        # news_scores RETIRED: this resolver wants news CONTEXT, not scores. Use
+        # scored_only=False so a missing sentiment never withholds the news itself
+        # (sentiment_score is surfaced when locally present, else None).
         news = dal.get_news(
             ticker=request.ticker,
             days=lookback_days,
-            scored_only=True,
+            scored_only=False,
         )
         return [
             {

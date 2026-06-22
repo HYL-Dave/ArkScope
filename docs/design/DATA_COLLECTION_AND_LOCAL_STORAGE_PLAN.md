@@ -135,10 +135,38 @@ PG was kept as the source of truth during the early migration because it was the
 
 Cutover order = lowest blast radius first.
 
+> **Decision (2026-06-23) — desktop-app PG exit + `news_scores` retirement.** ArkScope
+> is a **desktop app**: normal runtime must not require a reachable PG. PG is demoted to
+> **import / archive / backfill tooling only** — never a daily-read fallback. Consequences:
+>
+> - **`news_scores` / `news_latest_scores` are RETIRED, not migrated.** The 1–5 LLM scores
+>   aren't provider-refetchable (they cost LLM spend to recompute) and **no UI surfaces
+>   them**; the AI-card evidence path already excludes them by design (`evidence_packet`,
+>   `scored_only=False`, pure-objective). Replacement is **LLM sentiment written on-demand**
+>   when an analysis/card runs over an article, going forward — **no backfill**.
+> - **What shipped (slice A):** the local `news` table carries a single OPTIONAL 1–5
+>   `sentiment_score` (CHECK-enforced `IS NULL OR BETWEEN 1 AND 5`) plus `sentiment_source` /
+>   `sentiment_scale` **provenance/metadata** (TEXT). It does **not** yet have a numeric
+>   provider-polarity column — **provider-native sentiment (e.g. Polygon −1/0/+1) is a FUTURE
+>   addition that will need its OWN scale-tagged column**, because the CHECK makes it
+>   impossible (correctly) to store a polarity in the 1–5 field.
+> - **Scale invariant (load-bearing, ENFORCED not conventional):** `sentiment_score` is
+>   **strictly 1–5** — the CHECK constraint physically rejects a provider polarity, so it can
+>   never silently poison `get_news_sentiment_summary` (≥4 bullish / ≤2 bearish) / `min_sentiment`
+>   / strategies. `sentiment_source`/`sentiment_scale` document provenance + scale, they are
+>   NOT a numeric store.
+> - **`scored_only=True` no longer falls back to PG.** No local/provider sentiment → honest
+>   empty/unavailable. Pure-news-context callers (`context_builder`) use `scored_only=False`
+>   so a missing score never withholds the news itself.
+> - **Q3 reversal:** app records (`agent_queries`, `agent_memories`, `research_reports`,
+>   `job_runs`) move from "stay PG" to **transitional → local** (desktop-app requirement).
+>   `research_reports`/`agent_memories` = precious one-time migrate; `agent_queries`/`job_runs`
+>   may start fresh locally.
+
 | Phase | Tables moving | Why this order | What stays in PG meanwhile |
 |---|---|---|---|
 | **Phase 0 — no-op** | none | `profile_state.db` is already local SQLite; nothing to migrate. | everything market/SA/app |
-| **Phase 1 — market_data** | `prices`, `fundamentals`, `iv_history`, `financial_data_cache`, `analyst_consensus`, `macro_*`, `cal_*`, `news`/`news_scores`/`news_latest_scores` | **Regenerable** — safe to migrate and re-fetch on mismatch. Read PG via current backend → write local; validate by row counts + content checksum on a sample. The macro/calendar health query (`macro_calendar_health.py:449-459`) is a ready per-table count/last-fetched cross-check. | SA tables; agent/app records |
+| **Phase 1 — market_data** | `prices`, `fundamentals`, `iv_history`, `financial_data_cache`, `macro_*`, `cal_*`, `news` (articles). **`news_scores`/`news_latest_scores` = RETIRED, not migrated** (see §4 decision 2026-06-23). `analyst_consensus` is provider-fetched live (regenerable; not a backend PG read). | **Regenerable** — safe to migrate and re-fetch on mismatch. Read PG via current backend → write local; validate by row counts + content checksum on a sample. The macro/calendar health query (`macro_calendar_health.py:449-459`) is a ready per-table count/last-fetched cross-check. | SA tables; agent/app records |
 | **Phase 2 — sa_capture** | `sa_alpha_picks` (+ lifecycle), `sa_refresh_meta`, `sa_market_news`, `sa_articles`, `sa_article_comments`, `sa_comment_signals` | **Single-writer, re-capturable.** Must port the **partial-index `ON CONFLICT … WHERE` upserts** (`db_backend.py:1170-1196`) — SQLite supports partial-index upserts, but the index predicates must be recreated as real partial indexes in the new schema. | agent/app records |
 | **Phase 3 — app records (revisit)** | `agent_queries`, `agent_memories`, `research_reports`, `job_runs` | Lower priority; decide local vs remote after the user-facing split is stable. | — |
 
@@ -330,7 +358,7 @@ Source repo confirmed at `<workspace>/daily_stock_analysis`. The provider/fallba
 **RECOMMENDED defaults (gpt-5.5; lock before the dependent slice):**
 - **Q1 — Realtime stream: DEFER.** v1 uses snapshot/poll (`get_current_quote`) with an explicit `is_stale` indicator; build `reqRealTimeBars` only after the chart shell is stable. (Slice 4.)
 - **Q2 — `market_data` engine: SQLite-first acceptable for the low-risk first cut; DuckDB is the long-term target** for market/time-series OLAP. (Slice 3.)
-- **Q3 — app records (`agent_queries`/`agent_memories`/`research_reports`/`job_runs`): STAY in PG / current** — do NOT migrate them in the same slice as market_data. (Phase 3, later.)
+- **Q3 — app records (`agent_queries`/`agent_memories`/`research_reports`/`job_runs`): ~~STAY in PG~~ → TRANSITIONAL → LOCAL** (revised 2026-06-23 for the desktop-app PG exit). Still NOT in the market_data slice — but they no longer "stay PG": `research_reports`/`agent_memories` = precious one-time migrate, `agent_queries`/`job_runs` may start fresh locally. (Phase 3 / retirement track R1+R3.)
 - **Q4 — Daily-history backfill depth: ≥ 5 years of adjusted `1d`, ACTIVE universe only** (not whole-market). (Slice 4.)
 - **Q5 — Intraday retention: 1m ~30–60d, 5m ~6–12m, 15m ~1–2y.** (Slice 4.)
 

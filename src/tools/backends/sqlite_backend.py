@@ -150,12 +150,21 @@ class SqliteBackend:
 
     def query_news(self, ticker: Optional[str] = None, days: int = 30, source: str = "auto",
                    scored_only: bool = True, model: Optional[str] = None) -> pd.DataFrame:
-        """Local news articles (UNSCORED). Score-dependent requests
-        (``scored_only`` / a specific ``model``) cannot be served locally → return
-        empty so LocalMarketDatabaseBackend falls back to PG (where news_scores live)."""
+        """Local news articles, local-first sentiment.
+
+        ``news_scores`` is RETIRED (see DATA_COLLECTION plan §4 decision 2026-06-23):
+        the local ``news`` table carries an OPTIONAL 1-5 ``sentiment_score`` (written
+        on-demand by LLM analysis going forward) — NOT a multi-model PG join. So:
+          - ``scored_only=True`` returns only rows whose local ``sentiment_score`` is set
+            (empty if the column is absent / unpopulated — an HONEST empty, no PG);
+          - a specific ``model`` is meaningless locally (no per-model scores) → empty;
+          - ``risk_score``/``scored_model`` stay NULL (retired)."""
         empty = pd.DataFrame(columns=_NEWS_COLS)
-        if scored_only or model:
-            return empty
+        if model:
+            return empty  # per-model scoring retired locally
+        has_sent = self._news_has_column("sentiment_score")
+        if scored_only and not has_sent:
+            return empty  # no local sentiment column yet → nothing scored to serve
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         conds, params = ["published_at >= ?"], [cutoff]
         if ticker:
@@ -164,26 +173,91 @@ class SqliteBackend:
         if source != "auto":
             conds.append("source = ?")
             params.append(source)
+        if scored_only:
+            conds.append("sentiment_score IS NOT NULL")
+        sent_expr = "sentiment_score" if has_sent else "NULL"
         sql = (
-            "SELECT substr(published_at, 1, 10) AS date, ticker, title, source, url, publisher, "
-            "NULL AS sentiment_score, NULL AS risk_score, NULL AS scored_model, description "
+            f"SELECT substr(published_at, 1, 10) AS date, ticker, title, source, url, publisher, "
+            f"{sent_expr} AS sentiment_score, NULL AS risk_score, NULL AS scored_model, description "
             f"FROM news WHERE {' AND '.join(conds)} ORDER BY published_at DESC"
         )
         return self._news_df(sql, params, _NEWS_COLS)
 
+    def query_health_stats(self) -> dict:
+        """Local recompute of freshness/health stats from market_data.db — SAME shape as
+        DatabaseBackend.query_health_stats (``{news,prices,iv_history,financial_cache}``,
+        each ``{"rows": [positional tuples], "error": str|None}``), so provider-health /
+        freshness stop needing PG. A missing optional table is an honest empty (error None),
+        not a failure — same 'tolerate a pre-X DB' stance as the rest of the local backend."""
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        news_cutoff = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S+0000")
+        now_iso = now.isoformat(timespec="seconds")
+        stats: dict = {}
+
+        def _q(key: str, table: str, sql: str, params: tuple = ()) -> None:
+            try:
+                conn = self._connect()
+                try:
+                    exists = conn.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                    ).fetchone()
+                    rows = [tuple(r) for r in conn.execute(sql, params).fetchall()] if exists else []
+                finally:
+                    conn.close()
+                stats[key] = {"rows": rows, "error": None}
+            except Exception as e:  # noqa: BLE001
+                stats[key] = {"rows": [], "error": str(e)}
+
+        _q("news", "news",
+           "SELECT source, MAX(published_at) AS latest, "
+           "SUM(CASE WHEN published_at > ? THEN 1 ELSE 0 END) AS recent_count "
+           "FROM news GROUP BY source", (news_cutoff,))
+        _q("prices", "prices", "SELECT MAX(datetime) FROM prices")
+        _q("iv_history", "iv_history", "SELECT MAX(date) FROM iv_history")
+        _q("financial_cache", "financial_cache",
+           "SELECT source, "
+           "SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS cached, "
+           "SUM(CASE WHEN expires_at <= ? THEN 1 ELSE 0 END) AS expired, "
+           "MAX(fetched_at) AS latest_fetched "
+           "FROM financial_cache GROUP BY source", (now_iso, now_iso))
+        return stats
+
+    def _news_has_column(self, col: str) -> bool:
+        """Whether the local ``news`` table has ``col`` — lets query_news degrade
+        gracefully on a pre-sentiment market_data.db (column added by market_data_admin)."""
+        try:
+            conn = self._connect()
+            try:
+                cols = {r[1] for r in conn.execute("PRAGMA table_info(news)").fetchall()}
+            finally:
+                conn.close()
+            return col in cols
+        except Exception:
+            return False
+
     def query_news_search(self, query: str = "", ticker: Optional[str] = None, days: int = 30,
                           limit: int = 20, scored_only: bool = True) -> pd.DataFrame:
         """Local full-text news search via SQLite FTS5 (bm25 ranking), with a LIKE
-        fallback for <3-char queries — mirroring the PG tsvector + ILIKE-fallback
-        path. Scored requests → empty (PG fallback)."""
+        fallback for <3-char queries — mirroring the PG tsvector + ILIKE-fallback path.
+
+        news_scores RETIRED (§4 decision 2026-06-23): sentiment is local-first, so a SCORED
+        search returns only rows whose local 1-5 ``sentiment_score`` is set (empty if the
+        column is absent/unpopulated — an HONEST empty, NOT a PG fallback trigger). Same
+        contract as ``query_news``; ``risk_score`` stays NULL (retired)."""
         empty = pd.DataFrame(columns=_NEWS_SEARCH_COLS)
-        if scored_only:
-            return empty
+        has_sent = self._news_has_column("sentiment_score")
+        if scored_only and not has_sent:
+            return empty  # no local sentiment column yet → nothing scored to serve
         cutoff = (date.today() - timedelta(days=days)).isoformat()
-        cols = ("substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
-                "n.publisher, NULL AS sentiment_score, NULL AS risk_score, n.description")
+        sent_expr = "n.sentiment_score" if has_sent else "NULL"
+        cols = (f"substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
+                f"n.publisher, {sent_expr} AS sentiment_score, NULL AS risk_score, n.description")
         q = (query or "").strip()
         conds, params = ["n.published_at >= ?"], [cutoff]
+        if scored_only:
+            conds.append("n.sentiment_score IS NOT NULL")
         if ticker:
             conds.append("n.ticker = ?")
             params.append(ticker.upper())
@@ -205,23 +279,32 @@ class SqliteBackend:
         return self._news_df(sql, params, _NEWS_SEARCH_COLS)
 
     def query_news_stats(self, ticker: Optional[str] = None, days: int = 30) -> pd.DataFrame:
-        """Score-free local news statistics for the scout tool.
+        """Local news statistics for the scout tool — counts, date range, and (when the
+        local news table carries it) 1-5 ``sentiment_score`` aggregates.
 
-        Local market_data.db does not store news_scores yet, so sentiment/risk fields
-        are deliberately unavailable (NULL/0). This still gives get_news_brief the
-        cheap routing signal it needs — counts and date range — without reaching PG.
-        """
+        news_scores RETIRED (§4 decision 2026-06-23): sentiment is local-first. When the
+        local ``sentiment_score`` column exists, scored_count / avg_sentiment / bullish
+        (>=4) / bearish (<=2) aggregate it; a pre-sentiment DB falls back to 0/NULL. ``risk``
+        is fully retired → always NULL. No PG."""
+        has_sent = self._news_has_column("sentiment_score")
+        if has_sent:
+            scored_count = "SUM(CASE WHEN sentiment_score IS NOT NULL THEN 1 ELSE 0 END)"
+            avg_sent = "AVG(sentiment_score)"
+            bullish = "SUM(CASE WHEN sentiment_score >= 4 THEN 1 ELSE 0 END)"
+            bearish = "SUM(CASE WHEN sentiment_score <= 2 THEN 1 ELSE 0 END)"
+        else:
+            scored_count, avg_sent, bullish, bearish = "0", "NULL", "0", "0"
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         conds, params = ["published_at >= ?"], [cutoff]
         if ticker:
             conds.append("ticker = ?")
             params.append(ticker.upper())
         sql = (
-            "SELECT ticker, COUNT(*) AS article_count, 0 AS scored_count, "
+            f"SELECT ticker, COUNT(*) AS article_count, {scored_count} AS scored_count, "
             "substr(MIN(published_at), 1, 10) AS earliest_date, "
             "substr(MAX(published_at), 1, 10) AS latest_date, "
-            "NULL AS avg_sentiment, NULL AS avg_risk, "
-            "0 AS bullish_count, 0 AS bearish_count "
+            f"{avg_sent} AS avg_sentiment, NULL AS avg_risk, "
+            f"{bullish} AS bullish_count, {bearish} AS bearish_count "
             f"FROM news WHERE {' AND '.join(conds)} "
             "GROUP BY ticker ORDER BY article_count DESC"
         )

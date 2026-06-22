@@ -59,15 +59,24 @@ CREATE INDEX IF NOT EXISTS idx_prices_ticker_interval_dt ON prices(ticker, inter
 # it is the rowid the FTS5 external-content index keys on.
 _NEWS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS news (
-    id           INTEGER PRIMARY KEY,
-    ticker       TEXT NOT NULL,
-    title        TEXT NOT NULL,
-    description  TEXT,
-    url          TEXT,
-    publisher    TEXT,
-    source       TEXT NOT NULL,   -- 'ibkr' | 'polygon' | 'finnhub'
-    published_at TEXT NOT NULL,   -- UTC 'YYYY-MM-DDTHH:MM:SS+0000'
-    article_hash TEXT
+    id              INTEGER PRIMARY KEY,
+    ticker          TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    description     TEXT,
+    url             TEXT,
+    publisher       TEXT,
+    source          TEXT NOT NULL,   -- 'ibkr' | 'polygon' | 'finnhub'
+    published_at    TEXT NOT NULL,   -- UTC 'YYYY-MM-DDTHH:MM:SS+0000'
+    article_hash    TEXT,
+    -- news_scores RETIRED (DATA_COLLECTION plan §4 decision 2026-06-23): sentiment is
+    -- local-first + OPTIONAL. sentiment_score is the 1-5 LLM score written on-demand by
+    -- analysis (NULL until then). The CHECK makes the 1-5 scale ENFORCED, not merely
+    -- conventional: a provider's native polarity (-1/0/+1) physically CANNOT be written
+    -- here, so it can never poison the 1-5 consumers (get_news_sentiment_summary,
+    -- min_sentiment). A provider polarity, if ever carried, needs its OWN column.
+    sentiment_score  REAL CHECK (sentiment_score IS NULL OR sentiment_score BETWEEN 1 AND 5),
+    sentiment_source TEXT,           -- who produced the score: 'llm' | …
+    sentiment_scale  TEXT            -- documents the score's scale (currently '1-5')
 );
 CREATE INDEX IF NOT EXISTS idx_news_ticker_pub ON news(ticker, published_at);
 CREATE INDEX IF NOT EXISTS idx_news_pub ON news(published_at);
@@ -87,6 +96,27 @@ CREATE TABLE IF NOT EXISTS market_sync_meta (
     updated_at   TEXT NOT NULL
 );
 """
+
+def _ensure_news_sentiment_columns(conn) -> None:
+    """Idempotent: add the optional local sentiment columns to a pre-sentiment ``news``
+    table (CREATE TABLE IF NOT EXISTS won't alter an existing one). No-op when the news
+    table is absent or already has them. news_scores is RETIRED — these are the local-first
+    home for an on-demand 1-5 LLM score + scale-tagged provider sentiment."""
+    if not conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='news'"
+    ).fetchone():
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(news)").fetchall()}
+    # sentiment_score carries the SAME 1-5 CHECK as a fresh _NEWS_SCHEMA so an upgraded
+    # pre-existing DB enforces the scale invariant identically (born NULL → CHECK passes).
+    for col, decl in (
+        ("sentiment_score", "REAL CHECK (sentiment_score IS NULL OR sentiment_score BETWEEN 1 AND 5)"),
+        ("sentiment_source", "TEXT"),
+        ("sentiment_scale", "TEXT"),
+    ):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE news ADD COLUMN {col} {decl}")
+
 
 _PRICE_INSERT = ("INSERT OR IGNORE INTO prices "
                  "(ticker, datetime, interval, open, high, low, close, volume) "
@@ -738,6 +768,7 @@ def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> di
         sconn.executescript(_META_SCHEMA)  # tolerate a pre-meta DB
         sconn.executescript(_IV_SCHEMA)    # tolerate a pre-iv/fundamentals DB
         sconn.executescript(_FUND_SCHEMA)
+        _ensure_news_sentiment_columns(sconn)  # tolerate a pre-sentiment news table
         prices = _incr_prices(sconn, batch)  # per-(ticker,interval); catches new tickers
         news = _incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
                             _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
