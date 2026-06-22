@@ -512,10 +512,10 @@ Headline findings (all grounded; see the design doc for citations):
   exclusion, model-facing redaction residual (OQ-5), Option-1-vs-2 permission posture,
   and whether the sync `.messages` sites ever get a subscription path (OUT of 7B-3).
 
-Tier-1 allowlist (11 read-only tools): `get_sa_feed`, `get_sa_digest`,
+Tier-1 allowlist (12 read-only tools): `get_sa_feed`, `get_sa_digest`,
 `get_sa_alpha_picks`, `get_ticker_news`, `get_news_brief`, `search_news_advanced`,
-`get_ticker_prices`, `get_price_change`, `get_fundamentals_analysis`,
-`get_sec_filings`, `get_economic_calendar`.
+`get_ticker_prices`, `get_price_change`, `get_ticker_data_coverage`,
+`get_fundamentals_analysis`, `get_sec_filings`, `get_economic_calendar`.
 
 ### 7B-4/5/6 — BUILT + LIVE-VALIDATED (2026-06-20)
 

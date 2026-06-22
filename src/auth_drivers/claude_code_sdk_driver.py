@@ -83,7 +83,7 @@ _DEFAULT_MAX_TURNS = 60         # mirrors AgentConfig.max_tool_calls; no hidden 
 _MCP_SERVER_NAME = "ark"
 _MCP_PREFIX = "mcp__ark__"
 
-# §3 Tier-1 allowlist (11 read-only tools). Hardcoded frozenset — NOT derived
+# §3 Tier-1 allowlist (12 read-only tools). Hardcoded frozenset — NOT derived
 # from the registry `category` field (which is free-text, not a safety boundary).
 _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
     {
@@ -95,6 +95,7 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "search_news_advanced",
         "get_ticker_prices",
         "get_price_change",
+        "get_ticker_data_coverage",
         "get_fundamentals_analysis",
         "get_sec_filings",
         "get_economic_calendar",

@@ -925,6 +925,7 @@ class ToolRegistry:
 
     def _register_freshness_tools(self) -> None:
         from .freshness import check_data_freshness
+        from .data_coverage_tools import get_ticker_data_coverage
 
         self.register(ToolDefinition(
             name="check_data_freshness",
@@ -937,6 +938,23 @@ class ToolRegistry:
             category="analysis",
             parameters=[],
             requires_dal=True,
+        ))
+
+        self.register(ToolDefinition(
+            name="get_ticker_data_coverage",
+            description=(
+                "Explain local market-data coverage for one ticker. Reports latest "
+                "local price/news/IV/fundamentals dates and, for a target date, "
+                "whether missing price bars are expected (weekend/US market holiday) "
+                "or a local data gap. Read-only; never fetches provider data."
+            ),
+            function=get_ticker_data_coverage,
+            category="analysis",
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("target_date", "string", "Optional YYYY-MM-DD date to explain price coverage for", required=False),
+            ],
+            requires_dal=False,
         ))
 
 

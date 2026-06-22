@@ -43,7 +43,7 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 53
+        assert len(registry.list_all()) == 54
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
@@ -51,6 +51,7 @@ class TestRegistry:
         expected = [
             "get_ticker_news", "get_news_sentiment_summary", "search_news_by_keyword",
             "get_ticker_prices", "get_price_change", "get_sector_performance",
+            "get_ticker_data_coverage",
             "get_iv_analysis", "get_iv_history_data", "scan_mispricing", "calculate_greeks",
             "detect_anomalies", "detect_event_chains", "synthesize_signal",
             "get_fundamentals_analysis", "get_sec_filings",
@@ -66,14 +67,14 @@ class TestRegistry:
         assert len(registry.list_by_category("prices")) == 3
         assert len(registry.list_by_category("options")) == 6
         assert len(registry.list_by_category("signals")) == 4
-        assert len(registry.list_by_category("analysis")) == 12
+        assert len(registry.list_by_category("analysis")) == 13
         assert len(registry.list_by_category("portfolio")) == 6
         assert len(registry.list_by_category("execution")) == 1
 
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 53
+        assert len(schema) == 54
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -84,7 +85,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 53
+        assert len(schema) == 54
         for tool in schema:
             assert "name" in tool
             assert "description" in tool

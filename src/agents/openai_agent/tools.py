@@ -106,6 +106,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     )
     from src.tools.monitor_tools import scan_alerts as _scan_alerts
     from src.tools.freshness import check_data_freshness as _check_data_freshness
+    from src.tools.data_coverage_tools import get_ticker_data_coverage as _get_ticker_data_coverage
     from src.tools.sa_tools import (
         get_sa_alpha_picks as _get_sa_alpha_picks,
         get_sa_pick_detail as _get_sa_pick_detail,
@@ -913,6 +914,21 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = _check_data_freshness(dal)
         return _serialize_result(result, "check_data_freshness")
 
+    @function_tool
+    def tool_get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> str:
+        """Explain local data coverage for a ticker.
+
+        Args:
+            ticker: Stock ticker symbol
+            target_date: Optional YYYY-MM-DD date to explain missing price bars
+
+        Returns latest local price/news/IV/fundamentals dates and whether missing
+        price data on target_date is expected (weekend/US market holiday) or a
+        local data gap. Read-only; never fetches provider data.
+        """
+        result = _get_ticker_data_coverage(ticker=ticker, target_date=target_date)
+        return _serialize_result(result, "get_ticker_data_coverage")
+
     # ================================================================
     # SA Alpha Picks (Phase 11c)
     # ================================================================
@@ -1176,6 +1192,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_delete_memory,
         tool_scan_alerts,
         tool_check_data_freshness,
+        tool_get_ticker_data_coverage,
         tool_get_sa_alpha_picks,
         tool_get_sa_pick_detail,
         tool_refresh_sa_alpha_picks,

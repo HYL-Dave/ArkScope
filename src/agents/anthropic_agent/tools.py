@@ -211,6 +211,29 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             }
         },
         {
+            "name": "get_ticker_data_coverage",
+            "description": (
+                "Explain local data coverage for a ticker. Returns latest local "
+                "price/news/IV/fundamentals dates and whether missing price bars "
+                "on a target date are expected (weekend/US market holiday) or a "
+                "local data gap. Read-only; never fetches provider data."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "target_date": {
+                        "type": "string",
+                        "description": "Optional YYYY-MM-DD date to explain price coverage for"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
             "name": "get_sector_performance",
             "description": "Calculate average performance of all tickers in a sector.",
             "input_schema": {
@@ -1403,6 +1426,7 @@ def execute_tool(
     )
     from src.tools.monitor_tools import scan_alerts
     from src.tools.freshness import check_data_freshness
+    from src.tools.data_coverage_tools import get_ticker_data_coverage
     from src.tools.sa_tools import (
         get_sa_alpha_picks, get_sa_pick_detail, refresh_sa_alpha_picks,
         get_sa_articles, get_sa_article_detail, get_sa_market_news,
@@ -1652,6 +1676,10 @@ def execute_tool(
         ),
         # Data Freshness
         "check_data_freshness": lambda: check_data_freshness(dal),
+        "get_ticker_data_coverage": lambda: get_ticker_data_coverage(
+            ticker=tool_input["ticker"],
+            target_date=tool_input.get("target_date"),
+        ),
         # SA Alpha Picks (Phase 11c)
         "get_sa_alpha_picks": lambda: get_sa_alpha_picks(
             dal,

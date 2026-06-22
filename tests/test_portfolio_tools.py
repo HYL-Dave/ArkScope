@@ -191,5 +191,5 @@ class TestPortfolioToolRegistration:
         assert tool is not None
         assert tool.category == "portfolio"
         assert tool.requires_dal is True
-        # +2 for macro_calendar (P1.2 commit 6) + 1 for sa_digest (P1.3 commit 2).
-        assert len(registry.list_all()) == 53
+        # Includes macro/calendar, SA, and local coverage diagnostics.
+        assert len(registry.list_all()) == 54
