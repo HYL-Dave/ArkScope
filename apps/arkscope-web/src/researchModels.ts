@@ -32,17 +32,14 @@ export function defaultModel(options: string[], routeModel: string, current?: st
   return options[0] ?? routeModel ?? "";
 }
 
-// A live note when a selected effort will NOT actually apply: the Claude-subscription
-// (claude_code_oauth) path derives its own effort. Mirrors the backend save-time
-// warning (route_capability_warnings) so the user sees it at pick time too. null = fine.
+// A live note when a selected effort will NOT actually apply. null = fine.
 export function effortNote(
   provider: ModelProvider,
   authMode: CredentialAuthType | null,
   effort: string,
 ): string | null {
-  const hasEffort = (effort || "").trim() !== "" && effort !== "default";
-  if (provider === "anthropic" && authMode === "claude_code_oauth" && hasEffort) {
-    return `Claude 訂閱（claude_code_oauth）會自行決定 reasoning effort — 所選的「${effort}」不會套用。`;
-  }
+  void provider;
+  void authMode;
+  void effort;
   return null;
 }

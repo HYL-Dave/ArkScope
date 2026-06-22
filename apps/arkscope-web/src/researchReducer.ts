@@ -54,6 +54,13 @@ export interface Message {
   synthesized?: boolean; // true ONLY for the client-fabricated '連線中斷' bubble
 }
 
+export interface RetryCandidate {
+  question: string;
+  provider: Provider;
+  model: string | null;
+  ticker: string | null;
+}
+
 // ---- DTO: Thread (snapshot at first turn, frozen) --------------------------
 export interface Thread {
   id: string;
@@ -279,6 +286,23 @@ export function selectFooter(state: State): { total_tokens?: number; turn_count?
     }
   }
   return null;
+}
+
+export function lastRetryCandidate(messages: Message[]): RetryCandidate | null {
+  if (messages.length < 2) return null;
+  const last = messages[messages.length - 1];
+  const prev = messages[messages.length - 2];
+  if (last.role !== "assistant" || prev.role !== "user") return null;
+  if (!last.isError && !last.maxTurns) return null;
+  if (!prev.content.trim()) return null;
+  const provider = last.provider ?? null;
+  if (provider !== "anthropic" && provider !== "openai") return null;
+  return {
+    question: prev.content,
+    provider,
+    model: last.model ?? null,
+    ticker: prev.tickers?.[0] ?? null,
+  };
 }
 
 export function reduce(state: State, action: Action): State {

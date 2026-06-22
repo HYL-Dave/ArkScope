@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   initialState,
+  lastRetryCandidate,
   MAX_TURNS_SENTINEL,
   reduce,
   selectFooter,
@@ -749,4 +750,43 @@ describe("selectFooter", () => {
 // Smoke: the sentinel constant is exported for the max-turns group.
 it("exports the exact max-turns sentinel", () => {
   expect(MAX_TURNS_SENTINEL).toBe("Maximum tool calls reached. Please try a simpler query.");
+});
+
+describe("lastRetryCandidate", () => {
+  it("returns the previous user question for the final error assistant turn", () => {
+    const s = run(
+      submit({ question: "first", provider: "anthropic", model: "claude-sonnet-4-6", ticker: "NVDA", ts: 1000 }),
+      f("error", { error: "Reached maximum number of turns (8)" }, 2000),
+    );
+    expect(lastRetryCandidate(msgs(s))).toEqual({
+      question: "first",
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+      ticker: "NVDA",
+    });
+  });
+
+  it("returns the previous user question for the final max-turns sentinel", () => {
+    const s = run(
+      submit({ question: "broad", provider: "anthropic", model: "claude-opus-4-8", ts: 1000 }),
+      f("done", { answer: MAX_TURNS_SENTINEL, tools_used: [], provider: "anthropic", model: "claude-opus-4-8", token_usage: {} }, 2000),
+    );
+    expect(lastRetryCandidate(msgs(s))?.question).toBe("broad");
+  });
+
+  it("is null for successful tails and non-final failures", () => {
+    const success = run(
+      submit({ question: "q", provider: "anthropic", model: "m" }),
+      f("done", { answer: "ok", tools_used: [], provider: "anthropic", model: "m", token_usage: {} }),
+    );
+    expect(lastRetryCandidate(msgs(success))).toBeNull();
+
+    const oldFailureThenSuccess = run(
+      submit({ question: "bad", provider: "anthropic", model: "m" }),
+      f("error", { error: "boom" }),
+      submit({ question: "next", provider: "anthropic", model: "m" }),
+      f("done", { answer: "ok", tools_used: [], provider: "anthropic", model: "m", token_usage: {} }),
+    );
+    expect(lastRetryCandidate(msgs(oldFailureThenSuccess))).toBeNull();
+  });
 });

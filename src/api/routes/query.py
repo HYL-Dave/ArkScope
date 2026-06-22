@@ -32,6 +32,7 @@ class QueryRequest(BaseModel):
     # question; the RAW question is what gets persisted (criterion #2).
     thread_id: Optional[str] = None
     ticker: Optional[str] = None
+    retry_last_failed: bool = False
 
 
 def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
@@ -80,11 +81,10 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     system prompt so subscription Research behaves like API-key Research.
 
     Imports are LOCAL (lazy) to avoid import cycles, mirroring the existing branch.
-    ``effort`` is accepted for signature parity with run_query_stream but the
-    Agent-SDK driver derives effort itself (no per-call effort knob); it is unused
-    here by design.
+    ``effort`` maps to the Agent-SDK/Claude Code ``--effort`` option when set.
     """
     from src.agents.shared.prompts import build_system_prompt
+    from src.agents.config import get_agent_config
     from src.auth_drivers.factory import build_driver
     from src.auth_drivers.protocol import LLMRequest
     from src.auth_drivers.token_store import get_token_store
@@ -101,6 +101,8 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
         token_store=get_token_store(),
         registry=registry,
         dal=dal,
+        max_turns=get_agent_config().max_tool_calls,
+        timeout_s=get_agent_config().claude_subscription_timeout_s,
     )
     # SYSTEM PROMPT (v1): the SAME constant builder the anthropic agent uses
     # (src/agents/anthropic_agent/agent.py builds build_system_prompt(freshness)).
@@ -123,6 +125,7 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
         model=model,
         instructions=instructions,
         input_messages=[*history, {"role": "user", "content": question}],
+        reasoning_effort=None if effort in (None, "", "default") else effort,
     )
     return driver.stream_llm(req)
 
@@ -282,13 +285,21 @@ async def query_agent_stream(
         # Multi-turn (C-2c): prior thread turns seed the agent. Fetch BEFORE
         # persisting this turn's user message so it isn't duplicated. full_thread
         # policy, no silent truncation (AI_RESEARCH_CONTEXT_MEMORY_PLAN.md §4).
-        history = build_thread_history(store, request.thread_id) if persist else []
+        history = (
+            build_thread_history(
+                store,
+                request.thread_id,
+                exclude_last_failed_pair=request.retry_last_failed,
+            )
+            if persist
+            else []
+        )
         # No explicit model → the AI 研究 route (or the provider's default tier).
         # Resolve BEFORE persisting so the thread records the model actually used.
         # Explicit model (the AI 研究 picker) → use request.model + request.effort
         # directly. No explicit model → the AI 研究 route (or the provider's default
-        # tier). NOTE: effort is still derived by the Claude-subscription driver
-        # itself (it ignores res_effort, by design — surfaced as a save-time warning).
+        # tier). Retry excludes the immediately preceding failed user+assistant
+        # pair from history so the same question is not duplicated in context.
         res_model, res_effort = request.model, request.effort
         if res_model is None and provider in ("openai", "anthropic"):
             from src.agents.config import resolve_research_route

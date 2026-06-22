@@ -91,10 +91,12 @@ Current status:
 
 - OpenAI API keys: DB rows are imported/named; active DB key is wired into live
   OpenAI client construction.
-- Anthropic API key: DB row exists, but Claude OAuth active row still falls back
-  to env API key until the Claude-subscription Research driver lands.
-- Claude setup-token: token-store import/probe works; live Research use is still
-  pending.
+- Anthropic API key: DB row exists. Claude `claude_code_oauth` (subscription)
+  Research is **live-validated** (Slice 7B Research-stream consumer, commits
+  `5f0ea35`→`9131f7f`) — NOT env fallback. The sync `live_anthropic_client`
+  accessor intentionally stays fail-closed for OAuth-active; the live path is the
+  C-2 Research `stream_llm` consumer (see `SLICE_7B3_SDK_DRIVER_DESIGN.md` §8).
+- Claude setup-token: token-store import/probe works; subscription Research is live.
 - `.env`: no longer the intended day-to-day switch surface, but still fallback
   and portability format.
 
@@ -107,8 +109,10 @@ Next gate:
   calls — DB-only OpenAI key resolved + answered on HTTP transport; OpenAI
   switch affected the live run; Anthropic Claude-OAuth → explicit env fallback
   note). Live credential routing confirmed.
-- Complete Slice 7 so `claude_code_oauth` can actually run Research through the
-  subscription path, not env fallback.
+- DONE (Slice 7B): `claude_code_oauth` runs Research through the subscription path
+  (live-validated), not env fallback. The remaining OAuth-execution gap is OpenAI
+  `chatgpt_oauth` — login/token/probe/discovery are built but EXECUTION is
+  fail-closed (`live_resolver.py`) pending the P1/P2 backend probe.
 
 ### Model Routing
 
@@ -125,8 +129,12 @@ Current status:
 
 Next gate:
 
-- B2: expose `AI 研究` in Settings model routing and show the active route in the
-  Research surface.
+- B2 (expose `AI 研究` in Settings model routing + show the active route in
+  Research): **DONE**. Next: migrate the per-task routes (`{ai_research,
+  card_synthesis,card_translation}_{provider,model,effort}`) from
+  `user_profile.local.yaml` to **profile-DB authority** (the active slice — §6.6),
+  yaml/env demoted to fallback + import/export. Mirror the env-bridge precedence in
+  `data_provider_config.py` (`real env var > app-stored DB value > config file`).
 
 ### Scoring / Per-Purpose Credentials
 
@@ -195,6 +203,15 @@ These are not technical debt. They are bootstrap and rescue controls.
 ---
 
 ## 6. Sequencing
+
+> **Status reconciliation (2026-06-22):** Steps 1–4 are DONE — B1 drift fixed, B2
+> model-route UI shipped, Slice 6 live verification ✅ (2026-06-19), and Claude
+> `claude_code_oauth` subscription Research is **live-validated** (Slice 7B). The
+> remaining OAuth-execution gap is **OpenAI `chatgpt_oauth`**: login/token/probe/
+> discovery are built but EXECUTION is **fail-closed** (`live_resolver.py`) pending
+> the P1/P2 backend probe. **The active config-authority slice is step 6 reframed:**
+> migrate the per-task model routes to profile-DB authority — NOT a fresh framework
+> audit (§2/§3/§5 already specify the framework; the per-setting classes are known).
 
 1. **Fix B1 drift**: update stale tests and persist resolved model on stream
    error turns.

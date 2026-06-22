@@ -167,6 +167,53 @@ def test_build_thread_history_skips_error_turns(store):
     ]
 
 
+def test_build_thread_history_retry_excludes_last_failed_pair_only(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="a1")
+    store.append_message(thread_id="t1", role="user", content="failed q")
+    store.append_message(thread_id="t1", role="assistant", content="RuntimeError: db down", is_error=True)
+
+    hist = build_thread_history(store, "t1", exclude_last_failed_pair=True)
+
+    assert hist == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+
+
+def test_build_thread_history_retry_excludes_last_max_turns_pair(store):
+    from src.research_threads import MAX_TOOL_CALLS_SENTINEL, build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="a1")
+    store.append_message(thread_id="t1", role="user", content="too broad")
+    store.append_message(thread_id="t1", role="assistant", content=MAX_TOOL_CALLS_SENTINEL)
+
+    hist = build_thread_history(store, "t1", exclude_last_failed_pair=True)
+
+    assert hist == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+
+
+def test_build_thread_history_retry_does_not_exclude_successful_tail(store):
+    from src.research_threads import build_thread_history
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="a1")
+
+    assert build_thread_history(store, "t1", exclude_last_failed_pair=True) == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+
+
 def test_build_thread_history_skips_empty_content(store):
     from src.research_threads import build_thread_history
 

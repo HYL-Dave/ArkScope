@@ -26,3 +26,16 @@ def _isolate_locks(tmp_path_factory, monkeypatch):
     if "ARKSCOPE_LOCK_DIR" not in os.environ:
         monkeypatch.setenv(
             "ARKSCOPE_LOCK_DIR", str(tmp_path_factory.mktemp("locks")))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_profile_db(tmp_path_factory, monkeypatch):
+    """The profile-state DB (LLM credentials, model routes, data-provider config)
+    defaults to data/profile_state.db. Any DEFAULT-path store — e.g. the model-route
+    store behind ``task_route``/``resolve_research_route`` — must read a throwaway DB,
+    never the real dev one, or a route saved via the app would leak into resolution-
+    layer tests. Tests that inject an explicit db_path are unaffected."""
+    if "ARKSCOPE_PROFILE_DB" not in os.environ:
+        monkeypatch.setenv(
+            "ARKSCOPE_PROFILE_DB",
+            str(tmp_path_factory.mktemp("profile") / "profile_state.db"))

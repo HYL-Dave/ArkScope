@@ -96,6 +96,16 @@ def test_claude_code_oauth_is_the_sdk_driver_not_placeholder():
     assert isinstance(d, AnthropicClaudeCodeSdkDriver) and not isinstance(d, NotImplementedDriver)
 
 
+def test_claude_code_oauth_factory_passes_max_turns():
+    d = build_driver(
+        provider="anthropic",
+        auth_mode="claude_code_oauth",
+        credential=_cred(auth_type="claude_code_oauth"),
+        max_turns=42,
+    )
+    assert d._max_turns == 42
+
+
 # --- explicit errors for unknown provider / auth_mode -----------------------
 def test_unknown_provider_raises_valueerror():
     with pytest.raises(ValueError) as ei:

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 Provider = Literal["anthropic", "openai"]
 TaskId = Literal["card_synthesis", "card_translation", "ai_research"]
-RouteSource = Literal["env", "profile", "default"]
+RouteSource = Literal["env", "db", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 OPENAI_MODELS_SOURCE = "https://developers.openai.com/api/docs/models"
@@ -289,14 +289,6 @@ def route_capability_warnings(
     for ``provider`` (None if no active credential / not resolvable). Warnings, not errors:
     the catalog allows custom ids and discovery may be stale, so we inform, never block."""
     out: list[str] = []
-    has_effort = (effort or "").strip() not in ("", "default")
-    if auth_mode == "claude_code_oauth" and has_effort:
-        # The Claude-subscription SDK driver derives its own effort — a configured
-        # effort is silently dropped on that path. Surface it instead of pretending.
-        out.append(
-            f"The active Anthropic credential is a Claude subscription (claude_code_oauth), which "
-            f"derives its own reasoning effort — the configured effort '{effort}' will NOT be applied."
-        )
     if auth_mode == "chatgpt_oauth":
         # The ChatGPT backend's model set differs from the API-key catalog; seed
         # membership proves nothing here, so point the user at live discovery.

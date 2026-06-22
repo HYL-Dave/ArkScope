@@ -39,6 +39,7 @@ class TestAgentConfig:
         assert config.anthropic_model == "claude-sonnet-4-6"  # default tier (advanced = claude-opus-4-8)
         assert config.reasoning_effort in ("none", "minimal", "low", "medium", "high", "xhigh")
         assert config.max_tool_calls > 0
+        assert config.claude_subscription_timeout_s >= 900
         assert config.max_tokens > 0
 
     def test_anthropic_effort_default(self):

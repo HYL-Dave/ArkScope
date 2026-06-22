@@ -133,6 +133,7 @@ def _make_driver(
     *,
     token: Optional[str] = TOKEN,
     registry: Optional[_FakeRegistry] = None,
+    max_turns: int = 60,
     timeout_s: float = 180.0,
     per_tool_timeout_s: float = 45.0,
 ) -> AnthropicClaudeCodeSdkDriver:
@@ -141,6 +142,7 @@ def _make_driver(
         token_store=_FakeTokenStore(token),
         registry=registry if registry is not None else _full_fake_registry(),
         dal=_FakeDAL(),
+        max_turns=max_turns,
         timeout_s=timeout_s,
         per_tool_timeout_s=per_tool_timeout_s,
     )
@@ -300,6 +302,37 @@ def test_overall_timeout(monkeypatch):
     assert events[-1].type == EventType.error
     assert "timed out" in events[-1].data["error"]
     assert sum(1 for e in events if e.type in (EventType.done, EventType.error)) == 1
+
+
+def test_driver_default_max_turns_is_not_hidden_eight():
+    assert _make_driver()._max_turns == 60
+
+
+def test_zero_timeout_disables_overall_timeout(monkeypatch):
+    async def slow_but_finishes_query(*, prompt, options):
+        await asyncio.sleep(0.01)
+        yield _result_msg()
+
+    monkeypatch.setattr(mod, "query", slow_but_finishes_query)
+    driver = _make_driver(timeout_s=0)
+    events = asyncio.run(_collect(driver, _REQ))
+
+    assert events[-1].type == EventType.done
+
+
+def test_zero_max_turns_omits_sdk_max_turns(monkeypatch):
+    capture: dict = {}
+    _install_fake_query(monkeypatch, [_result_msg()], capture)
+    req = LLMRequest(
+        model="claude-opus-4-8",
+        instructions="You are a terse research assistant.",
+        input_messages=[{"role": "user", "content": "hard question"}],
+    )
+
+    events = asyncio.run(_collect(_make_driver(max_turns=0), req))
+
+    assert events[-1].type == EventType.done
+    assert capture["options"].max_turns is None
 
 
 # ===========================================================================
@@ -597,6 +630,38 @@ def test_get_quota_status_unknown():
     res = asyncio.run(_make_driver().get_quota_status())
     assert res["status"] == "unknown"
     assert res["provider"] == "anthropic"
+
+
+def test_build_options_passes_reasoning_effort_to_claude_sdk(monkeypatch):
+    capture: dict = {}
+    _install_fake_query(monkeypatch, [_result_msg()], capture)
+    req = LLMRequest(
+        model="claude-opus-4-8",
+        instructions="You are a terse research assistant.",
+        input_messages=[{"role": "user", "content": "hard question"}],
+        reasoning_effort="max",
+    )
+
+    events = asyncio.run(_collect(_make_driver(), req))
+
+    assert events[-1].type == EventType.done
+    assert capture["options"].effort == "max"
+
+
+def test_build_options_omits_default_reasoning_effort(monkeypatch):
+    capture: dict = {}
+    _install_fake_query(monkeypatch, [_result_msg()], capture)
+    req = LLMRequest(
+        model="claude-opus-4-8",
+        instructions="You are a terse research assistant.",
+        input_messages=[{"role": "user", "content": "normal question"}],
+        reasoning_effort="default",
+    )
+
+    events = asyncio.run(_collect(_make_driver(), req))
+
+    assert events[-1].type == EventType.done
+    assert capture["options"].effort is None
 
 
 def test_implements_research_provider_protocol():

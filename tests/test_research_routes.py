@@ -259,6 +259,48 @@ def test_query_stream_explicit_model_and_effort_passthrough(store, monkeypatch):
     assert captured["model"] == "gpt-5.4-mini" and captured["effort"] == "low"
 
 
+def test_query_stream_retry_last_failed_excludes_failed_pair_from_history(store, monkeypatch):
+    import asyncio
+
+    store.ensure_thread(id="t1", title="q")
+    store.append_message(thread_id="t1", role="user", content="q1")
+    store.append_message(thread_id="t1", role="assistant", content="a1")
+    store.append_message(thread_id="t1", role="user", content="failed q")
+    store.append_message(thread_id="t1", role="assistant", content="RuntimeError: db down", is_error=True)
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, **kwargs):
+        captured["question"] = question
+        captured["history"] = history
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "retried ok", "tools_used": [], "provider": "openai", "model": model, "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
+
+    req = q.QueryRequest(
+        question="failed q",
+        provider="openai",
+        model="gpt-5.4-mini",
+        effort="low",
+        thread_id="t1",
+        ticker=None,
+        retry_last_failed=True,
+    )
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    assert captured["question"] == "failed q"
+    assert captured["history"] == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1"},
+    ]
+    assert [m.content for m in store.list_messages("t1")][-2:] == ["failed q", "retried ok"]
+
+
 def test_query_stream_no_thread_id_sends_empty_history(store, monkeypatch):
     """Without a (valid) thread_id, no persistence and history=[] (single-turn)."""
     import asyncio
@@ -593,9 +635,10 @@ def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_promp
             captured["req"] = req
             return sentinel_stream
 
-    def fake_build_driver(*, provider, auth_mode, credential, token_store, registry, dal):
+    def fake_build_driver(*, provider, auth_mode, credential, token_store, registry, dal, max_turns, timeout_s):
         captured.update(provider=provider, auth_mode=auth_mode, credential=credential,
-                        token_store=token_store, registry=registry, dal=dal)
+                        token_store=token_store, registry=registry, dal=dal,
+                        max_turns=max_turns, timeout_s=timeout_s)
         return FakeDriver()
 
     monkeypatch.setattr("src.auth_drivers.factory.build_driver", fake_build_driver)
@@ -612,6 +655,8 @@ def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_promp
     assert captured["credential"] is sentinel_cred
     assert captured["token_store"] is sentinel_token_store
     assert captured["dal"] is sentinel_dal
+    assert captured["max_turns"] == 60  # AgentConfig.max_tool_calls default; no hidden 8-turn cap
+    assert captured["timeout_s"] == 900.0  # no hidden 180s wall-clock cap
     assert isinstance(captured["registry"], FakeRegistry)
     req = captured["req"]
     assert req.model == "claude-sonnet-4-6"
@@ -666,7 +711,7 @@ def test_anthropic_subscription_stream_no_history_uses_bare_prompt(monkeypatch):
 
     q._anthropic_subscription_stream(
         credential_id="local:7", question="hi", model="claude-sonnet-4-6",
-        effort=None, dal=object(), history=[],
+        effort="max", dal=object(), history=[],
     )
 
     from src.agents.shared.prompts import build_system_prompt
@@ -674,3 +719,4 @@ def test_anthropic_subscription_stream_no_history_uses_bare_prompt(monkeypatch):
     assert req.instructions == build_system_prompt()  # no suffix on single-turn
     assert "[多輪脈絡]" not in req.instructions
     assert req.input_messages == [{"role": "user", "content": "hi"}]
+    assert req.reasoning_effort == "max"

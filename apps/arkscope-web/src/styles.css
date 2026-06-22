@@ -2268,6 +2268,7 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
 .markdown-body .md-img-blocked { font-style: italic; }
 .research-interim { white-space: pre-wrap; font-style: italic; margin-bottom: 6px; }
 .research-bubble-tickers { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.research-bubble-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 
 .research-thinking { display: flex; align-items: center; gap: 8px; }
 .research-spinner { width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: research-spin 0.8s linear infinite; }

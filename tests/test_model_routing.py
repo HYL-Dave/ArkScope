@@ -34,17 +34,18 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
 
 
-def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):
+def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
+    from src.model_route_store import ModelRouteStore
 
-    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", raising=False)
-    monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", raising=False)
-    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_PROVIDER", raising=False)
-    monkeypatch.delenv("ARKSCOPE_CARD_TRANSLATION_MODEL", raising=False)
+    for t in ("CARD_SYNTHESIS", "CARD_TRANSLATION"):
+        for f in ("PROVIDER", "MODEL", "EFFORT"):
+            monkeypatch.delenv(f"ARKSCOPE_{t}_{f}", raising=False)
     monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
     monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
     cfg_mod.get_agent_config.cache_clear()
 
+    db = tmp_path / "profile_state.db"
     res = update_model_routes(
         ModelRoutesUpdate(
             routes={
@@ -52,17 +53,22 @@ def test_update_model_routes_persists_local_yaml(tmp_path, monkeypatch):
                 "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-4-6"),
             }
         ),
-        store=CredentialStore(tmp_path / "profile_state.db"),  # isolate: no active OAuth cred
+        store=CredentialStore(db),  # route store shares this profile DB
     )
     assert res["routes"]["card_synthesis"]["provider"] == "openai"
     assert res["routes"]["card_synthesis"]["model"] == "gpt-5.5"
     assert res["routes"]["card_synthesis"]["effort"] == "high"
+    assert res["routes"]["card_synthesis"]["source"] == "db"
 
-    data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
-    assert data["llm_preferences"]["card_synthesis_provider"] == "openai"
-    assert data["llm_preferences"]["card_synthesis_model"] == "gpt-5.5"
-    assert data["llm_preferences"]["card_synthesis_effort"] == "high"
-    assert runtime_config(store=CredentialStore(tmp_path / "profile_state.db"))["card_synthesis"]["provider"] == "openai"
+    # persisted to the profile DB as an atomic row, NOT user_profile.local.yaml
+    row = ModelRouteStore(db).get("card_synthesis")
+    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.5", "high")
+    assert not (tmp_path / "user_profile.local.yaml").exists()  # yaml untouched by a save
+
+    # resolution reads it back as DB authority
+    rc = runtime_config(store=CredentialStore(db))
+    assert rc["card_synthesis"]["provider"] == "openai"
+    assert rc["card_synthesis"]["source"] == "db"
 
     cfg_mod.get_agent_config.cache_clear()
 
@@ -80,11 +86,11 @@ def test_update_model_routes_rejects_provider_model_mismatch():
 
 
 # --- Step 2: auth-mode-aware capability / route validation -------------------
-def test_route_capability_warnings_claude_oauth_effort_dropped():
+def test_route_capability_warnings_claude_oauth_effort_supported():
     from src.model_routing import route_capability_warnings
 
     w = route_capability_warnings("anthropic", "claude-opus-4-8", "high", auth_mode="claude_code_oauth")
-    assert len(w) == 1 and "not be applied" in w[0].lower() and "high" in w[0]
+    assert w == []
 
 
 def test_route_capability_warnings_claude_oauth_default_effort_silent():
@@ -109,7 +115,7 @@ def test_route_capability_warnings_api_key_and_none_are_silent():
     assert route_capability_warnings("anthropic", "claude-opus-4-8", "high", auth_mode=None) == []
 
 
-def test_save_route_warns_when_claude_oauth_active_drops_effort(tmp_path, monkeypatch):
+def test_save_route_claude_oauth_active_preserves_effort_without_drop_warning(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
 
     monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
@@ -123,8 +129,8 @@ def test_save_route_warns_when_claude_oauth_active_drops_effort(tmp_path, monkey
         store=store,
     )
     w = res["routes"]["ai_research"]["warning"]
-    assert w and "not be applied" in w.lower() and "high" in w  # effort-dropped surfaced, not hidden
-    assert res["routes"]["ai_research"]["effort"] == "high"  # still saved (the driver derives at run time)
+    assert w is None
+    assert res["routes"]["ai_research"]["effort"] == "high"
     cfg_mod.get_agent_config.cache_clear()
 
 
@@ -231,3 +237,84 @@ def test_credential_store_concurrent_first_init_does_not_lock(tmp_path):
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         assert list(pool.map(lambda _: init_once(), range(12))) == [0] * 12
+
+
+# --- model-route DB authority — resolution: real env > DB > yaml > default ----------
+
+_YAML_AI = {"llm_preferences": {
+    "ai_research_provider": "openai",
+    "ai_research_model": "gpt-5.4-mini",
+    "ai_research_effort": "xhigh",
+}}
+
+
+@pytest.fixture()
+def make_route_store(monkeypatch, tmp_path):
+    """Hermetic route resolution + a ModelRouteStore on the same tmp profile DB.
+    Clears the AgentConfig cache on teardown so a tmp-yaml config can't leak."""
+    from src.agents import config as cfg_mod
+    from src.model_route_store import ModelRouteStore
+
+    def setup(local_yaml: dict | None = None) -> "ModelRouteStore":
+        for t in ("CARD_SYNTHESIS", "CARD_TRANSLATION", "AI_RESEARCH"):
+            for f in ("PROVIDER", "MODEL", "EFFORT"):
+                monkeypatch.delenv(f"ARKSCOPE_{t}_{f}", raising=False)
+        monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+        local_path = tmp_path / "user_profile.local.yaml"
+        if local_yaml is not None:
+            local_path.write_text(yaml.safe_dump(local_yaml))
+        monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", local_path)
+        cfg_mod.get_agent_config.cache_clear()
+        return ModelRouteStore(tmp_path / "profile_state.db")
+
+    yield setup
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_task_route_db_wins_over_yaml(make_route_store):
+    from src.agents.config import task_route
+
+    rs = make_route_store(_YAML_AI)
+    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")
+    route = task_route("ai_research", route_store=rs)
+    assert (route.provider, route.model, route.effort, route.source) == (
+        "anthropic", "claude-opus-4-8", "high", "db")
+
+
+def test_task_route_db_is_atomic_not_field_merged_with_yaml(make_route_store):
+    # A DB route is used as a UNIT — yaml is NOT merged field-by-field beneath it
+    # (that would re-introduce the half-applied-route problem the schema avoids).
+    from src.agents.config import task_route
+
+    rs = make_route_store(_YAML_AI)            # yaml: openai / gpt-5.4-mini / xhigh
+    rs.set("ai_research", "anthropic", "claude-opus-4-8")  # effort omitted → "default"
+    route = task_route("ai_research", route_store=rs)
+    assert route.model == "claude-opus-4-8"    # DB model, NOT yaml's gpt-5.4-mini
+    assert route.effort == "default"           # DB effort, NOT yaml's xhigh
+
+
+def test_task_route_yaml_fallback_when_db_empty(make_route_store):
+    from src.agents.config import task_route
+
+    rs = make_route_store(_YAML_AI)            # DB empty → fall back to yaml
+    route = task_route("ai_research", route_store=rs)
+    assert (route.provider, route.model, route.effort, route.source) == (
+        "openai", "gpt-5.4-mini", "xhigh", "profile")
+
+
+def test_task_route_default_when_no_db_no_yaml(make_route_store):
+    from src.agents.config import task_route
+
+    rs = make_route_store(None)
+    assert task_route("ai_research", route_store=rs).source == "default"
+
+
+def test_task_route_real_env_overrides_db(make_route_store, monkeypatch):
+    from src.agents.config import task_route
+
+    rs = make_route_store(None)
+    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")
+    monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_PROVIDER", "openai")
+    monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
+    route = task_route("ai_research", route_store=rs)
+    assert (route.provider, route.model, route.source) == ("openai", "gpt-5.5", "env")

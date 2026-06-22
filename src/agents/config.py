@@ -10,6 +10,7 @@ Models can be configured via:
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -28,6 +29,8 @@ from src.model_routing import (
     is_seed_model,
     model_provider,
 )
+
+logger = logging.getLogger(__name__)
 
 # Valid reasoning effort levels for GPT-5.x / o-series
 ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
@@ -79,6 +82,9 @@ class AgentConfig(BaseModel):
     # Limits
     max_tool_calls: int = 60
     max_tokens: int = 16384
+    # Claude subscription Agent-SDK Research session wall-clock timeout.
+    # 0 disables the overall session timeout; per-tool timeouts still apply.
+    claude_subscription_timeout_s: float = 900.0
 
     # Context management (Phase 3)
     # Compact old tool results when input_tokens > model_context_limit * ratio
@@ -228,6 +234,7 @@ def get_agent_config() -> AgentConfig:
         anthropic_model_advanced: "claude-opus-4-7"
         reasoning_effort: "xhigh"
         max_tool_calls: 60
+        claude_subscription_timeout_s: 900
         max_tokens: 16384
         anthropic_effort: "high"
         anthropic_thinking: false
@@ -270,6 +277,8 @@ def get_agent_config() -> AgentConfig:
         config.max_tool_calls = llm_prefs["max_tool_calls"]
     if "max_tokens" in llm_prefs:
         config.max_tokens = llm_prefs["max_tokens"]
+    if "claude_subscription_timeout_s" in llm_prefs:
+        config.claude_subscription_timeout_s = llm_prefs["claude_subscription_timeout_s"]
 
     # Anthropic effort/thinking overrides
     if "anthropic_effort" in llm_prefs:
@@ -424,31 +433,61 @@ def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str
     raise ValueError(f"unknown task: {task}")
 
 
-def task_route(task: TaskId) -> TaskRoute:
+def _default_route_store():
+    """The app-managed route store on the profile DB (path from ARKSCOPE_PROFILE_DB).
+    Constructed fresh so the path resolves at call time — tests inject their own."""
+    from src.model_route_store import ModelRouteStore
+
+    return ModelRouteStore()
+
+
+def _db_route(task: str, route_store):
+    """The app-managed route for ``task`` from the profile DB (a single atomic row),
+    or None to fall back to yaml/default. Never raises into resolution: a DB error
+    logs and degrades to the file/env authority (CONFIG_AUTHORITY_PLAN §3 gate 3)."""
+    try:
+        store = route_store if route_store is not None else _default_route_store()
+        return store.get(task)
+    except Exception:  # pragma: no cover - defensive fallback
+        logger.warning("model_route DB read failed for task %r; using yaml/default", task, exc_info=True)
+        return None
+
+
+def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
     """Resolve provider + model for a per-task LLM operation.
 
-    Resolution is env override → user_profile.local/user_profile → built-in
-    default. If only a model is provided, known model prefixes infer provider
+    Resolution is **real env override → profile DB → user_profile(.local) yaml →
+    built-in default**. The profile-DB route is the app-managed authority (Settings
+    writes it; CONFIG_AUTHORITY_PLAN §2); yaml is fallback + import/export. A DB route
+    is taken as a UNIT (provider/model/effort together) — yaml is NOT field-merged
+    beneath it, so a saved route can never go half-applied. real env stays the top
+    operator escape hatch. If only a model is given, known prefixes infer provider
     (``claude-*`` → Anthropic, ``gpt-*``/``o*`` → OpenAI).
     """
     ensure_env_loaded()
     config = get_agent_config()
-    profile_provider, profile_model, profile_effort = _configured_task_values(config, task)
     env_provider_key, env_model_key, env_effort_key = _TASK_ENV[task]
     env_provider = _clean_provider(os.environ.get(env_provider_key))
     env_model = (os.environ.get(env_model_key) or "").strip()
     env_effort = (os.environ.get(env_effort_key) or "").strip()
 
-    provider = env_provider or _clean_provider(profile_provider)
-    model = env_model or profile_model.strip()
-    effort = env_effort or profile_effort.strip() or "default"
-    source = (
-        "env"
-        if env_provider or env_model or env_effort
-        else "profile"
-        if provider or model or profile_effort
-        else "default"
-    )
+    db_row = _db_route(task, route_store)
+    if db_row is not None:
+        base_provider, base_model, base_effort, from_db = (
+            db_row.provider, db_row.model, db_row.effort, True)
+    else:
+        base_provider, base_model, base_effort = _configured_task_values(config, task)
+        from_db = False
+
+    provider = env_provider or _clean_provider(base_provider)
+    model = env_model or base_model.strip()
+    effort = env_effort or base_effort.strip() or "default"
+    if env_provider or env_model or env_effort:
+        source = "env"
+    elif from_db:
+        source = "db"
+    else:
+        source = "profile" if (provider or model or base_effort) else "default"
 
     if not provider and model:
         provider = model_provider(model)
@@ -498,14 +537,14 @@ def task_provider(task: TaskId) -> Provider:
     return task_route(task).provider
 
 
-def resolve_research_route(provider: Provider) -> tuple[str, Optional[str]]:
+def resolve_research_route(provider: Provider, *, route_store=None) -> tuple[str, Optional[str]]:
     """Model + effort the AI 研究 surface should use for ``provider`` when the
     request specifies neither. Honors a configured ``ai_research`` route ONLY when
     its provider matches the request provider; otherwise the request provider's
     default-tier agent model (today's behavior). A 'default'/empty effort → None
     (the agent uses its own default). The Research page picks the provider, so the
     model/effort are resolved for THAT provider, not forced to the route's."""
-    route = task_route("ai_research")
+    route = task_route("ai_research", route_store=route_store)
     if route.provider == provider and route.source != "default":
         effort = None if route.effort in ("", "default") else route.effort
         return route.model, effort

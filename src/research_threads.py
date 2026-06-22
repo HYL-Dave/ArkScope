@@ -54,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_research_messages_thread ON research_messages(thr
 
 
 MAX_THREAD_ID = 200
+MAX_TOOL_CALLS_SENTINEL = "Maximum tool calls reached. Please try a simpler query."
 
 
 def valid_thread_id(tid: Optional[str]) -> bool:
@@ -62,7 +63,22 @@ def valid_thread_id(tid: Optional[str]) -> bool:
     return bool(tid) and bool(tid.strip()) and len(tid) <= MAX_THREAD_ID
 
 
-def build_thread_history(store, thread_id: str, policy: str = "full_thread") -> list[dict]:
+def _is_retryable_failed_tail(m: ResearchMessage) -> bool:
+    if m.role != "assistant":
+        return False
+    if getattr(m, "is_error", False):
+        return True
+    content = m.content or ""
+    return content == MAX_TOOL_CALLS_SENTINEL or "Reached maximum number of turns" in content
+
+
+def build_thread_history(
+    store,
+    thread_id: str,
+    policy: str = "full_thread",
+    *,
+    exclude_last_failed_pair: bool = False,
+) -> list[dict]:
     """Provider-neutral prompt-context history for a thread (C-2c, plan §4/§5).
 
     Returns the prior conversation as ``[{role, content}, ...]`` to seed the
@@ -80,8 +96,16 @@ def build_thread_history(store, thread_id: str, policy: str = "full_thread") -> 
         return []
     if policy != "full_thread":
         raise ValueError(f"unsupported history policy (reserved, not yet built): {policy}")
+    messages = store.list_messages(thread_id)
+    if (
+        exclude_last_failed_pair
+        and len(messages) >= 2
+        and messages[-2].role == "user"
+        and _is_retryable_failed_tail(messages[-1])
+    ):
+        messages = messages[:-2]
     out: list[dict] = []
-    for m in store.list_messages(thread_id):
+    for m in messages:
         if getattr(m, "is_error", False) or not m.content:
             continue
         out.append({"role": m.role, "content": m.content})

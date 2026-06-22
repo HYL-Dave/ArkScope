@@ -152,7 +152,7 @@ Under §7 Option 1 the **only** enforcement gate is the `PreToolUse` hook, which
 R4 confirms there is **no existing per-tool wall-clock wrapper** in either agent loop (a GAP); the new in-process surface has no enclosing timeout. Therefore:
 - Wrap each bridged invocation in `asyncio.wait_for(tool_coro, timeout=_PER_TOOL_TIMEOUT_S)` with **`_PER_TOOL_TIMEOUT_S = 45.0`**. Rationale (R4): slowest single-tool I/O is HTTP 15–30 s and Playwright 30 s; 45 s covers one such call + a DB read while bounding a hung tool.
 - On per-tool timeout, return a **tool-error result** (`{"content":[{"type":"text","text":"tool timed out after 45s"}], "is_error": True}`) — do NOT kill the whole run. (This path is also inside the catch-all above.)
-- Keep the session-level **`_DEFAULT_TIMEOUT_S = 180.0`** (the 7A value, `claude_code_oauth_driver.py:52`) as the overall stream wall-clock (§6 channel f). Both are ctor kwargs (`timeout_s`, `per_tool_timeout_s`).
+- Keep the session-level **`_DEFAULT_TIMEOUT_S = 900.0`** as the overall stream wall-clock (§6 channel f); `timeout_s=0` disables the overall session timeout while preserving per-tool timeouts. Both are ctor kwargs (`timeout_s`, `per_tool_timeout_s`) and Research passes `AgentConfig.claude_subscription_timeout_s`.
 - **[DESIGNED-not-proven]:** no existing per-tool wrapper to copy; minimal addition consistent with the codebase's driver-boundary timeout style.
 
 ### Max RESULT-SIZE cap (two-tier, R4) + the model-facing-redaction decision
@@ -178,7 +178,7 @@ Applied at exactly these points — and the §6 mapping MUST be reconciled to ru
 
 **Net new/reused constants:**
 ```
-_DEFAULT_TIMEOUT_S    = 180.0   # reuse 7A (session/stream wall-clock)
+_DEFAULT_TIMEOUT_S    = 900.0   # session/stream wall-clock; 0 disables
 _PER_TOOL_TIMEOUT_S   = 45.0    # NEW — bounds one in-process tool call
 _BRIDGE_RESULT_BUDGET = 12_000  # = LAYER_5_CHAR_CAP; via truncate_with_marker
 _SUMMARY_CAP          = 200     # reuse 7A (event/history preview)
@@ -274,7 +274,7 @@ Guard `usage = result_msg.usage or {}` (`ResultMessage.usage` is `dict|None`). *
 | **(c) SDK exception while streaming** | `async for` raises `ProcessError`/`CLIJSONDecodeError`/`CLIConnectionError`/`MessageParseError`/`ClaudeSDKError` (`_errors.py:6-56`) | `try/except ClaudeSDKError as exc`: if no terminal yet, `yield _err(request, _redact_bridge(str(exc), token)[:500])`; return. **SEE corrected leak narrative below.** **[DESIGNED-not-proven]** |
 | **(d) Process death (no exception)** | usually collapses into (c) via `ProcessError` | same as (c); else (e) |
 | **(e) EOF without terminal** | loop ends, no ResultMessage seen | synthesize ONE `error`: `_err(request, "claude agent stream ended without a result")` — never a silent `done` (port of 7A `:189-205`) |
-| **(f) Timeout** | SDK does not self-enforce `_DEFAULT_TIMEOUT_S=180.0` | wrap consumption in `asyncio.timeout(self._timeout_s)`; on `TimeoutError` cancel the query, `yield _err(request, f"…timed out after {self._timeout_s}s")`, return. **[DESIGNED]** — exact cancel call (`ClaudeSDKClient.interrupt()` vs ceasing iteration) picked at build time |
+| **(f) Timeout** | SDK does not self-enforce `_DEFAULT_TIMEOUT_S=900.0` | bound consumption with `timeout_s` when positive; `timeout_s=0` disables the overall session timeout. On timeout, yield `_err(request, f"…timed out after {self._timeout_s}s")`, return. Per-tool timeout still applies. |
 | **(g) Cancellation / GeneratorExit** | consumer stops iterating | do NOT yield (can't during `GeneratorExit`); `try/finally` whose `finally` ONLY tears down the SDK session/subprocess (port of 7A `finally: _terminate(proc)`). Zero terminal events for a cancelled stream is CORRECT |
 
 **CORRECTED token-leak narrative for exceptions [folded in — three reviews concur, re-verified]:** §6c previously named `ProcessError.stderr` as the CRITICAL token-leak path. **That attribution is wrong for the installed SDK:**

@@ -93,6 +93,8 @@ def build_driver(
     token_store: Optional[Any] = None,
     registry: Any = None,
     dal: Any = None,
+    max_turns: Optional[int] = None,
+    timeout_s: Optional[float] = None,
 ) -> NotImplementedDriver:
     """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
     placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
@@ -127,6 +129,8 @@ def build_driver(
 
         return AnthropicClaudeCodeSdkDriver(
             credential=credential, token_store=token_store, registry=registry, dal=dal,
+            **({"max_turns": max_turns} if max_turns is not None else {}),
+            **({"timeout_s": timeout_s} if timeout_s is not None else {}),
         )
     # S3 step 1: chatgpt_oauth resolves to a real driver for READ-ONLY model discovery
     # (ChatGPT-backend list, not the api_key seed). Its execution path stays gated

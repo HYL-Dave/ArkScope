@@ -51,10 +51,9 @@ describe("defaultModel", () => {
 });
 
 describe("effortNote", () => {
-  it("warns that effort is dropped on the Claude subscription", () => {
+  it("does not warn for Claude subscription effort because the SDK driver applies it", () => {
     const n = effortNote("anthropic", "claude_code_oauth", "high");
-    expect(n).not.toBeNull();
-    expect(n!).toContain("high");
+    expect(n).toBeNull();
   });
   it("is silent for default/no effort on the subscription", () => {
     expect(effortNote("anthropic", "claude_code_oauth", "default")).toBeNull();

@@ -13,7 +13,8 @@ from src.api.dependencies import (
     get_oauth_token_store,
 )
 from src.api.permissions import require_profile_state_write
-from src.agents.config import save_local_override, task_route
+from src.agents.config import task_route
+from src.model_route_store import ModelRouteStore
 from src.env_keys import env_file_path
 from src.model_credentials import (
     CredentialStore,
@@ -167,6 +168,7 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
 
     ensure_env_loaded()
     store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
     cfg = get_agent_config()
 
     def key_set(name: str) -> bool:
@@ -192,9 +194,9 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
             "credentials": [c.model_dump() for c in credentials["openai"]],
         },
         # Per-task model routing (so the UI can show what each operation uses).
-        "card_synthesis": task_route("card_synthesis").model_dump(),
-        "card_translation": task_route("card_translation").model_dump(),
-        "ai_research": task_route("ai_research").model_dump(),
+        "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
+        "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
+        "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),
@@ -213,12 +215,13 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
     account entitlements, and providers roll models independently.
     """
     store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
     return {
         **catalog().model_dump(),
         "routes": {
-            "card_synthesis": task_route("card_synthesis").model_dump(),
-            "card_translation": task_route("card_translation").model_dump(),
-            "ai_research": task_route("ai_research").model_dump(),
+            "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
+            "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
+            "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
         },
         "credentials": {
             provider: [c.model_dump() for c in creds]
@@ -630,17 +633,19 @@ def update_model_routes(
     body: ModelRoutesUpdate,
     store: CredentialStore = Depends(get_credential_store),
 ):
-    """Persist per-task provider/model routing in user_profile.local.yaml.
+    """Persist per-task provider/model routing in the profile DB (app-managed
+    authority — CONFIG_AUTHORITY_PLAN §2). `user_profile.local.yaml` is now fallback
+    + import/export only; a save writes the DB, not the yaml.
 
     Validation is auth-mode-aware (S3 step 2): a saved model/effort is checked against
-    the ACTIVE credential's auth_mode for that provider — e.g. effort is dropped on the
-    Claude subscription, and the ChatGPT-backend model set differs from the API-key
-    catalog. These are non-blocking WARNINGS (the catalog allows custom ids); only a
-    provider/model-prefix mismatch is a hard 400.
+    the ACTIVE credential's auth_mode for that provider — e.g. the ChatGPT-backend
+    model set differs from the API-key catalog. These are non-blocking WARNINGS
+    (the catalog allows custom ids); only a provider/model-prefix mismatch is a hard 400.
     """
     if not body.routes:
         raise HTTPException(status_code=400, detail="no routes supplied")
     store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
 
     saved: dict[str, TaskRoute] = {}
     for task, update in body.routes.items():
@@ -661,8 +666,8 @@ def update_model_routes(
                 status_code=400,
                 detail=f"{task}: model '{model}' looks like {inferred}, not {update.provider}",
             )
-        # auth-mode-aware capability warnings (effort-dropped on subscription, OAuth
-        # model set differs from the api_key catalog). Best-effort, never blocks.
+        # auth-mode-aware capability warnings (for example, OAuth model set differs
+        # from the api_key catalog). Best-effort, never blocks.
         warnings.extend(
             route_capability_warnings(
                 update.provider, model, effort, auth_mode=_active_auth_mode(update.provider, store),
@@ -672,15 +677,14 @@ def update_model_routes(
             "model_route_update",
             {"task": task, "provider": update.provider, "model": model, "effort": effort},
         )
-        save_local_override("llm_preferences", f"{task}_provider", update.provider)
-        save_local_override("llm_preferences", f"{task}_model", model)
-        save_local_override("llm_preferences", f"{task}_effort", effort)
+        # Atomic upsert — provider/model/effort land together, never half-applied.
+        route_store.set(task, update.provider, model, effort)
         saved[task] = TaskRoute(
             task=task,
             provider=update.provider,
             model=model,
             effort=effort,
-            source="profile",
+            source="db",
             custom=not is_seed_model(update.provider, model),
             warning=" ".join(warnings) or None,
         )

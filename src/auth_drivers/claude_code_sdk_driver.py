@@ -74,11 +74,11 @@ from claude_agent_sdk import (
 logger = logging.getLogger(__name__)
 
 # --- constants (from §4; 7A values reused where noted) ----------------------
-_DEFAULT_TIMEOUT_S = 180.0      # reuse 7A — session/stream wall-clock (§6 channel f)
+_DEFAULT_TIMEOUT_S = 900.0      # session/stream wall-clock; 0 disables (§6 channel f)
 _PER_TOOL_TIMEOUT_S = 45.0      # NEW — bounds one in-process tool call (§4)
 _BRIDGE_RESULT_BUDGET = 12_000  # = LAYER_5_CHAR_CAP; model-facing result cap (§4)
 _SUMMARY_CAP = 200              # reuse 7A — event/history preview (§4)
-_DEFAULT_MAX_TURNS = 8          # a Research turn may use several tools
+_DEFAULT_MAX_TURNS = 60         # mirrors AgentConfig.max_tool_calls; no hidden 8-turn cap
 
 _MCP_SERVER_NAME = "ark"
 _MCP_PREFIX = "mcp__ark__"
@@ -413,8 +413,13 @@ class AnthropicClaudeCodeSdkDriver:
         # options.env (NEVER os.environ). dontAsk + tools=[] + allowed_tools +
         # setting_sources=[] is the validated locked posture.
         allowed = [_MCP_PREFIX + n for n in sorted(_RESEARCH_READONLY_TOOLS)]
+        effort = request.reasoning_effort
+        if effort in ("", "default"):
+            effort = None
+        max_turns = self._max_turns if self._max_turns > 0 else None
         return ClaudeAgentOptions(
             model=request.model,
+            effort=effort,
             system_prompt=request.instructions,
             mcp_servers={_MCP_SERVER_NAME: server},
             allowed_tools=allowed,
@@ -422,7 +427,7 @@ class AnthropicClaudeCodeSdkDriver:
             setting_sources=[],             # no user/project/local .claude
             strict_mcp_config=True,         # ignore any auto-loaded MCP config
             permission_mode="dontAsk",      # deny anything not pre-approved
-            max_turns=self._max_turns,
+            max_turns=max_turns,
             env={
                 "CLAUDE_CODE_OAUTH_TOKEN": token,   # subscription auth (token-store)
                 "ANTHROPIC_API_KEY": "",            # never bill the API key (§5)
@@ -447,25 +452,29 @@ class AnthropicClaudeCodeSdkDriver:
         config_dir = tempfile.mkdtemp(prefix="ark_claude_cfg_")
         options = self._build_options(request, token, server, config_dir)
         logger.info(
-            "claude agent-sdk (subscription) model=%s max_turns=%s", request.model, self._max_turns
+            "claude agent-sdk (subscription) model=%s max_turns=%s timeout_s=%s",
+            request.model, self._max_turns, self._timeout_s,
         )
 
         prompt = _compose_input(request.input_messages)
         tool_names: dict[str, str] = {}  # tool_use_id -> name, to label tool_end
         terminal = False
         loop = asyncio.get_event_loop()
-        deadline = loop.time() + self._timeout_s
+        deadline = None if self._timeout_s <= 0 else loop.time() + self._timeout_s
 
         agen = query(prompt=prompt, options=options)
         try:
             while True:
-                remaining = deadline - loop.time()
-                if remaining <= 0:
-                    yield _err(request, f"claude agent-sdk timed out after {self._timeout_s}s")
-                    terminal = True
-                    return
                 try:
-                    msg = await asyncio.wait_for(agen.__anext__(), timeout=remaining)
+                    if deadline is None:
+                        msg = await agen.__anext__()
+                    else:
+                        remaining = deadline - loop.time()
+                        if remaining <= 0:
+                            yield _err(request, f"claude agent-sdk timed out after {self._timeout_s}s")
+                            terminal = True
+                            return
+                        msg = await asyncio.wait_for(agen.__anext__(), timeout=remaining)
                 except StopAsyncIteration:
                     break  # EOF
                 except asyncio.TimeoutError:

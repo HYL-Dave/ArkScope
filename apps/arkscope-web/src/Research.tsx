@@ -39,6 +39,7 @@ import {
 import { activeCredential, defaultModel, effortNote, modelOptions } from "./researchModels";
 import {
   initialState,
+  lastRetryCandidate,
   MAX_TURNS_SENTINEL,
   reduce,
   selectFooter,
@@ -213,7 +214,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   // --- streaming runner: reducer is the authority; UI owns the controller ----
   // Sends the RAW question + ticker + thread_id; the server frames the agent
   // prompt and persists the raw question (criterion #2).
-  const runStream = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null }) => {
+  const runStream = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean }) => {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -293,6 +294,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
   // --- derived view state ----------------------------------------------------
   const msgs = state.activeThreadId ? state.messagesByThread[state.activeThreadId] ?? [] : [];
+  const retryCandidate = useMemo(() => lastRetryCandidate(msgs), [msgs]);
   const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
   const traceRows: TraceRow[] = state.pending
     ? state.pending.trace
@@ -359,6 +361,34 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
 
   const effortOpts = provider && catalog ? (catalog.effort_options[provider] ?? []) : [];
   const pickerEffortNote = provider ? effortNote(provider, activeAuthMode, selEffort) : null;
+
+  const retryLastFailed = useCallback(() => {
+    if (!retryCandidate || !state.activeThreadId || state.pending) return;
+    const retryProvider = retryCandidate.provider as ProviderId;
+    const effort = retryProvider === provider && selEffort && selEffort !== "default" ? selEffort : undefined;
+    setAutoRouteSelection(false);
+    setProvider(retryProvider);
+    setThreadError(null);
+    dispatch({
+      kind: "submit",
+      question: retryCandidate.question,
+      provider: retryProvider,
+      model: retryCandidate.model,
+      ticker: retryCandidate.ticker,
+      ts: Date.now(),
+      threadId: state.activeThreadId,
+    });
+    writeActiveThreadId(state.activeThreadId);
+    void runStream({
+      question: retryCandidate.question,
+      provider: retryProvider,
+      model: retryCandidate.model ?? undefined,
+      effort,
+      thread_id: state.activeThreadId,
+      ticker: retryCandidate.ticker,
+      retry_last_failed: true,
+    });
+  }, [provider, retryCandidate, runStream, selEffort, state.activeThreadId, state.pending]);
 
   return (
     <main className="main research">
@@ -450,7 +480,15 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                 </div>
               </div>
             ) : (
-              msgs.map((m, i) => <Bubble key={i} m={m} onOpenTicker={onOpenTicker} />)
+              msgs.map((m, i) => (
+                <Bubble
+                  key={i}
+                  m={m}
+                  onOpenTicker={onOpenTicker}
+                  canRetry={!!retryCandidate && i === msgs.length - 1 && !state.pending}
+                  onRetry={retryLastFailed}
+                />
+              ))
             )}
 
             {state.pending && (
@@ -584,7 +622,17 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   );
 }
 
-function Bubble({ m, onOpenTicker }: { m: Message; onOpenTicker: (t: string) => void }) {
+function Bubble({
+  m,
+  onOpenTicker,
+  canRetry,
+  onRetry,
+}: {
+  m: Message;
+  onOpenTicker: (t: string) => void;
+  canRetry?: boolean;
+  onRetry?: () => void;
+}) {
   const cls = `research-bubble ${m.role}${m.isError ? " error" : ""}`;
   return (
     <div className={cls}>
@@ -609,6 +657,17 @@ function Bubble({ m, onOpenTicker }: { m: Message; onOpenTicker: (t: string) => 
           {m.tickers.map((t) => (
             <button key={t} className="news-ticker-chip" onClick={() => onOpenTicker(t)} title={`開啟 ${t}`}>{t}</button>
           ))}
+        </div>
+      )}
+      {canRetry && (
+        <div className="research-bubble-actions">
+          <button
+            className="btn-ghost tiny"
+            onClick={onRetry}
+            title="保留同一對話上下文，排除最後失敗回合後重試"
+          >
+            重試
+          </button>
         </div>
       )}
     </div>
