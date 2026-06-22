@@ -16,7 +16,8 @@ SCORES — is the inherited PG behaviour, unchanged.
 Overridden, local-first with PG fallback on empty/miss:
   - ``query_prices`` (3a);
   - ``query_news`` (3b, UNSCORED — scored_only/model requests fall back to PG,
-    where news_scores live), ``query_news_search`` (3b, FTS5);
+    where news_scores live), ``query_news_search`` (3b, FTS5), and
+    ``query_news_stats`` (score-free scout stats; no PG fallback on local empty);
   - ``query_iv_history`` + ``query_fundamentals`` (3c-A);
   - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
 
@@ -25,7 +26,6 @@ financial_cache (3c-C) is LOCAL-PRIMARY, not a mirror:
   - ``get_financial_cache`` is local-first, falls back to PG for legacy rows, and
     READ-THROUGH PROMOTES a valid PG hit into the local cache (free, preserving its
     TTL) so PG cache migrates local over time.
-``query_news_stats`` is NOT overridden — it needs scores, so it stays on PG.
 """
 
 from __future__ import annotations
@@ -86,6 +86,17 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         return super().query_news_search(
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
         )
+
+    def query_news_stats(self, ticker=None, days=30):
+        # Scout stats must stay local and quick. The local mirror has article counts
+        # and date ranges but not news_scores yet, so score fields are NULL/0. Empty
+        # local results are honest empty results — do NOT fall back to PG, or a ticker
+        # miss can block get_news_brief on the remote score path.
+        try:
+            return self._market.query_news_stats(ticker=ticker, days=days)
+        except Exception as e:
+            logger.warning(f"local query_news_stats failed ({e}); falling back to PG")
+            return super().query_news_stats(ticker=ticker, days=days)
 
     def query_news_feed(self, q=None, ticker=None, source=None, days=30,
                         limit=50, offset=0):

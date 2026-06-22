@@ -194,6 +194,26 @@ def test_query_news_search_malicious_fts_query_is_safe(market_db):
     assert isinstance(df, pd.DataFrame)  # no sqlite OperationalError
 
 
+def test_query_news_stats_unscored_local_counts(market_db):
+    db, day = market_db
+    df = SqliteBackend(db).query_news_stats(ticker="aapl", days=30)
+    assert list(df.columns) == [
+        "ticker", "article_count", "scored_count", "earliest_date", "latest_date",
+        "avg_sentiment", "avg_risk", "bullish_count", "bearish_count",
+    ]
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["ticker"] == "AAPL"
+    assert int(row["article_count"]) == 2
+    assert int(row["scored_count"]) == 0
+    assert row["earliest_date"] == day.isoformat()
+    assert row["latest_date"] == day.isoformat()
+    assert pd.isna(row["avg_sentiment"])
+    assert pd.isna(row["avg_risk"])
+    assert int(row["bullish_count"]) == 0
+    assert int(row["bearish_count"]) == 0
+
+
 # --- iv_history + fundamentals (3c-A) ----------------------------------------
 
 _IV_COLS = ["date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes"]
@@ -465,7 +485,7 @@ def test_inherited_vs_overridden_methods(market_db):
     assert type(b).query_fundamentals is not DatabaseBackend.query_fundamentals   # 3c-A
     assert type(b).get_financial_cache is not DatabaseBackend.get_financial_cache  # 3c-C
     assert type(b).set_financial_cache is not DatabaseBackend.set_financial_cache  # 3c-C
-    assert type(b).query_news_stats is DatabaseBackend.query_news_stats  # NOT overridden (needs scores)
+    assert type(b).query_news_stats is not DatabaseBackend.query_news_stats  # local scout stats
 
 
 def test_news_local_unscored_scored_falls_back(market_db, monkeypatch):
@@ -483,6 +503,49 @@ def test_news_local_unscored_scored_falls_back(market_db, monkeypatch):
     # scored → local empty → PG fallback
     df = b.query_news(ticker="AAPL", days=30, scored_only=True)
     assert df.iloc[0]["ticker"] == "PGNEWS" and hit == [True]
+
+
+def test_news_stats_local_when_present_does_not_hit_pg(market_db, monkeypatch):
+    db, day = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_news_stats",
+        lambda self, ticker=None, days=30: hit.append(ticker) or pd.DataFrame(
+            [("PGONLY", 99, 99, "2000-01-01", "2000-01-01", 1.0, 1.0, 1, 1)],
+            columns=[
+                "ticker", "article_count", "scored_count", "earliest_date", "latest_date",
+                "avg_sentiment", "avg_risk", "bullish_count", "bearish_count",
+            ],
+        ),
+    )
+    df = _make(db).query_news_stats(ticker="AAPL", days=30)
+    assert hit == []
+    assert len(df) == 1
+    row = df.iloc[0]
+    assert row["ticker"] == "AAPL"
+    assert int(row["article_count"]) == 2
+    assert row["earliest_date"] == day.isoformat()
+    assert pd.isna(row["avg_sentiment"])
+
+
+def test_news_stats_local_empty_does_not_fallback_to_pg(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_news_stats",
+        lambda self, ticker=None, days=30: hit.append(ticker) or pd.DataFrame(
+            [("PGONLY", 99, 99, "2000-01-01", "2000-01-01", 1.0, 1.0, 1, 1)],
+            columns=[
+                "ticker", "article_count", "scored_count", "earliest_date", "latest_date",
+                "avg_sentiment", "avg_risk", "bullish_count", "bearish_count",
+            ],
+        ),
+    )
+    df = _make(db).query_news_stats(ticker="SNEX", days=30)
+    assert hit == []
+    assert df.empty
 
 
 # --- 新聞·事件 feed (score-free browse/search + facets) ------------------------

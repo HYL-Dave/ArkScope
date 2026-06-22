@@ -62,6 +62,10 @@ _NEWS_COLS = ["date", "ticker", "title", "source", "url", "publisher",
               "sentiment_score", "risk_score", "scored_model", "description"]
 _NEWS_SEARCH_COLS = ["date", "ticker", "title", "source", "url", "publisher",
                      "sentiment_score", "risk_score", "description"]
+_NEWS_STATS_COLS = [
+    "ticker", "article_count", "scored_count", "earliest_date", "latest_date",
+    "avg_sentiment", "avg_risk", "bullish_count", "bearish_count",
+]
 
 
 class SqliteBackend:
@@ -199,6 +203,29 @@ class SqliteBackend:
                    "ORDER BY n.published_at DESC LIMIT ?")
             params.append(limit)
         return self._news_df(sql, params, _NEWS_SEARCH_COLS)
+
+    def query_news_stats(self, ticker: Optional[str] = None, days: int = 30) -> pd.DataFrame:
+        """Score-free local news statistics for the scout tool.
+
+        Local market_data.db does not store news_scores yet, so sentiment/risk fields
+        are deliberately unavailable (NULL/0). This still gives get_news_brief the
+        cheap routing signal it needs — counts and date range — without reaching PG.
+        """
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conds, params = ["published_at >= ?"], [cutoff]
+        if ticker:
+            conds.append("ticker = ?")
+            params.append(ticker.upper())
+        sql = (
+            "SELECT ticker, COUNT(*) AS article_count, 0 AS scored_count, "
+            "substr(MIN(published_at), 1, 10) AS earliest_date, "
+            "substr(MAX(published_at), 1, 10) AS latest_date, "
+            "NULL AS avg_sentiment, NULL AS avg_risk, "
+            "0 AS bullish_count, 0 AS bearish_count "
+            f"FROM news WHERE {' AND '.join(conds)} "
+            "GROUP BY ticker ORDER BY article_count DESC"
+        )
+        return self._news_df(sql, params, _NEWS_STATS_COLS)
 
     @staticmethod
     def _fts_match(q: str) -> str:
