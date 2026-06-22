@@ -573,7 +573,7 @@ class OpenAIChatGPTOAuthDriver:
                     input_items.append({
                         "type": "function_call_output",
                         "call_id": call["call_id"],
-                        "output": summary,
+                        "output": result,
                     })
                 continue
 

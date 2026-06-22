@@ -20,8 +20,8 @@ export interface ToolTraceRow {
   kind: "tool";
   name: string;
   input?: unknown; // tool_start.input (undefined for every OpenAI row)
-  result_preview?: string; // tool_end.summary, <=200 chars (undefined for OpenAI)
-  chars?: number; // tool_end.chars (undefined for OpenAI)
+  result_preview?: string; // tool_end.summary, <=200 chars when emitted
+  chars?: number; // tool_end.chars when emitted
   done: boolean; // false while open (tool_start seen, tool_end not); true once closed
 }
 export interface ThinkingTraceRow {
@@ -34,7 +34,7 @@ export type TraceRow = ToolTraceRow | ThinkingTraceRow;
 export interface ToolCall {
   name: string;
   input?: unknown; // Anthropic only; undefined for OpenAI (name-only batch)
-  result_preview?: string; // Anthropic only; undefined for OpenAI / still-open rows
+  result_preview?: string; // tool preview when emitted; undefined for still-open rows
 }
 
 // ---- DTO: Message (field names == future C-2b columns, spec §6a) ------------
@@ -134,12 +134,19 @@ export const initialState: State = {
 };
 
 const TITLE_MAX = 60;
+const INTERIM_TEXT_MAX = 12_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /** Typed ticker field → [] when blank/absent, else a single uppercased symbol. */
 function normTickers(ticker?: string | null): string[] {
   const t = (ticker ?? "").trim().toUpperCase();
   return t ? [t] : [];
+}
+
+function appendInterimText(prev: string, next: unknown): string {
+  if (typeof next !== "string" || next.length === 0) return prev;
+  const combined = prev + next;
+  return combined.length > INTERIM_TEXT_MAX ? combined.slice(-INTERIM_TEXT_MAX) : combined;
 }
 
 /** Freeze the live trace's tool rows into the message tool_calls projection. */
@@ -246,7 +253,7 @@ function onFrame(state: State, a: Extract<Action, { kind: "frame" }>): State {
     case "thinking_content":
       return { ...state, pending: { ...p, trace: [...p.trace, { kind: "thinking", text: data.thinking }] } };
     case "text":
-      return { ...state, pending: { ...p, thinkingActive: false, interimText: data.content ?? "" } };
+      return { ...state, pending: { ...p, thinkingActive: false, interimText: appendInterimText(p.interimText, data.content) } };
     case "tool_start":
       return { ...state, pending: { ...p, thinkingActive: false, trace: [...p.trace, { kind: "tool", name: data.tool, input: data.input, result_preview: undefined, chars: undefined, done: false }] } };
     case "tool_end": {

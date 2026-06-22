@@ -122,6 +122,26 @@ class _Registry:
         return _ToolDef() if name == "get_price_change" else None
 
 
+class _VerboseToolDef:
+    name = "get_price_change"
+    description = "Get price change."
+    parameters = []
+    requires_dal = True
+
+    @staticmethod
+    def function(dal, **kwargs):
+        return {
+            "ok": True,
+            "ticker": kwargs.get("ticker"),
+            "analysis": "AAPL detailed local result " + ("abcdefghi " * 50),
+        }
+
+
+class _VerboseRegistry:
+    def get(self, name):
+        return _VerboseToolDef() if name == "get_price_change" else None
+
+
 class _SlowNewsBriefToolDef:
     name = "get_news_brief"
     description = "Slow news brief."
@@ -361,6 +381,40 @@ def test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id
     assert followup["stream"] is True and followup["store"] is False
     assert "previous_response_id" not in followup
     assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
+
+
+def test_stream_llm_sends_full_reduced_tool_result_to_model_not_ui_preview(monkeypatch):
+    first = [
+        {"type": "response.completed", "response": {"output": [
+            {"type": "function_call", "name": "get_price_change", "call_id": "call_1",
+             "arguments": "{\"ticker\":\"AAPL\"}"},
+        ]}},
+    ]
+    second = [
+        {"type": "response.output_text.delta", "delta": "I used the detailed result."},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "I used the detailed result."}]},
+        ]}},
+    ]
+    client = _ExecClient([first, second])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    d = OpenAIChatGPTOAuthDriver(
+        credential=_Cred(7),
+        token_store=_TokStore(),
+        registry=_VerboseRegistry(),
+        dal=object(),
+    )
+
+    events = _run(_collect(d.stream_llm(_req())))
+
+    tool_end = events[2].data
+    assert len(tool_end["summary"]) == 200
+    assert tool_end["chars"] > len(tool_end["summary"])
+    followup = client.responses.calls[1]
+    outputs = [item["output"] for item in followup["input"] if item.get("type") == "function_call_output"]
+    assert len(outputs) == 1
+    assert outputs[0] != tool_end["summary"]
+    assert "abcdefghi " * 20 in outputs[0]
 
 
 def test_stream_llm_returns_tool_timeout_to_model_instead_of_terminal_error(monkeypatch):

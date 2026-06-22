@@ -81,6 +81,18 @@ describe("reducer · anthropic live", () => {
     expect(s.pending!.trace).toEqual([]);
   });
 
+  it("interim text appends streaming deltas into a readable preview", () => {
+    const s = run(
+      submit({ question: "q" }),
+      f("thinking", { turn: 1, model: "m" }),
+      f("text", { content: "Let " }),
+      f("text", { content: "me " }),
+      f("text", { content: "check the local data." }),
+    );
+    expect(s.pending!.thinkingActive).toBe(false);
+    expect(s.pending!.interimText).toBe("Let me check the local data.");
+  });
+
   it("text then tool_start — only text (the first) flips the indicator; tool_start just opens the row", () => {
     const s = run(submit({ question: "q" }), f("thinking", { turn: 1, model: "m" }), f("text", { content: "Checking the feed." }), f("tool_start", { tool: "get_sa_feed", input: { ticker: "NVDA" } }));
     expect(s.pending!.thinkingActive).toBe(false);
