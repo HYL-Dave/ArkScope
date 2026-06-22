@@ -99,7 +99,7 @@ def test_claude_code_oauth_factory_passes_max_turns():
     assert d._max_turns == 42
 
 
-def test_chatgpt_oauth_factory_passes_registry_dal_and_max_turns():
+def test_chatgpt_oauth_factory_passes_registry_dal_and_runtime_limits():
     registry = object()
     dal = object()
     d = build_driver(
@@ -109,10 +109,14 @@ def test_chatgpt_oauth_factory_passes_registry_dal_and_max_turns():
         registry=registry,
         dal=dal,
         max_turns=33,
+        timeout_s=444,
+        per_tool_timeout_s=12,
     )
     assert d._registry is registry
     assert d._dal is dal
     assert d._max_turns == 33
+    assert d._timeout_s == 444
+    assert d._per_tool_timeout_s == 12
 
 
 # --- explicit errors for unknown provider / auth_mode -----------------------

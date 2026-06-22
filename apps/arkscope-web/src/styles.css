@@ -1223,6 +1223,14 @@ table.wl tbody tr.archived td {
   flex-basis: 100%;
   margin: 4px 0 0;
 }
+.research-runtime-panel {
+  margin-top: 14px;
+}
+.runtime-limit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+}
 .provider-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));

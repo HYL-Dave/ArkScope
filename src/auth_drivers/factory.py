@@ -95,6 +95,7 @@ def build_driver(
     dal: Any = None,
     max_turns: Optional[int] = None,
     timeout_s: Optional[float] = None,
+    per_tool_timeout_s: Optional[float] = None,
 ) -> NotImplementedDriver:
     """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
     placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
@@ -131,6 +132,7 @@ def build_driver(
             credential=credential, token_store=token_store, registry=registry, dal=dal,
             **({"max_turns": max_turns} if max_turns is not None else {}),
             **({"timeout_s": timeout_s} if timeout_s is not None else {}),
+            **({"per_tool_timeout_s": per_tool_timeout_s} if per_tool_timeout_s is not None else {}),
         )
     # S3: chatgpt_oauth resolves to the ChatGPT-backend driver. Discovery is live;
     # Research execution is a raw Responses stream loop (not the API-key Agents SDK).
@@ -143,6 +145,8 @@ def build_driver(
             registry=registry,
             dal=dal,
             **({"max_turns": max_turns} if max_turns is not None else {}),
+            **({"timeout_s": timeout_s} if timeout_s is not None else {}),
+            **({"per_tool_timeout_s": per_tool_timeout_s} if per_tool_timeout_s is not None else {}),
         )
     return NotImplementedDriver(
         provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,

@@ -20,6 +20,7 @@ from src.agents.config import (
     task_route,
 )
 from src.model_route_store import ModelRouteStore
+from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
 from src.model_credentials import (
     CredentialStore,
@@ -91,6 +92,12 @@ class RouteUpdate(BaseModel):
 
 class ModelRoutesUpdate(BaseModel):
     routes: dict[TaskId, RouteUpdate]
+
+
+class ResearchRuntimeUpdate(BaseModel):
+    max_tool_calls: int
+    session_timeout_s: float
+    per_tool_timeout_s: float
 
 
 class ModelDiscoveryRequest(BaseModel):
@@ -177,6 +184,7 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
     ensure_env_loaded()
     store = _credential_store(store)
     route_store = ModelRouteStore(store.db_path)
+    runtime_store = ResearchRuntimeStore(store.db_path)
     cfg = get_agent_config()
 
     def key_set(name: str) -> bool:
@@ -205,6 +213,7 @@ def runtime_config(store: CredentialStore = Depends(get_credential_store)):
         "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
         "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
         "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
+        "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
         "data_keys": {
             "finnhub": key_set("FINNHUB_API_KEY"),
             "polygon": key_set("POLYGON_API_KEY"),
@@ -698,6 +707,44 @@ def update_model_routes(
             warning=" ".join(warnings) or None,
         )
     return {"routes": {k: v.model_dump() for k, v in saved.items()}}
+
+
+@router.put("/config/research-runtime")
+def update_research_runtime(
+    body: ResearchRuntimeUpdate,
+    store: CredentialStore = Depends(get_credential_store),
+):
+    """Persist AI Research runtime limits in the profile DB.
+
+    These settings are scoped to /query/stream AI 研究. `user_profile.local.yaml`
+    remains fallback; real ARKSCOPE_RESEARCH_* env vars remain the top operator
+    override.
+    """
+    store = _credential_store(store)
+    runtime_store = ResearchRuntimeStore(store.db_path)
+    try:
+        require_profile_state_write("research_runtime_update", body.model_dump())
+        runtime_store.set(
+            max_tool_calls=body.max_tool_calls,
+            session_timeout_s=body.session_timeout_s,
+            per_tool_timeout_s=body.per_tool_timeout_s,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"research_runtime": resolve_research_runtime(store=runtime_store).model_dump()}
+
+
+@router.delete("/config/research-runtime")
+def delete_research_runtime(store: CredentialStore = Depends(get_credential_store)):
+    """Reset AI Research runtime limits to yaml/default authority by deleting the DB row."""
+    store = _credential_store(store)
+    runtime_store = ResearchRuntimeStore(store.db_path)
+    require_profile_state_write("research_runtime_delete", {})
+    deleted = runtime_store.delete()
+    return {
+        "deleted": deleted,
+        "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),
+    }
 
 
 @router.post("/config/model-routes/import")

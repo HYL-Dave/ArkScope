@@ -640,7 +640,7 @@ def test_oauth_active_driver_raises_persists_error_turn_no_crash(store, monkeypa
 
 
 # --- helper unit: builds the SDK driver with registry+dal+token_store + reused prompt ---
-def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_prompt(monkeypatch):
+def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_prompt(monkeypatch, tmp_path):
     """_anthropic_subscription_stream: cred from CredentialStore.get, a registered
     ToolRegistry, build_driver(..., registry, dal, token_store), and an LLMRequest
     whose input_messages = [*history, user] and instructions = the REUSED anthropic
@@ -649,6 +649,10 @@ def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_promp
     sentinel_dal = object()
     sentinel_cred = object()
     sentinel_stream = object()
+    db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
+    from src.research_runtime_config import ResearchRuntimeStore
+    ResearchRuntimeStore(db).set(max_tool_calls=72, session_timeout_s=1800, per_tool_timeout_s=60)
 
     # CredentialStore() → .get(credential_id) returns our sentinel credential.
     # Patched at SOURCE modules (the helper imports them lazily — project convention).
@@ -679,10 +683,22 @@ def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_promp
             captured["req"] = req
             return sentinel_stream
 
-    def fake_build_driver(*, provider, auth_mode, credential, token_store, registry, dal, max_turns, timeout_s):
+    def fake_build_driver(
+        *,
+        provider,
+        auth_mode,
+        credential,
+        token_store,
+        registry,
+        dal,
+        max_turns,
+        timeout_s,
+        per_tool_timeout_s,
+    ):
         captured.update(provider=provider, auth_mode=auth_mode, credential=credential,
                         token_store=token_store, registry=registry, dal=dal,
-                        max_turns=max_turns, timeout_s=timeout_s)
+                        max_turns=max_turns, timeout_s=timeout_s,
+                        per_tool_timeout_s=per_tool_timeout_s)
         return FakeDriver()
 
     monkeypatch.setattr("src.auth_drivers.factory.build_driver", fake_build_driver)
@@ -699,8 +715,9 @@ def test_anthropic_subscription_stream_builds_driver_with_registry_dal_and_promp
     assert captured["credential"] is sentinel_cred
     assert captured["token_store"] is sentinel_token_store
     assert captured["dal"] is sentinel_dal
-    assert captured["max_turns"] == 60  # AgentConfig.max_tool_calls default; no hidden 8-turn cap
-    assert captured["timeout_s"] == 900.0  # no hidden 180s wall-clock cap
+    assert captured["max_turns"] == 72  # DB authority; no hidden 8-turn cap
+    assert captured["timeout_s"] == 1800.0  # DB authority; no hidden 180s wall-clock cap
+    assert captured["per_tool_timeout_s"] == 60.0
     assert isinstance(captured["registry"], FakeRegistry)
     req = captured["req"]
     assert req.model == "claude-sonnet-4-6"
@@ -764,3 +781,97 @@ def test_anthropic_subscription_stream_no_history_uses_bare_prompt(monkeypatch):
     assert "[多輪脈絡]" not in req.instructions
     assert req.input_messages == [{"role": "user", "content": "hi"}]
     assert req.reasoning_effort == "max"
+
+
+def test_openai_subscription_stream_builds_driver_with_research_runtime(monkeypatch, tmp_path):
+    sentinel_token_store = object()
+    sentinel_dal = object()
+    sentinel_cred = object()
+    sentinel_stream = object()
+    db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
+    from src.research_runtime_config import ResearchRuntimeStore
+    ResearchRuntimeStore(db).set(max_tool_calls=23, session_timeout_s=1200, per_tool_timeout_s=18)
+
+    class FakeStore:
+        def __init__(self, *a, **k):
+            pass
+
+        def get(self, credential_id):
+            assert credential_id == "local:9"
+            return sentinel_cred
+
+    class FakeRegistry:
+        def register_all(self):
+            pass
+
+    class FakeDriver:
+        def stream_llm(self, req):
+            return sentinel_stream
+
+    captured = {}
+
+    def fake_build_driver(
+        *,
+        provider,
+        auth_mode,
+        credential,
+        token_store,
+        registry,
+        dal,
+        max_turns,
+        timeout_s,
+        per_tool_timeout_s,
+    ):
+        captured.update(
+            provider=provider, auth_mode=auth_mode, credential=credential,
+            token_store=token_store, registry=registry, dal=dal,
+            max_turns=max_turns, timeout_s=timeout_s,
+            per_tool_timeout_s=per_tool_timeout_s,
+        )
+        return FakeDriver()
+
+    monkeypatch.setattr("src.model_credentials.CredentialStore", FakeStore)
+    monkeypatch.setattr("src.auth_drivers.token_store.get_token_store", lambda: sentinel_token_store)
+    monkeypatch.setattr("src.tools.registry.ToolRegistry", FakeRegistry)
+    monkeypatch.setattr("src.auth_drivers.factory.build_driver", fake_build_driver)
+
+    out = q._openai_subscription_stream(
+        credential_id="local:9", question="hi", model="gpt-5.4-mini",
+        effort="low", dal=sentinel_dal, history=[],
+    )
+
+    assert out is sentinel_stream
+    assert captured["provider"] == "openai"
+    assert captured["auth_mode"] == "chatgpt_oauth"
+    assert captured["max_turns"] == 23
+    assert captured["timeout_s"] == 1200.0
+    assert captured["per_tool_timeout_s"] == 18.0
+
+
+def test_api_key_stream_receives_research_max_turns(store, monkeypatch, tmp_path):
+    import asyncio
+
+    db = tmp_path / "profile_state.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
+    from src.research_runtime_config import ResearchRuntimeStore
+    ResearchRuntimeStore(db).set(max_tool_calls=31, session_timeout_s=900, per_tool_timeout_s=45)
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _apikey_active("openai"))
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, max_tool_calls, **kwargs):
+        captured["max_tool_calls"] = max_tool_calls
+        from src.agents.shared.events import AgentEvent, EventType
+        yield AgentEvent(EventType.done, {"answer": "ok", "tools_used": [], "provider": "openai", "model": model, "token_usage": {}})
+
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", fake_stream)
+
+    req = q.QueryRequest(question="q", provider="openai", model="gpt-5.4-mini", thread_id=None)
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for _ in resp.body_iterator:
+            pass
+
+    asyncio.run(drive())
+    assert captured["max_tool_calls"] == 31

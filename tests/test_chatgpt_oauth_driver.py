@@ -374,6 +374,23 @@ def test_stream_llm_returns_tool_timeout_to_model_instead_of_terminal_error(monk
     assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
 
 
+def test_stream_llm_overall_timeout_errors(monkeypatch):
+    async def slow_stream():
+        await asyncio.sleep(0.05)
+        yield {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "late"}]},
+        ]}}
+
+    client = _ExecClient([slow_stream()])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    d = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(), timeout_s=0.001)
+
+    events = _run(_collect(d.stream_llm(_req())))
+
+    assert events[-1].type == EventType.error
+    assert "timed out after 0.001s" in events[-1].data["error"]
+
+
 def test_stream_llm_uses_last_call_id_when_arguments_done_omits_id(monkeypatch):
     # Live P2b shape: function_call_arguments.done can omit call_id/item_id while
     # output_item.added carries the call_id. Use the most recent call item.

@@ -37,6 +37,7 @@ from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PRO
 from .probe_harness import redact
 
 _PER_TOOL_TIMEOUT_S = 45.0
+_DEFAULT_TIMEOUT_S = 900.0
 _BRIDGE_RESULT_BUDGET = 12_000
 _SUMMARY_CAP = 200
 _DEFAULT_MAX_TURNS = 60
@@ -230,6 +231,7 @@ class OpenAIChatGPTOAuthDriver:
         registry: Any = None,
         dal: Any = None,
         max_turns: int = _DEFAULT_MAX_TURNS,
+        timeout_s: float = _DEFAULT_TIMEOUT_S,
         per_tool_timeout_s: float = _PER_TOOL_TIMEOUT_S,
     ):
         self.credential = credential
@@ -237,6 +239,7 @@ class OpenAIChatGPTOAuthDriver:
         self._registry = registry
         self._dal = dal
         self._max_turns = max_turns
+        self._timeout_s = timeout_s
         self._per_tool_timeout_s = per_tool_timeout_s
         self._credential_id = (
             f"local:{credential.id}"
@@ -420,7 +423,30 @@ class OpenAIChatGPTOAuthDriver:
         yield AgentEvent(EventType.thinking, {"turn": 1, "model": request.model})
 
         max_turns = self._max_turns if self._max_turns > 0 else 1000000
+        loop = asyncio.get_running_loop()
+        deadline = None if self._timeout_s <= 0 else loop.time() + self._timeout_s
+
+        def _remaining() -> Optional[float]:
+            if deadline is None:
+                return None
+            return max(0.0, deadline - loop.time())
+
+        async def _with_deadline(awaitable):
+            remaining = _remaining()
+            if remaining is None:
+                return await awaitable
+            if remaining <= 0:
+                raise asyncio.TimeoutError
+            return await asyncio.wait_for(awaitable, timeout=remaining)
+
         for _turn in range(max_turns):
+            if deadline is not None and _remaining() <= 0:
+                yield AgentEvent(EventType.error, {
+                    "error": f"ChatGPT OAuth driver timed out after {self._timeout_s}s",
+                    "provider": "openai",
+                    "model": request.model,
+                })
+                return
             kwargs: dict[str, Any] = {
                 "model": request.model,
                 "input": input_items,
@@ -440,8 +466,13 @@ class OpenAIChatGPTOAuthDriver:
             text_parts: list[str] = []
             current_call_id: Optional[str] = None
             try:
-                stream = await _maybe_await(client.responses.create(**kwargs))
-                async for event in _aiter_stream(stream):
+                stream = await _with_deadline(_maybe_await(client.responses.create(**kwargs)))
+                stream_iter = _aiter_stream(stream).__aiter__()
+                while True:
+                    try:
+                        event = await _with_deadline(stream_iter.__anext__())
+                    except StopAsyncIteration:
+                        break
                     raw = _to_dict(event)
                     etype = raw.get("type")
                     if etype == "response.output_text.delta":
@@ -466,6 +497,13 @@ class OpenAIChatGPTOAuthDriver:
                     elif etype in ("response.failed", "response.incomplete"):
                         yield AgentEvent(EventType.error, {"error": f"ChatGPT backend stream ended with {etype}", "provider": "openai", "model": request.model})
                         return
+            except asyncio.TimeoutError:
+                yield AgentEvent(EventType.error, {
+                    "error": f"ChatGPT OAuth driver timed out after {self._timeout_s}s",
+                    "provider": "openai",
+                    "model": request.model,
+                })
+                return
             except BaseException as exc:  # noqa: BLE001
                 yield AgentEvent(EventType.error, {"error": _redact_token(str(exc), token)[:500], "provider": "openai", "model": request.model})
                 return

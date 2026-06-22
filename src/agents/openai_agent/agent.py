@@ -718,6 +718,7 @@ async def run_query_stream(
     dal: Optional[Any] = None,
     reasoning_effort: Optional[ReasoningEffort] = None,
     history: list | None = None,
+    max_tool_calls: Optional[int] = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a query yielding events for progress tracking.
@@ -731,6 +732,7 @@ async def run_query_stream(
         model: Override model (default: gpt-5.4 from AgentConfig)
         dal: DataAccessLayer instance (auto-created if None)
         reasoning_effort: Override reasoning effort (default from AgentConfig)
+        max_tool_calls: Override max turns for AI Research (default from AgentConfig)
 
     Yields:
         AgentEvent for thinking, tool_end (post-run), and done
@@ -798,7 +800,7 @@ async def run_query_stream(
     # Server-side compaction (Phase 7a)
     session = _make_compaction_session() if config.server_compaction else None
 
-    effective_max_turns = config.max_tool_calls
+    effective_max_turns = max_tool_calls if max_tool_calls is not None else config.max_tool_calls
     runner_kwargs = dict(
         input=_compose_stream_input(_hist, question),
         max_turns=effective_max_turns,

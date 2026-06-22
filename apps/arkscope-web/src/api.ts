@@ -33,7 +33,17 @@ export interface RuntimeConfig {
   card_synthesis: TaskRoute;
   card_translation: TaskRoute;
   ai_research: TaskRoute;
+  research_runtime: ResearchRuntimeSettings;
   data_keys: Record<string, boolean>;
+}
+
+export interface ResearchRuntimeSettings {
+  max_tool_calls: number;
+  session_timeout_s: number;
+  per_tool_timeout_s: number;
+  source: "env" | "db" | "profile" | "default";
+  db_saved: boolean;
+  warning: string | null;
 }
 
 export type ModelProvider = "anthropic" | "openai";
@@ -602,6 +612,26 @@ export function exportModelRoutes(): Promise<{ exported: ModelTask[]; cleared: M
   return sendJSON<{ exported: ModelTask[]; cleared: ModelTask[] }>(
     "/config/model-routes/export",
     "POST",
+    undefined,
+    8_000,
+  );
+}
+
+export function saveResearchRuntime(
+  body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">,
+): Promise<{ research_runtime: ResearchRuntimeSettings }> {
+  return sendJSON<{ research_runtime: ResearchRuntimeSettings }>(
+    "/config/research-runtime",
+    "PUT",
+    body,
+    8_000,
+  );
+}
+
+export function deleteResearchRuntime(): Promise<{ deleted: boolean; research_runtime: ResearchRuntimeSettings }> {
+  return sendJSON<{ deleted: boolean; research_runtime: ResearchRuntimeSettings }>(
+    "/config/research-runtime",
+    "DELETE",
     undefined,
     8_000,
   );

@@ -137,6 +137,13 @@ Current status:
   `user_profile.yaml` is reviewed baseline and intentionally kept).
 - Built-in default/advanced tiers are fixed seeds; ArkScope does not silently
   auto-select "latest" at runtime.
+- **AI Research runtime limits (shipped 2026-06-22).** `max_tool_calls`,
+  subscription session timeout, and per-tool timeout now resolve **real env >
+  profile DB (`research_runtime_config` table) > `user_profile(.local).yaml` >
+  built-in default**. Settings → Models exposes them as "AI 研究執行限制". Today,
+  `max_tool_calls` applies to both API-key and subscription Research paths;
+  session/per-tool timeout apply to the subscription drivers. Server-owned runs
+  remain the plan for navigation-safe/background execution and parallel Research.
 
 Next gate:
 
@@ -224,7 +231,9 @@ These are not technical debt. They are bootstrap and rescue controls.
 > **Model-route DB authority: SHIPPED 2026-06-22** (not a fresh framework audit —
 > §2/§3/§5 already specify the framework). The per-task routes now resolve real env >
 > DB > yaml > default with a full Settings authority loop (source badge, reset, yaml↔DB
-> import/export) — see §4 Model Routing. **Next:** data-source keys/schedules (§6.8).
+> import/export), and AI Research runtime limits now resolve real env > DB > yaml >
+> default — see §4 Model Routing. **Next:** server-owned Research runs for
+> navigation-safe/background execution, then data-source keys/schedules (§6.8).
 
 1. **Fix B1 drift**: update stale tests and persist resolved model on stream
    error turns.

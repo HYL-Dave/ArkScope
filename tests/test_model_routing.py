@@ -12,12 +12,15 @@ from src.api.routes.config_routes import (
     CredentialUpdate,
     ModelRoutesUpdate,
     ModelTestRequest,
+    ResearchRuntimeUpdate,
     RouteUpdate,
     add_credential,
     delete_credential,
+    delete_research_runtime,
     model_catalog,
     run_provider_model_test,
     runtime_config,
+    update_research_runtime,
     update_credential,
     update_model_routes,
 )
@@ -70,6 +73,56 @@ def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
     rc = runtime_config(store=CredentialStore(db))
     assert rc["card_synthesis"]["provider"] == "openai"
     assert rc["card_synthesis"]["source"] == "db"
+
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_update_research_runtime_persists_to_profile_db(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+    from src.research_runtime_config import ResearchRuntimeStore
+
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    cfg_mod.get_agent_config.cache_clear()
+
+    db = tmp_path / "profile_state.db"
+    res = update_research_runtime(
+        ResearchRuntimeUpdate(max_tool_calls=96, session_timeout_s=3600, per_tool_timeout_s=75),
+        store=CredentialStore(db),
+    )
+    assert res["research_runtime"]["source"] == "db"
+    assert res["research_runtime"]["max_tool_calls"] == 96
+    assert res["research_runtime"]["session_timeout_s"] == 3600.0
+    assert res["research_runtime"]["per_tool_timeout_s"] == 75.0
+    assert ResearchRuntimeStore(db).get().max_tool_calls == 96
+
+    rc = runtime_config(store=CredentialStore(db))
+    assert rc["research_runtime"]["source"] == "db"
+    assert rc["research_runtime"]["max_tool_calls"] == 96
+
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_delete_research_runtime_reverts_to_profile_fallback(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+    import yaml
+
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    local = tmp_path / "user_profile.local.yaml"
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", local)
+    local.write_text(yaml.safe_dump({"llm_preferences": {"max_tool_calls": 44}}), encoding="utf-8")
+    cfg_mod.get_agent_config.cache_clear()
+
+    db = tmp_path / "profile_state.db"
+    update_research_runtime(
+        ResearchRuntimeUpdate(max_tool_calls=96, session_timeout_s=3600, per_tool_timeout_s=75),
+        store=CredentialStore(db),
+    )
+    res = delete_research_runtime(store=CredentialStore(db))
+    assert res["deleted"] is True
+    assert res["research_runtime"]["source"] == "profile"
+    assert res["research_runtime"]["max_tool_calls"] == 44
+    assert res["research_runtime"]["session_timeout_s"] == 900.0
 
     cfg_mod.get_agent_config.cache_clear()
 

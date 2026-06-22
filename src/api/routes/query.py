@@ -84,13 +84,14 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     ``effort`` maps to the Agent-SDK/Claude Code ``--effort`` option when set.
     """
     from src.agents.shared.prompts import build_system_prompt
-    from src.agents.config import get_agent_config
     from src.auth_drivers.factory import build_driver
     from src.auth_drivers.protocol import LLMRequest
     from src.auth_drivers.token_store import get_token_store
     from src.model_credentials import CredentialStore
+    from src.research_runtime_config import resolve_research_runtime
     from src.tools.registry import ToolRegistry
 
+    runtime = resolve_research_runtime()
     cred = CredentialStore().get(credential_id)
     registry = ToolRegistry()
     registry.register_all()
@@ -101,8 +102,9 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
         token_store=get_token_store(),
         registry=registry,
         dal=dal,
-        max_turns=get_agent_config().max_tool_calls,
-        timeout_s=get_agent_config().claude_subscription_timeout_s,
+        max_turns=runtime.max_tool_calls,
+        timeout_s=runtime.session_timeout_s,
+        per_tool_timeout_s=runtime.per_tool_timeout_s,
     )
     # SYSTEM PROMPT (v1): the SAME constant builder the anthropic agent uses
     # (src/agents/anthropic_agent/agent.py builds build_system_prompt(freshness)).
@@ -139,15 +141,17 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
     previous_response_id). The driver below owns the ChatGPT-backend-compatible
     Responses loop: stream=True, store=False, no max_output_tokens.
     """
-    from src.agents.config import get_agent_config
     from src.agents.openai_agent.agent import _build_effective_prompt
     from src.auth_drivers.factory import build_driver
     from src.auth_drivers.protocol import LLMRequest
     from src.auth_drivers.token_store import get_token_store
     from src.model_credentials import CredentialStore
+    from src.research_runtime_config import resolve_research_runtime
     from src.tools.registry import ToolRegistry
 
+    from src.agents.config import get_agent_config
     config = get_agent_config()
+    runtime = resolve_research_runtime()
     cred = CredentialStore().get(credential_id)
     registry = ToolRegistry()
     registry.register_all()
@@ -158,7 +162,9 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
         token_store=get_token_store(),
         registry=registry,
         dal=dal,
-        max_turns=config.max_tool_calls,
+        max_turns=runtime.max_tool_calls,
+        timeout_s=runtime.session_timeout_s,
+        per_tool_timeout_s=runtime.per_tool_timeout_s,
     )
     instructions = _build_effective_prompt(dal, config)
     if history:
@@ -362,6 +368,8 @@ async def query_agent_stream(
         t0 = _time.monotonic()
         try:
             if provider == "openai":
+                from src.research_runtime_config import resolve_research_runtime
+                runtime = resolve_research_runtime()
                 from src.auth_drivers.live_resolver import resolve_live_auth
                 _auth = resolve_live_auth("openai")
                 if _auth.source == "oauth_driver_unwired":
@@ -371,8 +379,14 @@ async def query_agent_stream(
                     )
                 else:
                     from src.agents.openai_agent.agent import run_query_stream
-                    stream = run_query_stream(question=agent_question, model=res_model, dal=dal, reasoning_effort=res_effort, history=history)
+                    stream = run_query_stream(
+                        question=agent_question, model=res_model, dal=dal,
+                        reasoning_effort=res_effort, history=history,
+                        max_tool_calls=runtime.max_tool_calls,
+                    )
             elif provider == "anthropic":
+                from src.research_runtime_config import resolve_research_runtime
+                runtime = resolve_research_runtime()
                 # 7B-6: if the ACTIVE anthropic credential is claude_code_oauth, the
                 # API-key loop (run_query_stream → live_anthropic_client) FAIL-CLOSES,
                 # so drive the Claude SUBSCRIPTION via the Agent-SDK driver instead.
@@ -389,7 +403,11 @@ async def query_agent_stream(
                     )
                 else:
                     from src.agents.anthropic_agent.agent import run_query_stream
-                    stream = run_query_stream(question=agent_question, model=res_model, dal=dal, effort=res_effort, history=history)
+                    stream = run_query_stream(
+                        question=agent_question, model=res_model, dal=dal,
+                        effort=res_effort, history=history,
+                        max_tool_calls=runtime.max_tool_calls,
+                    )
             else:
                 from src.agents.shared.events import AgentEvent, EventType
                 error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)

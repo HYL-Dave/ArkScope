@@ -176,6 +176,7 @@ async def run_query_stream(
     thinking: Optional[bool] = None,
     attachments: list | None = None,
     history: list | None = None,
+    max_tool_calls: Optional[int] = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a natural language query, yielding events as the agent progresses.
@@ -190,6 +191,7 @@ async def run_query_stream(
         dal: DataAccessLayer instance (auto-created if None)
         effort: Override Anthropic effort level (Opus 4.5+)
         thinking: Override thinking toggle (None = use config)
+        max_tool_calls: Override max turns for AI Research (default from AgentConfig)
 
     Yields:
         AgentEvent for each step of the agent loop
@@ -337,8 +339,9 @@ async def run_query_stream(
 
     # Tool use loop — wrapped in try/except for fault tolerance (Item G)
     _current_turn = 0
+    effective_max_turns = max_tool_calls if max_tool_calls is not None else config.max_tool_calls
     try:
-        for turn in range(config.max_tool_calls):
+        for turn in range(effective_max_turns):
             _current_turn = turn + 1
             yield AgentEvent(EventType.thinking, {"turn": _current_turn, "model": model_name})
 
@@ -516,7 +519,7 @@ async def run_query_stream(
                 logger.info(f"Context compacted: {compact_stats}")
 
         # Max turns reached
-        logger.warning(f"Max tool calls ({config.max_tool_calls}) reached")
+        logger.warning(f"Max tool calls ({effective_max_turns}) reached")
         pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
         if capture is not None:

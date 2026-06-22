@@ -20,9 +20,11 @@ import {
   getProvidersHealth,
   getSchedule,
   importModelRoutes,
+  deleteResearchRuntime,
   putProviderConfig,
   putSchedule,
   runScheduleNow,
+  saveResearchRuntime,
   saveModelRoutes,
   testProvider,
   setUseLocalMarket,
@@ -44,6 +46,7 @@ import {
   type ModelTestResult,
   type ModelTask,
   type ProviderCredential,
+  type ResearchRuntimeSettings,
   type RuntimeConfig,
   type TaskRoute,
 } from "./api";
@@ -246,6 +249,38 @@ export function SettingsView({
     }
   }
 
+  async function saveRuntimeLimits(
+    body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">,
+  ) {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await saveResearchRuntime(body);
+      await onRuntimeChanged();
+      setMsg("AI 研究執行限制已儲存到 profile DB。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetRuntimeLimits() {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await deleteResearchRuntime();
+      await onRuntimeChanged();
+      setMsg("AI 研究執行限制已重設為設定檔／內建預設。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <main className="main settings-page">
       <div className="page-head">
@@ -328,54 +363,64 @@ export function SettingsView({
 
           <section className="settings-content">
             {section === "models" ? (
-              <ModelRoutingSection
-                catalog={catalog}
-                draft={draft}
-                modelsByProvider={modelsByProvider}
-                testState={testState}
-                onDraft={setDraft}
-                onTest={async (task) => {
-                  const row = draft[task];
-                  if (!row || !row.model.trim()) return;
-                  setTestState((prev) => ({ ...prev, [task]: { loading: true, result: null } }));
-                  try {
-                    const result = await testModelAccess(row.provider, row.model.trim(), row.effort || "default");
-                    setTestState((prev) => ({ ...prev, [task]: { loading: false, result } }));
-                  } catch (e) {
-                    setTestState((prev) => ({
-                      ...prev,
-                      [task]: {
-                        loading: false,
-                        result: {
-                          provider: row.provider,
-                          credential_id: null,
-                          model: row.model,
-                          effort: row.effort || "default",
-                          status: "error",
-                          latency_ms: null,
-                          error: e instanceof Error ? e.message : String(e),
-                          warning: null,
-                          fallback_effort: null,
+              <>
+                <ModelRoutingSection
+                  catalog={catalog}
+                  draft={draft}
+                  modelsByProvider={modelsByProvider}
+                  testState={testState}
+                  onDraft={setDraft}
+                  onTest={async (task) => {
+                    const row = draft[task];
+                    if (!row || !row.model.trim()) return;
+                    setTestState((prev) => ({ ...prev, [task]: { loading: true, result: null } }));
+                    try {
+                      const result = await testModelAccess(row.provider, row.model.trim(), row.effort || "default");
+                      setTestState((prev) => ({ ...prev, [task]: { loading: false, result } }));
+                    } catch (e) {
+                      setTestState((prev) => ({
+                        ...prev,
+                        [task]: {
+                          loading: false,
+                          result: {
+                            provider: row.provider,
+                            credential_id: null,
+                            model: row.model,
+                            effort: row.effort || "default",
+                            status: "error",
+                            latency_ms: null,
+                            error: e instanceof Error ? e.message : String(e),
+                            warning: null,
+                            fallback_effort: null,
+                          },
                         },
-                      },
-                    }));
-                  }
-                }}
-                onReset={async (task) => {
-                  setErr(null);
-                  setMsg(null);
-                  try {
-                    await deleteModelRoute(task);
-                    const refreshed = await getModelCatalog();
-                    setCatalog(refreshed);
-                    setDraft(fromRoutes(refreshed.routes));
-                    await onRuntimeChanged();
-                    setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
-                  } catch (e) {
-                    setErr(e instanceof Error ? e.message : String(e));
-                  }
-                }}
-              />
+                      }));
+                    }
+                  }}
+                  onReset={async (task) => {
+                    setErr(null);
+                    setMsg(null);
+                    try {
+                      await deleteModelRoute(task);
+                      const refreshed = await getModelCatalog();
+                      setCatalog(refreshed);
+                      setDraft(fromRoutes(refreshed.routes));
+                      await onRuntimeChanged();
+                      setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
+                    } catch (e) {
+                      setErr(e instanceof Error ? e.message : String(e));
+                    }
+                  }}
+                />
+                {runtime?.research_runtime && (
+                  <ResearchRuntimeSection
+                    settings={runtime.research_runtime}
+                    saving={saving}
+                    onSave={saveRuntimeLimits}
+                    onReset={resetRuntimeLimits}
+                  />
+                )}
+              </>
             ) : section === "providers" ? (
               <ProviderSection
                 catalog={catalog}
@@ -1207,6 +1252,120 @@ export function ModelRoutingSection({
         })}
       </div>
     </>
+  );
+}
+
+function runtimeSourceBadge(source: ResearchRuntimeSettings["source"]) {
+  if (source === "db") return { label: "DB 已儲存", tone: "active" };
+  if (source === "env") return { label: "env override", tone: "override" };
+  if (source === "profile") return { label: "設定檔 fallback", tone: "fallback" };
+  return { label: "內建預設", tone: "default" };
+}
+
+export function ResearchRuntimeSection({
+  settings,
+  saving,
+  onSave,
+  onReset,
+}: {
+  settings: ResearchRuntimeSettings;
+  saving: boolean;
+  onSave: (body: Pick<ResearchRuntimeSettings, "max_tool_calls" | "session_timeout_s" | "per_tool_timeout_s">) => void | Promise<void>;
+  onReset: () => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState({
+    max_tool_calls: String(settings.max_tool_calls),
+    session_timeout_s: String(settings.session_timeout_s),
+    per_tool_timeout_s: String(settings.per_tool_timeout_s),
+  });
+
+  useEffect(() => {
+    setDraft({
+      max_tool_calls: String(settings.max_tool_calls),
+      session_timeout_s: String(settings.session_timeout_s),
+      per_tool_timeout_s: String(settings.per_tool_timeout_s),
+    });
+  }, [settings.max_tool_calls, settings.session_timeout_s, settings.per_tool_timeout_s]);
+
+  const badge = runtimeSourceBadge(settings.source);
+  const disabled = saving || !draft.max_tool_calls || !draft.session_timeout_s || !draft.per_tool_timeout_s;
+
+  return (
+    <section className="settings-panel research-runtime-panel">
+      <div className="settings-panel-head">
+        <div>
+          <h2>AI 研究執行限制</h2>
+          <p className="muted">
+            控制單次 AI 研究的工具輪數與 subscription driver timeout。API-key 路徑目前只套用 max turns；切頁不中斷與並行會由 server-owned run manager 解決。
+          </p>
+        </div>
+        <span className={`route-source ${badge.tone}`}>{badge.label}</span>
+      </div>
+
+      {settings.warning && <p className="warn-text">{settings.warning}</p>}
+
+      <div className="runtime-limit-grid">
+        <label className="field">
+          <span>Max turns</span>
+          <input
+            name="max_tool_calls"
+            type="number"
+            min={1}
+            max={500}
+            step={1}
+            value={draft.max_tool_calls}
+            onChange={(e) => setDraft((prev) => ({ ...prev, max_tool_calls: e.target.value }))}
+          />
+          <span className="field-help">模型可連續呼叫工具的最大輪數；API-key 與 subscription Research 都會套用。</span>
+        </label>
+        <label className="field">
+          <span>Session timeout 秒</span>
+          <input
+            name="session_timeout_s"
+            type="number"
+            min={0}
+            max={86400}
+            step={30}
+            value={draft.session_timeout_s}
+            onChange={(e) => setDraft((prev) => ({ ...prev, session_timeout_s: e.target.value }))}
+          />
+          <span className="field-help">subscription driver 的整體牆鐘時間；0 代表不設整體 timeout。</span>
+        </label>
+        <label className="field">
+          <span>每工具 timeout 秒</span>
+          <input
+            name="per_tool_timeout_s"
+            type="number"
+            min={1}
+            max={3600}
+            step={5}
+            value={draft.per_tool_timeout_s}
+            onChange={(e) => setDraft((prev) => ({ ...prev, per_tool_timeout_s: e.target.value }))}
+          />
+          <span className="field-help">subscription driver 裡單一 ArkScope 工具呼叫的 timeout。</span>
+        </label>
+      </div>
+
+      <div className="settings-actions">
+        <button
+          type="button"
+          className="btn-ghost small"
+          disabled={disabled}
+          onClick={() => onSave({
+            max_tool_calls: Number(draft.max_tool_calls),
+            session_timeout_s: Number(draft.session_timeout_s),
+            per_tool_timeout_s: Number(draft.per_tool_timeout_s),
+          })}
+        >
+          {saving ? "儲存中…" : "儲存限制"}
+        </button>
+        {settings.db_saved && (
+          <button type="button" className="btn-ghost small" disabled={saving} onClick={() => onReset()}>
+            重設限制
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
