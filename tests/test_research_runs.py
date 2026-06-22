@@ -67,7 +67,7 @@ def test_execute_run_records_events_and_persists_assistant(stores):
     thread_store.append_message(thread_id="t1", role="user", content="q")
     run_store.create_run(
         id="r1", thread_id="t1", question="q", ticker=None,
-        provider="anthropic", model="claude-sonnet-4-6", effort=None,
+        provider="anthropic", model="claude-sonnet-4-6", effort="high",
         auth_mode="api_key", credential_id="local:2",
     )
 
@@ -89,6 +89,7 @@ def test_execute_run_records_events_and_persists_assistant(stores):
     msgs = thread_store.list_messages("t1")
     assert [m.role for m in msgs] == ["user", "assistant"]
     assert msgs[-1].content == "answer"
+    assert msgs[-1].effort == "high"
     assert msgs[-1].tool_calls == [{"name": "get_sa_feed", "input": {"ticker": "AAPL"}, "result_preview": "2 articles"}]
 
 
@@ -116,6 +117,7 @@ def test_execute_run_error_event_persists_error_assistant(stores):
     msgs = thread_store.list_messages("t1")
     assert msgs[-1].is_error is True
     assert msgs[-1].content == "backend timeout"
+    assert msgs[-1].effort == "low"
 
 
 def test_create_run_route_persists_user_and_schedules_with_prior_history(stores, monkeypatch):

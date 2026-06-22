@@ -119,7 +119,7 @@ describe("reducer · anthropic live", () => {
 
   it("full single-turn happy path: interim replaced, footer reads only total_tokens+turn_count, trace chronological", () => {
     const s = run(
-      submit({ question: "NVDA 最新 SA 動態？", provider: "anthropic", model: "claude-opus-4-8", ticker: "NVDA", ts: 1000 }),
+      submit({ question: "NVDA 最新 SA 動態？", provider: "anthropic", model: "claude-opus-4-8", effort: "high", ticker: "NVDA", ts: 1000 }),
       f("thinking", { turn: 1, model: "claude-opus-4-8" }),
       f("thinking_content", { thinking: "pull feed" }),
       f("text", { content: "Checking SA…" }),
@@ -136,6 +136,7 @@ describe("reducer · anthropic live", () => {
       content: "NVDA: 3 看多 2 看空，焦點在 AI 需求。",
       provider: "anthropic",
       model: "claude-opus-4-8",
+      effort: "high",
       tools_used: ["get_sa_feed"],
       tool_calls: [{ name: "get_sa_feed", input: { ticker: "NVDA" }, result_preview: "5 articles…" }],
       tickers: ["NVDA"],

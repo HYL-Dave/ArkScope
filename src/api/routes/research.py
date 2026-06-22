@@ -84,6 +84,7 @@ def _thread_dict(t: ResearchThread, *, run_store=None) -> dict:
 def _message_dict(m: ResearchMessage) -> dict:
     return {
         "role": m.role, "content": m.content, "provider": m.provider, "model": m.model,
+        "effort": m.effort,
         "tools_used": m.tools_used, "tool_calls": m.tool_calls,
         "token_usage": m.token_usage, "tickers": m.tickers,
         "elapsed_seconds": m.elapsed_seconds, "is_error": m.is_error, "created_at": m.created_at,

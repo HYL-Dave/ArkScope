@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS research_messages (
     content         TEXT NOT NULL DEFAULT '',
     provider        TEXT,
     model           TEXT,
+    effort          TEXT,
     tools_used_json TEXT,
     tool_calls_json TEXT,
     token_usage_json TEXT,
@@ -140,6 +141,7 @@ class ResearchMessage:
     content: str
     provider: Optional[str]
     model: Optional[str]
+    effort: Optional[str]
     tools_used: list
     tool_calls: list
     token_usage: Optional[dict]
@@ -181,6 +183,11 @@ class ResearchThreadStore:
                     conn.execute("ALTER TABLE research_messages ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0")
                 except sqlite3.OperationalError:
                     pass
+            if "effort" not in cols:
+                try:
+                    conn.execute("ALTER TABLE research_messages ADD COLUMN effort TEXT")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     # --- row mappers -----------------------------------------------------
@@ -197,7 +204,7 @@ class ResearchThreadStore:
     def _message(r: sqlite3.Row) -> ResearchMessage:
         return ResearchMessage(
             id=r["id"], thread_id=r["thread_id"], role=r["role"], content=r["content"],
-            provider=r["provider"], model=r["model"],
+            provider=r["provider"], model=r["model"], effort=r["effort"],
             tools_used=_loads(r["tools_used_json"]) or [],
             tool_calls=_loads(r["tool_calls_json"]) or [],
             token_usage=_loads(r["token_usage_json"]),
@@ -241,6 +248,7 @@ class ResearchThreadStore:
         content: str = "",
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        effort: Optional[str] = None,
         tools_used: Optional[list] = None,
         tool_calls: Optional[list] = None,
         token_usage: Optional[dict] = None,
@@ -254,13 +262,13 @@ class ResearchThreadStore:
             cur = conn.execute(
                 """
                 INSERT INTO research_messages
-                    (thread_id, role, content, provider, model, tools_used_json,
+                    (thread_id, role, content, provider, model, effort, tools_used_json,
                      tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
                      is_error, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    thread_id, role, content, provider, model,
+                    thread_id, role, content, provider, model, effort,
                     json.dumps(tools_used) if tools_used is not None else None,
                     json.dumps(tool_calls) if tool_calls is not None else None,
                     json.dumps(token_usage) if token_usage is not None else None,

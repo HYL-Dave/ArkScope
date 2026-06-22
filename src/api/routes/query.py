@@ -235,7 +235,7 @@ def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, t
         logger.warning("research persist (user turn) failed, continuing: %s", e)
 
 
-def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed) -> None:
+def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed, effort=None) -> None:
     """Best-effort assistant persistence on a `done` terminal (#3 tool_calls from
     the trace, #4 safe). accumulate_tool_calls runs INSIDE the guard (SF1)."""
     try:
@@ -243,6 +243,7 @@ def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed) 
             thread_id=thread_id, role="assistant",
             content=done_data.get("answer", "") or "",
             provider=done_data.get("provider"), model=done_data.get("model"),
+            effort=effort,
             tools_used=done_data.get("tools_used"), tool_calls=accumulate_tool_calls(collected),
             token_usage=done_data.get("token_usage"), elapsed_seconds=elapsed,
         )
@@ -250,14 +251,14 @@ def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed) 
         logger.warning("research persist (assistant turn) failed, continuing: %s", e)
 
 
-def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed) -> None:
+def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed, effort=None) -> None:
     """Best-effort persistence of a NON-`done` terminal (agent error / stream
     exception) as an is_error assistant turn — so reload doesn't show a dangling
     user question with no reply (MUST-FIX 2). Partial trace preserved."""
     try:
         store.append_message(
             thread_id=thread_id, role="assistant", content=content or "(error)",
-            provider=provider, model=model, tool_calls=accumulate_tool_calls(collected),
+            provider=provider, model=model, effort=effort, tool_calls=accumulate_tool_calls(collected),
             elapsed_seconds=elapsed, is_error=True,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
@@ -444,9 +445,9 @@ async def query_agent_stream(
             if persist:
                 elapsed = round(_time.monotonic() - t0, 3)
                 if done_data is not None:
-                    _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed)
+                    _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed, effort=res_effort)
                 elif error_content is not None:
-                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, elapsed=elapsed)
+                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, effort=res_effort, elapsed=elapsed)
 
     return StreamingResponse(
         event_generator(),

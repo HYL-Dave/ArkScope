@@ -555,7 +555,7 @@ export interface ResearchThreadDTO {
 }
 export interface ResearchMessageDTO {
   role: "user" | "assistant"; content: string;
-  provider: string | null; model: string | null;
+  provider: string | null; model: string | null; effort: string | null;
   tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
   elapsed_seconds: number | null; is_error: boolean; created_at: string;

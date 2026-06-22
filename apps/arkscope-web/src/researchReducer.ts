@@ -43,6 +43,7 @@ export interface Message {
   content: string; // user: question; assistant: done.answer | error text | '連線中斷'
   provider?: Provider | null; // assistant: done.provider; user: null
   model?: string | null; // assistant: done.model (== optimistic thinking.model)
+  effort?: string | null; // submitted/resolved effort carried outside provider frames
   tools_used: string[]; // VERBATIM done.tools_used (deduped set) — not recomputed
   tool_calls: ToolCall[]; // frozen from the live trace's tool rows on terminal
   token_usage?: Record<string, number> | null; // VERBATIM done.token_usage
@@ -80,6 +81,7 @@ export interface PendingTurn {
   startedAt: number; // submit.ts (epoch ms) — sole wall-clock source for elapsed
   provider: Provider;
   model: string | null; // optimistic from submit, overwritten by thinking.model
+  effort: string | null;
   interimText: string; // text.content (Anthropic interim); replaced by done.answer
   trace: TraceRow[]; // chronological; tool rows + inline thinking lines
   thinkingActive: boolean; // true on submit; cleared on FIRST of text|tool_start|done
@@ -101,8 +103,8 @@ export interface State {
 export type Action =
   // threadId is CLIENT-OWNED (UI generates a stable uuid at 新對話, reuses the
   // active thread's id to continue). New thread iff no thread with that id exists.
-  | { kind: "submit"; question: string; provider: Provider; model: string | null; ticker?: string | null; ts: number; threadId: string }
-  | { kind: "attachRun"; threadId: string; provider: Provider; model: string | null; ticker?: string | null; ts: number }
+  | { kind: "submit"; question: string; provider: Provider; model: string | null; effort?: string | null; ticker?: string | null; ts: number; threadId: string }
+  | { kind: "attachRun"; threadId: string; provider: Provider; model: string | null; effort?: string | null; ticker?: string | null; ts: number }
   | { kind: "frame"; frame: SSEFrame; ts: number }
   | { kind: "abort"; ts?: number }
   | { kind: "streamEnd"; ts?: number }
@@ -170,7 +172,7 @@ function onSubmit(state: State, a: Extract<Action, { kind: "submit" }>): State {
     : state.threads;
   const prev = state.messagesByThread[threadId] ?? [];
   const pending: PendingTurn = {
-    threadId, startedAt: a.ts, provider: a.provider, model: a.model,
+    threadId, startedAt: a.ts, provider: a.provider, model: a.model, effort: a.effort ?? null,
     interimText: "", trace: [], thinkingActive: true, turnCount: 0, tickers,
   };
   return {
@@ -187,6 +189,7 @@ function onAttachRun(state: State, a: Extract<Action, { kind: "attachRun" }>): S
     startedAt: a.ts,
     provider: a.provider,
     model: a.model,
+    effort: a.effort ?? null,
     interimText: "",
     trace: [],
     thinkingActive: true,
@@ -199,7 +202,7 @@ function onAttachRun(state: State, a: Extract<Action, { kind: "attachRun" }>): S
 /** Build a terminal isError/synthesized assistant message, preserving the partial trace. */
 function terminalMsg(p: PendingTurn, content: string, ts: number, synthesized?: boolean): Message {
   return {
-    role: "assistant", content, provider: p.provider, model: p.model,
+    role: "assistant", content, provider: p.provider, model: p.model, effort: p.effort,
     tools_used: [], tool_calls: toolCalls(p.trace), token_usage: null,
     tickers: p.tickers, elapsed_seconds: (ts - p.startedAt) / 1000, created_at: iso(ts),
     isError: true, maxTurns: false, synthesized,
@@ -214,7 +217,7 @@ function onDone(state: State, p: PendingTurn, data: Record<string, unknown>, ts:
   const token_usage = (data.token_usage as Record<string, number>) ?? null;
   const maxTurns = provider === "anthropic" && content === MAX_TURNS_SENTINEL;
   const msg: Message = {
-    role: "assistant", content, provider, model, tools_used,
+    role: "assistant", content, provider, model, effort: p.effort, tools_used,
     tool_calls: toolCalls(p.trace), token_usage, tickers: p.tickers,
     elapsed_seconds: (ts - p.startedAt) / 1000, created_at: iso(ts),
     isError: false, maxTurns,

@@ -59,7 +59,7 @@ const toClientThread = (t: ResearchThreadDTO): Thread => ({
   created_at: t.created_at, updated_at: t.updated_at,
 });
 const toClientMessage = (m: ResearchMessageDTO): Message => ({
-  role: m.role, content: m.content, provider: m.provider, model: m.model,
+  role: m.role, content: m.content, provider: m.provider, model: m.model, effort: m.effort,
   tools_used: m.tools_used ?? [], tool_calls: m.tool_calls ?? [],
   token_usage: m.token_usage, tickers: m.tickers,
   elapsed_seconds: m.elapsed_seconds, created_at: m.created_at,
@@ -303,6 +303,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       threadId: run.thread_id,
       provider: run.provider,
       model: run.model,
+      effort: run.effort,
       ticker: run.ticker,
       ts: runStartedMs(run),
     });
@@ -318,7 +319,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     const threadId = state.activeThreadId ?? crypto.randomUUID();
     const model = selModel.trim() || null;
     const effort = selEffort && selEffort !== "default" ? selEffort : undefined;
-    dispatch({ kind: "submit", question: q, provider, model, ticker, ts: Date.now(), threadId });
+    dispatch({ kind: "submit", question: q, provider, model, effort, ticker, ts: Date.now(), threadId });
     writeActiveThreadId(threadId);
     setQuestion("");
     setThreadError(null);
@@ -468,6 +469,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       question: retryCandidate.question,
       provider: retryProvider,
       model: retryCandidate.model,
+      effort,
       ticker: retryCandidate.ticker,
       ts: Date.now(),
       threadId: state.activeThreadId,
@@ -731,7 +733,7 @@ function Bubble({
     <div className={cls}>
       {m.role === "assistant" && (m.model || m.maxTurns) && (
         <div className="research-bubble-meta muted tiny">
-          {m.model && <span className="research-model">{m.provider}/{m.model}</span>}
+          {m.model && <span className="research-model">{m.provider}/{m.model}{m.effort && m.effort !== "default" ? ` · ${m.effort}` : ""}</span>}
           {m.maxTurns && <span className="research-maxturns"> · 已達工具呼叫上限</span>}
           {typeof m.elapsed_seconds === "number" && <span> · {m.elapsed_seconds.toFixed(1)}s</span>}
         </div>

@@ -50,7 +50,7 @@ def test_append_user_then_assistant_roundtrips_and_orders(store):
     store.append_message(thread_id="th-nvda", role="user", content="NVDA 最新 SA 動態？", tickers=["NVDA"])
     store.append_message(
         thread_id="th-nvda", role="assistant", content="NVDA: 3 看多 2 看空。",
-        provider="anthropic", model="claude-opus-4-8",
+        provider="anthropic", model="claude-opus-4-8", effort="high",
         tools_used=["get_sa_feed"],
         tool_calls=[{"name": "get_sa_feed", "input": {"ticker": "NVDA"}, "result_preview": "5 articles"}],
         token_usage={"total_tokens": 1500, "turn_count": 2},
@@ -61,7 +61,7 @@ def test_append_user_then_assistant_roundtrips_and_orders(store):
     u, a = msgs
     assert u.content == "NVDA 最新 SA 動態？" and u.tickers == ["NVDA"]
     assert u.tools_used == [] and u.tool_calls == [] and u.token_usage is None
-    assert a.provider == "anthropic" and a.model == "claude-opus-4-8"
+    assert a.provider == "anthropic" and a.model == "claude-opus-4-8" and a.effort == "high"
     assert a.tools_used == ["get_sa_feed"]
     assert a.tool_calls == [{"name": "get_sa_feed", "input": {"ticker": "NVDA"}, "result_preview": "5 articles"}]
     assert a.token_usage == {"total_tokens": 1500, "turn_count": 2}
@@ -72,7 +72,7 @@ def test_append_minimal_assistant_tolerates_none_json_fields(store):
     store.ensure_thread(id="th-x", title="q")
     m = store.append_message(thread_id="th-x", role="assistant", content="direct answer")
     assert m.tools_used == [] and m.tool_calls == []
-    assert m.token_usage is None and m.tickers is None and m.elapsed_seconds is None
+    assert m.token_usage is None and m.tickers is None and m.elapsed_seconds is None and m.effort is None
     assert m.is_error is False  # default
 
 

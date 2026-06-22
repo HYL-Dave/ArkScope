@@ -86,6 +86,7 @@ async def execute_research_run(
         _persist_error_turn(
             thread_store, thread_id=run.thread_id, content="research run cancelled",
             collected=collected, provider=run.provider, model=run.model,
+            effort=run.effort,
             elapsed=round(time.monotonic() - t0, 3),
         )
         raise
@@ -98,7 +99,7 @@ async def execute_research_run(
     if done_data is not None:
         _persist_assistant_turn(
             thread_store, thread_id=run.thread_id, done_data=done_data,
-            collected=collected, elapsed=elapsed,
+            collected=collected, elapsed=elapsed, effort=run.effort,
         )
         run_store.mark_terminal(
             run_id, "succeeded",
@@ -108,7 +109,7 @@ async def execute_research_run(
         content = error_content or "research run failed"
         _persist_error_turn(
             thread_store, thread_id=run.thread_id, content=content, collected=collected,
-            provider=run.provider, model=run.model, elapsed=elapsed,
+            provider=run.provider, model=run.model, effort=run.effort, elapsed=elapsed,
         )
         run_store.mark_terminal(run_id, "failed", error=content)
 
