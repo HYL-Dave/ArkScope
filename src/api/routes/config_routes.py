@@ -13,7 +13,7 @@ from src.api.dependencies import (
     get_oauth_token_store,
 )
 from src.api.permissions import require_profile_state_write
-from src.agents.config import task_route
+from src.agents.config import _load_user_profile, save_local_override, task_route
 from src.model_route_store import ModelRouteStore
 from src.env_keys import env_file_path
 from src.model_credentials import (
@@ -413,9 +413,10 @@ class OAuthManualComplete(BaseModel):
 
 
 class OAuthStartRequest(BaseModel):
-    # Default FALSE: ChatGPT OAuth execution isn't wired yet (AI 研究 fail-closes when
-    # it's active), so logging in must NOT auto-switch the active credential. The user
-    # can opt in. Carried into the pending login state so the loopback callback honors it.
+    # Default FALSE: login/setup must not silently switch the active OpenAI credential.
+    # AI 研究 can use chatgpt_oauth, but direct OpenAI SDK-client features still fail
+    # closed for it; the user can opt in explicitly. Carried into pending login state
+    # so the loopback callback honors it.
     make_active: bool = False
 
 
@@ -689,3 +690,55 @@ def update_model_routes(
             warning=" ".join(warnings) or None,
         )
     return {"routes": {k: v.model_dump() for k, v in saved.items()}}
+
+
+@router.post("/config/model-routes/import")
+def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
+    """Explicit migration: copy per-task routes configured in user_profile(.local).yaml
+    ``llm_preferences`` into the profile DB (the authority). NEVER auto-runs — only on this
+    call. yaml is left intact as fallback; importing just promotes it to DB authority.
+
+    A task is imported only when it passes the SAME guards as the save path
+    (update_model_routes): both provider and model present, a recognized provider, and a
+    provider/model that don't conflict by prefix; an unknown effort is normalized to
+    'default'. An inconsistent yaml route is skipped, never persisted (no half/bad routes)."""
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    llm_prefs = _load_user_profile().get("llm_preferences", {})
+    imported: list[str] = []
+    skipped: list[str] = []
+    for task in ("card_synthesis", "card_translation", "ai_research"):
+        provider = str(llm_prefs.get(f"{task}_provider", "") or "").strip()
+        model = str(llm_prefs.get(f"{task}_model", "") or "").strip()
+        effort = str(llm_prefs.get(f"{task}_effort", "") or "default").strip() or "default"
+        if not (provider and model) or provider not in ("anthropic", "openai"):
+            skipped.append(task)
+            continue
+        inferred = model_provider(model)
+        if inferred and inferred != provider:  # same prefix-mismatch guard as update_model_routes
+            skipped.append(task)
+            continue
+        if not is_valid_effort(provider, effort):  # mirror the save path's effort normalization
+            effort = "default"
+        require_profile_state_write("model_route_import", {"task": task})
+        route_store.set(task, provider, model, effort)
+        imported.append(task)
+    return {"imported": imported, "skipped": skipped}
+
+
+@router.post("/config/model-routes/export")
+def export_model_routes(store: CredentialStore = Depends(get_credential_store)):
+    """Write the DB routes back into user_profile.local.yaml ``llm_preferences`` as a
+    portable backup snapshot. Only the 3 keys per task are touched: ``save_local_override``
+    reads the file, sets one key, and rewrites — PRESERVING every other yaml key. env and
+    unrelated config are never rewritten."""
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    exported: list[str] = []
+    for task, row in route_store.get_all().items():
+        require_profile_state_write("model_route_export", {"task": task})
+        save_local_override("llm_preferences", f"{task}_provider", row.provider)
+        save_local_override("llm_preferences", f"{task}_model", row.model)
+        save_local_override("llm_preferences", f"{task}_effort", row.effort)
+        exported.append(task)
+    return {"exported": exported}

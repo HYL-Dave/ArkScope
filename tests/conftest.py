@@ -34,8 +34,10 @@ def _isolate_profile_db(tmp_path_factory, monkeypatch):
     defaults to data/profile_state.db. Any DEFAULT-path store — e.g. the model-route
     store behind ``task_route``/``resolve_research_route`` — must read a throwaway DB,
     never the real dev one, or a route saved via the app would leak into resolution-
-    layer tests. Tests that inject an explicit db_path are unaffected."""
-    if "ARKSCOPE_PROFILE_DB" not in os.environ:
-        monkeypatch.setenv(
-            "ARKSCOPE_PROFILE_DB",
-            str(tmp_path_factory.mktemp("profile") / "profile_state.db"))
+    layer tests. Override UNCONDITIONALLY (unlike _isolate_locks): a profile DB carries
+    credentials + routes, so honoring an ambient ARKSCOPE_PROFILE_DB would leak real dev
+    state into tests; monkeypatch restores any prior value on teardown. Tests that inject
+    an explicit db_path are unaffected."""
+    monkeypatch.setenv(
+        "ARKSCOPE_PROFILE_DB",
+        str(tmp_path_factory.mktemp("profile") / "profile_state.db"))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 import yaml
@@ -318,3 +319,99 @@ def test_task_route_real_env_overrides_db(make_route_store, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
     route = task_route("ai_research", route_store=rs)
     assert (route.provider, route.model, route.source) == ("openai", "gpt-5.5", "env")
+
+
+# --- ④ import/export (yaml <-> DB) -------------------------------------------------
+
+def test_import_routes_copies_yaml_into_db(make_route_store, tmp_path):
+    from src.api.routes.config_routes import import_model_routes
+
+    rs = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "low",
+        "card_synthesis_provider": "anthropic",  # no model → incomplete → skipped
+    }})
+    assert rs.get("ai_research") is None  # explicit: nothing in DB until import is called
+
+    res = import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+
+    assert "ai_research" in res["imported"]
+    assert "card_synthesis" in res["skipped"]  # provider without model is not imported
+    row = rs.get("ai_research")
+    assert (row.provider, row.model, row.effort) == ("openai", "gpt-5.4-mini", "low")
+    assert rs.get("card_synthesis") is None
+
+
+def test_export_routes_writes_db_to_yaml_preserving_other_keys(make_route_store, tmp_path):
+    from src.api.routes.config_routes import export_model_routes
+
+    rs = make_route_store({"llm_preferences": {"reasoning_effort": "xhigh"}})  # unrelated key
+    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")
+
+    res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+
+    assert "ai_research" in res["exported"]
+    data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"   # route written back
+    assert data["llm_preferences"]["ai_research_provider"] == "openai"
+    assert data["llm_preferences"]["reasoning_effort"] == "xhigh"           # UNRELATED key preserved
+
+
+# --- review fixes: source-label / import validation / safety coverage --------------
+
+def test_task_route_whitespace_only_yaml_effort_resolves_to_default(make_route_store):
+    from src.agents.config import task_route
+
+    # yaml sets ONLY a whitespace effort (no provider/model) → resolves to pure built-in
+    # defaults, so the source must be "default", not "profile" (the label must use the
+    # STRIPPED effort, consistent with how effort itself is resolved).
+    rs = make_route_store({"llm_preferences": {"ai_research_effort": "   "}})
+    assert task_route("ai_research", route_store=rs).source == "default"
+
+
+def test_import_skips_provider_model_mismatch(make_route_store, tmp_path):
+    from src.api.routes.config_routes import import_model_routes
+
+    rs = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai", "ai_research_model": "claude-opus-4-8",  # claude model, openai provider
+    }})
+    res = import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+    assert "ai_research" in res["skipped"]      # same guard as the save path
+    assert rs.get("ai_research") is None         # inconsistent route NOT persisted
+
+
+def test_import_normalizes_unknown_effort_to_default(make_route_store, tmp_path):
+    from src.api.routes.config_routes import import_model_routes
+
+    rs = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "bogus",
+    }})
+    res = import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+    assert "ai_research" in res["imported"]
+    assert rs.get("ai_research").effort == "default"  # unknown effort normalized, mirroring save
+
+
+def test_task_route_db_error_degrades_to_yaml(make_route_store):
+    import sqlite3
+    from src.agents.config import task_route
+
+    rs = make_route_store(_YAML_AI)  # yaml fallback present
+
+    class BoomStore:  # a route store whose read raises — resolution must NOT propagate it
+        def get(self, task):
+            raise sqlite3.OperationalError("boom")
+
+    route = task_route("ai_research", route_store=BoomStore())
+    assert (route.provider, route.model, route.source) == ("openai", "gpt-5.4-mini", "profile")
+
+
+def test_import_export_do_not_rewrite_env_override(make_route_store, tmp_path, monkeypatch):
+    from src.api.routes.config_routes import export_model_routes, import_model_routes
+    from src.agents.config import task_route
+
+    rs = make_route_store({"llm_preferences": {
+        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "low"}})
+    monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
+    import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+    export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+    assert os.environ["ARKSCOPE_AI_RESEARCH_MODEL"] == "gpt-5.5"            # env never rewritten
+    assert task_route("ai_research", route_store=rs).source == "env"        # env still wins

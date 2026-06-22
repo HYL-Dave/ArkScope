@@ -479,9 +479,10 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
         base_provider, base_model, base_effort = _configured_task_values(config, task)
         from_db = False
 
+    base_effort = base_effort.strip()
     provider = env_provider or _clean_provider(base_provider)
     model = env_model or base_model.strip()
-    effort = env_effort or base_effort.strip() or "default"
+    effort = env_effort or base_effort or "default"
     if env_provider or env_model or env_effort:
         source = "env"
     elif from_db:
