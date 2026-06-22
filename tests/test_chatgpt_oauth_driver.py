@@ -17,6 +17,7 @@ Offline: the OpenAI client is built behind a monkeypatchable seam (_discovery_cl
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 
@@ -119,6 +120,23 @@ class _ToolDef:
 class _Registry:
     def get(self, name):
         return _ToolDef() if name == "get_price_change" else None
+
+
+class _SlowNewsBriefToolDef:
+    name = "get_news_brief"
+    description = "Slow news brief."
+    parameters = []
+    requires_dal = True
+
+    @staticmethod
+    def function(dal, **kwargs):
+        time.sleep(0.05)
+        return {"ok": True}
+
+
+class _SlowNewsRegistry:
+    def get(self, name):
+        return _SlowNewsBriefToolDef() if name == "get_news_brief" else None
 
 
 def _run(coro):
@@ -319,6 +337,40 @@ def test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id
     followup = client.responses.calls[1]
     assert followup["stream"] is True and followup["store"] is False
     assert "previous_response_id" not in followup
+    assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
+
+
+def test_stream_llm_returns_tool_timeout_to_model_instead_of_terminal_error(monkeypatch):
+    first = [
+        {"type": "response.completed", "response": {"output": [
+            {"type": "function_call", "name": "get_news_brief", "call_id": "call_1",
+             "arguments": "{\"tickers\":[\"SNEX\"]}"},
+        ]}},
+    ]
+    second = [
+        {"type": "response.output_text.delta", "delta": "I could not read the news brief in time."},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "I could not read the news brief in time."}]},
+        ]}},
+    ]
+    client = _ExecClient([first, second])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    d = OpenAIChatGPTOAuthDriver(
+        credential=_Cred(7),
+        token_store=_TokStore(),
+        registry=_SlowNewsRegistry(),
+        dal=object(),
+        per_tool_timeout_s=0.001,
+    )
+
+    events = _run(_collect(d.stream_llm(_req())))
+
+    assert [e.type for e in events] == [
+        EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.text, EventType.done,
+    ]
+    assert events[2].data["is_error"] is True
+    assert "tool 'get_news_brief' timed out after 0.001s" in events[2].data["summary"]
+    followup = client.responses.calls[1]
     assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
 
 

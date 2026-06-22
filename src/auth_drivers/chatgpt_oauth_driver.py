@@ -491,10 +491,8 @@ class OpenAIChatGPTOAuthDriver:
                     ok, result = await self._invoke_tool(name=name, args=args, token=token)
                     summary = result[:_SUMMARY_CAP]
                     yield AgentEvent(EventType.tool_end, {"tool": name, "summary": summary, "chars": len(result), "is_error": not ok})
-                    if not ok:
-                        yield AgentEvent(EventType.error, {"error": summary, "provider": "openai", "model": request.model})
-                        return
-                    used.append(name)
+                    if ok:
+                        used.append(name)
                     input_items.append({
                         "type": "function_call",
                         "name": name,
