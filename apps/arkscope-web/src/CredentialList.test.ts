@@ -108,4 +108,32 @@ describe("CredentialList", () => {
       "2027-06-22T00:00:00+00:00",
     );
   });
+
+  it("marks the alias edit field as required so it is not misread as clearable like the optional metadata", async () => {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root!.render(
+        React.createElement(CredentialList, {
+          credentials: [cred({})],
+          renames: {},
+          metadataDrafts: {},
+          onRenameDraft: vi.fn(),
+          onMetadataDraft: vi.fn(),
+          onSaveCredentialDetails: vi.fn(),
+          onSetActive: vi.fn(),
+          onDelete: vi.fn(),
+          onDiscover: vi.fn(),
+          discoverLoadingId: null,
+        }),
+      );
+    });
+
+    // alias is NOT NULL + the row's primary display name → blanking it is a no-op that keeps
+    // the original (unlike the neighbouring account-label/expiry fields, which DO clear on save).
+    // So the edit field must not borrow the add/import flow's "可留空" framing.
+    expect(inputByLabel("season alias").placeholder).toBe("必填；留空則保留原名稱");
+  });
 });

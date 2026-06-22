@@ -1840,6 +1840,7 @@ export function CredentialList({
                       value={aliasDraft}
                       onChange={(e) => onRenameDraft(cred.id, e.target.value)}
                       aria-label={`${cred.label} alias`}
+                      placeholder="必填；留空則保留原名稱"
                     />
                     <button
                       type="button"
