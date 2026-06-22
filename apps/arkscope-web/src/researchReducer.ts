@@ -102,6 +102,7 @@ export type Action =
   // threadId is CLIENT-OWNED (UI generates a stable uuid at 新對話, reuses the
   // active thread's id to continue). New thread iff no thread with that id exists.
   | { kind: "submit"; question: string; provider: Provider; model: string | null; ticker?: string | null; ts: number; threadId: string }
+  | { kind: "attachRun"; threadId: string; provider: Provider; model: string | null; ticker?: string | null; ts: number }
   | { kind: "frame"; frame: SSEFrame; ts: number }
   | { kind: "abort"; ts?: number }
   | { kind: "streamEnd"; ts?: number }
@@ -177,6 +178,22 @@ function onSubmit(state: State, a: Extract<Action, { kind: "submit" }>): State {
     messagesByThread: { ...state.messagesByThread, [threadId]: [...prev, userMsg] },
     pending, footer: null, terminal: null,
   };
+}
+
+function onAttachRun(state: State, a: Extract<Action, { kind: "attachRun" }>): State {
+  const tickers = normTickers(a.ticker);
+  const pending: PendingTurn = {
+    threadId: a.threadId,
+    startedAt: a.ts,
+    provider: a.provider,
+    model: a.model,
+    interimText: "",
+    trace: [],
+    thinkingActive: true,
+    turnCount: 0,
+    tickers,
+  };
+  return { ...state, activeThreadId: a.threadId, pending, footer: null, terminal: null };
 }
 
 /** Build a terminal isError/synthesized assistant message, preserving the partial trace. */
@@ -309,6 +326,8 @@ export function reduce(state: State, action: Action): State {
   switch (action.kind) {
     case "submit":
       return onSubmit(state, action);
+    case "attachRun":
+      return onAttachRun(state, action);
     case "frame":
       return onFrame(state, action);
     case "abort":

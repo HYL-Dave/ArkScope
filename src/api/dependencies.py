@@ -62,6 +62,21 @@ def get_thread_store():
 
 
 @lru_cache(maxsize=1)
+def get_run_store():
+    """Singleton local store for server-owned AI 研究 runs/events.
+
+    On process boot, any queued/running rows from a previous sidecar lifetime are
+    terminalized as interrupted so the UI never shows stale work as still live.
+    """
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    store = ResearchRunStore(_local_state_db_path())
+    store.reconcile_interrupted(thread_store=ResearchThreadStore(_local_state_db_path()))
+    return store
+
+
+@lru_cache(maxsize=1)
 def get_credential_store():
     """Singleton local LLM credential store (same ignored local SQLite DB)."""
     from src.model_credentials import CredentialStore

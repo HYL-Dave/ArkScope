@@ -703,6 +703,35 @@ describe("reducer · hydrate", () => {
     expect(cont.threads).toHaveLength(1); // appended, not a new thread
     expect(cont.messagesByThread["ta"]).toHaveLength(3);
   });
+
+  it("attachRun opens pending without duplicating the persisted user message", () => {
+    const h = reduce(initialState, {
+      kind: "hydrate",
+      threads: [mkThread("ta", "alpha")],
+      messagesByThread: { ta: [mkMsg("user", "qa")] },
+      activeThreadId: "ta",
+    });
+    const attached = reduce(h, {
+      kind: "attachRun",
+      threadId: "ta",
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+      ticker: "AAPL",
+      ts: 1000,
+    });
+    expect(attached.pending).toMatchObject({ threadId: "ta", model: "claude-sonnet-4-6", tickers: ["AAPL"] });
+    expect(attached.messagesByThread["ta"]).toHaveLength(1); // no duplicate user turn
+
+    const done = reduce(attached, f("done", {
+      answer: "finished",
+      tools_used: [],
+      provider: "anthropic",
+      model: "claude-sonnet-4-6",
+      token_usage: {},
+    }, 2000));
+    expect(done.pending).toBeNull();
+    expect(done.messagesByThread["ta"].map((m) => m.content)).toEqual(["qa", "finished"]);
+  });
 });
 
 // ---------------------------------------------------------------------------

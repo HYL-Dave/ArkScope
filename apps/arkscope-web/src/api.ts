@@ -551,6 +551,7 @@ export interface ResearchThreadDTO {
   id: string; title: string; ticker: string | null;
   provider: string | null; model: string | null;
   created_at: string; updated_at: string;
+  active_run?: ResearchRunDTO | null;
 }
 export interface ResearchMessageDTO {
   role: "user" | "assistant"; content: string;
@@ -558,6 +559,31 @@ export interface ResearchMessageDTO {
   tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
   elapsed_seconds: number | null; is_error: boolean; created_at: string;
+}
+export interface ResearchRunDTO {
+  id: string;
+  thread_id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "interrupted";
+  question: string;
+  ticker: string | null;
+  provider: string;
+  model: string;
+  effort: string | null;
+  auth_mode: string | null;
+  credential_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error: string | null;
+  token_usage: Record<string, number> | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface ResearchRunEventDTO {
+  run_id: string;
+  seq: number;
+  type: string;
+  data: Record<string, unknown>;
+  created_at: string;
 }
 export function getResearchThreads(limit = 50): Promise<{ threads: ResearchThreadDTO[] }> {
   return getJSON<{ threads: ResearchThreadDTO[] }>(`/research/threads?limit=${limit}`, 8_000);
@@ -567,6 +593,26 @@ export function getResearchMessages(threadId: string): Promise<{ thread_id: stri
 }
 export function deleteResearchThread(threadId: string): Promise<{ thread_id: string; deleted: boolean }> {
   return sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, "DELETE", undefined, 8_000);
+}
+export function createResearchRun(body: {
+  thread_id?: string;
+  question: string;
+  ticker?: string | null;
+  provider: string;
+  model?: string;
+  effort?: string;
+  retry_last_failed?: boolean;
+}): Promise<{ run: ResearchRunDTO }> {
+  return sendJSON<{ run: ResearchRunDTO }>("/research/runs", "POST", body, 8_000);
+}
+export function getResearchRunEvents(runId: string, after = 0): Promise<{ run: ResearchRunDTO; events: ResearchRunEventDTO[] }> {
+  return getJSON<{ run: ResearchRunDTO; events: ResearchRunEventDTO[] }>(
+    `/research/runs/${encodeURIComponent(runId)}/events?after=${after}`,
+    8_000,
+  );
+}
+export function cancelResearchRun(runId: string): Promise<{ run: ResearchRunDTO }> {
+  return sendJSON<{ run: ResearchRunDTO }>(`/research/runs/${encodeURIComponent(runId)}/cancel`, "POST", undefined, 8_000);
 }
 
 export function getModelCatalog(): Promise<ModelCatalog> {

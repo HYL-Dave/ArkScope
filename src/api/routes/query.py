@@ -182,6 +182,50 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
     return driver.stream_llm(req)
 
 
+def _research_provider_stream(*, provider: str, question: str, model: str, effort: Optional[str], dal, history):
+    """Return the provider AgentEvent stream for AI 研究.
+
+    This is the single dispatch point shared by the legacy page-owned
+    ``/query/stream`` endpoint and the server-owned run manager. It deliberately
+    preserves the existing credential/runtime branches; callers own persistence
+    and event framing.
+    """
+    provider = provider.lower()
+    from src.research_runtime_config import resolve_research_runtime
+    runtime = resolve_research_runtime()
+    from src.auth_drivers.live_resolver import resolve_live_auth
+
+    if provider == "openai":
+        _auth = resolve_live_auth("openai")
+        if _auth.source == "oauth_driver_unwired":
+            return _openai_subscription_stream(
+                credential_id=_auth.credential_id, question=question,
+                model=model, effort=effort, dal=dal, history=history,
+            )
+        from src.agents.openai_agent.agent import run_query_stream
+        return run_query_stream(
+            question=question, model=model, dal=dal,
+            reasoning_effort=effort, history=history,
+            max_tool_calls=runtime.max_tool_calls,
+        )
+
+    if provider == "anthropic":
+        _auth = resolve_live_auth("anthropic")
+        if _auth.source == "oauth_driver_unwired":
+            return _anthropic_subscription_stream(
+                credential_id=_auth.credential_id, question=question,
+                model=model, effort=effort, dal=dal, history=history,
+            )
+        from src.agents.anthropic_agent.agent import run_query_stream
+        return run_query_stream(
+            question=question, model=model, dal=dal,
+            effort=effort, history=history,
+            max_tool_calls=runtime.max_tool_calls,
+        )
+
+    raise ValueError(f"Unknown provider: {provider}")
+
+
 def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, title) -> None:
     """Best-effort: a persistence failure must never break the SSE answer (#4)."""
     try:
@@ -367,52 +411,14 @@ async def query_agent_stream(
         error_content: Optional[str] = None  # set on a non-done terminal (MUST-FIX 2)
         t0 = _time.monotonic()
         try:
-            if provider == "openai":
-                from src.research_runtime_config import resolve_research_runtime
-                runtime = resolve_research_runtime()
-                from src.auth_drivers.live_resolver import resolve_live_auth
-                _auth = resolve_live_auth("openai")
-                if _auth.source == "oauth_driver_unwired":
-                    stream = _openai_subscription_stream(
-                        credential_id=_auth.credential_id, question=agent_question,
-                        model=res_model, effort=res_effort, dal=dal, history=history,
-                    )
-                else:
-                    from src.agents.openai_agent.agent import run_query_stream
-                    stream = run_query_stream(
-                        question=agent_question, model=res_model, dal=dal,
-                        reasoning_effort=res_effort, history=history,
-                        max_tool_calls=runtime.max_tool_calls,
-                    )
-            elif provider == "anthropic":
-                from src.research_runtime_config import resolve_research_runtime
-                runtime = resolve_research_runtime()
-                # 7B-6: if the ACTIVE anthropic credential is claude_code_oauth, the
-                # API-key loop (run_query_stream → live_anthropic_client) FAIL-CLOSES,
-                # so drive the Claude SUBSCRIPTION via the Agent-SDK driver instead.
-                # Detection = the live resolver classifying the active row as an
-                # OAuth driver (anthropic's only OAuth mode is claude_code_oauth).
-                # Both yield the SAME AgentEvent vocabulary, so the SSE/persist code
-                # below is unchanged. The api-key anthropic case is untouched.
-                from src.auth_drivers.live_resolver import resolve_live_auth
-                _auth = resolve_live_auth("anthropic")
-                if _auth.source == "oauth_driver_unwired":
-                    stream = _anthropic_subscription_stream(
-                        credential_id=_auth.credential_id, question=agent_question,
-                        model=res_model, effort=res_effort, dal=dal, history=history,
-                    )
-                else:
-                    from src.agents.anthropic_agent.agent import run_query_stream
-                    stream = run_query_stream(
-                        question=agent_question, model=res_model, dal=dal,
-                        effort=res_effort, history=history,
-                        max_tool_calls=runtime.max_tool_calls,
-                    )
-            else:
-                from src.agents.shared.events import AgentEvent, EventType
-                error_content = f"Unknown provider: {provider}"  # so finally persists the error turn (no dangling user)
-                yield AgentEvent(EventType.error, {"message": error_content}).to_sse()
-                return
+            stream = _research_provider_stream(
+                provider=provider,
+                question=agent_question,
+                model=res_model,
+                effort=res_effort,
+                dal=dal,
+                history=history,
+            )
 
             async for event in stream:
                 if persist:
