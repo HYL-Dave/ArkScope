@@ -415,3 +415,134 @@ def test_import_export_do_not_rewrite_env_override(make_route_store, tmp_path, m
     export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
     assert os.environ["ARKSCOPE_AI_RESEARCH_MODEL"] == "gpt-5.5"            # env never rewritten
     assert task_route("ai_research", route_store=rs).source == "env"        # env still wins
+
+
+# --- ⑤ reset/delete (DELETE endpoint) + export mirrors DB absence ------------------
+
+def test_delete_model_route_reverts_to_yaml(make_route_store, tmp_path):
+    from src.api.routes.config_routes import delete_model_route
+
+    rs = make_route_store(_YAML_AI)                          # yaml fallback present
+    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")  # DB overrides it
+
+    res = delete_model_route("ai_research", store=CredentialStore(tmp_path / "profile_state.db"))
+
+    assert res["deleted"] is True
+    assert rs.get("ai_research") is None                     # DB row gone
+    # returns the now-resolved route → reverted to the yaml fallback
+    assert res["route"]["source"] == "profile"
+    assert res["route"]["model"] == "gpt-5.4-mini"
+
+
+def test_delete_model_route_no_row_is_idempotent_returns_default(make_route_store, tmp_path):
+    from src.api.routes.config_routes import delete_model_route
+
+    rs = make_route_store(None)                              # no yaml, no DB
+    res = delete_model_route("ai_research", store=CredentialStore(tmp_path / "profile_state.db"))
+    assert res["deleted"] is False                           # nothing to delete
+    assert res["route"]["source"] == "default"
+
+
+def test_delete_model_route_unknown_task_400(tmp_path):
+    from src.api.routes.config_routes import delete_model_route
+
+    with pytest.raises(HTTPException) as ei:
+        delete_model_route("not_a_task", store=CredentialStore(tmp_path / "profile_state.db"))
+    assert ei.value.status_code == 400
+
+
+def test_export_clears_keys_for_tasks_absent_from_db(make_route_store, tmp_path):
+    from src.api.routes.config_routes import export_model_routes
+
+    # yaml carries a STALE card_synthesis route + an unrelated key; DB has only ai_research
+    rs = make_route_store({"llm_preferences": {
+        "card_synthesis_provider": "openai", "card_synthesis_model": "gpt-5.5", "card_synthesis_effort": "high",
+        "reasoning_effort": "xhigh",
+    }})
+    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")
+
+    res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+
+    assert "ai_research" in res["exported"]
+    assert "card_synthesis" in res["cleared"]                # mirrored DB absence
+    data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"   # DB route written
+    assert "card_synthesis_provider" not in data["llm_preferences"]         # stale keys cleared
+    assert "card_synthesis_model" not in data["llm_preferences"]
+    assert "card_synthesis_effort" not in data["llm_preferences"]
+    assert data["llm_preferences"]["reasoning_effort"] == "xhigh"           # unrelated key preserved
+
+
+# --- ⑤ review fixes: yaml-helper robustness + audit symmetry -----------------------
+
+def test_save_local_override_coerces_non_dict_section(make_route_store, tmp_path):
+    from src.agents.config import save_local_override
+
+    make_route_store(None)  # points _LOCAL_CONFIG_PATH at this tmp file
+    # a hand-edited local yaml with an empty header → llm_preferences parses to None
+    (tmp_path / "user_profile.local.yaml").write_text("llm_preferences:\nother:\n  keep: 1\n")
+
+    save_local_override("llm_preferences", "ai_research_model", "gpt-5.4-mini")  # must NOT raise
+
+    data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"
+    assert data["other"]["keep"] == 1  # unrelated section preserved
+
+
+def test_clear_local_overrides_drops_emptied_section_and_preserves_others(make_route_store, tmp_path):
+    from src.agents.config import clear_local_overrides
+
+    make_route_store({
+        "llm_preferences": {"ai_research_model": "m", "ai_research_provider": "openai"},
+        "other": {"keep": 1},
+    })
+    p = tmp_path / "user_profile.local.yaml"
+    clear_local_overrides("llm_preferences", "ai_research_model", "ai_research_provider")
+    data = yaml.safe_load(p.read_text())
+    assert "llm_preferences" not in data   # emptied section dropped
+    assert data["other"]["keep"] == 1      # unrelated section preserved
+
+
+def test_clear_local_overrides_idempotent_and_safe_on_missing(make_route_store, tmp_path):
+    from src.agents.config import clear_local_overrides
+
+    make_route_store({"llm_preferences": {"ai_research_model": "m"}})
+    p = tmp_path / "user_profile.local.yaml"
+    clear_local_overrides("llm_preferences", "nope")          # nothing to remove → untouched
+    assert yaml.safe_load(p.read_text())["llm_preferences"]["ai_research_model"] == "m"
+    p.unlink()
+    clear_local_overrides("llm_preferences", "ai_research_model")  # missing file → no raise
+
+
+def test_export_audits_both_write_and_clear_branches(make_route_store, tmp_path, monkeypatch):
+    import src.api.routes.config_routes as cr
+
+    rs = make_route_store(None)
+    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")    # present → write branch
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(cr, "require_profile_state_write",
+                        lambda action, detail=None: calls.append((action, (detail or {}).get("task"))))
+
+    cr.export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+
+    actions = {a for a, _ in calls}
+    audited_tasks = {t for _, t in calls}
+    assert "model_route_export" in actions          # write branch audited
+    assert "model_route_export_clear" in actions    # destructive clear branch audited too
+    assert {"card_synthesis", "card_translation"} <= audited_tasks
+
+
+def test_export_cleared_reports_only_tasks_whose_keys_were_removed(make_route_store, tmp_path):
+    from src.api.routes.config_routes import export_model_routes
+
+    # yaml carries ONLY a stale card_synthesis route; the other two tasks have no keys; DB empty.
+    rs = make_route_store({"llm_preferences": {
+        "card_synthesis_provider": "openai", "card_synthesis_model": "gpt-5.5", "card_synthesis_effort": "high",
+    }})
+
+    res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
+
+    # 'cleared' must mean "keys actually removed", not "task has no DB row" — so it should NOT
+    # overcount card_translation / ai_research (which had nothing to clear).
+    assert res["cleared"] == ["card_synthesis"]
+    assert res["exported"] == []

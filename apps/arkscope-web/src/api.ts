@@ -44,7 +44,7 @@ export interface TaskRoute {
   provider: ModelProvider;
   model: string;
   effort: string;
-  source: "env" | "profile" | "default";
+  source: "env" | "db" | "profile" | "default";
   custom: boolean;
   warning: string | null;
 }
@@ -570,6 +570,39 @@ export function saveModelRoutes(
     "/config/model-routes",
     "PUT",
     { routes },
+    8_000,
+  );
+}
+
+// Reset one task's route to yaml/default authority (removes its DB row). Returns the
+// now-resolved route so the UI can show what it reverted to.
+export function deleteModelRoute(
+  task: ModelTask,
+): Promise<{ deleted: boolean; route: TaskRoute }> {
+  return sendJSON<{ deleted: boolean; route: TaskRoute }>(
+    `/config/model-routes/${task}`,
+    "DELETE",
+    undefined,
+    8_000,
+  );
+}
+
+// Promote the yaml (user_profile.local.yaml) routes into the DB authority. Explicit; never auto-runs.
+export function importModelRoutes(): Promise<{ imported: ModelTask[]; skipped: ModelTask[] }> {
+  return sendJSON<{ imported: ModelTask[]; skipped: ModelTask[] }>(
+    "/config/model-routes/import",
+    "POST",
+    undefined,
+    8_000,
+  );
+}
+
+// Snapshot the DB routes back into the yaml fallback (mirrors DB state: writes present, clears absent).
+export function exportModelRoutes(): Promise<{ exported: ModelTask[]; cleared: ModelTask[] }> {
+  return sendJSON<{ exported: ModelTask[]; cleared: ModelTask[] }>(
+    "/config/model-routes/export",
+    "POST",
+    undefined,
     8_000,
   );
 }

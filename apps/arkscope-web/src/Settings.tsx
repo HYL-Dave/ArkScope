@@ -13,10 +13,13 @@ import {
   discoverModels,
   getMarketDataJob,
   getMarketDataStatus,
+  deleteModelRoute,
+  exportModelRoutes,
   getModelCatalog,
   getProvidersConfig,
   getProvidersHealth,
   getSchedule,
+  importModelRoutes,
   putProviderConfig,
   putSchedule,
   runScheduleNow,
@@ -61,6 +64,7 @@ import {
   dateInputToIso,
 } from "./credentialDisplay";
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
+import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
@@ -194,7 +198,47 @@ export function SettingsView({
       setCatalog(refreshed);
       setDraft(fromRoutes(refreshed.routes));
       await onRuntimeChanged();
-      setMsg("模型路由已儲存到 config/user_profile.local.yaml。");
+      setMsg("模型路由已儲存到 profile DB（設定檔僅作 fallback／匯入匯出）。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function importRoutes() {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const res = await importModelRoutes();
+      const refreshed = await getModelCatalog();
+      setCatalog(refreshed);
+      setDraft(fromRoutes(refreshed.routes));
+      await onRuntimeChanged();
+      const imp = res.imported.length ? `匯入 ${res.imported.length}` : "無可匯入";
+      const skip = res.skipped.length ? `，略過 ${res.skipped.length}（不完整／不一致）` : "";
+      setMsg(`已從設定檔匯入路由到 DB：${imp}${skip}。`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function exportRoutes() {
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const res = await exportModelRoutes();
+      // the clear branch can drop a task from profile→default, so refresh the badge/draft
+      const refreshed = await getModelCatalog();
+      setCatalog(refreshed);
+      setDraft(fromRoutes(refreshed.routes));
+      await onRuntimeChanged();
+      const cleared = res.cleared.length ? `，清除 ${res.cleared.length} 個無 DB 路由的舊鍵` : "";
+      setMsg(`已將 DB 路由寫回設定檔（${res.exported.length} 筆${cleared}）。`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -212,9 +256,27 @@ export function SettingsView({
             為每個 AI 任務選擇 provider、model id 和 effort。Provider 頁可用目前 active key discovery/test 實際可用模型。
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void save()} disabled={saving || loading || !catalog}>
-          {saving ? "儲存中…" : "儲存路由"}
-        </button>
+        <div className="page-head-actions">
+          <button
+            className="btn-ghost"
+            onClick={() => void importRoutes()}
+            disabled={saving || loading || !catalog}
+            title="把設定檔（user_profile.local.yaml）裡的路由匯入成 DB 權威"
+          >
+            從設定檔匯入
+          </button>
+          <button
+            className="btn-ghost"
+            onClick={() => void exportRoutes()}
+            disabled={saving || loading || !catalog}
+            title="把 DB 路由寫回設定檔備份（鏡像 DB 狀態：有則寫入、無則清除）"
+          >
+            匯出到設定檔
+          </button>
+          <button className="btn-ghost" onClick={() => void save()} disabled={saving || loading || !catalog}>
+            {saving ? "儲存中…" : "儲存路由"}
+          </button>
+        </div>
       </div>
 
       {err && <p className="error-text">{err}</p>}
@@ -297,6 +359,20 @@ export function SettingsView({
                         },
                       },
                     }));
+                  }
+                }}
+                onReset={async (task) => {
+                  setErr(null);
+                  setMsg(null);
+                  try {
+                    await deleteModelRoute(task);
+                    const refreshed = await getModelCatalog();
+                    setCatalog(refreshed);
+                    setDraft(fromRoutes(refreshed.routes));
+                    await onRuntimeChanged();
+                    setMsg(`${TASK_LABELS[task]} 已重設為設定檔／內建預設。`);
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : String(e));
                   }
                 }}
               />
@@ -962,13 +1038,14 @@ function DataSourcesSection() {
   );
 }
 
-function ModelRoutingSection({
+export function ModelRoutingSection({
   catalog,
   draft,
   modelsByProvider,
   testState,
   onDraft,
   onTest,
+  onReset,
 }: {
   catalog: ModelCatalog;
   draft: Partial<Record<ModelTask, DraftRoute>>;
@@ -976,6 +1053,7 @@ function ModelRoutingSection({
   testState: TestState;
   onDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>;
   onTest: (task: ModelTask) => Promise<void>;
+  onReset: (task: ModelTask) => Promise<void>;
 }) {
   return (
     <>
@@ -1003,14 +1081,17 @@ function ModelRoutingSection({
                   <h2>{TASK_LABELS[task.id]}</h2>
                   <p className="muted">{task.description}</p>
                 </div>
-                <span className={`route-source ${effective?.source ?? "default"}`}>
-                  {effective?.source ?? "default"}
+                <span
+                  className={`route-source ${routeSourceBadge(effective?.source ?? "default").tone}`}
+                  title={`此路由目前的權威來源：${routeSourceBadge(effective?.source ?? "default").label}`}
+                >
+                  {routeSourceBadge(effective?.source ?? "default").label}
                 </span>
               </div>
 
               {envLocked && (
                 <p className="warn-text">
-                  目前由環境變數控制；儲存 profile 會保留設定，但 runtime 仍以 env 為準。
+                  目前由環境變數控制；可以儲存到 DB，但 runtime 仍以 env 為準（不會被 DB 覆蓋）。
                 </p>
               )}
               {effective?.warning && <p className="warn-text">{effective.warning}</p>}
@@ -1109,6 +1190,16 @@ function ModelRoutingSection({
                 >
                   {currentTest?.loading ? "測試中…" : "測試此模型"}
                 </button>
+                {routeIsOverridable(effective?.source ?? "default") && (
+                  <button
+                    type="button"
+                    className="btn-ghost small"
+                    title="移除此任務的 DB 路由，改回設定檔／內建預設"
+                    onClick={() => void onReset(task.id)}
+                  >
+                    重設為 fallback
+                  </button>
+                )}
                 {currentTest?.result && <ModelTestStatus result={currentTest.result} />}
               </div>
             </div>

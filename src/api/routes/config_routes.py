@@ -13,7 +13,12 @@ from src.api.dependencies import (
     get_oauth_token_store,
 )
 from src.api.permissions import require_profile_state_write
-from src.agents.config import _load_user_profile, save_local_override, task_route
+from src.agents.config import (
+    _load_user_profile,
+    clear_local_overrides,
+    save_local_override,
+    task_route,
+)
 from src.model_route_store import ModelRouteStore
 from src.env_keys import env_file_path
 from src.model_credentials import (
@@ -40,6 +45,9 @@ from src.tools.analysis_tools import get_watchlist_overview, get_morning_brief
 
 router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
+
+# The per-task model routes this surface manages (matches model_routing.TaskId).
+_ROUTE_TASKS = ("card_synthesis", "card_translation", "ai_research")
 
 
 def _credential_apply_enabled() -> bool:
@@ -707,7 +715,7 @@ def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
     llm_prefs = _load_user_profile().get("llm_preferences", {})
     imported: list[str] = []
     skipped: list[str] = []
-    for task in ("card_synthesis", "card_translation", "ai_research"):
+    for task in _ROUTE_TASKS:
         provider = str(llm_prefs.get(f"{task}_provider", "") or "").strip()
         model = str(llm_prefs.get(f"{task}_model", "") or "").strip()
         effort = str(llm_prefs.get(f"{task}_effort", "") or "default").strip() or "default"
@@ -728,17 +736,49 @@ def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
 
 @router.post("/config/model-routes/export")
 def export_model_routes(store: CredentialStore = Depends(get_credential_store)):
-    """Write the DB routes back into user_profile.local.yaml ``llm_preferences`` as a
-    portable backup snapshot. Only the 3 keys per task are touched: ``save_local_override``
-    reads the file, sets one key, and rewrites — PRESERVING every other yaml key. env and
-    unrelated config are never rewritten."""
+    """Snapshot the DB routes into user_profile.local.yaml ``llm_preferences`` so the yaml
+    fallback MIRRORS DB state for the known tasks: a task WITH a DB row writes its 3 keys; a
+    task WITHOUT one has its 3 keys CLEARED (so a stale local override can't keep resolving
+    after its DB row is gone). Only those keys are touched — every other yaml key, and env,
+    are preserved (save_local_override / clear_local_overrides do read-modify-write).
+
+    Scope: this writes ONLY user_profile.local.yaml (the user's mutable override). A route
+    key committed in the base user_profile.yaml is reviewed baseline config (§2 source
+    catalog) and is intentionally NOT cleared — it would re-surface as a 'profile' fallback
+    once the local key is gone. Both branches go through require_profile_state_write so the
+    write AND the destructive clear are audited/gatable alike."""
     store = _credential_store(store)
     route_store = ModelRouteStore(store.db_path)
+    rows = route_store.get_all()
     exported: list[str] = []
-    for task, row in route_store.get_all().items():
-        require_profile_state_write("model_route_export", {"task": task})
-        save_local_override("llm_preferences", f"{task}_provider", row.provider)
-        save_local_override("llm_preferences", f"{task}_model", row.model)
-        save_local_override("llm_preferences", f"{task}_effort", row.effort)
-        exported.append(task)
-    return {"exported": exported}
+    cleared: list[str] = []
+    for task in _ROUTE_TASKS:
+        row = rows.get(task)
+        if row is not None:
+            require_profile_state_write("model_route_export", {"task": task})
+            save_local_override("llm_preferences", f"{task}_provider", row.provider)
+            save_local_override("llm_preferences", f"{task}_model", row.model)
+            save_local_override("llm_preferences", f"{task}_effort", row.effort)
+            exported.append(task)
+        else:
+            require_profile_state_write("model_route_export_clear", {"task": task})
+            removed = clear_local_overrides(
+                "llm_preferences", f"{task}_provider", f"{task}_model", f"{task}_effort")
+            if removed:  # only report tasks whose stale yaml keys were actually removed
+                cleared.append(task)
+    return {"exported": exported, "cleared": cleared}
+
+
+@router.delete("/config/model-routes/{task}")
+def delete_model_route(task: str, store: CredentialStore = Depends(get_credential_store)):
+    """Reset a task's route to yaml/default authority by removing its DB row — the core
+    'revert to fallback' action of the DB-authority UI. Returns the NOW-resolved route so the
+    caller sees what it reverted to (yaml fallback or built-in default). Idempotent: deleting
+    an absent route is fine (deleted=False). Does NOT touch yaml — any fallback there remains."""
+    if task not in _ROUTE_TASKS:
+        raise HTTPException(status_code=400, detail=f"unknown task: {task}")
+    store = _credential_store(store)
+    route_store = ModelRouteStore(store.db_path)
+    require_profile_state_write("model_route_delete", {"task": task})
+    deleted = route_store.delete(task)
+    return {"deleted": deleted, "route": task_route(task, route_store=route_store).model_dump()}

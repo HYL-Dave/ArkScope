@@ -210,7 +210,10 @@ def save_local_override(section: str, key: str, value) -> None:
         with open(_LOCAL_CONFIG_PATH) as f:
             local = yaml.safe_load(f) or {}
 
-    if section not in local:
+    # Coerce a missing OR non-dict section (a hand-edited `llm_preferences:` parses to
+    # None) to a fresh dict — symmetric with clear_local_overrides' guard — so a malformed
+    # local file can't crash the write path mid-export.
+    if not isinstance(local.get(section), dict):
         local[section] = {}
     local[section][key] = value
 
@@ -220,6 +223,32 @@ def save_local_override(section: str, key: str, value) -> None:
 
     # Clear cached config so next call picks up the change
     get_agent_config.cache_clear()
+
+
+def clear_local_overrides(section: str, *keys: str) -> bool:
+    """Remove keys from a section of user_profile.local.yaml, preserving every other key.
+    Idempotent (absent keys / missing section / missing file are no-ops). Drops the section
+    if it becomes empty. Returns True iff a key was actually removed (so callers can report
+    what was really cleared, not just what they attempted). Used by route export to mirror DB
+    absence into the yaml fallback so a stale local override can't keep resolving after its
+    DB row is gone."""
+    if not _LOCAL_CONFIG_PATH.exists():
+        return False
+    with open(_LOCAL_CONFIG_PATH) as f:
+        local = yaml.safe_load(f) or {}
+    sect = local.get(section)
+    if not isinstance(sect, dict):
+        return False
+    if not any(key in sect for key in keys):
+        return False  # nothing to remove → don't rewrite the file
+    for key in keys:
+        sect.pop(key, None)
+    if not sect:
+        del local[section]
+    with open(_LOCAL_CONFIG_PATH, "w") as f:
+        yaml.dump(local, f, default_flow_style=False, allow_unicode=True)
+    get_agent_config.cache_clear()
+    return True
 
 
 @lru_cache(maxsize=1)
