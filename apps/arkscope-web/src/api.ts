@@ -605,8 +605,8 @@ export function createResearchRun(body: {
 }): Promise<{ run: ResearchRunDTO }> {
   return sendJSON<{ run: ResearchRunDTO }>("/research/runs", "POST", body, 8_000);
 }
-export function getResearchRunEvents(runId: string, after = 0): Promise<{ run: ResearchRunDTO; events: ResearchRunEventDTO[] }> {
-  return getJSON<{ run: ResearchRunDTO; events: ResearchRunEventDTO[] }>(
+export function getResearchRunEvents(runId: string, after = 0): Promise<{ run: ResearchRunDTO; events: ResearchRunEventDTO[]; has_more: boolean }> {
+  return getJSON<{ run: ResearchRunDTO; events: ResearchRunEventDTO[]; has_more: boolean }>(
     `/research/runs/${encodeURIComponent(runId)}/events?after=${after}`,
     8_000,
   );

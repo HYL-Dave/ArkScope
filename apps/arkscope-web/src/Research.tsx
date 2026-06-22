@@ -38,6 +38,7 @@ import {
   type ResearchProviderId,
 } from "./researchProvider";
 import { activeCredential, defaultModel, effortNote, modelOptions } from "./researchModels";
+import { shouldEndResearchReplay } from "./researchRunReplay";
 import {
   initialState,
   lastRetryCandidate,
@@ -265,7 +266,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
             ts: Number.isFinite(parsedTs) ? parsedTs : Date.now(),
           });
         }
-        if (isTerminalRun(res.run)) {
+        if (shouldEndResearchReplay(res.run, res.has_more === true)) {
           dispatch({ kind: "streamEnd", ts: Date.now() });
           return;
         }

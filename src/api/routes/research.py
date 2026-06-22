@@ -24,6 +24,7 @@ from src.research_threads import ResearchMessage, ResearchThread, valid_thread_i
 from ..dependencies import get_dal, get_run_store, get_thread_store
 
 router = APIRouter(tags=["research"])
+_RUN_EVENT_PAGE_SIZE = 500
 
 
 class ResearchRunCreate(BaseModel):
@@ -232,9 +233,13 @@ def list_research_run_events(
     run = run_store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
+    events = run_store.list_events(run_id, after=after, limit=_RUN_EVENT_PAGE_SIZE + 1)
+    has_more = len(events) > _RUN_EVENT_PAGE_SIZE
+    events = events[:_RUN_EVENT_PAGE_SIZE]
     return {
         "run": _run_dict(run),
-        "events": [_event_dict(e) for e in run_store.list_events(run_id, after=after)],
+        "events": [_event_dict(e) for e in events],
+        "has_more": has_more,
     }
 
 

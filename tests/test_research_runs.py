@@ -191,6 +191,30 @@ def test_run_events_route_replays_after_seq(stores):
     assert [(e["seq"], e["type"]) for e in res["events"]] == [(2, "done")]
 
 
+def test_run_events_route_reports_more_events_before_terminal_page(stores):
+    run_store, thread_store = stores
+    thread_store.ensure_thread(id="t1", title="q")
+    run_store.create_run(
+        id="r1", thread_id="t1", question="q", ticker=None,
+        provider="openai", model="gpt-5.5", effort="xhigh",
+        auth_mode="api_key", credential_id="local:3",
+    )
+    for i in range(500):
+        run_store.append_event("r1", "text", {"content": str(i)})
+    run_store.append_event("r1", "done", {"answer": "ok"})
+    run_store.mark_terminal("r1", "succeeded")
+
+    first = r.list_research_run_events("r1", after=0, run_store=run_store)
+    second = r.list_research_run_events("r1", after=500, run_store=run_store)
+
+    assert first["run"]["status"] == "succeeded"
+    assert len(first["events"]) == 500
+    assert first["events"][-1]["seq"] == 500
+    assert first["has_more"] is True
+    assert [(e["seq"], e["type"]) for e in second["events"]] == [(501, "done")]
+    assert second["has_more"] is False
+
+
 def test_cancel_run_route_terminalizes_when_no_in_memory_task(stores, monkeypatch):
     run_store, thread_store = stores
     thread_store.ensure_thread(id="t1", title="q")
