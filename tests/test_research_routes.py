@@ -524,20 +524,16 @@ def test_apikey_active_anthropic_still_uses_run_query_stream(store, monkeypatch)
     assert store.list_messages("t1")[-1].content == "apikey answer"
 
 
-# --- (c) openai → unchanged; the subscription path is never consulted ---
-def test_openai_unaffected_by_subscription_branch(store, monkeypatch):
+# --- (c) openai api_key → unchanged; the OAuth helper is never consulted ---
+def test_openai_api_key_active_still_uses_run_query_stream(store, monkeypatch):
     import asyncio
 
-    # If the openai branch ever consults the anthropic OAuth detection or helper,
-    # these explode — proving the openai path is behaviorally untouched.
-    def boom_resolve(*a, **k):  # pragma: no cover
-        raise AssertionError("openai branch must NOT call resolve_live_auth")
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _apikey_active("openai"))
 
-    def boom_sub(**k):  # pragma: no cover
-        raise AssertionError("openai branch must NOT call _anthropic_subscription_stream")
+    def boom_sub(**k):  # pragma: no cover - asserts it's never reached
+        raise AssertionError("_openai_subscription_stream must NOT run for api_key")
 
-    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", boom_resolve)
-    monkeypatch.setattr(q, "_anthropic_subscription_stream", boom_sub)
+    monkeypatch.setattr(q, "_openai_subscription_stream", boom_sub)
 
     captured = {}
 
@@ -558,6 +554,54 @@ def test_openai_unaffected_by_subscription_branch(store, monkeypatch):
     asyncio.run(drive())
     assert captured["question"] == "hi"
     assert store.list_messages("t1")[-1].content == "openai answer"
+
+
+def test_oauth_active_openai_routes_to_chatgpt_oauth_driver(store, monkeypatch):
+    import asyncio
+
+    store.ensure_thread(id="t1", title="prev")
+    store.append_message(thread_id="t1", role="user", content="prev q")
+    store.append_message(thread_id="t1", role="assistant", content="prev a")
+
+    monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth", lambda provider, **k: _oauth_active("openai", "local:9"))
+
+    captured = {}
+
+    def fake_oauth_stream(*, credential_id, question, model, effort, dal, history):
+        captured.update(credential_id=credential_id, question=question, model=model,
+                        effort=effort, history=history)
+        return _canned_events(provider="openai", model=model)
+
+    monkeypatch.setattr(q, "_openai_subscription_stream", fake_oauth_stream)
+
+    def boom_run_query_stream(**k):  # pragma: no cover - asserts it's never reached
+        raise AssertionError("run_query_stream must NOT be called for chatgpt_oauth")
+
+    monkeypatch.setattr("src.agents.openai_agent.agent.run_query_stream", boom_run_query_stream)
+
+    req = q.QueryRequest(question="follow up", provider="openai", model="gpt-5.4-mini",
+                         effort="low", thread_id="t1", ticker="AAPL")
+
+    frames = []
+
+    async def drive():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for chunk in resp.body_iterator:
+            frames.append(chunk)
+
+    asyncio.run(drive())
+
+    assert captured["credential_id"] == "local:9"
+    assert captured["question"] == "針對 AAPL：follow up"
+    assert captured["model"] == "gpt-5.4-mini"
+    assert captured["effort"] == "low"
+    assert captured["history"] == [
+        {"role": "user", "content": "prev q"},
+        {"role": "assistant", "content": "prev a"},
+    ]
+    blob = "".join(frames)
+    assert '"type": "done"' in blob and "subscription answer" in blob
+    assert store.list_messages("t1")[-1].content == "subscription answer"
 
 
 # --- (d) claude_code_oauth active but the driver raises on first step → error turn ---

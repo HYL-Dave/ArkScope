@@ -5,13 +5,13 @@ bare SDK client that reads the key implicitly from ``os.environ``; this module
 lets them instead obtain a client built from the *active* credential row, so a
 manual key switch in Settings takes effect on the next query.
 
-Hard rule: when an OAuth credential is the ACTIVE one but its live execution path
-isn't wired yet, FAIL CLOSED — never silently bill the env API key. This holds for
-BOTH providers now: anthropic claude_code_oauth (7A-0) and, since S3 step 0, openai
-chatgpt_oauth. A genuine env_fallback (NO active credential chosen) still uses the
-env key — that is the legitimate default, not a pretense. (The earlier rule let
-openai OAuth fall back to env; that was the "thought it was the subscription, it
-silently billed the API key" cost risk, reversed in S3 step 0.)
+Hard rule: when an OAuth credential is ACTIVE but the current call site is a
+direct SDK-client path that cannot use that OAuth mode, FAIL CLOSED — never
+silently bill the env API key. Research streaming has separate OAuth drivers in
+``query.py``; direct card-synthesis/code-gen client construction still cannot
+consume ChatGPT/Claude subscription tokens. A genuine env_fallback (NO active
+credential chosen) still uses the env key — that is the legitimate default, not a
+pretense.
 """
 
 from __future__ import annotations
@@ -30,30 +30,28 @@ logger = logging.getLogger(__name__)
 
 class SubscriptionDriverNotWiredError(RuntimeError):
     """Raised when an OAuth/subscription credential is the ACTIVE one but its
-    live driver isn't wired yet. We FAIL CLOSED rather than silently bill the
-    env API key — picking an OAuth credential must never quietly meter an API
-    key the user didn't intend to spend (Slice 7A-0)."""
+    current direct-client call site cannot use it. We FAIL CLOSED rather than
+    silently bill the env API key — picking an OAuth credential must never quietly
+    meter an API key the user didn't intend to spend."""
 
 
 # Anthropic-specific, actionable. (resolve_live_auth's .note stays
 # provider-generic — OpenAI chatgpt_oauth also yields oauth_driver_unwired
 # and must NOT inherit this Anthropic/Slice-7 wording.)
 _ANTHROPIC_OAUTH_FAILCLOSED_MSG = (
-    "Claude OAuth (claude_code_oauth) is the active Anthropic credential, but the "
-    "subscription Research driver isn't wired yet (Slice 7). Anthropic is paused "
-    "rather than silently billing the env API key — switch the active Anthropic "
-    "credential to an API key in Settings, or finish Slice 7."
+    "Claude OAuth (claude_code_oauth) is the active Anthropic credential. AI "
+    "Research uses the Claude subscription driver, but this direct Anthropic SDK "
+    "client path cannot use that subscription token. The call is paused rather "
+    "than silently billing the env API key — switch the active Anthropic credential "
+    "to an API key in Settings for this feature."
 )
 
-# OpenAI chatgpt_oauth, S3 step 0: same fail-closed posture as anthropic. The
-# subscription EXECUTION path isn't wired yet, so an active chatgpt_oauth credential
-# must NOT silently fall back to the env API key (the "thought it was the
-# subscription, billed the API key" cost risk).
 _OPENAI_OAUTH_FAILCLOSED_MSG = (
-    "ChatGPT OAuth (chatgpt_oauth) is the active OpenAI credential, but its "
-    "subscription execution path isn't wired yet (S3). OpenAI is paused rather than "
-    "silently billing the env API key — switch the active OpenAI credential to an "
-    "API key in Settings, or finish the S3 execution wiring."
+    "ChatGPT OAuth (chatgpt_oauth) is the active OpenAI credential. AI Research "
+    "uses the ChatGPT backend driver, but this direct OpenAI SDK client path cannot "
+    "use that subscription token. The call is paused rather than silently billing "
+    "the env API key — switch the active OpenAI credential to an API key in Settings "
+    "for this feature."
 )
 
 # The OAuth→env fallback must be EXPLICIT but not spammy: WARNING once per
@@ -94,11 +92,9 @@ def resolve_live_auth(provider: str, *, store: Optional[CredentialStore] = None)
     if active is not None and active.auth_type == "api_key" and active.secret:
         return LiveAuthResolution(provider, "db_api_key", f"local:{active.id}")
     if active is not None and active.auth_type in ("claude_code_oauth", "chatgpt_oauth"):
-        # An OAuth credential is active but its live EXECUTION path isn't wired yet.
-        # BOTH providers now FAIL CLOSED (anthropic 7A-0; openai S3 step 0) — the
-        # note is provider-specific + actionable. (anthropic's Research stream IS
-        # served by the subscription driver in query.py; this classifier still gates
-        # the sync .messages sites + the openai path, which fail closed.)
+        # An OAuth credential is active. Research streaming may intercept this
+        # classifier and route to an OAuth driver; direct SDK-client call sites use
+        # the note below and fail closed instead of silently using an env API key.
         note = _ANTHROPIC_OAUTH_FAILCLOSED_MSG if provider == "anthropic" else _OPENAI_OAUTH_FAILCLOSED_MSG
         return LiveAuthResolution(provider, "oauth_driver_unwired", f"local:{active.id}", note)
     return LiveAuthResolution(provider, "env_fallback")
@@ -108,8 +104,9 @@ def live_anthropic_client(*, store: Optional[CredentialStore] = None) -> Any:
     """A SYNC ``Anthropic`` client for the live Anthropic call sites.
 
     db_api_key → built from the active row via the driver. OAuth-active →
-    FAIL CLOSED (the subscription driver isn't wired yet; don't silently bill the
-    env key). No active credential → env fallback (bare ``Anthropic()``).
+    FAIL CLOSED (this sync client path cannot use the subscription token; don't
+    silently bill the env key). No active credential → env fallback (bare
+    ``Anthropic()``).
     """
     from anthropic import Anthropic
 
@@ -169,10 +166,11 @@ def apply_openai_live_client(*, store: Optional[CredentialStore] = None) -> Live
         set_default_openai_client(build_driver(provider="openai", auth_mode="api_key", credential=cred).client())
         return res
     if res.source == "oauth_driver_unwired":
-        # S3 step 0: the user chose chatgpt_oauth, whose execution path isn't wired
-        # yet — FAIL CLOSED. Neutralize the sticky process-global FIRST (so a prior
-        # db_api_key run is never left usable, even though we're about to raise),
-        # then raise. The env key is NOT used here, by design.
+        # The user chose chatgpt_oauth, but this Agents-SDK global-client path is
+        # not the ChatGPT-backend Research driver — FAIL CLOSED. Neutralize the
+        # sticky process-global FIRST (so a prior db_api_key run is never left
+        # usable, even though we're about to raise), then raise. The env key is
+        # NOT used here, by design.
         set_default_openai_client(AsyncOpenAI(api_key=_NEUTRAL))
         raise SubscriptionDriverNotWiredError(_OPENAI_OAUTH_FAILCLOSED_MSG)
     # env_fallback: genuinely no active credential chosen. NEVER leave a stale DB

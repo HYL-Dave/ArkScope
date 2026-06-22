@@ -56,17 +56,17 @@ def test_resolve_oauth_active_is_oauth_driver_unwired(store):
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
     res = lr.resolve_live_auth("anthropic", store=store)
     assert res.source == "oauth_driver_unwired"
-    # anthropic note = the fail-closed message (no false "env API key fallback" claim)
-    assert res.note and "wired yet" in res.note.lower() and "paused" in res.note.lower()
+    # anthropic note = direct-client fail-closed message (no false env fallback claim)
+    assert res.note and "direct" in res.note.lower() and "paused" in res.note.lower()
 
 
 def test_resolve_openai_oauth_note_says_fail_closed(store):
-    # S3 step 0: OpenAI chatgpt_oauth now FAILS CLOSED (no silent env-key billing).
+    # OpenAI chatgpt_oauth direct-client paths FAIL CLOSED (no silent env-key billing).
     # Its note is openai-specific + says paused, and must NOT claim an env fallback.
     store.add_oauth_credential(provider="openai", auth_mode="chatgpt_oauth", alias="cg", make_active=True)
     res = lr.resolve_live_auth("openai", store=store)
     assert res.source == "oauth_driver_unwired"
-    assert res.note and "paused" in res.note.lower()
+    assert res.note and "direct" in res.note.lower() and "paused" in res.note.lower()
     assert "env api key fallback" not in res.note.lower()  # the OLD (now false) claim is gone
 
 
@@ -82,9 +82,9 @@ def test_live_anthropic_client_uses_db_api_key(store):
 
 
 def test_live_anthropic_client_oauth_fails_closed(store, monkeypatch):
-    # 7A-0: when Claude OAuth is active but the subscription driver isn't wired
-    # yet, do NOT silently bill the env API key — FAIL CLOSED with an actionable
-    # message. (Env key present so the OLD behavior would have silently used it.)
+    # Claude OAuth Research is wired, but this sync SDK-client accessor still cannot
+    # use the subscription token. Do NOT silently bill the env API key — FAIL CLOSED
+    # with an actionable message. (Env key present so OLD behavior would use it.)
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-envfake")
     with pytest.raises(lr.SubscriptionDriverNotWiredError) as ei:

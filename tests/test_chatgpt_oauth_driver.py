@@ -1,9 +1,14 @@
-"""S3 step 1 — OpenAIChatGPTOAuthDriver: per-auth-mode READ-ONLY model discovery.
+"""S3 — OpenAIChatGPTOAuthDriver: per-auth-mode discovery + subscription stream.
 
 The driver surfaces the ChatGPT/Codex backend's actual model list (the P2c shape:
 plain models.list may 400, extra_query client_version returns ids) as a
 ModelDiscoveryResult — so an openai chatgpt_oauth credential shows ITS models, not
-the api_key seed catalog. Execution (call_llm/stream_llm) stays gated (S3 step 4).
+the api_key seed catalog.
+
+Execution is NOT the normal OpenAI API-key Agents SDK path: the ChatGPT backend
+rejects max_output_tokens and does not support the SDK's previous_response_id loop.
+The driver owns a raw Responses stream loop: stream=True, store=False, no
+max_output_tokens, explicit function_call_output items.
 
 Offline: the OpenAI client is built behind a monkeypatchable seam (_discovery_client)
 + the token is loaded from an injected token-store, so no network/token is needed.
@@ -16,8 +21,10 @@ import asyncio
 import pytest
 
 import src.auth_drivers.chatgpt_oauth_driver as mod
+from src.agents.shared.events import EventType
 from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
+from src.auth_drivers.protocol import LLMRequest
 from src.auth_drivers.token_store import StoredTokenRecord
 
 
@@ -49,6 +56,23 @@ class _FakeClient:
         self.models = _Models(on_list)
 
 
+class _Responses:
+    def __init__(self, streams):
+        self.streams = list(streams)
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        if not self.streams:
+            raise AssertionError("unexpected responses.create call")
+        return self.streams.pop(0)
+
+
+class _ExecClient:
+    def __init__(self, streams):
+        self.responses = _Responses(streams)
+
+
 class _Cred:
     def __init__(self, cid=7):
         self.id = cid
@@ -69,8 +93,43 @@ def _driver(token="cg-FAKE-TOKEN"):
     return OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(token))
 
 
+def _req(**kw):
+    base = dict(
+        model="gpt-5.4-mini",
+        instructions="You are ArkScope.",
+        input_messages=[{"role": "user", "content": "hi"}],
+        reasoning_effort="low",
+        max_output_tokens=128000,
+    )
+    base.update(kw)
+    return LLMRequest(**base)
+
+
+class _ToolDef:
+    name = "get_price_change"
+    description = "Get price change."
+    parameters = []
+    requires_dal = True
+
+    @staticmethod
+    def function(dal, **kwargs):
+        return {"ok": True, "ticker": kwargs.get("ticker"), "change": 1.23}
+
+
+class _Registry:
+    def get(self, name):
+        return _ToolDef() if name == "get_price_change" else None
+
+
 def _run(coro):
     return asyncio.run(coro)
+
+
+async def _collect(agen):
+    out = []
+    async for ev in agen:
+        out.append(ev)
+    return out
 
 
 # --- identity ----------------------------------------------------------------
@@ -197,15 +256,113 @@ def test_refresh_if_needed_delegates_to_login(monkeypatch):
     assert seen.get("cid") == "local:7"
 
 
-# --- execution stays gated (S3 step 4) ---------------------------------------
-def test_call_llm_raises_not_wired():
-    with pytest.raises(NotImplementedError):
-        _run(_driver().call_llm(object()))
+# --- execution (S3 step 4) ---------------------------------------------------
+def test_call_llm_collects_done_text(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ], "usage": {"input_tokens": 2, "output_tokens": 1, "total_tokens": 3}}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    res = _run(_driver().call_llm(_req()))
+    assert res.text == "OK"
+    assert res.usage.total_tokens == 3
 
 
-def test_stream_llm_raises_not_wired():
-    with pytest.raises(NotImplementedError):
-        _driver().stream_llm(object())
+def test_stream_llm_streams_text_done_and_strips_max_output_tokens(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.output_text.delta", "delta": "OK"},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ], "usage": {"input_tokens": 3, "output_tokens": 1}}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    events = _run(_collect(_driver().stream_llm(_req())))
+
+    assert [e.type for e in events] == [EventType.thinking, EventType.text, EventType.done]
+    assert events[-1].data["answer"] == "OK"
+    sent = client.responses.calls[0]
+    assert sent["stream"] is True and sent["store"] is False
+    assert sent["reasoning"] == {"effort": "low"}
+    assert "max_output_tokens" not in sent
+    assert "previous_response_id" not in sent
+
+
+def test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id(monkeypatch):
+    first = [
+        {"type": "response.output_item.added",
+         "item": {"type": "function_call", "name": "get_price_change", "call_id": "call_1"}},
+        {"type": "response.function_call_arguments.done", "arguments": "{\"ticker\":\"AAPL\"}"},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "function_call", "name": "get_price_change", "call_id": "call_1",
+             "arguments": "{\"ticker\":\"AAPL\"}"},
+        ]}},
+    ]
+    second = [
+        {"type": "response.output_text.delta", "delta": "AAPL is up."},
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "AAPL is up."}]},
+        ]}},
+    ]
+    client = _ExecClient([first, second])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    d = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(), registry=_Registry(), dal=object())
+    events = _run(_collect(d.stream_llm(_req())))
+
+    assert [e.type for e in events] == [
+        EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.text, EventType.done,
+    ]
+    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "AAPL"}}
+    assert events[2].data["tool"] == "get_price_change" and "AAPL" in events[2].data["summary"]
+    followup = client.responses.calls[1]
+    assert followup["stream"] is True and followup["store"] is False
+    assert "previous_response_id" not in followup
+    assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
+
+
+def test_stream_llm_uses_last_call_id_when_arguments_done_omits_id(monkeypatch):
+    # Live P2b shape: function_call_arguments.done can omit call_id/item_id while
+    # output_item.added carries the call_id. Use the most recent call item.
+    first = [
+        {"type": "response.output_item.added",
+         "item": {"type": "function_call", "name": "get_price_change", "call_id": "call_1"}},
+        {"type": "response.function_call_arguments.done", "arguments": "{\"ticker\":\"MSFT\"}"},
+        {"type": "response.completed"},
+    ]
+    second = [
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "done"}]},
+        ]}},
+    ]
+    client = _ExecClient([first, second])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    d = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(), registry=_Registry(), dal=object())
+
+    events = _run(_collect(d.stream_llm(_req())))
+
+    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "MSFT"}}
+
+
+def test_stream_llm_off_allowlist_tool_errors_without_calling_registry(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.completed", "response": {"output": [
+            {"type": "function_call", "name": "delete_files", "call_id": "call_9", "arguments": "{}"},
+        ]}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    class BoomRegistry:
+        def get(self, name):
+            if name == "delete_files":  # pragma: no cover - allowlist veto should fire first
+                raise AssertionError("off-allowlist tool must not be looked up")
+            return None
+
+    d = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(), registry=BoomRegistry(), dal=object())
+    events = _run(_collect(d.stream_llm(_req())))
+    assert events[-1].type == EventType.error
+    assert "not allowed" in events[-1].data["error"]
 
 
 def test_test_defers_to_probe_when_token_present():

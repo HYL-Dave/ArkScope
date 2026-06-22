@@ -281,14 +281,13 @@ Internally, capability is keyed by `(provider, auth_mode, model)` — never a gl
 | Credential | 列模型 (discovery) | 驗證 token/登入 (probe) | 測試模型呼叫 (model-test) | AI 研究 執行 |
 |---|---|---|---|---|
 | **openai api_key** | OpenAI `/models` — LIVE (`source=provider_api`) | — (key-exists; a real call = model-test) | model+effort test call — LIVE | runs |
-| **openai chatgpt_oauth** | ChatGPT-backend list — LIVE (step 1; `source=provider_api`) | **P1/P2 probe** (real backend calls) | **deferred** — execution unwired (would hit the max_output_tokens-400 surface); show "execution 接線後可測" | **fail-closed** (step 0) until step 4 |
+| **openai chatgpt_oauth** | ChatGPT-backend list — LIVE (step 1; `source=provider_api`) | **P1/P2 probe** (real backend calls) | **none** (raw-SDK model-test is the wrong surface; use AI 研究 or the OAuth probe) | AI 研究 uses the ChatGPT-backend driver (S3 execution code wired; live smoke pending) |
 | **anthropic api_key** | Anthropic `/v1/models` — LIVE | — | model+effort test call — LIVE | runs |
 | **anthropic claude_code_oauth** | **seed candidate list only** (no live discovery API; route returns seed) | **P3 probe** (`claude -p` + raw-SDK-reject) | **none** (no raw-SDK model-test — wrong surface/billing) | runs (subscription Research) |
 
 Correction vs the first-pass matrix: chatgpt_oauth 列模型 is now **LIVE** (step 1), not
-"暫不"; claude_code_oauth discovery is reachable but returns **seed** and the UI currently
-**hides** it (`can_discover_models=False`, `model_credentials.py:519`) — the inconsistency
-the hand-test hit.
+"暫不"; claude_code_oauth discovery is reachable and intentionally returns **seed**
+candidate models (`查看候選模型`), not a fake live API list.
 
 ### 11.3 Settings IA — per-credential row actions (DECIDED)
 

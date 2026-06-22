@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from src.auth_drivers import PlaintextTokenStore
+from src.auth_drivers.api_key_drivers import MissingCredentialError
 from src.auth_drivers.factory import NotImplementedDriver, build_driver
 
 
@@ -67,25 +68,17 @@ def test_build_driver_rejects_cross_provider_oauth(provider, auth_mode):
     assert auth_mode in str(ei.value) and provider in str(ei.value)
 
 
-# --- OAuth placeholder is inert: calling it raises NotImplementedError (slice ref)
-def test_oauth_placeholder_not_callable_yet():
+def test_chatgpt_oauth_without_token_fails_closed():
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     import asyncio
 
-    with pytest.raises(NotImplementedError) as ei:
+    with pytest.raises(MissingCredentialError):
         asyncio.run(d.call_llm(None))
-    assert "S3" in str(ei.value)  # chatgpt_oauth real driver comes in S3
 
 
-def test_chatgpt_oauth_execution_is_gated_to_step_4():
-    # chatgpt_oauth is a real driver for DISCOVERY (S3 step 1), but its EXECUTION
-    # (call_llm/stream_llm) stays gated until step 4 — the message names the slice.
+def test_chatgpt_oauth_execution_driver_is_wired():
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
-    import asyncio
-
-    with pytest.raises(NotImplementedError) as ei:
-        asyncio.run(d.call_llm(None))
-    assert "S3" in str(ei.value)  # message names the gating slice (step 4 execution wiring)
+    assert callable(d.stream_llm)
 
 
 def test_claude_code_oauth_is_the_sdk_driver_not_placeholder():
@@ -104,6 +97,22 @@ def test_claude_code_oauth_factory_passes_max_turns():
         max_turns=42,
     )
     assert d._max_turns == 42
+
+
+def test_chatgpt_oauth_factory_passes_registry_dal_and_max_turns():
+    registry = object()
+    dal = object()
+    d = build_driver(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential=_cred(auth_type="chatgpt_oauth"),
+        registry=registry,
+        dal=dal,
+        max_turns=33,
+    )
+    assert d._registry is registry
+    assert d._dal is dal
+    assert d._max_turns == 33
 
 
 # --- explicit errors for unknown provider / auth_mode -----------------------
@@ -125,8 +134,8 @@ def test_oauth_mode_is_not_api_key_path():
     assert d.auth_mode == "chatgpt_oauth"  # identity preserved, not collapsed to api_key
     import asyncio
 
-    # an api_key-style call must not succeed via an OAuth placeholder
-    with pytest.raises(NotImplementedError):
+    # Without a token-store token it fails closed; it never falls through to api_key.
+    with pytest.raises(MissingCredentialError):
         asyncio.run(d.call_llm(None))
 
 

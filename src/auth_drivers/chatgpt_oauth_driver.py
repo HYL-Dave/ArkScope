@@ -1,4 +1,4 @@
-"""S3 step 1 — OpenAI ChatGPT/Codex-backend OAuth driver (READ-ONLY discovery).
+"""S3 — OpenAI ChatGPT/Codex-backend OAuth driver.
 
 This driver makes an openai ``chatgpt_oauth`` credential report ITS OWN available
 models — the ChatGPT/Codex backend's list, NOT the api-key seed catalog — so the
@@ -7,11 +7,10 @@ on the wire. Discovery uses the P2c shape (plain ``models.list`` may 400; the co
 backend needs a Codex-style ``client_version`` via ``extra_query``), reusing the
 probe's model-id extraction.
 
-SCOPE (S3 step 1): discovery ONLY. Execution (``call_llm``/``stream_llm``) stays
-gated — the ChatGPT-backend request differences (no ``max_output_tokens``, forced
-``stream``/``store=False``, effort clamp) are S3 step 4, not done here. The real
-P1/P2 capability check is the probe route (``run_chatgpt_oauth_probe``); this
-driver's ``test()`` is an honest deferral, never a fake "ok".
+Discovery is live (ChatGPT-backend model list). Execution uses the raw Responses
+API against the ChatGPT/Codex backend — NOT the normal OpenAI API-key Agents SDK
+path. Load-bearing request differences: no ``max_output_tokens``, forced
+``stream=True`` + ``store=False``, no ``previous_response_id``.
 
 The OpenAI client is built behind ``_discovery_client`` (a monkeypatchable seam),
 and the token is loaded from the token-store ONLY (never ``credential.secret``).
@@ -20,17 +19,43 @@ Any surfaced error is redacted — the token can never leak into a result.
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
+import json
 import re
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
+from src.agents.shared.compressor.reducers import get_reducer
+from src.agents.shared.events import AgentEvent, EventType
+from src.auth_drivers.api_key_drivers import MissingCredentialError
+from src.auth_drivers.protocol import LLMRequest, LLMResponse, TokenUsage
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
 
 from .chatgpt_oauth_login import ChatGPTOAuthLoginError
 from .chatgpt_oauth_login import refresh_if_needed as _refresh_login
-from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PROBE_MODEL, _model_ids
+from .chatgpt_oauth_probe import CHATGPT_BACKEND_BASE_URL, _CLIENT_VERSION, _PROBE_MODEL, _model_ids, _to_dict
 from .probe_harness import redact
 
-_S3_EXEC = "OpenAI chatgpt_oauth execution isn't wired yet (S3 step 4 — backend request differences)."
+_PER_TOOL_TIMEOUT_S = 45.0
+_BRIDGE_RESULT_BUDGET = 12_000
+_SUMMARY_CAP = 200
+_DEFAULT_MAX_TURNS = 60
+
+_RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
+    {
+        "get_sa_feed",
+        "get_sa_digest",
+        "get_sa_alpha_picks",
+        "get_ticker_news",
+        "get_news_brief",
+        "search_news_advanced",
+        "get_ticker_prices",
+        "get_price_change",
+        "get_fundamentals_analysis",
+        "get_sec_filings",
+        "get_economic_calendar",
+    }
+)
 
 # A well-formed model id: starts alphanumeric, then [A-Za-z0-9._:-], ≤80 chars. Real
 # model ids — gpt-5.4-mini, gpt-3.5-turbo, claude-opus-4-8, ft:gpt-..., dated ids —
@@ -55,21 +80,164 @@ def _discovery_client(token: str) -> Any:  # seam for tests
     return OpenAI(api_key=token, base_url=CHATGPT_BACKEND_BASE_URL, timeout=15)
 
 
+def _execution_client(token: str) -> Any:  # seam for tests
+    from openai import AsyncOpenAI
+
+    return AsyncOpenAI(api_key=token, base_url=CHATGPT_BACKEND_BASE_URL, timeout=300)
+
+
 def _err(exc: BaseException) -> str:
     """Token-free, shape-only error string (redacted as defense-in-depth)."""
     return redact(f"{type(exc).__name__}: {exc}")[:200]
 
 
+def _redact_token(text: Any, token: Optional[str]) -> str:
+    if not isinstance(text, str):
+        text = "" if text is None else str(text)
+    if token and token in text:
+        text = text.replace(token, "[REDACTED]")
+    return redact(text)
+
+
+def _coerce_result_str(result: Any) -> str:
+    if isinstance(result, str):
+        return result
+    if hasattr(result, "model_dump"):
+        try:
+            return json.dumps(result.model_dump(), ensure_ascii=False, default=str)
+        except Exception:
+            return str(result)
+    if isinstance(result, (dict, list)):
+        try:
+            return json.dumps(result, ensure_ascii=False, default=str)
+        except Exception:
+            return str(result)
+    return str(result)
+
+
+def _ark_input_schema(tool_def: Any) -> dict:
+    properties: dict[str, dict] = {}
+    required: list[str] = []
+    for p in getattr(tool_def, "parameters", None) or []:
+        prop: dict = {"type": getattr(p, "type", "string")}
+        if getattr(p, "description", None):
+            prop["description"] = p.description
+        if getattr(p, "enum", None):
+            prop["enum"] = p.enum
+        properties[p.name] = prop
+        if getattr(p, "required", True):
+            required.append(p.name)
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+    }
+    if required:
+        schema["required"] = required
+    return schema
+
+
+def _tool_schema(name: str, tool_def: Any) -> dict:
+    return {
+        "type": "function",
+        "name": name,
+        "description": getattr(tool_def, "description", name) or name,
+        "parameters": _ark_input_schema(tool_def),
+    }
+
+
+def _request_input_items(request: LLMRequest) -> list[dict]:
+    out: list[dict] = []
+    for m in request.input_messages or []:
+        role = m.get("role")
+        content = m.get("content")
+        if role in ("user", "assistant") and content:
+            out.append({"role": role, "content": str(content)})
+    return out
+
+
+def _reasoning(effort: Optional[str]) -> Optional[dict]:
+    if not effort or effort in ("default", "none"):
+        return None
+    return {"effort": "high" if effort in ("xhigh", "max") else effort}
+
+
+def _response_output_items(response: Any) -> list[dict]:
+    if not response:
+        return []
+    raw = _to_dict(response)
+    output = raw.get("output")
+    return output if isinstance(output, list) else []
+
+
+def _text_from_output_items(items: list[dict]) -> str:
+    parts: list[str] = []
+    for item in items:
+        if item.get("type") != "message":
+            continue
+        for block in item.get("content") or []:
+            if isinstance(block, dict) and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+    return "".join(parts)
+
+
+def _call_from_item(item: dict, arg_fallback: dict[str, str]) -> Optional[dict]:
+    if item.get("type") != "function_call":
+        return None
+    name = item.get("name")
+    call_id = item.get("call_id") or item.get("id")
+    if not isinstance(name, str) or not isinstance(call_id, str):
+        return None
+    arguments = item.get("arguments")
+    if not isinstance(arguments, str):
+        arguments = arg_fallback.get(call_id) or ""
+    try:
+        args = json.loads(arguments) if arguments else {}
+    except (TypeError, ValueError):
+        args = {}
+    if not isinstance(args, dict):
+        args = {}
+    return {"name": name, "call_id": call_id, "arguments": arguments or "{}", "args": args}
+
+
+async def _maybe_await(value: Any) -> Any:
+    if hasattr(value, "__await__"):
+        return await value
+    return value
+
+
+async def _aiter_stream(stream: Any):
+    if hasattr(stream, "__aiter__"):
+        async for item in stream:
+            yield item
+    else:
+        for item in stream:
+            yield item
+
+
 class OpenAIChatGPTOAuthDriver:
     """ResearchProviderDriver for (openai, chatgpt_oauth). Discovery is real;
-    execution is gated to S3 step 4."""
+    Research execution uses the ChatGPT-backend raw Responses loop."""
 
     provider = "openai"
     auth_mode = "chatgpt_oauth"
 
-    def __init__(self, *, credential: Any = None, token_store: Any = None):
+    def __init__(
+        self,
+        *,
+        credential: Any = None,
+        token_store: Any = None,
+        registry: Any = None,
+        dal: Any = None,
+        max_turns: int = _DEFAULT_MAX_TURNS,
+        per_tool_timeout_s: float = _PER_TOOL_TIMEOUT_S,
+    ):
         self.credential = credential
         self._token_store = token_store
+        self._registry = registry
+        self._dal = dal
+        self._max_turns = max_turns
+        self._per_tool_timeout_s = per_tool_timeout_s
         self._credential_id = (
             f"local:{credential.id}"
             if credential is not None and getattr(credential, "id", None) is not None
@@ -170,9 +338,198 @@ class OpenAIChatGPTOAuthDriver:
             warning="run the ChatGPT OAuth probe (P1/P2) from Settings; this driver does not call the backend here",
         )
 
-    # --- execution gated to S3 step 4 -----------------------------------
+    # --- execution -------------------------------------------------------
     async def call_llm(self, request: Any):
-        raise NotImplementedError(_S3_EXEC)
+        text = ""
+        usage = TokenUsage()
+        async for event in self.stream_llm(request):
+            if event.type == EventType.done:
+                data = event.data
+                text = data.get("answer", "")
+                tok = data.get("token_usage") or {}
+                usage = TokenUsage(
+                    input_tokens=tok.get("input_tokens", 0),
+                    output_tokens=tok.get("output_tokens", 0),
+                    total_tokens=tok.get("total_tokens", 0),
+                )
+                break
+            if event.type == EventType.error:
+                raise RuntimeError(event.data.get("error") or event.data.get("message") or "chatgpt_oauth error")
+        return LLMResponse(text=text, usage=usage)
 
     def stream_llm(self, request: Any):
-        raise NotImplementedError(_S3_EXEC)
+        return self._stream(request)
+
+    def _build_tools(self) -> list[dict]:
+        if self._registry is None:
+            return []
+        tools: list[dict] = []
+        for name in sorted(_RESEARCH_READONLY_TOOLS):
+            tool_def = self._registry.get(name)
+            if tool_def is not None:
+                tools.append(_tool_schema(name, tool_def))
+        return tools
+
+    async def _invoke_tool(self, *, name: str, args: dict, token: Optional[str]) -> tuple[bool, str]:
+        try:
+            if name not in _RESEARCH_READONLY_TOOLS:
+                return False, f"tool '{name}' is not allowed (allowlist veto)"
+            tool_def = self._registry.get(name) if self._registry is not None else None
+            if tool_def is None:
+                return False, f"tool '{name}' is not registered"
+            fn = tool_def.function
+            requires_dal = getattr(tool_def, "requires_dal", True)
+
+            async def _run():
+                if asyncio.iscoroutinefunction(fn):
+                    return await (fn(self._dal, **args) if requires_dal else fn(**args))
+                call = (lambda: fn(self._dal, **args)) if requires_dal else (lambda: fn(**args))
+                loop = asyncio.get_running_loop()
+                pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="ark-openai-oauth")
+                try:
+                    return await loop.run_in_executor(pool, call)
+                finally:
+                    pool.shutdown(wait=False, cancel_futures=True)
+
+            try:
+                raw = await asyncio.wait_for(_run(), timeout=self._per_tool_timeout_s)
+            except asyncio.TimeoutError:
+                return False, f"tool '{name}' timed out after {self._per_tool_timeout_s}s"
+            result = _coerce_result_str(raw)
+            sized, _meta = get_reducer(name)(result, budget=_BRIDGE_RESULT_BUDGET)
+            return True, _redact_token(sized, token)
+        except BaseException as exc:  # noqa: BLE001
+            return False, _redact_token(str(exc), token)[:500]
+
+    async def _stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
+        token = self._load_token()
+        if not token:
+            raise MissingCredentialError("no ChatGPT OAuth token stored for this credential -- log in from Settings")
+        try:
+            rec = _refresh_login(credential_id=self._credential_id, token_store=self._token_store)
+            token = rec.access_token if rec and rec.access_token else token
+        except ChatGPTOAuthLoginError as exc:
+            yield AgentEvent(EventType.error, {"error": f"ChatGPT OAuth refresh failed: {_err(exc)}", "provider": "openai", "model": request.model})
+            return
+
+        client = _execution_client(token)
+        input_items = _request_input_items(request)
+        tools = self._build_tools()
+        used: list[str] = []
+        total_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        yield AgentEvent(EventType.thinking, {"turn": 1, "model": request.model})
+
+        max_turns = self._max_turns if self._max_turns > 0 else 1000000
+        for _turn in range(max_turns):
+            kwargs: dict[str, Any] = {
+                "model": request.model,
+                "input": input_items,
+                "instructions": request.instructions or "",
+                "stream": True,
+                "store": False,
+            }
+            if tools:
+                kwargs["tools"] = tools
+            reasoning = _reasoning(request.reasoning_effort)
+            if reasoning:
+                kwargs["reasoning"] = reasoning
+
+            response_obj = None
+            arg_fallback: dict[str, str] = {}
+            call_items: list[dict] = []
+            text_parts: list[str] = []
+            current_call_id: Optional[str] = None
+            try:
+                stream = await _maybe_await(client.responses.create(**kwargs))
+                async for event in _aiter_stream(stream):
+                    raw = _to_dict(event)
+                    etype = raw.get("type")
+                    if etype == "response.output_text.delta":
+                        delta = raw.get("delta")
+                        if isinstance(delta, str) and delta:
+                            text_parts.append(delta)
+                            yield AgentEvent(EventType.text, {"content": _redact_token(delta, token)})
+                    elif etype == "response.function_call_arguments.done":
+                        call_id = raw.get("call_id") or raw.get("item_id") or current_call_id
+                        args = raw.get("arguments")
+                        if isinstance(call_id, str) and isinstance(args, str):
+                            arg_fallback[call_id] = args
+                    elif etype in ("response.output_item.added", "response.output_item.done"):
+                        item = raw.get("item") or raw.get("output_item")
+                        if isinstance(item, dict) and item.get("type") == "function_call":
+                            maybe_id = item.get("call_id") or item.get("id")
+                            if isinstance(maybe_id, str):
+                                current_call_id = maybe_id
+                            call_items.append(item)
+                    elif etype == "response.completed":
+                        response_obj = raw.get("response")
+                    elif etype in ("response.failed", "response.incomplete"):
+                        yield AgentEvent(EventType.error, {"error": f"ChatGPT backend stream ended with {etype}", "provider": "openai", "model": request.model})
+                        return
+            except BaseException as exc:  # noqa: BLE001
+                yield AgentEvent(EventType.error, {"error": _redact_token(str(exc), token)[:500], "provider": "openai", "model": request.model})
+                return
+
+            output_items = _response_output_items(response_obj) or call_items
+            usage = _to_dict(response_obj).get("usage") if response_obj else None
+            if isinstance(usage, dict):
+                in_tokens = int(usage.get("input_tokens") or 0)
+                out_tokens = int(usage.get("output_tokens") or 0)
+                total_usage["input_tokens"] += in_tokens
+                total_usage["output_tokens"] += out_tokens
+                total_usage["total_tokens"] += int(usage.get("total_tokens") or (in_tokens + out_tokens))
+
+            calls = [c for c in (_call_from_item(item, arg_fallback) for item in output_items) if c]
+            if calls:
+                for call in calls:
+                    name = call["name"]
+                    args = call["args"]
+                    if name not in _RESEARCH_READONLY_TOOLS:
+                        yield AgentEvent(EventType.error, {"error": f"tool '{name}' is not allowed (allowlist veto)", "provider": "openai", "model": request.model})
+                        return
+                    yield AgentEvent(EventType.tool_start, {"tool": name, "input": _redact_jsonish(args, token)})
+                    ok, result = await self._invoke_tool(name=name, args=args, token=token)
+                    summary = result[:_SUMMARY_CAP]
+                    yield AgentEvent(EventType.tool_end, {"tool": name, "summary": summary, "chars": len(result), "is_error": not ok})
+                    if not ok:
+                        yield AgentEvent(EventType.error, {"error": summary, "provider": "openai", "model": request.model})
+                        return
+                    used.append(name)
+                    input_items.append({
+                        "type": "function_call",
+                        "name": name,
+                        "call_id": call["call_id"],
+                        "arguments": call["arguments"],
+                    })
+                    input_items.append({
+                        "type": "function_call_output",
+                        "call_id": call["call_id"],
+                        "output": summary,
+                    })
+                continue
+
+            answer = _text_from_output_items(output_items) or "".join(text_parts)
+            yield AgentEvent(EventType.done, {
+                "answer": _redact_token(answer, token),
+                "tools_used": sorted(set(used)),
+                "provider": "openai",
+                "model": request.model,
+                "token_usage": total_usage,
+            })
+            return
+
+        yield AgentEvent(EventType.error, {
+            "error": f"Reached maximum number of turns ({self._max_turns})",
+            "provider": "openai",
+            "model": request.model,
+        })
+
+
+def _redact_jsonish(obj: Any, token: Optional[str]) -> Any:
+    if isinstance(obj, dict):
+        return {k: _redact_jsonish(v, token) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_jsonish(v, token) for v in obj]
+    if isinstance(obj, str):
+        return _redact_token(obj, token)
+    return obj

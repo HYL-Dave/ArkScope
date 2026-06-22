@@ -110,9 +110,11 @@ Next gate:
   switch affected the live run; Anthropic Claude-OAuth → explicit env fallback
   note). Live credential routing confirmed.
 - DONE (Slice 7B): `claude_code_oauth` runs Research through the subscription path
-  (live-validated), not env fallback. The remaining OAuth-execution gap is OpenAI
-  `chatgpt_oauth` — login/token/probe/discovery are built but EXECUTION is
-  fail-closed (`live_resolver.py`) pending the P1/P2 backend probe.
+  (live-validated), not env fallback. OpenAI `chatgpt_oauth` login/token/probe/
+  discovery are built; S3 Research execution is now code-wired through the raw
+  ChatGPT-backend driver (offline-verified, live smoke pending). Direct OpenAI
+  SDK-client paths (`live_openai_client` / Agents-SDK global client) still fail
+  closed for `chatgpt_oauth` because they cannot consume that subscription token.
 
 ### Model Routing
 
@@ -207,9 +209,10 @@ These are not technical debt. They are bootstrap and rescue controls.
 > **Status reconciliation (2026-06-22):** Steps 1–4 are DONE — B1 drift fixed, B2
 > model-route UI shipped, Slice 6 live verification ✅ (2026-06-19), and Claude
 > `claude_code_oauth` subscription Research is **live-validated** (Slice 7B). The
-> remaining OAuth-execution gap is **OpenAI `chatgpt_oauth`**: login/token/probe/
-> discovery are built but EXECUTION is **fail-closed** (`live_resolver.py`) pending
-> the P1/P2 backend probe. **The active config-authority slice is step 6 reframed:**
+> OpenAI `chatgpt_oauth`: login/token/probe/discovery are built, and S3 Research
+> execution is code-wired through the raw ChatGPT-backend driver (offline-verified,
+> live smoke pending). Direct OpenAI SDK-client paths still fail closed. **The active
+> config-authority slice is step 6 reframed:**
 > migrate the per-task model routes to profile-DB authority — NOT a fresh framework
 > audit (§2/§3/§5 already specify the framework; the per-setting classes are known).
 

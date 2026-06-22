@@ -130,6 +130,52 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     return driver.stream_llm(req)
 
 
+def _openai_subscription_stream(*, credential_id, question, model, effort, dal, history):
+    """S3: drive AI 研究 on the ChatGPT subscription backend via the raw
+    chatgpt_oauth driver.
+
+    This is deliberately NOT ``openai_agent.run_query_stream``: that path uses the
+    OpenAI Agents SDK and sends API-key-only features (notably max_output_tokens /
+    previous_response_id). The driver below owns the ChatGPT-backend-compatible
+    Responses loop: stream=True, store=False, no max_output_tokens.
+    """
+    from src.agents.config import get_agent_config
+    from src.agents.openai_agent.agent import _build_effective_prompt
+    from src.auth_drivers.factory import build_driver
+    from src.auth_drivers.protocol import LLMRequest
+    from src.auth_drivers.token_store import get_token_store
+    from src.model_credentials import CredentialStore
+    from src.tools.registry import ToolRegistry
+
+    config = get_agent_config()
+    cred = CredentialStore().get(credential_id)
+    registry = ToolRegistry()
+    registry.register_all()
+    driver = build_driver(
+        provider="openai",
+        auth_mode="chatgpt_oauth",
+        credential=cred,
+        token_store=get_token_store(),
+        registry=registry,
+        dal=dal,
+        max_turns=config.max_tool_calls,
+    )
+    instructions = _build_effective_prompt(dal, config)
+    if history:
+        instructions = (
+            instructions
+            + "\n\n[多輪脈絡] 以下對話歷史僅供理解使用者意圖與指代；價格、新聞、SA、"
+            "基本面等時效性事實一律以工具即時查詢為準，歷史內容可能已過期。"
+        )
+    req = LLMRequest(
+        model=model,
+        instructions=instructions,
+        input_messages=[*history, {"role": "user", "content": question}],
+        reasoning_effort=None if effort in (None, "", "default") else effort,
+    )
+    return driver.stream_llm(req)
+
+
 def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, title) -> None:
     """Best-effort: a persistence failure must never break the SSE answer (#4)."""
     try:
@@ -316,8 +362,16 @@ async def query_agent_stream(
         t0 = _time.monotonic()
         try:
             if provider == "openai":
-                from src.agents.openai_agent.agent import run_query_stream
-                stream = run_query_stream(question=agent_question, model=res_model, dal=dal, reasoning_effort=res_effort, history=history)
+                from src.auth_drivers.live_resolver import resolve_live_auth
+                _auth = resolve_live_auth("openai")
+                if _auth.source == "oauth_driver_unwired":
+                    stream = _openai_subscription_stream(
+                        credential_id=_auth.credential_id, question=agent_question,
+                        model=res_model, effort=res_effort, dal=dal, history=history,
+                    )
+                else:
+                    from src.agents.openai_agent.agent import run_query_stream
+                    stream = run_query_stream(question=agent_question, model=res_model, dal=dal, reasoning_effort=res_effort, history=history)
             elif provider == "anthropic":
                 # 7B-6: if the ACTIVE anthropic credential is claude_code_oauth, the
                 # API-key loop (run_query_stream → live_anthropic_client) FAIL-CLOSES,

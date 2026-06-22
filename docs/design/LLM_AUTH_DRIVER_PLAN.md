@@ -247,7 +247,7 @@ Build the abstraction first; rewiring is the LAST slice and out of this doc's de
 
 ## 13. Decisions (RESOLVED 2026-06-15, gpt-5.5 review)
 
-1. **OpenAI subscription path = in-app `chatgpt_oauth` driver; `codex_cli` is NOT a product path.** Default provider stays **`api_key`**; the subscription path is the **compatibility-gated in-app `chatgpt_oauth` driver** — ArkScope itself does the OAuth login / token capture / refresh / store, *borrowing* the Codex OAuth+backend protocol but **NOT depending on or bundling Codex CLI** (a desktop app must never require the user to install Codex CLI). Login + token storage are live-proven; Research wire-in waits for the P1/P2 probe to confirm streaming + tool-call + model-discovery behavior on the ChatGPT backend. **`codex_cli` = dev/debug harness + an optional "import an existing Codex login's token" convenience ONLY** — never a product subscription path, never surfaced as "install Codex CLI to use OpenAI OAuth." **If `chatgpt_oauth` fails, the product fallback is "use an API key," NOT Codex CLI.**
+1. **OpenAI subscription path = in-app `chatgpt_oauth` driver; `codex_cli` is NOT a product path.** Default provider stays **`api_key`**; the subscription path is the **compatibility-gated in-app `chatgpt_oauth` driver** — ArkScope itself does the OAuth login / token capture / refresh / store, *borrowing* the Codex OAuth+backend protocol but **NOT depending on or bundling Codex CLI** (a desktop app must never require the user to install Codex CLI). Login + token storage are live-proven; Research execution is code-wired through the raw ChatGPT-backend driver after the P1/P2 probe established streaming + tool-call + model-discovery behavior; final live Research smoke is still pending. **`codex_cli` = dev/debug harness + an optional "import an existing Codex login's token" convenience ONLY** — never a product subscription path, never surfaced as "install Codex CLI to use OpenAI OAuth." **If `chatgpt_oauth` fails, the product fallback is "use an API key," NOT Codex CLI.**
 2. **Token at-rest = keyring first, plaintext `0600` dev-fallback allowed (UI-labeled).** Production target = OS keychain / Secret Service / a `keyring` abstraction; dev fallback = plaintext `0600` **but the UI must label it "local plaintext dev storage."** Do **NOT** make the OAuth token in `llm_credentials.secret` (plaintext column) the long-term home.
 3. **`auth_type` migration = explicit modes.** Rename/extend to `chatgpt_oauth` / `claude_code_oauth`; keep generic `oauth`/`setup_token` ONLY as deprecated read-aliases. No "generic + sub-mode column" (it perpetuates B/C ambiguity).
 4. **Anthropic Agent-SDK credit policy = S4 must live-re-verify.** Today *is* 2026-06-15 (the moving date). **Do NOT write any credit amount / plan allowance into the UI unless confirmed from the official page at that moment.** UI shows `status: unknown` / plan-if-available, never hardcoded figures.
@@ -561,6 +561,24 @@ and `response.output_item.*` events while `response.completed` omitted `response
 That proves the backend emitted a function call; the failure was the probe parser looking
 only at terminal output. Fixed: P2b now passes on either terminal `*_call` output items OR
 streamed function-call item/argument events.
+
+### S3 — ChatGPT-OAuth Research execution WIRED (offline TDD) (2026-06-22)
+
+`OpenAIChatGPTOAuthDriver.stream_llm()` now owns the ChatGPT-backend-compatible raw
+Responses loop for AI 研究:
+- token from token-store only, refresh before call;
+- `base_url=https://chatgpt.com/backend-api/codex`, `stream=True`, `store=False`;
+- **never** sends `max_output_tokens`;
+- **never** uses `previous_response_id` (known-broken with `store=false`);
+- manual `function_call` → ArkScope Tier-1 read-only tool → `function_call_output`
+  loop, using the same `AgentEvent` vocabulary as the existing research surface.
+
+`query.py` routes OpenAI AI 研究 to this driver only when the active OpenAI credential is
+`chatgpt_oauth`; OpenAI API-key Research remains on the existing Agents-SDK path. Direct
+OpenAI client surfaces (`live_openai_client`, card synthesis, code-gen, Agents-SDK global
+client setup) still fail closed for `chatgpt_oauth` because they cannot consume the
+ChatGPT subscription token. Live smoke is still pending; the code path is offline-verified
+with fake backend streams including the live P2b no-call-id argument shape.
 
 **Probe display/model inventory polish (2026-06-21):** P2c now includes the discovered
 model ids in the redacted observed text (capped at 20 for readability), and Settings shows
