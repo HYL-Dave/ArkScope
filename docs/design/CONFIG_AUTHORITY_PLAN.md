@@ -123,20 +123,28 @@ seeds.
 
 Current status:
 
-- Card task routes exist.
-- `ai_research` backend route exists, but the Settings/UI surface is not complete
-  until B2.
-- Built-in default/advanced tiers are fixed seeds; ArkScope should not silently
+- **DB-authoritative (shipped 2026-06-22).** The per-task routes
+  (`{ai_research,card_synthesis,card_translation}_{provider,model,effort}`) now resolve
+  **real env > profile DB (`model_route` table) > `user_profile(.local).yaml` > built-in
+  default**; a DB route is taken atomically (no field-merge). `user_profile.local.yaml`
+  is demoted to fallback + import/export, mirroring the env-bridge precedence in
+  `data_provider_config.py`.
+- Settings → Models surfaces the full authority loop: a source badge per route
+  (DB / yaml-fallback / env-override / default), **reset-to-fallback**
+  (`DELETE /config/model-routes/{task}` removes the DB row), and yaml↔DB
+  import/export (export mirrors DB state — present tasks write keys, absent tasks
+  clear them — into `local.yaml` only; a route committed in the base
+  `user_profile.yaml` is reviewed baseline and intentionally kept).
+- Built-in default/advanced tiers are fixed seeds; ArkScope does not silently
   auto-select "latest" at runtime.
 
 Next gate:
 
-- B2 (expose `AI 研究` in Settings model routing + show the active route in
-  Research): **DONE**. Next: migrate the per-task routes (`{ai_research,
-  card_synthesis,card_translation}_{provider,model,effort}`) from
-  `user_profile.local.yaml` to **profile-DB authority** (the active slice — §6.6),
-  yaml/env demoted to fallback + import/export. Mirror the env-bridge precedence in
-  `data_provider_config.py` (`real env var > app-stored DB value > config file`).
+- Retirement gate (§3) for the route keys: schema ✅, Settings UI ✅, DB-first read with
+  explicit source label ✅, import ✅, export ✅, tests ✅, rollback (yaml fallback retained)
+  ✅. The legacy `user_profile.local.yaml` route keys may now be relabeled fallback-only.
+- Next authority target is **data-source keys/schedules** (§6.8), once the LLM/route
+  authority is considered stable.
 
 ### Scoring / Per-Purpose Credentials
 
@@ -211,10 +219,12 @@ These are not technical debt. They are bootstrap and rescue controls.
 > `claude_code_oauth` subscription Research is **live-validated** (Slice 7B). The
 > OpenAI `chatgpt_oauth`: login/token/probe/discovery are built, and S3 Research
 > execution is code-wired through the raw ChatGPT-backend driver (offline-verified,
-> live smoke pending). Direct OpenAI SDK-client paths still fail closed. **The active
-> config-authority slice is step 6 reframed:**
-> migrate the per-task model routes to profile-DB authority — NOT a fresh framework
-> audit (§2/§3/§5 already specify the framework; the per-setting classes are known).
+> live smoke pending). Direct OpenAI SDK-client paths still fail closed.
+>
+> **Model-route DB authority: SHIPPED 2026-06-22** (not a fresh framework audit —
+> §2/§3/§5 already specify the framework). The per-task routes now resolve real env >
+> DB > yaml > default with a full Settings authority loop (source badge, reset, yaml↔DB
+> import/export) — see §4 Model Routing. **Next:** data-source keys/schedules (§6.8).
 
 1. **Fix B1 drift**: update stale tests and persist resolved model on stream
    error turns.
