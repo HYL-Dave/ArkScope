@@ -457,6 +457,10 @@ def backfill_prices_direct(
                 conn.execute("PRAGMA journal_mode = WAL")
             except sqlite3.OperationalError:
                 pass
+            # Setup (schema / ensure-tables / load-aliases / _start_provider_run) runs
+            # BEFORE the run is recorded, so a failure here is intentionally fail-loud with
+            # NO provider_sync_runs audit row — it cannot be: the run/table don't exist yet.
+            # The conn is still closed + the lock released (outer try/finally + the `with`).
             conn.executescript(_PRICES_SCHEMA)  # tolerate a fresh DB
             _ensure_provider_sync_tables(conn)
             aliases = _load_ticker_aliases(conn)
@@ -492,16 +496,30 @@ def backfill_prices_direct(
                                                   rows_added=0, error=None)
                     except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
                         rollup["errors"][canon] = str(e)
-                        _upsert_provider_meta(conn, provider=provider, ticker=canon,
-                                              interval=interval, last_bar_datetime=None,
-                                              rows_added=0, error=str(e))
+                        # The recovery telemetry write must itself be best-effort: if it
+                        # raises (same conn already faulting — disk/lock), it must NOT escape
+                        # to the outer handler and reclassify a per-ticker error as a fatal
+                        # batch abort (that would defeat the isolation guarantee).
+                        try:
+                            _upsert_provider_meta(conn, provider=provider, ticker=canon,
+                                                  interval=interval, last_bar_datetime=None,
+                                                  rows_added=0, error=str(e))
+                        except Exception:  # noqa: BLE001
+                            logger.warning("provider_sync_meta write failed for %s (per-ticker "
+                                           "error recovery); continuing", canon, exc_info=True)
                     if progress_cb:
                         progress_cb(i, total, canon)
             except Exception as e:  # a non-per-ticker failure (rare) fails the whole run
-                _finish_provider_run(conn, run_id, status="failed",
-                                     tickers_scanned=rollup["tickers_scanned"],
-                                     gaps_found=rollup["gaps_found"],
-                                     rows_added=rollup["rows_added"], error=str(e))
+                # Best-effort finalize: if the 'failed' write itself raises, it must NOT
+                # mask the original error (the bare `raise` re-propagates it + its traceback).
+                try:
+                    _finish_provider_run(conn, run_id, status="failed",
+                                         tickers_scanned=rollup["tickers_scanned"],
+                                         gaps_found=rollup["gaps_found"],
+                                         rows_added=rollup["rows_added"], error=str(e))
+                except Exception:  # noqa: BLE001
+                    logger.warning("provider_sync_runs failed-finalize write failed; "
+                                   "run row may stay 'running'", exc_info=True)
                 raise
             _finish_provider_run(conn, run_id, status="succeeded",
                                  tickers_scanned=rollup["tickers_scanned"],

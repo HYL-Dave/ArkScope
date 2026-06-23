@@ -485,3 +485,42 @@ def test_backfill_none_provider_constructs_default(tmp_path, monkeypatch):
     res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
                                      db_path=str(db), today=date(2026, 6, 18))  # no ibkr_src injected
     assert res["rows_added"] == 1
+
+
+def test_backfill_meta_write_failure_in_error_path_does_not_abort_batch(tmp_path, monkeypatch):
+    # review #1: if a per-ticker error's recovery meta-write ALSO fails (same conn, disk/
+    # lock fault), it must NOT escape to the outer handler and abort the batch — isolation
+    # must hold: remaining tickers still process, run stays 'succeeded'.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]},
+                     raises_for=["BAD"])
+    real = mdd._upsert_provider_meta
+    def flaky(conn, **kw):
+        if kw.get("error"):  # the error-path recovery write blows up
+            raise sqlite3.OperationalError("disk full during telemetry write")
+        return real(conn, **kw)
+    monkeypatch.setattr(mdd, "_upsert_provider_meta", flaky)
+    res = mdd.backfill_prices_direct(tickers_arg="BAD,AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert "BAD" in res["errors"]      # BAD recorded
+    assert res["rows_added"] == 1      # AAPL still processed — batch NOT aborted
+    conn = sqlite3.connect(db)
+    assert conn.execute("SELECT status FROM provider_sync_runs").fetchone()[0] == "succeeded"
+    conn.close()
+
+
+def test_backfill_fatal_path_finish_failure_does_not_mask_original(tmp_path, monkeypatch):
+    # review #2: a fatal (non-per-ticker) error → the failed-path _finish_provider_run
+    # write also failing must NOT mask the original error; the ORIGINAL propagates.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={})
+    def boom_progress(d, t, c):
+        raise ValueError("ORIGINAL fatal")  # raised outside the per-ticker try → outer handler
+    monkeypatch.setattr(mdd, "_finish_provider_run",
+                        lambda *a, **k: (_ for _ in ()).throw(sqlite3.OperationalError("finish failed")))
+    with pytest.raises(ValueError, match="ORIGINAL fatal"):
+        mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
+                                   db_path=str(db), ibkr_src=ibkr, progress_cb=boom_progress,
+                                   today=date(2026, 6, 18))
