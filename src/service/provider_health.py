@@ -68,10 +68,17 @@ def _to_dt(value: Any) -> Optional[datetime]:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str):
+        text = value.replace("Z", "+00:00")
         try:
-            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(text)
             return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
         except ValueError:
+            if len(text) >= 5 and text[-5] in ("+", "-") and text[-4:].isdigit():
+                try:
+                    dt = datetime.fromisoformat(f"{text[:-2]}:{text[-2:]}")
+                    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    return None
             return None
     return None
 
@@ -185,6 +192,12 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     except Exception as e:
         notes.append(f"fd enabled check failed: {e}")
 
+    macro_enabled: Optional[bool] = None
+    try:
+        from src.agents.config import get_agent_config
+        macro_enabled = bool(get_agent_config().macro_calendar_enabled)
+    except Exception as e:
+        notes.append(f"macro config check failed: {e}")
 
     # --- per-source decomposition ---------------------------------------------
     # news rows: (source, latest, recent_count) per provider
@@ -280,6 +293,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     _add(
         "fred", "FRED", "macro",
         _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
+        enabled=macro_enabled,
         last_success=fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
         detail=f"latest fred job success {_iso(fred['last_success']) or '—'}",

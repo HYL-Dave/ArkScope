@@ -9,6 +9,12 @@ const SA_ARTICLES_URL = "https://seekingalpha.com/alpha-picks/articles";
 const SA_MARKET_NEWS_URL = "https://seekingalpha.com/market-news";
 const NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 const TABLE_SELECTOR = "table tbody tr";
+const ALPHA_PICKS_PAGE_TIMEOUT_MS = 90 * 1000;
+const ALPHA_PICKS_ROW_SELECTORS = [
+  "table tbody tr",
+  '[role="row"]',
+  'div[role="row"]',
+];
 const PAYWALL_MARKERS = ["Subscribe to unlock", "Upgrade your plan", "Premium required"];
 const ALPHA_PICKS_AUTO_SYNC_ALARM = "alpha-picks-auto-sync";
 const ALPHA_PICKS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 30;
@@ -444,10 +450,9 @@ async function doRefresh(mode, options) {
     const tab = await chrome.tabs.create({ url: SA_CURRENT_URL, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "alpha_picks");
-    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_CURRENT_URL));
 
     sendProgress("Waiting for current picks table...");
-    let ready = await waitForTableReady(tabId);
+    let ready = await waitForAlphaPicksTableReady(tabId, SA_CURRENT_URL, "current picks");
     if (!ready.ok) {
       results.current = await sendToNativeHost("refresh_failure", "current", [], ready.error, batchTs);
     } else {
@@ -460,10 +465,9 @@ async function doRefresh(mode, options) {
     // --- Scrape closed (removed) picks ---
     sendProgress("Opening closed picks page...");
     await chrome.tabs.update(tabId, { url: SA_CLOSED_URL });
-    await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_CLOSED_URL));
 
     sendProgress("Waiting for closed picks table...");
-    ready = await waitForTableReady(tabId);
+    ready = await waitForAlphaPicksTableReady(tabId, SA_CLOSED_URL, "closed picks");
     if (!ready.ok) {
       results.closed = await sendToNativeHost("refresh_failure", "closed", [], ready.error, batchTs);
     } else {
@@ -1199,6 +1203,114 @@ async function safeRemoveTab(tabId) {
 }
 
 // --- DOM readiness polling ---
+
+async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs = ALPHA_PICKS_PAGE_TIMEOUT_MS) {
+  const start = Date.now();
+  const expectedPath = expectedPathFromUrl(expectedUrl);
+  let lastSnapshot = null;
+  while (Date.now() - start < timeoutMs) {
+    let tab = null;
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch (err) {
+      lastSnapshot = { scriptError: "tab not found: " + (err && err.message ? err.message : String(err || "")) };
+      await sleep(500);
+      continue;
+    }
+
+    const snapshot = await inspectAlphaPicksReadiness(tabId, expectedPath);
+    lastSnapshot = Object.assign({}, snapshot || {}, {
+      tabStatus: (tab && tab.status) || "unknown",
+      tabUrl: (tab && tab.url) || "",
+      pendingUrl: (tab && tab.pendingUrl) || "",
+    });
+
+    if (lastSnapshot.status === "login_redirect") {
+      return { ok: false, error: "Session expired: " + (lastSnapshot.url || "unknown redirect") };
+    }
+    if (lastSnapshot.status === "paywall") {
+      return { ok: false, error: "Paywall: " + lastSnapshot.marker };
+    }
+    if (lastSnapshot.status === "ready") {
+      return { ok: true };
+    }
+    await sleep(500);
+  }
+  return { ok: false, error: formatAlphaPicksReadinessTimeout(label, expectedPath, timeoutMs, lastSnapshot) };
+}
+
+async function inspectAlphaPicksReadiness(tabId, expectedPath) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (paywallMarkers, rowSelectors, expectedPathArg) => {
+        const body = document.body;
+        const text = body ? body.innerText || "" : "";
+        const selectorCounts = {};
+        let maxRows = 0;
+        for (const selector of rowSelectors) {
+          const count = document.querySelectorAll(selector).length;
+          selectorCounts[selector] = count;
+          if (count > maxRows) maxRows = count;
+        }
+        const url = location.href;
+        const pathMatches = !expectedPathArg || location.pathname.indexOf(expectedPathArg) >= 0;
+        if (location.href.includes("/login") || location.href.includes("/sign_in")) {
+          return { status: "login_redirect", url, selectorCounts };
+        }
+        for (const marker of paywallMarkers) {
+          if (text.includes(marker)) {
+            return { status: "paywall", marker, url, selectorCounts };
+          }
+        }
+        if (pathMatches && maxRows > 0) {
+          return { status: "ready", url, selectorCounts, rowCount: maxRows };
+        }
+        return {
+          status: "loading",
+          url,
+          expectedPath: expectedPathArg || "",
+          pathMatches,
+          documentReadyState: document.readyState,
+          title: document.title || "",
+          selectorCounts,
+          rowCount: maxRows,
+          bodySnippet: text.replace(/\s+/g, " ").slice(0, 280),
+        };
+      },
+      args: [PAYWALL_MARKERS, ALPHA_PICKS_ROW_SELECTORS, expectedPath],
+    });
+    return (results[0] && results[0].result) || { status: "loading", scriptError: "empty script result" };
+  } catch (err) {
+    return {
+      status: "loading",
+      scriptError: err && err.message ? err.message : String(err || ""),
+    };
+  }
+}
+
+function formatAlphaPicksReadinessTimeout(label, expectedPath, timeoutMs, snapshot) {
+  snapshot = snapshot || {};
+  const counts = snapshot.selectorCounts
+    ? Object.keys(snapshot.selectorCounts).map(function (k) {
+        return k + ":" + snapshot.selectorCounts[k];
+      }).join(", ")
+    : "n/a";
+  return (
+    "Timeout waiting for Alpha Picks " + (label || "page") +
+    " (" + timeoutMs + "ms" +
+    ", expected=" + (expectedPath || "any") +
+    ", tabStatus=" + (snapshot.tabStatus || "unknown") +
+    ", documentReadyState=" + (snapshot.documentReadyState || "unknown") +
+    ", url=" + shortenForLog(snapshot.url || snapshot.tabUrl || "", 180) +
+    ", pendingUrl=" + shortenForLog(snapshot.pendingUrl || "", 180) +
+    ", title=" + shortenForLog(snapshot.title || "", 120) +
+    ", selectorCounts=" + counts +
+    ", scriptError=" + shortenForLog(snapshot.scriptError || "", 160) +
+    ", bodySnippet=" + shortenForLog(snapshot.bodySnippet || "", 220) +
+    ")"
+  );
+}
 
 async function waitForTableReady(tabId, timeoutMs = 30000) {
   const start = Date.now();

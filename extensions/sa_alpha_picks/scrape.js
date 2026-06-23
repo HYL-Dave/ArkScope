@@ -21,11 +21,11 @@
 
   var isRemovedPage = location.pathname.includes("/removed");
 
-  var rows = document.querySelectorAll("table tbody tr");
+  var rows = collectCandidateRows();
   var picks = [];
 
   for (var i = 0; i < rows.length; i++) {
-    var cells = rows[i].querySelectorAll("td");
+    var cells = collectCells(rows[i]);
     var texts = [];
     for (var j = 0; j < cells.length; j++) {
       texts.push(cells[j].innerText.trim());
@@ -78,6 +78,24 @@
   return picks;
 
   // --- Helpers ---
+
+  function collectCandidateRows() {
+    var tableRows = Array.prototype.slice.call(document.querySelectorAll("table tbody tr"));
+    if (tableRows.length) return tableRows;
+    var roleRows = Array.prototype.slice.call(document.querySelectorAll('[role="row"]'));
+    return roleRows.filter(function (row) {
+      var cells = collectCells(row);
+      if (cells.length < 5) return false;
+      var first = (cells[0].innerText || "").trim();
+      return /^[A-Z. -]{1,12}$/.test(first);
+    });
+  }
+
+  function collectCells(row) {
+    var cells = row.querySelectorAll("td");
+    if (cells.length) return cells;
+    return row.querySelectorAll('[role="cell"], [role="gridcell"]');
+  }
 
   function parseDate(text) {
     if (!text) return null;

@@ -73,6 +73,15 @@ def test_connected_when_signal_recent(monkeypatch):
     assert p["last_success_at"] is not None and p["signals"]["news_recent_7d"] == 50
 
 
+def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypatch):
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    dal = _FakeDAL(_FakeBackend(stats=_stats(
+        news_rows=[("finnhub", "2026-06-10T10:30:00+0000", 12)])))
+    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "finnhub")
+    assert p["status"] == "connected"
+    assert p["last_success_at"] == "2026-06-10T10:30:00+00:00"
+
+
 def test_stale_when_signal_old_on_weekday(monkeypatch):
     monkeypatch.setenv("POLYGON_API_KEY", "k")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
@@ -117,8 +126,19 @@ def test_fd_disabled_is_a_state(monkeypatch):
 
 def test_no_signal_when_nothing_recorded(monkeypatch):
     monkeypatch.setenv("FRED_API_KEY", "k")
+    monkeypatch.setattr("src.agents.config.get_agent_config",
+                        lambda: type("Cfg", (), {"macro_calendar_enabled": True})())
     dal = _FakeDAL(_FakeBackend())  # no job_runs (fake backend has no _get_conn)
     assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "fred")["status"] == "no_signal"
+
+
+def test_fred_disabled_when_macro_calendar_feature_is_off(monkeypatch):
+    monkeypatch.setenv("FRED_API_KEY", "k")
+    monkeypatch.setattr("src.agents.config.get_agent_config",
+                        lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY), "fred")
+    assert p["status"] == "disabled"
+    assert p["enabled"] is False
 
 
 def test_sec_edgar_ttl_governed_never_stale():
