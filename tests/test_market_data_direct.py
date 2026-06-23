@@ -336,7 +336,8 @@ class _FakeIBKR:
         for t in tickers:
             if t in self._raises:
                 raise RuntimeError(f"gateway error for {t}")
-            out[t] = self._bars.get(t, [])
+            # faithful to real IBKR: only return bars within the requested [start,end] range
+            out[t] = [b for b in self._bars.get(t, []) if start_date <= b.datetime.date() <= end_date]
         return out
 
 
@@ -633,3 +634,61 @@ def test_gaps_now_et_aware_utc_is_converted_to_et(tmp_path):
     g_mid = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
                                   now_et=datetime(2026, 6, 23, 18, 0, tzinfo=timezone.utc))
     assert date(2026, 6, 23) not in g_mid["AAPL"]
+
+
+# --- 2d: full-window top-up (heal sparse/partial days, not just zero-bar) -----------
+
+def test_backfill_tops_up_a_partial_day(tmp_path, monkeypatch):
+    # THE canary finding: a day with 1 local bar (day-presence calls it "present") must be
+    # TOPPED UP from the provider's full day, not skipped. Pre-seed AAPL 6/22 with 1 bar;
+    # provider returns 3 bars for 6/22 → after backfill, 6/22 has all 3 (the dup PK ignored).
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO prices (ticker,datetime,interval,open,high,low,close,volume) "
+                 "VALUES ('AAPL','2026-06-22T13:30:00+0000','15min',1,1,1,1,1)")  # the lone sparse bar
+    conn.commit(); conn.close()
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [
+        _bar(datetime(2026, 6, 22, 9, 30, 0)),   # == the pre-seeded 13:30Z bar (dup PK → ignored)
+        _bar(datetime(2026, 6, 22, 9, 45, 0)),   # new
+        _bar(datetime(2026, 6, 22, 10, 0, 0)),   # new
+    ]})
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr,
+                                     now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    conn = sqlite3.connect(db)
+    n = conn.execute("SELECT COUNT(*) FROM prices WHERE ticker='AAPL' "
+                     "AND substr(datetime,1,10)='2026-06-22'").fetchone()[0]
+    conn.close()
+    assert n == 3                  # topped up 1 → 3 (NOT skipped as "present")
+    assert res["rows_added"] == 2  # 2 new bars; the dup-PK 13:30 ignored
+
+
+def test_backfill_topup_idempotent_on_complete_day(tmp_path, monkeypatch):
+    # a 2nd run over an already-complete day adds 0 (INSERT OR IGNORE), even though top-up
+    # refetches the full window unconditionally.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]})
+    a = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                   db_path=str(db), ibkr_src=ibkr,
+                                   now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    b = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                   db_path=str(db), ibkr_src=ibkr,
+                                   now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert a["rows_added"] == 1 and b["rows_added"] == 0
+
+
+def test_backfill_topup_excludes_in_progress_today(tmp_path, monkeypatch):
+    # 2c preserved: mid-session today must NOT be fetched (provider bar for today is not
+    # written), so we don't churn the in-progress day every run.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 23, 9, 30, 0))]})  # a "today" bar
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr,
+                                     now_et=datetime(2026, 6, 23, 11, 0, tzinfo=_ET))  # intraday
+    conn = sqlite3.connect(db)
+    today_rows = conn.execute("SELECT COUNT(*) FROM prices WHERE substr(datetime,1,10)='2026-06-23'").fetchone()[0]
+    conn.close()
+    assert today_rows == 0  # in-progress today not fetched/written

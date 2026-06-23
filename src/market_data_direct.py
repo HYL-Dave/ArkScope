@@ -194,6 +194,37 @@ def preflight_canonicalize(db_path: Optional[str] = None) -> dict:
         conn.close()
 
 
+# --- trading-day completeness (shared by gap detection + top-up backfill) ----------
+
+def _norm_now_et(now_et: Optional[datetime]) -> datetime:
+    """Resolve the ET clock: None → now(ET); naive → assume ET; aware → convert to ET."""
+    et = ZoneInfo(_EXCHANGE_TZ)
+    if now_et is None:
+        return datetime.now(et)
+    if now_et.tzinfo is None:
+        return now_et.replace(tzinfo=et)
+    return now_et.astimezone(et)
+
+
+def _is_session_complete(d: date, now_et: datetime) -> bool:
+    """A US trading day is COMPLETE iff strictly before the current ET date, or it IS the
+    current ET date and ET-now is past the close buffer (2c). A future ET day is never
+    complete. Judged in America/New_York (NOT a UTC date)."""
+    today_et = now_et.date()
+    if d < today_et:
+        return True
+    if d == today_et:
+        return now_et.timetz().replace(tzinfo=None) >= _RTH_COMPLETE_AFTER_ET
+    return False
+
+
+def _complete_trading_days(start: date, end: date, now_et: datetime) -> List[date]:
+    """Complete US trading days in [start, end] — weekends + US holidays excluded,
+    in-progress day excluded until close. The set a top-up backfill fetches over."""
+    return [d for d in _daterange(start, end)
+            if _market_day_status(d)["is_trading_day"] and _is_session_complete(d, now_et)]
+
+
 # --- gap detection (MISSING TRADING DAYS — day-presence, not bar-count) ------------
 
 def detect_price_gaps(
@@ -227,28 +258,13 @@ def detect_price_gaps(
     (complete) trading day is reported missing."""
     if not tickers:
         return {}
-    _et = ZoneInfo(_EXCHANGE_TZ)
-    if now_et is None:
-        now_et = datetime.now(_et)
-    elif now_et.tzinfo is None:
-        now_et = now_et.replace(tzinfo=_et)          # naive → assume ET
-    else:
-        now_et = now_et.astimezone(_et)              # aware (e.g. UTC) → convert to ET
-    today_et = now_et.date()
-
-    def _is_complete(d: date) -> bool:
-        if d < today_et:
-            return True
-        if d == today_et:
-            return now_et.timetz().replace(tzinfo=None) >= _RTH_COMPLETE_AFTER_ET
-        return False  # a future day (vs ET) is never complete
-
-    end = today or today_et
+    now_et = _norm_now_et(now_et)
+    end = today or now_et.date()
     start = end - timedelta(days=lookback_days)
     expected = [
         d for d in _daterange(start, end)
         if _market_day_status(d)["is_trading_day"]
-        and (include_incomplete_today or _is_complete(d))
+        and (include_incomplete_today or _is_session_complete(d, now_et))
     ]
     path = db_path or resolve_market_db_path()
     db_interval = _INTERVAL_DB.get(interval, interval)
@@ -421,24 +437,24 @@ def _default_polygon_src():  # pragma: no cover - exercised live (or via monkeyp
     return PolygonDataSource()
 
 
-def _fetch_rows_for_gaps(canon, gaps, interval, provider, ibkr_src, polygon_src) -> List[tuple]:
-    """Provider bars for a ticker's gap days → canonical rows. IBKR primary fetches the
-    CONTIGUOUS [min,max] gap span (auto-chunked; INSERT OR IGNORE drops the over-fetch).
+def _fetch_rows_for_gaps(canon, fetch_days, interval, provider, ibkr_src, polygon_src) -> List[tuple]:
+    """Provider bars for the COMPLETE-day window → canonical rows (top-up; ``fetch_days`` is
+    every complete trading day to cover, not just zero-bar gaps). IBKR primary fetches the
+    CONTIGUOUS [min,max] span in one request (auto-chunked; INSERT OR IGNORE dedupes).
 
-    Polygon fallback (per gap-day) engages ONLY when IBKR is REACHABLE but RETURNS NO
-    bars (e.g. the symbol isn't on IBKR / no data for those days). A Gateway/API
-    CONNECTION failure makes ``fetch_historical_intraday`` RAISE — that propagates out of
-    here and is handled as a per-ticker error upstream (recorded in provider_sync_meta),
-    NOT silently masked by Polygon. So a misconfigured/down Gateway fails LOUD, by design;
-    it does not quietly switch providers."""
-    start, end = min(gaps), max(gaps)
+    Polygon fallback (per day) engages ONLY when IBKR is REACHABLE but RETURNS NO bars
+    (e.g. the symbol isn't on IBKR / no data). A Gateway/API CONNECTION failure makes
+    ``fetch_historical_intraday`` RAISE — that propagates out and is handled as a per-ticker
+    error upstream (recorded in provider_sync_meta), NOT silently masked by Polygon. So a
+    misconfigured/down Gateway fails LOUD; it does not quietly switch providers."""
+    start, end = min(fetch_days), max(fetch_days)
     rows: List[tuple] = []
     if provider == "ibkr" and ibkr_src is not None:
         by_ticker = ibkr_src.fetch_historical_intraday([canon], start, end, interval="15 mins")
         bars = by_ticker.get(canon, []) if isinstance(by_ticker, dict) else []
         rows = _ibkr_bars_to_rows(canon, bars, interval)
     if not rows and polygon_src is not None:  # IBKR reachable-but-empty → Polygon (NOT on a raise)
-        for day in gaps:
+        for day in fetch_days:
             results = polygon_src.fetch_intraday_prices(canon, day, multiplier=15, timespan="minute")
             rows.extend(_polygon_results_to_rows(canon, results or [], interval))
     return rows
@@ -466,18 +482,26 @@ def backfill_prices_direct(
     ibkr_src=None,
     polygon_src=None,
     today: Optional[date] = None,
+    now_et: Optional[datetime] = None,
 ) -> dict:
-    """Direct provider→SQLite price backfill: fill MISSING TRADING DAYS in the local
-    ``prices`` table from a provider (IBKR primary / Polygon fallback) — no PG.
+    """Direct provider→SQLite price backfill (FULL-WINDOW TOP-UP, 2d) — heal sparse/partial
+    days in the local ``prices`` table from a provider (IBKR primary / Polygon fallback), no PG.
 
-    Holds ``market_write_lock`` ONCE at the outer level (serializes vs the PG→local
-    mirror); inside it: ``preflight_canonicalize`` (regularizes the live DB — does NOT
-    re-take the lock, so no nested-flock self-block), then per-ticker gap-detect → fetch →
-    canonical-row INSERT OR IGNORE → telemetry. Tickers are canonicalized + deduped BEFORE
-    fetch/insert (lock 2). A per-ticker failure is recorded and isolated (never aborts the
-    batch); an EMPTY scope fails loud. ``ibkr_src``/``polygon_src`` are injectable for
-    tests; unset → lazily constructed (live). The scheduler adapter calls this with
-    ``tickers_arg`` (CSV) + ``progress_cb`` (drop-in like collect_polygon_news)."""
+    TOP-UP not zero-bar-gap (the canary finding): a day with 1 of 26 bars is day-presence
+    "present" yet actually broken (IBKR has the full day). So this fetches EVERY COMPLETE
+    trading day in the lookback window per ticker and ``INSERT OR IGNORE``s — present bars
+    dedupe on the PK, missing bars fill. Heals sparse days (1→26) and tops up partial days on
+    a later run once the provider has them, with NO bar-count/early-close session model. The
+    in-progress ET day is excluded (2c) so we don't churn today every run; a partial today
+    completes on a later run after close. NOTE: INSERT OR IGNORE only ADDS missing bars — it
+    does not correct an existing wrong OHLCV value (out of scope; the problem is missing/sparse).
+
+    Holds ``market_write_lock`` ONCE (serializes vs the PG→local mirror); inside it
+    ``preflight_canonicalize`` (does NOT re-take the lock — no nested flock) → per-ticker
+    fetch → canonical-row INSERT OR IGNORE → telemetry. Tickers canonicalized + deduped
+    before fetch/insert. Per-ticker failure isolated (never aborts the batch); EMPTY scope
+    fails loud. ``ibkr_src``/``polygon_src`` injectable for tests, else lazily constructed.
+    Scheduler adapter calls with ``tickers_arg`` (CSV) + ``progress_cb``."""
     path = db_path or resolve_market_db_path()
     if tickers_arg is not None:
         raw = [t.strip() for t in tickers_arg.split(",") if t.strip()]
@@ -502,7 +526,10 @@ def backfill_prices_direct(
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()
 
-    end = today or datetime.now(timezone.utc).date()
+    now_et = _norm_now_et(now_et)
+    end = today or now_et.date()
+    start = end - timedelta(days=lookback_days)
+    fetch_days = _complete_trading_days(start, end, now_et)  # the top-up window (2c-gated)
     rollup = {"provider": provider, "tickers_scanned": 0, "gaps_found": 0,
               "rows_added": 0, "errors": {}}
 
@@ -535,12 +562,15 @@ def backfill_prices_direct(
                 for i, canon in enumerate(scope, 1):
                     rollup["tickers_scanned"] += 1
                     try:
-                        gaps = detect_price_gaps([canon], interval=interval,
-                                                 lookback_days=lookback_days, db_path=path,
-                                                 today=end)[canon]
-                        if gaps:
-                            rollup["gaps_found"] += len(gaps)
-                            rows = _fetch_rows_for_gaps(canon, gaps, interval, provider,
+                        # TOP-UP: fetch the WHOLE complete-day window (not just zero-bar days)
+                        # so sparse/partial days heal. INSERT OR IGNORE dedupes present bars.
+                        # zero-bar days are still counted for reporting (informative only).
+                        zero_bar = detect_price_gaps([canon], interval=interval,
+                                                     lookback_days=lookback_days, db_path=path,
+                                                     today=end, now_et=now_et)[canon]
+                        rollup["gaps_found"] += len(zero_bar)
+                        if fetch_days:
+                            rows = _fetch_rows_for_gaps(canon, fetch_days, interval, provider,
                                                         ibkr_src, polygon_src)
                             added = _insert_rows(conn, rows)
                             rollup["rows_added"] += added
