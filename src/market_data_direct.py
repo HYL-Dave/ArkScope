@@ -5,7 +5,7 @@ PG→SQLite MIRROR; this module writes the local ``prices`` table DIRECTLY from 
 provider (IBKR primary / Polygon fallback) so local freshness no longer depends on
 PG. No runtime PG dependency lives here.
 
-Slice #2a (hermetic, PG-free, no-Gateway core) +#2b·1 (the write lock):
+Slice #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch + write path):
 - ``backup_market_db``        : WAL-safe backup (SQLite backup API, NOT shutil.copyfile);
 - ``preflight_canonicalize``  : local-only create+seed ticker_aliases + fold existing
                                 rows (reuses slice-1 helpers); regularizes the live DB
@@ -19,11 +19,13 @@ Slice #2a (hermetic, PG-free, no-Gateway core) +#2b·1 (the write lock):
                                 US-holiday aware — NOT a per-day bar-count completeness
                                 claim, see the naming note below);
 - ``provider_sync_runs`` / ``provider_sync_meta`` tables + helpers (NEW; never
-  ``market_sync_meta``, which means "PG mirror").
+  ``market_sync_meta``, which means "PG mirror");
+- ``_ibkr_bars_to_rows`` / ``_polygon_results_to_rows`` + ``backfill_prices_direct``
+  (2b·2): IBKR-primary / Polygon-fallback fetch → canonicalize-before-insert →
+  INSERT OR IGNORE → provider_sync telemetry, under ``market_write_lock``.
 
-Still slice #2b (NOT in this file yet): the provider fetch (IBKR/Polygon) +
-canonicalize-before-insert write path (2b·2), and the scheduler ``price_backfill``
-source + run_source guard + live smoke (2b·3).
+Still slice #2b·3 (NOT in this file yet): the scheduler ``price_backfill`` source +
+``run_source`` guard (skip ``_local_refresh`` for a ``sync_flag=None`` adapter) + live smoke.
 """
 
 from __future__ import annotations
@@ -439,10 +441,20 @@ def backfill_prices_direct(
     if not raw:
         raise RuntimeError("backfill_prices_direct: empty ticker scope (active universe unavailable)")
 
-    if provider == "ibkr" and ibkr_src is None:
-        ibkr_src = _default_ibkr_src()
-    if polygon_src is None:
-        polygon_src = _default_polygon_src() if provider == "polygon" else polygon_src
+    if provider == "ibkr":
+        if ibkr_src is None:
+            ibkr_src = _default_ibkr_src()
+        if polygon_src is None:
+            # IBKR primary + Polygon FALLBACK (the documented design) — also on the live
+            # path, not just when a test injects polygon_src. Best-effort: a missing
+            # POLYGON_API_KEY (construction raises) must NOT break the IBKR-only backfill.
+            try:
+                polygon_src = _default_polygon_src()
+            except Exception:  # noqa: BLE001
+                logger.info("Polygon fallback unavailable (e.g. no API key); IBKR-only backfill")
+                polygon_src = None
+    elif provider == "polygon" and polygon_src is None:
+        polygon_src = _default_polygon_src()
 
     end = today or datetime.now(timezone.utc).date()
     rollup = {"provider": provider, "tickers_scanned": 0, "gaps_found": 0,

@@ -524,3 +524,33 @@ def test_backfill_fatal_path_finish_failure_does_not_mask_original(tmp_path, mon
         mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=1, provider="ibkr",
                                    db_path=str(db), ibkr_src=ibkr, progress_cb=boom_progress,
                                    today=date(2026, 6, 18))
+
+
+def test_backfill_default_ibkr_path_builds_polygon_fallback(tmp_path, monkeypatch):
+    # 2b·2 residual: the LIVE provider="ibkr" path (no injected polygon_src) must still
+    # construct a Polygon fallback so IBKR-empty falls back as designed (not IBKR-only).
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={})  # IBKR returns nothing
+    epoch_ms = int(datetime(2026, 6, 17, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    poly = _FakePolygon(results_by_day={date(2026, 6, 17): [
+        {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
+    monkeypatch.setattr(mdd, "_default_ibkr_src", lambda: ibkr)
+    monkeypatch.setattr(mdd, "_default_polygon_src", lambda: poly)
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), today=date(2026, 6, 18))  # NO srcs injected
+    assert res["rows_added"] == 1 and poly.calls  # Polygon fallback engaged on the default path
+
+
+def test_backfill_default_ibkr_path_survives_missing_polygon_key(tmp_path, monkeypatch):
+    # reviewer caveat: no Polygon key (construction raises) must NOT break the IBKR path —
+    # it just runs IBKR-only without a fallback.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    monkeypatch.setattr(mdd, "_default_ibkr_src", lambda: ibkr)
+    monkeypatch.setattr(mdd, "_default_polygon_src",
+                        lambda: (_ for _ in ()).throw(RuntimeError("POLYGON_API_KEY not set")))
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), today=date(2026, 6, 18))  # NO srcs injected
+    assert res["rows_added"] == 1  # IBKR path works; missing Polygon key didn't break it
