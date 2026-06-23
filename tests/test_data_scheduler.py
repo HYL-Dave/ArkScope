@@ -28,6 +28,9 @@ def hermetic(tmp_path, monkeypatch):
     # default stubs: no real subprocess, no real local refresh, no telemetry
     monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
     monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
+    # active-universe scope: stub a non-empty default so price/universe sources are
+    # hermetic (no real profile DB). Tests asserting the empty-scope path override this.
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     import scripts.collection.collect_finnhub_news as cfn
     import scripts.collection.collect_polygon_news as cpn
     monkeypatch.setattr(cpn, "run_incremental",
@@ -438,3 +441,68 @@ def test_last_result_surfaces_skips_in_snapshot(tmp_path):
     assert ds.run_source("polygon_news")["status"] == "succeeded"
     snap = ds.status_snapshot()["polygon_news"]
     assert snap["last_result"]["status"] == "succeeded"
+
+
+# --- price_backfill: direct local writer source (2b·3) -----------------------------
+
+def test_price_backfill_source_registered():
+    d = ds.SOURCES["price_backfill"]
+    assert d.adapter == ("src.market_data_direct", "backfill_prices_direct")
+    assert d.ibkr is True and d.universe_tickers is True and d.sync_flag is None
+    assert ds.source_config("price_backfill")["enabled"] is False  # default-off
+
+
+def test_price_backfill_passes_universe_and_progress_no_pg_no_mirror(monkeypatch):
+    import src.market_data_direct as mdd
+    seen = {}
+
+    def _fake_backfill(tickers_arg=None, progress_cb=None, **kw):
+        seen["tickers_arg"] = tickers_arg
+        if progress_cb:
+            progress_cb(1, 2, "AAPL")
+        return {"provider": "ibkr", "tickers_scanned": 2, "rows_added": 5, "errors": {}}
+
+    monkeypatch.setattr(mdd, "backfill_prices_direct", _fake_backfill)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
+    # PG sync + local mirror must NOT run for a direct writer
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync for direct writer")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(AssertionError("no _local_refresh for direct writer")))
+    res = ds.run_source("price_backfill")
+    assert res["status"] == "succeeded"
+    assert seen["tickers_arg"] == "AAPL,NVDA"                       # active universe passed
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_local_incremental_still_runs_local_refresh(monkeypatch):
+    # regression for the guard: local_incremental (adapter=None, sync_flag=None) IS the
+    # mirror — it must STILL call _local_refresh (the guard only skips DIRECT adapters).
+    ran = {"refresh": False}
+    monkeypatch.setattr(ds, "_local_refresh", lambda: ran.__setitem__("refresh", True) or {"ok": True})
+    res = ds.run_source("local_incremental")
+    assert res["status"] == "succeeded" and ran["refresh"] is True
+    assert res["local_refresh"] == {"ok": True}
+
+
+def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
+    import src.market_data_direct as mdd
+    monkeypatch.setattr(mdd, "backfill_prices_direct",
+                        lambda **kw: {"tickers_scanned": 0, "rows_added": 0, "errors": {}})
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+    monkeypatch.setattr(ds, "_IBKR_LOCK_TIMEOUT_S", 0.05)  # fast timeout → skip, not 30min block
+    assert ds._IBKR_LOCK.acquire(blocking=False)           # someone holds the gateway
+    try:
+        res = ds.run_source("price_backfill")              # IBKR busy → must SKIP, not block
+        assert res["status"] == "skipped" and "IBKR" in res["reason"]
+    finally:
+        ds._IBKR_LOCK.release()
+
+
+def test_price_backfill_empty_scope_fails_loud(monkeypatch):
+    import src.market_data_direct as mdd
+    monkeypatch.setattr(mdd, "backfill_prices_direct",
+                        lambda **kw: (_ for _ in ()).throw(AssertionError("must not run without scope")))
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
+    res = ds.run_source("price_backfill")
+    assert res["status"] == "failed" and "scope" in res["error"]

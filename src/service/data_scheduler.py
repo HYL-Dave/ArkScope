@@ -134,6 +134,14 @@ SOURCES: Dict[str, SourceDef] = {
             None, None, default_interval_min=15,
             description="PG → market_data.db delta only (no provider fetch)",
         ),
+        SourceDef(
+            "price_backfill", "本地價格直連補抓",
+            None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
+            adapter=("src.market_data_direct", "backfill_prices_direct"),
+            description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
+                        "trading-day gaps for the active universe. sync_flag=None → no PG "
+                        "sync AND no _local_refresh (it writes the local DB itself).",
+        ),
     )
 }
 
@@ -469,6 +477,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
+            elif d.adapter is not None and d.sync_flag is None:
+                # DIRECT local writer (e.g. price_backfill): it already wrote
+                # market_data.db itself — a PG→local mirror would be pointless and would
+                # re-pull stale PG. Skip it. (local_incremental has adapter=None and IS
+                # the mirror, so it still runs _local_refresh below.)
+                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
             else:
                 result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
