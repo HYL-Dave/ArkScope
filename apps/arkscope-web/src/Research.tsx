@@ -46,6 +46,7 @@ import {
   reduce,
   selectFooter,
   type Message,
+  type PendingTurn,
   type Thread,
   type ToolTraceRow,
   type TraceRow,
@@ -598,17 +599,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
             )}
 
             {state.pending && (
-              <div className="research-bubble assistant pending">
-                {state.pending.interimText && <div className="research-interim muted">{state.pending.interimText}</div>}
-                {state.pending.thinkingActive && (
-                  <div className="research-thinking muted tiny">
-                    <span className="research-spinner" />
-                    {pendingPresentation?.trace_mode === "post_run"
-                      ? `${PRESENTATION[state.pending.provider as ProviderId]?.label ?? state.pending.provider} 執行中，完成後一次顯示工具追蹤…`
-                      : "思考中…"}
-                  </div>
-                )}
-              </div>
+              <PendingAssistantBubble pending={state.pending} />
             )}
           </div>
 
@@ -776,6 +767,30 @@ function Bubble({
           >
             重試
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function PendingAssistantBubble({ pending }: { pending: PendingTurn }) {
+  const provider = pending.provider as ProviderId;
+  const presentation = PRESENTATION[provider];
+  const providerLabel = presentation?.label ?? pending.provider;
+  const hasInterimText = pending.interimText.length > 0;
+  const status = hasInterimText
+    ? "生成中…"
+    : presentation?.trace_mode === "post_run"
+      ? `${providerLabel} 執行中，完成後一次顯示工具追蹤…`
+      : "思考中…";
+
+  return (
+    <div className="research-bubble assistant pending">
+      {hasInterimText && <div className="research-interim research-bubble-body">{pending.interimText}</div>}
+      {(pending.thinkingActive || hasInterimText) && (
+        <div className="research-thinking muted tiny">
+          <span className="research-spinner" />
+          {status}
         </div>
       )}
     </div>

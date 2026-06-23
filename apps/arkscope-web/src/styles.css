@@ -2292,7 +2292,7 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
 .markdown-body th { background: var(--panel2); }
 .markdown-body img { max-width: 100%; height: auto; border-radius: 6px; }
 .markdown-body .md-img-blocked { font-style: italic; }
-.research-interim { white-space: pre-wrap; font-style: italic; margin-bottom: 6px; }
+.research-interim { margin-bottom: 6px; }
 .research-bubble-tickers { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .research-bubble-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 
