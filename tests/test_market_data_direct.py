@@ -692,3 +692,24 @@ def test_backfill_topup_excludes_in_progress_today(tmp_path, monkeypatch):
     today_rows = conn.execute("SELECT COUNT(*) FROM prices WHERE substr(datetime,1,10)='2026-06-23'").fetchone()[0]
     conn.close()
     assert today_rows == 0  # in-progress today not fetched/written
+
+
+def test_backfill_ibkr_empty_from_swallowed_request_error_falls_to_polygon(tmp_path, monkeypatch):
+    # 2d review (MED): the real IBKRDataSource SWALLOWS a request-level failure (mid-session
+    # disconnect / pacing / timeout) into an EMPTY result (logs+continues, no raise) — it is
+    # indistinguishable here from "symbol absent", so it falls through to Polygon. This pins
+    # that documented behavior so the contract can't silently drift back to "raises loud".
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={})  # empty (models the swallowed-error / absent result)
+    epoch_ms = int(datetime(2026, 6, 22, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    poly = _FakePolygon(results_by_day={date(2026, 6, 22): [
+        {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, polygon_src=poly,
+                                     now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert res["rows_added"] == 1 and poly.calls          # silently switched to Polygon
+    # masked: NOT recorded as a per-ticker error (the documented MED limitation)
+    conn = sqlite3.connect(db)
+    assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()[0] is None
+    conn.close()

@@ -442,11 +442,19 @@ def _fetch_rows_for_gaps(canon, fetch_days, interval, provider, ibkr_src, polygo
     every complete trading day to cover, not just zero-bar gaps). IBKR primary fetches the
     CONTIGUOUS [min,max] span in one request (auto-chunked; INSERT OR IGNORE dedupes).
 
-    Polygon fallback (per day) engages ONLY when IBKR is REACHABLE but RETURNS NO bars
-    (e.g. the symbol isn't on IBKR / no data). A Gateway/API CONNECTION failure makes
-    ``fetch_historical_intraday`` RAISE — that propagates out and is handled as a per-ticker
-    error upstream (recorded in provider_sync_meta), NOT silently masked by Polygon. So a
-    misconfigured/down Gateway fails LOUD; it does not quietly switch providers."""
+    Polygon fallback (per day) engages whenever IBKR returns NO bars for the span. Note the
+    failure granularity of ``IBKRDataSource.fetch_historical_intraday`` (verified):
+      - a COLD-CONNECT failure (Gateway down/unreachable at first connect) RAISES
+        ``ConnectionError`` → propagates out → recorded as a per-ticker error (loud). Polygon
+        is NOT reached.
+      - a REQUEST-LEVEL failure once connected (mid-session disconnect, pacing rejection,
+        timeout, no-data/error-162) is swallowed by the adapter (logs + continues) and
+        returns an EMPTY result, NOT a raise. So it is INDISTINGUISHABLE here from "symbol
+        genuinely absent on IBKR" — both fall through to Polygon. A real IBKR hiccup is
+        therefore masked as a Polygon substitution (data stays correct — Polygon rows
+        byte-match the UTC PK + INSERT OR IGNORE — but provider_sync_meta won't flag the IBKR
+        problem). Distinguishing the two needs the adapter to surface per-chunk errors; that
+        observability fix is a DEFERRED follow-up (best done with the recurring scheduler)."""
     start, end = min(fetch_days), max(fetch_days)
     rows: List[tuple] = []
     if provider == "ibkr" and ibkr_src is not None:
