@@ -383,15 +383,21 @@ def _default_polygon_src():  # pragma: no cover - exercised live (or via monkeyp
 
 def _fetch_rows_for_gaps(canon, gaps, interval, provider, ibkr_src, polygon_src) -> List[tuple]:
     """Provider bars for a ticker's gap days → canonical rows. IBKR primary fetches the
-    CONTIGUOUS [min,max] gap span (auto-chunked; INSERT OR IGNORE drops the over-fetch);
-    Polygon fallback (per gap-day) only when IBKR yields nothing."""
+    CONTIGUOUS [min,max] gap span (auto-chunked; INSERT OR IGNORE drops the over-fetch).
+
+    Polygon fallback (per gap-day) engages ONLY when IBKR is REACHABLE but RETURNS NO
+    bars (e.g. the symbol isn't on IBKR / no data for those days). A Gateway/API
+    CONNECTION failure makes ``fetch_historical_intraday`` RAISE — that propagates out of
+    here and is handled as a per-ticker error upstream (recorded in provider_sync_meta),
+    NOT silently masked by Polygon. So a misconfigured/down Gateway fails LOUD, by design;
+    it does not quietly switch providers."""
     start, end = min(gaps), max(gaps)
     rows: List[tuple] = []
     if provider == "ibkr" and ibkr_src is not None:
         by_ticker = ibkr_src.fetch_historical_intraday([canon], start, end, interval="15 mins")
         bars = by_ticker.get(canon, []) if isinstance(by_ticker, dict) else []
         rows = _ibkr_bars_to_rows(canon, bars, interval)
-    if not rows and polygon_src is not None:  # fallback (Gateway down / IBKR can't serve)
+    if not rows and polygon_src is not None:  # IBKR reachable-but-empty → Polygon (NOT on a raise)
         for day in gaps:
             results = polygon_src.fetch_intraday_prices(canon, day, multiplier=15, timespan="minute")
             rows.extend(_polygon_results_to_rows(canon, results or [], interval))
