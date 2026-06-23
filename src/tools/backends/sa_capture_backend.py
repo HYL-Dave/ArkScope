@@ -109,10 +109,11 @@ class SACaptureDatabaseBackend(LocalMarketDatabaseBackend):
     """DatabaseBackend whose SA domain lives in data/sa_capture.db (hard cutover)."""
 
     def __init__(self, dsn: str, sslmode: str = "prefer", *, sa_db: str,
-                 market_db: str = ""):
+                 market_db: str = "", strict: bool = False):
         # DatabaseBackend connects lazily (_get_conn), so constructing this with a
-        # dead/fake PG DSN must not touch the network.
-        super().__init__(dsn, sslmode, market_db=market_db)
+        # dead/fake PG DSN must not touch the network. ``strict`` threads to the market
+        # overrides (local-only, no PG fallback); SA reads are already hard-local.
+        super().__init__(dsn, sslmode, market_db=market_db, strict=strict)
         self._sa_db = sa_db
 
     # ------------------------------------------------------------------

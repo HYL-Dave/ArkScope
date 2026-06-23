@@ -235,19 +235,24 @@ class DataAccessLayer:
             if Path(candidate).exists():  # enabling before migration keeps PG (safe)
                 sa_db = candidate
 
+        # strict (local-only) market mode: market reads serve local-only, never PG. Only
+        # meaningful when market routing is active. A short PG connect_timeout makes any
+        # residual non-market PG path fail fast (desktop-app boot-without-PG).
+        strict = bool(market_on) and self._local_market_strict_enabled()
         if sa_db:
             from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
 
             logger.info(
                 f"Using SACaptureDatabaseBackend (sa_capture → {sa_db}, HARD local"
-                f"{'; market_data → ' + market_db if market_on else ''})")
+                f"{'; market_data → ' + market_db + (' STRICT' if strict else '') if market_on else ''})")
             return SACaptureDatabaseBackend(
-                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "")
+                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "", strict=strict)
         if market_on:
             from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
 
-            logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, PG fallback)")
-            return LocalMarketDatabaseBackend(dsn, sslmode, market_db=market_db)
+            logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, "
+                        f"{'STRICT local-only' if strict else 'PG fallback'})")
+            return LocalMarketDatabaseBackend(dsn, sslmode, market_db=market_db, strict=strict)
         logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
         return DatabaseBackend(dsn=dsn, sslmode=sslmode)
 
@@ -280,6 +285,18 @@ class DataAccessLayer:
 
     def _local_market_enabled(self) -> bool:
         return self._profile_setting_truthy("use_local_market", "ARKSCOPE_USE_LOCAL_MARKET")
+
+    def _local_market_strict_enabled(self) -> bool:
+        """Strict (local-only) market mode: market reads never fall back to PG. Off by
+        default — opt in once the local mirror is trusted complete (PG-exit step R4).
+
+        NOTE (by design): this is a MODIFIER of ``use_local_market``, NOT an independent
+        "never use PG" kill switch. ``use_local_market_strict=true`` only takes effect when
+        ``use_local_market`` is also on AND market_data.db exists (see ``_make_db_backend``:
+        ``strict = market_on and …``). It hardens the MARKET domain only; non-market PG paths
+        (SA is hard-local separately; app-records are a later slice) are out of its scope —
+        their fail-fast comes from the short connect_timeout, not this flag."""
+        return self._profile_setting_truthy("use_local_market_strict", "ARKSCOPE_LOCAL_MARKET_STRICT")
 
     def _local_sa_enabled(self) -> bool:
         """3d flip toggle: SA capture domain → local sa_capture.db (hard cutover)."""

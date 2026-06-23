@@ -15,13 +15,13 @@ class _StubSABackend:
     """Stands in for SACaptureDatabaseBackend (built in parallel by prep-2) so the
     matrix tests are hermetic — they assert SELECTION, not backend behavior."""
 
-    def __init__(self, dsn, sslmode="prefer", *, sa_db, market_db=""):
-        self.dsn, self.sa_db, self.market_db = dsn, sa_db, market_db
+    def __init__(self, dsn, sslmode="prefer", *, sa_db, market_db="", strict=False):
+        self.dsn, self.sa_db, self.market_db, self.strict = dsn, sa_db, market_db, strict
 
 
 class _StubLMDB:
-    def __init__(self, dsn, sslmode="prefer", *, market_db):
-        self.dsn, self.market_db = dsn, market_db
+    def __init__(self, dsn, sslmode="prefer", *, market_db, strict=False):
+        self.dsn, self.market_db, self.strict = dsn, market_db, strict
 
 
 class _StubPG:
@@ -72,6 +72,7 @@ def test_market_only(env):
     env.market_db.write_bytes(b"")  # exists
     b = _make(env)
     assert isinstance(b, _StubLMDB) and b.market_db == str(env.market_db)
+    assert b.strict is False
 
 
 def test_sa_only_market_inert(env):
@@ -91,6 +92,29 @@ def test_both_on_one_instance_serves_both(env):
     b = _make(env)
     assert isinstance(b, _StubSABackend)
     assert b.sa_db == str(env.sa_db) and b.market_db == str(env.market_db)
+    assert b.strict is False
+
+
+def test_market_strict_threads_to_selected_backend(env):
+    env.profile.set_setting("use_local_market", "true")
+    env.profile.set_setting("use_local_market_strict", "true")
+    env.market_db.write_bytes(b"")
+    b = _make(env)
+    assert isinstance(b, _StubLMDB)
+    assert b.market_db == str(env.market_db)
+    assert b.strict is True
+
+
+def test_sa_plus_market_strict_threads_to_single_backend(env):
+    env.profile.set_setting("use_local_sa", "true")
+    env.profile.set_setting("use_local_market", "true")
+    env.profile.set_setting("use_local_market_strict", "true")
+    env.sa_db.write_bytes(b"")
+    env.market_db.write_bytes(b"")
+    b = _make(env)
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db) and b.market_db == str(env.market_db)
+    assert b.strict is True
 
 
 def test_sa_toggle_without_db_stays_pg(env):

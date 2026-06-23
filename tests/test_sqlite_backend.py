@@ -810,3 +810,88 @@ def test_query_news_stats_aggregates_local_sentiment(tmp_path):
     assert row["article_count"] == 3 and row["scored_count"] == 2
     assert row["avg_sentiment"] == 3.5
     assert row["bullish_count"] == 1 and row["bearish_count"] == 1
+
+
+# --- strict (local-only) mode: market reads NEVER dial PG (desktop-app boot-without-PG) ---
+
+_MARKET_PG_METHODS = (
+    "query_prices", "query_news", "query_news_search", "query_news_stats", "query_news_feed",
+    "query_iv_history", "query_fundamentals", "get_financial_cache", "query_health_stats",
+    "get_available_tickers",
+)
+
+
+def _poison_pg(monkeypatch):
+    """Make every market read on the PG base RAISE — so any strict-mode fallback is caught."""
+    def boom(self, *a, **k):
+        raise AssertionError("PG dialed in strict mode")
+    for m in _MARKET_PG_METHODS:
+        monkeypatch.setattr(DatabaseBackend, m, boom)
+
+
+def test_strict_market_serves_local_without_pg(market_db, monkeypatch):
+    db, _ = market_db
+    _poison_pg(monkeypatch)
+    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
+    # local HITS resolve from SQLite, PG never touched
+    assert len(b.query_prices("AAPL", days=30)) == 8
+    assert b.get_available_tickers("prices") == ["AAPL"]
+    assert not b.query_news(ticker="AAPL", scored_only=False).empty
+    assert set(b.query_health_stats()) == {"news", "prices", "iv_history", "financial_cache"}
+
+
+def test_strict_market_local_miss_is_honest_empty_not_pg(market_db, monkeypatch):
+    db, _ = market_db
+    _poison_pg(monkeypatch)
+    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
+    # local MISS → honest empty / unavailable, NOT a PG fallback (no AssertionError raised)
+    assert b.query_prices("ZZZZ", days=30).empty
+    assert b.query_iv_history("ZZZZ").empty
+    assert b.query_fundamentals("ZZZZ") in ({}, None)
+    assert b.get_financial_cache("nope:key") is None
+    assert b.get_available_tickers("options") == []   # non-local type → strict empty, not PG
+
+
+def test_non_strict_still_falls_back_to_pg(market_db, monkeypatch):
+    db, _ = market_db
+    hit = []
+    monkeypatch.setattr(DatabaseBackend, "query_prices",
+                        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1])
+    b = LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db, strict=False)  # default
+    assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL" and hit == ["UNKNOWN"]
+
+
+def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
+    from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
+    db, _ = market_db
+    _poison_pg(monkeypatch)
+    sa_db = tmp_path / "sa.db"  # empty SA db is fine; we exercise the market path
+    sqlite3.connect(sa_db).close()
+    b = SACaptureDatabaseBackend("postgresql://unreachable/db", sa_db=str(sa_db), market_db=db, strict=True)
+    assert len(b.query_prices("AAPL", days=30)) == 8       # market served local
+    assert b.query_prices("ZZZZ", days=30).empty           # miss → honest empty, no PG
+
+
+def test_strict_uses_fast_pg_connect_timeout(market_db):
+    # boot-without-PG: a residual non-market PG path (app-records, a deferred slice) must
+    # FAIL FAST, not hang ~15s, when PG is unreachable. Strict → short connect_timeout.
+    db, _ = market_db
+    assert LocalMarketDatabaseBackend("postgresql://x/db", market_db=db, strict=True)._connect_timeout == 3
+    assert LocalMarketDatabaseBackend("postgresql://x/db", market_db=db, strict=False)._connect_timeout == 15
+
+
+def test_strict_news_feed_exception_returns_full_shape_not_thin(market_db, monkeypatch):
+    # On a NON-OperationalError local failure, the strict feed fallback must still be the
+    # CANONICAL full shape — News.tsx reads feed.total/feed.sources BEFORE the available
+    # guard, so a thin {available:false} would crash the News tab.
+    db, _ = market_db
+    _poison_pg(monkeypatch)  # PG must NOT be dialed in strict
+    b = LocalMarketDatabaseBackend("postgresql://unreachable/db", market_db=db, strict=True)
+
+    def _boom(**k):
+        raise RuntimeError("corrupt local db")
+    monkeypatch.setattr(b._market, "query_news_feed", _boom)
+
+    feed = b.query_news_feed(q="x")
+    assert set(feed) >= {"available", "items", "total", "sources", "days"}  # full shape, not thin
+    assert feed["available"] is False and feed["total"] == 0 and feed["sources"] == {}

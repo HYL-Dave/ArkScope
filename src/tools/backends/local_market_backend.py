@@ -39,25 +39,32 @@ import pandas as pd
 
 from . import provenance
 from .db_backend import DatabaseBackend
-from .sqlite_backend import SqliteBackend, _NEWS_COLS, _NEWS_SEARCH_COLS
+from .sqlite_backend import SqliteBackend, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
 
 logger = logging.getLogger(__name__)
 
 
 class LocalMarketDatabaseBackend(DatabaseBackend):
-    def __init__(self, dsn: str, sslmode: str = "prefer", *, market_db: str):
-        super().__init__(dsn, sslmode)  # full PG backend (lazy connect)
+    def __init__(self, dsn: str, sslmode: str = "prefer", *, market_db: str, strict: bool = False):
+        # strict (local-only): market reads NEVER fall back to PG — a local miss is an
+        # honest empty/unavailable, PG is import/archive only. The short connect_timeout
+        # makes any residual non-market PG path (app-records, a deferred slice) fail FAST
+        # rather than hang the desktop app when PG is unreachable.
+        super().__init__(dsn, sslmode, connect_timeout=3 if strict else 15)
         self._market = SqliteBackend(market_db)
         self._market_db = market_db
+        self._strict = strict
 
     def query_prices(self, ticker: str, interval: str = "15min", days: int = 30) -> pd.DataFrame:
         try:
             df = self._market.query_prices(ticker, interval=interval, days=days)
         except Exception as e:  # never let the local path break a read
-            logger.warning(f"local market query_prices failed ({e}); falling back to PG")
+            logger.warning(f"local market query_prices failed ({e})")
             df = None
         if df is not None and not df.empty:
             return df
+        if self._strict:
+            return df if df is not None else pd.DataFrame()  # local-only: honest empty, no PG
         return super().query_prices(ticker, interval=interval, days=days)  # PG authority/fallback
 
     def query_news(self, ticker=None, days=30, source="auto", scored_only=True, model=None):
@@ -75,7 +82,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             df = None
         if df is not None and not df.empty:
             return df
-        if scored_only or model:
+        if scored_only or model or self._strict:
             return df if df is not None else pd.DataFrame(columns=_NEWS_COLS)
         return super().query_news(
             ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
@@ -94,7 +101,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             df = None
         if df is not None and not df.empty:
             return df
-        if scored_only:
+        if scored_only or self._strict:
             return df if df is not None else pd.DataFrame(columns=_NEWS_SEARCH_COLS)
         return super().query_news_search(
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
@@ -108,7 +115,9 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         try:
             return self._market.query_news_stats(ticker=ticker, days=days)
         except Exception as e:
-            logger.warning(f"local query_news_stats failed ({e}); falling back to PG")
+            logger.warning(f"local query_news_stats failed ({e})")
+            if self._strict:
+                return pd.DataFrame(columns=_NEWS_STATS_COLS)  # local-only: honest empty, no PG
             return super().query_news_stats(ticker=ticker, days=days)
 
     def query_news_feed(self, q=None, ticker=None, source=None, days=30,
@@ -120,10 +129,15 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             local = self._market.query_news_feed(
                 q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
         except Exception as e:
-            logger.warning(f"local query_news_feed failed ({e}); falling back to PG")
-            local = {"available": False}
+            logger.warning(f"local query_news_feed failed ({e})")
+            # CANONICAL full shape (mirror SqliteBackend.query_news_feed's empty) — never a
+            # thin {available:False}: in strict mode this returns directly to the frontend,
+            # which reads total/sources before the available guard.
+            local = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
         if local.get("available"):
             return local
+        if self._strict:
+            return local  # local-only: honest local feed state (no PG), even if empty
         return super().query_news_feed(
             q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
 
@@ -131,11 +145,14 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         try:
             df = self._market.query_iv_history(ticker)
         except Exception as e:
-            logger.warning(f"local query_iv_history failed ({e}); falling back to PG")
+            logger.warning(f"local query_iv_history failed ({e})")
             df = None
         if df is not None and not df.empty:
             provenance.record("iv", "local")
             return df
+        if self._strict:
+            provenance.record("iv", "none")  # local-only: honest empty, no PG
+            return df if df is not None else pd.DataFrame()
         pg = super().query_iv_history(ticker)
         provenance.record("iv", "pg_fallback" if pg is not None and not pg.empty else "none")
         return pg
@@ -144,11 +161,14 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         try:
             data = self._market.query_fundamentals(ticker)
         except Exception as e:
-            logger.warning(f"local query_fundamentals failed ({e}); falling back to PG")
+            logger.warning(f"local query_fundamentals failed ({e})")
             data = None
         if data:  # non-empty dict → local hit
             provenance.record("fundamentals", "local")
             return data
+        if self._strict:
+            provenance.record("fundamentals", "none")  # local-only: honest empty, no PG
+            return data if data else {}
         pg = super().query_fundamentals(ticker)
         provenance.record("fundamentals", "pg_fallback" if pg else "none")
         return pg
@@ -160,10 +180,12 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         try:
             local = self._market.get_financial_cache(cache_key)
         except Exception as e:
-            logger.warning(f"local get_financial_cache failed ({e}); falling back to PG")
+            logger.warning(f"local get_financial_cache failed ({e})")
             local = None
         if local is not None:
             return local
+        if self._strict:
+            return None  # local-only: honest cache miss, no PG read-through
         # PG fallback (legacy rows) + read-through promotion into local (free, not a
         # paid call) so old PG cache migrates local over time.
         data = super().get_financial_cache(cache_key)
@@ -220,7 +242,10 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         try:
             return self._market.query_health_stats()
         except Exception as e:
-            logger.warning(f"local query_health_stats failed ({e}); falling back to PG")
+            logger.warning(f"local query_health_stats failed ({e})")
+            if self._strict:  # local-only: honest empty health, no PG
+                return {k: {"rows": [], "error": str(e)}
+                        for k in ("news", "prices", "iv_history", "financial_cache")}
             return super().query_health_stats()
 
     def get_available_tickers(self, data_type: str):
@@ -231,6 +256,8 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
                     return local
             except Exception:
                 pass
+        if self._strict:
+            return []  # local-only: honest empty (incl. non-local types), no PG
         return super().get_available_tickers(data_type)
 
     def close(self) -> None:

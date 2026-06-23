@@ -253,14 +253,18 @@ class DatabaseBackend:
     by creating connections on demand with a simple single-connection cache.
     """
 
-    def __init__(self, dsn: str, sslmode: str = "prefer"):
+    def __init__(self, dsn: str, sslmode: str = "prefer", connect_timeout: int = 15):
         """
         Args:
             dsn: PostgreSQL connection string.
             sslmode: SSL mode (disable for local Docker, require for cloud).
+            connect_timeout: psycopg2 connect timeout (s). Local-only/strict mode passes a
+                short value so a residual PG path fails FAST instead of hanging a desktop
+                app when PG is unreachable.
         """
         self._dsn = dsn
         self._sslmode = sslmode
+        self._connect_timeout = connect_timeout
         self._conn: Optional[psycopg2.extensions.connection] = None
 
     def _get_conn(self) -> psycopg2.extensions.connection:
@@ -282,7 +286,7 @@ class DatabaseBackend:
             self._conn = psycopg2.connect(
                 self._dsn,
                 sslmode=self._sslmode,
-                connect_timeout=15,
+                connect_timeout=self._connect_timeout,
             )
             self._conn.autocommit = True
         return self._conn
