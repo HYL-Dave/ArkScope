@@ -554,3 +554,68 @@ def test_backfill_default_ibkr_path_survives_missing_polygon_key(tmp_path, monke
     res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
                                      db_path=str(db), today=date(2026, 6, 18))  # NO srcs injected
     assert res["rows_added"] == 1  # IBKR path works; missing Polygon key didn't break it
+
+
+# --- 2c: completed-days-only gap rule (NY close-state, not UTC date) ---------------
+
+from datetime import time as _dtime
+try:
+    from zoneinfo import ZoneInfo as _ZI
+    _ET = _ZI("America/New_York")
+except Exception:  # pragma: no cover
+    _ET = timezone.utc
+
+
+def test_gaps_intraday_today_not_flagged(tmp_path):
+    # NY 11:00 ET on a trading day, table empty: TODAY is in-progress → NOT a gap
+    # (even with zero bars), so a future scheduler run can't freeze a partial day.
+    db = _prices_db(tmp_path, [])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
+                                 now_et=datetime(2026, 6, 23, 11, 0, tzinfo=_ET))
+    assert date(2026, 6, 23) not in gaps["AAPL"]
+
+
+def test_gaps_after_close_today_is_complete(tmp_path):
+    # NY 17:00 ET (after the 16:30 buffer), empty table → today IS complete → flagged.
+    db = _prices_db(tmp_path, [])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
+                                 now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert date(2026, 6, 23) in gaps["AAPL"]
+
+
+def test_gaps_next_day_flags_prior_trading_day(tmp_path):
+    # Next NY morning: the prior trading day (6/23) is complete → flagged if missing.
+    db = _prices_db(tmp_path, [])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=2, db_path=str(db),
+                                 now_et=datetime(2026, 6, 24, 9, 0, tzinfo=_ET))
+    assert date(2026, 6, 23) in gaps["AAPL"]
+
+
+def test_gaps_intraday_partial_today_does_not_hide_prior_gap(tmp_path):
+    # today has partial bars (10 of ~26) AND a prior trading day is missing: the
+    # in-progress day is excluded (not healed — that's deferred B), but the prior
+    # COMPLETE day is still correctly flagged.
+    db = _prices_db(tmp_path, [("AAPL", "2026-06-23T13:30:00+0000", "15min", 1, 1, 1, 1, 1)])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=2, db_path=str(db),
+                                 now_et=datetime(2026, 6, 23, 11, 0, tzinfo=_ET))  # intraday
+    assert date(2026, 6, 23) not in gaps["AAPL"]   # in-progress today excluded
+    assert date(2026, 6, 22) in gaps["AAPL"]       # prior complete day still flagged
+
+
+def test_gaps_include_incomplete_today_escape_hatch(tmp_path):
+    # explicit opt-in restores the old behavior (today counted even mid-session).
+    db = _prices_db(tmp_path, [])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
+                                 now_et=datetime(2026, 6, 23, 11, 0, tzinfo=_ET),
+                                 include_incomplete_today=True)
+    assert date(2026, 6, 23) in gaps["AAPL"]
+
+
+def test_gaps_weekend_holiday_still_excluded_with_completeness(tmp_path):
+    # the completeness gate must not change the weekend/holiday rule.
+    db = _prices_db(tmp_path, [])
+    gaps = mdd.detect_price_gaps(["AAPL"], lookback_days=8, db_path=str(db),
+                                 now_et=datetime(2026, 6, 24, 9, 0, tzinfo=_ET))
+    assert date(2026, 6, 20) not in gaps["AAPL"]   # Sat
+    assert date(2026, 6, 21) not in gaps["AAPL"]   # Sun
+    assert date(2026, 6, 19) not in gaps["AAPL"]   # Juneteenth

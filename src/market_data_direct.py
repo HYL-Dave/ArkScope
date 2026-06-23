@@ -36,6 +36,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
+from datetime import time as dtime  # aliased — `time` (stdlib module) is used for monotonic()
 from pathlib import Path
 from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
@@ -62,6 +63,11 @@ _MARKET_WRITE_LOCK_NAME = "local_refresh"
 
 _CANON_DOMAINS = ("prices", "news", "iv_history", "fundamentals")
 _EXCHANGE_TZ = "America/New_York"
+# A US trading day counts as "complete" (eligible for gap-fill) only after this ET time —
+# the RTH close (16:00) + a small settle buffer. Conservatively uses the REGULAR close even
+# on early-close days (a half-day is then considered complete a few hours "late", which is
+# harmless for a gap filler). Per-day bar-count completeness is deferred (see the docstring).
+_RTH_COMPLETE_AFTER_ET = dtime(16, 30)
 # JobRunsStore (PG telemetry) only accepts these — provider_sync_runs mirrors that set
 # so a run status can round-trip without a separate validation contract.
 _VALID_RUN_STATUSES = frozenset({"running", "succeeded", "failed"})
@@ -194,22 +200,50 @@ def detect_price_gaps(
     db_path: Optional[str] = None,
     *,
     today: Optional[date] = None,
+    now_et: Optional[datetime] = None,
+    include_incomplete_today: bool = False,
 ) -> Dict[str, List[date]]:
     """Per-ticker MISSING TRADING DAYS over the trailing ``lookback_days`` window.
 
     A day is "missing" iff it is a US-equity TRADING day (weekends + US market holidays
-    excluded via ``data_coverage_tools._market_day_status``) AND the local ``prices``
-    table has ZERO bars for the (canonical) ticker at ``interval`` that day.
+    excluded via ``data_coverage_tools._market_day_status``), is COMPLETE (see below), AND
+    the local ``prices`` table has ZERO bars for the (canonical) ticker at ``interval``.
 
-    This is DAY-PRESENCE, not completeness — a single bar marks a day present; partial-day
-    bar-quality (early closes etc.) is intentionally out of scope (see 2b). The query
-    ticker is resolved through ``ticker_aliases`` so an alias spelling finds canonical rows.
-    Read-only; an absent prices table ⇒ every expected trading day is reported missing."""
+    COMPLETED-DAYS-ONLY (2c): the in-progress US trading day is NOT a gap candidate until
+    the session has closed — judged in **America/New_York** (NOT a UTC date, which would
+    misclassify around the Taipei-morning / UTC-rollover boundary). A day is complete iff
+    it is strictly before the current ET date, or it IS the current ET date and ET-now is
+    past ``_RTH_COMPLETE_AFTER_ET``. This stops a mid-session run from filling a PARTIAL day
+    (10 of ~26 bars) that day-presence would then freeze as "present" forever.
+    ``include_incomplete_today=True`` opts out (counts the in-progress day too).
+
+    Still DAY-PRESENCE among complete days, NOT bar-count completeness — a single bar marks
+    a complete day present; healing an already-partial day (bar-count / early-close session
+    model) is a deferred follow-up (B), intentionally out of scope here. The query ticker is
+    resolved through ``ticker_aliases``. Read-only; an absent prices table ⇒ every expected
+    (complete) trading day is reported missing."""
     if not tickers:
         return {}
-    end = today or datetime.now(timezone.utc).date()
+    if now_et is None:
+        now_et = datetime.now(ZoneInfo(_EXCHANGE_TZ))
+    elif now_et.tzinfo is None:
+        now_et = now_et.replace(tzinfo=ZoneInfo(_EXCHANGE_TZ))
+    today_et = now_et.date()
+
+    def _is_complete(d: date) -> bool:
+        if d < today_et:
+            return True
+        if d == today_et:
+            return now_et.timetz().replace(tzinfo=None) >= _RTH_COMPLETE_AFTER_ET
+        return False  # a future day (vs ET) is never complete
+
+    end = today or today_et
     start = end - timedelta(days=lookback_days)
-    expected = [d for d in _daterange(start, end) if _market_day_status(d)["is_trading_day"]]
+    expected = [
+        d for d in _daterange(start, end)
+        if _market_day_status(d)["is_trading_day"]
+        and (include_incomplete_today or _is_complete(d))
+    ]
     path = db_path or resolve_market_db_path()
     db_interval = _INTERVAL_DB.get(interval, interval)
 
