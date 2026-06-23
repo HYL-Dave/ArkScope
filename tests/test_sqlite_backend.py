@@ -895,3 +895,34 @@ def test_strict_news_feed_exception_returns_full_shape_not_thin(market_db, monke
     feed = b.query_news_feed(q="x")
     assert set(feed) >= {"available", "items", "total", "sources", "days"}  # full shape, not thin
     assert feed["available"] is False and feed["total"] == 0 and feed["sources"] == {}
+
+
+# --- ticker canon resolve-on-read (strict-readiness slice #1) ----------------------
+
+def test_query_resolves_alias_to_canonical(tmp_path):
+    # A query for the alias spelling ('BRK.B') must resolve to the canonical rows
+    # ('BRK B') across domains — the cross-domain join fix, resolve-on-read.
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE ticker_aliases (alias TEXT PRIMARY KEY, canonical TEXT NOT NULL);"
+        "CREATE TABLE prices (ticker TEXT, datetime TEXT, interval TEXT, open REAL, high REAL, "
+        "low REAL, close REAL, volume INTEGER, PRIMARY KEY(ticker,datetime,interval));"
+    )
+    conn.execute("INSERT INTO ticker_aliases VALUES ('BRK.B','BRK B')")
+    pub = f"{date.today().isoformat()}T13:30:00+0000"
+    conn.execute("INSERT INTO prices VALUES ('BRK B',?,?,1,1,1,9,100)", (pub, "15min"))
+    conn.commit()
+    conn.close()
+    b = SqliteBackend(db)
+    # querying the ALIAS returns the canonical row's data
+    df_alias = b.query_prices("BRK.B", interval="15min", days=5)
+    df_canon = b.query_prices("BRK B", interval="15min", days=5)
+    assert len(df_alias) == 1 and float(df_alias.iloc[0]["close"]) == 9.0
+    assert len(df_canon) == 1  # canonical spelling still works too
+
+
+def test_canon_resolver_passthrough_when_no_alias_table(market_db):
+    # A pre-canon DB (no ticker_aliases table) must not break reads — resolver is a no-op.
+    db, _ = market_db
+    assert len(SqliteBackend(db).query_prices("AAPL", days=30)) == 8

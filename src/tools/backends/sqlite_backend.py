@@ -80,6 +80,22 @@ class SqliteBackend:
         conn.row_factory = sqlite3.Row
         return conn
 
+    def _canon(self, ticker: str) -> str:
+        """Resolve a query ticker to its canonical spelling via ticker_aliases, so an alias
+        (e.g. 'BRK.B') reaches the canonical rows ('BRK B') across domains. Upper-cased first
+        (callers already do). No-op + safe on a pre-canon DB with no ticker_aliases table."""
+        t = ticker.upper()
+        try:
+            conn = self._connect()
+            try:
+                row = conn.execute(
+                    "SELECT canonical FROM ticker_aliases WHERE alias = ?", (t,)).fetchone()
+            finally:
+                conn.close()
+            return row[0] if row else t
+        except sqlite3.OperationalError:
+            return t  # no ticker_aliases table (pre-canon DB) → passthrough
+
     def query_prices(self, ticker: str, interval: str = "15min", days: int = 30) -> pd.DataFrame:
         """OHLCV bars for ``ticker`` over the last ``days`` at ``interval``.
 
@@ -88,7 +104,7 @@ class SqliteBackend:
         last-close / sum-volume) — same definition as the PG path. Empty frame on
         any miss (LocalMarketDatabaseBackend then falls back to PG).
         """
-        ticker = ticker.upper()
+        ticker = self._canon(ticker)
         db_interval = _INTERVAL_MAP.get(interval, interval)
         # cutoff is a date string; ISO datetime strings sort lexicographically, so
         # `datetime >= 'YYYY-MM-DD'` correctly includes all of that day onward.
@@ -169,7 +185,7 @@ class SqliteBackend:
         conds, params = ["published_at >= ?"], [cutoff]
         if ticker:
             conds.append("ticker = ?")
-            params.append(ticker.upper())
+            params.append(self._canon(ticker))
         if source != "auto":
             conds.append("source = ?")
             params.append(source)
@@ -260,7 +276,7 @@ class SqliteBackend:
             conds.append("n.sentiment_score IS NOT NULL")
         if ticker:
             conds.append("n.ticker = ?")
-            params.append(ticker.upper())
+            params.append(self._canon(ticker))
         if len(q) >= 3:
             match = self._fts_match(q)
             sql = (
@@ -298,7 +314,7 @@ class SqliteBackend:
         conds, params = ["published_at >= ?"], [cutoff]
         if ticker:
             conds.append("ticker = ?")
-            params.append(ticker.upper())
+            params.append(self._canon(ticker))
         sql = (
             f"SELECT ticker, COUNT(*) AS article_count, {scored_count} AS scored_count, "
             "substr(MIN(published_at), 1, 10) AS earliest_date, "
@@ -341,7 +357,7 @@ class SqliteBackend:
             base_from = "news n"
             if ticker:
                 conds.append("n.ticker = ?")
-                params.append(ticker.upper())
+                params.append(self._canon(ticker))
             if source and source != "auto":
                 conds.append("n.source = ?")
                 params.append(source)
@@ -405,6 +421,7 @@ class SqliteBackend:
         """Local IV history for ``ticker`` (ordered by date ASC) — same columns as
         the PG path. Empty frame on any miss (caller falls back to PG)."""
         empty = pd.DataFrame(columns=_IV_COLS)
+        ticker = self._canon(ticker)
         try:
             conn = self._connect()
         except sqlite3.OperationalError:
@@ -413,7 +430,7 @@ class SqliteBackend:
             rows = conn.execute(
                 "SELECT date, atm_iv, hv_30d, vrp, spot_price, num_quotes FROM iv_history "
                 "WHERE ticker = ? ORDER BY date ASC",
-                (ticker.upper(),),
+                (ticker,),
             ).fetchall()
             return pd.DataFrame([tuple(r) for r in rows], columns=_IV_COLS) if rows else empty
         except sqlite3.OperationalError as e:
@@ -426,7 +443,7 @@ class SqliteBackend:
         """Latest local fundamentals snapshot for ``ticker``. Returns the same dict
         shape as the PG path (``snapshot`` / ``fin_summary`` / ``ownership`` pulled
         out of the stored ReportSnapshot JSON). Empty ``{}`` on any miss (PG fallback)."""
-        ticker = ticker.upper()
+        ticker = self._canon(ticker)
         try:
             conn = self._connect()
         except sqlite3.OperationalError:

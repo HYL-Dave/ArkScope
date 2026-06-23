@@ -119,6 +119,65 @@ def _ensure_news_sentiment_columns(conn) -> None:
             conn.execute(f"ALTER TABLE news ADD COLUMN {col} {decl}")
 
 
+# Ticker canonicalization (strict-readiness slice #1): one canonical spelling per company
+# so prices/news/fundamentals/iv join across domains. ``canonical`` is the spelling the
+# prices table already uses (the 2.27M-row history) — space form for class shares — so
+# canonicalizing never rewrites prices history. Seeded with the known BRK split; grows as
+# more aliases surface. Lives in market_data.db (locked topology). NOT for provider-sync
+# state (that is provider_sync_*; this is identity mapping only).
+_TICKER_ALIASES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS ticker_aliases (
+    alias     TEXT PRIMARY KEY,
+    canonical TEXT NOT NULL
+);
+"""
+_SEED_TICKER_ALIASES = (
+    ("BRK.B", "BRK B"),
+    ("BRK-B", "BRK B"),
+)
+
+
+def _ensure_ticker_aliases(conn) -> None:
+    """Idempotent: create ticker_aliases + seed the known splits (INSERT OR IGNORE so a
+    re-run never dups or clobbers an operator-edited mapping)."""
+    conn.executescript(_TICKER_ALIASES_SCHEMA)
+    conn.executemany(
+        "INSERT OR IGNORE INTO ticker_aliases (alias, canonical) VALUES (?, ?)",
+        _SEED_TICKER_ALIASES,
+    )
+
+
+def _canonicalize_table_tickers(conn, table: str) -> int:
+    """One-time PK-SAFE reconcile of EXISTING rows in ``table`` whose ticker is an alias →
+    its canonical spelling. Returns the number of DISTINCT alias spellings that had ≥1 row
+    reconciled (not the row count).
+
+    PK-safe (the load-bearing discipline): an alias row may collide with an already-present
+    canonical row (e.g. news has BOTH 'BRK B' and 'BRK.B'; prices may have a same-PK dup).
+    So per alias we UPDATE OR IGNORE (rename rows that DON'T collide) then DELETE whatever
+    alias rows remain (the collisions — a canonical row already exists, so the dup is
+    redundant). Never raises a PK IntegrityError, never loses a canonical row. Read paths
+    still resolve through the alias table, so this is cleanup, not a correctness dependency."""
+    aliases = conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall()
+    reconciled = 0
+    for alias, canonical in aliases:
+        if alias == canonical:
+            continue
+        before = conn.execute(
+            "SELECT COUNT(*) FROM {} WHERE ticker = ?".format(table), (alias,)).fetchone()[0]
+        if not before:
+            continue
+        # rename the non-colliding alias rows; OR IGNORE leaves a colliding row untouched
+        conn.execute(
+            "UPDATE OR IGNORE {} SET ticker = ? WHERE ticker = ?".format(table),
+            (canonical, alias))
+        # drop any alias rows that survived (they collided → canonical already exists)
+        conn.execute("DELETE FROM {} WHERE ticker = ?".format(table), (alias,))
+        reconciled += 1
+    conn.commit()
+    return reconciled
+
+
 _PRICE_INSERT = ("INSERT OR IGNORE INTO prices "
                  "(ticker, datetime, interval, open, high, low, close, volume) "
                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -300,6 +359,39 @@ def _sqlite_ticker_idsum(conn, sql: str) -> Dict[str, tuple]:
     return _ticker_idsum(conn.execute(sql).fetchall())
 
 
+def _fold_checksum_aliases(checksum: Dict, aliases: Dict[str, str], ticker_pos: int) -> Dict:
+    """Fold a checksum dict into canonical-ticker space so a post-canon LOCAL DB validates
+    against PRE-canon PG. ``ticker_pos`` = where the ticker sits in the key (tuple key
+    ``(source,ticker)`` → 1; bare ``ticker`` key → None). Colliding entries (e.g. BRK.B +
+    BRK B → BRK B) sum their (count, sum_id) component-wise, matching what the canonicalized
+    SQLite side produces. Returns a new dict; identity when no alias key is present."""
+    out: Dict = {}
+    for key, val in checksum.items():
+        if ticker_pos is None:
+            new_key = aliases.get(key, key)
+        else:
+            parts = list(key)
+            parts[ticker_pos] = aliases.get(parts[ticker_pos], parts[ticker_pos])
+            new_key = tuple(parts)
+        if new_key in out:
+            prev = out[new_key]
+            if isinstance(val, tuple):  # (count, sum_id) → component-wise sum
+                out[new_key] = tuple(a + b for a, b in zip(prev, val))
+            else:  # bare count (prices group) → scalar sum
+                out[new_key] = prev + val
+        else:
+            out[new_key] = val
+    return out
+
+
+def _load_ticker_aliases(conn) -> Dict[str, str]:
+    """alias→canonical map from a SQLite conn; {} if the table is absent (pre-canon DB)."""
+    try:
+        return {a: c for a, c in conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall()}
+    except sqlite3.OperationalError:
+        return {}
+
+
 def pg_market_counts() -> dict:
     """PG-side row + group counts per domain (the validation target / --dry-run)."""
     pg = _pg_conn()
@@ -411,7 +503,9 @@ def local_ticker_coverage(ticker: str, out_path: Optional[str] = None) -> dict:
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     except sqlite3.OperationalError:
         return cov
-    t = ticker.upper()
+    # resolve the alias spelling to canonical so coverage of e.g. 'BRK.B' reports the
+    # rows that live under the canonical 'BRK B' (consistent with the read paths' _canon).
+    t = _load_ticker_aliases(conn).get(ticker.upper(), ticker.upper())
     try:
         cov["exists"] = True
         for domain, table in (("prices", "prices"), ("news", "news"),
@@ -513,6 +607,11 @@ def bootstrap_market(out_path: Optional[str] = None,
                         fund_total, progress_cb, price_total + news_total + iv_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
             sconn.commit()  # financial_cache is carried over under-lock at swap time
+            # NOTE: ticker canonicalization is deliberately deferred to AFTER validation
+            # (see the `if match:` block). Canon folds alias spellings (BRK.B → BRK B),
+            # which would shift the SQLite (source,ticker) checksum key set away from the
+            # pre-canon PG fingerprint and make validation spuriously fail. Validate in the
+            # same spelling PG has; canonicalize the VALIDATED temp just before the swap.
 
             local_prices = sconn.execute("SELECT COUNT(*) FROM prices").fetchone()[0]
             sq_price_sum = _sqlite_group_counts(sconn, _SQ_PRICE_CHECKSUM)
@@ -540,6 +639,17 @@ def bootstrap_market(out_path: Optional[str] = None,
         # set_financial_cache. The lock queues a racing cache write so it lands in the
         # swapped-in DB rather than being dropped with the old inode. Window held is
         # just the swap (small cache + os.replace), ~ms.
+        # Canonicalize the VALIDATED temp (post-validation, pre-swap): tmp is private to
+        # this build, so reconciling alias spellings here can't race another writer, and
+        # validation already compared SQLite↔PG in the pre-canon spelling. PK-safe.
+        cnconn = sqlite3.connect(tmp, timeout=10.0)
+        try:
+            cnconn.execute("PRAGMA busy_timeout = 10000")
+            _ensure_ticker_aliases(cnconn)
+            for _t in ("prices", "news", "iv_history", "fundamentals"):
+                _canonicalize_table_tickers(cnconn, _t)
+        finally:
+            cnconn.close()
         with _CACHE_WRITE_LOCK:
             carried_rows = _read_fin_cache_rows(path)  # old cache (committed state)
             # Write the carried cache INTO tmp BEFORE the swap. tmp is private to this
@@ -625,8 +735,17 @@ def validate_market(out_path: Optional[str] = None) -> dict:
         sq_iv_sum = _sqlite_ticker_idsum(conn, _IV_CHECKSUM_SQL) if _table_exists(conn, "iv_history") else {}
         lf = conn.execute("SELECT COUNT(*) FROM fundamentals").fetchone()[0] if _table_exists(conn, "fundamentals") else 0
         sq_fund_sum = _sqlite_ticker_idsum(conn, _FUND_CHECKSUM_SQL) if _table_exists(conn, "fundamentals") else {}
+        aliases = _load_ticker_aliases(conn)  # local DB is post-canon; fold PG into the same space
     finally:
         conn.close()
+    # The local DB is canonicalized (BRK.B → BRK B); PG is not. Fold the PG-side checksum
+    # keys into canonical space before comparing so canon doesn't spuriously fail validation
+    # (no-op when PG has no alias spelling). Row totals are unaffected by canon.
+    if aliases:
+        pg_price_sum = _fold_checksum_aliases(pg_price_sum, aliases, ticker_pos=0)
+        pg_news_sum = _fold_checksum_aliases(pg_news_sum, aliases, ticker_pos=1)
+        pg_iv_sum = _fold_checksum_aliases(pg_iv_sum, aliases, ticker_pos=None)
+        pg_fund_sum = _fold_checksum_aliases(pg_fund_sum, aliases, ticker_pos=None)
     prices_match = lp == pg_price_rows and sq_price_sum == pg_price_sum
     news_match = ln == pg_news_rows and sq_news_sum == pg_news_sum
     iv_match = liv == pg_iv_rows and sq_iv_sum == pg_iv_sum
@@ -781,6 +900,14 @@ def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> di
                           _PG_IV_SELECT_INCR, _PG_IV_SELECT, _IV_INSERT, batch)
         fundamentals = _incr_domain(sconn, "fundamentals", "SELECT COALESCE(MAX(id), 0) FROM fundamentals",
                                     _PG_FUND_SELECT_INCR, _PG_FUND_SELECT, _FUND_INSERT, batch)
+        # Canonicalize tickers AFTER the mirror so newly-pulled alias rows (e.g. a PG
+        # 'BRK.B') are reconciled to the canonical spelling across all domains. PK-safe.
+        _ensure_ticker_aliases(sconn)
+        for _t in ("prices", "news", "iv_history", "fundamentals"):
+            try:
+                _canonicalize_table_tickers(sconn, _t)
+            except sqlite3.OperationalError:
+                pass  # table absent on a pre-domain DB — tolerate
     finally:
         sconn.close()
     return {"ok": prices["ok"] and news["ok"] and iv["ok"] and fundamentals["ok"],

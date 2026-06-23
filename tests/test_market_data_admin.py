@@ -660,3 +660,128 @@ def test_local_news_sentiment_score_is_check_constrained_to_1_5(tmp_path):
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(base, (99, "AAPL", "t", "polygon", "2026-06-01T12:00:00+0000", bad))
     conn.close()
+
+
+# --- ticker canonicalization (strict-readiness slice #1): aliases + PK-safe reconcile ---
+
+def test_ensure_ticker_aliases_seeds_brk_idempotent(tmp_path):
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    mda._ensure_ticker_aliases(conn)
+    rows = dict(conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall())
+    assert rows.get("BRK.B") == "BRK B" and rows.get("BRK-B") == "BRK B"  # seeded
+    mda._ensure_ticker_aliases(conn)  # idempotent — second run no error, no dup
+    assert len(conn.execute("SELECT alias FROM ticker_aliases").fetchall()) == len(rows)
+    conn.close()
+
+
+def test_canonicalize_news_rows_pk_safe_when_both_forms_present(tmp_path):
+    # news holds BOTH 'BRK B' and 'BRK.B' (the live state). Reconcile must NOT collide:
+    # canonical rows inserted-or-ignored, alias rows deleted only after, no row lost.
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, title TEXT NOT NULL, "
+        "source TEXT NOT NULL, published_at TEXT NOT NULL, article_hash TEXT);"
+    )
+    conn.executemany(
+        "INSERT INTO news (id,ticker,title,source,published_at,article_hash) VALUES (?,?,?,?,?,?)",
+        [(1, "BRK B", "a", "polygon", "2026-06-01T00:00:00+0000", "h1"),
+         (2, "BRK.B", "b", "finnhub", "2026-06-01T00:00:00+0000", "h2"),
+         (3, "AAPL", "c", "polygon", "2026-06-01T00:00:00+0000", "h3")],
+    )
+    conn.commit()
+    mda._ensure_ticker_aliases(conn)
+    n = mda._canonicalize_table_tickers(conn, "news")
+    assert n == 1  # one alias row (BRK.B) reconciled to canonical
+    tickers = sorted(r[0] for r in conn.execute("SELECT ticker FROM news").fetchall())
+    assert tickers == ["AAPL", "BRK B", "BRK B"]  # both BRK rows now canonical, none lost
+    conn.close()
+
+
+def test_canonicalize_prices_pk_safe_on_collision(tmp_path):
+    # prices PK = (ticker, datetime, interval). If an alias row would collide with an
+    # existing canonical row on rename, the INSERT-OR-IGNORE-then-delete keeps the
+    # canonical row and drops the dup — never a PK IntegrityError, never a lost canonical.
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.executemany(
+        "INSERT INTO prices (ticker,datetime,interval,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?,?)",
+        [("BRK B", "2026-06-01T13:30:00+0000", "15min", 1, 1, 1, 9, 100),   # canonical (keep its close=9)
+         ("BRK.B", "2026-06-01T13:30:00+0000", "15min", 1, 1, 1, 5, 50)],   # alias dup → drop on reconcile
+    )
+    conn.commit()
+    mda._ensure_ticker_aliases(conn)
+    mda._canonicalize_table_tickers(conn, "prices")
+    rows = conn.execute("SELECT ticker, close FROM prices ORDER BY ticker").fetchall()
+    assert rows == [("BRK B", 9.0)]  # canonical row survived, alias dup dropped, no error
+    conn.close()
+
+
+def test_bootstrap_with_alias_spellings_validates_then_canonicalizes(tmp_path, monkeypatch):
+    # REGRESSION (canon-vs-validation ordering): PG carries BOTH 'BRK B' and 'BRK.B'
+    # news rows (the live state). Canon must NOT run before the PG-vs-SQLite checksum
+    # (or the folded SQLite key set diverges from PG and the validated rebuild is
+    # discarded). bootstrap must report match=True AND the swapped-in DB must hold the
+    # single canonical 'BRK B' spelling.
+    out = str(tmp_path / "market_data.db")
+    news = [
+        (1, "BRK B", "Berkshire A", "d", "http://a", "Reuters", "polygon", "2026-06-01T12:00:00+0000", "h1"),
+        (2, "BRK.B", "Berkshire B", "d", "http://b", "Bloomberg", "polygon", "2026-06-01T12:00:00+0000", "h2"),
+        (3, "AAPL", "Apple", "d", "http://c", "Reuters", "finnhub", "2026-06-01T12:00:00+0000", "h3"),
+    ]
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
+    res = mda.bootstrap_market(out)
+
+    assert res["match"] is True          # validation passed (compared in pre-canon space)
+    assert res["news"]["rows"] == 3      # no row lost
+    assert not (tmp_path / "market_data.db.building").exists()  # swapped in, not discarded
+
+    conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
+    try:
+        tickers = sorted(r[0] for r in conn.execute("SELECT ticker FROM news").fetchall())
+    finally:
+        conn.close()
+    assert tickers == ["AAPL", "BRK B", "BRK B"]  # BRK.B folded to canonical in the live DB
+
+
+def test_validate_market_folds_aliases_so_canon_db_matches_pg(tmp_path, monkeypatch):
+    # validate_market compares a POST-canon local DB against PRE-canon PG. It must fold the
+    # PG checksum keys into canonical space (BRK.B + BRK B → BRK B) or canon spuriously fails.
+    out = str(tmp_path / "market_data.db")
+    news = [
+        (1, "BRK B", "Berkshire A", "d", "http://a", "Reuters", "polygon", "2026-06-01T12:00:00+0000", "h1"),
+        (2, "BRK.B", "Berkshire B", "d", "http://b", "Bloomberg", "polygon", "2026-06-01T12:00:00+0000", "h2"),
+        (3, "AAPL", "Apple", "d", "http://c", "Reuters", "finnhub", "2026-06-01T12:00:00+0000", "h3"),
+    ]
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
+    assert mda.bootstrap_market(out)["match"] is True  # builds + canonicalizes the local DB
+
+    # re-validate the canonical DB against the SAME (pre-canon) PG → must still match
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
+    res = mda.validate_market(out)
+    assert res["match"] is True and res["news"]["match"] is True
+
+
+def test_local_ticker_coverage_resolves_aliases(tmp_path):
+    # coverage is user-facing: querying the alias spelling ('BRK.B') must report the
+    # canonical rows ('BRK B') as present, not falsely "missing" after canon.
+    db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.executescript("CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, "
+                       "title TEXT NOT NULL, source TEXT NOT NULL, published_at TEXT NOT NULL);")
+    mda._ensure_ticker_aliases(conn)
+    conn.execute("INSERT INTO prices (ticker,datetime,interval,open,high,low,close,volume) "
+                 "VALUES ('BRK B','2026-06-01T13:30:00+0000','15min',1,1,1,1,1)")
+    conn.execute("INSERT INTO news (id,ticker,title,source,published_at) "
+                 "VALUES (1,'BRK B','t','polygon','2026-06-01T12:00:00+0000')")
+    conn.commit()
+    conn.close()
+    cov = mda.local_ticker_coverage("BRK.B", out_path=str(db))   # query the ALIAS
+    assert cov["exists"] is True
+    assert cov["prices"] is True and cov["news"] is True          # resolved to canonical rows
+    # canonical spelling still works
+    cov2 = mda.local_ticker_coverage("BRK B", out_path=str(db))
+    assert cov2["prices"] is True
