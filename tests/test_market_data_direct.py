@@ -313,3 +313,175 @@ def test_market_write_lock_shares_scheduler_lock_file_path(monkeypatch, tmp_path
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     from src.service.data_scheduler import _lock_dir as ds_lock_dir
     assert mdd._market_lock_path() == ds_lock_dir() / "local_refresh.lock"
+
+
+# --- 2b·2: provider mappers + backfill_prices_direct orchestration (fake providers) ---
+
+from types import SimpleNamespace
+
+
+def _bar(dt, o=1.0, h=2.0, l=0.5, c=1.5, v=100):
+    return SimpleNamespace(ticker="X", datetime=dt, open=o, high=h, low=l, close=c, volume=v)
+
+
+class _FakeIBKR:
+    def __init__(self, bars_by_ticker=None, raises_for=None):
+        self._bars = bars_by_ticker or {}
+        self._raises = set(raises_for or ())
+        self.calls = []
+
+    def fetch_historical_intraday(self, tickers, start_date, end_date, interval="15 mins", **k):
+        self.calls.append((tuple(tickers), start_date, end_date, interval))
+        out = {}
+        for t in tickers:
+            if t in self._raises:
+                raise RuntimeError(f"gateway error for {t}")
+            out[t] = self._bars.get(t, [])
+        return out
+
+
+class _FakePolygon:
+    def __init__(self, results_by_day=None):
+        self._r = results_by_day or {}
+        self.calls = []
+
+    def fetch_intraday_prices(self, ticker, trade_date, multiplier=15, timespan="minute", **k):
+        self.calls.append((ticker, trade_date, multiplier, timespan))
+        return self._r.get(trade_date, [])
+
+
+def test_ibkr_bars_to_rows_canonical_utc_pk():
+    rows = mdd._ibkr_bars_to_rows("BRK B", [_bar(datetime(2026, 6, 17, 9, 30, 0))], "15min")
+    assert rows == [("BRK B", "2026-06-17T13:30:00+0000", "15min", 1.0, 2.0, 0.5, 1.5, 100)]
+
+
+def test_ibkr_bars_to_rows_skips_nan_ohlc_coerces_nan_volume():
+    nan = float("nan")
+    rows = mdd._ibkr_bars_to_rows("AAPL", [
+        _bar(datetime(2026, 6, 17, 9, 30, 0), c=nan),          # NaN close → skipped
+        _bar(datetime(2026, 6, 17, 9, 45, 0), v=nan),          # NaN volume → coerced to 0
+    ], "15min")
+    assert len(rows) == 1 and rows[0][1] == "2026-06-17T13:45:00+0000" and rows[0][7] == 0
+
+
+def test_polygon_results_use_raw_epoch_not_mutated_datetime():
+    # the lock-#2 trap: must use raw 't' (epoch-ms UTC), NOT polygon_source's local-naive
+    # item['datetime']. Inject a bogus 'datetime' to prove it's ignored.
+    epoch_ms = int(datetime(2026, 6, 17, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    results = [{"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9,
+                "datetime": datetime(1999, 1, 1)}]  # bogus mutated field — must be ignored
+    rows = mdd._polygon_results_to_rows("AAPL", results, "15min")
+    assert rows == [("AAPL", "2026-06-17T13:30:00+0000", "15min", 1.0, 2.0, 0.5, 1.5, 9)]
+
+
+def _backfill_db(tmp_path):
+    db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.commit()
+    conn.close()
+    return db
+
+
+def test_backfill_inserts_canonical_rows_and_is_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert res["rows_added"] == 1
+    conn = sqlite3.connect(db)
+    row = conn.execute("SELECT ticker, datetime, interval FROM prices").fetchone()
+    assert row == ("AAPL", "2026-06-17T13:30:00+0000", "15min")
+    conn.close()
+    # idempotent: a second run inserts 0 (INSERT OR IGNORE on the identical PK)
+    res2 = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                      db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert res2["rows_added"] == 0
+
+
+def test_backfill_canonicalizes_ticker_before_insert(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    # provider keyed by the CANONICAL spelling (the scope is canonicalized before fetch)
+    ibkr = _FakeIBKR(bars_by_ticker={"BRK B": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    res = mdd.backfill_prices_direct(tickers_arg="BRK.B", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert res["rows_added"] == 1
+    conn = sqlite3.connect(db)
+    assert conn.execute("SELECT DISTINCT ticker FROM prices").fetchall() == [("BRK B",)]  # canonical
+    conn.close()
+    assert ibkr.calls[0][0] == ("BRK B",)  # fetched under canonical, not 'BRK.B'
+
+
+def test_backfill_dedupes_alias_and_canonical_scope(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"BRK B": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    mdd.backfill_prices_direct(tickers_arg="BRK.B,BRK B", lookback_days=2, provider="ibkr",
+                               db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    # both spellings collapse to ONE canonical fetch
+    assert [c[0] for c in ibkr.calls] == [("BRK B",)]
+
+
+def test_backfill_polygon_fallback_when_ibkr_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={})  # IBKR returns nothing
+    epoch_ms = int(datetime(2026, 6, 17, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    poly = _FakePolygon(results_by_day={date(2026, 6, 17): [
+        {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, polygon_src=poly,
+                                     today=date(2026, 6, 18))
+    assert res["rows_added"] == 1
+    assert poly.calls  # fallback engaged
+    conn = sqlite3.connect(db)
+    assert conn.execute("SELECT datetime FROM prices").fetchone()[0] == "2026-06-17T13:30:00+0000"
+    conn.close()
+
+
+def test_backfill_per_ticker_exception_isolated(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]},
+                     raises_for=["BAD"])
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL,BAD", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert res["rows_added"] == 1                 # AAPL succeeded
+    assert "BAD" in res["errors"]                 # BAD recorded, not fatal
+    conn = sqlite3.connect(db)
+    # run recorded succeeded (per-ticker failures don't fail the whole run)
+    assert conn.execute("SELECT status FROM provider_sync_runs").fetchone()[0] == "succeeded"
+    assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='BAD'").fetchone()[0]
+    conn.close()
+
+
+def test_backfill_empty_scope_fails_loud(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    with pytest.raises(RuntimeError):
+        mdd.backfill_prices_direct(tickers_arg="  ,  ", db_path=str(db), today=date(2026, 6, 18))
+
+
+def test_backfill_progress_cb_shape(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={})
+    seen = []
+    mdd.backfill_prices_direct(tickers_arg="AAPL,NVDA", lookback_days=1, provider="ibkr",
+                               db_path=str(db), ibkr_src=ibkr, progress_cb=lambda d, t, c: seen.append((d, t, c)),
+                               today=date(2026, 6, 18))
+    assert seen == [(1, 2, "AAPL"), (2, 2, "NVDA")]
+
+
+def test_backfill_none_provider_constructs_default(tmp_path, monkeypatch):
+    # the None→default seam (lazy construct) — monkeypatch the constructor to a fake so
+    # the prod branch is exercised without a live Gateway.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    fake = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    monkeypatch.setattr(mdd, "_default_ibkr_src", lambda: fake)
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                     db_path=str(db), today=date(2026, 6, 18))  # no ibkr_src injected
+    assert res["rows_added"] == 1
