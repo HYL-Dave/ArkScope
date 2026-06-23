@@ -47,7 +47,7 @@ Per-source cadence, retention, health surface, and cost gate. Provider-level dat
 | **IBKR prices — 1d (adjusted)** | proposed | backfill | manual / periodic | **permanent** (`fetch_adjusted_prices`, `ADJUSTED_LAST`, `ibkr_source.py:1163`) | as above | free (IB session) |
 | **IV / options history** | yes (Gateway-gated) | **opt-in backfill** (currently swept by `--all` — see §7) | manual | `iv_history`, permanent | connected / maintenance / last_success / last_error | free (IB session); heavy |
 | **Fundamentals** | yes | manual / cached | on demand | TTL: annual 180d / quarterly 90d / ttm 30d | connected / stale / last_success / last_error | **fallback chain:** IBKR snapshot → SEC EDGAR (free) → Financial Datasets (**metered**, cached). Not wired into `daily_update.py` (absent, not stale). |
-| **Macro / calendar (FRED + Finnhub)** | yes | scheduled | per release schedule | `macro_*`, `cal_*` tables, permanent | per-table count + last-fetched (`macro_calendar_health.py:449-459`) | free |
+| **Macro / calendar (FRED + Finnhub)** | yes | scheduled | per release schedule | `macro_*`, `cal_*` tables → **`macro_calendar.db`** (its own DB; see §4b/topology — NOT market_data.db) | per-table count + last-fetched (`macro_calendar_health.py:449-459`) | free |
 | **Analyst consensus (Finnhub)** | yes | scheduled cache | 24h TTL | daily cache | connected / stale / last_success | free |
 | **LLM sentiment/risk scoring** | yes | scheduled (piggybacks news today — to decouple, §7) | with news | `news_scores`, permanent | n/a (compute job) | **metered** (LLM API cost) |
 | **SA capture (extension)** | yes | **realtime push** (user browses) + extension-driven refresh | event-driven | `sa_*` tables, permanent | per-scope `sa_refresh_meta` (last_attempt/last_success/snapshot_ts/row_count/ok/last_error, `db_backend.py:1224-1234`) | free (user session); **protected path** §5 |
@@ -98,8 +98,8 @@ Written **exclusively** by the extension → native-host path, independent of th
 | `iv_history` | **market_data.db** | remote PG | `db_backend.py:635` |
 | `financial_data_cache` | **market_data.db** | remote PG | `db_backend.py:1029,1053` |
 | `analyst_consensus` | **market_data.db** | separate `data/cache/analyst_consensus.db` (fold in) | `analyst_consensus.py:27-39` |
-| `macro_series`, `macro_observations`, `macro_release_dates` | **market_data.db** | remote PG | `store.py:457,528,598` |
-| `cal_economic_events`, `cal_earnings_events`, `cal_ipo_events` + `*_revisions` | **market_data.db** | remote PG | `store.py:219/303/388` |
+| `macro_series`, `macro_observations`, `macro_release_dates` | **`macro_calendar.db`** (revised 2026-06-23; was market_data.db — see §4b) | remote PG | `store.py:457,528,598` |
+| `cal_economic_events`, `cal_earnings_events`, `cal_ipo_events` + `*_revisions` | **`macro_calendar.db`** (revised 2026-06-23) | remote PG | `store.py:219/303/388` |
 | `news`, `news_scores`, `news_latest_scores` | **market_data.db** | remote PG | `db_backend.py:334,354,398` |
 | `sa_alpha_picks`, `sa_refresh_meta`, `sa_market_news`, `sa_articles`, `sa_article_comments`, `sa_comment_signals` | **sa_capture.db** | remote PG | `db_backend.py:1200,1226,1405,1624,1699`; `comment_signal_backfill.py:223` |
 | `agent_queries`, `agent_memories`, `research_reports`, `job_runs` | **transitional PG / mixed local** (retire under §4a R1/R3) | remote PG + local stores where already migrated | `db_backend.py:1001,859/931,752/807`; `job_runs_store.py` |
@@ -117,7 +117,8 @@ backend by **data domain**, not one global backend.
 | Domain | Backend (target state) |
 |---|---|
 | profile (lists/tags/priority/notes/cards/credentials) | `profile_state.db` (SQLite) — already local |
-| market (prices/news/fundamentals/IV/macro/calendar/consensus) | `market_data.db` (SQLite) |
+| market (prices/news/fundamentals/IV/consensus) | `market_data.db` (SQLite) |
+| macro / calendar (FRED + Finnhub) | `macro_calendar.db` (SQLite; revised 2026-06-23 — its own DB) |
 | SA capture (`sa_*`) | **PG for now** → `sa_capture.db` only at the §5g quiet-window cutover |
 | app records (`agent_queries`/`agent_memories`/`research_reports`/`job_runs`) | **transitional PG** → local app-state store in the PG-retirement track (§4a) |
 
@@ -166,7 +167,7 @@ Cutover order = lowest blast radius first.
 | Phase | Tables moving | Why this order | What stays in PG meanwhile |
 |---|---|---|---|
 | **Phase 0 — no-op** | none | `profile_state.db` is already local SQLite; nothing to migrate. | everything market/SA/app |
-| **Phase 1 — market_data** | `prices`, `fundamentals`, `iv_history`, `financial_data_cache`, `macro_*`, `cal_*`, `news` (articles). **`news_scores`/`news_latest_scores` = RETIRED, not migrated** (see §4 decision 2026-06-23). `analyst_consensus` is provider-fetched live (regenerable; not a backend PG read). | **Regenerable** — safe to migrate and re-fetch on mismatch. Read PG via current backend → write local; validate by row counts + content checksum on a sample. The macro/calendar health query (`macro_calendar_health.py:449-459`) is a ready per-table count/last-fetched cross-check. | SA tables; agent/app records |
+| **Phase 1 — market_data** | `prices`, `fundamentals`, `iv_history`, `financial_data_cache`, `news` (articles). **`news_scores`/`news_latest_scores` = RETIRED, not migrated** (see §4 decision 2026-06-23). **`macro_*`/`cal_*` moved OUT of market_data → their own `macro_calendar.db`** (revised 2026-06-23). `analyst_consensus` is provider-fetched live (regenerable; not a backend PG read). | **Regenerable** — safe to migrate and re-fetch on mismatch. Read PG via current backend → write local; validate by row counts + content checksum on a sample. The macro/calendar health query (`macro_calendar_health.py:449-459`) is a ready per-table count/last-fetched cross-check. | SA tables; agent/app records |
 | **Phase 2 — sa_capture** | `sa_alpha_picks` (+ lifecycle), `sa_refresh_meta`, `sa_market_news`, `sa_articles`, `sa_article_comments`, `sa_comment_signals` | **Single-writer, re-capturable.** Must port the **partial-index `ON CONFLICT … WHERE` upserts** (`db_backend.py:1170-1196`) — SQLite supports partial-index upserts, but the index predicates must be recreated as real partial indexes in the new schema. | agent/app records |
 | **Phase 3 — app records (revisit)** | `agent_queries`, `agent_memories`, `research_reports`, `job_runs` | Lower priority; decide local vs remote after the user-facing split is stable. | — |
 
@@ -197,6 +198,35 @@ This is separate from the "one DB vs many DBs" decision. Adding more SQLite file
 | **R3 — local app records** | Remove PG from agent/research product use. | Ensure research threads, reports, memories, and agent query records are local and exportable. |
 | **R4 — disable live PG fallback** | Stop stale fallback masking bugs. | Domain-by-domain hard local mode, with explicit operator import fallback only. |
 | **R5 — retire scripts** | Remove migration scripts from runtime. | Move `scripts/migrate_market_to_sqlite.py`, `scripts/migrate_sa_to_sqlite.py`, and `scripts/migrate_to_supabase.py` to `scripts/legacy/` or delete after documented recovery alternatives exist. |
+
+### 4b. Market local strict-readiness (data-completeness, not just routing)
+
+**Status:** plan locked 2026-06-23 (design workflow + review). Strict mode (`e49cabc`/`c474221`)
+makes the *runtime* not need PG, but the local DB is not yet *complete/fresh* enough to
+enable it without degrading research. These are the gaps to close BEFORE flipping
+`use_local_market_strict` on for real.
+
+**Root cause of the price sparsity (verified, important):** `incremental_update()` →
+`_incr_prices` is a **PG→SQLite mirror**, not provider→SQLite. `market_sync_meta(prices)` =
+0 rows / no error today → the mirror is healthy; **PG itself is stale** (the IBKR
+`collect→PG` step has been partial/failing since ~6/10, and nothing detects per-ticker
+gaps — `local_market_stats` reports only the global `MAX(datetime)`). So price freshness
+needs a **direct provider→SQLite** path, not a mirror fix.
+
+**Topology (all market domains stay in `market_data.db` — a separate DB = split-brain):**
+
+| # | Area | Fix (concrete) | Target | Risk/Effort |
+|---|---|---|---|---|
+| 1 | **Ticker canon** | `ticker_aliases` table + resolve-on-read canonical resolver; PK-SAFE row reconciliation (INSERT OR IGNORE canonical → delete alias rows only after → per-table row-count audit); fixes `BRK B`/`BRK.B`/`BRK-B`. **prices PK unchanged.** | market_data.db | low / M |
+| 2 | **Price direct backfill** | NEW `market_data_direct.py`: `_normalize_utc` (byte-identical UTC PK string), `detect_price_gaps` (per-ticker-per-trading-day, weekend/holiday + early-close aware — NOT a hardcoded 26 bars), `backfill_prices_direct` (IBKR primary behind the scheduler IBKR lock + Polygon fallback → `INSERT OR IGNORE`); new scheduler source, coexists with the mirror (idempotent). | market_data.db + `provider_sync_runs`/`provider_sync_meta` (NEW; do NOT reuse `market_sync_meta`, which means "PG mirror") | med / L |
+| 3 | **Fundamentals gap** | NEW `fundamentals_backfill.py`: gap-detect vs active universe → free **SEC EDGAR** → snapshot JSON into `fundamentals`. (~23 Core tickers missing.) | market_data.db | low / M |
+| 4 | **News sentiment fill** | (a) persist Polygon polarity → **new scale-tagged columns** (`provider_sentiment`/scale), NEVER the 1-5 CHECK `sentiment_score`; (b) LLM-on-analysis is the only 1-5 writer, going forward. (Today: 362,975 news, 0 scored.) | market_data.db `news` | low / M |
+| 5 | **IV source/method** | add `iv_source`/`iv_method`/`as_of` + natural-key UNIQUE; dual-source (self-computed + externally-pre-computed); widen by priority. (Today: 4 tickers, 24 rows, stale.) Lowest priority. | market_data.db `iv_history` | low / M |
+
+**Sequence:** 1 canon → 2 price (the big knife; own review; **strict mode safe to ENABLE only after this**) → 3 fundamentals → 4 sentiment → (then §macro/cal local store) → 5 IV.
+**Cross-cutting end-state:** once direct writes are authoritative + validated, **demote the PG
+iv/prices/fundamentals mirror OUT of the runtime `incremental_update` loop → import/archive
+only** (else stale PG remains a silent runtime source, conflicting with strict-local).
 
 ---
 
