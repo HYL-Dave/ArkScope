@@ -19,7 +19,9 @@ from src.api.dependencies import get_profile_store
 from src.api.permissions import require_db_write, require_profile_state_write
 from src.market_data_admin import (
     USE_LOCAL_MARKET_KEY,
+    USE_LOCAL_MARKET_STRICT_KEY,
     env_routing_enabled,
+    env_strict_enabled,
     get_job,
     local_market_stats,
     local_ticker_coverage,
@@ -36,8 +38,16 @@ router = APIRouter(tags=["market-data"])
 _TRUTHY = ("1", "true", "yes", "on")
 
 
+def _setting_truthy(store: ProfileStateStore, key: str) -> bool:
+    return (store.get_setting(key) or "").strip().lower() in _TRUTHY
+
+
 def _setting_enabled(store: ProfileStateStore) -> bool:
-    return (store.get_setting(USE_LOCAL_MARKET_KEY) or "").strip().lower() in _TRUTHY
+    return _setting_truthy(store, USE_LOCAL_MARKET_KEY)
+
+
+def _strict_setting_enabled(store: ProfileStateStore) -> bool:
+    return _setting_truthy(store, USE_LOCAL_MARKET_STRICT_KEY)
 
 
 @router.get("/market-data/status")
@@ -52,8 +62,13 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     stats = local_market_stats(path)
     setting_on = _setting_enabled(store)
     env_on = env_routing_enabled()
+    strict_setting_on = _strict_setting_enabled(store)
+    strict_env_on = env_strict_enabled()
     # Routing only actually engages when enabled AND the DB exists (DAL guards this).
     routing_enabled = (setting_on or env_on) and stats["exists"]
+    # Strict is a modifier of local-market routing: it only has runtime effect when
+    # routing itself is active.
+    strict_enabled = routing_enabled and (strict_setting_on or strict_env_on)
     return {
         "market_db": path,
         "exists": stats["exists"],
@@ -65,9 +80,11 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "sync": read_sync_meta(path),  # per-domain incremental status (last_success/error/rows_added)
         "use_local_market_setting": setting_on,
         "env_override": env_on,
+        "local_market_strict_setting": strict_setting_on,
+        "strict_env_override": strict_env_on,
+        "strict_enabled": strict_enabled,
         "routing_enabled": routing_enabled,
-        # local-first routing always falls back to PG on a local miss/empty
-        "pg_fallback_active": routing_enabled,
+        "pg_fallback_active": routing_enabled and not strict_enabled,
     }
 
 

@@ -558,6 +558,25 @@ def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):
     assert dal._local_market_enabled() is True
 
 
+def test_status_route_reports_strict_local_only_when_enabled(store, tmp_path, monkeypatch):
+    from src.api.routes.market_data import market_data_status
+    db = tmp_path / "market_data.db"
+    db.write_bytes(b"")
+    store.set_setting("use_local_market", "true")
+    store.set_setting("use_local_market_strict", "true")
+    monkeypatch.setattr("src.api.routes.market_data.resolve_market_db_path", lambda: str(db))
+    monkeypatch.setattr("src.api.routes.market_data.env_routing_enabled", lambda: False)
+    monkeypatch.delenv("ARKSCOPE_LOCAL_MARKET_STRICT", raising=False)
+
+    out = market_data_status(store=store)
+
+    assert out["routing_enabled"] is True
+    assert out["local_market_strict_setting"] is True
+    assert out["strict_env_override"] is False
+    assert out["strict_enabled"] is True
+    assert out["pg_fallback_active"] is False
+
+
 def test_job_not_found_404():
     from fastapi import HTTPException
     from src.api.routes.market_data import market_data_job

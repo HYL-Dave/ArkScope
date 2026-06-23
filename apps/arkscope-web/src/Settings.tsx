@@ -69,6 +69,7 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
+import { marketRoutingLabel } from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -602,7 +603,7 @@ function DataStorageSection() {
           <h2>本地市場資料庫 · Market Data</h2>
           <p className="muted tiny">
             把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
-            缺資料自動 fallback 回 PG。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
+            一般模式缺資料會 fallback 回 PG；local-only strict 模式不 fallback。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
             Seeking Alpha capture 已切到本地 SQLite（hard cutover 2026-06-13，無 PG 讀 fallback）；報告與分數仍在 PG。
             最新資料時間沿用來源欄位；同步／抓取時間顯示本機時區 + 美股 ET 對照。
           </p>
@@ -637,12 +638,9 @@ function DataStorageSection() {
             <dd>{syncLine(status)}</dd>
             <dt>本地路由</dt>
             <dd>
-              {status.routing_enabled
-                ? "啟用中（PG fallback）"
-                : status.use_local_market_setting
-                  ? "設定已開，待建立資料庫"
-                  : "關閉（使用 PG）"}
+              {marketRoutingLabel(status)}
               {status.env_override && "（env 強制開啟）"}
+              {status.strict_enabled && status.strict_env_override && "（strict env 強制開啟）"}
             </dd>
           </dl>
 

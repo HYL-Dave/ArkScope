@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 USE_LOCAL_MARKET_KEY = "use_local_market"  # profile_settings key for the persisted toggle
+USE_LOCAL_MARKET_STRICT_KEY = "use_local_market_strict"  # modifier: local market on + DB exists → no PG fallback
 _TRUTHY = ("1", "true", "yes", "on")
 
 _PRICES_SCHEMA = """
@@ -224,6 +225,10 @@ def resolve_market_db_path() -> str:
 
 def env_routing_enabled() -> bool:
     return os.environ.get("ARKSCOPE_USE_LOCAL_MARKET", "").strip().lower() in _TRUTHY
+
+
+def env_strict_enabled() -> bool:
+    return os.environ.get("ARKSCOPE_LOCAL_MARKET_STRICT", "").strip().lower() in _TRUTHY
 
 
 # --- PostgreSQL access (source of the migration) ------------------------------

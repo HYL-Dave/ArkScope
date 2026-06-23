@@ -1180,6 +1180,9 @@ export interface MarketDataStatus {
   };
   use_local_market_setting: boolean;
   env_override: boolean;
+  local_market_strict_setting: boolean;
+  strict_env_override: boolean;
+  strict_enabled: boolean;
   routing_enabled: boolean;
   pg_fallback_active: boolean;
 }
