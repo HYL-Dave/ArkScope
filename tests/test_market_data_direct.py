@@ -260,3 +260,21 @@ def test_provider_run_status_constrained_to_valid_set(tmp_path):
         mdd._finish_provider_run(conn, rid, status="partial", tickers_scanned=1,
                                  gaps_found=0, rows_added=0, error=None)
     conn.close()
+
+
+def test_provider_sync_runs_status_check_enforced_at_schema(tmp_path):
+    # Defense-in-depth: the SQLite schema itself rejects an invalid status, not only
+    # the _finish_provider_run Python guard. A raw INSERT (bypassing the helper) of a
+    # bogus status must raise IntegrityError.
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    mdd._ensure_provider_sync_tables(conn)
+    # valid statuses insert fine
+    for st in ("running", "succeeded", "failed"):
+        conn.execute("INSERT INTO provider_sync_runs (provider, interval, started_at, status) "
+                     "VALUES ('ibkr','15min','2026-06-24T00:00:00+0000',?)", (st,))
+    # an invalid status is rejected by the schema CHECK
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("INSERT INTO provider_sync_runs (provider, interval, started_at, status) "
+                     "VALUES ('ibkr','15min','2026-06-24T00:00:00+0000','partial')")
+    conn.close()

@@ -194,7 +194,10 @@ CREATE TABLE IF NOT EXISTS provider_sync_runs (
     tickers_scanned INTEGER DEFAULT 0,
     gaps_found      INTEGER DEFAULT 0,
     rows_added      INTEGER DEFAULT 0,
-    status          TEXT NOT NULL,        -- running | succeeded | failed (matches JobRunsStore)
+    -- closed enum (matches JobRunsStore) — CHECK enforces it at the schema, not only the
+    -- _finish_provider_run Python guard. provider/domain are intentionally NOT CHECK'd
+    -- (extensible — more providers/domains likely; a CHECK there would force a migration).
+    status          TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
     error           TEXT
 );
 CREATE TABLE IF NOT EXISTS provider_sync_meta (
