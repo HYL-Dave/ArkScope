@@ -278,3 +278,38 @@ def test_provider_sync_runs_status_check_enforced_at_schema(tmp_path):
         conn.execute("INSERT INTO provider_sync_runs (provider, interval, started_at, status) "
                      "VALUES ('ibkr','15min','2026-06-24T00:00:00+0000','partial')")
     conn.close()
+
+
+# --- market_write_lock: serializes market_data.db writes vs the PG mirror (2b step 1) ---
+
+def test_market_write_lock_acquires_and_releases(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    with mdd.market_write_lock(timeout=2):
+        pass  # acquire + release cleanly, no error
+    # after release, re-acquire works
+    with mdd.market_write_lock(timeout=2):
+        pass
+
+
+def test_market_write_lock_actually_flocks_the_shared_file(tmp_path, monkeypatch):
+    # while held, a raw flock on the SAME lock file must fail — proving the lock is
+    # engaged on the file the scheduler's _local_refresh mirror also uses.
+    import fcntl
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    with mdd.market_write_lock(timeout=2):
+        lockfile = tmp_path / "locks" / "local_refresh.lock"
+        assert lockfile.exists()
+        fh = open(lockfile, "a+")
+        try:
+            with pytest.raises(OSError):  # already exclusively locked → EWOULDBLOCK
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            fh.close()
+
+
+def test_market_write_lock_shares_scheduler_lock_file_path(monkeypatch, tmp_path):
+    # the mutex-sharing invariant: market_write_lock must flock the EXACT file the
+    # scheduler's _LOCAL_REFRESH_FLOCK ("local_refresh") uses, or they wouldn't serialize.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    from src.service.data_scheduler import _lock_dir as ds_lock_dir
+    assert mdd._market_lock_path() == ds_lock_dir() / "local_refresh.lock"

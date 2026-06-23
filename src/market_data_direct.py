@@ -26,7 +26,10 @@ the live smoke are slice #2b — NOT in this file yet.
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
+import time
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -42,6 +45,13 @@ from src.market_data_admin import (
 from src.tools.data_coverage_tools import _market_day_status
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# SAME flock file the scheduler's _LOCAL_REFRESH_FLOCK uses ("local_refresh") — so a
+# direct backfill and the PG→local mirror (data_scheduler._local_refresh) can NEVER write
+# market_data.db concurrently. flock-per-FD mutexes both same-process and cross-process
+# (verified), so no shared threading.Lock / data_scheduler import is needed.
+_MARKET_WRITE_LOCK_NAME = "local_refresh"
 
 _CANON_DOMAINS = ("prices", "news", "iv_history", "fundamentals")
 _EXCHANGE_TZ = "America/New_York"
@@ -67,6 +77,51 @@ def _normalize_utc(dt: datetime, exchange_tz: str = _EXCHANGE_TZ) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo(exchange_tz))
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
+
+
+# --- market-write lock (serialize vs the PG→local mirror) --------------------------
+
+def _market_lock_path() -> Path:
+    """The flock file market writes serialize on — identical to data_scheduler._lock_dir()
+    / 'local_refresh.lock' (env ARKSCOPE_LOCK_DIR override, else <repo>/data/locks), so the
+    direct backfill and the scheduler's mirror share ONE cross-process lock."""
+    base = Path(os.environ.get("ARKSCOPE_LOCK_DIR") or (_PROJECT_ROOT / "data" / "locks"))
+    return base / f"{_MARKET_WRITE_LOCK_NAME}.lock"
+
+
+@contextmanager
+def market_write_lock(timeout: float = 30.0, poll: float = 0.5):
+    """Serialize market_data.db WRITES (direct backfill, preflight) against the PG→local
+    mirror by flocking the shared ``local_refresh.lock``. flock-per-FD mutexes same-process
+    AND cross-process; the kernel frees it on close/crash so a dead writer never wedges it.
+    Raises TimeoutError if the lock can't be taken within ``timeout``. Degrades to a no-op
+    (with a one-time warning) where fcntl is unavailable (non-POSIX), matching _FileLock."""
+    try:
+        import fcntl
+    except ImportError:  # non-POSIX
+        logger.warning("fcntl unavailable — market_write_lock degraded to no-op")
+        yield
+        return
+    path = _market_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(path, "a+")
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("market_data.db write lock busy (timeout)")
+                time.sleep(poll)
+        yield
+    finally:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except Exception:  # noqa: BLE001 — close drops the lock regardless
+            pass
+        fh.close()
 
 
 # --- WAL-safe backup ---------------------------------------------------------------
