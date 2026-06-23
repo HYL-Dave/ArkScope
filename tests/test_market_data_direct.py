@@ -619,3 +619,17 @@ def test_gaps_weekend_holiday_still_excluded_with_completeness(tmp_path):
     assert date(2026, 6, 20) not in gaps["AAPL"]   # Sat
     assert date(2026, 6, 21) not in gaps["AAPL"]   # Sun
     assert date(2026, 6, 19) not in gaps["AAPL"]   # Juneteenth
+
+
+def test_gaps_now_et_aware_utc_is_converted_to_et(tmp_path):
+    # a future caller passing an AWARE UTC datetime must be converted to ET, not used
+    # as-is (else .date()/.time() are UTC values and misclassify the in-progress day).
+    db = _prices_db(tmp_path, [])
+    # 2026-06-24 01:00 UTC == 2026-06-23 21:00 ET → ET day is 6/23, AFTER close → complete
+    g_after = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
+                                    now_et=datetime(2026, 6, 24, 1, 0, tzinfo=timezone.utc))
+    assert date(2026, 6, 23) in g_after["AAPL"]
+    # 2026-06-23 18:00 UTC == 2026-06-23 14:00 ET → mid-session → incomplete → excluded
+    g_mid = mdd.detect_price_gaps(["AAPL"], lookback_days=0, db_path=str(db),
+                                  now_et=datetime(2026, 6, 23, 18, 0, tzinfo=timezone.utc))
+    assert date(2026, 6, 23) not in g_mid["AAPL"]

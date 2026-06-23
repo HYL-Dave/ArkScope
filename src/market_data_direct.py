@@ -5,7 +5,9 @@ PG→SQLite MIRROR; this module writes the local ``prices`` table DIRECTLY from 
 provider (IBKR primary / Polygon fallback) so local freshness no longer depends on
 PG. No runtime PG dependency lives here.
 
-Slice #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch + write path):
+Slice #2 COMPLETE — #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch +
+write path) + #2c (completed-days-only gap rule). The scheduler ``price_backfill`` source
++ ``run_source`` guard live in ``src/service/data_scheduler.py``.
 - ``backup_market_db``        : WAL-safe backup (SQLite backup API, NOT shutil.copyfile);
 - ``preflight_canonicalize``  : local-only create+seed ticker_aliases + fold existing
                                 rows (reuses slice-1 helpers); regularizes the live DB
@@ -15,17 +17,18 @@ Slice #2a (hermetic core) + #2b·1 (write lock) + #2b·2 (provider fetch + write
                                 string PG produces (the load-bearing dedup invariant);
 - ``market_write_lock``       : flocks the shared ``local_refresh.lock`` so a direct
                                 write never races the PG→local mirror (2b·1);
-- ``detect_price_gaps``       : per-ticker MISSING TRADING DAYS (day-presence; weekend +
-                                US-holiday aware — NOT a per-day bar-count completeness
-                                claim, see the naming note below);
+- ``detect_price_gaps``       : per-ticker MISSING TRADING DAYS among COMPLETE days
+                                (day-presence; weekend + US-holiday aware; the in-progress
+                                ET day is excluded until close — 2c — NOT a per-day
+                                bar-count completeness claim, see the naming note below);
 - ``provider_sync_runs`` / ``provider_sync_meta`` tables + helpers (NEW; never
   ``market_sync_meta``, which means "PG mirror");
 - ``_ibkr_bars_to_rows`` / ``_polygon_results_to_rows`` + ``backfill_prices_direct``
   (2b·2): IBKR-primary / Polygon-fallback fetch → canonicalize-before-insert →
   INSERT OR IGNORE → provider_sync telemetry, under ``market_write_lock``.
 
-Still slice #2b·3 (NOT in this file yet): the scheduler ``price_backfill`` source +
-``run_source`` guard (skip ``_local_refresh`` for a ``sync_flag=None`` adapter) + live smoke.
+Deferred (B): bar-count completeness / early-close session model to HEAL an already-
+partial day — day-presence only marks a complete day present once it has ≥1 bar.
 """
 
 from __future__ import annotations
@@ -224,10 +227,13 @@ def detect_price_gaps(
     (complete) trading day is reported missing."""
     if not tickers:
         return {}
+    _et = ZoneInfo(_EXCHANGE_TZ)
     if now_et is None:
-        now_et = datetime.now(ZoneInfo(_EXCHANGE_TZ))
+        now_et = datetime.now(_et)
     elif now_et.tzinfo is None:
-        now_et = now_et.replace(tzinfo=ZoneInfo(_EXCHANGE_TZ))
+        now_et = now_et.replace(tzinfo=_et)          # naive → assume ET
+    else:
+        now_et = now_et.astimezone(_et)              # aware (e.g. UTC) → convert to ET
     today_et = now_et.date()
 
     def _is_complete(d: date) -> bool:
