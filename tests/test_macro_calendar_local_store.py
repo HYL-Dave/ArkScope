@@ -59,6 +59,21 @@ def test_economic_read_as_of_vintage(store):
     assert store.read_economic_event_as_of(eid, _dt(2026, 5, 1)) is None
 
 
+def test_economic_default_observed_at_distinct_revisions(store):
+    # realistic ingestion: observed_at=None → NOW() per call. Back-to-back mutations must
+    # get DISTINCT observed_at (microsecond) so they don't collide on UNIQUE(event_id,
+    # observed_at) — the bug a second-resolution stamp would cause.
+    p = {"country": "US", "event_name": "CPI", "event_time": _dt(2026, 6, 10),
+         "impact": "high", "unit": "%", "actual": None, "estimate": 3.1, "prev": 3.0}
+    eid, a0 = store.upsert_economic_event(p, source_payload={})            # NOW
+    _, a1 = store.upsert_economic_event({**p, "estimate": 3.2}, source_payload={})  # NOW (distinct)
+    _, a2 = store.upsert_economic_event({**p, "estimate": 3.3}, source_payload={})  # NOW (distinct)
+    assert (a0, a1, a2) == ("inserted", "mutated", "mutated")
+    # 3 revisions (baseline + 2 mutations), none lost to a collision
+    asof = store.read_economic_event_as_of(eid, _dt(2027, 1, 1))
+    assert asof["estimate"] == 3.3  # latest revision wins
+
+
 def test_economic_numeric_coercion_no_false_mutation(store):
     # Decimal-from-DB vs float-from-feed must compare equal (no revision-log flood).
     p = {"country": "US", "event_name": "PMI", "event_time": _dt(2026, 6, 2),

@@ -164,14 +164,25 @@ CREATE TABLE IF NOT EXISTS macro_release_dates (
 def _iso(v: Any) -> Any:
     """Render a datetime/date as a comparable UTC-ISO TEXT; pass through others.
     SQLite has no native datetime, so all temporal columns are lexicographically
-    comparable ISO strings (the same discipline as market_data.db's UTC PK)."""
+    comparable ISO strings (the same discipline as market_data.db's UTC PK).
+    Datetimes carry MICROSECOND precision so a default observed_at (NOW) for two
+    back-to-back upserts differs — matching PG's per-statement NOW() and respecting
+    UNIQUE(id, observed_at) on the revision log (PG uses COALESCE(%s, NOW())); a
+    second-resolution stamp would collide on a fast insert→mutate."""
     if isinstance(v, datetime):
         if v.tzinfo is not None:
             v = v.astimezone(timezone.utc)
-        return v.strftime("%Y-%m-%dT%H:%M:%S+0000")
+        return v.strftime("%Y-%m-%dT%H:%M:%S.%f+0000")
     if isinstance(v, date):
         return v.isoformat()
     return v
+
+
+def _now_observed() -> str:
+    """Default observed_at when the caller passes None — the local twin of PG's
+    COALESCE(observed_at, NOW()). Microsecond-precise so back-to-back revisions on one
+    event don't violate UNIQUE(id, observed_at)."""
+    return _iso(datetime.now(timezone.utc))
 
 
 def resolve_macro_calendar_db_path(db_path: str | Path | None = None) -> str:
@@ -261,7 +272,7 @@ class MacroCalendarLocalStore:
     def upsert_economic_event(self, payload: Dict[str, Any], *, source_payload: Dict[str, Any],
                               observed_at: Optional[datetime] = None) -> Tuple[Optional[int], str]:
         fp = economic_event_fingerprint(payload["country"], payload["event_name"], payload["event_time"])
-        obs = _iso(observed_at) if observed_at else _iso(datetime.now(timezone.utc))
+        obs = _iso(observed_at) if observed_at else _now_observed()
         return self._upsert_calendar_event(
             canonical_table="cal_economic_events", id_column="event_id", fingerprint=fp,
             tracked_fields=ECONOMIC_TRACKED_FIELDS,
@@ -293,7 +304,7 @@ class MacroCalendarLocalStore:
     def upsert_earnings_event(self, payload: Dict[str, Any], *, source_payload: Dict[str, Any],
                               observed_at: Optional[datetime] = None) -> Tuple[Optional[int], str]:
         fp = earnings_event_fingerprint(payload["symbol"], payload["year"], payload["quarter"])
-        obs = _iso(observed_at) if observed_at else _iso(datetime.now(timezone.utc))
+        obs = _iso(observed_at) if observed_at else _now_observed()
         return self._upsert_calendar_event(
             canonical_table="cal_earnings_events", id_column="earnings_id", fingerprint=fp,
             tracked_fields=EARNINGS_TRACKED_FIELDS,
@@ -329,7 +340,7 @@ class MacroCalendarLocalStore:
     def upsert_ipo_event(self, payload: Dict[str, Any], *, source_payload: Dict[str, Any],
                          observed_at: Optional[datetime] = None) -> Tuple[Optional[int], str]:
         fp = ipo_event_fingerprint(payload["name"], payload["ipo_date"])
-        obs = _iso(observed_at) if observed_at else _iso(datetime.now(timezone.utc))
+        obs = _iso(observed_at) if observed_at else _now_observed()
         return self._upsert_calendar_event(
             canonical_table="cal_ipo_events", id_column="ipo_id", fingerprint=fp,
             tracked_fields=IPO_TRACKED_FIELDS,
