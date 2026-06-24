@@ -47,7 +47,7 @@ from data_sources.fred_client import (
     FREDReleaseDate,
     FREDSeriesMetadata,
 )
-from src.macro_calendar.store import MacroCalendarStore
+from src.macro_calendar import get_macro_calendar_store
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ def fetch_fred_release_dates(
     via the offset parameter if we discover it matters).
     """
     stats = IngestionStats()
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -243,7 +243,7 @@ def fetch_fred_series(
     configured ``observation_start``.
     """
     stats = IngestionStats()
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -285,7 +285,7 @@ def _select_entries(
 
 def _ingest_one(
     fred: FREDClient,
-    store: MacroCalendarStore,
+    store: Any,   # PG MacroCalendarStore or the SQLite twin (get_macro_calendar_store)
     entry: CatalogEntry,
     catalog: Catalog,
     stats: IngestionStats,

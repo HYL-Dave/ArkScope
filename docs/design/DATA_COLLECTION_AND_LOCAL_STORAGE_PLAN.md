@@ -269,9 +269,22 @@ agent tool bridges), `macro_calendar_health.py`, `fred_ingestion.py`/`finnhub_in
 
 **Implementation order:** (1) SQLite schema + `MacroCalendarLocalStore` read/write **parity tests**
 (hermetic, no PG) → (2) toggle + wire selection in `api/app.py` → (3) routes/tools/health
-local-first → (4) one-time PG→SQLite migrate + validate → (5) FRED/Finnhub ingestion writes
-local. **NOTE:** enabling `macro_calendar.enabled` today routes to the PG-only path — do NOT
-flip it on until the local store lands (would regress the PG-exit direction).
+local-first → ~~(4) one-time PG→SQLite migrate + validate~~ **SKIPPED — see decision below** →
+(5) FRED/Finnhub ingestion writes local. **NOTE:** enabling `macro_calendar.enabled` today
+routes to the PG-only path — do NOT flip it on until the local store lands (would regress the
+PG-exit direction).
+
+**DECISION 2026-06-25 — migration (step 4) SKIPPED, PG macro/cal verified EMPTY.** Before
+building the migrator I checked the source: all 9 PG macro/cal tables have exact `COUNT(*)=0`
+and `job_runs` shows the FRED/Finnhub ingestion jobs **never ran** (the feature was schema-only,
+gated off — consistent with the `macro_calendar.enabled` note above). A PG→SQLite migration
+would copy zero rows, so it's a no-op and is dropped from the mainline. The migrator is
+downgraded to a **later optional import/archive tool** — only worth building if some machine
+ever accumulates PG macro/cal history by another path. The real path to local data is **slice 4
+(provider→local writes) + running ingestion once** to populate `macro_calendar.db` fresh from
+FRED/Finnhub. Sequencing now: slice 2 (done) → **slice 4** (ingestion via `get_macro_calendar_store`,
+default-off) → run local ingestion → verify routes/tools/health serve local data → later decide
+whether to default `use_local_macro` on / expose a Settings toggle.
 
 ---
 

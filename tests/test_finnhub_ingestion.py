@@ -420,7 +420,7 @@ def _client_with_ipo(*events):
 
 
 def _patch_store(store, monkeypatch):
-    monkeypatch.setattr(ing, "MacroCalendarStore", lambda dal: store)
+    monkeypatch.setattr(ing, "get_macro_calendar_store", lambda dal: store)
 
 
 _FOMC_EVENT = FinnhubEconomicEvent(
@@ -1004,3 +1004,30 @@ class TestFinnhubJobSummaries:
             "fetch_economic_calendar_recent", {"errors": ["boom"]}
         )
         assert "completed successfully" in msg.lower()
+
+
+class TestFinnhubIngestionLocalWrite:
+    """Slice 4: with use_local_macro ON, ingestion writes the LOCAL store (real factory +
+    real MacroCalendarLocalStore, no PG). Default-off still writes PG (covered above)."""
+
+    def test_economic_ingestion_writes_local_macro_calendar_db(self, tmp_path, monkeypatch):
+        from src.macro_calendar.local_store import MacroCalendarLocalStore
+        from src.tools.data_access import DataAccessLayer
+
+        db = tmp_path / "macro_calendar.db"
+        monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")
+        monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(db))
+        monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+
+        dal = DataAccessLayer()                       # toggle read from env → local store
+        client = _client_with_economic(_FOMC_EVENT)
+        stats = ing.fetch_finnhub_economic_events(
+            dal, date_from=date(2024, 12, 1), date_to=date(2024, 12, 31),
+            client=client, observed_at=datetime(2024, 12, 1, tzinfo=timezone.utc),
+        )
+        assert stats.events_inserted == 1 and not stats.errors
+        # the row landed in the LOCAL db (no PG), readable via the local store
+        rows = MacroCalendarLocalStore(db).list_economic_events(
+            date_from=datetime(2024, 12, 1, tzinfo=timezone.utc),
+            date_to=datetime(2024, 12, 31, tzinfo=timezone.utc))
+        assert len(rows) == 1 and rows[0]["event_name"] == "Fed Interest Rate Decision"

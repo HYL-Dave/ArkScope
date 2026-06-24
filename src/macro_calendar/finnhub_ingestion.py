@@ -34,7 +34,7 @@ from data_sources.finnhub_calendar_client import (
     FinnhubCalendarClient,
     FinnhubError,
 )
-from src.macro_calendar.store import MacroCalendarStore
+from src.macro_calendar import get_macro_calendar_store
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def fetch_finnhub_economic_events(
     the store if omitted.
     """
     stats = FinnhubIngestionStats()
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -160,7 +160,7 @@ def fetch_finnhub_earnings_events(
     appearing in multiple per-symbol responses is written only once.
     """
     stats = FinnhubIngestionStats()
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
@@ -234,7 +234,7 @@ def fetch_finnhub_ipo_events(
 ) -> FinnhubIngestionStats:
     """Refresh cal_ipo_events + revision log for [date_from, date_to]."""
     stats = FinnhubIngestionStats()
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         stats.errors.append("DAL backend unavailable")
         return stats
