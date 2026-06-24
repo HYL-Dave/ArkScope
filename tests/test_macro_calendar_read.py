@@ -386,7 +386,7 @@ class TestGetEconomicCalendarTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(
                     is_available=MagicMock(return_value=True),
                     list_economic_events=MagicMock(return_value=[]),
@@ -402,7 +402,7 @@ class TestGetEconomicCalendarTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(
                     is_available=MagicMock(return_value=True),
                     list_economic_events=MagicMock(return_value=[
@@ -432,7 +432,7 @@ class TestGetEconomicCalendarTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(is_available=MagicMock(return_value=True)),
             )
             out = get_economic_calendar(dal=object(), as_of="not-a-date")
@@ -454,7 +454,7 @@ class TestGetEconomicCalendarTool:
                 ),
             )
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: store_mock,
             )
             get_economic_calendar(dal=object(), as_of="2024-12-18")
@@ -487,7 +487,7 @@ class TestGetMacroValueTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(is_available=MagicMock(return_value=True)),
             )
             out = get_macro_value(
@@ -501,7 +501,7 @@ class TestGetMacroValueTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(
                     is_available=MagicMock(return_value=True),
                     get_macro_observations=MagicMock(return_value=None),
@@ -522,7 +522,7 @@ class TestGetMacroValueTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(
                     is_available=MagicMock(return_value=True),
                     get_macro_observations=MagicMock(return_value={
@@ -548,7 +548,7 @@ class TestGetMacroValueTool:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.tools.macro_calendar_tools.MacroCalendarStore",
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
                 lambda dal: MagicMock(
                     is_available=MagicMock(return_value=True),
                     get_macro_observations=MagicMock(return_value={

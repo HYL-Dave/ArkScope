@@ -302,6 +302,12 @@ class DataAccessLayer:
         """3d flip toggle: SA capture domain → local sa_capture.db (hard cutover)."""
         return self._profile_setting_truthy("use_local_sa", "ARKSCOPE_USE_LOCAL_SA")
 
+    def _local_macro_enabled(self) -> bool:
+        """Macro/calendar domain → local macro_calendar.db (PG-exit §4c slice 2). Off by
+        default; flip only once the local DB is migrated/seeded (slice 4). Selects the
+        SQLite twin in src.macro_calendar.get_macro_calendar_store."""
+        return self._profile_setting_truthy("use_local_macro", "ARKSCOPE_USE_LOCAL_MACRO")
+
     @property
     def backend_type(self) -> str:
         """Return the active backend type name."""

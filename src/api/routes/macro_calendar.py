@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from src.agents.config import get_agent_config
 from src.api.dependencies import get_dal
-from src.macro_calendar.store import MacroCalendarStore
+from src.macro_calendar import get_macro_calendar_store
 from src.service.macro_calendar_health import compute_macro_calendar_health
 
 router = APIRouter(prefix="/macro", tags=["macro_calendar"])
@@ -164,7 +164,7 @@ def economic_calendar(
     dt = _parse_iso_datetime_end(to_date, "to_date") or (today + timedelta(days=14))
     _validate_window(df, dt)
 
-    rows = MacroCalendarStore(dal).list_economic_events(
+    rows = get_macro_calendar_store(dal).list_economic_events(
         date_from=df,
         date_to=dt,
         countries=_split_csv(country),
@@ -202,7 +202,7 @@ def earnings_calendar(
     dt = _parse_iso_date(to_date, "to_date") or (today + timedelta(days=30))
     _validate_window(df, dt)
 
-    rows = MacroCalendarStore(dal).list_earnings_events(
+    rows = get_macro_calendar_store(dal).list_earnings_events(
         date_from=df,
         date_to=dt,
         symbols=_split_csv(symbol),
@@ -241,7 +241,7 @@ def ipo_calendar(
     dt = _parse_iso_date(to_date, "to_date") or (today + timedelta(days=90))
     _validate_window(df, dt)
 
-    rows = MacroCalendarStore(dal).list_ipo_events(
+    rows = get_macro_calendar_store(dal).list_ipo_events(
         date_from=df,
         date_to=dt,
         statuses=_split_csv(status),
@@ -282,7 +282,7 @@ def macro_series(
     dt = _parse_iso_date(to_date, "to_date")
     _validate_window(df, dt)
 
-    payload = MacroCalendarStore(dal).get_macro_observations(
+    payload = get_macro_calendar_store(dal).get_macro_observations(
         series_id.upper(),
         date_from=df,
         date_to=dt,

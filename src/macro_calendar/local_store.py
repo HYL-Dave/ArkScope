@@ -620,3 +620,23 @@ class MacroCalendarLocalStore:
             return None
         finally:
             conn.close()
+
+    # --- health support (local twin of macro_calendar_health._TABLE_STATS_SQL) ---------
+
+    _HEALTH_TABLES = ("cal_economic_events", "cal_earnings_events", "cal_ipo_events",
+                      "macro_series", "macro_observations", "macro_release_dates")
+
+    def table_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Per-table MAX(fetched_at) + COUNT(*) for the 6 macro/cal tables — the local twin
+        of the PG health ``_TABLE_STATS_SQL``. Returns ``{table: {last_fetched_at: str|None,
+        row_count: int}}`` (last_fetched_at is ISO-TEXT; the health evaluator's _coerce_dt
+        parses it)."""
+        conn = self._connect()
+        out: Dict[str, Dict[str, Any]] = {}
+        try:
+            for t in self._HEALTH_TABLES:
+                row = conn.execute(f"SELECT MAX(fetched_at) AS f, COUNT(*) AS c FROM {t}").fetchone()
+                out[t] = {"last_fetched_at": row["f"], "row_count": int(row["c"] or 0)}
+        finally:
+            conn.close()
+        return out

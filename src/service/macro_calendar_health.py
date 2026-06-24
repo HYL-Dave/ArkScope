@@ -136,6 +136,16 @@ def compute_macro_calendar_health(
         now = now.replace(tzinfo=timezone.utc)
     merged_thresholds = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
 
+    # Local-first (§4c slice 2): when use_local_macro is on, table coverage comes from the
+    # local macro_calendar.db — computable with NO PG (job_runs stays best-effort PG).
+    if getattr(dal, "_local_macro_enabled", None) and dal._local_macro_enabled():
+        try:
+            stats = _run_local_health_queries(dal)
+        except Exception as exc:  # pragma: no cover — logged + degraded
+            logger.error("local macro_calendar health query failed: %s", exc)
+            return _db_unavailable_report(now, merged_thresholds, error=str(exc))
+        return evaluate_health(stats, now=now, thresholds=merged_thresholds)
+
     backend = getattr(dal, "_backend", None)
     if backend is None or not hasattr(backend, "_get_conn"):
         return _db_unavailable_report(now, merged_thresholds)
@@ -460,15 +470,12 @@ _TABLE_STATS_SQL = """
 """
 
 
-def _run_health_queries(backend: Any) -> Dict[str, Any]:
-    """Aggregate job_runs + 6 macro/cal tables.
-
-    Each query degrades independently — a missing ``job_runs`` table
-    (pre-P0.2) still leaves the table-level coverage report usable.
-    """
+def _query_job_runs(conn) -> Dict[str, Dict[str, Any]]:
+    """job_runs cadence aggregation (best-effort; missing table → {}). Shared by the PG
+    and local-first paths — job_runs is the scheduler log, not part of §4c, so the local
+    path still reads it from PG when a backend is reachable."""
     from psycopg2 import extras as _pg_extras
 
-    conn = backend._get_conn()
     jobs: Dict[str, Dict[str, Any]] = {}
     try:
         with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
@@ -480,6 +487,19 @@ def _run_health_queries(backend: Any) -> Dict[str, Any]:
                 }
     except Exception as exc:
         logger.warning("macro_calendar health: job_runs lookup failed: %s", exc)
+    return jobs
+
+
+def _run_health_queries(backend: Any) -> Dict[str, Any]:
+    """Aggregate job_runs + 6 macro/cal tables (PG path).
+
+    Each query degrades independently — a missing ``job_runs`` table
+    (pre-P0.2) still leaves the table-level coverage report usable.
+    """
+    from psycopg2 import extras as _pg_extras
+
+    conn = backend._get_conn()
+    jobs = _query_job_runs(conn)
 
     tables: Dict[str, Dict[str, Any]] = {}
     with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
@@ -490,6 +510,22 @@ def _run_health_queries(backend: Any) -> Dict[str, Any]:
                 "row_count": int(row.get("row_count") or 0),
             }
 
+    return {"jobs": jobs, "tables": tables}
+
+
+def _run_local_health_queries(dal: Any) -> Dict[str, Any]:
+    """Local-first health: table coverage from the SQLite macro_calendar.db (no PG); jobs
+    best-effort from PG if a backend is reachable, else {} (degrades like the PG path)."""
+    from src.macro_calendar import get_macro_calendar_store
+
+    tables = get_macro_calendar_store(dal).table_stats()
+    jobs: Dict[str, Dict[str, Any]] = {}
+    backend = getattr(dal, "_backend", None)
+    if backend is not None and hasattr(backend, "_get_conn"):
+        try:
+            jobs = _query_job_runs(backend._get_conn())
+        except Exception as exc:
+            logger.warning("local macro_calendar health: job_runs best-effort failed: %s", exc)
     return {"jobs": jobs, "tables": tables}
 
 

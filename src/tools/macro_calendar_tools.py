@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.agents.config import get_agent_config
-from src.macro_calendar.store import MacroCalendarStore
+from src.macro_calendar import get_macro_calendar_store
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def get_economic_calendar(
     """
     if not get_agent_config().macro_calendar_enabled:
         return _DISABLED_MSG
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         return _BACKEND_MSG
 
@@ -130,7 +130,7 @@ def get_macro_value(
     """
     if not get_agent_config().macro_calendar_enabled:
         return _DISABLED_MSG
-    store = MacroCalendarStore(dal)
+    store = get_macro_calendar_store(dal)
     if not store.is_available():
         return _BACKEND_MSG
 
