@@ -206,29 +206,71 @@ def get_fundamentals_analysis(
     else:
         result = FundamentalsResult(ticker=ticker.upper())
 
-    # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies)
+    # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies). LOCAL-FIRST
+    # CACHE (#3): the SEC fetch is free but live + rate-limited (10 req/s, declared UA),
+    # so cache the built result in the local financial_cache (3c-C, local-primary → works
+    # under strict/no-PG) keyed by ticker+period. A positive hit serves from local; a
+    # NEGATIVE (no-data: non-US / CIK miss) is cached with a SHORT TTL so we don't hammer
+    # SEC for a symbol it doesn't cover.
+    _cache_be = getattr(dal, "_backend", None)
+    _sec_key = f"fundamentals_analysis:sec_edgar:{ticker.upper()}:{period}:v1"
+    _sec_negative_cached = False
+    if _cache_be is not None and hasattr(_cache_be, "get_financial_cache"):
+        try:
+            hit = _cache_be.get_financial_cache(_sec_key)
+        except Exception:  # noqa: BLE001 — cache read must never break the analysis
+            hit = None
+        if hit is not None:
+            if hit.get("_negative"):
+                _sec_negative_cached = True  # skip the live SEC fetch; FD branch still runs
+            else:
+                try:
+                    return FundamentalsResult.model_validate(hit)
+                except Exception:  # noqa: BLE001 — stale/incompatible cache shape → re-fetch
+                    pass
+
     income_stmts = []
     balance_sheets = []
     cashflow_stmts = []
-    try:
-        from data_sources.sec_edgar_financials import SECEdgarFinancials
-        sec = SECEdgarFinancials()
+    if not _sec_negative_cached:
+        try:
+            from data_sources.sec_edgar_financials import SECEdgarFinancials
+            sec = SECEdgarFinancials()
 
-        if period == "quarterly":
-            n = 4  # 4 most recent quarters
-        else:
-            n = 2  # 2 most recent years
-        income_stmts = sec.get_income_statement(ticker, years=n, period=period)[:n]
-        balance_sheets = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
-        cashflow_stmts = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
-    except Exception as e:
-        logger.warning(f"SEC EDGAR fallback failed for {ticker}: {e}")
+            if period == "quarterly":
+                n = 4  # 4 most recent quarters
+            else:
+                n = 2  # 2 most recent years
+            income_stmts = sec.get_income_statement(ticker, years=n, period=period)[:n]
+            balance_sheets = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
+            cashflow_stmts = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
+        except Exception as e:
+            logger.warning(f"SEC EDGAR fallback failed for {ticker}: {e}")
 
-    # If SEC EDGAR has sufficient data, use it
+    # If SEC EDGAR has sufficient data, use it (and cache it)
     if income_stmts or balance_sheets:
-        return _build_result_from_statements(
+        sec_result = _build_result_from_statements(
             ticker, "sec_edgar", income_stmts, balance_sheets, cashflow_stmts,
         )
+        if _cache_be is not None and hasattr(_cache_be, "set_financial_cache"):
+            try:  # cache only SUCCESS; never let a cache write break the analysis
+                _cache_be.set_financial_cache(
+                    _sec_key, ticker.upper(), sec_result.model_dump(),
+                    ttl_days=30 if period == "quarterly" else 90, source="sec_edgar")
+            except Exception:  # noqa: BLE001
+                logger.debug("SEC fundamentals cache write skipped for %s", ticker)
+        return sec_result
+
+    # SEC returned nothing → short negative cache (avoid re-hitting SEC for an uncovered
+    # symbol every call); the FD branch below still gets a chance THIS call. Skip the write
+    # if we already short-circuited on a cached negative.
+    if (not _sec_negative_cached and _cache_be is not None
+            and hasattr(_cache_be, "set_financial_cache")):
+        try:
+            _cache_be.set_financial_cache(
+                _sec_key, ticker.upper(), {"_negative": True}, ttl_days=1, source="sec_edgar")
+        except Exception:  # noqa: BLE001
+            pass
 
     # 3. Financial Datasets API (paid, cached — local-primary via the DAL backend)
     if _is_fd_enabled(dal):
