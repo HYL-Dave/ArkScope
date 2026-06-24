@@ -228,6 +228,51 @@ needs a **direct provider→SQLite** path, not a mirror fix.
 iv/prices/fundamentals mirror OUT of the runtime `incremental_update` loop → import/archive
 only** (else stale PG remains a silent runtime source, conflicting with strict-local).
 
+### 4c. Macro / calendar local store — SCOPING (`macro_calendar.db`)
+
+**Status:** scoping locked 2026-06-24; not yet built. `MacroCalendarStore` (`src/macro_calendar/store.py`)
+is still **raw psycopg2** (`is_available()` = `_backend has _get_conn`), so macro/cal is the
+largest remaining market/research PG runtime dependency. Its own DB (`macro_calendar.db`) per
+the topology decision — distinct schema + lifecycle from market_data.db, independently
+re-fetchable (FRED/Finnhub), and a rebuild must not be able to harm prices/news.
+
+**Grounded surface (verified):** 8 tables (`sql/013`) — 4 canonical (`cal_economic_events`,
+`cal_earnings_events`, `cal_ipo_events`, `macro_series`) + their revision logs / observations
+(`cal_*_event_revisions`, `macro_observations`, `macro_release_dates`); `BIGSERIAL` PKs,
+`fingerprint TEXT UNIQUE` upserts (`INSERT … ON CONFLICT`), `TIMESTAMPTZ`, partial indexes
+(`WHERE impact='high'`), FK `ON DELETE CASCADE`. Readers: `macro_calendar_tools.py` (+ both
+agent tool bridges), `macro_calendar_health.py`, `fred_ingestion.py`/`finnhub_ingestion.py`
+(writers), `api/app.py` (wiring), `agents/config.py` (`macro_calendar_enabled`).
+
+**The 6 locked scoping decisions:**
+1. **Schema** — port `sql/013` to SQLite in `macro_calendar.db` (PG-ism checklist: `BIGSERIAL`→
+   `INTEGER PRIMARY KEY AUTOINCREMENT`; `TIMESTAMPTZ`→TEXT UTC-ISO; `JSONB`→TEXT(json.dumps);
+   `%s`→`?`; `RealDictCursor`→`sqlite3.Row`; partial-index `WHERE` recreated as real partial
+   indexes; FK CASCADE kept). Fingerprint-UNIQUE upserts + the canonical+revisions pattern
+   port directly (SQLite supports `ON CONFLICT` + partial unique indexes).
+2. **Store shape** — a **SQLite-backed twin** (`MacroCalendarLocalStore`) over the SAME public
+   method surface (`upsert_*`, `get_macro_series`, `get_macro_value_as_of`, `get_release_dates`,
+   `is_available`) rather than abstracting a Protocol now — mirrors the slice-#2 LocalMarket
+   precedent (smallest change; a Protocol is over-engineering for one twin). Selected by a
+   `use_local_macro` toggle (env + profile_settings), default-off, like `use_local_market`.
+3. **PG fallback** — import/archive only; once the local store is validated, runtime reads/writes
+   are local. A one-time PG→SQLite migrate (like market_data) seeds history; provider re-fetch
+   is the steady state. No silent live PG fallback after cutover (strict-local consistent).
+4. **FRED/Finnhub re-fetch vs migrate** — both: a one-time migrate seeds existing PG rows
+   (cheap, preserves revision history), then `fred_ingestion`/`finnhub_ingestion` write the
+   local store directly going forward. Migrate first (parity proof), re-fetch is the R2 end-state.
+5. **Health route** — `macro_calendar_health.py` reads the local store's per-table count +
+   last-fetched (the same DTO), local-first; PG only as the labeled fallback until cutover.
+6. **boot-without-PG tests** — the store + ingestion + health resolve against a temp
+   `macro_calendar.db` with NO PG (a `_pg_conn`-raises guard, like the strict-market tests);
+   a read on a missing/empty DB is an honest empty, not a crash.
+
+**Implementation order:** (1) SQLite schema + `MacroCalendarLocalStore` read/write **parity tests**
+(hermetic, no PG) → (2) toggle + wire selection in `api/app.py` → (3) routes/tools/health
+local-first → (4) one-time PG→SQLite migrate + validate → (5) FRED/Finnhub ingestion writes
+local. **NOTE:** enabling `macro_calendar.enabled` today routes to the PG-only path — do NOT
+flip it on until the local store lands (would regress the PG-exit direction).
+
 ---
 
 ## 5. Seeking-Alpha capture isolation (protected ingestion path)
