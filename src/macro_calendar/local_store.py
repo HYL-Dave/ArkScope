@@ -31,6 +31,8 @@ from src.macro_calendar.store import (
     ECONOMIC_TRACKED_FIELDS,
     EARNINGS_TRACKED_FIELDS,
     IPO_TRACKED_FIELDS,
+    _clamp_limit,
+    _normalize_str_array,
     _tracked_payload_differs,
     economic_event_fingerprint,
     earnings_event_fingerprint,
@@ -47,7 +49,7 @@ CREATE TABLE IF NOT EXISTS cal_economic_events (
     country     TEXT NOT NULL,
     event_name  TEXT NOT NULL,
     event_time  TEXT NOT NULL,
-    impact      TEXT,
+    impact      TEXT NOT NULL DEFAULT '' CHECK (impact IN ('low','medium','high','')),
     unit        TEXT,
     actual      REAL,
     estimate    REAL,
@@ -75,8 +77,8 @@ CREATE TABLE IF NOT EXISTS cal_earnings_events (
     symbol           TEXT NOT NULL,
     report_date      TEXT NOT NULL,
     year             INTEGER NOT NULL,
-    quarter          INTEGER NOT NULL,
-    hour             TEXT,
+    quarter          INTEGER NOT NULL CHECK (quarter BETWEEN 1 AND 4),
+    hour             TEXT NOT NULL DEFAULT '' CHECK (hour IN ('bmo','amc','dmh','')),
     eps_estimate     REAL,
     eps_actual       REAL,
     revenue_estimate REAL,
@@ -107,9 +109,9 @@ CREATE TABLE IF NOT EXISTS cal_ipo_events (
     name               TEXT NOT NULL,
     ipo_date           TEXT NOT NULL,
     exchange           TEXT,
-    status             TEXT NOT NULL,
+    status             TEXT NOT NULL CHECK (status IN ('priced','filed','expected','withdrawn')),
     number_of_shares   REAL,
-    price              TEXT,
+    price              TEXT,   -- PG is NUMERIC; TEXT here tolerates Finnhub range strings ("18-20")
     total_shares_value REAL,
     fingerprint        TEXT NOT NULL UNIQUE,
     created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
@@ -138,19 +140,22 @@ CREATE TABLE IF NOT EXISTS macro_series (
     units               TEXT,
     seasonal_adjustment TEXT,
     last_updated        TEXT,
-    revision_strategy   TEXT NOT NULL DEFAULT 'latest_only',
+    revision_strategy   TEXT NOT NULL DEFAULT 'latest_only'
+                        CHECK (revision_strategy IN ('latest_only','full_vintages')),
     updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE TABLE IF NOT EXISTS macro_observations (
-    series_id        TEXT NOT NULL,
+    observation_id   INTEGER PRIMARY KEY AUTOINCREMENT,   -- surrogate (PG BIGSERIAL parity)
+    series_id        TEXT NOT NULL REFERENCES macro_series(series_id) ON DELETE CASCADE,
     observation_date TEXT NOT NULL,
     value            REAL,
     realtime_start   TEXT NOT NULL,
     realtime_end     TEXT NOT NULL DEFAULT '9999-12-31',
     fetched_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-    PRIMARY KEY (series_id, observation_date, realtime_start)
+    UNIQUE (series_id, observation_date, realtime_start)
 );
-CREATE INDEX IF NOT EXISTS idx_macro_obs ON macro_observations(series_id, observation_date);
+CREATE INDEX IF NOT EXISTS idx_macro_obs ON macro_observations(series_id, observation_date DESC);
+CREATE INDEX IF NOT EXISTS idx_macro_obs_realtime ON macro_observations(series_id, realtime_start DESC);
 CREATE TABLE IF NOT EXISTS macro_release_dates (
     release_id   INTEGER NOT NULL,
     release_name TEXT,
@@ -183,6 +188,15 @@ def _now_observed() -> str:
     COALESCE(observed_at, NOW()). Microsecond-precise so back-to-back revisions on one
     event don't violate UNIQUE(id, observed_at)."""
     return _iso(datetime.now(timezone.utc))
+
+
+def _in_clause(col: str, values: Optional[List[str]]) -> Tuple[str, list]:
+    """Build an ``' AND col IN (?,?,…)'`` fragment + params, or ``('', [])`` when there's
+    no filter — the SQLite twin of PG's ``%(arr)s::text[] IS NULL OR col = ANY(...)``."""
+    if not values:
+        return "", []
+    placeholders = ",".join("?" * len(values))
+    return f" AND {col} IN ({placeholders})", list(values)
 
 
 def resolve_macro_calendar_db_path(db_path: str | Path | None = None) -> str:
@@ -466,5 +480,142 @@ class MacroCalendarLocalStore:
                 f"SELECT release_date FROM macro_release_dates WHERE release_id=?{clause} "
                 "ORDER BY release_date DESC LIMIT ?", tuple(params)).fetchall()
             return [date.fromisoformat(r[0]) for r in rows]
+        finally:
+            conn.close()
+
+    # --- list reads (canonical + as-of), parity with store.list_* / get_macro_observations
+    # NOTE on shape: temporal columns come back as ISO-TEXT (not datetime objects like the
+    # PG RealDictCursor) and NUMERIC as float — consistent with SQLite storage; slice 2's
+    # wiring maps these to the route DTOs. Keys match the PG result (incl. as_of_observed_at).
+
+    def _list_query(self, conn, sql: str, params: list) -> List[Dict[str, Any]]:
+        try:
+            return [dict(r) for r in conn.execute(sql, params).fetchall()]
+        except sqlite3.OperationalError as exc:
+            logger.warning("local list query failed: %s", exc)
+            return []
+
+    def list_economic_events(self, *, date_from: datetime, date_to: datetime,
+                             countries: Optional[Iterable[str]] = None,
+                             impacts: Optional[Iterable[str]] = None,
+                             as_of: Optional[datetime] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        c_arr = _normalize_str_array(countries, upper=True)
+        i_arr = _normalize_str_array(impacts, lower=True)
+        lim = _clamp_limit(limit, hi=1000)
+        conn = self._connect()
+        try:
+            if as_of is None:
+                sql = ("SELECT event_id,country,event_name,event_time,impact,unit,actual,estimate,"
+                       "prev,NULL AS as_of_observed_at FROM cal_economic_events "
+                       "WHERE event_time>=? AND event_time<=?")
+                params = [_iso(date_from), _iso(date_to)]
+                cc, pc = _in_clause("country", c_arr); ci, pi = _in_clause("impact", i_arr)
+                sql += cc + ci + " ORDER BY event_time ASC LIMIT ?"; params += pc + pi + [lim]
+            else:
+                # INNER JOIN the latest revision <= as_of (MAX subquery → events with no
+                # revision <= as_of yield NULL → excluded, matching PG's INNER JOIN LATERAL).
+                sql = ("SELECT e.event_id,e.country,e.event_name,e.event_time,e.impact,e.unit,"
+                       "rev.actual,rev.estimate,rev.prev,rev.observed_at AS as_of_observed_at "
+                       "FROM cal_economic_events e JOIN cal_economic_event_revisions rev "
+                       "ON rev.event_id=e.event_id AND rev.observed_at=("
+                       "SELECT MAX(observed_at) FROM cal_economic_event_revisions "
+                       "WHERE event_id=e.event_id AND observed_at<=?) "
+                       "WHERE e.event_time>=? AND e.event_time<=?")
+                params = [_iso(as_of), _iso(date_from), _iso(date_to)]
+                cc, pc = _in_clause("e.country", c_arr); ci, pi = _in_clause("e.impact", i_arr)
+                sql += cc + ci + " ORDER BY e.event_time ASC LIMIT ?"; params += pc + pi + [lim]
+            return self._list_query(conn, sql, params)
+        finally:
+            conn.close()
+
+    def list_earnings_events(self, *, date_from: date, date_to: date,
+                             symbols: Optional[Iterable[str]] = None,
+                             as_of: Optional[datetime] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        s_arr = _normalize_str_array(symbols, upper=True)
+        lim = _clamp_limit(limit, hi=1000)
+        conn = self._connect()
+        try:
+            if as_of is None:
+                sql = ("SELECT earnings_id,symbol,report_date,year,quarter,hour,eps_estimate,"
+                       "eps_actual,revenue_estimate,revenue_actual,NULL AS as_of_observed_at "
+                       "FROM cal_earnings_events WHERE report_date>=? AND report_date<=?")
+                params = [_iso(date_from), _iso(date_to)]
+                cs, ps = _in_clause("symbol", s_arr)
+                sql += cs + " ORDER BY report_date ASC, symbol ASC LIMIT ?"; params += ps + [lim]
+            else:
+                sql = ("SELECT e.earnings_id,e.symbol,e.report_date,e.year,e.quarter,rev.hour,"
+                       "rev.eps_estimate,rev.eps_actual,rev.revenue_estimate,rev.revenue_actual,"
+                       "rev.observed_at AS as_of_observed_at FROM cal_earnings_events e "
+                       "JOIN cal_earnings_event_revisions rev ON rev.earnings_id=e.earnings_id "
+                       "AND rev.observed_at=(SELECT MAX(observed_at) FROM cal_earnings_event_revisions "
+                       "WHERE earnings_id=e.earnings_id AND observed_at<=?) "
+                       "WHERE e.report_date>=? AND e.report_date<=?")
+                params = [_iso(as_of), _iso(date_from), _iso(date_to)]
+                cs, ps = _in_clause("e.symbol", s_arr)
+                sql += cs + " ORDER BY e.report_date ASC, e.symbol ASC LIMIT ?"; params += ps + [lim]
+            return self._list_query(conn, sql, params)
+        finally:
+            conn.close()
+
+    def list_ipo_events(self, *, date_from: date, date_to: date,
+                        statuses: Optional[Iterable[str]] = None,
+                        as_of: Optional[datetime] = None, limit: int = 200) -> List[Dict[str, Any]]:
+        st_arr = _normalize_str_array(statuses, lower=True)
+        lim = _clamp_limit(limit, hi=1000)
+        conn = self._connect()
+        try:
+            if as_of is None:
+                sql = ("SELECT ipo_id,symbol,name,ipo_date,exchange,status,number_of_shares,price,"
+                       "total_shares_value,NULL AS as_of_observed_at FROM cal_ipo_events "
+                       "WHERE ipo_date>=? AND ipo_date<=?")
+                params = [_iso(date_from), _iso(date_to)]
+                cs, ps = _in_clause("status", st_arr)
+                sql += cs + " ORDER BY ipo_date ASC, name ASC LIMIT ?"; params += ps + [lim]
+            else:
+                # as-of status filter is on the REVISION status (parity: _LIST_IPO_AS_OF_SQL).
+                sql = ("SELECT e.ipo_id,e.symbol,e.name,e.ipo_date,rev.exchange,rev.status,"
+                       "rev.number_of_shares,rev.price,rev.total_shares_value,"
+                       "rev.observed_at AS as_of_observed_at FROM cal_ipo_events e "
+                       "JOIN cal_ipo_event_revisions rev ON rev.ipo_id=e.ipo_id "
+                       "AND rev.observed_at=(SELECT MAX(observed_at) FROM cal_ipo_event_revisions "
+                       "WHERE ipo_id=e.ipo_id AND observed_at<=?) "
+                       "WHERE e.ipo_date>=? AND e.ipo_date<=?")
+                params = [_iso(as_of), _iso(date_from), _iso(date_to)]
+                cs, ps = _in_clause("rev.status", st_arr)
+                sql += cs + " ORDER BY e.ipo_date ASC, e.name ASC LIMIT ?"; params += ps + [lim]
+            return self._list_query(conn, sql, params)
+        finally:
+            conn.close()
+
+    def get_macro_observations(self, series_id: str, *, date_from: Optional[date] = None,
+                               date_to: Optional[date] = None, as_of: Optional[date] = None,
+                               limit: int = 1000) -> Optional[Dict[str, Any]]:
+        """Series metadata + observation list. ``as_of`` selects the vintage window
+        (realtime_start<=as_of<realtime_end); without it, the current vintage
+        (realtime_end='9999-12-31'). None when the series is unknown."""
+        conn = self._connect()
+        try:
+            meta = conn.execute("SELECT * FROM macro_series WHERE series_id=?", (series_id,)).fetchone()
+            if meta is None:
+                return None
+            lim = _clamp_limit(limit, hi=10000)
+            clause, params = "", [series_id]
+            if as_of is None:
+                clause = " AND realtime_end='9999-12-31'"
+            else:
+                clause = " AND realtime_start<=? AND realtime_end>?"
+                params += [_iso(as_of), _iso(as_of)]
+            if date_from is not None:
+                clause += " AND observation_date>=?"; params.append(_iso(date_from))
+            if date_to is not None:
+                clause += " AND observation_date<=?"; params.append(_iso(date_to))
+            params.append(lim)
+            obs = conn.execute(
+                "SELECT observation_date,value,realtime_start,realtime_end FROM macro_observations "
+                f"WHERE series_id=?{clause} ORDER BY observation_date ASC LIMIT ?", params).fetchall()
+            return {**dict(meta), "observations": [dict(o) for o in obs]}
+        except sqlite3.OperationalError as exc:
+            logger.warning("get_macro_observations failed for %s: %s", series_id, exc)
+            return None
         finally:
             conn.close()
