@@ -713,3 +713,67 @@ def test_backfill_ibkr_empty_from_swallowed_request_error_falls_to_polygon(tmp_p
     conn = sqlite3.connect(db)
     assert conn.execute("SELECT last_error FROM provider_sync_meta WHERE ticker='AAPL'").fetchone()[0] is None
     conn.close()
+
+
+# --- 2e: IBKR preflight connect before the write lock (fail-fast, no churn) ---------
+
+class _FakeIBKRConnect(_FakeIBKR):
+    """A fake whose connect() can fail — to exercise the 2e preflight."""
+    def __init__(self, *a, connect_ok=True, **k):
+        super().__init__(*a, **k)
+        self._connect_ok = connect_ok
+        self.connect_calls = 0
+        self.disconnected = False
+    def connect(self):
+        self.connect_calls += 1
+        return self._connect_ok
+    def disconnect(self):
+        self.disconnected = True
+
+
+def test_backfill_preflight_connect_failure_fails_fast_no_lock_no_run(tmp_path, monkeypatch):
+    # IBKR cold-connect fails → run must fail FAST: never enter the per-ticker loop, never
+    # write prices, never create a provider_sync_runs row, and (critically) never hold the
+    # market write lock churning.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKRConnect(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
+                            connect_ok=False)
+    with pytest.raises(RuntimeError, match="IBKR"):
+        mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                   db_path=str(db), ibkr_src=ibkr,
+                                   now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    conn = sqlite3.connect(db)
+    # no prices written, no run row created
+    assert conn.execute("SELECT COUNT(*) FROM prices").fetchone()[0] == 0
+    has_runs = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_sync_runs'").fetchone()
+    assert (not has_runs) or conn.execute("SELECT COUNT(*) FROM provider_sync_runs").fetchone()[0] == 0
+    conn.close()
+    # the lock is free immediately (preflight failed BEFORE acquiring it)
+    with mdd.market_write_lock(timeout=2):
+        pass
+
+
+def test_backfill_preflight_connect_ok_proceeds(tmp_path, monkeypatch):
+    # connect ok → normal run (preflight is transparent on the happy path).
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKRConnect(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 22, 9, 30, 0))]},
+                            connect_ok=True)
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="ibkr",
+                                     db_path=str(db), ibkr_src=ibkr,
+                                     now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert res["rows_added"] == 1 and ibkr.connect_calls >= 1
+
+
+def test_backfill_polygon_provider_skips_ibkr_preflight(tmp_path, monkeypatch):
+    # provider='polygon' must NOT require an IBKR connect (no Gateway dependency at all).
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _backfill_db(tmp_path)
+    epoch_ms = int(datetime(2026, 6, 22, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    poly = _FakePolygon(results_by_day={date(2026, 6, 22): [
+        {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
+    res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=3, provider="polygon",
+                                     db_path=str(db), polygon_src=poly,
+                                     now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    assert res["rows_added"] == 1  # no IBKR involved, no preflight needed

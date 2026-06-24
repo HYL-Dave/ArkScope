@@ -427,9 +427,12 @@ def _polygon_results_to_rows(canon: str, results, interval: str) -> List[tuple]:
 
 # --- 2b·2: backfill orchestration --------------------------------------------------
 
+_IBKR_CONNECT_TIMEOUT_S = 15  # short cold-connect timeout (default 60 churned ~5min when down)
+
+
 def _default_ibkr_src():  # pragma: no cover - exercised live (or via monkeypatch in tests)
     from data_sources.ibkr_source import IBKRDataSource
-    return IBKRDataSource()
+    return IBKRDataSource(timeout=_IBKR_CONNECT_TIMEOUT_S)
 
 
 def _default_polygon_src():  # pragma: no cover - exercised live (or via monkeypatch in tests)
@@ -533,6 +536,23 @@ def backfill_prices_direct(
                 polygon_src = None
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()
+
+    # 2e PREFLIGHT: for the IBKR path, verify the Gateway API handshake BEFORE taking the
+    # market write lock. A cold-connect failure fails the run FAST and LOUD here — never
+    # holding the DB write lock while churning (the unattended-scheduler hazard the live
+    # re-canary exposed), never creating a dangling 'running' provider_sync_runs row. Only
+    # gates IBKR; provider='polygon' has no Gateway dependency. Best-effort connect() probe;
+    # if the source has no connect() (older/test doubles) the preflight is skipped.
+    if provider == "ibkr" and ibkr_src is not None and hasattr(ibkr_src, "connect"):
+        try:
+            ok = ibkr_src.connect()
+        except Exception as e:  # noqa: BLE001 — surface as a loud run failure
+            raise RuntimeError(f"IBKR preflight connect failed: {e}") from e
+        if not ok:
+            raise RuntimeError(
+                "IBKR preflight connect failed: Gateway API handshake not established "
+                "(TCP may be open but the API session is down — check login / API enabled / "
+                "client-id). Run aborted before acquiring the market write lock.")
 
     now_et = _norm_now_et(now_et)
     end = today or now_et.date()
