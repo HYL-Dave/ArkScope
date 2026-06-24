@@ -41,6 +41,12 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
+_IBKR_EQUITY_TIME_ZONE = "US/Eastern"
+
+
+def _ibkr_equity_end_of_day(trade_date: date) -> str:
+    return f"{trade_date:%Y%m%d} 23:59:59 {_IBKR_EQUITY_TIME_ZONE}"
+
 
 @dataclass
 class IntradayBar:
@@ -746,7 +752,7 @@ class IBKRDataSource(BaseDataSource):
             contract = self._create_contract(ticker)
             self._ib.qualifyContracts(contract)
 
-            end_datetime = datetime.combine(trade_date, datetime.max.time())
+            end_datetime = _ibkr_equity_end_of_day(trade_date)
 
             bars = self._ib.reqHistoricalData(
                 contract,
@@ -850,7 +856,7 @@ class IBKRDataSource(BaseDataSource):
                     self._ib.qualifyContracts(contract)
 
                     duration_days = (chunk_end - chunk_start).days + 1
-                    end_datetime = datetime.combine(chunk_end, datetime.max.time())
+                    end_datetime = _ibkr_equity_end_of_day(chunk_end)
 
                     bars = self._ib.reqHistoricalData(
                         contract,
