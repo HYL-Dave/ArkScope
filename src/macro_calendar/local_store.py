@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS cal_economic_events (
     estimate    REAL,
     prev        REAL,
     fingerprint TEXT NOT NULL UNIQUE,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    fetched_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cal_econ_event_time ON cal_economic_events(event_time DESC);
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS cal_economic_event_revisions (
     actual         REAL,
     estimate       REAL,
     prev           REAL,
-    source_payload TEXT,
+    source_payload TEXT NOT NULL,
     UNIQUE (event_id, observed_at)
 );
 CREATE INDEX IF NOT EXISTS idx_cal_econ_rev ON cal_economic_event_revisions(event_id, observed_at DESC);
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS cal_earnings_events (
     revenue_estimate REAL,
     revenue_actual   REAL,
     fingerprint      TEXT NOT NULL UNIQUE,
-    created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    fetched_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cal_earn_symbol ON cal_earnings_events(symbol, report_date DESC);
@@ -93,12 +93,12 @@ CREATE TABLE IF NOT EXISTS cal_earnings_event_revisions (
     revision_id      INTEGER PRIMARY KEY AUTOINCREMENT,
     earnings_id      INTEGER NOT NULL REFERENCES cal_earnings_events(earnings_id) ON DELETE CASCADE,
     observed_at      TEXT NOT NULL,
-    hour             TEXT,
+    hour             TEXT NOT NULL DEFAULT '',
     eps_estimate     REAL,
     eps_actual       REAL,
     revenue_estimate REAL,
     revenue_actual   REAL,
-    source_payload   TEXT,
+    source_payload   TEXT NOT NULL,
     UNIQUE (earnings_id, observed_at)
 );
 CREATE INDEX IF NOT EXISTS idx_cal_earn_rev ON cal_earnings_event_revisions(earnings_id, observed_at DESC);
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS cal_ipo_events (
     price              TEXT,   -- PG is NUMERIC; TEXT here tolerates Finnhub range strings ("18-20")
     total_shares_value REAL,
     fingerprint        TEXT NOT NULL UNIQUE,
-    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    fetched_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_cal_ipo_date ON cal_ipo_events(ipo_date DESC);
@@ -123,25 +123,26 @@ CREATE TABLE IF NOT EXISTS cal_ipo_event_revisions (
     revision_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     ipo_id             INTEGER NOT NULL REFERENCES cal_ipo_events(ipo_id) ON DELETE CASCADE,
     observed_at        TEXT NOT NULL,
-    status             TEXT,
+    status             TEXT NOT NULL,
     price              TEXT,
     exchange           TEXT,
     number_of_shares   REAL,
     total_shares_value REAL,
-    source_payload     TEXT,
+    source_payload     TEXT NOT NULL,
     UNIQUE (ipo_id, observed_at)
 );
 CREATE INDEX IF NOT EXISTS idx_cal_ipo_rev ON cal_ipo_event_revisions(ipo_id, observed_at DESC);
 
 CREATE TABLE IF NOT EXISTS macro_series (
     series_id           TEXT PRIMARY KEY,
-    title               TEXT,
-    frequency           TEXT,
-    units               TEXT,
+    title               TEXT NOT NULL,
+    frequency           TEXT NOT NULL,
+    units               TEXT NOT NULL,
     seasonal_adjustment TEXT,
     last_updated        TEXT,
     revision_strategy   TEXT NOT NULL DEFAULT 'latest_only'
                         CHECK (revision_strategy IN ('latest_only','full_vintages')),
+    fetched_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 CREATE TABLE IF NOT EXISTS macro_observations (
@@ -158,7 +159,7 @@ CREATE INDEX IF NOT EXISTS idx_macro_obs ON macro_observations(series_id, observ
 CREATE INDEX IF NOT EXISTS idx_macro_obs_realtime ON macro_observations(series_id, realtime_start DESC);
 CREATE TABLE IF NOT EXISTS macro_release_dates (
     release_id   INTEGER NOT NULL,
-    release_name TEXT,
+    release_name TEXT NOT NULL,
     release_date TEXT NOT NULL,
     fetched_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     PRIMARY KEY (release_id, release_date)

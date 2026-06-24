@@ -304,3 +304,55 @@ def test_check_constraints_reject_invalid_enums(store):
     # revision_strategy ∉ (latest_only/full_vintages)
     assert store.upsert_macro_series({"series_id": "BAD", "title": "t", "frequency": "Monthly",
         "units": "u", "revision_strategy": "vintage"}) is False  # upsert swallows → False
+
+
+# --- 1.2: fetched_at + NOT NULL schema parity (health-path readiness) --------------
+
+_HEALTH_TABLES = ("cal_economic_events", "cal_earnings_events", "cal_ipo_events",
+                  "macro_series", "macro_observations", "macro_release_dates")
+
+
+def _columns(db_path, table):
+    conn = sqlite3.connect(db_path)
+    try:
+        return {r[1]: {"type": r[2], "notnull": r[3]} for r in conn.execute(f"PRAGMA table_info({table})")}
+    finally:
+        conn.close()
+
+
+def test_fetched_at_present_on_all_health_tables(store, tmp_path):
+    # health _TABLE_STATS_SQL does MAX(fetched_at) on all 6 tables — every one must have it.
+    db = tmp_path / "macro_calendar.db"
+    for t in _HEALTH_TABLES:
+        assert "fetched_at" in _columns(db, t), f"{t} missing fetched_at (health MAX(fetched_at) needs it)"
+
+
+def test_not_null_parity_with_pg(store, tmp_path):
+    db = tmp_path / "macro_calendar.db"
+    ms = _columns(db, "macro_series")
+    for col in ("title", "frequency", "units"):
+        assert ms[col]["notnull"] == 1, f"macro_series.{col} should be NOT NULL (PG parity)"
+    assert _columns(db, "macro_release_dates")["release_name"]["notnull"] == 1
+    assert _columns(db, "cal_economic_event_revisions")["source_payload"]["notnull"] == 1
+    assert _columns(db, "cal_earnings_event_revisions")["source_payload"]["notnull"] == 1
+    assert _columns(db, "cal_ipo_event_revisions")["source_payload"]["notnull"] == 1
+    assert _columns(db, "cal_ipo_event_revisions")["status"]["notnull"] == 1
+
+
+def test_health_table_stats_query_shape(store, tmp_path):
+    # simulate slice-2's health read: MAX(fetched_at)+COUNT(*) per table must not error and
+    # must return a fetched_at after a write (proves the column exists + is populated).
+    store.upsert_economic_event({"country": "US", "event_name": "CPI", "event_time": _dt(2026, 6, 10),
+        "impact": "high", "unit": "%", "actual": 1.0, "estimate": 1.0, "prev": 1.0}, source_payload={})
+    _seed_series(store)
+    conn = sqlite3.connect(tmp_path / "macro_calendar.db")
+    try:
+        union = " UNION ALL ".join(
+            f"SELECT '{t}' AS table_name, MAX(fetched_at) AS last_fetched_at, COUNT(*) AS row_count FROM {t}"
+            for t in _HEALTH_TABLES)
+        rows = {r[0]: (r[1], r[2]) for r in conn.execute(union)}
+        assert set(rows) == set(_HEALTH_TABLES)                       # all 6 queryable, no missing-column error
+        assert rows["cal_economic_events"][1] == 1 and rows["cal_economic_events"][0] is not None
+        assert rows["macro_series"][1] == 1 and rows["macro_series"][0] is not None
+    finally:
+        conn.close()
