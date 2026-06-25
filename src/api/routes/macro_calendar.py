@@ -70,19 +70,24 @@ def macro_status(store=Depends(get_profile_store)):
     """Local macro/cal status (PURE READ; does not touch PG, does not create the local DB).
 
     Reports the persisted ``use_local_macro`` toggle, the env override, and — when
-    ``macro_calendar.db`` exists — per-table coverage (read-only). ``local_first_active`` is
-    whether reads/writes actually route local right now (toggle-or-env AND the DB exists)."""
+    ``macro_calendar.db`` exists — per-table coverage (read-only).
+
+    ``local_first_active`` = routing is local right now = ``setting OR env``. It does **not**
+    gate on file existence: the store factory (``get_macro_calendar_store``) selects the local
+    store the moment the toggle is on, creating ``macro_calendar.db`` on first use, and there
+    is **no PG fallback** in the local path (PG macro is empty). So toggle-on → local active,
+    even before the DB is built (queries just return empty until ingestion fills it).
+    ``exists`` is the separate "DB built yet?" signal the UI composes with this."""
     path = resolve_macro_calendar_db_path()
-    exists = os.path.exists(path)
     setting_on = _macro_setting_enabled(store)
     env_on = os.environ.get(ENV_USE_LOCAL_MACRO, "").strip().lower() in _TRUTHY
     return {
         "macro_db": path,
-        "exists": exists,
+        "exists": os.path.exists(path),
         "tables": read_macro_table_stats(path),  # {} when absent (no DB created)
         "use_local_macro_setting": setting_on,
         "env_override": env_on,
-        "local_first_active": (setting_on or env_on) and exists,
+        "local_first_active": setting_on or env_on,
     }
 
 

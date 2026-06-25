@@ -49,18 +49,22 @@ const macroStatus = (over: Partial<MacroStatus>): MacroStatus => ({
 });
 
 describe("macroRoutingLabel", () => {
-  it("labels local-first active (toggle vs env)", () => {
-    expect(macroRoutingLabel(macroStatus({ local_first_active: true, use_local_macro_setting: true })))
+  it("labels local-first active (toggle vs env), DB built", () => {
+    expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: true, use_local_macro_setting: true })))
       .toBe("啟用中（本地優先）");
-    expect(macroRoutingLabel(macroStatus({ local_first_active: true, env_override: true })))
+    expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: true, env_override: true })))
       .toBe("啟用中（本地優先 · env 強制）");
   });
 
-  it("flags toggle-on-but-db-absent as pending, and off as PG", () => {
-    // setting on but exists=false → not local_first_active → pending
-    expect(macroRoutingLabel(macroStatus({ use_local_macro_setting: true, local_first_active: false })))
-      .toBe("設定已開，待建立資料庫");
-    expect(macroRoutingLabel(macroStatus({})))
+  it("toggle-on but DB not built → local-first, pending ingestion (NOT PG fallback)", () => {
+    // the fix: local active even before the DB exists; the factory creates it on first use,
+    // no PG fallback. So this is 'pending ingestion', not 'reads go PG'.
+    expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: false })))
+      .toBe("啟用中（本地優先）· 待 ingestion 建立");
+  });
+
+  it("off → PG", () => {
+    expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
       .toBe("關閉（使用 PG）");
   });
 });

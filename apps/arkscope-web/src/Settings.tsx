@@ -835,9 +835,10 @@ function MacroStorageSection() {
             </label>
           </div>
 
-          {status.use_local_macro_setting && !exists && (
+          {status.local_first_active && !exists && (
             <p className="muted tiny" style={{ marginTop: 8 }}>
-              設定已開但本地庫尚未建立 — 讀取仍走 PG，直到 FRED／Finnhub job 把 macro_calendar.db 填起來。
+              已啟用本地優先：讀寫即走本地，macro_calendar.db 會在首次使用時自動建立；未經 FRED／Finnhub
+              ingestion 填入前本地查詢回空（不會 fallback 回 PG）。
             </p>
           )}
         </div>

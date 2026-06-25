@@ -9,11 +9,13 @@ export function marketRoutingLabel(status: MarketDataStatus): string {
 }
 
 export function macroRoutingLabel(status: MacroStatus): string {
-  // local_first_active = (toggle OR env) AND the local DB exists. The toggle/env can be on
-  // before the DB is populated → "待建立" (settable, but reads still go to PG until it exists).
-  if (status.local_first_active) {
-    return status.env_override ? "啟用中（本地優先 · env 強制）" : "啟用中（本地優先）";
-  }
-  if (status.use_local_macro_setting || status.env_override) return "設定已開，待建立資料庫";
-  return "關閉（使用 PG）";
+  // local_first_active = (toggle OR env). Routing is local the moment it's on — the store
+  // factory creates macro_calendar.db on first use and there is NO PG fallback in the local
+  // path. So toggle-on is "本地優先" even before the DB is built (queries return empty until
+  // ingestion fills it) — NOT a PG fallback.
+  if (!status.local_first_active) return "關閉（使用 PG）";
+  const envNote = status.env_override ? " · env 強制" : "";
+  return status.exists
+    ? `啟用中（本地優先${envNote}）`
+    : `啟用中（本地優先${envNote}）· 待 ingestion 建立`;
 }

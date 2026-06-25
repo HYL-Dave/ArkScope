@@ -63,6 +63,27 @@ def test_status_reflects_setting_and_env_and_coverage(tmp_path, monkeypatch):
     assert out2["local_first_active"] is True   # env override + db exists
 
 
+def test_local_first_active_when_toggle_on_even_if_db_absent(tmp_path, monkeypatch):
+    # Bug fix: the factory routes LOCAL the moment use_local_macro is on — it creates the DB
+    # on first use and there is NO PG fallback in the local path. So local_first_active must
+    # reflect routing (setting OR env), NOT file existence. Previously it was (on AND exists),
+    # which lied: status said "PG" while the runtime already served (empty) local.
+    db = tmp_path / "macro_calendar.db"
+    monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(db))
+    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
+    out = routes.macro_status(store=_FakeProfileStore({USE_LOCAL_MACRO_KEY: "true"}))
+    assert out["exists"] is False              # DB not built yet
+    assert out["local_first_active"] is True   # but routing IS local (factory ignores existence)
+    assert not db.exists()                     # status itself still must not create it
+
+    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")   # env-only path
+    out2 = routes.macro_status(store=_FakeProfileStore())
+    assert out2["local_first_active"] is True
+    # off → PG (unchanged)
+    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
+    assert routes.macro_status(store=_FakeProfileStore())["local_first_active"] is False
+
+
 def test_put_settings_persists_toggle(monkeypatch):
     store = _FakeProfileStore()
     res = routes.set_local_macro(routes.LocalMacroToggle(enabled=True), store=store)
