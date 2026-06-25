@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
 import type { MacroStatus, MarketDataStatus } from "./api";
 
 const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
@@ -66,5 +66,27 @@ describe("macroRoutingLabel", () => {
   it("off → PG", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
       .toBe("關閉（使用 PG）");
+  });
+});
+
+describe("coverageStatusLabel", () => {
+  const row = (over: Record<string, unknown>) => ({
+    coverage_status: "complete_like" as const, reason: "regular_trading_day",
+    holiday: null, max_observed_bar_count: 26, ...over,
+  });
+  it("renders backend coverage_status (UI does not re-derive completeness)", () => {
+    expect(coverageStatusLabel(row({ coverage_status: "complete_like" })).tone).toBe("ok");
+    expect(coverageStatusLabel(row({ coverage_status: "missing" })))
+      .toEqual({ label: "缺資料", tone: "bad" });
+    expect(coverageStatusLabel(row({ coverage_status: "thin", max_observed_bar_count: 3 })))
+      .toEqual({ label: "疑似不足（最多 3 根）", tone: "warn" });
+    expect(coverageStatusLabel(row({ coverage_status: "in_progress" })).tone).toBe("muted");
+  });
+  it("distinguishes weekend vs holiday for non_trading", () => {
+    expect(coverageStatusLabel(row({ coverage_status: "non_trading", reason: "weekend" })).label)
+      .toBe("週末");
+    expect(coverageStatusLabel(row({
+      coverage_status: "non_trading", reason: "us_market_holiday", holiday: "Juneteenth National Independence Day",
+    })).label).toBe("假日（Juneteenth National Independence Day）");
   });
 });

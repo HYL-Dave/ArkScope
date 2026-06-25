@@ -30,6 +30,7 @@ import {
   setUseLocalMarket,
   setUseLocalMacro,
   getMacroStatus,
+  getTradingDayCoverage,
   testModelAccess,
   updateCredential,
   updateMarketData,
@@ -38,6 +39,8 @@ import {
   type MarketDataStatus,
   type MarketDataValidate,
   type MacroStatus,
+  type TradingDayCoverage,
+  type TradingDayRow,
   type ProviderConfigEntry,
   type ProvidersHealthResponse,
   type ScheduleSourceState,
@@ -72,7 +75,7 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -729,7 +732,176 @@ function DataStorageSection() {
           )}
         </div>
       )}
+
+      <TradingDayCoveragePanel />
     </div>
+  );
+}
+
+// ---- 交易日 / 價格覆蓋唯讀診斷 (Slice B) — read-only; renders backend coverage_status ----
+
+function coverageToneColor(tone: "ok" | "warn" | "muted" | "bad"): string {
+  return tone === "ok" ? "var(--ok)" : tone === "bad" ? "var(--bad)"
+    : tone === "warn" ? "var(--warn, #b8860b)" : "var(--muted, #888)";
+}
+
+function TradingDayCoveragePanel() {
+  const [cov, setCov] = useState<TradingDayCoverage | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [lookback, setLookback] = useState(10);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      setCov(await getTradingDayCoverage(lookback, "15min"));
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [lookback]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <div style={{ marginTop: 24, borderTop: "1px solid var(--border, #333)", paddingTop: 16 }}>
+      <div className="settings-section-head">
+        <div>
+          <h2>交易日 / 價格覆蓋 · Trading-day coverage</h2>
+          <p className="muted tiny">
+            最近 {lookback} 天本地 15min 價格覆蓋（讀 market_data.db）。每列以 coverage_status 為準：
+            覆蓋完整 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。
+            <strong>唯讀診斷，不會自動補抓</strong>；full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label className="muted tiny">
+            天數{" "}
+            <select
+              value={lookback}
+              disabled={busy}
+              onChange={(e) => setLookback(Number(e.target.value))}
+            >
+              {[10, 15, 30, 60].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+        </div>
+      </div>
+
+      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+
+      {!cov ? (
+        <p className="muted">載入中…</p>
+      ) : (
+        <div className="settings-panel">
+          <p className="muted tiny">
+            universe {cov.universe_count} 檔 · interval {cov.interval} · 產生於 {shortTs(cov.generated_at_et)}
+          </p>
+          <table className="ds-table" style={{ width: "100%", marginTop: 8 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}>日期</th>
+                <th style={{ textAlign: "left" }}>狀態</th>
+                <th style={{ textAlign: "right" }}>最多 bars</th>
+                <th style={{ textAlign: "right" }}>覆蓋</th>
+                <th style={{ textAlign: "right" }}>缺</th>
+                <th style={{ textAlign: "right" }}>partial</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {cov.days.map((d) => {
+                const cs = coverageStatusLabel(d);
+                const open = expanded === d.date;
+                // in_progress: the session is open, so "missing/partial" is just not-fetched-yet,
+                // not a gap — don't offer an alarming drill-down. Only completed days drill.
+                const drillable =
+                  d.coverage_status !== "in_progress" &&
+                  d.is_trading_day &&
+                  ((d.missing ?? 0) > 0 || (d.partial ?? 0) > 0);
+                return (
+                  <CoverageRow
+                    key={d.date}
+                    row={d}
+                    label={cs.label}
+                    tone={cs.tone}
+                    open={open}
+                    drillable={drillable}
+                    onToggle={() => setExpanded(open ? null : d.date)}
+                    providerErrors={cov.provider_errors}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CoverageRow({
+  row, label, tone, open, drillable, onToggle, providerErrors,
+}: {
+  row: TradingDayRow;
+  label: string;
+  tone: "ok" | "warn" | "muted" | "bad";
+  open: boolean;
+  drillable: boolean;
+  onToggle: () => void;
+  providerErrors: TradingDayCoverage["provider_errors"];
+}) {
+  // Show numeric coverage only for COMPLETED trading days. Non-trading → "—"; in_progress →
+  // "—" too (mid-session counts aren't a gap; the status cell already says 盤中).
+  const showCounts = row.is_trading_day && row.coverage_status !== "in_progress";
+  const dash = (n: number | null) => (showCounts && n != null ? n.toLocaleString() : "—");
+  // provider errors are universe-wide (not per-day); show them only under a day that has misses.
+  const relErrors = drillable
+    ? providerErrors.filter((e) => row.missing_tickers.includes(e.ticker))
+    : [];
+  return (
+    <>
+      <tr
+        onClick={drillable ? onToggle : undefined}
+        style={{ cursor: drillable ? "pointer" : "default" }}
+      >
+        <td>{row.date}{drillable ? (open ? " ▾" : " ▸") : ""}</td>
+        <td style={{ color: coverageToneColor(tone) }}>{label}</td>
+        <td style={{ textAlign: "right" }}>{dash(row.max_observed_bar_count)}</td>
+        <td style={{ textAlign: "right" }}>{dash(row.covered)}</td>
+        <td style={{ textAlign: "right" }}>{dash(row.missing)}</td>
+        <td style={{ textAlign: "right" }}>{dash(row.partial)}</td>
+        <td />
+      </tr>
+      {open && drillable && (
+        <tr>
+          <td colSpan={7} style={{ background: "var(--panel-2, #1a1a1a)", padding: "8px 12px" }}>
+            {row.missing_tickers.length > 0 && (
+              <p className="tiny" style={{ margin: "0 0 4px" }}>
+                缺（{row.missing_tickers.length}）：{row.missing_tickers.join(", ")}
+              </p>
+            )}
+            {row.partial_tickers.length > 0 && (
+              <p className="tiny" style={{ margin: "0 0 4px" }}>
+                partial：{row.partial_tickers.map((p) => `${p.ticker}(${p.bars})`).join(", ")}
+              </p>
+            )}
+            {relErrors.length > 0 && (
+              <p className="tiny refresh-err" style={{ margin: 0 }}>
+                provider 錯誤：{relErrors.map((e) => `${e.ticker}: ${e.last_error}`).join("；")}
+              </p>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

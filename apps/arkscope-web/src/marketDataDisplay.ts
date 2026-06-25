@@ -1,4 +1,4 @@
-import type { MacroStatus, MarketDataStatus } from "./api";
+import type { CoverageStatus, MacroStatus, MarketDataStatus, TradingDayRow } from "./api";
 
 export function marketRoutingLabel(status: MarketDataStatus): string {
   if (status.routing_enabled) {
@@ -18,4 +18,28 @@ export function macroRoutingLabel(status: MacroStatus): string {
   return status.exists
     ? `啟用中（本地優先${envNote}）`
     : `啟用中（本地優先${envNote}）· 待 ingestion 建立`;
+}
+
+// coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);
+// the UI must render this label, NOT re-derive completeness from full/partial/missing.
+export function coverageStatusLabel(
+  row: Pick<TradingDayRow, "coverage_status" | "reason" | "holiday" | "max_observed_bar_count">,
+): { label: string; tone: "ok" | "warn" | "muted" | "bad" } {
+  switch (row.coverage_status) {
+    case "non_trading":
+      return {
+        label: row.reason === "weekend" ? "週末" : `假日${row.holiday ? `（${row.holiday}）` : ""}`,
+        tone: "muted",
+      };
+    case "in_progress":
+      return { label: "盤中（未收盤）", tone: "muted" };
+    case "missing":
+      return { label: "缺資料", tone: "bad" };
+    case "thin":
+      return { label: `疑似不足（最多 ${row.max_observed_bar_count ?? 0} 根）`, tone: "warn" };
+    case "complete_like":
+      return { label: "覆蓋完整", tone: "ok" };
+    default:
+      return { label: row.coverage_status, tone: "muted" };
+  }
 }

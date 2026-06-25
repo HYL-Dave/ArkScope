@@ -1288,6 +1288,54 @@ export function setUseLocalMacro(enabled: boolean): Promise<{ use_local_macro_se
   return sendJSON("/macro/settings", "PUT", { enabled });
 }
 
+// --- 交易日 / 價格覆蓋唯讀診斷 (Slice A/B; read-only over market_data.db) ---
+
+export type CoverageStatus =
+  | "non_trading"
+  | "in_progress"
+  | "missing"
+  | "thin"
+  | "complete_like";
+
+export interface TradingDayRow {
+  date: string;
+  is_trading_day: boolean;
+  reason: string; // weekend | us_market_holiday | regular_trading_day
+  holiday: string | null;
+  session_complete: boolean | null;
+  coverage_status: CoverageStatus;
+  max_observed_bar_count: number | null;
+  full: number | null;
+  partial: number | null;
+  missing: number | null;
+  covered: number | null;
+  missing_tickers: string[];
+  partial_tickers: Array<{ ticker: string; bars: number }>;
+}
+
+export interface TradingDayCoverage {
+  interval: string;
+  lookback_days: number;
+  universe_count: number;
+  generated_at_et: string;
+  days: TradingDayRow[];
+  provider_errors: Array<{
+    ticker: string;
+    interval: string;
+    last_error: string | null;
+    updated_at: string | null;
+  }>;
+}
+
+export function getTradingDayCoverage(
+  lookbackDays = 10,
+  interval = "15min",
+): Promise<TradingDayCoverage> {
+  return getJSON<TradingDayCoverage>(
+    `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,
+  );
+}
+
 // --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
 
 export interface NewsFeedItem {
