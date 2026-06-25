@@ -631,12 +631,26 @@ class MacroCalendarLocalStore:
         of the PG health ``_TABLE_STATS_SQL``. Returns ``{table: {last_fetched_at: str|None,
         row_count: int}}`` (last_fetched_at is ISO-TEXT; the health evaluator's _coerce_dt
         parses it)."""
-        conn = self._connect()
-        out: Dict[str, Dict[str, Any]] = {}
-        try:
-            for t in self._HEALTH_TABLES:
+        return read_macro_table_stats(self._db_path)
+
+
+def read_macro_table_stats(db_path: str | Path) -> Dict[str, Dict[str, Any]]:
+    """READ-ONLY per-table MAX(fetched_at)+COUNT(*) for the 6 macro/cal tables. Unlike the
+    store constructor it does NOT create the DB — returns ``{}`` when the file is absent (so
+    a Settings/status read can't materialise an empty macro_calendar.db). Missing tables (a
+    partially-built DB) are skipped, not raised."""
+    if not Path(db_path).exists():
+        return {}
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    out: Dict[str, Dict[str, Any]] = {}
+    try:
+        for t in MacroCalendarLocalStore._HEALTH_TABLES:
+            try:
                 row = conn.execute(f"SELECT MAX(fetched_at) AS f, COUNT(*) AS c FROM {t}").fetchone()
-                out[t] = {"last_fetched_at": row["f"], "row_count": int(row["c"] or 0)}
-        finally:
-            conn.close()
-        return out
+            except sqlite3.OperationalError:
+                continue  # table absent in a partial DB
+            out[t] = {"last_fetched_at": row["f"], "row_count": int(row["c"] or 0)}
+    finally:
+        conn.close()
+    return out

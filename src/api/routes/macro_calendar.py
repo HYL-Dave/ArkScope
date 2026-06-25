@@ -19,11 +19,20 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 
 from src.agents.config import get_agent_config
-from src.api.dependencies import get_dal
-from src.macro_calendar import get_macro_calendar_store
+from src.api.dependencies import get_dal, get_profile_store
+from src.api.permissions import require_profile_state_write
+from src.macro_calendar import (
+    ENV_USE_LOCAL_MACRO,
+    USE_LOCAL_MACRO_KEY,
+    get_macro_calendar_store,
+)
+from src.macro_calendar.local_store import read_macro_table_stats, resolve_macro_calendar_db_path
 from src.service.macro_calendar_health import compute_macro_calendar_health
 
 router = APIRouter(prefix="/macro", tags=["macro_calendar"])
@@ -37,6 +46,57 @@ _DISABLED_MSG = (
 def _require_enabled() -> None:
     if not get_agent_config().macro_calendar_enabled:
         raise HTTPException(status_code=503, detail=_DISABLED_MSG)
+
+
+# ---------------------------------------------------------------------------
+# use_local_macro Settings (PG-exit §4c slice 2) — mirrors /market-data/{status,settings}.
+# Config endpoints: intentionally NOT gated by macro_calendar_enabled (you need them to
+# configure the feature), matching market-data's ungated status/settings.
+# ---------------------------------------------------------------------------
+
+_TRUTHY = ("1", "true", "yes", "on")
+
+
+class LocalMacroToggle(BaseModel):
+    enabled: bool
+
+
+def _macro_setting_enabled(store) -> bool:
+    return (store.get_setting(USE_LOCAL_MACRO_KEY) or "").strip().lower() in _TRUTHY
+
+
+@router.get("/status")
+def macro_status(store=Depends(get_profile_store)):
+    """Local macro/cal status (PURE READ; does not touch PG, does not create the local DB).
+
+    Reports the persisted ``use_local_macro`` toggle, the env override, and — when
+    ``macro_calendar.db`` exists — per-table coverage (read-only). ``local_first_active`` is
+    whether reads/writes actually route local right now (toggle-or-env AND the DB exists)."""
+    path = resolve_macro_calendar_db_path()
+    exists = os.path.exists(path)
+    setting_on = _macro_setting_enabled(store)
+    env_on = os.environ.get(ENV_USE_LOCAL_MACRO, "").strip().lower() in _TRUTHY
+    return {
+        "macro_db": path,
+        "exists": exists,
+        "tables": read_macro_table_stats(path),  # {} when absent (no DB created)
+        "use_local_macro_setting": setting_on,
+        "env_override": env_on,
+        "local_first_active": (setting_on or env_on) and exists,
+    }
+
+
+@router.put("/settings")
+def set_local_macro(body: LocalMacroToggle, store=Depends(get_profile_store)):
+    """Persist the ``use_local_macro`` toggle. Explicit opt-in — never silently default-on.
+
+    The DAL reads this setting LIVE per request (a fresh profile_state.db read in
+    ``_local_macro_enabled``), so no DAL cache-clear is needed (unlike market, which caches
+    its backend at construction). Routing only engages once ``macro_calendar.db`` exists +
+    is populated (status reflects that via ``local_first_active``)."""
+    require_profile_state_write("set_use_local_macro", {"enabled": body.enabled})
+    store.set_setting(USE_LOCAL_MACRO_KEY, "true" if body.enabled else "false")
+    return {"use_local_macro_setting": body.enabled}
 
 
 def _parse_iso_datetime_impl(

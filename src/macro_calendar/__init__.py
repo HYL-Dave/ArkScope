@@ -8,6 +8,11 @@ read API/tools land in later commits.
 
 from typing import Any
 
+# profile_settings key + env override for the local-macro toggle (PG-exit §4c slice 2).
+# Shared by the DAL (data_access._local_macro_enabled) and the Settings route.
+USE_LOCAL_MACRO_KEY = "use_local_macro"
+ENV_USE_LOCAL_MACRO = "ARKSCOPE_USE_LOCAL_MACRO"
+
 
 def get_macro_calendar_store(dal: Any):
     """Return the macro/cal store for the active mode (PG-exit §4c slice 2).

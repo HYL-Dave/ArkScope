@@ -306,7 +306,8 @@ class DataAccessLayer:
         """Macro/calendar domain → local macro_calendar.db (PG-exit §4c slice 2). Off by
         default; flip only once the local DB is migrated/seeded (slice 4). Selects the
         SQLite twin in src.macro_calendar.get_macro_calendar_store."""
-        return self._profile_setting_truthy("use_local_macro", "ARKSCOPE_USE_LOCAL_MACRO")
+        from src.macro_calendar import ENV_USE_LOCAL_MACRO, USE_LOCAL_MACRO_KEY
+        return self._profile_setting_truthy(USE_LOCAL_MACRO_KEY, ENV_USE_LOCAL_MACRO)
 
     @property
     def backend_type(self) -> str:
