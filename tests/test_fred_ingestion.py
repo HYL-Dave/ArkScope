@@ -390,7 +390,10 @@ class TestLatestOnlyIngestion:
             full_refresh=True,
         )
         kwargs = client.get_observations.call_args.kwargs
-        assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
+        # chunked realtime window: floor is obs_start (no vintages predate it), not 1776;
+        # _tiny_catalog's 2024-01-01..today < one chunk → a single [obs_start, 9999] window
+        # whose end is still ALFRED_FULL_HISTORY_END so first-publication realtime_start is kept.
+        assert kwargs["realtime_start"] == date(2024, 1, 1)
         assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
 
     def test_latest_only_passes_each_row_to_store(self, monkeypatch):
@@ -520,7 +523,10 @@ class TestFullVintagesIngestion:
             full_refresh=True,
         )
         kwargs = client.get_observations.call_args.kwargs
-        assert kwargs["realtime_start"] == ALFRED_FULL_HISTORY_START
+        # chunked realtime window: floor is obs_start (no vintages predate it), not 1776;
+        # _tiny_catalog's 2024-01-01..today < one chunk → a single [obs_start, 9999] window
+        # whose end is still ALFRED_FULL_HISTORY_END so first-publication realtime_start is kept.
+        assert kwargs["realtime_start"] == date(2024, 1, 1)
         assert kwargs["realtime_end"] == ALFRED_FULL_HISTORY_END
 
     def test_full_vintages_uses_output_type_real_time_period(self, monkeypatch):
@@ -780,3 +786,104 @@ class TestJobSummaries:
         assert "Processed 11" in msg
         assert "1234 obs upserted" in msg
         assert "5 obs skipped" in msg
+
+
+# ---------------------------------------------------------------------------
+# Realtime-window chunking (DGS10 daily-series FRED vintage-date cap)
+# ---------------------------------------------------------------------------
+
+
+class _CapEnforcingFRED:
+    """Fake FRED modelling the vintage-date cap that broke DGS10 full_refresh: a single
+    /series/observations call whose realtime window contains more than ``cap`` vintage
+    dates raises FREDError (the real HTTP 400). Otherwise returns one obs per in-window
+    vintage."""
+
+    def __init__(self, vintages, *, cap):
+        self._vintages = sorted(vintages)
+        self._cap = cap
+        self.windows = []
+
+    def get_series_metadata(self, series_id):
+        return FREDSeriesMetadata(series_id=series_id, title="10Y Treasury", frequency="d",
+                                  units="%", seasonal_adjustment=None, last_updated=None)
+
+    def get_observations(self, series_id, *, observation_start=None, observation_end=None,
+                         realtime_start=None, realtime_end=None, vintage_dates=None,
+                         sort_order="asc", output_type=None, limit=None):
+        self.windows.append((realtime_start, realtime_end))
+        in_window = [v for v in self._vintages if realtime_start <= v <= realtime_end]
+        if len(in_window) > self._cap:
+            raise FREDError(
+                f"{len(in_window)} vintage dates in the specified real-time period: "
+                f"{realtime_start} to {realtime_end}. This exceeds the maximum number "
+                "of vintage dates allowed")
+        return [FREDObservation(v, 1.0, realtime_start=v, realtime_end=date(9999, 12, 31))
+                for v in in_window]
+
+
+class TestRealtimeChunking:
+    def test_latest_only_full_refresh_chunks_under_vintage_cap(self, monkeypatch):
+        # daily series: ~24 vintages/year over 1990..2025 (~864) — over a cap of 200.
+        vintages = ([date(y, m, 1) for y in range(1990, 2026) for m in range(1, 13)]
+                    + [date(y, m, 15) for y in range(1990, 2026) for m in range(1, 13)])
+        fred = _CapEnforcingFRED(vintages, cap=200)
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(Catalog(
+            entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
+            observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
+
+        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+                                  series_ids=["DGS10"], client=fred, full_refresh=True)
+
+        assert stats.errors == [], stats.errors          # chunked → no cap error
+        assert stats.series_processed == 1 and stats.series_skipped == 0
+        assert len(fred.windows) >= 2                     # genuinely chunked, not one call
+        # each non-terminal window stays bounded (the terminal window ends at 9999)
+        assert all((we.year - ws.year) <= 6 for ws, we in fred.windows if we.year < 9999)
+        # union of windows covers every vintage (idempotent upsert key dedupes overlaps)
+        assert {w["observation_date"] for w in store.observation_writes} == set(vintages)
+
+    def test_incremental_latest_only_stays_single_window(self, monkeypatch):
+        # incremental (no full_refresh) → obs_start = today-90d → one realtime window, 1 call.
+        fred = _CapEnforcingFRED([date(2026, 6, 1)], cap=200)
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="DGS10", revision_strategy="latest_only", release_id=53)), monkeypatch)
+        fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+                          series_ids=["DGS10"], client=fred, full_refresh=False)
+        assert len(fred.windows) == 1                     # narrow range → no chunking overhead
+
+
+class TestFredIngestionLocalWrite:
+    """Slice 4 gap-closer: with use_local_macro ON, FRED ingestion writes the REAL local
+    store (factory + MacroCalendarLocalStore, no PG) — the FRED twin of the finnhub e2e."""
+
+    def test_fred_series_ingestion_writes_local_store(self, tmp_path, monkeypatch):
+        from src.macro_calendar.local_store import MacroCalendarLocalStore
+        from src.tools.data_access import DataAccessLayer
+
+        db = tmp_path / "macro_calendar.db"
+        monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")
+        monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(db))
+        monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+
+        client = _client_with_canned(
+            metadata=FREDSeriesMetadata(series_id="CPIAUCNS", title="CPI", frequency="m",
+                                        units="Index", seasonal_adjustment="NSA", last_updated=None),
+            observations=[FREDObservation(date(2024, 3, 1), 312.332,
+                                          realtime_start=date(2024, 4, 10),
+                                          realtime_end=date(9999, 12, 31))],
+        )
+        _patch_catalog(_tiny_catalog(CatalogEntry(
+            series_id="CPIAUCNS", revision_strategy="latest_only", release_id=10)), monkeypatch)
+
+        dal = DataAccessLayer()                            # toggle from env → local store
+        stats = fetch_fred_series(dal=dal, client=client, full_refresh=True)
+        assert stats.observations_upserted == 1 and not stats.errors
+        # observation + series metadata landed in the LOCAL db (no PG)
+        got = MacroCalendarLocalStore(db).get_macro_observations("CPIAUCNS")
+        assert got is not None and got["title"] == "CPI"
+        assert [o["value"] for o in got["observations"]] == [312.332]

@@ -1,16 +1,23 @@
 # P1.2 Curated FRED series catalog (v1, 2026-04-26).
 #
 # See docs/design/P1_2_SPEC.md §10 for the rationale behind this list.
-# Each entry maps a FRED series_id to its revision strategy and (for
-# `latest_only` series) the FRED `release_id` whose schedule supplies
-# `realtime_start` for our observations.
+# Each entry maps a FRED series_id to its revision strategy and a FRED
+# `release_id` (used to populate the macro_release_dates schedule table).
+#
+# NOTE (corrected 2026-06-25): `realtime_start` for observations is NOT
+# derived from a release_date join. The ingestion calls FRED with
+# `output_type=4` (Initial Release Only) over the full ALFRED window, so
+# FRED returns the authoritative first-publication `realtime_start` per
+# observation. `release_id` is only for the release-schedule table, not
+# for dating observations. (The earlier release-join approach leaked
+# values early — see _ingest_latest_only's docstring.)
 #
 # Strategies:
-#   latest_only    — store one row per (series_id, observation_date),
-#                    realtime_start derived from release_date join.
+#   latest_only    — store one row per (series_id, observation_date) at
+#                    FRED's first-publication realtime_start (output_type=4).
 #                    Suitable for non-revising monthly / daily series.
-#   full_vintages  — request explicit vintage_dates from ALFRED so each
-#                    revision gets its own realtime window. Used for
+#   full_vintages  — request the full ALFRED real-time window (output_type=1)
+#                    so each revision gets its own realtime window. Used for
 #                    actively revised series (GDP, BEA NIPA, payrolls).
 #
 # release_id reference:
@@ -22,9 +29,10 @@
 #       publishes it under a separate release that we leave blank for v1
 #       and look up at ingest time.
 #
-# When release_id is null / missing, the latest_only ingestion path
-# logs and skips rows whose realtime_start can't be derived (spec §3.2 —
-# no sentinel writes).
+# When release_id is null / missing, only the release-schedule table for
+# that series is skipped; observations still ingest (their realtime_start
+# comes from FRED output_type=4, not the release schedule). Spec §3.2:
+# the store still rejects sentinel realtime_start writes.
 
 series:
   # --- Inflation ---

@@ -230,11 +230,17 @@ only** (else stale PG remains a silent runtime source, conflicting with strict-l
 
 ### 4c. Macro / calendar local store — SCOPING (`macro_calendar.db`)
 
-**Status:** scoping locked 2026-06-24; not yet built. `MacroCalendarStore` (`src/macro_calendar/store.py`)
-is still **raw psycopg2** (`is_available()` = `_backend has _get_conn`), so macro/cal is the
-largest remaining market/research PG runtime dependency. Its own DB (`macro_calendar.db`) per
-the topology decision — distinct schema + lifecycle from market_data.db, independently
-re-fetchable (FRED/Finnhub), and a rebuild must not be able to harm prices/news.
+**Status (updated 2026-06-25):** slices 1/1.1/1.2 (store + schema + read/write parity + CHECKs +
+fetched_at), 2 (toggle + routes/tools/health local-first, default-off), and 4 (FRED/Finnhub
+ingestion via the factory) are **BUILT + live-populated** (IPO + FRED seed in `macro_calendar.db`).
+Slice 3 (migration) **SKIPPED** — PG verified empty (decision below). `MacroCalendarStore` (PG,
+`store.py`) and `MacroCalendarLocalStore` (SQLite twin, `local_store.py`) both sit behind
+`get_macro_calendar_store(dal)`; `use_local_macro` selects (env `ARKSCOPE_USE_LOCAL_MACRO` /
+profile key, **default-off**). Its own DB (`macro_calendar.db`) per the topology decision —
+distinct schema + lifecycle from market_data.db, independently re-fetchable, rebuild can't harm
+prices/news. **Remaining:** full FRED catalog populate, earnings (throttled staged run), Finnhub
+economic (provider-plan blocked — `/calendar/economic` 403), and the default-on / Settings toggle
+decision.
 
 **Grounded surface (verified):** 8 tables (`sql/013`) — 4 canonical (`cal_economic_events`,
 `cal_earnings_events`, `cal_ipo_events`, `macro_series`) + their revision logs / observations
@@ -270,9 +276,11 @@ agent tool bridges), `macro_calendar_health.py`, `fred_ingestion.py`/`finnhub_in
 **Implementation order:** (1) SQLite schema + `MacroCalendarLocalStore` read/write **parity tests**
 (hermetic, no PG) → (2) toggle + wire selection in `api/app.py` → (3) routes/tools/health
 local-first → ~~(4) one-time PG→SQLite migrate + validate~~ **SKIPPED — see decision below** →
-(5) FRED/Finnhub ingestion writes local. **NOTE:** enabling `macro_calendar.enabled` today
-routes to the PG-only path — do NOT flip it on until the local store lands (would regress the
-PG-exit direction).
+(5) FRED/Finnhub ingestion writes local. **NOTE (updated 2026-06-25 — local store HAS landed):**
+`macro_calendar.enabled` gates the macro surface; `use_local_macro` selects local-vs-PG. With
+both on, routes/tools/health/ingestion are local; `macro_calendar.enabled` on but `use_local_macro`
+off → the (empty) PG path. So flip `use_local_macro` on (not just `macro_calendar.enabled`) to use
+the local seed; keep it default-off until the FRED catalog is fully populated.
 
 **DECISION 2026-06-25 — migration (step 4) SKIPPED, PG macro/cal verified EMPTY.** Before
 building the migrator I checked the source: all 9 PG macro/cal tables have exact `COUNT(*)=0`

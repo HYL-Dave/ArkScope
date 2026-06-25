@@ -342,27 +342,33 @@ def _ingest_latest_only(
     CPI, but a naive `release_date >= obs_date` rule would attach it to
     Mar 2024 CPI and leak the value 4 weeks early).
     """
-    obs = fred.get_observations(
-        entry.series_id,
-        observation_start=obs_start,
-        realtime_start=ALFRED_FULL_HISTORY_START,
-        realtime_end=ALFRED_FULL_HISTORY_END,
-        sort_order="asc",
-        output_type=OUTPUT_TYPE_INITIAL_RELEASE,
-    )
-    for row in obs:
-        # output_type=4 returns one row per observation_date already
-        # matching the first-publication realtime window. No dedupe
-        # needed — see P1_2_PROVIDER_DISCOVERY.md §6.3.
-        ok = store.upsert_macro_observation(
-            series_id=entry.series_id,
-            observation_date=row.observation_date,
-            value=row.value,
-            realtime_start=row.realtime_start,
-            realtime_end=None,  # canonical "current" tail
+    # CHUNK the realtime window: a daily series (DGS10/DGS2/T10Y2Y) over the full ALFRED
+    # window has thousands of vintage dates, exceeding FRED's per-call cap (HTTP 400). Each
+    # chunk stays under the cap; the (series_id, observation_date, realtime_start) upsert key
+    # makes the contiguous windows idempotent. Incremental obs_start (today-90d) collapses to
+    # a single window (one call). See _realtime_chunks.
+    for rt_start, rt_end in _realtime_chunks(obs_start, date.today(), years=_REALTIME_CHUNK_YEARS):
+        obs = fred.get_observations(
+            entry.series_id,
+            observation_start=obs_start,
+            realtime_start=rt_start,
+            realtime_end=rt_end,
+            sort_order="asc",
+            output_type=OUTPUT_TYPE_INITIAL_RELEASE,
         )
-        if ok:
-            stats.observations_upserted += 1
+        for row in obs:
+            # output_type=4 returns one row per observation_date already
+            # matching the first-publication realtime window. No dedupe
+            # needed — see P1_2_PROVIDER_DISCOVERY.md §6.3.
+            ok = store.upsert_macro_observation(
+                series_id=entry.series_id,
+                observation_date=row.observation_date,
+                value=row.value,
+                realtime_start=row.realtime_start,
+                realtime_end=None,  # canonical "current" tail
+            )
+            if ok:
+                stats.observations_upserted += 1
 
 
 def _ingest_full_vintages(
@@ -386,24 +392,28 @@ def _ingest_full_vintages(
     instead of just today's vintage. See
     ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the spike.
     """
-    obs = fred.get_observations(
-        entry.series_id,
-        observation_start=obs_start,
-        realtime_start=ALFRED_FULL_HISTORY_START,
-        realtime_end=ALFRED_FULL_HISTORY_END,
-        sort_order="asc",
-        output_type=OUTPUT_TYPE_REAL_TIME_PERIOD,
-    )
-    for row in obs:
-        ok = store.upsert_macro_observation(
-            series_id=entry.series_id,
-            observation_date=row.observation_date,
-            value=row.value,
-            realtime_start=row.realtime_start,
-            realtime_end=row.realtime_end,
+    # CHUNK the realtime window (same FRED vintage-date cap as _ingest_latest_only). Low-freq
+    # full_vintages series collapse to one window; this just keeps a daily full_vintages
+    # series (none in the catalog today) safe too. Upsert key dedupes contiguous windows.
+    for rt_start, rt_end in _realtime_chunks(obs_start, date.today(), years=_REALTIME_CHUNK_YEARS):
+        obs = fred.get_observations(
+            entry.series_id,
+            observation_start=obs_start,
+            realtime_start=rt_start,
+            realtime_end=rt_end,
+            sort_order="asc",
+            output_type=OUTPUT_TYPE_REAL_TIME_PERIOD,
         )
-        if ok:
-            stats.observations_upserted += 1
+        for row in obs:
+            ok = store.upsert_macro_observation(
+                series_id=entry.series_id,
+                observation_date=row.observation_date,
+                value=row.value,
+                realtime_start=row.realtime_start,
+                realtime_end=row.realtime_end,
+            )
+            if ok:
+                stats.observations_upserted += 1
 
 
 # ALFRED accepts the full history range when realtime_start='1776-07-04'
@@ -417,3 +427,33 @@ ALFRED_FULL_HISTORY_END = date(9999, 12, 31)
 # row shape. See P1_2_PROVIDER_DISCOVERY.md §6.3 for the spike.
 OUTPUT_TYPE_REAL_TIME_PERIOD = 1   # full revision history, our parser format
 OUTPUT_TYPE_INITIAL_RELEASE = 4    # first publication only
+
+# FRED caps the distinct vintage (real-time) dates per /series/observations call. A daily
+# series over the full ALFRED window has thousands → HTTP 400 ("exceeds the maximum number
+# of vintage dates allowed"), which broke DGS10 full_refresh. We fetch the realtime window
+# in sub-ranges of this many years; a daily series has ~250 vintages/yr, so 5y (~1250) stays
+# under FRED's cap with margin. Lower-frequency series and incremental runs collapse to one
+# window. The (series_id, observation_date, realtime_start) upsert key dedupes the windows.
+_REALTIME_CHUNK_YEARS = 5
+
+
+def _add_years(d: date, years: int) -> date:
+    try:
+        return d.replace(year=d.year + years)
+    except ValueError:  # Feb 29 in a non-leap target year → roll to Mar 1
+        return date(d.year + years, 3, 1)
+
+
+def _realtime_chunks(start: date, today: date, *, years: int):
+    """Yield contiguous ``[rt_start, rt_end]`` realtime windows from ``start`` to ``today`` in
+    ``years``-blocks. The terminal window's end is ``ALFRED_FULL_HISTORY_END`` so the current/
+    latest vintage is always captured. A range shorter than one block → a single
+    ``[start, 9999-12-31]`` window (incremental ingestion makes exactly one call)."""
+    cur = start
+    while True:
+        nxt = _add_years(cur, years)
+        if nxt > today:
+            yield cur, ALFRED_FULL_HISTORY_END
+            return
+        yield cur, nxt - timedelta(days=1)
+        cur = nxt
