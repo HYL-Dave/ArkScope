@@ -147,6 +147,26 @@ def test_provider_errors_surface_lc(db):
     assert "contract not found" in lc["last_error"] and lc["interval"] == "15min"
 
 
+def test_thin_threshold_uses_normalized_interval(tmp_path):
+    # caller passes the provider label "15 mins" → data reads as the normalized "15min"
+    # (_INTERVAL_DB), so the thin threshold must also normalize — else a thin day on a
+    # "15 mins" query silently never flags. Stored interval is the normalized "15min".
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA)
+    _ensure_provider_sync_tables(conn)
+    for t in ("AAPL", "BRK B"):
+        _bars(conn, t, "2026-06-22", 3, interval="15min")   # stored normalized
+    conn.commit()
+    conn.close()
+    out = summarize_trading_day_coverage(
+        ["AAPL", "BRK B"], interval="15 mins", lookback_days=2, db_path=str(path),
+        today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["max_observed_bar_count"] == 3        # data WAS read (interval normalized)
+    assert d["coverage_status"] == "thin"          # and the thin check fired (threshold normalized too)
+
+
 def test_route_wires_universe_and_db(db, monkeypatch):
     # the route resolves the active universe + market DB path and returns the summary shape.
     import src.api.routes.market_data as mroutes

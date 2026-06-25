@@ -398,7 +398,7 @@ def summarize_trading_day_coverage(
             status = "in_progress"                       # session not closed → don't judge thin
         elif not present:
             status = "missing"                           # complete trading day, zero coverage
-        elif day_max < _THIN_BAR_THRESHOLD.get(interval, 0):
+        elif day_max < _THIN_BAR_THRESHOLD.get(db_interval, 0):
             status = "thin"                              # data present but suspiciously low
         else:
             status = "complete_like"
