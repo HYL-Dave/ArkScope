@@ -299,6 +299,14 @@ def _daterange(start: date, end: date):
         d += timedelta(days=1)
 
 
+# Conservative per-interval "thin day" threshold (A.1): below this many bars on a COMPLETE
+# trading day, the whole day's coverage is suspiciously low (flagged 'thin' / 疑似不足, NOT a
+# hard error). 15min regular RTH = 26 bars; <20 is clearly short. An interval with no entry is
+# never flagged thin. NOTE: this is a blunt rule — a legitimate half-day / early close (~13-14
+# 15min bars) will read as 'thin' until a proper early-close calendar lands (deferred B+).
+_THIN_BAR_THRESHOLD = {"15min": 20}
+
+
 def summarize_trading_day_coverage(
     tickers: List[str],
     interval: str = "15min",
@@ -318,9 +326,14 @@ def summarize_trading_day_coverage(
       - ``session_complete`` for trading days (``_is_session_complete`` in America/New_York — the
         in-progress day is flagged, not counted as a gap);
       - across the (alias-canonicalized) universe: ``full`` / ``partial`` / ``missing`` counts +
-        the missing & partial ticker lists. FULL vs PARTIAL is measured against ``full_bar_count``
-        = the per-day MAX bar count across the universe (self-calibrating — half-days / early
-        closes need no hardcoded session length); ``missing`` = zero bars on that day.
+        the missing & partial ticker lists. full/partial are RELATIVE to ``max_observed_bar_count``
+        = the per-day MAX bar count across the universe — i.e. a per-ticker OUTLIER signal (which
+        tickers lag the best-covered ones that day), NOT an absolute-completeness claim;
+        ``missing`` = zero bars on that day.
+      - ``coverage_status`` (the UI-facing label, A.1): ``non_trading`` / ``in_progress`` /
+        ``missing`` (complete day, zero coverage) / ``thin`` (complete day but max bars below
+        ``_THIN_BAR_THRESHOLD`` — 疑似不足, guards the trap where a uniformly-thin day's relative
+        full/partial would otherwise read as complete) / ``complete_like``.
     Plus a ``provider_errors`` summary from ``provider_sync_meta.last_error`` (e.g. an IBKR
     contract that won't resolve — LC), so a recurring failure is visible instead of silently
     retried. Non-trading days carry null coverage. An absent DB ⇒ every trading day all-missing
@@ -367,11 +380,13 @@ def summarize_trading_day_coverage(
         if not mds["is_trading_day"]:
             days.append({
                 "date": iso, "is_trading_day": False, "reason": mds["reason"],
-                "holiday": mds["holiday"], "session_complete": None, "full_bar_count": None,
+                "holiday": mds["holiday"], "session_complete": None,
+                "coverage_status": "non_trading", "max_observed_bar_count": None,
                 "full": None, "partial": None, "missing": None, "covered": None,
                 "missing_tickers": [], "partial_tickers": [],
             })
             continue
+        complete = _is_session_complete(d, now_et)
         present = {t: counts_by_day.get(iso, {}).get(t, 0) for t in canon_universe}
         present = {t: n for t, n in present.items() if n > 0}
         day_max = max(present.values()) if present else 0
@@ -379,10 +394,19 @@ def summarize_trading_day_coverage(
             ({"ticker": t, "bars": n} for t, n in present.items() if 0 < n < day_max),
             key=lambda x: x["ticker"])
         missing = sorted(t for t in canon_universe if t not in present)
+        if not complete:
+            status = "in_progress"                       # session not closed → don't judge thin
+        elif not present:
+            status = "missing"                           # complete trading day, zero coverage
+        elif day_max < _THIN_BAR_THRESHOLD.get(interval, 0):
+            status = "thin"                              # data present but suspiciously low
+        else:
+            status = "complete_like"
         days.append({
             "date": iso, "is_trading_day": True, "reason": mds["reason"], "holiday": None,
-            "session_complete": _is_session_complete(d, now_et),
-            "full_bar_count": day_max,
+            "session_complete": complete,
+            "coverage_status": status,
+            "max_observed_bar_count": day_max,
             "full": sum(1 for n in present.values() if day_max and n >= day_max),
             "partial": len(partial),
             "missing": len(missing),

@@ -93,9 +93,39 @@ def test_weekend_and_holiday_marked_non_trading(db):
 def test_complete_trading_day_full_missing_counts(db):
     d = _day(_summary(db), "2026-06-22")
     assert d["is_trading_day"] and d["session_complete"] is True
-    assert d["full_bar_count"] == 26          # per-day max across the universe
+    assert d["max_observed_bar_count"] == 26  # per-day max (renamed from full_bar_count)
+    assert "full_bar_count" not in d
     assert d["full"] == 2 and d["partial"] == 0 and d["missing"] == 1
     assert d["missing_tickers"] == ["LC"]     # 0 bars on a complete trading day
+    assert d["coverage_status"] == "complete_like"  # 26 bars → looks like a full session
+
+
+def test_coverage_status_non_trading_and_in_progress(db):
+    s = _summary(db)
+    assert _day(s, "2026-06-20")["coverage_status"] == "non_trading"   # weekend
+    assert _day(s, "2026-06-19")["coverage_status"] == "non_trading"   # holiday
+    assert _day(s, "2026-06-23")["coverage_status"] == "in_progress"   # < 16:30 ET → not judged thin
+
+
+def test_uniformly_thin_day_not_read_as_complete(tmp_path):
+    # THE TRAP (A.1): every universe ticker has only 3 bars on a complete trading day. The
+    # per-day-max design would make full=all/partial=0 — looking complete. coverage_status
+    # must flag it 'thin' and max_observed_bar_count must be the honest 3.
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA)
+    _ensure_provider_sync_tables(conn)
+    for t in ("AAPL", "BRK B", "LC"):
+        _bars(conn, t, "2026-06-22", 3)
+    conn.commit()
+    conn.close()
+    out = summarize_trading_day_coverage(
+        ["AAPL", "BRK B", "LC"], interval="15min", lookback_days=2, db_path=str(path),
+        today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["max_observed_bar_count"] == 3
+    assert d["coverage_status"] == "thin"     # NOT complete_like, despite full==all
+    assert d["missing"] == 0                  # all present, just thin
 
 
 def test_partial_day_lists_thin_ticker(db):
@@ -142,4 +172,5 @@ def test_read_only_absent_db_is_honest(tmp_path):
     # absent DB → trading days show all-missing, non-trading days still marked
     tradeday = next(d for d in out["days"] if d["is_trading_day"] and d["session_complete"])
     assert tradeday["missing"] == 3 and tradeday["full"] == 0
+    assert tradeday["coverage_status"] == "missing"   # complete trading day, zero coverage
     assert out["provider_errors"] == []
