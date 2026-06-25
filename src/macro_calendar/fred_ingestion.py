@@ -342,33 +342,26 @@ def _ingest_latest_only(
     CPI, but a naive `release_date >= obs_date` rule would attach it to
     Mar 2024 CPI and leak the value 4 weeks early).
     """
-    # CHUNK the realtime window: a daily series (DGS10/DGS2/T10Y2Y) over the full ALFRED
-    # window has thousands of vintage dates, exceeding FRED's per-call cap (HTTP 400). Each
-    # chunk stays under the cap; the (series_id, observation_date, realtime_start) upsert key
-    # makes the contiguous windows idempotent. Incremental obs_start (today-90d) collapses to
-    # a single window (one call). See _realtime_chunks.
-    for rt_start, rt_end in _realtime_chunks(obs_start, date.today(), years=_REALTIME_CHUNK_YEARS):
-        obs = fred.get_observations(
-            entry.series_id,
-            observation_start=obs_start,
-            realtime_start=rt_start,
-            realtime_end=rt_end,
-            sort_order="asc",
-            output_type=OUTPUT_TYPE_INITIAL_RELEASE,
+    # Adaptive realtime fetch keeps daily series (DGS10 etc.) under FRED's vintage-date cap
+    # and tolerates pre-ALFRED windows (see _fetch_observations_adaptive). output_type=4
+    # returns one row per observation_date at its first-publication realtime window.
+    obs = _fetch_observations_adaptive(
+        fred, entry.series_id, obs_start=obs_start,
+        rt_start=obs_start, rt_end=ALFRED_FULL_HISTORY_END,
+        output_type=OUTPUT_TYPE_INITIAL_RELEASE,
+    )
+    for row in obs:
+        # No dedupe needed — see P1_2_PROVIDER_DISCOVERY.md §6.3; the upsert
+        # PK absorbs any realtime-window boundary overlap from bisection.
+        ok = store.upsert_macro_observation(
+            series_id=entry.series_id,
+            observation_date=row.observation_date,
+            value=row.value,
+            realtime_start=row.realtime_start,
+            realtime_end=None,  # canonical "current" tail
         )
-        for row in obs:
-            # output_type=4 returns one row per observation_date already
-            # matching the first-publication realtime window. No dedupe
-            # needed — see P1_2_PROVIDER_DISCOVERY.md §6.3.
-            ok = store.upsert_macro_observation(
-                series_id=entry.series_id,
-                observation_date=row.observation_date,
-                value=row.value,
-                realtime_start=row.realtime_start,
-                realtime_end=None,  # canonical "current" tail
-            )
-            if ok:
-                stats.observations_upserted += 1
+        if ok:
+            stats.observations_upserted += 1
 
 
 def _ingest_full_vintages(
@@ -392,28 +385,24 @@ def _ingest_full_vintages(
     instead of just today's vintage. See
     ``docs/design/P1_2_PROVIDER_DISCOVERY.md`` §6.3 for the spike.
     """
-    # CHUNK the realtime window (same FRED vintage-date cap as _ingest_latest_only). Low-freq
-    # full_vintages series collapse to one window; this just keeps a daily full_vintages
-    # series (none in the catalog today) safe too. Upsert key dedupes contiguous windows.
-    for rt_start, rt_end in _realtime_chunks(obs_start, date.today(), years=_REALTIME_CHUNK_YEARS):
-        obs = fred.get_observations(
-            entry.series_id,
-            observation_start=obs_start,
-            realtime_start=rt_start,
-            realtime_end=rt_end,
-            sort_order="asc",
-            output_type=OUTPUT_TYPE_REAL_TIME_PERIOD,
+    # Adaptive realtime fetch (same FRED vintage-date cap as _ingest_latest_only). Low-freq
+    # full_vintages series finish in one call; this keeps a daily full_vintages series (none
+    # in the catalog today) safe too. Upsert PK dedupes boundary overlap across sub-windows.
+    obs = _fetch_observations_adaptive(
+        fred, entry.series_id, obs_start=obs_start,
+        rt_start=obs_start, rt_end=ALFRED_FULL_HISTORY_END,
+        output_type=OUTPUT_TYPE_REAL_TIME_PERIOD,
+    )
+    for row in obs:
+        ok = store.upsert_macro_observation(
+            series_id=entry.series_id,
+            observation_date=row.observation_date,
+            value=row.value,
+            realtime_start=row.realtime_start,
+            realtime_end=row.realtime_end,
         )
-        for row in obs:
-            ok = store.upsert_macro_observation(
-                series_id=entry.series_id,
-                observation_date=row.observation_date,
-                value=row.value,
-                realtime_start=row.realtime_start,
-                realtime_end=row.realtime_end,
-            )
-            if ok:
-                stats.observations_upserted += 1
+        if ok:
+            stats.observations_upserted += 1
 
 
 # ALFRED accepts the full history range when realtime_start='1776-07-04'
@@ -429,31 +418,61 @@ OUTPUT_TYPE_REAL_TIME_PERIOD = 1   # full revision history, our parser format
 OUTPUT_TYPE_INITIAL_RELEASE = 4    # first publication only
 
 # FRED caps the distinct vintage (real-time) dates per /series/observations call. A daily
-# series over the full ALFRED window has thousands → HTTP 400 ("exceeds the maximum number
-# of vintage dates allowed"), which broke DGS10 full_refresh. We fetch the realtime window
-# in sub-ranges of this many years; a daily series has ~250 vintages/yr, so 5y (~1250) stays
-# under FRED's cap with margin. Lower-frequency series and incremental runs collapse to one
-# window. The (series_id, observation_date, realtime_start) upsert key dedupes the windows.
-_REALTIME_CHUNK_YEARS = 5
+# series (DGS10/DGS2/T10Y2Y) over a wide realtime window blows past it → HTTP 400 "exceeds
+# the maximum number of vintage dates allowed" (broke DGS10 full_refresh). We fetch the
+# realtime window ADAPTIVELY rather than on a fixed grid, because a series' ALFRED vintages
+# can start long after our obs_start (DGS10: vintages begin 2005, obs_start 1990) — a fixed
+# pre-2005 window returns "does not exist in ALFRED" (a 400), which a grid can't know to skip.
+# Adaptive: one call for the whole window (low-frequency series finish here), bisect ONLY on
+# the cap error until each sub-window is accepted, and treat not-in-ALFRED sub-windows as
+# empty. The (series_id, observation_date, realtime_start) upsert key dedupes boundary overlap.
+_MAX_SPLIT_DEPTH = 14   # 2^14 sub-windows ≫ any real series; runaway backstop only
 
 
-def _add_years(d: date, years: int) -> date:
+def _fetch_observations_adaptive(
+    fred: FREDClient,
+    series_id: str,
+    *,
+    obs_start: date,
+    rt_start: date,
+    rt_end: date,
+    output_type: int,
+    depth: int = 0,
+) -> List[FREDObservation]:
+    """Fetch the ``[rt_start, rt_end]`` realtime window, bisecting on FRED's vintage-date cap
+    and treating a not-in-ALFRED sub-window as empty (zero rows, not an error). Returns the
+    accumulated observations. The top-level call uses ``rt_end=ALFRED_FULL_HISTORY_END`` so a
+    series under the cap finishes in ONE call; bisection clamps the split to ``today`` (the
+    9999 sentinel would otherwise bisect into empty future ranges)."""
     try:
-        return d.replace(year=d.year + years)
-    except ValueError:  # Feb 29 in a non-leap target year → roll to Mar 1
-        return date(d.year + years, 3, 1)
-
-
-def _realtime_chunks(start: date, today: date, *, years: int):
-    """Yield contiguous ``[rt_start, rt_end]`` realtime windows from ``start`` to ``today`` in
-    ``years``-blocks. The terminal window's end is ``ALFRED_FULL_HISTORY_END`` so the current/
-    latest vintage is always captured. A range shorter than one block → a single
-    ``[start, 9999-12-31]`` window (incremental ingestion makes exactly one call)."""
-    cur = start
-    while True:
-        nxt = _add_years(cur, years)
-        if nxt > today:
-            yield cur, ALFRED_FULL_HISTORY_END
-            return
-        yield cur, nxt - timedelta(days=1)
-        cur = nxt
+        return fred.get_observations(
+            series_id,
+            observation_start=obs_start,
+            realtime_start=rt_start,
+            realtime_end=rt_end,
+            sort_order="asc",
+            output_type=output_type,
+        )
+    except FREDError as exc:
+        msg = str(exc)
+        if "does not exist in ALFRED" in msg:
+            return []  # no vintages in this realtime sub-window → empty, not an error
+        if "vintage dates" in msg and depth < _MAX_SPLIT_DEPTH:
+            # Compute the split point from a real anchor (today): the 9999 sentinel would
+            # otherwise bisect into nonsense future ranges. But PRESERVE rt_end on the right
+            # half — FRED rejects a realtime_end after *its* today (which can lag the local
+            # clock by a day) unless it's exactly the 9999 sentinel, so the right spine keeps
+            # 9999 while the left half uses a real, ≤today midpoint.
+            anchor = min(rt_end, date.today())
+            if rt_start >= anchor:
+                return []
+            mid = rt_start + (anchor - rt_start) // 2
+            return (
+                _fetch_observations_adaptive(
+                    fred, series_id, obs_start=obs_start, rt_start=rt_start, rt_end=mid,
+                    output_type=output_type, depth=depth + 1)
+                + _fetch_observations_adaptive(
+                    fred, series_id, obs_start=obs_start, rt_start=mid + timedelta(days=1),
+                    rt_end=rt_end, output_type=output_type, depth=depth + 1)
+            )
+        raise

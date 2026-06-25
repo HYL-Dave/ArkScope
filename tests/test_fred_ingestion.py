@@ -12,7 +12,7 @@ Strategy:
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -794,14 +794,17 @@ class TestJobSummaries:
 
 
 class _CapEnforcingFRED:
-    """Fake FRED modelling the vintage-date cap that broke DGS10 full_refresh: a single
-    /series/observations call whose realtime window contains more than ``cap`` vintage
-    dates raises FREDError (the real HTTP 400). Otherwise returns one obs per in-window
-    vintage."""
+    """Fake FRED modelling the two live failure modes the DGS10 verify hit:
+      - a realtime window with MORE than ``cap`` vintage dates → HTTP 400 "exceeds the
+        maximum number of vintage dates allowed" (the cap);
+      - a realtime window with ZERO vintage dates (predates the series' ALFRED coverage) →
+        HTTP 400 "does not exist in ALFRED but may exist in FRED" (empty window).
+    Otherwise returns one obs per in-window vintage."""
 
-    def __init__(self, vintages, *, cap):
+    def __init__(self, vintages, *, cap, fred_today=None):
         self._vintages = sorted(vintages)
         self._cap = cap
+        self._fred_today = fred_today  # if set, reject realtime_end after it (unless 9999)
         self.windows = []
 
     def get_series_metadata(self, series_id):
@@ -812,7 +815,16 @@ class _CapEnforcingFRED:
                          realtime_start=None, realtime_end=None, vintage_dates=None,
                          sort_order="asc", output_type=None, limit=None):
         self.windows.append((realtime_start, realtime_end))
+        if (self._fred_today is not None and realtime_end is not None
+                and self._fred_today < realtime_end < date(9999, 1, 1)):
+            raise FREDError("Variable realtime_end can not be after today's date "
+                            f"({self._fred_today}) unless it's equal to the real-time max "
+                            "date 9999-12-31.")
         in_window = [v for v in self._vintages if realtime_start <= v <= realtime_end]
+        if not in_window:
+            raise FREDError("Bad Request. The series does not exist in ALFRED but may "
+                            "exist in FRED. Try setting realtime_start and realtime_end "
+                            "to today's date or removing the realtime_start")
         if len(in_window) > self._cap:
             raise FREDError(
                 f"{len(in_window)} vintage dates in the specified real-time period: "
@@ -823,8 +835,8 @@ class _CapEnforcingFRED:
 
 
 class TestRealtimeChunking:
-    def test_latest_only_full_refresh_chunks_under_vintage_cap(self, monkeypatch):
-        # daily series: ~24 vintages/year over 1990..2025 (~864) — over a cap of 200.
+    def test_latest_only_full_refresh_bisects_under_vintage_cap(self, monkeypatch):
+        # daily series: ~24 vintages/year over 1990..2025 (~864), over a cap of 200.
         vintages = ([date(y, m, 1) for y in range(1990, 2026) for m in range(1, 13)]
                     + [date(y, m, 15) for y in range(1990, 2026) for m in range(1, 13)])
         fred = _CapEnforcingFRED(vintages, cap=200)
@@ -837,16 +849,56 @@ class TestRealtimeChunking:
         stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
                                   series_ids=["DGS10"], client=fred, full_refresh=True)
 
-        assert stats.errors == [], stats.errors          # chunked → no cap error
+        assert stats.errors == [], stats.errors           # adaptive bisection → no cap error
         assert stats.series_processed == 1 and stats.series_skipped == 0
-        assert len(fred.windows) >= 2                     # genuinely chunked, not one call
-        # each non-terminal window stays bounded (the terminal window ends at 9999)
-        assert all((we.year - ws.year) <= 6 for ws, we in fred.windows if we.year < 9999)
-        # union of windows covers every vintage (idempotent upsert key dedupes overlaps)
+        assert len(fred.windows) >= 2                      # genuinely bisected, not one call
+        # union of accepted windows covers every vintage (upsert PK dedupes boundary overlap)
+        assert {w["observation_date"] for w in store.observation_writes} == set(vintages)
+
+    def test_pre_alfred_window_tolerated_as_empty(self, monkeypatch):
+        # vintages start 2005 but obs_start=1990 → bisection produces fully-pre-2005 windows
+        # that FRED rejects ("does not exist in ALFRED"); adaptive treats them as empty.
+        # (range ends 2025 so every vintage is < today — the today-clamp drops future dates.)
+        vintages = ([date(y, m, 1) for y in range(2005, 2025) for m in range(1, 13)]
+                    + [date(y, m, 15) for y in range(2005, 2025) for m in range(1, 13)])
+        fred = _CapEnforcingFRED(vintages, cap=50)
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(Catalog(
+            entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
+            observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
+
+        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+                                  series_ids=["DGS10"], client=fred, full_refresh=True)
+
+        assert stats.errors == [], stats.errors            # empty pre-ALFRED windows tolerated
+        assert any(re_ < date(2005, 6, 28) for _ws, re_ in fred.windows)  # one was attempted
+        assert {w["observation_date"] for w in store.observation_writes} == set(vintages)
+
+    def test_right_spine_keeps_9999_not_local_today(self, monkeypatch):
+        # FRED's today lags the local clock; a realtime_end after FRED's today (but not the
+        # 9999 sentinel) is rejected. Adaptive must keep 9999 on the right spine of the
+        # bisection rather than clamp to the local today (the live DGS10 failure mode).
+        fred_today = date.today() - timedelta(days=1)
+        vintages = ([date(y, m, 1) for y in range(2005, 2025) for m in range(1, 13)]
+                    + [date(y, m, 15) for y in range(2005, 2025) for m in range(1, 13)])
+        fred = _CapEnforcingFRED(vintages, cap=50, fred_today=fred_today)
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(Catalog(
+            entries=(CatalogEntry(series_id="DGS10", revision_strategy="latest_only", release_id=53),),
+            observation_start=date(1990, 1, 1), release_date_lookback_years=10), monkeypatch)
+
+        stats = fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
+                                  series_ids=["DGS10"], client=fred, full_refresh=True)
+
+        assert stats.errors == [], stats.errors
+        # every realtime_end is either ≤ FRED's today or the 9999 sentinel — never the local today
+        assert all(re_ <= fred_today or re_ == date(9999, 12, 31) for _ws, re_ in fred.windows)
         assert {w["observation_date"] for w in store.observation_writes} == set(vintages)
 
     def test_incremental_latest_only_stays_single_window(self, monkeypatch):
-        # incremental (no full_refresh) → obs_start = today-90d → one realtime window, 1 call.
+        # incremental (no full_refresh) → obs_start = today-90d → under cap → one call.
         fred = _CapEnforcingFRED([date(2026, 6, 1)], cap=200)
         store = _FakeStore()
         _patch_store(store, monkeypatch)
@@ -854,7 +906,7 @@ class TestRealtimeChunking:
             series_id="DGS10", revision_strategy="latest_only", release_id=53)), monkeypatch)
         fetch_fred_series(dal=MagicMock(_backend=MagicMock(_get_conn=MagicMock())),
                           series_ids=["DGS10"], client=fred, full_refresh=False)
-        assert len(fred.windows) == 1                     # narrow range → no chunking overhead
+        assert len(fred.windows) == 1                      # narrow range → no bisection
 
 
 class TestFredIngestionLocalWrite:
