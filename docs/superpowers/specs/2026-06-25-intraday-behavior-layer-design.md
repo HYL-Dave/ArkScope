@@ -106,7 +106,7 @@ Core metrics:
 returns[t] = log(close[t] / close[t-1])
 
 intraday_abs_move = sum(abs(returns[t]))
-intraday_net_move = abs(log(last_close / first_open))
+intraday_net_move = abs(log(last_close / first_close))   # anchored to first_close, not first_open
 intraday_efficiency = intraday_net_move / max(intraday_abs_move, eps)
 intraday_chop_ratio = intraday_abs_move / max(intraday_net_move, eps)
 intraday_sign_changes = count(sign(returns[t]) != sign(returns[t-1]))
@@ -114,6 +114,18 @@ intraday_realized_vol = sqrt(sum(returns[t]^2))
 intraday_range_pct = (session_high - session_low) / first_open
 close_location = (last_close - session_low) / max(session_high - session_low, eps)
 ```
+
+`net_move` and `abs_move` MUST share the same anchor (`first_close` = `close[0]`): both measure the
+`close[0] → close[1] → … → last_close` path, so `efficiency = net/abs` stays in `[0, 1]` (it is the
+straight-line distance over the path length). Anchoring `net_move` to `first_open` instead would
+fold the opening `open[0] → close[0]` leg into `net` but not `abs`, letting `efficiency` exceed 1
+on a gap-and-trend day and breaking the "high efficiency = trend, very low = whipsaw" labeling.
+`range_pct` keeps `first_open` deliberately — it is the session range relative to the opening
+print, a different (range-vs-open) semantic, not a path-efficiency ratio.
+
+`efficiency` and `chop_ratio` are reciprocals (`chop_ratio ≈ 1 / efficiency`). Both are stored only
+for UI / query convenience (a caller can sort or threshold on either without recomputing); they are
+not independent signals.
 
 Derived labels:
 
@@ -229,6 +241,19 @@ CREATE TABLE intraday_behavior_metrics (
 
 `window_key` is deterministic: `as_of_time_et` for live-so-far rows, otherwise `close`.
 
+`source` is intentionally NOT in the primary key: there is one canonical metric row per
+`(ticker, trading_date, interval, session, window_key)`, and a recompute from a different source
+(e.g. IBKR then a Polygon backfill) is a **last-writer-wins** upsert that overwrites the row and
+restamps `source`/`computed_at`. This is acceptable because the metrics are deterministic given the
+bars; the `source` column records which provider produced the stored row, not a per-source history.
+
+`data_quality` here is a per-(ticker, session) classification of THIS metric row
+(`complete | partial | thin | live_so_far | insufficient`). It is deliberately distinct from the
+`/market-data/trading-days` coverage panel's per-day, universe-wide `coverage_status`
+(`non_trading | in_progress | missing | thin | complete_like`): different grain (one ticker-session
+vs. the whole universe on a date) and an independent threshold. The shared word `thin` does NOT
+imply a shared definition — do not couple them.
+
 ### intraday_bar_cache
 
 ```sql
@@ -258,8 +283,31 @@ Default storage policy:
 ## Provider Strategy
 
 IBKR is the v1 primary source because it is already integrated and free under the user's session.
-It must share the existing IBKR lock so it cannot overlap with price_backfill, IV, news, or other
-Gateway-heavy work.
+It must serialize on the **same cross-process Gateway lock** as every other IBKR consumer so it
+cannot overlap with price_backfill, IV, news, or other Gateway-heavy work.
+
+**Lock topology (verified against current code — read before implementing).** There is NOT one
+"IBKR lock" today; the Gateway serialization lives as scheduler-private globals:
+
+- `data_scheduler._IBKR_FLOCK = _FileLock("ibkr_gateway")` (cross-process) + `_IBKR_LOCK`
+  (in-process `threading.Lock`) — acquired ONLY by `run_source()` when a `SourceDef` has
+  `ibkr=True`. This is the real Gateway mutex.
+- `market_data_direct.market_write_lock()` flocks `local_refresh.lock` — this is the **DB-write**
+  lock (serializes vs the PG→SQLite mirror), NOT the Gateway. A standalone
+  `backfill_prices_direct()` (the way the price canary / universe backfill ran) takes only
+  `market_write_lock` and does an IBKR connect preflight BEFORE it — so a direct backfill already
+  dials the Gateway WITHOUT holding `_IBKR_FLOCK`.
+
+Therefore "share the existing IBKR lock" is not achievable by reusing `market_write_lock`, and a
+metrics-only intraday run (which may never take `market_write_lock` at all) would serialize
+against nothing. **Decision: extract the Gateway flock into a shared module** (e.g.
+`src/ibkr_gateway_lock.py` exposing an `ibkr_gateway_lock()` context manager over the
+`ibkr_gateway` flock + an in-process lock), then have the scheduler's `run_source`, the standalone
+`backfill_prices_direct`, AND the intraday behavior operation all acquire that one lock. This is
+preferred over "force all IBKR through the scheduler" because it preserves this design's
+independent operation/`run_id` model while still guaranteeing one Gateway user at a time. The
+extraction itself is a small precursor task (move + re-point existing callers, no behavior change)
+and should land before Slice 3; it also benefits the later scheduler-hardening work.
 
 The logical operation ID is independent. The provider client-id namespace should also be distinct
 where the code supports it, so behavior scans are not confused with price backfills in logs and
