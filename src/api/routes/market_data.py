@@ -12,7 +12,7 @@ incremental updater). See ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.m
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.api.dependencies import get_profile_store
@@ -31,6 +31,7 @@ from src.market_data_admin import (
     start_update_job,
     validate_market,
 )
+from src.market_data_direct import summarize_trading_day_coverage
 from src.profile_state import ProfileStateStore
 
 router = APIRouter(tags=["market-data"])
@@ -141,6 +142,28 @@ def market_data_coverage(ticker: str):
     detail page's honest "本地覆蓋：有/無" hint.
     """
     return local_ticker_coverage(ticker)
+
+
+@router.get("/market-data/trading-days")
+def market_data_trading_days(
+    lookback_days: int = Query(10, ge=1, le=120),
+    interval: str = Query("15min"),
+):
+    """READ-ONLY trading-day / price-coverage diagnostics across the active universe.
+
+    For the trailing window: weekend / US-holiday / trading-day per date, session-complete,
+    and how many universe tickers are full / partial / missing (+ the ticker lists), plus a
+    provider-error summary (e.g. an IBKR contract that won't resolve). PURE READ of
+    ``market_data.db`` — no PG, no provider call, no write, no scheduling. Powers the
+    Settings → Data Storage coverage panel.
+    """
+    from src.universe_scope import resolve_active_universe
+
+    universe = list(resolve_active_universe() or [])
+    return summarize_trading_day_coverage(
+        universe, interval=interval, lookback_days=lookback_days,
+        db_path=resolve_market_db_path(),
+    )
 
 
 @router.post("/market-data/validate")

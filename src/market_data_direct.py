@@ -41,7 +41,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime  # aliased — `time` (stdlib module) is used for monotonic()
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from src.market_data_admin import (
@@ -297,6 +297,108 @@ def _daterange(start: date, end: date):
     while d <= end:
         yield d
         d += timedelta(days=1)
+
+
+def summarize_trading_day_coverage(
+    tickers: List[str],
+    interval: str = "15min",
+    lookback_days: int = 10,
+    db_path: Optional[str] = None,
+    *,
+    today: Optional[date] = None,
+    now_et: Optional[datetime] = None,
+    max_errors: int = 50,
+) -> Dict[str, Any]:
+    """READ-ONLY per-day universe price-coverage diagnostics — the operator view of "what's
+    missing, can it be filled, is it even a trading day". NO PG, NO provider call, NO writes
+    (opens ``market_data.db`` ``mode=ro``); it does not heal or schedule anything.
+
+    For each calendar day in the trailing ``lookback_days`` window (newest-first) it reports:
+      - weekend / US-market-holiday / regular trading day (``data_coverage_tools._market_day_status``);
+      - ``session_complete`` for trading days (``_is_session_complete`` in America/New_York — the
+        in-progress day is flagged, not counted as a gap);
+      - across the (alias-canonicalized) universe: ``full`` / ``partial`` / ``missing`` counts +
+        the missing & partial ticker lists. FULL vs PARTIAL is measured against ``full_bar_count``
+        = the per-day MAX bar count across the universe (self-calibrating — half-days / early
+        closes need no hardcoded session length); ``missing`` = zero bars on that day.
+    Plus a ``provider_errors`` summary from ``provider_sync_meta.last_error`` (e.g. an IBKR
+    contract that won't resolve — LC), so a recurring failure is visible instead of silently
+    retried. Non-trading days carry null coverage. An absent DB ⇒ every trading day all-missing
+    (honest), non-trading days still marked."""
+    now_et = _norm_now_et(now_et)
+    end = today or now_et.date()
+    start = end - timedelta(days=lookback_days)
+    db_interval = _INTERVAL_DB.get(interval, interval)
+    path = db_path or resolve_market_db_path()
+
+    aliases: Dict[str, str] = {}
+    counts_by_day: Dict[str, Dict[str, int]] = {}
+    provider_errors: List[Dict[str, Any]] = []
+    conn = None
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.OperationalError:
+        conn = None
+    if conn is not None:
+        try:
+            aliases = _load_ticker_aliases(conn)
+            if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='prices'").fetchone():
+                for d, tk, n in conn.execute(
+                    "SELECT substr(datetime,1,10) AS d, ticker, COUNT(*) AS n FROM prices "
+                    "WHERE interval = ? AND substr(datetime,1,10) >= ? GROUP BY d, ticker",
+                    (db_interval, start.isoformat())):
+                    counts_by_day.setdefault(d, {})[tk] = int(n)
+            if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='provider_sync_meta'").fetchone():
+                provider_errors = [
+                    {"ticker": r[0], "interval": r[1], "last_error": r[2], "updated_at": r[3]}
+                    for r in conn.execute(
+                        "SELECT ticker, interval, last_error, updated_at FROM provider_sync_meta "
+                        "WHERE last_error IS NOT NULL AND interval = ? ORDER BY updated_at DESC LIMIT ?",
+                        (db_interval, max_errors))]
+        finally:
+            conn.close()
+
+    canon_universe = sorted({aliases.get(t.upper(), t.upper()) for t in tickers})
+
+    days: List[Dict[str, Any]] = []
+    for d in sorted(_daterange(start, end), reverse=True):
+        iso = d.isoformat()
+        mds = _market_day_status(d)
+        if not mds["is_trading_day"]:
+            days.append({
+                "date": iso, "is_trading_day": False, "reason": mds["reason"],
+                "holiday": mds["holiday"], "session_complete": None, "full_bar_count": None,
+                "full": None, "partial": None, "missing": None, "covered": None,
+                "missing_tickers": [], "partial_tickers": [],
+            })
+            continue
+        present = {t: counts_by_day.get(iso, {}).get(t, 0) for t in canon_universe}
+        present = {t: n for t, n in present.items() if n > 0}
+        day_max = max(present.values()) if present else 0
+        partial = sorted(
+            ({"ticker": t, "bars": n} for t, n in present.items() if 0 < n < day_max),
+            key=lambda x: x["ticker"])
+        missing = sorted(t for t in canon_universe if t not in present)
+        days.append({
+            "date": iso, "is_trading_day": True, "reason": mds["reason"], "holiday": None,
+            "session_complete": _is_session_complete(d, now_et),
+            "full_bar_count": day_max,
+            "full": sum(1 for n in present.values() if day_max and n >= day_max),
+            "partial": len(partial),
+            "missing": len(missing),
+            "covered": len(present),
+            "missing_tickers": missing,
+            "partial_tickers": partial,
+        })
+
+    return {
+        "interval": interval,
+        "lookback_days": lookback_days,
+        "universe_count": len(canon_universe),
+        "generated_at_et": now_et.isoformat(),
+        "days": days,
+        "provider_errors": provider_errors,
+    }
 
 
 # --- provider_sync telemetry (NEW tables — NOT market_sync_meta) -------------------
