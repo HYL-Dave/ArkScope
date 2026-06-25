@@ -113,9 +113,9 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
         name="fetch_fred_release_dates",
         description=(
             "Refresh macro_release_dates from FRED /release/dates for the "
-            "curated release_id set in config/macro_calendar_series.yaml. Run "
-            "before fetch_fred_series so latest_only ingestion has a "
-            "realtime_start lookup."
+            "curated release_id set in config/macro_calendar_series.yaml. Populates "
+            "the release-schedule table; observation realtime_start comes from FRED "
+            "(output_type=4), not from a release-date join."
         ),
         source="api",
         runnable_via_api=True,
@@ -125,10 +125,11 @@ _JOB_DEFINITIONS: Dict[str, JobDefinition] = {
     "fetch_fred_series": JobDefinition(
         name="fetch_fred_series",
         description=(
-            "Refresh macro_series + macro_observations from FRED. "
-            "latest_only series store one row per observation_date keyed on "
-            "release_date; full_vintages series store one row per ALFRED "
-            "vintage window. Default is incremental (~90 days back); set "
+            "Refresh macro_series + macro_observations from FRED. latest_only series "
+            "store one row per observation_date at FRED's first-publication realtime_start "
+            "(output_type=4); full_vintages series store one row per ALFRED vintage window. "
+            "The realtime window is fetched adaptively (bisects under FRED's vintage-date "
+            "cap, tolerates pre-ALFRED windows). Default is incremental (~90 days back); set "
             "full_refresh=true for full backfill."
         ),
         source="api",
