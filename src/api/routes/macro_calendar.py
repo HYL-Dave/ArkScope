@@ -97,8 +97,10 @@ def set_local_macro(body: LocalMacroToggle, store=Depends(get_profile_store)):
 
     The DAL reads this setting LIVE per request (a fresh profile_state.db read in
     ``_local_macro_enabled``), so no DAL cache-clear is needed (unlike market, which caches
-    its backend at construction). Routing only engages once ``macro_calendar.db`` exists +
-    is populated (status reflects that via ``local_first_active``)."""
+    its backend at construction). Routing engages the moment the toggle (or env) is on — the
+    store factory selects the local store and creates ``macro_calendar.db`` on first use, with
+    no PG fallback; until ingestion populates it, local reads simply return empty (status:
+    ``local_first_active`` true, ``exists`` possibly still false)."""
     require_profile_state_write("set_use_local_macro", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_MACRO_KEY, "true" if body.enabled else "false")
     return {"use_local_macro_setting": body.enabled}

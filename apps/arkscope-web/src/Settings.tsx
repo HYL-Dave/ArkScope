@@ -819,7 +819,6 @@ function MacroStorageSection() {
             <dt>本地路由</dt>
             <dd>
               {macroRoutingLabel(status)}
-              {status.env_override && "（env 強制開啟）"}
             </dd>
           </dl>
 
