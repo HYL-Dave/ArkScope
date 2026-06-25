@@ -28,6 +28,8 @@ import {
   saveModelRoutes,
   testProvider,
   setUseLocalMarket,
+  setUseLocalMacro,
+  getMacroStatus,
   testModelAccess,
   updateCredential,
   updateMarketData,
@@ -35,6 +37,7 @@ import {
   type MarketDataJob,
   type MarketDataStatus,
   type MarketDataValidate,
+  type MacroStatus,
   type ProviderConfigEntry,
   type ProvidersHealthResponse,
   type ScheduleSourceState,
@@ -69,7 +72,7 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { marketRoutingLabel } from "./marketDataDisplay";
+import { macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -77,7 +80,13 @@ const TASK_LABELS: Record<ModelTask, string> = {
   ai_research: "AI 研究",
 };
 
-type SettingsSection = "models" | "providers" | "data_storage" | "data_sources" | "permissions";
+type SettingsSection =
+  | "models"
+  | "providers"
+  | "data_storage"
+  | "macro_storage"
+  | "data_sources"
+  | "permissions";
 
 const SETTINGS_SECTIONS: Array<{
   id: SettingsSection;
@@ -101,6 +110,12 @@ const SETTINGS_SECTIONS: Array<{
     id: "data_storage",
     title: "Data Storage",
     description: "本地市場庫（價格＋新聞＋IV＋基本面）建立、驗證、啟用；PG 為 fallback。",
+    enabled: true,
+  },
+  {
+    id: "macro_storage",
+    title: "Macro / Calendar",
+    description: "本地總經＋行事曆庫（FRED 序列、經濟／財報／IPO 行事曆）啟用；資料由 FRED/Finnhub 抓取。",
     enabled: true,
   },
   {
@@ -475,6 +490,8 @@ export function SettingsView({
               />
             ) : section === "data_storage" ? (
               <DataStorageSection />
+            ) : section === "macro_storage" ? (
+              <MacroStorageSection />
             ) : section === "data_sources" ? (
               <DataSourcesSection />
             ) : null}
@@ -713,6 +730,129 @@ function DataStorageSection() {
         </div>
       )}
     </div>
+  );
+}
+
+const MACRO_TABLE_LABELS: Array<[string, string]> = [
+  ["macro_series", "FRED 序列"],
+  ["macro_observations", "FRED 觀測值"],
+  ["macro_release_dates", "發布排程"],
+  ["cal_economic_events", "經濟行事曆"],
+  ["cal_earnings_events", "財報行事曆"],
+  ["cal_ipo_events", "IPO 行事曆"],
+];
+
+function MacroStorageSection() {
+  const [status, setStatus] = useState<MacroStatus | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setStatus(await getMacroStatus());
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function toggle(enabled: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await setUseLocalMacro(enabled);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const exists = status?.exists ?? false;
+  const tables = status?.tables ?? {};
+  const totalObs = (tables.macro_observations?.row_count ?? 0).toLocaleString();
+  const seriesCount = (tables.macro_series?.row_count ?? 0).toLocaleString();
+
+  return (
+    <div>
+      <div className="settings-section-head">
+        <div>
+          <h2>本地總經／行事曆庫 · Macro / Calendar</h2>
+          <p className="muted tiny">
+            把 FRED 總經序列（含 ALFRED vintage 還原時點）與經濟／財報／IPO 行事曆存到本地 SQLite（macro_calendar.db）。
+            啟用後讀取走本地、不需 PG（PG 端目前為空，未做遷移）。資料由 FRED／Finnhub 抓取的 job 填入，非 PG 鏡像。
+            觀測值的 realtime_start 取 FRED 首次發布日（output_type=4），lookahead-safe。
+            注意：經濟行事曆需 Finnhub 付費方案（目前 403）；財報行事曆待節流批次抓取。
+          </p>
+        </div>
+        <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+      </div>
+
+      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+
+      {!status ? (
+        <p className="muted">載入中…</p>
+      ) : (
+        <div className="settings-panel">
+          <dl className="ds-kv">
+            <dt>本地總經庫</dt>
+            <dd>{exists ? `已建立 · ${seriesCount} 序列 · ${totalObs} 觀測值` : "尚未建立"}</dd>
+            {MACRO_TABLE_LABELS.map(([key, label]) => {
+              const t = tables[key];
+              return (
+                <FragmentKV
+                  key={key}
+                  label={label}
+                  value={
+                    exists && t
+                      ? `${t.row_count.toLocaleString()} 列 · 最新抓取 ${formatSystemTimestamp(t.last_fetched_at)}`
+                      : "—"
+                  }
+                />
+              );
+            })}
+            <dt>本地路由</dt>
+            <dd>
+              {macroRoutingLabel(status)}
+              {status.env_override && "（env 強制開啟）"}
+            </dd>
+          </dl>
+
+          <div className="settings-actions" style={{ marginTop: 12 }}>
+            <label className="ds-toggle">
+              <input
+                type="checkbox"
+                checked={status.use_local_macro_setting}
+                disabled={busy}
+                onChange={(e) => void toggle(e.target.checked)}
+              />
+              使用本地 macro / calendar
+            </label>
+          </div>
+
+          {status.use_local_macro_setting && !exists && (
+            <p className="muted tiny" style={{ marginTop: 8 }}>
+              設定已開但本地庫尚未建立 — 讀取仍走 PG，直到 FRED／Finnhub job 把 macro_calendar.db 填起來。
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A <dt>/<dd> pair (a fragment can't carry a key cleanly inside .map for the dl).
+function FragmentKV({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </>
   );
 }
 

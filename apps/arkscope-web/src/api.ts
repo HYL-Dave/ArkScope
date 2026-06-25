@@ -1262,6 +1262,32 @@ export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_
   return sendJSON("/market-data/settings", "PUT", { enabled });
 }
 
+// --- 本地總經/行事曆 (macro_calendar.db) — use_local_macro toggle + coverage (§4c) ---
+
+export interface MacroTableStat {
+  last_fetched_at: string | null;
+  row_count: number;
+}
+
+export interface MacroStatus {
+  macro_db: string;
+  exists: boolean;
+  // keyed by table name (cal_economic_events / cal_earnings_events / cal_ipo_events /
+  // macro_series / macro_observations / macro_release_dates); {} when the DB is absent.
+  tables: Record<string, MacroTableStat>;
+  use_local_macro_setting: boolean;
+  env_override: boolean;
+  local_first_active: boolean;
+}
+
+export function getMacroStatus(): Promise<MacroStatus> {
+  return getJSON<MacroStatus>("/macro/status");
+}
+
+export function setUseLocalMacro(enabled: boolean): Promise<{ use_local_macro_setting: boolean }> {
+  return sendJSON("/macro/settings", "PUT", { enabled });
+}
+
 // --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
 
 export interface NewsFeedItem {
