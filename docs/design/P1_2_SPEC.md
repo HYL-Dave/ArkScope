@@ -191,9 +191,9 @@ unique (series_id, observation_date, realtime_start)
 
 Index: `(series_id, observation_date desc)`, `(series_id, realtime_start desc)`.
 
-`realtime_start` is **NOT NULL with no fallback sentinel**. Lookahead-safety is the core contract of P1.2; an unknown `realtime_start` would mean we don't know when this value was knowable — that's not a writable observation. For `latest_only` series, ingestion looks up `release_date` from `macro_release_dates` (joined on the series's release id) and uses that as `realtime_start`. If the join fails, the ingestion job logs the gap and skips the row rather than writing `'1970-01-01'` and pretending it's queryable.
+`realtime_start` is **NOT NULL with no fallback sentinel**. Lookahead-safety is the core contract of P1.2; an unknown `realtime_start` would mean we don't know when this value was knowable — that's not a writable observation. For `latest_only` series, `realtime_start` is FRED's authoritative **first-publication date**, obtained by requesting `output_type=4` (Initial Release Only) over the full ALFRED real-time window — **not** derived from a `macro_release_dates` join. _(Corrected 2026-06-25: the original release-date-join design leaked values early — a within-month release of a different period pre-dated the new observation; see `_ingest_latest_only`'s docstring. The implementation switched to FRED `output_type=4`.)_ If FRED returns no real-time row, ingestion skips it rather than writing `'1970-01-01'` and pretending it's queryable.
 
-For `latest_only` series, one row exists per `(series_id, observation_date)` with `realtime_start = release_date` and `realtime_end = '9999-12-31'`.
+For `latest_only` series, one row exists per `(series_id, observation_date)` with `realtime_start` = FRED's first-publication date (output_type=4) and `realtime_end = '9999-12-31'`.
 
 For `full_vintages` series, multiple rows can exist per `(series_id, observation_date)` covering each revision; lookahead-safe query is:
 
@@ -216,7 +216,7 @@ fetched_at         timestamptz not null default now()
 primary key (release_id, release_date)
 ```
 
-Used by `latest_only` ingestion to populate `realtime_start = release_date` for each observation, so even cheap single-vintage storage gets a lookahead-safe lower bound.
+Populates the release-schedule surface (the calendar of scheduled / actual source releases). **NOTE (2026-06-25):** observation `realtime_start` is **not** derived from this table — it comes from FRED `output_type=4` (first publication). The release schedule is informational; it is no longer joined to date observations.
 
 ### 3.3 Snapshot semantics — single rule
 
@@ -372,7 +372,7 @@ Same shape as P1.1 — each tool returns a `data_quality` block (rows, errors, m
 Three rules, all enforced by the read layer. No backtest code in P1.2 — but the read layer is the foundation any future backtest will use, so getting these right matters.
 
 1. **Mutating-row reads** (`cal_*_events`): when `as_of` is supplied, the read joins to `cal_*_event_revisions` and returns the state observed at the most recent `observed_at <= as_of`. When no `as_of`, returns the canonical (latest) row.
-2. **FRED observation reads**: `as_of` filters `realtime_start <= as_of::date < realtime_end`. For `latest_only` series this collapses to `release_date <= as_of::date`. For `full_vintages` series this picks the right vintage. (FRED's vintage axis is day-precision; timestamp inputs are cast to date for this filter.)
+2. **FRED observation reads**: `as_of` filters `realtime_start <= as_of::date < realtime_end`. For `latest_only` series this collapses to `first_publication_date <= as_of::date`. For `full_vintages` series this picks the right vintage. (FRED's vintage axis is day-precision; timestamp inputs are cast to date for this filter.)
 3. **Release schedule**: a release_date is a **scheduled or actual source release**, not FRED/ALFRED ingestion availability (smoke §1.5). Lookahead-safe queries that need "data was knowable at decision time" use `realtime_start`, not a derived `decision_date >= release_date`.
 
 ---
@@ -391,7 +391,7 @@ Listed by area; each is a thing a reviewer can check.
 
 - Watchlist earnings ingestion completes for 50 tickers in < 60 seconds (per-symbol queries).
 - Economic-calendar ingestion captures `actual` flipping null → value when re-run after a release; revision log shows the transition.
-- FRED `latest_only` series stores `realtime_start = release_date` from the joined release schedule.
+- FRED `latest_only` series stores `realtime_start` = FRED's first-publication date (output_type=4).
 - FRED `full_vintages` series for GDP returns multiple rows per `observation_date` after backfill.
 
 **Health**
