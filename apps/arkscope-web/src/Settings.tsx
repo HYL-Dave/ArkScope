@@ -128,9 +128,11 @@ const SETTINGS_SECTIONS: Array<{
   },
   {
     id: "app_records",
+    // One-time PG→local migration tool; migration is done (use_local_records=true) so this is
+    // demoted out of the active nav. Component + backend route kept until the final PG-exit step.
     title: "App Records",
-    description: "報告／記憶／查詢記錄 PG→本地遷移（id 保留、先備份、dry-run 後再 apply）。",
-    enabled: true,
+    description: "報告／記憶／查詢記錄已本地化（use_local_records=true）。一次性 PG→本地遷移工具，已完成。",
+    enabled: false,
   },
   {
     id: "data_sources",
