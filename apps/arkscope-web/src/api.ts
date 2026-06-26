@@ -1509,6 +1509,17 @@ export interface ScheduleSourceState {
   // running this source", cross-process) writes no job_runs row, so this field is
   // the only way the UI can see it after a fire-and-return Run now.
   last_result: { source: string; status: string; reason?: string; at?: string } | null;
+  // v1.4: this source plans scope from coverage + can finish `partial` (→ manual 補抓)
+  gap_planned: boolean;
+  // v1.4: durable per-source state (survives restart). last_status 'partial' → a budget-bounded
+  // run left a continuation that needs a manual continue; 'failed' carries last_error.
+  durable_state: {
+    last_status: string | null; // running | succeeded | failed | partial
+    last_error: string | null;
+    continuation: { deferred?: string[]; lookback_days?: number; candidate_count?: number } | null;
+    last_attempt: string | null;
+    updated_at: string | null;
+  } | null;
   job_name: string; // collect.<source>
 }
 

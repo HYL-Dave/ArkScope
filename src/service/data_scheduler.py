@@ -737,6 +737,12 @@ def status_snapshot() -> Dict[str, Any]:
         progress = {k: dict(v) for k, v in _PROGRESS.items()}
     with _LAST_RESULT_LOCK:
         last_results = {k: dict(v) for k, v in _LAST_RESULT.items()}
+    # v1.4: durable per-source state (last_status / last_error / continuation / last_result)
+    # from the local scheduler_state store — survives restarts; the UI shows partial vs skipped.
+    try:
+        durable = _state_store().all()
+    except Exception:  # noqa: BLE001 — display must never fail on a store hiccup
+        durable = {}
     for source, d in SOURCES.items():
         cfg = source_config(source)
         out[source] = {
@@ -753,6 +759,11 @@ def status_snapshot() -> Dict[str, Any]:
             # last run_source outcome INCLUDING skips (skips write no job_runs row;
             # without this a cross-process "CLI is running it" skip is invisible)
             "last_result": last_results.get(source),
+            "gap_planned": d.gap_planned,   # v1.4: this source uses planner scope + partial/補抓
+            # v1.4 durable state (survives restart): {last_status, last_error, continuation,
+            # last_result, last_attempt, updated_at}. last_status 'partial' → needs manual 補抓;
+            # 'skipped' is transient (not persisted here → absent unless a real run set it).
+            "durable_state": durable.get(source),
             "job_name": job_name(source),
         }
     return out

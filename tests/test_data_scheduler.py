@@ -756,3 +756,20 @@ def test_v13_no_gaps_is_noop_success(monkeypatch):
     res = ds.run_source("price_backfill", trigger_source="scheduler")
     assert res["status"] == "succeeded" and called["n"] == 0   # no fillable gaps → executor not called
     assert res["collect"]["planned"] == 0
+
+
+def test_v14_status_snapshot_exposes_durable_state_and_gap_planned(monkeypatch):
+    # v1.4: GET /schedule data must surface the durable scheduler_state (partial + continuation +
+    # error) + the gap_planned flag, so the UI can show partial→補抓 and last failure across restarts.
+    ds._state_store().record_attempt("price_backfill",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome("price_backfill", status="partial", error=None,
+                                     result={"rows_added": 3},
+                                     continuation={"deferred": ["NVDA", "TSLA"], "lookback_days": 5})
+    snap = ds.status_snapshot()
+    pb = snap["price_backfill"]
+    assert pb["gap_planned"] is True
+    assert pb["durable_state"]["last_status"] == "partial"
+    assert pb["durable_state"]["continuation"]["deferred"] == ["NVDA", "TSLA"]
+    # a non-gap-planned source: flag false, durable_state present-or-None (no crash)
+    assert snap["polygon_news"]["gap_planned"] is False

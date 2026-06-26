@@ -79,7 +79,7 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1538,6 +1538,31 @@ function DataSourcesSection() {
                     {s.last_result?.status === "skipped" && (
                       <span className="refresh-err"> · 已跳過：{s.last_result.reason}</span>
                     )}
+                    {/* v1.4: durable state — partial (待補抓) vs failed, survives restart */}
+                    {(() => {
+                      const ss = schedulerStateLabel(s.durable_state ?? null);
+                      if (!s.durable_state?.last_status) return null;
+                      return (
+                        <>
+                          {" · "}
+                          <span style={{ color: coverageToneColor(ss.tone) }}>{ss.label}</span>
+                          {s.durable_state.last_status === "failed" && s.durable_state.last_error && (
+                            <span className="refresh-err"> · {s.durable_state.last_error}</span>
+                          )}
+                          {ss.needsContinue && (
+                            <button
+                              className="btn-ghost"
+                              style={{ marginLeft: 6 }}
+                              disabled={!!busy || s.running}
+                              onClick={() => void runNow(id)}
+                              title="手動補抓上次部分完成剩餘的標的"
+                            >
+                              補抓
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}

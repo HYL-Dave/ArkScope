@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel } from "./marketDataDisplay";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
 import type { MacroStatus, MarketDataStatus } from "./api";
 
 const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
@@ -88,5 +88,21 @@ describe("coverageStatusLabel", () => {
     expect(coverageStatusLabel(row({
       coverage_status: "non_trading", reason: "us_market_holiday", holiday: "Juneteenth National Independence Day",
     })).label).toBe("假日（Juneteenth National Independence Day）");
+  });
+});
+
+describe("schedulerStateLabel", () => {
+  it("partial with deferred → needs manual continue (補抓)", () => {
+    const r = schedulerStateLabel({ last_status: "partial", continuation: { deferred: ["NVDA", "TSLA"] } });
+    expect(r).toEqual({ label: "部分完成（待補抓 2）", tone: "warn", needsContinue: true });
+  });
+  it("distinguishes succeeded / failed / running / none", () => {
+    expect(schedulerStateLabel({ last_status: "succeeded", continuation: null }).tone).toBe("ok");
+    expect(schedulerStateLabel({ last_status: "failed", continuation: null }).tone).toBe("bad");
+    expect(schedulerStateLabel({ last_status: "running", continuation: null }).label).toBe("執行中");
+    expect(schedulerStateLabel(null).label).toBe("尚未執行");
+  });
+  it("partial with no deferred is not actionable", () => {
+    expect(schedulerStateLabel({ last_status: "partial", continuation: { deferred: [] } }).needsContinue).toBe(false);
   });
 });

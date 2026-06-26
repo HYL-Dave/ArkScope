@@ -43,3 +43,29 @@ export function coverageStatusLabel(
       return { label: row.coverage_status, tone: "muted" };
   }
 }
+
+// Scheduler durable-state → UI label + tone (v1.4). Distinguishes the cases the reviewer
+// stressed: partial = a budget-bounded run left work → needs manual 補抓; skipped (transient,
+// from last_result, not durable) = temporarily not run; failed carries the error.
+export function schedulerStateLabel(
+  durable: {
+    last_status: string | null;
+    continuation: { deferred?: string[] } | null;
+  } | null,
+): { label: string; tone: "ok" | "warn" | "muted" | "bad"; needsContinue: boolean } {
+  const st = durable?.last_status ?? null;
+  switch (st) {
+    case "succeeded":
+      return { label: "上次成功", tone: "ok", needsContinue: false };
+    case "partial": {
+      const n = durable?.continuation?.deferred?.length ?? 0;
+      return { label: `部分完成（待補抓 ${n}）`, tone: "warn", needsContinue: n > 0 };
+    }
+    case "failed":
+      return { label: "上次失敗", tone: "bad", needsContinue: false };
+    case "running":
+      return { label: "執行中", tone: "muted", needsContinue: false };
+    default:
+      return { label: "尚未執行", tone: "muted", needsContinue: false };
+  }
+}
