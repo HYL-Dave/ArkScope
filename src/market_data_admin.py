@@ -645,6 +645,8 @@ def bootstrap_market(out_path: Optional[str] = None,
             _copy_table(cur, sconn, _PG_FUND_SELECT, _FUND_INSERT,
                         fund_total, progress_cb, price_total + news_total + iv_total, grand, batch)
             sconn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")  # build FTS index
+            _ensure_news_hash_unique(sconn)    # 2b: UNIQUE(article_hash) for INSERT OR IGNORE dedup
+            _ensure_news_fts_triggers(sconn)   # 2b: after the bulk rebuild → steady-state writers sync fts via triggers
             sconn.commit()  # financial_cache is carried over under-lock at swap time
             # NOTE: ticker canonicalization is deliberately deferred to AFTER validation
             # (see the `if match:` block). Canon folds alias spellings (BRK.B → BRK B),
@@ -822,6 +824,9 @@ def _incr_domain(sconn, domain: str, local_max_sql: str, pg_select_incr: str,
     fatal: it is recorded to market_sync_meta.last_error and returned, not raised."""
     try:
         local_max = sconn.execute(local_max_sql).fetchone()[0]
+        if domain == "news":               # 2b: unify the news schema contract before appending
+            _ensure_news_hash_unique(sconn)
+            _ensure_news_fts_triggers(sconn)
         pg = _pg_conn()
         try:
             cur = pg.cursor()
@@ -830,23 +835,24 @@ def _incr_domain(sconn, domain: str, local_max_sql: str, pg_select_incr: str,
             else:
                 cur.execute(pg_select_incr, (local_max,))
             before = sconn.total_changes
+            # the news AFTER INSERT trigger cascades fts writes into total_changes (2b), so for
+            # news count the table directly; other domains have no triggers → total_changes is exact.
+            news_before = (sconn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
+                           if domain == "news" else 0)
             while True:
                 rows = cur.fetchmany(batch)
                 if not rows:
                     break
                 sconn.executemany(insert_sql, rows)
-            added = sconn.total_changes - before
+            if domain == "news":
+                added = sconn.execute("SELECT COUNT(*) FROM news").fetchone()[0] - news_before
+            else:
+                added = sconn.total_changes - before
             sconn.commit()
         finally:
             pg.close()
-        # keep the FTS index in sync for newly-inserted news rows
-        if domain == "news" and added:
-            sconn.execute(
-                "INSERT INTO news_fts(rowid, title, description) "
-                "SELECT id, title, description FROM news WHERE id > ?",
-                (local_max or 0,),
-            )
-            sconn.commit()
+        # news_fts is kept in sync by the AFTER INSERT trigger (2b) — the executemany above fires
+        # it per genuinely-inserted row, so NO manual fts insert here (a second would double-index).
         _record_sync_meta(sconn, domain, rows_added=added, error=None)
         return {"ok": True, "rows_added": added, "error": None}
     except Exception as e:  # noqa: BLE001 — provider down etc. must not be fatal

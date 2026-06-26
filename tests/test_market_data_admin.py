@@ -298,6 +298,37 @@ def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
     assert meta["news"]["rows_added"] == 1 and meta["news"]["last_error"] is None
 
 
+def test_bootstrap_and_incremental_keep_fts_via_triggers(tmp_path, fake_pg, monkeypatch):
+    # 2b-mirror: bootstrap installs UNIQUE(article_hash) + the fts triggers (after the bulk
+    # rebuild); the incremental append then syncs news_fts via the trigger (manual insert removed)
+    # — exactly one fts row per news row, no double-index, no orphan.
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    conn = sqlite3.connect(out)
+    try:
+        trigs = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='news'")}
+        idx = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='news'")}
+    finally:
+        conn.close()
+    assert {"news_ai", "news_ad", "news_au"} <= trigs    # triggers installed by bootstrap
+    assert "idx_news_article_hash" in idx                # UNIQUE index installed
+    # incremental append (one new article) → fts synced by the trigger, counts stay equal
+    monkeypatch.setattr(mda, "_pg_conn",
+                        lambda: _FakePG(_PRICE_ROWS + [_NEW_PRICE], _NEWS_ROWS + [_NEW_NEWS]))
+    mda.incremental_update(out)
+    conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
+    try:
+        news_n = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
+        fts_n = conn.execute("SELECT COUNT(*) FROM news_fts").fetchone()[0]
+        match_n = conn.execute("SELECT COUNT(*) FROM news_fts WHERE news_fts MATCH 'product'").fetchone()[0]
+    finally:
+        conn.close()
+    assert news_n == fts_n == 3      # 2 bootstrapped + 1 incremental, exactly one fts row each
+    assert match_n == 1              # the new article is searchable (synced once, not doubled)
+
+
 _NEW_TICKER_BAR = ("TSLA", "2026-05-01T09:00:00+0000", "15min", 200.0, 202.0, 199.0, 201.0, 500)
 
 
