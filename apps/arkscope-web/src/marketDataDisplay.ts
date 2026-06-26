@@ -23,7 +23,8 @@ export function macroRoutingLabel(status: MacroStatus): string {
 // coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);
 // the UI must render this label, NOT re-derive completeness from full/partial/missing.
 export function coverageStatusLabel(
-  row: Pick<TradingDayRow, "coverage_status" | "reason" | "holiday" | "max_observed_bar_count">,
+  row: Pick<TradingDayRow, "coverage_status" | "reason" | "holiday" | "max_observed_bar_count"> &
+    Partial<Pick<TradingDayRow, "well_covered" | "covered">>,  // only the 'partial' branch needs these
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad" } {
   switch (row.coverage_status) {
     case "non_trading":
@@ -37,6 +38,8 @@ export function coverageStatusLabel(
       return { label: "缺資料", tone: "bad" };
     case "thin":
       return { label: `疑似不足（最多 ${row.max_observed_bar_count ?? 0} 根）`, tone: "warn" };
+    case "partial":
+      return { label: `部分覆蓋（${row.well_covered ?? 0}/${row.covered ?? 0} 檔完整）`, tone: "warn" };
     case "complete_like":
       return { label: "覆蓋完整", tone: "ok" };
     default:

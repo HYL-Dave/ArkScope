@@ -80,6 +80,8 @@ describe("coverageStatusLabel", () => {
       .toEqual({ label: "缺資料", tone: "bad" });
     expect(coverageStatusLabel(row({ coverage_status: "thin", max_observed_bar_count: 3 })))
       .toEqual({ label: "疑似不足（最多 3 根）", tone: "warn" });
+    expect(coverageStatusLabel(row({ coverage_status: "partial", well_covered: 1, covered: 148 })))
+      .toEqual({ label: "部分覆蓋（1/148 檔完整）", tone: "warn" });
     expect(coverageStatusLabel(row({ coverage_status: "in_progress" })).tone).toBe("muted");
   });
   it("distinguishes weekend vs holiday for non_trading", () => {

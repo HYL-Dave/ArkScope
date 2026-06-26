@@ -305,6 +305,11 @@ def _daterange(start: date, end: date):
 # never flagged thin. NOTE: this is a blunt rule — a legitimate half-day / early close (~13-14
 # 15min bars) will read as 'thin' until a proper early-close calendar lands (deferred B+).
 _THIN_BAR_THRESHOLD = {"15min": 20}
+# A complete-looking day needs MOST *present* tickers well-covered, not just one outlier — else a
+# single fully-synced ticker (e.g. a freshly-renamed symbol) masks a universe-wide thin/partial
+# day. Ratio is over PRESENT tickers, so a permanently-missing ticker (delisted/unresolvable)
+# stays in `missing`, separate from this judgment. Below this fraction → 'partial', not 'complete'.
+_COMPLETE_COVERED_RATIO = 0.9
 
 
 def summarize_trading_day_coverage(
@@ -394,20 +399,25 @@ def summarize_trading_day_coverage(
             ({"ticker": t, "bars": n} for t, n in present.items() if 0 < n < day_max),
             key=lambda x: x["ticker"])
         missing = sorted(t for t in canon_universe if t not in present)
+        thin_thr = _THIN_BAR_THRESHOLD.get(db_interval, 0)
+        well_covered = sum(1 for n in present.values() if n >= thin_thr)
         if not complete:
             status = "in_progress"                       # session not closed → don't judge thin
         elif not present:
             status = "missing"                           # complete trading day, zero coverage
-        elif day_max < _THIN_BAR_THRESHOLD.get(db_interval, 0):
-            status = "thin"                              # data present but suspiciously low
+        elif day_max < thin_thr:
+            status = "thin"                              # even the best-covered ticker is sparse
+        elif well_covered >= _COMPLETE_COVERED_RATIO * len(present):
+            status = "complete_like"                     # most PRESENT tickers well-covered
         else:
-            status = "complete_like"
+            status = "partial"                           # a few well-covered, the rest sparse → uneven
         days.append({
             "date": iso, "is_trading_day": True, "reason": mds["reason"], "holiday": None,
             "session_complete": complete,
             "coverage_status": status,
             "max_observed_bar_count": day_max,
             "full": sum(1 for n in present.values() if day_max and n >= day_max),
+            "well_covered": well_covered,
             "partial": len(partial),
             "missing": len(missing),
             "covered": len(present),

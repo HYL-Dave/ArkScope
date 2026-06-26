@@ -1295,6 +1295,7 @@ export type CoverageStatus =
   | "in_progress"
   | "missing"
   | "thin"
+  | "partial"
   | "complete_like";
 
 export interface TradingDayRow {
@@ -1306,6 +1307,7 @@ export interface TradingDayRow {
   coverage_status: CoverageStatus;
   max_observed_bar_count: number | null;
   full: number | null;
+  well_covered: number | null;
   partial: number | null;
   missing: number | null;
   covered: number | null;

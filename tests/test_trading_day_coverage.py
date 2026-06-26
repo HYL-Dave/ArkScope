@@ -128,6 +128,46 @@ def test_uniformly_thin_day_not_read_as_complete(tmp_path):
     assert d["missing"] == 0                  # all present, just thin
 
 
+def test_outlier_full_does_not_mask_thin_universe(tmp_path):
+    # THE 6/25 TRAP: one freshly-synced ticker is fully covered (26 bars) while the rest of the
+    # universe is thin (5 bars). day_max=26 ≥ threshold would read complete_like off the MAX
+    # alone — but only 1/5 present tickers is well-covered, so the day is PARTIAL, not complete.
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA); _ensure_provider_sync_tables(conn)
+    _bars(conn, "HAPN", "2026-06-22", 26)                 # outlier: fully covered
+    for t in ("AAPL", "BRK B", "NVDA", "MSFT"):
+        _bars(conn, t, "2026-06-22", 5)                   # the rest: thin
+    conn.commit(); conn.close()
+    out = summarize_trading_day_coverage(
+        ["HAPN", "AAPL", "BRK B", "NVDA", "MSFT"], interval="15min", lookback_days=2,
+        db_path=str(path), today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["max_observed_bar_count"] == 26
+    assert d["coverage_status"] == "partial"              # NOT complete_like — 1/5 well-covered
+    assert d["well_covered"] == 1                         # new distribution signal
+    assert d["missing"] == 0                              # all present, just uneven
+
+
+def test_complete_when_most_present_well_covered_despite_one_laggard(tmp_path):
+    # inverse: a lone thin ticker among many full ones does NOT downgrade the day — it shows up
+    # as partial_tickers but the day stays complete_like (≥ the well-covered ratio threshold).
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA); _ensure_provider_sync_tables(conn)
+    full = ["AAPL", "BRK B", "NVDA", "MSFT", "TSLA", "AMD", "GOOG", "META", "AMZN"]
+    for t in full:
+        _bars(conn, t, "2026-06-22", 26)                  # 9 full
+    _bars(conn, "LAG", "2026-06-22", 4)                   # 1 thin → 9/10 well-covered = 0.9
+    conn.commit(); conn.close()
+    out = summarize_trading_day_coverage(
+        full + ["LAG"], interval="15min", lookback_days=2, db_path=str(path),
+        today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["coverage_status"] == "complete_like"        # 9/10 well-covered ≥ ratio
+    assert d["well_covered"] == 9 and d["partial"] == 1
+
+
 def test_partial_day_lists_thin_ticker(db):
     d = _day(_summary(db), "2026-06-18")
     assert d["full"] == 1 and d["missing"] == 1
