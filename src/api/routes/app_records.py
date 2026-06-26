@@ -12,6 +12,7 @@ migration, lest the local store's autoincrement collide with the id-preserving m
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -66,9 +67,14 @@ def migration_apply(dal=Depends(get_dal)):
     when PG is unreadable."""
     require_profile_state_write("migrate_app_records", {})
     source = _source(dal)
-    local = AppRecordsLocalStore(resolve_profile_state_db_path(dal), create=True)  # apply writes
+    # create=False so the constructor doesn't DDL — apply_migration backs up FIRST, then creates
+    # the tables (backup-before-write). Unique timestamped backup name so a re-run can never
+    # clobber the original pre-migration snapshot (backup_profile_state_db also refuses to
+    # overwrite as belt-and-suspenders).
+    local = AppRecordsLocalStore(resolve_profile_state_db_path(dal), create=False)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
     try:
-        return apply_migration(source, local, base=_base(dal), backup=True)
+        return apply_migration(source, local, base=_base(dal), backup=True, now_stamp=stamp)
     except HTTPException:
         raise
     except RuntimeError as e:        # conflict guard / incomplete-write

@@ -144,6 +144,11 @@ class AppRecordsLocalStore:
         finally:
             conn.close()
 
+    def ensure_schema(self) -> None:
+        """Public: create the app-record tables (idempotent). Used by the migrator AFTER its
+        backup, so a create=False store's first DDL happens post-backup (backup-before-write)."""
+        self._ensure_schema()
+
     @staticmethod
     def _cutoff(days: int, today: Optional[str]) -> str:
         base = date.fromisoformat(today) if today else datetime.now(timezone.utc).date()

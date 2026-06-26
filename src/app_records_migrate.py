@@ -198,9 +198,15 @@ def preview_migration(source: Any, local: AppRecordsLocalStore,
 
 
 def backup_profile_state_db(db_path: str, dest: str) -> Optional[str]:
-    """WAL-safe SQLite backup of profile_state.db before a migration write (gate #4)."""
+    """WAL-safe SQLite backup of profile_state.db before a migration write (gate #4). REFUSES to
+    overwrite an existing backup (a re-run with the same name must not clobber the original
+    pre-migration snapshot with a post-migration DB) → raise FileExistsError."""
     if not Path(db_path).exists():
         return None
+    if Path(dest).exists():
+        raise FileExistsError(
+            f"backup target already exists: {dest} — refusing to overwrite an existing "
+            "migration backup (use a fresh timestamped name).")
     src = sqlite3.connect(db_path)
     try:
         dst = sqlite3.connect(dest)
@@ -228,11 +234,15 @@ def apply_migration(source: Any, local: AppRecordsLocalStore, *, base: Optional[
         blocked = {t: c["conflicts"] for t, c in preview["tables"].items() if c["conflicts"]}
         raise RuntimeError(f"migration refused — same-id-different-content conflicts: {blocked}")
 
+    # BACKUP FIRST — before ANY local write or DDL (the store is passed create=False so its
+    # schema isn't materialized at construction; we create tables only AFTER the snapshot below).
     backup_made = None
     if backup:
         suffix = now_stamp or "pre-migrate"
         backup_made = backup_path or f"{local.db_path}.{suffix}.bak"
         backup_profile_state_db(local.db_path, backup_made)
+
+    local.ensure_schema()   # create app-record tables NOW (post-backup) — backup-before-write
 
     # Build the FULL insert batch across all tables, then write it in ONE atomic transaction
     # (fix #2: all-or-nothing — a mid-batch SQLite failure rolls back every row, not just the

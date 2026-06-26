@@ -283,3 +283,39 @@ def test_route_pg_error_becomes_409_not_500(tmp_path, monkeypatch):
     assert e.value.status_code == 409 and "PG read failed" in str(e.value.detail)
     # and the preview must not have created the real profile_state.db
     assert not (tmp_path / "profile_state.db").exists()
+
+
+# --- 1c-api-fix-2: conservative backup ----------------------------------------------
+
+def test_backup_refuses_to_overwrite(local, tmp_path):
+    # fix #1: a backup target that already exists must NOT be clobbered (a re-run could else
+    # overwrite the original pre-migration snapshot with a post-migration DB).
+    from src.app_records_migrate import backup_profile_state_db
+    apply_migration(_FakePG(reports=[_report(1)]), local, backup=False)  # so db file exists
+    dest = str(tmp_path / "b.bak")
+    assert backup_profile_state_db(local.db_path, dest) == dest          # first ok
+    with pytest.raises(FileExistsError):
+        backup_profile_state_db(local.db_path, dest)                     # second refuses
+
+
+def test_backup_taken_before_ddl(tmp_path):
+    # fix #2: on an EXISTING profile_state.db that has app-state but NOT YET the app-record
+    # tables, apply must back up BEFORE creating those tables — so the backup is the true
+    # pre-migration state (no research_reports table in it).
+    import sqlite3
+    db = tmp_path / "profile_state.db"
+    c = sqlite3.connect(db)                       # simulate existing local app-state, no app-records
+    c.execute("CREATE TABLE settings (k TEXT, v TEXT)")
+    c.execute("INSERT INTO settings VALUES ('x','1')"); c.commit(); c.close()
+
+    store = AppRecordsLocalStore(db, create=False)   # route builds it create=False
+    res = apply_migration(_FakePG(reports=[_report(1)]), store, backup=True,
+                          now_stamp="20260626T010101Z")
+    assert res["backup"] and os.path.exists(res["backup"])
+    # the LIVE db got the migrated row...
+    assert store.get_report_metadata(1)["id"] == 1
+    # ...but the BACKUP predates the DDL: it has 'settings' but NOT 'research_reports'
+    b = sqlite3.connect(res["backup"])
+    tbls = {r[0] for r in b.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    b.close()
+    assert "settings" in tbls and "research_reports" not in tbls
