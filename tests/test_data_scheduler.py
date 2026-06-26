@@ -700,24 +700,48 @@ def test_v13_attended_scheduler_skips_pending_continuation(monkeypatch):
     assert ds._state_store().get("price_backfill")["last_status"] == "partial"
 
 
-def test_v13_manual_trigger_processes_continuation(monkeypatch):
+def test_v13a_manual_continue_consumes_saved_deferred_not_fresh_plan(monkeypatch):
+    # v1.3a HIGH fix: a manual continue must execute the SAVED deferred scope, NOT a fresh
+    # re-plan. Saved continuation = ['NVDA'], but the fresh planner would return ['AAPL'] —
+    # the executor must receive NVDA (proving the saved remainder is what's serviced).
     import src.market_data_direct as mdd
     from src.scheduler_planner import BackfillPlan
     ds._state_store().record_attempt("price_backfill",
                                      datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
     ds._state_store().record_outcome("price_backfill", status="partial", error=None,
-                                     result={}, continuation={"deferred": ["NVDA"]})
-    ran = {"n": 0}
+                                     result={}, continuation={"deferred": ["NVDA"], "lookback_days": 7})
+    seen = {}
     monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: ran.__setitem__("n", ran["n"] + 1) or {"rows_added": 2, "errors": {}})
-    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["NVDA"])
+                        lambda **kw: seen.update(kw) or {"rows_added": 2, "errors": {}})
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
+    # the fresh planner would pick AAPL — but the manual continue must IGNORE it for the backlog
     monkeypatch.setattr(ds, "_plan_price_backfill_scope",
-                        lambda scope: BackfillPlan(tickers=["NVDA"], lookback_days=4, candidate_count=1))
-    # MANUAL trigger (api) → proceeds, runs the executor, clears the partial → succeeded
+                        lambda scope, **k: BackfillPlan(tickers=["AAPL"], lookback_days=3, candidate_count=1))
     res = ds.run_source("price_backfill", trigger_source="api")
-    assert res["status"] == "succeeded" and ran["n"] == 1
-    row = ds._state_store().get("price_backfill")
-    assert row["last_status"] == "succeeded" and row["continuation"] is None
+    assert res.get("resumed_continuation") is True
+    assert seen["tickers_arg"] == "NVDA"          # SAVED deferred, not the fresh-plan AAPL
+    assert seen["lookback_days"] == 7             # saved continuation's window
+    assert res["status"] == "succeeded"           # remainder exhausted → partial cleared
+    assert ds._state_store().get("price_backfill")["continuation"] is None
+
+
+def test_v13a_manual_continue_carries_remainder_when_over_budget(monkeypatch):
+    # saved deferred larger than max_tickers → batch this run, carry the rest forward (still partial).
+    import src.market_data_direct as mdd
+    ds._state_store().record_attempt("price_backfill",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome("price_backfill", status="partial", error=None, result={},
+                                     continuation={"deferred": ["A", "B", "C", "D"], "lookback_days": 5})
+    monkeypatch.setattr(ds, "_BACKFILL_MAX_TICKERS", 2)
+    seen = {}
+    monkeypatch.setattr(mdd, "backfill_prices_direct",
+                        lambda **kw: seen.update(kw) or {"rows_added": 1, "errors": {}})
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["A", "B", "C", "D"])
+    res = ds.run_source("price_backfill", trigger_source="api")
+    assert seen["tickers_arg"] == "A,B"           # batch of max_tickers from the saved deferred
+    assert res["status"] == "partial"
+    cont = ds._state_store().get("price_backfill")["continuation"]
+    assert cont["deferred"] == ["C", "D"]         # remainder carried forward
 
 
 def test_v13_no_gaps_is_noop_success(monkeypatch):

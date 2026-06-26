@@ -272,14 +272,24 @@ def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
                                max_days=_BACKFILL_MAX_DAYS, exclude_tickers=exclude)
 
 
-def _has_pending_continuation(source: str) -> bool:
-    """Attended mode (decision 4): a prior `partial` left a saved continuation → the SCHEDULER
-    must NOT auto-resume it; only a manual trigger processes it. Best-effort (local state)."""
+def _pending_continuation(source: str):
+    """The saved continuation dict from a prior `partial` (deferred scope to resume), or None.
+    Best-effort (local state)."""
     try:
         st = _state_store().get(source)
     except Exception:  # noqa: BLE001
-        return False
-    return bool(st and st.get("last_status") == "partial" and st.get("continuation"))
+        return None
+    if st and st.get("last_status") == "partial":
+        cont = st.get("continuation")
+        if cont and cont.get("deferred"):
+            return cont
+    return None
+
+
+def _has_pending_continuation(source: str) -> bool:
+    """Attended mode (decision 4): a prior `partial` left a saved continuation → the SCHEDULER
+    must NOT auto-resume it; only a manual trigger processes it."""
+    return _pending_continuation(source) is not None
 
 
 def source_config(source: str) -> Dict[str, Any]:
@@ -388,11 +398,15 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
+    # v1.3/v1.3a: capture any pending continuation NOW — before record_attempt sets last_status
+    # ='running' (which would mask the durable 'partial'). Used by both the attended skip-gate
+    # (scheduler) and the manual-continue branch (api/cli consumes the saved deferred scope).
+    pending_cont = _pending_continuation(source) if d.gap_planned else None
     try:
         # v1.3 attended (decision 4): a prior `partial` left deferred scope → the SCHEDULER does
         # NOT auto-resume; it skips until a MANUAL trigger (api/cli) processes the continuation.
         # Skip-only gate (before record_attempt → doesn't touch durable state, per v1.2a).
-        if d.gap_planned and trigger_source == "scheduler" and _has_pending_continuation(source):
+        if d.gap_planned and trigger_source == "scheduler" and pending_cont:
             return _record_result({"source": source, "status": "skipped",
                                    "reason": "partial pending manual continue"})
         if d.ibkr:
@@ -452,7 +466,24 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     scope = tickers if tickers is not None else _resolve_price_scope()
                     if not scope:
                         raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
-                    plan = _plan_price_backfill_scope(scope)
+                    # v1.3a: a MANUAL trigger with a pending partial CONSUMES the saved deferred
+                    # scope (batch-by-batch), NOT a fresh re-plan — so the saved remainder is
+                    # guaranteed to be serviced (the 'manual continue covers the saved remainder'
+                    # contract). It carries the unprocessed remainder forward as the next partial;
+                    # once the saved backlog is drained, normal coverage planning resumes.
+                    pending = pending_cont if trigger_source != "scheduler" else None
+                    if pending:
+                        from src.scheduler_planner import BackfillPlan
+                        deferred = list(pending["deferred"])
+                        batch, remainder = (deferred[:_BACKFILL_MAX_TICKERS],
+                                            deferred[_BACKFILL_MAX_TICKERS:])
+                        plan = BackfillPlan(
+                            tickers=batch,
+                            lookback_days=int(pending.get("lookback_days") or _BACKFILL_MAX_DAYS),
+                            deferred=remainder, candidate_count=len(deferred))
+                        result["resumed_continuation"] = True
+                    else:
+                        plan = _plan_price_backfill_scope(scope)
                     result["plan"] = {"tickers": plan.tickers, "lookback_days": plan.lookback_days,
                                       "candidate_count": plan.candidate_count,
                                       "deferred": plan.deferred, "excluded": plan.excluded}
