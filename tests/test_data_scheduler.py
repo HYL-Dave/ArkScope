@@ -132,6 +132,40 @@ def test_run_source_adapter_success_sync_refresh(monkeypatch):
                         "status": "succeeded"}
 
 
+def test_run_source_news_direct_when_use_local_news_on(monkeypatch):
+    # 2c ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
+    # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
+    import scripts.collection.collect_polygon_news as cpn
+    calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
+
+    def _subproc(argv):
+        if "--news" in argv:
+            calls["sync"] += 1
+        return {"returncode": 0}
+    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (calls.__setitem__("refresh", calls["refresh"] + 1), {"ok": True})[1])
+    monkeypatch.setattr("src.news_providers.make_news_provider",
+                        lambda source, **k: (calls.__setitem__("provider", source), object())[1])
+
+    def _direct(tickers, *, source, provider, progress_cb=None, **k):
+        calls["direct"] += 1
+        return {"source": source, "tickers_scanned": len(tickers), "articles_added": 0, "errors": {}}
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _direct)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+    assert res["status"] == "succeeded"
+    assert calls["direct"] == 1 and calls["provider"] == "polygon"   # direct writer + provider used
+    assert calls["run_incremental"] == 0                             # NOT the Parquet adapter
+    assert calls["sync"] == 0                                        # NO --news PG sync
+    assert calls["refresh"] == 0                                     # NO local mirror
+    assert "skipped" in res["local_refresh"]                         # mirror explicitly skipped
+    assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
+
+
 def test_run_source_subprocess_success_collect_sync_refresh(monkeypatch):
     # IBKR sources stay subprocess: collector + PG sync = two child processes.
     calls = []

@@ -97,6 +97,10 @@ class SourceDef:
     # tickers + a window that reaches the oldest gap; a budget-bounded run finishes
     # `partial` with a saved continuation. Today only price_backfill.
     gap_planned: bool = False
+    # 2c: when set ('polygon'|'finnhub') AND use_local_news is on, this source routes to the
+    # direct-local writer (provider→local news+fts, no Parquet / no PG sync / no mirror); OFF
+    # keeps the chain above (collector→Parquet→PG sync→local mirror) verbatim.
+    news_direct_source: Optional[str] = None
 
 
 SOURCES: Dict[str, SourceDef] = {
@@ -106,14 +110,14 @@ SOURCES: Dict[str, SourceDef] = {
             "polygon_news", "Polygon 新聞",
             None, "--news",
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
-            universe_tickers=True, default_interval_min=60,
+            universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             description="Polygon news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
             None, "--news",
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
-            universe_tickers=True, default_interval_min=60,
+            universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             description="Finnhub news incremental（進程內）→ PG → local mirror",
         ),
         SourceDef(
@@ -448,7 +452,25 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         try:
             collected = False
-            if d.adapter is not None:
+            from src.news_providers import use_local_news_enabled
+            news_direct = d.news_direct_source is not None and use_local_news_enabled()
+            if news_direct:
+                # 2c: route this news source to the DIRECT-LOCAL writer (provider→local news+fts,
+                # NO Parquet, NO PG sync, NO mirror). Cursored against the local DB (newest stored
+                # published_at), not the Parquet timestamp. OFF (default) keeps the chain below.
+                from src.news_direct import backfill_news_direct
+                from src.news_providers import make_news_provider
+                scope = tickers if tickers is not None else _resolve_price_scope()
+                if not scope:
+                    raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                result["ticker_count"] = len(scope)
+                result["collect"] = backfill_news_direct(
+                    scope, source=d.news_direct_source,
+                    provider=make_news_provider(d.news_direct_source),
+                    progress_cb=lambda done, total, current: _set_progress(
+                        source, done, total, current))
+                collected = True
+            elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
                 # resolved lazily so tests can monkeypatch the module function and
                 # the sidecar pays the import only when the source actually runs.
@@ -527,7 +549,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     raise RuntimeError(f"collector failed: {step.get('error_tail', '')[:200]}")
                 collected = True
 
-            if collected and d.sync_flag and not skip_sync:
+            if collected and d.sync_flag and not skip_sync and not news_direct:
                 with _SYNC_LOCK:
                     # cross-process: a CLI sync may be mid-flight — queue behind it
                     # (in-process semantics are queue-not-skip too), bounded.
@@ -545,7 +567,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
-            elif d.adapter is not None and d.sync_flag is None:
+            elif news_direct or (d.adapter is not None and d.sync_flag is None):
                 # DIRECT local writer (e.g. price_backfill): it already wrote
                 # market_data.db itself — a PG→local mirror would be pointless and would
                 # re-pull stale PG. Skip it. (local_incremental has adapter=None and IS
