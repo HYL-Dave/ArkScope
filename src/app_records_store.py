@@ -156,18 +156,21 @@ class AppRecordsLocalStore:
                       file_path: Optional[str] = None, tools_used: Optional[List[str]] = None,
                       tool_calls: Optional[int] = None, duration_seconds: Optional[float] = None,
                       tokens_in: Optional[int] = None, tokens_out: Optional[int] = None,
-                      *, created_at: Optional[str] = None) -> Optional[int]:
+                      *, created_at: Optional[str] = None,
+                      id: Optional[int] = None) -> Optional[int]:
+        cols = ("title,tickers,report_type,summary,conclusion,confidence,provider,model,"
+                "file_path,tools_used,tool_calls,duration_seconds,tokens_in,tokens_out,created_at")
+        vals: tuple = (title, _json_or_none(tickers), report_type, summary, conclusion, confidence,
+                       provider, model, file_path, _json_or_none(tools_used), tool_calls,
+                       duration_seconds, tokens_in, tokens_out, created_at or _now_iso())
+        if id is not None:  # id-preserving (PG→local migration, gate #2)
+            cols, vals = "id," + cols, (id,) + vals
         conn = self._connect()
         try:
             cur = conn.execute(
-                "INSERT INTO research_reports (title,tickers,report_type,summary,conclusion,"
-                "confidence,provider,model,file_path,tools_used,tool_calls,duration_seconds,"
-                "tokens_in,tokens_out,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (title, _json_or_none(tickers), report_type, summary, conclusion, confidence,
-                 provider, model, file_path, _json_or_none(tools_used), tool_calls,
-                 duration_seconds, tokens_in, tokens_out, created_at or _now_iso()))
+                f"INSERT INTO research_reports ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
             conn.commit()
-            return int(cur.lastrowid)
+            return int(id if id is not None else cur.lastrowid)
         except sqlite3.Error as e:
             logger.error("insert_report failed: %s", e)
             return None
@@ -219,16 +222,21 @@ class AppRecordsLocalStore:
                       importance: int = 5, source: Optional[str] = None,
                       provider: Optional[str] = None, model: Optional[str] = None,
                       file_path: Optional[str] = None, expires_at: Optional[str] = None,
-                      *, created_at: Optional[str] = None) -> Optional[int]:
+                      *, created_at: Optional[str] = None,
+                      id: Optional[int] = None) -> Optional[int]:
+        cols = ("title,content,category,tickers,tags,importance,source,provider,model,"
+                "file_path,expires_at,created_at")
+        vals: tuple = (title, content, category, _json_or_none(tickers), _json_or_none(tags),
+                       importance, source, provider, model, file_path, expires_at,
+                       created_at or _now_iso())
+        if id is not None:  # id-preserving migration (gate #2)
+            cols, vals = "id," + cols, (id,) + vals
         conn = self._connect()
         try:
             cur = conn.execute(
-                "INSERT INTO agent_memories (title,content,category,tickers,tags,importance,"
-                "source,provider,model,file_path,expires_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (title, content, category, _json_or_none(tickers), _json_or_none(tags),
-                 importance, source, provider, model, file_path, expires_at, created_at or _now_iso()))
+                f"INSERT INTO agent_memories ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
             conn.commit()
-            return int(cur.lastrowid)
+            return int(id if id is not None else cur.lastrowid)
         except sqlite3.Error as e:
             logger.error("insert_memory failed: %s", e)
             return None
@@ -307,16 +315,19 @@ class AppRecordsLocalStore:
                            provider: Optional[str] = None, model: Optional[str] = None,
                            tools_used: Optional[List[str]] = None, duration_ms: Optional[int] = None,
                            tokens_in: Optional[int] = None, tokens_out: Optional[int] = None,
-                           *, created_at: Optional[str] = None) -> Optional[int]:
+                           *, created_at: Optional[str] = None,
+                           id: Optional[int] = None) -> Optional[int]:
+        cols = "question,answer,provider,model,tools_used,duration_ms,tokens_in,tokens_out,created_at"
+        vals: tuple = (question, answer, provider, model, _json_or_none(tools_used), duration_ms,
+                       tokens_in, tokens_out, created_at or _now_iso())
+        if id is not None:  # id-preserving migration (gate #2)
+            cols, vals = "id," + cols, (id,) + vals
         conn = self._connect()
         try:
             cur = conn.execute(
-                "INSERT INTO agent_queries (question,answer,provider,model,tools_used,duration_ms,"
-                "tokens_in,tokens_out,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                (question, answer, provider, model, _json_or_none(tools_used), duration_ms,
-                 tokens_in, tokens_out, created_at or _now_iso()))
+                f"INSERT INTO agent_queries ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
             conn.commit()
-            return int(cur.lastrowid)
+            return int(id if id is not None else cur.lastrowid)
         except sqlite3.Error as e:
             logger.error("insert_agent_query failed: %s", e)
             return None
@@ -324,9 +335,34 @@ class AppRecordsLocalStore:
             conn.close()
 
     def count_agent_queries(self) -> int:
+        return self.count("agent_queries")
+
+    # --- migration support (1c) -----------------------------------------------------
+
+    MIGRATE_TABLES = ("research_reports", "agent_memories", "agent_queries")
+
+    @property
+    def db_path(self) -> str:
+        return self._db_path
+
+    def count(self, table: str) -> int:
+        if table not in self.MIGRATE_TABLES:
+            raise ValueError(f"unknown table: {table}")
         conn = self._connect()
         try:
-            return int(conn.execute("SELECT COUNT(*) FROM agent_queries").fetchone()[0])
+            return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+        finally:
+            conn.close()
+
+    def raw_rows(self, table: str) -> List[Dict[str, Any]]:
+        """All rows of ``table`` as raw column dicts (for migration hashing / collision guard).
+        Raw means stored representation (tickers/tags as JSON text) — NOT the list-decoded read
+        shape — so a PG source row and the migrated local row hash identically."""
+        if table not in self.MIGRATE_TABLES:
+            raise ValueError(f"unknown table: {table}")
+        conn = self._connect()
+        try:
+            return [dict(r) for r in conn.execute(f"SELECT * FROM {table}").fetchall()]
         finally:
             conn.close()
 

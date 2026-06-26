@@ -248,7 +248,8 @@ def get_report(
     Returns:
         Dict with: title, content, metadata (if from DB)
     """
-    # Get file path from DB if report_id provided
+    # Resolve metadata ONCE (used for both file_path resolution and the result below).
+    meta = None
     _store = get_app_records_store(dal)
     if report_id and hasattr(_store, 'get_report_metadata'):
         try:
@@ -280,14 +281,8 @@ def get_report(
         "content": content,
     }
 
-    # Add DB metadata if available
-    _store = get_app_records_store(dal)
-    if report_id and hasattr(_store, 'get_report_metadata'):
-        try:
-            meta = _store.get_report_metadata(report_id)
-            if meta:
-                result.update(meta)
-        except Exception:
-            pass
+    # Add DB metadata if available (reuse the single lookup above — no second fetch)
+    if meta:
+        result.update(meta)
 
     return result
