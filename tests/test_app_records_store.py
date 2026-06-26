@@ -237,3 +237,14 @@ def test_gate4_on_empty_local_is_honest_no_crash(tmp_path, monkeypatch):
     assert isinstance(memory_tools.recall_memories(dal, query="x"), (list, str))
     got = report_tools.get_report(dal, report_id=999999)          # absent id, pre-migration
     assert got is None or isinstance(got, (dict, str))            # honest, not a crash
+
+
+# --- 1c-api-fix: no-create read semantics -------------------------------------------
+
+def test_create_false_does_not_materialize_db(tmp_path):
+    # fix #1: a create=False store over an ABSENT path must NOT create the file, and reads
+    # return empty — so /migration/preview never materializes profile_state.db.
+    path = tmp_path / "absent.db"
+    s = AppRecordsLocalStore(path, create=False)
+    assert s.count("research_reports") == 0 and s.raw_rows("agent_memories") == []
+    assert not path.exists(), "preview/no-create store must not create the DB file"

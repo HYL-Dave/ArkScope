@@ -29,34 +29,50 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/app-records", tags=["app-records"])
 
 
-def _source_and_local(dal):
+def _source(dal):
     source = PgAppRecordsSource(getattr(dal, "_backend", None))
     if not source.available:
         raise HTTPException(
             status_code=409,
             detail="App-records migration requires a reachable PostgreSQL backend (it reads the "
                    "PG rows). The current DAL has no PG connection.")
-    local = AppRecordsLocalStore(resolve_profile_state_db_path(dal))
-    return source, local
+    return source
+
+
+def _base(dal):
+    return str(getattr(dal, "_base", "") or "") or None
 
 
 @router.get("/migration/preview")
 def migration_preview(dal=Depends(get_dal)):
     """DRY-RUN: per-table PG vs local counts, max ids, conflicts, missing files. Reads PG +
-    local read-only; writes nothing. ``would_apply`` false ⇒ apply would refuse."""
-    source, local = _source_and_local(dal)
-    base = str(getattr(dal, "_base", "") or "") or None
-    return preview_migration(source, local, base=base)
+    local read-only; writes NOTHING (the local store is opened no-create — preview must not
+    materialize profile_state.db). ``would_apply`` false ⇒ apply would refuse."""
+    source = _source(dal)
+    local = AppRecordsLocalStore(resolve_profile_state_db_path(dal), create=False)  # fix #1
+    try:
+        return preview_migration(source, local, base=_base(dal))
+    except HTTPException:
+        raise
+    except Exception as e:  # fix #3: PG connect/SQL error → 409, not an opaque 500
+        logger.warning("app-records migration preview failed: %s", e)
+        raise HTTPException(status_code=409, detail=f"PG read failed: {e}")
 
 
 @router.post("/migration/apply")
 def migration_apply(dal=Depends(get_dal)):
-    """APPLY (explicit, gated): backup profile_state.db → conflict guard → id-preserving inserts.
-    Raises 409 if a same-id-different-content conflict would clobber (nothing is written)."""
+    """APPLY (explicit, gated): backup profile_state.db → conflict guard → ATOMIC id-preserving
+    inserts (all-or-nothing). 409 on a same-id-different-content conflict (nothing written) or
+    when PG is unreadable."""
     require_profile_state_write("migrate_app_records", {})
-    source, local = _source_and_local(dal)
-    base = str(getattr(dal, "_base", "") or "") or None
+    source = _source(dal)
+    local = AppRecordsLocalStore(resolve_profile_state_db_path(dal), create=True)  # apply writes
     try:
-        return apply_migration(source, local, base=base, backup=True)
-    except RuntimeError as e:
+        return apply_migration(source, local, base=_base(dal), backup=True)
+    except HTTPException:
+        raise
+    except RuntimeError as e:        # conflict guard / incomplete-write
         raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:           # fix #3: PG connect/SQL error → 409
+        logger.warning("app-records migration apply failed: %s", e)
+        raise HTTPException(status_code=409, detail=f"migration failed: {e}")

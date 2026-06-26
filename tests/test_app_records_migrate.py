@@ -144,8 +144,9 @@ def test_full_field_difference_is_conflict_not_skip(local):
         apply_migration(_FakePG(reports=[diff]), local, backup=False)
 
 
-def test_apply_raises_on_insert_failure_no_silent_partial(local, monkeypatch):
-    # fix #2: an insert that returns None (sqlite error) or a wrong id must ABORT, not count.
+def test_apply_raises_on_insert_failure_atomic_rollback(local, monkeypatch):
+    # fix #2: an insert that fails mid-batch must ABORT AND roll back the whole batch (atomic —
+    # the already-inserted row 1 must NOT persist), not silently count a partial write.
     src = _FakePG(reports=[_report(1), _report(2)])
     real_insert = local.insert_report
     calls = {"n": 0}
@@ -153,8 +154,9 @@ def test_apply_raises_on_insert_failure_no_silent_partial(local, monkeypatch):
         calls["n"] += 1
         return real_insert(**k) if calls["n"] == 1 else None  # 2nd insert "fails"
     monkeypatch.setattr(local, "insert_report", flaky)
-    with pytest.raises(RuntimeError, match="write failed"):
+    with pytest.raises(RuntimeError, match="returned None"):
         apply_migration(src, local, backup=False)
+    assert local.count("research_reports") == 0   # row 1 rolled back (true all-or-nothing)
 
 
 def test_apply_uses_single_source_snapshot(local):
@@ -263,3 +265,21 @@ def test_route_409_without_pg():
     with pytest.raises(HTTPException) as e:
         routes.migration_preview(dal=_NoPgDal())
     assert e.value.status_code == 409
+
+
+def test_route_pg_error_becomes_409_not_500(tmp_path, monkeypatch):
+    # fix #3: a PG connection/SQL error during preview → 409 (clear), not an opaque 500.
+    import src.api.routes.app_records as routes
+    from fastapi import HTTPException
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+
+    class _BoomBackend:
+        def _get_conn(self): raise RuntimeError("connection refused")
+    class _Dal:
+        _base = str(tmp_path)
+        _backend = _BoomBackend()
+    with pytest.raises(HTTPException) as e:
+        routes.migration_preview(dal=_Dal())
+    assert e.value.status_code == 409 and "PG read failed" in str(e.value.detail)
+    # and the preview must not have created the real profile_state.db
+    assert not (tmp_path / "profile_state.db").exists()

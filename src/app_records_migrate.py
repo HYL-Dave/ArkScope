@@ -234,20 +234,19 @@ def apply_migration(source: Any, local: AppRecordsLocalStore, *, base: Optional[
         backup_made = backup_path or f"{local.db_path}.{suffix}.bak"
         backup_profile_state_db(local.db_path, backup_made)
 
-    result: Dict[str, Any] = {"backup": backup_made, "tables": {}}
+    # Build the FULL insert batch across all tables, then write it in ONE atomic transaction
+    # (fix #2: all-or-nothing — a mid-batch SQLite failure rolls back every row, not just the
+    # current table's). bulk_migrate raises on any failure → nothing partially written.
+    items: List[tuple] = []
+    per_table_inserted: Dict[str, int] = {}
     for table, _fetch, insert_name, _fc in _PLAN:
         to_insert = set(preview["tables"][table]["to_insert"])   # from the snapshot classify
-        insert: Callable = getattr(local, insert_name)
-        inserted = 0
-        for row in snapshot[table]:
-            rid = int(row["id"])
-            if rid in to_insert:
-                new_id = insert(**_insert_kwargs(table, row))
-                if new_id != rid:                       # fix #2: no silent partial write
-                    raise RuntimeError(
-                        f"migration write failed for {table} id={rid}: insert returned {new_id!r} "
-                        f"(precious data — aborting; profile_state.db backup at {backup_made})")
-                inserted += 1
-        result["tables"][table] = {"inserted": inserted,
-                                   "skipped": len(preview["tables"][table]["idempotent_skip"])}
-    return result
+        rows = [r for r in snapshot[table] if int(r["id"]) in to_insert]
+        per_table_inserted[table] = len(rows)
+        items += [(insert_name, _insert_kwargs(table, r)) for r in rows]
+
+    local.bulk_migrate(items)   # atomic: raises (and rolls back) on any failure → no partial write
+
+    return {"backup": backup_made, "tables": {
+        t: {"inserted": per_table_inserted[t],
+            "skipped": len(preview["tables"][t]["idempotent_skip"])} for t, *_ in _PLAN}}

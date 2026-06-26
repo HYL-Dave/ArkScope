@@ -125,9 +125,10 @@ def _list(v: Any) -> List[str]:
 class AppRecordsLocalStore:
     """SQLite app-records store over ``profile_state.db`` (local-primary; no PG)."""
 
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path, *, create: bool = True):
         self._db_path = str(db_path)
-        self._ensure_schema()
+        if create:  # create=False → no-create read-only view (preview must not materialize the DB)
+            self._ensure_schema()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, timeout=10.0)
@@ -148,6 +149,29 @@ class AppRecordsLocalStore:
         base = date.fromisoformat(today) if today else datetime.now(timezone.utc).date()
         return (base - timedelta(days=days)).isoformat()
 
+    def _exec_insert(self, table: str, cols: str, vals: tuple, id: Optional[int],
+                     conn: Optional[sqlite3.Connection]) -> Optional[int]:
+        """Run one INSERT. ``conn`` None → self-manage (open/commit/close, return None on error,
+        current standalone behavior). ``conn`` provided → join the caller's transaction (no
+        commit/close) and RAISE on error so bulk_migrate rolls the whole batch back (precious
+        data: no silent partial)."""
+        own = conn is None
+        c = conn or self._connect()
+        try:
+            cur = c.execute(
+                f"INSERT INTO {table} ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
+            if own:
+                c.commit()
+            return int(id if id is not None else cur.lastrowid)
+        except sqlite3.Error as e:
+            if own:
+                logger.error("insert into %s failed: %s", table, e)
+                return None
+            raise
+        finally:
+            if own:
+                c.close()
+
     # --- reports --------------------------------------------------------------------
 
     def insert_report(self, title: str, tickers: List[str], report_type: str, summary: str,
@@ -156,8 +180,8 @@ class AppRecordsLocalStore:
                       file_path: Optional[str] = None, tools_used: Optional[List[str]] = None,
                       tool_calls: Optional[int] = None, duration_seconds: Optional[float] = None,
                       tokens_in: Optional[int] = None, tokens_out: Optional[int] = None,
-                      *, created_at: Optional[str] = None,
-                      id: Optional[int] = None) -> Optional[int]:
+                      *, created_at: Optional[str] = None, id: Optional[int] = None,
+                      conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
         cols = ("title,tickers,report_type,summary,conclusion,confidence,provider,model,"
                 "file_path,tools_used,tool_calls,duration_seconds,tokens_in,tokens_out,created_at")
         vals: tuple = (title, _json_or_none(tickers), report_type, summary, conclusion, confidence,
@@ -165,17 +189,7 @@ class AppRecordsLocalStore:
                        duration_seconds, tokens_in, tokens_out, created_at or _now_iso())
         if id is not None:  # id-preserving (PG→local migration, gate #2)
             cols, vals = "id," + cols, (id,) + vals
-        conn = self._connect()
-        try:
-            cur = conn.execute(
-                f"INSERT INTO research_reports ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
-            conn.commit()
-            return int(id if id is not None else cur.lastrowid)
-        except sqlite3.Error as e:
-            logger.error("insert_report failed: %s", e)
-            return None
-        finally:
-            conn.close()
+        return self._exec_insert("research_reports", cols, vals, id, conn)
 
     def query_reports(self, ticker: Optional[str] = None, days: int = 30,
                       report_type: Optional[str] = None, limit: int = 20,
@@ -222,8 +236,8 @@ class AppRecordsLocalStore:
                       importance: int = 5, source: Optional[str] = None,
                       provider: Optional[str] = None, model: Optional[str] = None,
                       file_path: Optional[str] = None, expires_at: Optional[str] = None,
-                      *, created_at: Optional[str] = None,
-                      id: Optional[int] = None) -> Optional[int]:
+                      *, created_at: Optional[str] = None, id: Optional[int] = None,
+                      conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
         cols = ("title,content,category,tickers,tags,importance,source,provider,model,"
                 "file_path,expires_at,created_at")
         vals: tuple = (title, content, category, _json_or_none(tickers), _json_or_none(tags),
@@ -231,17 +245,7 @@ class AppRecordsLocalStore:
                        created_at or _now_iso())
         if id is not None:  # id-preserving migration (gate #2)
             cols, vals = "id," + cols, (id,) + vals
-        conn = self._connect()
-        try:
-            cur = conn.execute(
-                f"INSERT INTO agent_memories ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
-            conn.commit()
-            return int(id if id is not None else cur.lastrowid)
-        except sqlite3.Error as e:
-            logger.error("insert_memory failed: %s", e)
-            return None
-        finally:
-            conn.close()
+        return self._exec_insert("agent_memories", cols, vals, id, conn)
 
     def query_memories(self, query: str = "", category: Optional[str] = None,
                        tickers: Optional[List[str]] = None, tags: Optional[List[str]] = None,
@@ -315,24 +319,14 @@ class AppRecordsLocalStore:
                            provider: Optional[str] = None, model: Optional[str] = None,
                            tools_used: Optional[List[str]] = None, duration_ms: Optional[int] = None,
                            tokens_in: Optional[int] = None, tokens_out: Optional[int] = None,
-                           *, created_at: Optional[str] = None,
-                           id: Optional[int] = None) -> Optional[int]:
+                           *, created_at: Optional[str] = None, id: Optional[int] = None,
+                           conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
         cols = "question,answer,provider,model,tools_used,duration_ms,tokens_in,tokens_out,created_at"
         vals: tuple = (question, answer, provider, model, _json_or_none(tools_used), duration_ms,
                        tokens_in, tokens_out, created_at or _now_iso())
         if id is not None:  # id-preserving migration (gate #2)
             cols, vals = "id," + cols, (id,) + vals
-        conn = self._connect()
-        try:
-            cur = conn.execute(
-                f"INSERT INTO agent_queries ({cols}) VALUES ({','.join('?' * len(vals))})", vals)
-            conn.commit()
-            return int(id if id is not None else cur.lastrowid)
-        except sqlite3.Error as e:
-            logger.error("insert_agent_query failed: %s", e)
-            return None
-        finally:
-            conn.close()
+        return self._exec_insert("agent_queries", cols, vals, id, conn)
 
     def count_agent_queries(self) -> int:
         return self.count("agent_queries")
@@ -345,24 +339,62 @@ class AppRecordsLocalStore:
     def db_path(self) -> str:
         return self._db_path
 
+    def _ro_conn(self) -> Optional[sqlite3.Connection]:
+        """Read-only connection that does NOT create the file (mode=ro). None if the DB is
+        absent — so count/raw_rows are no-create-safe (preview must not materialize the DB)."""
+        if not Path(self._db_path).exists():
+            return None
+        conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        return conn
+
     def count(self, table: str) -> int:
         if table not in self.MIGRATE_TABLES:
             raise ValueError(f"unknown table: {table}")
-        conn = self._connect()
+        conn = self._ro_conn()
+        if conn is None:
+            return 0
         try:
             return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+        except sqlite3.OperationalError:
+            return 0  # table absent in a partial/uncreated DB
         finally:
             conn.close()
 
     def raw_rows(self, table: str) -> List[Dict[str, Any]]:
         """All rows of ``table`` as raw column dicts (for migration hashing / collision guard).
         Raw means stored representation (tickers/tags as JSON text) — NOT the list-decoded read
-        shape — so a PG source row and the migrated local row hash identically."""
+        shape — so a PG source row and the migrated local row hash identically. No-create-safe:
+        absent DB or table → [] (never materializes the file)."""
         if table not in self.MIGRATE_TABLES:
             raise ValueError(f"unknown table: {table}")
-        conn = self._connect()
+        conn = self._ro_conn()
+        if conn is None:
+            return []
         try:
             return [dict(r) for r in conn.execute(f"SELECT * FROM {table}").fetchall()]
+        except sqlite3.OperationalError:
+            return []
+        finally:
+            conn.close()
+
+    def bulk_migrate(self, items: List[tuple]) -> List[int]:
+        """Atomic id-preserving migration insert — ALL rows in ONE transaction (precious data:
+        all-or-nothing). Any insert failure rolls the whole batch back and re-raises (no silent
+        partial write). ``items`` = list of ``(insert_method_name, kwargs)``; returns the ids."""
+        conn = self._connect()
+        ids: List[int] = []
+        try:
+            for method_name, kw in items:
+                new_id = getattr(self, method_name)(conn=conn, **kw)
+                if new_id is None:   # belt-and-suspenders: raise BEFORE commit → atomic rollback
+                    raise RuntimeError(f"{method_name} returned None for id={kw.get('id')}")
+                ids.append(new_id)
+            conn.commit()
+            return ids
+        except Exception:
+            conn.rollback()   # any failure → whole batch rolled back (nothing partially written)
+            raise
         finally:
             conn.close()
 
