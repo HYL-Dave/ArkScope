@@ -223,6 +223,20 @@ def _store():
     return get_profile_store()
 
 
+# v1.2: durable per-source scheduler state in profile_state.db (recoverable + visible-failure).
+# Cached singleton; best-effort everywhere (a store error must never break collection).
+_SCHED_STATE = None
+
+
+def _state_store():
+    global _SCHED_STATE
+    if _SCHED_STATE is None:
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.scheduler_state import SchedulerStateStore
+        _SCHED_STATE = SchedulerStateStore(resolve_profile_state_db_path(None))
+    return _SCHED_STATE
+
+
 def source_config(source: str) -> Dict[str, Any]:
     d = SOURCES[source]
     store = _store()
@@ -330,6 +344,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started
     try:
+        _state_store().record_attempt(source, started)   # v1.2: durable last_attempt (best-effort)
+    except Exception:  # noqa: BLE001 — local state must never break collection
+        logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
+    try:
         if d.ibkr:
             ibkr_held = _IBKR_LOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_held:
@@ -436,6 +454,15 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             logger.warning(f"scheduler source {source} failed: {error}")
 
         result["status"] = "succeeded" if ok else "failed"
+        # v1.2: durable LOCAL outcome (recoverable + visible-failure), best-effort. This is the
+        # REAL run outcome (skips return earlier via _record_result and are not persisted here).
+        # error=None on success clears any stale last_error. PG job_runs (below) is unchanged —
+        # 'partial' (v1.3) lives only in this local store, never forced into job_runs' enum.
+        try:
+            _state_store().record_outcome(source, status=result["status"], error=error,
+                                          result=result)
+        except Exception:  # noqa: BLE001 — local state must never break collection
+            logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
         if store is not None and run_id is not None:
             try:
                 store.finish_run(run_id, status="succeeded" if ok else "failed",
@@ -481,13 +508,23 @@ def _pg_reachable(timeout: float = 3.0) -> bool:
 
 
 def _seed_last_attempts() -> None:
-    """Continuity across restarts: seed last-attempt from job_runs (scheduler runs
-    AND manual daily_update step runs via the alias map). STRICTLY best-effort:
-    bounded by the TCP probe above + the wait_for in scheduler_loop — losing the
-    seed only means a source may fire one interval early after a restart."""
+    """Continuity across restarts: seed last-attempt from the LOCAL scheduler_state store first
+    (v1.2 — works PG-unreachable), then SUPPLEMENT from PG job_runs for any source without local
+    state (transition continuity + manual daily_update runs via the alias map). STRICTLY
+    best-effort: losing the seed only means a source may fire one interval early after a restart."""
+    # 1. local-primary seed (no PG needed)
+    try:
+        for source, ts in _state_store().last_attempts().items():
+            if source in SOURCES:
+                with _LAST_ATTEMPT_LOCK:
+                    _LAST_ATTEMPT[source] = ts
+    except Exception as e:  # noqa: BLE001 — local seed best-effort
+        logger.debug(f"scheduler local seed skipped: {e}")
+
+    # 2. PG supplement (optional, only for sources still missing a local last_attempt)
     if not _pg_reachable():
-        logger.info("scheduler seed skipped: PG unreachable (starting without "
-                    "last-attempt continuity)")
+        logger.info("scheduler PG seed skipped: PG unreachable (local state used; "
+                    "any source without local state may fire one interval early)")
         return
     try:
         from src.api.dependencies import get_dal
@@ -495,9 +532,12 @@ def _seed_last_attempts() -> None:
 
         latest = JobRunsStore(get_dal()).latest_runs_by_name()
     except Exception as e:  # noqa: BLE001
-        logger.debug(f"scheduler seed skipped: {e}")
+        logger.debug(f"scheduler PG seed skipped: {e}")
         return
     for source in SOURCES:
+        with _LAST_ATTEMPT_LOCK:
+            if source in _LAST_ATTEMPT:
+                continue  # local state already covers it — PG is only a supplement
         candidates = []
         for name in (job_name(source), _DAILY_UPDATE_ALIAS.get(source)):
             row = latest.get(name) if name else None

@@ -22,6 +22,10 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
+    # v1.2: isolate the durable scheduler-state store to a per-test DB (never the real
+    # profile_state.db) and reset the cached singleton so it rebuilds against this tmp path.
+    from src.scheduler_state import SchedulerStateStore
+    monkeypatch.setattr(ds, "_SCHED_STATE", SchedulerStateStore(tmp_path / "profile_state.db"))
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
     # (a live sidecar's flocks would make these tests skip spuriously, and vice versa)
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
@@ -506,3 +510,61 @@ def test_price_backfill_empty_scope_fails_loud(monkeypatch):
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
     res = ds.run_source("price_backfill")
     assert res["status"] == "failed" and "scope" in res["error"]
+
+
+# --- v1.2: durable scheduler_state persistence ------------------------------------
+
+def test_run_source_persists_attempt_and_outcome_to_local_state(monkeypatch):
+    # a real run_source records last_attempt + the succeeded outcome in the LOCAL state store
+    # (recoverable + visible-failure), independently of PG telemetry.
+    import scripts.collection.collect_polygon_news as cpn
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
+    ds.run_source("polygon_news", trigger_source="api")
+    row = ds._state_store().get("polygon_news")
+    assert row is not None
+    assert row["last_status"] == "succeeded" and row["last_error"] is None
+    assert row["last_attempt"] is not None
+    assert row["last_result"]["status"] == "succeeded"
+
+
+def test_run_source_failure_persists_error_locally(monkeypatch):
+    import scripts.collection.collect_polygon_news as cpn
+    def _boom(*a, **k):
+        raise RuntimeError("provider exploded")
+    monkeypatch.setattr(cpn, "run_incremental", _boom)
+    res = ds.run_source("polygon_news", trigger_source="api")
+    assert res["status"] == "failed"
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "failed" and "provider exploded" in row["last_error"]
+
+
+def test_skip_does_not_overwrite_durable_outcome(monkeypatch):
+    # a real failure is recorded; a later in-process SKIP (per-source lock busy) must NOT clobber
+    # the durable last_error (skips aren't persisted to the state store).
+    import scripts.collection.collect_polygon_news as cpn
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("real failure")))
+    ds.run_source("polygon_news")
+    assert ds._state_store().get("polygon_news")["last_error"] == "real failure"[:200] or \
+        "real failure" in ds._state_store().get("polygon_news")["last_error"]
+    # now force a skip: hold the per-source lock so run_source returns 'already running'
+    ds._SOURCE_LOCKS["polygon_news"].acquire()
+    try:
+        skip = ds.run_source("polygon_news")
+        assert skip["status"] == "skipped"
+    finally:
+        ds._SOURCE_LOCKS["polygon_news"].release()
+    # durable failure still visible (skip not persisted)
+    assert "real failure" in ds._state_store().get("polygon_news")["last_error"]
+
+
+def test_seed_last_attempts_from_local_state(monkeypatch):
+    # seed continuity from the LOCAL store (no PG): a recorded attempt seeds _LAST_ATTEMPT.
+    from datetime import datetime, timezone
+    when = datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc)
+    ds._state_store().record_attempt("polygon_news", when)
+    monkeypatch.setattr(ds, "_pg_reachable", lambda timeout=3.0: False)  # PG down → local only
+    monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
+    ds._seed_last_attempts()
+    assert ds._LAST_ATTEMPT.get("polygon_news") == when
