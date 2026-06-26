@@ -342,11 +342,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     ibkr_flock_held = False
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
-        _LAST_ATTEMPT[source] = started
-    try:
-        _state_store().record_attempt(source, started)   # v1.2: durable last_attempt (best-effort)
-    except Exception:  # noqa: BLE001 — local state must never break collection
-        logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
+        _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
     try:
         if d.ibkr:
             ibkr_held = _IBKR_LOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
@@ -359,6 +355,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 return _record_result(
                     {"source": source, "status": "skipped",
                      "reason": "IBKR gateway busy in another process (lock timeout)"})
+
+        # v1.2 (v1.2a fix): durable run-start recorded ONLY after all skip-only gates pass
+        # (per-source + IBKR locks). A lock-busy skip returns above WITHOUT marking durable
+        # 'running' — so a skip never overwrites the prior durable outcome (last_status/error).
+        try:
+            _state_store().record_attempt(source, started)
+        except Exception:  # noqa: BLE001 — local state must never break collection
+            logger.debug("scheduler_state record_attempt failed for %s", source, exc_info=True)
 
         # telemetry: running → terminal, visible in /jobs + provider health
         store = None

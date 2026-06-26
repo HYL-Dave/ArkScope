@@ -568,3 +568,24 @@ def test_seed_last_attempts_from_local_state(monkeypatch):
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     ds._seed_last_attempts()
     assert ds._LAST_ATTEMPT.get("polygon_news") == when
+
+
+def test_ibkr_lock_skip_does_not_leave_durable_running(monkeypatch):
+    # v1.2a HIGH fix: record_attempt is AFTER the IBKR-lock gate. A prior failure is durable;
+    # then an IBKR-busy skip must NOT overwrite it with 'running' (skips don't touch durable state).
+    # Seed a prior failed outcome on an IBKR source (price_backfill).
+    ds._state_store().record_attempt("price_backfill",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome("price_backfill", status="failed",
+                                     error="earlier gateway failure", result={"e": 1})
+    # hold the shared IBKR lock so run_source skips at the gate (before record_attempt).
+    assert ds._IBKR_LOCK.acquire(timeout=2)
+    monkeypatch.setattr(ds, "_IBKR_LOCK_TIMEOUT_S", 0.05)   # fast skip, no 1800s wait
+    try:
+        res = ds.run_source("price_backfill")
+        assert res["status"] == "skipped" and "IBKR gateway busy" in res["reason"]
+    finally:
+        ds._IBKR_LOCK.release()
+    row = ds._state_store().get("price_backfill")
+    assert row["last_status"] == "failed"            # NOT 'running' — skip didn't clobber it
+    assert row["last_error"] == "earlier gateway failure"
