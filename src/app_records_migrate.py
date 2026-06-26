@@ -52,6 +52,50 @@ _MIGRATED_COLS = {
 _JSON_ARRAY_COLS = {"tickers", "tags", "tools_used"}
 
 
+_CREATED_AT_SQL = "TO_CHAR(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS created_at"
+
+# Per-table SELECT — created_at (and memories.expires_at) rendered to the local ISO shape so
+# source rows fingerprint identically to migrated local rows. tickers/tags (TEXT[]) and
+# tools_used (JSONB) come back as Python lists from psycopg2; the migrator's _list tolerates that.
+_PG_SELECT = {
+    "research_reports": (
+        "SELECT id, title, tickers, report_type, summary, conclusion, confidence, provider, "
+        f"model, file_path, tools_used, tool_calls, duration_seconds, tokens_in, tokens_out, "
+        f"{_CREATED_AT_SQL} FROM research_reports"),
+    "agent_memories": (
+        "SELECT id, title, content, category, tickers, tags, source, provider, model, importance, "
+        "file_path, TO_CHAR(expires_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') AS expires_at, "
+        f"{_CREATED_AT_SQL} FROM agent_memories"),
+    "agent_queries": (
+        "SELECT id, question, answer, provider, model, tools_used, duration_ms, tokens_in, "
+        f"tokens_out, {_CREATED_AT_SQL} FROM agent_queries"),
+}
+
+
+class PgAppRecordsSource:
+    """Live PG read side for the migration (1c-live). Raw full-table SELECTs via the DAL backend's
+    ``_get_conn`` (psycopg2 lazy-imported so the offline migrator core stays PG-free). Read-only —
+    no writes to PG. ``available`` is False unless the backend exposes ``_get_conn`` (PG)."""
+
+    def __init__(self, backend: Any):
+        self._backend = backend
+
+    @property
+    def available(self) -> bool:
+        return self._backend is not None and hasattr(self._backend, "_get_conn")
+
+    def _rows(self, table: str) -> List[Dict[str, Any]]:
+        from psycopg2.extras import RealDictCursor  # lazy: keeps the core import PG-free
+        conn = self._backend._get_conn()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(_PG_SELECT[table])
+            return [dict(r) for r in cur.fetchall()]
+
+    def fetch_reports(self): return self._rows("research_reports")
+    def fetch_memories(self): return self._rows("agent_memories")
+    def fetch_agent_queries(self): return self._rows("agent_queries")
+
+
 def _content_hash(table: str, row: Dict[str, Any]) -> str:
     """Stable hash over ALL migrated columns (normalized) — full same-content check."""
     norm = {c: (_list(row.get(c)) if c in _JSON_ARRAY_COLS else row.get(c))

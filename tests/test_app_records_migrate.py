@@ -173,3 +173,93 @@ def test_apply_uses_single_source_snapshot(local):
     assert src.report_fetches == 1                       # snapshot: fetched once, not per-phase
     assert res["tables"]["research_reports"]["inserted"] == 1
     assert local.count("research_reports") == 1          # only the snapshot's single row
+
+
+# --- 1c-api: PgAppRecordsSource (fake conn) + routes (direct handler) ----------------
+
+class _FakeCursor:
+    def __init__(self, rows): self._rows = rows
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def execute(self, sql): self._sql = sql
+    def fetchall(self): return self._rows
+
+class _FakeConn:
+    def __init__(self, rows_by_sql): self._rows_by_sql = rows_by_sql
+    def cursor(self, cursor_factory=None):
+        # pick rows by which table the SQL hits
+        for key, rows in self._rows_by_sql.items():
+            if key in self._last_sql_table:
+                return _FakeCursor(rows)
+        return _FakeCursor([])
+    # crude: route by table name in the SELECT
+    def cursor(self, cursor_factory=None):  # noqa: F811
+        return _TableCursor(self._rows_by_sql)
+
+class _TableCursor:
+    def __init__(self, rows_by_table): self._rows_by_table = rows_by_table; self._rows = []
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def execute(self, sql):
+        for tbl, rows in self._rows_by_table.items():
+            if f"FROM {tbl}" in sql:
+                self._rows = rows; return
+        self._rows = []
+    def fetchall(self): return self._rows
+
+class _FakePgBackend:
+    def __init__(self, rows_by_table): self._rows_by_table = rows_by_table
+    def _get_conn(self): return _FakeConn(self._rows_by_table)
+
+
+def test_pg_source_maps_tables(monkeypatch):
+    from src.app_records_migrate import PgAppRecordsSource
+    monkeypatch.setitem(__import__("sys").modules, "psycopg2.extras",
+                        type("M", (), {"RealDictCursor": object})())
+    be = _FakePgBackend({
+        "research_reports": [{"id": 1, "title": "r"}],
+        "agent_memories": [{"id": 2, "title": "m"}],
+        "agent_queries": [{"id": 3, "question": "q"}],
+    })
+    src = PgAppRecordsSource(be)
+    assert src.available is True
+    assert src.fetch_reports()[0]["id"] == 1
+    assert src.fetch_memories()[0]["id"] == 2
+    assert src.fetch_agent_queries()[0]["id"] == 3
+
+
+def test_pg_source_unavailable_without_get_conn():
+    from src.app_records_migrate import PgAppRecordsSource
+    assert PgAppRecordsSource(object()).available is False
+    assert PgAppRecordsSource(None).available is False
+
+
+def test_route_preview_and_apply(tmp_path, monkeypatch):
+    import src.api.routes.app_records as routes
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+
+    class _Dal:
+        _base = str(tmp_path)
+        _backend = _FakePgBackend({
+            "research_reports": [dict(_report(1), tickers=["AFRM"], tools_used=["t"])],
+            "agent_memories": [], "agent_queries": [],
+        })
+    dal = _Dal()
+    prev = routes.migration_preview(dal=dal)
+    assert prev["would_apply"] is True
+    assert prev["tables"]["research_reports"]["pg_count"] == 1
+    applied = routes.migration_apply(dal=dal)
+    assert applied["tables"]["research_reports"]["inserted"] == 1
+    assert AppRecordsLocalStore(tmp_path / "profile_state.db").get_report_metadata(1)["id"] == 1
+
+
+def test_route_409_without_pg():
+    import src.api.routes.app_records as routes
+    from fastapi import HTTPException
+    class _NoPgDal:
+        _base = None
+        _backend = object()  # no _get_conn
+    with pytest.raises(HTTPException) as e:
+        routes.migration_preview(dal=_NoPgDal())
+    assert e.value.status_code == 409
