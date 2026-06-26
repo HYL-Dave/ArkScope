@@ -127,3 +127,49 @@ def test_migrator_scope_excludes_signals():
     tables = {p[0] for p in mig._PLAN}
     assert tables == {"research_reports", "agent_memories", "agent_queries"}
     assert "signals" not in tables
+
+
+# --- 1c-core-fix regression tests ---------------------------------------------------
+
+def test_full_field_difference_is_conflict_not_skip(local):
+    # fix #1: same id + same title/created/summary/conclusion/file_path but DIFFERENT
+    # provider/model/tokens → must be a CONFLICT (the old 5-field hash falsely skipped it).
+    apply_migration(_FakePG(reports=[_report(1)]), local, backup=False)
+    base = _report(1)  # identical hash-subset fields...
+    diff = {**base, "provider": "openai", "model": "gpt-5.4", "tokens_in": 9999, "confidence": 0.1}
+    prev = preview_migration(_FakePG(reports=[diff]), local)
+    assert prev["tables"]["research_reports"]["conflicts"] == [1]   # caught now
+    assert prev["would_apply"] is False
+    with pytest.raises(RuntimeError, match="conflict"):
+        apply_migration(_FakePG(reports=[diff]), local, backup=False)
+
+
+def test_apply_raises_on_insert_failure_no_silent_partial(local, monkeypatch):
+    # fix #2: an insert that returns None (sqlite error) or a wrong id must ABORT, not count.
+    src = _FakePG(reports=[_report(1), _report(2)])
+    real_insert = local.insert_report
+    calls = {"n": 0}
+    def flaky(**k):
+        calls["n"] += 1
+        return real_insert(**k) if calls["n"] == 1 else None  # 2nd insert "fails"
+    monkeypatch.setattr(local, "insert_report", flaky)
+    with pytest.raises(RuntimeError, match="write failed"):
+        apply_migration(src, local, backup=False)
+
+
+def test_apply_uses_single_source_snapshot(local):
+    # fix #3: a source whose fetch returns different rows each call must not skew apply —
+    # apply reads the source ONCE. Track fetch counts.
+    class _MutatingPG:
+        def __init__(self):
+            self.report_fetches = 0
+        def fetch_reports(self):
+            self.report_fetches += 1
+            return [_report(1)] if self.report_fetches == 1 else [_report(1), _report(2)]
+        def fetch_memories(self): return []
+        def fetch_agent_queries(self): return []
+    src = _MutatingPG()
+    res = apply_migration(src, local, backup=False)
+    assert src.report_fetches == 1                       # snapshot: fetched once, not per-phase
+    assert res["tables"]["research_reports"]["inserted"] == 1
+    assert local.count("research_reports") == 1          # only the snapshot's single row

@@ -19,12 +19,13 @@ JSON text so they hash identically to the migrated local rows):
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import sqlite3
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.app_records_store import AppRecordsLocalStore
+from src.app_records_store import AppRecordsLocalStore, _list
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +36,28 @@ _PLAN = [
     ("agent_queries", "fetch_agent_queries", "insert_agent_query", None),
 ]
 
-# Stable identity-vs-content fields per table: enough to tell "same row re-migrated"
-# (idempotent skip) from "a DIFFERENT row already sits at this id" (hard fail).
-_HASH_FIELDS = {
-    "research_reports": ["title", "created_at", "summary", "conclusion", "file_path"],
-    "agent_memories": ["title", "created_at", "content", "category"],
-    "agent_queries": ["question", "created_at", "answer"],
+# EVERY migrated column per table (id excluded — it's the key, not content). The content
+# fingerprint covers ALL of these so "same id, different ANY field" is a conflict, not a false
+# idempotent-skip (1c-core-fix #1). JSON-array columns are canonicalized via _list so a source
+# row (JSON text or list) and the migrated local raw row (JSON text) fingerprint identically.
+_MIGRATED_COLS = {
+    "research_reports": ["title", "tickers", "report_type", "summary", "conclusion", "confidence",
+                         "provider", "model", "file_path", "tools_used", "tool_calls",
+                         "duration_seconds", "tokens_in", "tokens_out", "created_at"],
+    "agent_memories": ["title", "content", "category", "tickers", "tags", "source", "provider",
+                       "model", "importance", "file_path", "expires_at", "created_at"],
+    "agent_queries": ["question", "answer", "provider", "model", "tools_used", "duration_ms",
+                      "tokens_in", "tokens_out", "created_at"],
 }
+_JSON_ARRAY_COLS = {"tickers", "tags", "tools_used"}
 
 
 def _content_hash(table: str, row: Dict[str, Any]) -> str:
-    raw = "|".join("" if row.get(f) is None else str(row.get(f)) for f in _HASH_FIELDS[table])
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    """Stable hash over ALL migrated columns (normalized) — full same-content check."""
+    norm = {c: (_list(row.get(c)) if c in _JSON_ARRAY_COLS else row.get(c))
+            for c in _MIGRATED_COLS[table]}
+    return hashlib.sha256(
+        json.dumps(norm, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 def _insert_kwargs(table: str, row: Dict[str, Any]) -> Dict[str, Any]:
@@ -114,21 +125,32 @@ def _missing_files(table: str, file_col: Optional[str], source_rows: List[Dict],
     return out
 
 
-def preview_migration(source: Any, local: AppRecordsLocalStore,
-                      *, base: Optional[str] = None) -> Dict[str, Any]:
-    """DRY-RUN (gate #5): classify every PG row against the local store, surface counts, max ids,
-    conflicts, and missing markdown files. NO writes. ``would_apply`` is False iff any table has a
-    same-id-different-content conflict (apply would refuse)."""
+def _snapshot(source: Any) -> Dict[str, List[Dict]]:
+    """Fetch every table from the source ONCE (1c-core-fix #3). preview and apply both work off
+    this single snapshot so a live PG that changes between the two can't cause a preview/apply
+    skew (and the source is read once, not per-phase)."""
+    return {table: list(getattr(source, fetch)()) for table, fetch, _i, _f in _PLAN}
+
+
+def _preview_from_snapshot(snapshot: Dict[str, List[Dict]], local: AppRecordsLocalStore,
+                           base: Optional[str]) -> Dict[str, Any]:
     tables: Dict[str, Any] = {}
     any_conflict = False
-    for table, fetch, _insert, file_col in _PLAN:
-        source_rows = list(getattr(source, fetch)())
-        local_rows = local.raw_rows(table)
-        cls = _classify(table, source_rows, local_rows)
+    for table, _fetch, _insert, file_col in _PLAN:
+        source_rows = snapshot[table]
+        cls = _classify(table, source_rows, local.raw_rows(table))
         cls["missing_files"] = _missing_files(table, file_col, source_rows, base)
         any_conflict = any_conflict or bool(cls["conflicts"])
         tables[table] = cls
     return {"tables": tables, "would_apply": not any_conflict}
+
+
+def preview_migration(source: Any, local: AppRecordsLocalStore,
+                      *, base: Optional[str] = None) -> Dict[str, Any]:
+    """DRY-RUN (gate #5): classify every PG row against the local store, surface counts, max ids,
+    conflicts, and missing markdown files. NO writes. ``would_apply`` is False iff any table has a
+    same-id-different-content conflict (apply would refuse). Source read once via a snapshot."""
+    return _preview_from_snapshot(_snapshot(source), local, base)
 
 
 def backup_profile_state_db(db_path: str, dest: str) -> Optional[str]:
@@ -156,7 +178,8 @@ def apply_migration(source: Any, local: AppRecordsLocalStore, *, base: Optional[
 
     ``now_stamp`` names the backup file deterministically (the runtime can't call now() inside a
     workflow); defaults to a fixed suffix when omitted."""
-    preview = preview_migration(source, local, base=base)
+    snapshot = _snapshot(source)                       # fix #3: read source ONCE
+    preview = _preview_from_snapshot(snapshot, local, base)
     if not preview["would_apply"]:
         blocked = {t: c["conflicts"] for t, c in preview["tables"].items() if c["conflicts"]}
         raise RuntimeError(f"migration refused — same-id-different-content conflicts: {blocked}")
@@ -168,15 +191,19 @@ def apply_migration(source: Any, local: AppRecordsLocalStore, *, base: Optional[
         backup_profile_state_db(local.db_path, backup_made)
 
     result: Dict[str, Any] = {"backup": backup_made, "tables": {}}
-    for table, fetch, insert_name, _fc in _PLAN:
-        source_rows = list(getattr(source, fetch)())
-        cls = _classify(table, source_rows, local.raw_rows(table))
-        to_insert = set(cls["to_insert"])
+    for table, _fetch, insert_name, _fc in _PLAN:
+        to_insert = set(preview["tables"][table]["to_insert"])   # from the snapshot classify
         insert: Callable = getattr(local, insert_name)
         inserted = 0
-        for row in source_rows:
-            if int(row["id"]) in to_insert:
-                insert(**_insert_kwargs(table, row))
+        for row in snapshot[table]:
+            rid = int(row["id"])
+            if rid in to_insert:
+                new_id = insert(**_insert_kwargs(table, row))
+                if new_id != rid:                       # fix #2: no silent partial write
+                    raise RuntimeError(
+                        f"migration write failed for {table} id={rid}: insert returned {new_id!r} "
+                        f"(precious data — aborting; profile_state.db backup at {backup_made})")
                 inserted += 1
-        result["tables"][table] = {"inserted": inserted, "skipped": len(cls["idempotent_skip"])}
+        result["tables"][table] = {"inserted": inserted,
+                                   "skipped": len(preview["tables"][table]["idempotent_skip"])}
     return result
