@@ -92,6 +92,11 @@ class SourceDef:
     # code, with zero logic duplication. IBKR sources deliberately STAY subprocess:
     # process isolation is a feature there (ib_insync asyncio + client-id hygiene).
     adapter: Optional[tuple] = None
+    # v1.3: gap-aware planning. When True, the adapter run computes scope from the
+    # trading-day coverage diagnostic (planner) instead of the full universe — bounded
+    # tickers + a window that reaches the oldest gap; a budget-bounded run finishes
+    # `partial` with a saved continuation. Today only price_backfill.
+    gap_planned: bool = False
 
 
 SOURCES: Dict[str, SourceDef] = {
@@ -138,6 +143,7 @@ SOURCES: Dict[str, SourceDef] = {
             "price_backfill", "本地價格直連補抓",
             None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
             adapter=("src.market_data_direct", "backfill_prices_direct"),
+            gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
             description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
                         "trading-day gaps for the active universe. sync_flag=None → no PG "
                         "sync AND no _local_refresh (it writes the local DB itself).",
@@ -235,6 +241,45 @@ def _state_store():
         from src.scheduler_state import SchedulerStateStore
         _SCHED_STATE = SchedulerStateStore(resolve_profile_state_db_path(None))
     return _SCHED_STATE
+
+
+# v1.3 gap-aware price_backfill budget (env/profile-overridable later; bounded defaults now).
+_BACKFILL_MAX_TICKERS = 30
+_BACKFILL_MAX_DAYS = 30
+
+
+def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
+    """Gap-aware scope for price_backfill: read local trading-day coverage and plan a bounded
+    (tickers, lookback_days) set. GATE 1: coverage is queried with lookback_days =
+    _BACKFILL_MAX_DAYS (== the planner's max_days), so every SELECTED gap is reachable by the
+    executor's window top-up. GATE 2: coverage['provider_errors'] (LC-style unresolvable tickers)
+    feed exclude_tickers, so they never re-enter scheduled work. Read-only (planner is pure).
+    ``today``/``now_et`` are passed through to the coverage oracle (default: real now)."""
+    from src.market_data_direct import summarize_trading_day_coverage
+    from src.scheduler_planner import plan_price_backfill
+
+    cov = summarize_trading_day_coverage(scope, interval="15min",
+                                         lookback_days=_BACKFILL_MAX_DAYS,
+                                         today=today, now_et=now_et)
+    days = cov.get("days") or []
+    today_iso = days[0]["date"] if days else None  # newest day in the window = planner reference
+    exclude = {e["ticker"]: (e.get("last_error") or "provider error")
+               for e in cov.get("provider_errors", [])}
+    if today_iso is None:
+        from src.scheduler_planner import BackfillPlan
+        return BackfillPlan(tickers=[], lookback_days=0)
+    return plan_price_backfill(cov, today=today_iso, max_tickers=_BACKFILL_MAX_TICKERS,
+                               max_days=_BACKFILL_MAX_DAYS, exclude_tickers=exclude)
+
+
+def _has_pending_continuation(source: str) -> bool:
+    """Attended mode (decision 4): a prior `partial` left a saved continuation → the SCHEDULER
+    must NOT auto-resume it; only a manual trigger processes it. Best-effort (local state)."""
+    try:
+        st = _state_store().get(source)
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(st and st.get("last_status") == "partial" and st.get("continuation"))
 
 
 def source_config(source: str) -> Dict[str, Any]:
@@ -344,6 +389,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
     try:
+        # v1.3 attended (decision 4): a prior `partial` left deferred scope → the SCHEDULER does
+        # NOT auto-resume; it skips until a MANUAL trigger (api/cli) processes the continuation.
+        # Skip-only gate (before record_attempt → doesn't touch durable state, per v1.2a).
+        if d.gap_planned and trigger_source == "scheduler" and _has_pending_continuation(source):
+            return _record_result({"source": source, "status": "skipped",
+                                   "reason": "partial pending manual continue"})
         if d.ibkr:
             ibkr_held = _IBKR_LOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S)
             if not ibkr_held:
@@ -380,6 +431,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         result: Dict[str, Any] = {"source": source}
         ok = True
         error: Optional[str] = None
+        plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         try:
             collected = False
             if d.adapter is not None:
@@ -394,23 +446,42 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     "progress_cb": lambda done, total, current: _set_progress(
                         source, done, total, current),
                 }
-                if d.universe_tickers:
+                if d.gap_planned:
+                    # v1.3: planner decides SCOPE from coverage (bounded tickers + window that
+                    # reaches the oldest gap), not the full universe. Gates 1+2 in the helper.
                     scope = tickers if tickers is not None else _resolve_price_scope()
                     if not scope:
-                        # 3e-E: the collectors' legacy tickers_core default is
-                        # retired — no scope means FAIL, not silently-collect-other.
-                        raise RuntimeError(
-                            "active-universe scope empty/unavailable (profile DB)")
-                    kwargs["tickers_arg"] = ",".join(scope)
-                    result["ticker_count"] = len(scope)
-                if d.ibkr:
-                    # run_source ALREADY holds the shared Gateway lock (_IBKR_LOCK/_IBKR_FLOCK
-                    # above) — tell the IBKR adapter (price_backfill) NOT to re-acquire it (the
-                    # lock is non-reentrant; re-acquiring would self-deadlock). The kwarg is
-                    # accepted by IBKR adapters (today only backfill_prices_direct).
-                    kwargs["acquire_gateway_lock"] = False
-                result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
-                collected = True
+                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                    plan = _plan_price_backfill_scope(scope)
+                    result["plan"] = {"tickers": plan.tickers, "lookback_days": plan.lookback_days,
+                                      "candidate_count": plan.candidate_count,
+                                      "deferred": plan.deferred, "excluded": plan.excluded}
+                    if not plan.tickers:
+                        result["collect"] = {"planned": 0, "note": "no fillable gaps"}
+                        collected = True   # nothing to do is a success, not a fetch
+                    else:
+                        kwargs["tickers_arg"] = ",".join(plan.tickers)
+                        kwargs["lookback_days"] = plan.lookback_days
+                        kwargs["acquire_gateway_lock"] = False  # scheduler holds the Gateway lock
+                        result["ticker_count"] = len(plan.tickers)
+                        result["collect"] = fn(**kwargs)
+                        collected = True
+                else:
+                    if d.universe_tickers:
+                        scope = tickers if tickers is not None else _resolve_price_scope()
+                        if not scope:
+                            # 3e-E: the collectors' legacy tickers_core default is
+                            # retired — no scope means FAIL, not silently-collect-other.
+                            raise RuntimeError(
+                                "active-universe scope empty/unavailable (profile DB)")
+                        kwargs["tickers_arg"] = ",".join(scope)
+                        result["ticker_count"] = len(scope)
+                    if d.ibkr:
+                        # run_source ALREADY holds the shared Gateway lock — tell the IBKR adapter
+                        # NOT to re-acquire it (non-reentrant; would self-deadlock).
+                        kwargs["acquire_gateway_lock"] = False
+                    result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
+                    collected = True
             elif d.collector is not None:
                 argv = [sys.executable, str(_COLLECT_DIR / d.collector[0]), *d.collector[1:]]
                 if d.needs_price_scope:
@@ -457,14 +528,25 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             result["error"] = error
             logger.warning(f"scheduler source {source} failed: {error}")
 
-        result["status"] = "succeeded" if ok else "failed"
+        # v1.3: a successful gap-aware run that left DEFERRED tickers (budget cap) is PARTIAL,
+        # with a saved continuation (the deferred scope) for an attended manual continue.
+        continuation = None
+        if ok and plan is not None and plan.deferred:
+            result["status"] = "partial"
+            continuation = {"deferred": plan.deferred, "lookback_days": plan.lookback_days,
+                            "candidate_count": plan.candidate_count}
+            result["continuation"] = continuation
+        else:
+            result["status"] = "succeeded" if ok else "failed"
         # v1.2: durable LOCAL outcome (recoverable + visible-failure), best-effort. This is the
         # REAL run outcome (skips return earlier via _record_result and are not persisted here).
-        # error=None on success clears any stale last_error. PG job_runs (below) is unchanged —
-        # 'partial' (v1.3) lives only in this local store, never forced into job_runs' enum.
+        # error=None on success clears any stale last_error; continuation=None clears a prior
+        # partial's deferred scope. PG job_runs (below) is unchanged — `partial` lives ONLY in
+        # this local store; PG gets succeeded/failed (partial maps to succeeded — it completed
+        # its bounded batch without error), never `partial` in job_runs' enum.
         try:
             _state_store().record_outcome(source, status=result["status"], error=error,
-                                          result=result)
+                                          result=result, continuation=continuation)
         except Exception:  # noqa: BLE001 — local state must never break collection
             logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
         if store is not None and run_id is not None:
