@@ -76,10 +76,10 @@ re-fetch).
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
 | SA capture | ✅ (sa_capture.db) | ✅ | verify db_backend SA dead | mostly done |
 | macro/cal | ✅ (toggle) | ✅ | — | done |
-| **Reports** | ❌ **PG-only** | ❌ **PG-only** | **read+write+history** | **(2) app-records** |
-| **Memories** | ❌ **PG-only** | ❌ **PG-only** | **read+write+history** | **(2) app-records** |
-| **agent_queries** | ❌ PG-only | ❌ PG-only | query log | (2) app-records |
-| SEC filings | ❌ PG-only | (cache) | read | (1)-ish |
+| **Reports** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
+| **Memories** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
+| **agent_queries** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
+| SEC filings | ❌ PG-only | (cache) | read | (1)-ish — step 4 |
 
 ## Locked direction (from prior PG-exit work)
 
@@ -113,24 +113,24 @@ early, and the UI only simplifies once each domain is truly local.
    button, use_local_* toggles (or flip default-on + hide), "fallback 回 PG" / strict-mode copy.
    This is the redundancy the user noticed — real only after steps 1–4.
 
-## Open questions (need the user's call before slicing)
+## PG-exit DONE criteria (locked 2026-06-26)
 
-1. **App-record local home + schema.** One store per record type in `profile_state.db`
-   (`reports` / `memories` / `agent_queries` tables) mirroring the PG schema, or a dedicated
-   `app_records.db`? Lean: tables in `profile_state.db` (it's already the local app-state DB).
-2. **App-record migration trigger.** A one-time Settings "migrate app-records from PG" action (like
-   the market bootstrap), or automatic on first local-mode boot if PG reachable? Lean: explicit
-   Settings action (precious data, user-visible).
-3. **Toggle-per-domain vs. one master switch.** Keep per-domain toggles through the migration
-   (use_local_market / _macro / _sa + a new use_local_records), or introduce ONE "local mode" master
-   once enough domains are local? Lean: per-domain until step 5, then collapse.
-4. **Does step 1 or step 2 go first?** App-records (least recoverable) vs. ingest (more sources,
-   bigger). Lean: app-records first (this plan's order) — but if the user's priority is killing the
-   visible mirror button fastest, ingest-first + retire-mirror reorders to 2→3→1.
-5. **Scheduler hardening interleave.** It was deferred for this; but step 2/3 (direct-local ingest +
-   mirror retire) overlap heavily with it. Do them as one combined arc, or finish PG-exit ingest
-   then return to scheduler hardening? Lean: finish ingest localization, then scheduler hardening on
-   the clean direct-local base.
+"PG exit" is complete only when ALL hold (not before — partial domain localization ≠ PG exit):
+1. The app starts normally with PG unreachable / no `DATABASE_URL`.
+2. Normal runtime read/write needs no PG.
+3. The scheduler fetches provider→local DB directly — no PG mirror step.
+4. PG is archive/import-only, never in the normal app path.
+5. Settings no longer needs PG-fallback / local-mirror / strict dual-mode controls.
+6. Tests include a "PG unreachable" scenario proving normal use doesn't stall or fall back.
+
+## Resolved decisions (were open questions)
+
+1. App-record home → tables in `profile_state.db` ✅ (shipped Slice 1).
+2. Migration trigger → explicit Settings preview/apply ✅ (shipped 1c-api).
+3. Toggle → per-domain through the migration; collapse to one in step 5.
+4. Order → app-records FIRST ✅ done; then the remaining order below.
+5. Scheduler hardening → after the shared `ibkr_gateway_lock` + local scheduler state, starting
+   with gap-aware `price_backfill`; then ingest direct-local. (The lock extraction is next.)
 
 ## Relation to other plans
 

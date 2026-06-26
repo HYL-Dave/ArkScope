@@ -1084,6 +1084,9 @@ function AppRecordsSection() {
     ? Object.values(preview.tables).reduce((n, t) => n + t.conflicts.length, 0) : 0;
   const totalMissing = preview
     ? Object.values(preview.tables).reduce((n, t) => n + t.missing_files.length, 0) : 0;
+  const totalToInsert = preview
+    ? Object.values(preview.tables).reduce((n, t) => n + t.to_insert.length, 0) : 0;
+  const alreadyLocalized = !!preview && preview.would_apply && totalToInsert === 0;
 
   return (
     <div>
@@ -1143,6 +1146,11 @@ function AppRecordsSection() {
             </tbody>
           </table>
 
+          {alreadyLocalized && (
+            <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
+              ✓ 已本地化：PG 與本地一致，無待遷移項目（reports/memories/queries 走 profile_state.db）。
+            </p>
+          )}
           {totalConflicts > 0 && (
             <p className="tiny refresh-err" style={{ marginTop: 8 }}>
               ✗ 有 {totalConflicts} 筆同 id 不同內容的衝突 — 遷移會被拒絕（不寫入）。請先排查再重試。
@@ -1158,9 +1166,11 @@ function AppRecordsSection() {
             <button
               className="btn-ghost"
               onClick={() => void runApply()}
-              disabled={!!busy || !preview.would_apply}
+              disabled={!!busy || !preview.would_apply || totalToInsert === 0}
             >
-              {busy === "apply" ? "遷移中…" : "執行遷移 (apply)"}
+              {busy === "apply" ? "遷移中…"
+                : alreadyLocalized ? "已全部遷移"
+                : `執行遷移 (apply) · ${totalToInsert} 筆`}
             </button>
             {!preview.would_apply && <span className="muted tiny">（有衝突，無法遷移）</span>}
           </div>
