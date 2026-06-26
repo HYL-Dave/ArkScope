@@ -82,49 +82,65 @@ enabled+due `SourceDef` (`SOURCES`). Verified facts that shape the design:
 - **No new product surface** — scheduler ops/health stays inside Settings (Data Storage / Data
   Sources), per the post-pivot "ops view inside the workbench" decision.
 
-## Precursor (shared with Intraday Slice 3)
+## Precursor (shared with Intraday Slice 3) — ✅ DONE 2026-06-26
 
-**Extract `ibkr_gateway_lock` into a shared module** (e.g. `src/ibkr_gateway_lock.py`): move
-`_IBKR_FLOCK`/`_IBKR_LOCK` out of `data_scheduler.py`, expose an `ibkr_gateway_lock()` context
-manager, and re-point the scheduler's `run_source`, standalone `backfill_prices_direct`, and the
-future intraday operation at it. Pure refactor (no behavior change), fully testable
-(cross-process serialize; standalone now holds it). Lands before any gap-aware backfill operation
-so the new bounded ops can't overlap the Gateway with a manual backfill.
+**Extracted `ibkr_gateway_lock` into `src/ibkr_gateway_lock.py`** (commits `5014473` extract +
+`bf9847c` wire): `IBKR_THREAD_LOCK` + `IBKR_FILE_LOCK('ibkr_gateway')` + `ibkr_gateway_lock()`
+context manager; `FileLock`/`lock_dir` moved there too. `data_scheduler.run_source` imports the
+same singletons (behavior-identical, two skip messages kept); standalone `backfill_prices_direct`
+now acquires the shared lock across preflight+fetch, and the scheduler passes
+`acquire_gateway_lock=False` (the lock is non-reentrant; scheduler already holds it). 97 tests
+green. Every IBKR consumer now serializes on one Gateway session — the safe base the bounded
+gap-aware ops below require.
 
-## Open questions (need the user's call before slicing)
+## Locked decisions (user, 2026-06-26)
 
-1. **State store granularity.** A single `scheduler_state` table in `profile_state.db` (one row per
-   source: last_attempt / last_status / last_error / continuation_json), OR a richer
-   `scheduler_runs` + `scheduler_run_meta` pair mirroring `provider_sync_runs`/`_meta`? The former
-   is smaller; the latter gives per-run history + aligns with the intraday `*_runs` model. Lean:
-   start with the single table, add a runs log only if history is needed.
-2. **Gap-aware trigger vs. interval.** Should gap-awareness REPLACE the interval (`_is_due` becomes
-   "due if coverage shows fillable gaps"), or AUGMENT it (interval still bounds frequency, gaps
-   decide scope within a run)? Lean: augment — keep the interval as a rate limit, use gaps for
-   scope — but this changes scheduling semantics, so it's the user's call.
-3. **Scope of hardening v1.** Just `price_backfill` (the one with a clean gap oracle today), or all
-   IBKR sources (news/iv) too? Lean: price_backfill first (the coverage panel only models prices),
-   generalize later.
-4. **Auto-continue vs. attended.** After a `partial`, does the next tick auto-resume, or does it
-   wait for an explicit "continue" (like the universe-backfill batch-gated run we did manually)?
-   Lean: attended first (surface "N days still missing, [補抓]"), auto-resume once trusted — but
-   this is a product/safety call.
-5. **`enabled` default.** Stays default-OFF (current behavior) through v1 — hardening makes it
-   SAFE to enable, but flipping the default on is a separate, later decision. (Assumed yes.)
+1. **State store** → a SINGLE `scheduler_state` table in `profile_state.db` (one row per source:
+   last_attempt / last_status / last_error / continuation_json). Don't start heavy; add a per-run
+   history log only if it proves needed.
+2. **Gap vs. interval** → AUGMENT, not replace. The interval stays a **rate-limit / backoff** (how
+   OFTEN a source may run); the trading-day coverage diagnostic decides the **SCOPE** within a run
+   (which days/tickers to fetch). `_is_due` keeps gating frequency; the gap query shapes the work.
+3. **v1 scope** → **`price_backfill` only** (the one domain with a clean gap oracle today). News /
+   IV / fundamentals are NOT touched here — they generalize later (and overlap the ingest
+   direct-local work in `PG_EXIT_COMPLETION_PLAN.md` step 2).
+4. **Auto-continue** → **attended/manual continue first.** A `partial` run surfaces "N still
+   missing → [補抓]" in Settings; the user triggers the continuation. Auto-resume-on-next-tick is
+   deferred until the telemetry is trusted in practice.
+5. **`enabled` default** → stays **OFF.** Hardening makes enabling SAFE; flipping the default is a
+   separate later decision.
 
-## Slice plan (after the open questions are answered)
+## v1 slice plan (read-only planner → local state → bounded run/resume → Settings UI)
 
-- **Slice 0 — `ibkr_gateway_lock` extraction** (the precursor; pure refactor + tests).
-- **Slice 1 — local scheduler-state store** (recoverable + visible-failure): the table(s) per Q1,
-  persist last-attempt/outcome/error locally, seed `_LAST_ATTEMPT` from it instead of PG, keep PG
-  as optional archive. Hermetic tests; no scheduling-behavior change yet.
-- **Slice 2 — gap-aware price_backfill scope** (gap-filling): the bounded operation consumes the
-  coverage gaps + excludes known-unresolvable tickers; per Q2/Q3. Tests with a fake provider +
-  the coverage oracle.
-- **Slice 3 — bounded operation + continuation** (resumable): budget → `partial` + saved scope →
-  resume per Q4. Tests: timeout marks partial (never stuck `running`), resume covers the remainder.
-- **Slice 4 — Settings surface**: scheduler state + failure reasons + "still missing / 補抓" in the
-  Data Storage / Data Sources area, reusing the coverage panel.
+Decisions above locked. Slice 0 (lock) is DONE. The order front-loads the **read-only planner**
+(pure, no writes, fully testable) so the gap→scope logic is pinned before any runtime/state change.
+
+- **Slice 0 — `ibkr_gateway_lock` extraction.** ✅ DONE (see Precursor).
+
+- **v1.1 — read-only backfill PLANNER (pure function, no writes, no scheduler change).**
+  `plan_price_backfill(coverage, *, max_tickers, max_days, exclude) -> BackfillPlan`: consume
+  `summarize_trading_day_coverage` (the existing oracle) → the bounded set of (ticker, missing
+  complete-trading-days) to fetch, EXCLUDING non-trading / in-progress / known-unresolvable
+  tickers (the `LC`-style `coverage_status` / provider-error signal). Pure + deterministic →
+  hermetic tests only; touches nothing live. This is the gap→scope core decision-3/2 depend on.
+
+- **v1.2 — local scheduler-state store** (recoverable + visible-failure). Single `scheduler_state`
+  table in `profile_state.db` (decision 1): per-source last_attempt / last_status / last_error /
+  continuation_json. Seed `_LAST_ATTEMPT` from it instead of PG `job_runs`; record outcomes
+  locally; PG `job_runs` becomes an optional archive mirror. Hermetic; no scheduling-behavior
+  change yet (interval logic unchanged — just its state moves local).
+
+- **v1.3 — wire the planner + bounded run + continuation** (gap-filling + resumable). `_is_due`
+  still gates frequency (decision 2: interval = rate-limit); when due, `price_backfill` runs the
+  PLANNER for scope (not a blind full-window), bounded by budget; on budget-exhaustion finishes
+  `partial` and writes `continuation_json` (the remaining scope). **Attended** (decision 4): the
+  next tick does NOT auto-resume — continuation waits for an explicit trigger. Tests: timeout/
+  budget → `partial` (never stuck `running`); a manual continue covers the saved remainder; the
+  gateway lock (precursor) serializes it. price_backfill only (decision 3). Default OFF (decision 5).
+
+- **v1.4 — Settings surface.** Scheduler state + last failure reason + "N days/tickers still
+  missing → [補抓]" (manual continue) in the Data Storage / Data Sources area, reusing the
+  coverage panel + the local scheduler-state store. No new product surface.
 
 ## Relation to the coverage panel + Intraday layer
 
