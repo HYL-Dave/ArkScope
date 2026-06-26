@@ -152,6 +152,40 @@ def _ensure_ticker_aliases(conn) -> None:
     )
 
 
+# PG-exit 2b — news identity + FTS sync. UNIQUE(article_hash) lets every writer INSERT OR IGNORE
+# to dedup; the external-content news_fts is kept in sync by triggers so NO writer needs a manual
+# fts insert. Triggers are deliberately NOT in _NEWS_SCHEMA: the bulk bootstrap copy uses a one-shot
+# news_fts('rebuild') and would be slowed to a crawl by per-row triggers — bootstrap adds them AFTER
+# the rebuild; incremental/direct writers (small batches) get them up front.
+_NEWS_HASH_UNIQUE = "CREATE UNIQUE INDEX IF NOT EXISTS idx_news_article_hash ON news(article_hash)"
+_NEWS_FTS_TRIGGERS = """
+CREATE TRIGGER IF NOT EXISTS news_ai AFTER INSERT ON news BEGIN
+  INSERT INTO news_fts(rowid, title, description) VALUES (new.id, new.title, new.description);
+END;
+CREATE TRIGGER IF NOT EXISTS news_ad AFTER DELETE ON news BEGIN
+  INSERT INTO news_fts(news_fts, rowid, title, description) VALUES('delete', old.id, old.title, old.description);
+END;
+CREATE TRIGGER IF NOT EXISTS news_au AFTER UPDATE ON news BEGIN
+  INSERT INTO news_fts(news_fts, rowid, title, description) VALUES('delete', old.id, old.title, old.description);
+  INSERT INTO news_fts(rowid, title, description) VALUES (new.id, new.title, new.description);
+END;
+"""
+
+
+def _ensure_news_hash_unique(conn) -> None:
+    """Idempotent UNIQUE index on news.article_hash so INSERT OR IGNORE dedups (PG-exit 2b).
+    Safe to add to the live table because it has no dup/null article_hash rows (verified)."""
+    conn.execute(_NEWS_HASH_UNIQUE)
+
+
+def _ensure_news_fts_triggers(conn) -> None:
+    """Idempotent AFTER INSERT/DELETE/UPDATE triggers keeping the external-content news_fts in
+    sync (PG-exit 2b) — replaces the per-row manual fts inserts in the direct + mirror writers.
+    NOT part of _NEWS_SCHEMA (see the note above): apply where per-row sync is wanted, never around
+    the bulk bootstrap copy."""
+    conn.executescript(_NEWS_FTS_TRIGGERS)
+
+
 def _canonicalize_table_tickers(conn, table: str) -> int:
     """One-time PK-SAFE reconcile of EXISTING rows in ``table`` whose ticker is an alias →
     its canonical spelling. Returns the number of DISTINCT alias spellings that had ≥1 row

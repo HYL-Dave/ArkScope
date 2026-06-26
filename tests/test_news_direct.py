@@ -89,6 +89,25 @@ def test_fts_search_finds_written_articles(tmp_path, monkeypatch):
     assert hit_body == 1
 
 
+def test_fts_synced_by_trigger_no_double_write(tmp_path, monkeypatch):
+    # 2b: news_fts is populated by the AFTER INSERT trigger (not a manual insert) → exactly one fts
+    # row per news row (no double-index), and a deduped re-run adds neither a news nor an fts row.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    arts = [_article("AAPL", "Beat", "2026-06-24T13:30:00Z", h="h1"),
+            _article("AAPL", "Raise", "2026-06-24T14:00:00Z", h="h2")]
+    nd.backfill_news_direct(["AAPL"], source="polygon", provider=_FakeNewsProvider({"AAPL": arts}), db_path=db)
+    nd.backfill_news_direct(["AAPL"], source="polygon", provider=_FakeNewsProvider({"AAPL": arts}), db_path=db)  # all dup
+    c = sqlite3.connect(db)
+    try:
+        news_n = c.execute("SELECT COUNT(*) FROM news").fetchone()[0]
+        fts_n = c.execute("SELECT COUNT(*) FROM news_fts").fetchone()[0]
+        match_n = c.execute("SELECT COUNT(*) FROM news_fts WHERE news_fts MATCH 'beat OR raise'").fetchone()[0]
+    finally:
+        c.close()
+    assert news_n == 2 and fts_n == 2 and match_n == 2   # one fts row per news row, no double-index
+
+
 def test_provider_sync_telemetry_news_domain(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _news_db(tmp_path)
@@ -157,3 +176,42 @@ def test_skips_articles_missing_required_fields(tmp_path, monkeypatch):
 def test_no_pg_dependency():
     import src.news_direct as mod
     assert not hasattr(mod, "psycopg2")
+
+
+# --- 2a.1: cursor semantic + timestamp-normalization coverage (review gaps) ----------
+
+def test_norm_published_offset_fractional_and_space():
+    # the writer's published_at normalizer (not just 'Z'): offsets → UTC, fractional dropped,
+    # space-separated tolerated, date-only tolerated, garbage → None (row skipped).
+    assert nd._norm_published("2026-06-24T13:30:00Z") == "2026-06-24T13:30:00+0000"
+    assert nd._norm_published("2026-06-24T13:30:00+00:00") == "2026-06-24T13:30:00+0000"
+    assert nd._norm_published("2026-06-24T09:30:00-04:00") == "2026-06-24T13:30:00+0000"  # ET→UTC
+    assert nd._norm_published("2026-06-24T13:30:00.500Z") == "2026-06-24T13:30:00+0000"   # fractional
+    assert nd._norm_published("2026-06-24 13:30:00") == "2026-06-24T13:30:00+0000"        # space
+    assert nd._norm_published("not-a-date") is None and nd._norm_published("") is None
+
+
+def test_offset_articles_written_normalized(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    prov = _FakeNewsProvider({"AAPL": [_article("AAPL", "ET", "2026-06-24T09:30:00-04:00", h="e1")]})
+    nd.backfill_news_direct(["AAPL"], source="polygon", provider=prov, db_path=db)
+    assert _rows(db)[0]["published_at"] == "2026-06-24T13:30:00+0000"   # -04:00 → UTC
+
+
+def test_exact_inclusive_cursor_keeps_same_second_sibling(tmp_path, monkeypatch):
+    # the deliberate semantic: exact-inclusive cursor + dedup, NOT latest+1s. A sibling published
+    # in the SAME second as the stored boundary (different hash) must be picked up, not skipped.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    nd.backfill_news_direct(["AAPL"], source="polygon",
+                            provider=_FakeNewsProvider({"AAPL": [_article("AAPL", "first", "2026-06-24T13:30:00Z", h="a1")]}),
+                            db_path=db)
+    # 2nd run: provider returns the boundary article again (dedup) + a same-second sibling (new hash)
+    prov2 = _FakeNewsProvider({"AAPL": [
+        _article("AAPL", "first", "2026-06-24T13:30:00Z", h="a1"),       # boundary → deduped
+        _article("AAPL", "sibling", "2026-06-24T13:30:00Z", h="a2")]})   # same second, NEW
+    res = prov2 and nd.backfill_news_direct(["AAPL"], source="polygon", provider=prov2, db_path=db)
+    assert prov2.since_seen["AAPL"] == "2026-06-24T13:30:00+0000"   # EXACT cursor (not +1s)
+    assert res["articles_added"] == 1                               # only the sibling
+    assert {r["title"] for r in _rows(db)} == {"first", "sibling"}  # sibling NOT skipped

@@ -8,15 +8,15 @@ path. Mirrors `backfill_prices_direct`.
 
 Dedup is on the opaque ``article_hash`` (MD5 today — treated as a STABLE KEY, not assumed
 SHA-256). ``published_at`` is normalized to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
-``news_fts`` (external-content FTS5, ``content_rowid='id'``) is kept in sync by an explicit
-per-row insert here — the SAME approach the PG→local mirror uses today; Step 2b converts BOTH to
-AFTER-INSERT triggers (and removes these manual inserts to avoid double-write). The incremental
-cursor is the newest local ``published_at`` for THIS source (source-scoped, optionally
-ticker-scoped) so Polygon/Finnhub don't clobber each other's frontier.
+``news_fts`` (external-content FTS5, ``content_rowid='id'``) is kept in sync by AFTER
+INSERT/UPDATE/DELETE triggers (PG-exit 2b, ``_ensure_news_fts_triggers``) — no manual fts write
+here, so the writer can't double-index. The incremental cursor is the newest local
+``published_at`` for THIS source (source-scoped, optionally ticker-scoped) so Polygon/Finnhub
+don't clobber each other's frontier.
 
-2a is the writer only — NO scheduler routing (use_local_news), NO live-DB schema migration. The
-``article_hash`` UNIQUE index is created here for the hermetic temp DB; the live additive
-migration + triggers are Step 2b.
+NO scheduler routing yet (use_local_news = 2c). Schema (UNIQUE article_hash + fts triggers) is
+ensured here for the temp/local DB via the shared ``market_data_admin`` helpers; applying the
+additive migration to the live 371k-row DB is the gated 2b-live step.
 """
 
 from __future__ import annotations
@@ -26,7 +26,12 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from src.market_data_admin import _NEWS_SCHEMA, resolve_market_db_path
+from src.market_data_admin import (
+    _NEWS_SCHEMA,
+    _ensure_news_fts_triggers,
+    _ensure_news_hash_unique,
+    resolve_market_db_path,
+)
 from src.market_data_direct import (
     _ensure_provider_sync_tables,
     _finish_provider_run,
@@ -36,11 +41,6 @@ from src.market_data_direct import (
 )
 
 logger = logging.getLogger(__name__)
-
-# UNIQUE on the opaque article_hash → INSERT OR IGNORE dedups. (2a creates it for the temp DB;
-# 2b adds it to the live DB as a tolerant additive migration.)
-_NEWS_HASH_UNIQUE = (
-    "CREATE UNIQUE INDEX IF NOT EXISTS idx_news_article_hash ON news(article_hash)")
 
 _NEWS_REQUIRED = ("ticker", "title", "published_at", "article_hash")
 
@@ -92,12 +92,20 @@ def _article_row(article: Dict[str, Any], source: str) -> Optional[tuple]:
 
 def _ensure_news_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(_NEWS_SCHEMA)   # news + indexes + news_fts (external content)
-    conn.execute(_NEWS_HASH_UNIQUE)
+    _ensure_news_hash_unique(conn)     # UNIQUE(article_hash) → INSERT OR IGNORE dedups
+    _ensure_news_fts_triggers(conn)    # news_fts kept in sync by triggers (no manual insert here)
     conn.commit()
 
 
 def _latest_published(conn: sqlite3.Connection, source: str, ticker: str) -> Optional[str]:
-    """Source-scoped (+ticker) incremental cursor: newest local published_at, or None."""
+    """Source-scoped (+ticker) incremental cursor: newest local published_at, or None.
+
+    CURSOR SEMANTIC (deliberate, vs the legacy Parquet collector's latest+1s): we return the
+    EXACT newest local timestamp as an INCLUSIVE lower bound. The boundary second is re-fetched
+    each run and dropped by the article_hash dedup. This is intentional — a +1s EXCLUSIVE cursor
+    would SKIP any not-yet-stored sibling published in the SAME second as the stored boundary
+    article (common at the open). Exact-inclusive + idempotent dedup costs one re-fetched second
+    but never loses a same-second sibling. (2c's adapter must pass `since` as inclusive.)"""
     row = conn.execute(
         "SELECT MAX(published_at) FROM news WHERE source = ? AND ticker = ?",
         (source, ticker.upper())).fetchone()
@@ -105,17 +113,14 @@ def _latest_published(conn: sqlite3.Connection, source: str, ticker: str) -> Opt
 
 
 def _insert_article(conn: sqlite3.Connection, row: tuple) -> bool:
-    """INSERT OR IGNORE one article (dedup on article_hash); on a genuine insert, sync news_fts
-    (external content → must be written explicitly). Returns True iff a new row was inserted."""
+    """INSERT OR IGNORE one article (dedup on article_hash). Returns True iff a new row was
+    inserted; the external-content news_fts is synced by the AFTER INSERT trigger (2b) — no manual
+    fts write here (a second insert would double-index the row)."""
     before = conn.total_changes
-    cur = conn.execute(
+    conn.execute(
         "INSERT OR IGNORE INTO news (ticker, title, description, url, publisher, source, "
         "published_at, article_hash) VALUES (?,?,?,?,?,?,?,?)", row)
-    if conn.total_changes == before:
-        return False  # IGNORE'd duplicate (article_hash already present)
-    conn.execute("INSERT INTO news_fts (rowid, title, description) VALUES (?, ?, ?)",
-                 (cur.lastrowid, row[1], row[2]))   # row[1]=title, row[2]=description
-    return True
+    return conn.total_changes != before   # genuine insert → trigger populated news_fts
 
 
 def backfill_news_direct(

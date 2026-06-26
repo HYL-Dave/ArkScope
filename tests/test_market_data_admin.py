@@ -751,6 +751,43 @@ def test_canonicalize_rename_moves_history_when_canonical_absent(tmp_path):
     conn.close()
 
 
+def test_news_fts_triggers_keep_index_in_sync(tmp_path):
+    # PG-exit 2b: external-content news_fts kept in sync by AFTER INSERT/UPDATE/DELETE triggers,
+    # so no writer needs a manual fts insert. Triggers are NOT in _NEWS_SCHEMA (bulk bootstrap
+    # uses 'rebuild') — applied via _ensure_news_fts_triggers.
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._NEWS_SCHEMA)          # news + news_fts (external content), no triggers
+    mda._ensure_news_fts_triggers(conn)
+
+    def match(q):
+        return [r[0] for r in conn.execute(
+            "SELECT n.id FROM news_fts f JOIN news n ON n.id=f.rowid WHERE news_fts MATCH ?", (q,))]
+
+    conn.execute("INSERT INTO news (id,ticker,title,description,source,published_at,article_hash) "
+                 "VALUES (1,'AAPL','datacenter momentum','strong demand','polygon','2026-06-01T00:00:00+0000','h1')")
+    conn.commit()
+    assert match("datacenter") == [1]             # AFTER INSERT populated fts
+    conn.execute("UPDATE news SET title='earnings beat' WHERE id=1"); conn.commit()
+    assert match("datacenter") == [] and match("earnings") == [1]   # AFTER UPDATE re-synced
+    conn.execute("DELETE FROM news WHERE id=1"); conn.commit()
+    assert match("earnings") == []                # AFTER DELETE removed the entry
+    assert conn.execute("SELECT COUNT(*) FROM news_fts").fetchone()[0] == 0
+    mda._ensure_news_fts_triggers(conn)           # idempotent (CREATE TRIGGER IF NOT EXISTS)
+    conn.close()
+
+
+def test_ensure_news_hash_unique_dedups(tmp_path):
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._NEWS_SCHEMA)
+    mda._ensure_news_hash_unique(conn)
+    ins = ("INSERT OR IGNORE INTO news (ticker,title,source,published_at,article_hash) "
+           "VALUES ('AAPL','t','polygon','2026-06-01T00:00:00+0000','dup')")
+    conn.execute(ins); conn.execute(ins); conn.commit()   # same article_hash twice
+    assert conn.execute("SELECT COUNT(*) FROM news WHERE article_hash='dup'").fetchone()[0] == 1
+    mda._ensure_news_hash_unique(conn)            # idempotent
+    conn.close()
+
+
 def test_bootstrap_with_alias_spellings_validates_then_canonicalizes(tmp_path, monkeypatch):
     # REGRESSION (canon-vs-validation ordering): PG carries BOTH 'BRK B' and 'BRK.B'
     # news rows (the live state). Canon must NOT run before the PG-vs-SQLite checksum
