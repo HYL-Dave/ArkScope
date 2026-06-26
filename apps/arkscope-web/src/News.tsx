@@ -294,6 +294,8 @@ function SAFeedBody({
                 {it.url ? " · 原文 ↗" : ""}
               </span>
             </div>
+            {/* snippet is server-cleaned plain text (src/text_snippet.py) — render as
+                text only; do NOT add a markdown/HTML renderer here. */}
             {it.snippet && <div className="news-desc muted tiny">{it.snippet}</div>}
           </li>
         ))}

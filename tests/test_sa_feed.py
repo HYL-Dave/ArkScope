@@ -205,6 +205,51 @@ def test_route_handler_happy_and_disabled(tmp_path, monkeypatch):
     assert ei.value.status_code == 503
 
 
+def test_feed_snippet_is_clean_plain_text(tmp_path):
+    """Display-text contract: /sa/feed `snippet` is cleaned plain text (no raw
+    markdown / no SA byline-disclosure); the raw body_markdown is left untouched
+    in the DB (FTS / detail / agent evidence still see the original)."""
+    db = tmp_path / "sa.db"
+    conn = store.connect(str(db))
+    try:
+        conn.execute(
+            "INSERT INTO sa_articles (id, article_id, url, title, ticker, published_date, "
+            "body_markdown, comments_count) VALUES (?,?,?,?,?,?,?,?)",
+            (1, "A1", "https://sa/a1", "NVDA momentum", "NVDA", _d(1),
+             "# NVDA momentum\n\n*Author: Seeking Alpha*\n\nAnalyst's Disclosure: none.\n\n"
+             "NVIDIA posted **record** revenue on [AI demand](https://x/y).", 5))
+        # body is only the title heading + byline → nothing new to show → snippet dropped
+        conn.execute(
+            "INSERT INTO sa_articles (id, article_id, url, title, ticker, published_date, "
+            "body_markdown, comments_count) VALUES (?,?,?,?,?,?,?,?)",
+            (2, "A2", "https://sa/a2", "Weekly recap", "MU", _d(2),
+             "# Weekly recap\n\n*Author: Seeking Alpha*", 0))
+        conn.execute(
+            "INSERT INTO sa_market_news (id, news_id, url, title, published_at, summary, "
+            "body_markdown, comments_count) VALUES (?,?,?,?,?,?,?,?)",
+            (1, "N1", "https://sa/n1", "Apple news", _ts(1), "",
+             "# Apple news\n\n![credit](u) Apple raised prices.", 2))
+        conn.commit()
+    finally:
+        conn.close()
+    items = {i["id"]: i for i in _feed(db, days=30)["items"]}
+    # A1: heading de-marked, byline + disclosure dropped, emphasis/link flattened
+    assert items["A1"]["snippet"] == "NVDA momentum NVIDIA posted record revenue on AI demand."
+    assert "*" not in items["A1"]["snippet"] and "#" not in items["A1"]["snippet"]
+    # A2: snippet would only repeat the title shown above it → dropped to ""
+    assert items["A2"]["snippet"] == ""
+    # N1: market-news markdown cleaned (image → alt, heading de-marked)
+    assert items["N1"]["snippet"] == "Apple news credit Apple raised prices."
+    # raw body_markdown preserved in the DB (not mutated by the display cleanup)
+    rconn = store.connect(str(db), read_only=True)
+    try:
+        raw = rconn.execute(
+            "SELECT body_markdown FROM sa_articles WHERE article_id='A1'").fetchone()[0]
+    finally:
+        rconn.close()
+    assert raw.startswith("# NVDA momentum") and "*Author:" in raw
+
+
 def test_like_escapes_sql_wildcards(tmp_path):
     """A literal % in q must match literally, not as a SQL LIKE wildcard."""
     db = tmp_path / "sa.db"

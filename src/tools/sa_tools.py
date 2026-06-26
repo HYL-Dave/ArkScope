@@ -800,6 +800,19 @@ def get_sa_feed(
         return _empty_feed(30, empty_reason="error", error=str(e))
 
 
+def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
+    """Clean plain-text list snippet (markdown stripped, SA boilerplate dropped).
+    Returns "" when the cleaned snippet would merely repeat the title shown above
+    it (e.g. a pure heading+byline article body) — nothing new to display. Raw
+    body_markdown is untouched in the DB (FTS / detail / agent evidence keep it)."""
+    from src.text_snippet import markdown_to_plain_snippet
+
+    snip = markdown_to_plain_snippet(raw)
+    if not snip or snip == markdown_to_plain_snippet(title):
+        return ""
+    return snip
+
+
 def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[str, Any]:
     """SQLite feed: UNION of normalized sa_articles + sa_market_news. The window
     cutoff is applied PER COLUMN TYPE — published_date (DATE) vs published_at
@@ -834,7 +847,7 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
                 params += [like, like]
             sql = ("SELECT 'article' type, id row_id, article_id item_id, title, "
                    "ticker single_ticker, published_date published_at, url, "
-                   "substr(COALESCE(NULLIF(body_markdown,''), title), 1, 200) snippet, "
+                   "substr(COALESCE(NULLIF(body_markdown,''), title), 1, 1000) snippet_src, "
                    "CASE WHEN COALESCE(body_markdown,'')!='' THEN 1 ELSE 0 END has_detail, "
                    "COALESCE(comments_count,0) comments_count "
                    f"FROM sa_articles WHERE {' AND '.join(where)}")
@@ -851,7 +864,7 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
             params += [like, like]
         sql = ("SELECT 'market_news' type, id row_id, news_id item_id, title, "
                "NULL single_ticker, published_at, url, "
-               "substr(COALESCE(NULLIF(summary,''), NULLIF(body_markdown,''), title), 1, 200) snippet, "
+               "substr(COALESCE(NULLIF(summary,''), NULLIF(body_markdown,''), title), 1, 1000) snippet_src, "
                "CASE WHEN COALESCE(body_markdown,'')!='' THEN 1 ELSE 0 END has_detail, "
                "COALESCE(comments_count,0) comments_count "
                f"FROM sa_market_news WHERE {' AND '.join(where)}")
@@ -898,7 +911,7 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
                 "published_at": r["published_at"],
                 "url": r["url"],
                 "source": "seeking_alpha",
-                "snippet": r["snippet"],
+                "snippet": _display_snippet(r["snippet_src"], r["title"]),
                 "has_detail": bool(r["has_detail"]),
                 "comments_count": r["comments_count"],
                 "detail_route": detail_route,
