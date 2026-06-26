@@ -144,3 +144,96 @@ def test_absent_db_query_is_empty_not_crash(tmp_path):
     s = AppRecordsLocalStore(tmp_path / "fresh.db")
     assert s.query_reports().empty and s.query_memories().empty
     assert s.get_report_metadata(1) is None
+
+
+# --- 1b: factory routing (default-off) + DAL toggle ---------------------------------
+
+from src.app_records_store import (
+    USE_LOCAL_RECORDS_KEY, ENV_USE_LOCAL_RECORDS,
+    get_app_records_store, resolve_profile_state_db_path,
+)
+
+
+class _FakeBackend:
+    """Stand-in for dal._backend (PG/File) — distinct from the local store."""
+    def insert_report(self, **k): return -1   # sentinel: came from PG path
+    def query_reports(self, **k):
+        import pandas as pd
+        return pd.DataFrame()
+
+
+class _FakeDal:
+    def __init__(self, local: bool, backend=None, base=None):
+        self._local = local
+        self._backend = backend
+        self._base = base
+    def _local_records_enabled(self): return self._local
+
+
+def test_factory_off_returns_backend_unchanged():
+    be = _FakeBackend()
+    assert get_app_records_store(_FakeDal(local=False, backend=be)) is be   # OFF → exact PG behavior
+
+
+def test_factory_on_returns_local_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    store = get_app_records_store(_FakeDal(local=True, backend=_FakeBackend()))
+    assert isinstance(store, AppRecordsLocalStore)
+
+
+def test_factory_toggleless_dal_is_off():
+    be = _FakeBackend()
+    class _Bare:  # no _local_records_enabled (older/test double)
+        _backend = be
+    assert get_app_records_store(_Bare()) is be
+
+
+def test_resolver_no_api_import_and_env_precedence(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", "/x/custom.db")
+    assert resolve_profile_state_db_path(None) == "/x/custom.db"
+    monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+    assert resolve_profile_state_db_path(_FakeDal(local=True, base=str(tmp_path))) == \
+        str(tmp_path / "data" / "profile_state.db")
+    # gate #3: the store module must not import the API layer
+    import src.app_records_store as mod, inspect
+    assert "src.api" not in inspect.getsource(mod)
+
+
+def test_dal_local_records_toggle_default_off(monkeypatch):
+    from src.tools.data_access import DataAccessLayer
+    monkeypatch.delenv(ENV_USE_LOCAL_RECORDS, raising=False)
+    monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+    dal = DataAccessLayer()
+    assert dal._local_records_enabled() is False
+    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
+    assert dal._local_records_enabled() is True
+
+
+def test_end_to_end_save_report_routes_local_when_on(tmp_path, monkeypatch):
+    # toggle on → save_report's insert lands in the LOCAL store, readable via list_reports.
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
+    from src.tools.data_access import DataAccessLayer
+    from src.tools import report_tools
+    dal = DataAccessLayer(base_path=str(tmp_path))
+    rid = AppRecordsLocalStore(tmp_path / "profile_state.db")  # ensure schema exists
+    # route an insert through the tool layer
+    out = report_tools.save_report(dal, title="T", content="# body", tickers=["AFRM"],
+                                   report_type="entry_analysis", summary="s")
+    # the report id should come from the LOCAL store (not the -1 PG sentinel / not None)
+    listed = report_tools.list_reports(dal, days=3650)
+    assert any(r["title"] == "T" for r in listed), "local-routed report not found via list_reports"
+
+
+def test_gate4_on_empty_local_is_honest_no_crash(tmp_path, monkeypatch):
+    # gate #4: toggle ON + empty local store → reads are honest-empty, never crash, and the
+    # tools' existing markdown fallback still runs (no markdown files here → []).
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
+    from src.tools.data_access import DataAccessLayer
+    from src.tools import report_tools, memory_tools
+    dal = DataAccessLayer(base_path=str(tmp_path))
+    assert report_tools.list_reports(dal, days=30) == []          # honest empty, no crash
+    assert isinstance(memory_tools.recall_memories(dal, query="x"), (list, str))
+    got = report_tools.get_report(dal, report_id=999999)          # absent id, pre-migration
+    assert got is None or isinstance(got, (dict, str))            # honest, not a crash

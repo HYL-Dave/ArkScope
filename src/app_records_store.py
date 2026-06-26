@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -35,6 +36,11 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# Toggle for routing app-records local (PG-exit 1b). Default-OFF. Per-domain (mirrors
+# use_local_market / _macro / _sa); read by DataAccessLayer._local_records_enabled.
+USE_LOCAL_RECORDS_KEY = "use_local_records"
+ENV_USE_LOCAL_RECORDS = "ARKSCOPE_USE_LOCAL_RECORDS"
 
 _REPORT_COLS = ["id", "title", "tickers", "report_type", "summary", "conclusion",
                 "confidence", "model", "file_path", "tool_calls", "duration_seconds", "created_at"]
@@ -323,3 +329,31 @@ class AppRecordsLocalStore:
             return int(conn.execute("SELECT COUNT(*) FROM agent_queries").fetchone()[0])
         finally:
             conn.close()
+
+
+def resolve_profile_state_db_path(dal: Any = None) -> str:
+    """Path to the local app-state DB — same resolution as api.dependencies._local_state_db_path
+    but WITHOUT importing the API layer (gate #3: no core→API reverse coupling): ARKSCOPE_PROFILE_DB
+    env, else ``<dal._base>/data/profile_state.db``, else ``<repo>/data/profile_state.db``."""
+    env = os.environ.get("ARKSCOPE_PROFILE_DB")
+    if env:
+        return env
+    base = getattr(dal, "_base", None) if dal is not None else None
+    if base:
+        return str(Path(base) / "data" / "profile_state.db")
+    return str(Path(__file__).resolve().parents[1] / "data" / "profile_state.db")
+
+
+def get_app_records_store(dal: Any):
+    """Return the app-records store for the active mode (PG-exit 1b). When use_local_records is
+    on (env ARKSCOPE_USE_LOCAL_RECORDS or the persisted profile_settings key) → the local
+    AppRecordsLocalStore over profile_state.db. OFF (default) → ``dal._backend`` (PG/File),
+    i.e. exactly the current behavior. Both expose the same app-record surface, so the 10 call
+    sites are mode-agnostic. A dal lacking the toggle (older/test double) → OFF.
+
+    NOTE (gate #1): there is intentionally NO Settings UI to flip this in 1b — the local store
+    autoincrements ids from 1, so writing local rows BEFORE the 1c id-preserving PG→local
+    migration would collide with the migrated PG ids. Keep it env/profile-flag-only until 1c."""
+    if getattr(dal, "_local_records_enabled", None) and dal._local_records_enabled():
+        return AppRecordsLocalStore(resolve_profile_state_db_path(dal))
+    return getattr(dal, "_backend", None)

@@ -30,6 +30,7 @@ def mock_dal(tmp_path):
     """Create a mock DAL pointing to a tmp directory (no DB)."""
     dal = MagicMock()
     dal._base = tmp_path
+    dal._local_records_enabled = lambda: False  # PG-exit 1b: default-off → backend/file path
     # No DB backend — force file fallback
     del dal._backend
     return dal
@@ -40,6 +41,7 @@ def mock_dal_with_db(tmp_path):
     """Create a mock DAL with a mock DB backend."""
     dal = MagicMock()
     dal._base = tmp_path
+    dal._local_records_enabled = lambda: False  # PG-exit 1b: default-off → routes dal._backend
     dal._backend = MagicMock()
     dal._backend.insert_memory = MagicMock(return_value=42)
     dal._backend.query_memories = MagicMock()

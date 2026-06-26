@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
+from src.app_records_store import get_app_records_store  # PG-exit 1b: local-vs-PG routing
+
 logger = logging.getLogger(__name__)
 
 # Reports directory (relative to project root)
@@ -119,9 +121,10 @@ def save_report(
 
     # 2. Write metadata to DB (if available)
     report_id = None
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'insert_report'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'insert_report'):
         try:
-            report_id = dal._backend.insert_report(
+            report_id = _store.insert_report(
                 title=title,
                 tickers=[t.upper() for t in tickers],
                 report_type=report_type,
@@ -169,10 +172,11 @@ def list_reports(
         List of report summaries (id, title, tickers, summary, created_at, etc.)
     """
     # Try DB first
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'query_reports'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'query_reports'):
         try:
             import pandas as pd
-            df = dal._backend.query_reports(
+            df = _store.query_reports(
                 ticker=ticker,
                 days=days,
                 report_type=report_type,
@@ -245,9 +249,10 @@ def get_report(
         Dict with: title, content, metadata (if from DB)
     """
     # Get file path from DB if report_id provided
-    if report_id and hasattr(dal, '_backend') and hasattr(dal._backend, 'get_report_metadata'):
+    _store = get_app_records_store(dal)
+    if report_id and hasattr(_store, 'get_report_metadata'):
         try:
-            meta = dal._backend.get_report_metadata(report_id)
+            meta = _store.get_report_metadata(report_id)
             if meta:
                 file_path = meta.get("file_path")
         except Exception as e:
@@ -276,9 +281,10 @@ def get_report(
     }
 
     # Add DB metadata if available
-    if report_id and hasattr(dal, '_backend') and hasattr(dal._backend, 'get_report_metadata'):
+    _store = get_app_records_store(dal)
+    if report_id and hasattr(_store, 'get_report_metadata'):
         try:
-            meta = dal._backend.get_report_metadata(report_id)
+            meta = _store.get_report_metadata(report_id)
             if meta:
                 result.update(meta)
         except Exception:

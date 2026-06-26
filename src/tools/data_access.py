@@ -309,6 +309,15 @@ class DataAccessLayer:
         from src.macro_calendar import ENV_USE_LOCAL_MACRO, USE_LOCAL_MACRO_KEY
         return self._profile_setting_truthy(USE_LOCAL_MACRO_KEY, ENV_USE_LOCAL_MACRO)
 
+    def _local_records_enabled(self) -> bool:
+        """App-records domain (reports/memories/agent_queries) → local profile_state.db
+        (PG-exit slice 1b). Off by default; flip only AFTER the 1c id-preserving migration
+        (the local store autoincrements from 1 — writing local rows first would collide with
+        migrated PG ids). Selects the local store in app_records_store.get_app_records_store.
+        Intentionally has NO Settings UI toggle in 1b (env/profile flag only)."""
+        from src.app_records_store import ENV_USE_LOCAL_RECORDS, USE_LOCAL_RECORDS_KEY
+        return self._profile_setting_truthy(USE_LOCAL_RECORDS_KEY, ENV_USE_LOCAL_RECORDS)
+
     @property
     def backend_type(self) -> str:
         """Return the active backend type name."""

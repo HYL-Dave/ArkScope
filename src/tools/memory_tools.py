@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
+from src.app_records_store import get_app_records_store  # PG-exit 1b: local-vs-PG routing
+
 logger = logging.getLogger(__name__)
 
 # Memory directory (relative to project root)
@@ -118,9 +120,10 @@ def save_memory(
 
     # 2. Write metadata to DB (if available)
     memory_id = None
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'insert_memory'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'insert_memory'):
         try:
-            memory_id = dal._backend.insert_memory(
+            memory_id = _store.insert_memory(
                 title=title,
                 content=content,
                 category=category,
@@ -169,9 +172,10 @@ def recall_memories(
         importance, created_at)
     """
     # Try DB first
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'query_memories'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'query_memories'):
         try:
-            df = dal._backend.query_memories(
+            df = _store.query_memories(
                 query=query,
                 category=category,
                 tickers=tickers,
@@ -258,9 +262,10 @@ def list_memories(
         List of memory metadata dicts
     """
     # Try DB first
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'list_memories_meta'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'list_memories_meta'):
         try:
-            df = dal._backend.list_memories_meta(
+            df = _store.list_memories_meta(
                 category=category,
                 days=days,
                 limit=limit,
@@ -326,9 +331,10 @@ def delete_memory(
     file_path = None
 
     # Delete from DB
-    if hasattr(dal, '_backend') and hasattr(dal._backend, 'delete_memory'):
+    _store = get_app_records_store(dal)
+    if hasattr(_store, 'delete_memory'):
         try:
-            file_path = dal._backend.delete_memory(memory_id)
+            file_path = _store.delete_memory(memory_id)
         except Exception as e:
             logger.warning(f"DB memory delete failed: {e}")
             return {"deleted": False, "error": f"DB delete failed: {e}"}

@@ -562,10 +562,12 @@ def _log_agent_query(
 ) -> None:
     """Log a completed query to agent_queries table (best-effort, no errors)."""
     try:
-        if not hasattr(dal, '_backend') or not hasattr(dal._backend, 'insert_agent_query'):
+        from src.app_records_store import get_app_records_store  # PG-exit 1b: local-vs-PG routing
+        _store = get_app_records_store(dal)
+        if not hasattr(_store, 'insert_agent_query'):
             return
         usage = result.get("token_usage", {})
-        dal._backend.insert_agent_query(
+        _store.insert_agent_query(
             question=question,
             answer=result.get("answer", "")[:2000],  # Truncate for DB
             provider=state.provider,
@@ -1382,9 +1384,11 @@ def handle_save_command(state: "SessionState", arg: str) -> None:
         if hasattr(state, 'chat_history') and state.chat_history:
             # Access DAL through lazy import for DB insert
             from src.tools.data_access import DataAccessLayer
+            from src.app_records_store import get_app_records_store  # PG-exit 1b
             dal = DataAccessLayer()
-            if hasattr(dal, '_backend') and hasattr(dal._backend, 'insert_report'):
-                report_id = dal._backend.insert_report(
+            _store = get_app_records_store(dal)
+            if hasattr(_store, 'insert_report'):
+                report_id = _store.insert_report(
                     title=title,
                     tickers=sorted(all_tickers),
                     report_type="chat_save",
