@@ -719,6 +719,38 @@ def test_canonicalize_prices_pk_safe_on_collision(tmp_path):
     conn.close()
 
 
+def test_seed_includes_lc_to_hapn_rename(tmp_path):
+    # LendingClub → Nasdaq HAPN rename (2026-06-22): registered so reads fold LC→HAPN and
+    # the coverage panel shows one HAPN row instead of a perpetual LC missing-gap.
+    conn = sqlite3.connect(tmp_path / "m.db")
+    mda._ensure_ticker_aliases(conn)
+    rows = dict(conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall())
+    assert rows.get("LC") == "HAPN"
+    conn.close()
+
+
+def test_canonicalize_rename_moves_history_when_canonical_absent(tmp_path):
+    # A genuine RENAME (LC→HAPN): unlike the BRK spelling-variant, the history lives under the
+    # OLD symbol and the canonical (HAPN) has no rows yet → ALL alias rows move to canonical,
+    # nothing dropped (no collision). This is the "carry history" stitch.
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.executemany(
+        "INSERT INTO prices (ticker,datetime,interval,open,high,low,close,volume) VALUES (?,?,?,?,?,?,?,?)",
+        [("LC", "2026-06-18T19:45:00+0000", "15min", 1, 1, 1, 7, 10),
+         ("LC", "2026-06-18T20:00:00+0000", "15min", 1, 1, 1, 8, 20),
+         ("AAPL", "2026-06-18T20:00:00+0000", "15min", 1, 1, 1, 9, 30)],
+    )
+    conn.commit()
+    mda._ensure_ticker_aliases(conn)
+    n = mda._canonicalize_table_tickers(conn, "prices")
+    assert n == 1  # LC reconciled
+    tickers = sorted(r[0] for r in conn.execute("SELECT DISTINCT ticker FROM prices").fetchall())
+    assert tickers == ["AAPL", "HAPN"]  # all LC history now under HAPN, none lost, no LC left
+    assert conn.execute("SELECT COUNT(*) FROM prices WHERE ticker='HAPN'").fetchone()[0] == 2
+    conn.close()
+
+
 def test_bootstrap_with_alias_spellings_validates_then_canonicalizes(tmp_path, monkeypatch):
     # REGRESSION (canon-vs-validation ordering): PG carries BOTH 'BRK B' and 'BRK.B'
     # news rows (the live state). Canon must NOT run before the PG-vs-SQLite checksum

@@ -134,6 +134,11 @@ CREATE TABLE IF NOT EXISTS ticker_aliases (
 _SEED_TICKER_ALIASES = (
     ("BRK.B", "BRK B"),
     ("BRK-B", "BRK B"),
+    # LendingClub → Nasdaq HAPN rename (2026-06-22). Unlike the BRK spelling-variants
+    # (canonical == existing-history spelling), this is a true rename: the canonical (HAPN)
+    # is the NEW symbol new bars arrive under, so canonicalize stitches LC's history under
+    # HAPN. Read paths fold LC→HAPN; the coverage panel shows one HAPN row, not an LC gap.
+    ("LC", "HAPN"),
 )
 
 
