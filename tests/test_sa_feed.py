@@ -233,13 +233,16 @@ def test_feed_snippet_is_clean_plain_text(tmp_path):
     finally:
         conn.close()
     items = {i["id"]: i for i in _feed(db, days=30)["items"]}
-    # A1: heading de-marked, byline + disclosure dropped, emphasis/link flattened
-    assert items["A1"]["snippet"] == "NVDA momentum NVIDIA posted record revenue on AI demand."
+    # A1: leading `# {title}` heading dropped (no title dup), byline + disclosure gone,
+    # emphasis/link flattened — snippet is the real lede, not a repeat of the title
+    assert items["A1"]["snippet"] == "NVIDIA posted record revenue on AI demand."
+    assert not items["A1"]["snippet"].startswith("NVDA momentum")  # title not duplicated
     assert "*" not in items["A1"]["snippet"] and "#" not in items["A1"]["snippet"]
-    # A2: snippet would only repeat the title shown above it → dropped to ""
+    # A2: body is only the title heading + byline → nothing new → dropped to ""
     assert items["A2"]["snippet"] == ""
-    # N1: market-news markdown cleaned (image → alt, heading de-marked)
-    assert items["N1"]["snippet"] == "Apple news credit Apple raised prices."
+    # N1: market-news markdown cleaned + leading title heading dropped
+    assert items["N1"]["snippet"] == "credit Apple raised prices."
+    assert not items["N1"]["snippet"].startswith("Apple news")
     # raw body_markdown preserved in the DB (not mutated by the display cleanup)
     rconn = store.connect(str(db), read_only=True)
     try:

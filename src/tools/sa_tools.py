@@ -801,16 +801,14 @@ def get_sa_feed(
 
 
 def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
-    """Clean plain-text list snippet (markdown stripped, SA boilerplate dropped).
-    Returns "" when the cleaned snippet would merely repeat the title shown above
-    it (e.g. a pure heading+byline article body) — nothing new to display. Raw
-    body_markdown is untouched in the DB (FTS / detail / agent evidence keep it)."""
+    """Clean plain-text list snippet (markdown stripped, SA boilerplate dropped,
+    leading ``# {title}`` heading de-duplicated against the title shown above it).
+    Returns "" when nothing new is left to display (e.g. a pure heading+byline
+    article body). Raw body_markdown is untouched in the DB (FTS / detail / agent
+    evidence keep the original)."""
     from src.text_snippet import markdown_to_plain_snippet
 
-    snip = markdown_to_plain_snippet(raw)
-    if not snip or snip == markdown_to_plain_snippet(title):
-        return ""
-    return snip
+    return markdown_to_plain_snippet(raw, drop_title=title)
 
 
 def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[str, Any]:

@@ -102,3 +102,36 @@ def test_no_raw_markdown_leaks():
     out = plain(raw)
     for marker in ("#", "*", "`", "](", "!["):
         assert marker not in out
+
+
+def test_html_entities_decoded():
+    assert plain("AT&amp;T beat estimates") == "AT&T beat estimates"
+    assert plain("margin up &#37; today") == "margin up % today"
+    assert plain("a&nbsp;b") == "a b"            # nbsp → space (whitespace-collapsed)
+    # entity-encoded tags are decoded then stripped (text either way; never rendered)
+    assert plain("&lt;script&gt;evil&lt;/script&gt; safe") == "evil safe"
+
+
+def test_drop_title_heading_duplicate():
+    # body opens with a `# {title}` heading that repeats the title shown above it
+    raw = "# Apple raises prices\n\n![credit](u) Apple lifted MacBook prices."
+    assert plain(raw, drop_title="Apple raises prices") == "credit Apple lifted MacBook prices."
+    # match is case/space-insensitive
+    assert plain("#  Apple Raises Prices \n\nBody here.", drop_title="apple raises prices") == "Body here."
+
+
+def test_drop_title_when_body_is_only_title():
+    assert plain("# Weekly recap\n\n*Author: Seeking Alpha*", drop_title="Weekly recap") == ""
+
+
+def test_drop_title_strips_leading_separator():
+    assert plain("# Title\n\n— actual lede here", drop_title="Title") == "actual lede here"
+    assert plain("# Title\n\n: colon lede", drop_title="Title") == "colon lede"
+    # comma/semicolon orphaned by the dropped title heading are tidied too
+    assert plain("# Title\n\n, BNB-USD, IBIT listed", drop_title="Title") == "BNB-USD, IBIT listed"
+
+
+def test_drop_title_no_match_keeps_running_sentence():
+    # title is NOT a standalone heading → nothing dropped (no sentence mangling)
+    assert plain("Earnings beat expectations sharply.", drop_title="Earnings beat") == \
+        "Earnings beat expectations sharply."
