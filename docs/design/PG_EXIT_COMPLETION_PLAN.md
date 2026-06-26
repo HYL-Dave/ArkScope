@@ -1,7 +1,20 @@
 # PG-Exit Completion — Scoping + Audit
 
 Date: 2026-06-25
-Status: scoping (design-first; no code in this doc)
+Status: scoping → **Slice 1 (app-records) DONE + live-migrated 2026-06-26**; steps 2–5 pending.
+
+## Progress
+
+- **Step 1 — app-records → local-primary: COMPLETE (live, 2026-06-26).** reports / memories /
+  agent_queries now live in `profile_state.db`. Built across 1a (store) · 1b (factory routing,
+  default-off) · 1c-core + core-fix (id-preserving migrator, 5 gates, full-hash, atomic) ·
+  1c-api + fix + fix-2 (preview/apply routes + Settings panel; no-create preview, atomic apply,
+  no-clobber backup-before-DDL). **Live migration run 2026-06-26:** preview 2 reports / 1 memory /
+  2 queries, 0 conflicts → apply (timestamped backup + atomic, id-preserved [2,3]) → flipped
+  `use_local_records` → verified `list_reports`/`get_report`/`recall_memories` route local. PG
+  copy retained as the pre-migration archive; manual + timestamped backups on disk.
+  **This does NOT complete the PG-exit** — steps 2–5 below remain; the market mirror/fallback/
+  strict UI stays load-bearing.
 
 ## Why this exists
 
