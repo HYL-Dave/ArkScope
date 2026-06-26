@@ -97,7 +97,7 @@ def test_complete_trading_day_full_missing_counts(db):
     assert "full_bar_count" not in d
     assert d["full"] == 2 and d["partial"] == 0 and d["missing"] == 1
     assert d["missing_tickers"] == ["LC"]     # 0 bars on a complete trading day
-    assert d["coverage_status"] == "complete_like"  # 26 bars → looks like a full session
+    assert d["coverage_status"] == "partial"  # A.2: covered 2/3 < 0.9 (LC perma-missing) → not falsely complete
 
 
 def test_coverage_status_non_trading_and_in_progress(db):
@@ -166,6 +166,42 @@ def test_complete_when_most_present_well_covered_despite_one_laggard(tmp_path):
     d = next(x for x in out["days"] if x["date"] == "2026-06-22")
     assert d["coverage_status"] == "complete_like"        # 9/10 well-covered ≥ ratio
     assert d["well_covered"] == 9 and d["partial"] == 1
+
+
+def test_large_missing_fraction_is_partial_not_complete(tmp_path):
+    # A.2: most of the universe is MISSING (8/10) though the 2 present are fully covered.
+    # well-ratio alone (2/2 = 100%) would read complete — the covered-ratio gate must catch the
+    # large-scale missing and flag the day 'partial' (too optimistic to call it complete).
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA); _ensure_provider_sync_tables(conn)
+    _bars(conn, "AAPL", "2026-06-22", 26); _bars(conn, "MSFT", "2026-06-22", 26)
+    universe = ["AAPL", "MSFT"] + [f"T{i}" for i in range(8)]   # 8 never get bars → missing
+    conn.commit(); conn.close()
+    out = summarize_trading_day_coverage(
+        universe, interval="15min", lookback_days=2, db_path=str(path),
+        today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["covered"] == 2 and d["missing"] == 8
+    assert d["well_covered"] == 2                          # present ones are full
+    assert d["coverage_status"] == "partial"              # covered 2/10 < 0.9 → NOT complete
+
+
+def test_single_gap_in_large_universe_stays_complete(tmp_path):
+    # A.2 intent: a lone LC-type gap must NOT downgrade a large, otherwise-full universe.
+    path = tmp_path / "market_data.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(_PRICES_SCHEMA); _ensure_provider_sync_tables(conn)
+    universe = [f"T{i}" for i in range(20)]
+    for t in universe[:19]:
+        _bars(conn, t, "2026-06-22", 26)                  # 19 full, universe[19] missing
+    conn.commit(); conn.close()
+    out = summarize_trading_day_coverage(
+        universe, interval="15min", lookback_days=2, db_path=str(path),
+        today=date(2026, 6, 23), now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
+    d = next(x for x in out["days"] if x["date"] == "2026-06-22")
+    assert d["covered"] == 19 and d["missing"] == 1
+    assert d["coverage_status"] == "complete_like"        # covered 19/20 = 0.95 ≥ 0.9 → still complete
 
 
 def test_partial_day_lists_thin_ticker(db):

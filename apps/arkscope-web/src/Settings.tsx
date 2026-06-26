@@ -789,7 +789,7 @@ function TradingDayCoveragePanel() {
           <h2>交易日 / 價格覆蓋 · Trading-day coverage</h2>
           <p className="muted tiny">
             最近 {lookback} 天本地 15min 價格覆蓋（讀 market_data.db）。每列以 coverage_status 為準：
-            覆蓋完整 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。
+            覆蓋完整 / 部分覆蓋 / 疑似不足 / 缺資料 / 盤中 / 週末假日。點開可看缺漏與 partial 標的、以及 provider 錯誤。
             <strong>唯讀診斷，不會自動補抓</strong>；full/partial/missing 僅作為「相對當天覆蓋最佳標的」的 drill-down。
           </p>
         </div>

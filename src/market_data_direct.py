@@ -305,10 +305,10 @@ def _daterange(start: date, end: date):
 # never flagged thin. NOTE: this is a blunt rule — a legitimate half-day / early close (~13-14
 # 15min bars) will read as 'thin' until a proper early-close calendar lands (deferred B+).
 _THIN_BAR_THRESHOLD = {"15min": 20}
-# A complete-looking day needs MOST *present* tickers well-covered, not just one outlier — else a
-# single fully-synced ticker (e.g. a freshly-renamed symbol) masks a universe-wide thin/partial
-# day. Ratio is over PRESENT tickers, so a permanently-missing ticker (delisted/unresolvable)
-# stays in `missing`, separate from this judgment. Below this fraction → 'partial', not 'complete'.
+# 'complete_like' requires BOTH gates at this fraction (A.2): covered/universe (not too many
+# MISSING — a large gap shouldn't read complete) AND well_covered/present (those present aren't
+# thin — one fully-synced outlier shouldn't mask a thin day). A single LC-type gap in a large
+# universe still passes (0.9 tolerates it); below EITHER fraction → 'partial'.
 _COMPLETE_COVERED_RATIO = 0.9
 
 
@@ -332,13 +332,15 @@ def summarize_trading_day_coverage(
         in-progress day is flagged, not counted as a gap);
       - across the (alias-canonicalized) universe: ``full`` / ``partial`` / ``missing`` counts +
         the missing & partial ticker lists. full/partial are RELATIVE to ``max_observed_bar_count``
-        = the per-day MAX bar count across the universe — i.e. a per-ticker OUTLIER signal (which
-        tickers lag the best-covered ones that day), NOT an absolute-completeness claim;
-        ``missing`` = zero bars on that day.
-      - ``coverage_status`` (the UI-facing label, A.1): ``non_trading`` / ``in_progress`` /
-        ``missing`` (complete day, zero coverage) / ``thin`` (complete day but max bars below
-        ``_THIN_BAR_THRESHOLD`` — 疑似不足, guards the trap where a uniformly-thin day's relative
-        full/partial would otherwise read as complete) / ``complete_like``.
+        = the per-day MAX bar count (a per-ticker OUTLIER signal — which tickers lag the best-
+        covered ones that day); ``well_covered`` = present tickers with bars ≥
+        ``_THIN_BAR_THRESHOLD``; ``missing`` = zero bars that day.
+      - ``coverage_status`` (the UI-facing label): ``non_trading`` / ``in_progress`` / ``missing``
+        (complete day, zero coverage) / ``thin`` (even the best-covered ticker is sparse — max
+        bars below ``_THIN_BAR_THRESHOLD``) / ``complete_like`` (A.2: needs BOTH covered/universe
+        AND well_covered/present ≥ ``_COMPLETE_COVERED_RATIO``) / ``partial`` (large-scale missing
+        OR many present-but-sparse). Guards two traps: a uniformly-thin day reading complete, and
+        a single full outlier (or a large missing block) masking an incomplete day.
     Plus a ``provider_errors`` summary from ``provider_sync_meta.last_error`` (e.g. an IBKR
     contract that won't resolve — LC), so a recurring failure is visible instead of silently
     retried. Non-trading days carry null coverage. An absent DB ⇒ every trading day all-missing
@@ -401,16 +403,19 @@ def summarize_trading_day_coverage(
         missing = sorted(t for t in canon_universe if t not in present)
         thin_thr = _THIN_BAR_THRESHOLD.get(db_interval, 0)
         well_covered = sum(1 for n in present.values() if n >= thin_thr)
+        n_universe = len(canon_universe)
+        covered_ratio = len(present) / n_universe if n_universe else 0.0   # not too many MISSING
+        well_ratio = well_covered / len(present) if present else 0.0       # present ones well-covered
         if not complete:
             status = "in_progress"                       # session not closed → don't judge thin
         elif not present:
             status = "missing"                           # complete trading day, zero coverage
         elif day_max < thin_thr:
             status = "thin"                              # even the best-covered ticker is sparse
-        elif well_covered >= _COMPLETE_COVERED_RATIO * len(present):
-            status = "complete_like"                     # most PRESENT tickers well-covered
+        elif covered_ratio >= _COMPLETE_COVERED_RATIO and well_ratio >= _COMPLETE_COVERED_RATIO:
+            status = "complete_like"                     # most of universe present AND those present well-covered
         else:
-            status = "partial"                           # a few well-covered, the rest sparse → uneven
+            status = "partial"                           # large-scale missing OR many present-but-sparse → uneven
         days.append({
             "date": iso, "is_trading_day": True, "reason": mds["reason"], "holiday": None,
             "session_complete": complete,
