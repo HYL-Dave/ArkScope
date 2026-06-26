@@ -739,8 +739,12 @@ def status_snapshot() -> Dict[str, Any]:
         last_results = {k: dict(v) for k, v in _LAST_RESULT.items()}
     # v1.4: durable per-source state (last_status / last_error / continuation / last_result)
     # from the local scheduler_state store — survives restarts; the UI shows partial vs skipped.
+    # v1.4a: NO-CREATE read — a pure status read must not materialize profile_state.db / its
+    # schema (only a real run, via _state_store(), creates it).
     try:
-        durable = _state_store().all()
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.scheduler_state import read_all_if_exists
+        durable = read_all_if_exists(resolve_profile_state_db_path(None))
     except Exception:  # noqa: BLE001 — display must never fail on a store hiccup
         durable = {}
     for source, d in SOURCES.items():

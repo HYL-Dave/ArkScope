@@ -23,7 +23,9 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
     # v1.2: isolate the durable scheduler-state store to a per-test DB (never the real
-    # profile_state.db) and reset the cached singleton so it rebuilds against this tmp path.
+    # profile_state.db). Set ARKSCOPE_PROFILE_DB so BOTH the write store (_state_store) and the
+    # v1.4a no-create read (resolve_profile_state_db_path) resolve to this tmp path.
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     from src.scheduler_state import SchedulerStateStore
     monkeypatch.setattr(ds, "_SCHED_STATE", SchedulerStateStore(tmp_path / "profile_state.db"))
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
@@ -773,3 +775,19 @@ def test_v14_status_snapshot_exposes_durable_state_and_gap_planned(monkeypatch):
     assert pb["durable_state"]["continuation"]["deferred"] == ["NVDA", "TSLA"]
     # a non-gap-planned source: flag false, durable_state present-or-None (no crash)
     assert snap["polygon_news"]["gap_planned"] is False
+
+
+def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):
+    # v1.4a MED fix: a pure status read must NOT materialize profile_state.db / scheduler_state.
+    # Point at a FRESH (absent) profile DB, reset the cached store, call status_snapshot → the
+    # DB/table must NOT be created, and durable_state is None for every source.
+    import os
+    fresh = tmp_path / "fresh_profile.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(fresh))
+    monkeypatch.setattr(ds, "_SCHED_STATE", None)   # force resolution against the fresh path
+    snap = ds.status_snapshot()
+    assert not fresh.exists(), "status read must not create profile_state.db"
+    assert all(s["durable_state"] is None for s in snap.values())
+    # and a no-create read of an absent DB returns {} (helper-level)
+    from src.scheduler_state import read_all_if_exists
+    assert read_all_if_exists(str(fresh)) == {} and not fresh.exists()

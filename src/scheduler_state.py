@@ -142,3 +142,20 @@ class SchedulerStateStore:
                 except (ValueError, TypeError):
                     d[k] = None
         return d
+
+
+def read_all_if_exists(db_path: str | Path) -> Dict[str, Dict[str, Any]]:
+    """No-create read of all scheduler_state rows — for pure-read paths (GET /schedule status)
+    that must NOT materialize profile_state.db or its schema. Returns {} when the file or the
+    table is absent (mirrors read_macro_table_stats / app_records create=False)."""
+    if not Path(db_path).exists():
+        return {}
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("SELECT * FROM scheduler_state").fetchall()
+    except sqlite3.OperationalError:
+        return {}   # table not created yet
+    finally:
+        conn.close()
+    return {r["source"]: SchedulerStateStore._row_to_dict(r) for r in rows}
