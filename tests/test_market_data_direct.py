@@ -777,3 +777,66 @@ def test_backfill_polygon_provider_skips_ibkr_preflight(tmp_path, monkeypatch):
                                      db_path=str(db), polygon_src=poly,
                                      now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
     assert res["rows_added"] == 1  # no IBKR involved, no preflight needed
+
+
+# --- PG-exit: standalone backfill acquires the shared IBKR Gateway lock -------------
+
+def test_backfill_acquires_gateway_lock_by_default(tmp_path, monkeypatch):
+    # a standalone backfill must hold the SHARED gateway lock during the IBKR work, so it
+    # can't race the scheduler / intraday. Assert the lock is held when the fetch runs.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    import src.ibkr_gateway_lock as gw
+    db = _backfill_db(tmp_path)
+    seen = {"held": None}
+
+    class _ObservingIBKR(_FakeIBKR):
+        def fetch_historical_intraday(self, *a, **k):
+            seen["held"] = gw.IBKR_THREAD_LOCK.locked()   # was the gateway lock held during fetch?
+            return super().fetch_historical_intraday(*a, **k)
+
+    ibkr = _ObservingIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                               db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18))
+    assert seen["held"] is True                              # gateway lock held during the fetch
+    assert not gw.IBKR_THREAD_LOCK.locked()                  # released after
+
+
+def test_backfill_acquire_gateway_lock_false_skips_when_caller_holds_it(tmp_path, monkeypatch):
+    # the scheduler path: run_source already holds the gateway lock, so the adapter is called
+    # with acquire_gateway_lock=False. Simulate by holding the lock, then calling with the flag
+    # off → must NOT deadlock (would hang/timeout if it tried to re-acquire the non-reentrant lock).
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    import src.ibkr_gateway_lock as gw
+    db = _backfill_db(tmp_path)
+    ibkr = _FakeIBKR(bars_by_ticker={"AAPL": [_bar(datetime(2026, 6, 17, 9, 30, 0))]})
+    assert gw.IBKR_THREAD_LOCK.acquire(timeout=2)            # caller (scheduler) holds it
+    try:
+        res = mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="ibkr",
+                                         db_path=str(db), ibkr_src=ibkr, today=date(2026, 6, 18),
+                                         acquire_gateway_lock=False)
+        assert res["rows_added"] == 1                        # completed (no self-deadlock)
+    finally:
+        gw.IBKR_THREAD_LOCK.release()
+
+
+def test_backfill_polygon_path_no_gateway_lock(tmp_path, monkeypatch):
+    # provider=polygon has no Gateway dependency → must not hold the IBKR gateway lock.
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    import src.ibkr_gateway_lock as gw
+    db = _backfill_db(tmp_path)
+    epoch_ms = int(datetime(2026, 6, 17, 13, 30, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    poly = _FakePolygon(results_by_day={date(2026, 6, 17): [
+        {"t": epoch_ms, "o": 1, "h": 2, "l": 0.5, "c": 1.5, "v": 9}]})
+    # record whether the gateway lock was ever entered (it must NOT be for the polygon path)
+    entered = {"n": 0}
+    real_cm = gw.ibkr_gateway_lock
+
+    def _counting_cm(*a, **k):
+        entered["n"] += 1
+        return real_cm(*a, **k)
+    monkeypatch.setattr("src.market_data_direct.ibkr_gateway_lock", _counting_cm, raising=False)
+    monkeypatch.setattr(gw, "ibkr_gateway_lock", _counting_cm)
+    mdd.backfill_prices_direct(tickers_arg="AAPL", lookback_days=2, provider="polygon",
+                               db_path=str(db), polygon_src=poly, today=date(2026, 6, 18))
+    assert entered["n"] == 0                                  # polygon path never takes the gateway lock
+    assert not gw.IBKR_THREAD_LOCK.locked()

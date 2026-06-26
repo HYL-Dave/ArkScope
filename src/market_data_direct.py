@@ -620,6 +620,7 @@ def backfill_prices_direct(
     polygon_src=None,
     today: Optional[date] = None,
     now_et: Optional[datetime] = None,
+    acquire_gateway_lock: bool = True,
 ) -> dict:
     """Direct provider→SQLite price backfill (FULL-WINDOW TOP-UP, 2d) — heal sparse/partial
     days in the local ``prices`` table from a provider (IBKR primary / Polygon fallback), no PG.
@@ -663,6 +664,28 @@ def backfill_prices_direct(
     elif provider == "polygon" and polygon_src is None:
         polygon_src = _default_polygon_src()
 
+    # PG-exit: a standalone IBKR backfill serializes on the SHARED Gateway lock so it can't race
+    # the scheduler's IBKR jobs or a future intraday op (one TWS/Gateway session total). The
+    # scheduler's price_backfill adapter ALREADY holds it (run_source) → passes
+    # acquire_gateway_lock=False to avoid re-acquiring the non-reentrant lock (self-deadlock).
+    # Held across preflight + fetch; nullcontext for the polygon path / when the caller holds it.
+    from contextlib import nullcontext
+
+    from src.ibkr_gateway_lock import ibkr_gateway_lock
+    gateway = (ibkr_gateway_lock() if provider == "ibkr" and acquire_gateway_lock
+               else nullcontext())
+    with gateway:
+        return _run_backfill_body(
+            provider=provider, ibkr_src=ibkr_src, polygon_src=polygon_src, raw=raw, path=path,
+            interval=interval, lookback_days=lookback_days, today=today, now_et=now_et,
+            progress_cb=progress_cb)
+
+
+def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
+                       lookback_days, today, now_et, progress_cb) -> dict:
+    """The backfill work (preflight → window → write-lock → per-ticker fetch/insert/telemetry),
+    extracted so backfill_prices_direct can wrap it in the shared Gateway lock. Preflight stays
+    BEFORE market_write_lock (2e: fail fast before holding the DB write lock)."""
     # 2e PREFLIGHT: for the IBKR path, verify the Gateway API handshake BEFORE taking the
     # market write lock. A cold-connect failure fails the run FAST and LOUD here — never
     # holding the DB write lock while churning (the unattended-scheduler hazard the live

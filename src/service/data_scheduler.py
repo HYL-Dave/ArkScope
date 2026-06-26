@@ -381,6 +381,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                             "active-universe scope empty/unavailable (profile DB)")
                     kwargs["tickers_arg"] = ",".join(scope)
                     result["ticker_count"] = len(scope)
+                if d.ibkr:
+                    # run_source ALREADY holds the shared Gateway lock (_IBKR_LOCK/_IBKR_FLOCK
+                    # above) — tell the IBKR adapter (price_backfill) NOT to re-acquire it (the
+                    # lock is non-reentrant; re-acquiring would self-deadlock). The kwarg is
+                    # accepted by IBKR adapters (today only backfill_prices_direct).
+                    kwargs["acquire_gateway_lock"] = False
                 result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
                 collected = True
             elif d.collector is not None:
