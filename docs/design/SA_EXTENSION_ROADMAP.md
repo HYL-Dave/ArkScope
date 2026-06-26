@@ -1,6 +1,6 @@
 # Seeking Alpha Extension Roadmap
 
-Last updated: 2026-04-23
+Last updated: 2026-06-27
 
 ## Goal
 
@@ -25,6 +25,54 @@ Already implemented today:
 - bounded quick/full/deep-backfill refresh modes
 
 Current content-capture limitations for Alpha Picks article bodies are documented in `docs/design/SA_ALPHA_PICKS_CONTENT_CAPTURE.md`.
+
+## P0 prerequisite: capture runtime stability and embedded-browser readiness
+
+This roadmap now has a runtime prerequisite before adding broader SA surfaces or replacing the external browser path.
+
+Why:
+
+- The Firefox/extension workflow is a protected runtime surface, but long-running browser sessions can become memory-heavy and slow.
+- A future embedded browser is already a deferred product direction, but it should not inherit the extension's lifecycle leaks, duplicate listeners, unbounded queues, or login/session fragility.
+- Seeking Alpha capture must remain user-driven and durable while the runtime moves from "external browser extension" toward an app-owned capture backend.
+
+Required prework:
+
+1. **Runtime telemetry**
+   - Record browser kind, extension version, capture mode, session id, active tab/url class, native-port open/close counts, message queue depth, batch sizes, scrape duration, cleanup timestamp, and failure reason.
+   - When available, sample browser/renderer memory or at least process RSS around quick/full/deep refresh runs.
+   - Surface this as local diagnostic state, not as remote telemetry.
+
+2. **Lifecycle hardening**
+   - Content-script injection must be idempotent per tab/frame.
+   - `MutationObserver`, timers, DOM listeners, native messaging ports, and in-memory caches must be explicitly disconnected on navigation, tab close, refresh completion, and cancellation.
+   - Scrapers must not keep long-lived DOM node references, whole-page HTML snapshots, or unbounded arrays once a batch is sent.
+   - Native-host writes stay short, bounded, and retryable; failures must be visible but must not make the browser retain large pending payloads indefinitely.
+
+3. **Capture-core extraction**
+   - Split SA capture into a shared, testable core protocol plus thin adapters:
+     - Chrome/Firefox extension adapter.
+     - Future embedded-browser adapter.
+     - Native/app-owned write adapter.
+   - The core protocol owns normalized capture messages, batch boundaries, cancellation, dedupe keys, and evidence provenance.
+   - Browser-specific code owns only page access, session/login state, and user gesture plumbing.
+
+4. **Soak and restart acceptance**
+   - Run a multi-hour soak with repeated SA navigation, quick/full refresh, tab close/reopen, browser restart, and native-host reconnect.
+   - Acceptance: no duplicate content scripts/listeners, no stuck native ports, bounded queue sizes, stable or recoverable memory growth, no lost committed captures, and clear recovery instructions if a temporary extension disappears after browser restart.
+
+5. **Embedded-browser gate**
+   - Before adopting an embedded browser backend, decide the browser engine strategy, SA login-profile persistence, extension-support model, renderer recycle policy, memory budget, and compliance/ToS posture.
+   - If the chosen embedded browser cannot safely run the existing extension as-is, it must use the shared capture core through a dedicated embedded adapter instead of copying extension internals.
+
+Implementation order:
+
+1. Add diagnostics to the existing Firefox/Chrome extension and native-host path.
+2. Fix lifecycle leaks exposed by the diagnostics.
+3. Extract the capture-core protocol behind the current extension.
+4. Only then spike the embedded-browser adapter.
+
+This prerequisite is intentionally before broader source expansion. New SA surfaces can still be added later, but the capture runtime must first be observable and bounded.
 
 ## Product framing
 

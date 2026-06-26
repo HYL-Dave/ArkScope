@@ -231,7 +231,7 @@ Three distinct research objects, deliberately not merged:
 - **Current SA ingestion stays**: Chrome/Firefox extension → Native Messaging host → DB is a **protected runtime surface** — do not break it.
 - **RL** = retired/offline under `training/`; the Algo nav entry (if present) stays empty in v1.
 - **Deferred spikes (not v1, not drop-in replacements):**
-  - *Embedded/stealth browser* (e.g. CloakBrowser) as an alternative SA-ingestion backend — evaluate bundle size, ToS/compliance, login-profile, platform-publish cost before adopting. Not a v1 extension replacement.
+  - *Embedded/stealth browser* (e.g. CloakBrowser) as an alternative SA-ingestion backend — evaluate bundle size, ToS/compliance, login-profile, platform-publish cost before adopting. Not a v1 extension replacement. Before this can replace the external extension path, complete `SA_EXTENSION_ROADMAP.md` P0: runtime diagnostics, lifecycle cleanup, capture-core extraction, and soak testing.
   - *Code/doc knowledge-graph tooling* (e.g. Understand-Anything) for repo/doc navigation — a dev-tooling spike, **not** a replacement for the agent's research memory.
 
 ---

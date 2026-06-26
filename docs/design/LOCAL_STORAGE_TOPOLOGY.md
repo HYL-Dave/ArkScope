@@ -179,6 +179,8 @@ Reopen this design when one or more is true:
 - CLI and extension writers are consolidated behind an app-owned write service.
 - Cross-process write paths become hard to reason about despite file locks.
 
+Before the embedded-browser trigger moves to implementation, complete the SA capture runtime prerequisite in `SA_EXTENSION_ROADMAP.md`: extension/native-host diagnostics, lifecycle cleanup, capture-core extraction, soak testing, and an explicit embedded-browser session/memory strategy. The replacement path should be app-owned because it is more observable and bounded, not merely because it is packaged inside the desktop app.
+
 Until then, this remains a decision record and review checklist, not a broad immediate implementation slice.
 
 ---
@@ -187,5 +189,6 @@ Until then, this remains a decision record and review checklist, not a broad imm
 
 - `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` — active storage migration and collection plan.
 - `SA_CUTOVER_3D_RUNBOOK.md` — Seeking Alpha hard cutover to `sa_capture.db`.
+- `SA_EXTENSION_ROADMAP.md` — SA capture source expansion plus runtime/embedded-browser prerequisite.
 - `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md` — storage architecture authority.
 - `ARKSCOPE_PROVIDER_CATALOG.md` — provider facts, streaming modes, cost/latency.

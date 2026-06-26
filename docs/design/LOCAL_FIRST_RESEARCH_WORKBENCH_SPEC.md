@@ -218,6 +218,8 @@ External ingest clients — today **SA native host** (`scripts/sa_native_host.py
 - Read-only consumers of SA data (those go through DAL like everything else).
 - v2 features like remote ingestion / cloud sync — out of scope.
 
+**Embedded-browser prerequisite**: if ArkScope later replaces the external browser extension with an embedded/app-owned browser capture path, the extension code stops being "outside the profile" in practice. That cut must first complete the runtime prerequisite in `SA_EXTENSION_ROADMAP.md`: diagnostics for memory/lifecycle behavior, explicit cleanup of observers/listeners/native ports, capture-core extraction, and a soak-tested session/memory policy.
+
 ---
 
 ## 4. Storage Strategy (LOCK #4)
