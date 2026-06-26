@@ -1336,6 +1336,37 @@ export function getTradingDayCoverage(
   );
 }
 
+// --- App-records PG→local migration (PG-exit 1c) ---
+
+export interface AppRecordsTablePreview {
+  pg_count: number;
+  local_count: number;
+  max_pg_id: number | null;
+  max_local_id: number | null;
+  to_insert: number[];
+  idempotent_skip: number[];
+  conflicts: number[];
+  missing_files: string[];
+}
+
+export interface AppRecordsMigrationPreview {
+  tables: Record<string, AppRecordsTablePreview>;
+  would_apply: boolean;
+}
+
+export interface AppRecordsMigrationResult {
+  backup: string | null;
+  tables: Record<string, { inserted: number; skipped: number }>;
+}
+
+export function previewAppRecordsMigration(): Promise<AppRecordsMigrationPreview> {
+  return getJSON<AppRecordsMigrationPreview>("/app-records/migration/preview");
+}
+
+export function applyAppRecordsMigration(): Promise<AppRecordsMigrationResult> {
+  return sendJSON<AppRecordsMigrationResult>("/app-records/migration/apply", "POST");
+}
+
 // --- 新聞·事件 feed (score-free, local-first over news + FTS5) ---
 
 export interface NewsFeedItem {
