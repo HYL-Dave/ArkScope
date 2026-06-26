@@ -37,11 +37,12 @@ enabled+due `SourceDef` (`SOURCES`). Verified facts that shape the design:
   restart: `_LAST_RESULT.error` (in-mem), `job_runs.error` (PG), `provider_sync_meta.last_error`
   (local SQLite, but per-ticker, not per-scheduler-run). No single local surface answers "why did
   the last price_backfill fail, and what's still missing."
-- **Locks (the safety boundary).** `_IBKR_LOCK` (in-proc `threading.Lock`) + `_IBKR_FLOCK`
-  (`_FileLock("ibkr_gateway")`, cross-process) serialize Gateway work — but only inside
-  `run_source()` when `SourceDef.ibkr=True`. A standalone `backfill_prices_direct` takes only
-  `market_write_lock` (`local_refresh.lock`, the DB-write lock) and dials the Gateway in its
-  preflight WITHOUT the Gateway flock. (Same gap the Intraday spec flagged — see Precursor.)
+- **Locks (the safety boundary).** ✅ RESOLVED by the precursor (2026-06-26). The Gateway mutex
+  (`IBKR_THREAD_LOCK` + `IBKR_FILE_LOCK('ibkr_gateway')`) now lives in `src/ibkr_gateway_lock.py`;
+  `run_source` AND standalone `backfill_prices_direct` both acquire it (scheduler passes
+  `acquire_gateway_lock=False` since it already holds it — non-reentrant). _Was: the lock was
+  scheduler-private, so a standalone backfill dialed the Gateway without it._ The bounded
+  gap-aware ops below inherit this single-Gateway-session guarantee.
 - **No operation continuation.** There is no persisted "this run did days X..Y, resume at Z" — a
   killed mid-run leaves only an in-mem `_PROGRESS` that's already gone, and (for scheduler runs) a
   PG `job_runs` row. price_backfill's idempotent full-window re-run is the current "recovery": safe
@@ -118,11 +119,19 @@ Decisions above locked. Slice 0 (lock) is DONE. The order front-loads the **read
 - **Slice 0 — `ibkr_gateway_lock` extraction.** ✅ DONE (see Precursor).
 
 - **v1.1 — read-only backfill PLANNER (pure function, no writes, no scheduler change).**
-  `plan_price_backfill(coverage, *, max_tickers, max_days, exclude) -> BackfillPlan`: consume
-  `summarize_trading_day_coverage` (the existing oracle) → the bounded set of (ticker, missing
-  complete-trading-days) to fetch, EXCLUDING non-trading / in-progress / known-unresolvable
-  tickers (the `LC`-style `coverage_status` / provider-error signal). Pure + deterministic →
-  hermetic tests only; touches nothing live. This is the gap→scope core decision-3/2 depend on.
+  **Planner/executor contract (locked):** the executor (`backfill_prices_direct`) is window-based
+  top-up — it takes `tickers_arg` + `lookback_days` and `INSERT OR IGNORE`s a contiguous
+  complete-day window (no per-day fetch entry point, and we are NOT adding one — the top-up's
+  idempotence is the proven heal path). So the planner outputs a **bounded ticker set + a window
+  depth**, NOT a (ticker, day-list): `plan_price_backfill(coverage, *, max_tickers, max_days,
+  exclude_tickers) -> BackfillPlan` where `BackfillPlan = {tickers: list[str], lookback_days: int,
+  excluded: list[{ticker, reason}], deferred: list[str], candidate_count: int}`. It consumes
+  `summarize_trading_day_coverage`: select tickers that have ≥1 missing COMPLETE trading day,
+  EXCLUDE non-trading/in-progress (not gaps) + known-unresolvable tickers (the `LC`-style
+  provider-error / persistent-zero signal, via `exclude_tickers`); `lookback_days` = enough to
+  reach the OLDEST selected gap (capped at `max_days`); cap the ticker set at `max_tickers` and
+  put the rest in `deferred` (→ v1.3 continuation). Pure + deterministic → hermetic tests only;
+  touches nothing live. This is the gap→scope core that decisions 2/3 depend on.
 
 - **v1.2 — local scheduler-state store** (recoverable + visible-failure). Single `scheduler_state`
   table in `profile_state.db` (decision 1): per-source last_attempt / last_status / last_error /
