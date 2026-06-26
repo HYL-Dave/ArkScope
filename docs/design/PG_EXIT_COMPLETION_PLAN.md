@@ -104,6 +104,9 @@ early, and the UI only simplifies once each domain is truly local.
 2. **Ingest collectors → direct-local.** Apply the `price_backfill` direct-write pattern to
    news / IV / fundamentals collectors (provider→local, no PG), behind the same kind of toggle, then
    make local the default. Prices' scheduler source switches to the direct path too.
+   **NEWS chosen first** (high-frequency, user-visible, recoverable) — scoped in
+   `NEWS_DIRECT_LOCAL_PLAN.md` (5 open decisions + a 2a–2d slice plan; note: news is provider→
+   Parquet→PG→mirror today, not provider→PG). IV deferred until its source strategy is clearer.
 3. **Retire the PG mirror.** Once all ingest is direct-local, `local_incremental` (本地鏡像增量) and
    the per-collector `sync_flag` PG-sync become dead — remove them. This is where the scheduler
    simplifies (and connects to the scheduler-hardening plan, which assumed direct-local).
