@@ -156,85 +156,23 @@ _DAILY_UPDATE_ALIAS = {
 }
 
 # --- locks (single sidecar process) -------------------------------------------
+# The Gateway lock (in-process + cross-process) now lives in src.ibkr_gateway_lock so EVERY
+# IBKR consumer — this scheduler, the standalone direct price backfill, and the future intraday
+# operation — serializes on the SAME mutex. _FileLock / _lock_dir moved there too (shared infra
+# for all the flocks below); imported here so the other flocks keep identical behavior.
+from src.ibkr_gateway_lock import (  # noqa: E402
+    IBKR_FILE_LOCK as _IBKR_FLOCK,
+    IBKR_THREAD_LOCK as _IBKR_LOCK,
+    FileLock as _FileLock,
+    lock_dir as _lock_dir,
+)
+
 _SOURCE_LOCKS: Dict[str, threading.Lock] = {name: threading.Lock() for name in SOURCES}
-_IBKR_LOCK = threading.Lock()    # one Gateway session — IBKR jobs never overlap
 _SYNC_LOCK = threading.Lock()    # one migrate_to_supabase at a time
 _LOCAL_REFRESH_LOCK = threading.Lock()  # one incremental_update at a time (skip-if-busy)
 
-
 # --- cross-process lock twins (sidecar ⟷ daily_update CLI) ---------------------
-
-def _lock_dir() -> Path:
-    """Lock-file directory (env-overridable so tests never collide with a live
-    sidecar's locks)."""
-    return Path(os.environ.get("ARKSCOPE_LOCK_DIR") or (_REPO_ROOT / "data" / "locks"))
-
-
-class _FileLock:
-    """flock(2) twin of a threading.Lock: serializes the sidecar against the
-    daily_update CLI (separate PROCESSES calling the same run_source — a
-    threading.Lock cannot see across them). The kernel releases flock when the
-    fd closes OR the process dies, so a crashed run never wedges the lock.
-
-    Each instance is only ever acquired while its threading twin is held, so the
-    instance itself needs no thread-safety. Non-POSIX (no fcntl) degrades to
-    in-process-only locking with a one-time warning."""
-
-    _warned = False
-
-    def __init__(self, name: str):
-        self._name = name
-        self._fh = None
-
-    def acquire(self, timeout: float = 0.0, poll: float = 5.0) -> bool:
-        """timeout 0 → single non-blocking try; >0 → poll until the deadline."""
-        try:
-            import fcntl
-        except ImportError:  # non-POSIX
-            if not _FileLock._warned:
-                logger.warning("fcntl unavailable — cross-process locks degraded "
-                               "to in-process only")
-                _FileLock._warned = True
-            return True
-        path = _lock_dir() / f"{self._name}.lock"
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fh = open(path, "a+")
-        except OSError as e:
-            # A broken lock dir must not brick collection: degrade, don't skip.
-            logger.warning(f"file lock {path.name} unavailable ({e}); "
-                           "cross-process exclusion degraded for this run")
-            return True
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                self._fh = fh
-                return True
-            except OSError:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    fh.close()
-                    return False
-                time.sleep(min(poll, max(0.1, remaining)))
-
-    def release(self) -> None:
-        if self._fh is None:
-            return
-        try:
-            import fcntl
-
-            fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
-        except Exception:  # noqa: BLE001 — close below still drops the lock
-            pass
-        try:
-            self._fh.close()
-        finally:
-            self._fh = None
-
-
 _SOURCE_FLOCKS: Dict[str, _FileLock] = {name: _FileLock(f"source_{name}") for name in SOURCES}
-_IBKR_FLOCK = _FileLock("ibkr_gateway")
 _SYNC_FLOCK = _FileLock("pg_sync")
 _LOCAL_REFRESH_FLOCK = _FileLock("local_refresh")
 
