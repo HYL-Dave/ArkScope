@@ -1,0 +1,159 @@
+"""PG-exit Step 2a — direct-local news writer (hermetic: fake provider, temp DB, no PG).
+
+provider → local market_data.db `news` + `news_fts`, no PG / no Parquet round-trip. Dedup on the
+opaque article_hash (MD5 today — treated as a stable key, NOT assumed SHA-256), UTC-normalized
+published_at, FTS searchable, provider_sync telemetry, per-ticker failure isolation, source-scoped
+incremental cursor. 2a is the writer only — NO scheduler routing, NO live-DB migration (2b/2c).
+"""
+
+from __future__ import annotations
+
+import sqlite3
+
+import pytest
+
+import src.news_direct as nd
+
+
+class _FakeNewsProvider:
+    """Injectable provider: fetch_news(ticker, since_iso) → list of raw article dicts.
+    Records the `since` it was asked for (to assert the cursor)."""
+    def __init__(self, by_ticker):
+        self._by = by_ticker
+        self.since_seen = {}
+
+    def fetch_news(self, ticker, since_iso=None):
+        self.since_seen[ticker] = since_iso
+        return list(self._by.get(ticker, []))
+
+
+def _article(ticker, title, published_at, *, h=None, desc="body", url="u", publisher="pub"):
+    return {"ticker": ticker, "title": title, "published_at": published_at,
+            "description": desc, "url": url, "publisher": publisher,
+            "article_hash": h or f"{ticker}|{title}|{published_at[:10]}"}
+
+
+def _news_db(tmp_path):
+    return str(tmp_path / "market_data.db")
+
+
+def _rows(db, where=""):
+    c = sqlite3.connect(db); c.row_factory = sqlite3.Row
+    try:
+        return [dict(r) for r in c.execute(f"SELECT * FROM news {where} ORDER BY published_at").fetchall()]
+    finally:
+        c.close()
+
+
+def test_writes_articles_to_local_news(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    prov = _FakeNewsProvider({"AAPL": [
+        _article("AAPL", "Beat", "2026-06-24T13:30:00Z", h="h1"),
+        _article("AAPL", "Raise", "2026-06-24T14:00:00Z", h="h2")]})
+    res = nd.backfill_news_direct(["AAPL"], source="polygon", provider=prov, db_path=db)
+    assert res["articles_added"] == 2 and res["tickers_scanned"] == 1 and res["errors"] == {}
+    rows = _rows(db)
+    assert [r["title"] for r in rows] == ["Beat", "Raise"]
+    assert all(r["source"] == "polygon" for r in rows)
+    assert rows[0]["published_at"] == "2026-06-24T13:30:00+0000"   # UTC-normalized ('Z' → +0000)
+
+
+def test_dedup_idempotent_on_article_hash(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    arts = [_article("AAPL", "Beat", "2026-06-24T13:30:00Z", h="h1")]
+    nd.backfill_news_direct(["AAPL"], source="polygon", provider=_FakeNewsProvider({"AAPL": arts}), db_path=db)
+    # re-run with the SAME hash (even different title) → no duplicate row (INSERT OR IGNORE on hash)
+    again = [_article("AAPL", "Beat (edited)", "2026-06-24T13:30:00Z", h="h1")]
+    res = nd.backfill_news_direct(["AAPL"], source="polygon", provider=_FakeNewsProvider({"AAPL": again}), db_path=db)
+    assert res["articles_added"] == 0
+    assert len(_rows(db)) == 1
+
+
+def test_fts_search_finds_written_articles(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    prov = _FakeNewsProvider({"NVDA": [
+        _article("NVDA", "Nvidia earnings beat", "2026-06-24T13:30:00Z", h="n1", desc="record datacenter revenue")]})
+    nd.backfill_news_direct(["NVDA"], source="polygon", provider=prov, db_path=db)
+    c = sqlite3.connect(db)
+    try:
+        # external-content FTS5 must be populated → MATCH finds the row by title AND body
+        hit_title = c.execute("SELECT n.title FROM news_fts f JOIN news n ON n.id=f.rowid "
+                              "WHERE news_fts MATCH 'earnings'").fetchone()
+        hit_body = c.execute("SELECT COUNT(*) FROM news_fts WHERE news_fts MATCH 'datacenter'").fetchone()[0]
+    finally:
+        c.close()
+    assert hit_title and hit_title[0] == "Nvidia earnings beat"
+    assert hit_body == 1
+
+
+def test_provider_sync_telemetry_news_domain(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    nd.backfill_news_direct(["AAPL"], source="polygon",
+                            provider=_FakeNewsProvider({"AAPL": [_article("AAPL", "X", "2026-06-24T13:30:00Z", h="h1")]}),
+                            db_path=db)
+    c = sqlite3.connect(db); c.row_factory = sqlite3.Row
+    try:
+        run = c.execute("SELECT * FROM provider_sync_runs ORDER BY id DESC LIMIT 1").fetchone()
+        meta = c.execute("SELECT * FROM provider_sync_meta WHERE provider='polygon' AND ticker='AAPL'").fetchone()
+    finally:
+        c.close()
+    assert run["domain"] == "news" and run["status"] == "succeeded" and run["rows_added"] == 1
+    assert meta["interval"] == "news" and meta["last_error"] is None
+    assert meta["last_bar_datetime"] == "2026-06-24T13:30:00+0000"   # cursor = newest published_at
+
+
+def test_per_ticker_failure_isolated(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+
+    class _PartlyBroken(_FakeNewsProvider):
+        def fetch_news(self, ticker, since_iso=None):
+            if ticker == "BAD":
+                raise RuntimeError("provider 500")
+            return super().fetch_news(ticker, since_iso)
+
+    prov = _PartlyBroken({"AAPL": [_article("AAPL", "ok", "2026-06-24T13:30:00Z", h="h1")], "BAD": []})
+    res = nd.backfill_news_direct(["AAPL", "BAD"], source="polygon", provider=prov, db_path=db)
+    assert res["articles_added"] == 1                  # AAPL still written
+    assert "BAD" in res["errors"] and "provider 500" in res["errors"]["BAD"]
+    assert len(_rows(db)) == 1                          # batch not aborted by BAD
+
+
+def test_incremental_cursor_is_source_scoped(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    # seed an existing polygon article; a finnhub run for the same ticker must NOT inherit
+    # polygon's cursor (source-scoped — decision 4).
+    nd.backfill_news_direct(["AAPL"], source="polygon",
+                            provider=_FakeNewsProvider({"AAPL": [_article("AAPL", "P", "2026-06-24T13:30:00Z", h="p1")]}),
+                            db_path=db)
+    finn = _FakeNewsProvider({"AAPL": [_article("AAPL", "F", "2026-06-20T10:00:00Z", h="f1")]})
+    nd.backfill_news_direct(["AAPL"], source="finnhub", provider=finn, db_path=db)
+    assert finn.since_seen["AAPL"] is None             # no prior finnhub article → cursor None
+    # second polygon run sees polygon's own latest as the cursor
+    poly2 = _FakeNewsProvider({"AAPL": []})
+    nd.backfill_news_direct(["AAPL"], source="polygon", provider=poly2, db_path=db)
+    assert poly2.since_seen["AAPL"] == "2026-06-24T13:30:00+0000"   # polygon's newest, not finnhub's
+
+
+def test_skips_articles_missing_required_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    arts = [
+        _article("AAPL", "good", "2026-06-24T13:30:00Z", h="h1"),
+        {"ticker": "AAPL", "title": "", "published_at": "2026-06-24T14:00:00Z", "article_hash": "h2"},  # no title
+        {"ticker": "AAPL", "title": "no hash", "published_at": "2026-06-24T15:00:00Z"},                  # no hash
+    ]
+    res = nd.backfill_news_direct(["AAPL"], source="polygon",
+                                  provider=_FakeNewsProvider({"AAPL": arts}), db_path=db)
+    assert res["articles_added"] == 1                  # only the valid one
+    assert [r["title"] for r in _rows(db)] == ["good"]
+
+
+def test_no_pg_dependency():
+    import src.news_direct as mod
+    assert not hasattr(mod, "psycopg2")
