@@ -6,8 +6,8 @@ The first direct-local ingest collector after price_backfill, reusing its machin
 isolation, and idempotent ``INSERT OR IGNORE``. No PG, no Parquet round-trip for the local read
 path. Mirrors `backfill_prices_direct`.
 
-Dedup is on the opaque ``article_hash`` (MD5 today — treated as a STABLE KEY, not assumed
-SHA-256). ``published_at`` is normalized to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
+Dedup is on the canonical SHA-256 ``article_hash`` shared by direct ingest and the PG/mirror
+migration. ``published_at`` is normalized to the local UTC format ``'YYYY-MM-DDTHH:MM:SS+0000'``.
 ``news_fts`` (external-content FTS5, ``content_rowid='id'``) is kept in sync by AFTER
 INSERT/UPDATE/DELETE triggers (PG-exit 2b, ``_ensure_news_fts_triggers``) — no manual fts write
 here, so the writer can't double-index. The incremental cursor is the newest local

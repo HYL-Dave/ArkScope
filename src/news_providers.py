@@ -8,19 +8,20 @@ path writes only the local SQLite ``news`` table, no Parquet, and is cursored ag
 (``backfill_news_direct`` passes the local newest-published_at as ``since_iso``), not the Parquet
 ``get_latest_timestamp``.
 
-The collector ``NewsArticle`` is mapped to the local news-row contract:
-``article_hash = dedup_hash`` (the collector's MD5 identity) and ``description`` falls back to
-``content``. Also here: ``use_local_news_enabled()`` — the default-OFF routing toggle, read
-standalone (no DAL) so the scheduler can consult it per source-run.
+The collector ``NewsArticle`` is mapped to the local news-row contract using the canonical SHA-256
+identity shared with the PG/mirror migration; ``description`` falls back to ``content``. Also here:
+``use_local_news_enabled()`` — the default-OFF routing toggle, read standalone (no DAL) so the
+scheduler can consult it per source-run.
 """
 from __future__ import annotations
 
-import hashlib
 import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from src.news_identity import canonical_article_hash
 
 _TRUTHY = ("1", "true", "yes", "on")
 _DEFAULT_LOOKBACK_DAYS = 7   # first run (no local cursor for this source/ticker) → look back a week
@@ -54,25 +55,9 @@ def use_local_news_enabled() -> bool:
         return False
 
 
-def _canonical_article_hash(ticker: str, title: str, published_at: str) -> str:
-    """The canonical news identity — IDENTICAL to the PG/mirror scheme
-    (``scripts.migrate_to_supabase.article_hash``): ``sha256("{ticker}|{title}|{date}")[:64]`` over
-    the VERBATIM ticker + title (no case/strip) and the date portion ``published_at[:10]``.
-
-    S3.0: the direct path previously used the collector's ``dedup_hash`` (MD5,
-    ``TICKER.upper()|title.strip().lower()|date``), which differs from the mirror's SHA-256 for the
-    SAME article — so ``INSERT OR IGNORE`` could not dedup a direct-origin row against a mirror-origin
-    one (it produced duplicates). Computing this canonical hash from the SAME fields written to the
-    row makes one ``UNIQUE(article_hash)`` dedup across both writers. Pinned equal to
-    ``migrate_to_supabase.article_hash`` by tests/test_news_providers.py so the two cannot drift."""
-    date10 = (published_at or "")[:10]
-    return hashlib.sha256(f"{ticker}|{title}|{date10}".encode("utf-8")).hexdigest()[:64]
-
-
 def _article_to_raw(article: Any) -> Dict[str, Any]:
     """Collector ``NewsArticle`` (duck-typed) → the raw dict ``backfill_news_direct`` expects.
-    ``article_hash`` = the canonical SHA-256 (matches the PG/mirror scheme — see
-    ``_canonical_article_hash``); ``description`` falls back to ``content``."""
+    ``article_hash`` = the shared canonical SHA-256; ``description`` falls back to ``content``."""
     return {
         "ticker": article.ticker,
         "title": article.title,
@@ -80,7 +65,7 @@ def _article_to_raw(article: Any) -> Dict[str, Any]:
         "url": getattr(article, "url", "") or "",
         "publisher": getattr(article, "publisher", "") or "",
         "published_at": article.published_at,
-        "article_hash": _canonical_article_hash(
+        "article_hash": canonical_article_hash(
             article.ticker, article.title, article.published_at),
     }
 

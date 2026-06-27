@@ -19,7 +19,6 @@ Reads DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env.
 """
 
 import argparse
-import hashlib
 import json
 import logging
 import re
@@ -39,7 +38,14 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.news_identity import canonical_article_hash
+
 BATCH_SIZE = 1000
+
+# Compatibility name used throughout this migration and by existing callers/tests. Both the
+# direct-local path and this migration now reference the same production function object.
+article_hash = canonical_article_hash
 
 
 def load_db_url() -> str:
@@ -66,12 +72,6 @@ def get_connection(db_url: str) -> psycopg2.extensions.connection:
     conn = psycopg2.connect(db_url, sslmode=sslmode, connect_timeout=15)
     conn.autocommit = False
     return conn
-
-
-def article_hash(ticker: str, title: str, date_str: str) -> str:
-    """Generate a dedup hash for a news article."""
-    raw = f"{ticker}|{title}|{date_str}".encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()[:64]
 
 
 def safe_str(val) -> str | None:

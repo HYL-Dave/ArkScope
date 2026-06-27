@@ -1,7 +1,7 @@
 """2c: Parquet-free news provider adapters + the use_local_news toggle (hermetic).
 
 The adapter wraps the real collectors' fetch+parse (no StorageManager/Parquet) and maps the
-collector NewsArticle to the local news row contract: article_hash=dedup_hash,
+collector NewsArticle to the local news row contract using the shared canonical SHA-256;
 description=description or content. The toggle gates scheduler routing (default-OFF).
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ import sqlite3
 
 import src.news_providers as np
 from scripts.collection.collect_polygon_news import NewsArticle
+from src.news_identity import canonical_article_hash
 
 
 def _article(**kw):
@@ -22,8 +23,7 @@ def test_article_to_raw_maps_real_collector_dataclass():
     a = _article(description="", content="full body text", url="http://u", publisher="Reuters",
                  dedup_hash="md5hash123")
     raw = np._article_to_raw(a)
-    from scripts.migrate_to_supabase import article_hash as _canon
-    assert raw["article_hash"] == _canon("AAPL", "Beat", "2026-06-24")  # canonical SHA-256, not dedup_hash
+    assert raw["article_hash"] == canonical_article_hash("AAPL", "Beat", "2026-06-24")
     assert len(raw["article_hash"]) == 64 and raw["article_hash"] != "md5hash123"
     assert raw["description"] == "full body text"         # description empty → falls back to content
     assert raw["published_at"] == "2026-06-24T13:30:00+0000"
@@ -92,11 +92,10 @@ def test_article_to_raw_uses_canonical_sha256_hash():
     # S3.0: the direct path must produce the SAME article_hash as the PG/mirror canonical scheme
     # (sha256(f"{ticker}|{title}|{published_at[:10]}"), ticker/title VERBATIM) so INSERT OR IGNORE
     # dedups direct-origin vs mirror-origin rows for the same article. NOT the collector's MD5.
-    from scripts.migrate_to_supabase import article_hash as canonical
     a = _article(title="Massive News for Apple Stock Investors!",
                  published_at="2026-06-27T00:20:57+0000", dedup_hash="deadbeef_md5_ignored")
     raw = np._article_to_raw(a)
-    assert raw["article_hash"] == canonical("AAPL", "Massive News for Apple Stock Investors!",
-                                            "2026-06-27")
+    assert raw["article_hash"] == canonical_article_hash(
+        "AAPL", "Massive News for Apple Stock Investors!", "2026-06-27")
     assert len(raw["article_hash"]) == 64               # SHA-256, not the collector's 32-char MD5
     assert raw["article_hash"] != "deadbeef_md5_ignored"  # collector dedup_hash no longer used
