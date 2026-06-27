@@ -94,4 +94,3 @@ def test_successful_run_with_ticker_failure_is_partial_not_clean(tmp_path):
     assert out["status"] == "partial"
     assert out["providers"]["polygon"]["status"] == "partial"
     assert "LC: contract unresolved" in out["last_error"]
-

@@ -63,4 +63,3 @@ def test_static_status_route_is_declared_before_dynamic_ticker_route():
     paths = [route.path for route in routes.router.routes]
     assert paths.index("/news/status") < paths.index("/news/{ticker}")
     assert paths.index("/news/settings") < paths.index("/news/{ticker}")
-
