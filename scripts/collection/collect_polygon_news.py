@@ -665,12 +665,23 @@ def load_tickers(tickers_arg: Optional[str] = None,
 
 
 def load_env() -> str:
-    """Load API key from .env file."""
+    """Resolve the Polygon API key, os.environ FIRST.
+
+    The sidecar's apply_env() injects DB-managed provider values into os.environ
+    (precedence real env > app-DB > config/.env), so os.environ is the resolved
+    source and reading it first keeps news collection consistent with the Settings
+    "test connection" button (which uses os.getenv). Falls back to reading
+    config/.env directly for standalone runs that never went through the env bridge.
+    A placeholder ('your_'-prefixed) or empty value is rejected at each layer so a
+    stub never shadows a real key."""
+    env_val = os.environ.get('POLYGON_API_KEY', '').strip()
+    if env_val and not env_val.startswith('your_'):
+        return env_val
+
     env_paths = [
         Path("config/.env"),
         Path(".env"),
     ]
-
     for path in env_paths:
         if path.exists():
             with open(path, 'r') as f:
@@ -683,11 +694,9 @@ def load_env() -> str:
                         value = value.strip()
                         while len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
                             value = value[1:-1].strip()
-                        if key == 'POLYGON_API_KEY' and not value.startswith('your_'):
+                        if key == 'POLYGON_API_KEY' and value and not value.startswith('your_'):
                             return value
-
-    # Try environment variable
-    return os.environ.get('POLYGON_API_KEY', '')
+    return ''
 
 
 def generate_months(start_date: date, end_date: date) -> List[Tuple[int, int]]:
