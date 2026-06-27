@@ -65,6 +65,10 @@ News ticker reconciliation gets a news-specific path instead of relying on the g
      `sentiment_source`, and `sentiment_scale`.
    - Delete the stale row only after the merge succeeds.
 
+`source` and the time portion of `published_at` are deliberately not merged. The canonical owner
+wins for those fields: the hash contract intentionally identifies by ticker/title/calendar date,
+and changing provenance or timestamp while reconciling identity would invent a composite record.
+
 The canonical row ID is preserved because it is already the stable owner of the canonical hash and
 is the row future writes will deduplicate against.
 
@@ -85,6 +89,10 @@ assume that every stale row came from a specific alias.
 The normal runtime canonicalization path must not scan the full news table on every incremental
 sync. It processes only rows whose ticker is currently an alias. The full-table classifier is used
 only by the explicit one-time repair and its dry-run.
+
+Only `news` uses this identity-aware handler. Prices, IV, and fundamentals keep the existing generic
+ticker reconciliation because none of their stored identities duplicate ticker inside a separate
+hash column.
 
 ## Transaction and Failure Model
 
@@ -151,9 +159,9 @@ Regression tests cover the direct news writer, PG mirror canonicalization, boots
 
 ## Documentation Cleanup
 
-Update stale comments that still describe the direct identity as MD5 or `dedup_hash`. Record S3.0a
-under `NEWS_DIRECT_LOCAL_PLAN.md` and do not mark S3.0 fully complete until the live post-conditions
-pass.
+Update stale comments in the module docstrings of `news_providers.py` and `news_direct.py` that still
+describe the direct identity as MD5 or `dedup_hash`. Record S3.0a under
+`NEWS_DIRECT_LOCAL_PLAN.md` and do not mark S3.0 fully complete until the live post-conditions pass.
 
 ## Sequencing
 
