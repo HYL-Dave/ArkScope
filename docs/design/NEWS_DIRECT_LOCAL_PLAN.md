@@ -1,7 +1,9 @@
 # News Direct-Local — Scoping (PG-exit Step 2, first collector)
 
 Date: 2026-06-26
-Status: scoping (design-first; no runtime code in this doc). News chosen first (over IV) — high
+Status: Step 2 (2a–2d) DONE; **Step 3 designed 2026-06-27** (see the "Step 3 — design" section near
+the end). Original Step 2 scoping retained below as history. Design-first; no runtime code in this
+doc. News chosen first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
 provider_sync + scheduler-state + Settings pattern. IV waits until its data-source strategy
 (provider-precomputed?) is clearer.
@@ -41,10 +43,15 @@ price_backfill, so `local_incremental` + `--news` PG sync can eventually retire 
 1. **Dedup key / PK.** Local-direct has no PG `id` to preserve. Options: (a) `id` autoincrement +
    a UNIQUE index on `article_hash` (the collector already computes it) → `INSERT OR IGNORE`
    dedups on hash; (b) UNIQUE `(source, url)`; (c) UNIQUE `(source, ticker, published_at, title)`.
-   Lean: **(a) UNIQUE(article_hash)** — the hash is the existing identity; cheapest, and
-   cross-provider dup of the same article is still two rows only if their hashes differ (acceptable
-   v1). Needs an additive migration: a UNIQUE index on `news.article_hash` (tolerant of existing
-   rows — verify no current dup hashes first; if dups exist, dedup-or-skip).
+   Chosen: **(a) UNIQUE(article_hash)** (shipped in 2b). ⚠️ **CORRECTION (2026-06-27, refuted by a
+   live duplicate):** `article_hash` is NOT one canonical identity. The PG/mirror path computes
+   **SHA-256** (`migrate_to_supabase.article_hash`: `sha256(f"{ticker}|{title}|{published_at[:10]}")`,
+   ticker/title VERBATIM); the direct path used the collector's **MD5** `dedup_hash`
+   (`md5("{TICKER.upper()}|{title.strip().lower()}|{date[:10]}")`). Same article → different hash →
+   `INSERT OR IGNORE` does NOT dedup direct-vs-mirror. The original "two rows only if hashes differ
+   (acceptable v1)" assumption is WRONG for the *same* article and must not be relied on. Fixed in
+   **Step 3 §S3.0** (direct path adopts the canonical SHA-256). Additive migration shipped in 2b:
+   the UNIQUE index on `news.article_hash`.
 2. **FTS sync.** `news_fts` is external-content. Options: (a) AFTER INSERT/DELETE/UPDATE triggers
    on `news` (set-and-forget, also fixes the mirror path); (b) the writer manually
    `INSERT INTO news_fts(rowid,title,description)` after each row. Lean: **(a) triggers** —
@@ -97,3 +104,87 @@ Reuses the `backfill_prices_direct` direct-write + `provider_sync_*` + `market_w
 scheduler-state/Settings machinery, and the shared `ibkr_gateway_lock` (for the eventual
 `ibkr_news` direct path — out of scope here; polygon/finnhub first, no Gateway). This is
 `PG_EXIT_COMPLETION_PLAN.md` Step 2's first collector; IV/fundamentals + mirror retirement follow.
+
+---
+
+## Step 2 — status (DONE 2026-06-27)
+
+2a (`b347148`); 2a.1 + 2b (`b53e5ce`/`0796719`, incl. the live 371k DB migrated: `UNIQUE(article_hash)`
++ FTS triggers `news_ai/ad/au`); 2c (`3b782f2`, toggle + scheduler routing, default-OFF); Slice B
+(`1469c43`, collectors' `load_env` reads os.environ FIRST so a DB-managed key wins). 2d live smoke
+PASS (DB-key→news). Provider keys then migrated `config/.env`→`data_provider_config` + real-profile
+smoke PASS — the **sidecar is DB-authoritative** for provider keys; `.env` kept as fallback
+(CLI/standalone still read it — sidecar-only authority accepted, desktop-first; see
+`project_provider_config_dbification` memory).
+
+## Step 3 — design (2026-06-27; provider-scoped mirror BYPASS, NOT a domain retirement)
+
+Goal: make polygon/finnhub news ingest the default **direct-local** path (bypass `--news` PG sync +
+the PG→local mirror), with an in-product rollback toggle and honest status — **without data loss or
+duplicates**. Designed via an adversarial 5-reader pass; approved in principle by the user
+(hash option A; default-ON + rollback lever + Settings toggle; persist-this-doc-first).
+
+### Critical prerequisite — the `article_hash` divergence (the real work, not the toggle)
+- **Canonical (mirror)**, `migrate_to_supabase.py:71` applied at `:230`:
+  `sha256(f"{ticker}|{title}|{published_at[:10]}")[:64]` — ticker + title **VERBATIM** (no case/strip).
+  All 371k existing rows use this (len 64).
+- **Direct (today)**: `article.dedup_hash` =
+  `md5(f"{TICKER.upper()}|{title.strip().lower()}|{date[:10]}")` (`collect_polygon_news.py:374`,
+  `collect_finnhub_news.py:268`, mapped at `news_providers.py:66`) — len 32.
+- ⇒ same article → different hash → `INSERT OR IGNORE` cannot dedup direct-vs-mirror.
+  **VERIFIED LIVE:** the only 3 non-SHA rows among 371,675 are the 2d/real-profile smoke writes;
+  id `519309779` (AAPL "Massive News…") is a TRUE duplicate of SHA id `517324858`; ids
+  `519309780`/`519309781` are genuinely-new (legit content, wrong-scheme hash).
+- The cursor does NOT mask it: `_latest_published` is hash-agnostic (correct), but its
+  inclusive-boundary re-fetch leans on hash dedup, which the divergence defeats for mirror-origin
+  boundary articles.
+
+### Scope (narrower than "retire the news mirror")
+- `ibkr_news` has **no direct writer** (`news_direct_source=None`) → it STAYS collector→PG→mirror.
+  So the mirror's **news domain MUST STAY** (it still feeds ibkr_news). Step 3 only makes
+  **polygon/finnhub bypass** the mirror; do **NOT** remove the `news` branch from
+  `incremental_update`. IV/fundamentals/prices unchanged (no direct writer; stay on the mirror).
+
+### Slices (each its own commit + gate; TDD)
+- **S3.0 — hash unification (PREREQUISITE).** Direct path computes the **canonical SHA-256** from
+  the row's own ticker/title/`published_at[:10]` (one shared `article_hash` source of truth — reuse
+  `migrate_to_supabase.article_hash` or extract a util — with a test pinning direct-hash ==
+  canonical for the same inputs, so they can't drift). Adopt the mirror's scheme (option A); do NOT
+  rewrite the 371k. **Bundled live cleanup:** delete the 3 len-32 smoke rows (1 dup + 2 that
+  re-fetch cleanly under SHA) → DB 100% SHA; verify `COUNT(*) WHERE length(article_hash)=32 == 0`
+  and zero duplicate groups; re-run an idempotent smoke. **Coexistence test:** seed a SHA
+  mirror-style row, run the direct writer over the same article → `articles_added==0`.
+- **S3.1 — status/health repoint (gated, additive read-only).** New
+  `read_news_sync_status()` from `provider_sync_runs WHERE domain='news'` (last_success =
+  MAX(finished_at where succeeded); rows_added = SUM over the most-recent run per provider;
+  last_error = most-recent failed run; updated_at = MAX). Overlay ONLY the news slice in
+  `market_data.py:81`, `data_coverage_tools.py:255`, `provider_health.py:356`; keep
+  prices/iv/fundamentals on `read_sync_meta`. **Gate the overlay on `use_local_news_enabled()`** so
+  status follows the active writer (ungated → shows "never run" while the mirror is still the
+  default writer). Per-provider cards already read the live `news` table (not stale); optionally
+  enrich them with run-level `last_error`.
+- **S3.2 — official switch + Settings UI (cutover).** Flip `use_local_news` **default → ON**
+  (distinguish unset→ON from explicit-false→OFF); keep env/profile as the rollback lever. Routing
+  line unchanged (`news_direct = d.news_direct_source is not None and use_local_news_enabled()`).
+  Add `PUT /news/settings` + `GET /news/status` on the **macro route template** (NO `cache_clear`
+  — the scheduler re-reads the toggle live per fire and news *reads* are governed by
+  `use_local_market`), `api.ts` `setUseLocalNews`/`getNewsStatus`, and a Settings 新聞 panel
+  (clone the macro panel). Toggle OFF = rollback to collector→Parquet→PG→mirror.
+- **S3.3 — test gate.** G1 polygon/finnhub direct by DEFAULT (no `--news`, no `_local_refresh`) +
+  explicit-OFF restores the mirror chain (rollback pin); G2 mirror UNAFFECTED — `incremental_update`
+  still syncs prices/iv/fundamentals **and ibkr_news's news** (news domain NOT removed); G3 news
+  status from provider telemetry, not stale `market_sync_meta`; G4/G5 confirm direct idempotency +
+  FTS parity (existing tests, default-agnostic). Plus a separate **gated live smoke** (live PG still
+  serves iv/fundamentals + ibkr_news after the bypass — unit tests cannot assert live PG).
+
+### Rollback / invariants (locked)
+Touches only routing + telemetry-read + the direct hash scheme + UI. **NEVER** deletes/drops: live
+news rows (beyond the 3 own-smoke artifacts cleaned in S3.0), FTS triggers, `news_fts`,
+`idx_news_article_hash`, `market_sync_meta`, the shared `local_refresh` lock, the `--news` migrate
+flag, or the mirror's news branch. Rollback = toggle OFF (+ revert the additive slices); no DB
+restore.
+
+### Sequencing
+`use_local_news` stays default-OFF until S3.0 + S3.1 land. **S3.0 MUST precede S3.2** (default-ON)
+or the cutover duplicates. Order: S3.0 (hash unify + cleanup) → S3.1 (status repoint) → S3.2
+(default-ON + UI) → S3.3 (tests woven TDD per slice) → gated live smoke.
