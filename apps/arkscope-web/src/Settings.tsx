@@ -30,6 +30,8 @@ import {
   setUseLocalMarket,
   setUseLocalMacro,
   getMacroStatus,
+  setUseLocalNews,
+  getNewsStatus,
   getTradingDayCoverage,
   previewAppRecordsMigration,
   applyAppRecordsMigration,
@@ -43,6 +45,7 @@ import {
   type MarketDataStatus,
   type MarketDataValidate,
   type MacroStatus,
+  type NewsStatus,
   type TradingDayCoverage,
   type TradingDayRow,
   type ProviderConfigEntry,
@@ -79,7 +82,7 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, newsRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -91,6 +94,7 @@ type SettingsSection =
   | "models"
   | "providers"
   | "data_storage"
+  | "news_storage"
   | "macro_storage"
   | "app_records"
   | "data_sources"
@@ -118,6 +122,12 @@ const SETTINGS_SECTIONS: Array<{
     id: "data_storage",
     title: "Data Storage",
     description: "本地市場庫（價格＋新聞＋IV＋基本面）建立、驗證、啟用；PG 為 fallback。",
+    enabled: true,
+  },
+  {
+    id: "news_storage",
+    title: "News Ingestion",
+    description: "Polygon／Finnhub 直接寫入本地 SQLite；可明確回退 PG 鏡像路徑。",
     enabled: true,
   },
   {
@@ -506,6 +516,8 @@ export function SettingsView({
               />
             ) : section === "data_storage" ? (
               <DataStorageSection />
+            ) : section === "news_storage" ? (
+              <NewsStorageSection />
             ) : section === "macro_storage" ? (
               <MacroStorageSection />
             ) : section === "app_records" ? (
@@ -749,6 +761,108 @@ function DataStorageSection() {
       )}
 
       <TradingDayCoveragePanel />
+    </div>
+  );
+}
+
+function NewsStorageSection() {
+  const [status, setStatus] = useState<NewsStatus | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setStatus(await getNewsStatus());
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function toggle(enabled: boolean) {
+    if (busy || status?.env_override) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await setUseLocalNews(enabled);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const sync = status?.sync;
+  const providerErrors = sync
+    ? Object.entries(sync.providers)
+        .filter(([, provider]) => provider.last_error)
+        .map(([provider, state]) => `${provider}: ${state.last_error}`)
+        .join("；")
+    : "";
+
+  return (
+    <div>
+      <div className="settings-section-head">
+        <div>
+          <h2>新聞直寫本地 · News Ingestion</h2>
+          <p className="muted tiny">
+            Polygon／Finnhub 排程預設直接寫入 market_data.db，略過 Parquet、PG sync 與本地鏡像。
+            關閉可立即回退舊路徑。IBKR news 暫時仍使用 collector → PG → mirror，因此這個開關不會停用
+            mirror 的 news domain。
+          </p>
+        </div>
+        <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+      </div>
+
+      {err && <div className="errorbox"><p className="muted">{err}</p></div>}
+
+      {!status ? (
+        <p className="muted">載入中…</p>
+      ) : (
+        <div className="settings-panel">
+          <dl className="ds-kv">
+            <dt>本地新聞庫</dt>
+            <dd>
+              {status.exists
+                ? `${status.news.row_count.toLocaleString()} 篇 · ${status.news.source_count} 來源 · 最新 ${status.news.latest_published ?? "—"}`
+                : "尚未建立"}
+            </dd>
+            <dt>Polygon／Finnhub 路由</dt>
+            <dd>{newsRoutingLabel(status)}</dd>
+            <dt>最近 direct 成功</dt>
+            <dd>{formatSystemTimestamp(sync?.last_success)}</dd>
+            <dt>最近 direct 嘗試</dt>
+            <dd>{formatSystemTimestamp(sync?.last_attempt)}</dd>
+            <dt>Direct 狀態</dt>
+            <dd>{sync?.status ?? "尚未執行"}</dd>
+            <dt>最近錯誤</dt>
+            <dd className={providerErrors ? "refresh-err" : undefined}>{providerErrors || sync?.last_error || "—"}</dd>
+          </dl>
+
+          <div className="settings-actions" style={{ marginTop: 12 }}>
+            <label className="ds-toggle">
+              <input
+                type="checkbox"
+                checked={status.env_override ? status.direct_active : status.use_local_news_setting}
+                disabled={busy || status.env_override}
+                onChange={(e) => void toggle(e.target.checked)}
+              />
+              Polygon／Finnhub 新聞直寫本地
+            </label>
+          </div>
+
+          {status.env_override && (
+            <p className="muted tiny" style={{ marginTop: 8 }}>
+              目前由 ARKSCOPE_USE_LOCAL_NEWS 環境變數強制控制；移除 env override 後才能由此開關變更。
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

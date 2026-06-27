@@ -1154,7 +1154,35 @@ export interface SyncMeta {
   last_success: string | null;
   last_error: string | null;
   rows_added: number;
-  updated_at: string;
+  updated_at: string | null;
+}
+
+export interface NewsProviderSync {
+  status: "running" | "succeeded" | "failed" | "partial";
+  last_success: string | null;
+  last_attempt: string | null;
+  last_error: string | null;
+  rows_added: number;
+  tickers_scanned: number;
+  ticker_errors: Array<{ ticker: string; error: string; updated_at: string }>;
+}
+
+export interface NewsDirectSync extends SyncMeta {
+  status: "running" | "succeeded" | "failed" | "partial";
+  last_attempt: string | null;
+  providers: Record<string, NewsProviderSync>;
+}
+
+export interface NewsStatus {
+  market_db: string;
+  exists: boolean;
+  news: { row_count: number; source_count: number; latest_published: string | null };
+  use_local_news_setting: boolean;
+  setting_explicit: boolean;
+  env_override: boolean;
+  env_value: boolean | null;
+  direct_active: boolean;
+  sync: NewsDirectSync | null;
 }
 
 // iv/fundamentals are id-keyed snapshot domains → date-only "latest" (no time).
@@ -1260,6 +1288,16 @@ export function validateMarketData(): Promise<MarketDataValidate> {
 
 export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_setting: boolean }> {
   return sendJSON("/market-data/settings", "PUT", { enabled });
+}
+
+// Polygon/Finnhub direct-local news ingest. Explicit OFF restores the legacy
+// collector -> PG sync -> local mirror chain; IBKR news remains on that chain.
+export function getNewsStatus(): Promise<NewsStatus> {
+  return getJSON<NewsStatus>("/news/status");
+}
+
+export function setUseLocalNews(enabled: boolean): Promise<{ use_local_news_setting: boolean }> {
+  return sendJSON("/news/settings", "PUT", { enabled });
 }
 
 // --- 本地總經/行事曆 (macro_calendar.db) — use_local_macro toggle + coverage (§4c) ---

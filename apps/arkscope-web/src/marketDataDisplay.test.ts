@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
-import type { MacroStatus, MarketDataStatus } from "./api";
+import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, newsRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
+import type { MacroStatus, MarketDataStatus, NewsStatus } from "./api";
 
 const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
   market_db: "/tmp/market.db",
@@ -66,6 +66,35 @@ describe("macroRoutingLabel", () => {
   it("off → PG", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
       .toBe("關閉（使用 PG）");
+  });
+});
+
+const newsStatus = (over: Partial<NewsStatus>): NewsStatus => ({
+  market_db: "/tmp/market.db",
+  exists: true,
+  news: { row_count: 10, source_count: 2, latest_published: "2026-06-27T00:00:00+00:00" },
+  use_local_news_setting: true,
+  setting_explicit: false,
+  env_override: false,
+  env_value: null,
+  direct_active: true,
+  sync: null,
+  ...over,
+});
+
+describe("newsRoutingLabel", () => {
+  it("distinguishes default direct routing from explicit rollback", () => {
+    expect(newsRoutingLabel(newsStatus({}))).toBe("直寫本地（預設）");
+    expect(newsRoutingLabel(newsStatus({ setting_explicit: true }))).toBe("直寫本地（已設定）");
+    expect(newsRoutingLabel(newsStatus({ direct_active: false, use_local_news_setting: false, setting_explicit: true })))
+      .toBe("回退至 PG 同步／本地鏡像");
+  });
+
+  it("makes env override direction explicit", () => {
+    expect(newsRoutingLabel(newsStatus({ env_override: true, env_value: true })))
+      .toBe("直寫本地（env 強制開啟）");
+    expect(newsRoutingLabel(newsStatus({ direct_active: false, env_override: true, env_value: false })))
+      .toBe("回退 PG 鏡像（env 強制關閉）");
   });
 });
 

@@ -1,4 +1,4 @@
-import type { CoverageStatus, MacroStatus, MarketDataStatus, TradingDayRow } from "./api";
+import type { CoverageStatus, MacroStatus, MarketDataStatus, NewsStatus, TradingDayRow } from "./api";
 
 export function marketRoutingLabel(status: MarketDataStatus): string {
   if (status.routing_enabled) {
@@ -18,6 +18,16 @@ export function macroRoutingLabel(status: MacroStatus): string {
   return status.exists
     ? `啟用中（本地優先${envNote}）`
     : `啟用中（本地優先${envNote}）· 待 ingestion 建立`;
+}
+
+export function newsRoutingLabel(status: NewsStatus): string {
+  if (status.env_override) {
+    return status.direct_active
+      ? "直寫本地（env 強制開啟）"
+      : "回退 PG 鏡像（env 強制關閉）";
+  }
+  if (!status.direct_active) return "回退至 PG 同步／本地鏡像";
+  return status.setting_explicit ? "直寫本地（已設定）" : "直寫本地（預設）";
 }
 
 // coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);
