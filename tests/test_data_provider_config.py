@@ -26,7 +26,7 @@ def hermetic(monkeypatch):
     monkeypatch.setattr("src.env_keys.reload_var_from_file",
                         lambda name: (os.environ.pop(name, None), False)[1])
     for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
-                "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT"):
+                "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID"):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -98,6 +98,30 @@ def test_unapply_falls_back_to_file(store, monkeypatch):
     assert calls == ["FINNHUB_API_KEY"]
     assert os.environ["FINNHUB_API_KEY"] == "fk_from_file_again"
     assert dpc.effective_source("FINNHUB_API_KEY") != "app"
+
+
+# --- IBKR client id (Slice A: was env-only @ ibkr_source.py:277, now app-managed) -----
+
+def test_ibkr_client_id_field_defined():
+    fields = {f.field: f for f in dpc.PROVIDER_FIELDS["ibkr"]}
+    assert "client_id" in fields, "IBKR client id must be app-managed, not env-only"
+    cid = fields["client_id"]
+    assert cid.env_var == "IBKR_CLIENT_ID"   # the var ibkr_source.py:277 actually reads
+    assert cid.secret is False               # an id, not a secret → shown raw
+
+
+def test_ibkr_client_id_injected_by_bridge(store):
+    store.set_field("ibkr", "client_id", "7")
+    dpc.apply_env(store)
+    assert os.environ["IBKR_CLIENT_ID"] == "7"   # reaches IBKRDataSource via the env bridge
+    assert dpc.effective_source("IBKR_CLIENT_ID") == "app"
+
+
+def test_ibkr_client_id_in_route_view(store):
+    from src.api.routes import providers_config as pc
+    view = pc.providers_config(store=store)["providers"]
+    row = next(f for f in view["ibkr"]["fields"] if f["field"] == "client_id")
+    assert row["env_var"] == "IBKR_CLIENT_ID" and row["secret"] is False
 
 
 # --- connection tests ----------------------------------------------------------------

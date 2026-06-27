@@ -71,6 +71,10 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
     "ibkr": [
         FieldDef("host", "IBKR_HOST", False, "Gateway host"),
         FieldDef("port", "IBKR_PORT", False, "Gateway port"),
+        # ibkr_source.py reads IBKR_CLIENT_ID (default 1); was env-only. NOTE config/.env
+        # historically used the name IBKR_CLIENT (mismatch the code never read) — setting it
+        # here injects the correct IBKR_CLIENT_ID via the env bridge.
+        FieldDef("client_id", "IBKR_CLIENT_ID", False, "Client ID"),
     ],
     "sec_edgar": [],
     "seeking_alpha": [],

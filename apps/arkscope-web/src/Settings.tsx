@@ -1339,7 +1339,8 @@ function DataSourcesSection() {
           <h2>資料來源 · Data Sources</h2>
           <p className="muted tiny">
             App 直接發起資料抓取（免 cron）。每個來源獨立排程：自己的開關與間隔、平行執行
-            （IBKR 三項共用 Gateway 鎖序列化）。一次執行 = 抓取 → 同步 PG → 更新本地鏡像。
+            （IBKR 三項共用 Gateway 鎖序列化）。一次執行＝抓取並寫入本地（多數來源經 PG
+            同步→更新本地鏡像；新聞在 use_local_news 開啟時直寫本地 SQLite，略過 PG／鏡像）。
             預設全部停用。
           </p>
         </div>

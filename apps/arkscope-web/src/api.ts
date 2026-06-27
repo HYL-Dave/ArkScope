@@ -1454,8 +1454,9 @@ export function getSAFeed(params: {
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a
-// state, never an HTTP error. Key info is presence+source only (keys stay in
-// config/.env; no entry UI — that is its own future slice).
+// state, never an HTTP error. Key info is presence+source only (effective source =
+// real env > app DB > config/.env; the entry UI is the Data Sources "連線與金鑰"
+// panel — see getProvidersConfig/putProviderConfig below).
 
 export type ProviderStatus =
   | "connected" | "stale" | "maintenance" | "no_signal" | "missing_key" | "disabled";
@@ -1489,8 +1490,9 @@ export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
 }
 
 // --- per-source data-collection schedule (3e-D; app-owned, no cron) ---
-// All sources are DISABLED by default; enabling one makes the sidecar collect →
-// PG sync → local-mirror refresh on its own interval. Run-now is fire-and-return;
+// All sources are DISABLED by default; enabling one makes the sidecar collect on its
+// own interval (most sources: PG sync → local-mirror refresh; news with use_local_news
+// ON writes the local DB directly, skipping PG/mirror). Run-now is fire-and-return;
 // poll getSchedule() for the per-source running flag and the job_runs row
 // (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.
 
