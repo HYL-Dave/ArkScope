@@ -158,14 +158,21 @@ duplicates**. Designed via an adversarial 5-reader pass; approved in principle b
   re-fetch cleanly under SHA) → DB 100% SHA; verify `COUNT(*) WHERE length(article_hash)=32 == 0`
   and zero duplicate groups; re-run an idempotent smoke. **Coexistence test:** seed a SHA
   mirror-style row, run the direct writer over the same article → `articles_added==0`.
-- **S3.0a — ticker/hash identity repair (CODE COMPLETE; LIVE APPLY PENDING).** A ticker rename used
+- **S3.0a — ticker/hash identity repair (LIVE COMPLETE 2026-06-27).** A ticker rename used
   to update `news.ticker` without recomputing the ticker-derived hash. The audited live DB has
   1,148 stale SHA rows (HAPN 369, BRK B 779), including 101 HAPN collisions where 93 stale rows
   carry descriptions missing from the canonical owner. Commits `4a2a55e`/`0da6ee2`/`90b9d74`/
   `e3a3f31` centralize the hash helper, add deterministic merge-not-delete reconciliation, route
   future news aliases through it, and provide preview → fingerprint → no-clobber WAL backup → one
-  transaction → validation. Live completion remains gated on reviewed preview counts/fingerprint;
-  see `docs/superpowers/specs/2026-06-27-news-identity-repair-design.md`.
+  transaction → validation. The reviewed live plan (`15ccb2d…b09813b`) applied 1,047 updates,
+  merged/deleted 101 collisions, and filled 93 missing descriptions. Independent post-checks found
+  0 hash mismatches, hash/semantic duplicate groups, or FTS missing/orphan rowids;
+  `news == news_fts == 371,574`; HAPN/BRK B stale counts are 0; a second preview is 0/0. The
+  WAL-safe pre-state backup is
+  `data/market_data.db.bak-pre-news-identity-20260627T141946625934Z` (371,675 rows,
+  `PRAGMA quick_check=ok`) and remains until one subsequent normal news ingest is verified. Normal
+  SQLite reads passed (`HAPN` and alias `LC` both resolve to the same 372-row corpus). See
+  `docs/superpowers/specs/2026-06-27-news-identity-repair-design.md`.
 - **S3.1 — status/health repoint (gated, additive read-only).** New
   `read_news_sync_status()` combines `provider_sync_runs WHERE domain='news'` for aggregate run
   timing/status/rows with `provider_sync_meta WHERE interval='news'` for current per-ticker errors.
@@ -198,7 +205,7 @@ flag, or the mirror's news branch. Rollback = toggle OFF (+ revert the additive 
 restore.
 
 ### Sequencing
-`use_local_news` stays default-OFF until S3.0a live validation + S3.1 land. **S3.0/S3.0a MUST
+`use_local_news` stays default-OFF until S3.1 lands. **S3.0/S3.0a MUST
 precede S3.2** (default-ON) or the cutover can duplicate alias-renamed rows. Order: S3.0a gated live
 repair → S3.1 (status repoint) → S3.2 (default-ON + UI) → S3.3 (tests woven TDD per slice) → gated
 live smoke.
