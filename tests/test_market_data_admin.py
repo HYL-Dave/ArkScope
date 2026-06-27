@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import src.market_data_admin as mda
+from src.news_identity import canonical_article_hash
 from src.profile_state import ProfileStateStore
 
 # --- a minimal fake PG serving BOTH domains (no live DB needed) ---------------
@@ -727,6 +728,90 @@ def test_canonicalize_news_rows_pk_safe_when_both_forms_present(tmp_path):
     assert n == 1  # one alias row (BRK.B) reconciled to canonical
     tickers = sorted(r[0] for r in conn.execute("SELECT ticker FROM news").fetchall())
     assert tickers == ["AAPL", "BRK B", "BRK B"]  # both BRK rows now canonical, none lost
+    conn.close()
+
+
+def test_canonicalize_news_updates_ticker_and_hash_together(tmp_path):
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._NEWS_SCHEMA)
+    mda._ensure_news_hash_unique(conn)
+    mda._ensure_news_fts_triggers(conn)
+    published = "2026-06-18T12:00:00+0000"
+    conn.execute(
+        "INSERT INTO news (id,ticker,title,source,published_at,article_hash) "
+        "VALUES (1,'LC','rename article','ibkr',?,?)",
+        (published, canonical_article_hash("LC", "rename article", published)),
+    )
+    mda._ensure_ticker_aliases(conn)
+    conn.commit()
+
+    reconciled = mda._canonicalize_table_tickers(conn, "news")
+
+    row = conn.execute("SELECT id,ticker,article_hash FROM news").fetchone()
+    assert reconciled == 1
+    assert row == (
+        1,
+        "HAPN",
+        canonical_article_hash("HAPN", "rename article", published),
+    )
+    conn.close()
+
+
+def test_canonicalize_news_collision_merges_and_keeps_canonical_id(tmp_path):
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._NEWS_SCHEMA)
+    mda._ensure_news_hash_unique(conn)
+    mda._ensure_news_fts_triggers(conn)
+    published = "2026-06-18T12:00:00+0000"
+    conn.executemany(
+        "INSERT INTO news (id,ticker,title,description,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?)",
+        [
+            (1, "LC", "same article", "richarchivephrase", "ibkr", published,
+             canonical_article_hash("LC", "same article", published)),
+            (2, "HAPN", "same article", "", "ibkr", published,
+             canonical_article_hash("HAPN", "same article", published)),
+        ],
+    )
+    mda._ensure_ticker_aliases(conn)
+    conn.commit()
+
+    reconciled = mda._canonicalize_table_tickers(conn, "news")
+
+    rows = conn.execute("SELECT id,ticker,description FROM news").fetchall()
+    assert reconciled == 1
+    assert rows == [(2, "HAPN", "richarchivephrase")]
+    conn.close()
+
+
+def test_canonicalize_news_collision_keeps_fts_in_sync(tmp_path):
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.executescript(mda._NEWS_SCHEMA)
+    mda._ensure_news_hash_unique(conn)
+    mda._ensure_news_fts_triggers(conn)
+    published = "2026-06-18T12:00:00+0000"
+    conn.executemany(
+        "INSERT INTO news (id,ticker,title,description,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?)",
+        [
+            (1, "LC", "same article", "richarchivephrase", "ibkr", published,
+             canonical_article_hash("LC", "same article", published)),
+            (2, "HAPN", "same article", "", "ibkr", published,
+             canonical_article_hash("HAPN", "same article", published)),
+        ],
+    )
+    mda._ensure_ticker_aliases(conn)
+    conn.commit()
+
+    mda._canonicalize_table_tickers(conn, "news")
+
+    hits = conn.execute(
+        "SELECT n.id FROM news_fts f JOIN news n ON n.id=f.rowid "
+        "WHERE news_fts MATCH 'richarchivephrase'"
+    ).fetchall()
+    assert hits == [(2,)]
+    assert conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM news_fts").fetchone()[0] == 1
     conn.close()
 
 

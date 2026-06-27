@@ -34,6 +34,8 @@ import uuid
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
+from src.news_identity import apply_news_identity_plan, plan_news_identity_repair
+
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -186,6 +188,28 @@ def _ensure_news_fts_triggers(conn) -> None:
     conn.executescript(_NEWS_FTS_TRIGGERS)
 
 
+def _canonicalize_news_tickers(conn, aliases) -> int:
+    """Fold current alias rows while updating their ticker-derived identity atomically."""
+    overrides: dict[int, str] = {}
+    spellings: set[str] = set()
+    for alias, canonical in aliases:
+        if alias == canonical:
+            continue
+        ids = conn.execute("SELECT id FROM news WHERE ticker = ?", (alias,)).fetchall()
+        if not ids:
+            continue
+        spellings.add(alias)
+        overrides.update({int(row[0]): canonical for row in ids})
+    if overrides:
+        plan = plan_news_identity_repair(
+            conn,
+            ticker_overrides=overrides,
+            only_ids=set(overrides),
+        )
+        apply_news_identity_plan(conn, plan)
+    return len(spellings)
+
+
 def _canonicalize_table_tickers(conn, table: str) -> int:
     """One-time PK-SAFE reconcile of EXISTING rows in ``table`` whose ticker is an alias →
     its canonical spelling. Returns the number of DISTINCT alias spellings that had ≥1 row
@@ -198,6 +222,10 @@ def _canonicalize_table_tickers(conn, table: str) -> int:
     redundant). Never raises a PK IntegrityError, never loses a canonical row. Read paths
     still resolve through the alias table, so this is cleanup, not a correctness dependency."""
     aliases = conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall()
+    if table == "news":
+        reconciled = _canonicalize_news_tickers(conn, aliases)
+        conn.commit()
+        return reconciled
     reconciled = 0
     for alias, canonical in aliases:
         if alias == canonical:
