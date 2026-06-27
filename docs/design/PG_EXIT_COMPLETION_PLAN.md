@@ -1,7 +1,9 @@
 # PG-Exit Completion — Scoping + Audit
 
 Date: 2026-06-25
-Status: scoping → **Slice 1 (app-records) DONE + live-migrated 2026-06-26**; steps 2–5 pending.
+Status: **Slice 1 DONE + live-migrated; Step 2 IN PROGRESS.** Polygon/Finnhub news direct-local
+cutover completed and live-verified 2026-06-27; `ibkr_news`, IV, fundamentals, remaining price
+ingest, mirror retirement, SEC/dead paths, and UI collapse remain.
 
 ## Progress
 
@@ -15,6 +17,11 @@ Status: scoping → **Slice 1 (app-records) DONE + live-migrated 2026-06-26**; s
   copy retained as the pre-migration archive; manual + timestamped backups on disk.
   **This does NOT complete the PG-exit** — steps 2–5 below remain; the market mirror/fallback/
   strict UI stays load-bearing.
+- **Step 2 — ingest collectors → direct-local: IN PROGRESS.** Polygon/Finnhub news now default to
+  provider → local SQLite with app-managed keys, direct telemetry, FTS/hash invariants, explicit
+  Settings rollback, and a real-profile idempotent smoke. This bypasses PG sync/mirror only for
+  those two scheduler sources. `ibkr_news` intentionally remains collector → PG → mirror, and the
+  mirror remains load-bearing for IV/fundamentals and other unfinished ingest paths.
 
 ## Why this exists
 
@@ -70,7 +77,7 @@ re-fetch).
 | Domain | Read local? | Write local? | PG still needed for | Class |
 |---|---|---|---|---|
 | Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
-| News | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
+| News | ✅ local | ✅ Polygon/Finnhub direct; ⚠️ IBKR via mirror | `ibkr_news` ingest | (1) ingest — partial |
 | IV | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
 | Fundamentals | ✅ (mirror) + SEC/FD live | ❌ PG→mirror | ingest | (1) ingest |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |

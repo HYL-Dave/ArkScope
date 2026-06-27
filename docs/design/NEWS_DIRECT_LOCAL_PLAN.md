@@ -1,9 +1,9 @@
 # News Direct-Local — Scoping (PG-exit Step 2, first collector)
 
 Date: 2026-06-26
-Status: Step 2 (2a–2d) DONE; **Step 3 designed 2026-06-27** (see the "Step 3 — design" section near
-the end). Original Step 2 scoping retained below as history. Design-first; no runtime code in this
-doc. News chosen first (over IV) — high
+Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27** (see the
+"Step 3" section near the end). Original Step 2 scoping is retained below as history. News chosen
+first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
 provider_sync + scheduler-state + Settings pattern. IV waits until its data-source strategy
 (provider-precomputed?) is clearer.
@@ -35,7 +35,8 @@ PG ids, and (must) keep `news_fts` in sync.
 A **direct-local news writer**: provider → parse → local `news` table (+ FTS) directly, no PG, no
 Parquet round-trip required for the local read path. Mirrors `backfill_prices_direct`: hold
 `market_write_lock`, `INSERT OR IGNORE` for idempotence, `provider_sync_runs`/`_meta` telemetry,
-per-ticker isolation, behind a default-OFF toggle. Selectable via the scheduler like
+per-ticker isolation, originally behind a default-OFF toggle and now default-ON with an explicit
+rollback. Selectable via the scheduler like
 price_backfill, so `local_incremental` + `--news` PG sync can eventually retire (Step 3, NOT now).
 
 ## Open design decisions (need the user's call before slicing)
@@ -66,12 +67,12 @@ price_backfill, so `local_incremental` + `--news` PG sync can eventually retire 
    cursor. Add a "latest local `news.published_at` for (source[, ticker])" read; the writer fetches
    from +1s like the collector does off Parquet. (If we keep Parquet (3a), the two cursors could
    diverge — decision: the LOCAL cursor governs the direct-local writer.)
-5. **Scheduler wiring + toggle.** A `use_local_news` toggle (env + profile, default-OFF, like
+5. **Scheduler wiring + toggle.** A `use_local_news` toggle (env + profile, initially default-OFF,
    `use_local_market`/`_macro`/`_records`); when on, the `polygon_news`/`finnhub_news` scheduler
    sources route to the direct-local writer (no `--news` PG sync, no mirror) instead of
    provider→Parquet→PG. News is timestamp-incremental (NOT gap-day-based like price), so it does
-   NOT use the coverage planner — just the local-cursor incremental fetch. Default-OFF; flipping
-   on is a later decision (like the records cutover).
+   NOT use the coverage planner — just the local-cursor incremental fetch. Step 3 subsequently
+   made unset default to ON while preserving explicit false as the rollback.
 
 ## Slice plan (each its own commit + review gate; mirror the price/records cadence)
 
@@ -96,7 +97,8 @@ price_backfill, so `local_incremental` + `--news` PG sync can eventually retire 
   schema-touching slices (2b, 2c) are gated.
 - Do NOT retire the mirror / `--news` sync until the direct-local writer is landed + trusted (Step
   3, separate). Do NOT remove any Settings local/mirror/strict UI yet (Step 5, last).
-- Default-OFF throughout; flipping `use_local_news` on is a later, separate decision.
+- Step 2 stayed default-OFF; Step 3's reviewed cutover changes unset to ON and retains explicit
+  profile/env false as the rollback.
 
 ## Relation to other plans
 
@@ -117,7 +119,7 @@ smoke PASS — the **sidecar is DB-authoritative** for provider keys; `.env` kep
 (CLI/standalone still read it — sidecar-only authority accepted, desktop-first; see
 `project_provider_config_dbification` memory).
 
-## Step 3 — design (2026-06-27; provider-scoped mirror BYPASS, NOT a domain retirement)
+## Step 3 — COMPLETE (2026-06-27; provider-scoped mirror BYPASS, NOT a domain retirement)
 
 Goal: make polygon/finnhub news ingest the default **direct-local** path (bypass `--news` PG sync +
 the PG→local mirror), with an in-product rollback toggle and honest status — **without data loss or
@@ -173,7 +175,7 @@ duplicates**. Designed via an adversarial 5-reader pass; approved in principle b
   `PRAGMA quick_check=ok`) and remains until one subsequent normal news ingest is verified. Normal
   SQLite reads passed (`HAPN` and alias `LC` both resolve to the same 372-row corpus). See
   `docs/superpowers/specs/2026-06-27-news-identity-repair-design.md`.
-- **S3.1 — status/health repoint (gated, additive read-only).** New
+- **S3.1 — COMPLETE (`c9b6945`), status/health repoint (gated, additive read-only).** New
   `read_news_sync_status()` combines `provider_sync_runs WHERE domain='news'` for aggregate run
   timing/status/rows with `provider_sync_meta WHERE interval='news'` for current per-ticker errors.
   The direct writer intentionally isolates a ticker failure and can still finish the aggregate run
@@ -181,21 +183,31 @@ duplicates**. Designed via an adversarial 5-reader pass; approved in principle b
   `market_data.py:81`, `data_coverage_tools.py:255`, `provider_health.py:356`; keep
   prices/iv/fundamentals on `read_sync_meta`. **Gate the overlay on `use_local_news_enabled()`** so
   status follows the active writer (ungated → shows "never run" while the mirror is still the
-  default writer). Per-provider cards already read the live `news` table (not stale); optionally
-  enrich them with run-level `last_error`.
-- **S3.2 — official switch + Settings UI (cutover).** Flip `use_local_news` **default → ON**
+  default writer). Provider cards retain content freshness detail but use direct per-provider
+  run success/attempt/error while the direct writer is active; an unrun provider is `no_signal`,
+  not made healthy by old mirrored content.
+- **S3.2 — COMPLETE (`f458669` backend, `1cc8a25` UI), official switch + Settings UI.** Flip
+  `use_local_news` **default → ON**
   (distinguish unset→ON from explicit-false→OFF); keep env/profile as the rollback lever. Routing
   line unchanged (`news_direct = d.news_direct_source is not None and use_local_news_enabled()`).
   Add `PUT /news/settings` + `GET /news/status` on the **macro route template** (NO `cache_clear`
   — the scheduler re-reads the toggle live per fire and news *reads* are governed by
   `use_local_market`), `api.ts` `setUseLocalNews`/`getNewsStatus`, and a Settings 新聞 panel
   (clone the macro panel). Toggle OFF = rollback to collector→Parquet→PG→mirror.
-- **S3.3 — test gate.** G1 polygon/finnhub direct by DEFAULT (no `--news`, no `_local_refresh`) +
+- **S3.3 — COMPLETE, test + live gate.** G1 polygon/finnhub direct by DEFAULT (no `--news`, no `_local_refresh`) +
   explicit-OFF restores the mirror chain (rollback pin); G2 mirror UNAFFECTED — `incremental_update`
   still syncs prices/iv/fundamentals **and ibkr_news's news** (news domain NOT removed); G3 news
   status from provider telemetry, not stale `market_sync_meta`; G4/G5 confirm direct idempotency +
-  FTS parity (existing tests, default-agnostic). Plus a separate **gated live smoke** (live PG still
-  serves iv/fundamentals + ibkr_news after the bypass — unit tests cannot assert live PG).
+  FTS parity. The focused news/market/scheduler suite passed 249 tests; frontend passed 197 tests
+  and a production build. The gated real-profile AAPL smoke resolved the Polygon key from the app
+  DB, ran with direct routing and no PG telemetry/backend, added 1 legitimate provider-returned
+  article, then added 0 on the second run. `market_sync_meta.news` was byte-for-byte unchanged,
+  `news == news_fts == 371,575`, all hashes are 64-character canonical SHA, duplicate groups are
+  zero, `PRAGMA quick_check=ok`, and a normal local feed read returned data. The AAPL cursor stayed
+  at `2026-06-27T07:11:00+0000` because the newly returned article's canonical primary ticker was
+  another ETF; this is the collector's established primary-ticker behavior, not a missed boundary.
+  `ibkr_news` remains pinned by tests to collector + `--news`, and `local_incremental` still runs
+  the mirror for news/IV/fundamentals.
 
 ### Rollback / invariants (locked)
 Touches only routing + telemetry-read + the direct hash scheme + UI. **NEVER** deletes/drops: live
@@ -205,7 +217,7 @@ flag, or the mirror's news branch. Rollback = toggle OFF (+ revert the additive 
 restore.
 
 ### Sequencing
-`use_local_news` stays default-OFF until S3.1 lands. **S3.0/S3.0a MUST
-precede S3.2** (default-ON) or the cutover can duplicate alias-renamed rows. Order: S3.0a gated live
-repair → S3.1 (status repoint) → S3.2 (default-ON + UI) → S3.3 (tests woven TDD per slice) → gated
-live smoke.
+Completed order: S3.0a gated live repair → S3.1 status repoint → S3.2 default-ON + UI → S3.3
+tests + gated live smoke. The S3.0a backup and the older pre-2b backup have both met their stated
+verification gates and are eligible for manual deletion, but remain on disk; this cutover does not
+delete backups automatically.
