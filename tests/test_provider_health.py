@@ -56,6 +56,9 @@ def hermetic(monkeypatch):
     for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
                 "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT"):
         monkeypatch.delenv(var, raising=False)
+    # Existing health tests exercise mirrored content timestamps. S3.2 default is direct;
+    # pin rollback here and opt direct tests in explicitly.
+    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "false")
     monkeypatch.setattr("src.market_data_admin.read_sync_meta", lambda *a, **k: {})
     monkeypatch.setattr("src.tools.analysis_tools._is_fd_enabled", lambda dal: False)
 

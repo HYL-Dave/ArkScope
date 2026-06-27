@@ -19,6 +19,9 @@ def hermetic(tmp_path, monkeypatch):
     the real DAL / subprocesses / local market DB — and CRITICALLY, stub both
     in-process news adapters so no test can fire a real provider API call."""
     store = ProfileStateStore(tmp_path / "profile_state.db")
+    # S3.2 defaults news direct-local ON. Most legacy scheduler tests below exercise
+    # the mirror path, so pin the rollback explicitly; the default-direct test clears it.
+    store.set_setting("use_local_news", "false")
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
@@ -105,6 +108,7 @@ def test_tick_fires_only_enabled_and_due():
 def test_run_source_adapter_success_sync_refresh(monkeypatch):
     # polygon_news runs IN-PROCESS via the adapter; only the PG sync is a subprocess.
     import scripts.collection.collect_polygon_news as cpn
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "incremental", "new_articles": 3})
     calls = []
@@ -132,12 +136,12 @@ def test_run_source_adapter_success_sync_refresh(monkeypatch):
                         "status": "succeeded"}
 
 
-def test_run_source_news_direct_when_use_local_news_on(monkeypatch):
-    # 2c ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
+def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
+    # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
     # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
     import scripts.collection.collect_polygon_news as cpn
+    hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
     calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
 

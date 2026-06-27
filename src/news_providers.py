@@ -10,8 +10,8 @@ path writes only the local SQLite ``news`` table, no Parquet, and is cursored ag
 
 The collector ``NewsArticle`` is mapped to the local news-row contract using the canonical SHA-256
 identity shared with the PG/mirror migration; ``description`` falls back to ``content``. Also here:
-``use_local_news_enabled()`` — the default-OFF routing toggle, read standalone (no DAL) so the
-scheduler can consult it per source-run.
+``use_local_news_enabled()`` — the default-ON routing toggle with explicit env/profile rollback,
+read standalone (no DAL) so the scheduler can consult it per source-run.
 """
 from __future__ import annotations
 
@@ -23,7 +23,11 @@ from typing import Any, Dict, List, Optional
 
 from src.news_identity import canonical_article_hash
 
+USE_LOCAL_NEWS_KEY = "use_local_news"
+ENV_USE_LOCAL_NEWS = "ARKSCOPE_USE_LOCAL_NEWS"
+
 _TRUTHY = ("1", "true", "yes", "on")
+_FALSY = ("0", "false", "no", "off")
 _DEFAULT_LOOKBACK_DAYS = 7   # first run (no local cursor for this source/ticker) → look back a week
 
 
@@ -31,28 +35,48 @@ def _default_profile_db() -> str:
     return str(Path(__file__).resolve().parents[1] / "data" / "profile_state.db")
 
 
-def use_local_news_enabled() -> bool:
-    """Whether news ingest routes to the direct-local writer (2c toggle, default-OFF).
-
-    Env override (``ARKSCOPE_USE_LOCAL_NEWS``) OR the persisted ``profile_settings.use_local_news``
-    key, read-only — standalone (the scheduler reads it per source-run without constructing a DAL).
-    Mirrors the DAL's ``_profile_setting_truthy`` semantics; default OFF keeps the current
-    collector→Parquet→PG sync→local mirror path."""
-    if os.environ.get("ARKSCOPE_USE_LOCAL_NEWS", "").strip().lower() in _TRUTHY:
+def parse_news_toggle(value: Any) -> Optional[bool]:
+    text = str(value).strip().lower() if value is not None else ""
+    if text in _TRUTHY:
         return True
+    if text in _FALSY:
+        return False
+    return None
+
+
+def resolve_use_local_news(profile_value: Any, env_value: Any = None) -> bool:
+    """Resolve routing as explicit env > explicit profile > default ON."""
+    env = parse_news_toggle(env_value)
+    if env is not None:
+        return env
+    profile = parse_news_toggle(profile_value)
+    return profile if profile is not None else True
+
+
+def use_local_news_enabled() -> bool:
+    """Whether Polygon/Finnhub news ingest routes to the direct-local writer.
+
+    Both true and false are explicit overrides. Unset defaults ON; setting either
+    ``ARKSCOPE_USE_LOCAL_NEWS=false`` or profile ``use_local_news=false`` restores
+    the collector -> PG sync -> local mirror path.
+    """
+    env_value = os.environ.get(ENV_USE_LOCAL_NEWS)
+    if parse_news_toggle(env_value) is not None:
+        return resolve_use_local_news(None, env_value)
     db = os.environ.get("ARKSCOPE_PROFILE_DB") or _default_profile_db()
     if not db or not Path(db).exists():
-        return False
+        return True
     try:
         conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         try:
             row = conn.execute(
-                "SELECT value FROM profile_settings WHERE key = 'use_local_news'").fetchone()
+                "SELECT value FROM profile_settings WHERE key = ?", (USE_LOCAL_NEWS_KEY,)
+            ).fetchone()
         finally:
             conn.close()
-        return bool(row) and str(row[0]).strip().lower() in _TRUTHY
+        return resolve_use_local_news(row[0] if row else None)
     except sqlite3.OperationalError:
-        return False
+        return True
 
 
 def _article_to_raw(article: Any) -> Dict[str, Any]:
