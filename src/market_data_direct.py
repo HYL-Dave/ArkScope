@@ -142,24 +142,41 @@ def market_write_lock(timeout: float = 30.0, poll: float = 0.5):
 
 # --- WAL-safe backup ---------------------------------------------------------------
 
-def backup_market_db(src_path: str, dest_path: str) -> Optional[str]:
+def backup_market_db(
+    src_path: str,
+    dest_path: str,
+    *,
+    overwrite: bool = True,
+) -> Optional[str]:
     """WAL-safe snapshot of the market DB via the SQLite backup API (NOT a raw file
     copy — a ``.db`` copy can miss rows still in an uncheckpointed ``-wal`` sidecar).
-    Returns dest_path on success, None if src is missing."""
+    Returns dest_path on success, None if src is missing. ``overwrite=False`` reserves
+    the destination atomically and never clobbers an earlier operator backup."""
     if not Path(src_path).exists():
         return None
-    Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(dest_path).unlink(missing_ok=True)
+    destination = Path(dest_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    reserved = False
+    if overwrite:
+        destination.unlink(missing_ok=True)
+    else:
+        fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        reserved = True
     src = sqlite3.connect(src_path, timeout=10.0)
     try:
-        dst = sqlite3.connect(dest_path)
+        dst = sqlite3.connect(destination)
         try:
             src.backup(dst)  # online backup — captures committed WAL pages too
         finally:
             dst.close()
+    except Exception:
+        if reserved:
+            destination.unlink(missing_ok=True)
+        raise
     finally:
         src.close()
-    return dest_path
+    return str(destination)
 
 
 # --- local-only preflight (regularize the live DB; reuse slice-1 helpers) ----------

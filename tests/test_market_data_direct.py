@@ -137,6 +137,21 @@ def test_backup_missing_src_returns_none(tmp_path):
     assert mdd.backup_market_db(str(tmp_path / "nope.db"), str(tmp_path / "b.db")) is None
 
 
+def test_backup_refuses_to_overwrite_existing_destination(tmp_path):
+    src = tmp_path / "source.db"
+    conn = sqlite3.connect(src)
+    conn.execute("CREATE TABLE t (id INTEGER)")
+    conn.commit()
+    conn.close()
+    dest = tmp_path / "protected.db"
+    dest.write_bytes(b"do-not-clobber")
+
+    with pytest.raises(FileExistsError):
+        mdd.backup_market_db(str(src), str(dest), overwrite=False)
+
+    assert dest.read_bytes() == b"do-not-clobber"
+
+
 # --- detect_price_gaps: day-presence, weekend/holiday aware (NOT 26-bar count) ------
 
 def _prices_db(tmp_path, rows):

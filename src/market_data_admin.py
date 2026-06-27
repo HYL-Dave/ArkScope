@@ -222,7 +222,10 @@ def _canonicalize_table_tickers(conn, table: str) -> int:
     redundant). Never raises a PK IntegrityError, never loses a canonical row. Read paths
     still resolve through the alias table, so this is cleanup, not a correctness dependency."""
     aliases = conn.execute("SELECT alias, canonical FROM ticker_aliases").fetchall()
-    if table == "news":
+    table_columns = {
+        str(row[1]) for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+    }
+    if table == "news" and "article_hash" in table_columns:
         reconciled = _canonicalize_news_tickers(conn, aliases)
         conn.commit()
         return reconciled
