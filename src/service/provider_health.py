@@ -177,11 +177,22 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         notes.append(f"job_runs failed: {e}")
 
     sync: Dict[str, Any] = {}
+    direct_news: Optional[Dict[str, Any]] = None
+    direct_news_enabled = False
     db_exists = False
     try:
         from src.market_data_admin import read_sync_meta, resolve_market_db_path
-        sync = read_sync_meta()
-        db_exists = Path(resolve_market_db_path()).exists()
+        from src.news_providers import use_local_news_enabled
+        from src.news_sync_status import read_news_sync_status
+
+        db_path = resolve_market_db_path()
+        sync = read_sync_meta(db_path)
+        db_exists = Path(db_path).exists()
+        direct_news_enabled = use_local_news_enabled()
+        if direct_news_enabled:
+            direct_news = read_news_sync_status(db_path)
+            sync = dict(sync)
+            sync["news"] = direct_news
     except Exception as e:
         notes.append(f"market sync meta failed: {e}")
 
@@ -281,12 +292,20 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
     for pid, label in (("polygon", "Polygon"), ("finnhub", "Finnhub")):
         n = news_by_src.get(pid, {})
+        direct = (direct_news or {}).get("providers", {}).get(pid) if direct_news_enabled else None
         _add(
             pid, label, "news",
             _key_info(loaded_file_keys, app_keys, f"{pid.upper()}_API_KEY"),
-            last_success=n.get("latest"),
+            last_success=(_to_dt(direct.get("last_success")) if direct else None)
+            if direct_news_enabled else n.get("latest"),
+            last_attempt=(_to_dt(direct.get("last_attempt")) if direct else None),
+            last_error=(direct.get("last_error") if direct else None),
             detail=f"news latest {_iso(n.get('latest')) or '—'} · 7d {n.get('recent_7d', 0)}",
-            signals={"news_latest": _iso(n.get("latest")), "news_recent_7d": n.get("recent_7d", 0)},
+            signals={
+                "news_latest": _iso(n.get("latest")),
+                "news_recent_7d": n.get("recent_7d", 0),
+                "direct_sync": direct,
+            },
         )
 
     fred = _job_signal("fetch_fred")

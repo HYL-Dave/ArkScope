@@ -202,6 +202,41 @@ def test_section_failure_degrades_not_raises():
     assert _by_id(out, "sec_edgar")["status"] == "no_signal"
 
 
+def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeypatch):
+    monkeypatch.setenv("POLYGON_API_KEY", "k")
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    direct = {
+        "status": "partial",
+        "last_success": "2026-06-10T10:00:00+00:00",
+        "last_attempt": "2026-06-10T11:00:00+00:00",
+        "last_error": "polygon: BAD: 403",
+        "rows_added": 0,
+        "updated_at": "2026-06-10T11:00:00+00:00",
+        "providers": {
+            "polygon": {
+                "status": "partial", "last_success": "2026-06-10T10:00:00+00:00",
+                "last_attempt": "2026-06-10T11:00:00+00:00", "last_error": "BAD: 403",
+                "rows_added": 0, "tickers_scanned": 2, "ticker_errors": [],
+            }
+        },
+    }
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
+    monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
+    dal = _FakeDAL(_FakeBackend(stats=_stats(news_rows=[
+        ("polygon", _WEDNESDAY - timedelta(hours=1), 50),
+        ("finnhub", _WEDNESDAY - timedelta(hours=1), 50),
+    ])))
+
+    out = compute_provider_health(dal, now=_WEDNESDAY)
+
+    polygon = _by_id(out, "polygon")
+    assert polygon["last_success_at"] == "2026-06-10T10:00:00+00:00"
+    assert polygon["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
+    assert polygon["last_error"] == "BAD: 403"
+    assert _by_id(out, "finnhub")["status"] == "no_signal"
+    assert out["local_market"]["sync"]["news"] == direct
+
+
 def test_route_returns_aggregation(monkeypatch):
     from src.api.routes.health import providers_health
     dal = _FakeDAL(_FakeBackend())

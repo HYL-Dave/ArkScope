@@ -32,6 +32,7 @@ from src.market_data_admin import (
     validate_market,
 )
 from src.market_data_direct import summarize_trading_day_coverage
+from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
 
 router = APIRouter(tags=["market-data"])
@@ -70,6 +71,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     # Strict is a modifier of local-market routing: it only has runtime effect when
     # routing itself is active.
     strict_enabled = routing_enabled and (strict_setting_on or strict_env_on)
+    sync = overlay_news_sync_status(read_sync_meta(path), path)
     return {
         "market_db": path,
         "exists": stats["exists"],
@@ -78,7 +80,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "iv": stats["iv"],
         "fundamentals": stats["fundamentals"],
         "financial_cache": stats["financial_cache"],  # 3c-C local-primary cache (rows/valid/expired)
-        "sync": read_sync_meta(path),  # per-domain incremental status (last_success/error/rows_added)
+        "sync": sync,  # mirror domains + direct-news telemetry when its writer is active
         "use_local_market_setting": setting_on,
         "env_override": env_on,
         "local_market_strict_setting": strict_setting_on,

@@ -47,6 +47,10 @@ def _make_market_db(path):
         "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
         ("prices", "2026-06-22T12:00:00+00:00", None, 2, "2026-06-22T12:00:01+00:00"),
     )
+    conn.execute(
+        "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
+        ("news", "mirror", None, 1, "mirror"),
+    )
     conn.commit()
     conn.close()
 
@@ -100,3 +104,22 @@ def test_ticker_data_coverage_rejects_invalid_target_date_without_raising(tmp_pa
 
     assert out["prices"]["target_date"]["status"] == "invalid_target_date"
     assert out["prices"]["target_date"]["reason"] == "target_date must be YYYY-MM-DD"
+
+
+def test_ticker_coverage_news_sync_follows_active_writer_only(tmp_path, monkeypatch):
+    db = tmp_path / "market_data.db"
+    _make_market_db(db)
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(db))
+    direct = {
+        "status": "succeeded", "last_success": "direct", "last_attempt": "direct",
+        "last_error": None, "rows_added": 0, "updated_at": "direct", "providers": {},
+    }
+    monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
+
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
+    assert get_ticker_data_coverage("CLS")["sync"]["news"]["last_success"] == "mirror"
+
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
+    out = get_ticker_data_coverage("CLS")
+    assert out["sync"]["news"] == direct
+    assert out["sync"]["prices"]["last_success"] == "2026-06-22T12:00:00+00:00"

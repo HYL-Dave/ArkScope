@@ -570,6 +570,38 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     assert out["routing_enabled"] is False  # no DB + setting off
 
 
+def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatch):
+    from src.api.routes.market_data import market_data_status
+
+    db = tmp_path / "market_data.db"
+    db.write_bytes(b"")
+    mirror = {
+        "prices": {"last_success": "p", "last_error": None, "rows_added": 1, "updated_at": "p"},
+        "news": {"last_success": "mirror", "last_error": None, "rows_added": 2, "updated_at": "mirror"},
+    }
+    direct = {
+        "status": "partial", "last_success": "direct", "last_attempt": "now",
+        "last_error": "polygon: BAD: 403", "rows_added": 3, "updated_at": "now",
+        "providers": {},
+    }
+    monkeypatch.setattr("src.api.routes.market_data.resolve_market_db_path", lambda: str(db))
+    monkeypatch.setattr("src.api.routes.market_data.local_market_stats", lambda path: {
+        "exists": True, "prices": {}, "news": {}, "iv": {}, "fundamentals": {},
+        "financial_cache": {},
+    })
+    monkeypatch.setattr("src.api.routes.market_data.read_sync_meta", lambda path: mirror)
+    monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
+
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
+    off = market_data_status(store=store)
+    assert off["sync"] == mirror
+
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
+    on = market_data_status(store=store)
+    assert on["sync"]["news"] == direct
+    assert on["sync"]["prices"] == mirror["prices"]
+
+
 def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):
     from src.api.routes.market_data import set_local_market, LocalMarketToggle, market_data_status
     set_local_market(LocalMarketToggle(enabled=True), store=store)

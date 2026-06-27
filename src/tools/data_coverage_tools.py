@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.market_data_admin import resolve_market_db_path
+from src.news_sync_status import overlay_news_sync_status
 
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
@@ -252,7 +253,7 @@ def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> 
             "news": _news_summary(conn, t),
             "iv": _domain_summary(conn, "iv_history", t, "date"),
             "fundamentals": _domain_summary(conn, "fundamentals", t, "snapshot_date"),
-            "sync": _sync_meta(conn),
+            "sync": overlay_news_sync_status(_sync_meta(conn), path),
             "note": "local-only diagnostic; no provider fetch attempted",
         }
     finally:
