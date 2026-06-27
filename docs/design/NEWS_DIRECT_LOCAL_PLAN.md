@@ -124,11 +124,11 @@ the PG→local mirror), with an in-product rollback toggle and honest status —
 duplicates**. Designed via an adversarial 5-reader pass; approved in principle by the user
 (hash option A; default-ON + rollback lever + Settings toggle; persist-this-doc-first).
 
-### Critical prerequisite — the `article_hash` divergence (the real work, not the toggle)
+### Critical prerequisite — the `article_hash` divergence (S3.0 DONE, `59b0ebd`)
 - **Canonical (mirror)**, `migrate_to_supabase.py:71` applied at `:230`:
   `sha256(f"{ticker}|{title}|{published_at[:10]}")[:64]` — ticker + title **VERBATIM** (no case/strip).
   All 371k existing rows use this (len 64).
-- **Direct (today)**: `article.dedup_hash` =
+- **Direct (before S3.0)**: `article.dedup_hash` =
   `md5(f"{TICKER.upper()}|{title.strip().lower()}|{date[:10]}")` (`collect_polygon_news.py:374`,
   `collect_finnhub_news.py:268`, mapped at `news_providers.py:66`) — len 32.
 - ⇒ same article → different hash → `INSERT OR IGNORE` cannot dedup direct-vs-mirror.
@@ -138,6 +138,10 @@ duplicates**. Designed via an adversarial 5-reader pass; approved in principle b
 - The cursor does NOT mask it: `_latest_published` is hash-agnostic (correct), but its
   inclusive-boundary re-fetch leans on hash dedup, which the divergence defeats for mirror-origin
   boundary articles.
+- **S3.0 result:** direct ingest now emits the canonical SHA-256, the three MD5 smoke rows were
+  cleaned and re-fetched under SHA, coexistence/idempotency passed live, and the local table is
+  100% 64-character SHA. A follow-up audit then found ticker-alias hash drift despite the valid
+  SHA shape; that separate invariant is S3.0a below.
 
 ### Scope (narrower than "retire the news mirror")
 - `ibkr_news` has **no direct writer** (`news_direct_source=None`) → it STAYS collector→PG→mirror.
@@ -154,10 +158,19 @@ duplicates**. Designed via an adversarial 5-reader pass; approved in principle b
   re-fetch cleanly under SHA) → DB 100% SHA; verify `COUNT(*) WHERE length(article_hash)=32 == 0`
   and zero duplicate groups; re-run an idempotent smoke. **Coexistence test:** seed a SHA
   mirror-style row, run the direct writer over the same article → `articles_added==0`.
+- **S3.0a — ticker/hash identity repair (CODE COMPLETE; LIVE APPLY PENDING).** A ticker rename used
+  to update `news.ticker` without recomputing the ticker-derived hash. The audited live DB has
+  1,148 stale SHA rows (HAPN 369, BRK B 779), including 101 HAPN collisions where 93 stale rows
+  carry descriptions missing from the canonical owner. Commits `4a2a55e`/`0da6ee2`/`90b9d74`/
+  `e3a3f31` centralize the hash helper, add deterministic merge-not-delete reconciliation, route
+  future news aliases through it, and provide preview → fingerprint → no-clobber WAL backup → one
+  transaction → validation. Live completion remains gated on reviewed preview counts/fingerprint;
+  see `docs/superpowers/specs/2026-06-27-news-identity-repair-design.md`.
 - **S3.1 — status/health repoint (gated, additive read-only).** New
-  `read_news_sync_status()` from `provider_sync_runs WHERE domain='news'` (last_success =
-  MAX(finished_at where succeeded); rows_added = SUM over the most-recent run per provider;
-  last_error = most-recent failed run; updated_at = MAX). Overlay ONLY the news slice in
+  `read_news_sync_status()` combines `provider_sync_runs WHERE domain='news'` for aggregate run
+  timing/status/rows with `provider_sync_meta WHERE interval='news'` for current per-ticker errors.
+  The direct writer intentionally isolates a ticker failure and can still finish the aggregate run
+  as `succeeded`, so run rows alone MUST NOT claim a clean source. Overlay ONLY the news slice in
   `market_data.py:81`, `data_coverage_tools.py:255`, `provider_health.py:356`; keep
   prices/iv/fundamentals on `read_sync_meta`. **Gate the overlay on `use_local_news_enabled()`** so
   status follows the active writer (ungated → shows "never run" while the mirror is still the
@@ -185,6 +198,7 @@ flag, or the mirror's news branch. Rollback = toggle OFF (+ revert the additive 
 restore.
 
 ### Sequencing
-`use_local_news` stays default-OFF until S3.0 + S3.1 land. **S3.0 MUST precede S3.2** (default-ON)
-or the cutover duplicates. Order: S3.0 (hash unify + cleanup) → S3.1 (status repoint) → S3.2
-(default-ON + UI) → S3.3 (tests woven TDD per slice) → gated live smoke.
+`use_local_news` stays default-OFF until S3.0a live validation + S3.1 land. **S3.0/S3.0a MUST
+precede S3.2** (default-ON) or the cutover can duplicate alias-renamed rows. Order: S3.0a gated live
+repair → S3.1 (status repoint) → S3.2 (default-ON + UI) → S3.3 (tests woven TDD per slice) → gated
+live smoke.
