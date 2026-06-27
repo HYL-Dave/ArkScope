@@ -22,7 +22,9 @@ def test_article_to_raw_maps_real_collector_dataclass():
     a = _article(description="", content="full body text", url="http://u", publisher="Reuters",
                  dedup_hash="md5hash123")
     raw = np._article_to_raw(a)
-    assert raw["article_hash"] == "md5hash123"            # dedup_hash → article_hash
+    from scripts.migrate_to_supabase import article_hash as _canon
+    assert raw["article_hash"] == _canon("AAPL", "Beat", "2026-06-24")  # canonical SHA-256, not dedup_hash
+    assert len(raw["article_hash"]) == 64 and raw["article_hash"] != "md5hash123"
     assert raw["description"] == "full body text"         # description empty → falls back to content
     assert raw["published_at"] == "2026-06-24T13:30:00+0000"
     assert raw["ticker"] == "AAPL" and raw["title"] == "Beat"
@@ -48,7 +50,7 @@ def test_provider_fetch_uses_collector_fetch_parse_no_parquet():
     fake = _FakePolygon()
     prov = np.make_news_provider("polygon", collector=fake)
     out = prov.fetch_news("AAPL", since_iso="2026-06-20T00:00:00+0000")
-    assert [r["article_hash"] for r in out] == ["h1", "h2"]
+    assert len(out) == 2 and all(len(r["article_hash"]) == 64 for r in out)  # canonical SHA, not dedup_hash
     assert fake.range_args[0] == "AAPL" and str(fake.range_args[1]) == "2026-06-20"  # cursor date
     assert not hasattr(fake, "save_articles")  # no Parquet sink touched
 
@@ -61,7 +63,7 @@ def test_provider_skips_none_parse_results():
         def parse_article(self, raw, ticker, collected_at):
             return None if raw["id"] == "2" else _article(dedup_hash="h1")
     out = np.make_news_provider("finnhub", collector=_FakeFinnhub()).fetch_news("AAPL")
-    assert [r["article_hash"] for r in out] == ["h1"]
+    assert len(out) == 1 and len(out[0]["article_hash"]) == 64  # None parse result skipped
 
 
 def test_use_local_news_default_off(tmp_path, monkeypatch):
@@ -84,3 +86,17 @@ def test_use_local_news_profile_setting_on(tmp_path, monkeypatch):
     c.commit(); c.close()
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
     assert np.use_local_news_enabled() is True
+
+
+def test_article_to_raw_uses_canonical_sha256_hash():
+    # S3.0: the direct path must produce the SAME article_hash as the PG/mirror canonical scheme
+    # (sha256(f"{ticker}|{title}|{published_at[:10]}"), ticker/title VERBATIM) so INSERT OR IGNORE
+    # dedups direct-origin vs mirror-origin rows for the same article. NOT the collector's MD5.
+    from scripts.migrate_to_supabase import article_hash as canonical
+    a = _article(title="Massive News for Apple Stock Investors!",
+                 published_at="2026-06-27T00:20:57+0000", dedup_hash="deadbeef_md5_ignored")
+    raw = np._article_to_raw(a)
+    assert raw["article_hash"] == canonical("AAPL", "Massive News for Apple Stock Investors!",
+                                            "2026-06-27")
+    assert len(raw["article_hash"]) == 64               # SHA-256, not the collector's 32-char MD5
+    assert raw["article_hash"] != "deadbeef_md5_ignored"  # collector dedup_hash no longer used

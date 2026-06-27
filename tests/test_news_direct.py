@@ -71,6 +71,43 @@ def test_dedup_idempotent_on_article_hash(tmp_path, monkeypatch):
     assert len(_rows(db)) == 1
 
 
+def test_direct_dedups_against_mirror_sha_row(tmp_path, monkeypatch):
+    # S3.0 coexistence: a mirror-origin row uses the canonical SHA-256 hash; a later DIRECT fetch of
+    # the SAME article (through make_news_provider -> _article_to_raw, which now computes that same
+    # canonical SHA) must dedup -> NO duplicate row. (Before S3.0 the direct path used the
+    # collector's MD5 dedup_hash, so the same article re-entered as a duplicate.)
+    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
+    db = _news_db(tmp_path)
+    from scripts.migrate_to_supabase import article_hash as canonical
+    import src.news_providers as npv
+    from scripts.collection.collect_polygon_news import NewsArticle
+
+    tk, title, pub = "AAPL", "Massive News for Apple Stock Investors!", "2026-06-27T00:20:57+0000"
+    sha = canonical(tk, title, pub[:10])
+
+    # create the schema via a first direct write of an UNRELATED article, then raw-insert a
+    # MIRROR-STYLE row (canonical SHA hash) for the article under test.
+    nd.backfill_news_direct(["NVDA"], source="polygon",
+                            provider=_FakeNewsProvider({"NVDA": [_article("NVDA", "x", "2026-06-20T00:00:00Z", h="other")]}),
+                            db_path=db)
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO news (ticker,title,description,url,publisher,source,published_at,article_hash) "
+              "VALUES (?,?,?,?,?,?,?,?)", (tk, title, "body", "u", "pub", "polygon", pub, sha))
+    c.commit(); c.close()
+
+    # a DIRECT fetch of the same article through the real provider adapter (-> _article_to_raw -> SHA)
+    class _FakeCollector:
+        def fetch_news_range(self, ticker, start, end, **kw):
+            return [{"id": "1"}]
+        def parse_article(self, raw, collected_at):
+            return NewsArticle(article_id="1", ticker=tk, title=title, published_at=pub,
+                               description="body", url="u", publisher="pub", dedup_hash="md5_ignored")
+    prov = npv.make_news_provider("polygon", collector=_FakeCollector())
+    res = nd.backfill_news_direct(["AAPL"], source="polygon", provider=prov, db_path=db)
+    assert res["articles_added"] == 0                      # deduped against the mirror SHA row
+    assert len(_rows(db, "WHERE ticker='AAPL'")) == 1       # the mirror row only; no MD5 duplicate
+
+
 def test_fts_search_finds_written_articles(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _news_db(tmp_path)

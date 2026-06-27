@@ -15,6 +15,7 @@ standalone (no DAL) so the scheduler can consult it per source-run.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
@@ -53,9 +54,25 @@ def use_local_news_enabled() -> bool:
         return False
 
 
+def _canonical_article_hash(ticker: str, title: str, published_at: str) -> str:
+    """The canonical news identity — IDENTICAL to the PG/mirror scheme
+    (``scripts.migrate_to_supabase.article_hash``): ``sha256("{ticker}|{title}|{date}")[:64]`` over
+    the VERBATIM ticker + title (no case/strip) and the date portion ``published_at[:10]``.
+
+    S3.0: the direct path previously used the collector's ``dedup_hash`` (MD5,
+    ``TICKER.upper()|title.strip().lower()|date``), which differs from the mirror's SHA-256 for the
+    SAME article — so ``INSERT OR IGNORE`` could not dedup a direct-origin row against a mirror-origin
+    one (it produced duplicates). Computing this canonical hash from the SAME fields written to the
+    row makes one ``UNIQUE(article_hash)`` dedup across both writers. Pinned equal to
+    ``migrate_to_supabase.article_hash`` by tests/test_news_providers.py so the two cannot drift."""
+    date10 = (published_at or "")[:10]
+    return hashlib.sha256(f"{ticker}|{title}|{date10}".encode("utf-8")).hexdigest()[:64]
+
+
 def _article_to_raw(article: Any) -> Dict[str, Any]:
     """Collector ``NewsArticle`` (duck-typed) → the raw dict ``backfill_news_direct`` expects.
-    ``article_hash`` = the collector's ``dedup_hash``; ``description`` falls back to ``content``."""
+    ``article_hash`` = the canonical SHA-256 (matches the PG/mirror scheme — see
+    ``_canonical_article_hash``); ``description`` falls back to ``content``."""
     return {
         "ticker": article.ticker,
         "title": article.title,
@@ -63,7 +80,8 @@ def _article_to_raw(article: Any) -> Dict[str, Any]:
         "url": getattr(article, "url", "") or "",
         "publisher": getattr(article, "publisher", "") or "",
         "published_at": article.published_at,
-        "article_hash": article.dedup_hash,
+        "article_hash": _canonical_article_hash(
+            article.ticker, article.title, article.published_at),
     }
 
 
