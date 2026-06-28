@@ -279,7 +279,9 @@ PG-unreachable E2E.
 - All 35 timestamp-drift groups remain one article each without false recency.
 - The 35 exact URL duplicates merge; the 13 semantic URL sets remain separate and demoted.
 - All 940 weak rows are reviewed rejections, never guessed mappings.
-- All 718 variant groups retain one active body and every distinct cold variant.
+- All 718 input variant groups retain one active body and every distinct cold variant. Exact
+  Polygon URL merges create three additional resolved variant groups, so the reviewed apply plan
+  contains 721 groups and 731 cold bodies.
 - Repeated 10172 becomes `unavailable` after bounded retry, never `empty` or inferred `expired`.
 - Every legacy row is durably mapped or reviewed-rejected.
 - Apply is backup-first, fingerprint-gated, atomic, rollback-all, and idempotent.

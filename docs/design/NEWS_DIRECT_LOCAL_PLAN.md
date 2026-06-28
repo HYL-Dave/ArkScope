@@ -2,7 +2,8 @@
 
 Date: 2026-06-26
 Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27**;
-**normalized all-source N1–N5 offline foundation COMPLETE 2026-06-28, not migrated or cut over**
+**normalized all-source N1–N7 code COMPLETE and preview-verified 2026-06-29; live apply and N8
+cutover have not run**
 (see the checkpoint near the end). Original Step 2 scoping is retained below as history. News chosen
 first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
@@ -287,3 +288,59 @@ Parquet is no longer the intended authority for the normalized end state. For no
 frozen migration/enrichment source **and** an active legacy dependency for IBKR collection and
 scoring. It can be frozen/archived and obsolete scripts removed only after N8 proves all readers,
 writers, and scoring against normalized SQLite.
+
+---
+
+## N7 resolved migration gate (code complete, live apply NOT run, 2026-06-29)
+
+N7 now has a source-wide Polygon URL policy, deterministic body ranking with cold variants,
+bounded IBKR 10172 retry state, an immutable resolved plan, a row-group-batched Parquet body
+reader, an atomic transaction-local writer, and a CLI that requires three independently reviewed
+fingerprints plus explicit confirmation that the scheduler is paused. The implementation remains
+additive and unrouted. The live DB still has zero normalized-news schema objects.
+
+### Reproduced real-input gate
+
+Two complete read-only previews produced identical values:
+
+- input fingerprint:
+  `55aa79c33ebed92658dc8af232d12ae465d4d19c8ef3bf4556f2e0ed6c5442cc`;
+- resolved fingerprint:
+  `0b6008b64afa1c97021738b3faee81ac6fccc13404c04a704ffe8f757895cce7`;
+- rejection-evidence fingerprint:
+  `79c290856dafa45b75357224fdb6cde6292e7507700718a343a5146bdd1b6a67`;
+- unreviewed blockers: `0`;
+- articles `287,016`; identity keys `659,737`; ticker relations `618,170`; titles `287,039`;
+- legacy rows `371,575`: mapped `370,635`, reviewed-rejected `940`;
+- reviewed rejections: IBKR `924`, Polygon `16`; unique ticker/sentiment evidence `0/0`;
+- provider timestamp drifts `35`; Polygon URL merges `35`; URL demotions `13`;
+- body states: fetched `281,765`, failed `133`, pending `5,118`;
+- body variants: `721` groups and `731` cold bodies. The input audit had 718 groups
+  (IBKR 709 + Polygon 9); three additional Polygon groups become variants only after exact-URL
+  provider groups merge, yielding the resolved Polygon count of 12.
+
+| Source | Articles | Provider-ID matched | Fallback-only | Bodies | Missing | Variant groups | Cold bodies |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Finnhub | 85,674 | 85,025 | 0 | 82,610 | 3,064 | 0 | 0 |
+| IBKR | 83,092 | 76,859 | 0 | 82,771 | 321 | 709 | 719 |
+| Polygon | 118,250 | 118,028 | 4 | 116,384 | 1,866 | 12 | 12 |
+
+Input immutability was checked before and after both previews: `market_data.db` remained
+808,534,016 bytes with the same mtime and inode; normalized object count remained zero; all 103
+Parquet files retained the same size/mtime/inode snapshot. Verification passed 140 hermetic tests
+with six configured live-IBKR tests skipped, and all touched modules compile.
+
+### Remaining hard gates
+
+- **Live apply requires a new independent review and explicit approval.** It must use the three
+  exact fingerprints above and a unique no-clobber backup path. No apply command has run.
+- **Run apply only in a quiet operator window with scheduler/manual ingest paused.** The shared
+  market write lock remains held through initial planning, backup, migration, reopened validation,
+  and the multi-minute post-commit idempotent replan.
+- **Polygon URL demotion remains source-wide in N8.** New Polygon URL reuse must never regain
+  strong-key semantics.
+- **N8 runtime cutover is blocked until N7 live validation passes.** Its implementation plan must
+  explicitly reconcile scorer-versus-read ordering. Locked direction: scorer first, then writers,
+  bounded IBKR smoke, reads, news PG-sync/mirror retirement, and finally PG-unreachable E2E.
+- N9 legacy table/Parquet/script deletion remains blocked until N8 proves normalized reads,
+  writers, scoring, and rollback behavior.
