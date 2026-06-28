@@ -32,6 +32,8 @@ class ParquetEvidence:
     content_fetched_at: str | None
     collected_at: str | None
     source_path: str
+    row_group: int
+    row_index: int
 
 
 @dataclass(frozen=True)
@@ -190,7 +192,13 @@ def _source_from_path(path: Path) -> str:
     return ""
 
 
-def _parquet_row_to_evidence(row: dict, path: Path) -> ParquetEvidence:
+def _parquet_row_to_evidence(
+    row: dict,
+    path: Path,
+    *,
+    row_group: int,
+    row_index: int,
+) -> ParquetEvidence:
     source = (_optional_text(row.get("source_api")) or _source_from_path(path)).casefold()
     raw_body = _optional_text(row.get("content")) or _optional_text(row.get("description"))
     attempts = row.get("content_fetch_attempts")
@@ -213,6 +221,8 @@ def _parquet_row_to_evidence(row: dict, path: Path) -> ParquetEvidence:
         content_fetched_at=_optional_text(row.get("content_fetched_at")),
         collected_at=_optional_text(row.get("collected_at")),
         source_path=str(path),
+        row_group=row_group,
+        row_index=row_index,
     )
 
 
@@ -224,11 +234,24 @@ def iter_parquet_news(
         parquet = pq.ParquetFile(raw_path)
         available = set(parquet.schema.names)
         columns = [name for name in _PARQUET_COLUMNS if name in available]
-        for batch in parquet.iter_batches(batch_size=batch_size, columns=columns):
-            yield [
-                _parquet_row_to_evidence(row, raw_path)
-                for row in batch.to_pylist()
-            ]
+        for row_group in range(parquet.num_row_groups):
+            row_offset = 0
+            for batch in parquet.iter_batches(
+                batch_size=batch_size,
+                row_groups=[row_group],
+                columns=columns,
+            ):
+                rows = batch.to_pylist()
+                yield [
+                    _parquet_row_to_evidence(
+                        row,
+                        raw_path,
+                        row_group=row_group,
+                        row_index=row_offset + index,
+                    )
+                    for index, row in enumerate(rows)
+                ]
+                row_offset += len(rows)
 
 
 def _read_ticker_aliases(path: Path) -> dict[str, str]:

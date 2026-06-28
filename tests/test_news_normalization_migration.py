@@ -8,12 +8,140 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from src.news_identity import canonical_article_hash
+from src.news_normalized.identity import normalize_identity_text, normalize_stable_url, normalize_timestamp
 from src.news_normalized.migration import (
     inventory_inputs,
     iter_legacy_news,
     iter_parquet_news,
     plan_news_normalization,
 )
+from src.news_normalized.migration_policy import (
+    BodyEvidenceRef,
+    LegacyEvidence,
+    PolicyGroup,
+    reject_weak_legacy,
+    resolve_body_variants,
+    resolve_polygon_shared_url,
+    resolve_timestamp_drift,
+)
+from src.news_normalized.models import KeyKind
+
+
+def policy_group(
+    *,
+    source="polygon",
+    provider_ids=("id",),
+    titles=("Same",),
+    urls=("https://example.test/shared",),
+    published_at=("2026-06-29T10:00:00Z",),
+    tickers=("AAPL",),
+    sentiment_values=(),
+    bodies=(),
+):
+    return PolicyGroup(
+        source=source,
+        identity=f"synthetic:{provider_ids[0]}",
+        provider_ids=tuple(provider_ids),
+        normalized_titles=tuple(normalize_identity_text(item) for item in titles),
+        normalized_urls=tuple(normalize_stable_url(item) for item in urls),
+        publication_dates=tuple(
+            normalize_timestamp(item)[:10] for item in published_at
+        ),
+        published_at=tuple(published_at),
+        tickers=tuple(tickers),
+        sentiment_values=tuple(sentiment_values),
+        body_refs=tuple(bodies),
+    )
+
+
+def legacy_evidence(*, legacy_id, ticker, sentiment):
+    return LegacyEvidence(
+        legacy_news_id=legacy_id,
+        canonical_ticker=ticker,
+        sentiment_value=sentiment,
+    )
+
+
+def body_ref(*, digest, clean_length, raw_length):
+    return BodyEvidenceRef(
+        source_path="synthetic.parquet",
+        row_group=0,
+        row_index=0,
+        body_sha256=digest,
+        raw_length=raw_length,
+        clean_length=clean_length,
+        cleaner_ok=True,
+        fetched_at=None,
+    )
+
+
+def test_same_provider_id_title_url_with_different_times_is_timestamp_drift():
+    group = policy_group(
+        source="finnhub",
+        provider_ids=("synthetic-id",),
+        titles=("Same title",),
+        urls=("https://example.test/story",),
+        published_at=("2026-01-01T00:00:00Z", "2026-06-01T00:00:00Z"),
+    )
+    resolved = resolve_timestamp_drift(group)
+    assert resolved.canonical_published_at == "2026-01-01T00:00:00Z"
+    assert resolved.resolution_kind == "provider_timestamp_drift"
+
+
+def test_same_polygon_url_title_and_day_merges_provider_groups():
+    groups = (
+        policy_group(source="polygon", provider_ids=("id-a",), titles=("Same",)),
+        policy_group(source="polygon", provider_ids=("id-b",), titles=("Same",)),
+    )
+    resolved = resolve_polygon_shared_url(groups)
+    assert resolved.action == "merge"
+    assert resolved.canonical_provider_id == "id-a"
+    assert resolved.provider_ids == ("id-a", "id-b")
+    assert all(key.kind is not KeyKind.URL for key in resolved.identity_keys)
+
+
+def test_polygon_shared_url_with_different_metadata_stays_separate():
+    groups = (
+        policy_group(source="polygon", provider_ids=("id-a",), titles=("First",)),
+        policy_group(source="polygon", provider_ids=("id-b",), titles=("Second",)),
+    )
+    resolved = resolve_polygon_shared_url(groups)
+    assert resolved.action == "demote"
+    assert len(resolved.groups) == 2
+    assert all(
+        key.kind is not KeyKind.URL
+        for group in resolved.groups
+        for key in group.identity_keys
+    )
+
+
+def test_weak_ambiguity_reports_unique_legacy_evidence():
+    rejected = reject_weak_legacy(
+        legacy_evidence(legacy_id=42, ticker="UNIQUE", sentiment=4.0),
+        candidates=(
+            policy_group(tickers=("AAPL",), sentiment_values=(3.0,)),
+            policy_group(tickers=("MSFT",), sentiment_values=(3.0,)),
+        ),
+    )
+    assert rejected.ticker_unique is True
+    assert rejected.sentiment_present is True
+    assert rejected.sentiment_unique is True
+
+
+def test_body_variants_choose_one_active_and_keep_other_digests():
+    bodies = (
+        body_ref(digest="a" * 64, clean_length=5, raw_length=5),
+        body_ref(digest="b" * 64, clean_length=20, raw_length=20),
+    )
+    active, cold = resolve_body_variants(bodies)
+    assert active.body_sha256 == "b" * 64
+    assert [item.body_sha256 for item in cold] == ["a" * 64]
+
+
+def test_migration_policy_has_no_live_audit_allowlist():
+    policy = Path("src/news_normalized/migration_policy.py").read_text()
+    forbidden = ("DJ-N$", "DJ-RTA$", "api.polygon.io/v2/reference/news")
+    assert not any(item in policy for item in forbidden)
 
 
 def _legacy_db(path: Path):
@@ -121,6 +249,21 @@ def test_parquet_loader_streams_batches_and_optional_columns(tmp_path):
     assert batches[0][0].provider_article_id == "DJ-N$1"
     assert batches[0][0].related_tickers == ("AAPL", "MSFT")
     assert batches[1][0].related_tickers == ()
+
+
+def test_parquet_loader_exposes_stable_row_group_locators(tmp_path):
+    path = tmp_path / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    table = pq.read_table(path)
+    pq.write_table(table, path, row_group_size=2)
+
+    evidence = [item for batch in iter_parquet_news([path]) for item in batch]
+
+    assert [(item.row_group, item.row_index) for item in evidence] == [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+    ]
 
 
 def test_inventory_aggregates_body_by_provider_article_not_ticker_row(tmp_path):
