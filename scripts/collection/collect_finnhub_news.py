@@ -43,7 +43,7 @@ import time
 import hashlib
 import logging
 import argparse
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
@@ -238,8 +238,8 @@ class FinnhubNewsCollector:
         # Parse timestamp (Finnhub uses Unix timestamp)
         timestamp = raw.get('datetime', 0)
         if timestamp:
-            pub_dt = datetime.fromtimestamp(timestamp)
-            published_at = pub_dt.isoformat() + 'Z'
+            pub_dt = datetime.fromtimestamp(timestamp, timezone.utc)
+            published_at = pub_dt.isoformat().replace('+00:00', 'Z')
         else:
             published_at = ''
 
