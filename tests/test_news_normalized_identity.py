@@ -117,13 +117,13 @@ def test_fallback_excludes_ticker_and_has_a_deterministic_64_char_value():
     assert len(expected) == 64
 
 
-def test_stable_url_normalizes_host_and_removes_fragment_slash_and_all_utm_keys():
+def test_stable_url_normalizes_and_drops_tracking_and_blank_query_values():
     value = (
         "HTTPS://Example.TEST/Story///?z=&UTM_Source=x&utm_custom=y&a=1"
         "#section"
     )
 
-    assert normalize_stable_url(value) == "https://example.test/Story?a=1&z="
+    assert normalize_stable_url(value) == "https://example.test/Story?a=1"
 
 
 def test_stable_url_preserves_userinfo_case_while_normalizing_host():

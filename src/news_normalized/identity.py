@@ -31,7 +31,7 @@ def normalize_stable_url(value: str) -> str:
     parts = urlsplit(value.strip())
     query_items = (
         (key, query_value)
-        for key, query_value in parse_qsl(parts.query, keep_blank_values=True)
+        for key, query_value in parse_qsl(parts.query)
         if not key.casefold().startswith("utm_")
     )
     query = urlencode(sorted(query_items))
