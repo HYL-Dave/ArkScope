@@ -1,10 +1,14 @@
 from contextlib import contextmanager, nullcontext
 import json
 import sqlite3
+import traceback
+from types import SimpleNamespace
 
+from ib_insync import RequestError
 import pytest
 
-from data_sources.ibkr_source import IBKRDataSource
+import data_sources.ibkr_source as ibkr_source
+from data_sources.ibkr_source import IBKRDataSource, IBKRNewsArticleUnavailable
 from scripts.diagnostics.probe_ibkr_news_bodies import (
     DEFAULT_PROBES,
     ProbeSpec,
@@ -36,6 +40,93 @@ class FakeGateway:
         if error:
             raise error
         return self.bodies.get((provider_code, article_id))
+
+
+def test_ibkr_news_unavailable_exception_is_public():
+    assert hasattr(ibkr_source, "IBKRNewsArticleUnavailable")
+
+
+class BodyClient:
+    def __init__(self, result=None, error=None, raise_request_errors=False):
+        self.result = result
+        self.error = error
+        self.RaiseRequestErrors = raise_request_errors
+        self.setting_seen = []
+
+    def reqNewsArticle(self, provider_code, article_id):
+        self.setting_seen.append(self.RaiseRequestErrors)
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+    def disconnect(self):
+        pass
+
+
+def body_source(client):
+    source = IBKRDataSource.__new__(IBKRDataSource)
+    source._ib = client
+    source._ensure_connected = lambda: None
+    source._rate_limit_wait = lambda: None
+    return source
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [(None, None), (SimpleNamespace(articleText="text"), "text")],
+)
+def test_ibkr_strict_body_scopes_request_errors_and_restores_on_success(
+    result, expected
+):
+    client = BodyClient(result=result, raise_request_errors=False)
+
+    assert (
+        body_source(client).fetch_news_article_body_strict("DJ-N", "id")
+        == expected
+    )
+    assert client.setting_seen == [True]
+    assert client.RaiseRequestErrors is False
+
+
+def test_ibkr_strict_body_translates_10172_without_leaking_provider_message():
+    secret = "licensed provider payload"
+    client = BodyClient(error=RequestError(4, 10172, secret))
+
+    with pytest.raises(IBKRNewsArticleUnavailable) as caught:
+        body_source(client).fetch_news_article_body_strict("DJ-N", "id")
+
+    rendered = "".join(
+        traceback.format_exception(
+            type(caught.value), caught.value, caught.value.__traceback__
+        )
+    )
+    assert caught.value.error_code == 10172
+    assert secret not in str(caught.value)
+    assert secret not in rendered
+    assert caught.value.__suppress_context__ is True
+    assert client.RaiseRequestErrors is False
+
+
+def test_ibkr_strict_body_reraises_other_request_errors_and_restores():
+    error = RequestError(5, 321, "other")
+    client = BodyClient(error=error, raise_request_errors=True)
+
+    with pytest.raises(RequestError) as caught:
+        body_source(client).fetch_news_article_body_strict("DJ-N", "id")
+
+    assert caught.value is error
+    assert client.setting_seen == [True]
+    assert client.RaiseRequestErrors is True
+
+
+def test_ibkr_strict_body_restores_after_transport_error():
+    client = BodyClient(error=TimeoutError("timeout"))
+
+    with pytest.raises(TimeoutError):
+        body_source(client).fetch_news_article_body_strict("DJ-N", "id")
+
+    assert client.setting_seen == [True]
+    assert client.RaiseRequestErrors is False
 
 
 def headline(article_id, ticker):
@@ -123,14 +214,7 @@ def test_ibkr_successful_empty_response_is_terminal_empty():
 
 
 def test_ibkr_strict_body_method_propagates_but_compatibility_method_catches():
-    class Client:
-        def reqNewsArticle(self, provider_code, article_id):
-            raise TimeoutError("gateway timeout")
-
-    source = IBKRDataSource.__new__(IBKRDataSource)
-    source._ib = Client()
-    source._ensure_connected = lambda: None
-    source._rate_limit_wait = lambda: None
+    source = body_source(BodyClient(error=TimeoutError("gateway timeout")))
 
     with pytest.raises(TimeoutError):
         source.fetch_news_article_body_strict("DJ-N", "DJ-N$2")

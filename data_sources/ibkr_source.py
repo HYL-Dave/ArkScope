@@ -27,7 +27,15 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 
 try:
-    from ib_insync import IB, Stock, Option, ScannerSubscription, TagValue, util
+    from ib_insync import (
+        IB,
+        Option,
+        RequestError,
+        ScannerSubscription,
+        Stock,
+        TagValue,
+        util,
+    )
     HAS_IB_INSYNC = True
 except ImportError:
     HAS_IB_INSYNC = False
@@ -42,6 +50,14 @@ from .base import (
 logger = logging.getLogger(__name__)
 
 _IBKR_EQUITY_TIME_ZONE = "US/Eastern"
+
+
+class IBKRNewsArticleUnavailable(RuntimeError):
+    """IBKR explicitly reported that a requested news article is unavailable."""
+
+    def __init__(self, error_code: int):
+        self.error_code = int(error_code)
+        super().__init__(f"IBKR news article unavailable ({self.error_code})")
 
 
 def _ibkr_equity_end_of_day(trade_date: date) -> str:
@@ -619,7 +635,16 @@ class IBKRDataSource(BaseDataSource):
         """Fetch one body while preserving the distinction between empty and failed."""
         self._ensure_connected()
         self._rate_limit_wait()
-        body = self._ib.reqNewsArticle(provider_code, article_id)
+        previous_raise_request_errors = self._ib.RaiseRequestErrors
+        self._ib.RaiseRequestErrors = True
+        try:
+            body = self._ib.reqNewsArticle(provider_code, article_id)
+        except RequestError as exc:
+            if exc.code == 10172:
+                raise IBKRNewsArticleUnavailable(exc.code) from None
+            raise
+        finally:
+            self._ib.RaiseRequestErrors = previous_raise_request_errors
         return body.articleText if body else None
 
     def fetch_news_article_body(self, provider_code: str, article_id: str) -> Optional[str]:
