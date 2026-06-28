@@ -2,6 +2,8 @@ import sqlite3
 
 import pytest
 
+import src.news_normalized.schema as schema_module
+from src.news_normalized.models import BodyCandidate, BodyStatus
 from src.news_normalized.schema import ensure_news_normalized_schema
 
 
@@ -46,9 +48,12 @@ def test_schema_is_idempotent_and_has_all_normalized_tables(conn):
         "news_article_tickers",
         "news_article_titles",
         "news_article_bodies",
+        "news_article_body_variants",
         "news_search_documents",
         "news_articles_fts",
         "news_ingest_conflicts",
+        "news_normalization_runs",
+        "news_legacy_migration_map",
     } <= tables
 
 
@@ -77,7 +82,14 @@ def test_body_status_check_and_raw_ref_column(conn):
     ensure_news_normalized_schema(conn)
     article_id = _article(conn)
     columns = {row[1] for row in conn.execute("PRAGMA table_info(news_article_bodies)")}
-    assert {"raw_body", "raw_ref", "body_text", "body_sha256"} <= columns
+    assert {
+        "raw_body",
+        "raw_ref",
+        "body_text",
+        "body_sha256",
+        "last_error_code",
+        "unavailable_at",
+    } <= columns
     conn.execute(
         "INSERT INTO news_article_bodies(article_id,body_status,raw_ref) VALUES (?,?,?)",
         (article_id, "fetched", "cold://body/1"),
@@ -87,6 +99,44 @@ def test_body_status_check_and_raw_ref_column(conn):
             "INSERT INTO news_article_bodies(article_id,body_status) VALUES (?,?)",
             (_article(conn, title="Bad"), "guessed_expired"),
         )
+
+
+def test_body_model_has_unavailable_and_structured_retry_fields():
+    body = BodyCandidate(
+        status=BodyStatus.UNAVAILABLE,
+        error_code=10172,
+        fetch_attempts=3,
+        next_retry_at=None,
+    )
+
+    assert body.status.value == "unavailable"
+    assert body.error_code == 10172
+    assert body.fetch_attempts == 3
+
+
+def test_legacy_migration_map_does_not_reference_legacy_news(conn):
+    ensure_news_normalized_schema(conn)
+
+    targets = {
+        row[2]
+        for row in conn.execute("PRAGMA foreign_key_list(news_legacy_migration_map)")
+    }
+
+    assert "news" not in targets
+    assert {"news_articles", "news_normalization_runs"} <= targets
+
+
+def test_migration_schema_helper_opens_one_rollbackable_transaction(conn):
+    schema_module.begin_news_normalized_schema_transaction(conn)
+
+    assert conn.in_transaction is True
+    assert conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name='news_articles'"
+    ).fetchone()[0] == 1
+    conn.rollback()
+    assert conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name='news_articles'"
+    ).fetchone()[0] == 0
 
 
 def test_foreign_keys_cascade_article_children(conn):

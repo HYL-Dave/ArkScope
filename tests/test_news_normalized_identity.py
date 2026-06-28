@@ -26,6 +26,7 @@ def test_models_have_stable_values_defaults_and_are_immutable():
         "fetched",
         "empty",
         "failed",
+        "unavailable",
         "expired",
     ]
 
@@ -42,6 +43,9 @@ def test_models_have_stable_values_defaults_and_are_immutable():
         source_url=None,
         fetched_at=None,
         error=None,
+        error_code=None,
+        fetch_attempts=0,
+        next_retry_at=None,
     )
     assert article == ArticleCandidate(
         source="ibkr",

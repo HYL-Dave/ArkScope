@@ -14,6 +14,7 @@ class BodyStatus(str, Enum):
     FETCHED = "fetched"
     EMPTY = "empty"
     FAILED = "failed"
+    UNAVAILABLE = "unavailable"
     EXPIRED = "expired"
 
 
@@ -42,6 +43,9 @@ class BodyCandidate:
     source_url: Optional[str] = None
     fetched_at: Optional[str] = None
     error: Optional[str] = None
+    error_code: Optional[int] = None
+    fetch_attempts: int = 0
+    next_retry_at: Optional[str] = None
 
 
 @dataclass(frozen=True)

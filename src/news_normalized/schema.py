@@ -73,7 +73,9 @@ CREATE TABLE IF NOT EXISTS news_article_titles (
 CREATE TABLE IF NOT EXISTS news_article_bodies (
     article_id        INTEGER PRIMARY KEY REFERENCES news_articles(id) ON DELETE CASCADE,
     body_status       TEXT NOT NULL CHECK (
-                          body_status IN ('pending','fetched','empty','failed','expired')
+                          body_status IN (
+                              'pending','fetched','empty','failed','unavailable','expired'
+                          )
                       ),
     raw_body          TEXT,
     raw_ref           TEXT,
@@ -89,9 +91,54 @@ CREATE TABLE IF NOT EXISTS news_article_bodies (
     next_retry_at     TEXT,
     fetched_at        TEXT,
     last_error        TEXT,
+    last_error_code   INTEGER,
+    unavailable_at    TEXT,
     cleaned_at        TEXT,
     clean_error       TEXT
 );
+
+CREATE TABLE IF NOT EXISTS news_article_body_variants (
+    id                INTEGER PRIMARY KEY,
+    article_id        INTEGER NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
+    body_sha256       TEXT NOT NULL,
+    raw_body          TEXT NOT NULL,
+    raw_format        TEXT,
+    body_text         TEXT,
+    cleaner_version   TEXT,
+    retrieval_method  TEXT,
+    retrieval_source  TEXT,
+    source_url        TEXT,
+    fetched_at        TEXT,
+    evidence_ref      TEXT,
+    created_at        TEXT NOT NULL,
+    UNIQUE (article_id, body_sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_news_body_variants_article
+ON news_article_body_variants(article_id);
+
+CREATE TABLE IF NOT EXISTS news_normalization_runs (
+    id                              INTEGER PRIMARY KEY,
+    policy_version                  TEXT NOT NULL,
+    input_fingerprint               TEXT NOT NULL,
+    resolved_fingerprint            TEXT NOT NULL UNIQUE,
+    rejection_evidence_fingerprint  TEXT NOT NULL,
+    counts_json                     TEXT NOT NULL,
+    backup_path                     TEXT NOT NULL,
+    applied_at                      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS news_legacy_migration_map (
+    legacy_news_id         INTEGER PRIMARY KEY,
+    article_id             INTEGER REFERENCES news_articles(id) ON DELETE RESTRICT,
+    resolution_kind        TEXT NOT NULL,
+    rejection_reason       TEXT,
+    migration_run_id       INTEGER NOT NULL
+                           REFERENCES news_normalization_runs(id) ON DELETE RESTRICT,
+    migration_fingerprint  TEXT NOT NULL,
+    CHECK (article_id IS NOT NULL OR rejection_reason IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_news_legacy_map_article
+ON news_legacy_migration_map(article_id);
 
 CREATE TABLE IF NOT EXISTS news_ingest_conflicts (
     id                         INTEGER PRIMARY KEY,
@@ -141,3 +188,13 @@ def ensure_news_normalized_schema(conn) -> None:
     """Create the normalized schema without touching the legacy ``news`` tables."""
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(ARTICLE_SCHEMA + SEARCH_SCHEMA)
+
+
+def begin_news_normalized_schema_transaction(conn) -> None:
+    """Create the normalized schema inside one caller-controlled transaction."""
+    if conn.in_transaction:
+        raise RuntimeError("migration schema transaction must start from autocommit")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.executescript("BEGIN IMMEDIATE;\n" + ARTICLE_SCHEMA + SEARCH_SCHEMA)
+    if not conn.in_transaction:
+        raise RuntimeError("migration schema transaction did not remain open")
