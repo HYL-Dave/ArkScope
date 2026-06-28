@@ -11,9 +11,10 @@ import sqlite3
 from typing import Iterable, Optional
 
 from .cleaner import clean_news_body
-from .identity import build_identity_keys, normalize_identity_text
+from .identity import build_identity_keys, normalize_identity_text, normalize_timestamp
 from .models import ArticleCandidate, ArticleKey, BodyCandidate, BodyStatus, KeyKind
 from .schema import ensure_news_normalized_schema
+from .tickers import canonical_ticker, load_ticker_aliases
 
 
 class BodyConflictError(ValueError):
@@ -65,6 +66,7 @@ class NormalizedNewsStore:
         self.conn = conn
         self.conn.row_factory = sqlite3.Row
         ensure_news_normalized_schema(conn)
+        self._ticker_aliases = load_ticker_aliases(conn)
 
     def upsert(self, candidate: ArticleCandidate) -> UpsertResult:
         keys = build_identity_keys(
@@ -384,17 +386,7 @@ class NormalizedNewsStore:
             )
 
     def _canonical_ticker(self, ticker: str) -> str:
-        value = (ticker or "").strip().upper()
-        exists = self.conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ticker_aliases'"
-        ).fetchone()
-        if exists:
-            row = self.conn.execute(
-                "SELECT canonical FROM ticker_aliases WHERE alias=?", (value,)
-            ).fetchone()
-            if row:
-                return row[0]
-        return value
+        return canonical_ticker(ticker, self._ticker_aliases)
 
     def _upsert_body(
         self, article_id: int, body: BodyCandidate, source: str
@@ -515,7 +507,25 @@ class NormalizedNewsStore:
         payload = json.dumps(
             _jsonable(asdict(candidate)), sort_keys=True, separators=(",", ":")
         )
-        fingerprint = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        keys = build_identity_keys(
+            source=candidate.source,
+            provider_article_id=candidate.provider_article_id,
+            url=candidate.url,
+            publisher=candidate.publisher,
+            title=candidate.title,
+            published_at=candidate.published_at,
+        )
+        stable_payload = json.dumps(
+            {
+                "source": candidate.source.strip().casefold(),
+                "keys": sorted((key.kind.value, key.value) for key in keys),
+                "title": normalize_identity_text(candidate.title),
+                "published_at": normalize_timestamp(candidate.published_at),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        fingerprint = hashlib.sha256(stable_payload.encode("utf-8")).hexdigest()
         existing_json = json.dumps(list(resolution.existing_ids), separators=(",", ":"))
         self.conn.execute(
             "INSERT OR IGNORE INTO news_ingest_conflicts "

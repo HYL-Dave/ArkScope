@@ -12,7 +12,8 @@ from typing import Iterator, Sequence
 import pyarrow.parquet as pq
 
 from src.news_identity import canonical_article_hash
-from .identity import fallback_identity_hash, normalize_stable_url
+from .identity import fallback_identity_hash, normalize_stable_url, normalize_timestamp
+from .tickers import canonical_ticker, load_ticker_aliases
 
 
 @dataclass(frozen=True)
@@ -230,16 +231,34 @@ def iter_parquet_news(
             ]
 
 
+def _read_ticker_aliases(path: Path) -> dict[str, str]:
+    conn = sqlite3.connect(f"file:{Path(path)}?mode=ro", uri=True)
+    try:
+        return load_ticker_aliases(conn)
+    finally:
+        conn.close()
+
+
 def inventory_inputs(
     market_db: Path, parquet_paths: Sequence[Path]
 ) -> InputInventory:
     """Summarize inputs without retaining or returning licensed body content."""
+    aliases = _read_ticker_aliases(Path(market_db))
     legacy_counts: dict[str, int] = {}
     legacy_rows: list[tuple[str, str]] = []
     for row in iter_legacy_news(Path(market_db)):
         source = _text(row["source"]).strip().casefold()
         legacy_counts[source] = legacy_counts.get(source, 0) + 1
-        legacy_rows.append((source, _text(row["article_hash"])))
+        legacy_rows.append(
+            (
+                source,
+                canonical_article_hash(
+                    canonical_ticker(_text(row["ticker"]), aliases),
+                    _text(row["title"]),
+                    _text(row["published_at"]),
+                ),
+            )
+        )
 
     parquet_counts: dict[str, int] = {}
     provider_ids: dict[str, set[str]] = {}
@@ -273,7 +292,9 @@ def inventory_inputs(
                 evidence.raw_body
             )
             mention_hash = canonical_article_hash(
-                evidence.ticker, evidence.title, evidence.published_at
+                canonical_ticker(evidence.ticker, aliases),
+                evidence.title,
+                evidence.published_at,
             )
             legacy_hash_to_provider.setdefault((source, mention_hash), set()).add(
                 provider_id
@@ -350,10 +371,14 @@ def _group_for_parquet(
     )
 
 
-def _add_parquet_evidence(group: _PlanGroup, evidence: ParquetEvidence) -> None:
+def _add_parquet_evidence(
+    group: _PlanGroup, evidence: ParquetEvidence, aliases: dict[str, str]
+) -> None:
     if evidence.ticker:
-        group.tickers.add(evidence.ticker)
-    group.tickers.update(evidence.related_tickers)
+        group.tickers.add(canonical_ticker(evidence.ticker, aliases))
+    group.tickers.update(
+        canonical_ticker(ticker, aliases) for ticker in evidence.related_tickers
+    )
     if evidence.title:
         group.titles.add(evidence.title)
     if evidence.publisher:
@@ -369,9 +394,11 @@ def _add_parquet_evidence(group: _PlanGroup, evidence: ParquetEvidence) -> None:
         )
 
 
-def _add_legacy_row(group: _PlanGroup, row: sqlite3.Row) -> None:
+def _add_legacy_row(
+    group: _PlanGroup, row: sqlite3.Row, aliases: dict[str, str]
+) -> None:
     group.legacy_ids.add(int(row["id"]))
-    ticker = _text(row["ticker"]).strip().upper()
+    ticker = canonical_ticker(_text(row["ticker"]), aliases)
     if ticker:
         group.tickers.add(ticker)
     title = _text(row["title"])
@@ -399,7 +426,11 @@ def _plan_conflicts(
     blocking = list(mention_conflicts)
     weak = list(mention_ambiguities)
     for group in groups.values():
-        publication_dates = {value[:10] for value in group.published_at if value}
+        publication_dates = {
+            normalize_timestamp(value)[:10]
+            for value in group.published_at
+            if value
+        }
         if group.provider_article_id and len(publication_dates) > 1:
             blocking.append(
                 PreviewConflict(
@@ -442,6 +473,7 @@ def plan_news_normalization(
     market_db: Path, parquet_paths: Sequence[Path]
 ) -> MigrationPreview:
     """Build a deterministic, body-redacted migration preview without writing inputs."""
+    aliases = _read_ticker_aliases(Path(market_db))
     groups: dict[str, _PlanGroup] = {}
     mention_to_groups: dict[tuple[str, str], set[str]] = {}
     url_to_groups: dict[tuple[str, str], set[str]] = {}
@@ -451,10 +483,12 @@ def plan_news_normalization(
     for batch in iter_parquet_news(parquet_paths):
         for evidence in batch:
             group = _group_for_parquet(groups, evidence)
-            _add_parquet_evidence(group, evidence)
+            _add_parquet_evidence(group, evidence, aliases)
             parquet_rows[evidence.source] = parquet_rows.get(evidence.source, 0) + 1
             mention_hash = canonical_article_hash(
-                evidence.ticker, evidence.title, evidence.published_at
+                canonical_ticker(evidence.ticker, aliases),
+                evidence.title,
+                evidence.published_at,
             )
             mention_to_groups.setdefault(
                 (evidence.source, mention_hash), set()
@@ -493,7 +527,15 @@ def plan_news_normalization(
         )
         fallback_matches = fallback_to_groups.get((source, fallback), set())
         mention_matches = mention_to_groups.get(
-            (source, _text(row["article_hash"])), set()
+            (
+                source,
+                canonical_article_hash(
+                    canonical_ticker(_text(row["ticker"]), aliases),
+                    _text(row["title"]),
+                    _text(row["published_at"]),
+                ),
+            ),
+            set(),
         )
         if url_matches:
             matches = url_matches
@@ -525,7 +567,7 @@ def plan_news_normalization(
         group = groups.setdefault(
             identity, _PlanGroup(source=source, identity=identity)
         )
-        _add_legacy_row(group, row)
+        _add_legacy_row(group, row, aliases)
 
     blocking, weak = _plan_conflicts(
         groups, mention_conflicts, mention_ambiguities

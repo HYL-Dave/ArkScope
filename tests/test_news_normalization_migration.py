@@ -216,6 +216,40 @@ def test_preview_blocks_provider_id_reuse_across_publication_dates(tmp_path):
     assert preview.blocking_conflicts[0].kind == "provider_id_reuse"
 
 
+def test_preview_compares_provider_reuse_dates_in_utc(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    path.parent.mkdir(parents=True)
+    base = {
+        "article_id": "same-instant",
+        "ticker": "AAPL",
+        "title": "Same instant",
+        "source_api": "ibkr",
+        "description": "",
+        "content": "same body",
+        "url": "",
+        "publisher": "DJ-N",
+        "related_tickers": '["AAPL"]',
+    }
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {**base, "published_at": "2026-06-27T23:30:00-02:00"},
+                {**base, "published_at": "2026-06-28T01:30:00Z"},
+            ]
+        ),
+        path,
+    )
+
+    preview = plan_news_normalization(db, [path])
+
+    assert all(
+        conflict.kind != "provider_id_reuse"
+        for conflict in preview.blocking_conflicts
+    )
+
+
 def test_preview_uses_stable_url_to_disambiguate_same_legacy_mention_hash(tmp_path):
     db = tmp_path / "market.db"
     conn = sqlite3.connect(db)
@@ -311,6 +345,59 @@ def test_preview_keeps_unresolved_fallback_match_as_weak_ambiguity(tmp_path):
     ]
     assert preview.sources["ibkr"].fallback_only == 1
     assert preview.sources["ibkr"].provider_id_matched == 0
+
+
+def test_preview_canonicalizes_parquet_tickers_before_identity_and_relations(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    conn.execute(
+        "CREATE TABLE ticker_aliases (alias TEXT PRIMARY KEY, canonical TEXT NOT NULL)"
+    )
+    conn.execute("INSERT INTO ticker_aliases VALUES ('LC','HAPN')")
+    published_at = "2026-06-27T10:00:00Z"
+    conn.execute(
+        "INSERT INTO news VALUES (1,'HAPN','Renamed story','','',"
+        "'Legacy Wire','ibkr',?,?,NULL,NULL,NULL)",
+        (published_at, canonical_article_hash("HAPN", "Renamed story", published_at)),
+    )
+    conn.commit()
+    conn.close()
+
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    path.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": "DJ-N$rename",
+                    "ticker": "LC",
+                    "title": "Renamed story",
+                    "published_at": published_at,
+                    "source_api": "ibkr",
+                    "description": "",
+                    "content": "body",
+                    "url": "",
+                    "publisher": "Parquet Wire",
+                    "related_tickers": '["LC", "HAPN"]',
+                }
+            ]
+        ),
+        path,
+    )
+
+    preview = plan_news_normalization(db, [path])
+    inventory = inventory_inputs(db, [path])
+
+    assert preview.sources["ibkr"].provider_id_matched == 1
+    assert preview.sources["ibkr"].fallback_only == 0
+    assert preview.planned_ticker_links == 1
+    assert inventory.sources["ibkr"].sqlite_rows_matched_to_parquet == 1
 
 
 def test_preview_to_dict_contains_only_aggregate_and_digest_data(tmp_path):

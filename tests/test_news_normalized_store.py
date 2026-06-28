@@ -109,6 +109,35 @@ def test_disagreeing_strong_keys_are_quarantined_without_article_mutation(store,
     assert "p1" in conflict["candidate_payload_json"]
 
 
+def test_repeated_identity_conflict_ignores_volatile_observation_and_body_fields(
+    store, conn
+):
+    store.upsert(candidate("p1", url="https://example.test/a"))
+    store.upsert(candidate("p2", url="https://example.test/b", title="Other"))
+
+    first = store.upsert(
+        candidate(
+            "p1",
+            url="https://example.test/b",
+            observed_at="2026-06-27T10:01:00Z",
+            body_status=BodyStatus.FETCHED,
+            raw_body="first volatile body",
+        )
+    )
+    second = store.upsert(
+        candidate(
+            "p1",
+            url="https://example.test/b",
+            observed_at="2026-06-27T10:02:00Z",
+            body_status=BodyStatus.FETCHED,
+            raw_body="different volatile body",
+        )
+    )
+
+    assert first.conflict_id == second.conflict_id
+    assert conn.execute("SELECT COUNT(*) FROM news_ingest_conflicts").fetchone()[0] == 1
+
+
 def test_incompatible_weak_collision_stays_separate(store, conn):
     first = store.upsert(
         candidate(body_status=BodyStatus.FETCHED, raw_body="<p>first</p>")
