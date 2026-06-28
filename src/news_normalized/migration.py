@@ -107,6 +107,8 @@ class SourcePreview:
     body_match_rate: float
     body_fetched: int
     body_missing: int
+    body_variant_groups: int = 0
+    cold_body_variants: int = 0
 
 
 @dataclass(frozen=True)
@@ -1172,6 +1174,12 @@ def build_resolved_plan(
             ),
             body_fetched=sum(bool(group.body_refs) for group in source_groups),
             body_missing=sum(not group.body_refs for group in source_groups),
+            body_variant_groups=sum(
+                len(group.body_refs) > 1 for group in source_groups
+            ),
+            cold_body_variants=sum(
+                max(0, len(group.body_refs) - 1) for group in source_groups
+            ),
         )
     mapped = [item for item in resolutions_tuple if item.article_identity is not None]
     mapped_articles = {item.article_identity for item in mapped}
