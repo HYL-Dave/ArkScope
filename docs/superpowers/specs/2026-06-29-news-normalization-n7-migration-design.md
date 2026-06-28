@@ -116,7 +116,7 @@ For the 35 URLs whose groups share normalized title and publication date:
 - merge into one article;
 - use the lexicographically smallest provider ID in the canonical display column;
 - attach every provider ID as a strong key to that article;
-- retain all ticker and title observations and one strong URL key.
+- retain all ticker and title observations.
 
 The store must accept any provider-ID key already attached to the article rather than rejecting it
 because it differs from the canonical display column.
@@ -127,6 +127,11 @@ For the 13 URLs whose title or date differs:
 - retain the URL as metadata;
 - omit it from strong URL keys for every member of that collision set;
 - resolve future candidates by provider ID or compatible fallback, never that URL alone.
+
+Polygon URLs are demoted source-wide, not only for these 13 historical sets. The shared identity
+builder never emits a strong URL key for source `polygon`; the URL remains article metadata.
+Polygon provider IDs remain strong, and fallback identity remains available for legacy rows. N8
+must retain this same source policy so a newly reused Polygon URL cannot false-merge articles.
 
 ### 5.3 IBKR weak ambiguities: 924 legacy rows
 
@@ -140,6 +145,12 @@ reason = multiple metadata-compatible provider articles
 
 The legacy row remains in the frozen old table through N9. Reviewed rejections do not block apply;
 any new weak ambiguity class or count does.
+
+Preview also reports whether rejected rows contain ticker or sentiment evidence absent from every
+candidate provider article. It emits counts for rows with unique ticker evidence, distinct unique
+ticker relations, rows with non-null sentiment, and rows whose sentiment value is unique. These
+counts and a rejection-evidence fingerprint require explicit review before apply; rejection is not
+authorized by row count alone.
 
 ### 5.4 Body variants: 718 groups
 
@@ -185,6 +196,7 @@ emits no body text and includes:
 
 - input fingerprint and policy version;
 - mapped and reviewed-rejected legacy counts;
+- rejected-row unique ticker/sentiment counts and rejection-evidence fingerprint;
 - timestamp-drift, URL-merge, and URL-demotion counts;
 - active/cold variant counts by source;
 - pending/failed/fetched body-state counts;

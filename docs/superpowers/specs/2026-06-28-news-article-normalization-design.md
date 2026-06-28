@@ -83,9 +83,10 @@ source remains date-only. The fallback deliberately excludes ticker so cross-tic
 collapse. It is an identity candidate, not a body digest, and is named
 `fallback_identity_hash`; `body_sha256` is reserved for actual body bytes.
 
-Provider IDs and normalized stable URLs are **strong keys**. The derived fallback is a **weak
-key**: it may identify candidates, but repeated same-title bulletins can collide and it must never
-force an automatic merge by itself.
+Provider IDs and eligible normalized stable URLs are **strong keys**. Polygon URLs are never
+strong keys because that source can reuse one URL across provider articles; they remain metadata.
+The derived fallback is a **weak key**: it may identify candidates, but repeated same-title
+bulletins can collide and it must never force an automatic merge by itself.
 
 ### 4.2 Why a COALESCE unique key is insufficient
 
