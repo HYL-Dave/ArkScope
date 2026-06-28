@@ -1,0 +1,6 @@
+{
+  "source": "ibkr",
+  "format": "text",
+  "raw": "! TRADING HALT\n\nReason: News pending\nTicker: TEST",
+  "expected": "! TRADING HALT\n\nReason: News pending\n\nTicker: TEST"
+}

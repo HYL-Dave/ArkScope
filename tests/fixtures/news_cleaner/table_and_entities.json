@@ -1,0 +1,6 @@
+{
+  "source": "polygon",
+  "format": "html",
+  "raw": "<p>AT&amp;T&nbsp;rose &#37;.</p><table><tr><th>Metric</th><th>Value</th></tr><tr><td>EPS</td><td>2.50</td></tr></table>",
+  "expected": "AT&T rose %.\n\nMetric | Value\n\nEPS | 2.50"
+}

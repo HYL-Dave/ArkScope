@@ -1,0 +1,6 @@
+{
+  "source": "ibkr",
+  "format": "html",
+  "raw": "<html><head><style>.x{display:none}</style><script>secret()</script></head><body><h1>Market Update</h1><p>First paragraph.</p><p>Second <strong>paragraph</strong>.</p></body></html>",
+  "expected": "Market Update\n\nFirst paragraph.\n\nSecond paragraph."
+}
