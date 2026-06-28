@@ -25,7 +25,8 @@ fundamentals, remaining price ingest, mirror retirement, SEC/dead paths, and UI 
   mirror remains load-bearing for IV/fundamentals and other unfinished ingest paths.
   The normalized all-source foundation is committed through N5 (identity/schema/cleaner/store,
   read-only preview, bounded writer, REST adapters, fake-tested IBKR adapter). The real preview
-  fingerprint is `451c8b5837eb5d540b8f43579486cf66915cbbd2f2ad127a969d9ce3c1c4c716`;
+  canonical post-alias fingerprint is
+  `55aa79c33ebed92658dc8af232d12ae465d4d19c8ef3bf4556f2e0ed6c5442cc`;
   it reports 816 strong conflicts and 924 weak ambiguities, so N7 apply remains gated. **N6 probe
   pending: Gateway handshake unavailable. N7 apply / N8 cutover / N9 deletion are not started.**
   Live `market_data.db` has no normalized-news tables yet. Parquet remains frozen enrichment input

@@ -241,15 +241,20 @@ relations, and eventually retiring the remaining IBKR news mirror path; it is no
 - **N4 Polygon/Finnhub normalized adapters:** `e387e4c` (also fixes the existing Finnhub Unix
   timestamp conversion so it emits real UTC instead of local time mislabeled `Z`).
 - **N5 IBKR normalized adapter + sanitized, unrun N6 probe:** `d4fea9c`.
-- Verification: 96 normalized focused tests and 130 legacy news/read/scheduler regressions passed;
+- **Pre-merge invariant hardening:** `74de01d` centralizes ticker canonicalization across the
+  store/inventory/preview, compares provider reuse dates in UTC, and removes volatile observation
+  and body fields from conflict fingerprints.
+- Verification: 101 normalized focused tests and 130 legacy news/read/scheduler regressions passed;
   compile and diff checks passed. The live `market_data.db` still contains zero
   `news_article%` objects.
 
 ### Real read-only preview
 
 The planner scanned the live legacy SQLite table and all three Parquet corpora without changing
-their size/mtime or creating SQLite sidecars/tables. Fingerprint:
-`451c8b5837eb5d540b8f43579486cf66915cbbd2f2ad127a969d9ce3c1c4c716`.
+their size/mtime/inode or creating normalized tables. A read of a WAL-mode database may create
+benign `-wal`/`-shm` sidecars; they are not evidence of a main-database mutation. Fingerprint:
+`55aa79c33ebed92658dc8af232d12ae465d4d19c8ef3bf4556f2e0ed6c5442cc`.
+This supersedes the pre-alias fingerprint `451c8b58…c4c716`.
 
 | Source | Legacy rows | Parquet rows | Planned articles | Provider-ID matched | Fallback-only | Body match |
 |---|---:|---:|---:|---:|---:|---:|
@@ -257,8 +262,11 @@ their size/mtime or creating SQLite sidecars/tables. Fingerprint:
 | IBKR | 103,239 | 322,033 | 83,853 | 76,859 | 761 | 101,920 (98.7224%) |
 | Polygon | 118,060 | 118,291 | 118,348 | 117,983 | 67 | 116,137 (98.3712%) |
 
-The preview plans 620,360 ticker links, 287,912 title observations, and collapses 90,880 legacy
-cross-ticker rows. It is correctly **not applicable yet**: 816 strong blockers remain (718 body
+The preview plans 619,209 ticker links, 287,912 title observations, and collapses 90,880 legacy
+cross-ticker rows. Shared alias canonicalization removed 1,151 duplicate relation candidates from
+the prior plan. UTC-normalized comparison left the 35 provider-ID reuse conflicts unchanged, so
+they are not date-offset-only false positives. It is correctly **not applicable yet**: 816 strong
+blockers remain (718 body
 variants, 63 multiple-provider strong-URL collisions, 35 provider-ID reuse cases), plus 924 weak
 fallback ambiguities that stay separate rather than being silently merged. These need a reviewed
 resolution policy in the separately gated N7 migration plan; the offline foundation does not guess.
