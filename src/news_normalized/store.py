@@ -121,12 +121,13 @@ class NormalizedNewsStore:
     def candidate_by_provider_id(
         self, source: str, provider_article_id: str
     ) -> Optional[ArticleCandidate]:
-        row = self.conn.execute(
-            "SELECT * FROM news_articles WHERE source=? AND provider_article_id=?",
-            (source.strip().casefold(), provider_article_id),
-        ).fetchone()
-        if row is None:
+        article_id = self._article_id_for_provider(source, provider_article_id)
+        if article_id is None:
             return None
+        row = self.conn.execute(
+            "SELECT * FROM news_articles WHERE id=?",
+            (article_id,),
+        ).fetchone()
         ticker_rows = self.conn.execute(
             "SELECT ticker,relation_kind FROM news_article_tickers WHERE article_id=? "
             "ORDER BY ticker",
@@ -184,7 +185,14 @@ class NormalizedNewsStore:
                 "SELECT provider_article_id FROM news_articles WHERE id=?", (article_id,)
             ).fetchone()
             incoming = (candidate.provider_article_id or "").strip() or None
-            if row[0] and incoming and row[0] != incoming:
+            if (
+                row[0]
+                and incoming
+                and row[0] != incoming
+                and not self._article_owns_provider_id(
+                    article_id, candidate.source, incoming
+                )
+            ):
                 return _Resolution(
                     conflict_kind="strong_metadata_conflict",
                     existing_ids=(article_id,),
@@ -496,10 +504,28 @@ class NormalizedNewsStore:
         if not provider_article_id:
             return None
         row = self.conn.execute(
-            "SELECT id FROM news_articles WHERE source=? AND provider_article_id=?",
+            "SELECT a.id FROM news_articles a JOIN news_article_keys k "
+            "ON k.article_id=a.id WHERE k.source=? AND k.key_kind='provider_id' "
+            "AND k.key_value=?",
             (source.strip().casefold(), provider_article_id.strip()),
         ).fetchone()
         return int(row[0]) if row else None
+
+    def _article_owns_provider_id(
+        self, article_id: int, source: str, provider_article_id: str
+    ) -> bool:
+        return (
+            self.conn.execute(
+                "SELECT 1 FROM news_article_keys WHERE article_id=? AND source=? "
+                "AND key_kind='provider_id' AND key_value=?",
+                (
+                    article_id,
+                    source.strip().casefold(),
+                    provider_article_id.strip(),
+                ),
+            ).fetchone()
+            is not None
+        )
 
     def _quarantine(
         self, candidate: ArticleCandidate, resolution: _Resolution

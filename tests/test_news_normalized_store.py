@@ -54,6 +54,18 @@ def candidate(
     )
 
 
+def polygon_candidate(provider_id):
+    return ArticleCandidate(
+        source="polygon",
+        provider_article_id=provider_id,
+        title="Same title",
+        publisher="Example Wire",
+        url="https://example.test/reused",
+        published_at="2026-06-27T10:00:00Z",
+        primary_ticker="AAPL",
+    )
+
+
 def test_fallback_article_acquires_provider_id_without_second_row(store, conn):
     first = store.upsert(candidate())
     second = store.upsert(candidate("DJ-N$1"))
@@ -61,6 +73,22 @@ def test_fallback_article_acquires_provider_id_without_second_row(store, conn):
     assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 1
     row = conn.execute("SELECT provider_article_id FROM news_articles").fetchone()
     assert row[0] == "DJ-N$1"
+
+
+def test_attached_provider_alias_resolves_same_article(store, conn):
+    first = store.upsert(polygon_candidate("id-a"))
+    conn.execute(
+        "INSERT INTO news_article_keys"
+        "(article_id,source,key_kind,key_value,created_at) VALUES (?,?,?,?,?)",
+        (first.article_id, "polygon", "provider_id", "id-b", "2026-06-29T00:00:00Z"),
+    )
+
+    alias = store.candidate_by_provider_id("polygon", "id-b")
+    result = store.upsert(polygon_candidate("id-b"))
+
+    assert alias is not None
+    assert result.article_id == first.article_id
+    assert result.quarantined is False
 
 
 def test_cross_ticker_fetch_stores_one_body_and_relations(store, conn):

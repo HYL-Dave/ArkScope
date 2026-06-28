@@ -12,6 +12,7 @@ IDENTITY_VERSION = "news-id-v1"
 _TRACKING_QUERY_KEYS = frozenset(
     {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"}
 )
+_SOURCES_WITH_NON_IDENTITY_URLS = frozenset({"polygon"})
 _FRACTION_RE = re.compile(r"[.,](\d+)(?=(?:Z|[+-]\d{2}:?\d{2})$)")
 
 
@@ -102,6 +103,10 @@ def _canonical_source(source: str) -> str:
     return (source or "").strip().casefold()
 
 
+def url_is_strong_identity(source: str) -> bool:
+    return _canonical_source(source) not in _SOURCES_WITH_NON_IDENTITY_URLS
+
+
 def _fallback_hash(
     *, canonical_source: str, publisher: str, title: str, published_at: str
 ) -> str:
@@ -148,7 +153,7 @@ def build_identity_keys(
         )
 
     stable_url = normalize_stable_url(url)
-    if stable_url:
+    if stable_url and url_is_strong_identity(canonical_source):
         keys.append(ArticleKey(canonical_source, KeyKind.URL, stable_url, True))
 
     keys.append(

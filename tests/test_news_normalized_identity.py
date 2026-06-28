@@ -218,9 +218,26 @@ def test_stable_url_preserves_userinfo_case_while_normalizing_host():
     )
 
 
-def test_provider_and_url_are_strong_in_order_but_fallback_is_weak():
+def test_polygon_url_is_metadata_not_an_identity_key():
     keys = build_identity_keys(
         source="polygon",
+        provider_article_id=" abc-123 ",
+        url="https://EXAMPLE.test/story/?utm_source=x",
+        publisher="Reuters",
+        title="Title",
+        published_at="2026-06-27T10:11:12Z",
+    )
+
+    assert [(key.kind, key.strong) for key in keys] == [
+        (KeyKind.PROVIDER_ID, True),
+        (KeyKind.FALLBACK, False),
+    ]
+    assert keys[0] == ArticleKey("polygon", KeyKind.PROVIDER_ID, "abc-123", True)
+
+
+def test_finnhub_provider_and_url_are_strong_but_fallback_is_weak():
+    keys = build_identity_keys(
+        source="finnhub",
         provider_article_id=" abc-123 ",
         url="https://EXAMPLE.test/story/?utm_source=x",
         publisher="Reuters",
@@ -233,9 +250,8 @@ def test_provider_and_url_are_strong_in_order_but_fallback_is_weak():
         (KeyKind.URL, True),
         (KeyKind.FALLBACK, False),
     ]
-    assert keys[0] == ArticleKey("polygon", KeyKind.PROVIDER_ID, "abc-123", True)
     assert keys[1] == ArticleKey(
-        "polygon", KeyKind.URL, "https://example.test/story/", True
+        "finnhub", KeyKind.URL, "https://example.test/story/", True
     )
 
 
