@@ -979,16 +979,27 @@ class MigrationApplyResult:
     already_applied: bool = False
 
 
-def read_body_evidence(ref: BodyEvidenceRef) -> str:
-    table = pq.ParquetFile(ref.source_path).read_row_group(
-        ref.row_group, columns=["content", "description"]
-    )
-    row = table.slice(ref.row_index, 1).to_pylist()[0]
-    raw = str(row.get("content") or row.get("description") or "")
-    if hashlib.sha256(raw.encode("utf-8")).hexdigest() != ref.body_sha256:
-        raise MigrationValidationError("body evidence digest changed")
-    return raw
+def read_body_evidence_batch(
+    refs: Iterable[BodyEvidenceRef],
+) -> dict[BodyEvidenceRef, str]:
+    result = {}
+    grouped = groupby_sorted(refs, key=lambda ref: (ref.source_path, ref.row_group))
+    for (source_path, row_group), group in grouped:
+        table = pq.ParquetFile(source_path).read_row_group(
+            row_group, columns=["content", "description"]
+        )
+        for ref in group:
+            row = table.slice(ref.row_index, 1).to_pylist()[0]
+            raw = str(row.get("content") or row.get("description") or "")
+            if hashlib.sha256(raw.encode("utf-8")).hexdigest() != ref.body_sha256:
+                raise MigrationValidationError("body evidence digest changed")
+            result[ref] = raw
+    return result
 ```
+
+Sort and group every active/cold ref before any insert so each Parquet row group is read at most
+once per apply. Tests instrument `ParquetFile.read_row_group` and assert two refs in one group cause
+one read; this is an apply performance invariant, not an optional optimization.
 
 - [ ] **Step 4: Implement direct SQL writes under the caller transaction**
 
@@ -1242,6 +1253,10 @@ Record the actual resolved/rejection fingerprints and counts in `NEWS_DIRECT_LOC
 - apply requires independent preview reproduction and explicit approval;
 - Polygon URL demotion is source-wide and must remain in N8;
 - N8 runtime cutover remains blocked on N7 live validation.
+- live apply must run in a quiet operator window with the scheduler paused because the write lock
+  remains held through the multi-minute post-commit idempotent replan;
+- the N8 plan must reconcile scorer-versus-read cutover ordering explicitly before runtime work;
+  N7 records the dependency but does not decide it.
 
 ```bash
 git add docs/design/NEWS_DIRECT_LOCAL_PLAN.md
