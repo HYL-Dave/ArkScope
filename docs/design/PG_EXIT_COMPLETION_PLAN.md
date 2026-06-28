@@ -2,8 +2,9 @@
 
 Date: 2026-06-25
 Status: **Slice 1 DONE + live-migrated; Step 2 IN PROGRESS.** Polygon/Finnhub news direct-local
-cutover completed and live-verified 2026-06-27; `ibkr_news`, IV, fundamentals, remaining price
-ingest, mirror retirement, SEC/dead paths, and UI collapse remain.
+cutover completed and live-verified 2026-06-27. The all-source normalized-news N1–N5 offline
+foundation completed 2026-06-28, but its migration/cutover has not started; `ibkr_news`, IV,
+fundamentals, remaining price ingest, mirror retirement, SEC/dead paths, and UI collapse remain.
 
 ## Progress
 
@@ -22,6 +23,13 @@ ingest, mirror retirement, SEC/dead paths, and UI collapse remain.
   Settings rollback, and a real-profile idempotent smoke. This bypasses PG sync/mirror only for
   those two scheduler sources. `ibkr_news` intentionally remains collector → PG → mirror, and the
   mirror remains load-bearing for IV/fundamentals and other unfinished ingest paths.
+  The normalized all-source foundation is committed through N5 (identity/schema/cleaner/store,
+  read-only preview, bounded writer, REST adapters, fake-tested IBKR adapter). The real preview
+  fingerprint is `451c8b5837eb5d540b8f43579486cf66915cbbd2f2ad127a969d9ce3c1c4c716`;
+  it reports 816 strong conflicts and 924 weak ambiguities, so N7 apply remains gated. **N6 probe
+  pending: Gateway handshake unavailable. N7 apply / N8 cutover / N9 deletion are not started.**
+  Live `market_data.db` has no normalized-news tables yet. Parquet remains frozen enrichment input
+  plus an active IBKR/scoring legacy dependency, not the future authority.
 
 ## Why this exists
 

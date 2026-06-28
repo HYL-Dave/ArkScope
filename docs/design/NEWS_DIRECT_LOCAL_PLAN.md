@@ -1,8 +1,9 @@
 # News Direct-Local — Scoping (PG-exit Step 2, first collector)
 
 Date: 2026-06-26
-Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27** (see the
-"Step 3" section near the end). Original Step 2 scoping is retained below as history. News chosen
+Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27**;
+**normalized all-source N1–N5 offline foundation COMPLETE 2026-06-28, not migrated or cut over**
+(see the checkpoint near the end). Original Step 2 scoping is retained below as history. News chosen
 first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
 provider_sync + scheduler-state + Settings pattern. IV waits until its data-source strategy
@@ -221,3 +222,60 @@ Completed order: S3.0a gated live repair → S3.1 status repoint → S3.2 defaul
 tests + gated live smoke. The S3.0a backup and the older pre-2b backup have both met their stated
 verification gates and are eligible for manual deletion, but remain on disk; this cutover does not
 delete backups automatically.
+
+---
+
+## All-source normalization offline checkpoint (N1–N5, 2026-06-28)
+
+The normalized `news_articles` model is now implemented and verified **beside** the active legacy
+`news` path. This checkpoint deliberately made no scheduler/read routing change and no live schema
+write. It is a foundation for retaining provider IDs, storing one body per article, modeling ticker
+relations, and eventually retiring the remaining IBKR news mirror path; it is not that retirement.
+
+### Commits and offline gate
+
+- **N1 identity/schema/cleaner/store:** `0d48573`, `097314d`, `5cfd79b`, `4fc5cfc`, `f8cee5b`,
+  `cff9d8a`.
+- **N2 streaming inventory + read-only migration preview:** `8a0ea7d`, `9bef570`.
+- **N3 bounded common writer + provider-ID continuation:** `a15161b`.
+- **N4 Polygon/Finnhub normalized adapters:** `e387e4c` (also fixes the existing Finnhub Unix
+  timestamp conversion so it emits real UTC instead of local time mislabeled `Z`).
+- **N5 IBKR normalized adapter + sanitized, unrun N6 probe:** `d4fea9c`.
+- Verification: 96 normalized focused tests and 130 legacy news/read/scheduler regressions passed;
+  compile and diff checks passed. The live `market_data.db` still contains zero
+  `news_article%` objects.
+
+### Real read-only preview
+
+The planner scanned the live legacy SQLite table and all three Parquet corpora without changing
+their size/mtime or creating SQLite sidecars/tables. Fingerprint:
+`451c8b5837eb5d540b8f43579486cf66915cbbd2f2ad127a969d9ce3c1c4c716`.
+
+| Source | Legacy rows | Parquet rows | Planned articles | Provider-ID matched | Fallback-only | Body match |
+|---|---:|---:|---:|---:|---:|---:|
+| Finnhub | 150,276 | 153,879 | 85,674 | 85,025 | 0 | 144,926 (96.4399%) |
+| IBKR | 103,239 | 322,033 | 83,853 | 76,859 | 761 | 101,920 (98.7224%) |
+| Polygon | 118,060 | 118,291 | 118,348 | 117,983 | 67 | 116,137 (98.3712%) |
+
+The preview plans 620,360 ticker links, 287,912 title observations, and collapses 90,880 legacy
+cross-ticker rows. It is correctly **not applicable yet**: 816 strong blockers remain (718 body
+variants, 63 multiple-provider strong-URL collisions, 35 provider-ID reuse cases), plus 924 weak
+fallback ambiguities that stay separate rather than being silently merged. These need a reviewed
+resolution policy in the separately gated N7 migration plan; the offline foundation does not guess.
+
+### Explicit remaining gates
+
+- **N6 probe pending: Gateway handshake unavailable.** The five-case probe is built and
+  fake-tested, but has not been run against `192.168.0.153:4001`; no `empty`/`expired` retention
+  policy was inferred.
+- **N7 apply not started.** No normalized schema/data has been written to the live DB.
+- **N8 cutover not started.** Runtime reads, scheduler routing, sentiment/risk scoring, and UI
+  still use their current paths. Active scoring must move from Parquet to normalized SQLite before
+  cutover, or new articles would silently remain unscored.
+- **N9 legacy deletion not started.** The legacy `news` table, FileBackend fallback, mirror code,
+  and old collection/scoring scripts remain until replacement paths pass the PG-unreachable gate.
+
+Parquet is no longer the intended authority for the normalized end state. For now it remains a
+frozen migration/enrichment source **and** an active legacy dependency for IBKR collection and
+scoring. It can be frozen/archived and obsolete scripts removed only after N8 proves all readers,
+writers, and scoring against normalized SQLite.
