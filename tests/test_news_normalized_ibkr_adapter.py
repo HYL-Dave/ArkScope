@@ -213,6 +213,20 @@ def test_ibkr_successful_empty_response_is_terminal_empty():
     assert body.raw_body is None
 
 
+def test_ibkr_unavailable_body_is_failed_and_sanitized():
+    gateway = FakeGateway()
+    key = ("DJ-N", "DJ-N$2")
+    unavailable = IBKRNewsArticleUnavailable(10172)
+    unavailable.args = ("licensed provider payload",)
+    gateway.body_errors[key] = unavailable
+
+    body = IBKRNormalizedProvider(gateway).fetch_body(candidate())
+
+    assert body.status is BodyStatus.FAILED
+    assert body.error == "IBKR news article unavailable (10172)"
+    assert body.raw_body is None
+
+
 def test_ibkr_strict_body_method_propagates_but_compatibility_method_catches():
     source = body_source(BodyClient(error=TimeoutError("gateway timeout")))
 
@@ -260,6 +274,38 @@ def test_probe_output_never_contains_body_or_exception_payload(capsys):
     }
     assert payload[1]["response_class"] == "error"
     assert payload[1]["error_type"] == "RuntimeError"
+
+
+def test_probe_classifies_ibkr_unavailable_without_payload(capsys):
+    class Source:
+        def fetch_news_article_body_strict(self, provider, article_id):
+            raise IBKRNewsArticleUnavailable(10172)
+
+        def disconnect(self):
+            pass
+
+    exit_code = probe_main(
+        [],
+        source_factory=Source,
+        probes=(ProbeSpec("missing", "DJ-N", "secret-id"),),
+        lock_factory=nullcontext,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "secret-id" not in captured.out
+    assert "secret-id" not in captured.err
+    assert json.loads(captured.out) == [
+        {
+            "error_code": 10172,
+            "html_tags": 0,
+            "label": "missing",
+            "length": 0,
+            "present": False,
+            "provider": "DJ-N",
+            "response_class": "unavailable",
+        }
+    ]
 
 
 def test_probe_has_five_reviewed_default_cases():

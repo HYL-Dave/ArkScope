@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import re
 from typing import Iterable, Optional, Protocol
 
+from data_sources.ibkr_source import IBKRNewsArticleUnavailable
 from src.ibkr_gateway_lock import ibkr_gateway_lock
 
 from .models import ArticleCandidate, BodyCandidate, BodyStatus
@@ -89,6 +90,13 @@ class IBKRNormalizedProvider:
         try:
             raw = self.gateway.fetch_news_article_body_strict(
                 provider_code, article_id
+            )
+        except IBKRNewsArticleUnavailable as exc:
+            return BodyCandidate(
+                status=BodyStatus.FAILED,
+                error=f"IBKR news article unavailable ({exc.error_code})",
+                retrieval_method="provider_api",
+                retrieval_source=self.source,
             )
         except Exception as exc:
             return BodyCandidate(

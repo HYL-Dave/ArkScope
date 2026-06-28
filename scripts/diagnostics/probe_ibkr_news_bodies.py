@@ -17,7 +17,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from data_sources.ibkr_source import IBKRDataSource  # noqa: E402
+from data_sources.ibkr_source import (  # noqa: E402
+    IBKRDataSource,
+    IBKRNewsArticleUnavailable,
+)
 from src.ibkr_gateway_lock import ibkr_gateway_lock  # noqa: E402
 
 
@@ -79,6 +82,15 @@ def _probe_one(source, probe: ProbeSpec) -> dict:
         raw = source.fetch_news_article_body_strict(
             probe.provider, probe.article_id
         )
+    except IBKRNewsArticleUnavailable as exc:
+        return {
+            **base,
+            "present": False,
+            "length": 0,
+            "html_tags": 0,
+            "response_class": "unavailable",
+            "error_code": exc.error_code,
+        }
     except Exception as exc:
         return {
             **base,
