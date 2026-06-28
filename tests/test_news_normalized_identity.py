@@ -64,6 +64,34 @@ def test_models_have_stable_values_defaults_and_are_immutable():
         article.title = "Revised"
 
 
+@pytest.mark.parametrize(
+    ("kind", "strong"),
+    [
+        (KeyKind.PROVIDER_ID, False),
+        (KeyKind.URL, False),
+        (KeyKind.FALLBACK, True),
+    ],
+)
+def test_article_key_rejects_strength_inconsistent_with_kind(kind, strong):
+    with pytest.raises(ValueError, match="strength"):
+        ArticleKey("ibkr", kind, "value", strong)
+
+
+def test_article_candidate_coerces_related_tickers_to_an_immutable_tuple():
+    related_tickers = ["AAPL", "MSFT"]
+
+    article = ArticleCandidate(
+        source="polygon",
+        title="Title",
+        published_at="2026-06-27",
+        related_tickers=related_tickers,
+    )
+    related_tickers.append("NVDA")
+
+    assert article.related_tickers == ("AAPL", "MSFT")
+    assert isinstance(article.related_tickers, tuple)
+
+
 def test_identity_text_decodes_nfkc_collapses_whitespace_and_casefolds():
     assert normalize_identity_text("  Stra&szlig;e\t\uff21\uff34\uff06\uff34\n") == "strasse at&t"
 
@@ -81,10 +109,25 @@ def test_timestamp_normalizes_equivalent_utc_suffixes(value):
 
 
 def test_timestamp_preserves_available_precision_and_date_only_values():
-    assert normalize_timestamp("2026-06-27T10:11:12.1200+00:00") == (
+    assert normalize_timestamp("2026-06-27T11:11:12.1200+01:00") == (
         "2026-06-27T10:11:12.1200Z"
     )
     assert normalize_timestamp("2026-06-27") == "2026-06-27"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-06-27T11:11:12+01:00",
+        "2026-06-27T05:11:12-0500",
+    ],
+)
+def test_timestamp_converts_nonzero_offsets_to_utc(value):
+    assert normalize_timestamp(value) == "2026-06-27T10:11:12Z"
+
+
+def test_invalid_timestamp_is_trimmed_but_otherwise_preserved():
+    assert normalize_timestamp("  not-a-time+00:00  ") == "not-a-time+00:00"
 
 
 def test_fallback_excludes_ticker_and_has_a_deterministic_64_char_value():
@@ -117,20 +160,61 @@ def test_fallback_excludes_ticker_and_has_a_deterministic_64_char_value():
     assert len(expected) == 64
 
 
-def test_stable_url_normalizes_and_drops_tracking_and_blank_query_values():
+@pytest.mark.parametrize(
+    "value",
+    [
+        "ftp://example.test/story",
+        "/relative/story",
+        "https:///missing-host",
+        "https://example.test:/story",
+        "https://example.test:not-a-port/story",
+        "https://example.test:99999/story",
+        "https://[not-an-ipv6]/story",
+        "https://[::1/story",
+    ],
+)
+def test_stable_url_rejects_non_http_relative_and_malformed_values(value):
+    assert normalize_stable_url(value) == ""
+
+
+def test_stable_url_lowercases_scheme_and_host_and_drops_fragment():
+    value = "HTTPS://Example.TEST/Story/#section"
+
+    assert normalize_stable_url(value) == "https://example.test/Story/"
+
+
+def test_stable_url_removes_only_known_utm_tracking_parameters():
     value = (
-        "HTTPS://Example.TEST/Story///?z=&UTM_Source=x&utm_custom=y&a=1"
-        "#section"
+        "https://example.test/story?"
+        "utm_source=s&utm_medium=m&utm_campaign=c&utm_term=t&utm_content=x&"
+        "utm_custom=keep&ref=home"
     )
 
-    assert normalize_stable_url(value) == "https://example.test/Story?a=1"
+    assert normalize_stable_url(value) == (
+        "https://example.test/story?utm_custom=keep&ref=home"
+    )
+
+
+def test_stable_url_preserves_query_order_duplicates_and_blank_values():
+    value = "https://example.test/story?b=2&a=1&a=2&empty=&a=3"
+
+    assert normalize_stable_url(value) == value
+
+
+def test_stable_url_preserves_trailing_slash_as_part_of_path_identity():
+    without_slash = normalize_stable_url("https://example.test/a")
+    with_slash = normalize_stable_url("https://example.test/a/")
+
+    assert without_slash == "https://example.test/a"
+    assert with_slash == "https://example.test/a/"
+    assert without_slash != with_slash
 
 
 def test_stable_url_preserves_userinfo_case_while_normalizing_host():
     value = "HTTPS://User:Pass@Example.TEST:443/story/"
 
     assert normalize_stable_url(value) == (
-        "https://User:Pass@example.test:443/story"
+        "https://User:Pass@example.test:443/story/"
     )
 
 
@@ -151,7 +235,7 @@ def test_provider_and_url_are_strong_in_order_but_fallback_is_weak():
     ]
     assert keys[0] == ArticleKey("polygon", KeyKind.PROVIDER_ID, "abc-123", True)
     assert keys[1] == ArticleKey(
-        "polygon", KeyKind.URL, "https://example.test/story", True
+        "polygon", KeyKind.URL, "https://example.test/story/", True
     )
 
 
@@ -168,3 +252,19 @@ def test_blank_provider_and_url_do_not_create_empty_strong_keys():
     assert len(keys) == 1
     assert keys[0].kind is KeyKind.FALLBACK
     assert keys[0].strong is False
+
+
+def test_source_is_canonicalized_once_for_all_keys_and_fallback_identity():
+    arguments = {
+        "provider_article_id": "article-1",
+        "url": "https://example.test/story",
+        "publisher": "Reuters",
+        "title": "Title",
+        "published_at": "2026-06-27T10:11:12Z",
+    }
+
+    padded = build_identity_keys(source=" IBKR ", **arguments)
+    canonical = build_identity_keys(source="ibkr", **arguments)
+
+    assert padded == canonical
+    assert {key.source for key in padded} == {"ibkr"}

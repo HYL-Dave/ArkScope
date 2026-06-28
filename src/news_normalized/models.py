@@ -24,6 +24,13 @@ class ArticleKey:
     value: str
     strong: bool
 
+    def __post_init__(self) -> None:
+        expected_strength = self.kind in (KeyKind.PROVIDER_ID, KeyKind.URL)
+        if self.strong != expected_strength:
+            raise ValueError(
+                f"{self.kind.value} key strength must be {expected_strength}"
+            )
+
 
 @dataclass(frozen=True)
 class BodyCandidate:
@@ -50,3 +57,6 @@ class ArticleCandidate:
     observed_at: Optional[str] = None
     content_kind: str = "unknown"
     body: BodyCandidate = field(default_factory=BodyCandidate)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "related_tickers", tuple(self.related_tickers))
