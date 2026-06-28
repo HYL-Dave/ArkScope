@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import hashlib
 import json
 import sqlite3
 from typing import Iterable, Optional
 
-from .cleaner import clean_news_body
+from .body_policy import PreparedBody, choose_active_body, prepare_body
 from .identity import build_identity_keys, normalize_identity_text, normalize_timestamp
 from .models import ArticleCandidate, ArticleKey, BodyCandidate, BodyStatus, KeyKind
 from .schema import ensure_news_normalized_schema
@@ -44,11 +44,22 @@ _CONTENT_RANK = {
     "summary": 3,
     "full_text": 4,
 }
-_TERMINAL = {BodyStatus.FETCHED, BodyStatus.EMPTY, BodyStatus.EXPIRED}
+_TERMINAL = {
+    BodyStatus.FETCHED,
+    BodyStatus.EMPTY,
+    BodyStatus.UNAVAILABLE,
+    BodyStatus.EXPIRED,
+}
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _hours_after(value: str, hours: int) -> str:
+    parseable = value[:-1] + "+00:00" if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(parseable)
+    return (parsed + timedelta(hours=hours)).isoformat().replace("+00:00", "Z")
 
 
 def _jsonable(value):
@@ -92,14 +103,25 @@ class NormalizedNewsStore:
             self._refresh_search_document(article_id)
             return UpsertResult(article_id=article_id, inserted=inserted)
 
-    def update_body(self, candidate: ArticleCandidate, body: BodyCandidate) -> None:
+    def update_body(
+        self,
+        candidate: ArticleCandidate,
+        body: BodyCandidate,
+        *,
+        allow_terminal_recovery: bool = False,
+    ) -> None:
         article_id = self._article_id_for_provider(
             candidate.source, candidate.provider_article_id
         )
         if article_id is None:
             raise KeyError("provider article is not present in normalized store")
         with self.conn:
-            self._upsert_body(article_id, body, candidate.source)
+            self._upsert_body(
+                article_id,
+                body,
+                candidate.source,
+                allow_terminal_recovery=allow_terminal_recovery,
+            )
             if body.status is BodyStatus.FETCHED:
                 self._record_title(article_id, candidate, observed_with_body=True)
                 self.conn.execute(
@@ -152,6 +174,9 @@ class NormalizedNewsStore:
                 source_url=body_row["source_url"],
                 fetched_at=body_row["fetched_at"],
                 error=body_row["last_error"],
+                error_code=body_row["last_error_code"],
+                fetch_attempts=int(body_row["fetch_attempts"] or 0),
+                next_retry_at=body_row["next_retry_at"],
             )
         return ArticleCandidate(
             source=row["source"],
@@ -397,7 +422,12 @@ class NormalizedNewsStore:
         return canonical_ticker(ticker, self._ticker_aliases)
 
     def _upsert_body(
-        self, article_id: int, body: BodyCandidate, source: str
+        self,
+        article_id: int,
+        body: BodyCandidate,
+        source: str,
+        *,
+        allow_terminal_recovery: bool = False,
     ) -> None:
         current = self.conn.execute(
             "SELECT * FROM news_article_bodies WHERE article_id=?", (article_id,)
@@ -416,73 +446,165 @@ class NormalizedNewsStore:
         existing = BodyStatus(current["body_status"])
         if incoming is BodyStatus.PENDING:
             return
-        if existing in _TERMINAL and incoming is not existing:
-            raise BodyConflictError(f"cannot transition {existing.value} to {incoming.value}")
-        if existing in {BodyStatus.EMPTY, BodyStatus.EXPIRED} and incoming is existing:
+        fetched_variant = existing is BodyStatus.FETCHED and incoming is BodyStatus.FETCHED
+        explicit_recovery = (
+            existing is BodyStatus.UNAVAILABLE
+            and incoming is BodyStatus.FETCHED
+            and allow_terminal_recovery
+        )
+        if existing in _TERMINAL and incoming is not existing and not explicit_recovery:
+            raise BodyConflictError(
+                f"cannot transition {existing.value} to {incoming.value}"
+            )
+        if existing in {
+            BodyStatus.EMPTY,
+            BodyStatus.UNAVAILABLE,
+            BodyStatus.EXPIRED,
+        } and incoming is existing:
             return
 
         attempts = int(current["fetch_attempts"] or 0) + 1
         attempted_at = _now()
         if incoming is BodyStatus.FETCHED:
-            if not body.raw_body:
-                raise ValueError("fetched body requires non-empty raw_body")
-            digest = hashlib.sha256(body.raw_body.encode("utf-8")).hexdigest()
-            if existing is BodyStatus.FETCHED:
-                if current["body_sha256"] != digest:
-                    raise BodyConflictError("provider body differs from stored fetched body")
-                return
-            clean_error = None
-            clean_text = None
-            cleaner_version = None
-            try:
-                cleaned = clean_news_body(
-                    body.raw_body, raw_format=body.raw_format, source=source
-                )
-                clean_text = cleaned.text
-                cleaner_version = cleaned.version
-            except Exception as exc:  # raw evidence must survive cleaner failure
-                clean_error = str(exc)
-            self.conn.execute(
-                "UPDATE news_article_bodies SET body_status='fetched',raw_body=?,raw_ref=NULL,"
-                "raw_format=?,body_text=?,body_sha256=?,cleaner_version=?,retrieval_method=?,"
-                "retrieval_source=?,source_url=?,fetch_attempts=?,last_attempt_at=?,"
-                "next_retry_at=NULL,fetched_at=?,last_error=NULL,cleaned_at=?,clean_error=? "
-                "WHERE article_id=?",
-                (
-                    body.raw_body,
-                    body.raw_format,
-                    clean_text,
-                    digest,
-                    cleaner_version,
-                    body.retrieval_method,
-                    body.retrieval_source,
-                    body.source_url,
-                    attempts,
-                    attempted_at,
-                    body.fetched_at or attempted_at,
-                    attempted_at if clean_error is None else None,
-                    clean_error,
-                    article_id,
-                ),
+            prepared = prepare_body(
+                body.raw_body or "",
+                raw_format=body.raw_format,
+                source=source,
+                retrieval_method=body.retrieval_method,
+                retrieval_source=body.retrieval_source,
+                source_url=body.source_url,
+                fetched_at=body.fetched_at or attempted_at,
             )
+            if fetched_variant:
+                if current["body_sha256"] == prepared.body_sha256:
+                    return
+                active = self._prepared_body_from_row(current)
+                winner = choose_active_body((active, prepared))
+                loser = prepared if winner is active else active
+                self._insert_body_variant(article_id, loser, attempted_at)
+                if winner is active:
+                    return
+                self.conn.execute(
+                    "DELETE FROM news_article_body_variants "
+                    "WHERE article_id=? AND body_sha256=?",
+                    (article_id, winner.body_sha256),
+                )
+            self._write_active_body(article_id, prepared, attempts, attempted_at)
             return
 
         if incoming is BodyStatus.FAILED:
             if existing not in {BodyStatus.PENDING, BodyStatus.FAILED}:
                 raise BodyConflictError(f"cannot fail terminal body {existing.value}")
+            if body.error_code == 10172:
+                unavailable = attempts >= 3
+                self.conn.execute(
+                    "UPDATE news_article_bodies SET body_status=?,fetch_attempts=?,"
+                    "last_attempt_at=?,next_retry_at=?,last_error=?,last_error_code=?,"
+                    "unavailable_at=? WHERE article_id=?",
+                    (
+                        BodyStatus.UNAVAILABLE.value if unavailable else "failed",
+                        attempts,
+                        attempted_at,
+                        None if unavailable else _hours_after(attempted_at, 6),
+                        body.error,
+                        10172,
+                        attempted_at if unavailable else None,
+                        article_id,
+                    ),
+                )
+                return
             self.conn.execute(
                 "UPDATE news_article_bodies SET body_status='failed',fetch_attempts=?,"
-                "last_attempt_at=?,last_error=? WHERE article_id=?",
-                (attempts, attempted_at, body.error, article_id),
+                "last_attempt_at=?,next_retry_at=?,last_error=?,last_error_code=? "
+                "WHERE article_id=?",
+                (
+                    attempts,
+                    attempted_at,
+                    body.next_retry_at,
+                    body.error,
+                    body.error_code,
+                    article_id,
+                ),
             )
             return
 
         if incoming in {BodyStatus.EMPTY, BodyStatus.EXPIRED}:
             self.conn.execute(
                 "UPDATE news_article_bodies SET body_status=?,fetch_attempts=?,"
-                "last_attempt_at=?,last_error=NULL WHERE article_id=?",
+                "last_attempt_at=?,next_retry_at=NULL,last_error=NULL,last_error_code=NULL "
+                "WHERE article_id=?",
                 (incoming.value, attempts, attempted_at, article_id),
             )
+
+    @staticmethod
+    def _prepared_body_from_row(row: sqlite3.Row) -> PreparedBody:
+        return PreparedBody(
+            body_sha256=row["body_sha256"],
+            raw_body=row["raw_body"] or "",
+            raw_format=row["raw_format"],
+            body_text=row["body_text"],
+            cleaner_version=row["cleaner_version"],
+            clean_error=row["clean_error"],
+            retrieval_method=row["retrieval_method"],
+            retrieval_source=row["retrieval_source"],
+            source_url=row["source_url"],
+            fetched_at=row["fetched_at"],
+        )
+
+    def _insert_body_variant(
+        self, article_id: int, body: PreparedBody, created_at: str
+    ) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO news_article_body_variants "
+            "(article_id,body_sha256,raw_body,raw_format,body_text,cleaner_version,"
+            "retrieval_method,retrieval_source,source_url,fetched_at,evidence_ref,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                article_id,
+                body.body_sha256,
+                body.raw_body,
+                body.raw_format,
+                body.body_text,
+                body.cleaner_version,
+                body.retrieval_method,
+                body.retrieval_source,
+                body.source_url,
+                body.fetched_at,
+                body.evidence_ref,
+                created_at,
+            ),
+        )
+
+    def _write_active_body(
+        self,
+        article_id: int,
+        body: PreparedBody,
+        attempts: int,
+        attempted_at: str,
+    ) -> None:
+        self.conn.execute(
+            "UPDATE news_article_bodies SET body_status='fetched',raw_body=?,raw_ref=NULL,"
+            "raw_format=?,body_text=?,body_sha256=?,cleaner_version=?,retrieval_method=?,"
+            "retrieval_source=?,source_url=?,fetch_attempts=?,last_attempt_at=?,"
+            "next_retry_at=NULL,fetched_at=?,last_error=NULL,last_error_code=NULL,"
+            "unavailable_at=NULL,cleaned_at=?,clean_error=? WHERE article_id=?",
+            (
+                body.raw_body,
+                body.raw_format,
+                body.body_text,
+                body.body_sha256,
+                body.cleaner_version,
+                body.retrieval_method,
+                body.retrieval_source,
+                body.source_url,
+                attempts,
+                attempted_at,
+                body.fetched_at or attempted_at,
+                attempted_at if body.clean_error is None else None,
+                body.clean_error,
+                article_id,
+            ),
+        )
 
     def _refresh_search_document(self, article_id: int) -> None:
         row = self.conn.execute(

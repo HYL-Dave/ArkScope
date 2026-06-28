@@ -122,6 +122,133 @@ def test_cross_ticker_fetch_stores_one_body_and_relations(store, conn):
     assert body["body_text"] == "body"
 
 
+def test_third_10172_becomes_terminal_unavailable(store, conn, monkeypatch):
+    article = candidate("DJ-N$retry")
+    result = store.upsert(article)
+    conn.execute(
+        "UPDATE news_article_bodies SET body_status='failed',fetch_attempts=2 "
+        "WHERE article_id=?",
+        (result.article_id,),
+    )
+    monkeypatch.setattr(
+        "src.news_normalized.store._now", lambda: "2026-06-29T00:00:00Z"
+    )
+
+    store.update_body(
+        article,
+        BodyCandidate(
+            status=BodyStatus.FAILED,
+            error="IBKR news article unavailable (10172)",
+            error_code=10172,
+        ),
+    )
+
+    row = conn.execute(
+        "SELECT body_status,fetch_attempts,last_error_code,next_retry_at,unavailable_at "
+        "FROM news_article_bodies WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == (
+        "unavailable",
+        3,
+        10172,
+        None,
+        "2026-06-29T00:00:00Z",
+    )
+
+
+def test_10172_before_third_attempt_sets_six_hour_retry(store, conn, monkeypatch):
+    article = candidate("DJ-N$retry")
+    result = store.upsert(article)
+    monkeypatch.setattr(
+        "src.news_normalized.store._now", lambda: "2026-06-29T00:00:00Z"
+    )
+
+    store.update_body(
+        article,
+        BodyCandidate(
+            status=BodyStatus.FAILED,
+            error="IBKR news article unavailable (10172)",
+            error_code=10172,
+        ),
+    )
+
+    row = conn.execute(
+        "SELECT body_status,fetch_attempts,last_error_code,next_retry_at "
+        "FROM news_article_bodies WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == (
+        "failed",
+        1,
+        10172,
+        "2026-06-29T06:00:00Z",
+    )
+
+
+def test_new_body_variant_preserves_loser_and_indexes_only_active(store, conn):
+    article = candidate(
+        "DJ-N$variant",
+        body_status=BodyStatus.FETCHED,
+        raw_body="short",
+    )
+    result = store.upsert(article)
+
+    store.update_body(
+        article,
+        BodyCandidate(
+            status=BodyStatus.FETCHED,
+            raw_body="long complete provider body",
+            raw_format="text",
+            retrieval_method="provider_api",
+            retrieval_source="ibkr",
+            fetched_at="2026-06-29T01:00:00Z",
+        ),
+    )
+
+    active = conn.execute(
+        "SELECT raw_body FROM news_article_bodies WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()[0]
+    cold = conn.execute(
+        "SELECT raw_body FROM news_article_body_variants WHERE article_id=?",
+        (result.article_id,),
+    ).fetchall()
+    search = conn.execute(
+        "SELECT body_text FROM news_search_documents WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()[0]
+    assert active == "long complete provider body"
+    assert [row[0] for row in cold] == ["short"]
+    assert search == "long complete provider body"
+
+
+def test_unavailable_recovers_only_through_explicit_reprobe(store, conn):
+    article = candidate("DJ-N$recover")
+    result = store.upsert(article)
+    conn.execute(
+        "UPDATE news_article_bodies SET body_status='unavailable',fetch_attempts=3,"
+        "last_error_code=10172 WHERE article_id=?",
+        (result.article_id,),
+    )
+    fetched = BodyCandidate(
+        status=BodyStatus.FETCHED,
+        raw_body="recovered body",
+        raw_format="text",
+    )
+
+    with pytest.raises(BodyConflictError):
+        store.update_body(article, fetched)
+    store.update_body(article, fetched, allow_terminal_recovery=True)
+
+    row = conn.execute(
+        "SELECT body_status,last_error_code,unavailable_at FROM news_article_bodies "
+        "WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == ("fetched", None, None)
+
+
 def test_disagreeing_strong_keys_are_quarantined_without_article_mutation(store, conn):
     store.upsert(candidate("p1", url="https://example.test/a"))
     store.upsert(candidate("p2", url="https://example.test/b", title="Other"))
@@ -236,16 +363,24 @@ def test_raw_markup_is_not_searchable_but_clean_text_is(store, conn):
     ) == []
 
 
-def test_fetched_body_cannot_be_downgraded_or_replaced(store):
+def test_fetched_body_cannot_be_downgraded_and_replacement_is_preserved(store, conn):
     original = candidate(
         "DJ-N$5", body_status=BodyStatus.FETCHED, raw_body="original"
     )
     store.upsert(original)
     store.upsert(candidate("DJ-N$5", body_status=BodyStatus.PENDING))
-    with pytest.raises(BodyConflictError):
-        store.upsert(
-            candidate("DJ-N$5", body_status=BodyStatus.FETCHED, raw_body="different")
-        )
+    store.upsert(
+        candidate("DJ-N$5", body_status=BodyStatus.FETCHED, raw_body="different")
+    )
+
+    active = conn.execute(
+        "SELECT raw_body FROM news_article_bodies"
+    ).fetchone()[0]
+    variants = conn.execute(
+        "SELECT raw_body FROM news_article_body_variants"
+    ).fetchall()
+    assert active == "different"
+    assert [row[0] for row in variants] == ["original"]
 
 
 def test_failed_body_can_retry_to_fetched(store, conn):

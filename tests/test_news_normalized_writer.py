@@ -8,6 +8,7 @@ from src.news_normalized.models import (
     BodyCandidate,
     BodyStatus,
     WriterBudget,
+    WriterContinuation,
 )
 from src.news_normalized.store import NormalizedNewsStore
 from src.news_normalized.writer import write_news_batch
@@ -134,6 +135,30 @@ def test_writer_rerun_is_idempotent_and_does_not_refetch_terminal_body(store):
     assert second.articles_inserted == 0
     assert second.continuation is None
     assert provider.body_calls == ["p1"]
+
+
+def test_writer_defers_failed_body_until_next_retry_at(store):
+    article = candidate("p1")
+    result = store.upsert(article)
+    store.conn.execute(
+        "UPDATE news_article_bodies SET body_status='failed',fetch_attempts=1,"
+        "next_retry_at='2099-01-01T00:00:00Z' WHERE article_id=?",
+        (result.article_id,),
+    )
+    provider = FakeProvider({})
+
+    outcome = write_news_batch(
+        store,
+        provider,
+        [],
+        WriterBudget(max_articles=0, max_body_fetches=1),
+        continuation=WriterContinuation(deferred_body_ids=("p1",)),
+    )
+
+    assert provider.body_calls == []
+    assert outcome.status == "partial"
+    assert outcome.continuation is not None
+    assert outcome.continuation.deferred_body_ids == ("p1",)
 
 
 def test_writer_carries_deferred_tickers_when_article_budget_is_hit(store):

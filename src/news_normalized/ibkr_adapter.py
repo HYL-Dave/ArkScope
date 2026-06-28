@@ -95,6 +95,7 @@ class IBKRNormalizedProvider:
             return BodyCandidate(
                 status=BodyStatus.FAILED,
                 error=f"IBKR news article unavailable ({exc.error_code})",
+                error_code=exc.error_code,
                 retrieval_method="provider_api",
                 retrieval_source=self.source,
             )

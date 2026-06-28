@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Callable, Iterable, Optional, Protocol
 
 from src.market_data_direct import (
@@ -39,12 +40,30 @@ class NewsProvider(Protocol):
 _TERMINAL_BODY_STATUSES = {
     BodyStatus.FETCHED,
     BodyStatus.EMPTY,
+    BodyStatus.UNAVAILABLE,
     BodyStatus.EXPIRED,
 }
 
 
 def _unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(value for value in values if value))
+
+
+def _body_fetch_due(body: BodyCandidate) -> bool:
+    if not body.next_retry_at:
+        return True
+    parseable = (
+        body.next_retry_at[:-1] + "+00:00"
+        if body.next_retry_at.endswith("Z")
+        else body.next_retry_at
+    )
+    try:
+        retry_at = datetime.fromisoformat(parseable)
+    except ValueError:
+        return True
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=timezone.utc)
+    return retry_at <= datetime.now(timezone.utc)
 
 
 def write_news_batch(
@@ -105,6 +124,9 @@ def write_news_batch(
                     continue
                 if restored.body.status in _TERMINAL_BODY_STATUSES:
                     continue
+                if not _body_fetch_due(restored.body):
+                    still_deferred_bodies.append(provider_id)
+                    continue
                 if body_fetch_attempts >= budget.max_body_fetches:
                     still_deferred_bodies.append(provider_id)
                     continue
@@ -115,7 +137,12 @@ def write_news_batch(
                     if body.status is BodyStatus.FETCHED:
                         bodies_fetched += 1
                     elif body.status is BodyStatus.FAILED:
-                        still_deferred_bodies.append(provider_id)
+                        persisted = store.candidate_by_provider_id(source, provider_id)
+                        if (
+                            persisted is not None
+                            and persisted.body.status not in _TERMINAL_BODY_STATUSES
+                        ):
+                            still_deferred_bodies.append(provider_id)
                         error = body.error or "body fetch failed"
                         errors[f"body:{provider_id}"] = error
                         record_resumed_body_error(restored, error)
@@ -176,6 +203,9 @@ def write_news_batch(
                             continue
                         if restored.body.status in _TERMINAL_BODY_STATUSES:
                             continue
+                        if not _body_fetch_due(restored.body):
+                            still_deferred_bodies.append(provider_id)
+                            continue
                         if body_fetch_attempts >= budget.max_body_fetches:
                             still_deferred_bodies.append(provider_id)
                             continue
@@ -186,7 +216,15 @@ def write_news_batch(
                             if body.status is BodyStatus.FETCHED:
                                 bodies_fetched += 1
                             elif body.status is BodyStatus.FAILED:
-                                still_deferred_bodies.append(provider_id)
+                                persisted = store.candidate_by_provider_id(
+                                    source, provider_id
+                                )
+                                if (
+                                    persisted is not None
+                                    and persisted.body.status
+                                    not in _TERMINAL_BODY_STATUSES
+                                ):
+                                    still_deferred_bodies.append(provider_id)
                                 ticker_error = body.error or "body fetch failed"
                                 errors[f"body:{provider_id}"] = ticker_error
                         except Exception as exc:  # metadata remains durable

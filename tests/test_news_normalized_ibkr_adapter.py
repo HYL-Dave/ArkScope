@@ -257,6 +257,7 @@ def test_ibkr_unavailable_body_is_failed_and_sanitized():
 
     assert body.status is BodyStatus.FAILED
     assert body.error == "IBKR news article unavailable (10172)"
+    assert body.error_code == 10172
     assert body.raw_body is None
 
 
