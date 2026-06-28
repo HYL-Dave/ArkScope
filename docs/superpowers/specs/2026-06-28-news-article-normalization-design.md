@@ -313,6 +313,11 @@ Only `pending` and eligible `failed` rows are retried. `fetched`, `empty`, and `
 The retry cap, backoff, and retention window are configuration, not schema constants. IBKR's
 approximately 30-day body window remains unconfirmed until the approved five-article probe runs.
 
+N6.1 preserves IBKR request error 10172 as typed `unavailable` evidence and temporarily maps it to
+retryable `failed`. N7 must resolve unavailable cohorts into a bounded retry or terminal policy
+using the post-fix five-article probe before N8 routes IBKR ingest. Shipping N8 with unbounded 10172
+retries is not permitted.
+
 The existing 321 body-missing IBKR IDs are not deleted or pre-classified by age during migration.
 The preview reports likely recent/old cohorts, but the probe must distinguish:
 
