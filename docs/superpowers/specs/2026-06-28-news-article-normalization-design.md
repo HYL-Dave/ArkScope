@@ -228,7 +228,7 @@ Exactly one provider-authoritative body state is stored per article:
 CREATE TABLE news_article_bodies (
     article_id          INTEGER PRIMARY KEY REFERENCES news_articles(id) ON DELETE CASCADE,
     body_status         TEXT NOT NULL CHECK (
-        body_status IN ('pending', 'fetched', 'empty', 'failed', 'expired')
+        body_status IN ('pending', 'fetched', 'empty', 'failed', 'unavailable', 'expired')
     ),
     raw_body            TEXT,
     raw_ref             TEXT,
@@ -244,6 +244,8 @@ CREATE TABLE news_article_bodies (
     next_retry_at       TEXT,
     fetched_at          TEXT,
     last_error          TEXT,
+    last_error_code     INTEGER,
+    unavailable_at      TEXT,
     cleaned_at          TEXT,
     clean_error         TEXT
 );
@@ -257,7 +259,14 @@ atomically verified `raw_ref`, but a fetched body must always have at least one 
 snippets, and UI. Web recovery must not silently overwrite a provider body; a future recovery
 design must preserve separate provenance and explicitly choose a canonical evidence source.
 
-### 5.6 Search projection and FTS
+### 5.6 Cold body variants
+
+When one provider article has multiple distinct raw bodies, `news_article_bodies` retains the
+deterministically selected active body and `news_article_body_variants` retains every other digest.
+Cold variants preserve raw and cleaned evidence but are never rendered, indexed, or scored. The
+selection policy and table contract are fixed by the N7 migration design.
+
+### 5.7 Search projection and FTS
 
 `news_search_documents(article_id PRIMARY KEY, title, body_text)` is a rebuildable projection.
 `news_articles_fts` is an external-content FTS5 index over that projection. The store updates the
@@ -273,7 +282,7 @@ Search behavior:
 - legacy API responses may expose one primary ticker plus a ticker list, but must not recreate one
   result row per ticker.
 
-### 5.7 `news_ingest_conflicts`
+### 5.8 `news_ingest_conflicts`
 
 Identity ambiguity must survive process restarts without contaminating canonical articles:
 
@@ -306,10 +315,13 @@ The body status enum is fixed:
 - `fetched`: provider returned non-empty content; raw is stored and cleaning is attempted;
 - `empty`: request succeeded and provider explicitly returned no body; terminal;
 - `failed`: transport/provider error; retryable with backoff while below the attempt cap;
+- `unavailable`: repeated explicit provider-unavailable responses after bounded retry; terminal
+  for scheduled work but reversible by an explicit successful re-probe;
 - `expired`: provider confirmed or policy concluded the article is outside retrievable history;
   terminal.
 
-Only `pending` and eligible `failed` rows are retried. `fetched`, `empty`, and `expired` are not.
+Only `pending` and eligible `failed` rows are retried. `fetched`, `empty`, `unavailable`, and
+`expired` are not.
 The retry cap, backoff, and retention window are configuration, not schema constants. IBKR's
 approximately 30-day body window remains unconfirmed until the approved five-article probe runs.
 
@@ -317,6 +329,9 @@ N6.1 preserves IBKR request error 10172 as typed `unavailable` evidence and temp
 retryable `failed`. N7 must resolve unavailable cohorts into a bounded retry or terminal policy
 using the post-fix five-article probe before N8 routes IBKR ingest. Shipping N8 with unbounded 10172
 retries is not permitted.
+
+The approved N7 policy permits at most three 10172 attempts separated by at least six hours, then
+transitions to terminal `unavailable`. It never infers `expired` from 10172 or age alone.
 
 The existing 321 body-missing IBKR IDs are not deleted or pre-classified by age during migration.
 The preview reports likely recent/old cohorts, but the probe must distinguish:
@@ -539,7 +554,8 @@ Archive policy, story grouping, quality ranking, and web recovery remain separat
 - `raw_ref` is reserved for later cold offload; this project keeps raw bodies inline and does not
   introduce a second writable authority.
 - Cleaned body is deterministic, versioned, and is the only body used by FTS/agent/UI.
-- Body states distinguish pending, fetched, terminal empty, retryable failed, and expired.
+- Body states distinguish pending, fetched, terminal empty, retryable failed, terminal unavailable,
+  and expired.
 - Search returns one article result with ticker relationships, not duplicate ticker rows.
 - Preview fingerprint and apply fingerprint match; conflicts block writes.
 - Apply is backup-first, one-transaction, rollback-all, and idempotent.

@@ -273,9 +273,9 @@ resolution policy in the separately gated N7 migration plan; the offline foundat
 
 ### Explicit remaining gates
 
-- **N6 probe pending: Gateway handshake unavailable.** The five-case probe is built and
-  fake-tested, but has not been run against `192.168.0.153:4001`; no `empty`/`expired` retention
-  policy was inferred.
+- **N6/N6.1 complete.** The sanitized five-case probe returned two bodies and three explicit 10172
+  unavailable responses. N6.1 preserves 10172 as typed unavailable evidence; N7 owns bounded retry
+  and terminal policy without inferring `expired` from age.
 - **N7 apply not started.** No normalized schema/data has been written to the live DB.
 - **N8 cutover not started.** Runtime reads, scheduler routing, sentiment/risk scoring, and UI
   still use their current paths. Active scoring must move from Parquet to normalized SQLite before
