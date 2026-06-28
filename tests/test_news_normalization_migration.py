@@ -1,5 +1,8 @@
+import json
 import sqlite3
 from pathlib import Path
+import subprocess
+import sys
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -9,6 +12,7 @@ from src.news_normalized.migration import (
     inventory_inputs,
     iter_legacy_news,
     iter_parquet_news,
+    plan_news_normalization,
 )
 
 
@@ -151,3 +155,201 @@ def test_inventory_records_input_file_metadata_without_body_content(tmp_path):
     assert file_row.rows == 3
     assert file_row.size_bytes == path.stat().st_size
     assert "full body" not in repr(report)
+
+
+def test_preview_reports_provider_matches_fallback_blast_and_collapse(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    preview = plan_news_normalization(db, [path])
+    ibkr = preview.sources["ibkr"]
+    assert ibkr.legacy_rows == 3
+    assert ibkr.planned_articles == 3
+    assert ibkr.provider_id_matched == 1
+    assert ibkr.fallback_only == 1
+    assert ibkr.body_fetched == 1
+    assert ibkr.body_missing == 2
+    assert preview.sources["polygon"].fallback_only == 1
+    assert preview.cross_ticker_rows_collapsed == 1
+    assert preview.planned_ticker_links == 5
+    assert preview.planned_titles == 4
+    assert preview.blocking_conflicts == ()
+    assert preview.weak_ambiguities == ()
+    assert preview.would_apply is True
+    assert len(preview.fingerprint) == 64
+    assert "full body" not in repr(preview)
+
+
+def test_preview_fingerprint_is_deterministic_and_body_sensitive(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    first = plan_news_normalization(db, [path])
+    second = plan_news_normalization(db, list(reversed([path])))
+    assert first.fingerprint == second.fingerprint
+
+    table = pq.read_table(path)
+    rows = table.to_pylist()
+    rows[0]["content"] = "different body"
+    pq.write_table(pa.Table.from_pylist(rows), path)
+    changed = plan_news_normalization(db, [path])
+    assert changed.fingerprint != first.fingerprint
+
+
+def test_preview_blocks_provider_id_reuse_across_publication_dates(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    table = pq.read_table(path)
+    rows = table.to_pylist()
+    reused = dict(rows[0])
+    reused["ticker"] = "META"
+    reused["title"] = "Unrelated"
+    reused["published_at"] = "2026-06-28T10:00:00Z"
+    rows.append(reused)
+    pq.write_table(pa.Table.from_pylist(rows), path)
+    preview = plan_news_normalization(db, [path])
+    assert preview.would_apply is False
+    assert preview.blocking_conflicts[0].kind == "provider_id_reuse"
+
+
+def test_preview_uses_stable_url_to_disambiguate_same_legacy_mention_hash(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    published_at = "2026-06-27T10:00:00Z"
+    mention_hash = canonical_article_hash("AAPL", "Shared wire title", published_at)
+    conn.execute(
+        "INSERT INTO news VALUES (1,'AAPL','Shared wire title','',?,"
+        "'Wire','ibkr',?,?,NULL,NULL,NULL)",
+        ("https://example.test/story/a?utm_source=feed", published_at, mention_hash),
+    )
+    conn.commit()
+    conn.close()
+
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    path.parent.mkdir(parents=True)
+    rows = []
+    for provider_id, url in (
+        ("wire-a", "https://example.test/story/a"),
+        ("wire-b", "https://example.test/story/b"),
+    ):
+        rows.append(
+            {
+                "article_id": provider_id,
+                "ticker": "AAPL",
+                "title": "Shared wire title",
+                "published_at": published_at,
+                "source_api": "ibkr",
+                "description": "",
+                "content": "",
+                "url": url,
+                "publisher": "Wire",
+                "related_tickers": '["AAPL"]',
+            }
+        )
+    pq.write_table(pa.Table.from_pylist(rows), path)
+
+    preview = plan_news_normalization(db, [path])
+
+    assert preview.blocking_conflicts == ()
+    assert preview.sources["ibkr"].provider_id_matched == 1
+    assert preview.sources["ibkr"].fallback_only == 0
+
+
+def test_preview_keeps_unresolved_fallback_match_as_weak_ambiguity(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    published_at = "2026-06-27T10:00:00Z"
+    mention_hash = canonical_article_hash("AAPL", "Shared wire title", published_at)
+    conn.execute(
+        "INSERT INTO news VALUES (1,'AAPL','Shared wire title','','',"
+        "'Wire','ibkr',?,?,NULL,NULL,NULL)",
+        (published_at, mention_hash),
+    )
+    conn.commit()
+    conn.close()
+
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "article_id": provider_id,
+            "ticker": "AAPL",
+            "title": "Shared wire title",
+            "published_at": published_at,
+            "source_api": "ibkr",
+            "description": "",
+            "content": "",
+            "url": "",
+            "publisher": "Wire",
+            "related_tickers": '["AAPL"]',
+        }
+        for provider_id in ("wire-a", "wire-b")
+    ]
+    pq.write_table(pa.Table.from_pylist(rows), path)
+
+    preview = plan_news_normalization(db, [path])
+
+    assert preview.blocking_conflicts == ()
+    assert [item.kind for item in preview.weak_ambiguities] == [
+        "legacy_weak_identity_ambiguity"
+    ]
+    assert preview.sources["ibkr"].fallback_only == 1
+    assert preview.sources["ibkr"].provider_id_matched == 0
+
+
+def test_preview_to_dict_contains_only_aggregate_and_digest_data(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    path = tmp_path / "raw" / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    payload = plan_news_normalization(db, [path]).to_dict()
+    rendered = json.dumps(payload, sort_keys=True)
+    assert payload["would_apply"] is True
+    assert "fingerprint" in payload
+    assert "full body" not in rendered
+
+
+def test_preview_cli_is_read_only_and_emits_json(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    root = tmp_path / "raw"
+    path = root / "ibkr" / "2026" / "2026-06.parquet"
+    _parquet(path)
+    before_db = db.read_bytes()
+    before_parquet = path.read_bytes()
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/migration/preview_news_normalization.py",
+            "--market-db",
+            str(db),
+            "--parquet-root",
+            str(root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["would_apply"] is True
+    assert len(payload["fingerprint"]) == 64
+    assert db.read_bytes() == before_db
+    assert path.read_bytes() == before_parquet
+    assert not Path(f"{db}-wal").exists()

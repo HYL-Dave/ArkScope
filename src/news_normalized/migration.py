@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -11,6 +12,7 @@ from typing import Iterator, Sequence
 import pyarrow.parquet as pq
 
 from src.news_identity import canonical_article_hash
+from .identity import fallback_identity_hash, normalize_stable_url
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,73 @@ class SourceInventory:
 class InputInventory:
     sources: dict[str, SourceInventory]
     parquet_files: tuple[InputFileInfo, ...]
+
+
+@dataclass(frozen=True)
+class PreviewConflict:
+    kind: str
+    source: str
+    identity: str
+    count: int
+
+
+@dataclass(frozen=True)
+class SourcePreview:
+    legacy_rows: int
+    parquet_rows: int
+    planned_articles: int
+    provider_id_matched: int
+    fallback_only: int
+    sqlite_rows_enriched_from_parquet: int
+    body_match_count: int
+    body_match_rate: float
+    body_fetched: int
+    body_missing: int
+
+
+@dataclass(frozen=True)
+class MigrationPreview:
+    sources: dict[str, SourcePreview]
+    planned_ticker_links: int
+    planned_titles: int
+    cross_ticker_rows_collapsed: int
+    blocking_conflicts: tuple[PreviewConflict, ...]
+    weak_ambiguities: tuple[PreviewConflict, ...]
+    fingerprint: str
+    would_apply: bool
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class _PlanGroup:
+    source: str
+    identity: str
+    provider_article_id: str | None = None
+    legacy_ids: set[int] = field(default_factory=set)
+    tickers: set[str] = field(default_factory=set)
+    titles: set[str] = field(default_factory=set)
+    publishers: set[str] = field(default_factory=set)
+    urls: set[str] = field(default_factory=set)
+    published_at: set[str] = field(default_factory=set)
+    body_hashes: set[str] = field(default_factory=set)
+    sentiment_values: set[float] = field(default_factory=set)
+
+    def fingerprint_record(self) -> dict:
+        return {
+            "source": self.source,
+            "identity": self.identity,
+            "provider_article_id": self.provider_article_id,
+            "legacy_ids": sorted(self.legacy_ids),
+            "tickers": sorted(self.tickers),
+            "titles": sorted(self.titles),
+            "publishers": sorted(self.publishers),
+            "urls": sorted(self.urls),
+            "published_at": sorted(self.published_at),
+            "body_hashes": sorted(self.body_hashes),
+            "sentiment_values": sorted(self.sentiment_values),
+        }
 
 
 _PARQUET_COLUMNS = (
@@ -242,3 +311,285 @@ def inventory_inputs(
             ) if legacy_counts.get(source, 0) else 0.0,
         )
     return InputInventory(sources=output, parquet_files=tuple(file_infos))
+
+
+def _fallback_key(
+    *, source: str, publisher: str, title: str, published_at: str
+) -> str:
+    return "fallback:" + fallback_identity_hash(
+        source=source,
+        publisher=publisher,
+        title=title,
+        published_at=published_at,
+    )
+
+
+def _provider_key(source: str, provider_article_id: str) -> str:
+    return f"provider:{source}:{provider_article_id}"
+
+
+def _group_for_parquet(
+    groups: dict[str, _PlanGroup], evidence: ParquetEvidence
+) -> _PlanGroup:
+    if evidence.provider_article_id:
+        identity = _provider_key(evidence.source, evidence.provider_article_id)
+    else:
+        identity = _fallback_key(
+            source=evidence.source,
+            publisher=evidence.publisher,
+            title=evidence.title,
+            published_at=evidence.published_at,
+        )
+    return groups.setdefault(
+        identity,
+        _PlanGroup(
+            source=evidence.source,
+            identity=identity,
+            provider_article_id=evidence.provider_article_id,
+        ),
+    )
+
+
+def _add_parquet_evidence(group: _PlanGroup, evidence: ParquetEvidence) -> None:
+    if evidence.ticker:
+        group.tickers.add(evidence.ticker)
+    group.tickers.update(evidence.related_tickers)
+    if evidence.title:
+        group.titles.add(evidence.title)
+    if evidence.publisher:
+        group.publishers.add(evidence.publisher)
+    stable_url = normalize_stable_url(evidence.url)
+    if stable_url:
+        group.urls.add(stable_url)
+    if evidence.published_at:
+        group.published_at.add(evidence.published_at)
+    if evidence.raw_body:
+        group.body_hashes.add(
+            hashlib.sha256(evidence.raw_body.encode("utf-8")).hexdigest()
+        )
+
+
+def _add_legacy_row(group: _PlanGroup, row: sqlite3.Row) -> None:
+    group.legacy_ids.add(int(row["id"]))
+    ticker = _text(row["ticker"]).strip().upper()
+    if ticker:
+        group.tickers.add(ticker)
+    title = _text(row["title"])
+    if title:
+        group.titles.add(title)
+    publisher = _text(row["publisher"])
+    if publisher:
+        group.publishers.add(publisher)
+    stable_url = normalize_stable_url(_text(row["url"]))
+    if stable_url:
+        group.urls.add(stable_url)
+    published = _text(row["published_at"])
+    if published:
+        group.published_at.add(published)
+    sentiment = row["sentiment_score"]
+    if sentiment is not None:
+        group.sentiment_values.add(float(sentiment))
+
+
+def _plan_conflicts(
+    groups: dict[str, _PlanGroup],
+    mention_conflicts: list[PreviewConflict],
+    mention_ambiguities: list[PreviewConflict],
+) -> tuple[tuple[PreviewConflict, ...], tuple[PreviewConflict, ...]]:
+    blocking = list(mention_conflicts)
+    weak = list(mention_ambiguities)
+    for group in groups.values():
+        publication_dates = {value[:10] for value in group.published_at if value}
+        if group.provider_article_id and len(publication_dates) > 1:
+            blocking.append(
+                PreviewConflict(
+                    "provider_id_reuse", group.source, group.identity, len(publication_dates)
+                )
+            )
+        if len(group.body_hashes) > 1:
+            conflict = PreviewConflict(
+                "body_variant", group.source, group.identity, len(group.body_hashes)
+            )
+            if group.provider_article_id:
+                blocking.append(conflict)
+            else:
+                weak.append(conflict)
+        if len(group.sentiment_values) > 1:
+            blocking.append(
+                PreviewConflict(
+                    "sentiment_conflict",
+                    group.source,
+                    group.identity,
+                    len(group.sentiment_values),
+                )
+            )
+        if not group.provider_article_id and len(group.urls) > 1:
+            weak.append(
+                PreviewConflict(
+                    "weak_url_ambiguity", group.source, group.identity, len(group.urls)
+                )
+            )
+    ordered_blocking = tuple(
+        sorted(blocking, key=lambda item: (item.source, item.kind, item.identity))
+    )
+    ordered_weak = tuple(
+        sorted(weak, key=lambda item: (item.source, item.kind, item.identity))
+    )
+    return ordered_blocking, ordered_weak
+
+
+def plan_news_normalization(
+    market_db: Path, parquet_paths: Sequence[Path]
+) -> MigrationPreview:
+    """Build a deterministic, body-redacted migration preview without writing inputs."""
+    groups: dict[str, _PlanGroup] = {}
+    mention_to_groups: dict[tuple[str, str], set[str]] = {}
+    url_to_groups: dict[tuple[str, str], set[str]] = {}
+    fallback_to_groups: dict[tuple[str, str], set[str]] = {}
+    parquet_rows: dict[str, int] = {}
+
+    for batch in iter_parquet_news(parquet_paths):
+        for evidence in batch:
+            group = _group_for_parquet(groups, evidence)
+            _add_parquet_evidence(group, evidence)
+            parquet_rows[evidence.source] = parquet_rows.get(evidence.source, 0) + 1
+            mention_hash = canonical_article_hash(
+                evidence.ticker, evidence.title, evidence.published_at
+            )
+            mention_to_groups.setdefault(
+                (evidence.source, mention_hash), set()
+            ).add(group.identity)
+            stable_url = normalize_stable_url(evidence.url)
+            if stable_url:
+                url_to_groups.setdefault(
+                    (evidence.source, stable_url), set()
+                ).add(group.identity)
+            fallback = _fallback_key(
+                source=evidence.source,
+                publisher=evidence.publisher,
+                title=evidence.title,
+                published_at=evidence.published_at,
+            )
+            fallback_to_groups.setdefault(
+                (evidence.source, fallback), set()
+            ).add(group.identity)
+
+    legacy_counts: dict[str, int] = {}
+    matched_legacy: dict[str, int] = {}
+    mention_conflicts: list[PreviewConflict] = []
+    mention_ambiguities: list[PreviewConflict] = []
+    for row in iter_legacy_news(Path(market_db)):
+        source = _text(row["source"]).strip().casefold()
+        legacy_counts[source] = legacy_counts.get(source, 0) + 1
+        stable_url = normalize_stable_url(_text(row["url"]))
+        fallback = _fallback_key(
+            source=source,
+            publisher=_text(row["publisher"]),
+            title=_text(row["title"]),
+            published_at=_text(row["published_at"]),
+        )
+        url_matches = (
+            url_to_groups.get((source, stable_url), set()) if stable_url else set()
+        )
+        fallback_matches = fallback_to_groups.get((source, fallback), set())
+        mention_matches = mention_to_groups.get(
+            (source, _text(row["article_hash"])), set()
+        )
+        if url_matches:
+            matches = url_matches
+            match_kind = "url"
+        elif fallback_matches:
+            matches = fallback_matches
+            match_kind = "fallback"
+        else:
+            matches = mention_matches
+            match_kind = "mention"
+        if len(matches) == 1:
+            identity = next(iter(matches))
+            matched_legacy[source] = matched_legacy.get(source, 0) + 1
+        else:
+            identity = fallback
+            if len(matches) > 1:
+                conflict = PreviewConflict(
+                    "legacy_multiple_strong_url_matches"
+                    if match_kind == "url"
+                    else "legacy_weak_identity_ambiguity",
+                    source,
+                    stable_url if match_kind == "url" else fallback,
+                    len(matches),
+                )
+                if match_kind == "url":
+                    mention_conflicts.append(conflict)
+                else:
+                    mention_ambiguities.append(conflict)
+        group = groups.setdefault(
+            identity, _PlanGroup(source=source, identity=identity)
+        )
+        _add_legacy_row(group, row)
+
+    blocking, weak = _plan_conflicts(
+        groups, mention_conflicts, mention_ambiguities
+    )
+    source_names = sorted(
+        set(legacy_counts) | set(parquet_rows) | {group.source for group in groups.values()}
+    )
+    sources: dict[str, SourcePreview] = {}
+    for source in source_names:
+        source_groups = [group for group in groups.values() if group.source == source]
+        provider_matched = sum(
+            1
+            for group in source_groups
+            if group.provider_article_id and group.legacy_ids
+        )
+        fallback_only = sum(
+            1
+            for group in source_groups
+            if not group.provider_article_id and group.legacy_ids
+        )
+        body_count = sum(bool(group.body_hashes) for group in source_groups)
+        legacy_total = legacy_counts.get(source, 0)
+        matched = matched_legacy.get(source, 0)
+        matched_with_body = sum(
+            len(group.legacy_ids)
+            for group in source_groups
+            if group.provider_article_id and group.body_hashes
+        )
+        sources[source] = SourcePreview(
+            legacy_rows=legacy_total,
+            parquet_rows=parquet_rows.get(source, 0),
+            planned_articles=len(source_groups),
+            provider_id_matched=provider_matched,
+            fallback_only=fallback_only,
+            sqlite_rows_enriched_from_parquet=matched,
+            body_match_count=matched_with_body,
+            body_match_rate=round(matched_with_body / legacy_total, 6)
+            if legacy_total
+            else 0.0,
+            body_fetched=body_count,
+            body_missing=len(source_groups) - body_count,
+        )
+
+    payload = {
+        "groups": [
+            groups[key].fingerprint_record() for key in sorted(groups)
+        ],
+        "blocking": [asdict(item) for item in blocking],
+        "weak": [asdict(item) for item in weak],
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    planned_legacy_articles = sum(
+        1 for group in groups.values() if group.legacy_ids
+    )
+    legacy_total = sum(legacy_counts.values())
+    return MigrationPreview(
+        sources=sources,
+        planned_ticker_links=sum(len(group.tickers) for group in groups.values()),
+        planned_titles=sum(len(group.titles) for group in groups.values()),
+        cross_ticker_rows_collapsed=max(0, legacy_total - planned_legacy_articles),
+        blocking_conflicts=blocking,
+        weak_ambiguities=weak,
+        fingerprint=fingerprint,
+        would_apply=not blocking and not weak,
+    )
