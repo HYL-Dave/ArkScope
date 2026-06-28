@@ -231,6 +231,7 @@ CREATE TABLE news_article_bodies (
         body_status IN ('pending', 'fetched', 'empty', 'failed', 'expired')
     ),
     raw_body            TEXT,
+    raw_ref             TEXT,
     raw_format          TEXT,
     body_text           TEXT,
     body_sha256         TEXT,
@@ -249,9 +250,12 @@ CREATE TABLE news_article_bodies (
 ```
 
 `raw_body` preserves the exact provider/legacy payload and is never rendered or indexed.
-`body_text` is the only full-text body used by FTS, agents, snippets, and UI. Web recovery must not
-silently overwrite a provider body; a future recovery design must preserve separate provenance and
-explicitly choose a canonical evidence source.
+`raw_ref` is reserved for a future cold-storage reference; it remains NULL in this project and no
+offload path is implemented. A future archive operation may replace an old `raw_body` with an
+atomically verified `raw_ref`, but a fetched body must always have at least one of them and retain
+`body_sha256`. `body_text` remains in SQLite and is the only full-text body used by FTS, agents,
+snippets, and UI. Web recovery must not silently overwrite a provider body; a future recovery
+design must preserve separate provenance and explicitly choose a canonical evidence source.
 
 ### 5.6 Search projection and FTS
 
@@ -428,7 +432,8 @@ Required post-conditions:
 - every known provider ID and stable URL maps to at most one article per source;
 - every article has a fallback key, while ambiguous fallback values remain explicitly reported;
 - no duplicate `(article_id, ticker)` or title observation;
-- fetched bodies have raw content and a body digest;
+- fetched bodies have `raw_body` or `raw_ref` and a body digest;
+- in the initial migration every fetched body is inline (`raw_body` non-empty, `raw_ref` NULL);
 - raw bodies never appear in the search projection;
 - search projection and FTS rowids have no missing/orphan rows;
 - source, article, ticker, title, body, and conflict counts match the reviewed plan;
@@ -451,6 +456,21 @@ Cutover is atomic at the routing level:
 4. The old `news` table becomes read-only rollback data.
 5. `ibkr_news` stops PG sync and the mirror's news branch retires only after all three source
    writers are direct-local and verified.
+
+The current Parquet readers are explicit cutover dependencies, not reasons to preserve Parquet as
+the new authority:
+
+- `scripts/scoring/score_ibkr_news.py` is the active universal live-workbench scorer and must gain a
+  normalized-SQLite input/output path before N8; a test must prove a newly ingested normalized
+  article can be selected and scored without Parquet.
+- `FileBackend` still reads Parquet when the DAL has no DSN. It is not the sidecar's primary news
+  path, but its fallback must be replaced by the normalized local store or formally retired before
+  historical Parquet files and their reader code can be deleted.
+
+After replacements pass, obsolete Parquet writers/readers, PG migration commands, mirror branches,
+tests, and documentation are removed incrementally. Deletion requires a call-site/scheduler/docs
+audit and a replacement regression test; "legacy" alone is not sufficient evidence that a script
+is dead.
 
 Rollback before old-table retirement routes reads/writes back to the legacy chain and restores the
 pre-migration database if normalized writes occurred. No fallback may silently combine old and new
@@ -495,7 +515,11 @@ Each slice is separately committed and reviewed:
 7. **N7 — live migration apply (local-write gated).** Reviewed fingerprint, backup, transaction,
    validation, and idempotent post-check.
 8. **N8 — all-source cutover and live smokes (runtime/outward gated).** Switch reads and all three
-   writers, validate feed/FTS/sentiment/telemetry, then retire only the news PG-sync/mirror domain.
+   writers, move active scoring to normalized SQLite, validate feed/FTS/sentiment/telemetry, then
+   retire only the news PG-sync/mirror domain.
+9. **N9 — news legacy decommission.** Replace or retire `FileBackend` news fallback, freeze/archive
+   the Parquet corpus, and delete only verified-dead news Parquet/PG/mirror scripts and copy that no
+   scheduler, app route, tool, scorer, test, or maintained document still references.
 
 Archive policy, story grouping, quality ranking, and web recovery remain separate later specs.
 
@@ -507,11 +531,15 @@ Archive policy, story grouping, quality ranking, and web recovery remain separat
   ambiguous weak matches remain separate and visible rather than being falsely merged.
 - The 18 known IBKR multi-title IDs remain one article with title history.
 - Raw body is preserved exactly once, never rendered, and never indexed.
+- `raw_ref` is reserved for later cold offload; this project keeps raw bodies inline and does not
+  introduce a second writable authority.
 - Cleaned body is deterministic, versioned, and is the only body used by FTS/agent/UI.
 - Body states distinguish pending, fetched, terminal empty, retryable failed, and expired.
 - Search returns one article result with ticker relationships, not duplicate ticker rows.
 - Preview fingerprint and apply fingerprint match; conflicts block writes.
 - Apply is backup-first, one-transaction, rollback-all, and idempotent.
 - Polygon, Finnhub, and IBKR ingest direct-local with no PG news sync.
+- Active scoring consumes normalized SQLite, so post-cutover articles do not silently remain
+  unscored because Parquet stopped receiving writes.
 - The mirror's news domain is removed only after all-source live verification.
 - With PG unreachable, normal news ingest, search, feed, and article reads still work.
