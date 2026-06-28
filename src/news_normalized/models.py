@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 
 class KeyKind(str, Enum):
@@ -60,3 +60,34 @@ class ArticleCandidate:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "related_tickers", tuple(self.related_tickers))
+
+
+@dataclass(frozen=True)
+class WriterBudget:
+    max_articles: int
+    max_body_fetches: int
+
+    def __post_init__(self) -> None:
+        if self.max_articles < 0 or self.max_body_fetches < 0:
+            raise ValueError("writer budgets must be non-negative")
+
+
+@dataclass(frozen=True)
+class WriterContinuation:
+    deferred_tickers: Tuple[str, ...] = field(default_factory=tuple)
+    deferred_body_ids: Tuple[str, ...] = field(default_factory=tuple)
+    cursor: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "deferred_tickers", tuple(self.deferred_tickers))
+        object.__setattr__(self, "deferred_body_ids", tuple(self.deferred_body_ids))
+
+
+@dataclass(frozen=True)
+class WriterResult:
+    status: str
+    articles_seen: int
+    articles_inserted: int
+    bodies_fetched: int
+    errors: Dict[str, str]
+    continuation: Optional[WriterContinuation]
