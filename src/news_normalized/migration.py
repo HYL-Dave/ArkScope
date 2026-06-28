@@ -1097,6 +1097,34 @@ def build_resolved_plan(
             )
 
     articles = tuple(_resolved_article(groups[key]) for key in sorted(groups))
+    strong_owners: dict[tuple[str, str, str], set[str]] = {}
+    for article in articles:
+        for key in article.identity_keys:
+            if not key.strong:
+                continue
+            strong_owners.setdefault(
+                (key.source, key.kind.value, key.value), set()
+            ).add(article.identity)
+    for (source, kind, value), owners in strong_owners.items():
+        if len(owners) > 1:
+            blockers.append(
+                PreviewConflict(
+                    "strong_key_multiple_owners",
+                    source,
+                    f"{kind}:{value}",
+                    len(owners),
+                )
+            )
+    for group in groups.values():
+        if not group.provider_ids and len(group.urls) > 1:
+            blockers.append(
+                PreviewConflict(
+                    "weak_url_ambiguity",
+                    group.source,
+                    group.identity,
+                    len(group.urls),
+                )
+            )
     resolutions_tuple = tuple(sorted(resolutions, key=lambda item: item.legacy_news_id))
     rejected_records = [
         asdict(item)

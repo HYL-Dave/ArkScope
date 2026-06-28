@@ -7,6 +7,7 @@ import argparse
 from dataclasses import asdict
 import json
 from pathlib import Path
+import shutil
 import sqlite3
 import sys
 
@@ -31,6 +32,43 @@ from src.news_normalized.schema import (  # noqa: E402
 
 class MigrationFingerprintMismatch(ValueError):
     pass
+
+
+class InsufficientMigrationSpace(RuntimeError):
+    pass
+
+
+def _existing_parent(path: Path) -> Path:
+    current = path.resolve().parent
+    while not current.exists():
+        if current == current.parent:
+            raise FileNotFoundError(f"no existing parent for backup path: {path}")
+        current = current.parent
+    return current
+
+
+def require_backup_capacity(market_db: Path, backup_path: Path) -> None:
+    """Reserve headroom for backup, normalized growth, and transaction overhead."""
+    database_parent = market_db.resolve().parent
+    backup_parent = _existing_parent(backup_path)
+    database_size = market_db.stat().st_size
+    if database_parent.stat().st_dev == backup_parent.stat().st_dev:
+        required = database_size * 3
+        if shutil.disk_usage(database_parent).free < required:
+            raise InsufficientMigrationSpace(
+                f"migration filesystem needs at least {required} free bytes"
+            )
+        return
+    database_required = database_size * 2
+    backup_required = database_size
+    if shutil.disk_usage(database_parent).free < database_required:
+        raise InsufficientMigrationSpace(
+            f"database filesystem needs at least {database_required} free bytes"
+        )
+    if shutil.disk_usage(backup_parent).free < backup_required:
+        raise InsufficientMigrationSpace(
+            f"backup filesystem needs at least {backup_required} free bytes"
+        )
 
 
 def require_expected_fingerprints(
@@ -126,6 +164,7 @@ def apply_news_normalization(
                 expected_rejection_evidence_fingerprint
             ),
         )
+        require_backup_capacity(market_db, backup_path)
         backup = backup_market_db(
             str(market_db), str(backup_path), overwrite=False
         )

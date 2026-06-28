@@ -451,3 +451,29 @@ def test_apply_cli_requires_scheduler_paused_confirmation(temp_inputs, tmp_path)
         arguments + ["--confirm-scheduler-paused"]
     )
     assert parsed.confirm_scheduler_paused is True
+
+
+def test_disk_preflight_refuses_before_backup(tmp_path, monkeypatch, temp_inputs):
+    backup_calls = []
+    monkeypatch.setattr(
+        apply_module, "build_resolved_plan", lambda *args: temp_inputs[2]
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "require_backup_capacity",
+        lambda *args: (_ for _ in ()).throw(
+            apply_module.InsufficientMigrationSpace("insufficient")
+        ),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "backup_market_db",
+        lambda *args, **kwargs: backup_calls.append(args),
+    )
+
+    with pytest.raises(apply_module.InsufficientMigrationSpace):
+        apply_module.apply_news_normalization(
+            **_approved_arguments(temp_inputs, tmp_path)
+        )
+
+    assert backup_calls == []

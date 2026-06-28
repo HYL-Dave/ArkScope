@@ -478,6 +478,48 @@ def test_polygon_distinct_urls_with_same_metadata_preserve_articles_and_reject_l
     assert preview.would_apply is True
 
 
+def test_resolved_preview_blocks_duplicate_non_polygon_strong_url(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    conn.commit()
+    conn.close()
+    parquet = tmp_path / "raw" / "finnhub" / "2026" / "input.parquet"
+    parquet.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": provider_id,
+                    "ticker": "AAPL",
+                    "title": title,
+                    "published_at": published,
+                    "source_api": "finnhub",
+                    "url": "https://example.test/reused",
+                    "publisher": "Wire",
+                }
+                for provider_id, title, published in (
+                    ("id-a", "First", "2026-06-27T10:00:00Z"),
+                    ("id-b", "Second", "2026-06-28T10:00:00Z"),
+                )
+            ]
+        ),
+        parquet,
+    )
+
+    preview = plan_news_normalization(db, [parquet])
+
+    assert preview.would_apply is False
+    assert [item.kind for item in preview.remaining_blockers] == [
+        "strong_key_multiple_owners"
+    ]
+
+
 def test_reviewed_expected_counts_refuse_rejection_drift(tmp_path):
     db, paths = _weak_rejection_fixture(tmp_path)
     preview = plan_news_normalization(db, paths)
