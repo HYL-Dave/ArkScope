@@ -36,6 +36,13 @@ class _Resolution:
 
 
 _RELATION_RANK = {"observed_via": 0, "related": 1, "primary": 2}
+_CONTENT_RANK = {
+    "unknown": 0,
+    "headline_only": 1,
+    "brief": 2,
+    "summary": 3,
+    "full_text": 4,
+}
 _TERMINAL = {BodyStatus.FETCHED, BodyStatus.EMPTY, BodyStatus.EXPIRED}
 
 
@@ -94,7 +101,8 @@ class NormalizedNewsStore:
             if body.status is BodyStatus.FETCHED:
                 self._record_title(article_id, candidate, observed_with_body=True)
                 self.conn.execute(
-                    "UPDATE news_articles SET canonical_title=?,updated_at=? WHERE id=?",
+                    "UPDATE news_articles SET canonical_title=?,content_kind='full_text',"
+                    "updated_at=? WHERE id=?",
                     (candidate.title, _now(), article_id),
                 )
             self._refresh_search_document(article_id)
@@ -266,19 +274,23 @@ class NormalizedNewsStore:
         self, article_id: int, candidate: ArticleCandidate
     ) -> None:
         row = self.conn.execute(
-            "SELECT provider_article_id FROM news_articles WHERE id=?", (article_id,)
+            "SELECT provider_article_id,content_kind FROM news_articles WHERE id=?",
+            (article_id,),
         ).fetchone()
         provider_id = row[0] or ((candidate.provider_article_id or "").strip() or None)
+        content_kind = (
+            candidate.content_kind
+            if _CONTENT_RANK[candidate.content_kind] > _CONTENT_RANK[row[1]]
+            else row[1]
+        )
         self.conn.execute(
             "UPDATE news_articles SET provider_article_id=?,publisher=COALESCE(NULLIF(?,''),publisher),"
-            "url=COALESCE(NULLIF(?,''),url),content_kind=CASE WHEN ?='unknown' "
-            "THEN content_kind ELSE ? END,updated_at=? WHERE id=?",
+            "url=COALESCE(NULLIF(?,''),url),content_kind=?,updated_at=? WHERE id=?",
             (
                 provider_id,
                 candidate.publisher,
                 candidate.url,
-                candidate.content_kind,
-                candidate.content_kind,
+                content_kind,
                 _now(),
                 article_id,
             ),

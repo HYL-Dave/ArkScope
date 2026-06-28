@@ -613,6 +613,15 @@ class IBKRDataSource(BaseDataSource):
         logger.info(f"Fetched {len(all_articles)} total news articles")
         return all_articles
 
+    def fetch_news_article_body_strict(
+        self, provider_code: str, article_id: str
+    ) -> Optional[str]:
+        """Fetch one body while preserving the distinction between empty and failed."""
+        self._ensure_connected()
+        self._rate_limit_wait()
+        body = self._ib.reqNewsArticle(provider_code, article_id)
+        return body.articleText if body else None
+
     def fetch_news_article_body(self, provider_code: str, article_id: str) -> Optional[str]:
         """
         Fetch the full body of a news article.
@@ -624,14 +633,8 @@ class IBKRDataSource(BaseDataSource):
         Returns:
             Article body text or None.
         """
-        self._ensure_connected()
-        self._rate_limit_wait()
-
         try:
-            body = self._ib.reqNewsArticle(provider_code, article_id)
-            if body:
-                return body.articleText
-            return None
+            return self.fetch_news_article_body_strict(provider_code, article_id)
         except Exception as e:
             logger.error(f"Error fetching article body: {e}")
             return None
