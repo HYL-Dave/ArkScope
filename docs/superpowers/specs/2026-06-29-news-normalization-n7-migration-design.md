@@ -27,7 +27,9 @@ It is an input-audit baseline, not an apply fingerprint. The current conflicts a
 - 718 body-variant groups: 709 IBKR and 9 Polygon;
 - 63 Polygon conflict records representing 48 shared URLs;
 - 35 apparent provider-ID reuse groups: 31 Finnhub and 4 Polygon;
-- 924 IBKR weak legacy identity ambiguities.
+- 940 weak legacy identity ambiguities: 924 IBKR plus 16 Polygon rows discovered by the
+  resolved planner. Each Polygon row matches 2–3 URL-distinct provider IDs with identical title,
+  timestamp, and ticker evidence, so the flattened legacy row cannot be assigned safely.
 
 Read-only audit established that all 35 apparent provider-ID reuse groups have one normalized title
 and URL and differ only in provider timestamps. Of the 48 shared URLs, 35 join two provider IDs
@@ -133,10 +135,12 @@ builder never emits a strong URL key for source `polygon`; the URL remains artic
 Polygon provider IDs remain strong, and fallback identity remains available for legacy rows. N8
 must retain this same source policy so a newly reused Polygon URL cannot false-merge articles.
 
-### 5.3 IBKR weak ambiguities: 924 legacy rows
+### 5.3 Weak ambiguities: 940 legacy rows
 
 Do not merge provider-ID groups, duplicate relations across candidates, or invent a third article.
-Preserve provider-backed articles and mark each ambiguous legacy row as a reviewed rejection:
+Preserve provider-backed articles and mark each ambiguous legacy row as a reviewed rejection. This
+policy is source-neutral: the 924 IBKR and 16 Polygon rows both lack evidence identifying one
+provider-backed owner:
 
 ```text
 resolution_kind = weak_identity_rejected
@@ -274,7 +278,7 @@ PG-unreachable E2E.
 - Resolved preview has zero unreviewed blockers and a new stable fingerprint.
 - All 35 timestamp-drift groups remain one article each without false recency.
 - The 35 exact URL duplicates merge; the 13 semantic URL sets remain separate and demoted.
-- All 924 weak rows are reviewed rejections, never guessed mappings.
+- All 940 weak rows are reviewed rejections, never guessed mappings.
 - All 718 variant groups retain one active body and every distinct cold variant.
 - Repeated 10172 becomes `unavailable` after bounded retry, never `empty` or inferred `expired`.
 - Every legacy row is durably mapped or reviewed-rejected.

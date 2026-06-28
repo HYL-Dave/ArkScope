@@ -853,7 +853,9 @@ legacy accountability. The CLI prints all five rejection counts plus its fingerp
 
 Preview is structurally applyable with reviewed weak-policy rules, but apply must later require
 `expected_rejection_evidence_fingerprint` separately from the resolved fingerprint. This prevents
-the 924-row rejection from being authorized by count alone.
+the reviewed rejection cohort from being authorized by count alone. The first real resolved
+preview corrected that cohort to 940 rows: 924 IBKR plus 16 Polygon exact-metadata ambiguities
+whose provider IDs and URLs remain distinct.
 
 - [ ] **Step 5: Run Task 5 tests and commit**
 

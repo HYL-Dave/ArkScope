@@ -6,14 +6,18 @@ import sys
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 
 from src.news_identity import canonical_article_hash
 from src.news_normalized.identity import normalize_identity_text, normalize_stable_url, normalize_timestamp
 from src.news_normalized.migration import (
+    MigrationPlanDriftError,
+    build_resolved_plan,
     inventory_inputs,
     iter_legacy_news,
     iter_parquet_news,
     plan_news_normalization,
+    require_expected_counts,
 )
 from src.news_normalized.migration_policy import (
     BodyEvidenceRef,
@@ -23,6 +27,7 @@ from src.news_normalized.migration_policy import (
     resolve_body_variants,
     resolve_polygon_shared_url,
     resolve_timestamp_drift,
+    N7_POLICY_VERSION,
 )
 from src.news_normalized.models import KeyKind
 
@@ -227,6 +232,270 @@ def _parquet(path: Path):
         ]
     )
     pq.write_table(table, path)
+
+
+def _snapshot_inputs(db, paths):
+    return tuple(
+        (str(path.resolve()), path.stat().st_size, path.stat().st_mtime_ns, path.stat().st_ino)
+        for path in (Path(db), *(Path(item) for item in paths))
+    )
+
+
+def _weak_rejection_fixture(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    published = "2026-06-27T10:00:00Z"
+    rows = (
+        (1, "AAPL", 3.0, ""),
+        (2, "UNIQUE", 4.0, ""),
+        (3, "AAPL", 3.0, "https://example.test/a"),
+        (4, "MSFT", 3.0, "https://example.test/b"),
+    )
+    for legacy_id, ticker, sentiment, url in rows:
+        conn.execute(
+            "INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?,?,NULL,NULL)",
+            (
+                legacy_id,
+                ticker,
+                "Ambiguous",
+                "",
+                url,
+                "Wire",
+                "ibkr",
+                published,
+                canonical_article_hash(ticker, "Ambiguous", published),
+                sentiment,
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+    parquet = tmp_path / "raw" / "ibkr" / "2026" / "weak.parquet"
+    parquet.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": provider_id,
+                    "ticker": "AAPL",
+                    "title": "Ambiguous",
+                    "published_at": published,
+                    "source_api": "ibkr",
+                    "description": "",
+                    "content": "",
+                    "url": f"https://example.test/{suffix}",
+                    "publisher": "Wire",
+                    "related_tickers": '["AAPL"]',
+                }
+                for provider_id, suffix in (("synthetic-a", "a"), ("synthetic-b", "b"))
+            ]
+        ),
+        parquet,
+    )
+    return db, [parquet]
+
+
+def test_resolved_preview_has_all_three_fingerprints(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    parquet = tmp_path / "raw" / "ibkr" / "2026" / "input.parquet"
+    _parquet(parquet)
+
+    preview = plan_news_normalization(db, [parquet])
+
+    assert len(preview.input_fingerprint) == 64
+    assert preview.policy_version == N7_POLICY_VERSION
+    assert len(preview.resolved_fingerprint) == 64
+    assert len(preview.rejection_evidence.fingerprint) == 64
+
+
+def test_rejection_summary_counts_unique_ticker_and_sentiment(tmp_path):
+    db, paths = _weak_rejection_fixture(tmp_path)
+
+    summary = plan_news_normalization(db, paths).rejection_evidence
+
+    assert summary.rejected_rows == 2
+    assert summary.rows_with_unique_ticker == 1
+    assert summary.unique_ticker_relations == 1
+    assert summary.rows_with_sentiment == 2
+    assert summary.rows_with_unique_sentiment == 1
+
+
+def test_rejection_fingerprint_changes_with_unique_evidence(tmp_path):
+    db, paths = _weak_rejection_fixture(tmp_path)
+    first = plan_news_normalization(db, paths).rejection_evidence.fingerprint
+    conn = sqlite3.connect(db)
+    conn.execute("UPDATE news SET ticker='UNIQUE2' WHERE id=2")
+    conn.commit()
+    conn.close()
+
+    second = plan_news_normalization(db, paths).rejection_evidence.fingerprint
+
+    assert second != first
+
+
+def test_resolved_fingerprint_is_input_order_independent(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    first_path = tmp_path / "raw" / "ibkr" / "2026" / "a.parquet"
+    second_path = tmp_path / "raw" / "ibkr" / "2026" / "b.parquet"
+    _parquet(first_path)
+    _parquet(second_path)
+
+    first = plan_news_normalization(db, [first_path, second_path])
+    second = plan_news_normalization(db, [second_path, first_path])
+
+    assert second.resolved_fingerprint == first.resolved_fingerprint
+
+
+def test_resolved_preview_is_zero_mutation(tmp_path):
+    db = tmp_path / "market.db"
+    _legacy_db(db)
+    parquet = tmp_path / "raw" / "ibkr" / "2026" / "input.parquet"
+    _parquet(parquet)
+    before = _snapshot_inputs(db, [parquet])
+
+    plan = build_resolved_plan(db, [parquet])
+
+    assert _snapshot_inputs(db, [parquet]) == before
+    assert plan.preview.would_apply is True
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    count = conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'news_article%'"
+    ).fetchone()[0]
+    conn.close()
+    assert count == 0
+
+
+def test_polygon_demoted_url_uses_unique_ticker_mention_not_weak_rejection(tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    published = "2026-06-27T10:00:00Z"
+    conn.execute(
+        "INSERT INTO news VALUES (1,'AAPL','Shared','','https://example.test/reused',"
+        "'Wire','polygon',?,?,NULL,NULL,NULL)",
+        (published, canonical_article_hash("AAPL", "Shared", published)),
+    )
+    conn.commit()
+    conn.close()
+    parquet = tmp_path / "raw" / "polygon" / "2026" / "input.parquet"
+    parquet.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": "id-a",
+                    "ticker": "AAPL",
+                    "title": title,
+                    "published_at": published,
+                    "source_api": "polygon",
+                    "url": "https://example.test/reused",
+                    "publisher": "Wire",
+                    "related_tickers": '["AAPL"]',
+                }
+                for title in ("Shared", "Revised")
+            ]
+            + [
+                {
+                    "article_id": "id-b",
+                    "ticker": "MSFT",
+                    "title": "Shared",
+                    "published_at": published,
+                    "source_api": "polygon",
+                    "url": "https://example.test/reused",
+                    "publisher": "Wire",
+                    "related_tickers": '["MSFT"]',
+                }
+            ]
+        ),
+        parquet,
+    )
+
+    preview = plan_news_normalization(db, [parquet])
+
+    assert preview.counts["polygon_url_demotions"] == 1
+    assert preview.rejection_evidence.rejected_rows == 0
+    assert preview.counts["legacy_mapped"] == 1
+
+
+def test_polygon_distinct_urls_with_same_metadata_preserve_articles_and_reject_legacy(
+    tmp_path,
+):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    published = "2026-06-27T10:00:00Z"
+    conn.execute(
+        "INSERT INTO news VALUES (1,'AAPL','Same','','','Wire','polygon',?,?,"
+        "NULL,NULL,NULL)",
+        (published, canonical_article_hash("AAPL", "Same", published)),
+    )
+    conn.commit()
+    conn.close()
+    parquet = tmp_path / "raw" / "polygon" / "2026" / "input.parquet"
+    parquet.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": provider_id,
+                    "ticker": "AAPL",
+                    "title": "Same",
+                    "published_at": published,
+                    "source_api": "polygon",
+                    "url": f"https://example.test/{suffix}",
+                    "publisher": "Wire",
+                    "related_tickers": '["AAPL"]',
+                }
+                for provider_id, suffix in (("id-a", "a"), ("id-b", "b"))
+            ]
+        ),
+        parquet,
+    )
+
+    preview = plan_news_normalization(db, [parquet])
+
+    assert preview.sources["polygon"].planned_articles == 2
+    assert preview.rejection_evidence.rejected_rows == 1
+    assert preview.counts["legacy_mapped"] == 0
+    assert preview.would_apply is True
+
+
+def test_reviewed_expected_counts_refuse_rejection_drift(tmp_path):
+    db, paths = _weak_rejection_fixture(tmp_path)
+    preview = plan_news_normalization(db, paths)
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "INSERT INTO news SELECT 5,'THIRD',title,description,url,publisher,source,"
+        "published_at,article_hash,5.0,sentiment_source,sentiment_scale "
+        "FROM news WHERE id=1"
+    )
+    conn.commit()
+    conn.close()
+    changed = plan_news_normalization(db, paths)
+
+    with pytest.raises(MigrationPlanDriftError):
+        require_expected_counts(
+            changed,
+            {"legacy_rejected": preview.counts["legacy_rejected"]},
+        )
 
 
 def test_legacy_loader_opens_sqlite_read_only(tmp_path):
@@ -486,8 +755,11 @@ def test_preview_keeps_unresolved_fallback_match_as_weak_ambiguity(tmp_path):
     assert [item.kind for item in preview.weak_ambiguities] == [
         "legacy_weak_identity_ambiguity"
     ]
-    assert preview.sources["ibkr"].fallback_only == 1
+    assert preview.sources["ibkr"].fallback_only == 0
     assert preview.sources["ibkr"].provider_id_matched == 0
+    assert preview.sources["ibkr"].planned_articles == 2
+    assert preview.rejection_evidence.rejected_rows == 1
+    assert preview.would_apply is True
 
 
 def test_preview_canonicalizes_parquet_tickers_before_identity_and_relations(tmp_path):
