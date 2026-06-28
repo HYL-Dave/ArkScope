@@ -385,6 +385,7 @@ class IBKRDataSource(BaseDataSource):
         10090,  # Part of requested market data is not subscribed
         10167,  # Not subscribed, displaying delayed data
         10168,  # Not subscribed, delayed data not enabled
+        10172,  # Requested news article is unavailable
         354,    # Requested market data is not subscribed (older code)
         2104,   # Market data farm connection is OK
         2106,   # HMDS data farm connection is OK
@@ -401,7 +402,11 @@ class IBKRDataSource(BaseDataSource):
         Downgrades non-critical subscription errors to debug level
         to reduce noise in scanner output.
         """
-        if errorCode in self._SUPPRESSED_ERROR_CODES:
+        if errorCode == 10172:
+            logger.debug(
+                f"IBKR news article unavailable 10172, reqId {reqId}"
+            )
+        elif errorCode in self._SUPPRESSED_ERROR_CODES:
             logger.debug(f"IBKR info {errorCode}, reqId {reqId}: {errorString}")
         else:
             logger.error(f"IBKR error {errorCode}, reqId {reqId}: {errorString}")

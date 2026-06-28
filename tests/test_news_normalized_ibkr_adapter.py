@@ -1,5 +1,6 @@
 from contextlib import contextmanager, nullcontext
 import json
+import logging
 import sqlite3
 import traceback
 from types import SimpleNamespace
@@ -127,6 +128,38 @@ def test_ibkr_strict_body_restores_after_transport_error():
 
     assert client.setting_seen == [True]
     assert client.RaiseRequestErrors is False
+
+
+def test_ibkr_wrapper_filter_suppresses_raw_10172_message():
+    secret = "licensed provider payload"
+    record = logging.LogRecord(
+        "ib_insync.wrapper",
+        logging.ERROR,
+        __file__,
+        1,
+        f"Error 10172, reqId 4: {secret}",
+        (),
+        None,
+    )
+    error_filter = IBKRDataSource._IbErrorFilter(
+        IBKRDataSource._SUPPRESSED_ERROR_CODES
+    )
+
+    assert error_filter.filter(record) is False
+
+
+def test_ibkr_error_handler_sanitizes_10172_message(caplog):
+    secret = "licensed provider payload"
+    source = IBKRDataSource.__new__(IBKRDataSource)
+    source._ib = None
+    source._connected = False
+
+    with caplog.at_level(logging.DEBUG, logger="data_sources.ibkr_source"):
+        source._on_ib_error(4, 10172, secret, None)
+
+    assert "10172" in caplog.text
+    assert "reqId 4" in caplog.text
+    assert secret not in caplog.text
 
 
 def headline(article_id, ticker):
