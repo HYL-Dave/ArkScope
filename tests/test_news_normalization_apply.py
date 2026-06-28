@@ -1,4 +1,5 @@
 from dataclasses import replace
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 import sqlite3
 
@@ -15,6 +16,7 @@ from src.news_normalized.migration_apply import (
     write_resolved_plan,
 )
 from src.news_normalized.schema import begin_news_normalized_schema_transaction
+from scripts.migration import apply_news_normalization as apply_module
 
 
 NOW = "2026-06-29T12:00:00Z"
@@ -236,3 +238,216 @@ def test_second_apply_of_same_fingerprint_is_zero_change(temp_inputs):
     assert second.run_id == first.run_id
     assert conn.total_changes == before
     conn.close()
+
+
+def _approved_arguments(temp_inputs, tmp_path):
+    db, paths, plan = temp_inputs
+    return {
+        "market_db": db,
+        "parquet_root": Path(paths[0]).parents[2],
+        "expected_input_fingerprint": plan.preview.input_fingerprint,
+        "expected_resolved_fingerprint": plan.preview.resolved_fingerprint,
+        "expected_rejection_evidence_fingerprint": (
+            plan.preview.rejection_evidence.fingerprint
+        ),
+        "backup_path": tmp_path / "backup.db",
+    }
+
+
+@pytest.mark.parametrize(
+    ("argument", "bad_value"),
+    [
+        ("expected_input_fingerprint", "bad-input"),
+        ("expected_resolved_fingerprint", "bad-resolved"),
+        ("expected_rejection_evidence_fingerprint", "bad-rejection"),
+    ],
+)
+def test_orchestrator_refuses_each_fingerprint_before_backup(
+    tmp_path, monkeypatch, temp_inputs, argument, bad_value
+):
+    backup_calls = []
+    monkeypatch.setattr(
+        apply_module, "build_resolved_plan", lambda *args: temp_inputs[2]
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "backup_market_db",
+        lambda *args, **kwargs: backup_calls.append(args),
+    )
+    kwargs = _approved_arguments(temp_inputs, tmp_path)
+    kwargs[argument] = bad_value
+
+    with pytest.raises(apply_module.MigrationFingerprintMismatch):
+        apply_module.apply_news_normalization(**kwargs)
+
+    assert backup_calls == []
+
+
+class _RecordingConnection:
+    def __init__(self, events):
+        self.events = events
+
+    def commit(self):
+        self.events.append("commit")
+
+    def rollback(self):
+        self.events.append("rollback")
+
+    def close(self):
+        self.events.append("close")
+
+
+def test_orchestrator_orders_lock_backup_begin_and_postcheck(
+    tmp_path, monkeypatch, temp_inputs
+):
+    events = []
+
+    @contextmanager
+    def recording_lock(*args, **kwargs):
+        events.append("lock-enter")
+        try:
+            yield
+        finally:
+            events.append("lock-exit")
+
+    monkeypatch.setattr(apply_module, "market_write_lock", recording_lock)
+    monkeypatch.setattr(
+        apply_module, "build_resolved_plan", lambda *args: temp_inputs[2]
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "backup_market_db",
+        lambda *args, **kwargs: events.append("backup") or str(args[1]),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "open_apply_connection",
+        lambda *args: _RecordingConnection(events),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "begin_news_normalized_schema_transaction",
+        lambda conn: events.append("begin"),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "write_resolved_plan",
+        lambda *args: events.append("write") or "result",
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "validate_applied_plan",
+        lambda *args: events.append("validate"),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "validate_reopened_read_only",
+        lambda *args: events.append("postcheck"),
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "require_idempotent_replan",
+        lambda *args: events.append("idempotent"),
+    )
+
+    result = apply_module.apply_news_normalization(
+        **_approved_arguments(temp_inputs, tmp_path)
+    )
+
+    assert result == "result"
+    assert events == [
+        "lock-enter",
+        "backup",
+        "begin",
+        "write",
+        "validate",
+        "commit",
+        "close",
+        "postcheck",
+        "idempotent",
+        "lock-exit",
+    ]
+
+
+def test_orchestrator_rolls_back_on_validation_failure(
+    tmp_path, monkeypatch, temp_inputs
+):
+    events = []
+    connection = _RecordingConnection(events)
+    monkeypatch.setattr(
+        apply_module, "build_resolved_plan", lambda *args: temp_inputs[2]
+    )
+    monkeypatch.setattr(
+        apply_module, "backup_market_db", lambda *args, **kwargs: str(args[1])
+    )
+    monkeypatch.setattr(
+        apply_module, "open_apply_connection", lambda *args: connection
+    )
+    monkeypatch.setattr(
+        apply_module, "begin_news_normalized_schema_transaction", lambda conn: None
+    )
+    monkeypatch.setattr(
+        apply_module, "write_resolved_plan", lambda *args: "result"
+    )
+    monkeypatch.setattr(
+        apply_module,
+        "validate_applied_plan",
+        lambda *args: (_ for _ in ()).throw(MigrationValidationError("injected")),
+    )
+
+    with pytest.raises(MigrationValidationError):
+        apply_module.apply_news_normalization(
+            **_approved_arguments(temp_inputs, tmp_path)
+        )
+
+    assert "rollback" in events
+    assert "commit" not in events
+
+
+def test_orchestrator_integrates_backup_apply_reopen_and_replan(
+    tmp_path, monkeypatch, temp_inputs
+):
+    monkeypatch.setattr(
+        apply_module, "market_write_lock", lambda *args, **kwargs: nullcontext()
+    )
+    kwargs = _approved_arguments(temp_inputs, tmp_path)
+
+    result = apply_module.apply_news_normalization(**kwargs)
+
+    assert result.already_applied is False
+    assert kwargs["backup_path"].is_file()
+    backup = sqlite3.connect(
+        f"file:{kwargs['backup_path']}?mode=ro", uri=True
+    )
+    assert backup.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name='news_articles'"
+    ).fetchone()[0] == 0
+    backup.close()
+    live = sqlite3.connect(f"file:{kwargs['market_db']}?mode=ro", uri=True)
+    assert live.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 3
+    live.close()
+
+
+def test_apply_cli_requires_scheduler_paused_confirmation(temp_inputs, tmp_path):
+    kwargs = _approved_arguments(temp_inputs, tmp_path)
+    arguments = [
+        "--market-db",
+        str(kwargs["market_db"]),
+        "--parquet-root",
+        str(kwargs["parquet_root"]),
+        "--expected-input-fingerprint",
+        kwargs["expected_input_fingerprint"],
+        "--expected-resolved-fingerprint",
+        kwargs["expected_resolved_fingerprint"],
+        "--expected-rejection-evidence-fingerprint",
+        kwargs["expected_rejection_evidence_fingerprint"],
+        "--backup-path",
+        str(kwargs["backup_path"]),
+    ]
+
+    with pytest.raises(SystemExit):
+        apply_module.build_parser().parse_args(arguments)
+    parsed = apply_module.build_parser().parse_args(
+        arguments + ["--confirm-scheduler-paused"]
+    )
+    assert parsed.confirm_scheduler_paused is True
