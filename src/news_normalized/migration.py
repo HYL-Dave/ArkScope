@@ -1125,6 +1125,19 @@ def build_resolved_plan(
                     len(group.urls),
                 )
             )
+    # Mirror the apply-time body-state invariant (validate_applied_plan rejects
+    # ``body_status='failed' AND fetch_attempts=0``) into the preview gate so a
+    # failed-without-attempts article is refused here, not after the live write.
+    for article in articles:
+        if article.body_status is BodyStatus.FAILED and article.fetch_attempts <= 0:
+            blockers.append(
+                PreviewConflict(
+                    "body_failed_without_attempts",
+                    article.source,
+                    article.identity,
+                    article.fetch_attempts,
+                )
+            )
     resolutions_tuple = tuple(sorted(resolutions, key=lambda item: item.legacy_news_id))
     rejected_records = [
         asdict(item)

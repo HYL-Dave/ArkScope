@@ -373,6 +373,60 @@ def test_resolved_preview_is_zero_mutation(tmp_path):
     assert count == 0
 
 
+def test_failed_article_without_attempts_blocks_apply(tmp_path):
+    """A resolved article that is failed with zero fetch attempts violates the
+    apply-time body-state invariant (validate_applied_plan rejects
+    ``body_status='failed' AND fetch_attempts=0``). The preview must block it
+    rather than defer the failure to the live apply transaction."""
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news ("
+        "id INTEGER PRIMARY KEY,ticker TEXT,title TEXT,description TEXT,url TEXT,"
+        "publisher TEXT,source TEXT,published_at TEXT,article_hash TEXT,"
+        "sentiment_score REAL,sentiment_source TEXT,sentiment_scale TEXT)"
+    )
+    conn.commit()
+    conn.close()
+    parquet = tmp_path / "raw" / "ibkr" / "2026" / "failed.parquet"
+    parquet.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {
+                    "article_id": "failed-no-attempts",
+                    "ticker": "AAPL",
+                    "title": "Failed brief",
+                    "published_at": "2026-06-27T10:00:00Z",
+                    "source_api": "ibkr",
+                    "description": "",
+                    "content": "",
+                    "url": "https://example.test/failed",
+                    "publisher": "Wire",
+                    "related_tickers": '["AAPL"]',
+                    "content_status": "failed",
+                    "content_fetch_attempts": 0,
+                }
+            ]
+        ),
+        parquet,
+    )
+
+    plan = build_resolved_plan(db, [parquet])
+
+    # Precondition: the single article is failed via content_status, with no
+    # body and no recorded attempts.
+    article = plan.articles[0]
+    assert article.body_status.value == "failed"
+    assert article.fetch_attempts == 0
+    # The preview must refuse to apply and name the offending article.
+    assert plan.preview.would_apply is False
+    assert any(
+        blocker.kind == "body_failed_without_attempts"
+        for blocker in plan.preview.remaining_blockers
+    )
+
+
 def test_polygon_demoted_url_uses_unique_ticker_mention_not_weak_rejection(tmp_path):
     db = tmp_path / "market.db"
     conn = sqlite3.connect(db)
