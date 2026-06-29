@@ -15,7 +15,7 @@ import pyarrow.parquet as pq
 from .body_policy import prepare_body
 from .cleaner import looks_like_html
 from .identity import normalize_identity_text
-from .migration import ResolvedMigrationPlan
+from .migration import ResolvedMigrationPlan, extract_parquet_body
 from .migration_policy import BodyEvidenceRef
 from .models import BodyStatus
 
@@ -58,7 +58,7 @@ def read_body_evidence_batch(
             if ref.row_index < 0 or ref.row_index >= table.num_rows:
                 raise MigrationValidationError("body evidence row locator changed")
             row = table.slice(ref.row_index, 1).to_pylist()[0]
-            raw = str(row.get("content") or row.get("description") or "")
+            raw = extract_parquet_body(row) or ""
             digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
             if digest != ref.body_sha256:
                 raise MigrationValidationError("body evidence digest changed")

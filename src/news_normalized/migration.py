@@ -241,6 +241,13 @@ def _optional_text(value) -> str | None:
     return text or None
 
 
+def extract_parquet_body(row: dict) -> str | None:
+    """Apply the canonical content-first, stripped Parquet body contract."""
+    return _optional_text(row.get("content")) or _optional_text(
+        row.get("description")
+    )
+
+
 def _parse_related_tickers(value) -> tuple[str, ...]:
     try:
         items = json.loads(value) if isinstance(value, str) else (value or [])
@@ -284,7 +291,7 @@ def _parquet_row_to_evidence(
     row_index: int,
 ) -> ParquetEvidence:
     source = (_optional_text(row.get("source_api")) or _source_from_path(path)).casefold()
-    raw_body = _optional_text(row.get("content")) or _optional_text(row.get("description"))
+    raw_body = extract_parquet_body(row)
     attempts = row.get("content_fetch_attempts")
     try:
         attempts_int = int(attempts or 0)

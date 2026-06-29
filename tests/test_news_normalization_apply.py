@@ -1,6 +1,7 @@
 from dataclasses import replace
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
+import hashlib
 import sqlite3
 
 import pyarrow as pa
@@ -15,6 +16,7 @@ from src.news_normalized.migration_apply import (
     validate_applied_plan,
     write_resolved_plan,
 )
+from src.news_normalized.migration_policy import BodyEvidenceRef
 from src.news_normalized.schema import begin_news_normalized_schema_transaction
 from scripts.migration import apply_news_normalization as apply_module
 
@@ -75,10 +77,10 @@ def _parquet_inputs(root: Path):
                     "content_fetched_at": fetched_at,
                 }
                 for provider_id, body, fetched_at in (
-                    ("polygon-a", "short body", "2026-06-27T10:01:00Z"),
+                    ("polygon-a", "\n short body \n", "2026-06-27T10:01:00Z"),
                     (
                         "polygon-b",
-                        "longer canonical body text",
+                        "\n longer canonical body text \n",
                         "2026-06-27T10:02:00Z",
                     ),
                 )
@@ -190,6 +192,39 @@ def test_body_reader_batches_same_parquet_row_group(temp_inputs, monkeypatch):
 
     assert set(bodies.values()) == {"short body", "longer canonical body text"}
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("content", "description", "expected"),
+    [
+        ("\n  body text  \n", "ignored", "body text"),
+        (" \n", "\n fallback text \n", "fallback text"),
+    ],
+)
+def test_body_reader_matches_planner_whitespace_and_fallback_contract(
+    tmp_path, content, description, expected
+):
+    path = tmp_path / "input.parquet"
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"content": content, "description": description}]
+        ),
+        path,
+    )
+    reference = BodyEvidenceRef(
+        source_path=str(path),
+        row_group=0,
+        row_index=0,
+        body_sha256=hashlib.sha256(expected.encode("utf-8")).hexdigest(),
+        raw_length=len(expected),
+        clean_length=len(expected),
+        cleaner_ok=True,
+        fetched_at=None,
+    )
+
+    bodies = read_body_evidence_batch((reference,))
+
+    assert bodies[reference] == expected
 
 
 def test_apply_rolls_back_when_outer_validation_raises(temp_inputs):
