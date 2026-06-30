@@ -1032,6 +1032,44 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
     assert "collect_ibkr_news.py" not in rendered_calls
 
 
+def test_ibkr_news_fails_closed_when_pg_exit_audit_cannot_be_read(
+    tmp_path,
+    monkeypatch,
+):
+    market_db = tmp_path / "market_data.db"
+    market_db.write_text("not sqlite", encoding="utf-8")
+
+    import src.market_data_admin as mda
+
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    calls = []
+    monkeypatch.setattr(
+        ds,
+        "_run_subprocess",
+        lambda argv: (calls.append(argv), {"returncode": 0})[1],
+    )
+    monkeypatch.setattr(
+        ds.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("normalized worker should not run when audit is unreadable")
+        ),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for blocked news")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert res["status"] == "failed"
+    assert "audit marker could not be read" in res["error"]
+    assert calls == []
+
+
 def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch):
     market_db = tmp_path / "market_data.db"
     conn = sqlite3.connect(market_db)
@@ -1074,6 +1112,44 @@ def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch
 
     assert calls == [("prices", "iv", "fundamentals")]
     assert res == {"ok": True, "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": 3}}
+
+
+def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path, monkeypatch):
+    market_db = tmp_path / "market_data.db"
+    market_db.write_text("not sqlite", encoding="utf-8")
+
+    class _Lock:
+        def acquire(self, *args, **kwargs):
+            return True
+
+        def release(self):
+            pass
+
+    import src.market_data_admin as mda
+
+    calls = []
+    monkeypatch.setattr(ds, "_LOCAL_REFRESH_LOCK", _Lock())
+    monkeypatch.setattr(ds, "_LOCAL_REFRESH_FLOCK", _Lock())
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    monkeypatch.setattr(
+        mda,
+        "incremental_update",
+        lambda *args, **kwargs: (
+            calls.append(kwargs.get("domains")),
+            {
+                "ok": True,
+                "prices": {"ok": True, "rows_added": 1},
+                "news": {"skipped": "domain disabled"},
+                "iv": {"ok": True, "rows_added": 2},
+                "fundamentals": {"ok": True, "rows_added": 3},
+            },
+        )[1],
+    )
+
+    res = _REAL_LOCAL_REFRESH()
+
+    assert calls == [("prices", "iv", "fundamentals")]
+    assert res["domains"]["news"] is None
 
 
 def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(

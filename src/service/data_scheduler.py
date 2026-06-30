@@ -532,8 +532,12 @@ def _resolve_price_scope() -> List[str]:
     return resolve_active_universe()
 
 
-def _news_pg_exit_audit_completed(db_path: str) -> bool:
-    """Read the market DB audit marker without creating or mutating it."""
+def _news_pg_exit_audit_state(db_path: str) -> Optional[bool]:
+    """Read the market DB audit marker without creating or mutating it.
+
+    Returns None when the marker cannot be read. News scheduling treats that as
+    fail-closed so a transient/corrupt audit read never re-enables PG news.
+    """
     path = Path(db_path)
     if not path.exists():
         return False
@@ -554,10 +558,10 @@ def _news_pg_exit_audit_completed(db_path: str) -> bool:
         finally:
             conn.close()
     except sqlite3.Error:
-        return False
+        return None
 
 
-def _news_pg_exit_completed(market_db: str) -> bool:
+def _news_pg_exit_assume_completed_for_refresh(market_db: str) -> bool:
     from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
     from src.news_providers import parse_news_toggle
 
@@ -566,7 +570,40 @@ def _news_pg_exit_completed(market_db: str) -> bool:
             return True
     except Exception:  # noqa: BLE001 — routing falls back to the DB audit marker
         pass
-    return _news_pg_exit_audit_completed(market_db)
+    audit_state = _news_pg_exit_audit_state(market_db)
+    if audit_state is None:
+        logger.warning(
+            "news PG-exit audit marker could not be read; excluding news from local mirror"
+        )
+        return True
+    return audit_state
+
+
+def _blocked_news_audit_route():
+    from src.news_normalized.routing import NewsWriteMode, NewsWriteRoute
+
+    return NewsWriteRoute(
+        NewsWriteMode.BLOCKED,
+        "News PG-exit audit marker could not be read; refusing legacy PG news route.",
+    )
+
+
+def _read_profile_news_write_values() -> Optional[dict]:
+    from src.news_normalized.routing import (
+        NEWS_PG_EXIT_COMPLETED_KEY,
+        USE_NORMALIZED_NEWS_WRITES_KEY,
+    )
+    from src.news_providers import USE_LOCAL_NEWS_KEY
+
+    try:
+        store = _store()
+        return {
+            NEWS_PG_EXIT_COMPLETED_KEY: store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY),
+            USE_NORMALIZED_NEWS_WRITES_KEY: store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY),
+            USE_LOCAL_NEWS_KEY: store.get_setting(USE_LOCAL_NEWS_KEY),
+        }
+    except Exception:  # noqa: BLE001 — caller decides whether audit can cover this
+        return None
 
 
 def _read_news_write_route_for_scheduler():
@@ -575,6 +612,7 @@ def _read_news_write_route_for_scheduler():
     from src.news_normalized.routing import (
         ENV_USE_NORMALIZED_NEWS_WRITES,
         NEWS_PG_EXIT_COMPLETED_KEY,
+        NewsWriteMode,
         USE_NORMALIZED_NEWS_WRITES_KEY,
         read_news_write_route,
         resolve_news_write_route,
@@ -582,25 +620,26 @@ def _read_news_write_route_for_scheduler():
     from src.news_providers import ENV_USE_LOCAL_NEWS, USE_LOCAL_NEWS_KEY
 
     market_db = resolve_market_db_path()
-    audit_completed = _news_pg_exit_audit_completed(market_db)
-    if not audit_completed:
+    audit_state = _news_pg_exit_audit_state(market_db)
+    if audit_state is False:
         return read_news_write_route()
-    try:
-        store = _store()
-        exit_completed = store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)
-        normalized = store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
-        local = store.get_setting(USE_LOCAL_NEWS_KEY)
-    except Exception:  # noqa: BLE001 — the completed audit marker still retires PG news
-        exit_completed = True
-        normalized = None
-        local = None
-    return resolve_news_write_route(
-        exit_completed=True if audit_completed else exit_completed,
+    values = _read_profile_news_write_values()
+    if values is None and audit_state is None:
+        return _blocked_news_audit_route()
+    values = values or {}
+    exit_completed = values.get(NEWS_PG_EXIT_COMPLETED_KEY)
+    normalized = values.get(USE_NORMALIZED_NEWS_WRITES_KEY)
+    local = values.get(USE_LOCAL_NEWS_KEY)
+    route = resolve_news_write_route(
+        exit_completed=True if audit_state is True else exit_completed,
         normalized_value=normalized,
         local_value=local,
         normalized_env=os.environ.get(ENV_USE_NORMALIZED_NEWS_WRITES),
         local_env=os.environ.get(ENV_USE_LOCAL_NEWS),
     )
+    if audit_state is None and route.mode not in (NewsWriteMode.NORMALIZED, NewsWriteMode.BLOCKED):
+        return _blocked_news_audit_route()
+    return route
 
 
 def _local_refresh() -> Dict[str, Any]:
@@ -619,7 +658,7 @@ def _local_refresh() -> Dict[str, Any]:
                 return {"skipped": "no local market DB (bootstrap first)"}
             domains = (
                 ("prices", "iv", "fundamentals")
-                if _news_pg_exit_completed(market_db)
+                if _news_pg_exit_assume_completed_for_refresh(market_db)
                 else None
             )
             res = incremental_update(domains=domains) if domains is not None else incremental_update()
