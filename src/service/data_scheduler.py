@@ -49,6 +49,7 @@ a manual run 10 minutes ago means the scheduler does not re-fetch immediately).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import subprocess
@@ -253,6 +254,14 @@ _BACKFILL_MAX_TICKERS = 30
 _BACKFILL_MAX_DAYS = 30
 _NORMALIZED_NEWS_MAX_ARTICLES = 50_000
 _NORMALIZED_NEWS_MAX_BODY_FETCHES = 50_000
+_SANITIZED_WORKER_COUNT_KEYS = (
+    "articles_seen",
+    "articles_inserted",
+    "bodies_fetched",
+    "legacy_rows_inserted",
+    "legacy_rows_updated",
+    "projection_skipped_no_ticker",
+)
 
 
 def _make_normalized_news_provider(source: str):
@@ -448,6 +457,72 @@ def _run_subprocess(argv: List[str]) -> Dict[str, Any]:
     return out
 
 
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
+    try:
+        raw = json.loads(stdout or "")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+
+    payload: Dict[str, Any] = {"status": str(raw.get("status") or "unknown")}
+    for key in _SANITIZED_WORKER_COUNT_KEYS:
+        payload[key] = _safe_int(raw.get(key))
+    payload["error_count"] = _safe_int(raw.get("error_count"))
+    classes = raw.get("error_classes")
+    if isinstance(classes, list):
+        payload["error_classes"] = [
+            str(item)
+            for item in classes
+            if str(item).replace("_", "").isalnum()
+        ]
+    else:
+        payload["error_classes"] = []
+    continuation = raw.get("continuation")
+    if isinstance(continuation, dict):
+        payload["continuation"] = {
+            "deferred_ticker_count": _safe_int(
+                continuation.get("deferred_ticker_count")
+            ),
+            "deferred_body_count": _safe_int(
+                continuation.get("deferred_body_count")
+            ),
+            "has_cursor": bool(continuation.get("has_cursor")),
+        }
+    return payload
+
+
+def _run_sanitized_json_subprocess(argv: List[str]) -> Dict[str, Any]:
+    """Run a child whose stdout contract is sanitized JSON; never surface stderr."""
+    proc = subprocess.run(
+        argv, cwd=str(_REPO_ROOT), capture_output=True, text=True,
+    )
+    payload = _parse_sanitized_worker_stdout(proc.stdout)
+    if payload is None:
+        payload = {
+            "status": "failed",
+            "error_count": 1,
+            "error_classes": [],
+            **{key: 0 for key in _SANITIZED_WORKER_COUNT_KEYS},
+        }
+        return {"returncode": proc.returncode or 1, "payload": payload}
+    return {"returncode": proc.returncode, "payload": payload}
+
+
+def _sanitized_worker_failure_message(payload: Dict[str, Any]) -> str:
+    classes = payload.get("error_classes")
+    if isinstance(classes, list) and classes:
+        return f"normalized IBKR worker failed ({', '.join(map(str, classes))})"
+    return "normalized IBKR worker failed"
+
+
 def _resolve_price_scope() -> List[str]:
     """Active-universe tickers — delegates to the ONE shared resolver
     (src.universe_scope), same contract as the collectors' --scope flag."""
@@ -625,11 +700,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         ",".join(scope),
                         "--gateway-lock-held",
                     ]
-                    step = _run_subprocess(argv)
-                    result["collect"] = step
+                    step = _run_sanitized_json_subprocess(argv)
+                    result["collect"] = step["payload"]
                     if step["returncode"] != 0:
                         raise RuntimeError(
-                            f"collector failed: {step.get('error_tail', '')[:200]}"
+                            _sanitized_worker_failure_message(step["payload"])
                         )
                 else:
                     result["collect"] = _run_normalized_news_writer(

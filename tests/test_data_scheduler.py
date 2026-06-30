@@ -5,6 +5,8 @@ from __future__ import annotations
 import threading
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
+import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -870,11 +872,27 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     )
     calls = []
 
-    def _subprocess(argv):
+    def _subprocess(argv, cwd=None, capture_output=False, text=False):
         calls.append(argv)
-        return {"returncode": 0}
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "succeeded",
+                    "articles_seen": 0,
+                    "articles_inserted": 0,
+                    "bodies_fetched": 0,
+                    "legacy_rows_inserted": 0,
+                    "legacy_rows_updated": 0,
+                    "projection_skipped_no_ticker": 0,
+                    "error_count": 0,
+                    "error_classes": [],
+                }
+            ),
+            stderr="",
+        )
 
-    monkeypatch.setattr(ds, "_run_subprocess", _subprocess)
+    monkeypatch.setattr(ds.subprocess, "run", _subprocess)
     monkeypatch.setattr(
         ds,
         "_local_refresh",
@@ -896,6 +914,142 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert "--gateway-lock-held" in argv
     assert "sync" not in res
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
+    )
+    raw_id = "DJ-N$raw-secret-id"
+    payload = {
+        "status": "partial",
+        "articles_seen": 5,
+        "articles_inserted": 3,
+        "bodies_fetched": 1,
+        "legacy_rows_inserted": 3,
+        "legacy_rows_updated": 0,
+        "projection_skipped_no_ticker": 0,
+        "error_count": 0,
+        "error_classes": [],
+        "continuation": {
+            "deferred_ticker_count": 0,
+            "deferred_body_count": 1,
+            "has_cursor": False,
+        },
+    }
+    subprocess_calls = []
+
+    def _run(argv, cwd=None, capture_output=False, text=False):
+        subprocess_calls.append(argv)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr(ds.subprocess, "run", _run)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for normalized IBKR")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert len(subprocess_calls) == 1
+    assert res["status"] == "partial"
+    assert res["collect"]["status"] == "partial"
+    assert res["collect"]["continuation"] == payload["continuation"]
+    assert "sync" not in res
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] is None
+    assert row["last_result"]["collect"]["status"] == "partial"
+    snap = ds.status_snapshot()["ibkr_news"]["durable_state"]
+    assert snap["last_status"] == "partial"
+    assert snap["continuation"] is None
+    assert raw_id not in json.dumps(row, sort_keys=True)
+
+
+def test_normalized_ibkr_worker_failure_hides_raw_child_stderr(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
+    )
+    secret = "licensed provider payload DJ-N$raw-secret-id raw body text"
+    payload = {
+        "status": "failed",
+        "articles_seen": 0,
+        "articles_inserted": 0,
+        "bodies_fetched": 0,
+        "legacy_rows_inserted": 0,
+        "legacy_rows_updated": 0,
+        "projection_skipped_no_ticker": 0,
+        "error_count": 1,
+        "error_classes": ["ProviderError"],
+    }
+
+    def _run(argv, cwd=None, capture_output=False, text=False):
+        return SimpleNamespace(
+            returncode=1,
+            stdout=json.dumps(payload),
+            stderr=f"provider log leaked: {secret}",
+        )
+
+    monkeypatch.setattr(ds.subprocess, "run", _run)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for normalized IBKR")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    rendered = json.dumps(res, sort_keys=True)
+    row = ds._state_store().get("ibkr_news")
+    assert res["status"] == "failed"
+    assert "normalized IBKR worker failed" in res["error"]
+    assert res["collect"]["status"] == "failed"
+    assert secret not in rendered
+    assert secret not in json.dumps(row, sort_keys=True)
+    assert row["last_status"] == "failed"
+    assert secret not in row["last_error"]
+
+
+def test_normalized_ibkr_worker_invalid_stdout_is_generic_failure(monkeypatch):
+    import src.news_normalized.routing as routing
+
+    _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
+    )
+    secret = "DJ-N$raw-secret-id raw provider stdout"
+
+    def _run(argv, cwd=None, capture_output=False, text=False):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=f"not-json {secret}",
+            stderr=f"raw stderr {secret}",
+        )
+
+    monkeypatch.setattr(ds.subprocess, "run", _run)
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    row = ds._state_store().get("ibkr_news")
+    rendered = json.dumps(res, sort_keys=True)
+    assert res["status"] == "failed"
+    assert res["error"] == "normalized IBKR worker failed"
+    assert secret not in rendered
+    assert row["last_status"] == "failed"
+    assert secret not in json.dumps(row, sort_keys=True)
 
 
 def test_ibkr_legacy_local_route_keeps_legacy_pg_collector_sync_and_mirror(

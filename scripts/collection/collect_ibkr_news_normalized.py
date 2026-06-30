@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, nullcontext, redirect_stderr
 from dataclasses import asdict, is_dataclass
+import io
 import json
+import logging
 import sqlite3
 import sys
 from pathlib import Path
@@ -113,6 +116,17 @@ def sanitize_worker_error(exc: BaseException) -> dict[str, Any]:
     return payload
 
 
+@contextmanager
+def _suppress_provider_stderr_logging():
+    previous_disable = logging.root.manager.disable
+    try:
+        logging.disable(logging.CRITICAL)
+        with redirect_stderr(io.StringIO()):
+            yield
+    finally:
+        logging.disable(previous_disable)
+
+
 def _apply_provider_config() -> None:
     from src.data_provider_config import DataProviderConfigStore, apply_env
 
@@ -127,6 +141,7 @@ def _run_worker(
     gateway_lock_held: bool,
 ) -> Any:
     from data_sources.ibkr_source import IBKRDataSource
+    from src.ibkr_gateway_lock import ibkr_gateway_lock
     from src.market_data_admin import resolve_market_db_path
     from src.market_data_direct import market_write_lock
     from src.news_normalized.ibkr_adapter import IBKRNormalizedProvider
@@ -138,21 +153,23 @@ def _run_worker(
     source = IBKRDataSource()
     gateway = IBKRRuntimeGateway(source)
     conn = None
+    gateway_lock = nullcontext() if gateway_lock_held else ibkr_gateway_lock()
     try:
-        provider = IBKRNormalizedProvider(
-            gateway,
-            acquire_gateway_lock=not gateway_lock_held,
-        )
-        conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
-        with market_write_lock():
-            store = NormalizedNewsStore(conn)
-            return write_news_batch(
-                store,
-                provider,
-                tickers,
-                WriterBudget(max_articles, max_body_fetches),
-                project_legacy=True,
+        with gateway_lock:
+            provider = IBKRNormalizedProvider(
+                gateway,
+                acquire_gateway_lock=False,
             )
+            conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
+            with market_write_lock():
+                store = NormalizedNewsStore(conn)
+                return write_news_batch(
+                    store,
+                    provider,
+                    tickers,
+                    WriterBudget(max_articles, max_body_fetches),
+                    project_legacy=True,
+                )
     finally:
         if conn is not None:
             conn.close()
@@ -162,13 +179,14 @@ def _run_worker(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        _apply_provider_config()
-        result = _run_worker(
-            args.tickers,
-            max_articles=args.max_articles,
-            max_body_fetches=args.max_body_fetches,
-            gateway_lock_held=args.gateway_lock_held,
-        )
+        with _suppress_provider_stderr_logging():
+            _apply_provider_config()
+            result = _run_worker(
+                args.tickers,
+                max_articles=args.max_articles,
+                max_body_fetches=args.max_body_fetches,
+                gateway_lock_held=args.gateway_lock_held,
+            )
         payload = sanitize_worker_result(result)
         code = 0
     except Exception as exc:  # noqa: BLE001 - stdout must remain sanitized.

@@ -1,10 +1,34 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 from datetime import datetime
+import logging
+import sys
 from types import SimpleNamespace
+import types
 
 import pytest
+
+try:
+    import ib_insync  # noqa: F401
+except ModuleNotFoundError:
+    class RequestError(Exception):
+        def __init__(self, req_id, code, message):
+            self.reqId = req_id
+            self.code = code
+            self.message = message
+            super().__init__(req_id, code, message)
+
+    ib_insync_stub = types.ModuleType("ib_insync")
+    ib_insync_stub.IB = object
+    ib_insync_stub.Option = object
+    ib_insync_stub.RequestError = RequestError
+    ib_insync_stub.ScannerSubscription = object
+    ib_insync_stub.Stock = object
+    ib_insync_stub.TagValue = object
+    ib_insync_stub.util = SimpleNamespace()
+    sys.modules["ib_insync"] = ib_insync_stub
 
 
 def test_ibkr_runtime_disconnects_after_worker_failure():
@@ -129,3 +153,88 @@ def test_ibkr_worker_prints_sanitized_json_without_provider_payload(
         forbidden_body,
     ):
         assert forbidden not in rendered
+
+
+def test_ibkr_worker_suppresses_provider_stderr_and_logging(monkeypatch, capsys):
+    from scripts.collection import collect_ibkr_news_normalized as worker
+
+    secret = "licensed provider payload DJ-N$raw-id body text"
+
+    def fake_run_worker(*args, **kwargs):
+        print(secret, file=sys.stderr)
+        logging.warning(secret)
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr(worker, "_run_worker", fake_run_worker)
+    monkeypatch.setattr(worker, "_apply_provider_config", lambda: None)
+
+    code = worker.main(["--tickers", "AAPL"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert code == 1
+    assert payload["status"] == "failed"
+    assert secret not in captured.out
+    assert secret not in captured.err
+
+
+def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
+    monkeypatch,
+):
+    from scripts.collection import collect_ibkr_news_normalized as worker
+
+    events = []
+
+    class Source:
+        def disconnect(self):
+            events.append("disconnect")
+
+    class Conn:
+        def close(self):
+            events.append("conn_close")
+
+    class Store:
+        def __init__(self, conn):
+            events.append("store")
+            self.conn = conn
+
+    @contextmanager
+    def ibkr_lock():
+        events.append("ibkr_enter")
+        yield
+        events.append("ibkr_exit")
+
+    @contextmanager
+    def market_lock():
+        events.append("market_enter")
+        yield
+        events.append("market_exit")
+
+    def write_news_batch(store, provider, tickers, budget, *, project_legacy=False):
+        events.append("write")
+        with provider.operation():
+            events.append("provider_operation")
+        return {"status": "succeeded", "errors": {}}
+
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", lambda: Source())
+    monkeypatch.setattr("src.ibkr_gateway_lock.ibkr_gateway_lock", ibkr_lock)
+    monkeypatch.setattr("src.news_normalized.ibkr_adapter.ibkr_gateway_lock", ibkr_lock)
+    monkeypatch.setattr(worker.sqlite3, "connect", lambda *a, **k: Conn())
+    monkeypatch.setattr("src.market_data_admin.resolve_market_db_path", lambda: "market.db")
+    monkeypatch.setattr("src.market_data_direct.market_write_lock", lambda: market_lock())
+    monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", Store)
+    monkeypatch.setattr("src.news_normalized.writer.write_news_batch", write_news_batch)
+
+    worker._run_worker(
+        ["AAPL"],
+        max_articles=1,
+        max_body_fetches=1,
+        gateway_lock_held=False,
+    )
+
+    assert events.count("ibkr_enter") == 1
+    assert events.index("ibkr_enter") < events.index("market_enter")
+    assert events.index("market_enter") < events.index("write")
+    assert events.index("write") < events.index("market_exit")
+    assert events.index("market_exit") < events.index("ibkr_exit")
+    assert "provider_operation" in events
