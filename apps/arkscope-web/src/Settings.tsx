@@ -922,7 +922,7 @@ function NewsStorageSection() {
             </div>
           )}
 
-          {status.env_override && (
+          {status.env_override && !status.news_hard_local && (
             <p className="muted tiny" style={{ marginTop: 8 }}>
               目前由 ARKSCOPE_USE_LOCAL_NEWS 環境變數強制控制；移除 env override 後才能由此開關變更。
             </p>
