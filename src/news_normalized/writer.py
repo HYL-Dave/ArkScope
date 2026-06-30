@@ -236,6 +236,8 @@ def write_news_batch(
                                 else pending
                             )
                         except Exception as exc:
+                            if not project_legacy:
+                                raise
                             key = candidate.provider_article_id or f"ticker:{ticker}"
                             errors[key] = str(exc)
                             ticker_error = str(exc)

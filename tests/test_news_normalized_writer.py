@@ -229,6 +229,40 @@ def test_writer_isolates_ticker_failures_and_records_local_telemetry(store):
     assert tuple(run) == ("news", "succeeded", 2, 1)
 
 
+def test_writer_default_mode_upsert_error_stays_ticker_scoped(store, monkeypatch):
+    provider = FakeProvider({"AAPL": [candidate("p1"), candidate("p2")]})
+    original_upsert = store.upsert
+    calls = []
+
+    def fail_first_upsert(article):
+        calls.append(article.provider_article_id)
+        if article.provider_article_id == "p1":
+            raise RuntimeError("store write failed")
+        return original_upsert(article)
+
+    monkeypatch.setattr(store, "upsert", fail_first_upsert)
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=10, max_body_fetches=0),
+    )
+
+    assert result.status == "partial"
+    assert result.errors == {"AAPL": "store write failed"}
+    assert calls == ["p1"]
+    assert result.articles_seen == 1
+    assert result.articles_inserted == 0
+    assert result.continuation is None
+    assert store.conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 0
+    meta = store.conn.execute(
+        "SELECT ticker,last_error,rows_added FROM provider_sync_meta "
+        "WHERE provider='fakewire' AND interval='news'"
+    ).fetchone()
+    assert tuple(meta) == ("AAPL", "store write failed", 0)
+
+
 def test_writer_body_failure_is_resumable_and_visible_in_ticker_telemetry(store):
     provider = FakeProvider({"AAPL": [candidate("p1")]}, body_errors={"p1"})
 
