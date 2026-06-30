@@ -55,7 +55,7 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -97,9 +97,9 @@ class SourceDef:
     # tickers + a window that reaches the oldest gap; a budget-bounded run finishes
     # `partial` with a saved continuation. Today only price_backfill.
     gap_planned: bool = False
-    # 2c: when set ('polygon'|'finnhub') AND use_local_news is on, this source routes to the
-    # direct-local writer (provider→local news+fts, no Parquet / no PG sync / no mirror); OFF
-    # keeps the chain above (collector→Parquet→PG sync→local mirror) verbatim.
+    # When set ('polygon'|'finnhub'), resolve the Task 1 news write route per source run.
+    # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
+    # chain; BLOCKED fails closed before provider work.
     news_direct_source: Optional[str] = None
 
 
@@ -250,6 +250,68 @@ def _state_store():
 # v1.3 gap-aware price_backfill budget (env/profile-overridable later; bounded defaults now).
 _BACKFILL_MAX_TICKERS = 30
 _BACKFILL_MAX_DAYS = 30
+_NORMALIZED_NEWS_MAX_ARTICLES = 50_000
+_NORMALIZED_NEWS_MAX_BODY_FETCHES = 50_000
+
+
+def _make_normalized_news_provider(source: str):
+    """Build the Parquet-free normalized REST provider for a scheduler news source."""
+    if source == "polygon":
+        from scripts.collection.collect_polygon_news import (
+            CollectionConfig,
+            PolygonNewsCollector,
+            load_env,
+        )
+        from src.news_normalized.provider_adapters import PolygonNormalizedProvider
+
+        api_key = load_env()
+        if not api_key:
+            raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
+        return PolygonNormalizedProvider(PolygonNewsCollector(api_key, CollectionConfig()))
+    if source == "finnhub":
+        from scripts.collection.collect_finnhub_news import (
+            FinnhubConfig,
+            FinnhubNewsCollector,
+            load_env,
+        )
+        from src.news_normalized.provider_adapters import FinnhubNormalizedProvider
+
+        api_key = load_env()
+        if not api_key:
+            raise RuntimeError("FINNHUB_API_KEY not found in config/.env or environment")
+        return FinnhubNormalizedProvider(FinnhubNewsCollector(api_key, FinnhubConfig()))
+    raise ValueError(f"unknown normalized news source: {source!r}")
+
+
+def _run_normalized_news_writer(source: str, scope: List[str], *, progress_cb=None) -> Dict[str, Any]:
+    """Write Polygon/Finnhub REST news through normalized tables plus legacy projection."""
+    import sqlite3
+
+    from src.market_data_admin import resolve_market_db_path
+    from src.market_data_direct import market_write_lock
+    from src.news_normalized.models import WriterBudget
+    from src.news_normalized.store import NormalizedNewsStore
+    from src.news_normalized.writer import write_news_batch
+
+    provider = _make_normalized_news_provider(source)
+    conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
+    try:
+        with market_write_lock():
+            store = NormalizedNewsStore(conn)
+            result = write_news_batch(
+                store,
+                provider,
+                scope,
+                WriterBudget(
+                    max_articles=_NORMALIZED_NEWS_MAX_ARTICLES,
+                    max_body_fetches=_NORMALIZED_NEWS_MAX_BODY_FETCHES,
+                ),
+                project_legacy=True,
+                progress_cb=progress_cb,
+            )
+        return asdict(result) if hasattr(result, "__dataclass_fields__") else result
+    finally:
+        conn.close()
 
 
 def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
@@ -452,12 +514,35 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         try:
             collected = False
-            from src.news_providers import use_local_news_enabled
-            news_direct = d.news_direct_source is not None and use_local_news_enabled()
-            if news_direct:
-                # 2c: route this news source to the DIRECT-LOCAL writer (provider→local news+fts,
+            local_news_writer = False
+            news_route = None
+            if d.news_direct_source is not None:
+                from src.news_normalized.routing import NewsWriteMode, read_news_write_route
+
+                news_route = read_news_write_route()
+                if news_route.mode == NewsWriteMode.BLOCKED:
+                    raise RuntimeError(news_route.reason)
+                local_news_writer = news_route.mode in (
+                    NewsWriteMode.NORMALIZED,
+                    NewsWriteMode.LEGACY_LOCAL,
+                )
+
+            if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
+                scope = tickers if tickers is not None else _resolve_price_scope()
+                if not scope:
+                    raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                result["ticker_count"] = len(scope)
+                result["collect"] = _run_normalized_news_writer(
+                    d.news_direct_source,
+                    scope,
+                    progress_cb=lambda done, total, current: _set_progress(
+                        source, done, total, current),
+                )
+                collected = True
+            elif news_route is not None and news_route.mode == NewsWriteMode.LEGACY_LOCAL:
+                # LEGACY_LOCAL keeps the direct-local writer (provider→local news+fts,
                 # NO Parquet, NO PG sync, NO mirror). Cursored against the local DB (newest stored
-                # published_at), not the Parquet timestamp. OFF (default) keeps the chain below.
+                # published_at), not the Parquet timestamp.
                 from src.news_direct import backfill_news_direct
                 from src.news_providers import make_news_provider
                 scope = tickers if tickers is not None else _resolve_price_scope()
@@ -549,7 +634,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     raise RuntimeError(f"collector failed: {step.get('error_tail', '')[:200]}")
                 collected = True
 
-            if collected and d.sync_flag and not skip_sync and not news_direct:
+            if collected and d.sync_flag and not skip_sync and not local_news_writer:
                 with _SYNC_LOCK:
                     # cross-process: a CLI sync may be mid-flight — queue behind it
                     # (in-process semantics are queue-not-skip too), bounded.
@@ -563,16 +648,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 if sync["returncode"] != 0:
                     raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
 
-            if skip_sync:
+            if local_news_writer or (d.adapter is not None and d.sync_flag is None):
+                # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
+                # would be pointless and could re-pull stale PG news/prices.
+                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
+            elif skip_sync:
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
-            elif news_direct or (d.adapter is not None and d.sync_flag is None):
-                # DIRECT local writer (e.g. price_backfill): it already wrote
-                # market_data.db itself — a PG→local mirror would be pointless and would
-                # re-pull stale PG. Skip it. (local_incremental has adapter=None and IS
-                # the mirror, so it still runs _local_refresh below.)
-                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
             else:
                 result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001

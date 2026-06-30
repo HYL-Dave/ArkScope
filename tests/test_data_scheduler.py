@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -168,6 +169,279 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     assert calls["refresh"] == 0                                     # NO local mirror
     assert "skipped" in res["local_refresh"]                         # mirror explicitly skipped
     assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
+
+
+def _patch_news_write_route(monkeypatch, mode, reason="test route"):
+    import src.news_normalized.routing as routing
+
+    calls = []
+
+    def _read_route(*args, **kwargs):
+        calls.append((args, kwargs))
+        return routing.NewsWriteRoute(mode, reason)
+
+    monkeypatch.setattr(routing, "read_news_write_route", _read_route)
+    return calls
+
+
+@pytest.mark.parametrize(
+    ("source", "direct_source", "collector_module", "config_name", "collector_name",
+     "provider_name"),
+    [
+        ("polygon_news", "polygon", "scripts.collection.collect_polygon_news",
+         "CollectionConfig", "PolygonNewsCollector", "PolygonNormalizedProvider"),
+        ("finnhub_news", "finnhub", "scripts.collection.collect_finnhub_news",
+         "FinnhubConfig", "FinnhubNewsCollector", "FinnhubNormalizedProvider"),
+    ],
+)
+def test_normalized_news_route_calls_writer_under_market_lock(
+    monkeypatch, source, direct_source, collector_module, config_name, collector_name,
+    provider_name,
+):
+    # NORMALIZED routes Polygon/Finnhub straight into the normalized writer with legacy projection.
+    import importlib
+    import sqlite3
+
+    import src.market_data_admin as mda
+    import src.market_data_direct as mdd
+    import src.news_normalized.provider_adapters as adapters
+    import src.news_normalized.routing as routing
+    import src.news_normalized.store as store_module
+    import src.news_normalized.writer as writer_module
+    from src.news_normalized.models import WriterBudget, WriterResult
+
+    route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                                          "normalized test route")
+    legacy_module = importlib.import_module(collector_module)
+    monkeypatch.setattr(legacy_module, "run_incremental",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("legacy run_incremental must not run")))
+    monkeypatch.setattr("src.news_direct.backfill_news_direct",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("legacy direct writer must not run")))
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(
+                            AssertionError("PG sync subprocess must not run")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("_local_refresh must not run")))
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
+
+    events = []
+
+    class FakeConn:
+        def close(self):
+            events.append("close")
+
+    fake_conn = FakeConn()
+    real_connect = sqlite3.connect
+
+    def _connect(path, timeout=0, **kwargs):
+        if str(path) != "/tmp/test-market-data.db":
+            return real_connect(path, timeout=timeout, **kwargs)
+        events.append(("connect", path, timeout))
+        return fake_conn
+
+    monkeypatch.setattr(sqlite3, "connect", _connect)
+
+    class FakeStore:
+        def __init__(self, conn):
+            events.append(("store", conn))
+            self.conn = conn
+
+    monkeypatch.setattr(store_module, "NormalizedNewsStore", FakeStore)
+
+    class RecordingLock:
+        def __enter__(self):
+            events.append("lock_enter")
+
+        def __exit__(self, exc_type, exc, tb):
+            events.append("lock_exit")
+
+    monkeypatch.setattr(mdd, "market_write_lock", lambda: RecordingLock())
+
+    seen = {}
+
+    class FakeConfig:
+        pass
+
+    class FakeCollector:
+        def __init__(self, api_key, config):
+            seen["collector"] = (api_key, config)
+
+    class FakeProvider:
+        source = direct_source
+
+        def __init__(self, collector):
+            seen["provider"] = (direct_source, collector)
+
+        def operation(self):
+            return nullcontext()
+
+    monkeypatch.setattr(legacy_module, "load_env", lambda: f"{direct_source}-key")
+    monkeypatch.setattr(legacy_module, config_name, FakeConfig)
+    monkeypatch.setattr(legacy_module, collector_name, FakeCollector)
+    monkeypatch.setattr(adapters, provider_name, FakeProvider)
+
+    def _write_news_batch(store, provider, scope, budget, *, project_legacy=False,
+                          progress_cb=None, **kwargs):
+        events.append("write")
+        seen["writer"] = {
+            "store": store,
+            "provider": provider,
+            "scope": list(scope),
+            "budget": budget,
+            "project_legacy": project_legacy,
+            "progress_cb": progress_cb,
+        }
+        assert "lock_enter" in events
+        assert events.index("lock_enter") < events.index("write")
+        assert "lock_exit" not in events
+        return WriterResult(
+            status="succeeded",
+            articles_seen=2,
+            articles_inserted=1,
+            bodies_fetched=1,
+            errors={},
+            continuation=None,
+            legacy_rows_inserted=1,
+        )
+
+    monkeypatch.setattr(writer_module, "write_news_batch", _write_news_batch)
+
+    res = ds.run_source(source, trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert route_calls and len(route_calls) == 1
+    assert seen["collector"][0] == f"{direct_source}-key"
+    assert isinstance(seen["collector"][1], FakeConfig)
+    assert seen["provider"][0] == direct_source
+    assert seen["writer"]["scope"] == ["AAPL", "NVDA"]
+    assert isinstance(seen["writer"]["budget"], WriterBudget)
+    assert seen["writer"]["project_legacy"] is True
+    assert callable(seen["writer"]["progress_cb"])
+    assert res["collect"]["articles_seen"] == 2
+    assert res["collect"]["legacy_rows_inserted"] == 1
+    assert res["ticker_count"] == 2
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+    assert events == [
+        ("connect", "/tmp/test-market-data.db", 10.0),
+        "lock_enter",
+        ("store", fake_conn),
+        "write",
+        "lock_exit",
+        "close",
+    ]
+
+
+def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkeypatch):
+    # LEGACY_LOCAL is the pre-exit rollback/current local path: provider→news_direct only.
+    import scripts.collection.collect_polygon_news as cpn
+    import src.news_normalized.routing as routing
+
+    route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
+                                          "legacy local test route")
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
+    calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: calls.__setitem__("run_incremental",
+                                                          calls["run_incremental"] + 1))
+
+    def _subproc(argv):
+        if "--news" in argv:
+            calls["sync"] += 1
+        return {"returncode": 0}
+
+    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (calls.__setitem__("refresh", calls["refresh"] + 1),
+                                 {"ok": True})[1])
+    monkeypatch.setattr("src.news_providers.make_news_provider",
+                        lambda source, **k: (calls.__setitem__("provider", source), object())[1])
+
+    def _direct(tickers, *, source, provider, progress_cb=None, **k):
+        calls["direct"] += 1
+        return {"source": source, "tickers_scanned": len(tickers), "articles_added": 0,
+                "errors": {}}
+
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _direct)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert len(route_calls) == 1
+    assert calls == {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 1,
+                     "provider": "polygon"}
+    assert res["collect"]["source"] == "polygon"
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
+    # LEGACY_PG keeps the old collector→PG sync→local mirror chain even if local-news is default-on.
+    import scripts.collection.collect_finnhub_news as cfn
+    import src.news_normalized.routing as routing
+
+    route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
+                                          "legacy PG test route")
+    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
+    monkeypatch.setattr("src.news_direct.backfill_news_direct",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("legacy direct writer must not run")))
+    seen = {}
+
+    def _run_incremental(**kwargs):
+        seen["adapter_kwargs"] = kwargs
+        return {"mode": "incremental", "new_articles": 4}
+
+    monkeypatch.setattr(cfn, "run_incremental", _run_incremental)
+    sync_calls = []
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
+    refresh_calls = []
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (refresh_calls.append(True), {"ok": True})[1])
+
+    res = ds.run_source("finnhub_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert len(route_calls) == 1
+    assert seen["adapter_kwargs"]["tickers_arg"] == "AAPL,NVDA"
+    assert res["collect"] == {"mode": "incremental", "new_articles": 4}
+    assert len(sync_calls) == 1 and "--news" in sync_calls[0]
+    assert refresh_calls == [True]
+    assert res["local_refresh"] == {"ok": True}
+
+
+def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
+    # BLOCKED must fail closed before any provider, subprocess, or mirror work starts.
+    import scripts.collection.collect_polygon_news as cpn
+    import src.news_normalized.routing as routing
+
+    route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
+                                          "blocked test route")
+    provider_calls = {"adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: provider_calls.__setitem__(
+                            "adapter", provider_calls["adapter"] + 1))
+    monkeypatch.setattr("src.news_direct.backfill_news_direct",
+                        lambda *a, **k: provider_calls.__setitem__(
+                            "direct", provider_calls["direct"] + 1))
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (provider_calls.__setitem__(
+                            "sync", provider_calls["sync"] + 1), {"returncode": 0})[1])
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (provider_calls.__setitem__(
+                            "refresh", provider_calls["refresh"] + 1), {"ok": True})[1])
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "failed"
+    assert len(route_calls) == 1
+    assert "blocked test route" in res["error"]
+    assert provider_calls == {"adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "failed"
+    assert "blocked test route" in row["last_error"]
 
 
 def test_run_source_subprocess_success_collect_sync_refresh(monkeypatch):
