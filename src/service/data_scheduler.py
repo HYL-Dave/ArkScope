@@ -314,6 +314,18 @@ def _run_normalized_news_writer(source: str, scope: List[str], *, progress_cb=No
         conn.close()
 
 
+def _normalized_writer_continuation(collect: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    continuation = collect.get("continuation") if collect.get("status") == "partial" else None
+    if not isinstance(continuation, dict):
+        return None
+    out = {
+        "deferred_tickers": list(continuation.get("deferred_tickers") or ()),
+        "deferred_body_ids": list(continuation.get("deferred_body_ids") or ()),
+        "cursor": continuation.get("cursor"),
+    }
+    return out if out["deferred_tickers"] or out["deferred_body_ids"] or out["cursor"] else None
+
+
 def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
     """Gap-aware scope for price_backfill: read local trading-day coverage and plan a bounded
     (tickers, lookback_days) set. GATE 1: coverage is queried with lookback_days =
@@ -512,6 +524,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         ok = True
         error: Optional[str] = None
         plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
+        writer_continuation = None
         try:
             collected = False
             local_news_writer = False
@@ -538,6 +551,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     progress_cb=lambda done, total, current: _set_progress(
                         source, done, total, current),
                 )
+                writer_continuation = _normalized_writer_continuation(result["collect"])
+                if writer_continuation is not None:
+                    result["collect"]["continuation"] = writer_continuation
                 collected = True
             elif news_route is not None and news_route.mode == NewsWriteMode.LEGACY_LOCAL:
                 # LEGACY_LOCAL keeps the direct-local writer (provider→local news+fts,
@@ -648,14 +664,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 if sync["returncode"] != 0:
                     raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
 
-            if local_news_writer or (d.adapter is not None and d.sync_flag is None):
-                # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
-                # would be pointless and could re-pull stale PG news/prices.
-                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
-            elif skip_sync:
+            if skip_sync:
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
+            elif local_news_writer or (d.adapter is not None and d.sync_flag is None):
+                # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
+                # would be pointless and could re-pull stale PG news/prices.
+                result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
             else:
                 result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
@@ -664,10 +680,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             result["error"] = error
             logger.warning(f"scheduler source {source} failed: {error}")
 
-        # v1.3: a successful gap-aware run that left DEFERRED tickers (budget cap) is PARTIAL,
-        # with a saved continuation (the deferred scope) for an attended manual continue.
+        # Partial runs persist their continuation so the UI/manual follow-up can surface the
+        # unfinished scope instead of clearing it as a success.
         continuation = None
-        if ok and plan is not None and plan.deferred:
+        if ok and writer_continuation is not None:
+            result["status"] = "partial"
+            continuation = writer_continuation
+            result["continuation"] = continuation
+        elif ok and plan is not None and plan.deferred:
             result["status"] = "partial"
             continuation = {"deferred": plan.deferred, "lookback_days": plan.lookback_days,
                             "candidate_count": plan.candidate_count}

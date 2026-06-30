@@ -334,6 +334,89 @@ def test_normalized_news_route_calls_writer_under_market_lock(
     ]
 
 
+def test_normalized_news_route_preserves_writer_partial_continuation(monkeypatch):
+    import sqlite3
+
+    import src.market_data_admin as mda
+    import src.market_data_direct as mdd
+    import src.news_normalized.routing as routing
+    import src.news_normalized.store as store_module
+    import src.news_normalized.writer as writer_module
+    from src.news_normalized.models import WriterContinuation, WriterResult
+
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(
+                            AssertionError("PG sync subprocess must not run")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("_local_refresh must not run")))
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
+
+    class FakeConn:
+        def close(self):
+            pass
+
+    fake_conn = FakeConn()
+    real_connect = sqlite3.connect
+
+    def _connect(path, timeout=0, **kwargs):
+        if str(path) != "/tmp/test-market-data.db":
+            return real_connect(path, timeout=timeout, **kwargs)
+        return fake_conn
+
+    monkeypatch.setattr(sqlite3, "connect", _connect)
+
+    class FakeStore:
+        def __init__(self, conn):
+            self.conn = conn
+
+    class FakeProvider:
+        source = "polygon"
+
+    monkeypatch.setattr(store_module, "NormalizedNewsStore", FakeStore)
+    monkeypatch.setattr(mdd, "market_write_lock", lambda: nullcontext())
+    monkeypatch.setattr(ds, "_make_normalized_news_provider", lambda source: FakeProvider())
+
+    writer_continuation = WriterContinuation(
+        deferred_tickers=("MSFT", "TSLA"),
+        deferred_body_ids=("polygon-body-1",),
+        cursor="cursor-1",
+    )
+
+    def _write_news_batch(*args, **kwargs):
+        return WriterResult(
+            status="partial",
+            articles_seen=10,
+            articles_inserted=7,
+            bodies_fetched=3,
+            errors={},
+            continuation=writer_continuation,
+        )
+
+    monkeypatch.setattr(writer_module, "write_news_batch", _write_news_batch)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    expected_continuation = {
+        "deferred_tickers": ["MSFT", "TSLA"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    assert res["status"] == "partial"
+    assert res["continuation"] == expected_continuation
+    assert res["collect"]["status"] == "partial"
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] == expected_continuation
+    assert row["last_result"]["status"] == "partial"
+    assert row["last_result"]["continuation"] == expected_continuation
+    assert ds.status_snapshot()["polygon_news"]["durable_state"]["continuation"] == (
+        expected_continuation
+    )
+
+
 def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkeypatch):
     # LEGACY_LOCAL is the pre-exit rollback/current local path: provider→news_direct only.
     import scripts.collection.collect_polygon_news as cpn
@@ -374,6 +457,29 @@ def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkey
                      "provider": "polygon"}
     assert res["collect"]["source"] == "polygon"
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_skip_sync_message_precedes_legacy_local_news_route(monkeypatch):
+    import src.news_normalized.routing as routing
+
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
+                            "legacy local test route")
+    monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda tickers, **kwargs: {"source": kwargs["source"], "tickers_scanned": len(tickers)},
+    )
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(
+                            AssertionError("PG sync subprocess must not run")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("_local_refresh must not run")))
+
+    res = ds.run_source("polygon_news", trigger_source="cli", skip_sync=True)
+
+    assert res["status"] == "succeeded"
+    assert res["local_refresh"]["skipped"] == "collect-only run (no PG sync)"
 
 
 def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
