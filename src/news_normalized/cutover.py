@@ -12,7 +12,7 @@ from typing import Any, Mapping
 
 from src.market_data_direct import backup_market_db, market_write_lock
 
-from .schema import ensure_news_normalized_schema
+from .schema import begin_news_normalized_schema_transaction
 
 
 class CutoverBlocked(RuntimeError):
@@ -111,6 +111,10 @@ def begin_news_pg_exit(
     _require_exact_report(expected, current)
 
     with market_write_lock(timeout=30.0):
+        locked = preview_news_pg_exit(db_path)
+        _require_no_unmapped_legacy_rows(locked)
+        _require_exact_report(expected, locked)
+
         created_backup = backup_market_db(
             str(db_path), str(backup_path), overwrite=False
         )
@@ -125,26 +129,28 @@ def begin_news_pg_exit(
 
         conn = sqlite3.connect(db_path)
         try:
-            with conn:
-                conn.execute("PRAGMA foreign_keys=ON")
-                ensure_news_normalized_schema(conn)
-                cursor = conn.execute(
-                    "INSERT INTO news_pg_exit_runs "
-                    "(preflight_fingerprint,legacy_max_id,legacy_row_count,"
-                    "normalized_row_count,normalized_only_count,backup_path,status,"
-                    "started_at) VALUES (?,?,?,?,?,?,?,?)",
-                    (
-                        post_backup.fingerprint,
-                        post_backup.legacy_max_id,
-                        post_backup.legacy_row_count,
-                        post_backup.normalized_row_count,
-                        post_backup.normalized_only_count,
-                        str(backup_path),
-                        "testing",
-                        _utc_now(),
-                    ),
-                )
-                run_id = int(cursor.lastrowid)
+            begin_news_normalized_schema_transaction(conn)
+            cursor = conn.execute(
+                "INSERT INTO news_pg_exit_runs "
+                "(preflight_fingerprint,legacy_max_id,legacy_row_count,"
+                "normalized_row_count,normalized_only_count,backup_path,status,"
+                "started_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    post_backup.fingerprint,
+                    post_backup.legacy_max_id,
+                    post_backup.legacy_row_count,
+                    post_backup.normalized_row_count,
+                    post_backup.normalized_only_count,
+                    str(backup_path),
+                    "testing",
+                    _utc_now(),
+                ),
+            )
+            run_id = int(cursor.lastrowid)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
     return CutoverBeginResult(
@@ -202,8 +208,10 @@ def coerce_preview_report(
 
 
 def _open_read_only(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    uri = Path(db_path).resolve().as_uri() + "?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA query_only=ON")
     return conn
 
 
@@ -334,8 +342,8 @@ def _update_run_status(
     conn = sqlite3.connect(db_path)
     try:
         with conn:
-            conn.execute("PRAGMA foreign_keys=ON")
-            ensure_news_normalized_schema(conn)
+            if not _table_exists(conn, "news_pg_exit_runs"):
+                raise CutoverBlocked("cutover audit table is missing")
             cursor = conn.execute(
                 "UPDATE news_pg_exit_runs "
                 "SET status=?,completed_at=?,validation_json=? "

@@ -1,6 +1,7 @@
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -176,6 +177,14 @@ def _create_legacy_only_db(path: Path) -> Path:
     return path
 
 
+def _create_empty_legacy_db(path: Path) -> Path:
+    conn = _connect(path)
+    _create_legacy_schema(conn)
+    conn.commit()
+    conn.close()
+    return path
+
+
 def _create_normalized_only_db(path: Path) -> Path:
     _create_matched_db(path)
     conn = _connect(path)
@@ -260,6 +269,19 @@ def test_read_only_preview_preserves_file_identity_and_does_not_create_schema(tm
     assert _file_identity(db_path) == before
     assert not _table_exists(db_path, "news_pg_exit_runs")
     assert not _table_exists(db_path, "news_articles")
+
+
+def test_preview_uses_safe_read_only_uri_for_relative_paths(tmp_path, monkeypatch):
+    db_path = _create_matched_db(tmp_path / "market?cutover.db")
+    before = _file_identity(db_path)
+    monkeypatch.chdir(tmp_path)
+
+    report = cutover.preview_news_pg_exit(Path("market?cutover.db"))
+
+    assert report.legacy_row_count == 2
+    assert report.unmapped_legacy_rows == 0
+    assert _file_identity(db_path) == before
+    assert not (tmp_path / "market").exists()
 
 
 def test_preview_report_and_fingerprint_are_deterministic(tmp_path):
@@ -379,6 +401,45 @@ def test_begin_requires_exact_report_match_before_backup(tmp_path, monkeypatch):
     assert _audit_row_count(db_path) == 0
 
 
+def test_begin_rechecks_expected_report_inside_lock_before_backup(tmp_path, monkeypatch):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    expected = cutover.preview_news_pg_exit(db_path)
+    backup_calls = []
+
+    @contextmanager
+    def drifting_lock(*args, **kwargs):
+        conn = _connect(db_path)
+        _insert_normalized_article(
+            conn,
+            article_id=105,
+            source="ibkr",
+            title="Drift between preview and lock",
+            published_at="2026-06-30T12:00:00+0000",
+            ticker="TSLA",
+        )
+        conn.commit()
+        conn.close()
+        yield
+
+    monkeypatch.setattr(cutover, "market_write_lock", drifting_lock)
+    monkeypatch.setattr(
+        cutover,
+        "backup_market_db",
+        lambda *args, **kwargs: backup_calls.append((args, kwargs)) or str(args[1]),
+    )
+
+    with pytest.raises(cutover.CutoverBlocked, match="expected report changed"):
+        cutover.begin_news_pg_exit(
+            db_path,
+            expected_report=expected,
+            backup_path=tmp_path / "backup.db",
+        )
+
+    assert backup_calls == []
+    assert not (tmp_path / "backup.db").exists()
+    assert _audit_row_count(db_path) == 0
+
+
 def test_begin_writes_testing_audit_row_after_zero_delta_and_reserved_backup(tmp_path):
     db_path = _create_matched_db(tmp_path / "market.db")
     expected = cutover.preview_news_pg_exit(db_path)
@@ -444,6 +505,27 @@ def test_begin_allows_normalized_only_rows_and_audits_the_count(tmp_path):
     assert backup_path.is_file()
 
 
+def test_begin_insert_failure_rolls_back_cutover_schema(tmp_path, monkeypatch):
+    db_path = _create_empty_legacy_db(tmp_path / "market.db")
+    expected = cutover.preview_news_pg_exit(db_path)
+    monkeypatch.setattr(
+        cutover,
+        "backup_market_db",
+        lambda *args, **kwargs: str(args[1]),
+    )
+    monkeypatch.setattr(cutover, "_utc_now", lambda: None)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        cutover.begin_news_pg_exit(
+            db_path,
+            expected_report=expected,
+            backup_path=tmp_path / "backup.db",
+        )
+
+    assert not _table_exists(db_path, "news_pg_exit_runs")
+    assert not _table_exists(db_path, "news_articles")
+
+
 def test_finalize_and_rollback_update_existing_testing_runs(tmp_path):
     first_db = _create_matched_db(tmp_path / "finalize.db")
     first = cutover.begin_news_pg_exit(
@@ -488,6 +570,26 @@ def test_finalize_and_rollback_update_existing_testing_runs(tmp_path):
         )
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize("action", ["finalize", "rollback"])
+def test_finalize_and_rollback_do_not_create_missing_cutover_schema(
+    tmp_path, action
+):
+    db_path = _create_empty_legacy_db(tmp_path / f"{action}.db")
+    validation_path = tmp_path / "validation.json"
+    validation_path.write_text('{"projection_parity":"passed"}', encoding="utf-8")
+
+    with pytest.raises(cutover.CutoverBlocked):
+        if action == "finalize":
+            cutover.finalize_news_pg_exit(
+                db_path, run_id=1, validation_json_path=validation_path
+            )
+        else:
+            cutover.rollback_news_pg_exit(db_path, run_id=1)
+
+    assert not _table_exists(db_path, "news_pg_exit_runs")
+    assert not _table_exists(db_path, "news_articles")
 
 
 def test_cli_preview_output_and_begin_requires_confirmation(tmp_path):
