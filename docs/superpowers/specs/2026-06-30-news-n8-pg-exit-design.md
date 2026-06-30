@@ -12,8 +12,8 @@ N8 is split into two independently gated phases:
 
 - **N8a -- news PG-exit:** all providers write to normalized local SQLite and atomically maintain
   the current local legacy projection. Existing readers remain behaviorally unchanged. News PG
-  sync and the news portion of the PG mirror retire, strict-local reads become mandatory, and a
-  PG-unreachable E2E proves the domain is local.
+  sync and the news portion of the PG mirror retire, news-specific hard-local reads become
+  mandatory, and a PG-unreachable E2E proves the domain is local.
 - **N8b -- normalized-read upgrade:** readers deliberately adopt deduplicated articles, M:N ticker
   relations, cleaned full bodies, and normalized FTS. This is a data-model and product-semantic
   change, not a prerequisite for PG exit.
@@ -77,7 +77,8 @@ a frozen archive/tool input until a later explicit decommission decision.
 6. Run a bounded live smoke for all three providers, including IBKR 10172 retry behavior.
 7. Remove news `--news` PG sync and exclude news from local incremental mirror work.
 8. Keep IV, fundamentals, and other unfinished mirror domains unchanged.
-9. Persist strict local-market mode and remove news read fallback to PostgreSQL.
+9. Persist news-specific hard-local mode and remove news read fallback to PostgreSQL without
+   changing unfinished price, IV, or fundamentals fallback policy.
 10. Prove normal news ingest and reads with no `DATABASE_URL` and unreachable PostgreSQL.
 
 ### 3.2 N8b in scope
@@ -173,9 +174,12 @@ The normalized read toggle is separate and remains default **OFF** throughout N8
 
 - **Polygon/Finnhub:** replace `backfill_news_direct` routing with their existing normalized
   provider adapters plus the common writer. Provider IDs and related tickers are preserved.
-- **IBKR:** replace the subprocess -> PG chain with the normalized IBKR adapter and common writer,
-  under the shared Gateway lock. Metadata is durable before body retrieval; 10172 follows bounded
-  retry and terminal-unavailable policy. No nested lock acquisition is allowed.
+- **IBKR:** preserve subprocess isolation for `ib_insync` event-loop and client-ID hygiene, but
+  replace the child process's Parquet -> PG behavior with the normalized IBKR adapter and common
+  writer. The scheduler parent continues to hold the shared Gateway lock; the child is explicitly
+  told that the lock is already held and must not acquire it again. The child owns one connection,
+  disconnects in `finally`, and process exit clears its event-loop state. Metadata is durable
+  before body retrieval; 10172 follows bounded retry and terminal-unavailable policy.
 
 All three use normalized cursors. Telemetry remains in `provider_sync_runs` and
 `provider_sync_meta`, with partial status when per-ticker/body failures occur.
@@ -213,7 +217,8 @@ In a quiet window with scheduler/manual ingest paused:
 5. run a bounded IBKR metadata/body/10172 smoke;
 6. verify normalized/projection parity and idempotent reruns;
 7. disable news PG sync and news mirror work;
-8. persist strict local-market mode;
+8. persist the news PG-exit marker, which makes news hard-local without enabling global market
+   strict mode;
 9. run PG-unreachable news E2E;
 10. resume the scheduler only after every gate passes.
 
@@ -222,14 +227,23 @@ rollback remains fully local through the legacy projection.
 
 ## 6. Strict-Local Read Contract
 
-N8a keeps existing legacy read semantics but removes PostgreSQL as a possible news source:
+N8a keeps existing legacy read semantics but removes PostgreSQL as a possible news source. It does
+**not** enable the existing global `use_local_market_strict` switch because that switch also
+changes prices, IV, and fundamentals before their PG-exit slices are complete. Instead, the news
+PG-exit marker forces local-market routing on for news and makes only news methods hard-local:
 
 - `query_news`, `query_news_search`, `query_news_stats`, and `query_news_feed` must return local
   results or honest local empty/unavailable states;
 - no empty result may trigger `DatabaseBackend.query_news*`;
 - malformed/missing local schema is surfaced as a local availability error, not concealed by PG;
-- Settings/status must report strict mode effective, not merely implemented;
+- Settings/status must report news hard-local effective, not merely implemented;
 - tests must fail if a PG news method is called.
+
+When `DATABASE_URL` is absent, DAL construction must still select the local market/SA composite
+when local databases and their routing markers are present. The PostgreSQL base may remain an
+unconnected compatibility superclass for existing `isinstance(DatabaseBackend)` call sites, but
+an empty DSN must fail clearly if an unfinished non-local method actually tries to connect. News
+methods must never reach that base.
 
 Other unfinished domains may still use PG until their own slices complete. The N8a E2E therefore
 asserts news-domain isolation specifically and does not mislabel the whole application PG-free.
@@ -303,7 +317,8 @@ operator-selected retention policy.
 - Polygon, Finnhub, and IBKR ingest never require PostgreSQL.
 - Normalized and legacy projection writes are local and atomic.
 - News PG sync and news mirror processing are unreachable in normal scheduling.
-- Existing readers remain behaviorally stable and cannot fall back to PG.
+- Existing readers remain behaviorally stable and cannot fall back to PG, including when no
+  `DATABASE_URL` is configured.
 - PG-unreachable news E2E passes.
 - N7 backup and legacy tables remain available for recovery.
 
