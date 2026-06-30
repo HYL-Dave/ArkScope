@@ -140,6 +140,14 @@ CREATE TABLE IF NOT EXISTS news_legacy_migration_map (
 CREATE INDEX IF NOT EXISTS idx_news_legacy_map_article
 ON news_legacy_migration_map(article_id);
 
+CREATE TABLE IF NOT EXISTS news_legacy_projection_map (
+    article_id      INTEGER NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
+    ticker          TEXT NOT NULL,
+    legacy_news_id  INTEGER NOT NULL UNIQUE,
+    projected_at    TEXT NOT NULL,
+    PRIMARY KEY(article_id,ticker)
+);
+
 CREATE TABLE IF NOT EXISTS news_ingest_conflicts (
     id                         INTEGER PRIMARY KEY,
     source                     TEXT NOT NULL,
