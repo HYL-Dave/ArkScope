@@ -30,3 +30,4 @@ def test_ibkr_source_imports_without_ib_insync_and_constructor_explains_dependen
     )
 
     assert proc.returncode == 0, proc.stderr
+    assert proc.stderr == ""

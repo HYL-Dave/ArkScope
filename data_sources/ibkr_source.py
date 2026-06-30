@@ -298,6 +298,11 @@ class IBKRDataSource(BaseDataSource):
         """
         super().__init__(api_key=None)  # IBKR doesn't use API keys
 
+        self._ib: Optional[IB] = None
+        self._connected = False
+        self._last_request_time = 0
+        self._request_count = 0
+
         if not HAS_IB_INSYNC:
             raise ImportError(
                 "ib_insync is required for IBKR data source. "
@@ -312,11 +317,6 @@ class IBKRDataSource(BaseDataSource):
         self.readonly = readonly
 
         logger.info(f"IBKR config: {self.host}:{self.port} (client_id={self.client_id})")
-
-        self._ib: Optional[IB] = None
-        self._connected = False
-        self._last_request_time = 0
-        self._request_count = 0
 
     @property
     def source_name(self) -> str:
