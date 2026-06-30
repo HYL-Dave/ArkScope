@@ -21,6 +21,7 @@ export function macroRoutingLabel(status: MacroStatus): string {
 }
 
 export function newsRoutingLabel(status: NewsStatus): string {
+  if (status.news_hard_local) return newsWriteRouteLabel(status);
   if (status.env_override) {
     return status.direct_active
       ? "直寫本地（env 強制開啟）"
@@ -28,6 +29,32 @@ export function newsRoutingLabel(status: NewsStatus): string {
   }
   if (!status.direct_active) return "回退至 PG 同步／本地鏡像";
   return status.setting_explicit ? "直寫本地（已設定）" : "直寫本地（預設）";
+}
+
+export function newsWriteRouteLabel(status: NewsStatus): string {
+  if (status.news_hard_local) return "Normalized SQLite + legacy local projection";
+  switch (status.write_route) {
+    case "normalized":
+      return "Normalized SQLite + legacy local projection（pre-exit test）";
+    case "legacy_local":
+      return "Legacy local direct writer";
+    case "legacy_pg":
+      return "Legacy PG sync + local mirror";
+    case "blocked":
+      return "Blocked";
+    default:
+      return status.write_route;
+  }
+}
+
+export function newsPostgresRouteLabel(status: NewsStatus): string {
+  if (status.news_hard_local) return "已退出（不可回退到 PG）";
+  return status.pg_news_route_available ? "可用（尚未退出）" : "不可用";
+}
+
+export function newsReadSurfaceLabel(status: NewsStatus): string {
+  if (status.news_hard_local) return "Legacy local compatibility surface (N8b pending)";
+  return status.direct_active ? "Legacy local direct surface" : "Legacy PG mirror surface";
 }
 
 // coverage_status → UI label + tone. The backend owns the completeness judgement (Slice A.1);

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, newsRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
+import {
+  coverageStatusLabel,
+  macroRoutingLabel,
+  marketRoutingLabel,
+  newsPostgresRouteLabel,
+  newsReadSurfaceLabel,
+  newsRoutingLabel,
+  newsWriteRouteLabel,
+  schedulerStateLabel,
+} from "./marketDataDisplay";
 import type { MacroStatus, MarketDataStatus, NewsStatus } from "./api";
 
 const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
@@ -78,6 +87,15 @@ const newsStatus = (over: Partial<NewsStatus>): NewsStatus => ({
   env_override: false,
   env_value: null,
   direct_active: true,
+  normalized_writes_setting: false,
+  normalized_writes_setting_explicit: false,
+  normalized_writes_env_override: false,
+  normalized_writes_env_value: null,
+  write_route: "legacy_local",
+  write_route_reason: "test",
+  news_pg_exit_completed: false,
+  news_hard_local: false,
+  pg_news_route_available: true,
   sync: null,
   ...over,
 });
@@ -95,6 +113,37 @@ describe("newsRoutingLabel", () => {
       .toBe("直寫本地（env 強制開啟）");
     expect(newsRoutingLabel(newsStatus({ direct_active: false, env_override: true, env_value: false })))
       .toBe("回退 PG 鏡像（env 強制關閉）");
+  });
+});
+
+describe("news cutover labels", () => {
+  it("renders the locked post-exit state", () => {
+    const postExit = newsStatus({
+      write_route: "normalized",
+      news_pg_exit_completed: true,
+      news_hard_local: true,
+      pg_news_route_available: false,
+    } as Partial<NewsStatus>);
+
+    expect(newsWriteRouteLabel(postExit)).toBe("Normalized SQLite + legacy local projection");
+    expect(newsPostgresRouteLabel(postExit)).toBe("已退出（不可回退到 PG）");
+    expect(newsReadSurfaceLabel(postExit)).toBe("Legacy local compatibility surface (N8b pending)");
+    expect(newsRoutingLabel(postExit)).toBe("Normalized SQLite + legacy local projection");
+  });
+
+  it("keeps normalized writes visibly pre-exit/test while PG remains available", () => {
+    const preExit = newsStatus({
+      normalized_writes_setting: true,
+      normalized_writes_setting_explicit: true,
+      write_route: "normalized",
+      news_pg_exit_completed: false,
+      news_hard_local: false,
+      pg_news_route_available: true,
+    } as Partial<NewsStatus>);
+
+    expect(newsWriteRouteLabel(preExit)).toBe("Normalized SQLite + legacy local projection（pre-exit test）");
+    expect(newsPostgresRouteLabel(preExit)).toBe("可用（尚未退出）");
+    expect(newsReadSurfaceLabel(preExit)).toBe("Legacy local direct surface");
   });
 });
 

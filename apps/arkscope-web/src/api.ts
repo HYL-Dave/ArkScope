@@ -1173,6 +1173,8 @@ export interface NewsDirectSync extends SyncMeta {
   providers: Record<string, NewsProviderSync>;
 }
 
+export type NewsWriteRoute = "normalized" | "legacy_local" | "legacy_pg" | "blocked";
+
 export interface NewsStatus {
   market_db: string;
   exists: boolean;
@@ -1182,6 +1184,15 @@ export interface NewsStatus {
   env_override: boolean;
   env_value: boolean | null;
   direct_active: boolean;
+  normalized_writes_setting: boolean;
+  normalized_writes_setting_explicit: boolean;
+  normalized_writes_env_override: boolean;
+  normalized_writes_env_value: boolean | null;
+  write_route: NewsWriteRoute;
+  write_route_reason: string;
+  news_pg_exit_completed: boolean;
+  news_hard_local: boolean;
+  pg_news_route_available: boolean;
   sync: NewsDirectSync | null;
 }
 
@@ -1298,6 +1309,10 @@ export function getNewsStatus(): Promise<NewsStatus> {
 
 export function setUseLocalNews(enabled: boolean): Promise<{ use_local_news_setting: boolean }> {
   return sendJSON("/news/settings", "PUT", { enabled });
+}
+
+export function setNormalizedNewsWrites(enabled: boolean): Promise<{ normalized_writes_setting: boolean }> {
+  return sendJSON("/news/settings/normalized-writes", "PUT", { enabled });
 }
 
 // --- 本地總經/行事曆 (macro_calendar.db) — use_local_macro toggle + coverage (§4c) ---

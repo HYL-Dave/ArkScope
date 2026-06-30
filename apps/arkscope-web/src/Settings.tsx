@@ -31,6 +31,7 @@ import {
   setUseLocalMacro,
   getMacroStatus,
   setUseLocalNews,
+  setNormalizedNewsWrites,
   getNewsStatus,
   getTradingDayCoverage,
   previewAppRecordsMigration,
@@ -82,7 +83,16 @@ import {
 import { buildManualCompletion, pollOAuthStatus, probeDisplayLabel, probeDisplaySummary, probeRuntimeNote } from "./chatgptOAuth";
 import { routeSourceBadge, routeIsOverridable } from "./modelRouteDisplay";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { coverageStatusLabel, macroRoutingLabel, marketRoutingLabel, newsRoutingLabel, schedulerStateLabel } from "./marketDataDisplay";
+import {
+  coverageStatusLabel,
+  macroRoutingLabel,
+  marketRoutingLabel,
+  newsPostgresRouteLabel,
+  newsReadSurfaceLabel,
+  newsRoutingLabel,
+  newsWriteRouteLabel,
+  schedulerStateLabel,
+} from "./marketDataDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -783,12 +793,26 @@ function NewsStorageSection() {
     void load();
   }, [load]);
 
-  async function toggle(enabled: boolean) {
-    if (busy || status?.env_override) return;
+  async function toggleLocalNews(enabled: boolean) {
+    if (busy || status?.env_override || status?.news_hard_local) return;
     setBusy(true);
     setErr(null);
     try {
       await setUseLocalNews(enabled);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleNormalizedWrites(enabled: boolean) {
+    if (busy || status?.normalized_writes_env_override || status?.news_hard_local) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await setNormalizedNewsWrites(enabled);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -832,8 +856,35 @@ function NewsStorageSection() {
                 ? `${status.news.row_count.toLocaleString()} 篇 · ${status.news.source_count} 來源 · 最新 ${status.news.latest_published ?? "—"}`
                 : "尚未建立"}
             </dd>
-            <dt>Polygon／Finnhub 路由</dt>
-            <dd>{newsRoutingLabel(status)}</dd>
+            {status.news_hard_local ? (
+              <>
+                <dt>新聞寫入</dt>
+                <dd>{newsWriteRouteLabel(status)}</dd>
+                <dt>PostgreSQL</dt>
+                <dd>{newsPostgresRouteLabel(status)}</dd>
+                <dt>新聞讀取</dt>
+                <dd>{newsReadSurfaceLabel(status)}</dd>
+              </>
+            ) : (
+              <>
+                <dt>Legacy local 直寫</dt>
+                <dd>{newsRoutingLabel(status)}</dd>
+                <dt>Normalized 寫入測試</dt>
+                <dd>
+                  {status.normalized_writes_env_override
+                    ? status.normalized_writes_env_value
+                      ? "開啟（env 強制）"
+                      : "關閉（env 強制）"
+                    : status.normalized_writes_setting
+                      ? "開啟（pre-exit test）"
+                      : "關閉"}
+                </dd>
+                <dt>目前新聞寫入</dt>
+                <dd>{newsWriteRouteLabel(status)}</dd>
+                <dt>PostgreSQL</dt>
+                <dd>{newsPostgresRouteLabel(status)}</dd>
+              </>
+            )}
             <dt>最近 direct 成功</dt>
             <dd>{formatSystemTimestamp(sync?.last_success)}</dd>
             <dt>最近 direct 嘗試</dt>
@@ -844,21 +895,41 @@ function NewsStorageSection() {
             <dd className={providerErrors ? "refresh-err" : undefined}>{providerErrors || sync?.last_error || "—"}</dd>
           </dl>
 
-          <div className="settings-actions" style={{ marginTop: 12 }}>
-            <label className="ds-toggle">
-              <input
-                type="checkbox"
-                checked={status.env_override ? status.direct_active : status.use_local_news_setting}
-                disabled={busy || status.env_override}
-                onChange={(e) => void toggle(e.target.checked)}
-              />
-              Polygon／Finnhub 新聞直寫本地
-            </label>
-          </div>
+          {!status.news_hard_local && (
+            <div className="settings-actions" style={{ marginTop: 12 }}>
+              <label className="ds-toggle">
+                <input
+                  type="checkbox"
+                  checked={status.env_override ? status.direct_active : status.use_local_news_setting}
+                  disabled={busy || status.env_override}
+                  onChange={(e) => void toggleLocalNews(e.target.checked)}
+                />
+                Polygon／Finnhub 新聞直寫本地
+              </label>
+              <label className="ds-toggle">
+                <input
+                  type="checkbox"
+                  checked={
+                    status.normalized_writes_env_override
+                      ? !!status.normalized_writes_env_value
+                      : status.normalized_writes_setting
+                  }
+                  disabled={busy || status.normalized_writes_env_override}
+                  onChange={(e) => void toggleNormalizedWrites(e.target.checked)}
+                />
+                Normalized news writes（測試）
+              </label>
+            </div>
+          )}
 
           {status.env_override && (
             <p className="muted tiny" style={{ marginTop: 8 }}>
               目前由 ARKSCOPE_USE_LOCAL_NEWS 環境變數強制控制；移除 env override 後才能由此開關變更。
+            </p>
+          )}
+          {status.normalized_writes_env_override && !status.news_hard_local && (
+            <p className="muted tiny" style={{ marginTop: 8 }}>
+              目前由 ARKSCOPE_USE_NORMALIZED_NEWS_WRITES 環境變數強制控制；移除 env override 後才能由此開關變更。
             </p>
           )}
         </div>

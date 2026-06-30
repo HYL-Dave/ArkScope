@@ -1,8 +1,10 @@
 """News read routes plus direct-local ingest routing settings."""
 
 import os
+import sqlite3
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 
@@ -14,6 +16,12 @@ from src.news_providers import (
     USE_LOCAL_NEWS_KEY,
     parse_news_toggle,
     resolve_use_local_news,
+)
+from src.news_normalized.routing import (
+    ENV_USE_NORMALIZED_NEWS_WRITES,
+    NEWS_PG_EXIT_COMPLETED_KEY,
+    USE_NORMALIZED_NEWS_WRITES_KEY,
+    resolve_news_write_route,
 )
 from src.news_sync_status import read_news_sync_status
 from src.profile_state import ProfileStateStore
@@ -31,6 +39,47 @@ class LocalNewsToggle(BaseModel):
     enabled: bool
 
 
+class NormalizedNewsWritesToggle(BaseModel):
+    enabled: bool
+
+
+def _news_pg_exit_audit_completed(db_path: str) -> bool:
+    """Read the market DB audit marker without creating or mutating it."""
+    path = Path(db_path)
+    if not path.exists():
+        return False
+    try:
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                ("news_pg_exit_runs",),
+            ).fetchone()
+            if not exists:
+                return False
+            row = conn.execute(
+                "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
+
+
+def _news_pg_exit_completed(store: ProfileStateStore, market_db: str) -> bool:
+    profile_value = parse_news_toggle(store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY))
+    return profile_value is True or _news_pg_exit_audit_completed(market_db)
+
+
+def _reject_pg_retired_setting() -> None:
+    raise HTTPException(
+        status_code=409,
+        detail="PG news route is retired after exit; this setting cannot select PG.",
+    )
+
+
 @router.get("/status")
 def news_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Read direct-news routing, local coverage, and telemetry without writes."""
@@ -39,6 +88,23 @@ def news_status(store: ProfileStateStore = Depends(get_profile_store)):
     profile_value = store.get_setting(USE_LOCAL_NEWS_KEY)
     env_raw = os.environ.get(ENV_USE_LOCAL_NEWS)
     env_value = parse_news_toggle(env_raw)
+    normalized_profile_value = store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
+    normalized_setting = parse_news_toggle(normalized_profile_value)
+    normalized_env_raw = os.environ.get(ENV_USE_NORMALIZED_NEWS_WRITES)
+    normalized_env_value = parse_news_toggle(normalized_env_raw)
+    exit_profile_value = store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)
+    audit_exit_completed = _news_pg_exit_audit_completed(path)
+    news_pg_exit_completed = (
+        parse_news_toggle(exit_profile_value) is True or audit_exit_completed
+    )
+    route_exit_value = True if audit_exit_completed else exit_profile_value
+    write_route = resolve_news_write_route(
+        exit_completed=route_exit_value,
+        normalized_value=normalized_profile_value,
+        local_value=profile_value,
+        normalized_env=normalized_env_raw,
+        local_env=env_raw,
+    )
     return {
         "market_db": path,
         "exists": stats["exists"],
@@ -48,6 +114,15 @@ def news_status(store: ProfileStateStore = Depends(get_profile_store)):
         "env_override": env_value is not None,
         "env_value": env_value,
         "direct_active": resolve_use_local_news(profile_value, env_raw),
+        "normalized_writes_setting": normalized_setting is True,
+        "normalized_writes_setting_explicit": normalized_setting is not None,
+        "normalized_writes_env_override": normalized_env_value is not None,
+        "normalized_writes_env_value": normalized_env_value,
+        "write_route": write_route.mode.value,
+        "write_route_reason": write_route.reason,
+        "news_pg_exit_completed": news_pg_exit_completed,
+        "news_hard_local": news_pg_exit_completed,
+        "pg_news_route_available": not news_pg_exit_completed,
         "sync": read_news_sync_status(path),
     }
 
@@ -58,9 +133,27 @@ def set_local_news(
     store: ProfileStateStore = Depends(get_profile_store),
 ):
     """Persist the explicit direct-local routing value; scheduler reads it live."""
+    if not body.enabled and _news_pg_exit_completed(store, resolve_market_db_path()):
+        _reject_pg_retired_setting()
     require_profile_state_write("set_use_local_news", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_NEWS_KEY, "true" if body.enabled else "false")
     return {"use_local_news_setting": body.enabled}
+
+
+@router.put("/settings/normalized-writes")
+def set_normalized_news_writes(
+    body: NormalizedNewsWritesToggle,
+    store: ProfileStateStore = Depends(get_profile_store),
+):
+    """Persist normalized-writer routing unless the PG route has been retired."""
+    if not body.enabled and _news_pg_exit_completed(store, resolve_market_db_path()):
+        _reject_pg_retired_setting()
+    require_profile_state_write("set_normalized_news_writes", {"enabled": body.enabled})
+    store.set_setting(
+        USE_NORMALIZED_NEWS_WRITES_KEY,
+        "true" if body.enabled else "false",
+    )
+    return {"normalized_writes_setting": body.enabled}
 
 
 @router.get("/feed")
