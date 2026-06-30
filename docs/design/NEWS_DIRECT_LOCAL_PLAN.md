@@ -2,16 +2,18 @@
 
 Date: 2026-06-26
 Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27**;
-**normalized all-source N1–N7 LIVE-MIGRATED and validated 2026-06-29; N8 cutover has not run**
+**normalized all-source N1–N7 LIVE-MIGRATED and validated 2026-06-29; N8a code/offline gate
+COMPLETE 2026-06-30, but the live begin/finalize cutover has NOT run**
 (see the checkpoint near the end). Original Step 2 scoping is retained below as history. News chosen
 first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
 provider_sync + scheduler-state + Settings pattern. IV waits until its data-source strategy
 (provider-precomputed?) is clearer.
 
-## Current news flow (verified against code)
+## Historical Step 2 news flow (pre-direct-local; retained for context)
 
-It is NOT provider→PG today — it's **provider → Parquet → PG → local mirror**:
+At the original Step 2 baseline it was NOT provider→PG directly — it was
+**provider → Parquet → PG → local mirror**:
 
 - `scripts/collection/collect_polygon_news.run_incremental` (and the finnhub twin) fetch + parse
   articles and write **Parquet** under `data/news/raw/` (via `StorageManager.save_articles`),
@@ -276,17 +278,18 @@ resolution policy in the separately gated N7 migration plan; the offline foundat
 - **N6/N6.1 complete.** The sanitized five-case probe returned two bodies and three explicit 10172
   unavailable responses. N6.1 preserves 10172 as typed unavailable evidence; N7 owns bounded retry
   and terminal policy without inferring `expired` from age.
-- **N7 apply not started.** No normalized schema/data has been written to the live DB.
-- **N8 cutover not started.** Runtime reads, scheduler routing, sentiment/risk scoring, and UI
-  still use their current paths. Active scoring must move from Parquet to normalized SQLite before
-  cutover, or new articles would silently remain unscored.
+- **N7 live migration complete.** Normalized schema/data now exists beside unchanged legacy `news`;
+  the N7 backup remains the rollback point through N8 validation.
+- **N8a implementation complete, live cutover not started.** Runtime still follows the pre-exit
+  profile state until Task 13 begin/finalize is run. Scoring is not a PG-exit gate; it remains a
+  standalone local Parquet/OpenAI CLI until a separate scoring redesign exists.
 - **N9 legacy deletion not started.** The legacy `news` table, FileBackend fallback, mirror code,
   and old collection/scoring scripts remain until replacement paths pass the PG-unreachable gate.
 
 Parquet is no longer the intended authority for the normalized end state. For now it remains a
-frozen migration/enrichment source **and** an active legacy dependency for IBKR collection and
-scoring. It can be frozen/archived and obsolete scripts removed only after N8 proves all readers,
-writers, and scoring against normalized SQLite.
+frozen migration/enrichment source **and** a local legacy input for standalone scoring. It can be
+frozen/archived and obsolete scripts removed only after N8b/N9 prove replacement readers and
+tooling; that is separate from news PG-exit.
 
 ---
 
@@ -347,8 +350,49 @@ legacy rows, zero normalized objects, and passes `quick_check`. Retain it throug
 
 - **Polygon URL demotion remains source-wide in N8.** New Polygon URL reuse must never regain
   strong-key semantics.
-- **N8 runtime work is now unblocked, but cutover has not occurred.** Its implementation plan must
-  explicitly reconcile scorer-versus-read ordering. Locked direction: scorer first, then writers,
-  bounded IBKR smoke, reads, news PG-sync/mirror retirement, and finally PG-unreachable E2E.
-- N9 legacy table/Parquet/script deletion remains blocked until N8 proves normalized reads,
-  writers, scoring, and rollback behavior.
+- **N8a runtime work is implemented and offline-verified, but the live cutover has not occurred.**
+  Scoring is intentionally **outside** PG-exit: the existing scorer is a local Parquet/OpenAI CLI,
+  not a PostgreSQL dependency and not part of the live read path. N8a therefore targets PG-exit
+  only: normalized writers + legacy projection, strict local news behavior after the exit marker,
+  IBKR normalized subprocess routing, news-only mirror/sync retirement, and a PG-unreachable gate.
+- N9 legacy table/Parquet/script deletion remains blocked until N8b/N9 prove normalized reads and
+  replacement tooling. The N8a compatibility projection keeps current readers on legacy `news`.
+
+## N8a PG-exit implementation checkpoint (code/offline gate complete, 2026-06-30)
+
+N8a is implemented in code but **not live-enabled**. No live `news_pg_exit_runs` begin/finalize
+transition has been executed by this checkpoint; `news_pg_exit_completed` is not asserted here.
+The live cutover remains Task 13 and requires a fresh preview, explicit operator approval,
+scheduler/manual ingest pause, backup, validation JSON, and final PG-unreachable smoke.
+
+Implemented behavior:
+
+- A three-state route resolver separates legacy PG, legacy local, normalized, and blocked states.
+  After `news_pg_exit_completed=true`, normalized writes are the only allowed news write path;
+  explicit attempts to disable normalized writes fail closed rather than routing to PG.
+- Polygon/Finnhub adapters can write through the normalized common writer, which transactionally
+  projects to the existing `news`/`news_fts` compatibility tables. Current readers therefore remain
+  on legacy `news` until N8b.
+- IBKR keeps subprocess isolation via `collect_ibkr_news_normalized.py`; it no longer needs the old
+  IBKR collector → Parquet → `migrate_to_supabase --news` → mirror chain after the exit marker.
+- News hard-local behavior is gated by the audited exit marker. With the marker set, news reads and
+  Settings status fail closed without `DATABASE_URL`; without it, pre-cutover behavior is preserved.
+- Scheduler and manual market-data update paths exclude only the `news` mirror domain after the
+  audited exit. Prices/IV/fundamentals mirror behavior remains untouched.
+- Guarded begin/finalize/rollback tooling writes one immutable audit row and profile-state markers.
+  Begin only enables normalized writes after the preflight report, backup, and audit row exist;
+  finalize only marks exit complete after all required validation gates are exactly `passed`;
+  rollback is allowed only from `testing` and checks audit eligibility before profile cleanup.
+
+Offline verification for this checkpoint:
+
+- Backend gate:
+  `398 passed` for `tests/test_news_normalized_*.py`, `tests/test_news_n8a_cutover.py`,
+  `tests/test_normalized_ibkr_worker.py`, scheduler/admin/backend/SA/news-settings/no-PG suites.
+- Frontend gate: `200 passed` in Vitest, `npm run typecheck` clean, and production build clean.
+- Python compile gate: `compileall` over `src/news_normalized`, scheduler, normalized IBKR worker,
+  and cutover CLI passed.
+- Hygiene: `git diff --check` passed.
+
+This checkpoint is intentionally not a PG-exit completion claim. The live Task 13 cutover remains
+blocked on explicit approval and post-cutover validation.

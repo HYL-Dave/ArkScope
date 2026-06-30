@@ -2,9 +2,11 @@
 
 Date: 2026-06-25
 Status: **Slice 1 DONE + live-migrated; Step 2 IN PROGRESS.** Polygon/Finnhub news direct-local
-cutover completed and live-verified 2026-06-27. The all-source normalized-news N1–N5 offline
-foundation completed 2026-06-28, but its migration/cutover has not started; `ibkr_news`, IV,
-fundamentals, remaining price ingest, mirror retirement, SEC/dead paths, and UI collapse remain.
+cutover completed and live-verified 2026-06-27. The all-source normalized-news N7 migration is
+live-applied and validated (2026-06-29). N8a news PG-exit code and offline verification are
+complete (2026-06-30), but the hard-gated live begin/finalize cutover has **not** run; `ibkr_news`
+still uses the old PG/mirror runtime path until that cutover. IV, fundamentals, remaining price
+ingest, broader mirror retirement, SEC/dead paths, and UI collapse remain.
 
 ## Progress
 
@@ -23,14 +25,14 @@ fundamentals, remaining price ingest, mirror retirement, SEC/dead paths, and UI 
   Settings rollback, and a real-profile idempotent smoke. This bypasses PG sync/mirror only for
   those two scheduler sources. `ibkr_news` intentionally remains collector → PG → mirror, and the
   mirror remains load-bearing for IV/fundamentals and other unfinished ingest paths.
-  The normalized all-source foundation is committed through N5 (identity/schema/cleaner/store,
-  read-only preview, bounded writer, REST adapters, fake-tested IBKR adapter). The real preview
-  canonical post-alias fingerprint is
-  `55aa79c33ebed92658dc8af232d12ae465d4d19c8ef3bf4556f2e0ed6c5442cc`;
-  it reports 816 strong conflicts and 924 weak ambiguities, so N7 apply remains gated. **N6 probe
-  pending: Gateway handshake unavailable. N7 apply / N8 cutover / N9 deletion are not started.**
-  Live `market_data.db` has no normalized-news tables yet. Parquet remains frozen enrichment input
-  plus an active IBKR/scoring legacy dependency, not the future authority.
+  The all-source normalized-news migration is now live (`news_articles`/body/ticker/key tables
+  populated beside unchanged legacy `news`), and N8a has a normalized writer plus atomic legacy
+  projection, isolated normalized IBKR worker, audited cutover tooling, strict local news behavior
+  after the exit marker, and news-only mirror/sync exclusion. This is still **not live cutover**:
+  the `news_pg_exit_completed` marker is not set here, and Task 13 must run the begin/finalize
+  sequence plus PG-unreachable smoke before claiming news is off PG.
+  Scoring is deliberately outside PG-exit: the current scorer is a local Parquet/OpenAI CLI and is
+  not a runtime PostgreSQL dependency.
 
 ## Why this exists
 
@@ -86,7 +88,7 @@ re-fetch).
 | Domain | Read local? | Write local? | PG still needed for | Class |
 |---|---|---|---|---|
 | Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
-| News | ✅ local | ✅ Polygon/Finnhub direct; ⚠️ IBKR via mirror | `ibkr_news` ingest | (1) ingest — partial |
+| News | ✅ local | ✅ Polygon/Finnhub direct; ⚠️ IBKR via mirror until N8a live cutover | `ibkr_news` ingest until Task 13 | (1) ingest — partial |
 | IV | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
 | Fundamentals | ✅ (mirror) + SEC/FD live | ❌ PG→mirror | ingest | (1) ingest |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
