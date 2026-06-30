@@ -40,6 +40,23 @@ try:
 except ImportError:
     HAS_IB_INSYNC = False
 
+    class RequestError(Exception):
+        def __init__(self, req_id, code, message):
+            self.reqId = req_id
+            self.code = code
+            self.message = message
+            super().__init__(req_id, code, message)
+
+    class _MissingIBSync:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "ib_insync is required for IBKR data source. "
+                "Install with: pip install ib_insync"
+            )
+
+    IB = Option = ScannerSubscription = Stock = TagValue = _MissingIBSync
+    util = None
+
 from .base import (
     BaseDataSource,
     DataSourceType,

@@ -2,37 +2,17 @@ from contextlib import contextmanager, nullcontext
 import json
 import logging
 import sqlite3
-import sys
 import traceback
 from types import SimpleNamespace
-import types
 
 import pytest
 
-try:
-    from ib_insync import RequestError
-except ModuleNotFoundError:
-    class RequestError(Exception):
-        def __init__(self, req_id, code, message):
-            self.reqId = req_id
-            self.code = code
-            self.message = message
-            super().__init__(req_id, code, message)
-
-    ib_insync_stub = types.ModuleType("ib_insync")
-    ib_insync_stub.IB = object
-    ib_insync_stub.Option = object
-    ib_insync_stub.RequestError = RequestError
-    ib_insync_stub.ScannerSubscription = object
-    ib_insync_stub.Stock = object
-    ib_insync_stub.TagValue = object
-    ib_insync_stub.util = SimpleNamespace()
-    sys.modules["ib_insync"] = ib_insync_stub
-
 import data_sources.ibkr_source as ibkr_source
-from data_sources.ibkr_source import IBKRDataSource, IBKRNewsArticleUnavailable
-if not hasattr(ibkr_source, "RequestError"):
-    ibkr_source.RequestError = RequestError
+from data_sources.ibkr_source import (
+    IBKRDataSource,
+    IBKRNewsArticleUnavailable,
+    RequestError,
+)
 from scripts.diagnostics.probe_ibkr_news_bodies import (
     DEFAULT_PROBES,
     ProbeSpec,

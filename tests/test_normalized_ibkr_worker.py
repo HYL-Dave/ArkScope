@@ -6,29 +6,8 @@ from datetime import datetime
 import logging
 import sys
 from types import SimpleNamespace
-import types
 
 import pytest
-
-try:
-    import ib_insync  # noqa: F401
-except ModuleNotFoundError:
-    class RequestError(Exception):
-        def __init__(self, req_id, code, message):
-            self.reqId = req_id
-            self.code = code
-            self.message = message
-            super().__init__(req_id, code, message)
-
-    ib_insync_stub = types.ModuleType("ib_insync")
-    ib_insync_stub.IB = object
-    ib_insync_stub.Option = object
-    ib_insync_stub.RequestError = RequestError
-    ib_insync_stub.ScannerSubscription = object
-    ib_insync_stub.Stock = object
-    ib_insync_stub.TagValue = object
-    ib_insync_stub.util = SimpleNamespace()
-    sys.modules["ib_insync"] = ib_insync_stub
 
 
 def test_ibkr_runtime_disconnects_after_worker_failure():
