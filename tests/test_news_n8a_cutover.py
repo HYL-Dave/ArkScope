@@ -192,6 +192,36 @@ def _create_normalized_only_db(path: Path) -> Path:
     return path
 
 
+def _create_projection_only_legacy_db(path: Path) -> Path:
+    _create_matched_db(path)
+    conn = _connect(path)
+    _insert_legacy(
+        conn,
+        row_id=12,
+        ticker="NVDA",
+        title="Projection-only legacy story",
+        source="ibkr",
+        published_at="2026-06-29T12:00:00+0000",
+        url="https://example.test/projection-only",
+    )
+    _insert_normalized_article(
+        conn,
+        article_id=104,
+        source="ibkr",
+        title="Projection-only legacy story",
+        published_at="2026-06-29T12:00:00+0000",
+        ticker="NVDA",
+    )
+    conn.execute(
+        "INSERT INTO news_legacy_projection_map "
+        "(article_id,ticker,legacy_news_id,projected_at) VALUES (?,?,?,?)",
+        (104, "NVDA", 12, "2026-06-29T12:01:00Z"),
+    )
+    conn.commit()
+    conn.close()
+    return path
+
+
 def _table_exists(path: Path, table: str) -> bool:
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
@@ -302,6 +332,29 @@ def test_unmapped_legacy_rows_are_reported_and_block_begin_before_writes(
     assert backup_calls == []
     assert not (tmp_path / "backup.db").exists()
     assert not _table_exists(db_path, "news_pg_exit_runs")
+
+
+def test_projection_map_does_not_mask_unmapped_legacy_rows(tmp_path):
+    db_path = _create_projection_only_legacy_db(tmp_path / "market.db")
+
+    report = cutover.preview_news_pg_exit(db_path)
+
+    assert report.unmapped_legacy_rows == 1
+    assert report.unmapped_rows == [
+        {
+            "legacy_news_id": 12,
+            "ticker": "NVDA",
+            "title": "Projection-only legacy story",
+            "source": "ibkr",
+            "published_at": "2026-06-29T12:00:00+0000",
+            "article_hash": canonical_article_hash(
+                "NVDA",
+                "Projection-only legacy story",
+                "2026-06-29T12:00:00+0000",
+            ),
+            "url": "https://example.test/projection-only",
+        }
+    ]
 
 
 def test_begin_requires_exact_report_match_before_backup(tmp_path, monkeypatch):

@@ -272,20 +272,13 @@ def _normalized_only_count(conn: sqlite3.Connection) -> int:
 def _unmapped_legacy_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     if not _table_exists(conn, "news"):
         return []
-    conditions = []
+    where = ""
     if _table_exists(conn, "news_legacy_migration_map"):
-        conditions.append(
-            "NOT EXISTS ("
+        where = (
+            " WHERE NOT EXISTS ("
             "SELECT 1 FROM news_legacy_migration_map m "
             "WHERE m.legacy_news_id=n.id)"
         )
-    if _table_exists(conn, "news_legacy_projection_map"):
-        conditions.append(
-            "NOT EXISTS ("
-            "SELECT 1 FROM news_legacy_projection_map p "
-            "WHERE p.legacy_news_id=n.id)"
-        )
-    where = " WHERE " + " AND ".join(conditions) if conditions else ""
     rows = conn.execute(
         "SELECT id,ticker,title,source,published_at,article_hash,url "
         f"FROM news n{where} ORDER BY id"
