@@ -1,8 +1,10 @@
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 
 import src.news_direct as news_direct
+import src.news_providers as news_providers
 from src.market_data_admin import (
     _NEWS_SCHEMA,
     _ensure_news_fts_triggers,
@@ -96,8 +98,24 @@ def _fts_match_count(conn, query):
     ).fetchone()[0]
 
 
+def _direct_writer_expected_row(candidate, ticker):
+    raw = news_providers._article_to_raw(
+        SimpleNamespace(
+            ticker=ticker,
+            title=candidate.title,
+            description=candidate.body.raw_body or "",
+            content="",
+            url=candidate.url,
+            publisher=candidate.publisher,
+            published_at=candidate.published_at,
+        )
+    )
+    return news_direct._article_row(raw, candidate.source)
+
+
 def test_projects_one_normalized_article_to_one_legacy_row_per_ticker(store, conn):
-    article_id = store.upsert(article()).article_id
+    candidate = article()
+    article_id = store.upsert(candidate).article_id
 
     result = project_article_uncommitted(conn, article_id)
 
@@ -116,27 +134,36 @@ def test_projects_one_normalized_article_to_one_legacy_row_per_ticker(store, con
         row["ticker"]: row["article_hash"] for row in rows
     } == {
         "AAPL": canonical_article_hash(
-            "AAPL", "Apple expands AI server program", "2026-06-24T13:30:00+0000"
+            "AAPL", "Apple expands AI server program", candidate.published_at
         ),
         "MSFT": canonical_article_hash(
-            "MSFT", "Apple expands AI server program", "2026-06-24T13:30:00+0000"
+            "MSFT", "Apple expands AI server program", candidate.published_at
         ),
     }
     assert _fts_match_count(conn, "server") == 2
     assert _fts_match_count(conn, "partner") == 2
 
 
-def test_projection_rerun_updates_mapped_rows_without_duplicates(store, conn):
+def test_projection_rerun_is_noop_for_unchanged_mapped_rows(store, conn, monkeypatch):
+    now = ["2026-06-24T13:31:00Z"]
+    monkeypatch.setattr(
+        "src.news_normalized.legacy_projection._now", lambda: now[0]
+    )
     article_id = store.upsert(article()).article_id
     first = project_article_uncommitted(conn, article_id)
     first_ids = {row["ticker"]: row["id"] for row in _projected_news(conn)}
+    first_rows = _projected_news(conn)
+    first_map = _map_rows(conn)
 
+    now[0] = "2026-06-24T13:32:00Z"
     second = project_article_uncommitted(conn, article_id)
 
     assert first.inserted == 2
     assert second.inserted == 0
-    assert second.updated == 2
+    assert second.updated == 0
     assert conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] == 2
+    assert _projected_news(conn) == first_rows
+    assert _map_rows(conn) == first_map
     assert {row["ticker"]: row["id"] for row in _projected_news(conn)} == first_ids
     assert [row["legacy_news_id"] for row in _map_rows(conn)] == [
         first_ids["AAPL"],
@@ -144,10 +171,17 @@ def test_projection_rerun_updates_mapped_rows_without_duplicates(store, conn):
     ]
 
 
-def test_projection_updates_title_and_body_corrections_in_mapped_rows(store, conn):
+def test_projection_updates_title_and_body_corrections_in_mapped_rows(store, conn, monkeypatch):
+    now = ["2026-06-24T13:31:00Z"]
+    monkeypatch.setattr(
+        "src.news_normalized.legacy_projection._now", lambda: now[0]
+    )
     article_id = store.upsert(article()).article_id
     project_article_uncommitted(conn, article_id)
     original_ids = {row["ticker"]: row["id"] for row in _projected_news(conn)}
+    original_projection_times = {
+        row["ticker"]: row["projected_at"] for row in _map_rows(conn)
+    }
 
     conn.execute(
         "UPDATE news_articles SET canonical_title=?,updated_at=? WHERE id=?",
@@ -164,6 +198,7 @@ def test_projection_updates_title_and_body_corrections_in_mapped_rows(store, con
             article_id,
         ),
     )
+    now[0] = "2026-06-24T14:01:00Z"
     result = project_article_uncommitted(conn, article_id)
 
     rows = _projected_news(conn)
@@ -174,9 +209,16 @@ def test_projection_updates_title_and_body_corrections_in_mapped_rows(store, con
     assert all("rackscale accelerators" in row["description"] for row in rows)
     assert all(
         row["article_hash"]
-        == canonical_article_hash(row["ticker"], row["title"], row["published_at"])
+        == canonical_article_hash(
+            row["ticker"], row["title"], "2026-06-24T09:30:00-04:00"
+        )
         for row in rows
     )
+    assert {
+        row["ticker"]: row["projected_at"] for row in _map_rows(conn)
+    } == {
+        ticker: "2026-06-24T14:01:00Z" for ticker in original_projection_times
+    }
     assert _fts_match_count(conn, "rackscale") == 2
     assert _fts_match_count(conn, "expanded") == 2
     assert _fts_match_count(conn, "partner") == 2
@@ -331,6 +373,20 @@ def test_adopts_existing_compatible_legacy_row_and_fts_stays_consistent(store, c
             ),
             "MSFT",
         ),
+        (
+            article(
+                provider_id="poly-boundary-parity",
+                source="polygon",
+                title="Polygon boundary parity article",
+                publisher="Polygon Publisher",
+                url="https://example.test/polygon-boundary-parity",
+                published_at="2026-06-26T23:30:00-04:00",
+                primary_ticker="AAPL",
+                related_tickers=(),
+                raw_body="Polygon boundary projected body.",
+            ),
+            "AAPL",
+        ),
     ],
 )
 def test_polygon_and_finnhub_projection_matches_direct_writer_row(
@@ -341,22 +397,6 @@ def test_polygon_and_finnhub_projection_matches_direct_writer_row(
     result = project_article_uncommitted(conn, article_id)
 
     row = _projected_news(conn)[0]
-    expected_published = news_direct._norm_published(candidate.published_at)
-    expected = news_direct._article_row(
-        {
-            "ticker": ticker,
-            "title": candidate.title,
-            "description": candidate.body.raw_body,
-            "url": candidate.url,
-            "publisher": candidate.publisher,
-            "published_at": candidate.published_at,
-            "article_hash": canonical_article_hash(
-                ticker, candidate.title, expected_published
-            ),
-        },
-        candidate.source,
-    )
-
     assert result.inserted == 1
     assert (
         row["ticker"],
@@ -367,4 +407,36 @@ def test_polygon_and_finnhub_projection_matches_direct_writer_row(
         row["source"],
         row["published_at"],
         row["article_hash"],
-    ) == expected
+    ) == _direct_writer_expected_row(candidate, ticker)
+
+
+def test_direct_writer_hash_parity_preserves_provider_date_across_utc_boundary(
+    store, conn
+):
+    candidate = article(
+        provider_id="utc-boundary",
+        source="polygon",
+        title="Late session article crosses UTC date",
+        publisher="Polygon Publisher",
+        url="https://example.test/utc-boundary",
+        published_at="2026-06-26T23:30:00-04:00",
+        primary_ticker="AAPL",
+        related_tickers=(),
+        raw_body="Late session projected body.",
+    )
+    article_id = store.upsert(candidate).article_id
+
+    result = project_article_uncommitted(conn, article_id)
+
+    row = _projected_news(conn)[0]
+    expected = _direct_writer_expected_row(candidate, "AAPL")
+    assert result.inserted == 1
+    assert row["published_at"] == "2026-06-27T03:30:00+0000"
+    assert expected[6] == "2026-06-27T03:30:00+0000"
+    assert row["article_hash"] == expected[7]
+    assert expected[7] == canonical_article_hash(
+        "AAPL", "Late session article crosses UTC date", "2026-06-26T23:30:00-04:00"
+    )
+    assert expected[7] != canonical_article_hash(
+        "AAPL", "Late session article crosses UTC date", row["published_at"]
+    )

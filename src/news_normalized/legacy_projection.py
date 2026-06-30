@@ -52,15 +52,15 @@ def project_article_uncommitted(conn: sqlite3.Connection, article_id: int) -> Pr
         row = _legacy_values(article, ticker, published_at, description)
         mapped = _mapped_legacy_id(conn, article_id, ticker)
         if mapped is not None:
-            _update_mapped_row(conn, mapped, row)
-            _touch_map(conn, article_id, ticker, mapped)
-            updated += 1
+            if _update_mapped_row(conn, mapped, row):
+                _touch_map(conn, article_id, ticker, mapped)
+                updated += 1
             continue
 
         existing = _legacy_row_by_hash(conn, row["article_hash"])
         if existing is not None:
-            _adopt_existing_row(conn, article_id, ticker, existing, row)
-            updated += 1
+            if _adopt_existing_row(conn, article_id, ticker, existing, row):
+                updated += 1
             continue
 
         legacy_id = _insert_legacy_row(conn, row)
@@ -129,7 +129,9 @@ def _legacy_values(
         "publisher": article["publisher"] or "",
         "source": article["source"],
         "published_at": published_at,
-        "article_hash": canonical_article_hash(ticker, title, published_at),
+        "article_hash": canonical_article_hash(
+            ticker, title, article["published_at"]
+        ),
     }
 
 
@@ -179,7 +181,7 @@ def _mapped_owner(
 
 def _update_mapped_row(
     conn: sqlite3.Connection, legacy_id: int, row: dict[str, Any]
-) -> None:
+) -> bool:
     current = _legacy_row_by_id(conn, legacy_id)
     if current is None:
         raise LegacyProjectionConflict(
@@ -190,7 +192,10 @@ def _update_mapped_row(
         raise LegacyProjectionConflict(
             "canonical legacy hash is already owned by another news row"
         )
+    if _legacy_row_matches(current, row):
+        return False
     _write_legacy_row(conn, legacy_id, row)
+    return True
 
 
 def _adopt_existing_row(
@@ -199,7 +204,7 @@ def _adopt_existing_row(
     ticker: str,
     existing: dict[str, Any],
     row: dict[str, Any],
-) -> None:
+) -> bool:
     if existing["ticker"] != ticker or existing["source"] != row["source"]:
         raise LegacyProjectionConflict(
             "canonical legacy hash is owned by incompatible ticker/source"
@@ -210,8 +215,11 @@ def _adopt_existing_row(
         raise LegacyProjectionConflict(
             "legacy news row is already mapped to another projection"
         )
-    _write_legacy_row(conn, legacy_id, row)
+    changed = not _legacy_row_matches(existing, row)
+    if changed:
+        _write_legacy_row(conn, legacy_id, row)
     _insert_map(conn, article_id, ticker, legacy_id)
+    return changed
 
 
 def _insert_legacy_row(conn: sqlite3.Connection, row: dict[str, Any]) -> int:
@@ -269,3 +277,7 @@ def _row_tuple(row: dict[str, Any]) -> tuple[Any, ...]:
         row["published_at"],
         row["article_hash"],
     )
+
+
+def _legacy_row_matches(existing: dict[str, Any], desired: dict[str, Any]) -> bool:
+    return all(existing[key] == desired[key] for key in desired)
