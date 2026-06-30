@@ -554,6 +554,26 @@ def test_update_job_passes_explicit_domains_to_incremental_update(tmp_path, monk
     assert j["status"] == "done"
 
 
+def test_update_job_ignores_skipped_domains_when_deciding_success(tmp_path, monkeypatch):
+    j = _drain_update_job(
+        str(tmp_path / "m.db"),
+        monkeypatch,
+        {
+            "ok": False,
+            "prices": {"ok": False, "rows_added": 0, "error": "prices down"},
+            "news": {"ok": True, "rows_added": 0, "skipped": "domain disabled"},
+            "iv": {"ok": False, "rows_added": 0, "error": "iv down"},
+            "fundamentals": {"ok": False, "rows_added": 0, "error": "fund down"},
+        },
+        domains=("prices", "iv", "fundamentals"),
+        expected_domains=("prices", "iv", "fundamentals"),
+    )
+    assert j["status"] == "error"
+    assert "prices down" in j["error"]
+    assert "iv down" in j["error"]
+    assert "fund down" in j["error"]
+
+
 # --- 3c-C: financial_cache (local-primary; carry-over on rebuild) -------------
 
 def test_bootstrap_creates_empty_financial_cache(tmp_path, fake_pg):

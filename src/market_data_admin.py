@@ -1108,7 +1108,8 @@ def start_update_job(
             domain_results = [
                 res.get("prices"), res.get("news"), res.get("iv"), res.get("fundamentals")
             ]
-            any_ok = any((d or {}).get("ok") for d in domain_results)
+            attempted_domains = [d for d in domain_results if not (d or {}).get("skipped")]
+            any_ok = any((d or {}).get("ok") for d in attempted_domains)
             _JOBS[job_id]["status"] = "done" if res.get("ok") or any_ok else "error"
             if not res.get("ok"):
                 errs = [(d or {}).get("error") for d in domain_results]
