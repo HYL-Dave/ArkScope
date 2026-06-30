@@ -913,6 +913,49 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
     assert fund_hit == ["UNKNOWN"]
 
 
+def test_news_strict_available_news_tickers_empty_does_not_hit_pg(tmp_path, monkeypatch):
+    db = tmp_path / "empty_news.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT, title TEXT, "
+        "description TEXT, url TEXT, publisher TEXT, source TEXT, published_at TEXT, "
+        "article_hash TEXT)"
+    )
+    conn.commit()
+    conn.close()
+
+    def ticker_boom(self, data_type):
+        raise AssertionError("PG called")
+
+    monkeypatch.setattr(DatabaseBackend, "get_available_tickers", ticker_boom)
+    b = LocalMarketDatabaseBackend(
+        "postgresql://fake/db", market_db=str(db), strict=False, news_strict=True
+    )
+
+    assert b.get_available_tickers("news") == []
+
+
+def test_news_strict_feed_local_exception_does_not_hit_pg(market_db, monkeypatch):
+    db, _ = market_db
+
+    def pg_feed_boom(self, *args, **kwargs):
+        raise AssertionError("PG called")
+
+    monkeypatch.setattr(DatabaseBackend, "query_news_feed", pg_feed_boom)
+    b = LocalMarketDatabaseBackend(
+        "postgresql://fake/db", market_db=db, strict=False, news_strict=True
+    )
+    monkeypatch.setattr(
+        b._market,
+        "query_news_feed",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("local feed failed")),
+    )
+
+    feed = b.query_news_feed(q="Apple")
+
+    assert feed == {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+
+
 def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
     from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
     db, _ = market_db

@@ -191,6 +191,8 @@ class DataAccessLayer:
                 sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
                 self._backend = self._make_db_backend(env_dsn, sslmode)
             else:
+                # No DSN: still try local composite routing first so completed news
+                # exit and other local-first desktop modes can boot without PG.
                 self._backend = self._make_db_backend(
                     "", "prefer", allow_plain_pg=False
                 ) or FileBackend(base_path=self._base)
