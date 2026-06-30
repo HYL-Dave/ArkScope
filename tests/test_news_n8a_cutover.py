@@ -14,10 +14,22 @@ from src.market_data_admin import (
 )
 from src.news_identity import canonical_article_hash
 from src.news_normalized import cutover
+from src.news_normalized.routing import (
+    NEWS_PG_EXIT_COMPLETED_KEY,
+    USE_NORMALIZED_NEWS_WRITES_KEY,
+)
 from src.news_normalized.schema import ensure_news_normalized_schema
+from src.profile_state import ProfileStateStore
 
 
 PUBLISHED = "2026-06-27T10:00:00+0000"
+VALIDATION_PASSED = {
+    "polygon": "passed",
+    "finnhub": "passed",
+    "ibkr": "passed",
+    "projection_parity": "passed",
+    "pg_unreachable": "passed",
+}
 
 
 def _file_identity(path: Path) -> dict:
@@ -258,6 +270,18 @@ def _canonical_json(data: dict) -> str:
     return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
+def _write_validation_json(path: Path, data: dict | None = None) -> Path:
+    path.write_text(
+        json.dumps(VALIDATION_PASSED if data is None else data, sort_keys=True),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _profile_setting(path: Path, key: str) -> str | None:
+    return ProfileStateStore(path).get_setting(key)
+
+
 def test_read_only_preview_preserves_file_identity_and_does_not_create_schema(tmp_path):
     db_path = _create_legacy_only_db(tmp_path / "market.db")
     before = _file_identity(db_path)
@@ -336,6 +360,7 @@ def test_unmapped_legacy_rows_are_reported_and_block_begin_before_writes(
             db_path,
             expected_report=expected,
             backup_path=tmp_path / "backup.db",
+            profile_db=tmp_path / "profile_state.db",
         )
 
     assert expected.unmapped_rows == [
@@ -395,6 +420,7 @@ def test_begin_requires_exact_report_match_before_backup(tmp_path, monkeypatch):
             db_path,
             expected_report=expected,
             backup_path=tmp_path / "backup.db",
+            profile_db=tmp_path / "profile_state.db",
         )
 
     assert backup_calls == []
@@ -433,6 +459,7 @@ def test_begin_rechecks_expected_report_inside_lock_before_backup(tmp_path, monk
             db_path,
             expected_report=expected,
             backup_path=tmp_path / "backup.db",
+            profile_db=tmp_path / "profile_state.db",
         )
 
     assert backup_calls == []
@@ -440,15 +467,39 @@ def test_begin_rechecks_expected_report_inside_lock_before_backup(tmp_path, monk
     assert _audit_row_count(db_path) == 0
 
 
-def test_begin_writes_testing_audit_row_after_zero_delta_and_reserved_backup(tmp_path):
+def test_begin_writes_testing_audit_row_after_zero_delta_and_reserved_backup(
+    tmp_path, monkeypatch
+):
     db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
     expected = cutover.preview_news_pg_exit(db_path)
     backup_path = tmp_path / "backup.db"
+    profile_writes = []
+
+    class RecordingProfileStateStore:
+        def __init__(self, path):
+            self._store = ProfileStateStore(path)
+
+        def set_setting(self, key, value):
+            profile_writes.append(
+                {
+                    "key": key,
+                    "value": value,
+                    "audit_rows": _audit_row_count(db_path),
+                    "backup_exists": backup_path.is_file(),
+                }
+            )
+            self._store.set_setting(key, value)
+
+    monkeypatch.setattr(
+        cutover, "ProfileStateStore", RecordingProfileStateStore, raising=False
+    )
 
     result = cutover.begin_news_pg_exit(
         db_path,
         expected_report=expected,
         backup_path=backup_path,
+        profile_db=profile_db,
     )
 
     assert result.run_id == 1
@@ -476,6 +527,35 @@ def test_begin_writes_testing_audit_row_after_zero_delta_and_reserved_backup(tmp
         "status": "testing",
         "validation_json": None,
     }
+    assert profile_writes == [
+        {
+            "key": USE_NORMALIZED_NEWS_WRITES_KEY,
+            "value": "true",
+            "audit_rows": 1,
+            "backup_exists": True,
+        }
+    ]
+    assert _profile_setting(profile_db, USE_NORMALIZED_NEWS_WRITES_KEY) == "true"
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
+    assert _profile_setting(profile_db, "use_local_market_strict") is None
+
+
+def test_begin_does_not_write_profile_flag_when_report_gate_fails(tmp_path):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
+    expected = cutover.preview_news_pg_exit(db_path).to_json_dict()
+    expected["legacy_row_count"] = 999
+
+    with pytest.raises(cutover.CutoverBlocked, match="expected report changed"):
+        cutover.begin_news_pg_exit(
+            db_path,
+            expected_report=expected,
+            backup_path=tmp_path / "backup.db",
+            profile_db=profile_db,
+        )
+
+    assert _audit_row_count(db_path) == 0
+    assert _profile_setting(profile_db, USE_NORMALIZED_NEWS_WRITES_KEY) is None
 
 
 def test_begin_allows_normalized_only_rows_and_audits_the_count(tmp_path):
@@ -490,6 +570,7 @@ def test_begin_allows_normalized_only_rows_and_audits_the_count(tmp_path):
         db_path,
         expected_report=expected,
         backup_path=backup_path,
+        profile_db=tmp_path / "profile_state.db",
     )
 
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -520,56 +601,210 @@ def test_begin_insert_failure_rolls_back_cutover_schema(tmp_path, monkeypatch):
             db_path,
             expected_report=expected,
             backup_path=tmp_path / "backup.db",
+            profile_db=tmp_path / "profile_state.db",
         )
 
     assert not _table_exists(db_path, "news_pg_exit_runs")
     assert not _table_exists(db_path, "news_articles")
 
 
-def test_finalize_and_rollback_update_existing_testing_runs(tmp_path):
-    first_db = _create_matched_db(tmp_path / "finalize.db")
-    first = cutover.begin_news_pg_exit(
-        first_db,
-        expected_report=cutover.preview_news_pg_exit(first_db),
-        backup_path=tmp_path / "finalize-backup.db",
+@pytest.mark.parametrize(
+    "validation",
+    [
+        {
+            "finnhub": "passed",
+            "ibkr": "passed",
+            "projection_parity": "passed",
+            "pg_unreachable": "passed",
+        },
+        {**VALIDATION_PASSED, "polygon": True},
+        {**VALIDATION_PASSED, "polygon": "PASS"},
+    ],
+)
+def test_finalize_rejects_missing_or_non_passed_validation_gates(
+    tmp_path, validation
+):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
+    begin = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "backup.db",
+        profile_db=profile_db,
     )
-    validation_path = tmp_path / "validation.json"
-    validation_path.write_text('{"projection_parity":"passed"}', encoding="utf-8")
+    validation_path = _write_validation_json(tmp_path / "validation.json", validation)
 
-    cutover.finalize_news_pg_exit(
-        first_db, run_id=first.run_id, validation_json_path=validation_path
-    )
+    with pytest.raises(cutover.CutoverBlocked, match="validation gate"):
+        cutover.finalize_news_pg_exit(
+            db_path,
+            run_id=begin.run_id,
+            validation_json_path=validation_path,
+            profile_db=profile_db,
+        )
 
-    conn = sqlite3.connect(first_db)
+    conn = sqlite3.connect(db_path)
     try:
         row = conn.execute(
             "SELECT status,validation_json,completed_at FROM news_pg_exit_runs WHERE id=?",
-            (first.run_id,),
+            (begin.run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("testing", None, None)
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
+
+
+def test_finalize_with_all_validation_gates_sets_audit_and_profile_marker(tmp_path):
+    db_path = _create_matched_db(tmp_path / "finalize.db")
+    profile_db = tmp_path / "profile_state.db"
+    begin = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "finalize-backup.db",
+        profile_db=profile_db,
+    )
+    validation_path = _write_validation_json(tmp_path / "validation.json")
+
+    cutover.finalize_news_pg_exit(
+        db_path,
+        run_id=begin.run_id,
+        validation_json_path=validation_path,
+        profile_db=profile_db,
+    )
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status,validation_json,completed_at FROM news_pg_exit_runs WHERE id=?",
+            (begin.run_id,),
         ).fetchone()
     finally:
         conn.close()
     assert row[0] == "completed"
-    assert row[1] == '{"projection_parity":"passed"}'
+    assert row[1] == _canonical_json(VALIDATION_PASSED)
     assert row[2] is not None
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) == "true"
 
-    second_db = _create_matched_db(tmp_path / "rollback.db")
-    second = cutover.begin_news_pg_exit(
-        second_db,
-        expected_report=cutover.preview_news_pg_exit(second_db),
-        backup_path=tmp_path / "rollback-backup.db",
+
+def test_finalize_is_repeatable_when_profile_marker_write_fails_after_audit(
+    tmp_path, monkeypatch
+):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
+    begin = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "backup.db",
+        profile_db=profile_db,
     )
-    cutover.rollback_news_pg_exit(second_db, run_id=second.run_id)
-    conn = sqlite3.connect(second_db)
+    validation_path = _write_validation_json(tmp_path / "validation.json")
+
+    class FailingProfileStateStore:
+        def __init__(self, path):
+            self._store = ProfileStateStore(path)
+
+        def set_setting(self, key, value):
+            if key == NEWS_PG_EXIT_COMPLETED_KEY:
+                raise RuntimeError("profile marker write failed")
+            self._store.set_setting(key, value)
+
+    monkeypatch.setattr(cutover, "ProfileStateStore", FailingProfileStateStore)
+    with pytest.raises(RuntimeError, match="profile marker write failed"):
+        cutover.finalize_news_pg_exit(
+            db_path,
+            run_id=begin.run_id,
+            validation_json_path=validation_path,
+            profile_db=profile_db,
+        )
+
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status,validation_json FROM news_pg_exit_runs WHERE id=?",
+            (begin.run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row == ("completed", _canonical_json(VALIDATION_PASSED))
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
+
+    monkeypatch.setattr(cutover, "ProfileStateStore", ProfileStateStore)
+    result = cutover.finalize_news_pg_exit(
+        db_path,
+        run_id=begin.run_id,
+        validation_json_path=validation_path,
+        profile_db=profile_db,
+    )
+
+    assert result.status == "completed"
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) == "true"
+
+
+def test_rollback_only_from_testing_and_never_sets_exit_marker(tmp_path):
+    rollback_db = _create_matched_db(tmp_path / "rollback.db")
+    rollback_profile_db = tmp_path / "rollback-profile.db"
+    rollback_run = cutover.begin_news_pg_exit(
+        rollback_db,
+        expected_report=cutover.preview_news_pg_exit(rollback_db),
+        backup_path=tmp_path / "rollback-backup.db",
+        profile_db=rollback_profile_db,
+    )
+    cutover.rollback_news_pg_exit(
+        rollback_db, run_id=rollback_run.run_id, profile_db=rollback_profile_db
+    )
+    conn = sqlite3.connect(rollback_db)
     try:
         assert (
             conn.execute(
                 "SELECT status FROM news_pg_exit_runs WHERE id=?",
-                (second.run_id,),
+                (rollback_run.run_id,),
             ).fetchone()[0]
             == "rolled_back"
         )
     finally:
         conn.close()
+    assert (
+        _profile_setting(rollback_profile_db, USE_NORMALIZED_NEWS_WRITES_KEY)
+        == "false"
+    )
+    assert _profile_setting(rollback_profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
+
+    completed_db = _create_matched_db(tmp_path / "completed.db")
+    completed_profile_db = tmp_path / "completed-profile.db"
+    completed_run = cutover.begin_news_pg_exit(
+        completed_db,
+        expected_report=cutover.preview_news_pg_exit(completed_db),
+        backup_path=tmp_path / "completed-backup.db",
+        profile_db=completed_profile_db,
+    )
+    cutover.finalize_news_pg_exit(
+        completed_db,
+        run_id=completed_run.run_id,
+        validation_json_path=_write_validation_json(
+            tmp_path / "completed-validation.json"
+        ),
+        profile_db=completed_profile_db,
+    )
+    with pytest.raises(cutover.CutoverBlocked, match="run is not in testing status"):
+        cutover.rollback_news_pg_exit(
+            completed_db, run_id=completed_run.run_id, profile_db=completed_profile_db
+        )
+    conn = sqlite3.connect(completed_db)
+    try:
+        assert (
+            conn.execute(
+                "SELECT status FROM news_pg_exit_runs WHERE id=?",
+                (completed_run.run_id,),
+            ).fetchone()[0]
+            == "completed"
+        )
+    finally:
+        conn.close()
+    assert _profile_setting(completed_profile_db, NEWS_PG_EXIT_COMPLETED_KEY) == "true"
+    assert (
+        _profile_setting(completed_profile_db, USE_NORMALIZED_NEWS_WRITES_KEY)
+        == "true"
+    )
 
 
 @pytest.mark.parametrize("action", ["finalize", "rollback"])
@@ -578,15 +813,20 @@ def test_finalize_and_rollback_do_not_create_missing_cutover_schema(
 ):
     db_path = _create_empty_legacy_db(tmp_path / f"{action}.db")
     validation_path = tmp_path / "validation.json"
-    validation_path.write_text('{"projection_parity":"passed"}', encoding="utf-8")
+    _write_validation_json(validation_path)
 
     with pytest.raises(cutover.CutoverBlocked):
         if action == "finalize":
             cutover.finalize_news_pg_exit(
-                db_path, run_id=1, validation_json_path=validation_path
+                db_path,
+                run_id=1,
+                validation_json_path=validation_path,
+                profile_db=tmp_path / "profile.db",
             )
         else:
-            cutover.rollback_news_pg_exit(db_path, run_id=1)
+            cutover.rollback_news_pg_exit(
+                db_path, run_id=1, profile_db=tmp_path / "profile.db"
+            )
 
     assert not _table_exists(db_path, "news_pg_exit_runs")
     assert not _table_exists(db_path, "news_articles")
@@ -624,3 +864,89 @@ def test_cli_preview_output_and_begin_requires_confirmation(tmp_path):
 
     with pytest.raises(SystemExit):
         parser.parse_args(begin_args + ["--confirm-scheduler-paused", "--force"])
+
+
+def test_cli_passes_profile_db_to_begin_finalize_and_rollback(tmp_path, monkeypatch):
+    db_path = tmp_path / "market.db"
+    profile_db = tmp_path / "profile.db"
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{}", encoding="utf-8")
+    validation_path = _write_validation_json(tmp_path / "validation.json")
+    calls = []
+
+    class Result:
+        def __init__(self, status="testing"):
+            self.status = status
+
+        def to_json_dict(self):
+            return {"run_id": 7, "status": self.status}
+
+    def fake_begin(db_path_arg, *, expected_report, backup_path, profile_db):
+        calls.append(("begin", db_path_arg, profile_db, expected_report, backup_path))
+        return Result()
+
+    def fake_finalize(db_path_arg, *, run_id, validation_json_path, profile_db):
+        calls.append(("finalize", db_path_arg, profile_db, run_id, validation_json_path))
+        return Result(status="completed")
+
+    def fake_rollback(db_path_arg, *, run_id, profile_db):
+        calls.append(("rollback", db_path_arg, profile_db, run_id))
+        return Result(status="rolled_back")
+
+    monkeypatch.setattr(cutover_cli, "begin_news_pg_exit", fake_begin)
+    monkeypatch.setattr(cutover_cli, "finalize_news_pg_exit", fake_finalize)
+    monkeypatch.setattr(cutover_cli, "rollback_news_pg_exit", fake_rollback)
+
+    assert (
+        cutover_cli.main(
+            [
+                "begin",
+                "--db",
+                str(db_path),
+                "--profile-db",
+                str(profile_db),
+                "--expected-report",
+                str(report_path),
+                "--backup",
+                str(tmp_path / "backup.db"),
+                "--confirm-scheduler-paused",
+            ]
+        )
+        == 0
+    )
+    assert (
+        cutover_cli.main(
+            [
+                "finalize",
+                "--db",
+                str(db_path),
+                "--profile-db",
+                str(profile_db),
+                "--run-id",
+                "7",
+                "--validation-json",
+                str(validation_path),
+            ]
+        )
+        == 0
+    )
+    assert (
+        cutover_cli.main(
+            [
+                "rollback",
+                "--db",
+                str(db_path),
+                "--profile-db",
+                str(profile_db),
+                "--run-id",
+                "7",
+            ]
+        )
+        == 0
+    )
+
+    assert [call[:3] for call in calls] == [
+        ("begin", db_path, profile_db),
+        ("finalize", db_path, profile_db),
+        ("rollback", db_path, profile_db),
+    ]

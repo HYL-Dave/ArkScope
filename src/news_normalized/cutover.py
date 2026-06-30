@@ -11,12 +11,23 @@ import sqlite3
 from typing import Any, Mapping
 
 from src.market_data_direct import backup_market_db, market_write_lock
+from src.profile_state import ProfileStateStore
 
+from .routing import NEWS_PG_EXIT_COMPLETED_KEY, USE_NORMALIZED_NEWS_WRITES_KEY
 from .schema import begin_news_normalized_schema_transaction
 
 
 class CutoverBlocked(RuntimeError):
     """Raised when the reviewed PG-exit gate cannot safely proceed."""
+
+
+REQUIRED_VALIDATION_GATES = (
+    "polygon",
+    "finnhub",
+    "ibkr",
+    "projection_parity",
+    "pg_unreachable",
+)
 
 
 @dataclass(frozen=True)
@@ -101,10 +112,12 @@ def begin_news_pg_exit(
     *,
     expected_report: CutoverPreviewReport | Mapping[str, Any],
     backup_path: str | Path,
+    profile_db: str | Path | None = None,
 ) -> CutoverBeginResult:
     """Reserve a backup and write one immutable ``testing`` audit row."""
     db_path = Path(db_path)
     backup_path = Path(backup_path)
+    profile_db = _profile_db_path(profile_db)
     current = preview_news_pg_exit(db_path)
     expected = coerce_preview_report(expected_report)
     _require_no_unmapped_legacy_rows(current)
@@ -153,6 +166,9 @@ def begin_news_pg_exit(
             raise
         finally:
             conn.close()
+        ProfileStateStore(profile_db).set_setting(
+            USE_NORMALIZED_NEWS_WRITES_KEY, "true"
+        )
     return CutoverBeginResult(
         run_id=run_id,
         status="testing",
@@ -166,25 +182,36 @@ def finalize_news_pg_exit(
     *,
     run_id: int,
     validation_json_path: str | Path,
+    profile_db: str | Path | None = None,
 ) -> CutoverStatusResult:
-    validation_json = _read_canonical_json(validation_json_path)
-    _update_run_status(
+    validation_json = _read_validated_validation_json(validation_json_path)
+    _complete_run_status(
         db_path,
         run_id=run_id,
-        status="completed",
         validation_json=validation_json,
         completed_at=_utc_now(),
+    )
+    ProfileStateStore(_profile_db_path(profile_db)).set_setting(
+        NEWS_PG_EXIT_COMPLETED_KEY, "true"
     )
     return CutoverStatusResult(run_id=run_id, status="completed")
 
 
-def rollback_news_pg_exit(db_path: str | Path, *, run_id: int) -> CutoverStatusResult:
-    _update_run_status(
+def rollback_news_pg_exit(
+    db_path: str | Path,
+    *,
+    run_id: int,
+    profile_db: str | Path | None = None,
+) -> CutoverStatusResult:
+    _update_run_status_from_testing(
         db_path,
         run_id=run_id,
         status="rolled_back",
         validation_json=None,
         completed_at=_utc_now(),
+    )
+    ProfileStateStore(_profile_db_path(profile_db)).set_setting(
+        USE_NORMALIZED_NEWS_WRITES_KEY, "false"
     )
     return CutoverStatusResult(run_id=run_id, status="rolled_back")
 
@@ -325,13 +352,20 @@ def _require_no_unmapped_legacy_rows(report: CutoverPreviewReport) -> None:
         raise CutoverBlocked(f"unmapped legacy rows: {report.unmapped_legacy_rows}")
 
 
-def _read_canonical_json(path: str | Path) -> str:
+def _read_validated_validation_json(path: str | Path) -> str:
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
+    if not isinstance(data, Mapping):
+        raise CutoverBlocked("validation JSON must be an object")
+    for gate in REQUIRED_VALIDATION_GATES:
+        if data.get(gate) != "passed":
+            raise CutoverBlocked(
+                f"validation gate {gate} must be exactly 'passed'"
+            )
     return _canonical_json(data)
 
 
-def _update_run_status(
+def _update_run_status_from_testing(
     db_path: str | Path,
     *,
     run_id: int,
@@ -354,6 +388,49 @@ def _update_run_status(
                 raise CutoverBlocked(f"run is not in testing status: {run_id}")
     finally:
         conn.close()
+
+
+def _complete_run_status(
+    db_path: str | Path,
+    *,
+    run_id: int,
+    validation_json: str,
+    completed_at: str,
+) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        with conn:
+            if not _table_exists(conn, "news_pg_exit_runs"):
+                raise CutoverBlocked("cutover audit table is missing")
+            row = conn.execute(
+                "SELECT status,validation_json FROM news_pg_exit_runs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise CutoverBlocked(f"run is not in testing status: {run_id}")
+            current_status, current_validation_json = row
+            if current_status == "completed":
+                if current_validation_json != validation_json:
+                    raise CutoverBlocked(
+                        f"run is already completed with different validation: {run_id}"
+                    )
+                return
+            if current_status != "testing":
+                raise CutoverBlocked(f"run is not in testing status: {run_id}")
+            conn.execute(
+                "UPDATE news_pg_exit_runs "
+                "SET status=?,completed_at=?,validation_json=? "
+                "WHERE id=? AND status='testing'",
+                ("completed", completed_at, validation_json, run_id),
+            )
+    finally:
+        conn.close()
+
+
+def _profile_db_path(profile_db: str | Path | None) -> Path:
+    if profile_db is not None:
+        return Path(profile_db)
+    return Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
 
 
 def _utc_now() -> str:

@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     begin = subparsers.add_parser("begin")
     _add_db_argument(begin)
+    _add_profile_db_argument(begin)
     begin.add_argument("--expected-report", required=True, type=Path)
     begin.add_argument("--backup", required=True, type=Path)
     begin.add_argument(
@@ -46,11 +47,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     finalize = subparsers.add_parser("finalize")
     _add_db_argument(finalize)
+    _add_profile_db_argument(finalize)
     finalize.add_argument("--run-id", required=True, type=int)
-    finalize.add_argument("--validation-json", required=True, type=Path)
+    finalize.add_argument(
+        "--validation-json",
+        required=True,
+        type=Path,
+        help=(
+            "JSON with polygon, finnhub, ibkr, projection_parity, and "
+            "pg_unreachable all set exactly to 'passed'"
+        ),
+    )
 
     rollback = subparsers.add_parser("rollback")
     _add_db_argument(rollback)
+    _add_profile_db_argument(rollback)
     rollback.add_argument("--run-id", required=True, type=int)
     return parser
 
@@ -69,6 +80,7 @@ def main(argv=None) -> int:
             market_db,
             expected_report=expected,
             backup_path=args.backup,
+            profile_db=args.profile_db,
         )
         print(_json_line(result.to_json_dict()))
         return 0
@@ -77,11 +89,14 @@ def main(argv=None) -> int:
             market_db,
             run_id=args.run_id,
             validation_json_path=args.validation_json,
+            profile_db=args.profile_db,
         )
         print(_json_line(result.to_json_dict()))
         return 0
     if args.command == "rollback":
-        result = rollback_news_pg_exit(market_db, run_id=args.run_id)
+        result = rollback_news_pg_exit(
+            market_db, run_id=args.run_id, profile_db=args.profile_db
+        )
         print(_json_line(result.to_json_dict()))
         return 0
     raise AssertionError(f"unhandled command: {args.command}")
@@ -89,6 +104,14 @@ def main(argv=None) -> int:
 
 def _add_db_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--db", type=Path, help="Path to market_data.db")
+
+
+def _add_profile_db_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--profile-db",
+        type=Path,
+        help="Path to profile_state.db; defaults to data/profile_state.db",
+    )
 
 
 def _market_db(args: argparse.Namespace) -> Path:
