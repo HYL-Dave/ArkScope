@@ -98,6 +98,17 @@ def test_explicit_normalized_environment_false_blocks_after_exit():
     assert "retired" in route.reason.lower()
 
 
+def test_malformed_exit_marker_blocks_pure_route():
+    route = resolve_news_write_route(
+        exit_completed="garbage",
+        normalized_value=None,
+        local_value=False,
+    )
+
+    assert route.mode is NewsWriteMode.BLOCKED
+    assert "exit marker" in route.reason.lower()
+
+
 def test_route_is_immutable():
     route = NewsWriteRoute(NewsWriteMode.NORMALIZED, "test")
 
@@ -137,3 +148,58 @@ def test_read_news_write_route_defaults_without_profile_database(tmp_path):
 
     assert route.mode is NewsWriteMode.LEGACY_LOCAL
     assert not (tmp_path / "missing.db").exists()
+
+
+def test_read_news_write_route_blocks_when_profile_table_is_missing(tmp_path):
+    db = tmp_path / "profile_state.db"
+    sqlite3.connect(db).close()
+
+    route = read_news_write_route(profile_db=db, environ={})
+
+    assert route.mode is NewsWriteMode.BLOCKED
+    assert "profile settings" in route.reason.lower()
+    assert "read" in route.reason.lower()
+
+
+def test_read_news_write_route_blocks_when_profile_database_is_corrupt(tmp_path):
+    db = tmp_path / "profile_state.db"
+    db.write_bytes(b"not a sqlite database")
+
+    route = read_news_write_route(profile_db=db, environ={})
+
+    assert route.mode is NewsWriteMode.BLOCKED
+    assert "profile settings" in route.reason.lower()
+    assert "read" in route.reason.lower()
+
+
+def test_read_news_write_route_blocks_malformed_stored_exit_marker(tmp_path):
+    db = tmp_path / "profile_state.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute(
+        "INSERT INTO profile_settings VALUES (?, ?)",
+        (NEWS_PG_EXIT_COMPLETED_KEY, "garbage"),
+    )
+    conn.commit()
+    conn.close()
+
+    route = read_news_write_route(profile_db=db, environ={})
+
+    assert route.mode is NewsWriteMode.BLOCKED
+    assert "exit marker" in route.reason.lower()
+
+
+def test_read_news_write_route_encodes_sqlite_uri_metacharacters(tmp_path):
+    db = tmp_path / "profile?state.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute(
+        "INSERT INTO profile_settings VALUES (?, ?)",
+        (NEWS_PG_EXIT_COMPLETED_KEY, "true"),
+    )
+    conn.commit()
+    conn.close()
+
+    route = read_news_write_route(profile_db=db, environ={})
+
+    assert route.mode is NewsWriteMode.NORMALIZED

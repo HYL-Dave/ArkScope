@@ -34,6 +34,10 @@ class NewsWriteRoute:
     reason: str
 
 
+class NewsWriteConfigError(RuntimeError):
+    """Profile state exists but cannot be read safely."""
+
+
 def _resolved_toggle(profile_value: Any, env_value: Any) -> Optional[bool]:
     env = parse_news_toggle(env_value)
     return env if env is not None else parse_news_toggle(profile_value)
@@ -47,7 +51,13 @@ def resolve_news_write_route(
     local_env: Any = None,
 ) -> NewsWriteRoute:
     """Resolve the writer route without reading external state."""
-    exit_done = parse_news_toggle(exit_completed) is True
+    parsed_exit = parse_news_toggle(exit_completed)
+    if exit_completed is not None and parsed_exit is None:
+        return NewsWriteRoute(
+            NewsWriteMode.BLOCKED,
+            "News PG exit marker is malformed; refusing to select a write route.",
+        )
+    exit_done = parsed_exit is True
     normalized = _resolved_toggle(normalized_value, normalized_env)
     local = _resolved_toggle(local_value, local_env)
 
@@ -87,7 +97,8 @@ def _read_profile_values(profile_db: Union[str, Path]) -> Mapping[str, Any]:
     if not path.exists():
         return {}
     try:
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
         try:
             rows = conn.execute(
                 "SELECT key, value FROM profile_settings WHERE key IN (?, ?, ?)",
@@ -99,8 +110,10 @@ def _read_profile_values(profile_db: Union[str, Path]) -> Mapping[str, Any]:
             ).fetchall()
         finally:
             conn.close()
-    except sqlite3.OperationalError:
-        return {}
+    except sqlite3.Error as exc:
+        raise NewsWriteConfigError(
+            f"News writer profile settings could not be read: {exc}"
+        ) from exc
     return dict(rows)
 
 
@@ -111,7 +124,10 @@ def read_news_write_route(
     """Read profile/env settings without creating or modifying the profile database."""
     env = os.environ if environ is None else environ
     db = profile_db or env.get(ENV_PROFILE_DB) or _default_profile_db()
-    values = _read_profile_values(db)
+    try:
+        values = _read_profile_values(db)
+    except NewsWriteConfigError as exc:
+        return NewsWriteRoute(NewsWriteMode.BLOCKED, str(exc))
     return resolve_news_write_route(
         exit_completed=values.get(NEWS_PG_EXIT_COMPLETED_KEY),
         normalized_value=values.get(USE_NORMALIZED_NEWS_WRITES_KEY),
