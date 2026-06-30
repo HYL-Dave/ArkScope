@@ -191,7 +191,9 @@ class DataAccessLayer:
                 sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
                 self._backend = self._make_db_backend(env_dsn, sslmode)
             else:
-                self._backend = FileBackend(base_path=self._base)
+                self._backend = self._make_db_backend(
+                    "", "prefer", allow_plain_pg=False
+                ) or FileBackend(base_path=self._base)
         elif db_dsn:
             self._backend = DatabaseBackend(dsn=db_dsn)
         else:
@@ -204,7 +206,7 @@ class DataAccessLayer:
         self._cache: Dict[str, tuple] = {}
         self._cache_ttl_seconds: int = 3600  # 1 hour default
 
-    def _make_db_backend(self, dsn: str, sslmode: str):
+    def _make_db_backend(self, dsn: str, sslmode: str, *, allow_plain_pg: bool = True):
         """Construct the PG backend, layered with the enabled local routings.
         Subclasses keep ``isinstance(backend, DatabaseBackend)`` True everywhere, so
         DB-only code paths behave exactly as on plain PG.
@@ -225,7 +227,10 @@ class DataAccessLayer:
         market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
             str(self._base / "data" / "market_data.db") if self._base else None
         )
-        market_on = self._local_market_enabled() and market_db and Path(market_db).exists()
+        market_db_exists = bool(market_db) and Path(market_db).exists()
+        local_market_requested = self._local_market_enabled()
+        news_strict = bool(market_db_exists) and self._news_pg_exit_completed(market_db)
+        market_on = bool(market_db_exists) and (local_market_requested or news_strict)
 
         sa_db = None
         if self._local_sa_enabled():
@@ -238,50 +243,98 @@ class DataAccessLayer:
         # strict (local-only) market mode: market reads serve local-only, never PG. Only
         # meaningful when market routing is active. A short PG connect_timeout makes any
         # residual non-market PG path fail fast (desktop-app boot-without-PG).
-        strict = bool(market_on) and self._local_market_strict_enabled()
+        strict = bool(market_db_exists and local_market_requested) and self._local_market_strict_enabled()
         if sa_db:
             from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
 
             logger.info(
                 f"Using SACaptureDatabaseBackend (sa_capture → {sa_db}, HARD local"
-                f"{'; market_data → ' + market_db + (' STRICT' if strict else '') if market_on else ''})")
+                f"{'; market_data → ' + market_db + (' STRICT' if strict else '') if market_on else ''}"
+                f"{'; news HARD local' if news_strict else ''})")
             return SACaptureDatabaseBackend(
-                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "", strict=strict)
+                dsn, sslmode, sa_db=sa_db, market_db=market_db if market_on else "",
+                strict=strict, news_strict=news_strict)
         if market_on:
             from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
 
             logger.info(f"Using LocalMarketDatabaseBackend (market_data → {market_db}, "
-                        f"{'STRICT local-only' if strict else 'PG fallback'})")
-            return LocalMarketDatabaseBackend(dsn, sslmode, market_db=market_db, strict=strict)
+                        f"{'STRICT local-only' if strict else 'PG fallback'}"
+                        f"{'; news HARD local' if news_strict else ''})")
+            return LocalMarketDatabaseBackend(
+                dsn, sslmode, market_db=market_db, strict=strict, news_strict=news_strict)
+        if not allow_plain_pg:
+            return None
         logger.info(f"Using DatabaseBackend (sslmode={sslmode})")
         return DatabaseBackend(dsn=dsn, sslmode=sslmode)
 
-    def _profile_setting_truthy(self, key: str, env_var: str) -> bool:
-        """Shared toggle reader: env override OR the persisted profile_settings key,
-        via a light read-only SQLite query (no ProfileStateStore import / no
-        migration — fresh native-host processes re-read this every spawn)."""
+    def _profile_setting_value(self, key: str) -> Optional[str]:
+        """Read one persisted profile setting without creating or migrating the DB."""
         import os
         import sqlite3
 
-        truthy = ("1", "true", "yes", "on")
-        if os.environ.get(env_var, "").strip().lower() in truthy:
-            return True
         profile_db = os.environ.get("ARKSCOPE_PROFILE_DB") or (
             str(self._base / "data" / "profile_state.db") if self._base else None
         )
         if not profile_db or not Path(profile_db).exists():
-            return False
+            return None
         try:
-            conn = sqlite3.connect(f"file:{profile_db}?mode=ro", uri=True)
+            uri = f"{Path(profile_db).resolve().as_uri()}?mode=ro"
+            conn = sqlite3.connect(uri, uri=True)
             try:
                 row = conn.execute(
                     "SELECT value FROM profile_settings WHERE key = ?", (key,)
                 ).fetchone()
             finally:
                 conn.close()
-            return bool(row) and str(row[0]).strip().lower() in truthy
-        except sqlite3.OperationalError:
+            return str(row[0]) if row else None
+        except sqlite3.Error:
+            return None
+
+    def _news_pg_exit_completed(self, market_db: Optional[str]) -> bool:
+        """Whether news has completed PG exit, from profile state or audit marker."""
+        import sqlite3
+
+        from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
+        from src.news_providers import parse_news_toggle
+
+        if parse_news_toggle(self._profile_setting_value(NEWS_PG_EXIT_COMPLETED_KEY)) is True:
+            return True
+
+        if not market_db:
             return False
+        path = Path(market_db)
+        if not path.exists():
+            return False
+        try:
+            uri = f"{path.resolve().as_uri()}?mode=ro"
+            conn = sqlite3.connect(uri, uri=True)
+            try:
+                exists = conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    ("news_pg_exit_runs",),
+                ).fetchone()
+                if not exists:
+                    return False
+                row = conn.execute(
+                    "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
+                ).fetchone()
+                return row is not None
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return False
+
+    def _profile_setting_truthy(self, key: str, env_var: str) -> bool:
+        """Shared toggle reader: env override OR the persisted profile_settings key,
+        via a light read-only SQLite query (no ProfileStateStore import / no
+        migration — fresh native-host processes re-read this every spawn)."""
+        import os
+
+        truthy = ("1", "true", "yes", "on")
+        if os.environ.get(env_var, "").strip().lower() in truthy:
+            return True
+        value = self._profile_setting_value(key)
+        return value is not None and value.strip().lower() in truthy
 
     def _local_market_enabled(self) -> bool:
         return self._profile_setting_truthy("use_local_market", "ARKSCOPE_USE_LOCAL_MARKET")

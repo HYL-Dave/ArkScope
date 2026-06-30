@@ -269,6 +269,8 @@ class DatabaseBackend:
 
     def _get_conn(self) -> psycopg2.extensions.connection:
         """Get or create a database connection, with stale-connection detection."""
+        if not self._dsn:
+            raise RuntimeError("PostgreSQL is not configured")
         if self._conn is not None and not self._conn.closed:
             # Ping to detect server-side disconnects (idle timeout etc.)
             try:

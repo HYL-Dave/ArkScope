@@ -15,13 +15,16 @@ class _StubSABackend:
     """Stands in for SACaptureDatabaseBackend (built in parallel by prep-2) so the
     matrix tests are hermetic — they assert SELECTION, not backend behavior."""
 
-    def __init__(self, dsn, sslmode="prefer", *, sa_db, market_db="", strict=False):
+    def __init__(self, dsn, sslmode="prefer", *, sa_db, market_db="", strict=False,
+                 news_strict=False):
         self.dsn, self.sa_db, self.market_db, self.strict = dsn, sa_db, market_db, strict
+        self.news_strict = news_strict
 
 
 class _StubLMDB:
-    def __init__(self, dsn, sslmode="prefer", *, market_db, strict=False):
+    def __init__(self, dsn, sslmode="prefer", *, market_db, strict=False, news_strict=False):
         self.dsn, self.market_db, self.strict = dsn, market_db, strict
+        self.news_strict = news_strict
 
 
 class _StubPG:
@@ -115,6 +118,20 @@ def test_sa_plus_market_strict_threads_to_single_backend(env):
     assert isinstance(b, _StubSABackend)
     assert b.sa_db == str(env.sa_db) and b.market_db == str(env.market_db)
     assert b.strict is True
+
+
+def test_news_exit_threads_news_strict_to_sa_backend_without_market_strict(env):
+    env.profile.set_setting("use_local_sa", "true")
+    env.profile.set_setting("use_local_market", "false")
+    env.profile.set_setting("news_pg_exit_completed", "true")
+    env.sa_db.write_bytes(b"")
+    env.market_db.write_bytes(b"")
+    b = _make(env)
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
+    assert b.market_db == str(env.market_db)
+    assert b.news_strict is True
+    assert b.strict is False
 
 
 def test_sa_toggle_without_db_stays_pg(env):

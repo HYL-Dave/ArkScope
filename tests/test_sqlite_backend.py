@@ -861,6 +861,58 @@ def test_non_strict_still_falls_back_to_pg(market_db, monkeypatch):
     assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL" and hit == ["UNKNOWN"]
 
 
+def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
+    db, _ = market_db
+
+    def news_boom(self, *args, **kwargs):
+        raise AssertionError("PG called")
+
+    for name in ("query_news", "query_news_search", "query_news_feed", "query_news_stats"):
+        monkeypatch.setattr(DatabaseBackend, name, news_boom)
+
+    price_hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_prices",
+        lambda self, ticker, interval="15min", days=30:
+            (price_hit.append(ticker), _PG_SENTINEL)[1],
+    )
+    iv_hit = []
+    pg_iv = pd.DataFrame([("2026-01-01", 0.3, 0.2, 0.1, 1.0, 5)], columns=_IV_COLS)
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_iv_history",
+        lambda self, ticker: (iv_hit.append(ticker), pg_iv)[1],
+    )
+    fund_hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_fundamentals",
+        lambda self, ticker: (
+            fund_hit.append(ticker),
+            {"ticker": ticker, "snapshot": {"source": "PG"}},
+        )[1],
+    )
+
+    b = LocalMarketDatabaseBackend(
+        "postgresql://fake/db", market_db=db, strict=False, news_strict=True
+    )
+
+    assert b._strict is False
+    assert b._news_strict is True
+    assert b.query_news(ticker="ZZZZ", scored_only=False).empty
+    assert b.query_news_search(query="notpresent", scored_only=False).empty
+    assert b.query_news_feed(q="notpresent")["total"] == 0
+    assert b.query_news_stats(ticker="ZZZZ").empty
+
+    assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL"
+    assert b.query_iv_history("UNKNOWN").iloc[0]["date"] == "2026-01-01"
+    assert b.query_fundamentals("UNKNOWN")["snapshot"] == {"source": "PG"}
+    assert price_hit == ["UNKNOWN"]
+    assert iv_hit == ["UNKNOWN"]
+    assert fund_hit == ["UNKNOWN"]
+
+
 def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
     from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
     db, _ = market_db

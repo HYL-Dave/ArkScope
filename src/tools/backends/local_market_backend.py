@@ -45,7 +45,15 @@ logger = logging.getLogger(__name__)
 
 
 class LocalMarketDatabaseBackend(DatabaseBackend):
-    def __init__(self, dsn: str, sslmode: str = "prefer", *, market_db: str, strict: bool = False):
+    def __init__(
+        self,
+        dsn: str,
+        sslmode: str = "prefer",
+        *,
+        market_db: str,
+        strict: bool = False,
+        news_strict: bool = False,
+    ):
         # strict (local-only): market reads NEVER fall back to PG — a local miss is an
         # honest empty/unavailable, PG is import/archive only. The short connect_timeout
         # makes any residual non-market PG path (app-records, a deferred slice) fail FAST
@@ -54,6 +62,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         self._market = SqliteBackend(market_db)
         self._market_db = market_db
         self._strict = strict
+        self._news_strict = news_strict
 
     def query_prices(self, ticker: str, interval: str = "15min", days: int = 30) -> pd.DataFrame:
         try:
@@ -82,7 +91,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             df = None
         if df is not None and not df.empty:
             return df
-        if scored_only or model or self._strict:
+        if scored_only or model or self._strict or self._news_strict:
             return df if df is not None else pd.DataFrame(columns=_NEWS_COLS)
         return super().query_news(
             ticker=ticker, days=days, source=source, scored_only=scored_only, model=model
@@ -101,7 +110,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             df = None
         if df is not None and not df.empty:
             return df
-        if scored_only or self._strict:
+        if scored_only or self._strict or self._news_strict:
             return df if df is not None else pd.DataFrame(columns=_NEWS_SEARCH_COLS)
         return super().query_news_search(
             query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
@@ -116,7 +125,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             return self._market.query_news_stats(ticker=ticker, days=days)
         except Exception as e:
             logger.warning(f"local query_news_stats failed ({e})")
-            if self._strict:
+            if self._strict or self._news_strict:
                 return pd.DataFrame(columns=_NEWS_STATS_COLS)  # local-only: honest empty, no PG
             return super().query_news_stats(ticker=ticker, days=days)
 
@@ -136,7 +145,7 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
             local = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
         if local.get("available"):
             return local
-        if self._strict:
+        if self._strict or self._news_strict:
             return local  # local-only: honest local feed state (no PG), even if empty
         return super().query_news_feed(
             q=q, ticker=ticker, source=source, days=days, limit=limit, offset=offset)
@@ -256,6 +265,8 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
                     return local
             except Exception:
                 pass
+        if data_type == "news" and self._news_strict:
+            return []  # news PG-exit: honest local empty, no PG
         if self._strict:
             return []  # local-only: honest empty (incl. non-local types), no PG
         return super().get_available_tickers(data_type)
