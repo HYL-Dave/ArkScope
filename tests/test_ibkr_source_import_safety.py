@@ -11,6 +11,15 @@ def test_ibkr_source_imports_without_ib_insync_and_constructor_explains_dependen
         "PYTHONPATH": f"{repo}:/tmp/arkscope_pydeps",
     }
     code = (
+        "import importlib.abc\n"
+        "import sys\n"
+        "class BlockIBInsync(importlib.abc.MetaPathFinder):\n"
+        "    def find_spec(self, fullname, path=None, target=None):\n"
+        "        if fullname == 'ib_insync' or fullname.startswith('ib_insync.'):\n"
+        "            raise ImportError('ib_insync blocked by import-safety test')\n"
+        "        return None\n"
+        "sys.modules.pop('ib_insync', None)\n"
+        "sys.meta_path.insert(0, BlockIBInsync())\n"
         "import src.news_normalized.ibkr_adapter\n"
         "from data_sources.ibkr_source import IBKRDataSource\n"
         "try:\n"
