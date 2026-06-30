@@ -148,6 +148,21 @@ CREATE TABLE IF NOT EXISTS news_legacy_projection_map (
     PRIMARY KEY(article_id,ticker)
 );
 
+CREATE TABLE IF NOT EXISTS news_pg_exit_runs (
+    id                         INTEGER PRIMARY KEY,
+    preflight_fingerprint      TEXT NOT NULL UNIQUE,
+    legacy_max_id              INTEGER NOT NULL,
+    legacy_row_count           INTEGER NOT NULL,
+    normalized_row_count       INTEGER NOT NULL,
+    normalized_only_count      INTEGER NOT NULL,
+    backup_path                TEXT,
+    status                     TEXT NOT NULL
+                               CHECK(status IN ('testing','completed','rolled_back')),
+    started_at                 TEXT NOT NULL,
+    completed_at               TEXT,
+    validation_json            TEXT
+);
+
 CREATE TABLE IF NOT EXISTS news_ingest_conflicts (
     id                         INTEGER PRIMARY KEY,
     source                     TEXT NOT NULL,
