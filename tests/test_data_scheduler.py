@@ -417,6 +417,162 @@ def test_normalized_news_route_preserves_writer_partial_continuation(monkeypatch
     )
 
 
+def test_normalized_news_scheduler_skips_pending_continuation(monkeypatch):
+    import src.news_normalized.routing as routing
+
+    continuation = {
+        "deferred_tickers": ["MSFT", "TSLA"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    monkeypatch.setattr(ds, "_run_normalized_news_writer",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("normalized writer must not run")))
+
+    res = ds.run_source("polygon_news", trigger_source="scheduler")
+
+    assert res["status"] == "skipped"
+    assert "partial pending manual continue" in res["reason"]
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] == continuation
+    assert row["last_result"]["continuation"] == continuation
+
+
+def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    from src.news_normalized.models import WriterContinuation
+
+    continuation = {
+        "deferred_tickers": ["MSFT", "TSLA"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    seen = {}
+
+    def _normalized_writer(source, scope, *, continuation=None, progress_cb=None):
+        seen["source"] = source
+        seen["scope"] = list(scope)
+        seen["continuation"] = continuation
+        return {
+            "status": "succeeded",
+            "articles_seen": 0,
+            "articles_inserted": 0,
+            "bodies_fetched": 0,
+            "errors": {},
+            "continuation": None,
+        }
+
+    monkeypatch.setattr(ds, "_run_normalized_news_writer", _normalized_writer)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert seen["source"] == "polygon"
+    assert seen["scope"] == ["AAPL", "NVDA"]
+    assert isinstance(seen["continuation"], WriterContinuation)
+    assert seen["continuation"].deferred_tickers == ("MSFT", "TSLA")
+    assert seen["continuation"].deferred_body_ids == ("polygon-body-1",)
+    assert seen["continuation"].cursor == "cursor-1"
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "succeeded"
+    assert row["continuation"] is None
+
+
+def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch):
+    import sqlite3
+
+    import src.market_data_admin as mda
+    import src.market_data_direct as mdd
+    import src.news_normalized.routing as routing
+    import src.news_normalized.store as store_module
+    import src.news_normalized.writer as writer_module
+    from src.news_normalized.models import WriterResult
+
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(
+                            AssertionError("PG sync subprocess must not run")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("_local_refresh must not run")))
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
+
+    class FakeConn:
+        def close(self):
+            pass
+
+    fake_conn = FakeConn()
+    real_connect = sqlite3.connect
+
+    def _connect(path, timeout=0, **kwargs):
+        if str(path) != "/tmp/test-market-data.db":
+            return real_connect(path, timeout=timeout, **kwargs)
+        return fake_conn
+
+    monkeypatch.setattr(sqlite3, "connect", _connect)
+
+    class FakeStore:
+        def __init__(self, conn):
+            self.conn = conn
+
+    class FakeProvider:
+        source = "polygon"
+
+    monkeypatch.setattr(store_module, "NormalizedNewsStore", FakeStore)
+    monkeypatch.setattr(mdd, "market_write_lock", lambda: nullcontext())
+    monkeypatch.setattr(ds, "_make_normalized_news_provider", lambda source: FakeProvider())
+    monkeypatch.setattr(
+        writer_module,
+        "write_news_batch",
+        lambda *a, **k: WriterResult(
+            status="partial",
+            articles_seen=1,
+            articles_inserted=0,
+            bodies_fetched=0,
+            errors={"AAPL": "provider err"},
+            continuation=None,
+        ),
+    )
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "partial"
+    assert "continuation" not in res
+    assert res["collect"]["status"] == "partial"
+    assert res["collect"]["errors"] == {"AAPL": "provider err"}
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "partial"
+    assert row["continuation"] is None
+    assert row["last_result"]["collect"]["errors"] == {"AAPL": "provider err"}
+
+
 def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkeypatch):
     # LEGACY_LOCAL is the pre-exit rollback/current local path: provider→news_direct only.
     import scripts.collection.collect_polygon_news as cpn

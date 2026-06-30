@@ -283,7 +283,13 @@ def _make_normalized_news_provider(source: str):
     raise ValueError(f"unknown normalized news source: {source!r}")
 
 
-def _run_normalized_news_writer(source: str, scope: List[str], *, progress_cb=None) -> Dict[str, Any]:
+def _run_normalized_news_writer(
+    source: str,
+    scope: List[str],
+    *,
+    continuation=None,
+    progress_cb=None,
+) -> Dict[str, Any]:
     """Write Polygon/Finnhub REST news through normalized tables plus legacy projection."""
     import sqlite3
 
@@ -307,6 +313,7 @@ def _run_normalized_news_writer(source: str, scope: List[str], *, progress_cb=No
                     max_body_fetches=_NORMALIZED_NEWS_MAX_BODY_FETCHES,
                 ),
                 project_legacy=True,
+                continuation=continuation,
                 progress_cb=progress_cb,
             )
         return asdict(result) if hasattr(result, "__dataclass_fields__") else result
@@ -314,8 +321,7 @@ def _run_normalized_news_writer(source: str, scope: List[str], *, progress_cb=No
         conn.close()
 
 
-def _normalized_writer_continuation(collect: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    continuation = collect.get("continuation") if collect.get("status") == "partial" else None
+def _normalized_news_continuation(continuation: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(continuation, dict):
         return None
     out = {
@@ -324,6 +330,24 @@ def _normalized_writer_continuation(collect: Dict[str, Any]) -> Optional[Dict[st
         "cursor": continuation.get("cursor"),
     }
     return out if out["deferred_tickers"] or out["deferred_body_ids"] or out["cursor"] else None
+
+
+def _normalized_writer_continuation(collect: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    continuation = collect.get("continuation") if collect.get("status") == "partial" else None
+    return _normalized_news_continuation(continuation)
+
+
+def _writer_continuation_from_pending(continuation: Optional[Dict[str, Any]]):
+    normalized = _normalized_news_continuation(continuation)
+    if normalized is None:
+        return None
+    from src.news_normalized.models import WriterContinuation
+
+    return WriterContinuation(
+        deferred_tickers=tuple(normalized["deferred_tickers"]),
+        deferred_body_ids=tuple(normalized["deferred_body_ids"]),
+        cursor=normalized["cursor"],
+    )
 
 
 def _plan_price_backfill_scope(scope, *, today=None, now_et=None):
@@ -359,8 +383,12 @@ def _pending_continuation(source: str):
         return None
     if st and st.get("last_status") == "partial":
         cont = st.get("continuation")
-        if cont and cont.get("deferred"):
-            return cont
+        if isinstance(cont, dict):
+            if cont.get("deferred"):
+                return cont
+            normalized = _normalized_news_continuation(cont)
+            if normalized is not None:
+                return normalized
     return None
 
 
@@ -476,15 +504,34 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     started = datetime.now(timezone.utc)
     with _LAST_ATTEMPT_LOCK:
         _LAST_ATTEMPT[source] = started   # in-mem: interval backoff (incl. for attempted skips)
-    # v1.3/v1.3a: capture any pending continuation NOW — before record_attempt sets last_status
-    # ='running' (which would mask the durable 'partial'). Used by both the attended skip-gate
-    # (scheduler) and the manual-continue branch (api/cli consumes the saved deferred scope).
-    pending_cont = _pending_continuation(source) if d.gap_planned else None
+    # Capture any pending continuation NOW — before record_attempt sets last_status='running'
+    # (which would mask the durable 'partial'). Used by attended skip-gates (scheduler) and
+    # manual-continue branches (api/cli consume saved deferred work).
+    pending_cont = _pending_continuation(source) if (
+        d.gap_planned or d.news_direct_source is not None
+    ) else None
+    news_route = None
     try:
+        if d.news_direct_source is not None:
+            from src.news_normalized.routing import NewsWriteMode, read_news_write_route
+
+            news_route = read_news_write_route()
         # v1.3 attended (decision 4): a prior `partial` left deferred scope → the SCHEDULER does
         # NOT auto-resume; it skips until a MANUAL trigger (api/cli) processes the continuation.
         # Skip-only gate (before record_attempt → doesn't touch durable state, per v1.2a).
         if d.gap_planned and trigger_source == "scheduler" and pending_cont:
+            return _record_result({"source": source, "status": "skipped",
+                                   "reason": "partial pending manual continue"})
+        normalized_pending_cont = (
+            _normalized_news_continuation(pending_cont)
+            if d.news_direct_source is not None
+            else None
+        )
+        if (
+            d.news_direct_source is not None
+            and trigger_source == "scheduler"
+            and normalized_pending_cont is not None
+        ):
             return _record_result({"source": source, "status": "skipped",
                                    "reason": "partial pending manual continue"})
         if d.ibkr:
@@ -525,14 +572,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         error: Optional[str] = None
         plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         writer_continuation = None
+        writer_partial = False
         try:
             collected = False
             local_news_writer = False
-            news_route = None
             if d.news_direct_source is not None:
-                from src.news_normalized.routing import NewsWriteMode, read_news_write_route
-
-                news_route = read_news_write_route()
                 if news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
                 local_news_writer = news_route.mode in (
@@ -548,12 +592,16 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 result["collect"] = _run_normalized_news_writer(
                     d.news_direct_source,
                     scope,
+                    continuation=_writer_continuation_from_pending(
+                        pending_cont if trigger_source != "scheduler" else None
+                    ),
                     progress_cb=lambda done, total, current: _set_progress(
                         source, done, total, current),
                 )
                 writer_continuation = _normalized_writer_continuation(result["collect"])
                 if writer_continuation is not None:
                     result["collect"]["continuation"] = writer_continuation
+                writer_partial = result["collect"].get("status") == "partial"
                 collected = True
             elif news_route is not None and news_route.mode == NewsWriteMode.LEGACY_LOCAL:
                 # LEGACY_LOCAL keeps the direct-local writer (provider→local news+fts,
@@ -683,10 +731,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         # Partial runs persist their continuation so the UI/manual follow-up can surface the
         # unfinished scope instead of clearing it as a success.
         continuation = None
-        if ok and writer_continuation is not None:
+        if ok and writer_partial:
             result["status"] = "partial"
             continuation = writer_continuation
-            result["continuation"] = continuation
+            if continuation is not None:
+                result["continuation"] = continuation
         elif ok and plan is not None and plan.deferred:
             result["status"] = "partial"
             continuation = {"deferred": plan.deferred, "lookback_days": plan.lookback_days,
