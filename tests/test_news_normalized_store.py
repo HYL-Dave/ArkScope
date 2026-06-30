@@ -70,6 +70,7 @@ def test_upsert_uncommitted_rolls_back_with_caller_transaction(store, conn):
     conn.execute("BEGIN IMMEDIATE")
 
     store.upsert_uncommitted(candidate("caller-owned"))
+    assert conn.in_transaction is True
     conn.rollback()
 
     assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 0
@@ -96,6 +97,7 @@ def test_update_body_uncommitted_rolls_back_with_caller_transaction(store, conn)
             raw_format="text",
         ),
     )
+    assert conn.in_transaction is True
     conn.rollback()
 
     row = conn.execute(
@@ -110,6 +112,40 @@ def test_update_body_uncommitted_rolls_back_with_caller_transaction(store, conn)
     ).fetchone()
     assert tuple(row) == ("Original title", "pending", None)
     assert tuple(search) == ("Original title", "")
+
+
+def test_update_body_missing_provider_preserves_caller_transaction(store, conn):
+    conn.execute("BEGIN IMMEDIATE")
+    conn.execute(
+        "INSERT INTO news_articles "
+        "(source,provider_article_id,canonical_title,published_at,content_kind,"
+        "created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+        (
+            "pending-source",
+            "pending-id",
+            "Pending row",
+            "2026-06-27T09:00:00Z",
+            "unknown",
+            "2026-06-27T09:00:00Z",
+            "2026-06-27T09:00:00Z",
+        ),
+    )
+
+    with pytest.raises(KeyError):
+        store.update_body(
+            candidate("missing-provider"),
+            BodyCandidate(status=BodyStatus.FETCHED, raw_body="unused"),
+        )
+
+    assert conn.in_transaction is True
+    assert (
+        conn.execute(
+            "SELECT COUNT(*) FROM news_articles WHERE provider_article_id='pending-id'"
+        ).fetchone()[0]
+        == 1
+    )
+    conn.rollback()
+    assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 0
 
 
 def test_update_body_still_commits_its_transaction(store, conn):

@@ -80,11 +80,23 @@ class NormalizedNewsStore:
         self._ticker_aliases = load_ticker_aliases(conn)
 
     def upsert(self, candidate: ArticleCandidate) -> UpsertResult:
+        keys = self._identity_keys(candidate)
+        resolution = self._resolve(candidate, keys)
         with self.conn:
-            return self.upsert_uncommitted(candidate)
+            return self._upsert_resolved(candidate, keys, resolution)
 
     def upsert_uncommitted(self, candidate: ArticleCandidate) -> UpsertResult:
-        keys = build_identity_keys(
+        """Write without opening a transaction.
+
+        Callers that need atomic rollback must already own a transaction; otherwise
+        the connection's SQLite autocommit/implicit transaction behavior applies.
+        """
+        keys = self._identity_keys(candidate)
+        resolution = self._resolve(candidate, keys)
+        return self._upsert_resolved(candidate, keys, resolution)
+
+    def _identity_keys(self, candidate: ArticleCandidate) -> tuple[ArticleKey, ...]:
+        return build_identity_keys(
             source=candidate.source,
             provider_article_id=candidate.provider_article_id,
             url=candidate.url,
@@ -92,12 +104,20 @@ class NormalizedNewsStore:
             title=candidate.title,
             published_at=candidate.published_at,
         )
-        resolution = self._resolve(candidate, keys)
+
+    def _upsert_resolved(
+        self,
+        candidate: ArticleCandidate,
+        keys: tuple[ArticleKey, ...],
+        resolution: _Resolution,
+    ) -> UpsertResult:
         if resolution.conflict_kind:
             return self._quarantine(candidate, resolution)
 
         inserted = resolution.article_id is None
-        article_id = resolution.article_id or self._insert_article(candidate, keys[0].source)
+        article_id = resolution.article_id or self._insert_article(
+            candidate, keys[0].source
+        )
         self._update_article_metadata(article_id, candidate)
         self._attach_keys(article_id, keys)
         self._upsert_title(article_id, candidate)
@@ -113,8 +133,10 @@ class NormalizedNewsStore:
         *,
         allow_terminal_recovery: bool = False,
     ) -> None:
+        article_id = self._require_article_id_for_provider(candidate)
         with self.conn:
-            self.update_body_uncommitted(
+            self._update_body_for_article_id(
+                article_id,
                 candidate,
                 body,
                 allow_terminal_recovery=allow_terminal_recovery,
@@ -127,11 +149,35 @@ class NormalizedNewsStore:
         *,
         allow_terminal_recovery: bool = False,
     ) -> None:
+        """Write body state without opening a transaction.
+
+        Callers that need atomic rollback must already own a transaction; otherwise
+        the connection's SQLite autocommit/implicit transaction behavior applies.
+        """
+        article_id = self._require_article_id_for_provider(candidate)
+        self._update_body_for_article_id(
+            article_id,
+            candidate,
+            body,
+            allow_terminal_recovery=allow_terminal_recovery,
+        )
+
+    def _require_article_id_for_provider(self, candidate: ArticleCandidate) -> int:
         article_id = self._article_id_for_provider(
             candidate.source, candidate.provider_article_id
         )
         if article_id is None:
             raise KeyError("provider article is not present in normalized store")
+        return article_id
+
+    def _update_body_for_article_id(
+        self,
+        article_id: int,
+        candidate: ArticleCandidate,
+        body: BodyCandidate,
+        *,
+        allow_terminal_recovery: bool = False,
+    ) -> None:
         self._upsert_body(
             article_id,
             body,
