@@ -95,16 +95,23 @@ def write_news_batch(
     legacy_rows_inserted = 0
     legacy_rows_updated = 0
     projection_skipped_no_ticker = 0
+    projection_skip_article_ids: set[int] = set()
     body_fetch_attempts = 0
     tickers_scanned = 0
 
-    def record_projection(result: ProjectionResult) -> None:
+    def record_projection(result: ProjectionResult, article_id: Optional[int]) -> None:
         nonlocal legacy_rows_inserted
         nonlocal legacy_rows_updated
         nonlocal projection_skipped_no_ticker
+        skipped_no_ticker = result.skipped_no_ticker
+        if article_id is not None and result.skipped_no_ticker:
+            if article_id in projection_skip_article_ids:
+                skipped_no_ticker = 0
+            else:
+                projection_skip_article_ids.add(article_id)
         legacy_rows_inserted += result.inserted
         legacy_rows_updated += result.updated
-        projection_skipped_no_ticker += result.skipped_no_ticker
+        projection_skipped_no_ticker += skipped_no_ticker
 
     def upsert_candidate(candidate: ArticleCandidate):
         if not project_legacy:
@@ -120,20 +127,8 @@ def write_news_batch(
         except Exception:
             store.conn.rollback()
             raise
-        record_projection(projection)
+        record_projection(projection, upsert.article_id)
         return upsert
-
-    def article_id_for_provider(candidate: ArticleCandidate) -> int:
-        row = store.conn.execute(
-            "SELECT id FROM news_articles WHERE source=? AND provider_article_id=?",
-            (
-                candidate.source.strip().casefold(),
-                (candidate.provider_article_id or "").strip(),
-            ),
-        ).fetchone()
-        if row is None:
-            raise KeyError("provider article is not present in normalized store")
-        return int(row[0])
 
     def update_body(candidate: ArticleCandidate, body: BodyCandidate) -> None:
         if not project_legacy:
@@ -141,17 +136,16 @@ def write_news_batch(
             return
 
         projection = ProjectionResult()
+        article_id: Optional[int] = None
         store.conn.execute("BEGIN IMMEDIATE")
         try:
-            store.update_body_uncommitted(candidate, body)
-            projection = project_article_uncommitted(
-                store.conn, article_id_for_provider(candidate)
-            )
+            article_id = store.update_body_uncommitted(candidate, body)
+            projection = project_article_uncommitted(store.conn, article_id)
             store.conn.commit()
         except Exception:
             store.conn.rollback()
             raise
-        record_projection(projection)
+        record_projection(projection, article_id)
 
     def record_resumed_body_error(
         article: ArticleCandidate, error: str
@@ -235,11 +229,17 @@ def write_news_batch(
                         articles_seen += 1
                         incoming_body = candidate.body
                         pending = replace(candidate, body=BodyCandidate())
-                        upsert = upsert_candidate(
-                            candidate
-                            if incoming_body.status is not BodyStatus.PENDING
-                            else pending
-                        )
+                        try:
+                            upsert = upsert_candidate(
+                                candidate
+                                if incoming_body.status is not BodyStatus.PENDING
+                                else pending
+                            )
+                        except Exception as exc:
+                            key = candidate.provider_article_id or f"ticker:{ticker}"
+                            errors[key] = str(exc)
+                            ticker_error = str(exc)
+                            continue
                         if upsert.quarantined:
                             key = candidate.provider_article_id or f"ticker:{ticker}"
                             errors[key] = "article identity conflict quarantined"

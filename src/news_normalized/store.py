@@ -132,7 +132,7 @@ class NormalizedNewsStore:
         body: BodyCandidate,
         *,
         allow_terminal_recovery: bool = False,
-    ) -> None:
+    ) -> int:
         article_id = self._require_article_id_for_provider(candidate)
         with self.conn:
             self._update_body_for_article_id(
@@ -141,6 +141,7 @@ class NormalizedNewsStore:
                 body,
                 allow_terminal_recovery=allow_terminal_recovery,
             )
+        return article_id
 
     def update_body_uncommitted(
         self,
@@ -148,7 +149,7 @@ class NormalizedNewsStore:
         body: BodyCandidate,
         *,
         allow_terminal_recovery: bool = False,
-    ) -> None:
+    ) -> int:
         """Write body state without opening a transaction.
 
         Callers that need atomic rollback must already own a transaction; otherwise
@@ -161,6 +162,7 @@ class NormalizedNewsStore:
             body,
             allow_terminal_recovery=allow_terminal_recovery,
         )
+        return article_id
 
     def _require_article_id_for_provider(self, candidate: ArticleCandidate) -> int:
         article_id = self._article_id_for_provider(

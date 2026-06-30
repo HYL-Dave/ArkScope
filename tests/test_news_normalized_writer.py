@@ -396,13 +396,100 @@ def test_projection_failure_is_atomic_for_normalized_and_legacy_rows(store):
     assert result.status == "partial"
     assert result.articles_inserted == 0
     assert result.legacy_rows_inserted == 0
-    assert "AAPL" in result.errors
+    assert "p1" in result.errors
     assert store.conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 0
     projected_count = store.conn.execute(
         "SELECT COUNT(*) FROM news WHERE ticker IN ('AAPL','MSFT')"
     ).fetchone()[0]
     assert projected_count == 0
     assert store.conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] == 1
+
+
+def test_projection_conflict_isolates_candidate_and_continues_ticker(store):
+    ensure_legacy_news_schema(store.conn)
+    conflicting = ArticleCandidate(
+        source="fakewire",
+        provider_article_id="p1",
+        title="Conflicting projection story",
+        publisher="Fake Wire",
+        published_at="2026-06-27T10:00:01Z",
+        primary_ticker="AAPL",
+        related_tickers=("MSFT",),
+        content_kind="headline_only",
+    )
+    valid = candidate("p2")
+    conflicting_hash = canonical_article_hash(
+        "MSFT", "Conflicting projection story", "2026-06-27T10:00:01Z"
+    )
+    store.conn.execute(
+        "INSERT INTO news "
+        "(ticker,title,description,url,publisher,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (
+            "TSLA",
+            "Different owner",
+            "legacy owner",
+            "",
+            "Other Wire",
+            "fakewire",
+            "2026-06-27T10:00:01+0000",
+            conflicting_hash,
+        ),
+    )
+    store.conn.commit()
+    provider = FakeProvider({"AAPL": [conflicting, valid]})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=2, max_body_fetches=0),
+        project_legacy=True,
+    )
+
+    assert result.status == "partial"
+    assert result.errors.keys() == {"p1"}
+    assert result.articles_seen == 2
+    assert result.articles_inserted == 1
+    assert result.legacy_rows_inserted == 1
+    assert store.candidate_by_provider_id("fakewire", "p1") is None
+    assert store.candidate_by_provider_id("fakewire", "p2") is not None
+    normalized = store.conn.execute(
+        "SELECT provider_article_id FROM news_articles"
+    ).fetchall()
+    assert [row[0] for row in normalized] == ["p2"]
+    legacy = store.conn.execute(
+        "SELECT ticker,title,source FROM news WHERE ticker='AAPL'"
+    ).fetchall()
+    assert [tuple(row) for row in legacy] == [("AAPL", "Story p2", "fakewire")]
+
+
+def test_projection_skip_for_untickered_body_fetch_counts_once_per_batch(store):
+    ensure_legacy_news_schema(store.conn)
+    article = ArticleCandidate(
+        source="fakewire",
+        provider_article_id="p1",
+        title="Untickered body story",
+        publisher="Fake Wire",
+        published_at="2026-06-27T10:00:01Z",
+        content_kind="headline_only",
+    )
+    provider = FakeProvider({"AAPL": [article]})
+
+    result = write_news_batch(
+        store,
+        provider,
+        ["AAPL"],
+        WriterBudget(max_articles=1, max_body_fetches=1),
+        project_legacy=True,
+    )
+
+    assert result.status == "succeeded"
+    assert result.bodies_fetched == 1
+    assert result.legacy_rows_inserted == 0
+    assert result.legacy_rows_updated == 0
+    assert result.projection_skipped_no_ticker == 1
+    assert store.conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] == 0
 
 
 def test_projection_disabled_leaves_legacy_news_empty(store):

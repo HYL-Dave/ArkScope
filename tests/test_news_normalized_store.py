@@ -114,6 +114,37 @@ def test_update_body_uncommitted_rolls_back_with_caller_transaction(store, conn)
     assert tuple(search) == ("Original title", "")
 
 
+def test_update_body_uncommitted_returns_article_id_resolved_through_key_alias(
+    store, conn
+):
+    article = candidate("body-caller-owned", title="Original title")
+    result = store.upsert(article)
+    conn.execute(
+        "INSERT INTO news_article_keys"
+        "(article_id,source,key_kind,key_value,created_at) VALUES (?,?,?,?,?)",
+        (result.article_id, "ibkr", "provider_id", "body-alias", "2026-06-29T00:00:00Z"),
+    )
+    conn.commit()
+    conn.execute("BEGIN IMMEDIATE")
+
+    article_id = store.update_body_uncommitted(
+        candidate("body-alias", title="Alias body title"),
+        BodyCandidate(
+            status=BodyStatus.FETCHED,
+            raw_body="alias body",
+            raw_format="text",
+        ),
+    )
+    conn.commit()
+
+    assert article_id == result.article_id
+    row = conn.execute(
+        "SELECT provider_article_id,canonical_title FROM news_articles WHERE id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == ("body-caller-owned", "Alias body title")
+
+
 def test_update_body_missing_provider_preserves_caller_transaction(store, conn):
     conn.execute("BEGIN IMMEDIATE")
     conn.execute(
