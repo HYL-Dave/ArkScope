@@ -52,6 +52,7 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -531,6 +532,77 @@ def _resolve_price_scope() -> List[str]:
     return resolve_active_universe()
 
 
+def _news_pg_exit_audit_completed(db_path: str) -> bool:
+    """Read the market DB audit marker without creating or mutating it."""
+    path = Path(db_path)
+    if not path.exists():
+        return False
+    try:
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                ("news_pg_exit_runs",),
+            ).fetchone()
+            if not exists:
+                return False
+            row = conn.execute(
+                "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
+
+
+def _news_pg_exit_completed(market_db: str) -> bool:
+    from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
+    from src.news_providers import parse_news_toggle
+
+    try:
+        if parse_news_toggle(_store().get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True:
+            return True
+    except Exception:  # noqa: BLE001 — routing falls back to the DB audit marker
+        pass
+    return _news_pg_exit_audit_completed(market_db)
+
+
+def _read_news_write_route_for_scheduler():
+    """Resolve news writer routing with the local market DB audit marker included."""
+    from src.market_data_admin import resolve_market_db_path
+    from src.news_normalized.routing import (
+        ENV_USE_NORMALIZED_NEWS_WRITES,
+        NEWS_PG_EXIT_COMPLETED_KEY,
+        USE_NORMALIZED_NEWS_WRITES_KEY,
+        read_news_write_route,
+        resolve_news_write_route,
+    )
+    from src.news_providers import ENV_USE_LOCAL_NEWS, USE_LOCAL_NEWS_KEY
+
+    market_db = resolve_market_db_path()
+    audit_completed = _news_pg_exit_audit_completed(market_db)
+    if not audit_completed:
+        return read_news_write_route()
+    try:
+        store = _store()
+        exit_completed = store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)
+        normalized = store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
+        local = store.get_setting(USE_LOCAL_NEWS_KEY)
+    except Exception:  # noqa: BLE001 — the completed audit marker still retires PG news
+        exit_completed = True
+        normalized = None
+        local = None
+    return resolve_news_write_route(
+        exit_completed=True if audit_completed else exit_completed,
+        normalized_value=normalized,
+        local_value=local,
+        normalized_env=os.environ.get(ENV_USE_NORMALIZED_NEWS_WRITES),
+        local_env=os.environ.get(ENV_USE_LOCAL_NEWS),
+    )
+
+
 def _local_refresh() -> Dict[str, Any]:
     """PG → local market_data.db delta. Skip-if-busy (in-process AND cross-process):
     concurrent refreshes are idempotent (INSERT OR IGNORE) but wasteful."""
@@ -542,9 +614,15 @@ def _local_refresh() -> Dict[str, Any]:
         try:
             from src.market_data_admin import incremental_update, resolve_market_db_path
 
-            if not Path(resolve_market_db_path()).exists():
+            market_db = resolve_market_db_path()
+            if not Path(market_db).exists():
                 return {"skipped": "no local market DB (bootstrap first)"}
-            res = incremental_update()
+            domains = (
+                ("prices", "iv", "fundamentals")
+                if _news_pg_exit_completed(market_db)
+                else None
+            )
+            res = incremental_update(domains=domains) if domains is not None else incremental_update()
             return {"ok": res.get("ok"), "domains": {
                 k: (v or {}).get("rows_added") for k, v in res.items() if isinstance(v, dict)}}
         finally:
@@ -597,9 +675,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     news_route = None
     try:
         if d.news_direct_source is not None:
-            from src.news_normalized.routing import NewsWriteMode, read_news_write_route
+            from src.news_normalized.routing import NewsWriteMode
 
-            news_route = read_news_write_route()
+            news_route = _read_news_write_route_for_scheduler()
         # v1.3 attended (decision 4): a prior `partial` left deferred scope → the SCHEDULER does
         # NOT auto-resume; it skips until a MANUAL trigger (api/cli) processes the continuation.
         # Skip-only gate (before record_attempt → doesn't touch durable state, per v1.2a).

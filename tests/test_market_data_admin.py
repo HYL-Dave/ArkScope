@@ -299,6 +299,74 @@ def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
     assert meta["news"]["rows_added"] == 1 and meta["news"]["last_error"] is None
 
 
+def test_incremental_update_exclude_news_domain_skips_pg_news_query(tmp_path, fake_pg, monkeypatch):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    queries = []
+
+    class _CaptureCursor(_FakeCursor):
+        def execute(self, sql, params=None):
+            queries.append(" ".join(sql.split()))
+            super().execute(sql, params)
+
+    class _CapturePG(_FakePG):
+        def __init__(self):
+            self._c = _CaptureCursor(
+                _PRICE_ROWS + [_NEW_PRICE],
+                _NEWS_ROWS + [_NEW_NEWS],
+                iv=_IV_ROWS + [_NEW_IV],
+                fund=_FUND_ROWS + [_NEW_FUND],
+            )
+
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _CapturePG())
+
+    res = mda.incremental_update(out, domains=("prices", "iv", "fundamentals"))
+
+    assert res["ok"] is True
+    assert res["news"]["skipped"] == "domain disabled"
+    assert res["prices"]["ok"] is True
+    assert res["iv"]["ok"] is True
+    assert res["fundamentals"]["ok"] is True
+    assert not any("FROM news" in q for q in queries)
+    assert mda.local_market_stats(out)["news"]["row_count"] == 2
+
+
+def test_incremental_update_exclude_news_and_other_omitted_domains_skip_pg_queries(
+    tmp_path, fake_pg, monkeypatch
+):
+    out = str(tmp_path / "market_data.db")
+    mda.bootstrap_market(out)
+    queries = []
+
+    class _CaptureCursor(_FakeCursor):
+        def execute(self, sql, params=None):
+            queries.append(" ".join(sql.split()))
+            super().execute(sql, params)
+
+    class _CapturePG(_FakePG):
+        def __init__(self):
+            self._c = _CaptureCursor(
+                _PRICE_ROWS + [_NEW_PRICE],
+                _NEWS_ROWS + [_NEW_NEWS],
+                iv=_IV_ROWS + [_NEW_IV],
+                fund=_FUND_ROWS + [_NEW_FUND],
+            )
+
+    monkeypatch.setattr(mda, "_pg_conn", lambda: _CapturePG())
+
+    res = mda.incremental_update(out, domains=("prices",))
+
+    assert res["ok"] is True
+    assert res["prices"]["ok"] is True
+    assert res["news"]["skipped"] == "domain disabled"
+    assert res["iv"]["skipped"] == "domain disabled"
+    assert res["fundamentals"]["skipped"] == "domain disabled"
+    assert any("FROM prices" in q for q in queries)
+    assert not any("FROM news" in q for q in queries)
+    assert not any("FROM iv_history" in q for q in queries)
+    assert not any("FROM fundamentals" in q for q in queries)
+
+
 def test_bootstrap_and_incremental_keep_fts_via_triggers(tmp_path, fake_pg, monkeypatch):
     # 2b-mirror: bootstrap installs UNIQUE(article_hash) + the fts triggers (after the bulk
     # rebuild); the incremental append then syncs news_fts via the trigger (manual insert removed)

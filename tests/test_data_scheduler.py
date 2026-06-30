@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import sqlite3
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import json
@@ -14,6 +15,7 @@ import src.service.data_scheduler as ds
 from src.profile_state import ProfileStateStore
 
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
+_REAL_LOCAL_REFRESH = ds._local_refresh
 
 
 @pytest.fixture(autouse=True)
@@ -914,6 +916,164 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert "--gateway-lock-held" in argv
     assert "sync" not in res
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
+    tmp_path,
+    monkeypatch,
+):
+    market_db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(market_db)
+    try:
+        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
+        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    import src.market_data_admin as mda
+
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    calls = []
+
+    def _subprocess(argv, cwd=None, capture_output=False, text=False):
+        calls.append(argv)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "succeeded",
+                    "articles_seen": 0,
+                    "articles_inserted": 0,
+                    "bodies_fetched": 0,
+                    "legacy_rows_inserted": 0,
+                    "legacy_rows_updated": 0,
+                    "projection_skipped_no_ticker": 0,
+                    "error_count": 0,
+                    "error_classes": [],
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(ds.subprocess, "run", _subprocess)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for post-exit IBKR news")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    rendered_calls = json.dumps(calls)
+    assert "collect_ibkr_news_normalized.py" in rendered_calls
+    assert "collect_ibkr_news.py" not in rendered_calls
+    assert "migrate_to_supabase.py" not in rendered_calls
+    assert "--news" not in rendered_calls
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailable(
+    tmp_path,
+    monkeypatch,
+):
+    market_db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(market_db)
+    try:
+        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
+        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    import src.market_data_admin as mda
+
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    monkeypatch.setattr(ds, "_store", lambda: (_ for _ in ()).throw(RuntimeError("profile down")))
+    calls = []
+
+    def _subprocess(argv, cwd=None, capture_output=False, text=False):
+        calls.append(argv)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "succeeded",
+                    "articles_seen": 0,
+                    "articles_inserted": 0,
+                    "bodies_fetched": 0,
+                    "legacy_rows_inserted": 0,
+                    "legacy_rows_updated": 0,
+                    "projection_skipped_no_ticker": 0,
+                    "error_count": 0,
+                    "error_classes": [],
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(ds.subprocess, "run", _subprocess)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for post-exit IBKR news")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    rendered_calls = json.dumps(calls)
+    assert "collect_ibkr_news_normalized.py" in rendered_calls
+    assert "collect_ibkr_news.py" not in rendered_calls
+
+
+def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch):
+    market_db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(market_db)
+    try:
+        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
+        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    class _Lock:
+        def acquire(self, *args, **kwargs):
+            return True
+
+        def release(self):
+            pass
+
+    import src.market_data_admin as mda
+
+    calls = []
+    monkeypatch.setattr(ds, "_LOCAL_REFRESH_LOCK", _Lock())
+    monkeypatch.setattr(ds, "_LOCAL_REFRESH_FLOCK", _Lock())
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
+    monkeypatch.setattr(
+        mda,
+        "incremental_update",
+        lambda *args, **kwargs: (
+            calls.append(kwargs.get("domains")),
+            {
+                "ok": True,
+                "prices": {"ok": True, "rows_added": 1},
+                "news": {"skipped": "domain disabled"},
+                "iv": {"ok": True, "rows_added": 2},
+                "fundamentals": {"ok": True, "rows_added": 3},
+            },
+        )[1],
+    )
+
+    res = _REAL_LOCAL_REFRESH()
+
+    assert calls == [("prices", "iv", "fundamentals")]
+    assert res == {"ok": True, "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": 3}}
 
 
 def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(

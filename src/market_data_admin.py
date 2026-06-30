@@ -946,18 +946,41 @@ def _incr_prices(sconn, batch: int) -> dict:
         return {"ok": False, "rows_added": 0, "error": str(e)}
 
 
-def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> dict:
+_INCREMENTAL_DOMAINS = ("prices", "news", "iv", "fundamentals")
+_DOMAIN_TABLES = {
+    "prices": "prices",
+    "news": "news",
+    "iv": "iv_history",
+    "fundamentals": "fundamentals",
+}
+
+
+def _domain_disabled_result() -> dict:
+    return {"ok": True, "rows_added": 0, "error": None, "skipped": "domain disabled"}
+
+
+def incremental_update(
+    out_path: Optional[str] = None,
+    batch: int = 20000,
+    domains: Optional[tuple[str, ...]] = None,
+) -> dict:
     """Append-only delta refresh of the local market DB (prices + news + iv +
     fundamentals) from PG — only rows newer than the local max (prices: per
     (ticker,interval) datetime; news/iv/fundamentals: id). Writes in place to the
     live WAL DB (no atomic swap), so routing can stay active. A provider/PG failure
     in one domain is recorded, not fatal to the others.
 
-    Requires an existing local DB (bootstrap first). Returns per-domain results."""
+    Requires an existing local DB (bootstrap first). Returns per-domain results.
+    ``domains=None`` preserves the historical all-domain refresh; otherwise only
+    the requested result-key domains are queried from PG."""
     path = out_path or resolve_market_db_path()
     if not Path(path).exists():
         return {"ok": False, "error": "local market DB does not exist — run a bootstrap first",
                 "prices": None, "news": None, "iv": None, "fundamentals": None}
+    active_domains = set(_INCREMENTAL_DOMAINS if domains is None else domains)
+    unknown = active_domains.difference(_INCREMENTAL_DOMAINS)
+    if unknown:
+        raise ValueError(f"unknown incremental update domain(s): {', '.join(sorted(unknown))}")
     sconn = sqlite3.connect(path, timeout=10.0)
     try:
         try:
@@ -969,17 +992,24 @@ def incremental_update(out_path: Optional[str] = None, batch: int = 20000) -> di
         sconn.executescript(_IV_SCHEMA)    # tolerate a pre-iv/fundamentals DB
         sconn.executescript(_FUND_SCHEMA)
         _ensure_news_sentiment_columns(sconn)  # tolerate a pre-sentiment news table
-        prices = _incr_prices(sconn, batch)  # per-(ticker,interval); catches new tickers
-        news = _incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
-                            _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
-        iv = _incr_domain(sconn, "iv", "SELECT COALESCE(MAX(id), 0) FROM iv_history",
-                          _PG_IV_SELECT_INCR, _PG_IV_SELECT, _IV_INSERT, batch)
-        fundamentals = _incr_domain(sconn, "fundamentals", "SELECT COALESCE(MAX(id), 0) FROM fundamentals",
-                                    _PG_FUND_SELECT_INCR, _PG_FUND_SELECT, _FUND_INSERT, batch)
+        prices = (_incr_prices(sconn, batch) if "prices" in active_domains
+                  else _domain_disabled_result())  # per-(ticker,interval); catches new tickers
+        news = (_incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
+                             _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
+                if "news" in active_domains else _domain_disabled_result())
+        iv = (_incr_domain(sconn, "iv", "SELECT COALESCE(MAX(id), 0) FROM iv_history",
+                           _PG_IV_SELECT_INCR, _PG_IV_SELECT, _IV_INSERT, batch)
+              if "iv" in active_domains else _domain_disabled_result())
+        fundamentals = (
+            _incr_domain(sconn, "fundamentals", "SELECT COALESCE(MAX(id), 0) FROM fundamentals",
+                         _PG_FUND_SELECT_INCR, _PG_FUND_SELECT, _FUND_INSERT, batch)
+            if "fundamentals" in active_domains else _domain_disabled_result()
+        )
         # Canonicalize tickers AFTER the mirror so newly-pulled alias rows (e.g. a PG
         # 'BRK.B') are reconciled to the canonical spelling across all domains. PK-safe.
-        _ensure_ticker_aliases(sconn)
-        for _t in ("prices", "news", "iv_history", "fundamentals"):
+        if active_domains:
+            _ensure_ticker_aliases(sconn)
+        for _t in (_DOMAIN_TABLES[d] for d in _INCREMENTAL_DOMAINS if d in active_domains):
             try:
                 _canonicalize_table_tickers(sconn, _t)
             except sqlite3.OperationalError:
