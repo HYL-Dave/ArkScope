@@ -381,14 +381,22 @@ def _pending_continuation(source: str):
         st = _state_store().get(source)
     except Exception:  # noqa: BLE001
         return None
-    if st and st.get("last_status") == "partial":
-        cont = st.get("continuation")
+    if not st:
+        return None
+    status = st.get("last_status")
+    cont = st.get("continuation")
+    if status == "partial":
         if isinstance(cont, dict):
             if cont.get("deferred"):
                 return cont
             normalized = _normalized_news_continuation(cont)
             if normalized is not None:
                 return normalized
+    source_def = SOURCES.get(source)
+    if status == "failed" and source_def is not None and source_def.news_direct_source is not None:
+        normalized = _normalized_news_continuation(cont)
+        if normalized is not None:
+            return normalized
     return None
 
 
@@ -530,6 +538,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         if (
             d.news_direct_source is not None
             and trigger_source == "scheduler"
+            and news_route.mode == NewsWriteMode.NORMALIZED
             and normalized_pending_cont is not None
         ):
             return _record_result({"source": source, "status": "skipped",
@@ -573,6 +582,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         plan = None   # v1.3: the gap-aware BackfillPlan (price_backfill); None for other sources
         writer_continuation = None
         writer_partial = False
+        preserve_continuation_on_failure = None
         try:
             collected = False
             local_news_writer = False
@@ -589,12 +599,20 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 if not scope:
                     raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
                 result["ticker_count"] = len(scope)
+                pending_writer_continuation = (
+                    pending_cont if trigger_source != "scheduler" else None
+                )
+                resume_continuation = _writer_continuation_from_pending(
+                    pending_writer_continuation
+                )
+                if resume_continuation is not None:
+                    preserve_continuation_on_failure = _normalized_news_continuation(
+                        pending_writer_continuation
+                    )
                 result["collect"] = _run_normalized_news_writer(
                     d.news_direct_source,
                     scope,
-                    continuation=_writer_continuation_from_pending(
-                        pending_cont if trigger_source != "scheduler" else None
-                    ),
+                    continuation=resume_continuation,
                     progress_cb=lambda done, total, current: _set_progress(
                         source, done, total, current),
                 )
@@ -743,6 +761,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             result["continuation"] = continuation
         else:
             result["status"] = "succeeded" if ok else "failed"
+            if not ok and preserve_continuation_on_failure is not None:
+                continuation = preserve_continuation_on_failure
         # v1.2: durable LOCAL outcome (recoverable + visible-failure), best-effort. This is the
         # REAL run outcome (skips return earlier via _record_result and are not persisted here).
         # error=None on success clears any stale last_error; continuation=None clears a prior

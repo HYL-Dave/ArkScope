@@ -450,6 +450,96 @@ def test_normalized_news_scheduler_skips_pending_continuation(monkeypatch):
     assert row["last_result"]["continuation"] == continuation
 
 
+def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monkeypatch):
+    import src.news_normalized.routing as routing
+
+    continuation = {
+        "deferred_tickers": ["MSFT"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
+                            "legacy local rollback route")
+    monkeypatch.setattr(ds, "_run_normalized_news_writer",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("normalized writer must not run")))
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (_ for _ in ()).throw(
+                            AssertionError("PG sync subprocess must not run")))
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("_local_refresh must not run")))
+    monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
+    direct_calls = []
+
+    def _direct(tickers, *, source, provider, progress_cb=None, **kwargs):
+        direct_calls.append((source, list(tickers)))
+        return {"source": source, "tickers_scanned": len(tickers), "articles_added": 0,
+                "errors": {}}
+
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _direct)
+
+    res = ds.run_source("polygon_news", trigger_source="scheduler")
+
+    assert res["status"] == "succeeded"
+    assert direct_calls == [("polygon", ["AAPL", "NVDA"])]
+    assert res["collect"]["source"] == "polygon"
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypatch):
+    import scripts.collection.collect_polygon_news as cpn
+    import src.news_normalized.routing as routing
+
+    continuation = {
+        "deferred_tickers": ["MSFT"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
+                            "blocked rollback route")
+    calls = {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+    monkeypatch.setattr(ds, "_run_normalized_news_writer",
+                        lambda *a, **k: calls.__setitem__(
+                            "normalized", calls["normalized"] + 1))
+    monkeypatch.setattr(cpn, "run_incremental",
+                        lambda *a, **k: calls.__setitem__(
+                            "adapter", calls["adapter"] + 1))
+    monkeypatch.setattr("src.news_direct.backfill_news_direct",
+                        lambda *a, **k: calls.__setitem__(
+                            "direct", calls["direct"] + 1))
+    monkeypatch.setattr(ds, "_run_subprocess",
+                        lambda argv: (calls.__setitem__(
+                            "sync", calls["sync"] + 1), {"returncode": 0})[1])
+    monkeypatch.setattr(ds, "_local_refresh",
+                        lambda: (calls.__setitem__(
+                            "refresh", calls["refresh"] + 1), {"ok": True})[1])
+
+    res = ds.run_source("polygon_news", trigger_source="scheduler")
+
+    assert res["status"] == "failed"
+    assert "blocked rollback route" in res["error"]
+    assert calls == {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0, "refresh": 0}
+
+
 def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it(
     monkeypatch,
 ):
@@ -502,6 +592,48 @@ def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_i
     row = ds._state_store().get("polygon_news")
     assert row["last_status"] == "succeeded"
     assert row["continuation"] is None
+
+
+def test_failed_manual_normalized_continuation_preserves_pending(monkeypatch):
+    import src.news_normalized.routing as routing
+    from src.news_normalized.models import WriterContinuation
+
+    continuation = {
+        "deferred_tickers": ["MSFT", "TSLA"],
+        "deferred_body_ids": ["polygon-body-1"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    seen = {}
+
+    def _normalized_writer(source, scope, *, continuation=None, progress_cb=None):
+        seen["continuation"] = continuation
+        raise RuntimeError("writer boom")
+
+    monkeypatch.setattr(ds, "_run_normalized_news_writer", _normalized_writer)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "failed"
+    assert "writer boom" in res["error"]
+    assert isinstance(seen["continuation"], WriterContinuation)
+    assert seen["continuation"].deferred_tickers == ("MSFT", "TSLA")
+    assert seen["continuation"].deferred_body_ids == ("polygon-body-1",)
+    assert seen["continuation"].cursor == "cursor-1"
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "failed"
+    assert row["continuation"] == continuation
+    assert ds._pending_continuation("polygon_news") == continuation
 
 
 def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch):
