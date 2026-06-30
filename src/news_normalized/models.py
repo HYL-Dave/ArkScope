@@ -95,3 +95,6 @@ class WriterResult:
     bodies_fetched: int
     errors: Dict[str, str]
     continuation: Optional[WriterContinuation]
+    legacy_rows_inserted: int = 0
+    legacy_rows_updated: int = 0
+    projection_skipped_no_ticker: int = 0

@@ -14,6 +14,7 @@ from src.market_data_direct import (
     _upsert_provider_meta,
 )
 
+from .legacy_projection import ProjectionResult, project_article_uncommitted
 from .models import (
     ArticleCandidate,
     BodyCandidate,
@@ -74,6 +75,7 @@ def write_news_batch(
     *,
     continuation: Optional[WriterContinuation] = None,
     progress_cb: Optional[Callable[[int, int, str], None]] = None,
+    project_legacy: bool = False,
 ) -> WriterResult:
     """Persist metadata first, then spend bounded provider calls on article bodies."""
     source = provider.source.strip().casefold()
@@ -90,8 +92,66 @@ def write_news_batch(
     articles_seen = 0
     articles_inserted = 0
     bodies_fetched = 0
+    legacy_rows_inserted = 0
+    legacy_rows_updated = 0
+    projection_skipped_no_ticker = 0
     body_fetch_attempts = 0
     tickers_scanned = 0
+
+    def record_projection(result: ProjectionResult) -> None:
+        nonlocal legacy_rows_inserted
+        nonlocal legacy_rows_updated
+        nonlocal projection_skipped_no_ticker
+        legacy_rows_inserted += result.inserted
+        legacy_rows_updated += result.updated
+        projection_skipped_no_ticker += result.skipped_no_ticker
+
+    def upsert_candidate(candidate: ArticleCandidate):
+        if not project_legacy:
+            return store.upsert(candidate)
+
+        projection = ProjectionResult()
+        store.conn.execute("BEGIN IMMEDIATE")
+        try:
+            upsert = store.upsert_uncommitted(candidate)
+            if upsert.article_id is not None and not upsert.quarantined:
+                projection = project_article_uncommitted(store.conn, upsert.article_id)
+            store.conn.commit()
+        except Exception:
+            store.conn.rollback()
+            raise
+        record_projection(projection)
+        return upsert
+
+    def article_id_for_provider(candidate: ArticleCandidate) -> int:
+        row = store.conn.execute(
+            "SELECT id FROM news_articles WHERE source=? AND provider_article_id=?",
+            (
+                candidate.source.strip().casefold(),
+                (candidate.provider_article_id or "").strip(),
+            ),
+        ).fetchone()
+        if row is None:
+            raise KeyError("provider article is not present in normalized store")
+        return int(row[0])
+
+    def update_body(candidate: ArticleCandidate, body: BodyCandidate) -> None:
+        if not project_legacy:
+            store.update_body(candidate, body)
+            return
+
+        projection = ProjectionResult()
+        store.conn.execute("BEGIN IMMEDIATE")
+        try:
+            store.update_body_uncommitted(candidate, body)
+            projection = project_article_uncommitted(
+                store.conn, article_id_for_provider(candidate)
+            )
+            store.conn.commit()
+        except Exception:
+            store.conn.rollback()
+            raise
+        record_projection(projection)
 
     def record_resumed_body_error(
         article: ArticleCandidate, error: str
@@ -133,7 +193,7 @@ def write_news_batch(
                 body_fetch_attempts += 1
                 try:
                     body = provider.fetch_body(restored)
-                    store.update_body(restored, body)
+                    update_body(restored, body)
                     if body.status is BodyStatus.FETCHED:
                         bodies_fetched += 1
                     elif body.status is BodyStatus.FAILED:
@@ -147,7 +207,7 @@ def write_news_batch(
                         errors[f"body:{provider_id}"] = error
                         record_resumed_body_error(restored, error)
                 except Exception as exc:  # provider failure remains resumable
-                    store.update_body(
+                    update_body(
                         restored,
                         BodyCandidate(status=BodyStatus.FAILED, error=str(exc)),
                     )
@@ -175,7 +235,7 @@ def write_news_batch(
                         articles_seen += 1
                         incoming_body = candidate.body
                         pending = replace(candidate, body=BodyCandidate())
-                        upsert = store.upsert(
+                        upsert = upsert_candidate(
                             candidate
                             if incoming_body.status is not BodyStatus.PENDING
                             else pending
@@ -212,7 +272,7 @@ def write_news_batch(
                         body_fetch_attempts += 1
                         try:
                             body = provider.fetch_body(restored)
-                            store.update_body(restored, body)
+                            update_body(restored, body)
                             if body.status is BodyStatus.FETCHED:
                                 bodies_fetched += 1
                             elif body.status is BodyStatus.FAILED:
@@ -228,7 +288,7 @@ def write_news_batch(
                                 ticker_error = body.error or "body fetch failed"
                                 errors[f"body:{provider_id}"] = ticker_error
                         except Exception as exc:  # metadata remains durable
-                            store.update_body(
+                            update_body(
                                 restored,
                                 BodyCandidate(status=BodyStatus.FAILED, error=str(exc)),
                             )
@@ -296,4 +356,7 @@ def write_news_batch(
         bodies_fetched=bodies_fetched,
         errors=errors,
         continuation=continuation_out,
+        legacy_rows_inserted=legacy_rows_inserted,
+        legacy_rows_updated=legacy_rows_updated,
+        projection_skipped_no_ticker=projection_skipped_no_ticker,
     )
