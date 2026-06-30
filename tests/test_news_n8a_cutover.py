@@ -654,6 +654,31 @@ def test_finalize_rejects_missing_or_non_passed_validation_gates(
     assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
 
 
+def test_finalize_rejects_validation_json_with_extra_keys(tmp_path):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
+    begin = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "backup.db",
+        profile_db=profile_db,
+    )
+    validation_path = _write_validation_json(
+        tmp_path / "validation.json",
+        {**VALIDATION_PASSED, "generated_at": "2026-07-01T00:00:00Z"},
+    )
+
+    with pytest.raises(cutover.CutoverBlocked, match="unexpected validation gate"):
+        cutover.finalize_news_pg_exit(
+            db_path,
+            run_id=begin.run_id,
+            validation_json_path=validation_path,
+            profile_db=profile_db,
+        )
+
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
+
+
 def test_finalize_with_all_validation_gates_sets_audit_and_profile_marker(tmp_path):
     db_path = _create_matched_db(tmp_path / "finalize.db")
     profile_db = tmp_path / "profile_state.db"
@@ -684,6 +709,72 @@ def test_finalize_with_all_validation_gates_sets_audit_and_profile_marker(tmp_pa
     assert row[1] == _canonical_json(VALIDATION_PASSED)
     assert row[2] is not None
     assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) == "true"
+
+
+def test_finalize_does_not_set_profile_marker_when_audit_update_loses_race(
+    tmp_path, monkeypatch
+):
+    db_path = _create_matched_db(tmp_path / "market.db")
+    profile_db = tmp_path / "profile_state.db"
+    begin = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "backup.db",
+        profile_db=profile_db,
+    )
+    validation_path = _write_validation_json(tmp_path / "validation.json")
+    real_connect = sqlite3.connect
+
+    class RacingConnection:
+        def __init__(self, path):
+            self._conn = real_connect(path)
+            self._raced = False
+
+        def __getattr__(self, name):
+            return getattr(self._conn, name)
+
+        def execute(self, sql, params=()):
+            if (
+                isinstance(sql, str)
+                and sql.startswith("UPDATE news_pg_exit_runs SET status=")
+                and not self._raced
+            ):
+                self._raced = True
+                other = real_connect(db_path)
+                try:
+                    other.execute(
+                        "UPDATE news_pg_exit_runs SET status='rolled_back' WHERE id=?",
+                        (begin.run_id,),
+                    )
+                    other.commit()
+                finally:
+                    other.close()
+            return self._conn.execute(sql, params)
+
+        def __enter__(self):
+            self._conn.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self._conn.__exit__(*args)
+
+    monkeypatch.setattr(
+        cutover.sqlite3,
+        "connect",
+        lambda path, *a, **k: RacingConnection(path)
+        if str(path) == str(db_path)
+        else real_connect(path, *a, **k),
+    )
+
+    with pytest.raises(cutover.CutoverBlocked, match="not in testing status"):
+        cutover.finalize_news_pg_exit(
+            db_path,
+            run_id=begin.run_id,
+            validation_json_path=validation_path,
+            profile_db=profile_db,
+        )
+
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) is None
 
 
 def test_finalize_is_repeatable_when_profile_marker_write_fails_after_audit(
@@ -805,6 +896,49 @@ def test_rollback_only_from_testing_and_never_sets_exit_marker(tmp_path):
         _profile_setting(completed_profile_db, USE_NORMALIZED_NEWS_WRITES_KEY)
         == "true"
     )
+
+
+def test_rollback_audit_state_is_retryable_when_profile_cleanup_fails(
+    tmp_path, monkeypatch
+):
+    db_path = _create_matched_db(tmp_path / "rollback-fail.db")
+    profile_db = tmp_path / "rollback-fail-profile.db"
+    run = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "rollback-fail-backup.db",
+        profile_db=profile_db,
+    )
+
+    class FailingProfileStateStore:
+        def __init__(self, path):
+            self._store = ProfileStateStore(path)
+
+        def get_setting(self, key):
+            return self._store.get_setting(key)
+
+        def set_setting(self, key, value):
+            if key == USE_NORMALIZED_NEWS_WRITES_KEY and value == "false":
+                raise RuntimeError("profile rollback cleanup failed")
+            self._store.set_setting(key, value)
+
+    monkeypatch.setattr(cutover, "ProfileStateStore", FailingProfileStateStore)
+    with pytest.raises(RuntimeError, match="profile rollback cleanup failed"):
+        cutover.rollback_news_pg_exit(db_path, run_id=run.run_id, profile_db=profile_db)
+
+    conn = sqlite3.connect(db_path)
+    try:
+        status = conn.execute(
+            "SELECT status FROM news_pg_exit_runs WHERE id=?", (run.run_id,)
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert status == "testing"
+    assert _profile_setting(profile_db, USE_NORMALIZED_NEWS_WRITES_KEY) == "true"
+
+    monkeypatch.setattr(cutover, "ProfileStateStore", ProfileStateStore)
+    cutover.rollback_news_pg_exit(db_path, run_id=run.run_id, profile_db=profile_db)
+    assert _profile_setting(profile_db, USE_NORMALIZED_NEWS_WRITES_KEY) == "false"
 
 
 @pytest.mark.parametrize("action", ["finalize", "rollback"])
@@ -950,3 +1084,10 @@ def test_cli_passes_profile_db_to_begin_finalize_and_rollback(tmp_path, monkeypa
         ("finalize", db_path, profile_db),
         ("rollback", db_path, profile_db),
     ]
+
+
+def test_default_profile_db_path_honors_environment(tmp_path, monkeypatch):
+    profile_db = tmp_path / "env-profile.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
+
+    assert cutover._profile_db_path(None) == profile_db

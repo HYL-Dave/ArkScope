@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 from typing import Any, Mapping
@@ -203,16 +204,20 @@ def rollback_news_pg_exit(
     run_id: int,
     profile_db: str | Path | None = None,
 ) -> CutoverStatusResult:
-    _update_run_status_from_testing(
-        db_path,
-        run_id=run_id,
-        status="rolled_back",
-        validation_json=None,
-        completed_at=_utc_now(),
-    )
-    ProfileStateStore(_profile_db_path(profile_db)).set_setting(
-        USE_NORMALIZED_NEWS_WRITES_KEY, "false"
-    )
+    profile = ProfileStateStore(_profile_db_path(profile_db))
+    previous_normalized_setting = profile.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
+    profile.set_setting(USE_NORMALIZED_NEWS_WRITES_KEY, "false")
+    try:
+        _update_run_status_from_testing(
+            db_path,
+            run_id=run_id,
+            status="rolled_back",
+            validation_json=None,
+            completed_at=_utc_now(),
+        )
+    except Exception:
+        profile.set_setting(USE_NORMALIZED_NEWS_WRITES_KEY, previous_normalized_setting)
+        raise
     return CutoverStatusResult(run_id=run_id, status="rolled_back")
 
 
@@ -357,6 +362,11 @@ def _read_validated_validation_json(path: str | Path) -> str:
         data = json.load(handle)
     if not isinstance(data, Mapping):
         raise CutoverBlocked("validation JSON must be an object")
+    unexpected = set(data).difference(REQUIRED_VALIDATION_GATES)
+    if unexpected:
+        raise CutoverBlocked(
+            f"unexpected validation gate(s): {', '.join(sorted(unexpected))}"
+        )
     for gate in REQUIRED_VALIDATION_GATES:
         if data.get(gate) != "passed":
             raise CutoverBlocked(
@@ -417,12 +427,14 @@ def _complete_run_status(
                 return
             if current_status != "testing":
                 raise CutoverBlocked(f"run is not in testing status: {run_id}")
-            conn.execute(
+            cursor = conn.execute(
                 "UPDATE news_pg_exit_runs "
                 "SET status=?,completed_at=?,validation_json=? "
                 "WHERE id=? AND status='testing'",
                 ("completed", completed_at, validation_json, run_id),
             )
+            if cursor.rowcount != 1:
+                raise CutoverBlocked(f"run is not in testing status: {run_id}")
     finally:
         conn.close()
 
@@ -430,6 +442,9 @@ def _complete_run_status(
 def _profile_db_path(profile_db: str | Path | None) -> Path:
     if profile_db is not None:
         return Path(profile_db)
+    env_profile_db = os.environ.get("ARKSCOPE_PROFILE_DB")
+    if env_profile_db:
+        return Path(env_profile_db)
     return Path(__file__).resolve().parents[2] / "data" / "profile_state.db"
 
 
