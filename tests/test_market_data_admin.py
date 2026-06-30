@@ -490,17 +490,24 @@ def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
     assert j["status"] == "done" and j["result"]["match"] is True
 
 
-def _drain_update_job(out, monkeypatch, fake_result):
+def _drain_update_job(out, monkeypatch, fake_result, *, domains=None, expected_domains=None):
     """Run start_update_job with incremental_update stubbed to fake_result; poll to done."""
     mda._JOBS.clear()  # hermetic: don't attach to a prior test's running update job
-    monkeypatch.setattr(mda, "incremental_update", lambda path, batch=20000: fake_result)
-    job = mda.start_update_job(out)
+    calls = []
+
+    def _fake_incremental(path, batch=20000, domains=None):
+        calls.append((path, batch, domains))
+        return fake_result
+
+    monkeypatch.setattr(mda, "incremental_update", _fake_incremental)
+    job = mda.start_update_job(out, domains=domains)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         j = mda.get_job(job["id"])
         if j["status"] != "running":
             break
         time.sleep(0.05)
+    assert calls == [(out, 20000, expected_domains)]
     return mda.get_job(job["id"])
 
 
@@ -528,6 +535,23 @@ def test_update_job_all_domains_fail_is_error(tmp_path, monkeypatch):
         "fundamentals": {"ok": False, "rows_added": 0, "error": "PG down"},
     })
     assert j["status"] == "error" and "PG down" in j["error"]
+
+
+def test_update_job_passes_explicit_domains_to_incremental_update(tmp_path, monkeypatch):
+    j = _drain_update_job(
+        str(tmp_path / "m.db"),
+        monkeypatch,
+        {
+            "ok": True,
+            "prices": {"ok": True, "rows_added": 1},
+            "news": {"ok": True, "rows_added": 0, "skipped": "domain disabled"},
+            "iv": {"ok": True, "rows_added": 2},
+            "fundamentals": {"ok": True, "rows_added": 3},
+        },
+        domains=("prices", "iv", "fundamentals"),
+        expected_domains=("prices", "iv", "fundamentals"),
+    )
+    assert j["status"] == "done"
 
 
 # --- 3c-C: financial_cache (local-primary; carry-over on rebuild) -------------
@@ -715,6 +739,33 @@ def test_job_not_found_404():
     with pytest.raises(HTTPException) as exc:
         market_data_job("nonexistent")
     assert exc.value.status_code == 404
+
+
+def test_update_route_excludes_news_after_pg_exit_audit(store, tmp_path, monkeypatch):
+    from src.api.routes import market_data as md
+
+    db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute("CREATE TABLE news_pg_exit_runs (status TEXT NOT NULL)")
+        conn.execute("INSERT INTO news_pg_exit_runs (status) VALUES ('completed')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    calls = []
+    monkeypatch.setattr(md, "resolve_market_db_path", lambda: str(db))
+    monkeypatch.setattr(md, "require_db_write", lambda *a, **k: None)
+    monkeypatch.setattr(
+        md,
+        "start_update_job",
+        lambda domains=None: (calls.append(domains), {"status": "running"})[1],
+    )
+
+    out = md.update_route(store=store)
+
+    assert out == {"status": "running"}
+    assert calls == [("prices", "iv", "fundamentals")]
 
 
 def test_toggle_invalidates_dal_cache(store, monkeypatch):

@@ -12,6 +12,9 @@ incremental updater). See ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.m
 
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -32,6 +35,8 @@ from src.market_data_admin import (
     validate_market,
 )
 from src.market_data_direct import summarize_trading_day_coverage
+from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
+from src.news_providers import parse_news_toggle
 from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
 
@@ -42,6 +47,38 @@ _TRUTHY = ("1", "true", "yes", "on")
 
 def _setting_truthy(store: ProfileStateStore, key: str) -> bool:
     return (store.get_setting(key) or "").strip().lower() in _TRUTHY
+
+
+def _news_pg_exit_audit_state(db_path: str) -> bool | None:
+    path = Path(db_path)
+    if not path.exists():
+        return False
+    try:
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                ("news_pg_exit_runs",),
+            ).fetchone()
+            if not exists:
+                return False
+            row = conn.execute(
+                "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+
+
+def _manual_update_domains(store: ProfileStateStore) -> tuple[str, ...] | None:
+    profile_done = parse_news_toggle(store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True
+    audit_state = _news_pg_exit_audit_state(resolve_market_db_path())
+    if profile_done or audit_state is True or audit_state is None:
+        return ("prices", "iv", "fundamentals")
+    return None
 
 
 def _setting_enabled(store: ProfileStateStore) -> bool:
@@ -106,13 +143,14 @@ def bootstrap_route():
 
 
 @router.post("/market-data/update")
-def update_route():
+def update_route(store: ProfileStateStore = Depends(get_profile_store)):
     """Start (or attach to) a background INCREMENTAL update (delta since latest;
-    prices + news + iv + fundamentals). Append-only to the live DB — routing can
-    stay active. A provider/PG failure in one domain is recorded (last_error), not
+    prices + news + iv + fundamentals before news PG exit; prices + iv +
+    fundamentals after news exit). Append-only to the live DB — routing can stay
+    active. A provider/PG failure in one domain is recorded (last_error), not
     fatal to the others. Requires an existing local DB (bootstrap first)."""
     require_db_write("market_update", {"db": resolve_market_db_path()})
-    return start_update_job()
+    return start_update_job(domains=_manual_update_domains(store))
 
 
 @router.get("/market-data/jobs/{job_id}")

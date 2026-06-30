@@ -1082,7 +1082,10 @@ def start_bootstrap_job(out_path: Optional[str] = None) -> dict:
     return dict(_JOBS[job_id])
 
 
-def start_update_job(out_path: Optional[str] = None) -> dict:
+def start_update_job(
+    out_path: Optional[str] = None,
+    domains: Optional[tuple[str, ...]] = None,
+) -> dict:
     """Start a background incremental update (idempotent while running)."""
     path = out_path or resolve_market_db_path()
     with _JOBS_LOCK:
@@ -1096,17 +1099,19 @@ def start_update_job(out_path: Optional[str] = None) -> dict:
 
     def _run():
         try:
-            res = incremental_update(path)
+            res = incremental_update(path, domains=domains)
             _JOBS[job_id]["result"] = res
             # incremental is best-effort PER DOMAIN (provider down ≠ fatal); the job
             # is "error" only if NO domain succeeded (e.g. missing DB / PG fully
             # down), else "done". Consider all 4 domains, not just prices/news, so an
             # iv/fundamentals failure is surfaced in job["error"] too.
-            domains = [res.get("prices"), res.get("news"), res.get("iv"), res.get("fundamentals")]
-            any_ok = any((d or {}).get("ok") for d in domains)
+            domain_results = [
+                res.get("prices"), res.get("news"), res.get("iv"), res.get("fundamentals")
+            ]
+            any_ok = any((d or {}).get("ok") for d in domain_results)
             _JOBS[job_id]["status"] = "done" if res.get("ok") or any_ok else "error"
             if not res.get("ok"):
-                errs = [(d or {}).get("error") for d in domains]
+                errs = [(d or {}).get("error") for d in domain_results]
                 _JOBS[job_id]["error"] = res.get("error") or "; ".join(e for e in errs if e) or None
         except Exception as e:  # noqa: BLE001
             _JOBS[job_id]["status"] = "error"

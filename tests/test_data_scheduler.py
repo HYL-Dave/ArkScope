@@ -1111,7 +1111,11 @@ def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch
     res = _REAL_LOCAL_REFRESH()
 
     assert calls == [("prices", "iv", "fundamentals")]
-    assert res == {"ok": True, "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": 3}}
+    assert res == {
+        "ok": True,
+        "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": 3},
+        "skipped_domains": {"news": "domain disabled"},
+    }
 
 
 def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path, monkeypatch):
@@ -1150,6 +1154,7 @@ def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path,
 
     assert calls == [("prices", "iv", "fundamentals")]
     assert res["domains"]["news"] is None
+    assert res["skipped_domains"] == {"news": "domain disabled"}
 
 
 def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(

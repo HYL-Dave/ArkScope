@@ -662,8 +662,20 @@ def _local_refresh() -> Dict[str, Any]:
                 else None
             )
             res = incremental_update(domains=domains) if domains is not None else incremental_update()
-            return {"ok": res.get("ok"), "domains": {
-                k: (v or {}).get("rows_added") for k, v in res.items() if isinstance(v, dict)}}
+            domain_rows = {}
+            skipped_domains = {}
+            for key, value in res.items():
+                if not isinstance(value, dict):
+                    continue
+                if value.get("skipped"):
+                    domain_rows[key] = None
+                    skipped_domains[key] = value["skipped"]
+                else:
+                    domain_rows[key] = value.get("rows_added")
+            out = {"ok": res.get("ok"), "domains": domain_rows}
+            if skipped_domains:
+                out["skipped_domains"] = skipped_domains
+            return out
         finally:
             _LOCAL_REFRESH_FLOCK.release()
     finally:
