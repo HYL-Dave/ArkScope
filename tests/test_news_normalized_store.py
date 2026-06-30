@@ -66,6 +66,80 @@ def polygon_candidate(provider_id):
     )
 
 
+def test_upsert_uncommitted_rolls_back_with_caller_transaction(store, conn):
+    conn.execute("BEGIN IMMEDIATE")
+
+    store.upsert_uncommitted(candidate("caller-owned"))
+    conn.rollback()
+
+    assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 0
+
+
+def test_upsert_still_commits_its_transaction(store, conn):
+    result = store.upsert(candidate("store-owned"))
+    conn.rollback()
+
+    assert result.inserted is True
+    assert conn.execute("SELECT COUNT(*) FROM news_articles").fetchone()[0] == 1
+
+
+def test_update_body_uncommitted_rolls_back_with_caller_transaction(store, conn):
+    article = candidate("body-caller-owned", title="Original title")
+    result = store.upsert(article)
+    conn.execute("BEGIN IMMEDIATE")
+
+    store.update_body_uncommitted(
+        candidate("body-caller-owned", title="Body title"),
+        BodyCandidate(
+            status=BodyStatus.FETCHED,
+            raw_body="transactional body",
+            raw_format="text",
+        ),
+    )
+    conn.rollback()
+
+    row = conn.execute(
+        "SELECT a.canonical_title,b.body_status,b.raw_body "
+        "FROM news_articles a JOIN news_article_bodies b ON b.article_id=a.id "
+        "WHERE a.id=?",
+        (result.article_id,),
+    ).fetchone()
+    search = conn.execute(
+        "SELECT title,body_text FROM news_search_documents WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == ("Original title", "pending", None)
+    assert tuple(search) == ("Original title", "")
+
+
+def test_update_body_still_commits_its_transaction(store, conn):
+    article = candidate("body-store-owned", title="Original title")
+    result = store.upsert(article)
+
+    store.update_body(
+        candidate("body-store-owned", title="Body title"),
+        BodyCandidate(
+            status=BodyStatus.FETCHED,
+            raw_body="committed body",
+            raw_format="text",
+        ),
+    )
+    conn.rollback()
+
+    row = conn.execute(
+        "SELECT a.canonical_title,b.body_status,b.raw_body "
+        "FROM news_articles a JOIN news_article_bodies b ON b.article_id=a.id "
+        "WHERE a.id=?",
+        (result.article_id,),
+    ).fetchone()
+    search = conn.execute(
+        "SELECT title,body_text FROM news_search_documents WHERE article_id=?",
+        (result.article_id,),
+    ).fetchone()
+    assert tuple(row) == ("Body title", "fetched", "committed body")
+    assert tuple(search) == ("Body title", "committed body")
+
+
 def test_fallback_article_acquires_provider_id_without_second_row(store, conn):
     first = store.upsert(candidate())
     second = store.upsert(candidate("DJ-N$1"))

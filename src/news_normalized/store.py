@@ -80,6 +80,10 @@ class NormalizedNewsStore:
         self._ticker_aliases = load_ticker_aliases(conn)
 
     def upsert(self, candidate: ArticleCandidate) -> UpsertResult:
+        with self.conn:
+            return self.upsert_uncommitted(candidate)
+
+    def upsert_uncommitted(self, candidate: ArticleCandidate) -> UpsertResult:
         keys = build_identity_keys(
             source=candidate.source,
             provider_article_id=candidate.provider_article_id,
@@ -88,22 +92,35 @@ class NormalizedNewsStore:
             title=candidate.title,
             published_at=candidate.published_at,
         )
-        with self.conn:
-            resolution = self._resolve(candidate, keys)
-            if resolution.conflict_kind:
-                return self._quarantine(candidate, resolution)
+        resolution = self._resolve(candidate, keys)
+        if resolution.conflict_kind:
+            return self._quarantine(candidate, resolution)
 
-            inserted = resolution.article_id is None
-            article_id = resolution.article_id or self._insert_article(candidate, keys[0].source)
-            self._update_article_metadata(article_id, candidate)
-            self._attach_keys(article_id, keys)
-            self._upsert_title(article_id, candidate)
-            self._upsert_tickers(article_id, candidate)
-            self._upsert_body(article_id, candidate.body, candidate.source)
-            self._refresh_search_document(article_id)
-            return UpsertResult(article_id=article_id, inserted=inserted)
+        inserted = resolution.article_id is None
+        article_id = resolution.article_id or self._insert_article(candidate, keys[0].source)
+        self._update_article_metadata(article_id, candidate)
+        self._attach_keys(article_id, keys)
+        self._upsert_title(article_id, candidate)
+        self._upsert_tickers(article_id, candidate)
+        self._upsert_body(article_id, candidate.body, candidate.source)
+        self._refresh_search_document(article_id)
+        return UpsertResult(article_id=article_id, inserted=inserted)
 
     def update_body(
+        self,
+        candidate: ArticleCandidate,
+        body: BodyCandidate,
+        *,
+        allow_terminal_recovery: bool = False,
+    ) -> None:
+        with self.conn:
+            self.update_body_uncommitted(
+                candidate,
+                body,
+                allow_terminal_recovery=allow_terminal_recovery,
+            )
+
+    def update_body_uncommitted(
         self,
         candidate: ArticleCandidate,
         body: BodyCandidate,
@@ -115,21 +132,20 @@ class NormalizedNewsStore:
         )
         if article_id is None:
             raise KeyError("provider article is not present in normalized store")
-        with self.conn:
-            self._upsert_body(
-                article_id,
-                body,
-                candidate.source,
-                allow_terminal_recovery=allow_terminal_recovery,
+        self._upsert_body(
+            article_id,
+            body,
+            candidate.source,
+            allow_terminal_recovery=allow_terminal_recovery,
+        )
+        if body.status is BodyStatus.FETCHED:
+            self._record_title(article_id, candidate, observed_with_body=True)
+            self.conn.execute(
+                "UPDATE news_articles SET canonical_title=?,content_kind='full_text',"
+                "updated_at=? WHERE id=?",
+                (candidate.title, _now(), article_id),
             )
-            if body.status is BodyStatus.FETCHED:
-                self._record_title(article_id, candidate, observed_with_body=True)
-                self.conn.execute(
-                    "UPDATE news_articles SET canonical_title=?,content_kind='full_text',"
-                    "updated_at=? WHERE id=?",
-                    (candidate.title, _now(), article_id),
-                )
-            self._refresh_search_document(article_id)
+        self._refresh_search_document(article_id)
 
     def latest_cursor(self, source: str, ticker: str) -> Optional[str]:
         row = self.conn.execute(
