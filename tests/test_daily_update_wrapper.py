@@ -8,6 +8,8 @@ only).
 
 from __future__ import annotations
 
+import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -15,9 +17,27 @@ from pathlib import Path
 _SCRIPT = str(Path(__file__).resolve().parents[1] / "scripts" / "collection" / "daily_update.py")
 
 
-def _run(*flags: str) -> subprocess.CompletedProcess:
+def _profile_db(tmp_path: Path) -> str:
+    db = tmp_path / "profile_state.db"
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute("CREATE TABLE watchlist_memberships (ticker TEXT NOT NULL)")
+        conn.executemany(
+            "INSERT INTO watchlist_memberships (ticker) VALUES (?)",
+            [("AAPL",), ("NVDA",)],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return str(db)
+
+
+def _run(*flags: str, profile_db: str | None = None) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    if profile_db is not None:
+        env["ARKSCOPE_PROFILE_DB"] = profile_db
     return subprocess.run([sys.executable, _SCRIPT, *flags],
-                          capture_output=True, text=True, timeout=120)
+                          capture_output=True, text=True, timeout=120, env=env)
 
 
 def test_help_exits_zero_with_full_flag_set():
@@ -30,10 +50,17 @@ def test_help_exits_zero_with_full_flag_set():
         assert flag in r.stdout, f"flag {flag} missing from --help"
 
 
-def test_protected_command_dry_run_plan():
+def test_protected_command_dry_run_plan(tmp_path):
     # The protected gate command in plan-only mode: same source step set as the
     # pre-wrapper orchestrator (news x3 + prices; IV stays opt-in), exit 0.
-    r = _run("--all", "--scope", "active-universe", "--sync-db", "--dry-run")
+    r = _run(
+        "--all",
+        "--scope",
+        "active-universe",
+        "--sync-db",
+        "--dry-run",
+        profile_db=_profile_db(tmp_path),
+    )
     out = r.stdout + r.stderr
     assert r.returncode == 0
     for source in ("polygon_news", "finnhub_news", "ibkr_news", "ibkr_prices"):
