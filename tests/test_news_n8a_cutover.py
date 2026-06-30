@@ -898,6 +898,47 @@ def test_rollback_only_from_testing_and_never_sets_exit_marker(tmp_path):
     )
 
 
+def test_rollback_rejects_completed_run_before_profile_mutation(
+    tmp_path, monkeypatch
+):
+    db_path = _create_matched_db(tmp_path / "completed-before-profile.db")
+    profile_db = tmp_path / "completed-before-profile-profile.db"
+    run = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=cutover.preview_news_pg_exit(db_path),
+        backup_path=tmp_path / "completed-before-profile-backup.db",
+        profile_db=profile_db,
+    )
+    cutover.finalize_news_pg_exit(
+        db_path,
+        run_id=run.run_id,
+        validation_json_path=_write_validation_json(
+            tmp_path / "completed-before-profile-validation.json"
+        ),
+        profile_db=profile_db,
+    )
+
+    class GuardedProfileStateStore:
+        def __init__(self, path):
+            self._store = ProfileStateStore(path)
+
+        def get_setting(self, key):
+            return self._store.get_setting(key)
+
+        def set_setting(self, key, value):
+            if key == USE_NORMALIZED_NEWS_WRITES_KEY and value == "false":
+                raise AssertionError("rollback touched profile before audit eligibility")
+            self._store.set_setting(key, value)
+
+    monkeypatch.setattr(cutover, "ProfileStateStore", GuardedProfileStateStore)
+
+    with pytest.raises(cutover.CutoverBlocked, match="run is not in testing status"):
+        cutover.rollback_news_pg_exit(db_path, run_id=run.run_id, profile_db=profile_db)
+
+    assert _profile_setting(profile_db, USE_NORMALIZED_NEWS_WRITES_KEY) == "true"
+    assert _profile_setting(profile_db, NEWS_PG_EXIT_COMPLETED_KEY) == "true"
+
+
 def test_rollback_audit_state_is_retryable_when_profile_cleanup_fails(
     tmp_path, monkeypatch
 ):
@@ -946,6 +987,7 @@ def test_finalize_and_rollback_do_not_create_missing_cutover_schema(
     tmp_path, action
 ):
     db_path = _create_empty_legacy_db(tmp_path / f"{action}.db")
+    profile_db = tmp_path / "profile.db"
     validation_path = tmp_path / "validation.json"
     _write_validation_json(validation_path)
 
@@ -955,15 +997,16 @@ def test_finalize_and_rollback_do_not_create_missing_cutover_schema(
                 db_path,
                 run_id=1,
                 validation_json_path=validation_path,
-                profile_db=tmp_path / "profile.db",
+                profile_db=profile_db,
             )
         else:
             cutover.rollback_news_pg_exit(
-                db_path, run_id=1, profile_db=tmp_path / "profile.db"
+                db_path, run_id=1, profile_db=profile_db
             )
 
     assert not _table_exists(db_path, "news_pg_exit_runs")
     assert not _table_exists(db_path, "news_articles")
+    assert not profile_db.exists()
 
 
 def test_cli_preview_output_and_begin_requires_confirmation(tmp_path):

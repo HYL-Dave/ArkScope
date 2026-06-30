@@ -204,6 +204,7 @@ def rollback_news_pg_exit(
     run_id: int,
     profile_db: str | Path | None = None,
 ) -> CutoverStatusResult:
+    _require_run_testing(db_path, run_id=run_id)
     profile = ProfileStateStore(_profile_db_path(profile_db))
     previous_normalized_setting = profile.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
     profile.set_setting(USE_NORMALIZED_NEWS_WRITES_KEY, "false")
@@ -396,6 +397,20 @@ def _update_run_status_from_testing(
             )
             if cursor.rowcount != 1:
                 raise CutoverBlocked(f"run is not in testing status: {run_id}")
+    finally:
+        conn.close()
+
+
+def _require_run_testing(db_path: str | Path, *, run_id: int) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        if not _table_exists(conn, "news_pg_exit_runs"):
+            raise CutoverBlocked("cutover audit table is missing")
+        row = conn.execute(
+            "SELECT status FROM news_pg_exit_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if row is None or row[0] != "testing":
+            raise CutoverBlocked(f"run is not in testing status: {run_id}")
     finally:
         conn.close()
 
