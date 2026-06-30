@@ -22,13 +22,19 @@ from src.news_normalized.cutover import (  # noqa: E402
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--market-db", required=True, type=Path)
+    parser.add_argument(
+        "--market-db",
+        type=Path,
+        help="Backward-compatible global alias for the subcommand --db option",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     preview = subparsers.add_parser("preview")
+    _add_db_argument(preview)
     preview.add_argument("--output", required=True, type=Path)
 
     begin = subparsers.add_parser("begin")
+    _add_db_argument(begin)
     begin.add_argument("--expected-report", required=True, type=Path)
     begin.add_argument("--backup", required=True, type=Path)
     begin.add_argument(
@@ -39,25 +45,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     finalize = subparsers.add_parser("finalize")
+    _add_db_argument(finalize)
     finalize.add_argument("--run-id", required=True, type=int)
     finalize.add_argument("--validation-json", required=True, type=Path)
 
     rollback = subparsers.add_parser("rollback")
+    _add_db_argument(rollback)
     rollback.add_argument("--run-id", required=True, type=int)
     return parser
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    market_db = _market_db(args)
     if args.command == "preview":
-        report = preview_news_pg_exit(args.market_db).to_json_dict()
+        report = preview_news_pg_exit(market_db).to_json_dict()
         _write_json(args.output, report)
         return 0
     if args.command == "begin":
         with open(args.expected_report, encoding="utf-8") as handle:
             expected = json.load(handle)
         result = begin_news_pg_exit(
-            args.market_db,
+            market_db,
             expected_report=expected,
             backup_path=args.backup,
         )
@@ -65,17 +74,28 @@ def main(argv=None) -> int:
         return 0
     if args.command == "finalize":
         result = finalize_news_pg_exit(
-            args.market_db,
+            market_db,
             run_id=args.run_id,
             validation_json_path=args.validation_json,
         )
         print(_json_line(result.to_json_dict()))
         return 0
     if args.command == "rollback":
-        result = rollback_news_pg_exit(args.market_db, run_id=args.run_id)
+        result = rollback_news_pg_exit(market_db, run_id=args.run_id)
         print(_json_line(result.to_json_dict()))
         return 0
     raise AssertionError(f"unhandled command: {args.command}")
+
+
+def _add_db_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--db", type=Path, help="Path to market_data.db")
+
+
+def _market_db(args: argparse.Namespace) -> Path:
+    db = getattr(args, "db", None) or args.market_db
+    if db is None:
+        raise SystemExit("one of --db or --market-db is required")
+    return db
 
 
 def _write_json(path: Path, payload: dict) -> None:

@@ -107,7 +107,7 @@ def begin_news_pg_exit(
     backup_path = Path(backup_path)
     current = preview_news_pg_exit(db_path)
     expected = coerce_preview_report(expected_report)
-    _require_zero_delta(current)
+    _require_no_unmapped_legacy_rows(current)
     _require_exact_report(expected, current)
 
     with market_write_lock(timeout=30.0):
@@ -120,7 +120,7 @@ def begin_news_pg_exit(
         # Re-check after the backup and before any DDL/audit write. A scheduler should
         # be paused, but this catches an accidental local writer deterministically.
         post_backup = preview_news_pg_exit(db_path)
-        _require_zero_delta(post_backup)
+        _require_no_unmapped_legacy_rows(post_backup)
         _require_exact_report(expected, post_backup)
 
         conn = sqlite3.connect(db_path)
@@ -319,13 +319,9 @@ def _require_exact_report(
         raise CutoverBlocked("expected report changed")
 
 
-def _require_zero_delta(report: CutoverPreviewReport) -> None:
+def _require_no_unmapped_legacy_rows(report: CutoverPreviewReport) -> None:
     if report.unmapped_legacy_rows:
         raise CutoverBlocked(f"unmapped legacy rows: {report.unmapped_legacy_rows}")
-    if report.normalized_only_count:
-        raise CutoverBlocked(
-            f"normalized-only rows: {report.normalized_only_count}"
-        )
 
 
 def _read_canonical_json(path: str | Path) -> str:

@@ -176,6 +176,22 @@ def _create_legacy_only_db(path: Path) -> Path:
     return path
 
 
+def _create_normalized_only_db(path: Path) -> Path:
+    _create_matched_db(path)
+    conn = _connect(path)
+    _insert_normalized_article(
+        conn,
+        article_id=103,
+        source="ibkr",
+        title="IBKR normalized-only archive",
+        published_at="2026-06-29T12:00:00+0000",
+        ticker="NVDA",
+    )
+    conn.commit()
+    conn.close()
+    return path
+
+
 def _table_exists(path: Path, table: str) -> bool:
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
@@ -348,6 +364,33 @@ def test_begin_writes_testing_audit_row_after_zero_delta_and_reserved_backup(tmp
     }
 
 
+def test_begin_allows_normalized_only_rows_and_audits_the_count(tmp_path):
+    db_path = _create_normalized_only_db(tmp_path / "market.db")
+    expected = cutover.preview_news_pg_exit(db_path)
+    backup_path = tmp_path / "backup.db"
+
+    assert expected.unmapped_legacy_rows == 0
+    assert expected.normalized_only_count == 1
+
+    result = cutover.begin_news_pg_exit(
+        db_path,
+        expected_report=expected,
+        backup_path=backup_path,
+    )
+
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        row = conn.execute(
+            "SELECT normalized_only_count,status FROM news_pg_exit_runs WHERE id=?",
+            (result.run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row == (1, "testing")
+    assert backup_path.is_file()
+
+
 def test_finalize_and_rollback_update_existing_testing_runs(tmp_path):
     first_db = _create_matched_db(tmp_path / "finalize.db")
     first = cutover.begin_news_pg_exit(
@@ -400,7 +443,7 @@ def test_cli_preview_output_and_begin_requires_confirmation(tmp_path):
 
     assert (
         cutover_cli.main(
-            ["--market-db", str(db_path), "preview", "--output", str(output)]
+            ["preview", "--db", str(db_path), "--output", str(output)]
         )
         == 0
     )
@@ -410,9 +453,9 @@ def test_cli_preview_output_and_begin_requires_confirmation(tmp_path):
 
     parser = cutover_cli.build_parser()
     begin_args = [
-        "--market-db",
-        str(db_path),
         "begin",
+        "--db",
+        str(db_path),
         "--expected-report",
         str(output),
         "--backup",
