@@ -595,10 +595,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 )
 
             if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
-                scope = tickers if tickers is not None else _resolve_price_scope()
-                if not scope:
-                    raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
-                result["ticker_count"] = len(scope)
                 pending_writer_continuation = (
                     pending_cont if trigger_source != "scheduler" else None
                 )
@@ -609,6 +605,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     preserve_continuation_on_failure = _normalized_news_continuation(
                         pending_writer_continuation
                     )
+                    scope = list(resume_continuation.deferred_tickers)
+                else:
+                    scope = tickers if tickers is not None else _resolve_price_scope()
+                    if not scope:
+                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                result["ticker_count"] = len(scope)
                 result["collect"] = _run_normalized_news_writer(
                     d.news_direct_source,
                     scope,

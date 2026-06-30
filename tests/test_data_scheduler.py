@@ -584,10 +584,64 @@ def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_i
 
     assert res["status"] == "succeeded"
     assert seen["source"] == "polygon"
-    assert seen["scope"] == ["AAPL", "NVDA"]
+    assert seen["scope"] == ["MSFT", "TSLA"]
     assert isinstance(seen["continuation"], WriterContinuation)
     assert seen["continuation"].deferred_tickers == ("MSFT", "TSLA")
     assert seen["continuation"].deferred_body_ids == ("polygon-body-1",)
+    assert seen["continuation"].cursor == "cursor-1"
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "succeeded"
+    assert row["continuation"] is None
+
+
+def test_manual_normalized_body_continuation_does_not_require_active_scope(monkeypatch):
+    import src.news_normalized.routing as routing
+    from src.news_normalized.models import WriterContinuation
+
+    continuation = {
+        "deferred_tickers": [],
+        "deferred_body_ids": ["polygon-body-1", "polygon-body-2"],
+        "cursor": "cursor-1",
+    }
+    ds._state_store().record_attempt("polygon_news",
+                                     datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
+    ds._state_store().record_outcome(
+        "polygon_news",
+        status="partial",
+        error=None,
+        result={"status": "partial", "continuation": continuation},
+        continuation=continuation,
+    )
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
+                            "normalized test route")
+    monkeypatch.setattr(ds, "_resolve_price_scope",
+                        lambda: (_ for _ in ()).throw(
+                            AssertionError("active scope must not be required")))
+    seen = {}
+
+    def _normalized_writer(source, scope, *, continuation=None, progress_cb=None):
+        seen["source"] = source
+        seen["scope"] = list(scope)
+        seen["continuation"] = continuation
+        return {
+            "status": "succeeded",
+            "articles_seen": 0,
+            "articles_inserted": 0,
+            "bodies_fetched": 2,
+            "errors": {},
+            "continuation": None,
+        }
+
+    monkeypatch.setattr(ds, "_run_normalized_news_writer", _normalized_writer)
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert seen["source"] == "polygon"
+    assert seen["scope"] == []
+    assert isinstance(seen["continuation"], WriterContinuation)
+    assert seen["continuation"].deferred_tickers == ()
+    assert seen["continuation"].deferred_body_ids == ("polygon-body-1", "polygon-body-2")
     assert seen["continuation"].cursor == "cursor-1"
     row = ds._state_store().get("polygon_news")
     assert row["last_status"] == "succeeded"
