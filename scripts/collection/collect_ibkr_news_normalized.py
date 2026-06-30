@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Collect IBKR news through the normalized local writer in an isolated process."""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import asdict, is_dataclass
+import json
+import sqlite3
+import sys
+from pathlib import Path
+from typing import Any, Iterable
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+DEFAULT_MAX_ARTICLES = 50_000
+DEFAULT_MAX_BODY_FETCHES = 50_000
+_COUNT_KEYS = (
+    "articles_seen",
+    "articles_inserted",
+    "bodies_fetched",
+    "legacy_rows_inserted",
+    "legacy_rows_updated",
+    "projection_skipped_no_ticker",
+)
+
+
+def _parse_tickers(value: str) -> list[str]:
+    tickers = [item.strip().upper() for item in value.split(",") if item.strip()]
+    if not tickers:
+        raise argparse.ArgumentTypeError("--tickers must contain at least one ticker")
+    return tickers
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Write IBKR news directly to normalized SQLite tables."
+    )
+    parser.add_argument("--tickers", required=True, type=_parse_tickers)
+    parser.add_argument(
+        "--max-articles", type=int, default=DEFAULT_MAX_ARTICLES,
+        help="Maximum headline records to process in this worker run.",
+    )
+    parser.add_argument(
+        "--max-body-fetches", type=int, default=DEFAULT_MAX_BODY_FETCHES,
+        help="Maximum article-body requests to spend in this worker run.",
+    )
+    parser.add_argument(
+        "--gateway-lock-held",
+        action="store_true",
+        help="Parent scheduler already holds the shared IBKR Gateway lock.",
+    )
+    args = parser.parse_args(argv)
+    if args.max_articles < 0 or args.max_body_fetches < 0:
+        parser.error("budgets must be non-negative")
+    return args
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
+def _continuation_counts(value: Any) -> dict[str, Any] | None:
+    data = _mapping(value)
+    if not data:
+        return None
+    ticker_count = len(data.get("deferred_tickers") or ())
+    body_count = len(data.get("deferred_body_ids") or ())
+    has_cursor = bool(data.get("cursor"))
+    if not ticker_count and not body_count and not has_cursor:
+        return None
+    return {
+        "deferred_ticker_count": ticker_count,
+        "deferred_body_count": body_count,
+        "has_cursor": has_cursor,
+    }
+
+
+def sanitize_worker_result(result: Any) -> dict[str, Any]:
+    data = _mapping(result)
+    payload: dict[str, Any] = {"status": str(data.get("status") or "unknown")}
+    for key in _COUNT_KEYS:
+        try:
+            payload[key] = int(data.get(key) or 0)
+        except (TypeError, ValueError):
+            payload[key] = 0
+
+    errors = data.get("errors") or {}
+    error_count = len(errors) if isinstance(errors, dict) else 0
+    payload["error_count"] = error_count
+    payload["error_classes"] = ["ProviderError"] if error_count else []
+
+    continuation = _continuation_counts(data.get("continuation"))
+    if continuation is not None:
+        payload["continuation"] = continuation
+    return payload
+
+
+def sanitize_worker_error(exc: BaseException) -> dict[str, Any]:
+    payload = {"status": "failed"}
+    for key in _COUNT_KEYS:
+        payload[key] = 0
+    payload["error_count"] = 1
+    payload["error_classes"] = [type(exc).__name__]
+    return payload
+
+
+def _apply_provider_config() -> None:
+    from src.data_provider_config import DataProviderConfigStore, apply_env
+
+    apply_env(DataProviderConfigStore())
+
+
+def _run_worker(
+    tickers: Iterable[str],
+    *,
+    max_articles: int,
+    max_body_fetches: int,
+    gateway_lock_held: bool,
+) -> Any:
+    from data_sources.ibkr_source import IBKRDataSource
+    from src.market_data_admin import resolve_market_db_path
+    from src.market_data_direct import market_write_lock
+    from src.news_normalized.ibkr_adapter import IBKRNormalizedProvider
+    from src.news_normalized.ibkr_runtime import IBKRRuntimeGateway
+    from src.news_normalized.models import WriterBudget
+    from src.news_normalized.store import NormalizedNewsStore
+    from src.news_normalized.writer import write_news_batch
+
+    source = IBKRDataSource()
+    gateway = IBKRRuntimeGateway(source)
+    conn = None
+    try:
+        provider = IBKRNormalizedProvider(
+            gateway,
+            acquire_gateway_lock=not gateway_lock_held,
+        )
+        conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
+        with market_write_lock():
+            store = NormalizedNewsStore(conn)
+            return write_news_batch(
+                store,
+                provider,
+                tickers,
+                WriterBudget(max_articles, max_body_fetches),
+                project_legacy=True,
+            )
+    finally:
+        if conn is not None:
+            conn.close()
+        gateway.close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        _apply_provider_config()
+        result = _run_worker(
+            args.tickers,
+            max_articles=args.max_articles,
+            max_body_fetches=args.max_body_fetches,
+            gateway_lock_held=args.gateway_lock_held,
+        )
+        payload = sanitize_worker_result(result)
+        code = 0
+    except Exception as exc:  # noqa: BLE001 - stdout must remain sanitized.
+        payload = sanitize_worker_error(exc)
+        code = 1
+    print(json.dumps(payload, sort_keys=True))
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

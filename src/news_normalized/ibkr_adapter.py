@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import re
@@ -39,11 +40,19 @@ class IBKRNewsGateway(Protocol):
 class IBKRNormalizedProvider:
     source = "ibkr"
 
-    def __init__(self, gateway: IBKRNewsGateway):
+    def __init__(
+        self,
+        gateway: IBKRNewsGateway,
+        *,
+        acquire_gateway_lock: bool = True,
+    ):
         self.gateway = gateway
+        self._acquire_gateway_lock = bool(acquire_gateway_lock)
         self._body_cache: dict[tuple[str, str], BodyCandidate] = {}
 
     def operation(self):
+        if not self._acquire_gateway_lock:
+            return nullcontext()
         return ibkr_gateway_lock()
 
     def fetch_articles(

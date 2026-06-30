@@ -124,6 +124,7 @@ SOURCES: Dict[str, SourceDef] = {
             "ibkr_news", "IBKR 新聞",
             ["collect_ibkr_news.py", "--incremental"], "--news", ibkr=True,
             needs_price_scope=True, default_interval_min=120,
+            news_direct_source="ibkr",
             description="IBKR news incremental (Gateway) → PG → local mirror",
         ),
         SourceDef(
@@ -589,9 +590,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             if d.news_direct_source is not None:
                 if news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
-                local_news_writer = news_route.mode in (
-                    NewsWriteMode.NORMALIZED,
-                    NewsWriteMode.LEGACY_LOCAL,
+                local_news_writer = news_route.mode == NewsWriteMode.NORMALIZED or (
+                    news_route.mode == NewsWriteMode.LEGACY_LOCAL
+                    and d.news_direct_source != "ibkr"
                 )
 
             if news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
@@ -611,19 +612,43 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     if not scope:
                         raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
                 result["ticker_count"] = len(scope)
-                result["collect"] = _run_normalized_news_writer(
-                    d.news_direct_source,
-                    scope,
-                    continuation=resume_continuation,
-                    progress_cb=lambda done, total, current: _set_progress(
-                        source, done, total, current),
-                )
+                if d.news_direct_source == "ibkr":
+                    if resume_continuation is not None:
+                        raise RuntimeError(
+                            "normalized IBKR continuation cannot be resumed from sanitized "
+                            "worker output"
+                        )
+                    argv = [
+                        sys.executable,
+                        str(_COLLECT_DIR / "collect_ibkr_news_normalized.py"),
+                        "--tickers",
+                        ",".join(scope),
+                        "--gateway-lock-held",
+                    ]
+                    step = _run_subprocess(argv)
+                    result["collect"] = step
+                    if step["returncode"] != 0:
+                        raise RuntimeError(
+                            f"collector failed: {step.get('error_tail', '')[:200]}"
+                        )
+                else:
+                    result["collect"] = _run_normalized_news_writer(
+                        d.news_direct_source,
+                        scope,
+                        continuation=resume_continuation,
+                        progress_cb=lambda done, total, current: _set_progress(
+                            source, done, total, current),
+                    )
                 writer_continuation = _normalized_writer_continuation(result["collect"])
                 if writer_continuation is not None:
                     result["collect"]["continuation"] = writer_continuation
                 writer_partial = result["collect"].get("status") == "partial"
                 collected = True
-            elif news_route is not None and news_route.mode == NewsWriteMode.LEGACY_LOCAL:
+            elif (
+                news_route is not None
+                and news_route.mode == NewsWriteMode.LEGACY_LOCAL
+                and d.news_direct_source != "ibkr"
+            ):
                 # LEGACY_LOCAL keeps the direct-local writer (provider→local news+fts,
                 # NO Parquet, NO PG sync, NO mirror). Cursored against the local DB (newest stored
                 # published_at), not the Parquet timestamp.

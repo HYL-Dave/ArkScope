@@ -2,14 +2,37 @@ from contextlib import contextmanager, nullcontext
 import json
 import logging
 import sqlite3
+import sys
 import traceback
 from types import SimpleNamespace
+import types
 
-from ib_insync import RequestError
 import pytest
+
+try:
+    from ib_insync import RequestError
+except ModuleNotFoundError:
+    class RequestError(Exception):
+        def __init__(self, req_id, code, message):
+            self.reqId = req_id
+            self.code = code
+            self.message = message
+            super().__init__(req_id, code, message)
+
+    ib_insync_stub = types.ModuleType("ib_insync")
+    ib_insync_stub.IB = object
+    ib_insync_stub.Option = object
+    ib_insync_stub.RequestError = RequestError
+    ib_insync_stub.ScannerSubscription = object
+    ib_insync_stub.Stock = object
+    ib_insync_stub.TagValue = object
+    ib_insync_stub.util = SimpleNamespace()
+    sys.modules["ib_insync"] = ib_insync_stub
 
 import data_sources.ibkr_source as ibkr_source
 from data_sources.ibkr_source import IBKRDataSource, IBKRNewsArticleUnavailable
+if not hasattr(ibkr_source, "RequestError"):
+    ibkr_source.RequestError = RequestError
 from scripts.diagnostics.probe_ibkr_news_bodies import (
     DEFAULT_PROBES,
     ProbeSpec,
@@ -219,6 +242,51 @@ def test_ibkr_adapter_fetches_one_body_for_article_seen_through_many_tickers(
     assert conn.execute("SELECT COUNT(*) FROM news_article_tickers").fetchone()[0] == 2
     assert conn.execute("SELECT content_kind FROM news_articles").fetchone()[0] == "full_text"
     conn.close()
+
+
+def test_ibkr_adapter_lock_can_be_skipped_when_parent_holds_gateway_lock(
+    monkeypatch,
+):
+    gateway = FakeGateway()
+    lock_entries = []
+
+    @contextmanager
+    def forbidden_lock():
+        lock_entries.append("enter")
+        raise AssertionError("scheduler child must not re-acquire gateway lock")
+        yield
+
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_adapter.ibkr_gateway_lock", forbidden_lock
+    )
+
+    provider = IBKRNormalizedProvider(gateway, acquire_gateway_lock=False)
+    operation = provider.operation()
+
+    assert isinstance(operation, nullcontext)
+    with operation:
+        pass
+    assert lock_entries == []
+
+
+def test_ibkr_adapter_lock_is_acquired_by_default(monkeypatch):
+    gateway = FakeGateway()
+    lock_events = []
+
+    @contextmanager
+    def recording_lock():
+        lock_events.append("enter")
+        yield
+        lock_events.append("exit")
+
+    monkeypatch.setattr(
+        "src.news_normalized.ibkr_adapter.ibkr_gateway_lock", recording_lock
+    )
+
+    with IBKRNormalizedProvider(gateway).operation():
+        lock_events.append("body")
+
+    assert lock_events == ["enter", "body", "exit"]
 
 
 def test_ibkr_failed_body_is_retryable_and_not_cached():

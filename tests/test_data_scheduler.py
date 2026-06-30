@@ -860,6 +860,75 @@ def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
     assert res["local_refresh"] == {"ok": True}
 
 
+def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirror(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    route_calls = _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
+    )
+    calls = []
+
+    def _subprocess(argv):
+        calls.append(argv)
+        return {"returncode": 0}
+
+    monkeypatch.setattr(ds, "_run_subprocess", _subprocess)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("_local_refresh must not run for normalized IBKR")
+        ),
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert len(route_calls) == 1
+    assert len(calls) == 1
+    argv = calls[0]
+    assert argv[0] == ds.sys.executable
+    assert argv[1].endswith("collect_ibkr_news_normalized.py")
+    assert "--tickers" in argv
+    assert argv[argv.index("--tickers") + 1] == "AAPL,NVDA"
+    assert "--gateway-lock-held" in argv
+    assert "sync" not in res
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_ibkr_legacy_local_route_keeps_legacy_pg_collector_sync_and_mirror(
+    monkeypatch,
+):
+    import src.news_normalized.routing as routing
+
+    route_calls = _patch_news_write_route(
+        monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL, "ibkr legacy-local rollback"
+    )
+    calls = []
+    monkeypatch.setattr(
+        ds, "_run_subprocess", lambda argv: (calls.append(argv), {"returncode": 0})[1]
+    )
+    refresh_calls = []
+    monkeypatch.setattr(
+        ds, "_local_refresh", lambda: (refresh_calls.append(True), {"ok": True})[1]
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="api")
+
+    assert res["status"] == "succeeded"
+    assert len(route_calls) == 1
+    assert len(calls) == 2
+    assert calls[0][1].endswith("collect_ibkr_news.py")
+    assert "--incremental" in calls[0]
+    assert "--tickers" in calls[0]
+    assert calls[0][calls[0].index("--tickers") + 1] == "AAPL,NVDA"
+    assert "--news" in calls[1]
+    assert refresh_calls == [True]
+    assert res["local_refresh"] == {"ok": True}
+
+
 def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
     # BLOCKED must fail closed before any provider, subprocess, or mirror work starts.
     import scripts.collection.collect_polygon_news as cpn
