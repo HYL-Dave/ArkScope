@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import json
+import os
 from datetime import datetime
 import logging
+from pathlib import Path
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -233,3 +236,38 @@ def test_legacy_ibkr_worker_script_delegates_to_src_module(monkeypatch):
 
     assert legacy.main(["--tickers", "AAPL"]) == 17
     assert calls == [["--tickers", "AAPL"]]
+
+
+def test_ibkr_worker_module_startup_emits_only_sanitized_json(tmp_path):
+    env = os.environ.copy()
+    env["ARKSCOPE_MARKET_DB"] = str(tmp_path / "market_data.db")
+    env["ARKSCOPE_PROFILE_DB"] = str(tmp_path / "profile_state.db")
+    repo_root = Path(__file__).resolve().parents[1]
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.news_normalized.ibkr_cli",
+            "--tickers",
+            "FAKE",
+            "--max-articles",
+            "0",
+            "--max-body-fetches",
+            "0",
+            "--gateway-lock-held",
+        ],
+        cwd=str(repo_root),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert proc.returncode == 0
+    payload = json.loads(proc.stdout)
+    assert proc.stdout.strip() == json.dumps(payload, sort_keys=True)
+    assert payload["status"] == "partial"
+    assert payload["articles_seen"] == 0
+    assert payload["error_count"] == 0
+    assert "FAKE" not in proc.stderr
