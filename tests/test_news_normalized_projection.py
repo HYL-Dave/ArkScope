@@ -342,6 +342,60 @@ def test_adopts_existing_compatible_legacy_row_and_fts_stays_consistent(store, c
     assert _fts_match_count(conn, "normalized") == 0
 
 
+def test_adopts_cross_source_duplicate_legacy_row_for_same_ticker_title_date(
+    store, conn
+):
+    title = "Market indexes close out June with a tech-fueled rally"
+    polygon_article_id = store.upsert(
+        article(
+            provider_id="polygon-cross-source-owner",
+            title=title,
+            source="polygon",
+            url="https://www.fool.com/investing/2026/06/30/market-indexes/",
+            publisher="Motley Fool",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T17:11:25+0000",
+            raw_body="Polygon already projected this syndicated article.",
+        )
+    ).article_id
+    first = project_article_uncommitted(conn, polygon_article_id)
+    legacy_id = conn.execute("SELECT id FROM news").fetchone()[0]
+
+    finnhub_article_id = store.upsert(
+        article(
+            provider_id="finnhub-cross-source-duplicate",
+            title=title,
+            source="finnhub",
+            url="https://finnhub.io/api/news?id=cross-source",
+            publisher="Finnhub",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T17:31:25Z",
+            raw_body="Finnhub summary for the same syndicated article.",
+        )
+    ).article_id
+
+    result = project_article_uncommitted(conn, finnhub_article_id)
+
+    assert first.inserted == 1
+    assert result.inserted == 0
+    assert result.updated == 0
+    rows = _projected_news(conn)
+    assert len(rows) == 1
+    assert rows[0]["id"] == legacy_id
+    assert rows[0]["source"] == "polygon"
+    assert rows[0]["description"] == "Polygon already projected this syndicated article."
+    assert _map_rows(conn) == [
+        {
+            "article_id": polygon_article_id,
+            "ticker": "AAPL",
+            "legacy_news_id": legacy_id,
+            "projected_at": _map_rows(conn)[0]["projected_at"],
+        }
+    ]
+
+
 @pytest.mark.parametrize(
     ("candidate", "ticker"),
     [
