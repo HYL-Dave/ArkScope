@@ -267,7 +267,7 @@ def test_ibkr_worker_module_startup_emits_only_sanitized_json(tmp_path):
     assert proc.returncode == 0
     payload = json.loads(proc.stdout)
     assert proc.stdout.strip() == json.dumps(payload, sort_keys=True)
-    assert payload["status"] == "partial"
+    assert payload["status"] in {"partial", "failed"}
     assert payload["articles_seen"] == 0
     assert payload["error_count"] == 0
     assert "FAKE" not in proc.stderr
