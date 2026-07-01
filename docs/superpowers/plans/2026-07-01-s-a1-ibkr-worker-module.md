@@ -29,6 +29,8 @@ This slice should not block normal PG-exit progress. It can run while scheduler/
 - Modify: `tests/test_normalized_ibkr_worker.py`
   - Import `src.news_normalized.ibkr_cli` for worker tests.
   - Add a compatibility-wrapper test proving the old script delegates without duplicating logic.
+  - Add a committed `python -m src.news_normalized.ibkr_cli` subprocess test that proves module
+    startup emits clean JSON, not import-time noise.
 - Modify: `tests/test_data_scheduler.py`
   - Update three scheduler assertions to require `-m src.news_normalized.ibkr_cli`.
   - Assert `scripts/collection/collect_ibkr_news_normalized.py` is no longer in runtime argv.
@@ -188,7 +190,7 @@ Expected: FAIL because the current legacy script owns its own `main` implementat
 
 - [ ] **Step 3: Replace legacy script body with wrapper**
 
-Replace `scripts/collection/collect_ibkr_news_normalized.py` with:
+Replace `scripts/collection/collect_ibkr_news_normalized.py` with a call-time delegating wrapper:
 
 ```python
 #!/usr/bin/env python3
@@ -196,6 +198,8 @@ Replace `scripts/collection/collect_ibkr_news_normalized.py` with:
 
 Runtime scheduler code must invoke ``python -m src.news_normalized.ibkr_cli``.
 This file remains only for manual/backward compatibility during scripts retirement.
+Retire it in N9, or earlier once grep confirms no manual/docs/tests path still
+requires the old ``scripts/`` entrypoint.
 """
 
 from __future__ import annotations
@@ -208,7 +212,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.news_normalized.ibkr_cli import main  # noqa: E402
+from src.news_normalized import ibkr_cli  # noqa: E402
+
+
+def main(argv: list[str] | None = None) -> int:
+    return ibkr_cli.main(argv)
 
 
 if __name__ == "__main__":
@@ -331,12 +339,75 @@ git add src/service/data_scheduler.py tests/test_data_scheduler.py
 git commit -m "refactor: run IBKR news worker as src module"
 ```
 
-## Task 4: Verify Subprocess Resolution And Sanitized Contract End-To-End
+## Task 4: Add `python -m` Subprocess Purity Test
 
 **Files:**
-- Test only; no code change expected unless a failure reveals a real issue.
+- Modify: `tests/test_normalized_ibkr_worker.py`
 
-- [ ] **Step 1: Run module help from repo root**
+- [ ] **Step 1: Add failing subprocess test for module stdout purity**
+
+Add this test to `tests/test_normalized_ibkr_worker.py`:
+
+```python
+def test_ibkr_worker_module_subprocess_stdout_is_single_json_object(tmp_path):
+    import os
+    import sqlite3
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    market_db = tmp_path / "market_data.db"
+    sqlite3.connect(market_db).close()
+
+    env = os.environ.copy()
+    env["ARKSCOPE_MARKET_DB"] = str(market_db)
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "src.news_normalized.ibkr_cli",
+            "--tickers",
+            "FAKE",
+            "--max-articles",
+            "0",
+            "--max-body-fetches",
+            "0",
+            "--gateway-lock-held",
+        ],
+        cwd=str(Path(__file__).resolve().parents[1]),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert proc.stdout.strip() == json.dumps(payload, sort_keys=True)
+    assert payload["status"] == "partial"
+    assert payload["articles_seen"] == 0
+    assert payload["error_count"] == 0
+    assert "FAKE" not in proc.stderr
+```
+
+This intentionally uses a temp `ARKSCOPE_MARKET_DB`. It must not touch live `data/market_data.db`
+and must not require a live IBKR Gateway. `--max-articles 0` exercises module startup and sanitized
+JSON output while preventing provider fetches.
+
+- [ ] **Step 2: Run test to verify it fails before Task 3**
+
+Run:
+
+```bash
+pytest tests/test_normalized_ibkr_worker.py::test_ibkr_worker_module_subprocess_stdout_is_single_json_object -q
+```
+
+Expected before Task 3/module creation: FAIL with `No module named src.news_normalized.ibkr_cli`.
+Expected after Task 3/module creation: PASS. If it fails because the subprocess touches live IBKR
+or live DB, fix the module/test so the zero-budget path remains hermetic.
+
+- [ ] **Step 3: Run module help from repo root**
 
 Run:
 
@@ -346,7 +417,7 @@ python -m src.news_normalized.ibkr_cli --help
 
 Expected: exits 0 and prints argparse help containing `Write IBKR news directly to normalized SQLite tables.`
 
-- [ ] **Step 2: Run module parse failure and confirm sanitized behavior**
+- [ ] **Step 4: Run module parse failure and confirm argparse-only failure**
 
 Run:
 
@@ -356,7 +427,7 @@ python -m src.news_normalized.ibkr_cli
 
 Expected: exits non-zero with argparse usage. This command occurs before provider work, so no provider payload can be emitted.
 
-- [ ] **Step 3: Run targeted tests**
+- [ ] **Step 5: Run targeted tests**
 
 Run:
 
@@ -366,7 +437,21 @@ pytest tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py::test_i
 
 Expected: PASS.
 
-- [ ] **Step 4: Run broader scheduler/news-normalized tests**
+- [ ] **Step 6: Commit Task 4**
+
+Run:
+
+```bash
+git add tests/test_normalized_ibkr_worker.py
+git commit -m "test: pin IBKR worker module stdout contract"
+```
+
+## Task 5: Verify Subprocess Resolution And Sanitized Contract End-To-End
+
+**Files:**
+- Test only; no code change expected unless a failure reveals a real issue.
+
+- [ ] **Step 1: Run broader scheduler/news-normalized tests**
 
 Run:
 
@@ -376,9 +461,19 @@ pytest tests/test_news_normalized_ibkr_adapter.py tests/test_normalized_ibkr_wor
 
 Expected: PASS, except live-IBKR tests may be skipped if they require Gateway. There must be no failures.
 
-- [ ] **Step 5: Commit only if verification caused code/test changes**
+- [ ] **Step 2: Run the offline suite subset that commonly imports scheduler/backend code**
 
-If Step 4 required a fix, commit only the actual files changed by that fix. For example, if
+Run:
+
+```bash
+pytest tests/test_data_scheduler.py tests/test_normalized_ibkr_worker.py tests/test_news_normalized_ibkr_adapter.py tests/test_news_pg_unreachable.py tests/test_provider_health.py tests/test_sqlite_backend.py -q
+```
+
+Expected: PASS, except explicit live-IBKR tests may be skipped. There must be no failures.
+
+- [ ] **Step 3: Commit only if verification caused code/test changes**
+
+If Steps 1-2 required a fix, commit only the actual files changed by that fix. For example, if
 `src/news_normalized/ibkr_cli.py` needed a package-resolution fix, run:
 
 ```bash
@@ -386,9 +481,9 @@ git add src/news_normalized/ibkr_cli.py
 git commit -m "fix: preserve IBKR worker module contract"
 ```
 
-If Step 4 required no changes, do not create an empty commit.
+If verification required no changes, do not create an empty commit.
 
-## Task 5: Documentation Touch-Up
+## Task 6: Documentation Touch-Up
 
 **Files:**
 - Modify: `docs/design/PG_EXIT_REMAINDER_SCOPING.md`
