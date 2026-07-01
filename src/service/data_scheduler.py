@@ -825,7 +825,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         )
                     argv = [
                         sys.executable,
-                        str(_COLLECT_DIR / "collect_ibkr_news_normalized.py"),
+                        "-m",
+                        "src.news_normalized.ibkr_cli",
                         "--tickers",
                         ",".join(scope),
                         "--gateway-lock-held",

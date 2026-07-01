@@ -865,13 +865,16 @@ def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
 
 
 def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirror(
+    tmp_path,
     monkeypatch,
 ):
     import src.news_normalized.routing as routing
+    import src.market_data_admin as mda
 
     route_calls = _patch_news_write_route(
         monkeypatch, routing.NewsWriteMode.NORMALIZED, "normalized ibkr test route"
     )
+    monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(tmp_path / "pre_exit.db"))
     calls = []
 
     def _subprocess(argv, cwd=None, capture_output=False, text=False):
@@ -909,8 +912,12 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     assert len(route_calls) == 1
     assert len(calls) == 1
     argv = calls[0]
-    assert argv[0] == ds.sys.executable
-    assert argv[1].endswith("collect_ibkr_news_normalized.py")
+    assert argv[:3] == [
+        ds.sys.executable,
+        "-m",
+        "src.news_normalized.ibkr_cli",
+    ]
+    assert not any(str(part).endswith("collect_ibkr_news_normalized.py") for part in argv)
     assert "--tickers" in argv
     assert argv[argv.index("--tickers") + 1] == "AAPL,NVDA"
     assert "--gateway-lock-held" in argv
@@ -969,7 +976,8 @@ def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
 
     assert res["status"] == "succeeded"
     rendered_calls = json.dumps(calls)
-    assert "collect_ibkr_news_normalized.py" in rendered_calls
+    assert "src.news_normalized.ibkr_cli" in rendered_calls
+    assert "collect_ibkr_news_normalized.py" not in rendered_calls
     assert "collect_ibkr_news.py" not in rendered_calls
     assert "migrate_to_supabase.py" not in rendered_calls
     assert "--news" not in rendered_calls
@@ -1028,7 +1036,8 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
 
     assert res["status"] == "succeeded"
     rendered_calls = json.dumps(calls)
-    assert "collect_ibkr_news_normalized.py" in rendered_calls
+    assert "src.news_normalized.ibkr_cli" in rendered_calls
+    assert "collect_ibkr_news_normalized.py" not in rendered_calls
     assert "collect_ibkr_news.py" not in rendered_calls
 
 
