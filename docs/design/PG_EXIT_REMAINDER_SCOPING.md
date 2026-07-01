@@ -1,7 +1,7 @@
 # PG-Exit Remainder Scoping (design skeleton v0)
 
 - **Date:** 2026-07-01
-- **Status:** DRAFT / survey v1 — local/runtime audit + provider survey folded; still not an implementation plan
+- **Status:** DRAFT / survey v1 — local/runtime audit + provider survey folded; S-A1 demonstrator implemented; still not an implementation plan
 - **Context:** news-domain PG exit is LIVE-complete (`news_pg_exit_runs` id=1 completed, fail-closed). **Overall ArkScope PG exit is NOT complete.**
 - **Purpose of this doc:** scope the *remainder* of the PG exit — enumerate residual PG domains, assign a destination strategy per domain, define the `scripts/` retirement rule with a runtime-coupling inventory as its gating input, produce the N9 drop list, and sequence the remaining slices. **This document implements nothing.**
 
@@ -68,7 +68,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 | Location | Target | Domain | State |
 |---|---|---|---|
-| `data_scheduler.py:827` | `collect_ibkr_news_normalized.py` | news | **active (shipped in N8a)** |
+| `data_scheduler.py:827` | `python -m src.news_normalized.ibkr_cli` | news | **converted in S-A1**; old script retained as compatibility wrapper |
 | `data_scheduler.py:128` → 938 | `collect_ibkr_news.py` | news | **likely dead** (post-exit routing never selects legacy) → confirm, then retire |
 | `data_scheduler.py:135` → 938 | `collect_ibkr_prices.py` | prices | active |
 | `data_scheduler.py:141` → 938 | `collect_iv_history.py` | iv | idle (collection stopped) |
@@ -106,7 +106,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ## 6. Slice breakdown (each own spec/plan/gate, TDD)
 
-1. **S-A | scripts/ retirement rule + coupling baseline** — land §4/§5 as a contract + first demonstrator conversion (IBKR news worker → `python -m src`). This is a small refactor with security invariants, not a one-line path change.
+1. **S-A | scripts/ retirement rule + coupling baseline** — §4/§5 landed as a contract; S-A1 converted the IBKR news worker runtime boundary to `python -m src.news_normalized.ibkr_cli`. Remaining S-A work applies the same definition-of-done per domain.
 2. **S-B | fundamentals refetch/cache** — *fast win, may run first / in parallel with the survey.* Stop the PG mirror for the fundamentals domain, route reads to the local cache + EDGAR fallback, reuse the period-aware TTL, warm the active universe on cold start, **check for non-US tickers** (EDGAR is US-only). Extract `src/fundamentals/`.
 3. **S-C | IV provider survey** (decision axes in §7) → outputs a selection recommendation, no implementation.
 4. **S-D | IV local schema reboot** (contract in §7): raw-retain + versioned-derive schema, provider-abstraction interface; no scheduling yet.
@@ -195,9 +195,11 @@ uses `scripts/` in these ways:
 - Polygon/Finnhub news: `src/news_providers.py` and `src/service/data_scheduler.py`
   still lazily import `scripts.collection.collect_polygon_news` and
   `scripts.collection.collect_finnhub_news`.
-- IBKR news: N8a's normalized worker is launched as
-  `scripts/collection/collect_ibkr_news_normalized.py`, even though the real logic
-  lives in `src/news_normalized/ibkr_runtime.py`.
+- IBKR news: S-A1 moved the normalized worker boundary into
+  `src/news_normalized/ibkr_cli.py` and scheduler now launches it with
+  `python -m src.news_normalized.ibkr_cli`; the old
+  `scripts/collection/collect_ibkr_news_normalized.py` file is only a compatibility
+  wrapper until N9/scripts cleanup.
 - IBKR prices and IV: scheduler subprocesses still target
   `scripts/collection/collect_ibkr_prices.py` and `scripts/collection/collect_iv_history.py`.
 - PG sync: `scripts/migrate_to_supabase.py` remains the domain sync target for
@@ -295,22 +297,13 @@ IBKR prototype and bulk provider backends:
 
 ### 12.7 Immediate slice recommendation
 
-Do not wait for the IV provider survey to do fundamentals or the scripts demonstrator.
+Do not wait for the IV provider survey to do fundamentals. S-A1 is now complete and
+serves as the scripts-retirement demonstrator.
 Recommended next order:
 
-1. **S-A1 scripts demonstrator:** move the N8a IBKR news worker module from
-   `scripts/collection/collect_ibkr_news_normalized.py` to `src/news_normalized/ibkr_cli.py`
-   and repoint the scheduler to `python -m src.news_normalized.ibkr_cli`.
-   Acceptance requires:
-   - no behavior change to IBKR normalized writes;
-   - subprocess can resolve the repo package (`cwd` or `PYTHONPATH` handled explicitly);
-   - worker output remains sanitized JSON and never includes title/url/article-id/body/provider
-     message text;
-   - existing worker tests move from `scripts.collection...` imports to `src.news_normalized...`;
-   - scheduler tests pin the `python -m` invocation rather than a `scripts/*.py` path.
-2. **S-B fundamentals refetch/cache:** local-only stored reads + provider fallback retained.
-3. **S-C IV provider proof packet:** compare Polygon/Massive, Alpha Vantage, EODHD,
+1. **S-B fundamentals refetch/cache:** local-only stored reads + provider fallback retained.
+2. **S-C IV provider proof packet:** compare Polygon/Massive, Alpha Vantage, EODHD,
    Tradier, ORATS, and IBKR against the raw-retain/versioned-derive contract.
-4. **S-D IV schema design:** provider-neutral schema and status model.
-5. **S-E IV IBKR prototype:** small scope only (10-30 tickers), fixed snapshot time,
+3. **S-D IV schema design:** provider-neutral schema and status model.
+4. **S-E IV IBKR prototype:** small scope only (10-30 tickers), fixed snapshot time,
    no gap-fill, honest failures.
