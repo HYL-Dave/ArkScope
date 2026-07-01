@@ -921,10 +921,10 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
 
     assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL"
     assert b.query_iv_history("UNKNOWN").iloc[0]["date"] == "2026-01-01"
-    assert b.query_fundamentals("UNKNOWN")["snapshot"] == {"source": "PG"}
+    assert b.query_fundamentals("UNKNOWN") == {}
     assert price_hit == ["UNKNOWN"]
     assert iv_hit == ["UNKNOWN"]
-    assert fund_hit == ["UNKNOWN"]
+    assert fund_hit == []
 
 
 def test_news_strict_available_news_tickers_empty_does_not_hit_pg(tmp_path, monkeypatch):

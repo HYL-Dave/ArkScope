@@ -787,7 +787,7 @@ def test_update_route_excludes_news_after_pg_exit_audit(store, tmp_path, monkeyp
     out = md.update_route(store=store)
 
     assert out == {"status": "running"}
-    assert calls == [("prices", "iv", "fundamentals")]
+    assert calls == [("prices", "iv")]
 
 
 def test_toggle_invalidates_dal_cache(store, monkeypatch):
