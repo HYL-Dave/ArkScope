@@ -86,16 +86,27 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ## 5. `scripts/` retirement rule (principle)
 
-- **Logic lives in `src/` domain modules** (`src/providers/`, `src/iv/`, `src/fundamentals/`, …). `scripts/` either disappears or remains only as **one-time migration** tooling.
+- **Provider clients stay in `data_sources/` unless deliberately migrated.** That is the existing
+  provider layer (`data_sources/ibkr_source.py`, `sec_edgar_financials.py`,
+  `financial_datasets_client.py`, `polygon_source.py`, ...). Runtime orchestration / domain logic
+  moves into `src/<domain>/...` modules (`src/news_normalized/`, `src/iv/`,
+  `src/fundamentals/`, ...). Do **not** accidentally create a second provider layer under
+  `src/providers/`.
 - **Runtime imports `src/` only.** Subprocess isolation may stay, but its **target becomes `python -m src.<module>`, never `scripts/*.py`**.
 - **Retirement = definition-of-done of each domain's cutover**, riding along that domain's migration. **Not** a standalone mega-refactor (avoid stalling PG-exit momentum).
-- **First conversion candidate = the N8a IBKR news worker:** its logic already lives in `src/news_normalized/ibkr_runtime.py`; `scripts/collection/collect_ibkr_news_normalized.py` is a thin shell → repoint the subprocess to `python -m src.news_normalized.ibkr_cli` to decouple (small change, demonstrates the pattern).
+- **First conversion candidate = the N8a IBKR news worker:** `scripts/collection/collect_ibkr_news_normalized.py`
+  is **not** a trivial shell. `src/news_normalized/ibkr_runtime.py` holds the Gateway adapter, but
+  the script still owns worker orchestration, DB/write locking, provider config injection,
+  `stderr` suppression, sanitized stdout JSON, sanitized error classes, and continuation-count
+  redaction. S-A1 must move this whole worker boundary into `src/news_normalized/ibkr_cli.py` and
+  repoint the scheduler to `python -m src.news_normalized.ibkr_cli` while preserving the
+  sanitization contract.
 
 ---
 
 ## 6. Slice breakdown (each own spec/plan/gate, TDD)
 
-1. **S-A | scripts/ retirement rule + coupling baseline** — land §4/§5 as a contract + first demonstrator conversion (IBKR news worker → `python -m src`).
+1. **S-A | scripts/ retirement rule + coupling baseline** — land §4/§5 as a contract + first demonstrator conversion (IBKR news worker → `python -m src`). This is a small refactor with security invariants, not a one-line path change.
 2. **S-B | fundamentals refetch/cache** — *fast win, may run first / in parallel with the survey.* Stop the PG mirror for the fundamentals domain, route reads to the local cache + EDGAR fallback, reuse the period-aware TTL, warm the active universe on cold start, **check for non-US tickers** (EDGAR is US-only). Extract `src/fundamentals/`.
 3. **S-C | IV provider survey** (decision axes in §7) → outputs a selection recommendation, no implementation.
 4. **S-D | IV local schema reboot** (contract in §7): raw-retain + versioned-derive schema, provider-abstraction interface; no scheduling yet.
@@ -143,7 +154,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ## 10. Open questions / decisions needed
 
-1. **IV forward strategy:** accept forward-only, or — if the survey finds an affordable historical IV / option-chain vendor — switch to "one-time backfill + forward"? (The only finding that overturns the "not re-fetchable" premise.)
+1. **IV forward strategy:** historical options backfill now looks plausible in principle, but only the proof packet can decide if it is usable. It must verify historical IV/greeks completeness/reliability, provider rate limits, tier/pricing gates, and timestamp/input comparability before switching from forward-only to "one-time backfill + forward".
 2. **app-state homes:** `agent_queries` / `research_reports` / `agent_memories` / `signals` / `job_runs` → which local store (`profile_state.db`? a new `ops.db`?) or retire?
 3. **macro/cal:** is `macro_calendar.db` already the local authority? Are PG `macro_*` / `cal_*` orphans or still authoritative?
 4. **scorer timing:** cutover `news_scores` *before* or *with* N8b reads?
@@ -206,7 +217,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | Domain | Current survey finding | Disposition |
 |---|---|---|
 | News | hard-local reads and normalized local writes are live; PG news is no longer the app authority | N9 drop candidate after final reader grep; keep legacy local projection until N8b/N9 |
-| News scores | PG table and `migrate_to_supabase --scores` still exist, but local runtime code marks `news_scores` retired/deferred and score-dependent local reads do not fall back to PG | not a PG-exit blocker; treat as separate scoring/enrichment project or verified-dead PG drop, not part of IV/fundamentals work |
+| News scores | PG table and `migrate_to_supabase --scores` still exist, but local runtime code marks `news_scores` retired/deferred and score-dependent local reads do not fall back to PG | not a PG-exit blocker; treat as separate scoring/enrichment project or verified-dead PG drop, not part of IV/fundamentals work. Conscious tradeoff: hard-local news currently degrades multi-model sentiment/risk to `NULL`/`0` until a future scoring project exists |
 | SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; a few health paths still use `job_runs` best-effort | PG `sa_*` is a likely orphan; grep-gate before drop; job telemetry belongs to app-state/ops, not SA market data |
 | Fundamentals | local table has only 130 stored snapshots; default analysis already does stored → SEC EDGAR → Financial Datasets; stored-only UI path can still PG-fallback unless strict | fast win: stop fundamentals mirror/sync, make stored path local-only with honest empty, rely on local financial cache + SEC/paid fallback |
 | IV | only 24 local rows; scheduler still routes `iv_history` through IBKR script → PG → mirror; tools/UI read local with PG fallback on miss | abandon old 24 rows as experimental; preserve capability via rebooted local schema + provider abstraction |
@@ -246,10 +257,10 @@ dataset without making IBKR rate limits the backbone.
 | Provider | What official docs indicate | Fit for ArkScope |
 |---|---|---|
 | IBKR TWS/Gateway | `reqContractDetails` can enumerate option chains but complete chains are throttled and not recommended for all strikes/rights/expiries; `reqSecDefOptParams` improves chain definition discovery but returns expirations/strikes, not all market quotes. Greeks/IV arrive through option market data subscriptions and tick computations. | Good for a small-scope computed-IV prototype and live cross-checks; poor as the 148-ticker daily backbone |
-| Polygon / Massive Options | chain snapshot endpoint returns chain-level pricing details, greeks, IV, quotes/trades, open interest, and underlying asset data; historical quotes endpoint provides bid/ask records with precise timestamps but is plan-gated. | Best raw/bulk-style candidate if plan/history access is acceptable; supports own computation from raw snapshots |
-| Alpha Vantage | realtime US options can return full chains; `require_greeks=true` enables greeks/IV; historical options accept dates back to 2008-01-01 and can return a whole chain or a contract. | Strong cheap/accessible candidate for historical chain backfill; needs payload/time semantics verification before choosing |
-| EODHD / Unicorn options | marketplace product advertises US options EOD + historical data for 6,000+ symbols, two-year history, bid/ask/trade, volume, OI, IV (`volatility`), greeks, theoretical, DTE, midpoint. | Cheap EOD-history candidate; likely better for daily research snapshots than intraday raw reconstruction |
-| Tradier | chain endpoint is per underlying + expiration and can include greeks/IV courtesy of ORATS. | Useful live broker-style source; less suitable as the historical raw backbone unless account terms fit |
+| Polygon / Massive Options | chain snapshot endpoint returns chain-level pricing details, greeks, IV, quotes/trades, open interest, and underlying asset data; historical quotes endpoint provides bid/ask records with precise timestamps but is plan-gated. | Best raw/bulk-style candidate if plan/history access is acceptable; supports own computation from raw snapshots. Proof packet must verify current product naming/plan boundaries ("Polygon" vs "Massive") and historical endpoint tier gates |
+| Alpha Vantage | realtime US options can return full chains; `require_greeks=true` enables greeks/IV; historical options accept dates back to 2008-01-01 and can return a whole chain or a contract. | Strong cheap/accessible candidate for historical chain backfill, but proof packet must test whether historical IV/greeks are populated/reliable and whether low-tier rate limits make multi-ticker backfill impractical |
+| EODHD / Unicorn options | marketplace product advertises US options EOD + historical data for 6,000+ symbols, two-year history, bid/ask/trade, volume, OI, IV (`volatility`), greeks, theoretical, DTE, midpoint. | Cheap EOD-history candidate; likely better for daily research snapshots than intraday raw reconstruction. Proof packet must verify product name, current availability, actual historical IV/greeks population, and cost/tier gates |
+| Tradier | chain endpoint is per underlying + expiration and can include greeks/IV courtesy of ORATS. | Useful live broker-style source; less suitable as the historical raw backbone unless account terms fit. Its greeks/IV are ORATS-derived, so Tradier is not an independent cross-check against ORATS |
 | ORATS | API focuses on volatility summarizations, smoothed parameterized curves, derived IV/earnings/volatility metrics, live/1-minute/snapshot APIs. | Excellent reference/specialist data; not the backbone if ArkScope wants to own derived IV computation |
 
 Survey recommendation:
@@ -262,6 +273,10 @@ Survey recommendation:
 - **Next IV slice output:** a provider proof packet, not production code: sample payload
   fields, timestamp semantics, history depth, cost/rate constraints, and whether the same
   raw snapshot is sufficient to recompute ATM IV / term structure / VRP.
+- **Proof-packet blockers:** a provider cannot be selected until the packet quantifies:
+  historical IV/greeks non-null coverage, request limits for the desired
+  `tickers × dates × expiries` backfill, exact tier/pricing gates, and whether any
+  vendor-derived greeks are independent or just ORATS-derived.
 
 ### 12.6 IV reboot schema implications
 
@@ -283,9 +298,16 @@ IBKR prototype and bulk provider backends:
 Do not wait for the IV provider survey to do fundamentals or the scripts demonstrator.
 Recommended next order:
 
-1. **S-A1 scripts demonstrator:** repoint N8a IBKR news worker from
-   `scripts/collection/collect_ibkr_news_normalized.py` to `python -m src.news_normalized...`.
-   This proves the retirement rule without changing behavior.
+1. **S-A1 scripts demonstrator:** move the N8a IBKR news worker module from
+   `scripts/collection/collect_ibkr_news_normalized.py` to `src/news_normalized/ibkr_cli.py`
+   and repoint the scheduler to `python -m src.news_normalized.ibkr_cli`.
+   Acceptance requires:
+   - no behavior change to IBKR normalized writes;
+   - subprocess can resolve the repo package (`cwd` or `PYTHONPATH` handled explicitly);
+   - worker output remains sanitized JSON and never includes title/url/article-id/body/provider
+     message text;
+   - existing worker tests move from `scripts.collection...` imports to `src.news_normalized...`;
+   - scheduler tests pin the `python -m` invocation rather than a `scripts/*.py` path.
 2. **S-B fundamentals refetch/cache:** local-only stored reads + provider fallback retained.
 3. **S-C IV provider proof packet:** compare Polygon/Massive, Alpha Vantage, EODHD,
    Tradier, ORATS, and IBKR against the raw-retain/versioned-derive contract.
