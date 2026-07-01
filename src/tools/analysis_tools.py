@@ -212,22 +212,18 @@ def get_fundamentals_analysis(
     # under strict/no-PG) keyed by ticker+period. A positive hit serves from local; a
     # NEGATIVE (no-data: non-US / CIK miss) is cached with a SHORT TTL so we don't hammer
     # SEC for a symbol it doesn't cover.
+    from src.fundamentals.cache import (
+        fundamentals_analysis_cache_key,
+        read_cached_sec_fundamentals,
+    )
+
     _cache_be = getattr(dal, "_backend", None)
-    _sec_key = f"fundamentals_analysis:sec_edgar:{ticker.upper()}:{period}:v1"
-    _sec_negative_cached = False
-    if _cache_be is not None and hasattr(_cache_be, "get_financial_cache"):
-        try:
-            hit = _cache_be.get_financial_cache(_sec_key)
-        except Exception:  # noqa: BLE001 — cache read must never break the analysis
-            hit = None
-        if hit is not None:
-            if hit.get("_negative"):
-                _sec_negative_cached = True  # skip the live SEC fetch; FD branch still runs
-            else:
-                try:
-                    return FundamentalsResult.model_validate(hit)
-                except Exception:  # noqa: BLE001 — stale/incompatible cache shape → re-fetch
-                    pass
+    _sec_key = fundamentals_analysis_cache_key(ticker, period)
+    cached_sec, _sec_negative_cached = read_cached_sec_fundamentals(
+        _cache_be, ticker, period
+    )
+    if cached_sec is not None:
+        return cached_sec
 
     income_stmts = []
     balance_sheets = []

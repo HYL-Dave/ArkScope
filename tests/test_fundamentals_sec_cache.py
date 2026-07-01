@@ -93,6 +93,113 @@ def test_sec_cache_miss_then_hit_round_trips_result(monkeypatch):
     assert r1.roe == r2.roe == 0.21 and r2.data_source == "sec_edgar"
 
 
+def test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback(monkeypatch):
+    from src.tools.schemas import FundamentalsResult
+
+    class _Market:
+        def __init__(self):
+            self.calls = []
+
+        def get_financial_cache(self, cache_key):
+            self.calls.append(cache_key)
+            return FundamentalsResult(
+                ticker="AAPL",
+                data_source="sec_edgar",
+                snapshot_date="2025-12-31",
+                roe=0.33,
+            ).model_dump()
+
+    class _LocalMarketLike:
+        def __init__(self):
+            self._market = _Market()
+            self.pg_calls = []
+
+        def get_financial_cache(self, cache_key):
+            self.pg_calls.append(cache_key)
+            raise AssertionError("PG cache fallback must not be used for fundamentals")
+
+        def set_financial_cache(self, *args, **kwargs):
+            raise AssertionError("cache hit must not write")
+
+    class _DAL:
+        def __init__(self):
+            self._backend = _LocalMarketLike()
+
+        def get_fundamentals(self, ticker):
+            return FundamentalsResult(ticker=ticker.upper())
+
+    monkeypatch.setattr(at, "_is_fd_enabled", lambda dal: False)
+    dal = _DAL()
+
+    result = at.get_fundamentals_analysis(dal, "AAPL")
+
+    assert result.data_source == "sec_edgar"
+    assert result.roe == 0.33
+    assert dal._backend._market.calls == [
+        "fundamentals_analysis:sec_edgar:AAPL:annual:v1"
+    ]
+    assert dal._backend.pg_calls == []
+
+
+def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.schemas import FundamentalsResult
+
+    class _Backend:
+        def __init__(self):
+            self.store = {}
+            self.set_calls = []
+
+        def get_financial_cache(self, cache_key):
+            return self.store.get(cache_key)
+
+        def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+            self.set_calls.append((cache_key, ticker, ttl_days, source, data))
+            self.store[cache_key] = data
+            return True
+
+    class _DAL:
+        def __init__(self):
+            self._backend = _Backend()
+
+        def get_fundamentals(self, ticker):
+            return FundamentalsResult(ticker=ticker.upper())
+
+    class _FakeSEC:
+        def get_income_statement(self, ticker, years=2, period="annual"):
+            return [type("Statement", (), {"report_period": "2025-12-31"})()]
+
+        def get_balance_sheet(self, ticker, years=1, period="annual"):
+            return []
+
+        def get_cash_flow_statement(self, ticker, years=2, period="annual"):
+            return []
+
+    import data_sources.sec_edgar_financials as sec_mod
+    monkeypatch.setattr(sec_mod, "SECEdgarFinancials", lambda: _FakeSEC())
+    monkeypatch.setattr(at, "_is_fd_enabled", lambda dal: False)
+    monkeypatch.setattr(
+        at,
+        "_build_result_from_statements",
+        lambda t, src, i, b, c: FundamentalsResult(
+            ticker=t.upper(),
+            data_source=src,
+            snapshot_date="2025-12-31",
+            roe=0.44,
+        ),
+    )
+
+    dal = _DAL()
+    result = at.get_fundamentals_analysis(dal, "AAPL")
+
+    expected_key = fundamentals_analysis_cache_key("AAPL", "annual")
+    assert result.data_source == "sec_edgar"
+    assert result.roe == 0.44
+    assert dal._backend.set_calls
+    assert dal._backend.set_calls[0][:4] == (expected_key, "AAPL", 90, "sec_edgar")
+    assert dal._backend.store[expected_key]["roe"] == 0.44
+
+
 # --- SEC User-Agent canonicalization (ARKSCOPE_SEC_USER_AGENT) ----------------------
 
 def test_user_agent_prefers_canonical_arkscope_var(monkeypatch):
