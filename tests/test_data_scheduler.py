@@ -1115,18 +1115,21 @@ def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch
                 "prices": {"ok": True, "rows_added": 1},
                 "news": {"skipped": "domain disabled"},
                 "iv": {"ok": True, "rows_added": 2},
-                "fundamentals": {"ok": True, "rows_added": 3},
+                "fundamentals": {"skipped": "domain disabled"},
             },
         )[1],
     )
 
     res = _REAL_LOCAL_REFRESH()
 
-    assert calls == [("prices", "iv", "fundamentals")]
+    assert calls == [("prices", "iv")]
     assert res == {
         "ok": True,
-        "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": 3},
-        "skipped_domains": {"news": "domain disabled"},
+        "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": None},
+        "skipped_domains": {
+            "news": "domain disabled",
+            "fundamentals": "domain disabled",
+        },
     }
 
 
@@ -1157,16 +1160,20 @@ def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path,
                 "prices": {"ok": True, "rows_added": 1},
                 "news": {"skipped": "domain disabled"},
                 "iv": {"ok": True, "rows_added": 2},
-                "fundamentals": {"ok": True, "rows_added": 3},
+                "fundamentals": {"skipped": "domain disabled"},
             },
         )[1],
     )
 
     res = _REAL_LOCAL_REFRESH()
 
-    assert calls == [("prices", "iv", "fundamentals")]
+    assert calls == [("prices", "iv")]
     assert res["domains"]["news"] is None
-    assert res["skipped_domains"] == {"news": "domain disabled"}
+    assert res["domains"]["fundamentals"] is None
+    assert res["skipped_domains"] == {
+        "news": "domain disabled",
+        "fundamentals": "domain disabled",
+    }
 
 
 def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(

@@ -77,7 +77,7 @@ def _manual_update_domains(store: ProfileStateStore) -> tuple[str, ...] | None:
     profile_done = parse_news_toggle(store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True
     audit_state = _news_pg_exit_audit_state(resolve_market_db_path())
     if profile_done or audit_state is True or audit_state is None:
-        return ("prices", "iv", "fundamentals")
+        return ("prices", "iv")
     return None
 
 
@@ -145,8 +145,8 @@ def bootstrap_route():
 @router.post("/market-data/update")
 def update_route(store: ProfileStateStore = Depends(get_profile_store)):
     """Start (or attach to) a background INCREMENTAL update (delta since latest;
-    prices + news + iv + fundamentals before news PG exit; prices + iv +
-    fundamentals after news exit). Append-only to the live DB — routing can stay
+    prices + news + iv + fundamentals before news PG exit; prices + iv after
+    news/fundamentals PG-exit slices). Append-only to the live DB — routing can stay
     active. A provider/PG failure in one domain is recorded (last_error), not
     fatal to the others. Requires an existing local DB (bootstrap first)."""
     require_db_write("market_update", {"db": resolve_market_db_path()})
