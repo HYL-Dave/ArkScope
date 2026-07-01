@@ -34,6 +34,9 @@ def hermetic(tmp_path, monkeypatch):
     # profile_state.db). Set ARKSCOPE_PROFILE_DB so BOTH the write store (_state_store) and the
     # v1.4a no-create read (resolve_profile_state_db_path) resolve to this tmp path.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    # N8a cutover writes a durable audit marker to the real market DB. Scheduler tests are
+    # hermetic and must not let that live marker change legacy-route expectations.
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market_data.db"))
     from src.scheduler_state import SchedulerStateStore
     monkeypatch.setattr(ds, "_SCHED_STATE", SchedulerStateStore(tmp_path / "profile_state.db"))
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
