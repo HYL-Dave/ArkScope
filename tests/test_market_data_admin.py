@@ -678,6 +678,7 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     out = market_data_status(store=store)
     assert out["exists"] is False
     assert out["prices"]["row_count"] == 0 and out["news"]["row_count"] == 0
+    assert out["fundamentals_mode"] == "local_cache_refetch"
     assert out["use_local_market_setting"] is False
     assert out["routing_enabled"] is False  # no DB + setting off
 
@@ -706,6 +707,7 @@ def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatc
 
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     off = market_data_status(store=store)
+    assert off["fundamentals_mode"] == "local_cache_refetch"
     assert off["sync"] == mirror
 
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)

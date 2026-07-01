@@ -117,6 +117,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "iv": stats["iv"],
         "fundamentals": stats["fundamentals"],
         "financial_cache": stats["financial_cache"],  # 3c-C local-primary cache (rows/valid/expired)
+        "fundamentals_mode": "local_cache_refetch",
         "sync": sync,  # mirror domains + direct-news telemetry when its writer is active
         "use_local_market_setting": setting_on,
         "env_override": env_on,

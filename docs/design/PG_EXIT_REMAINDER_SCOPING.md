@@ -107,7 +107,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 ## 6. Slice breakdown (each own spec/plan/gate, TDD)
 
 1. **S-A | scripts/ retirement rule + coupling baseline** — §4/§5 landed as a contract; S-A1 converted the IBKR news worker runtime boundary to `python -m src.news_normalized.ibkr_cli`. Remaining S-A work applies the same definition-of-done per domain.
-2. **S-B | fundamentals refetch/cache** — *fast win, may run first / in parallel with the survey.* Stop the PG mirror for the fundamentals domain, route reads to the local cache + EDGAR fallback, reuse the period-aware TTL, warm the active universe on cold start, **check for non-US tickers** (EDGAR is US-only). Extract `src/fundamentals/`.
+2. **S-B | fundamentals refetch/cache** — *fast win, may run first / in parallel with the survey.* Stop the PG mirror for the fundamentals domain, retire the frozen `fundamentals` table as an authority, make `stored=true` read only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise return honest empty, keep default analysis on SEC EDGAR / Financial Datasets fallback, reuse the existing TTL semantics, **check for non-US tickers** (EDGAR is US-only). Extract `src/fundamentals/`.
 3. **S-C | IV provider survey** (decision axes in §7) → outputs a selection recommendation, no implementation.
 4. **S-D | IV local schema reboot** (contract in §7): raw-retain + versioned-derive schema, provider-abstraction interface; no scheduling yet.
 5. **S-E | IV IBKR small-scope computed-IV prototype** (10–30 tickers, near-month/ATM, fixed DTE-or-delta bucket, append-only, no gap-fill). Extract `src/iv/`.
@@ -221,7 +221,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | News | hard-local reads and normalized local writes are live; PG news is no longer the app authority | N9 drop candidate after final reader grep; keep legacy local projection until N8b/N9 |
 | News scores | PG table and `migrate_to_supabase --scores` still exist, but local runtime code marks `news_scores` retired/deferred and score-dependent local reads do not fall back to PG | not a PG-exit blocker; treat as separate scoring/enrichment project or verified-dead PG drop, not part of IV/fundamentals work. Conscious tradeoff: hard-local news currently degrades multi-model sentiment/risk to `NULL`/`0` until a future scoring project exists |
 | SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; a few health paths still use `job_runs` best-effort | PG `sa_*` is a likely orphan; grep-gate before drop; job telemetry belongs to app-state/ops, not SA market data |
-| Fundamentals | local table has only 130 stored snapshots; default analysis already does stored → SEC EDGAR → Financial Datasets; stored-only UI path can still PG-fallback unless strict | fast win: stop fundamentals mirror/sync, make stored path local-only with honest empty, rely on local financial cache + SEC/paid fallback |
+| Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise returns honest empty; live cache may initially be cold; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table is an N9 drop-orphan |
 | IV | only 24 local rows; scheduler still routes `iv_history` through IBKR script → PG → mirror; tools/UI read local with PG fallback on miss | abandon old 24 rows as experimental; preserve capability via rebooted local schema + provider abstraction |
 | Prices | local table has 2.3M rows and price data is core | migrate/direct-local slice; do not refetch 2.3M by default |
 | Macro/cal | local `macro_calendar.db` exists | audit readers and PG tables; likely local authority already |
@@ -243,7 +243,7 @@ The fundamentals direction is unchanged: refetch/cache, not PG migration.
 Slice implication: fundamentals should be a small PG-exit slice, not an N7-style
 migration. Required gates:
 
-1. set stored-only fundamentals reads to local-only under PG-exit (no PG fallback),
+1. set stored-only fundamentals reads to local `financial_cache` only (no PG fallback, no provider fetch),
 2. preserve default `get_fundamentals_analysis` provider fallback,
 3. keep/verify SEC User-Agent + backoff/rate limit,
 4. scan active universe for non-US / EDGAR-uncovered symbols,
@@ -301,7 +301,7 @@ Do not wait for the IV provider survey to do fundamentals. S-A1 is now complete 
 serves as the scripts-retirement demonstrator.
 Recommended next order:
 
-1. **S-B fundamentals refetch/cache:** local-only stored reads + provider fallback retained.
+1. **S-B fundamentals refetch/cache:** local-cache stored reads + provider fallback retained. **Status: implemented** once the S-B code commit lands.
 2. **S-C IV provider proof packet:** compare Polygon/Massive, Alpha Vantage, EODHD,
    Tradier, ORATS, and IBKR against the raw-retain/versioned-derive contract.
 3. **S-D IV schema design:** provider-neutral schema and status model.
