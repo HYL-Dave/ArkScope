@@ -205,21 +205,19 @@ def _adopt_existing_row(
     existing: dict[str, Any],
     row: dict[str, Any],
 ) -> bool:
-    if existing["ticker"] != ticker:
+    if existing["ticker"] != ticker or existing["title"] != row["title"]:
         raise LegacyProjectionConflict(
             "canonical legacy hash is owned by incompatible ticker/source"
         )
+    legacy_id = int(existing["id"])
+    owner = _mapped_owner(conn, legacy_id)
     if existing["source"] != row["source"]:
         # Legacy news rows are unique by ticker/title/date hash, not by source. If
         # another provider already projected the same syndicated article, preserve
         # that compatibility row and treat this source as represented.
         return False
-    legacy_id = int(existing["id"])
-    owner = _mapped_owner(conn, legacy_id)
     if owner is not None and owner != (article_id, ticker):
-        raise LegacyProjectionConflict(
-            "legacy news row is already mapped to another projection"
-        )
+        return False
     changed = not _legacy_row_matches(existing, row)
     if changed:
         _write_legacy_row(conn, legacy_id, row)

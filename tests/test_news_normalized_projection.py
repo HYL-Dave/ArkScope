@@ -396,6 +396,55 @@ def test_adopts_cross_source_duplicate_legacy_row_for_same_ticker_title_date(
     ]
 
 
+def test_adopts_same_source_duplicate_legacy_row_already_mapped_to_other_article(
+    store, conn
+):
+    title = "IBKR duplicate headline"
+    first_article_id = store.upsert(
+        article(
+            provider_id="ibkr-duplicate-owner",
+            title=title,
+            source="ibkr",
+            url="https://ibkr.example.test/owner",
+            publisher="IBKR",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T20:39:00Z",
+            raw_body="First IBKR body.",
+        )
+    ).article_id
+    first = project_article_uncommitted(conn, first_article_id)
+    legacy_id = conn.execute("SELECT id FROM news").fetchone()[0]
+
+    duplicate_article_id = store.upsert(
+        article(
+            provider_id="ibkr-duplicate-second-id",
+            title=title,
+            source="ibkr",
+            url="https://ibkr.example.test/duplicate",
+            publisher="IBKR",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T20:40:00Z",
+            raw_body="Second IBKR body for the same legacy hash.",
+        )
+    ).article_id
+
+    result = project_article_uncommitted(conn, duplicate_article_id)
+
+    assert first.inserted == 1
+    assert result.inserted == 0
+    assert result.updated == 0
+    rows = _projected_news(conn)
+    assert len(rows) == 1
+    assert rows[0]["id"] == legacy_id
+    assert rows[0]["description"] == "First IBKR body."
+    map_rows = _map_rows(conn)
+    assert len(map_rows) == 1
+    assert map_rows[0]["article_id"] == first_article_id
+    assert map_rows[0]["legacy_news_id"] == legacy_id
+
+
 @pytest.mark.parametrize(
     ("candidate", "ticker"),
     [
