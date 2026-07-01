@@ -1,6 +1,6 @@
 """
 LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domain
-from a local SQLite (3a prices + 3b news + 3c-A iv/fundamentals), with PostgreSQL
+from a local SQLite (3a prices + 3b news + 3c-A iv), with PostgreSQL
 fallback.
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
@@ -21,8 +21,12 @@ Overridden, local-first with PG fallback on empty/miss:
     (optional 1-5 ``sentiment_score`` on the local row), so a scored miss is an
     honest empty. ``query_news_search`` (3b, FTS5) + ``query_news_stats`` (score-free
     scout stats; no PG fallback on local empty);
-  - ``query_iv_history`` + ``query_fundamentals`` (3c-A);
+  - ``query_iv_history`` (3c-A);
   - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
+
+The old ``fundamentals`` mirror table is retained for legacy inspection until N9,
+but is no longer an authority. Current fundamentals are served through the
+SEC/Financial-Datasets analysis path and local ``financial_cache``.
 
 financial_cache (3c-C) is LOCAL-PRIMARY, not a mirror:
   - ``set_financial_cache`` writes the LOCAL cache ONLY (never PG);
@@ -167,20 +171,15 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         return pg
 
     def query_fundamentals(self, ticker: str) -> dict:
-        try:
-            data = self._market.query_fundamentals(ticker)
-        except Exception as e:
-            logger.warning(f"local query_fundamentals failed ({e})")
-            data = None
-        if data:  # non-empty dict → local hit
-            provenance.record("fundamentals", "local")
-            return data
-        if self._strict:
-            provenance.record("fundamentals", "none")  # local-only: honest empty, no PG
-            return data if data else {}
-        pg = super().query_fundamentals(ticker)
-        provenance.record("fundamentals", "pg_fallback" if pg else "none")
-        return pg
+        """The PG-mirrored fundamentals table is retired as an authority.
+
+        Use get_fundamentals_analysis() for live SEC/Financial-Datasets fallback and
+        /fundamentals/{ticker}?stored=true for local financial_cache hits. The old
+        fundamentals table remains inspectable through SqliteBackend until N9, but
+        LocalMarketDatabaseBackend must not serve or PG-fallback it as current data.
+        """
+        provenance.record("fundamentals", "none")
+        return {}
 
     # --- financial_cache (3c-C): local-primary (set local-only; get local-first +
     #     PG fallback + read-through promotion) -----------------------------------

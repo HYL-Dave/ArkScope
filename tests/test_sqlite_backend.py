@@ -433,16 +433,22 @@ def test_iv_history_local_then_pg_fallback(market_db, monkeypatch):
     assert df.iloc[0]["date"] == "2020-01-01" and hit == ["UNKNOWN"]
 
 
-def test_fundamentals_local_then_pg_fallback(market_db, monkeypatch):
+def test_fundamentals_mirror_table_retired_no_pg_fallback(market_db, monkeypatch):
     db, _ = market_db
     hit = []
-    monkeypatch.setattr(DatabaseBackend, "query_fundamentals",
-                        lambda self, ticker: (hit.append(ticker), {"ticker": ticker, "snapshot": "PG"})[1])
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_fundamentals",
+        lambda self, ticker: (
+            hit.append(ticker),
+            {"ticker": ticker, "snapshot": "PG"},
+        )[1],
+    )
     b = _make(db)
-    out = b.query_fundamentals("AAPL")        # local hit → PG not hit
-    assert out["snapshot"] == {"Name": "Apple Inc"} and hit == []
-    out = b.query_fundamentals("UNKNOWN")      # local empty {} → PG fallback
-    assert out["snapshot"] == "PG" and hit == ["UNKNOWN"]
+
+    assert b.query_fundamentals("AAPL") == {}
+    assert b.query_fundamentals("UNKNOWN") == {}
+    assert hit == []
 
 
 def test_financial_cache_set_is_local_only(market_db, monkeypatch):
@@ -499,19 +505,27 @@ def test_provenance_iv_recorded(market_db, monkeypatch):
     assert provenance.read("iv") == "none"
 
 
-def test_provenance_fundamentals_recorded(market_db, monkeypatch):
+def test_provenance_fundamentals_records_none_after_mirror_retirement(
+    market_db, monkeypatch
+):
     from src.tools.backends import provenance
+
     db, _ = market_db
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "query_fundamentals",
+        lambda self, t: hit.append(t) or {"ticker": t, "snapshot": {"x": 1}},
+    )
     b = _make(db)
-    provenance.reset(); b.query_fundamentals("AAPL")          # local has AAPL
-    assert provenance.read("fundamentals") == "local"
-    monkeypatch.setattr(DatabaseBackend, "query_fundamentals",
-                        lambda self, t: {"ticker": t, "snapshot": {"x": 1}})
-    provenance.reset(); b.query_fundamentals("UNKNOWN")
-    assert provenance.read("fundamentals") == "pg_fallback"
-    monkeypatch.setattr(DatabaseBackend, "query_fundamentals", lambda self, t: {})
-    provenance.reset(); b.query_fundamentals("UNKNOWN")
+
+    provenance.reset()
+    assert b.query_fundamentals("AAPL") == {}
     assert provenance.read("fundamentals") == "none"
+    provenance.reset(); b.query_fundamentals("UNKNOWN")
+    assert b.query_fundamentals("UNKNOWN") == {}
+    assert provenance.read("fundamentals") == "none"
+    assert hit == []
 
 
 def test_inherited_vs_overridden_methods(market_db):
