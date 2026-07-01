@@ -642,15 +642,59 @@ def test_fundamentals_stored_source_path_mapping(monkeypatch):
     assert out["snapshot_date"] is None
 ```
 
+Append this expiry test so the stored route never serves stale fundamentals cache rows:
+
+```python
+def test_fundamentals_stored_expired_cache_is_honest_empty(tmp_path):
+    """/fundamentals/{ticker}?stored=true must respect financial_cache expiry.
+
+    SqliteBackend.get_financial_cache filters expires_at, so the route should see an
+    expired annual-analysis cache row as a miss and return honest empty rather than
+    serving stale fundamentals.
+    """
+    from src.api.routes import fundamentals as fr
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    from src.tools.schemas import FundamentalsResult
+
+    backend = SqliteBackend(str(tmp_path / "market_data.db"))
+    cache_key = fundamentals_analysis_cache_key("AAPL", "annual")
+    assert backend.set_financial_cache(
+        cache_key,
+        "AAPL",
+        FundamentalsResult(
+            ticker="AAPL",
+            data_source="sec_edgar",
+            snapshot_date="2025-12-31",
+            roe=0.99,
+        ).model_dump(),
+        source="sec_edgar",
+        fetched_at="2000-01-01T00:00:00+00:00",
+        expires_at="2000-01-02T00:00:00+00:00",
+    )
+
+    class _DAL(_FakeDALBT):
+        def __init__(self):
+            super().__init__("LocalMarketDatabaseBackend")
+            self._backend = backend
+
+    out = fr.fundamentals("AAPL", stored=True, dal=_DAL())
+
+    assert out["source_path"] == "none"
+    assert out["data_source"] == "none"
+    assert out["snapshot_date"] is None
+    assert out["roe"] is None
+```
+
 - [ ] **Step 2: Run API tests to verify they fail**
 
 Run:
 
 ```bash
-pytest tests/test_api.py::test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch tests/test_api.py::test_fundamentals_stored_source_path_mapping -q
+pytest tests/test_api.py::test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch tests/test_api.py::test_fundamentals_stored_source_path_mapping tests/test_api.py::test_fundamentals_stored_expired_cache_is_honest_empty -q
 ```
 
-Expected: FAIL because the route still calls `dal.get_fundamentals()`.
+Expected: FAIL because the route still calls `dal.get_fundamentals()` and has not yet routed stored mode through expiry-filtered local `financial_cache`.
 
 - [ ] **Step 3: Update stored route**
 
@@ -710,7 +754,7 @@ The empty result is constructed directly so `stored=true` cache misses do not to
 Run:
 
 ```bash
-pytest tests/test_api.py::test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch tests/test_api.py::test_fundamentals_stored_source_path_mapping tests/test_fundamentals_cache.py tests/test_fundamentals_sec_cache.py -q
+pytest tests/test_api.py::test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch tests/test_api.py::test_fundamentals_stored_source_path_mapping tests/test_api.py::test_fundamentals_stored_expired_cache_is_honest_empty tests/test_fundamentals_cache.py tests/test_fundamentals_sec_cache.py -q
 ```
 
 Expected: PASS.
