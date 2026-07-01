@@ -54,7 +54,7 @@ def test_ibkr_runtime_rejects_malformed_provider_article_id():
 
 
 def test_ibkr_worker_requires_explicit_tickers():
-    from scripts.collection import collect_ibkr_news_normalized as worker
+    from src.news_normalized import ibkr_cli as worker
 
     with pytest.raises(SystemExit) as caught:
         worker.parse_args([])
@@ -66,7 +66,7 @@ def test_ibkr_worker_prints_sanitized_json_without_provider_payload(
     monkeypatch,
     capsys,
 ):
-    from scripts.collection import collect_ibkr_news_normalized as worker
+    from src.news_normalized import ibkr_cli as worker
 
     forbidden_title = "Secret merger title"
     forbidden_url = "https://provider.example.test/article"
@@ -135,7 +135,7 @@ def test_ibkr_worker_prints_sanitized_json_without_provider_payload(
 
 
 def test_ibkr_worker_suppresses_provider_stderr_and_logging(monkeypatch, capsys):
-    from scripts.collection import collect_ibkr_news_normalized as worker
+    from src.news_normalized import ibkr_cli as worker
 
     secret = "licensed provider payload DJ-N$raw-id body text"
 
@@ -160,7 +160,7 @@ def test_ibkr_worker_suppresses_provider_stderr_and_logging(monkeypatch, capsys)
 def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     monkeypatch,
 ):
-    from scripts.collection import collect_ibkr_news_normalized as worker
+    from src.news_normalized import ibkr_cli as worker
 
     events = []
 
