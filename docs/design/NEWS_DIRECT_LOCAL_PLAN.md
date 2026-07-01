@@ -3,7 +3,7 @@
 Date: 2026-06-26
 Status: Step 2 (2a–2d) DONE; **Step 3 S3.0–S3.3 COMPLETE + live-verified 2026-06-27**;
 **normalized all-source N1–N7 LIVE-MIGRATED and validated 2026-06-29; N8a code/offline gate
-COMPLETE 2026-06-30, but the live begin/finalize cutover has NOT run**
+COMPLETE 2026-06-30; N8a LIVE-FINALIZED 2026-07-01**
 (see the checkpoint near the end). Original Step 2 scoping is retained below as history. News chosen
 first (over IV) — high
 frequency, user-visible, more recoverable, and it can reuse the price_backfill direct-write +
@@ -280,9 +280,13 @@ resolution policy in the separately gated N7 migration plan; the offline foundat
   and terminal policy without inferring `expired` from age.
 - **N7 live migration complete.** Normalized schema/data now exists beside unchanged legacy `news`;
   the N7 backup remains the rollback point through N8 validation.
-- **N8a implementation complete, live cutover not started.** Runtime still follows the pre-exit
-  profile state until Task 13 begin/finalize is run. Scoring is not a PG-exit gate; it remains a
-  standalone local Parquet/OpenAI CLI until a separate scoring redesign exists.
+- **N8a live cutover complete (2026-07-01).** Task 13 finalized `news_pg_exit_runs.id=1` with all
+  validation gates passed, set `news_pg_exit_completed=true`, and left `use_normalized_news_writes`
+  true. Polygon/Finnhub/IBKR now route through normalized local writers with atomic legacy
+  projection; news reads are hard-local without PostgreSQL. IBKR may still show a bounded
+  `partial` body-retry backlog for 10172 unavailable bodies; this does not re-enable PG.
+  Scoring is not a PG-exit gate; it remains a standalone local Parquet/OpenAI CLI until a separate
+  scoring redesign exists.
 - **N9 legacy deletion not started.** The legacy `news` table, FileBackend fallback, mirror code,
   and old collection/scoring scripts remain until replacement paths pass the PG-unreachable gate.
 
@@ -350,7 +354,7 @@ legacy rows, zero normalized objects, and passes `quick_check`. Retain it throug
 
 - **Polygon URL demotion remains source-wide in N8.** New Polygon URL reuse must never regain
   strong-key semantics.
-- **N8a runtime work is implemented and offline-verified, but the live cutover has not occurred.**
+- **N8a runtime work is implemented, offline-verified, and live-finalized (2026-07-01).**
   Scoring is intentionally **outside** PG-exit: the existing scorer is a local Parquet/OpenAI CLI,
   not a PostgreSQL dependency and not part of the live read path. N8a therefore targets PG-exit
   only: normalized writers + legacy projection, strict local news behavior after the exit marker,
@@ -358,12 +362,12 @@ legacy rows, zero normalized objects, and passes `quick_check`. Retain it throug
 - N9 legacy table/Parquet/script deletion remains blocked until N8b/N9 prove normalized reads and
   replacement tooling. The N8a compatibility projection keeps current readers on legacy `news`.
 
-## N8a PG-exit implementation checkpoint (code/offline gate complete, 2026-06-30)
+## N8a PG-exit checkpoint (code/offline gate complete 2026-06-30; live-finalized 2026-07-01)
 
-N8a is implemented in code but **not live-enabled**. No live `news_pg_exit_runs` begin/finalize
-transition has been executed by this checkpoint; `news_pg_exit_completed` is not asserted here.
-The live cutover remains Task 13 and requires a fresh preview, explicit operator approval,
-scheduler/manual ingest pause, backup, validation JSON, and final PG-unreachable smoke.
+N8a is now live-enabled. Task 13 ran the guarded begin/finalize flow against the live profile and
+market DB, preserved a pre-cutover backup, and completed `news_pg_exit_runs.id=1` with validation
+JSON exactly covering `polygon`, `finnhub`, `ibkr`, `projection_parity`, and `pg_unreachable`.
+The live profile has `news_pg_exit_completed=true` and `use_normalized_news_writes=true`.
 
 Implemented behavior:
 
@@ -384,7 +388,7 @@ Implemented behavior:
   finalize only marks exit complete after all required validation gates are exactly `passed`;
   rollback is allowed only from `testing` and checks audit eligibility before profile cleanup.
 
-Offline verification for this checkpoint:
+Verification for this checkpoint:
 
 - Backend gate:
   `398 passed` for `tests/test_news_normalized_*.py`, `tests/test_news_n8a_cutover.py`,
@@ -393,6 +397,11 @@ Offline verification for this checkpoint:
 - Python compile gate: `compileall` over `src/news_normalized`, scheduler, normalized IBKR worker,
   and cutover CLI passed.
 - Hygiene: `git diff --check` passed.
+- Live Task 13 gate: preview fingerprint
+  `1734a2ba6e3d22a10db0d186b18ae1de932cd3b622a7df374764ac1c313857f8`; post-finalize
+  `news == news_fts == 372696`, FTS missing/orphan `0/0`, projection integrity all zero, provider
+  meta errors empty, and a no-DSN hard-local smoke returned local IBKR news with `news_strict=true`.
 
-This checkpoint is intentionally not a PG-exit completion claim. The live Task 13 cutover remains
-blocked on explicit approval and post-cutover validation.
+This checkpoint completes the **news-domain** PG exit. It is not an app-wide PG-exit completion
+claim; IV/fundamentals, remaining ingest, SEC/dead paths, and later N8b/N9 normalized-read cleanup
+remain separate work.

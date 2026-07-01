@@ -3,10 +3,11 @@
 Date: 2026-06-25
 Status: **Slice 1 DONE + live-migrated; Step 2 IN PROGRESS.** Polygon/Finnhub news direct-local
 cutover completed and live-verified 2026-06-27. The all-source normalized-news N7 migration is
-live-applied and validated (2026-06-29). N8a news PG-exit code and offline verification are
-complete (2026-06-30), but the hard-gated live begin/finalize cutover has **not** run; `ibkr_news`
-still uses the old PG/mirror runtime path until that cutover. IV, fundamentals, remaining price
-ingest, broader mirror retirement, SEC/dead paths, and UI collapse remain.
+live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
+`news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
+the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
+IV, fundamentals, remaining price ingest, broader mirror retirement, SEC/dead paths, and UI
+collapse remain.
 
 ## Progress
 
@@ -23,14 +24,13 @@ ingest, broader mirror retirement, SEC/dead paths, and UI collapse remain.
 - **Step 2 — ingest collectors → direct-local: IN PROGRESS.** Polygon/Finnhub news now default to
   provider → local SQLite with app-managed keys, direct telemetry, FTS/hash invariants, explicit
   Settings rollback, and a real-profile idempotent smoke. This bypasses PG sync/mirror only for
-  those two scheduler sources. `ibkr_news` intentionally remains collector → PG → mirror, and the
-  mirror remains load-bearing for IV/fundamentals and other unfinished ingest paths.
+  those two scheduler sources until N8a.
   The all-source normalized-news migration is now live (`news_articles`/body/ticker/key tables
-  populated beside unchanged legacy `news`), and N8a has a normalized writer plus atomic legacy
-  projection, isolated normalized IBKR worker, audited cutover tooling, strict local news behavior
-  after the exit marker, and news-only mirror/sync exclusion. This is still **not live cutover**:
-  the `news_pg_exit_completed` marker is not set here, and Task 13 must run the begin/finalize
-  sequence plus PG-unreachable smoke before claiming news is off PG.
+  populated beside unchanged legacy `news`), and N8a is live-finalized (2026-07-01): Polygon,
+  Finnhub, and IBKR route through normalized local writers with atomic legacy projection; the
+  audited `news_pg_exit_completed` marker forces hard-local news reads and retires the news
+  PG-sync/mirror path. The broader mirror remains load-bearing for IV/fundamentals and other
+  unfinished ingest paths.
   Scoring is deliberately outside PG-exit: the current scorer is a local Parquet/OpenAI CLI and is
   not a runtime PostgreSQL dependency.
 
@@ -88,7 +88,7 @@ re-fetch).
 | Domain | Read local? | Write local? | PG still needed for | Class |
 |---|---|---|---|---|
 | Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
-| News | ✅ local | ✅ Polygon/Finnhub direct; ⚠️ IBKR via mirror until N8a live cutover | `ibkr_news` ingest until Task 13 | (1) ingest — partial |
+| News | ✅ hard-local | ✅ Polygon/Finnhub/IBKR normalized local writers + legacy projection | — | news-domain PG-exit done |
 | IV | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
 | Fundamentals | ✅ (mirror) + SEC/FD live | ❌ PG→mirror | ingest | (1) ingest |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
