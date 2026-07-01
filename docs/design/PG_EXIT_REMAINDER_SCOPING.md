@@ -1,7 +1,7 @@
 # PG-Exit Remainder Scoping (design skeleton v0)
 
 - **Date:** 2026-07-01
-- **Status:** DRAFT / scoping skeleton — to be fleshed into per-slice specs
+- **Status:** DRAFT / survey v1 — local/runtime audit + provider survey folded; still not an implementation plan
 - **Context:** news-domain PG exit is LIVE-complete (`news_pg_exit_runs` id=1 completed, fail-closed). **Overall ArkScope PG exit is NOT complete.**
 - **Purpose of this doc:** scope the *remainder* of the PG exit — enumerate residual PG domains, assign a destination strategy per domain, define the `scripts/` retirement rule with a runtime-coupling inventory as its gating input, produce the N9 drop list, and sequence the remaining slices. **This document implements nothing.**
 
@@ -157,3 +157,138 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 - For slices that touch the live DB: preview (`mode=ro`) → fingerprint → backup (`O_EXCL`) → single txn → validate → rollback-able → reopen-RO verify; no `--force`.
 - Before any retirement / drop: grep-confirm no runtime/script reader remains.
 - Each slice: TDD + green offline gate + independent review (plus an independent re-check when touching the live DB).
+
+---
+
+## 12. Survey v1 evidence (2026-07-01)
+
+This section records the first concrete survey pass. It is intentionally scoped to
+evidence and ordering; it does not authorize any live schema change or code cutover.
+
+### 12.1 Local stores already present
+
+Read-only SQLite checks (`PRAGMA quick_check`) all passed:
+
+| Local DB | Relevant tables / counts | Survey conclusion |
+|---|---:|---|
+| `data/market_data.db` | `prices=2,312,165`, `news=377,650`, `news_articles=290,241`, `iv_history=24`, `fundamentals=130`, `news_legacy_migration_map=371,575`, `news_legacy_projection_map=43,603` | news-domain cutover is represented locally; prices are large enough to migrate; IV/fundamentals local rows are tiny legacy snapshots |
+| `data/sa_capture.db` | `sa_articles=394`, `sa_market_news=21,747`, `sa_alpha_picks=111` | SA data is local; PG `sa_*` should be treated as a drop-orphan candidate after reader grep |
+| `data/profile_state.db` | `agent_queries=2`, `research_reports=2`, `agent_memories=1`, plus `scheduler_state`, `data_provider_config`, research thread tables | app-records already have a local app-state home; future app-state should not go into `market_data.db` |
+| `data/macro_calendar.db` | `macro_*` / `cal_*` tables present | macro/cal likely already have a local authority; confirm no PG authority remains before drop |
+
+### 12.2 Runtime couplings that are still real
+
+The `scripts/` retirement rule in §5 is not optional hygiene. Current runtime still
+uses `scripts/` in these ways:
+
+- Polygon/Finnhub news: `src/news_providers.py` and `src/service/data_scheduler.py`
+  still lazily import `scripts.collection.collect_polygon_news` and
+  `scripts.collection.collect_finnhub_news`.
+- IBKR news: N8a's normalized worker is launched as
+  `scripts/collection/collect_ibkr_news_normalized.py`, even though the real logic
+  lives in `src/news_normalized/ibkr_runtime.py`.
+- IBKR prices and IV: scheduler subprocesses still target
+  `scripts/collection/collect_ibkr_prices.py` and `scripts/collection/collect_iv_history.py`.
+- PG sync: `scripts/migrate_to_supabase.py` remains the domain sync target for
+  unfinished domains (`--prices`, `--iv`, `--fundamentals`, and opt-in `--scores`).
+- `scripts/collection/daily_update.py` remains a parallel CLI runtime path and writes
+  `daily_update.*` job aliases that scheduler state still recognizes.
+
+Therefore "scripts retirement" must be a per-domain definition-of-done:
+
+1. extract runtime logic into a `src/<domain>/...` module,
+2. keep subprocess isolation where it is technically valuable,
+3. launch subprocesses with `python -m src.<domain>.<entrypoint>`, and
+4. leave `scripts/` only for one-shot migration/backfill tools until they are retired.
+
+### 12.3 Domain disposition after survey
+
+| Domain | Current survey finding | Disposition |
+|---|---|---|
+| News | hard-local reads and normalized local writes are live; PG news is no longer the app authority | N9 drop candidate after final reader grep; keep legacy local projection until N8b/N9 |
+| News scores | PG table and `migrate_to_supabase --scores` still exist, but local runtime code marks `news_scores` retired/deferred and score-dependent local reads do not fall back to PG | not a PG-exit blocker; treat as separate scoring/enrichment project or verified-dead PG drop, not part of IV/fundamentals work |
+| SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; a few health paths still use `job_runs` best-effort | PG `sa_*` is a likely orphan; grep-gate before drop; job telemetry belongs to app-state/ops, not SA market data |
+| Fundamentals | local table has only 130 stored snapshots; default analysis already does stored → SEC EDGAR → Financial Datasets; stored-only UI path can still PG-fallback unless strict | fast win: stop fundamentals mirror/sync, make stored path local-only with honest empty, rely on local financial cache + SEC/paid fallback |
+| IV | only 24 local rows; scheduler still routes `iv_history` through IBKR script → PG → mirror; tools/UI read local with PG fallback on miss | abandon old 24 rows as experimental; preserve capability via rebooted local schema + provider abstraction |
+| Prices | local table has 2.3M rows and price data is core | migrate/direct-local slice; do not refetch 2.3M by default |
+| Macro/cal | local `macro_calendar.db` exists | audit readers and PG tables; likely local authority already |
+| App state / ops | profile app-records are local, but `job_runs` remains PG-backed telemetry | decide `job_runs` home (`scheduler_state` / `profile_state.db` / new `ops.db`) separately from market data |
+
+### 12.4 Fundamentals survey
+
+The fundamentals direction is unchanged: refetch/cache, not PG migration.
+
+- SEC EDGAR is the primary free source for US public-company filings and extracted
+  XBRL; the SEC's developer guidance explicitly exposes data APIs and requires fair
+  access discipline, currently no more than 10 requests per second across machines.
+- Existing code already caches SEC-derived fundamentals into `financial_cache`, and
+  negative SEC misses are short-cached to avoid hammering uncovered tickers.
+- EODHD is a reasonable paid/global supplement candidate: its docs cover fundamentals
+  for stocks/ETFs/funds/indices across US and non-US exchanges, with broad historical
+  coverage and versioned fundamentals endpoint guidance.
+
+Slice implication: fundamentals should be a small PG-exit slice, not an N7-style
+migration. Required gates:
+
+1. set stored-only fundamentals reads to local-only under PG-exit (no PG fallback),
+2. preserve default `get_fundamentals_analysis` provider fallback,
+3. keep/verify SEC User-Agent + backoff/rate limit,
+4. scan active universe for non-US / EDGAR-uncovered symbols,
+5. optionally pre-warm active-universe fundamentals into local `financial_cache`, and
+6. retire `migrate_to_supabase --fundamentals` only after the local-only smoke passes.
+
+### 12.5 IV provider survey
+
+The IV decision is not "keep old rows vs drop old rows"; the old rows are too small
+and stale to matter. The real decision is how to build a forward research-grade IV
+dataset without making IBKR rate limits the backbone.
+
+| Provider | What official docs indicate | Fit for ArkScope |
+|---|---|---|
+| IBKR TWS/Gateway | `reqContractDetails` can enumerate option chains but complete chains are throttled and not recommended for all strikes/rights/expiries; `reqSecDefOptParams` improves chain definition discovery but returns expirations/strikes, not all market quotes. Greeks/IV arrive through option market data subscriptions and tick computations. | Good for a small-scope computed-IV prototype and live cross-checks; poor as the 148-ticker daily backbone |
+| Polygon / Massive Options | chain snapshot endpoint returns chain-level pricing details, greeks, IV, quotes/trades, open interest, and underlying asset data; historical quotes endpoint provides bid/ask records with precise timestamps but is plan-gated. | Best raw/bulk-style candidate if plan/history access is acceptable; supports own computation from raw snapshots |
+| Alpha Vantage | realtime US options can return full chains; `require_greeks=true` enables greeks/IV; historical options accept dates back to 2008-01-01 and can return a whole chain or a contract. | Strong cheap/accessible candidate for historical chain backfill; needs payload/time semantics verification before choosing |
+| EODHD / Unicorn options | marketplace product advertises US options EOD + historical data for 6,000+ symbols, two-year history, bid/ask/trade, volume, OI, IV (`volatility`), greeks, theoretical, DTE, midpoint. | Cheap EOD-history candidate; likely better for daily research snapshots than intraday raw reconstruction |
+| Tradier | chain endpoint is per underlying + expiration and can include greeks/IV courtesy of ORATS. | Useful live broker-style source; less suitable as the historical raw backbone unless account terms fit |
+| ORATS | API focuses on volatility summarizations, smoothed parameterized curves, derived IV/earnings/volatility metrics, live/1-minute/snapshot APIs. | Excellent reference/specialist data; not the backbone if ArkScope wants to own derived IV computation |
+
+Survey recommendation:
+
+- **Backbone preference:** buy/access raw or near-raw chain/quote/OI snapshots and compute
+  ArkScope metrics from retained inputs.
+- **IBKR role:** keep as bounded prototype/cross-check, not full-universe daily collector.
+- **Pre-derived role:** ORATS/vendor surfaces are reference/enrichment, not the canonical
+  research dataset unless a future product decision explicitly chooses vendor-derived IV.
+- **Next IV slice output:** a provider proof packet, not production code: sample payload
+  fields, timestamp semantics, history depth, cost/rate constraints, and whether the same
+  raw snapshot is sufficient to recompute ATM IV / term structure / VRP.
+
+### 12.6 IV reboot schema implications
+
+The reboot schema should be designed before choosing the provider. It must support both
+IBKR prototype and bulk provider backends:
+
+- raw snapshot table: provider, snapshot_at, underlying price, contract identity, strike,
+  expiry, call/put, bid/ask/last/mid, bid/ask sizes, volume, OI, quote/trade timestamps,
+  provider greeks/IV if supplied, rate/dividend assumptions if available, raw payload
+  hash/ref, and confidence inputs such as spread and `num_quotes`;
+- derived metrics table: deterministic ArkScope outputs (`atm_iv`, term buckets, VRP,
+  event-vol fields), `iv_method_version`, source snapshot id(s), selection rule, and
+  confidence;
+- status table: attempted/no-data/error/not-attempted per ticker/date/provider, so gaps
+  are visible and never silently interpolated.
+
+### 12.7 Immediate slice recommendation
+
+Do not wait for the IV provider survey to do fundamentals or the scripts demonstrator.
+Recommended next order:
+
+1. **S-A1 scripts demonstrator:** repoint N8a IBKR news worker from
+   `scripts/collection/collect_ibkr_news_normalized.py` to `python -m src.news_normalized...`.
+   This proves the retirement rule without changing behavior.
+2. **S-B fundamentals refetch/cache:** local-only stored reads + provider fallback retained.
+3. **S-C IV provider proof packet:** compare Polygon/Massive, Alpha Vantage, EODHD,
+   Tradier, ORATS, and IBKR against the raw-retain/versioned-derive contract.
+4. **S-D IV schema design:** provider-neutral schema and status model.
+5. **S-E IV IBKR prototype:** small scope only (10-30 tickers), fixed snapshot time,
+   no gap-fill, honest failures.
