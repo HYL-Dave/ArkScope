@@ -4,7 +4,7 @@
 
 **Goal:** Remove the fundamentals domain's runtime PostgreSQL dependency by retiring the frozen `fundamentals` mirror table as an authority, serving read-only stored fundamentals from local `financial_cache`, and stopping fundamentals from the PG mirror/update path.
 
-**Architecture:** The old `fundamentals` table becomes a legacy orphan for N9 drop; S-B must not migrate or refresh it. The read-only `/fundamentals/{ticker}?stored=true` path reads only positive local SEC cache rows from `financial_cache` and returns honest empty when no cache exists; the default analysis path still performs SEC EDGAR / Financial Datasets fallback and writes local cache. Scheduler and market-data update routes stop requesting the `fundamentals` mirror domain after news PG exit, while prices and IV remain unchanged.
+**Architecture:** The old `fundamentals` table becomes a legacy orphan for N9 drop; S-B must not migrate or refresh it. The read-only `/fundamentals/{ticker}?stored=true` path reads only positive local SEC annual-analysis cache rows from `financial_cache` and returns honest empty when no such cache exists; live audit shows this cache is currently cold for annual fundamentals, so this behavior is intentional and must be documented. The default analysis path still performs SEC EDGAR / Financial Datasets fallback and writes the same local cache key. Scheduler and market-data update routes stop requesting the `fundamentals` mirror domain after news PG exit, while prices and IV remain unchanged.
 
 **Tech Stack:** Python 3, FastAPI route functions, SQLite local `market_data.db`, existing `LocalMarketDatabaseBackend`, existing `financial_cache`, pytest, existing scheduler and market-data status routes.
 
@@ -18,7 +18,7 @@ The authoritative future for fundamentals is:
 
 1. `get_fundamentals_analysis()` may fetch SEC EDGAR / Financial Datasets on demand.
 2. Successful SEC analysis writes a local `financial_cache` row keyed as `fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`.
-3. `/fundamentals/{ticker}?stored=true` reads that local cache row only.
+3. `/fundamentals/{ticker}?stored=true` reads that local cache row only. Existing `metrics_{TICKER}_annual_y2` rows are detailed-metrics cache payloads, not `FundamentalsResult` payloads, and are intentionally not adapted in S-B.
 4. The frozen `fundamentals` table remains physically present until N9, but S-B code must stop treating it as current data.
 
 ## File Map
@@ -26,6 +26,7 @@ The authoritative future for fundamentals is:
 - Create: `src/fundamentals/cache.py`
   - Owns cache-key construction and local-only reads of cached `FundamentalsResult` payloads.
   - Avoids `LocalMarketDatabaseBackend.get_financial_cache()` because that method can still PG-fallback for generic cache migration.
+  - The helper delegates expiry semantics to the local SQLite cache reader; `SqliteBackend.get_financial_cache()` already filters `expires_at`.
 - Create: `tests/test_fundamentals_cache.py`
   - Pins cache-key shape, local-only read behavior, negative-cache handling, stale payload handling, and "do not call PG fallback" behavior.
 - Modify: `src/tools/analysis_tools.py`
@@ -312,15 +313,74 @@ def test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback(monkeypatc
     assert dal._backend.pg_calls == []
 ```
 
+Append this second regression test to prove cache misses still write through the shared key and do not lose `_sec_key`:
+
+```python
+def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.schemas import FundamentalsResult
+
+    class _Backend:
+        def __init__(self):
+            self.store = {}
+            self.set_calls = []
+        def get_financial_cache(self, cache_key):
+            return self.store.get(cache_key)
+        def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+            self.set_calls.append((cache_key, ticker, ttl_days, source, data))
+            self.store[cache_key] = data
+            return True
+
+    class _DAL:
+        def __init__(self):
+            self._backend = _Backend()
+        def get_fundamentals(self, ticker):
+            return FundamentalsResult(ticker=ticker.upper())
+
+    class _FakeSEC:
+        def get_income_statement(self, ticker, years=2, period="annual"):
+            return [type("Statement", (), {"report_period": "2025-12-31"})()]
+        def get_balance_sheet(self, ticker, years=1, period="annual"):
+            return []
+        def get_cash_flow_statement(self, ticker, years=2, period="annual"):
+            return []
+
+    import data_sources.sec_edgar_financials as sec_mod
+    monkeypatch.setattr(sec_mod, "SECEdgarFinancials", lambda: _FakeSEC())
+    monkeypatch.setattr(at, "_is_fd_enabled", lambda dal: False)
+    monkeypatch.setattr(
+        at,
+        "_build_result_from_statements",
+        lambda t, src, i, b, c: FundamentalsResult(
+            ticker=t.upper(),
+            data_source=src,
+            snapshot_date="2025-12-31",
+            roe=0.44,
+        ),
+    )
+
+    dal = _DAL()
+    result = at.get_fundamentals_analysis(dal, "AAPL")
+
+    expected_key = fundamentals_analysis_cache_key("AAPL", "annual")
+    assert result.data_source == "sec_edgar"
+    assert result.roe == 0.44
+    assert dal._backend.set_calls
+    assert dal._backend.set_calls[0][:4] == (expected_key, "AAPL", 90, "sec_edgar")
+    assert dal._backend.store[expected_key]["roe"] == 0.44
+```
+
 - [ ] **Step 2: Run the new test to verify it fails**
 
 Run:
 
 ```bash
-pytest tests/test_fundamentals_sec_cache.py::test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback -q
+pytest tests/test_fundamentals_sec_cache.py::test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback tests/test_fundamentals_sec_cache.py::test_sec_cache_miss_writes_with_shared_cache_key -q
 ```
 
-Expected: FAIL with `AssertionError: PG cache fallback must not be used for fundamentals`.
+Expected:
+- `test_sec_cache_hit_with_local_market_backend_does_not_pg_fallback` fails with `AssertionError: PG cache fallback must not be used for fundamentals`.
+- `test_sec_cache_miss_writes_with_shared_cache_key` may pass before the implementation because current code still defines `_sec_key`; after Step 3 it protects against the planned `_sec_key` deletion regression.
 
 - [ ] **Step 3: Update analysis_tools to use helper**
 
@@ -348,9 +408,13 @@ In `src/tools/analysis_tools.py`, replace the SEC cache-read block:
 with:
 
 ```python
-    from src.fundamentals.cache import read_cached_sec_fundamentals
+    from src.fundamentals.cache import (
+        fundamentals_analysis_cache_key,
+        read_cached_sec_fundamentals,
+    )
 
     _cache_be = getattr(dal, "_backend", None)
+    _sec_key = fundamentals_analysis_cache_key(ticker, period)
     cached_sec, _sec_negative_cached = read_cached_sec_fundamentals(
         _cache_be, ticker, period
     )
@@ -358,7 +422,7 @@ with:
         return cached_sec
 ```
 
-Leave the existing `set_financial_cache(...)` calls unchanged so successful SEC fetches still populate local cache.
+Leave the existing `set_financial_cache(...)` calls in place, but ensure they use the `_sec_key` defined by `fundamentals_analysis_cache_key(...)`. This makes the read key and write key one contract and prevents a cache-miss SEC fetch from raising `NameError`.
 
 - [ ] **Step 4: Run SEC cache tests**
 
@@ -593,9 +657,10 @@ Expected: FAIL because the route still calls `dal.get_fundamentals()`.
 In `src/api/routes/fundamentals.py`, change the `stored` description to:
 
 ```python
-        description="Stored-only: return ONLY the local fundamentals financial_cache "
-        "snapshot with NO external fetch and NO PG fallback. Default (false) runs "
-        "the full analysis (SEC EDGAR → Financial Datasets fallback).",
+        description="Stored-only: return ONLY a local SEC annual-analysis "
+        "financial_cache snapshot with NO external fetch and NO PG fallback. This "
+        "cache may be empty until the full analysis path has run for the ticker. "
+        "Default (false) runs the full analysis (SEC EDGAR → Financial Datasets fallback).",
 ```
 
 Add this import near the existing route imports:
@@ -638,7 +703,7 @@ with:
         return {**empty.model_dump(), "source_path": "none"}
 ```
 
-The empty result is constructed directly so `stored=true` cache misses do not touch the retired `fundamentals` table, do not enter the SEC/FD analysis path, and do not PG-fallback.
+The empty result is constructed directly so `stored=true` cache misses do not touch the retired `fundamentals` table, do not enter the SEC/FD analysis path, and do not PG-fallback. Do not adapt `metrics_{TICKER}_annual_y2` here; those rows are detailed metrics (`standard` / `tech`) and are not a `FundamentalsResult` cache contract.
 
 - [ ] **Step 4: Run API tests**
 
@@ -826,7 +891,7 @@ In `docs/design/PG_EXIT_REMAINDER_SCOPING.md`, update the fundamentals row in §
 to:
 
 ```markdown
-| Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC `financial_cache` rows and otherwise returns honest empty; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table is an N9 drop-orphan |
+| Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise returns honest empty; live cache may initially be cold; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table is an N9 drop-orphan |
 ```
 
 Update §12.4 gate 1 from:
@@ -877,7 +942,7 @@ git commit -m "docs: mark fundamentals PG exit complete"
 **Files:**
 - No code changes expected.
 
-- [ ] **Step 1: Audit old fundamentals table scope**
+- [ ] **Step 1: Audit old fundamentals table scope and financial_cache key distribution**
 
 Run:
 
@@ -892,13 +957,24 @@ try:
     rows = conn.execute(
         "SELECT ticker, MAX(snapshot_date) FROM fundamentals GROUP BY ticker ORDER BY ticker"
     ).fetchall()
-    print({"ticker_count": len(rows), "sample": rows[:10]})
+    print({"legacy_fundamentals_ticker_count": len(rows), "sample": rows[:10]})
+    checks = [
+        ("annual_analysis_v1", "cache_key LIKE 'fundamentals_analysis:sec_edgar:%:annual:v1'"),
+        ("any_sec_analysis_v1", "cache_key LIKE 'fundamentals_analysis:sec_edgar:%'"),
+        ("detailed_metrics_annual_y2", "cache_key LIKE 'metrics_%_annual_y2'"),
+        ("fd_balance", "cache_key LIKE 'balance_%'"),
+        ("fd_income", "cache_key LIKE 'income_%'"),
+        ("fd_cashflow", "cache_key LIKE 'cashflow_%'"),
+    ]
+    for label, where in checks:
+        count = conn.execute(f"SELECT COUNT(*) FROM financial_cache WHERE {where}").fetchone()[0]
+        print({label: count})
 finally:
     conn.close()
 PY
 ```
 
-Expected: read-only report of the frozen legacy table; no write, no schema change. Record the ticker count and sample in the final answer. This satisfies the S-B "non-US / uncovered symbols need awareness" gate at the level available without live SEC calls; any suspicious non-US/ADR tickers from the sample or full output should be noted for a later provider-coverage pass.
+Expected: read-only report; no write, no schema change. Record the legacy ticker count and cache-key counts in the final answer. If `annual_analysis_v1` is zero or near-zero, that is acceptable and should be reported as the intentional cold-cache baseline for `stored=true`. `detailed_metrics_annual_y2` rows are not a substitute for `FundamentalsResult` and must not be counted as stored-route hits.
 
 - [ ] **Step 2: Verify SEC User-Agent/cache contract remains intact**
 
@@ -925,11 +1001,12 @@ Expected: PASS.
 Run:
 
 ```bash
-rg -n '"prices", "iv", "fundamentals"|--fundamentals|fundamentals.*PG fallback|query_fundamentals\\(' src/service src/api src/tools tests | head -n 200
+rg -n '"prices", "iv", "fundamentals"|domains = None|--fundamentals|fundamentals.*PG fallback|query_fundamentals\\(' src/service src/api src/tools scripts tests | head -n 240
 ```
 
 Expected:
 - No `("prices", "iv", "fundamentals")` tuple remains in scheduler/API post-exit update code.
+- No post-news-exit runtime path uses `domains = None` in a way that expands to all mirror domains including fundamentals. If a historical pre-exit path still does, document why it is not active after N8a finalize.
 - `--fundamentals` may still appear in `scripts/migrate_to_supabase.py` and docs as a legacy/N9 target; that is acceptable until N9.
 - `query_fundamentals(` remains as an interface and low-level legacy table reader; LocalMarket backend must be retired/honest-empty.
 
