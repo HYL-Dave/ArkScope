@@ -312,22 +312,38 @@ class TestAnalysisEndpoint:
 # Fundamentals: stored-only mode must NOT trigger a provider fetch
 # ============================================================
 
-def test_fundamentals_stored_mode_no_provider_fetch(monkeypatch):
-    """`/fundamentals/{ticker}?stored=true` must read ONLY the stored snapshot via the
-    DAL and never enter the SEC/Financial-Datasets fetch chain (the read-only 數據 tab
-    depends on this). Default (stored=false) still runs the full analysis."""
+def test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch(monkeypatch):
+    """stored=true is read-only: it may read local financial_cache, but never enters
+    the SEC/Financial-Datasets fetch chain and never reads the retired mirror table."""
     from src.api.routes import fundamentals as fr
     from src.tools.schemas import FundamentalsResult
 
     calls = {"analysis": 0, "dal": 0}
 
+    class _Backend:
+        def __init__(self):
+            self.rows = {
+                "fundamentals_analysis:sec_edgar:AAPL:annual:v1":
+                    FundamentalsResult(
+                        ticker="AAPL",
+                        data_source="sec_edgar",
+                        snapshot_date="2025-12-31",
+                        roe=0.22,
+                    ).model_dump()
+            }
+
+        def get_financial_cache(self, cache_key):
+            return self.rows.get(cache_key)
+
     class _FakeDAL:
-        backend_type = "LocalMarketDatabaseBackend"  # for the source_path fallback
+        backend_type = "LocalMarketDatabaseBackend"
+
+        def __init__(self):
+            self._backend = _Backend()
 
         def get_fundamentals(self, ticker):
             calls["dal"] += 1
-            return FundamentalsResult(ticker=ticker.upper(), snapshot_date="2026-06-01",
-                                      market_cap=1.0, snapshot={"market_cap": 1.0})
+            raise AssertionError("stored=true must not read retired fundamentals table")
 
     def _spy_analysis(dal, ticker):
         calls["analysis"] += 1
@@ -336,12 +352,13 @@ def test_fundamentals_stored_mode_no_provider_fetch(monkeypatch):
     monkeypatch.setattr(fr, "get_fundamentals_analysis", _spy_analysis)
     dal = _FakeDAL()
 
-    # stored=true → DAL stored path only; the fetch-capable analysis is NEVER called
     out = fr.fundamentals("AAPL", stored=True, dal=dal)
-    assert calls["analysis"] == 0 and calls["dal"] == 1
-    assert out["data_source"] == "ibkr" and out["snapshot_date"] == "2026-06-01"
+    assert calls == {"analysis": 0, "dal": 0}
+    assert out["data_source"] == "sec_edgar"
+    assert out["snapshot_date"] == "2025-12-31"
+    assert out["roe"] == 0.22
+    assert out["source_path"] == "local_cache"
 
-    # default (stored=false) → full analysis path (provider fallback)
     out2 = fr.fundamentals("AAPL", stored=False, dal=dal)
     assert calls["analysis"] == 1
     assert out2["data_source"] == "sec_edgar"
@@ -395,23 +412,75 @@ def test_iv_history_source_path_mapping(monkeypatch):
 
 
 def test_fundamentals_stored_source_path_mapping(monkeypatch):
-    """/fundamentals/{ticker}?stored=true reports source_path the same way."""
+    """/fundamentals/{ticker}?stored=true reports local_cache or none."""
     from src.api.routes import fundamentals as fr
-    from src.tools.backends import provenance
     from src.tools.schemas import FundamentalsResult
 
-    class _DAL(_FakeDALBT):
-        def get_fundamentals(self, ticker):
-            return FundamentalsResult(ticker=ticker.upper(), snapshot_date="2026-06-01")
+    class _CachedDAL(_FakeDALBT):
+        def __init__(self):
+            super().__init__("LocalMarketDatabaseBackend")
+            self._backend = self
 
-    monkeypatch.setattr(provenance, "read", lambda d: "pg_fallback")
-    out = fr.fundamentals("AAPL", stored=True, dal=_DAL("LocalMarketDatabaseBackend"))
-    assert out["source_path"] == "pg_fallback"
+        def get_financial_cache(self, cache_key):
+            return FundamentalsResult(
+                ticker="AAPL",
+                data_source="sec_edgar",
+                snapshot_date="2025-12-31",
+            ).model_dump()
+
+    out = fr.fundamentals("AAPL", stored=True, dal=_CachedDAL())
+    assert out["source_path"] == "local_cache"
 
     class _EmptyDAL(_FakeDALBT):
-        def get_fundamentals(self, ticker):
-            return FundamentalsResult(ticker=ticker.upper())  # no snapshot_date
+        def __init__(self):
+            super().__init__("LocalMarketDatabaseBackend")
+            self._backend = self
 
-    monkeypatch.setattr(provenance, "read", lambda d: None)
-    out = fr.fundamentals("AAPL", stored=True, dal=_EmptyDAL("FileBackend"))
-    assert out["source_path"] == "none"  # empty → none regardless of backend type
+        def get_financial_cache(self, cache_key):
+            return None
+
+    out = fr.fundamentals("AAPL", stored=True, dal=_EmptyDAL())
+    assert out["source_path"] == "none"
+    assert out["data_source"] == "none"
+    assert out["snapshot_date"] is None
+
+
+def test_fundamentals_stored_expired_cache_is_honest_empty(tmp_path):
+    """/fundamentals/{ticker}?stored=true must respect financial_cache expiry.
+
+    SqliteBackend.get_financial_cache filters expires_at, so the route should see an
+    expired annual-analysis cache row as a miss and return honest empty rather than
+    serving stale fundamentals.
+    """
+    from src.api.routes import fundamentals as fr
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from src.tools.backends.sqlite_backend import SqliteBackend
+    from src.tools.schemas import FundamentalsResult
+
+    backend = SqliteBackend(str(tmp_path / "market_data.db"))
+    cache_key = fundamentals_analysis_cache_key("AAPL", "annual")
+    assert backend.set_financial_cache(
+        cache_key,
+        "AAPL",
+        FundamentalsResult(
+            ticker="AAPL",
+            data_source="sec_edgar",
+            snapshot_date="2025-12-31",
+            roe=0.99,
+        ).model_dump(),
+        source="sec_edgar",
+        fetched_at="2000-01-01T00:00:00+00:00",
+        expires_at="2000-01-02T00:00:00+00:00",
+    )
+
+    class _DAL(_FakeDALBT):
+        def __init__(self):
+            super().__init__("LocalMarketDatabaseBackend")
+            self._backend = backend
+
+    out = fr.fundamentals("AAPL", stored=True, dal=_DAL())
+
+    assert out["source_path"] == "none"
+    assert out["data_source"] == "none"
+    assert out["snapshot_date"] is None
+    assert out["roe"] is None
