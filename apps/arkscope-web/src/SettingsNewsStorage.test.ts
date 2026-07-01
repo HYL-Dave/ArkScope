@@ -99,5 +99,6 @@ describe("SettingsView news storage copy", () => {
 
     expect(host.textContent).toContain("已退出（不可回退到 PG）");
     expect(host.textContent).not.toContain("ARKSCOPE_USE_LOCAL_NEWS");
+    expect(host.textContent).not.toContain("IBKR news 暫時仍使用 collector");
   });
 });

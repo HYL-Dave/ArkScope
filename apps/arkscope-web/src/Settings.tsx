@@ -137,7 +137,7 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "news_storage",
     title: "News Ingestion",
-    description: "Polygon／Finnhub 直接寫入本地 SQLite；可明確回退 PG 鏡像路徑。",
+    description: "新聞寫入路由、PostgreSQL exit 狀態與 direct telemetry。",
     enabled: true,
   },
   {
@@ -835,9 +835,8 @@ function NewsStorageSection() {
         <div>
           <h2>新聞直寫本地 · News Ingestion</h2>
           <p className="muted tiny">
-            Polygon／Finnhub 排程預設直接寫入 market_data.db，略過 Parquet、PG sync 與本地鏡像。
-            關閉可立即回退舊路徑。IBKR news 暫時仍使用 collector → PG → mirror，因此這個開關不會停用
-            mirror 的 news domain。
+            新聞排程在 PG exit 前可走 direct-local；PG exit 完成後，Polygon／Finnhub／IBKR
+            寫入 normalized SQLite，並投影到 legacy local 讀取面直到 N8b 完成。不再經 news PG sync／mirror。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
