@@ -16,10 +16,11 @@ Sources v1:
   - local_incremental                 — app-native PG → local market_data.db delta
     (market_data_admin.incremental_update)
 
-After a collector succeeds, its data is synced to PG (migrate_to_supabase
---news/--prices/--iv, serialized behind a global sync lock — concurrent syncs are
-idempotent but wasteful), then the local mirror refreshes (incremental_update,
-skip-if-busy). So one scheduled source run = collect → PG → local, end to end.
+After a non-news collector succeeds, its data is synced to PG
+(migrate_to_supabase --prices/--iv, serialized behind a global sync lock —
+concurrent syncs are idempotent but wasteful), then the local mirror refreshes
+(incremental_update, skip-if-busy). News is post-N8a PG-exited: provider fetches
+write normalized SQLite and project the legacy local read surface directly.
 
 Write-contention guarantees (the user's explicit SQLite concern):
   - collectors write per-source Parquet dirs — disjoint, safe in parallel;
@@ -113,21 +114,21 @@ SOURCES: Dict[str, SourceDef] = {
             None, "--news",
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
-            description="Polygon news incremental（進程內）→ PG → local mirror",
+            description="Polygon news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
             None, "--news",
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
-            description="Finnhub news incremental（進程內）→ PG → local mirror",
+            description="Finnhub news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
             "ibkr_news", "IBKR 新聞",
             ["collect_ibkr_news.py", "--incremental"], "--news", ibkr=True,
             needs_price_scope=True, default_interval_min=120,
             news_direct_source="ibkr",
-            description="IBKR news incremental (Gateway) → PG → local mirror",
+            description="IBKR news incremental (Gateway) → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",

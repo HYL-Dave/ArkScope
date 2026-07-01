@@ -1301,8 +1301,8 @@ export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_
   return sendJSON("/market-data/settings", "PUT", { enabled });
 }
 
-// Polygon/Finnhub direct-local news ingest. Explicit OFF restores the legacy
-// collector -> PG sync -> local mirror chain; IBKR news remains on that chain.
+// News direct-local ingest. After news PG exit, polygon/finnhub/ibkr write
+// normalized SQLite and project the legacy local read surface; PG fallback is closed.
 export function getNewsStatus(): Promise<NewsStatus> {
   return getJSON<NewsStatus>("/news/status");
 }
@@ -1544,8 +1544,8 @@ export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
 
 // --- per-source data-collection schedule (3e-D; app-owned, no cron) ---
 // All sources are DISABLED by default; enabling one makes the sidecar collect on its
-// own interval (most sources: PG sync → local-mirror refresh; news with use_local_news
-// ON writes the local DB directly, skipping PG/mirror). Run-now is fire-and-return;
+// own interval (non-news mirror domains still use PG sync → local refresh; news is
+// normalized-local after PG exit). Run-now is fire-and-return;
 // poll getSchedule() for the per-source running flag and the job_runs row
 // (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.
 

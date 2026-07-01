@@ -1544,6 +1544,10 @@ def test_get_schedule_snapshot_shape():
     p = out["polygon_news"]
     assert p["enabled"] is False and p["running"] is False
     assert p["provider_fetch"] is True and p["job_name"] == "collect.polygon_news"
+    for name in ("polygon_news", "finnhub_news", "ibkr_news"):
+        assert "PG → local mirror" not in out[name]["description"]
+        assert "normalized SQLite" in out[name]["description"]
+        assert "no news PG sync/mirror" in out[name]["description"]
     assert out["local_incremental"]["provider_fetch"] is False
     assert out["ibkr_prices"]["ibkr"] is True
 
