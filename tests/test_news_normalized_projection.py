@@ -445,6 +445,167 @@ def test_adopts_same_source_duplicate_legacy_row_already_mapped_to_other_article
     assert map_rows[0]["legacy_news_id"] == legacy_id
 
 
+def test_does_not_backproject_reviewed_rejected_legacy_rows(store, conn):
+    title = "Reviewed weak identity headline"
+    article_id = store.upsert(
+        article(
+            provider_id="ibkr-reviewed-rejected-match",
+            title=title,
+            source="ibkr",
+            url="https://ibkr.example.test/rejected-match",
+            publisher="IBKR",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T20:39:00Z",
+            raw_body="Body for a row whose legacy side was reviewed-rejected.",
+        )
+    ).article_id
+    legacy_hash = canonical_article_hash("AAPL", title, "2026-06-30T20:39:00+0000")
+    conn.execute(
+        "INSERT INTO news "
+        "(id,ticker,title,description,url,publisher,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            12345,
+            "AAPL",
+            title,
+            "reviewed rejected legacy row",
+            "https://legacy.example.test/rejected",
+            "IBKR",
+            "ibkr",
+            "2026-06-30T20:39:00+0000",
+            legacy_hash,
+        ),
+    )
+    conn.execute(
+        "INSERT INTO news_normalization_runs "
+        "(id,policy_version,input_fingerprint,resolved_fingerprint,"
+        "rejection_evidence_fingerprint,counts_json,backup_path,applied_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (
+            99,
+            "test",
+            "input",
+            "resolved-rejected",
+            "rejection",
+            "{}",
+            "backup.db",
+            "2026-06-29T13:00:00Z",
+        ),
+    )
+    conn.execute(
+        "INSERT INTO news_legacy_migration_map "
+        "(legacy_news_id,article_id,resolution_kind,rejection_reason,"
+        "migration_run_id,migration_fingerprint) VALUES (?,?,?,?,?,?)",
+        (
+            12345,
+            None,
+            "weak_identity_rejected",
+            "multiple metadata-compatible provider articles",
+            99,
+            "resolved-rejected",
+        ),
+    )
+
+    result = project_article_uncommitted(conn, article_id)
+
+    assert result.inserted == 0
+    assert result.updated == 0
+    assert conn.execute("SELECT COUNT(*) FROM news_legacy_projection_map").fetchone()[0] == 0
+    assert conn.execute("SELECT description FROM news WHERE id=12345").fetchone()[0] == (
+        "reviewed rejected legacy row"
+    )
+
+
+def test_does_not_adopt_legacy_rows_migrated_to_another_article(store, conn):
+    title = "Migrated owner headline"
+    original_article_id = store.upsert(
+        article(
+            provider_id="ibkr-migrated-owner",
+            title=title,
+            source="ibkr",
+            url="https://ibkr.example.test/original-owner",
+            publisher="IBKR",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T13:00:00Z",
+            raw_body="The original N7 owner body.",
+        )
+    ).article_id
+    duplicate_article_id = store.upsert(
+        article(
+            provider_id="ibkr-migrated-duplicate",
+            title=title,
+            source="ibkr",
+            url="https://ibkr.example.test/duplicate-owner",
+            publisher="IBKR",
+            primary_ticker="AAPL",
+            related_tickers=(),
+            published_at="2026-06-30T20:39:00Z",
+            raw_body="A later provider ID with the same legacy hash.",
+        )
+    ).article_id
+    legacy_hash = canonical_article_hash("AAPL", title, "2026-06-30T13:00:00+0000")
+    conn.execute(
+        "INSERT INTO news "
+        "(id,ticker,title,description,url,publisher,source,published_at,article_hash) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            22345,
+            "AAPL",
+            title,
+            "original migrated legacy row",
+            "https://legacy.example.test/original-owner",
+            "IBKR",
+            "ibkr",
+            "2026-06-30T13:00:00+0000",
+            legacy_hash,
+        ),
+    )
+    conn.execute(
+        "INSERT INTO news_normalization_runs "
+        "(id,policy_version,input_fingerprint,resolved_fingerprint,"
+        "rejection_evidence_fingerprint,counts_json,backup_path,applied_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (
+            100,
+            "test",
+            "input",
+            "resolved-owner",
+            "rejection",
+            "{}",
+            "backup.db",
+            "2026-06-29T13:00:00Z",
+        ),
+    )
+    conn.execute(
+        "INSERT INTO news_legacy_migration_map "
+        "(legacy_news_id,article_id,resolution_kind,rejection_reason,"
+        "migration_run_id,migration_fingerprint) VALUES (?,?,?,?,?,?)",
+        (
+            22345,
+            original_article_id,
+            "fallback_matched",
+            None,
+            100,
+            "resolved-owner",
+        ),
+    )
+
+    result = project_article_uncommitted(conn, duplicate_article_id)
+
+    assert result.inserted == 0
+    assert result.updated == 0
+    assert conn.execute("SELECT COUNT(*) FROM news_legacy_projection_map").fetchone()[0] == 0
+    row = conn.execute(
+        "SELECT description,published_at FROM news WHERE id=22345"
+    ).fetchone()
+    assert tuple(row) == (
+        "original migrated legacy row",
+        "2026-06-30T13:00:00+0000",
+    )
+
+
 @pytest.mark.parametrize(
     ("candidate", "ticker"),
     [

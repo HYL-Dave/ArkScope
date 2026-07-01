@@ -179,6 +179,25 @@ def _mapped_owner(
     return (int(row[0]), str(row[1])) if row else None
 
 
+def _migration_owner(conn: sqlite3.Connection, legacy_id: int) -> int | None:
+    row = conn.execute(
+        "SELECT article_id FROM news_legacy_migration_map WHERE legacy_news_id=?",
+        (legacy_id,),
+    ).fetchone()
+    if row is None or row[0] is None:
+        return None
+    return int(row[0])
+
+
+def _migration_rejected(conn: sqlite3.Connection, legacy_id: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM news_legacy_migration_map "
+        "WHERE legacy_news_id=? AND article_id IS NULL",
+        (legacy_id,),
+    ).fetchone()
+    return row is not None
+
+
 def _update_mapped_row(
     conn: sqlite3.Connection, legacy_id: int, row: dict[str, Any]
 ) -> bool:
@@ -210,6 +229,11 @@ def _adopt_existing_row(
             "canonical legacy hash is owned by incompatible ticker/source"
         )
     legacy_id = int(existing["id"])
+    if _migration_rejected(conn, legacy_id):
+        return False
+    migration_owner = _migration_owner(conn, legacy_id)
+    if migration_owner is not None and migration_owner != article_id:
+        return False
     owner = _mapped_owner(conn, legacy_id)
     if existing["source"] != row["source"]:
         # Legacy news rows are unique by ticker/title/date hash, not by source. If
