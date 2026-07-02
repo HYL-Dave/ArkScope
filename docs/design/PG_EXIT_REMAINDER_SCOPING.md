@@ -313,7 +313,7 @@ Recommendation after S-C:
 - In parallel, run a small **proof-packet data collection** script/notebook outside the
   runtime path. It must be read-only with respect to ArkScope DBs and must not add new
   `.env` authority; any provider key selected for continued use goes straight into
-  FieldDefs / DB-managed config per S-J.
+  FieldDefs / DB-managed config per S-J. Plan: `docs/design/IV_PROVIDER_PROOF_PACKET_PLAN.md`.
 
 ### 12.6 IV reboot schema implications
 
