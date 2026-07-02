@@ -15,15 +15,16 @@
 
 ### Current operating map (post-pivot, locked 2026-07-02)
 
-The detailed P0/P1/P2/P3 sections below are retained as historical provenance for
-already-landed foundation work. The active resolver for "what next?" is now:
+The detailed P0/P1/P2/P3 sections (§2–§5) and the pre-pivot dependency graph /
+sequencing sections (§8–§9) are retained as historical provenance for already-landed
+foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
 | **P0-A** | **Layer C-1 SA evidence feed** | **Next implementation line.** Spec is locked at `SA_EVIDENCE_FEED_C1_SPEC.md`; open the implementation plan before code. | Direct user-visible workbench value; turns existing SA/news evidence into a daily research surface. |
-| **P0-B** | **PG-exit completion, small slices** | **Parallel / immediately after C-1:** S-G scorer cutover first, then S-H orphan/app-state audit and N9-safe drops as their reader checks pass. | Completes the product goal that app runtime is local-store authority, not PG-backed. S-G is small enough not to block C-1. |
-| **P0-C** | **Prices migration** | **Separate large slice.** Do not hide it inside C-1/S-G work. | 2.25M-row core market-data domain; too large and high-blast-radius for "while we are here" treatment. |
-| **P0-D** | **Provider config authority Phase 2** | Wait for S-J Phase 0-1 soak: Settings should show no managed fields still sourced from `config/.env`. Then flip strict-by-default behind the documented rollback lever. | Supports zip-and-go portability and avoids silent `.env` authority in the desktop runtime. |
+| **P0-B** | **PG-exit completion, small slices** | **Parallel / immediately after C-1:** S-G scorer cutover first, then S-H orphan/app-state audit and N9-safe drops as their reader checks pass. Detail authority: `PG_EXIT_REMAINDER_SCOPING.md` §6. | Completes the product goal that app runtime is local-store authority, not PG-backed. S-G is small enough not to block C-1. |
+| **P0-C** | **Prices migration** | **Separate large slice.** Do not hide it inside C-1/S-G work. Detail authority: `PG_EXIT_REMAINDER_SCOPING.md` §6. | 2.25M-row core market-data domain; too large and high-blast-radius for "while we are here" treatment. |
+| **P0-D** | **Provider config authority Phase 2** | Soak gate already satisfied on the primary machine (`PG_EXIT_REMAINDER_SCOPING.md` §13.6, 2026-07-02); schedule when convenient — flip strict-by-default behind the documented rollback lever. | Supports zip-and-go portability and avoids silent `.env` authority in the desktop runtime. |
 | **P1** | **IV proof packet Task 1 only** | Optional cleanup: names-only cost/key authorization audit, then stop at sign-off. Paid sampling default = **DEFER**. | IV is PG-exit design insurance, not an active product line; no current consumer justifies paid data or S-D/S-E implementation yet. |
 | **P1** | **Publication / backup hygiene** | Push/bundle/review publication when convenient; master has many local-only commits. | Operational risk reduction, not product scope. |
 | **Gated** | **IV S-D/S-E / paid options data** | Blocked until written hypothesis + OOS plan + kill criteria + cost-vs-value. | Research subscription rule applies; no consumer and no hypothesis today. |
