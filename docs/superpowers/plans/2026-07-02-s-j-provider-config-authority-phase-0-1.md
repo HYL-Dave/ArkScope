@@ -26,7 +26,9 @@ This plan implements §13 Phase 0-1 only:
 Create:
 
 - `src/provider_config_runtime.py` — process-local setup-only state and route/scheduler guard.
+- `data_sources/sec_user_agent.py` — one canonical SEC User-Agent resolver used by every SEC data-source client.
 - `tests/test_provider_config_startup.py` — lifespan/setup-only and route guard tests.
+- `tests/test_sec_user_agent.py` — canonical SEC UA regression tests across the SEC clients.
 - `apps/arkscope-web/src/SettingsProviderConfig.test.ts` — Settings provider-config provenance/import/guard tests.
 
 Modify:
@@ -39,6 +41,11 @@ Modify:
 - `src/api/app.py` — startup setup-only behavior and scheduler suppression on config-store failure.
 - `src/api/routes/health.py` — expose provider-config setup state in `/status`.
 - `src/service/provider_health.py` — update key-source comments and expose import-needed provenance without changing status vocabulary.
+- `data_sources/sec_edgar_financials.py` — delegate SEC UA resolution to the shared helper.
+- `data_sources/sec_edgar_source.py` — read canonical `ARKSCOPE_SEC_USER_AGENT` through the shared helper.
+- `data_sources/sec_filings.py` — read canonical `ARKSCOPE_SEC_USER_AGENT` through the shared helper.
+- `data_sources/sec_earnings_releases.py` — read canonical `ARKSCOPE_SEC_USER_AGENT` through the shared helper.
+- `data_sources/sec_insider_trades.py` — read canonical `ARKSCOPE_SEC_USER_AGENT` through the shared helper.
 - `tests/test_data_provider_config.py` — FieldDef/default/import/guard/route tests.
 - `tests/test_provider_health.py` — provenance warning tests.
 - `tests/test_data_scheduler.py` — setup-only run_source guard.
@@ -52,6 +59,18 @@ Modify:
 
 **Files:**
 - Modify: `docs/design/PG_EXIT_REMAINDER_SCOPING.md`
+
+- [ ] **Step 0: Record the implementation base SHA**
+
+Run:
+
+```bash
+git rev-parse --short HEAD > /tmp/s-j-provider-config-base-sha.txt
+cat /tmp/s-j-provider-config-base-sha.txt
+```
+
+Expected: prints the pre-implementation commit. Task 7 uses this instead of a
+hard-coded `HEAD~N` range.
 
 - [ ] **Step 1: Re-run the audit grep and save output for review**
 
@@ -111,13 +130,79 @@ git commit -m "docs: record provider config authority audit"
 
 ---
 
-### Task 2: FieldDef Metadata, SEC UA, and IBKR Default
+### Task 2: SEC UA Canonicalization, FieldDef Metadata, and IBKR Default
 
 **Files:**
+- Create: `data_sources/sec_user_agent.py`
+- Create: `tests/test_sec_user_agent.py`
 - Modify: `src/data_provider_config.py`
+- Modify: `src/api/routes/providers_config.py`
+- Modify: `data_sources/sec_edgar_financials.py`
+- Modify: `data_sources/sec_edgar_source.py`
+- Modify: `data_sources/sec_filings.py`
+- Modify: `data_sources/sec_earnings_releases.py`
+- Modify: `data_sources/sec_insider_trades.py`
 - Modify: `tests/test_data_provider_config.py`
 
-- [ ] **Step 1: Write failing tests for SEC UA FieldDef and IBKR default seeding**
+- [ ] **Step 1: Write failing tests for canonical SEC UA consumers**
+
+Create `tests/test_sec_user_agent.py`:
+
+```python
+from __future__ import annotations
+
+
+def _clear_sec_env(monkeypatch):
+    for name in ("ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_sec_user_agent_prefers_canonical_var(monkeypatch):
+    from data_sources.sec_user_agent import get_sec_user_agent
+
+    _clear_sec_env(monkeypatch)
+    monkeypatch.setenv("ARKSCOPE_SEC_USER_AGENT", "ArkScope ops@arkscope.test")
+    monkeypatch.setenv("SEC_CONTACT_EMAIL", "legacy@old.test")
+
+    assert get_sec_user_agent() == "ArkScope ops@arkscope.test"
+
+
+def test_sec_user_agent_preserves_legacy_contact_email(monkeypatch):
+    from data_sources.sec_user_agent import get_sec_user_agent
+
+    _clear_sec_env(monkeypatch)
+    monkeypatch.setenv("SEC_CONTACT_EMAIL", "legacy@old.test")
+
+    assert get_sec_user_agent() == "ArkScope legacy@old.test"
+
+
+def test_sec_user_agent_preserves_legacy_raw_user_agent(monkeypatch):
+    from data_sources.sec_user_agent import get_sec_user_agent
+
+    _clear_sec_env(monkeypatch)
+    monkeypatch.setenv("SEC_USER_AGENT", "LegacyRawUA contact@example.com")
+
+    assert get_sec_user_agent() == "LegacyRawUA contact@example.com"
+
+
+def test_sec_clients_use_canonical_user_agent(monkeypatch):
+    _clear_sec_env(monkeypatch)
+    monkeypatch.setenv("ARKSCOPE_SEC_USER_AGENT", "ArkScope ops@arkscope.test")
+
+    from data_sources.sec_edgar_source import SECEdgarDataSource
+    import data_sources.sec_filings as filings
+    import data_sources.sec_earnings_releases as earnings
+    import data_sources.sec_insider_trades as insider
+    import data_sources.sec_edgar_financials as financials
+
+    assert SECEdgarDataSource().user_agent == "ArkScope ops@arkscope.test"
+    assert filings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
+    assert earnings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
+    assert insider._get_sec_user_agent() == "ArkScope ops@arkscope.test"
+    assert financials._get_sec_user_agent() == "ArkScope ops@arkscope.test"
+```
+
+- [ ] **Step 2: Write failing tests for SEC UA FieldDef, default availability, and IBKR default seeding**
 
 Append to `tests/test_data_provider_config.py`:
 
@@ -128,7 +213,17 @@ def test_sec_edgar_user_agent_field_defined():
     f = fields["user_agent"]
     assert f.env_var == "ARKSCOPE_SEC_USER_AGENT"
     assert f.secret is False
+    assert f.optional is True
     assert f.import_aliases == ("SEC_CONTACT_EMAIL", "SEC_USER_AGENT")
+
+
+def test_sec_edgar_user_agent_optional_keeps_provider_default_available(store):
+    from src.api.routes import providers_config as pc
+
+    view = pc.providers_config(store=store)["providers"]
+    assert view["sec_edgar"]["default_available"] is True
+    row = next(f for f in view["sec_edgar"]["fields"] if f["field"] == "user_agent")
+    assert row["effective_source"] == "missing"
 
 
 def test_apply_env_seeds_ibkr_client_id_default(store):
@@ -146,17 +241,86 @@ Update the `hermetic` fixture env cleanup tuple to include:
 "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT"
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [ ] **Step 3: Run tests and verify they fail**
 
 Run:
 
 ```bash
-pytest tests/test_data_provider_config.py::test_sec_edgar_user_agent_field_defined tests/test_data_provider_config.py::test_apply_env_seeds_ibkr_client_id_default -q
+pytest \
+  tests/test_sec_user_agent.py \
+  tests/test_data_provider_config.py::test_sec_edgar_user_agent_field_defined \
+  tests/test_data_provider_config.py::test_sec_edgar_user_agent_optional_keeps_provider_default_available \
+  tests/test_data_provider_config.py::test_apply_env_seeds_ibkr_client_id_default \
+  -q
 ```
 
-Expected: both fail because `sec_edgar` has no fields and `apply_env()` does not seed defaults.
+Expected: fail because `data_sources.sec_user_agent` does not exist, `sec_edgar` has no fields, and `apply_env()` does not seed defaults.
 
-- [ ] **Step 3: Extend FieldDef and registry**
+- [ ] **Step 4: Add the shared SEC UA helper**
+
+Create `data_sources/sec_user_agent.py`:
+
+```python
+"""Shared SEC EDGAR User-Agent resolver.
+
+Every SEC client must use this helper so the app-managed
+ARKSCOPE_SEC_USER_AGENT FieldDef actually reaches all SEC request paths.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SEC_USER_AGENT = "ArkScope research@example.com"
+
+
+def get_sec_user_agent() -> str:
+    canonical = os.environ.get("ARKSCOPE_SEC_USER_AGENT", "").strip()
+    if canonical:
+        return canonical
+    contact = os.environ.get("SEC_CONTACT_EMAIL", "").strip()
+    if contact:
+        return contact if contact.startswith("ArkScope ") else f"ArkScope {contact}"
+    legacy = os.environ.get("SEC_USER_AGENT", "").strip()
+    if legacy:
+        return legacy
+    logger.warning(
+        "No SEC User-Agent set — using placeholder (SEC may rate-limit/reject). "
+        "Set ARKSCOPE_SEC_USER_AGENT (e.g. 'ArkScope you@example.com') in Settings."
+    )
+    return DEFAULT_SEC_USER_AGENT
+```
+
+In these files, replace their local SEC UA logic with the helper:
+
+- `data_sources/sec_edgar_financials.py`
+- `data_sources/sec_edgar_source.py`
+- `data_sources/sec_filings.py`
+- `data_sources/sec_earnings_releases.py`
+- `data_sources/sec_insider_trades.py`
+
+For files that expose `_get_sec_user_agent()` for tests or callers, keep that function as a thin wrapper:
+
+```python
+from .sec_user_agent import get_sec_user_agent
+
+
+def _get_sec_user_agent() -> str:
+    return get_sec_user_agent()
+```
+
+For `SECEdgarDataSource.__init__`, replace the `SEC_CONTACT_EMAIL` / `SEC_USER_AGENT` block with:
+
+```python
+from .sec_user_agent import get_sec_user_agent
+...
+self.user_agent = user_agent or get_sec_user_agent()
+```
+
+- [ ] **Step 5: Extend FieldDef and registry**
 
 In `src/data_provider_config.py`, replace `FieldDef` with:
 
@@ -169,6 +333,7 @@ class FieldDef:
     label: str
     default_value: str | None = None
     defaulted: bool = False
+    optional: bool = False
     guarded: bool = False
     guard_reason: str | None = None
     import_aliases: tuple[str, ...] = ()
@@ -201,12 +366,39 @@ Change `sec_edgar` from an empty list to:
         "ARKSCOPE_SEC_USER_AGENT",
         False,
         "SEC User-Agent",
+        optional=True,
         import_aliases=("SEC_CONTACT_EMAIL", "SEC_USER_AGENT"),
     )
 ],
 ```
 
-- [ ] **Step 4: Add default seeding on the store**
+- [ ] **Step 6: Add default-availability helper and route use**
+
+Add below `_FIELD_BY_KEY` in `src/data_provider_config.py`:
+
+```python
+def provider_default_available(provider: str) -> bool:
+    defs = PROVIDER_FIELDS.get(provider)
+    if defs is None:
+        return False
+    return provider != "seeking_alpha" and all(f.optional for f in defs)
+```
+
+In `src/api/routes/providers_config.py`, import `provider_default_available` and replace both copies of:
+
+```python
+"default_available": not fields and provider != "seeking_alpha",
+```
+
+with:
+
+```python
+"default_available": provider_default_available(provider),
+```
+
+This keeps `sec_edgar` default-available after adding the optional UA field.
+
+- [ ] **Step 7: Add default seeding on the store**
 
 Add to `DataProviderConfigStore`:
 
@@ -249,7 +441,12 @@ At the start of `apply_env(store)`, before `ensure_env_loaded()`, add:
     store.seed_defaults()
 ```
 
-- [ ] **Step 5: Add import helper primitives**
+Conscious side effects: app startup and the normalized IBKR worker may now issue
+an idempotent `INSERT OR IGNORE` into `profile_state.db` before loading `.env`.
+If the store is unavailable, this raises before `.env` is loaded, which is
+intentional fail-closed behavior for S-J.
+
+- [ ] **Step 8: Add import helper primitives**
 
 Add below `mask_value`:
 
@@ -275,20 +472,42 @@ def guarded_change_detail(provider: str, field: str, fdef: FieldDef) -> dict[str
     }
 ```
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 9: Update existing route validation expectation**
+
+Because `sec_edgar` now has an optional configurable `user_agent`, update the old validation assertion:
+
+```python
+with pytest.raises(HTTPException) as e:
+    pc.put_provider_config("sec_edgar", pc.ProviderConfigUpdate(fields={"api_key": "x"}), store=store)
+assert e.value.status_code == 400
+```
+
+Do not expect `put_provider_config("sec_edgar", fields={})` to fail because "no configurable fields"; the provider now has one optional field.
+
+- [ ] **Step 10: Run tests**
 
 Run:
 
 ```bash
-pytest tests/test_data_provider_config.py -q
+pytest tests/test_sec_user_agent.py tests/test_data_provider_config.py -q
 ```
 
-Expected: all tests in the file pass after updating any `sec_edgar has no configurable fields` assertion in Task 3.
+Expected: pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add src/data_provider_config.py tests/test_data_provider_config.py
+git add \
+  data_sources/sec_user_agent.py \
+  data_sources/sec_edgar_financials.py \
+  data_sources/sec_edgar_source.py \
+  data_sources/sec_filings.py \
+  data_sources/sec_earnings_releases.py \
+  data_sources/sec_insider_trades.py \
+  src/data_provider_config.py \
+  src/api/routes/providers_config.py \
+  tests/test_sec_user_agent.py \
+  tests/test_data_provider_config.py
 git commit -m "feat: add provider config defaults and import metadata"
 ```
 
@@ -410,6 +629,7 @@ from src.data_provider_config import (
     importable_env_vars,
     mask_value,
     normalize_import_value,
+    provider_default_available,
     run_connection_test,
     unapply_env,
 )
@@ -431,7 +651,7 @@ class ProviderConfigImportEnv(BaseModel):
 
 - [ ] **Step 4: Make `_view` expose import metadata**
 
-Inside `_view`, call `store.seed_defaults()` before reading stored values. Replace the row construction with:
+Do not call `store.seed_defaults()` in `_view`; GET must stay read-only. Replace the row construction with:
 
 ```python
             source = effective_source(f.env_var)
@@ -759,18 +979,27 @@ Add to returned dict:
 
 - [ ] **Step 6: Make providers-config GET safe when store construction fails**
 
-In `src/api/routes/providers_config.py`, add:
+In `src/api/routes/providers_config.py`, add a lenient FastAPI dependency:
 
 ```python
-def _empty_view_with_setup(reason: str) -> dict:
-    from src.provider_config_runtime import mark_provider_config_setup_required, provider_config_setup_state
+def get_data_provider_store_lenient() -> DataProviderConfigStore | None:
+    try:
+        return get_data_provider_store()
+    except Exception as e:  # noqa: BLE001
+        from src.provider_config_runtime import mark_provider_config_setup_required
 
-    mark_provider_config_setup_required(reason)
+        mark_provider_config_setup_required(str(e))
+        return None
+
+
+def _empty_view_with_setup() -> dict:
+    from src.provider_config_runtime import provider_config_setup_state
+
     providers = {
         provider: {
             "fields": [],
             "testable": provider in _TESTABLE,
-            "default_available": not fields and provider != "seeking_alpha",
+            "default_available": provider_default_available(provider),
         }
         for provider, fields in PROVIDER_FIELDS.items()
     }
@@ -785,20 +1014,33 @@ Change `_view` to include setup state:
     return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
 ```
 
-Change `providers_config` signature from dependency injection to:
+Change `providers_config` to use that dependency:
 
 ```python
 @router.get("/providers/config")
-def providers_config(store: DataProviderConfigStore | None = None):
+def providers_config(
+    store: DataProviderConfigStore | None = Depends(get_data_provider_store_lenient),
+):
     if store is None:
-        try:
-            store = get_data_provider_store()
-        except Exception as e:  # noqa: BLE001
-            return _empty_view_with_setup(str(e))
+        return _empty_view_with_setup()
     return _view(store)
 ```
 
-Keep tests that call `providers_config(store=store)` working.
+This keeps FastAPI route registration valid. Tests that call
+`providers_config(store=store)` still work because dependencies are resolved
+only for HTTP requests.
+
+In `put_provider_config` and `import_provider_config_field`, after a successful
+`apply_env(store)`, add:
+
+```python
+    from src.provider_config_runtime import clear_provider_config_setup_required
+    clear_provider_config_setup_required()
+```
+
+This gives the setup-only latch a symmetric recovery path: once a Settings save
+or import can reach `profile_state.db` and apply config, provider work is allowed
+again without requiring a sidecar restart.
 
 - [ ] **Step 7: Guard provider test and run-now**
 
@@ -821,7 +1063,7 @@ At the start of `run_source` in `src/service/data_scheduler.py`, after unknown-s
 ```python
     from src.provider_config_runtime import provider_config_setup_state
     setup_state = provider_config_setup_state()
-    if setup_state.required and trigger_source in ("api", "scheduler"):
+    if setup_state.required:
         return _record_result({
             "source": source,
             "status": "failed",
@@ -1354,6 +1596,7 @@ Run:
 
 ```bash
 pytest \
+  tests/test_sec_user_agent.py \
   tests/test_data_provider_config.py \
   tests/test_provider_config_startup.py \
   tests/test_provider_health.py \
@@ -1384,17 +1627,24 @@ rg -n "keys live in config/.env|優先序：環境變數 ＞ App 設定 ＞ conf
 
 Expected: no stale data-provider UI copy remains in `src/api/routes/providers_config.py`, `src/service/provider_health.py`, or `apps/arkscope-web/src/Settings.tsx`. It is acceptable for retiring `scripts/`, old tests, or legacy SEC modules not touched by this slice to remain; those should be listed in the Phase 0 audit table.
 
-- [ ] **Step 5: Verify docs-only plus intended source paths**
+- [ ] **Step 5: Verify intended source paths**
 
 Run:
 
 ```bash
-git diff --name-only HEAD~7..HEAD
+BASE_SHA=$(cat /tmp/s-j-provider-config-base-sha.txt)
+git diff --name-only "$BASE_SHA"..HEAD
 ```
 
 Expected paths are limited to:
 
 ```text
+data_sources/sec_user_agent.py
+data_sources/sec_edgar_financials.py
+data_sources/sec_edgar_source.py
+data_sources/sec_filings.py
+data_sources/sec_earnings_releases.py
+data_sources/sec_insider_trades.py
 docs/design/PG_EXIT_REMAINDER_SCOPING.md
 src/data_provider_config.py
 src/provider_config_runtime.py
@@ -1405,6 +1655,7 @@ src/api/routes/schedule.py
 src/service/data_scheduler.py
 src/service/provider_health.py
 tests/test_data_provider_config.py
+tests/test_sec_user_agent.py
 tests/test_provider_config_startup.py
 tests/test_data_scheduler.py
 tests/test_provider_health.py
