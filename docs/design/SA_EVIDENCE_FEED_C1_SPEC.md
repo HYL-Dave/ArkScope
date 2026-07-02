@@ -1,6 +1,6 @@
 # Layer C-1 — SA Evidence Feed + News-surface SA filter
 
-> **Status:** PLAN LOCKED 2026-06-14 (gpt-5.5 + user refined). Execute in ONE clean round (not at the tail of a long session — the cut spans backend query shape, News UI, and a shared agent primitive).
+> **Status:** IMPLEMENTED / RECONCILED 2026-07-03. The locked plan was already executed in master before the 2026-07-02 priority-map refresh: `b3ebd21` backend+route+agent tool, `a71d317` backend verification follow-ups, `3d717d6` News surface, `61982e3` hardening, `1abf3e9` / `52df08b` snippet cleanup. Focused verification on 2026-07-03: `tests/test_sa_feed.py` = 14 passed. No new implementation plan is needed.
 > **Scope:** a SA evidence feed/search endpoint + agent tool, and a Seeking Alpha source/filter inside the EXISTING News (新聞·事件) surface. NOT a new page.
 > **Predecessors:** SA hard cutover (SA_CUTOVER_3D_RUNBOOK) + follow-up #1 (comment-signal port Layer A, get_sa_comment_focus Layer B, v1.2 stopwords) — all done.
 
