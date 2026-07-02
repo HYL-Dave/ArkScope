@@ -35,6 +35,8 @@ from typing import List, Optional
 
 import pandas as pd
 
+from src.news_normalized.scores import latest_score_cte, normalize_score_model
+
 logger = logging.getLogger(__name__)
 
 _PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
@@ -176,8 +178,16 @@ class SqliteBackend:
           - a specific ``model`` is meaningless locally (no per-model scores) → empty;
           - ``risk_score``/``scored_model`` stay NULL (retired)."""
         empty = pd.DataFrame(columns=_NEWS_COLS)
+        if self._news_score_tables_available():
+            return self._query_news_with_normalized_scores(
+                ticker=ticker,
+                days=days,
+                source=source,
+                scored_only=scored_only,
+                model=model,
+            )
         if model:
-            return empty  # per-model scoring retired locally
+            return empty  # per-model scoring absent locally
         has_sent = self._news_has_column("sentiment_score")
         if scored_only and not has_sent:
             return empty  # no local sentiment column yet → nothing scored to serve
@@ -253,6 +263,78 @@ class SqliteBackend:
         except Exception:
             return False
 
+    def _news_score_tables_available(self) -> bool:
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return False
+        try:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            return (
+                "news_article_scores" in tables
+                and (
+                    "news_legacy_migration_map" in tables
+                    or "news_legacy_projection_map" in tables
+                )
+            )
+        except sqlite3.OperationalError:
+            return False
+        finally:
+            conn.close()
+
+    def _score_ctes(self, model: Optional[str] = None) -> str:
+        normalized_model = normalize_score_model(model) if model else None
+        return (
+            "WITH article_bridge AS ("
+            "SELECT n.id AS legacy_news_id, COALESCE(m.article_id, p.article_id) AS article_id "
+            "FROM news n "
+            "LEFT JOIN news_legacy_migration_map m ON m.legacy_news_id = n.id "
+            "LEFT JOIN news_legacy_projection_map p ON p.legacy_news_id = n.id"
+            "), "
+            + latest_score_cte("sentiment", alias="latest_sentiment", model=normalized_model)
+            + ", "
+            + latest_score_cte("risk", alias="latest_risk", model=normalized_model)
+        )
+
+    def _query_news_with_normalized_scores(
+        self,
+        *,
+        ticker: Optional[str],
+        days: int,
+        source: str,
+        scored_only: bool,
+        model: Optional[str],
+    ) -> pd.DataFrame:
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conds, params = ["n.published_at >= ?"], [cutoff]
+        if ticker:
+            conds.append("n.ticker = ?")
+            params.append(self._canon(ticker))
+        if source != "auto":
+            conds.append("n.source = ?")
+            params.append(source)
+        if scored_only or model:
+            conds.append("(latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL)")
+        sql = (
+            f"{self._score_ctes(model)} "
+            "SELECT substr(n.published_at, 1, 10) AS date, n.ticker AS ticker, "
+            "n.title AS title, n.source AS source, n.url AS url, n.publisher AS publisher, "
+            "latest_sentiment.score AS sentiment_score, latest_risk.score AS risk_score, "
+            "COALESCE(latest_sentiment.model, latest_risk.model) AS scored_model, "
+            "n.description AS description "
+            "FROM news n "
+            "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
+            "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
+            "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id "
+            f"WHERE {' AND '.join(conds)} ORDER BY n.published_at DESC"
+        )
+        return self._news_df(sql, params, _NEWS_COLS)
+
     def query_news_search(self, query: str = "", ticker: Optional[str] = None, days: int = 30,
                           limit: int = 20, scored_only: bool = True) -> pd.DataFrame:
         """Local full-text news search via SQLite FTS5 (bm25 ranking), with a LIKE
@@ -263,6 +345,10 @@ class SqliteBackend:
         column is absent/unpopulated — an HONEST empty, NOT a PG fallback trigger). Same
         contract as ``query_news``; ``risk_score`` stays NULL (retired)."""
         empty = pd.DataFrame(columns=_NEWS_SEARCH_COLS)
+        if self._news_score_tables_available():
+            return self._query_news_search_with_normalized_scores(
+                query=query, ticker=ticker, days=days, limit=limit, scored_only=scored_only
+            )
         has_sent = self._news_has_column("sentiment_score")
         if scored_only and not has_sent:
             return empty  # no local sentiment column yet → nothing scored to serve
@@ -294,6 +380,58 @@ class SqliteBackend:
             params.append(limit)
         return self._news_df(sql, params, _NEWS_SEARCH_COLS)
 
+    def _query_news_search_with_normalized_scores(
+        self,
+        *,
+        query: str,
+        ticker: Optional[str],
+        days: int,
+        limit: int,
+        scored_only: bool,
+    ) -> pd.DataFrame:
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        cols = (
+            "substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
+            "n.publisher, latest_sentiment.score AS sentiment_score, "
+            "latest_risk.score AS risk_score, n.description"
+        )
+        q = (query or "").strip()
+        conds, params = ["n.published_at >= ?"], [cutoff]
+        if scored_only:
+            conds.append("(latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL)")
+        if ticker:
+            conds.append("n.ticker = ?")
+            params.append(self._canon(ticker))
+        if len(q) >= 3:
+            match = self._fts_match(q)
+            base_from = (
+                "news_fts f JOIN news n ON n.id = f.rowid "
+                "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
+                "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
+                "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id"
+            )
+            conds.insert(0, "news_fts MATCH ?")
+            params.insert(0, match)
+            order = "bm25(news_fts), n.published_at DESC"
+        else:
+            base_from = (
+                "news n "
+                "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
+                "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
+                "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id"
+            )
+            if q:
+                conds.append("(n.title LIKE ? OR n.description LIKE ?)")
+                params += [f"%{q}%", f"%{q}%"]
+            order = "n.published_at DESC"
+        sql = (
+            f"{self._score_ctes()} "
+            f"SELECT {cols} FROM {base_from} WHERE {' AND '.join(conds)} "
+            f"ORDER BY {order} LIMIT ?"
+        )
+        params.append(limit)
+        return self._news_df(sql, params, _NEWS_SEARCH_COLS)
+
     def query_news_stats(self, ticker: Optional[str] = None, days: int = 30) -> pd.DataFrame:
         """Local news statistics for the scout tool — counts, date range, and (when the
         local news table carries it) 1-5 ``sentiment_score`` aggregates.
@@ -302,6 +440,8 @@ class SqliteBackend:
         local ``sentiment_score`` column exists, scored_count / avg_sentiment / bullish
         (>=4) / bearish (<=2) aggregate it; a pre-sentiment DB falls back to 0/NULL. ``risk``
         is fully retired → always NULL. No PG."""
+        if self._news_score_tables_available():
+            return self._query_news_stats_with_normalized_scores(ticker=ticker, days=days)
         has_sent = self._news_has_column("sentiment_score")
         if has_sent:
             scored_count = "SUM(CASE WHEN sentiment_score IS NOT NULL THEN 1 ELSE 0 END)"
@@ -323,6 +463,34 @@ class SqliteBackend:
             f"{bullish} AS bullish_count, {bearish} AS bearish_count "
             f"FROM news WHERE {' AND '.join(conds)} "
             "GROUP BY ticker ORDER BY article_count DESC"
+        )
+        return self._news_df(sql, params, _NEWS_STATS_COLS)
+
+    def _query_news_stats_with_normalized_scores(
+        self, *, ticker: Optional[str], days: int
+    ) -> pd.DataFrame:
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        conds, params = ["n.published_at >= ?"], [cutoff]
+        if ticker:
+            conds.append("n.ticker = ?")
+            params.append(self._canon(ticker))
+        sql = (
+            f"{self._score_ctes()} "
+            "SELECT n.ticker AS ticker, COUNT(*) AS article_count, "
+            "SUM(CASE WHEN latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL "
+            "THEN 1 ELSE 0 END) AS scored_count, "
+            "substr(MIN(n.published_at), 1, 10) AS earliest_date, "
+            "substr(MAX(n.published_at), 1, 10) AS latest_date, "
+            "AVG(latest_sentiment.score) AS avg_sentiment, "
+            "AVG(latest_risk.score) AS avg_risk, "
+            "SUM(CASE WHEN latest_sentiment.score >= 4 THEN 1 ELSE 0 END) AS bullish_count, "
+            "SUM(CASE WHEN latest_sentiment.score <= 2 THEN 1 ELSE 0 END) AS bearish_count "
+            "FROM news n "
+            "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
+            "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
+            "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id "
+            f"WHERE {' AND '.join(conds)} "
+            "GROUP BY n.ticker ORDER BY article_count DESC"
         )
         return self._news_df(sql, params, _NEWS_STATS_COLS)
 

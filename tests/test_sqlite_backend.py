@@ -12,6 +12,7 @@ import pytest
 from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.backends.sqlite_backend import SqliteBackend
 from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+from src.news_normalized.schema import ensure_news_normalized_schema
 
 _COLS = ["datetime", "open", "high", "low", "close", "volume"]
 
@@ -206,6 +207,108 @@ def test_query_news_scored_no_pg_fallback(market_db, monkeypatch):
     assert hit == []                                             # specific model also score-dep → no PG
     b.query_news(ticker="ZZZZ", scored_only=False)               # unscored local miss → transition fallback
     assert hit == ["PG"]
+
+
+def _news_db_with_normalized_scores(tmp_path):
+    db = tmp_path / "scores.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE news (id INTEGER PRIMARY KEY, ticker TEXT NOT NULL, title TEXT NOT NULL, "
+        "description TEXT, url TEXT, publisher TEXT, source TEXT NOT NULL, published_at TEXT NOT NULL, "
+        "article_hash TEXT);"
+        "CREATE VIRTUAL TABLE news_fts USING fts5(title, description, content='news', "
+        "content_rowid='id', tokenize='porter unicode61');"
+    )
+    ensure_news_normalized_schema(conn)
+    pub = f"{date.today().isoformat()}T00:00:00+0000"
+    conn.executemany(
+        "INSERT INTO news VALUES (?,?,?,?,?,?,?,?,?)",
+        [
+            (1, "AAPL", "Apple scored historical", "earnings", "u1", "p", "ibkr", pub, "h1"),
+            (2, "AAPL", "Apple projection risk", "supply", "u2", "p", "ibkr", pub, "h2"),
+            (3, "AAPL", "Apple unscored", "services", "u3", "p", "ibkr", pub, "h3"),
+        ],
+    )
+    conn.execute("INSERT INTO news_fts(news_fts) VALUES('rebuild')")
+    conn.executemany(
+        "INSERT INTO news_articles "
+        "(id,source,canonical_title,published_at,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+        [
+            (101, "ibkr", "Apple scored historical", pub, "now", "now"),
+            (102, "ibkr", "Apple projection risk", pub, "now", "now"),
+            (103, "ibkr", "Apple unscored", pub, "now", "now"),
+        ],
+    )
+    conn.execute(
+        "INSERT INTO news_normalization_runs "
+        "(id,policy_version,input_fingerprint,resolved_fingerprint,"
+        "rejection_evidence_fingerprint,counts_json,backup_path,applied_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (1, "test", "input", "resolved", "reject", "{}", "backup.db", "now"),
+    )
+    conn.execute(
+        "INSERT INTO news_legacy_migration_map "
+        "(legacy_news_id,article_id,resolution_kind,migration_run_id,migration_fingerprint) "
+        "VALUES (?,?,?,?,?)",
+        (1, 101, "mapped", 1, "resolved"),
+    )
+    conn.execute(
+        "INSERT INTO news_legacy_projection_map "
+        "(article_id,ticker,legacy_news_id,projected_at) VALUES (?,?,?,?)",
+        (102, "AAPL", 2, "now"),
+    )
+    conn.executemany(
+        "INSERT INTO news_article_scores "
+        "(article_id,score_type,model,reasoning_effort,score,scored_at,created_at,updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        [
+            (101, "sentiment", "gpt_5_2", "high", 4.0, "2026-07-01T00:00:00Z", "now", "now"),
+            (101, "risk", "gpt_5_2", "high", 2.0, "2026-07-01T00:00:00Z", "now", "now"),
+            (102, "risk", "o4_mini", "", 1.5, "2026-07-01T00:00:00Z", "now", "now"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+    return db
+
+
+def test_query_news_surfaces_normalized_scores_from_both_legacy_maps(tmp_path):
+    db = _news_db_with_normalized_scores(tmp_path)
+
+    scored = SqliteBackend(db).query_news(ticker="AAPL", scored_only=True)
+
+    assert len(scored) == 2
+    by_title = {row["title"]: row for _, row in scored.iterrows()}
+    historical = by_title["Apple scored historical"]
+    projection = by_title["Apple projection risk"]
+    assert float(historical["sentiment_score"]) == 4.0
+    assert float(historical["risk_score"]) == 2.0
+    assert historical["scored_model"] == "gpt_5_2"
+    assert pd.isna(projection["sentiment_score"])
+    assert float(projection["risk_score"]) == 1.5
+    assert projection["scored_model"] == "o4_mini"
+
+
+def test_query_news_model_filter_uses_normalized_model_name(tmp_path):
+    db = _news_db_with_normalized_scores(tmp_path)
+
+    scored = SqliteBackend(db).query_news(ticker="AAPL", scored_only=False, model="gpt-5.2")
+
+    assert list(scored["title"]) == ["Apple scored historical"]
+    assert scored.iloc[0]["scored_model"] == "gpt_5_2"
+
+
+def test_query_news_unscored_mode_keeps_unscored_rows_with_score_columns(tmp_path):
+    db = _news_db_with_normalized_scores(tmp_path)
+
+    all_rows = SqliteBackend(db).query_news(ticker="AAPL", scored_only=False)
+
+    assert len(all_rows) == 3
+    assert set(all_rows["title"]) == {
+        "Apple scored historical",
+        "Apple projection risk",
+        "Apple unscored",
+    }
 
 
 def test_query_news_search_fts5(market_db):
@@ -811,6 +914,28 @@ def test_query_news_search_surfaces_local_sentiment(tmp_path):
     scored = b.query_news_search(query="Apple", scored_only=True)
     assert len(scored) == 1 and float(scored.iloc[0]["sentiment_score"]) == 5.0  # only the scored hit
     assert b.query_news_search(query="Apple", scored_only=False).shape[0] == 2   # all hits
+
+
+def test_query_news_search_surfaces_normalized_scores(tmp_path):
+    db = _news_db_with_normalized_scores(tmp_path)
+
+    scored = SqliteBackend(db).query_news_search(query="Apple", scored_only=True)
+
+    assert len(scored) == 2
+    assert scored["risk_score"].notna().sum() == 2
+
+
+def test_query_news_stats_aggregates_normalized_scores(tmp_path):
+    db = _news_db_with_normalized_scores(tmp_path)
+
+    row = SqliteBackend(db).query_news_stats(ticker="AAPL").iloc[0]
+
+    assert row["article_count"] == 3
+    assert row["scored_count"] == 2
+    assert row["avg_sentiment"] == 4.0
+    assert row["avg_risk"] == 1.75
+    assert row["bullish_count"] == 1
+    assert row["bearish_count"] == 0
 
 
 def test_query_news_stats_aggregates_local_sentiment(tmp_path):
