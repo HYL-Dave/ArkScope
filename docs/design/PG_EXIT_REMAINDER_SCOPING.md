@@ -115,6 +115,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 7. **S-G | scorer (news_scores) cutover** — place near N8b reads.
 8. **S-H | orphan/audit + app-state relocation** — drop-orphan PG `news`/`sa_*` (confirm no reader first); decide app-state homes; audit macro/cal.
 9. **S-I | N9 real drop** (§8).
+10. **S-J | provider-config authority hardening (DB-first, fail-closed)** — orthogonal to the domain slices (provider *config*, not market data). Kill the two silent `config/.env` fallbacks (per-field overlay + whole-store startup degrade), surface per-field provenance with an explicit import affordance, then flip strict-by-default behind a tri-state. Contract in §13. **Phase 0–1 must land before S-E** so new IV provider keys are DB-native from day one.
 
 ---
 
@@ -147,7 +148,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-G (scorer), S-H (orphan/app-state audit).
+- **Independent:** S-G (scorer), S-H (orphan/app-state audit), S-J (provider-config hardening — but its Phase 0–1 must land before S-E, §13.6).
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---
@@ -307,3 +308,122 @@ Recommended next order:
 3. **S-D IV schema design:** provider-neutral schema and status model.
 4. **S-E IV IBKR prototype:** small scope only (10-30 tickers), fixed snapshot time,
    no gap-fill, honest failures.
+
+---
+
+## 13. Provider-config authority hardening design contract (core of S-J) — DRAFT for review
+
+**Problem.** The desktop premise is DB-first, but provider config today is
+"DB-overlays-.env". `apply_env` (`src/data_provider_config.py:162`) first loads
+`config/.env` (`env_keys.ensure_env_loaded()`), then overwrites per-field with
+app-stored values. Two silent-fallback modes result:
+
+- **per-field:** a managed field with no DB row silently serves the `config/.env`
+  value — no prompt, no provenance shown at the point of use;
+- **whole-store:** sidecar startup wraps `apply_env` in try/except-warning
+  (`src/api/app.py:43`) — an unreadable profile DB silently degrades the whole
+  process tree to pure-.env mode.
+
+Both violate the desktop model (DB required; missing config = visible
+"not configured", never a silent substitute). The **real shell env > app**
+precedence is a deliberate operator escape hatch and does **not** change.
+
+**Why convergence is cheap.** `.env` ingestion has a single choke point
+(`src/env_keys.py`: `ensure_env_loaded` / `keys_loaded_from_file` /
+`reload_var_from_file`); per-var provenance already exists
+(`effective_source()` → `app | env | config/.env | missing`); the sidecar is the
+parent of every collector subprocess, so one injection covers the tree; the S-A1
+worker already applies DB config explicitly
+(`src/news_normalized/ibkr_cli.py:125`).
+
+### 13.1 Consumer classes (hardening applies to the first class only)
+
+| Class | Examples | Rule |
+|---|---|---|
+| sidecar process tree | FastAPI app, scheduler, collector subprocesses | DB-first, fail-closed; provider keys enter ONLY via `apply_env` |
+| spawned workers (standalone-capable) | `python -m src.news_normalized.ibkr_cli` | must call `apply_env(DataProviderConfigStore())` at startup (S-A1 precedent) |
+| CLI + `scripts/` (retiring) | `src/agents/cli.py::_load_env()`, `scripts/*` | no investment; legacy `.env` behavior until retirement |
+
+**Out of scope:** LLM credentials (auth-driver/token-store thread — deliberately a
+different design); `DATABASE_URL`/PG DSN (`src/tools/data_access.py:381` — it IS
+the PG-exit retirement target; stays .env-transitional until PG-exit completes);
+OS keyring (existing backlog item); unit tests (they keep fake backends —
+fail-closed is a runtime policy, not a test-fixture requirement).
+
+### 13.2 Phase 0 — audit (output = a classification table appended here)
+
+Inventory every provider env var and classify:
+
+- **managed** (already in FieldDefs): `POLYGON_API_KEY`, `FINNHUB_API_KEY`,
+  `FRED_API_KEY`, `FINANCIAL_DATASETS_API_KEY`, `IBKR_HOST` / `IBKR_PORT` /
+  `IBKR_CLIENT_ID`;
+- **.env-only gap** (known: `SEC_CONTACT_EMAIL` / `ARKSCOPE_SEC_USER_AGENT` (UA
+  contract); audit for others, e.g. EODHD / Alpha Vantage if S-C selects one,
+  Discord ops token) → each gap is either promoted to FieldDefs or explicitly
+  recorded as stays-.env-with-reason;
+- **retiring consumer** (CLI/scripts) → listed, not fixed.
+
+Grep surface: `_load_env|load_dotenv|config/\.env|os\.environ` (provider-key
+reads) + FieldDefs registry. Read-only; no code change in Phase 0.
+
+### 13.3 Phase 1 — visibility + hard startup (no default-behavior flip yet)
+
+1. **Startup fail-closed:** unreadable profile DB at sidecar startup → startup
+   fails into a needs-setup state (replace the `app.py:43` warn-and-continue).
+   A desktop app whose premise is the DB must not boot in a shadow .env mode.
+2. **Provenance surfaced:** status/Settings show `effective_source` per managed
+   field; `config/.env` renders as "from config/.env — import suggested" with a
+   per-field one-click import (Settings PUT exists; the 2026-06-27 .env→DB
+   migration was one-shot, so this adds a first-class import affordance).
+3. **FieldDefs growth:** promote `SEC_CONTACT_EMAIL` (+ UA var) to managed.
+4. **New-provider rule (effective immediately):** any provider added from now on
+   (e.g. the S-F IV bulk backend) is DB-native only — no `.env` fallback is ever
+   added for new keys.
+
+### 13.4 Phase 2 — strict default (tri-state, news-S3.2 pattern)
+
+- New setting `provider_env_fallback` (profile setting + env override),
+  tri-state: **unset → strict** — managed fields read DB-injected values only; a
+  missing field is a structured `not_configured` (provider-health status, honest
+  route/tool errors, Settings 未設定 badge), never a silent `.env` read.
+  Explicit `true` → legacy per-field fallback (migration/rescue). Explicit
+  `false` → strict, pinned.
+- Rollback = explicit `true`, mirroring the news S3.2 default-ON tri-state
+  discipline (default is the new world; the old world needs an explicit flag).
+- `config/.env` thereafter = import/export + migration material; real shell env
+  remains the operator escape hatch (precedence unchanged).
+
+### 13.5 Gates / tests
+
+- strict + DB value present → the file loader is not consulted for that var
+  (assert via `keys_loaded_from_file` bookkeeping / monkeypatched loader).
+- strict + missing → structured `not_configured` at all three surfaces
+  (provider-health, API route, agent tool) — no exception, no silent empty.
+- explicit `true` → legacy fallback restored (rollback path proven).
+- unreadable profile DB → startup needs-setup failure (lifespan test).
+- worker entrypoints apply DB config before provider construction (extend the
+  S-A1 worker tests).
+- §11 generic gate applies; the only persistent-state growth is additive
+  FieldDefs rows in `profile_state.db` (no live market-DB step in this slice).
+
+### 13.6 Sequencing
+
+- Does not block S-C (survey is doc work; run in parallel).
+- **Phase 0–1 land before S-E**, so the IV prototype's provider wiring is born
+  DB-first and never grows a `.env` dependency.
+- Phase 2 flips only after Phase 1 has soaked: Settings shows no remaining
+  "from config/.env" managed fields on the primary machine (or each is a
+  conscious keep), then default-strict is turned on.
+
+### 13.7 Open points (decide at review)
+
+1. **Strict scope:** strict applies to FieldDefs-managed vars only; `.env` stays
+   live for unmanaged vars until each is promoted or its consumer retires — OK,
+   or should strict also warn on any unmanaged provider-key read?
+2. **`not_configured` shape:** reuse the provider-health status vocabulary, or a
+   new structured error code shared by route + tool surfaces?
+3. **Import affordance:** per-field only, or also a bulk "import all from .env"
+   action (bulk is convenient but re-blesses .env as a source; leaning per-field)?
+4. **`IBKR_CLIENT_ID`:** deliberately skipped in the 2026-06-27 migration —
+   stays env/real-env-only, or becomes managed with a change-guard (client_id
+   changes are operationally sensitive)?
