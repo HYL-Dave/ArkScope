@@ -108,7 +108,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 1. **S-A | scripts/ retirement rule + coupling baseline** — §4/§5 landed as a contract; S-A1 converted the IBKR news worker runtime boundary to `python -m src.news_normalized.ibkr_cli`. Remaining S-A work applies the same definition-of-done per domain.
 2. **S-B | fundamentals refetch/cache** — *fast win, may run first / in parallel with the survey.* Stop the PG mirror for the fundamentals domain, retire the frozen `fundamentals` table as an authority, make `stored=true` read only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise return honest empty, keep default analysis on SEC EDGAR / Financial Datasets fallback, reuse the existing TTL semantics, **check for non-US tickers** (EDGAR is US-only). Extract `src/fundamentals/`.
-3. **S-C | IV provider survey** (decision axes in §7) → outputs a selection recommendation, no implementation.
+3. **S-C | IV provider survey** (decision axes in §7) — **completed**; output is a narrowed proof-packet plan, not a provider selection.
 4. **S-D | IV local schema reboot** (contract in §7): raw-retain + versioned-derive schema, provider-abstraction interface; no scheduling yet.
 5. **S-E | IV IBKR small-scope computed-IV prototype** (10–30 tickers, near-month/ATM, fixed DTE-or-delta bucket, append-only, no gap-fill). Extract `src/iv/`.
 6. **S-F | (optional) IV bulk provider backend** — only if the survey finds a fit; plugs into the same schema.
@@ -264,7 +264,7 @@ without making IBKR rate limits the backbone.
 | IBKR TWS/Gateway | Legacy IBKR docs state that `reqContractDetails` can enumerate chains but is throttled and not recommended for all strikes/rights/expiries; `reqSecDefOptParams` returns expirations/strikes, not market quotes. Greeks/IV arrive through option market-data ticks and require the relevant option + underlying market data subscriptions. Source: `interactivebrokers.github.io/tws-api/options.html`, `option_computations.html`. | Good for a small-scope computed-IV prototype and live cross-checks. Poor as the 148-ticker daily backbone. | Keep as S-E prototype backend only: 10-30 tickers, near-ATM/near-term scope, fixed snapshot time, explicit no-data/error status. |
 | Massive / Polygon Options | Current docs redirect Polygon options docs to Massive. Option Chain Snapshot returns pricing details, greeks, implied volatility, quotes/trades, open interest, and underlying data; it is delayed on Starter/Developer and real-time on Advanced, with no history on that endpoint. Historical options quotes provide bid/ask records with nanosecond timestamps, max limit 50k, history back to 2022-03-07, and Advanced-tier access. Sources: `massive.com/docs/rest/options/snapshots/option-chain-snapshot`, `massive.com/docs/rest/options/trades-quotes/quotes`. | Best raw/near-raw candidate for own-computation if the plan tier and history depth are acceptable. It is the only verified candidate here that clearly offers historical bid/ask quote records rather than only derived IV fields. | **Proof-packet candidate A.** Verify product naming/account migration (`Polygon` vs `Massive`), Advanced-tier access, 2022 history sufficiency, payload completeness, and whether chain snapshot + historical quote samples are enough for ArkScope-derived ATM IV / term buckets / VRP. |
 | Alpha Vantage | Docs state realtime options return full chains and `require_greeks=true` enables greeks + IV; realtime options require the 600 or 1200 requests/min premium tiers. Historical options return full chains for a symbol/date, include IV + common greeks, accept dates later than 2008-01-01, and unlock under premium membership. Premium page lists 75-1200 requests/min tiers, with realtime options entitlement instructions. Sources: `alphavantage.co/documentation` Options Data APIs, `alphavantage.co/premium`. | Strong accessible historical backfill candidate, but not raw enough to be a pure own-computation backbone if only vendor IV/greeks are retained. Its value depends on whether bid/ask/last/OI fields are consistently populated and whether request limits make multi-ticker backfill tolerable. | **Proof-packet candidate B.** Test historical non-null coverage and rate-limit economics first. If fields are complete enough, use as the cheapest historical bootstrap; still compute ArkScope metrics from retained chain inputs where possible. |
-| EODHD / Unicorn options | No official, citable product/documentation page was found during this survey despite targeted searches. Prior notes about two-year history, greeks, IV, DTE, midpoint, and 6,000+ symbols remain unverified. | Cannot be treated as a serious backbone candidate until official docs/pricing are found. | Hold. Proof packet may include it only after an official source is located and the product name/tier gates are verified. |
+| EODHD / Unicorn options | EODHD marketplace lists Unicorn Data Services' US Stock Options Data API: over 6,000 US stock symbols, two-plus years of history, daily EOD updates, over 1.5M bid/ask/trade events daily, bid/ask/OHLC/midpoint, volume/OI with day-over-day changes, all five greeks, implied volatility, DTE, 43 fields per trade, and January 2025 per-ticker + separate EOD bid/ask/trade endpoints. Source: `eodhd.com/marketplace/unicornbay/options`. | Credible cheap EOD-granularity chain-snapshot candidate that matches the fixed-time snapshot direction better than an intraday API would. It is less raw/timestamp-controllable than Massive historical quotes, and timestamp semantics (near-close vs vendor EOD aggregation), beta/product maturity, and tier gates must be verified. | **Proof-packet candidate C.** Test after A/B or alongside them if key access is easy. Do not select until timestamp semantics, endpoint shape, and historical non-null greeks/IV coverage are measured. |
 | Tradier | Options chains endpoint is per underlying + expiration and includes greeks when requested; Tradier explicitly says Greek and IV data is courtesy of ORATS. Source: `docs.tradier.com/reference/brokerage-api-markets-get-options-chains`. | Useful broker-style live source and possible operational fallback. Not an independent ORATS cross-check and not a bulk historical backbone from the verified docs. | Do not use as backbone. Keep as optional live reference if account terms make it cheap. |
 | ORATS | ORATS advertises live, delayed, historical EOD options data back to 2007, 5,000+ symbols, 500+ indicators, high-quality bid/ask quotes and greeks gathered near close, smoothed market values, IV rank/history, and intraday tiers. Sources: `orats.com/data-api`, `docs.orats.io`. | Excellent specialist/reference dataset and vendor-derived signal source. It conflicts with the "own the computation" backbone unless ArkScope explicitly chooses ORATS-derived surfaces as canonical. | Reference/enrichment only for now. Use to compare research outputs, not to validate raw-derived IV unless inputs/timestamps are comparable. |
 
@@ -277,10 +277,13 @@ Survey recommendation:
 - **Run proof packet before S-D provider lock.** Test two candidates first:
   1. **Massive / Polygon** for raw quote-chain capability and forward snapshots.
   2. **Alpha Vantage** for historical backfill feasibility and cheap access.
+  3. **EODHD / Unicorn** as the low-cost EOD-history fallback if A/B are too costly
+     or incomplete.
 - **IBKR role:** keep as bounded prototype/cross-check, not full-universe daily collector.
 - **ORATS / Tradier role:** reference/enrichment only. Tradier greeks are ORATS-derived,
   so Tradier is not independent evidence against ORATS.
-- **EODHD / Unicorn role:** parked until official docs are found.
+- **EODHD / Unicorn role:** candidate C, with timestamp semantics and beta/product
+  maturity as the main proof-packet risks.
 
 Proof-packet requirements:
 
@@ -290,6 +293,9 @@ Proof-packet requirements:
   historical date (2017 if provider claims deep history);
 - record non-null coverage for bid/ask/last/volume/OI/provider IV/provider greeks,
   quote timestamps, underlying price, and expiration/strike metadata;
+- verify expiry enumeration completeness, especially weekly/0DTE vs monthly contracts,
+  and compare any provider-supplied underlying price against the independent stock
+  quote used for IV recomputation;
 - quantify request math for `tickers × dates × expiries/contracts`, including the
   provider's actual request/minute or monthly cap and whether pagination multiplies
   cost;
@@ -332,8 +338,9 @@ Recommended next order:
 
 1. **S-B fundamentals refetch/cache:** local-cache stored reads + provider fallback retained. **Status: implemented.**
 2. **S-C IV provider survey:** **Status: completed.** Next proof packet should test
-   Massive/Polygon and Alpha Vantage first; keep IBKR as prototype/cross-check,
-   ORATS/Tradier as reference, and park EODHD/Unicorn until official docs are found.
+   Massive/Polygon and Alpha Vantage first, include EODHD/Unicorn as candidate C if
+   key access is easy, keep IBKR as prototype/cross-check, and keep ORATS/Tradier as
+   reference.
 3. **S-D IV schema design:** provider-neutral schema and status model.
 4. **S-E IV IBKR prototype:** small scope only (10-30 tickers), fixed snapshot time,
    no gap-fill, honest failures.
