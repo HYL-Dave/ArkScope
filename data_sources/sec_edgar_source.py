@@ -15,7 +15,6 @@ Rate Limits:
 Documentation: https://www.sec.gov/edgar/sec-api-documentation
 """
 
-import os
 import time
 import logging
 import re
@@ -30,6 +29,7 @@ from .base import (
     StockPrice,
     SECFiling,
 )
+from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -102,28 +102,11 @@ class SECEdgarDataSource(BaseDataSource):
         Args:
             user_agent: User-Agent string (required by SEC).
                        Format: "Company Name contact@email.com"
-                       If None, reads from SEC_USER_AGENT env var.
+                       If None, uses the shared SEC User-Agent resolver.
         """
         super().__init__(api_key=None)  # No API key needed
 
-        if user_agent:
-            self.user_agent = user_agent
-        else:
-            # Prefer SEC_CONTACT_EMAIL (new), fallback to SEC_USER_AGENT (legacy)
-            contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
-            if contact:
-                self.user_agent = f'ArkScope {contact}'
-            else:
-                legacy = os.environ.get('SEC_USER_AGENT', '').strip()
-                if legacy:
-                    self.user_agent = legacy
-                else:
-                    logger.warning(
-                        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
-                        "SEC may rate-limit or reject requests. "
-                        "Set SEC_CONTACT_EMAIL in config/.env"
-                    )
-                    self.user_agent = 'ArkScope research@example.com'
+        self.user_agent = user_agent or get_sec_user_agent()
 
         self._session = requests.Session()
         self._session.headers.update({

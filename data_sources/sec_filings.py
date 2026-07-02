@@ -25,7 +25,6 @@ SEC Filings 整合模組
 """
 
 import logging
-import os
 from datetime import date
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass
@@ -36,28 +35,13 @@ from edgar import set_identity, Company
 
 # 我們現有的 SEC EDGAR 實作
 from .sec_edgar_source import SECEdgarDataSource, SECFiling
+from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SEC_CONTACT = 'ArkScope research@example.com'
-
 
 def _get_sec_user_agent() -> str:
-    """Build SEC User-Agent from env var or default (with warning).
-
-    Reads at call time (not import time) so config/.env can be loaded first.
-    """
-    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
-    if contact:
-        return f'ArkScope {contact}'
-    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
-    if legacy:
-        return legacy
-    logger.warning(
-        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
-        "SEC may rate-limit or reject requests. Set SEC_CONTACT_EMAIL in config/.env"
-    )
-    return _DEFAULT_SEC_CONTACT
+    return get_sec_user_agent()
 
 
 @dataclass

@@ -22,6 +22,7 @@ from src.data_provider_config import (
     apply_env,
     effective_source,
     mask_value,
+    provider_default_available,
     run_connection_test,
     unapply_env,
 )
@@ -52,7 +53,7 @@ def _view(store: DataProviderConfigStore) -> dict:
             "fields": rows,
             "testable": provider in _TESTABLE,
             # key-free + extension-free providers are available by default
-            "default_available": not fields and provider != "seeking_alpha",
+            "default_available": provider_default_available(provider),
         }
     return {"providers": providers}
 

@@ -26,7 +26,8 @@ def hermetic(monkeypatch):
     monkeypatch.setattr("src.env_keys.reload_var_from_file",
                         lambda name: (os.environ.pop(name, None), False)[1])
     for var in ("POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
-                "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID"):
+                "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT", "IBKR_CLIENT_ID",
+                "ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT"):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -124,6 +125,34 @@ def test_ibkr_client_id_in_route_view(store):
     assert row["env_var"] == "IBKR_CLIENT_ID" and row["secret"] is False
 
 
+def test_sec_edgar_user_agent_field_defined():
+    fields = {f.field: f for f in dpc.PROVIDER_FIELDS["sec_edgar"]}
+    assert "user_agent" in fields
+    f = fields["user_agent"]
+    assert f.env_var == "ARKSCOPE_SEC_USER_AGENT"
+    assert f.secret is False
+    assert f.optional is True
+    assert f.import_aliases == ("SEC_CONTACT_EMAIL", "SEC_USER_AGENT")
+
+
+def test_sec_edgar_user_agent_optional_keeps_provider_default_available(store):
+    from src.api.routes import providers_config as pc
+
+    view = pc.providers_config(store=store)["providers"]
+    assert view["sec_edgar"]["default_available"] is True
+    row = next(f for f in view["sec_edgar"]["fields"] if f["field"] == "user_agent")
+    assert row["effective_source"] == "missing"
+
+
+def test_apply_env_seeds_ibkr_client_id_default(store):
+    assert store.get_all() == {}
+    dpc.apply_env(store)
+    stored = store.get_all()
+    assert stored["ibkr"]["client_id"] == "1"
+    assert os.environ["IBKR_CLIENT_ID"] == "1"
+    assert dpc.effective_source("IBKR_CLIENT_ID") == "app"
+
+
 # --- connection tests ----------------------------------------------------------------
 
 def test_ibkr_test_socket(monkeypatch):
@@ -213,8 +242,9 @@ def test_routes_validation(store):
         pc.put_provider_config("nope", pc.ProviderConfigUpdate(fields={}), store=store)
     assert e.value.status_code == 404
     with pytest.raises(HTTPException) as e:
-        pc.put_provider_config("sec_edgar", pc.ProviderConfigUpdate(fields={}), store=store)
-    assert e.value.status_code == 400      # no configurable fields
+        pc.put_provider_config("sec_edgar", pc.ProviderConfigUpdate(fields={"api_key": "x"}),
+                               store=store)
+    assert e.value.status_code == 400      # unknown field for this provider
     with pytest.raises(HTTPException) as e:
         pc.put_provider_config("polygon",
                                pc.ProviderConfigUpdate(fields={"host": "x"}), store=store)

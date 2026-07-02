@@ -38,42 +38,19 @@ Convenience functions:
 """
 
 import logging
-import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import pandas as pd
 
 from .sec_edgar_source import SECEdgarDataSource
+from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SEC_CONTACT = 'ArkScope research@example.com'
-
 
 def _get_sec_user_agent() -> str:
-    """Build SEC User-Agent from env var or default (with warning).
-
-    Reads at call time (not import time) so config/.env can be loaded first.
-    """
-    # Canonical var (aligns with the config-authority plan's ARKSCOPE_* naming); the
-    # SEC data APIs need no key, only a declared User-Agent (SEC asks automated access to
-    # identify itself; current rate cap is 10 req/s). Precedence: canonical → legacy email
-    # (wrapped) → legacy raw UA → placeholder.
-    canonical = os.environ.get('ARKSCOPE_SEC_USER_AGENT', '').strip()
-    if canonical:
-        return canonical
-    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
-    if contact:
-        return f'ArkScope {contact}'
-    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
-    if legacy:
-        return legacy
-    logger.warning(
-        "No SEC User-Agent set — using placeholder (SEC may rate-limit/reject). "
-        "Set ARKSCOPE_SEC_USER_AGENT (e.g. 'ArkScope you@example.com') in config/.env"
-    )
-    return _DEFAULT_SEC_CONTACT
+    return get_sec_user_agent()
 
 
 @dataclass

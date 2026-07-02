@@ -53,15 +53,21 @@ CREATE TABLE IF NOT EXISTS data_provider_config (
 
 @dataclass(frozen=True)
 class FieldDef:
-    field: str          # "api_key" | "host" | "port"
-    env_var: str        # the variable every call site already reads
-    secret: bool        # masked in every read path
+    field: str
+    env_var: str
+    secret: bool
     label: str
+    default_value: str | None = None
+    defaulted: bool = False
+    optional: bool = False
+    guarded: bool = False
+    guard_reason: str | None = None
+    import_aliases: tuple[str, ...] = ()
 
 
-# What each provider can store here. Key-free providers have no fields — SEC EDGAR
-# is available by default (no key, no extension); Seeking Alpha is the extension
-# capture path (nothing to configure here).
+# What each provider can store here. SEC EDGAR has no key but does have an
+# optional app-managed User-Agent field; Seeking Alpha is the extension capture
+# path (nothing to configure here).
 PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
     "polygon": [FieldDef("api_key", "POLYGON_API_KEY", True, "API key")],
     "finnhub": [FieldDef("api_key", "FINNHUB_API_KEY", True, "API key")],
@@ -74,15 +80,43 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
         # ibkr_source.py reads IBKR_CLIENT_ID (default 1); was env-only. NOTE config/.env
         # historically used the name IBKR_CLIENT (mismatch the code never read) — setting it
         # here injects the correct IBKR_CLIENT_ID via the env bridge.
-        FieldDef("client_id", "IBKR_CLIENT_ID", False, "Client ID"),
+        FieldDef(
+            "client_id",
+            "IBKR_CLIENT_ID",
+            False,
+            "Client ID",
+            default_value="1",
+            defaulted=True,
+            guarded=True,
+            guard_reason=(
+                "Changing IBKR client_id can disturb active Gateway sessions; this is the "
+                "base id, and option_chain_tools uses base+10."
+            ),
+        ),
     ],
-    "sec_edgar": [],
+    "sec_edgar": [
+        FieldDef(
+            "user_agent",
+            "ARKSCOPE_SEC_USER_AGENT",
+            False,
+            "SEC User-Agent",
+            optional=True,
+            import_aliases=("SEC_CONTACT_EMAIL", "SEC_USER_AGENT"),
+        )
+    ],
     "seeking_alpha": [],
 }
 
 _FIELD_BY_KEY: Dict[tuple, FieldDef] = {
     (p, f.field): f for p, defs in PROVIDER_FIELDS.items() for f in defs
 }
+
+
+def provider_default_available(provider: str) -> bool:
+    defs = PROVIDER_FIELDS.get(provider)
+    if defs is None:
+        return False
+    return provider != "seeking_alpha" and all(f.optional for f in defs)
 
 # env-var names the APP injected this process (effective source = 'app')
 _APP_APPLIED: set = set()
@@ -94,6 +128,27 @@ def mask_value(value: str, secret: bool) -> str:
     if len(value) <= 10:
         return "••••"
     return f"{value[:4]}…{value[-4:]}"
+
+
+def importable_env_vars(fdef: FieldDef) -> tuple[str, ...]:
+    return (fdef.env_var, *fdef.import_aliases)
+
+
+def normalize_import_value(fdef: FieldDef, source_env_var: str, value: str) -> str:
+    value = value.strip()
+    if fdef.env_var == "ARKSCOPE_SEC_USER_AGENT" and source_env_var == "SEC_CONTACT_EMAIL":
+        return value if value.startswith("ArkScope ") else f"ArkScope {value}"
+    return value
+
+
+def guarded_change_detail(provider: str, field: str, fdef: FieldDef) -> dict[str, str]:
+    return {
+        "code": "provider_config_change_guard",
+        "status": "confirmation_required",
+        "provider": provider,
+        "field": field,
+        "message": fdef.guard_reason or "Changing this provider setting requires confirmation.",
+    }
 
 
 class DataProviderConfigStore:
@@ -156,6 +211,32 @@ class DataProviderConfigStore:
         finally:
             conn.close()
 
+    def seed_defaults(self) -> list[tuple[str, str]]:
+        """Persist app-owned defaults so Settings can show their app authority."""
+        seeded: list[tuple[str, str]] = []
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        conn = self._connect()
+        try:
+            for provider, defs in PROVIDER_FIELDS.items():
+                for fdef in defs:
+                    if fdef.default_value is None:
+                        continue
+                    before = conn.execute(
+                        "SELECT 1 FROM data_provider_config WHERE provider = ? AND field = ?",
+                        (provider, fdef.field),
+                    ).fetchone()
+                    conn.execute(
+                        "INSERT OR IGNORE INTO data_provider_config "
+                        "(provider, field, value, updated_at) VALUES (?, ?, ?, ?)",
+                        (provider, fdef.field, fdef.default_value, now),
+                    )
+                    if before is None:
+                        seeded.append((provider, fdef.field))
+            conn.commit()
+            return seeded
+        finally:
+            conn.close()
+
 
 # --- env bridge -----------------------------------------------------------------
 
@@ -164,6 +245,7 @@ def apply_env(store: DataProviderConfigStore) -> frozenset:
     Idempotent; call at sidecar startup and after every save."""
     from src.env_keys import ensure_env_loaded, keys_loaded_from_file
 
+    store.seed_defaults()
     ensure_env_loaded()
     file_keys = keys_loaded_from_file()
     stored = store.get_all()

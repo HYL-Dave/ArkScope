@@ -11,7 +11,6 @@ Usage:
 """
 
 import logging
-import os
 import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -20,28 +19,13 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
+from .sec_user_agent import get_sec_user_agent
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SEC_CONTACT = 'ArkScope research@example.com'
-
 
 def _get_sec_user_agent() -> str:
-    """Build SEC User-Agent from env var or default (with warning).
-
-    Reads at call time (not import time) so config/.env can be loaded first.
-    """
-    contact = os.environ.get('SEC_CONTACT_EMAIL', '').strip()
-    if contact:
-        return f'ArkScope {contact}'
-    legacy = os.environ.get('SEC_USER_AGENT', '').strip()
-    if legacy:
-        return legacy
-    logger.warning(
-        "SEC_CONTACT_EMAIL not set — using placeholder User-Agent. "
-        "SEC may rate-limit or reject requests. Set SEC_CONTACT_EMAIL in config/.env"
-    )
-    return _DEFAULT_SEC_CONTACT
+    return get_sec_user_agent()
 
 # Transaction codes mapping
 TRANSACTION_CODES = {
