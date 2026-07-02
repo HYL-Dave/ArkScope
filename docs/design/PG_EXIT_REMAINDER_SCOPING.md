@@ -467,6 +467,10 @@ DB-native instead of expanding `.env` fallback.
 - Does not block S-C (survey is doc work; run in parallel).
 - **Phase 0–1 land before S-E**, so the IV prototype's provider wiring is born
   DB-first and never grows a `.env` dependency.
+- Phase 0-1 implementation status: audit table recorded; SEC UA and IBKR
+  client-id defaults are app-managed; `config/.env` fallback is still allowed but
+  visible/importable; profile DB startup failure now enters setup-only mode.
+  Phase 2 strict-by-default remains pending.
 - Phase 2 flips only after Phase 1 has soaked: Settings shows no remaining
   "from config/.env" managed fields on the primary machine (or each is a
   conscious keep), then default-strict is turned on.

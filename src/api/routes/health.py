@@ -31,7 +31,8 @@ def providers_health(dal: DataAccessLayer = Depends(get_dal)):
     ProviderRun-compatible DTO per provider with a unified status vocabulary
     (connected | stale | maintenance | no_signal | missing_key | disabled).
     Disabled-by-config is a state in the body, never a 503. Key info is
-    presence + source only (read-only; keys stay in config/.env).
+    presence + source only (read-only; values stay masked, file-backed values
+    are import-suggested through Settings).
     """
     from src.service.provider_health import compute_provider_health
 
