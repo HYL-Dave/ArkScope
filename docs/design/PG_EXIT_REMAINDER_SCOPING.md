@@ -442,13 +442,20 @@ DB-native instead of expanding `.env` fallback.
   discipline (default is the new world; the old world needs an explicit flag).
 - `config/.env` thereafter = import/export + migration material; real shell env
   remains the operator escape hatch (precedence unchanged).
-- **Carried micro-fix (found during Phase-1 live acceptance 2026-07-02):**
-  manual PUT of `sec_edgar.user_agent` must apply the same
-  `normalize_import_value` wrapping as the alias-import path (bare email →
-  `ArkScope <email>`); today only `POST .../import-env` normalizes, so a
-  hand-typed bare email is stored/injected un-prefixed. Small: route-side
-  normalize on PUT for this field + one test. Land with Phase 2 or earlier as a
-  standalone fix.
+- **Carried micro-fix, WIDENED per user review 2026-07-02 (email-first field
+  UX; may land before Phase 2 as a standalone micro-slice):** the user-owned
+  datum is a contact email — "ArkScope" is a program constant, and the field
+  must not ask users to hand-compose a protocol string. (Found live: the field
+  gave no hint an email was expected, and a hand-typed bare email was
+  stored/injected un-prefixed because only `POST .../import-env` normalizes.)
+  Scope: (a) FieldDef label → 聯絡 Email（SEC 自動化存取宣告用）— the UI input
+  placeholder renders the label, so this alone fixes discoverability; (b) BOTH
+  write paths (manual PUT + import-env) normalize with the heuristic: value
+  contains `@` and no whitespace → bare email → store `ArkScope <email>`;
+  contains whitespace → full custom UA → store as-is (power users keep full-UA
+  passthrough; real-env escape hatch unchanged); (c) display keeps showing the
+  composed full value. ~10-15 lines + tests (PUT-normalize, import-normalize
+  unchanged, full-UA passthrough, label).
 
 ### 13.5 Gates / tests
 
