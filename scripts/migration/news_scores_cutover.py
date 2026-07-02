@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.news_normalized.score_cutover import preview_news_scores_cutover  # noqa: E402
+from src.news_normalized.score_cutover import (  # noqa: E402
+    apply_news_scores_cutover,
+    preview_news_scores_cutover,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +31,18 @@ def build_parser() -> argparse.ArgumentParser:
     _add_db_argument(preview)
     preview.add_argument("--pg-dsn", required=True)
     preview.add_argument("--output", required=True, type=Path)
+
+    apply = subparsers.add_parser("apply")
+    _add_db_argument(apply)
+    apply.add_argument("--pg-dsn", required=True)
+    apply.add_argument("--expected-fingerprint", required=True)
+    apply.add_argument("--backup", required=True, type=Path)
+    apply.add_argument(
+        "--confirm-scheduler-paused",
+        required=True,
+        action="store_true",
+        help="Confirm scheduler and manual score/news ingest are paused",
+    )
     return parser
 
 
@@ -36,6 +51,15 @@ def main(argv=None) -> int:
     if args.command == "preview":
         report = preview_news_scores_cutover(_market_db(args), args.pg_dsn)
         _write_json(args.output, report.to_json_dict())
+        return 0
+    if args.command == "apply":
+        result = apply_news_scores_cutover(
+            _market_db(args),
+            pg_dsn=args.pg_dsn,
+            expected_fingerprint=args.expected_fingerprint,
+            backup_path=args.backup,
+        )
+        print(_json_line(result.to_json_dict()))
         return 0
     raise AssertionError(f"unhandled command: {args.command}")
 
