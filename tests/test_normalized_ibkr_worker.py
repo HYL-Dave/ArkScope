@@ -160,6 +160,24 @@ def test_ibkr_worker_suppresses_provider_stderr_and_logging(monkeypatch, capsys)
     assert secret not in captured.err
 
 
+def test_worker_applies_provider_config_before_gateway_construction(monkeypatch, capsys):
+    import src.news_normalized.ibkr_cli as worker
+
+    order: list[str] = []
+    monkeypatch.setattr(worker, "_apply_provider_config", lambda: order.append("apply"))
+
+    def _fake_run_worker(*args, **kwargs):
+        order.append("run_worker")
+        raise RuntimeError("stop before provider construction")
+
+    monkeypatch.setattr(worker, "_run_worker", _fake_run_worker)
+    code = worker.main(["--tickers", "AAPL", "--max-articles", "0", "--max-body-fetches", "0"])
+    assert code == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "failed"
+    assert order == ["apply", "run_worker"]
+
+
 def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     monkeypatch,
 ):

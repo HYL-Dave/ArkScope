@@ -18,7 +18,8 @@ missing_key | disabled``.
     weekend maintenance is expected, not an error (locked F1+F2 directive:
     display "IBKR maintenance / last success").
 Key presence is READ-ONLY (locked fork F5): presence + source
-(``env`` / ``config/.env`` / ``missing``); keys stay in config/.env, no entry UI.
+(``app`` / ``env`` / ``config/.env`` / ``missing``). Values stay masked; health
+may suggest importing file-backed values into the app-managed provider store.
 
 Signal sources merged (all already persisted; each degrades independently):
   - DatabaseBackend.query_health_stats()  — news per source / prices / iv /
@@ -138,8 +139,8 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     backend = getattr(dal, "_backend", None)
     notes: List[str] = []
 
-    # Keys live in config/.env, not the system environment (project convention) —
-    # make sure they are loaded before any os.getenv presence check (idempotent).
+    # Load config/.env before presence checks, then layer app-applied provenance on
+    # top so source reporting mirrors the env bridge's effective precedence.
     loaded_file_keys: frozenset = frozenset()
     app_keys: frozenset = frozenset()
     try:
@@ -259,6 +260,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             "kind": kind,
             "key_present": key["present"],
             "key_source": key["source"],
+            "key_import_suggested": key["source"] == "config/.env",
             "key_vars": key["vars"],
             "enabled": enabled,
             "status": _status(

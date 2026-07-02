@@ -171,6 +171,15 @@ def test_key_source_reports_effective_origin(monkeypatch):
     assert _by_id(out, "fred")["key_source"] == "missing"
 
 
+def test_config_file_key_source_sets_import_suggestion(monkeypatch):
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
+    monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
+    out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
+    p = _by_id(out, "polygon")
+    assert p["key_source"] == "config/.env"
+    assert p["key_import_suggested"] is True
+
+
 def test_disabled_outranks_missing_key(monkeypatch):
     # FD disabled AND key missing → product semantics say "disabled" (the user
     # turned it off; nagging missing_key for an unwanted provider is wrong).
