@@ -26,6 +26,7 @@ from src.data_provider_config import (
     guarded_change_detail,
     importable_env_vars,
     mask_value,
+    normalize_provider_config_value,
     normalize_import_value,
     provider_default_available,
     run_connection_test,
@@ -152,6 +153,8 @@ def put_provider_config(
     current_fields = store.get_all().get(provider) or {}
     for field, value in body.fields.items():
         value = (value or "").strip()
+        if value:
+            value = normalize_provider_config_value(by_name[field], value)
         current = current_fields.get(field)
         if by_name[field].guarded and (value or None) != (current or None):
             if not body.confirm_guarded.get(field):

@@ -130,6 +130,7 @@ def test_sec_edgar_user_agent_field_defined():
     assert "user_agent" in fields
     f = fields["user_agent"]
     assert f.env_var == "ARKSCOPE_SEC_USER_AGENT"
+    assert f.label == "聯絡 Email"
     assert f.secret is False
     assert f.optional is True
     assert f.import_aliases == ("SEC_CONTACT_EMAIL", "SEC_USER_AGENT")
@@ -296,6 +297,52 @@ def test_sec_contact_email_import_normalizes_to_canonical_user_agent(store, monk
     row = next(f for f in out["fields"] if f["field"] == "user_agent")
     assert row["effective_source"] == "app"
     assert os.environ["ARKSCOPE_SEC_USER_AGENT"] == "ArkScope ops@example.com"
+
+
+def test_sec_user_agent_put_normalizes_bare_email(store):
+    from src.api.routes import providers_config as pc
+
+    out = pc.put_provider_config(
+        "sec_edgar",
+        pc.ProviderConfigUpdate(fields={"user_agent": "ops@example.com"}),
+        store=store,
+    )
+    assert store.get_all()["sec_edgar"]["user_agent"] == "ArkScope ops@example.com"
+    row = next(f for f in out["fields"] if f["field"] == "user_agent")
+    assert row["label"] == "聯絡 Email"
+    assert row["app_value_masked"] == "ArkScope ops@example.com"
+    assert os.environ["ARKSCOPE_SEC_USER_AGENT"] == "ArkScope ops@example.com"
+
+
+def test_sec_user_agent_put_preserves_full_user_agent(store):
+    from src.api.routes import providers_config as pc
+
+    value = "ArkScope Research ops@example.com"
+    out = pc.put_provider_config(
+        "sec_edgar",
+        pc.ProviderConfigUpdate(fields={"user_agent": value}),
+        store=store,
+    )
+    assert store.get_all()["sec_edgar"]["user_agent"] == value
+    row = next(f for f in out["fields"] if f["field"] == "user_agent")
+    assert row["app_value_masked"] == value
+    assert os.environ["ARKSCOPE_SEC_USER_AGENT"] == value
+
+
+def test_sec_user_agent_import_preserves_full_user_agent(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    value = "ArkScope Research ops@example.com"
+    monkeypatch.setenv("SEC_USER_AGENT", value)
+    out = pc.import_provider_config_field(
+        "sec_edgar",
+        "user_agent",
+        pc.ProviderConfigImportEnv(source_env_var="SEC_USER_AGENT"),
+        store=store,
+    )
+    assert store.get_all()["sec_edgar"]["user_agent"] == value
+    row = next(f for f in out["fields"] if f["field"] == "user_agent")
+    assert row["app_value_masked"] == value
 
 
 def test_guarded_ibkr_client_id_requires_confirmation(store):

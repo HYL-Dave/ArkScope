@@ -99,7 +99,7 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             "user_agent",
             "ARKSCOPE_SEC_USER_AGENT",
             False,
-            "SEC User-Agent",
+            "聯絡 Email",
             optional=True,
             import_aliases=("SEC_CONTACT_EMAIL", "SEC_USER_AGENT"),
         )
@@ -134,11 +134,17 @@ def importable_env_vars(fdef: FieldDef) -> tuple[str, ...]:
     return (fdef.env_var, *fdef.import_aliases)
 
 
-def normalize_import_value(fdef: FieldDef, source_env_var: str, value: str) -> str:
+def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
     value = value.strip()
-    if fdef.env_var == "ARKSCOPE_SEC_USER_AGENT" and source_env_var == "SEC_CONTACT_EMAIL":
+    if fdef.env_var == "ARKSCOPE_SEC_USER_AGENT" and "@" in value and not any(
+        ch.isspace() for ch in value
+    ):
         return value if value.startswith("ArkScope ") else f"ArkScope {value}"
     return value
+
+
+def normalize_import_value(fdef: FieldDef, source_env_var: str, value: str) -> str:
+    return normalize_provider_config_value(fdef, value)
 
 
 def guarded_change_detail(provider: str, field: str, fdef: FieldDef) -> dict[str, str]:
