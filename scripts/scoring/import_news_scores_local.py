@@ -32,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     plan = build_local_score_import_plan(args.market_db, parquet_files_under(args.news_dir))
+    if not args.dry_run and not args.expected_fingerprint:
+        raise SystemExit("score import apply requires --expected-fingerprint")
     if args.expected_fingerprint and plan.fingerprint != args.expected_fingerprint:
         raise SystemExit("score import fingerprint mismatch")
     payload = plan.to_json_dict()

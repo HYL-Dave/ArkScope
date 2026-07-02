@@ -65,7 +65,13 @@ def main(argv=None) -> int:
 
 
 def _add_db_argument(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--db", type=Path, help="Path to market_data.db")
+    parser.add_argument(
+        "--db",
+        "--market-db",
+        dest="db",
+        type=Path,
+        help="Path to market_data.db",
+    )
 
 
 def _market_db(args: argparse.Namespace) -> Path:

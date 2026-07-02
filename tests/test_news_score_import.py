@@ -2,9 +2,11 @@ import json
 import sqlite3
 
 import pandas as pd
+import pytest
 
 from scripts.scoring import import_news_scores_local as import_cli
 from src.news_normalized.schema import ensure_news_normalized_schema
+from src.news_normalized import score_import
 from src.news_normalized.score_import import (
     apply_local_score_import_plan,
     build_local_score_import_plan,
@@ -153,6 +155,36 @@ def test_import_apply_is_idempotent(tmp_path):
         conn.close()
 
 
+def test_import_apply_takes_market_write_lock(tmp_path, monkeypatch):
+    db = _create_import_db(tmp_path / "market.db")
+    parquet = _write_parquet(
+        tmp_path / "scores.parquet",
+        [
+            {
+                "source": "ibkr",
+                "provider_article_id": "DJ-N$1",
+                "published_at": "2026-07-01T00:00:00Z",
+                "risk_o4_mini": 2,
+            }
+        ],
+    )
+    plan = build_local_score_import_plan(db, [parquet])
+    events = []
+
+    class FakeLock:
+        def __enter__(self):
+            events.append("enter")
+
+        def __exit__(self, exc_type, exc, tb):
+            events.append("exit")
+
+    monkeypatch.setattr(score_import, "market_write_lock", lambda: FakeLock())
+
+    apply_local_score_import_plan(db, plan)
+
+    assert events == ["enter", "exit"]
+
+
 def test_import_cli_dry_run_writes_sanitized_json(tmp_path):
     db = _create_import_db(tmp_path / "market.db")
     news_dir = tmp_path / "news"
@@ -181,3 +213,29 @@ def test_import_cli_dry_run_writes_sanitized_json(tmp_path):
     assert payload["score_rows"] == 1
     assert "SECRET TITLE" not in text
     assert "secret.example" not in text
+
+
+def test_import_cli_apply_requires_expected_fingerprint(tmp_path):
+    db = _create_import_db(tmp_path / "market.db")
+    news_dir = tmp_path / "news"
+    news_dir.mkdir()
+    _write_parquet(
+        news_dir / "scores.parquet",
+        [
+            {
+                "source": "ibkr",
+                "provider_article_id": "DJ-N$1",
+                "published_at": "2026-07-01T00:00:00Z",
+                "risk_o4_mini": 2,
+            }
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        import_cli.main(["--market-db", str(db), "--news-dir", str(news_dir)])
+
+    conn = sqlite3.connect(db)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM news_article_scores").fetchone()[0] == 0
+    finally:
+        conn.close()

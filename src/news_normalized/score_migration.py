@@ -43,6 +43,8 @@ class ScoreMigrationPlan:
     source_rows: int
     mapped_rows: int
     unmapped_rows: int
+    rejected_rows: int
+    missing_legacy_rows: int
     duplicate_keys: int
     counts: dict[str, int]
     fingerprint: str
@@ -82,6 +84,8 @@ def _fingerprint(
     source_rows: int,
     mapped_rows: int,
     unmapped_rows: int,
+    rejected_rows: int,
+    missing_legacy_rows: int,
     duplicate_keys: int,
     counts: dict[str, int],
 ) -> str:
@@ -89,6 +93,8 @@ def _fingerprint(
         "counts": counts,
         "duplicate_keys": duplicate_keys,
         "mapped_rows": mapped_rows,
+        "missing_legacy_rows": missing_legacy_rows,
+        "rejected_rows": rejected_rows,
         "rows": [asdict(row) for row in rows],
         "source_rows": source_rows,
         "unmapped_rows": unmapped_rows,
@@ -105,13 +111,21 @@ def build_score_migration_plan(
     source_count = 0
     mapped_count = 0
     unmapped_count = 0
+    rejected_count = 0
+    missing_count = 0
     by_key: dict[tuple[int, str, str, str], ScoreMigrationRow] = {}
 
     for source in source_rows:
         source_count += 1
-        article_id = legacy_article_map.get(int(source.legacy_news_id))
+        legacy_id = int(source.legacy_news_id)
+        if legacy_id not in legacy_article_map:
+            unmapped_count += 1
+            missing_count += 1
+            continue
+        article_id = legacy_article_map[legacy_id]
         if article_id is None:
             unmapped_count += 1
+            rejected_count += 1
             continue
         mapped_count += 1
         row = _normalize_row(source, int(article_id))
@@ -133,6 +147,8 @@ def build_score_migration_plan(
         source_rows=source_count,
         mapped_rows=mapped_count,
         unmapped_rows=unmapped_count,
+        rejected_rows=rejected_count,
+        missing_legacy_rows=missing_count,
         duplicate_keys=duplicate_keys,
         counts=counts,
         fingerprint=_fingerprint(
@@ -140,6 +156,8 @@ def build_score_migration_plan(
             source_rows=source_count,
             mapped_rows=mapped_count,
             unmapped_rows=unmapped_count,
+            rejected_rows=rejected_count,
+            missing_legacy_rows=missing_count,
             duplicate_keys=duplicate_keys,
             counts=counts,
         ),

@@ -32,6 +32,8 @@ class ScoreCutoverPreviewReport:
     pg_score_rows: int
     mapped_rows: int
     unmapped_rows: int
+    rejected_rows: int
+    missing_legacy_rows: int
     duplicate_keys: int
     article_count: int
     score_type_counts: dict[str, int]
@@ -49,8 +51,10 @@ class ScoreCutoverPreviewReport:
             "latest_scored_at": self.latest_scored_at,
             "malformed_rows": self.malformed_rows,
             "mapped_rows": self.mapped_rows,
+            "missing_legacy_rows": self.missing_legacy_rows,
             "model_counts": self.model_counts,
             "pg_score_rows": self.pg_score_rows,
+            "rejected_rows": self.rejected_rows,
             "reasoning_effort_counts": self.reasoning_effort_counts,
             "score_type_counts": self.score_type_counts,
             "unmapped_rows": self.unmapped_rows,
@@ -356,8 +360,10 @@ def _report_from_plan(
         "latest_scored_at": latest_scored_at,
         "malformed_rows": malformed_rows,
         "mapped_rows": plan.mapped_rows,
+        "missing_legacy_rows": plan.missing_legacy_rows,
         "model_counts": model_counts,
         "pg_score_rows": source_rows,
+        "rejected_rows": plan.rejected_rows,
         "reasoning_effort_counts": effort_counts,
         "score_type_counts": score_type_counts,
         "unmapped_rows": plan.unmapped_rows,
@@ -371,6 +377,8 @@ def _report_from_plan(
         pg_score_rows=source_rows,
         mapped_rows=plan.mapped_rows,
         unmapped_rows=plan.unmapped_rows,
+        rejected_rows=plan.rejected_rows,
+        missing_legacy_rows=plan.missing_legacy_rows,
         duplicate_keys=plan.duplicate_keys,
         article_count=article_count,
         score_type_counts=score_type_counts,

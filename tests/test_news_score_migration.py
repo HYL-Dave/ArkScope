@@ -44,6 +44,8 @@ def test_rejected_and_missing_legacy_rows_are_counted_unmapped():
     assert plan.source_rows == 3
     assert plan.mapped_rows == 1
     assert plan.unmapped_rows == 2
+    assert plan.rejected_rows == 1
+    assert plan.missing_legacy_rows == 1
     assert [row.legacy_news_id for row in plan.rows] == [10]
 
 

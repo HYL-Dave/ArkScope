@@ -25,6 +25,7 @@ def _source_rows():
     return [
         ScoreSourceRow(10, "sentiment", "gpt-5.2", "high", 4.0, "2026-07-01T00:00:00Z"),
         ScoreSourceRow(11, "risk", "gpt-5.2", None, 2.0, "2026-07-01T00:00:00Z"),
+        ScoreSourceRow(12, "risk", "gpt-5.2", None, 3.0, "2026-07-01T00:00:00Z"),
     ]
 
 
@@ -41,9 +42,11 @@ def test_preview_writes_deterministic_json_and_does_not_create_score_table(
 
     assert first.read_bytes() == second.read_bytes()
     payload = json.loads(first.read_text())
-    assert payload["pg_score_rows"] == 2
+    assert payload["pg_score_rows"] == 3
     assert payload["mapped_rows"] == 1
-    assert payload["unmapped_rows"] == 1
+    assert payload["unmapped_rows"] == 2
+    assert payload["rejected_rows"] == 1
+    assert payload["missing_legacy_rows"] == 1
     assert payload["would_apply"] is True
     assert "secret" not in first.read_text()
 
@@ -73,3 +76,15 @@ def test_preview_malformed_rows_make_would_apply_false(tmp_path, monkeypatch):
     assert payload["would_apply"] is False
     assert payload["malformed_rows"] == 1
     assert "quality" not in output.read_text()
+
+
+def test_subcommand_market_db_alias_is_accepted(tmp_path, monkeypatch):
+    db = _create_mapping_db(tmp_path / "market.db")
+    monkeypatch.setattr(score_cutover, "read_pg_score_rows", lambda _dsn: _source_rows())
+    output = tmp_path / "preview.json"
+
+    assert cutover_cli.main(
+        ["preview", "--market-db", str(db), "--pg-dsn", "postgres://secret", "--output", str(output)]
+    ) == 0
+
+    assert json.loads(output.read_text())["mapped_rows"] == 1

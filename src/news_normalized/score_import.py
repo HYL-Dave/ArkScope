@@ -12,6 +12,7 @@ from typing import Iterable
 
 import pandas as pd
 
+from src.market_data_direct import market_write_lock
 from src.tools.backends.file_backend import detect_score_columns
 
 from .scores import normalize_reasoning_effort, normalize_score_model, normalize_score_type
@@ -98,39 +99,40 @@ def build_local_score_import_plan(
 def apply_local_score_import_plan(
     market_db: str | Path, plan: LocalScoreImportPlan
 ) -> int:
-    conn = sqlite3.connect(market_db)
-    try:
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("BEGIN IMMEDIATE")
-        for row in plan.rows:
-            conn.execute(
-                "INSERT INTO news_article_scores "
-                "(article_id,score_type,model,reasoning_effort,score,scored_at,source,"
-                "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) "
-                "ON CONFLICT(article_id,score_type,model,reasoning_effort) DO UPDATE SET "
-                "score=excluded.score,"
-                "scored_at=excluded.scored_at,"
-                "source=excluded.source,"
-                "updated_at=excluded.updated_at",
-                (
-                    row.article_id,
-                    row.score_type,
-                    row.model,
-                    row.reasoning_effort,
-                    row.score,
-                    row.scored_at,
-                    "local_parquet_score_import",
-                    row.scored_at,
-                    row.scored_at,
-                ),
-            )
-        conn.commit()
-        return len(plan.rows)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with market_write_lock():
+        conn = sqlite3.connect(market_db)
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("BEGIN IMMEDIATE")
+            for row in plan.rows:
+                conn.execute(
+                    "INSERT INTO news_article_scores "
+                    "(article_id,score_type,model,reasoning_effort,score,scored_at,source,"
+                    "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(article_id,score_type,model,reasoning_effort) DO UPDATE SET "
+                    "score=excluded.score,"
+                    "scored_at=excluded.scored_at,"
+                    "source=excluded.source,"
+                    "updated_at=excluded.updated_at",
+                    (
+                        row.article_id,
+                        row.score_type,
+                        row.model,
+                        row.reasoning_effort,
+                        row.score,
+                        row.scored_at,
+                        "local_parquet_score_import",
+                        row.scored_at,
+                        row.scored_at,
+                    ),
+                )
+            conn.commit()
+            return len(plan.rows)
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
 
 def parquet_files_under(news_dir: str | Path) -> tuple[Path, ...]:
