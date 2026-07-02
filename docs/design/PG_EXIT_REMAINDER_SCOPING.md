@@ -371,6 +371,33 @@ Inventory every provider env var and classify:
 Grep surface: `_load_env|load_dotenv|config/\.env|os\.environ` (provider-key
 reads) + FieldDefs registry. Read-only; no code change in Phase 0.
 
+#### Phase 0 classification result (2026-07-02)
+
+| Env var / family | Class | Runtime owner | Decision |
+|---|---|---|---|
+| `POLYGON_API_KEY` | managed | `polygon.api_key` | already FieldDef-managed; Phase 1 adds visible import when effective source is `config/.env`. |
+| `FINNHUB_API_KEY` | managed | `finnhub.api_key` | already FieldDef-managed; Phase 1 adds visible import when effective source is `config/.env`. |
+| `FRED_API_KEY` | managed | `fred.api_key` | already FieldDef-managed; Phase 1 adds visible import when effective source is `config/.env`. |
+| `FINANCIAL_DATASETS_API_KEY` | managed | `financial_datasets.api_key` | already FieldDef-managed; Phase 1 adds visible import when effective source is `config/.env`. |
+| `IBKR_HOST` / `IBKR_PORT` | managed | `ibkr.host` / `ibkr.port` | already FieldDef-managed. |
+| `IBKR_CLIENT_ID` | managed-with-default | `ibkr.client_id` | already FieldDef-managed; Phase 1 seeds explicit default `1` and guards edits. |
+| `ARKSCOPE_SEC_USER_AGENT` | promote | `sec_edgar.user_agent` | canonical SEC User-Agent; promote to FieldDef in Phase 1. |
+| `SEC_CONTACT_EMAIL` | legacy import alias | `sec_edgar.user_agent` | explicit per-field import only; imported value is normalized to `ArkScope <email>`. |
+| `SEC_USER_AGENT` | legacy import alias | `sec_edgar.user_agent` | explicit per-field import only; imported value is treated as already full User-Agent. |
+| `ALPHA_VANTAGE_API_KEY` | legacy_env_only | inactive desktop provider | live reader exists, but no active scheduler/API path uses it; keep warning-only until an Alpha Vantage feature is reintroduced DB-native. |
+| `TIINGO_API_KEY` | legacy_env_only | inactive desktop provider | live reader exists, but no active scheduler/API path uses it; keep warning-only until a Tiingo feature is reintroduced DB-native. |
+| `EODHD_API_KEY` | legacy_env_only | inactive desktop provider | live reader exists, but no active scheduler/API path uses it; keep warning-only until an EODHD feature is reintroduced DB-native. |
+| `DISCORD_*` | legacy_env_only | ops monitor | not a data provider; keep out of provider FieldDefs. |
+| `REDDIT_*` / `FMP*` | retiring/defer | no active reader | do not promote; revisit only if a real desktop feature is designed. |
+| `DATABASE_URL` / `SUPABASE_DB_URL` | out of scope | PG-exit target | leave transitional until full PG exit removes the consumer. |
+| LLM keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, OAuth tokens) | out of scope | auth-driver thread | do not mix with data-provider config. |
+
+Phase 1 promotes only `sec_edgar.user_agent` plus the existing
+`ibkr.client_id` default/guard. Alpha Vantage, Tiingo, and EODHD remain
+`legacy_env_only` in this slice because they are not active desktop ingest paths;
+any future S-C/S-F provider selected for IV or fundamentals must be added
+DB-native instead of expanding `.env` fallback.
+
 ### 13.3 Phase 1 — visibility + hard startup (no default-behavior flip yet)
 
 1. **Startup fail-closed = needs-setup mode, not process death:** unreadable
