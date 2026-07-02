@@ -1,0 +1,179 @@
+/** @vitest-environment jsdom */
+import React from "react";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { ModelCatalog, ModelTask, ProvidersHealthResponse, TaskRoute } from "./api";
+
+const mocked = vi.hoisted(() => ({
+  providersConfig: {
+    providers: {
+      polygon: {
+        fields: [{
+          field: "api_key",
+          label: "API key",
+          secret: true,
+          env_var: "POLYGON_API_KEY",
+          app_value_set: false,
+          app_value_masked: null,
+          effective_source: "config/.env",
+          needs_import: true,
+          import_source: "POLYGON_API_KEY",
+          importable_env_vars: ["POLYGON_API_KEY"],
+          defaulted: false,
+          guarded: false,
+          guard_reason: null,
+        }],
+        testable: true,
+        default_available: false,
+      },
+      ibkr: {
+        fields: [{
+          field: "client_id",
+          label: "Client ID",
+          secret: false,
+          env_var: "IBKR_CLIENT_ID",
+          app_value_set: true,
+          app_value_masked: "1",
+          effective_source: "app",
+          needs_import: false,
+          import_source: null,
+          importable_env_vars: ["IBKR_CLIENT_ID"],
+          defaulted: true,
+          guarded: true,
+          guard_reason: "Changing IBKR client_id can disturb active Gateway sessions.",
+        }],
+        testable: true,
+        default_available: false,
+      },
+    },
+    setup: { required: false, code: null, reason: null },
+  },
+  importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
+  putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
+}));
+
+const emptyCatalog: ModelCatalog = {
+  providers: ["anthropic", "openai"],
+  tasks: [],
+  models: [],
+  effort_options: { anthropic: [], openai: [] },
+  routes: {} as Record<ModelTask, TaskRoute>,
+  credentials: { anthropic: [], openai: [] },
+  custom_allowed: true,
+};
+
+const health: ProvidersHealthResponse = {
+  providers: [
+    { id: "polygon", label: "Polygon", kind: "news", status: "missing_key", enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: true },
+    { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
+  ],
+  generated_at: "2026-07-02T00:00:00+00:00",
+  jobs: {},
+  local_market: { db_exists: true, sync: {} },
+  notes: [],
+};
+
+vi.mock("./api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api")>();
+  return {
+    ...actual,
+    getModelCatalog: vi.fn(async () => emptyCatalog),
+    getSchedule: vi.fn(async () => ({ sources: {} })),
+    getProvidersHealth: vi.fn(async () => health),
+    getProvidersConfig: vi.fn(async () => mocked.providersConfig),
+    importProviderConfigField: vi.fn(async (provider: string, field: string, sourceEnvVar?: string | null) => {
+      mocked.importCalls.push({ provider, field, sourceEnvVar });
+      return mocked.providersConfig.providers[provider as keyof typeof mocked.providersConfig.providers];
+    }),
+    putProviderConfig: vi.fn(async (provider: string, fields: Record<string, string | null>, confirmGuarded?: Record<string, boolean>) => {
+      mocked.putCalls.push({ provider, fields, confirmGuarded });
+      return mocked.providersConfig.providers[provider as keyof typeof mocked.providersConfig.providers];
+    }),
+    testProvider: vi.fn(),
+  };
+});
+
+import { SettingsView } from "./Settings";
+
+let root: ReturnType<typeof createRoot> | null = null;
+let host: HTMLDivElement | null = null;
+
+afterEach(() => {
+  if (root) {
+    act(() => root!.unmount());
+    root = null;
+  }
+  host?.remove();
+  host = null;
+  mocked.importCalls = [];
+  mocked.putCalls = [];
+  vi.restoreAllMocks();
+});
+
+async function renderDataSources() {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root!.render(React.createElement(SettingsView, { runtime: null, onRuntimeChanged: vi.fn() }));
+  });
+  await act(async () => { await Promise.resolve(); });
+  const dataButton = Array.from(host.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("Data Sources"));
+  if (!dataButton) throw new Error("missing Data Sources section button");
+  await act(async () => {
+    dataButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  });
+  await act(async () => { await Promise.resolve(); });
+}
+
+function setInputValue(el: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+describe("Settings provider config authority", () => {
+  it("renders config-file provenance with per-field import", async () => {
+    await renderDataSources();
+    expect(host!.textContent).toContain("config/.env");
+    expect(host!.textContent).toContain("建議匯入");
+    const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
+      row.textContent?.includes("Polygon") && row.textContent.includes("API key"));
+    if (!polygonRow) throw new Error("missing polygon config row");
+    const importButton = Array.from(polygonRow.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("匯入"));
+    if (!importButton) throw new Error("missing import button");
+    await act(async () => {
+      importButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    expect(mocked.importCalls).toEqual([{ provider: "polygon", field: "api_key", sourceEnvVar: "POLYGON_API_KEY" }]);
+  });
+
+  it("confirms guarded IBKR client id edits", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderDataSources();
+    const input = Array.from(host!.querySelectorAll("input")).find((node) =>
+      node.getAttribute("placeholder") === "Client ID") as HTMLInputElement | undefined;
+    if (!input) throw new Error("missing client-id input");
+    await act(async () => {
+      setInputValue(input, "7");
+    });
+    const ibkrRow = input.closest("tr");
+    if (!ibkrRow) throw new Error("missing ibkr config row");
+    const saveButton = Array.from(ibkrRow.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("儲存"));
+    if (!saveButton) throw new Error("missing save button");
+    await act(async () => {
+      saveButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mocked.putCalls.at(-1)).toEqual({
+      provider: "ibkr",
+      fields: { client_id: "7" },
+      confirmGuarded: { client_id: true },
+    });
+  });
+});

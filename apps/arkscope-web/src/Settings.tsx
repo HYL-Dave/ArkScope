@@ -19,6 +19,7 @@ import {
   getProvidersConfig,
   getProvidersHealth,
   getSchedule,
+  importProviderConfigField,
   importModelRoutes,
   deleteResearchRuntime,
   putProviderConfig,
@@ -50,6 +51,8 @@ import {
   type TradingDayCoverage,
   type TradingDayRow,
   type ProviderConfigEntry,
+  type ProviderConfigField,
+  type ProviderConfigSetupState,
   type ProvidersHealthResponse,
   type ScheduleSourceState,
   type SyncMeta,
@@ -1386,6 +1389,14 @@ const PROVIDER_STATUS_LABEL: Record<string, string> = {
   disabled: "已停用",
 };
 
+function providerConfigSourceLabel(source: string): string {
+  if (source === "app") return "App";
+  if (source === "env") return "環境變數";
+  if (source === "config/.env") return "config/.env";
+  if (source === "missing") return "未設定";
+  return source;
+}
+
 function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
 }
@@ -1394,6 +1405,7 @@ function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
+  const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -1405,7 +1417,10 @@ function DataSourcesSection() {
       getSchedule(), getProvidersHealth(), getProvidersConfig()]);
     if (rs.status === "fulfilled") setSchedule(rs.value.sources);
     if (rh.status === "fulfilled") setHealth(rh.value);
-    if (rc.status === "fulfilled") setCfg(rc.value.providers);
+    if (rc.status === "fulfilled") {
+      setCfg(rc.value.providers);
+      setCfgSetup(rc.value.setup);
+    }
     const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
@@ -1468,11 +1483,38 @@ function DataSourcesSection() {
     }
   }
 
-  async function saveField(provider: string, field: string, value: string | null) {
+  async function importField(provider: string, field: string, sourceEnvVar: string | null) {
     if (busy) return;
+    setBusy(`import.${provider}.${field}`);
+    try {
+      await importProviderConfigField(provider, field, sourceEnvVar);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveField(
+    provider: string,
+    field: string,
+    value: string | null,
+    fieldMeta?: ProviderConfigField,
+  ) {
+    if (busy) return;
+    const confirmGuarded =
+      fieldMeta?.guarded && value !== null
+        ? window.confirm(fieldMeta.guard_reason ?? "此設定需要確認後才會變更。")
+        : true;
+    if (!confirmGuarded) return;
     setBusy(`${provider}.${field}`);
     try {
-      await putProviderConfig(provider, { [field]: value });
+      await putProviderConfig(
+        provider,
+        { [field]: value },
+        fieldMeta?.guarded ? { [field]: true } : undefined,
+      );
       setKeyDrafts((d) => ({ ...d, [`${provider}.${field}`]: "" }));
       await load();
     } catch (e) {
@@ -1549,7 +1591,10 @@ function DataSourcesSection() {
                 <tr key={p.id}>
                   <td title={p.detail}>{p.label}</td>
                   <td><span className={`ds-chip ds-${p.status}`}>{PROVIDER_STATUS_LABEL[p.status] ?? p.status}</span></td>
-                  <td>{p.key_source === "not_required" ? "免金鑰" : p.key_source}</td>
+                  <td>
+                    {p.key_source === "not_required" ? "免金鑰" : p.key_source}
+                    {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
+                  </td>
                   <td>{shortTs(p.last_success_at)}</td>
                   <td className="muted">{p.last_error ? p.last_error.slice(0, 60) : "—"}</td>
                 </tr>
@@ -1562,10 +1607,16 @@ function DataSourcesSection() {
       <div className="settings-panel" style={{ marginTop: 16 }}>
         <h4 className="detail-section">連線與金鑰</h4>
         <p className="muted tiny">
-          App 管理各 provider 的金鑰與連線設定（存本地、僅顯示遮罩值）。IB Gateway 本體在你啟動的那台機器上
-          — 這裡填的是「連去哪」（host / port）。儲存即生效（毋須重啟）；優先序：環境變數 ＞ App 設定 ＞
-          config/.env。SEC EDGAR 免金鑰、預設可用。
+          App 管理各 provider 的金鑰與連線設定（存本地、僅顯示遮罩值）。真實環境變數仍可作為 operator escape hatch；
+          若目前來源是 config/.env，請逐欄匯入到 App 設定。儲存即生效（毋須重啟）。
         </p>
+        {cfgSetup?.required && (
+          <div className="errorbox">
+            <p className="muted">
+              Provider 設定需要修復：{cfgSetup.reason ?? cfgSetup.code ?? "profile DB unavailable"}
+            </p>
+          </div>
+        )}
         {!cfg ? (
           <p className="muted tiny">loading…</p>
         ) : (
@@ -1594,7 +1645,16 @@ function DataSourcesSection() {
                             ? <span className="ds-chip ds-missing_key">未設定</span>
                             : <>
                                 <span className="mono">{f.app_value_set ? f.app_value_masked : "（外部）"}</span>
-                                <span className="muted tiny">（{f.effective_source}）</span>
+                                {f.defaulted && <span className="muted tiny"> · 預設</span>}
+                                <span className="muted tiny">（{providerConfigSourceLabel(f.effective_source)}）</span>
+                                {f.needs_import && (
+                                  <button className="btn-ghost tiny"
+                                    disabled={busy === `import.${pid}.${f.field}`}
+                                    onClick={() => void importField(pid, f.field, f.import_source)}>
+                                    匯入
+                                  </button>
+                                )}
+                                {f.needs_import && <span className="muted tiny">建議匯入</span>}
                               </>
                           : "—"}
                       </td>
@@ -1611,18 +1671,18 @@ function DataSourcesSection() {
                                 setKeyDrafts((d) => ({ ...d, [`${pid}.${f.field}`]: e.target.value }))}
                               onKeyDown={(e) => {
                                 const v = keyDrafts[`${pid}.${f.field}`];
-                                if (e.key === "Enter" && v) void saveField(pid, f.field, v);
+                                if (e.key === "Enter" && v) void saveField(pid, f.field, v, f);
                               }}
                             />
                             {keyDrafts[`${pid}.${f.field}`] && (
                               <button className="btn-ghost tiny"
-                                onClick={() => void saveField(pid, f.field, keyDrafts[`${pid}.${f.field}`])}>
+                                onClick={() => void saveField(pid, f.field, keyDrafts[`${pid}.${f.field}`], f)}>
                                 儲存
                               </button>
                             )}
                             {f.app_value_set && (
                               <button className="btn-ghost tiny"
-                                onClick={() => void saveField(pid, f.field, null)}>
+                                onClick={() => void saveField(pid, f.field, null, f)}>
                                 清除
                               </button>
                             )}

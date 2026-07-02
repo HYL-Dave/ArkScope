@@ -1519,7 +1519,8 @@ export interface ProviderHealth {
   label: string;
   kind: string; // market | news | macro | fundamentals | capture
   key_present: boolean;
-  key_source: string; // env | config/.env | missing | not_required
+  key_source: string; // app | env | config/.env | missing | mixed | not_required
+  key_import_suggested: boolean;
   key_vars: string[];
   enabled: boolean | null; // null = no toggle exists for this provider
   status: ProviderStatus;
@@ -1611,6 +1612,12 @@ export interface ProviderConfigField {
   app_value_set: boolean;
   app_value_masked: string | null;
   effective_source: string; // app | env | config/.env | missing
+  needs_import: boolean;
+  import_source: string | null;
+  importable_env_vars: string[];
+  defaulted: boolean;
+  guarded: boolean;
+  guard_reason: string | null;
 }
 
 export interface ProviderConfigEntry {
@@ -1619,15 +1626,46 @@ export interface ProviderConfigEntry {
   default_available: boolean; // key-free + extension-free (e.g. SEC EDGAR)
 }
 
-export function getProvidersConfig(): Promise<{ providers: Record<string, ProviderConfigEntry> }> {
-  return getJSON<{ providers: Record<string, ProviderConfigEntry> }>("/providers/config", 8_000);
+export interface ProviderConfigSetupState {
+  required: boolean;
+  code: string | null;
+  reason: string | null;
+}
+
+export interface ProvidersConfigResponse {
+  providers: Record<string, ProviderConfigEntry>;
+  setup: ProviderConfigSetupState;
+}
+
+export function getProvidersConfig(): Promise<ProvidersConfigResponse> {
+  return getJSON<ProvidersConfigResponse>("/providers/config", 8_000);
 }
 
 export function putProviderConfig(
   provider: string,
   fields: Record<string, string | null>,
+  confirmGuarded?: Record<string, boolean>,
 ): Promise<ProviderConfigEntry> {
-  return sendJSON(`/providers/config/${encodeURIComponent(provider)}`, "PUT", { fields }, 8_000);
+  return sendJSON(
+    `/providers/config/${encodeURIComponent(provider)}`,
+    "PUT",
+    { fields, confirm_guarded: confirmGuarded ?? {} },
+    8_000,
+  );
+}
+
+export function importProviderConfigField(
+  provider: string,
+  field: string,
+  sourceEnvVar?: string | null,
+  confirmGuarded = false,
+): Promise<ProviderConfigEntry> {
+  return sendJSON(
+    `/providers/config/${encodeURIComponent(provider)}/${encodeURIComponent(field)}/import-env`,
+    "POST",
+    { source_env_var: sourceEnvVar ?? null, confirm_guarded: confirmGuarded },
+    8_000,
+  );
 }
 
 export interface ProviderTestResult {
