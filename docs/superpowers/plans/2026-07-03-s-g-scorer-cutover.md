@@ -90,6 +90,8 @@ Model-filtered reads use the latest score per `(article_id, score_type, model)` 
 
 The migration preserves every model/effort row. The reader chooses a default latest projection only at query time.
 
+The extra `model` / `reasoning_effort` tie-breakers are intentional determinism improvements over the PG `news_latest_scores` view, which only orders by `scored_at DESC` and can choose arbitrarily on timestamp ties.
+
 ### D3. Legacy Read Bridge
 
 N8a has not cut over every reader to normalized articles yet. Runtime reads still query the legacy `news` projection, so score joins must map a legacy `news.id` to normalized `article_id` through both maps:
@@ -399,7 +401,8 @@ latest_risk AS (...)
 4. `query_news(model="...")` returns rows with the requested model's scores.
 5. `query_news(scored_only=False)` surfaces score columns when present but still returns unscored rows.
 6. `query_news_search(scored_only=True)` uses the same bridge.
-7. `query_news_stats()` aggregates local normalized scores:
+7. `query_news` must populate `scored_model` with `COALESCE(latest_sentiment.model, latest_risk.model)`, matching the PG wide-row contract in `DatabaseBackend.query_news`.
+8. `query_news_stats()` aggregates local normalized scores:
    - `scored_count`: rows with local sentiment or risk
    - `avg_sentiment`: average latest sentiment
    - `avg_risk`: average latest risk
@@ -418,6 +421,7 @@ Tests:
 - `model="gpt-5.2"` filters to normalized model `gpt_5_2`.
 - `scored_only=True` filters to scored rows.
 - `scored_only=False` returns scored and unscored rows.
+- `scored_model` is the sentiment model when sentiment exists, otherwise the risk model.
 - Search and stats use the same local scores.
 - With no score table, the existing retired/honest-empty behavior remains.
 - PG poison test proves scored requests do not call `DatabaseBackend`.
