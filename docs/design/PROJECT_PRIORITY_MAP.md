@@ -2,7 +2,7 @@
 
 > **Created**: 2026-04-25
 > **Purpose**: Single resolver for "what should we work on next?". Consolidates the various roadmap documents (service architecture, agent refactor, SA roadmap, signal detection, RL, rename) into one ordered backlog.
-> **How to use**: Before starting a new feature, scope shift, or branch, check this map. If the work isn't here, either add it (with justification) or argue the active P0/P1 should change.
+> **How to use**: Before starting a new feature, scope shift, multi-slice line, or branch, check this map. If the work isn't here, either add it (with justification) or argue the active P0/P1 should change. New multi-slice lines must pass this check before their first implementation slice.
 > **When to update**: Whenever a P0/P1 item completes, blocks, or a higher-priority item emerges. Insert at the TOP of §10 Decision Log (newest-first ordering — see the note inside that section).
 
 ---
@@ -13,34 +13,26 @@
 
 > **Formal product repositioning 2026-05-02**: This is no longer an "intraday RL trading research repo" or "agent/tool backend for analysis". The project transitions to **local-first financial research agent workbench** — a single-user research environment that combines (a) Hermes-like agent capabilities (persistent memory, skills, tools, scheduler, replay, compression, subagents), (b) this codebase's existing financial data layer (news / SA / macro / prices / fundamentals / signals), and (c) a research GUI that lets the user read, edit, schedule, and migrate research artefacts. **North star**: the agent reads its own accumulated knowledge substrate across sessions and machines; the user sees and edits everything via a research GUI; zipping the profile directory moves a researcher's work between machines. **Five-layer architecture**: Workbench UI → Agent Layer → Data Layer → Profile Layer → Portability Layer (top-to-bottom). **Hermes is capability reference, NOT product reference** — we borrow filesystem-first profile + daemon scheduler + FTS5 cross-session recall + skills/tools flexibility, but our differentiation is the financial data layer + investment research workflow, not general-purpose agent platform. **Phase C PAUSED** — runner refactor is now second-order to product boundary, profile, sync, GUI IA, and agent-data-access API. Active sequence: audit done → spec done (`b0743da`) → **docs governance cleanup** (audit `docs/design/DOCS_GOVERNANCE_AUDIT_2026_05.md` + follow-up archive/delete/rewrite commit) → read-only UI skeleton against existing reads → **two-SQLite split + transient DuckDB** migration first cut (kill criterion: zip-and-go on a second machine). Phase C resumes only after `workbench v1 ship + 2 wks stable + 1 verified migration`. Repo identity renamed to `ArkScope` (Phase 2 / P3.2 executed 2026-05-31; only intentional `mindfulrl` lowercase for DB/host/addon/historical remains). Detail in §10 newest entry.
 
-```
-P0 (immediate, this iteration)
-  1. Replay Harness            ✅ minimal-spike 2026-04-25 (5e12d63/875a6ef) + full-v1 2026-05-01 (14567db…172b5a1)
-  2. Service S2 jobs persist   ✅ done 2026-04-25 (commit a86c2ab)
-  3. SA Comment Intel Stage 1  ✅ done 2026-04-25 (commits aa76cb0 / 5e72f6f / ba66fde)
-  4. SA Market News reliability — observability slice ✅ done 2026-04-25 (commits d923177 / 78e56d2); anti-bot fallback + p95 monitoring deferred
+### Current operating map (post-pivot, locked 2026-07-02)
 
-P1 (next, after P0 done or in flight)
-  5. Multi-factor signals → tool/API   ✅ done 2026-04-26 (commits 550c4da / e739e79)
-  6. Free calendar / FRED + Finnhub    ✅ done 2026-04-27 (commits e8fc1db … 95a644d)
-  7. SA Digest / Reading Workflow v1   ✅ done 2026-04-27 (commits ce5f780 … 68a60a5)
-  8. Context Compression Phase B       ✅ done 2026-04-30 (commits 99f90c9 … 95ff3cb)
-  9. S3 admin dashboard                ✅ spike done 2026-05-02 — see P1_5_S3_OSS_SPIKE_DECISION.md (custom minimal recommended); integration deferred behind Phase C spec
+The detailed P0/P1/P2/P3 sections below are retained as historical provenance for
+already-landed foundation work. The active resolver for "what next?" is now:
 
-P2 (later, has dependencies)
-  10. Unified Agent Runner Phase C     ⏸ PAUSED 2026-05-02 — product pivot to local-first workbench takes priority; spec at PHASE_C_UNIFIED_RUNNER_SPEC.md is preserved; resume gated on (workbench v1 ship + 2 wks stable + 1 verified cross-machine migration)
-  11. Knowledge Graph Phase A          (needs SA + News mature)
-  12. OpenClaw integration             (needs S2/S3)
-  13. Key Markets / Factor Grades
+| Priority | Workstream | Status / next action | Why it is here |
+|---|---|---|---|
+| **P0-A** | **Layer C-1 SA evidence feed** | **Next implementation line.** Spec is locked at `SA_EVIDENCE_FEED_C1_SPEC.md`; open the implementation plan before code. | Direct user-visible workbench value; turns existing SA/news evidence into a daily research surface. |
+| **P0-B** | **PG-exit completion, small slices** | **Parallel / immediately after C-1:** S-G scorer cutover first, then S-H orphan/app-state audit and N9-safe drops as their reader checks pass. | Completes the product goal that app runtime is local-store authority, not PG-backed. S-G is small enough not to block C-1. |
+| **P0-C** | **Prices migration** | **Separate large slice.** Do not hide it inside C-1/S-G work. | 2.25M-row core market-data domain; too large and high-blast-radius for "while we are here" treatment. |
+| **P0-D** | **Provider config authority Phase 2** | Wait for S-J Phase 0-1 soak: Settings should show no managed fields still sourced from `config/.env`. Then flip strict-by-default behind the documented rollback lever. | Supports zip-and-go portability and avoids silent `.env` authority in the desktop runtime. |
+| **P1** | **IV proof packet Task 1 only** | Optional cleanup: names-only cost/key authorization audit, then stop at sign-off. Paid sampling default = **DEFER**. | IV is PG-exit design insurance, not an active product line; no current consumer justifies paid data or S-D/S-E implementation yet. |
+| **P1** | **Publication / backup hygiene** | Push/bundle/review publication when convenient; master has many local-only commits. | Operational risk reduction, not product scope. |
+| **Gated** | **IV S-D/S-E / paid options data** | Blocked until written hypothesis + OOS plan + kill criteria + cost-vs-value. | Research subscription rule applies; no consumer and no hypothesis today. |
+| **Gated** | **Unified Runner Phase C** | Still paused. Resume only after workbench v1 ships, two weeks stable, and one verified cross-machine migration. | Internal infra win; premature before storage/profile/UI shape settles. |
+| **Deferred** | RL productionization, Reddit/StockTwits/X paid, MCP integration | No active work. | Prior pause/defer decisions still stand. |
 
-P3 (paused / deferred)
-  14. RL productionization      (paused — see project_rl_paused.md)
-  15. ArkScope rename Phase 2   (blocked on git clean state)
-  16. Reddit/StockTwits/X paid  (clear use case required)
-  17. MCP integration            (HTTP API more direct)
-```
-
-Subscription strategy: see §10. Splits into **operational** (must-keep) vs **research** (evidence-gated).
+Subscription strategy: see §10. Splits into **operational** (must-keep) vs
+**research** (evidence-gated). Paid IV/options data is research subscription work and
+therefore defaults to defer until the hypothesis gate exists.
 
 ---
 
