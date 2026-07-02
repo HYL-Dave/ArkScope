@@ -175,6 +175,48 @@ class TestMigrateDetectScoreColumns:
             sys.path.pop(0)
 
 
+class TestMigrateScoresArchiveGate:
+    def _patch_main(self, monkeypatch, argv):
+        from scripts import migrate_to_supabase as migrate
+
+        calls = []
+
+        class FakeConn:
+            def close(self):
+                calls.append("close")
+
+        monkeypatch.setattr("sys.argv", ["migrate_to_supabase.py", *argv])
+        monkeypatch.setattr(migrate, "load_db_url", lambda: "postgres://archive")
+        monkeypatch.setattr(migrate, "get_connection", lambda _dsn: FakeConn())
+        monkeypatch.setattr(migrate, "import_news", lambda conn, dry_run=False: calls.append("news") or 1)
+        monkeypatch.setattr(migrate, "import_prices", lambda conn, dry_run=False: calls.append("prices") or 1)
+        monkeypatch.setattr(migrate, "import_iv_history", lambda conn, dry_run=False: calls.append("iv") or 1)
+        monkeypatch.setattr(migrate, "import_fundamentals", lambda conn, dry_run=False: calls.append("fundamentals") or 1)
+        monkeypatch.setattr(migrate, "import_news_scores", lambda conn, dry_run=False: calls.append("scores") or 1)
+        return migrate, calls
+
+    def test_default_import_all_skips_pg_news_scores(self, monkeypatch):
+        migrate, calls = self._patch_main(monkeypatch, [])
+
+        migrate.main()
+
+        assert "scores" not in calls
+        assert {"news", "prices", "iv", "fundamentals"} <= set(calls)
+
+    def test_scores_requires_archive_flag(self, monkeypatch):
+        migrate, _calls = self._patch_main(monkeypatch, ["--scores"])
+
+        with pytest.raises(SystemExit):
+            migrate.main()
+
+    def test_scores_archive_flag_allows_explicit_pg_score_import(self, monkeypatch):
+        migrate, calls = self._patch_main(monkeypatch, ["--scores", "--archive-scores"])
+
+        migrate.main()
+
+        assert calls == ["scores", "close"]
+
+
 # ===========================================================================
 # FileBackend model selection integration
 # ===========================================================================

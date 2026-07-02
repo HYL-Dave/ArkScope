@@ -481,9 +481,10 @@ Cutover is atomic at the routing level:
 The current Parquet readers are explicit cutover dependencies, not reasons to preserve Parquet as
 the new authority:
 
-- `scripts/scoring/score_ibkr_news.py` is the active universal live-workbench scorer and must gain a
-  normalized-SQLite input/output path before N8; a test must prove a newly ingested normalized
-  article can be selected and scored without Parquet.
+- `scripts/scoring/score_ibkr_news.py` remains the Parquet-producing/manual scorer for now. S-G
+  adds `scripts/scoring/import_news_scores_local.py` as the normalized SQLite import path before
+  PG `news_scores` can retire; a test must prove a scored article can be selected through the
+  normalized local mapping without PG.
 - `FileBackend` still reads Parquet when the DAL has no DSN. It is not the sidecar's primary news
   path, but its fallback must be replaced by the normalized local store or formally retired before
   historical Parquet files and their reader code can be deleted.

@@ -156,8 +156,8 @@
 
 | 元件 | Verdict | 動作 |
 |---|---|---|
-| scoring read-path (detect/resolve_score_columns, query_news_scores) | **preserve-as-is** | news/sentiment evidence panel |
-| `score_ibkr_news.py` | **preserve-adapt** | main() 包成可從 GUI dispatch 的 job entrypoint（回 DTO/progress 非 stdout） |
+| scoring read-path (detect/resolve_score_columns, local `news_article_scores`) | **preserve-adapt** | news/sentiment evidence panel；score-dependent reads use SQLite-local scores, not PG `news_scores` |
+| `score_ibkr_news.py` | **preserve-adapt** | keep as the Parquet-producing/manual scorer for now; active DB import is `scripts/scoring/import_news_scores_local.py`, not `migrate_to_supabase --scores` |
 | `score_sentiment_anthropic.py` + `score_risk_anthropic.py` | **preserve-adapt** | 丟 CSV --input/--output，收斂 parquet + --data-dir；provider switcher 的 Anthropic 後端 |
 | `openai_summary.py` | **preserve-adapt** | 解耦 CSV I/O，曝露為 callable enrichment step。*註：review 修正——它 **並未** 被 anthropic scorers import（原 rationale 錯），價值在 summarization-for-evidence，自帶獨立 routing* |
 | `sql/002_add_news_scores.sql` | **preserve-adapt** | DDL 移 SQLite（BIGSERIAL→INTEGER PK、TIMESTAMPTZ→TEXT/INTEGER） |

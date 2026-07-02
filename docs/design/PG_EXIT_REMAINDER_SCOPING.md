@@ -41,7 +41,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 | PG table | ~rows | Cut A | Strategy | Notes |
 |---|---|---|---|---|
 | `prices` | 2.25M | market | **migrate** | re-fetchable but large; N7-style migration; own slice |
-| `news_scores` | 503k | market | **cutover (scorer)** | scorer still on PG; place near N8b reads |
+| `news_scores` | 503k | market | **cutover (scorer)** | S-G in implementation: migrate PG scores into local `news_article_scores`; future active imports use `scripts/scoring/import_news_scores_local.py`; PG `--scores` is archive-only |
 | `news` (PG) | 343k | market | **drop-orphan** | not read by app post-N8a → N9 drop |
 | `sa_*` (comments/signals/market_news/articles/alpha_picks) | ~95k | market | **drop-orphan?** | SA already local (`sa_capture.db`); confirm no reader before drop |
 | `fundamentals` | 130 | market | **refetch/cache** | EDGAR base + paid supplement; period-aware TTL |
@@ -112,7 +112,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 4. **S-D | IV local schema reboot** (contract in §7): raw-retain + versioned-derive schema, provider-abstraction interface; no scheduling yet.
 5. **S-E | IV IBKR small-scope computed-IV prototype** (10–30 tickers, near-month/ATM, fixed DTE-or-delta bucket, append-only, no gap-fill). Extract `src/iv/`.
 6. **S-F | (optional) IV bulk provider backend** — only if the survey finds a fit; plugs into the same schema.
-7. **S-G | scorer (news_scores) cutover** — place near N8b reads.
+7. **S-G | scorer (news_scores) cutover** — in implementation. Add local `news_article_scores`, migrate reviewed PG history behind a preview/apply fingerprint gate, repoint score-dependent local reads, and make future active score imports use `scripts/scoring/import_news_scores_local.py` while PG `--scores` becomes archive-only.
 8. **S-H | orphan/audit + app-state relocation** — drop-orphan PG `news`/`sa_*` (confirm no reader first); decide app-state homes; audit macro/cal.
 9. **S-I | N9 real drop** (§8).
 10. **S-J | provider-config authority hardening (DB-first, fail-closed)** — orthogonal to the domain slices (provider *config*, not market data). Kill the two silent `config/.env` fallbacks (per-field overlay + whole-store startup degrade), surface per-field provenance with an explicit import affordance, then flip strict-by-default behind a tri-state. Contract in §13. **Phase 0–1 must land before S-E** so new IV provider keys are DB-native from day one.
@@ -204,7 +204,8 @@ uses `scripts/` in these ways:
 - IBKR prices and IV: scheduler subprocesses still target
   `scripts/collection/collect_ibkr_prices.py` and `scripts/collection/collect_iv_history.py`.
 - PG sync: `scripts/migrate_to_supabase.py` remains the domain sync target for
-  unfinished domains (`--prices`, `--iv`, `--fundamentals`, and opt-in `--scores`).
+  unfinished domains (`--prices`, `--iv`, and `--fundamentals`); `--scores`
+  is retained only as an explicit archive path and requires `--archive-scores`.
 - `scripts/collection/daily_update.py` remains a parallel CLI runtime path and writes
   `daily_update.*` job aliases that scheduler state still recognizes.
 
@@ -220,7 +221,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | Domain | Current survey finding | Disposition |
 |---|---|---|
 | News | hard-local reads and normalized local writes are live; PG news is no longer the app authority | N9 drop candidate after final reader grep; keep legacy local projection until N8b/N9 |
-| News scores | PG table and `migrate_to_supabase --scores` still exist, but local runtime code marks `news_scores` retired/deferred and score-dependent local reads do not fall back to PG | not a PG-exit blocker; treat as separate scoring/enrichment project or verified-dead PG drop, not part of IV/fundamentals work. Conscious tradeoff: hard-local news currently degrades multi-model sentiment/risk to `NULL`/`0` until a future scoring project exists |
+| News scores | PG table and `migrate_to_supabase --scores --archive-scores` remain only as an archive path. S-G adds local `news_article_scores`, bridges legacy rows through the normalized news maps, and makes active local score imports use `scripts/scoring/import_news_scores_local.py` | S-G removes the hard-local score degradation for migrated/imported scores once its live apply completes; PG `news_scores` becomes an N9 drop candidate after the reviewed local cutover and reader grep |
 | SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; a few health paths still use `job_runs` best-effort | PG `sa_*` is a likely orphan; grep-gate before drop; job telemetry belongs to app-state/ops, not SA market data |
 | Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise returns honest empty; live cache may initially be cold; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table is an N9 drop-orphan |
 | IV | only 24 local rows; scheduler still routes `iv_history` through IBKR script → PG → mirror; tools/UI read local with PG fallback on miss | abandon old 24 rows as experimental; preserve capability via rebooted local schema + provider abstraction |

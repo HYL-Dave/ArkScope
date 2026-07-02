@@ -5,13 +5,16 @@ migrate_to_supabase.py — Import historical data files into PostgreSQL.
 Usage:
     python scripts/migrate_to_supabase.py              # Import all data types
     python scripts/migrate_to_supabase.py --news       # News articles only
-    python scripts/migrate_to_supabase.py --scores     # News scores only (multi-model)
+    python scripts/migrate_to_supabase.py --scores --archive-scores
+                                                   # Archived PG news scores only
     python scripts/migrate_to_supabase.py --prices     # Prices only
     python scripts/migrate_to_supabase.py --iv         # IV history only
     python scripts/migrate_to_supabase.py --fundamentals  # Fundamentals only
     python scripts/migrate_to_supabase.py --dry-run    # Count rows without importing
 
-The --scores flag imports multi-model scores into the news_scores table.
+The --scores flag is now an archive-only path for legacy PG news_scores.
+Use scripts/scoring/import_news_scores_local.py for active local score imports.
+Archived PG score import requires --archive-scores.
 It auto-detects score columns (sentiment_haiku, risk_gpt_5_2_xhigh, etc.)
 from parquet/CSV files and upserts them incrementally.
 
@@ -691,12 +694,27 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
 def main():
     parser = argparse.ArgumentParser(description="Import data into PostgreSQL")
     parser.add_argument("--news", action="store_true", help="Import news articles only")
-    parser.add_argument("--scores", action="store_true", help="Import news scores to news_scores table (multi-model)")
+    parser.add_argument(
+        "--scores",
+        action="store_true",
+        help="Import archived PG news scores only; requires --archive-scores",
+    )
+    parser.add_argument(
+        "--archive-scores",
+        action="store_true",
+        help="Allow explicit archive import into PG news_scores",
+    )
     parser.add_argument("--prices", action="store_true", help="Import prices only")
     parser.add_argument("--iv", action="store_true", help="Import IV history only")
     parser.add_argument("--fundamentals", action="store_true", help="Import fundamentals only")
     parser.add_argument("--dry-run", action="store_true", help="Count rows without importing")
     args = parser.parse_args()
+    if args.scores and not args.archive_scores:
+        parser.error(
+            "--scores writes archived PG news_scores; use "
+            "scripts/scoring/import_news_scores_local.py for active local imports, "
+            "or pass --archive-scores for an explicit archive import"
+        )
 
     # If no specific flag, import all
     import_all = not (args.news or args.scores or args.prices or args.iv or args.fundamentals)
@@ -718,7 +736,7 @@ def main():
         if import_all or args.news:
             totals["news"] = import_news(conn, dry_run=args.dry_run)
 
-        if import_all or args.scores:
+        if args.scores:
             totals["news_scores"] = import_news_scores(conn, dry_run=args.dry_run)
 
         if import_all or args.iv:
