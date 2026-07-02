@@ -249,3 +249,75 @@ def test_routes_validation(store):
         pc.put_provider_config("polygon",
                                pc.ProviderConfigUpdate(fields={"host": "x"}), store=store)
     assert e.value.status_code == 400      # unknown field for this provider
+
+
+def test_route_marks_file_source_as_importable(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
+    monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
+    view = pc.providers_config(store=store)["providers"]
+    row = view["polygon"]["fields"][0]
+    assert row["effective_source"] == "config/.env"
+    assert row["needs_import"] is True
+    assert row["import_source"] == "POLYGON_API_KEY"
+    assert row["importable_env_vars"] == ["POLYGON_API_KEY"]
+
+
+def test_import_env_field_promotes_file_value_to_db(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_from_file")
+    monkeypatch.setattr("src.env_keys._loaded_keys", {"POLYGON_API_KEY"})
+    out = pc.import_provider_config_field(
+        "polygon",
+        "api_key",
+        pc.ProviderConfigImportEnv(source_env_var=None),
+        store=store,
+    )
+    row = out["fields"][0]
+    assert store.get_all()["polygon"]["api_key"] == "pk_from_file"
+    assert row["effective_source"] == "app"
+    assert row["needs_import"] is False
+    assert "pk_from_file" not in str(out)
+
+
+def test_sec_contact_email_import_normalizes_to_canonical_user_agent(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    monkeypatch.setenv("SEC_CONTACT_EMAIL", "ops@example.com")
+    out = pc.import_provider_config_field(
+        "sec_edgar",
+        "user_agent",
+        pc.ProviderConfigImportEnv(source_env_var="SEC_CONTACT_EMAIL"),
+        store=store,
+    )
+    assert store.get_all()["sec_edgar"]["user_agent"] == "ArkScope ops@example.com"
+    row = next(f for f in out["fields"] if f["field"] == "user_agent")
+    assert row["effective_source"] == "app"
+    assert os.environ["ARKSCOPE_SEC_USER_AGENT"] == "ArkScope ops@example.com"
+
+
+def test_guarded_ibkr_client_id_requires_confirmation(store):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+
+    dpc.apply_env(store)  # seeds ibkr.client_id=1
+    with pytest.raises(HTTPException) as e:
+        pc.put_provider_config(
+            "ibkr",
+            pc.ProviderConfigUpdate(fields={"client_id": "7"}),
+            store=store,
+        )
+    assert e.value.status_code == 409
+    assert e.value.detail["code"] == "provider_config_change_guard"
+
+    out = pc.put_provider_config(
+        "ibkr",
+        pc.ProviderConfigUpdate(fields={"client_id": "7"}, confirm_guarded={"client_id": True}),
+        store=store,
+    )
+    row = next(f for f in out["fields"] if f["field"] == "client_id")
+    assert row["app_value_masked"] == "7"
+    assert row["effective_source"] == "app"
