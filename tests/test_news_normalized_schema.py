@@ -54,6 +54,7 @@ def test_schema_is_idempotent_and_has_all_normalized_tables(conn):
         "news_ingest_conflicts",
         "news_normalization_runs",
         "news_legacy_migration_map",
+        "news_article_scores",
     } <= tables
 
 
@@ -98,6 +99,49 @@ def test_body_status_check_and_raw_ref_column(conn):
         conn.execute(
             "INSERT INTO news_article_bodies(article_id,body_status) VALUES (?,?)",
             (_article(conn, title="Bad"), "guessed_expired"),
+        )
+
+
+def test_article_scores_schema_constraints_and_indexes(conn):
+    ensure_news_normalized_schema(conn)
+    article_id = _article(conn)
+
+    indexes = {
+        row[1]
+        for row in conn.execute("PRAGMA index_list(news_article_scores)").fetchall()
+    }
+    assert {
+        "idx_news_article_scores_article",
+        "idx_news_article_scores_latest",
+        "idx_news_article_scores_model",
+    } <= indexes
+
+    conn.execute(
+        "INSERT INTO news_article_scores "
+        "(article_id,score_type,model,reasoning_effort,score,scored_at,created_at,updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (article_id, "sentiment", "gpt_5_2", "high", 4.2, "2026-07-01T00:00:00Z", "now", "now"),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO news_article_scores "
+            "(article_id,score_type,model,reasoning_effort,score,scored_at,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (article_id, "risk", "gpt_5_2", "high", 6.0, "2026-07-01T00:00:00Z", "now", "now"),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO news_article_scores "
+            "(article_id,score_type,model,reasoning_effort,score,scored_at,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (article_id, "quality", "gpt_5_2", "high", 4.0, "2026-07-01T00:00:00Z", "now", "now"),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO news_article_scores "
+            "(article_id,score_type,model,reasoning_effort,score,scored_at,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (article_id, "sentiment", "gpt_5_2", "high", 3.8, "2026-07-02T00:00:00Z", "now", "now"),
         )
 
 

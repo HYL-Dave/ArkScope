@@ -116,6 +116,29 @@ CREATE TABLE IF NOT EXISTS news_article_body_variants (
 CREATE INDEX IF NOT EXISTS idx_news_body_variants_article
 ON news_article_body_variants(article_id);
 
+CREATE TABLE IF NOT EXISTS news_article_scores (
+    article_id             INTEGER NOT NULL
+                           REFERENCES news_articles(id) ON DELETE CASCADE,
+    score_type             TEXT NOT NULL
+                           CHECK (score_type IN ('sentiment','risk')),
+    model                  TEXT NOT NULL,
+    reasoning_effort       TEXT NOT NULL DEFAULT '',
+    score                  REAL NOT NULL
+                           CHECK (score BETWEEN 1 AND 5),
+    scored_at              TEXT NOT NULL,
+    source                 TEXT NOT NULL DEFAULT 'pg_news_scores_cutover',
+    source_legacy_news_id  INTEGER,
+    created_at             TEXT NOT NULL,
+    updated_at             TEXT NOT NULL,
+    PRIMARY KEY (article_id, score_type, model, reasoning_effort)
+);
+CREATE INDEX IF NOT EXISTS idx_news_article_scores_article
+ON news_article_scores(article_id);
+CREATE INDEX IF NOT EXISTS idx_news_article_scores_latest
+ON news_article_scores(article_id, score_type, scored_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_article_scores_model
+ON news_article_scores(score_type, model, reasoning_effort);
+
 CREATE TABLE IF NOT EXISTS news_normalization_runs (
     id                              INTEGER PRIMARY KEY,
     policy_version                  TEXT NOT NULL,
