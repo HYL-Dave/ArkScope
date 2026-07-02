@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import Iterable, Mapping
@@ -51,13 +52,16 @@ def _normalize_row(row: ScoreSourceRow, article_id: int) -> ScoreMigrationRow:
     scored_at = (row.scored_at or "").strip()
     if not scored_at:
         raise ValueError(f"score row {row.legacy_news_id} has no scored_at")
+    score = float(row.score)
+    if not math.isfinite(score) or not 1 <= score <= 5:
+        raise ValueError(f"score row {row.legacy_news_id} has invalid score")
     return ScoreMigrationRow(
         article_id=int(article_id),
         legacy_news_id=int(row.legacy_news_id),
         score_type=normalize_score_type(row.score_type),
         model=normalize_score_model(row.model),
         reasoning_effort=normalize_reasoning_effort(row.reasoning_effort),
-        score=float(row.score),
+        score=score,
         scored_at=scored_at,
     )
 
