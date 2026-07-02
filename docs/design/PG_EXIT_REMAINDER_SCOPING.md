@@ -442,6 +442,13 @@ DB-native instead of expanding `.env` fallback.
   discipline (default is the new world; the old world needs an explicit flag).
 - `config/.env` thereafter = import/export + migration material; real shell env
   remains the operator escape hatch (precedence unchanged).
+- **Carried micro-fix (found during Phase-1 live acceptance 2026-07-02):**
+  manual PUT of `sec_edgar.user_agent` must apply the same
+  `normalize_import_value` wrapping as the alias-import path (bare email →
+  `ArkScope <email>`); today only `POST .../import-env` normalizes, so a
+  hand-typed bare email is stored/injected un-prefixed. Small: route-side
+  normalize on PUT for this field + one test. Land with Phase 2 or earlier as a
+  standalone fix.
 
 ### 13.5 Gates / tests
 
@@ -471,6 +478,11 @@ DB-native instead of expanding `.env` fallback.
   client-id defaults are app-managed; `config/.env` fallback is still allowed but
   visible/importable; profile DB startup failure now enters setup-only mode.
   Phase 2 strict-by-default remains pending.
+- Soak-gate status 2026-07-02: primary machine has no `config/.env`-sourced
+  managed fields left (provider keys migrated 2026-06-27; `config/.env` never
+  contained SEC UA keys, so SEC ran on the placeholder UA until the user set
+  `sec_edgar.user_agent` manually in Settings today). Phase 2 can be scheduled;
+  it should include the §13.4 carried micro-fix.
 - Phase 2 flips only after Phase 1 has soaked: Settings shows no remaining
   "from config/.env" managed fields on the primary machine (or each is a
   conscious keep), then default-strict is turned on.
