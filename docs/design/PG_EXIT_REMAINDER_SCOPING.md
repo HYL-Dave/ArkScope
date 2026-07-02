@@ -311,7 +311,7 @@ Recommended next order:
 
 ---
 
-## 13. Provider-config authority hardening design contract (core of S-J) — DRAFT for review
+## 13. Provider-config authority hardening design contract (core of S-J) — decisions locked 2026-07-02
 
 **Problem.** The desktop premise is DB-first, but provider config today is
 "DB-overlays-.env". `apply_env` (`src/data_provider_config.py:162`) first loads
@@ -357,10 +357,15 @@ Inventory every provider env var and classify:
 - **managed** (already in FieldDefs): `POLYGON_API_KEY`, `FINNHUB_API_KEY`,
   `FRED_API_KEY`, `FINANCIAL_DATASETS_API_KEY`, `IBKR_HOST` / `IBKR_PORT` /
   `IBKR_CLIENT_ID`;
-- **.env-only gap** (known: `SEC_CONTACT_EMAIL` / `ARKSCOPE_SEC_USER_AGENT` (UA
-  contract); audit for others, e.g. EODHD / Alpha Vantage if S-C selects one,
-  Discord ops token) → each gap is either promoted to FieldDefs or explicitly
-  recorded as stays-.env-with-reason;
+- **`legacy_env_only`** (known candidates: `SEC_CONTACT_EMAIL` /
+  `ARKSCOPE_SEC_USER_AGENT` (UA contract — attach to the existing `sec_edgar`
+  provider); alpha_vantage / tiingo / eodhd api_keys (live readers exist — this
+  absorbs the old "Slice A optional" FieldDefs list, incl. its
+  `_TESTABLE`/connection-test decision); Discord ops token; `REDDIT_*`/FMP have
+  no live reader → defer/retire) → each is either promoted to FieldDefs or
+  recorded as `legacy_env_only`-with-reason. Under strict these keep working
+  with a rendered warning — never blocked; no runtime `getenv()` interception
+  sweep;
 - **retiring consumer** (CLI/scripts) → listed, not fixed.
 
 Grep surface: `_load_env|load_dotenv|config/\.env|os\.environ` (provider-key
@@ -368,24 +373,42 @@ reads) + FieldDefs registry. Read-only; no code change in Phase 0.
 
 ### 13.3 Phase 1 — visibility + hard startup (no default-behavior flip yet)
 
-1. **Startup fail-closed:** unreadable profile DB at sidecar startup → startup
-   fails into a needs-setup state (replace the `app.py:43` warn-and-continue).
-   A desktop app whose premise is the DB must not boot in a shadow .env mode.
+1. **Startup fail-closed = needs-setup mode, not process death:** unreadable
+   profile DB at sidecar startup → boot into a setup-only state (replaces the
+   `app.py:43` warn-and-continue): Settings/status surfaces stay up, but the
+   scheduler loop is not started and provider fetch / collector subprocesses
+   are disabled. The one forbidden outcome is today's behavior — silently
+   continuing to collect on pure-.env config.
 2. **Provenance surfaced:** status/Settings show `effective_source` per managed
    field; `config/.env` renders as "from config/.env — import suggested" with a
-   per-field one-click import (Settings PUT exists; the 2026-06-27 .env→DB
-   migration was one-shot, so this adds a first-class import affordance).
-3. **FieldDefs growth:** promote `SEC_CONTACT_EMAIL` (+ UA var) to managed.
-4. **New-provider rule (effective immediately):** any provider added from now on
+   **per-field** one-click import (Settings PUT exists; the 2026-06-27 .env→DB
+   migration was one-shot, so this adds a first-class import affordance). No
+   blind bulk import — any later batch action must be preview + selected-import.
+3. **FieldDefs growth:** promote `SEC_CONTACT_EMAIL` / `ARKSCOPE_SEC_USER_AGENT`
+   onto the existing `sec_edgar` provider (preserve the canonical-var-first
+   precedence); promote the `legacy_env_only` candidates that pass the Phase-0
+   promote/keep call.
+4. **`IBKR_CLIENT_ID` seed + change guard** (already a FieldDef since Slice A —
+   only the value was never seeded): if the DB row is missing, seed the explicit
+   default `1`; Settings renders it app-managed (defaulted). Edits get a change
+   guard (changing it disturbs IB Gateway sessions; the stored value is a *base*
+   — `option_chain_tools` applies a +10 offset). The legacy `.env` name
+   `IBKR_CLIENT` (never read by code) is not auto-ingested — explicit user
+   import only.
+5. **New-provider rule (effective immediately):** any provider added from now on
    (e.g. the S-F IV bulk backend) is DB-native only — no `.env` fallback is ever
    added for new keys.
 
 ### 13.4 Phase 2 — strict default (tri-state, news-S3.2 pattern)
 
 - New setting `provider_env_fallback` (profile setting + env override),
-  tri-state: **unset → strict** — managed fields read DB-injected values only; a
-  missing field is a structured `not_configured` (provider-health status, honest
-  route/tool errors, Settings 未設定 badge), never a silent `.env` read.
+  tri-state: **unset → strict** — FieldDefs-managed fields read DB-injected
+  values only; a missing field is a structured
+  `{code: "provider_config_missing", status: "not_configured", provider, field}`
+  shared by provider-health, API routes, and agent tools (display layers may
+  re-render it into their vocabulary, but consumers assert on the machine
+  `code`, never on message text), and never a silent `.env` read.
+  `legacy_env_only` vars keep working under strict with a rendered warning.
   Explicit `true` → legacy per-field fallback (migration/rescue). Explicit
   `false` → strict, pinned.
 - Rollback = explicit `true`, mirroring the news S3.2 default-ON tri-state
@@ -397,10 +420,16 @@ reads) + FieldDefs registry. Read-only; no code change in Phase 0.
 
 - strict + DB value present → the file loader is not consulted for that var
   (assert via `keys_loaded_from_file` bookkeeping / monkeypatched loader).
-- strict + missing → structured `not_configured` at all three surfaces
-  (provider-health, API route, agent tool) — no exception, no silent empty.
+- strict + missing → `provider_config_missing` at all three surfaces
+  (provider-health, API route, agent tool), asserted on the machine `code` — no
+  exception, no silent empty.
 - explicit `true` → legacy fallback restored (rollback path proven).
-- unreadable profile DB → startup needs-setup failure (lifespan test).
+- unreadable profile DB → boots needs-setup: Settings/status reachable,
+  scheduler not started, collector subprocess launch refused (lifespan test).
+- `IBKR_CLIENT_ID`: missing row → seeded `1`; edit → change guard; legacy
+  `IBKR_CLIENT` env name never auto-ingested.
+- `legacy_env_only` var under strict → still works + warning rendered, not
+  blocked.
 - worker entrypoints apply DB config before provider construction (extend the
   S-A1 worker tests).
 - §11 generic gate applies; the only persistent-state growth is additive
@@ -415,15 +444,24 @@ reads) + FieldDefs registry. Read-only; no code change in Phase 0.
   "from config/.env" managed fields on the primary machine (or each is a
   conscious keep), then default-strict is turned on.
 
-### 13.7 Open points (decide at review)
+### 13.7 Decisions (locked at review, 2026-07-02)
 
-1. **Strict scope:** strict applies to FieldDefs-managed vars only; `.env` stays
-   live for unmanaged vars until each is promoted or its consumer retires — OK,
-   or should strict also warn on any unmanaged provider-key read?
-2. **`not_configured` shape:** reuse the provider-health status vocabulary, or a
-   new structured error code shared by route + tool surfaces?
-3. **Import affordance:** per-field only, or also a bulk "import all from .env"
-   action (bulk is convenient but re-blesses .env as a source; leaning per-field)?
-4. **`IBKR_CLIENT_ID`:** deliberately skipped in the 2026-06-27 migration —
-   stays env/real-env-only, or becomes managed with a change-guard (client_id
-   changes are operationally sensitive)?
+1. **Strict scope:** FieldDefs-managed vars only. No runtime interception sweep
+   of all `getenv()` (that becomes a house-cleaning project). Unmanaged provider
+   keys are listed in the Phase-0 table as `legacy_env_only`; under strict they
+   warn but never block. New providers never gain `.env` fallback.
+2. **`not_configured` shape:** shared structured error —
+   `code: "provider_config_missing"` / `status: "not_configured"` — one shape
+   for provider-health, routes, and tools; display layers may re-render it, but
+   the machine `code` is the contract (never a text-only status).
+3. **Import affordance:** Phase 1 ships per-field import only. No blind bulk
+   import as a mainline flow (it would re-bless `.env` as an authority); any
+   later batch action must be preview + selected-import.
+4. **`IBKR_CLIENT_ID`:** becomes managed-with-value, guarded: Phase 1 seeds the
+   explicit default `1` when the DB row is missing, Settings shows
+   app-managed/defaulted, edits warn (IB Gateway session impact), and the legacy
+   `IBKR_CLIENT` `.env` name is imported only on explicit user action.
+5. **Startup semantics (correction):** fail-closed means *boot to setup-only* —
+   Settings/needs-setup surfaces stay available while the scheduler, provider
+   fetch, and collector subprocesses are disabled. It does not mean the sidecar
+   dies; it does mean no silent pure-.env collection.
