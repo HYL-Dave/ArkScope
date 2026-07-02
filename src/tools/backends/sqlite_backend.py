@@ -35,7 +35,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from src.news_normalized.scores import latest_score_cte, normalize_score_model
+from src.news_normalized.scores import normalize_score_model
 
 logger = logging.getLogger(__name__)
 
@@ -287,18 +287,38 @@ class SqliteBackend:
         finally:
             conn.close()
 
-    def _score_ctes(self, model: Optional[str] = None) -> str:
-        normalized_model = normalize_score_model(model) if model else None
+    @staticmethod
+    def _score_map_joins() -> str:
         return (
-            "WITH article_bridge AS ("
-            "SELECT n.id AS legacy_news_id, COALESCE(m.article_id, p.article_id) AS article_id "
-            "FROM news n "
             "LEFT JOIN news_legacy_migration_map m ON m.legacy_news_id = n.id "
             "LEFT JOIN news_legacy_projection_map p ON p.legacy_news_id = n.id"
-            "), "
-            + latest_score_cte("sentiment", alias="latest_sentiment", model=normalized_model)
-            + ", "
-            + latest_score_cte("risk", alias="latest_risk", model=normalized_model)
+        )
+
+    @staticmethod
+    def _sql_literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    def _score_lookup_expr(
+        self,
+        score_type: str,
+        column: str,
+        *,
+        model: Optional[str],
+        article_expr: str = "COALESCE(m.article_id, p.article_id)",
+    ) -> str:
+        if column not in {"score", "model"}:
+            raise ValueError(f"unsupported score lookup column: {column}")
+        clauses = [
+            f"s.article_id = {article_expr}",
+            f"s.score_type = {self._sql_literal(score_type)}",
+        ]
+        if model:
+            clauses.append(f"s.model = {self._sql_literal(normalize_score_model(model))}")
+        where = " AND ".join(clauses)
+        return (
+            f"(SELECT s.{column} FROM news_article_scores s "
+            f"WHERE {where} "
+            "ORDER BY s.scored_at DESC, s.model DESC, s.reasoning_effort DESC LIMIT 1)"
         )
 
     def _query_news_with_normalized_scores(
@@ -318,19 +338,19 @@ class SqliteBackend:
         if source != "auto":
             conds.append("n.source = ?")
             params.append(source)
+        sent_score = self._score_lookup_expr("sentiment", "score", model=model)
+        risk_score = self._score_lookup_expr("risk", "score", model=model)
+        sent_model = self._score_lookup_expr("sentiment", "model", model=model)
+        risk_model = self._score_lookup_expr("risk", "model", model=model)
         if scored_only or model:
-            conds.append("(latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL)")
+            conds.append(f"({sent_score} IS NOT NULL OR {risk_score} IS NOT NULL)")
         sql = (
-            f"{self._score_ctes(model)} "
             "SELECT substr(n.published_at, 1, 10) AS date, n.ticker AS ticker, "
             "n.title AS title, n.source AS source, n.url AS url, n.publisher AS publisher, "
-            "latest_sentiment.score AS sentiment_score, latest_risk.score AS risk_score, "
-            "COALESCE(latest_sentiment.model, latest_risk.model) AS scored_model, "
-            "n.description AS description "
+            f"{sent_score} AS sentiment_score, {risk_score} AS risk_score, "
+            f"COALESCE({sent_model}, {risk_model}) AS scored_model, n.description AS description "
             "FROM news n "
-            "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
-            "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
-            "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id "
+            f"{self._score_map_joins()} "
             f"WHERE {' AND '.join(conds)} ORDER BY n.published_at DESC"
         )
         return self._news_df(sql, params, _NEWS_COLS)
@@ -390,15 +410,17 @@ class SqliteBackend:
         scored_only: bool,
     ) -> pd.DataFrame:
         cutoff = (date.today() - timedelta(days=days)).isoformat()
-        cols = (
-            "substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
-            "n.publisher, latest_sentiment.score AS sentiment_score, "
-            "latest_risk.score AS risk_score, n.description"
-        )
         q = (query or "").strip()
         conds, params = ["n.published_at >= ?"], [cutoff]
+        sent_score = self._score_lookup_expr("sentiment", "score", model=None)
+        risk_score = self._score_lookup_expr("risk", "score", model=None)
+        cols = (
+            "substr(n.published_at, 1, 10) AS date, n.ticker, n.title, n.source, n.url, "
+            f"n.publisher, {sent_score} AS sentiment_score, "
+            f"{risk_score} AS risk_score, n.description"
+        )
         if scored_only:
-            conds.append("(latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL)")
+            conds.append(f"({sent_score} IS NOT NULL OR {risk_score} IS NOT NULL)")
         if ticker:
             conds.append("n.ticker = ?")
             params.append(self._canon(ticker))
@@ -406,9 +428,7 @@ class SqliteBackend:
             match = self._fts_match(q)
             base_from = (
                 "news_fts f JOIN news n ON n.id = f.rowid "
-                "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
-                "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
-                "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id"
+                f"{self._score_map_joins()}"
             )
             conds.insert(0, "news_fts MATCH ?")
             params.insert(0, match)
@@ -416,16 +436,13 @@ class SqliteBackend:
         else:
             base_from = (
                 "news n "
-                "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
-                "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
-                "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id"
+                f"{self._score_map_joins()}"
             )
             if q:
                 conds.append("(n.title LIKE ? OR n.description LIKE ?)")
                 params += [f"%{q}%", f"%{q}%"]
             order = "n.published_at DESC"
         sql = (
-            f"{self._score_ctes()} "
             f"SELECT {cols} FROM {base_from} WHERE {' AND '.join(conds)} "
             f"ORDER BY {order} LIMIT ?"
         )
@@ -474,21 +491,20 @@ class SqliteBackend:
         if ticker:
             conds.append("n.ticker = ?")
             params.append(self._canon(ticker))
+        sent_score = self._score_lookup_expr("sentiment", "score", model=None)
+        risk_score = self._score_lookup_expr("risk", "score", model=None)
         sql = (
-            f"{self._score_ctes()} "
             "SELECT n.ticker AS ticker, COUNT(*) AS article_count, "
-            "SUM(CASE WHEN latest_sentiment.score IS NOT NULL OR latest_risk.score IS NOT NULL "
+            f"SUM(CASE WHEN {sent_score} IS NOT NULL OR {risk_score} IS NOT NULL "
             "THEN 1 ELSE 0 END) AS scored_count, "
             "substr(MIN(n.published_at), 1, 10) AS earliest_date, "
             "substr(MAX(n.published_at), 1, 10) AS latest_date, "
-            "AVG(latest_sentiment.score) AS avg_sentiment, "
-            "AVG(latest_risk.score) AS avg_risk, "
-            "SUM(CASE WHEN latest_sentiment.score >= 4 THEN 1 ELSE 0 END) AS bullish_count, "
-            "SUM(CASE WHEN latest_sentiment.score <= 2 THEN 1 ELSE 0 END) AS bearish_count "
+            f"AVG({sent_score}) AS avg_sentiment, "
+            f"AVG({risk_score}) AS avg_risk, "
+            f"SUM(CASE WHEN {sent_score} >= 4 THEN 1 ELSE 0 END) AS bullish_count, "
+            f"SUM(CASE WHEN {sent_score} <= 2 THEN 1 ELSE 0 END) AS bearish_count "
             "FROM news n "
-            "LEFT JOIN article_bridge b ON b.legacy_news_id = n.id "
-            "LEFT JOIN latest_sentiment ON latest_sentiment.article_id = b.article_id "
-            "LEFT JOIN latest_risk ON latest_risk.article_id = b.article_id "
+            f"{self._score_map_joins()} "
             f"WHERE {' AND '.join(conds)} "
             "GROUP BY n.ticker ORDER BY article_count DESC"
         )

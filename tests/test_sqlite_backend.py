@@ -311,6 +311,28 @@ def test_query_news_unscored_mode_keeps_unscored_rows_with_score_columns(tmp_pat
     }
 
 
+def test_query_news_normalized_scores_joins_maps_after_news_filter(tmp_path, monkeypatch):
+    db = _news_db_with_normalized_scores(tmp_path)
+    backend = SqliteBackend(db)
+    captured = {}
+
+    def capture(sql, params, cols):
+        captured["sql"] = sql
+        captured["params"] = params
+        return pd.DataFrame(columns=cols)
+
+    monkeypatch.setattr(backend, "_news_df", capture)
+
+    backend.query_news(ticker="AAPL", scored_only=True)
+
+    sql = captured["sql"]
+    assert "article_bridge" not in sql
+    assert "LEFT JOIN news_legacy_migration_map m ON m.legacy_news_id = n.id" in sql
+    assert "LEFT JOIN news_legacy_projection_map p ON p.legacy_news_id = n.id" in sql
+    assert "FROM news_article_scores s" in sql
+    assert "s.article_id = COALESCE(m.article_id, p.article_id)" in sql
+
+
 def test_query_news_search_fts5(market_db):
     db, _ = market_db
     b = SqliteBackend(db)
