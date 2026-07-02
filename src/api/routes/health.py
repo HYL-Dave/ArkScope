@@ -44,9 +44,12 @@ def status(
     registry: ToolRegistry = Depends(get_registry),
 ):
     """Health check and system status."""
+    from src.provider_config_runtime import provider_config_setup_state
+
     return {
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
+        "provider_config": provider_config_setup_state().as_dict(),
         "tools_registered": len(registry.list_all()),
         "tool_categories": {
             cat: len(registry.list_by_category(cat))

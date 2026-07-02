@@ -38,7 +38,33 @@ router = APIRouter(tags=["providers"])
 _TESTABLE = {"ibkr", "polygon", "finnhub", "fred", "sec_edgar"}
 
 
+def get_data_provider_store_lenient() -> DataProviderConfigStore | None:
+    try:
+        return get_data_provider_store()
+    except Exception as e:  # noqa: BLE001
+        from src.provider_config_runtime import mark_provider_config_setup_required
+
+        mark_provider_config_setup_required(str(e))
+        return None
+
+
+def _empty_view_with_setup() -> dict:
+    from src.provider_config_runtime import provider_config_setup_state
+
+    providers = {
+        provider: {
+            "fields": [],
+            "testable": provider in _TESTABLE,
+            "default_available": provider_default_available(provider),
+        }
+        for provider in PROVIDER_FIELDS
+    }
+    return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
+
+
 def _view(store: DataProviderConfigStore) -> dict:
+    from src.provider_config_runtime import provider_config_setup_state
+
     stored = store.get_all()
     providers = {}
     for provider, fields in PROVIDER_FIELDS.items():
@@ -78,12 +104,16 @@ def _view(store: DataProviderConfigStore) -> dict:
             # key-free + extension-free providers are available by default
             "default_available": provider_default_available(provider),
         }
-    return {"providers": providers}
+    return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
 
 
 @router.get("/providers/config")
-def providers_config(store: DataProviderConfigStore = Depends(get_data_provider_store)):
+def providers_config(
+    store: DataProviderConfigStore | None = Depends(get_data_provider_store_lenient),
+):
     """Per-provider configurable fields with masked app values + effective source."""
+    if store is None:
+        return _empty_view_with_setup()
     return _view(store)
 
 
@@ -133,6 +163,9 @@ def put_provider_config(
         if not value:
             unapply_env(by_name[field].env_var)
     apply_env(store)
+    from src.provider_config_runtime import clear_provider_config_setup_required
+
+    clear_provider_config_setup_required()
     return _view(store)["providers"][provider]
 
 
@@ -188,12 +221,18 @@ def import_provider_config_field(
     })
     store.set_field(provider, field, value)
     apply_env(store)
+    from src.provider_config_runtime import clear_provider_config_setup_required
+
+    clear_provider_config_setup_required()
     return _view(store)["providers"][provider]
 
 
 @router.post("/providers/test/{provider}")
 def test_provider(provider: str):
     """Run one explicit, cheap, timeout-bounded connection test."""
+    from src.provider_config_runtime import require_provider_config_ready
+
+    require_provider_config_ready("provider_test")
     if provider not in PROVIDER_FIELDS:
         raise HTTPException(status_code=404, detail=f"unknown provider {provider!r}")
     return {"provider": provider, **run_connection_test(provider)}

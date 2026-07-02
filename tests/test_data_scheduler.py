@@ -2038,3 +2038,21 @@ def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):
     # and a no-create read of an absent DB returns {} (helper-level)
     from src.scheduler_state import read_all_if_exists
     assert read_all_if_exists(str(fresh)) == {} and not fresh.exists()
+
+
+def test_run_source_refuses_provider_work_when_provider_config_setup_required(monkeypatch):
+    import src.provider_config_runtime as runtime
+    import src.service.data_scheduler as ds
+
+    runtime.mark_provider_config_setup_required("profile DB unavailable")
+    try:
+        monkeypatch.setattr(
+            ds,
+            "_run_subprocess",
+            lambda argv: (_ for _ in ()).throw(AssertionError("subprocess used")),
+        )
+        res = ds.run_source("polygon_news", trigger_source="api")
+        assert res["status"] == "failed"
+        assert res["code"] == "provider_config_setup_required"
+    finally:
+        runtime.clear_provider_config_setup_required()

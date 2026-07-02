@@ -702,6 +702,16 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
+    from src.provider_config_runtime import provider_config_setup_state
+
+    setup_state = provider_config_setup_state()
+    if setup_state.required:
+        return _record_result({
+            "source": source,
+            "status": "failed",
+            "error": setup_state.reason or "provider config setup required",
+            "code": setup_state.code,
+        })
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):

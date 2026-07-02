@@ -71,6 +71,9 @@ def run_now(source: str):
     """
     if source not in SOURCES:
         raise HTTPException(status_code=404, detail=f"unknown source {source!r}")
+    from src.provider_config_runtime import require_provider_config_ready
+
+    require_provider_config_ready("schedule_run_now")
     # EVERY source writes a database when run — provider sources end in PG sync +
     # local mirror refresh, and local_incremental writes market_data.db directly —
     # so the choke-point applies unconditionally (was provider-fetch-only, which

@@ -35,22 +35,35 @@ async def lifespan(app: FastAPI):
     # Apply app-managed provider keys / IBKR host+port into os.environ BEFORE the
     # scheduler exists: the sidecar is the parent of every collector subprocess, so
     # one injection here reaches all call sites (in-process getenv + children).
+    provider_config_ready = True
     try:
         from src.data_provider_config import apply_env
+        from src.provider_config_runtime import clear_provider_config_setup_required
 
         from .dependencies import get_data_provider_store
 
         apply_env(get_data_provider_store())
-    except Exception as e:  # noqa: BLE001 — config bridge must not block startup
-        logger.warning(f"data-provider env bridge failed: {e}")
+        clear_provider_config_setup_required()
+    except Exception as e:  # noqa: BLE001 — setup-only, never silent pure-.env runtime
+        from src.provider_config_runtime import mark_provider_config_setup_required
+
+        provider_config_ready = False
+        mark_provider_config_setup_required(str(e))
+        logger.warning("data-provider env bridge failed; booting setup-only: %s", e)
 
     # Test hygiene: TestClient(create_app()) runs this lifespan, and the scheduler's
     # seed/tick threads reach the real PG/network — tests/conftest.py disables it so
     # unit tests stay hermetic (a stalled seed thread otherwise hangs pytest at the
     # executor's atexit join in PG-less environments).
     sched_task = None
-    if os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower() not in ("1", "true", "yes", "on"):
+    if (
+        provider_config_ready
+        and os.environ.get("ARKSCOPE_DISABLE_SCHEDULER", "").strip().lower()
+        not in ("1", "true", "yes", "on")
+    ):
         sched_task = asyncio.create_task(scheduler_loop(), name="data-scheduler")
+    elif not provider_config_ready:
+        logger.warning("data scheduler disabled: provider config setup required")
     else:
         logger.info("data scheduler disabled via ARKSCOPE_DISABLE_SCHEDULER")
     logger.info("ArkScope API ready — DAL and registry initialize lazily")
