@@ -46,6 +46,7 @@ TARGET_TABLES = (
 
 TARGET_VIEWS = ("news_latest_scores",)
 TARGET_FUNCTION_SIGNATURES = (
+    "get_recent_news(character varying, integer, integer)",
     "news_sentiment_summary(character varying, integer, character varying)",
 )
 OPTIONAL_TARGETS = {"signals"}
@@ -264,10 +265,21 @@ def collect_pg_snapshot(conn) -> dict[str, Any]:
                    d.deptype::text AS dependency_type
             FROM pg_depend d
             JOIN pg_class c ON c.oid = d.refobjid
-            WHERE c.relname = ANY(%s)
+            WHERE c.relname = ANY(%(names)s)
+            UNION
+            SELECT DISTINCT
+                   'pg_proc',
+                   p.oid::regprocedure::text,
+                   c.relname || ' (rowtype)',
+                   d.deptype::text
+            FROM pg_depend d
+            JOIN pg_proc p ON d.classid = 'pg_proc'::regclass AND d.objid = p.oid
+            JOIN pg_type t ON d.refclassid = 'pg_type'::regclass AND d.refobjid = t.oid
+            JOIN pg_class c ON t.typrelid = c.oid
+            WHERE c.relname = ANY(%(names)s)
             ORDER BY 1, 2, 3, 4
             """,
-            (list(TARGET_TABLES) + list(TARGET_VIEWS),),
+            {"names": list(TARGET_TABLES) + list(TARGET_VIEWS)},
         )
         dependencies = [
             {

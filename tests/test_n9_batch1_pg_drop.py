@@ -941,3 +941,11 @@ def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
 
     assert code == 0
     assert order == ["createdb", "psql-extension", "psql-function-ddl", "pg_restore", "dropdb"]
+
+
+def test_dead_pg_helper_get_recent_news_is_a_drop_target():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    # Live drop attempt 1 (2026-07-03) was correctly blocked because this day-one
+    # PG helper depends on the news rowtype and was outside the reviewed targets.
+    assert "get_recent_news(character varying, integer, integer)" in cli.TARGET_FUNCTION_SIGNATURES
