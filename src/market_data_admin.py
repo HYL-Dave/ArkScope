@@ -370,6 +370,20 @@ def retired_price_mirror_result(operation: str = "incremental_update") -> dict:
     }
 
 
+def overlay_price_sync_retired(sync: dict | None) -> dict:
+    out = dict(sync or {})
+    prices = dict(out.get("prices") or {})
+    prices.update(
+        {
+            "retired": True,
+            "authority": "local",
+            "message": "Prices are served from local market_data.db; PG mirror sync is retired.",
+        }
+    )
+    out["prices"] = prices
+    return out
+
+
 def _now() -> str:
     """UTC ISO-8601 timestamp (seconds). Imported lazily to keep this off the hot path."""
     from datetime import datetime, timezone

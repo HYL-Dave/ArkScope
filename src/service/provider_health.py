@@ -26,7 +26,8 @@ Signal sources merged (all already persisted; each degrades independently):
     financial_cache per source (+ MAX(fetched_at))
   - sa_refresh_meta (get_sa_refresh_meta) — SA capture per-scope success/error
   - job_runs (get_job_runs_store(...).latest_runs_by_name) — latest run per job
-  - market_sync_meta (read_sync_meta)     — local mirror incremental sync
+  - market_sync_meta (read_sync_meta)     — legacy sync telemetry; prices is marked
+    retired/local-authority after P0-C
 """
 
 from __future__ import annotations
@@ -182,12 +183,16 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     direct_news_enabled = False
     db_exists = False
     try:
-        from src.market_data_admin import read_sync_meta, resolve_market_db_path
+        from src.market_data_admin import (
+            overlay_price_sync_retired,
+            read_sync_meta,
+            resolve_market_db_path,
+        )
         from src.news_providers import use_local_news_enabled
         from src.news_sync_status import read_news_sync_status
 
         db_path = resolve_market_db_path()
-        sync = read_sync_meta(db_path)
+        sync = overlay_price_sync_retired(read_sync_meta(db_path))
         db_exists = Path(db_path).exists()
         direct_news_enabled = use_local_news_enabled()
         if direct_news_enabled:

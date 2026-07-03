@@ -249,6 +249,18 @@ def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeyp
     assert out["local_market"]["sync"]["news"] == direct
 
 
+def test_p0c_provider_health_marks_price_sync_retired(monkeypatch):
+    monkeypatch.setattr("src.market_data_admin.read_sync_meta", lambda *a, **k: {
+        "prices": {"last_success": "old", "last_error": None, "rows_added": 1, "updated_at": "old"}
+    })
+
+    out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
+
+    prices = out["local_market"]["sync"]["prices"]
+    assert prices["retired"] is True
+    assert prices["authority"] == "local"
+
+
 def test_route_returns_aggregation(monkeypatch):
     from src.api.routes.health import providers_health
     dal = _FakeDAL(_FakeBackend())

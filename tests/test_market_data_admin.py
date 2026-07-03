@@ -685,12 +685,9 @@ def store(tmp_path):
     return ProfileStateStore(tmp_path / "profile_state.db")
 
 
-def test_manual_update_domains_after_news_pg_exit_requests_prices_only(store, monkeypatch):
+def test_manual_update_domains_after_p0c_returns_empty_retired_domain_set(store, monkeypatch):
     from src.api.routes import market_data as route
-    from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
 
-    store.set_setting(NEWS_PG_EXIT_COMPLETED_KEY, "true")
-    monkeypatch.setattr(route, "_news_pg_exit_audit_state", lambda _: True)
     monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
 
     assert route._manual_update_domains(store) == ()
@@ -825,12 +822,47 @@ def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatc
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     off = market_data_status(store=store)
     assert off["fundamentals_mode"] == "local_cache_refetch"
-    assert off["sync"] == mirror
+    assert off["sync"]["news"] == mirror["news"]
+    assert off["sync"]["prices"]["last_success"] == "p"
+    assert off["sync"]["prices"]["retired"] is True
 
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
     on = market_data_status(store=store)
     assert on["sync"]["news"] == direct
-    assert on["sync"]["prices"] == mirror["prices"]
+    assert on["sync"]["prices"]["last_success"] == "p"
+    assert on["sync"]["prices"]["retired"] is True
+
+
+def test_p0c_market_status_reports_prices_local_authority(monkeypatch):
+    from src.api.routes import market_data as route
+
+    class Store:
+        def get_setting(self, key):
+            return "true"
+
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
+    monkeypatch.setattr(route, "env_routing_enabled", lambda: False)
+    monkeypatch.setattr(route, "env_strict_enabled", lambda: False)
+    monkeypatch.setattr(route, "local_market_stats", lambda _path: {
+        "exists": True,
+        "prices": {"row_count": 10, "ticker_count": 1, "latest_datetime": "2026-07-02T14:15:00+0000"},
+        "news": {},
+        "iv": {},
+        "fundamentals": {},
+        "financial_cache": {},
+    })
+    monkeypatch.setattr(route, "read_sync_meta", lambda _path: {
+        "prices": {"last_success": "old", "last_error": None, "rows_added": 1, "updated_at": "old"}
+    })
+    monkeypatch.setattr(route, "overlay_news_sync_status", lambda sync, _path: sync)
+
+    out = route.market_data_status(Store())
+
+    assert out["prices_authority"] == "local"
+    assert out["price_mirror_retired"] is True
+    assert out["pg_fallback_active"] is False
+    assert out["sync"]["prices"]["retired"] is True
+    assert out["sync"]["prices"]["authority"] == "local"
 
 
 def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):

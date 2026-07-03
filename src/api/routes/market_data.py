@@ -1,19 +1,13 @@
 """
 Market-data lifecycle routes (slice 3a.1) — local SQLite bootstrap/status/validate.
 
-Productizes the PG → local market_data.db migration so the desktop app owns it
-(no CLI required): status, a background bootstrap job the UI can poll, validation,
-and a persisted "use local market" toggle (stored in profile_settings, read by the
-DAL at construction). Domains: 3a PRICES + 3b NEWS (articles + FTS5) + 3c-A
-IV_HISTORY + FUNDAMENTALS + 3c-C FINANCIAL_CACHE (local-primary: status reports its
-rows/valid/expired, but it is NOT validated against PG and NOT touched by the
-incremental updater). See ``docs/design/DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md`` §8.
+Reports and controls the local market_data.db authority. The old PG
+bootstrap/update/validate mirror endpoints are fail-closed; active collection now
+uses direct-local providers. Domains: prices, normalized news, IV/fundamentals
+legacy inspection, and financial_cache (local-primary).
 """
 
 from __future__ import annotations
-
-import sqlite3
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -28,15 +22,13 @@ from src.market_data_admin import (
     get_job,
     local_market_stats,
     local_ticker_coverage,
+    overlay_price_sync_retired,
     read_sync_meta,
     resolve_market_db_path,
     start_bootstrap_job,
-    start_update_job,
     validate_market,
 )
 from src.market_data_direct import summarize_trading_day_coverage
-from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
-from src.news_providers import parse_news_toggle
 from src.news_sync_status import overlay_news_sync_status
 from src.profile_state import ProfileStateStore
 
@@ -47,30 +39,6 @@ _TRUTHY = ("1", "true", "yes", "on")
 
 def _setting_truthy(store: ProfileStateStore, key: str) -> bool:
     return (store.get_setting(key) or "").strip().lower() in _TRUTHY
-
-
-def _news_pg_exit_audit_state(db_path: str) -> bool | None:
-    path = Path(db_path)
-    if not path.exists():
-        return False
-    try:
-        uri = f"{path.resolve().as_uri()}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True)
-        try:
-            exists = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
-                ("news_pg_exit_runs",),
-            ).fetchone()
-            if not exists:
-                return False
-            row = conn.execute(
-                "SELECT 1 FROM news_pg_exit_runs WHERE status = 'completed' LIMIT 1"
-            ).fetchone()
-            return row is not None
-        finally:
-            conn.close()
-    except sqlite3.Error:
-        return None
 
 
 def _manual_update_domains(store: ProfileStateStore) -> tuple[str, ...] | None:
@@ -104,11 +72,13 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     # Strict is a modifier of local-market routing: it only has runtime effect when
     # routing itself is active.
     strict_enabled = routing_enabled and (strict_setting_on or strict_env_on)
-    sync = overlay_news_sync_status(read_sync_meta(path), path)
+    sync = overlay_price_sync_retired(overlay_news_sync_status(read_sync_meta(path), path))
     return {
         "market_db": path,
         "exists": stats["exists"],
         "prices": stats["prices"],
+        "prices_authority": "local",
+        "price_mirror_retired": True,
         "news": stats["news"],
         "iv": stats["iv"],
         "fundamentals": stats["fundamentals"],
@@ -121,7 +91,7 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
         "strict_env_override": strict_env_on,
         "strict_enabled": strict_enabled,
         "routing_enabled": routing_enabled,
-        "pg_fallback_active": routing_enabled and not strict_enabled,
+        "pg_fallback_active": False,
     }
 
 
@@ -146,10 +116,8 @@ def update_route(store: ProfileStateStore = Depends(get_profile_store)):
     closed instead of creating a background mirror job.
     """
     require_db_write("market_update", {"db": resolve_market_db_path()})
-    domains = _manual_update_domains(store)
-    if domains == ():
-        raise _retired_market_update_http_error()
-    return start_update_job(domains=domains)
+    _manual_update_domains(store)
+    raise _retired_market_update_http_error()
 
 
 @router.get("/market-data/jobs/{job_id}")
