@@ -209,3 +209,5 @@ apps/*/dist/
 apps/*/dist-electron/
 apps/*/release/
 *.tsbuildinfo
+
+scratchpad/
