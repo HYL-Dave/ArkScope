@@ -62,6 +62,24 @@ SA rollback-basis ruling: this plan explicitly uses the 2026-07-03 decision in `
 4. **No time-window assumptions.** Evidence is fingerprinted from actual PG/local state. If a table changes between preview and apply, live drop stops.
 5. **No silent runtime breakage.** Any remaining runtime path that can hit a to-be-dropped table is a blocker unless it is converted to local-only/honest-empty before the live drop.
 
+## Post-Drop Rollback Semantics
+
+After N9 batch-1, the old "turn off the local toggle and fall back to PG" lever is invalid for every dropped domain. This is expected and must be documented plainly:
+
+- `use_local_market=false` can no longer recover PG `news`, `fundamentals`, `iv_history`, `financial_data_cache`, or `news_scores`; those PG objects are gone.
+- `use_local_sa=false` can no longer recover PG `sa_*`; those PG objects are gone.
+- `use_local_macro=false` can no longer recover PG macro/cal objects included in batch-1; those PG objects are gone.
+- Any plain `DatabaseBackend` method that still references dropped objects becomes an archive/dead-path method, not a valid runtime rollback path.
+
+The post-drop recovery procedure is:
+
+1. Stop the app/scheduler/native-host writers.
+2. Restore the N9 batch-1 dump into PG, including function DDL sidecars.
+3. Repoint the app to the restored PG authority or use the restored DB only for manual export.
+4. Re-enable any legacy toggle only after the restored tables have been verified.
+
+Task 9 must record exactly which rollback levers are invalidated. Batch-2 / cleanup must also collapse defaults so a fresh install does not construct dead PG paths after the source tables are intentionally gone.
+
 ## File Map
 
 Create:
@@ -73,8 +91,11 @@ Create:
 Modify:
 
 - `src/service/data_scheduler.py` - stop local refresh from requesting PG `iv_history` after news PG-exit; after N9 batch-1 it may request `prices` only.
+- `src/api/routes/market_data.py` - stop manual update from requesting PG `iv_history`; make bootstrap/validate semantics honest after dropped mirror domains.
+- `src/market_data_admin.py` - reject or disable retired mirror-domain bootstrap/validation paths that read PG `news`, `iv_history`, or `fundamentals`.
 - `src/tools/backends/local_market_backend.py` - make `query_iv_history()` local-only/honest-empty when market strict is unset, because old PG `iv_history` is intentionally abandoned.
 - `tests/test_data_scheduler.py` - assert post-N9 local refresh only requests `prices`.
+- `tests/test_market_data_admin.py` - assert manual update requests prices only and bootstrap/validation no longer reads retired PG domains.
 - `tests/test_sqlite_backend.py` - update IV fallback tests to assert no PG fallback for local misses.
 - `scripts/migrate_to_supabase.py` - disable active PG imports for `--news`, `--iv`, and `--fundamentals`; `--scores --archive-scores` remains archive-only only until the live N9 drop, then becomes blocked.
 - `tests/test_news_scores.py` and/or a new focused test - pin the disabled migration-domain behavior.
@@ -132,9 +153,12 @@ The evidence command must tolerate missing optional targets (`signals` may not e
 **Files:**
 
 - Modify: `src/service/data_scheduler.py`
+- Modify: `src/api/routes/market_data.py`
+- Modify: `src/market_data_admin.py`
 - Modify: `src/tools/backends/local_market_backend.py`
 - Modify: `scripts/migrate_to_supabase.py`
 - Test: `tests/test_data_scheduler.py`
+- Test: `tests/test_market_data_admin.py`
 - Test: `tests/test_sqlite_backend.py`
 - Test: `tests/test_news_scores.py`
 
@@ -199,7 +223,233 @@ pytest tests/test_data_scheduler.py::test_local_refresh_after_news_pg_exit_reque
 
 Expected: PASS.
 
-### Task 1B: Make IV reads local-only before dropping PG `iv_history`
+### Task 1B: Stop manual update from requesting PG IV
+
+- [ ] **Step 1: Write the failing route helper test**
+
+Add a test in `tests/test_market_data_admin.py` or the existing market-data route test area. The test calls the route helper directly and proves manual update mirrors scheduler semantics.
+
+```python
+def test_manual_update_domains_after_news_pg_exit_requests_prices_only(monkeypatch):
+    from src.api.routes import market_data as route
+    from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
+
+    class Store:
+        def get_setting(self, key):
+            if key == NEWS_PG_EXIT_COMPLETED_KEY:
+                return "true"
+            return None
+
+    monkeypatch.setattr(route, "_news_pg_exit_audit_state", lambda _: True)
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
+
+    assert route._manual_update_domains(Store()) == ("prices",)
+```
+
+- [ ] **Step 2: Run the failing test**
+
+Run:
+
+```bash
+pytest tests/test_market_data_admin.py::test_manual_update_domains_after_news_pg_exit_requests_prices_only -q
+```
+
+Expected before implementation: FAIL because `_manual_update_domains()` currently returns `("prices", "iv")`.
+
+- [ ] **Step 3: Implement the minimal change**
+
+In `src/api/routes/market_data.py`, change the post-news-exit branch:
+
+```python
+if profile_done or audit_state is True or audit_state is None:
+    return ("prices",)
+```
+
+Also update the `/market-data/update` docstring from "prices + iv after news/fundamentals PG-exit slices" to "prices only after N9 batch-1 retired the PG IV mirror."
+
+- [ ] **Step 4: Verify**
+
+Run:
+
+```bash
+pytest tests/test_market_data_admin.py::test_manual_update_domains_after_news_pg_exit_requests_prices_only -q
+```
+
+Expected: PASS.
+
+### Task 1C: Retire full PG mirror bootstrap/validation endpoints
+
+`bootstrap_market()` and `validate_market()` are live paths, not just old tests. They currently read PG `news`, `iv_history`, and `fundamentals`, so they must not remain callable after those tables are dropped.
+
+Post-drop semantics:
+
+- `/market-data/bootstrap` returns HTTP 409 with a structured message that the old all-domain PG mirror bootstrap is retired.
+- `/market-data/validate` returns HTTP 409 with the same retired-domain message.
+- `market_data_admin.bootstrap_market()` and `validate_market()` refuse by default before opening a PG connection.
+- A test-only escape hatch may exist for old checksum tests, but no FastAPI route or scheduler path may pass it.
+- Prices bootstrap/migration is a separate P0-C slice; N9 batch-1 must not invent a partial prices rebuild inside the retired all-domain bootstrap.
+
+- [ ] **Step 1: Write failing route tests**
+
+```python
+def test_bootstrap_route_rejects_retired_pg_mirror(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from src.api.routes import market_data as route
+
+    monkeypatch.setattr(route, "require_db_write", lambda *args, **kwargs: None)
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
+
+    with pytest.raises(HTTPException) as exc:
+        route.bootstrap_route()
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_bootstrap_retired"
+    assert exc.value.detail["retired_domains"] == ["news", "iv", "fundamentals"]
+
+
+def test_validate_route_rejects_retired_pg_mirror(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from src.api.routes import market_data as route
+
+    with pytest.raises(HTTPException) as exc:
+        route.validate_route()
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_bootstrap_retired"
+```
+
+- [ ] **Step 2: Write failing admin tests**
+
+```python
+def test_bootstrap_market_refuses_retired_pg_mirror_before_pg_connect(monkeypatch, tmp_path):
+    from src import market_data_admin as mda
+
+    called = False
+
+    def fake_pg_conn():
+        nonlocal called
+        called = True
+        raise AssertionError("retired bootstrap must not connect to PG")
+
+    monkeypatch.setattr(mda, "_pg_conn", fake_pg_conn)
+
+    res = mda.bootstrap_market(str(tmp_path / "market_data.db"))
+
+    assert called is False
+    assert res["ok"] is False
+    assert res["code"] == "pg_market_bootstrap_retired"
+
+
+def test_validate_market_refuses_retired_pg_mirror_before_pg_connect(monkeypatch, tmp_path):
+    from src import market_data_admin as mda
+
+    called = False
+
+    def fake_pg_conn():
+        nonlocal called
+        called = True
+        raise AssertionError("retired validation must not connect to PG")
+
+    monkeypatch.setattr(mda, "_pg_conn", fake_pg_conn)
+
+    res = mda.validate_market(str(tmp_path / "market_data.db"))
+
+    assert called is False
+    assert res["ok"] is False
+    assert res["code"] == "pg_market_bootstrap_retired"
+```
+
+- [ ] **Step 3: Run the failing tests**
+
+Run:
+
+```bash
+pytest tests/test_market_data_admin.py -k "retired_pg_mirror or manual_update_domains" -q
+```
+
+Expected before implementation: FAIL because the routes/admin functions still attempt the old PG mirror behavior.
+
+- [ ] **Step 4: Implement retired-domain refusal**
+
+In `src/market_data_admin.py`, add:
+
+```python
+RETIRED_MARKET_MIRROR_DOMAINS = ["news", "iv", "fundamentals"]
+
+
+def retired_market_mirror_result(operation: str) -> dict:
+    return {
+        "ok": False,
+        "match": False,
+        "code": "pg_market_bootstrap_retired",
+        "operation": operation,
+        "retired_domains": list(RETIRED_MARKET_MIRROR_DOMAINS),
+        "error": (
+            "The old all-domain PG market mirror bootstrap/validation path is retired. "
+            "News, IV, fundamentals, scores, and financial cache are local/refetch authorities; "
+            "prices migration remains a separate PG-exit slice."
+        ),
+    }
+```
+
+Change public functions:
+
+```python
+def bootstrap_market(..., *, allow_retired_pg_mirror: bool = False) -> dict:
+    if not allow_retired_pg_mirror:
+        return retired_market_mirror_result("bootstrap_market")
+    ...
+
+
+def validate_market(..., *, allow_retired_pg_mirror: bool = False) -> dict:
+    if not allow_retired_pg_mirror:
+        return retired_market_mirror_result("validate_market")
+    ...
+```
+
+If existing checksum tests still need the old behavior, update those tests to call `allow_retired_pg_mirror=True`. Do not pass that flag from FastAPI routes, scheduler paths, or CLI runbooks.
+
+In `src/api/routes/market_data.py`, add:
+
+```python
+def _retired_market_mirror_http_error():
+    from src.market_data_admin import retired_market_mirror_result
+
+    return HTTPException(
+        status_code=409,
+        detail=retired_market_mirror_result("market_data_route"),
+    )
+```
+
+Then:
+
+```python
+@router.post("/market-data/bootstrap")
+def bootstrap_route():
+    require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
+    raise _retired_market_mirror_http_error()
+
+
+@router.post("/market-data/validate")
+def validate_route():
+    raise _retired_market_mirror_http_error()
+```
+
+Update route docstrings to say the old PG all-domain mirror bootstrap/validation is retired by N9 batch-1 and prices migration is separate.
+
+- [ ] **Step 5: Verify**
+
+Run:
+
+```bash
+pytest tests/test_market_data_admin.py -k "retired_pg_mirror or manual_update_domains or bootstrap or validate" -q
+```
+
+Expected: PASS.
+
+### Task 1D: Make IV reads local-only before dropping PG `iv_history`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -272,7 +522,7 @@ pytest tests/test_sqlite_backend.py -k "iv_history" -q
 
 Expected: PASS.
 
-### Task 1C: Disable active PG import paths for dropped domains
+### Task 1E: Disable active PG import paths for dropped domains
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -575,11 +825,13 @@ Allowed categories:
 - SQL migration files documenting historical schema
 - archive/migration scripts only when the plan explicitly marks them disabled before live drop
 - local SQLite table names in `sqlite_backend.py`, `sa_capture_backend.py`, and `macro_calendar/local_store.py`
-- plain PG backend dead methods only if no runtime factory can select them in hard-local mode; these must appear in `allowed_hits` with reason `dead_pg_backend_method_pending_n9_cleanup`
+- plain PG backend methods for dropped domains only as invalidated rollback levers; these must appear in `allowed_hits` with reason `invalidated_rollback_lever_pending_n9_cleanup`, not as "unreachable" code
 
 Blocker categories:
 
 - `src/service/data_scheduler.py` invoking retired PG domains after Task 1
+- `src/api/routes/market_data.py` invoking manual update, bootstrap, or validation paths that request retired PG domains after Task 1
+- `src/market_data_admin.py` default paths that connect to PG for `news`, `iv_history`, or `fundamentals` after Task 1
 - `LocalMarketDatabaseBackend` fallback to PG for `iv_history`, `news`, `fundamentals`, or `financial_data_cache`
 - app routes/tools directly importing `DatabaseBackend` for target domains
 - native host or extension code writing/reading target PG tables
@@ -940,8 +1192,9 @@ rg -n "incremental_update\\(|--news|--iv|--fundamentals|--scores" src scripts te
 Expected:
 
 - No runtime blocker in `src/service/data_scheduler.py`.
+- No runtime blocker in `src/api/routes/market_data.py` or default `src/market_data_admin.py` paths.
 - No `LocalMarketDatabaseBackend` fallback to PG for `iv_history`, `fundamentals`, or `financial_data_cache`.
-- `DatabaseBackend` PG methods may remain only as archive/dead-path methods before code cleanup.
+- `DatabaseBackend` PG methods for dropped domains may remain only as `invalidated_rollback_lever_pending_n9_cleanup`, with docs stating that toggle-off is no longer a valid rollback path after live drop.
 - `migrate_to_supabase.py` rejects retired domains.
 - Tests/docs/schema files are allowed.
 
@@ -1151,6 +1404,15 @@ Update docs with:
 - drop UTC timestamp
 - dropped object list
 - postcheck result
+- invalidated rollback levers:
+  - `use_local_market=false` no longer restores PG `news`, `fundamentals`, `iv_history`, `financial_data_cache`, or `news_scores`
+  - `use_local_sa=false` no longer restores PG `sa_*`
+  - `use_local_macro=false` no longer restores dropped PG macro/cal tables
+- restore procedure:
+  - restore N9 batch-1 dump into PG
+  - apply `function_ddl.sql`
+  - verify counts/fingerprints
+  - only then repoint any legacy reader
 - remaining PG dependencies:
   - `prices`
   - `job_runs` until batch-2 soak collapse
@@ -1164,6 +1426,7 @@ Add N9 cleanup candidates:
 - `migrate_to_supabase` retired domain code
 - old SA PG freeze/migration utilities if no longer useful after dump
 - PG macro/cal store code if local-only macro is permanent
+- post-drop default collapse so fresh installs do not construct dead PG fallback paths for dropped domains
 
 - [ ] **Step 3: Commit**
 
