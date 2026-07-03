@@ -55,20 +55,61 @@ def test_reconcile_fingerprint_is_order_stable():
     assert fingerprint_report(first) == fingerprint_report(second)
 
 
-def test_value_checksum_mismatch_is_reported_by_bucket():
+def test_value_checksum_mismatch_is_reported_by_bucket_with_row_count():
     mismatches = compare_value_checksums(
-        pg_checksums={("NVDA", "15min"): "pg-hash", ("AAPL", "15min"): "same"},
-        local_checksums={("NVDA", "15min"): "local-hash", ("AAPL", "15min"): "same"},
+        pg_checksums={
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "pg-hash-1",
+            ("NVDA", "15min", "2026-01-02T14:45:00+0000"): "same",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "pg-hash-2",
+        },
+        local_checksums={
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "local-hash-1",
+            ("NVDA", "15min", "2026-01-02T14:45:00+0000"): "same",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "local-hash-2",
+        },
     )
 
     assert mismatches == (
         {
-            "bucket": ("NVDA", "15min"),
-            "pg_checksum": "pg-hash",
-            "local_checksum": "local-hash",
+            "bucket": ("AAPL", "15min"),
+            "mismatch_count": 1,
             "reason": "ohlcv_checksum_mismatch",
+            "samples": (
+                {
+                    "key": ("AAPL", "15min", "2026-01-02T14:30:00+0000"),
+                    "pg_checksum": "pg-hash-2",
+                    "local_checksum": "local-hash-2",
+                },
+            ),
+        },
+        {
+            "bucket": ("NVDA", "15min"),
+            "mismatch_count": 1,
+            "reason": "ohlcv_checksum_mismatch",
+            "samples": (
+                {
+                    "key": ("NVDA", "15min", "2026-01-02T14:30:00+0000"),
+                    "pg_checksum": "pg-hash-1",
+                    "local_checksum": "local-hash-1",
+                },
+            ),
         },
     )
+
+
+def test_value_checksum_ignores_single_sided_keys():
+    mismatches = compare_value_checksums(
+        pg_checksums={
+            ("MSFT", "15min", "2026-01-02T14:30:00+0000"): "pg-only",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+        },
+        local_checksums={
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "local-only",
+        },
+    )
+
+    assert mismatches == ()
 
 
 def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys):
@@ -87,7 +128,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
                 "max_datetime": "2026-01-02T14:30:00+0000",
             },
             "keys": [("LC", "15min", "2026-01-02T14:30:00+0000")],
-            "value_checksums": {("LC", "15min"): "pg-lc-hash"},
+            "value_checksums": {("LC", "15min", "2026-01-02T14:30:00+0000"): "pg-lc-hash"},
             "samples": [],
         },
     )
@@ -103,7 +144,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
                 "max_datetime": "2026-01-02T14:30:00+0000",
             },
             "keys": [("HAPN", "15min", "2026-01-02T14:30:00+0000")],
-            "value_checksums": {("HAPN", "15min"): "local-hapn-hash"},
+            "value_checksums": {("HAPN", "15min", "2026-01-02T14:30:00+0000"): "local-hapn-hash"},
             "aliases": {"LC": "HAPN"},
             "samples": [],
         },
@@ -128,3 +169,54 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
     assert report["unexplained_pg_only_count"] == 0
     assert report["alias_explained_pg_only_count"] == 1
     assert len(report["fingerprint"]) == 64
+
+
+def test_reconcile_report_groups_pg_only_and_value_mismatch_rows():
+    from scripts.migration.p0c_prices_reconcile import build_report
+
+    report = build_report(
+        pg_snapshot={
+            "summary": {"row_count": 3},
+            "keys": [
+                ("HAPN", "15min", "2026-01-02T14:30:00+0000"),
+                ("HAPN", "15min", "2026-01-02T14:45:00+0000"),
+                ("AAPL", "15min", "2026-01-02T14:30:00+0000"),
+            ],
+            "value_checksums": {
+                ("HAPN", "15min", "2026-01-02T14:30:00+0000"): "pg-only",
+                ("HAPN", "15min", "2026-01-02T14:45:00+0000"): "pg-hapn",
+                ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+            },
+        },
+        local_snapshot={
+            "summary": {"row_count": 2},
+            "keys": [
+                ("HAPN", "15min", "2026-01-02T14:45:00+0000"),
+                ("AAPL", "15min", "2026-01-02T14:30:00+0000"),
+            ],
+            "value_checksums": {
+                ("HAPN", "15min", "2026-01-02T14:45:00+0000"): "local-hapn",
+                ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+            },
+            "aliases": {},
+        },
+    )
+
+    assert report["pg_only_by_ticker"] == {"HAPN": 1}
+    assert report["unexplained_pg_only_by_ticker"] == {"HAPN": 1}
+    assert report["value_checksum_mismatch_count"] == 1
+    assert report["value_checksum_mismatch_row_count"] == 1
+    assert report["value_checksum_mismatch_samples"] == [
+        {
+            "bucket": ["HAPN", "15min"],
+            "mismatch_count": 1,
+            "reason": "ohlcv_checksum_mismatch",
+            "samples": [
+                {
+                    "key": ["HAPN", "15min", "2026-01-02T14:45:00+0000"],
+                    "pg_checksum": "pg-hapn",
+                    "local_checksum": "local-hapn",
+                }
+            ],
+        }
+    ]

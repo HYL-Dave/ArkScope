@@ -37,22 +37,46 @@ def fingerprint_report(report: Mapping[str, object]) -> str:
 
 def compare_value_checksums(
     *,
-    pg_checksums: Mapping[tuple[str, str], str],
-    local_checksums: Mapping[tuple[str, str], str],
+    pg_checksums: Mapping[tuple[str, str, str], str],
+    local_checksums: Mapping[tuple[str, str, str], str],
+    sample_limit: int = 5,
 ) -> tuple[dict[str, object], ...]:
-    mismatches = []
-    common_buckets = sorted(set(pg_checksums) & set(local_checksums))
-    for bucket in common_buckets:
-        if pg_checksums[bucket] != local_checksums[bucket]:
-            mismatches.append(
+    by_bucket: dict[tuple[str, str], dict[str, object]] = {}
+    common_keys = sorted(set(pg_checksums) & set(local_checksums))
+    for key in common_keys:
+        if pg_checksums[key] == local_checksums[key]:
+            continue
+        bucket = (key[0], key[1])
+        entry = by_bucket.setdefault(
+            bucket,
+            {
+                "bucket": bucket,
+                "mismatch_count": 0,
+                "reason": "ohlcv_checksum_mismatch",
+                "samples": [],
+            },
+        )
+        entry["mismatch_count"] = int(entry["mismatch_count"]) + 1
+        samples = entry["samples"]
+        assert isinstance(samples, list)
+        if len(samples) < sample_limit:
+            samples.append(
                 {
-                    "bucket": bucket,
-                    "pg_checksum": pg_checksums[bucket],
-                    "local_checksum": local_checksums[bucket],
-                    "reason": "ohlcv_checksum_mismatch",
+                    "key": key,
+                    "pg_checksum": pg_checksums[key],
+                    "local_checksum": local_checksums[key],
                 }
             )
-    return tuple(mismatches)
+
+    return tuple(
+        {
+            "bucket": entry["bucket"],
+            "mismatch_count": entry["mismatch_count"],
+            "reason": entry["reason"],
+            "samples": tuple(entry["samples"]),
+        }
+        for _, entry in sorted(by_bucket.items())
+    )
 
 
 def classify_price_differences(

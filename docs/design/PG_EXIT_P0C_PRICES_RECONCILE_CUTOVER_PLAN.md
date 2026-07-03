@@ -272,18 +272,45 @@ def test_reconcile_fingerprint_is_order_stable():
 
 def test_value_checksum_mismatch_is_reported_by_bucket():
     mismatches = compare_value_checksums(
-        pg_checksums={("NVDA", "15min"): "pg-hash", ("AAPL", "15min"): "same"},
-        local_checksums={("NVDA", "15min"): "local-hash", ("AAPL", "15min"): "same"},
+        pg_checksums={
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "pg-hash",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+        },
+        local_checksums={
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "local-hash",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+        },
     )
 
     assert mismatches == (
         {
             "bucket": ("NVDA", "15min"),
-            "pg_checksum": "pg-hash",
-            "local_checksum": "local-hash",
+            "mismatch_count": 1,
             "reason": "ohlcv_checksum_mismatch",
+            "samples": (
+                {
+                    "key": ("NVDA", "15min", "2026-01-02T14:30:00+0000"),
+                    "pg_checksum": "pg-hash",
+                    "local_checksum": "local-hash",
+                },
+            ),
         },
     )
+
+
+def test_value_checksum_ignores_single_sided_keys():
+    mismatches = compare_value_checksums(
+        pg_checksums={
+            ("MSFT", "15min", "2026-01-02T14:30:00+0000"): "pg-only",
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+        },
+        local_checksums={
+            ("AAPL", "15min", "2026-01-02T14:30:00+0000"): "same",
+            ("NVDA", "15min", "2026-01-02T14:30:00+0000"): "local-only",
+        },
+    )
+
+    assert mismatches == ()
 ```
 
 - [ ] **Step 2: Run the tests and verify RED**
@@ -340,20 +367,34 @@ def fingerprint_report(report: Mapping[str, object]) -> str:
 
 def compare_value_checksums(
     *,
-    pg_checksums: Mapping[tuple[str, str], str],
-    local_checksums: Mapping[tuple[str, str], str],
+    pg_checksums: Mapping[tuple[str, str, str], str],
+    local_checksums: Mapping[tuple[str, str, str], str],
+    sample_limit: int = 5,
 ) -> tuple[dict[str, object], ...]:
-    mismatches = []
-    common_buckets = sorted(set(pg_checksums) & set(local_checksums))
-    for bucket in common_buckets:
-        if pg_checksums[bucket] != local_checksums[bucket]:
-            mismatches.append({
-                "bucket": bucket,
-                "pg_checksum": pg_checksums[bucket],
-                "local_checksum": local_checksums[bucket],
-                "reason": "ohlcv_checksum_mismatch",
-            })
-    return tuple(mismatches)
+    by_bucket: dict[tuple[str, str], dict[str, object]] = {}
+    common_keys = sorted(set(pg_checksums) & set(local_checksums))
+    for key in common_keys:
+        if pg_checksums[key] == local_checksums[key]:
+            continue
+        bucket = (key[0], key[1])
+        entry = by_bucket.setdefault(
+            bucket,
+            {"bucket": bucket, "mismatch_count": 0, "reason": "ohlcv_checksum_mismatch", "samples": []},
+        )
+        entry["mismatch_count"] = int(entry["mismatch_count"]) + 1
+        samples = entry["samples"]
+        assert isinstance(samples, list)
+        if len(samples) < sample_limit:
+            samples.append({"key": key, "pg_checksum": pg_checksums[key], "local_checksum": local_checksums[key]})
+    return tuple(
+        {
+            "bucket": entry["bucket"],
+            "mismatch_count": entry["mismatch_count"],
+            "reason": entry["reason"],
+            "samples": tuple(entry["samples"]),
+        }
+        for _, entry in sorted(by_bucket.items())
+    )
 
 
 def classify_price_differences(
@@ -434,7 +475,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
             "max_datetime": "2026-01-02T14:30:00+0000",
         },
         "keys": [("LC", "15min", "2026-01-02T14:30:00+0000")],
-        "value_checksums": {("LC", "15min"): "pg-lc-hash"},
+        "value_checksums": {("LC", "15min", "2026-01-02T14:30:00+0000"): "pg-lc-hash"},
         "samples": [],
     })
     monkeypatch.setattr(cli, "load_sqlite_snapshot", lambda _db: {
@@ -446,7 +487,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
             "max_datetime": "2026-01-02T14:30:00+0000",
         },
         "keys": [("HAPN", "15min", "2026-01-02T14:30:00+0000")],
-        "value_checksums": {("HAPN", "15min"): "local-hapn-hash"},
+        "value_checksums": {("HAPN", "15min", "2026-01-02T14:30:00+0000"): "local-hapn-hash"},
         "aliases": {"LC": "HAPN"},
         "samples": [],
     })
@@ -486,6 +527,7 @@ Create `scripts/migration/p0c_prices_reconcile.py`:
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 import sqlite3
@@ -525,16 +567,28 @@ def connect_pg(database_url: str):
     return psycopg2.connect(database_url)
 
 
-def _value_checksum_rows(rows: Iterable[tuple[object, ...]]) -> dict[tuple[str, str], str]:
-    hashes = {}
+def _value_checksum_rows(rows: Iterable[tuple[object, ...]]) -> dict[tuple[str, str, str], str]:
+    checksums = {}
     for ticker, interval, dt, open_, high, low, close, volume in rows:
-        bucket = (str(ticker), str(interval))
-        h = hashes.get(bucket)
-        if h is None:
-            h = hashlib.sha256()
-            hashes[bucket] = h
+        key = (str(ticker), str(interval), str(dt))
+        h = hashlib.sha256()
         h.update(_canonical_json([str(dt), str(open_), str(high), str(low), str(close), str(volume)]).encode("utf-8"))
-    return {bucket: h.hexdigest() for bucket, h in sorted(hashes.items())}
+        checksums[key] = h.hexdigest()
+    return dict(sorted(checksums.items()))
+
+
+def _count_by_ticker(keys: Iterable[tuple[str, str, str]]) -> dict[str, int]:
+    return dict(sorted(Counter(key[0] for key in keys).items()))
+
+
+def _json_ready(value: object) -> object:
+    if isinstance(value, tuple):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, list):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    return value
 
 
 def load_pg_snapshot(database_url: str) -> dict[str, Any]:
@@ -634,6 +688,8 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
         pg_checksums=pg_snapshot["value_checksums"],
         local_checksums=local_snapshot["value_checksums"],
     )
+    alias_explained_pg_keys = [tuple(item["pg_key"]) for item in diff.alias_explained_pg_only]
+    pg_only_keys = [*alias_explained_pg_keys, *diff.unexplained_pg_only]
     report = {
         "schema_version": 1,
         "scope": "p0c_prices_reconcile",
@@ -642,13 +698,20 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
         "alias_explained_pg_only_count": len(diff.alias_explained_pg_only),
         "unexplained_pg_only_count": len(diff.unexplained_pg_only),
         "local_only_count": len(diff.local_only),
+        "pg_only_by_ticker": _count_by_ticker(pg_only_keys),
+        "alias_explained_pg_only_by_ticker": _count_by_ticker(alias_explained_pg_keys),
+        "unexplained_pg_only_by_ticker": _count_by_ticker(diff.unexplained_pg_only),
+        "local_only_by_ticker": _count_by_ticker(diff.local_only),
         "value_checksum_mismatch_count": len(value_mismatches),
+        "value_checksum_mismatch_row_count": sum(int(item["mismatch_count"]) for item in value_mismatches),
         "bulk_copy_allowed": diff.bulk_copy_allowed,
         "alias_explained_pg_only_samples": list(diff.alias_explained_pg_only[:20]),
         "unexplained_pg_only_samples": list(diff.unexplained_pg_only[:20]),
         "local_only_samples": list(diff.local_only[:20]),
         "value_checksum_mismatch_samples": list(value_mismatches[:20]),
     }
+    report = _json_ready(report)
+    assert isinstance(report, dict)
     report["fingerprint"] = fingerprint_report(report)
     return report
 
