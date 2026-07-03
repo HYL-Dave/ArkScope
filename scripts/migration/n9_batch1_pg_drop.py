@@ -509,7 +509,9 @@ def collect_trigger_function_ddl(conn, tables) -> str:
             """,
             (list(tables),),
         )
-        return "\n\n".join(str(row[0]) for row in cur.fetchall())
+        return "\n\n".join(
+            str(row[0]).rstrip().rstrip(";") + ";" for row in cur.fetchall()
+        )
 
 
 def collect_required_extensions(conn) -> list[str]:
@@ -671,7 +673,7 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
             # triggers; check_function_bodies=off lets functions referencing the
             # not-yet-restored tables be created.
             _run_checked(
-                ["psql", "--dbname", restore_db, "--file", str(function_ddl)],
+                ["psql", "-v", "ON_ERROR_STOP=1", "--dbname", restore_db, "--file", str(function_ddl)],
                 database_url=args.database_url,
                 dbname=restore_db,
             )

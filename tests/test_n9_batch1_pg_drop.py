@@ -886,6 +886,7 @@ def test_trigger_function_ddl_collected_for_target_tables():
     ddl = cli.collect_trigger_function_ddl(_TrigConn(), ["news"])
 
     assert "news_search_vector_update" in ddl
+    assert ddl.rstrip().endswith(";")
 
 
 def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
@@ -920,6 +921,7 @@ def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
     def fake_run_checked(cmd, *, database_url=None, dbname=None):
         tag = cmd[0]
         if tag == "psql" and any("function_ddl" in str(part) for part in cmd):
+            assert "ON_ERROR_STOP=1" in cmd
             tag = "psql-function-ddl"
         elif tag == "psql":
             tag = "psql-extension"
