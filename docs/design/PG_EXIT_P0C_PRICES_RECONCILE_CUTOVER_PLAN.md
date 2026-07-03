@@ -1443,18 +1443,26 @@ Before implementation starts, reviewer must confirm:
 
 ## Live Gate Record
 
-Status: **not run**. This section must be filled only after Task 3/8/9 evidence exists.
+Status: **Task 3 audit + HAPN patch COMPLETE (2026-07-04). Local prices declared authority. Cutover Tasks 4-9 pending.**
 
 ```text
-Reviewed reconcile fingerprint:
-PG summary:
-Local summary:
-Alias-explained PG-only:
-Unexplained PG-only:
-Bulk copy applied:
-Backup path:
-Live cutover:
-Post-cutover smoke:
+Reviewed reconcile fingerprint (final): 61bbf613c1fe94dd6558dc4bcc2bae7f9624e238df9c8114ed9a4e23da2580d2
+Audit iterations: v1 49e15e6b… (bucket-level checksums, superseded) → v2 a77b1222…
+  (intersection checksums; unexplained {HAPN:315}, drift 11 buckets/288 rows)
+  → final 61bbf613… after the HAPN patch.
+PG summary: 2,314,293 rows / 150 tickers / 15min only
+Local summary (post-patch): 2,324,487 rows / 149 tickers / 15min only
+Alias-explained PG-only: 15,530 (LC→HAPN — hypothesis CONFIRMED)
+Unexplained PG-only: 0 (was 315, all HAPN partial-day gaps over 16 days 2026-01-26..06-05)
+Value drift: 19 rows / 10 tickers remain, all 2026-06-23 volume-revision noise
+  (OHLC identical) — keep-local per ruling. HAPN's 269 truncated-bar rows adopted PG.
+Bulk copy applied: NO. Scoped deterministic HAPN patch only:
+  patch fingerprint ebe085be9e2dd86bbc77802ef69537468bd6043827700390504d9f37193ac630
+  (315 INSERT + 269 UPDATE, insert-only outside preimage-verified updates;
+  copy dry-run + idempotent rerun proven; audit row in prices_patch_runs).
+Backup path: data/market_data.db.bak-pre-p0c-hapn-patch-20260703T232813Z.db
+Live cutover: NOT YET (Tasks 4-9).
+Post-cutover smoke: pending cutover.
 ```
 
 ## Self-Review Notes
