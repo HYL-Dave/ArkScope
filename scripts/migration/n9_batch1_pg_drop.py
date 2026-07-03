@@ -11,11 +11,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
+from urllib.parse import urlsplit, urlunsplit
 
 TARGET_TABLES = (
     "news",
@@ -285,9 +287,98 @@ def collect_repo_grep_summary(repo_root: str | Path) -> dict[str, list[dict[str,
     return classify_grep_hits(hits)
 
 
+def build_pg_dump_command(
+    *,
+    database_url: str,
+    output: str | Path,
+    present_tables: Sequence[str],
+    present_views: Sequence[str],
+) -> list[str]:
+    del database_url  # supplied to subprocess env by the caller; do not expose in argv
+    cmd = [
+        "pg_dump",
+        "--format=custom",
+        "--no-owner",
+        "--no-privileges",
+        f"--file={Path(output)}",
+    ]
+    for name in sorted(set(present_tables) | set(present_views)):
+        if name in EXCLUDED_TABLES:
+            continue
+        cmd.append(f"--table=public.{name}")
+    return cmd
+
+
+def _object_counts(snapshot: Mapping[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    explicit_counts = snapshot.get("row_counts")
+    if isinstance(explicit_counts, Mapping):
+        counts.update({str(k): int(v) for k, v in explicit_counts.items()})
+    for obj in snapshot.get("objects", []):
+        if not isinstance(obj, Mapping):
+            continue
+        if obj.get("status") == "present" and "row_count" in obj:
+            counts[str(obj["name"])] = int(obj["row_count"])
+    return counts
+
+
+def compare_restore_to_evidence(restored: Mapping[str, Any], evidence: Mapping[str, Any]) -> dict[str, Any]:
+    expected_snapshot = evidence.get("pg_snapshot", {})
+    expected_counts = _object_counts(expected_snapshot)
+    restored_counts = _object_counts(restored)
+    expected_fps = expected_snapshot.get("row_fingerprints", {})
+    restored_fps = restored.get("row_fingerprints", {})
+    mismatches: list[dict[str, Any]] = []
+
+    for table in sorted(expected_counts):
+        expected = expected_counts.get(table)
+        actual = restored_counts.get(table)
+        if expected != actual:
+            mismatches.append({
+                "table": table,
+                "field": "row_count",
+                "expected": expected,
+                "actual": actual,
+            })
+    for table in sorted(expected_fps):
+        expected = expected_fps.get(table)
+        actual = restored_fps.get(table)
+        if expected != actual:
+            mismatches.append({
+                "table": table,
+                "field": "row_fingerprint",
+                "expected": expected,
+                "actual": actual,
+            })
+    return {"ok": not mismatches, "mismatches": mismatches}
+
+
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _load_json(path: str | Path) -> dict[str, Any]:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def file_sha256(path: str | Path) -> str:
+    h = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def read_function_ddl(conn) -> str:
+    ddl: list[str] = []
+    with conn.cursor() as cur:
+        for signature in TARGET_FUNCTION_SIGNATURES:
+            cur.execute("SELECT pg_get_functiondef(%s::regprocedure::oid)", (signature,))
+            row = cur.fetchone()
+            if row and row[0]:
+                ddl.append(row[0].rstrip() + ";\n")
+    return "\n".join(ddl)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -298,6 +389,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     preview.add_argument("--database-url", required=True)
     preview.add_argument("--repo-root", required=True)
     preview.add_argument("--output", required=True)
+
+    dump = sub.add_parser("dump", help="Create targeted N9 batch-1 PG archive")
+    dump.add_argument("--database-url", required=True)
+    dump.add_argument("--expected-report", required=True)
+    dump.add_argument("--archive-dir", required=True)
+
+    verify = sub.add_parser("verify-dump", help="Restore archive into a disposable DB and verify")
+    verify.add_argument("--database-url", required=True)
+    verify.add_argument("--archive-dir", required=True)
+    verify.add_argument("--restore-db", required=True)
+    verify.add_argument("--confirm-create-drop-restore-db", action="store_true")
 
     return parser
 
@@ -321,11 +423,135 @@ def _cmd_preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def _present_names(report: Mapping[str, Any], kind: str) -> list[str]:
+    out: list[str] = []
+    for obj in report.get("pg_snapshot", {}).get("objects", []):
+        if not isinstance(obj, Mapping):
+            continue
+        if obj.get("kind") == kind and obj.get("status") == "present":
+            out.append(str(obj["name"]))
+    return sorted(out)
+
+
+def _run_checked(cmd: Sequence[str], *, database_url: str | None = None) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if database_url:
+        env["PGDATABASE"] = database_url
+    proc = subprocess.run(
+        list(cmd),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"{cmd[0]} failed: {proc.stderr.strip()[:500]}")
+    return proc
+
+
+def _cmd_dump(args: argparse.Namespace) -> int:
+    archive_dir = Path(args.archive_dir)
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    evidence = _load_json(args.expected_report)
+    evidence_path = archive_dir / "evidence.json"
+    _write_json(evidence_path, evidence)
+    dump_path = archive_dir / "n9_batch1.dump"
+
+    cmd = build_pg_dump_command(
+        database_url=args.database_url,
+        output=dump_path,
+        present_tables=_present_names(evidence, "table"),
+        present_views=_present_names(evidence, "view"),
+    )
+    _run_checked(cmd, database_url=args.database_url)
+    restore_list = _run_checked(["pg_restore", "--list", str(dump_path)])
+    (archive_dir / "pg_restore_list.txt").write_text(restore_list.stdout, encoding="utf-8")
+
+    conn = connect_pg(args.database_url)
+    try:
+        (archive_dir / "function_ddl.sql").write_text(read_function_ddl(conn), encoding="utf-8")
+    finally:
+        conn.close()
+
+    manifest = {
+        "schema_version": 1,
+        "scope": "pg_exit_n9_batch1",
+        "evidence_fingerprint": evidence["fingerprint"],
+        "dump_sha256": file_sha256(dump_path),
+        "dump_file": dump_path.name,
+        "restore_list_file": "pg_restore_list.txt",
+        "function_ddl_file": "function_ddl.sql",
+    }
+    _write_json(archive_dir / "manifest.json", manifest)
+    print(json.dumps({
+        "status": "dumped",
+        "fingerprint": evidence["fingerprint"],
+        "archive_dir": str(archive_dir),
+        "dump_sha256": manifest["dump_sha256"],
+    }))
+    return 0
+
+
+def _database_url_for_db(database_url: str, dbname: str) -> str:
+    parts = urlsplit(database_url)
+    return urlunsplit((parts.scheme, parts.netloc, "/" + dbname, parts.query, parts.fragment))
+
+
+def _cmd_verify_dump(args: argparse.Namespace) -> int:
+    if not args.confirm_create_drop_restore_db:
+        raise SystemExit("--confirm-create-drop-restore-db is required")
+    archive_dir = Path(args.archive_dir)
+    evidence = _load_json(archive_dir / "evidence.json")
+    manifest = _load_json(archive_dir / "manifest.json")
+    dump_path = archive_dir / "n9_batch1.dump"
+    dump_sha = file_sha256(dump_path)
+    if dump_sha != manifest.get("dump_sha256"):
+        raise SystemExit("dump sha256 does not match manifest")
+
+    restore_db = args.restore_db
+    restore_url = _database_url_for_db(args.database_url, restore_db)
+    created = False
+    try:
+        _run_checked(["createdb", restore_db], database_url=args.database_url)
+        created = True
+        _run_checked(["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)])
+        function_ddl = archive_dir / "function_ddl.sql"
+        if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
+            _run_checked(["psql", "--dbname", restore_db, "--file", str(function_ddl)])
+        conn = connect_pg(restore_url)
+        try:
+            restored = collect_pg_snapshot(conn)
+        finally:
+            conn.close()
+        proof = compare_restore_to_evidence(restored, evidence)
+        proof.update({
+            "evidence_fingerprint": evidence["fingerprint"],
+            "dump_sha256": dump_sha,
+            "restore_db": restore_db,
+        })
+        _write_json(archive_dir / "restore_proof.json", proof)
+    finally:
+        if created:
+            _run_checked(["dropdb", restore_db], database_url=args.database_url)
+
+    print(json.dumps({
+        "status": "verified" if proof["ok"] else "failed",
+        "ok": proof["ok"],
+        "fingerprint": evidence["fingerprint"],
+    }))
+    return 0 if proof["ok"] else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     if args.cmd == "preview":
         return _cmd_preview(args)
+    if args.cmd == "dump":
+        return _cmd_dump(args)
+    if args.cmd == "verify-dump":
+        return _cmd_verify_dump(args)
     parser.error(f"unknown command: {args.cmd}")
     return 2
 
