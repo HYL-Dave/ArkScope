@@ -1456,27 +1456,37 @@ def test_price_scope_required(monkeypatch):
     res = ds.run_source("ibkr_prices")
     assert res["status"] == "failed" and "scope" in res["error"]
 
-    argv_seen = []
+    import src.market_data_direct as mdd
+
+    seen = {}
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (argv_seen.append(argv), {"returncode": 0})[1])
+                        lambda argv: (_ for _ in ()).throw(AssertionError("prices subprocess retired")))
+    monkeypatch.setattr(
+        mdd,
+        "backfill_prices_direct",
+        lambda **kwargs: seen.update(kwargs) or {"tickers_scanned": 2, "rows_added": 0, "errors": {}},
+    )
     res = ds.run_source("ibkr_prices")
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
-    assert "--tickers" in argv_seen[0] and "AAPL,NVDA" in argv_seen[0]
+    assert seen["tickers_arg"] == "AAPL,NVDA"
+    assert seen["acquire_gateway_lock"] is False
 
 
 def test_local_incremental_has_no_subprocess(monkeypatch):
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(AssertionError("subprocess used")))
     res = ds.run_source("local_incremental")
-    assert res["status"] == "succeeded" and res["local_refresh"] == {"ok": True}
+    assert res["status"] == "failed"
+    assert "prices PG mirror retired by P0-C" in res["error"]
 
 
 def test_run_source_never_raises(monkeypatch):
     monkeypatch.setattr(ds, "_local_refresh",
                         lambda: (_ for _ in ()).throw(RuntimeError("disk gone")))
     res = ds.run_source("local_incremental")
-    assert res["status"] == "failed" and "disk gone" in res["error"]
+    assert res["status"] == "failed"
+    assert "prices PG mirror retired by P0-C" in res["error"]
 
 
 # --- cross-process locks (CLI ⟷ sidecar) -----------------------------------------
@@ -1752,14 +1762,54 @@ def test_price_backfill_uses_planner_scope_no_pg_no_mirror(monkeypatch):
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
 
 
-def test_local_incremental_still_runs_local_refresh(monkeypatch):
-    # regression for the guard: local_incremental (adapter=None, sync_flag=None) IS the
-    # mirror — it must STILL call _local_refresh (the guard only skips DIRECT adapters).
-    ran = {"refresh": False}
-    monkeypatch.setattr(ds, "_local_refresh", lambda: ran.__setitem__("refresh", True) or {"ok": True})
+def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
+    import src.market_data_direct as mdd
+
+    seen = {}
+
+    def fake_backfill(**kwargs):
+        seen.update(kwargs)
+        return {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 2, "errors": {}}
+
+    monkeypatch.setattr(mdd, "backfill_prices_direct", fake_backfill)
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["NVDA"])
+    monkeypatch.setattr(
+        ds,
+        "_run_subprocess",
+        lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync/subprocess")),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(AssertionError("no PG mirror refresh")),
+    )
+
+    res = ds.run_source("ibkr_prices")
+
+    assert res["status"] == "succeeded"
+    assert seen["tickers_arg"] == "NVDA"
+    assert seen["acquire_gateway_lock"] is False
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_local_incremental_retired_after_p0c():
     res = ds.run_source("local_incremental")
-    assert res["status"] == "succeeded" and ran["refresh"] is True
-    assert res["local_refresh"] == {"ok": True}
+
+    assert res["status"] == "failed"
+    assert "prices PG mirror retired by P0-C" in res["error"]
+
+
+def test_local_incremental_retirement_does_not_call_local_refresh(monkeypatch):
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(AssertionError("_local_refresh retired for local_incremental")),
+    )
+
+    res = ds.run_source("local_incremental")
+
+    assert res["status"] == "failed"
+    assert "prices PG mirror retired by P0-C" in res["error"]
 
 
 def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):

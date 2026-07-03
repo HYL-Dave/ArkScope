@@ -10,24 +10,25 @@ Sources v1:
   - polygon_news / finnhub_news      — IN-PROCESS adapters (the collector modules
     are import-safe; run_incremental() returns structured stats like new_articles
     instead of an opaque exit code); independent, can run concurrently
-  - ibkr_news / ibkr_prices / iv_history — collector SUBPROCESSES, serialized
+  - ibkr_news / iv_history — collector SUBPROCESSES, serialized
     behind ONE shared IBKR lock (one Gateway session; client-id hygiene + the
     ib_insync asyncio loop is safer in its own process)
-  - local_incremental                 — app-native PG → local market_data.db delta
-    (market_data_admin.incremental_update)
+  - ibkr_prices                       — direct-local adapter into market_data.db
+  - local_incremental                 — retired PG mirror path
 
-After a non-news collector succeeds, its data is synced to PG
-(migrate_to_supabase --prices/--iv, serialized behind a global sync lock —
-concurrent syncs are idempotent but wasteful), then the local mirror refreshes
-(incremental_update, skip-if-busy). News is post-N8a PG-exited: provider fetches
-write normalized SQLite and project the legacy local read surface directly.
+After a remaining non-news collector succeeds, its data is synced to PG
+(migrate_to_supabase --iv, serialized behind a global sync lock — concurrent
+syncs are idempotent but wasteful), then the local mirror refreshes
+(incremental_update, skip-if-busy). Prices are post-P0-C direct-local; news is
+post-N8a PG-exited: provider fetches write normalized SQLite and project the
+legacy local read surface directly.
 
 Write-contention guarantees (the user's explicit SQLite concern):
   - collectors write per-source Parquet dirs — disjoint, safe in parallel;
-  - PG writes are idempotent upserts, serialized by _SYNC_LOCK anyway;
-  - the local SQLite is written ONLY by incremental_update (WAL + busy_timeout,
-    INSERT OR IGNORE) — serialized here by a skip-if-busy lock, and
-    financial_cache writes are already serialized by _CACHE_WRITE_LOCK;
+  - remaining PG writes are idempotent upserts, serialized by _SYNC_LOCK anyway;
+  - the local SQLite is written by direct-local writers and retired-domain
+    incremental paths only; financial_cache writes are already serialized by
+    _CACHE_WRITE_LOCK;
   - per-source locks make same-source runs skip (never queue), so a slow run
     cannot pile up behind itself;
   - CROSS-PROCESS: every lock above has a file-lock twin (flock(2) under
@@ -132,9 +133,10 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",
-            ["collect_ibkr_prices.py", "--incremental", "--minute-only"], "--prices",
-            ibkr=True, needs_price_scope=True, default_interval_min=60,
-            description="IBKR 15min bars for the active universe → PG → local mirror",
+            None, None,
+            ibkr=True, universe_tickers=True, default_interval_min=60,
+            adapter=("src.market_data_direct", "backfill_prices_direct"),
+            description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
         ),
         SourceDef(
             "iv_history", "IV 歷史",
@@ -145,7 +147,7 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "local_incremental", "本地鏡像增量",
             None, None, default_interval_min=15,
-            description="PG → market_data.db delta only (no provider fetch)",
+            description="Retired PG → market_data.db delta path; use direct-local sources",
         ),
         SourceDef(
             "price_backfill", "本地價格直連補抓",
@@ -172,6 +174,9 @@ _N9_RETIRED_SOURCES = {
     "iv_history": (
         "iv_history PG mirror source retired by N9 batch-1; "
         "IV collection will return through the separate IV reboot path"
+    ),
+    "local_incremental": (
+        "prices PG mirror retired by P0-C; use ibkr_prices/price_backfill direct-local"
     ),
 }
 
