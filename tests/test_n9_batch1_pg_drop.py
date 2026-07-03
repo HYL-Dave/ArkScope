@@ -236,9 +236,8 @@ def test_dump_command_writes_archive_manifest(tmp_path, monkeypatch, capsys):
     assert (archive_dir / "n9_batch1.dump").exists()
     assert (archive_dir / "evidence.json").exists()
     assert (archive_dir / "manifest.json").exists()
-    assert (archive_dir / "function_ddl.sql").read_text(encoding="utf-8") == (
-        "SET check_function_bodies = off;\n\n-- function ddl\n\n"
-    )
+    assert (archive_dir / "function_ddl.sql").read_text(encoding="utf-8") == "-- function ddl\n"
+    assert (archive_dir / "trigger_function_ddl.sql").exists()
 
 
 def test_verify_dump_writes_restore_proof(tmp_path, monkeypatch):
@@ -916,11 +915,17 @@ def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
         "SET check_function_bodies = off;\nCREATE FUNCTION ...;", encoding="utf-8"
     )
 
+    (archive_dir / "trigger_function_ddl.sql").write_text(
+        "SET check_function_bodies = off;\nCREATE FUNCTION trg...;", encoding="utf-8"
+    )
     order = []
 
     def fake_run_checked(cmd, *, database_url=None, dbname=None):
         tag = cmd[0]
-        if tag == "psql" and any("function_ddl" in str(part) for part in cmd):
+        if tag == "psql" and any("trigger_function_ddl" in str(part) for part in cmd):
+            assert "ON_ERROR_STOP=1" in cmd
+            tag = "psql-trigger-ddl"
+        elif tag == "psql" and any("function_ddl" in str(part) for part in cmd):
             assert "ON_ERROR_STOP=1" in cmd
             tag = "psql-function-ddl"
         elif tag == "psql":
@@ -940,7 +945,7 @@ def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
     ])
 
     assert code == 0
-    assert order == ["createdb", "psql-extension", "psql-function-ddl", "pg_restore", "dropdb"]
+    assert order == ["createdb", "psql-extension", "psql-trigger-ddl", "pg_restore", "psql-function-ddl", "dropdb"]
 
 
 def test_dead_pg_helper_get_recent_news_is_a_drop_target():

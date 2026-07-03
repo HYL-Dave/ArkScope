@@ -620,13 +620,16 @@ def _cmd_dump(args: argparse.Namespace) -> int:
     conn = connect_pg(args.database_url)
     try:
         trigger_ddl = collect_trigger_function_ddl(conn, _present_names(evidence, "table"))
-        target_ddl = read_function_ddl(conn)
-        pieces = [piece for piece in (trigger_ddl, target_ddl) if piece.strip()]
-        function_ddl = (
-            "SET check_function_bodies = off;\n\n" + "\n\n".join(pieces) + "\n"
-            if pieces else ""
+        # Pre-restore: trigger functions must exist before pg_restore recreates the
+        # tables' CREATE TRIGGER statements. check_function_bodies=off lets them be
+        # created before the tables they touch.
+        (archive_dir / "trigger_function_ddl.sql").write_text(
+            "SET check_function_bodies = off;\n\n" + trigger_ddl + "\n" if trigger_ddl.strip() else "",
+            encoding="utf-8",
         )
-        (archive_dir / "function_ddl.sql").write_text(function_ddl, encoding="utf-8")
+        # Post-restore: target-signature functions may reference table rowtypes
+        # (e.g. RETURNS SETOF news), so they can only be created after the tables.
+        (archive_dir / "function_ddl.sql").write_text(read_function_ddl(conn), encoding="utf-8")
         required_extensions = collect_required_extensions(conn)
     finally:
         conn.close()
@@ -640,6 +643,7 @@ def _cmd_dump(args: argparse.Namespace) -> int:
         "dump_file": dump_path.name,
         "restore_list_file": "pg_restore_list.txt",
         "function_ddl_file": "function_ddl.sql",
+        "trigger_function_ddl_file": "trigger_function_ddl.sql",
     }
     _write_json(archive_dir / "manifest.json", manifest)
     print(json.dumps({
@@ -679,13 +683,11 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
                 database_url=args.database_url,
                 dbname=restore_db,
             )
-        function_ddl = archive_dir / "function_ddl.sql"
-        if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
-            # Trigger functions must exist BEFORE pg_restore creates the tables'
-            # triggers; check_function_bodies=off lets functions referencing the
-            # not-yet-restored tables be created.
+        trigger_ddl_file = archive_dir / "trigger_function_ddl.sql"
+        if trigger_ddl_file.exists() and trigger_ddl_file.read_text(encoding="utf-8").strip():
+            # Trigger functions must exist BEFORE pg_restore creates the tables' triggers.
             _run_checked(
-                ["psql", "-v", "ON_ERROR_STOP=1", "--dbname", restore_db, "--file", str(function_ddl)],
+                ["psql", "-v", "ON_ERROR_STOP=1", "--dbname", restore_db, "--file", str(trigger_ddl_file)],
                 database_url=args.database_url,
                 dbname=restore_db,
             )
@@ -694,6 +696,15 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
             database_url=args.database_url,
             dbname=restore_db,
         )
+        function_ddl = archive_dir / "function_ddl.sql"
+        if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
+            # Target-signature functions may reference restored table rowtypes, so
+            # they are applied AFTER pg_restore.
+            _run_checked(
+                ["psql", "-v", "ON_ERROR_STOP=1", "--dbname", restore_db, "--file", str(function_ddl)],
+                database_url=args.database_url,
+                dbname=restore_db,
+            )
         conn = connect_pg(restore_url)
         try:
             restored = collect_pg_snapshot(conn)
