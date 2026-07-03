@@ -556,6 +556,8 @@ WHERE interval = '15min'
 ORDER BY ticker, interval, datetime
 """
 
+FULL_UNEXPLAINED_KEY_LIMIT = 5000
+
 
 def _canonical_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -690,6 +692,7 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
     )
     alias_explained_pg_keys = [tuple(item["pg_key"]) for item in diff.alias_explained_pg_only]
     pg_only_keys = [*alias_explained_pg_keys, *diff.unexplained_pg_only]
+    unexplained_keys_truncated = len(diff.unexplained_pg_only) > FULL_UNEXPLAINED_KEY_LIMIT
     report = {
         "schema_version": 1,
         "scope": "p0c_prices_reconcile",
@@ -702,6 +705,8 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
         "alias_explained_pg_only_by_ticker": _count_by_ticker(alias_explained_pg_keys),
         "unexplained_pg_only_by_ticker": _count_by_ticker(diff.unexplained_pg_only),
         "local_only_by_ticker": _count_by_ticker(diff.local_only),
+        "unexplained_pg_only_keys": [] if unexplained_keys_truncated else list(diff.unexplained_pg_only),
+        "unexplained_pg_only_keys_truncated": unexplained_keys_truncated,
         "value_checksum_mismatch_count": len(value_mismatches),
         "value_checksum_mismatch_row_count": sum(int(item["mismatch_count"]) for item in value_mismatches),
         "bulk_copy_allowed": diff.bulk_copy_allowed,

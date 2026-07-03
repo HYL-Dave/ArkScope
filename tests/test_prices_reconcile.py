@@ -204,6 +204,10 @@ def test_reconcile_report_groups_pg_only_and_value_mismatch_rows():
 
     assert report["pg_only_by_ticker"] == {"HAPN": 1}
     assert report["unexplained_pg_only_by_ticker"] == {"HAPN": 1}
+    assert report["unexplained_pg_only_keys"] == [
+        ["HAPN", "15min", "2026-01-02T14:30:00+0000"]
+    ]
+    assert report["unexplained_pg_only_keys_truncated"] is False
     assert report["value_checksum_mismatch_count"] == 1
     assert report["value_checksum_mismatch_row_count"] == 1
     assert report["value_checksum_mismatch_samples"] == [
