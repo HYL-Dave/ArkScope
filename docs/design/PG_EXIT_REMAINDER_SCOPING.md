@@ -113,7 +113,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 5. **S-E | IV IBKR small-scope computed-IV prototype** (10–30 tickers, near-month/ATM, fixed DTE-or-delta bucket, append-only, no gap-fill). Extract `src/iv/`.
 6. **S-F | (optional) IV bulk provider backend** — only if the survey finds a fit; plugs into the same schema.
 7. **S-G | scorer (news_scores) cutover** — **implemented and live-applied 2026-07-03**. Local `news_article_scores` now carries the reviewed PG score history, score-dependent local reads use SQLite-local scores, future active score imports use `scripts/scoring/import_news_scores_local.py`, and PG `--scores` is archive-only. Proof: fingerprint `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`, `pg_score_rows=503,226`, `inserted_or_updated=491,808`, `rejected_rows=604`, `missing_legacy_rows=14`, idempotent reapply `inserted_or_updated=0`.
-8. **S-H | orphan/audit + app-state relocation** — **audit complete 2026-07-03** (`PG_EXIT_S_H_ORPHAN_APP_STATE_AUDIT.md`). Findings: PG `news`/`news_scores`/`fundamentals`/`iv_history` and likely `sa_*` are N9 candidates after final grep; app-records are local; `job_runs`, `financial_data_cache`, and macro/cal need targeted follow-up slices before drop.
+8. **S-H | orphan/audit + app-state relocation** — **audit complete 2026-07-03** (`PG_EXIT_S_H_ORPHAN_APP_STATE_AUDIT.md`). Findings: PG `news`/`news_scores`/`fundamentals`/`iv_history` and likely `sa_*` are N9 candidates after final grep; app-records are local; `job_runs`, `financial_data_cache`, and macro/cal need targeted follow-up slices before drop. S-H1 job-runs local plan is drafted at `PG_EXIT_S_H1_JOB_RUNS_LOCAL_PLAN.md`.
 9. **S-I | N9 real drop** (§8).
 10. **S-J | provider-config authority hardening (DB-first, fail-closed)** — orthogonal to the domain slices (provider *config*, not market data). Kill the two silent `config/.env` fallbacks (per-field overlay + whole-store startup degrade), surface per-field provenance with an explicit import affordance, then flip strict-by-default behind a tri-state. Contract in §13. **Phase 0–1 must land before S-E** so new IV provider keys are DB-native from day one.
 
@@ -151,7 +151,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H follow-up slices (`job_runs`, `financial_cache`, macro/cal proof) can run independently of P0-C prices. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete.
+- **Independent:** S-H audit is complete; S-H1 job-runs plan is ready for review, and S-H follow-up slices (`job_runs`, `financial_cache`, macro/cal proof) can run independently of P0-C prices. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete.
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---
