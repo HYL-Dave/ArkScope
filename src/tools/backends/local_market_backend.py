@@ -1,7 +1,6 @@
 """
 LocalMarketDatabaseBackend — DatabaseBackend that serves the market_data domain
-from a local SQLite (3a prices + 3b news + 3c-A iv), with PostgreSQL
-fallback.
+from a local SQLite (3a prices + 3b news + 3c-A iv).
 
 Why a SUBCLASS of DatabaseBackend rather than a wrapper: the DAL and agents branch
 on ``isinstance(backend, DatabaseBackend)`` in ~30 places to decide "is this a
@@ -13,8 +12,9 @@ methods inherited and hit PG); we override ONLY the migrated market-domain reads
 to go local-first. Everything else — Seeking-Alpha, reports, memories, news
 SCORES — is the inherited PG behaviour, unchanged.
 
-Overridden, local-first with PG fallback on empty/miss:
-  - ``query_prices`` (3a);
+Overridden market reads:
+  - ``query_prices`` (3a) — local-only after P0-C; a miss is an honest empty,
+    never a PG fallback;
   - ``query_news`` (3b) — UNSCORED reads are local-first with PG fallback; a SCORED
     request (``scored_only`` / a specific ``model``) does NOT fall back to PG —
     ``news_scores`` is RETIRED (§4 decision 2026-06-23), sentiment is local-first
@@ -23,7 +23,8 @@ Overridden, local-first with PG fallback on empty/miss:
     scout stats; no PG fallback on local empty);
   - ``query_iv_history`` (3c-A) — local-only after N9 batch-1; the old PG
     ``iv_history`` mirror is intentionally abandoned;
-  - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
+  - ``get_available_tickers('prices')`` is local-only after P0-C;
+    other local domains remain transitional where noted.
 
 The old ``fundamentals`` mirror table is retained for legacy inspection until N9,
 but is no longer an authority. Current fundamentals are served through the
@@ -70,15 +71,10 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
 
     def query_prices(self, ticker: str, interval: str = "15min", days: int = 30) -> pd.DataFrame:
         try:
-            df = self._market.query_prices(ticker, interval=interval, days=days)
+            return self._market.query_prices(ticker, interval=interval, days=days)
         except Exception as e:  # never let the local path break a read
             logger.warning(f"local market query_prices failed ({e})")
-            df = None
-        if df is not None and not df.empty:
-            return df
-        if self._strict:
-            return df if df is not None else pd.DataFrame()  # local-only: honest empty, no PG
-        return super().query_prices(ticker, interval=interval, days=days)  # PG authority/fallback
+            return pd.DataFrame()
 
     def query_news(self, ticker=None, days=30, source="auto", scored_only=True, model=None):
         # news_scores RETIRED (DATA_COLLECTION plan §4 decision 2026-06-23): sentiment is
@@ -213,10 +209,13 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         if data_type in ("prices", "news", "iv_history", "fundamentals"):  # all local-first now
             try:
                 local = self._market.get_available_tickers(data_type)
+                if data_type == "prices":
+                    return local
                 if local:
                     return local
             except Exception:
-                pass
+                if data_type == "prices":
+                    return []
         if data_type == "news" and self._news_strict:
             return []  # news PG-exit: honest local empty, no PG
         if self._strict:

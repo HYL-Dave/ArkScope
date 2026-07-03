@@ -523,15 +523,19 @@ def test_prices_local_when_present(market_db, monkeypatch):
     assert hit == []  # PG (super) never hit when local has data
 
 
-def test_prices_fallback_to_pg(market_db, monkeypatch):
+def test_p0c_prices_miss_is_honest_empty_no_pg(market_db, monkeypatch):
     db, _ = market_db
     hit = []
     monkeypatch.setattr(
         DatabaseBackend, "query_prices",
-        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1],
+        lambda self, ticker, interval="15min", days=30: (
+            hit.append(ticker),
+            (_ for _ in ()).throw(AssertionError("PG fallback forbidden")),
+        )[1],
     )
-    df = _make(db).query_prices("UNKNOWN", days=30)  # not in local → PG fallback
-    assert df.iloc[0]["datetime"] == "PGSENTINEL" and hit == ["UNKNOWN"]
+    df = _make(db).query_prices("UNKNOWN", days=30)  # not in local → honest empty
+    assert df.empty
+    assert hit == []
 
 
 def test_available_tickers_routing(market_db, monkeypatch):
@@ -543,6 +547,25 @@ def test_available_tickers_routing(market_db, monkeypatch):
     assert b.get_available_tickers("iv_history") == ["AAPL", "NVDA"]  # local (3c-A)
     assert b.get_available_tickers("fundamentals") == ["AAPL", "NVDA"]  # local (3c-A)
     assert b.get_available_tickers("options") == ["PGONLY"]          # non-local → PG (super)
+
+
+def test_p0c_available_price_tickers_empty_is_honest_empty_no_pg(tmp_path, monkeypatch):
+    db = tmp_path / "market_data.db"
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "CREATE TABLE prices (ticker TEXT, datetime TEXT, interval TEXT, "
+        "open REAL, high REAL, low REAL, close REAL, volume INTEGER)"
+    )
+    conn.close()
+    hit = []
+    monkeypatch.setattr(
+        DatabaseBackend,
+        "get_available_tickers",
+        lambda self, data_type: (hit.append(data_type), ["PGONLY"])[1],
+    )
+
+    assert _make(str(db)).get_available_tickers("prices") == []
+    assert hit == []
 
 
 def test_iv_history_local_then_honest_empty_without_pg(market_db, monkeypatch):
@@ -1018,13 +1041,17 @@ def test_strict_market_local_miss_is_honest_empty_not_pg(market_db, monkeypatch)
     assert b.get_available_tickers("options") == []   # non-local type → strict empty, not PG
 
 
-def test_non_strict_still_falls_back_to_pg(market_db, monkeypatch):
+def test_p0c_non_strict_prices_still_do_not_fallback_to_pg(market_db, monkeypatch):
     db, _ = market_db
     hit = []
     monkeypatch.setattr(DatabaseBackend, "query_prices",
-                        lambda self, ticker, interval="15min", days=30: (hit.append(ticker), _PG_SENTINEL)[1])
+                        lambda self, ticker, interval="15min", days=30: (
+                            hit.append(ticker),
+                            (_ for _ in ()).throw(AssertionError("PG fallback forbidden")),
+                        )[1])
     b = LocalMarketDatabaseBackend("postgresql://fake/db", market_db=db, strict=False)  # default
-    assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL" and hit == ["UNKNOWN"]
+    assert b.query_prices("UNKNOWN").empty
+    assert hit == []
 
 
 def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
@@ -1071,10 +1098,10 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
     assert b.query_news_feed(q="notpresent")["total"] == 0
     assert b.query_news_stats(ticker="ZZZZ").empty
 
-    assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL"
+    assert b.query_prices("UNKNOWN").empty
     assert b.query_iv_history("UNKNOWN").empty
     assert b.query_fundamentals("UNKNOWN") == {}
-    assert price_hit == ["UNKNOWN"]
+    assert price_hit == []
     assert iv_hit == []
     assert fund_hit == []
 
