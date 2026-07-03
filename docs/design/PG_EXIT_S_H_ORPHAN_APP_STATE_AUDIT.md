@@ -82,9 +82,9 @@ Cut A from the scoping doc still holds: app-state does not belong in `market_dat
 4. **S-I/N9 first drop batch**
    After final reader grep, drop/archive the clearly localised market orphans: PG `news`, `news_scores`, `fundamentals`, `iv_history`, likely `sa_*`, and legacy PG `signals` if present. Keep prices, job_runs, financial cache, and unresolved macro/cal out of this first batch.
 
-## 6. Open User Decisions
+## 6. Open User Decisions — ALL DECIDED 2026-07-03 (map §10 entry has the ruling text)
 
-1. **Job runs home:** `profile_state.db` vs a new `ops.db`. `profile_state.db` is simpler and already device-local; `ops.db` gives cleaner write isolation for scheduler telemetry.
-2. **Financial cache cold-start:** promote PG rows first, or accept cold local cache and remove fallback immediately.
-3. **Macro/cal empty tables:** accept local empty economic/earnings events, re-fetch them, or seed from PG once.
-4. **N9 archive policy:** whether to keep a PG dump / SQLite export for dropped orphan domains before destructive removal.
+1. **Job runs home:** ✅ DECIDED = `profile_state.db` v1 (executed by S-H1 live cutover, fingerprint `38cf152…`; `ops.db` remains a future option only if write contention appears).
+2. **Financial cache cold-start:** ✅ DECIDED = **cold-start, no promote.** Evidence: PG `financial_data_cache` = 24 rows / 7 unexpired / 100% `sec_edgar` / 0 paid FD rows — promotion machinery would rescue seven free-to-refetch rows. S-H2 = remove the PG fallback / read-through promotion from `get_financial_cache()`, keep local-miss → SEC/FD refetch.
+3. **Macro/cal empty tables:** ✅ DECIDED = **accept honest-empty; fold into N9 evidence.** Evidence: all nine PG `macro_*`/`cal_*` tables have 0 live tuples — the local `macro_calendar.db` was always the only populated copy; nothing to seed or refetch. Local empty economic/earnings tables = future forward-collection surfaces.
+4. **N9 archive policy:** ✅ DECIDED = **dump once, then drop.** One compressed pg_dump containing only the drop-batch tables, kept as offline evidence insurance; then clean drops. **This ruling explicitly supersedes the 2026-06-13 SA-cutover "PG `sa_*` frozen rollback basis / do NOT delete" rule — the rollback basis becomes the dump file.** Batch 1: `news`, `news_scores`, `fundamentals`, `iv_history`, empty `macro_*`/`cal_*`, `signals` (if present + reader-free), `sa_*`. `job_runs` joins batch 2 after soak; `prices` stays a separate large slice. Local/cloud profile-backup strategy is a separate future Portability-Layer item.
