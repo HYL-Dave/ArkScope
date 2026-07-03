@@ -133,21 +133,27 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ---
 
-## 8. N9 real drop list (draft — grep-confirm "no training/report/migrate/other script still reads" before each drop)
+## 8. N9 real drop list — **BATCH-1 LIVE-EXECUTED 2026-07-03T05:2xZ**
 
-Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md` (authored/reviewed 2026-07-03; offline implementation complete). The plan makes the destructive nature explicit: pre-drop runtime hardening first, then reader-free evidence, then compressed `pg_dump`, then mandatory restore verification, then a separate user-approved live drop. The offline implementation already removed the old PG `iv_history` runtime seam: local reads are honest-empty on miss, manual refresh requests prices only, and the scheduler `iv_history` source fails before provider work.
+Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md`.
 
-- PG `news` (343k, orphaned)
-- PG `sa_*` (SA already local; final reader/script grep still required)
-- PG `iv_history` (old 24 rows)
-- PG `fundamentals` (130, after refetch)
-- PG `news_scores` (503k, after S-G local cutover and final reader grep)
-- PG `financial_data_cache` (24 rows; after S-H2 local-only cold-start and final reader grep)
-- PG `job_runs` (13,652, after S-H1 local cutover soak and final reader/script grep)
-- the news/fundamentals/iv `--sync` paths in `migrate_to_supabase.py`
-- verified-dead PG score helper: `src/tools/backends/db_backend.py::query_news_scores` (zero callers; local score reads go through `news_article_scores`)
-- verified-dead PG `signals` table if present (no runtime SQL reader/writer found in S-H)
-- **Retain for follow-up:** `prices` (pending migration slice), unresolved `macro_*` / `cal_*` proof folded into N9 batch-1 evidence. PG `job_runs` is retained only through S-H1 soak / N9 final grep.
+**Batch-1 live record (2026-07-03):**
+
+- Approved evidence fingerprint `fd995f7092ad9535499294506ec328836a44fe71e1370f2746fcef211bd14d21` (third approval package; two earlier packages were invalidated by the fingerprint's own repo-grep gate after reviewed tooling fixes — correct gate behavior, and the drop's first attempt was correctly rolled back by a rowtype dependency).
+- Archive `data/pg_archive/n9_batch1_20260703T045919/` — dump sha256 `eb9fd854…`, `required_extensions=[pg_trgm, vector]`, two-phase DDL sidecars (trigger fns pre-restore / target fns post-restore), **restore proof ok:true against a disposable DB** (row fingerprints matched).
+- Dropped in ONE transaction (4 statements, no CASCADE): 21 tables (`news` 371,672 / `news_scores` 503,226 / `fundamentals` 130 / `iv_history` 24 / `financial_data_cache` 24 / `signals` 0 / 6×`sa_*` / 9× empty `macro_*`+`cal_*`), view `news_latest_scores`, functions `news_sentiment_summary(...)` + `get_recent_news(...)` (dead day-one helper; its `news` rowtype dependency blocked drop attempt #1 → txn rollback → target amended + dependency scan widened to `pg_type` edges).
+- `postcheck` ok (targets incl. functions absent; excluded present). App smoke pass: scored news 9,999d == S-G baseline 8,869; FTS/stats/prices/IV/SA/macro/job_runs local reads all healthy.
+- **Remaining PG objects: `prices` (2,314,293) + `job_runs` (13,652, frozen archive until batch-2) + app-record tables.**
+- **Invalidated rollback levers** (per the plan's Post-Drop Rollback Semantics): toggle-off-to-PG is dead for all dropped domains; recovery = restore the archive first.
+- Gate lessons banked: preflight the client toolchain (`pg_dump`/`pg_restore` ≥ server major; a real `ripgrep` binary — shell aliases don't reach subprocesses); repo freeze between evidence and drop (the fingerprint includes the repo grep); psql DDL applies always run with `ON_ERROR_STOP=1`.
+
+**Batch-2 / cleanup queue (unchanged owners):**
+
+- PG `job_runs` (13,652) — drop after S-H1 soak + final reader/script grep.
+- Orphaned PG function `news_search_vector_update()` (its trigger died with `news`).
+- verified-dead PG score helper: `src/tools/backends/db_backend.py::query_news_scores` + other `DatabaseBackend` methods now referencing absent tables.
+- `migrate_to_supabase.py` retired-domain code (physical removal).
+- **Retain:** `prices` (pending P0-C migration slice — the final PG dependency).
 
 ---
 

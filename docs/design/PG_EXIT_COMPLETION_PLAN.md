@@ -6,7 +6,7 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-Remaining price ingest, N9 batch-1 live drop, SEC/dead paths, and UI collapse remain. S-G
+**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8) — PG now holds only `prices`, frozen `job_runs`, and app-record tables.** Remaining: price ingest/migration, batch-2 (job_runs + dead paths), SEC/dead paths, and UI collapse. S-G
 `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local. N9 batch-1 offline
 implementation is ready for live evidence/dump approval; no destructive live drop has been run.
 
