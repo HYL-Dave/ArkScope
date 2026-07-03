@@ -140,10 +140,10 @@ class _RunTelemetry:
         if not enabled:
             return
         try:
-            from src.service.job_runs_store import JobRunsStore
+            from src.service.job_runs_store import get_job_runs_store
             from src.tools.data_access import DataAccessLayer
 
-            store = JobRunsStore(DataAccessLayer(db_dsn="auto"))
+            store = get_job_runs_store(DataAccessLayer(db_dsn="auto"))
             if store.is_available():
                 self._store = store
             else:

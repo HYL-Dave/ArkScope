@@ -11,13 +11,22 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.service import jobs as jobs_module
-from src.service.job_runs_store import JobRunsStore, _serialize_row
+from src.service.job_runs_store import (
+    ENV_USE_LOCAL_JOB_RUNS,
+    USE_LOCAL_JOB_RUNS_KEY,
+    JobRunsLocalStore,
+    JobRunsStore,
+    _serialize_row,
+    get_job_runs_store,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -587,14 +596,204 @@ def test_record_completed_run_omits_finished_at_when_not_provided():
 
 
 # ---------------------------------------------------------------------------
+# Local job_runs store + routing (S-H1)
+# ---------------------------------------------------------------------------
+
+
+def test_local_store_create_finish_and_latest(tmp_path):
+    db = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(db)
+
+    run_id = store.create_run(
+        "analysis_watchlist_batch",
+        trigger_source="api",
+        payload={"tickers": ["NVDA"]},
+    )
+    assert run_id == 1
+    assert store.finish_run(
+        run_id,
+        status="succeeded",
+        message="ok",
+        result={"processed": 1},
+        duration_ms=123,
+    ) is True
+
+    rows = store.list_runs(job_name="analysis_watchlist_batch", limit=10, offset=0)
+    assert len(rows) == 1
+    assert rows[0]["payload"] == {"tickers": ["NVDA"]}
+    assert rows[0]["result"] == {"processed": 1}
+    assert rows[0]["duration_ms"] == 123
+    assert rows[0]["started_at"]
+    assert rows[0]["finished_at"]
+
+    latest = store.latest_runs_by_name()
+    assert latest["analysis_watchlist_batch"]["status"] == "succeeded"
+
+
+def test_local_store_finish_run_computes_duration_when_omitted(tmp_path):
+    db = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(db)
+    run_id = store.create_run("monitor_watchlist_scan")
+
+    assert store.finish_run(run_id, status="succeeded", message="ok") is True
+
+    row = store.list_runs(job_name="monitor_watchlist_scan")[0]
+    assert row["duration_ms"] is not None
+
+
+def test_local_store_record_completed_preserves_ids_and_payload(tmp_path):
+    db = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(db)
+    started = datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc)
+    finished = datetime(2026, 4, 25, 12, 0, 30, tzinfo=timezone.utc)
+
+    run_id = store.record_completed_run(
+        "sa_extension:market_news_quick",
+        status="failed",
+        started_at=started,
+        finished_at=finished,
+        trigger_source="extension",
+        payload={"scope": "current"},
+        result={"saved": 0},
+        error="timeout",
+        duration_ms=30_000,
+        id=77,
+    )
+
+    assert run_id == 77
+    row = store.list_runs(limit=1)[0]
+    assert row["id"] == 77
+    assert row["payload"] == {"scope": "current"}
+    assert row["result"] == {"saved": 0}
+    assert row["error"] == "timeout"
+    assert row["started_at"].startswith("2026-04-25T12:00:00")
+
+
+def test_local_store_run_summary_distinguishes_latest_success_and_latest_any(tmp_path):
+    db = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(db)
+
+    store.record_completed_run(
+        "fetch_economic_calendar_recent",
+        status="succeeded",
+        started_at="2026-04-25T10:00:00Z",
+        finished_at="2026-04-25T10:01:00Z",
+    )
+    store.record_completed_run(
+        "fetch_economic_calendar_recent",
+        status="failed",
+        started_at="2026-04-25T11:00:00Z",
+        finished_at="2026-04-25T11:01:00Z",
+        error="boom",
+    )
+
+    summary = store.run_summary_by_name(["fetch_economic_calendar_recent"])
+
+    assert summary["fetch_economic_calendar_recent"] == {
+        "last_success_at": "2026-04-25T10:01:00+00:00",
+        "last_any_at": "2026-04-25T11:01:00+00:00",
+    }
+
+
+def test_get_job_runs_store_uses_profile_toggle_for_local(tmp_path, monkeypatch):
+    monkeypatch.delenv(ENV_USE_LOCAL_JOB_RUNS, raising=False)
+    dal = MagicMock()
+    dal._profile_setting_truthy.return_value = True
+    dal._base = None
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+
+    store = get_job_runs_store(dal)
+
+    assert isinstance(store, JobRunsLocalStore)
+    dal._profile_setting_truthy.assert_called_once_with(
+        USE_LOCAL_JOB_RUNS_KEY, ENV_USE_LOCAL_JOB_RUNS
+    )
+
+
+def test_get_job_runs_store_explicit_false_keeps_pg_store(monkeypatch):
+    monkeypatch.delenv(ENV_USE_LOCAL_JOB_RUNS, raising=False)
+    dal = MagicMock()
+    dal._profile_setting_truthy.return_value = False
+
+    store = get_job_runs_store(dal)
+
+    assert isinstance(store, JobRunsStore)
+
+
+def test_jobs_history_endpoint_uses_store_factory(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_rows = [
+        {
+            "id": 2,
+            "job_name": "foo",
+            "status": "succeeded",
+            "trigger_source": "api",
+            "payload": {},
+            "result": None,
+            "message": None,
+            "error": None,
+            "started_at": "2026-04-25T10:00:00+00:00",
+            "finished_at": None,
+            "duration_ms": None,
+            "created_at": "2026-04-25T10:00:00+00:00",
+            "updated_at": "2026-04-25T10:00:00+00:00",
+        }
+    ]
+    fake_store = MagicMock()
+    fake_store.list_runs.return_value = fake_rows
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+
+    response = jobs_route.jobs_history(name="foo", limit=10, offset=0, dal=MagicMock())
+
+    assert response.count == 1
+    fake_store.list_runs.assert_called_once_with(job_name="foo", limit=10, offset=0)
+
+
+# ---------------------------------------------------------------------------
 # Native host: record_extension_job action
 # ---------------------------------------------------------------------------
 
 
-def test_record_extension_job_succeeded_path():
+def test_extension_record_endpoint_records_via_store_factory(monkeypatch):
+    from src.api.routes import jobs as jobs_route
+
+    fake_store = MagicMock()
+    fake_store.record_completed_run.return_value = 345
+    monkeypatch.setattr(jobs_route, "get_job_runs_store", lambda dal: fake_store)
+
+    req = jobs_route.ExtensionJobRecordRequest(
+        job_name="sa_extension:market_news_quick",
+        status="succeeded",
+        started_at="2026-04-25T12:00:00Z",
+        finished_at="2026-04-25T12:00:30Z",
+        duration_ms=30000,
+        payload={"display_name": "Market News quick"},
+        result={"saved": 17},
+        message="ok",
+        trigger_source="extension",
+    )
+    response = jobs_route.record_extension_job(req, dal=MagicMock())
+
+    assert response.status == "ok"
+    assert response.run_id == 345
+    fake_store.record_completed_run.assert_called_once()
+    kwargs = fake_store.record_completed_run.call_args.kwargs
+    assert kwargs["payload"] == {"display_name": "Market News quick"}
+    assert kwargs["result"] == {"saved": 17}
+    assert kwargs["duration_ms"] == 30000
+
+
+def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
     from scripts.sa_native_host import _handle_record_extension_job
 
-    dal = MagicMock()
+    calls = []
+
+    def fake_post(payload):
+        calls.append(payload)
+        return {"status": "ok", "run_id": 99, "persisted": True}
+
+    monkeypatch.setattr("scripts.sa_native_host._post_extension_job_to_sidecar", fake_post)
     msg = {
         "job_name": "sa_extension:market_news_quick",
         "status": "succeeded",
@@ -606,51 +805,37 @@ def test_record_extension_job_succeeded_path():
         "message": "ok",
         "trigger_source": "extension",
     }
-    with patch(
-        "src.service.job_runs_store.JobRunsStore.record_completed_run",
-        return_value=99,
-    ) as record:
-        result = _handle_record_extension_job(dal, msg)
+    result = _handle_record_extension_job(MagicMock(), msg)
 
     assert result["status"] == "ok"
     assert result["run_id"] == 99
     assert result["persisted"] is True
-
-    record.assert_called_once()
-    kwargs = record.call_args.kwargs
-    assert kwargs["status"] == "succeeded"
-    assert kwargs["trigger_source"] == "extension"
-    assert kwargs["duration_ms"] == 30000
-    assert kwargs["payload"] == {"display_name": "Market News quick"}
-    assert kwargs["result"] == {"saved": 17}
-    # Timestamps parsed from ISO 8601 with trailing Z.
-    assert kwargs["started_at"].year == 2026
-    assert kwargs["started_at"].tzinfo is not None
-    assert kwargs["finished_at"].minute == 0
-    assert kwargs["finished_at"].second == 30
+    assert calls == [
+        {
+            **msg,
+            "error": None,
+        }
+    ]
 
 
-def test_record_extension_job_failed_path_carries_error():
+def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monkeypatch):
     from scripts.sa_native_host import _handle_record_extension_job
 
-    dal = MagicMock()
+    def fake_post(payload):
+        raise OSError("sidecar down")
+
+    monkeypatch.setattr("scripts.sa_native_host._post_extension_job_to_sidecar", fake_post)
     msg = {
         "job_name": "sa_extension:alpha_picks_quick",
         "status": "failed",
         "started_at": "2026-04-25T12:00:00Z",
         "error": "paywall: Subscribe to unlock",
     }
-    with patch(
-        "src.service.job_runs_store.JobRunsStore.record_completed_run",
-        return_value=100,
-    ) as record:
-        result = _handle_record_extension_job(dal, msg)
+    result = _handle_record_extension_job(MagicMock(), msg)
 
     assert result["status"] == "ok"
-    assert result["run_id"] == 100
-    kwargs = record.call_args.kwargs
-    assert kwargs["status"] == "failed"
-    assert kwargs["error"] == "paywall: Subscribe to unlock"
+    assert result["persisted"] is False
+    assert result["run_id"] is None
 
 
 def test_record_extension_job_rejects_invalid_status():
@@ -685,28 +870,6 @@ def test_record_extension_job_rejects_missing_job_name():
     assert "job_name" in result["error"]
 
 
-def test_record_extension_job_persistence_failure_returns_ok_status_with_persisted_false():
-    """Best-effort: DB write fails inside store → action still returns ok=True."""
-    from scripts.sa_native_host import _handle_record_extension_job
-
-    dal = MagicMock()
-    with patch(
-        "src.service.job_runs_store.JobRunsStore.record_completed_run",
-        return_value=None,
-    ):
-        result = _handle_record_extension_job(
-            dal,
-            {
-                "job_name": "sa_extension:x",
-                "status": "succeeded",
-                "started_at": "2026-04-25T12:00:00Z",
-            },
-        )
-    assert result["status"] == "ok"
-    assert result["persisted"] is False
-    assert result["run_id"] is None
-
-
 def test_record_extension_job_dispatched_via_handle_message():
     """handle_message routes action=record_extension_job to the helper."""
     from scripts import sa_native_host
@@ -727,6 +890,12 @@ def test_record_extension_job_dispatched_via_handle_message():
 
     helper.assert_called_once()
     assert result["run_id"] == 1
+
+
+def test_native_host_does_not_construct_job_runs_store_or_profile_writer():
+    text = Path("scripts/sa_native_host.py").read_text()
+    assert "JobRunsStore(" not in text
+    assert "profile_state.db" not in text
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 from src.agents.config import AgentConfig, get_agent_config
 from src.analysis import AnalysisRequest, run_analysis_request, save_analysis_run
 from src.monitor.engine import MonitorEngine
-from src.service.job_runs_store import JobRunsStore
+from src.service.job_runs_store import get_job_runs_store
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,7 @@ def list_jobs_status(
     """
     cfg = config or get_agent_config()
     watchlist_count = len(_watchlist_tickers(dal))
-    store = JobRunsStore(dal)
+    store = get_job_runs_store(dal)
     db_latest = store.latest_runs_by_name() if store.is_available() else {}
 
     jobs: List[Dict[str, Any]] = []
@@ -480,7 +480,7 @@ def run_job(
         payload.update(params)
 
     started_at = _mark_running(job.name)
-    store = JobRunsStore(dal)
+    store = get_job_runs_store(dal)
     run_id = store.create_run(
         job.name, trigger_source=trigger_source, payload=payload,
     )

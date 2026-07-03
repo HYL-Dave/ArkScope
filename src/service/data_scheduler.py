@@ -784,9 +784,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         run_id = None
         try:
             from src.api.dependencies import get_dal
-            from src.service.job_runs_store import JobRunsStore
+            from src.service.job_runs_store import get_job_runs_store
 
-            store = JobRunsStore(get_dal())
+            store = get_job_runs_store(get_dal())
             run_id = store.create_run(job_name(source), trigger_source=trigger_source,
                                       payload={"source": source})
         except Exception as e:  # noqa: BLE001 — telemetry must not block collection
@@ -1082,9 +1082,9 @@ def _seed_last_attempts() -> None:
         return
     try:
         from src.api.dependencies import get_dal
-        from src.service.job_runs_store import JobRunsStore
+        from src.service.job_runs_store import get_job_runs_store
 
-        latest = JobRunsStore(get_dal()).latest_runs_by_name()
+        latest = get_job_runs_store(get_dal()).latest_runs_by_name()
     except Exception as e:  # noqa: BLE001
         logger.debug(f"scheduler PG seed skipped: {e}")
         return

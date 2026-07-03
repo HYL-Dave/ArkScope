@@ -29,6 +29,7 @@ from src.service.sa_market_news_health import (
     SEVERITY_OK,
     SEVERITY_WARNING,
     _is_us_market_hours,
+    _query_extension_run,
     compute_market_news_health,
     evaluate_health,
 )
@@ -363,10 +364,28 @@ class TestOrchestrator:
         assert report["severity"] == SEVERITY_CRITICAL
         assert any(r["code"] == "db_unavailable" for r in report["reasons"])
 
+    def test_extension_run_uses_job_runs_store_factory(self, monkeypatch):
+        class _Store:
+            def run_summary_by_name(self, job_names):
+                assert job_names == ["sa_market_news_refresh"]
+                return {
+                    "sa_market_news_refresh": {
+                        "last_success_at": "2026-03-11T14:20:00+00:00",
+                        "last_any_at": "2026-03-11T14:20:00+00:00",
+                    }
+                }
+
+        monkeypatch.setattr(
+            "src.service.job_runs_store.get_job_runs_store",
+            lambda dal: _Store(),
+        )
+
+        assert _query_extension_run(SimpleNamespace()) == "2026-03-11T14:20:00+00:00"
+
     def test_orchestrator_passes_now_to_query_and_evaluation(self, monkeypatch):
         captured = {}
 
-        def fake_run_health_query(backend, *, now):
+        def fake_run_health_query(dal, backend, *, now):
             captured["now"] = now
             return _healthy_stats(now)
 

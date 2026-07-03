@@ -123,7 +123,7 @@ def compute_market_news_health(
         return _db_unavailable_report(now, merged_thresholds)
 
     try:
-        stats = _run_health_query(backend, now=now)
+        stats = _run_health_query(dal, backend, now=now)
     except Exception as exc:  # pragma: no cover — logged + degraded
         logger.error("sa_market_news health query failed: %s", exc)
         return _db_unavailable_report(now, merged_thresholds, error=str(exc))
@@ -149,8 +149,8 @@ def evaluate_health(
     last_fetched_at = _coerce_dt(stats.get("last_fetched_at"))
     last_published_at = _coerce_dt(stats.get("last_published_at"))
     extension_last_success_at = _coerce_dt(stats.get("extension_last_success_at"))
-    # 3d health split: set only by the SA-local branch of _run_health_query
-    # when PG (job_runs) is unreachable; PG-mode stats never carry this key.
+    # 3d health split: set only when the job_runs signal is unreachable;
+    # capture-side stats remain independently usable.
     pipeline_signal_degraded = bool(stats.get("pipeline_signal_unavailable"))
     rows_24h_fetched = int(stats.get("rows_24h_fetched") or 0)
     items_24h_published = int(stats.get("items_24h_published") or 0)
@@ -205,7 +205,7 @@ def evaluate_health(
         reasons.append(_Reason(
             SEVERITY_WARNING,
             "pipeline_signal_unavailable",
-            "Extension-run signal (job_runs on PG) is unreachable — pipeline "
+            "Extension-run signal (job_runs) is unreachable — pipeline "
             "freshness degraded to capture-side fetched_at only.",
         ))
 
@@ -348,13 +348,6 @@ _HEALTH_SQL = """
     FROM sa_market_news
 """
 
-_EXTENSION_RUN_SQL = """
-    SELECT MAX(finished_at) FILTER (WHERE status = 'succeeded')
-        AS extension_last_success_at
-    FROM job_runs
-    WHERE job_name = %(job_name)s
-"""
-
 # SQLite (sa_capture.db) twin of _HEALTH_SQL — slice 3d prep-3 health split.
 # Dialect sweep (runbook §1): COUNT(*) FILTER (WHERE …) → SUM(CASE …);
 # ``%(now)s::timestamptz - INTERVAL`` → Python-computed canonical TEXT cutoffs
@@ -381,7 +374,7 @@ _HEALTH_SQL_SQLITE = """
 """
 
 
-def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
+def _run_health_query(dal: Any, backend: Any, *, now: datetime) -> Dict[str, Any]:
     """Aggregate sa_market_news + read latest extension run from job_runs.
 
     Two queries: the data-layer aggregation is required, and the
@@ -389,23 +382,21 @@ def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
     ``job_runs`` is missing or unreachable. This way pre-P0.2 deployments
     still get a usable health report.
 
-    3d prep-3 split (runbook L6): when the backend is in SA-local mode
-    (``backend._sa_db`` set), the capture-domain metrics come from
-    sa_capture.db while the extension-run signal ALWAYS stays on PG
-    (job_runs is locked PG). A PG outage in that mode must NOT take the
-    capture-side health down: it degrades to signal=None plus a
-    warning-severity ``pipeline_signal_unavailable`` reason instead of
-    crashing the endpoint. PG mode (``_sa_db`` absent) is unchanged.
+    S-H1 split: capture-domain metrics come from the active SA backend;
+    extension-run telemetry comes from the active job_runs store factory.
+    A job_runs outage must NOT take capture-side health down: it degrades
+    to signal=None plus a warning-severity ``pipeline_signal_unavailable``
+    reason instead of crashing the endpoint.
     """
     sa_db = getattr(backend, "_sa_db", None)
     if sa_db is not None:
         out = _query_capture_stats_local(sa_db, now=now)
         try:
-            out["extension_last_success_at"] = _query_extension_run_pg(backend)
+            out["extension_last_success_at"] = _query_extension_run(dal)
         except Exception as exc:
             logger.warning(
                 "sa_market_news health: extension_last_success_at lookup failed "
-                "(job_runs/PG degraded): %s",
+                "(job_runs degraded): %s",
                 exc,
             )
             out["extension_last_success_at"] = None
@@ -422,10 +413,7 @@ def _run_health_query(backend: Any, *, now: datetime) -> Dict[str, Any]:
 
     extension_last_success_at: Any = None
     try:
-        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-            cur.execute(_EXTENSION_RUN_SQL, {"job_name": EXTENSION_JOB_NAME})
-            row = cur.fetchone() or {}
-            extension_last_success_at = row.get("extension_last_success_at")
+        extension_last_success_at = _query_extension_run(dal)
     except Exception as exc:
         # job_runs absent (pre-P0.2) or transient DB error — fall back to
         # row-level signals only. Log once; do not raise.
@@ -455,15 +443,12 @@ def _query_capture_stats_local(sa_db: str, *, now: datetime) -> Dict[str, Any]:
         conn.close()
 
 
-def _query_extension_run_pg(backend: Any) -> Any:
-    """Latest succeeded extension run — ALWAYS from PG job_runs (locked L6)."""
-    from psycopg2 import extras as _pg_extras
+def _query_extension_run(dal: Any) -> Any:
+    """Latest succeeded extension run from the active job_runs store."""
+    from src.service.job_runs_store import get_job_runs_store
 
-    conn = backend._get_conn()
-    with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-        cur.execute(_EXTENSION_RUN_SQL, {"job_name": EXTENSION_JOB_NAME})
-        row = cur.fetchone() or {}
-        return row.get("extension_last_success_at")
+    summary = get_job_runs_store(dal).run_summary_by_name([EXTENSION_JOB_NAME])
+    return (summary.get(EXTENSION_JOB_NAME) or {}).get("last_success_at")
 
 
 def _db_unavailable_report(

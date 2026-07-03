@@ -25,7 +25,7 @@ Signal sources merged (all already persisted; each degrades independently):
   - DatabaseBackend.query_health_stats()  — news per source / prices / iv /
     financial_cache per source (+ MAX(fetched_at))
   - sa_refresh_meta (get_sa_refresh_meta) — SA capture per-scope success/error
-  - job_runs (JobRunsStore.latest_runs_by_name) — latest run per job
+  - job_runs (get_job_runs_store(...).latest_runs_by_name) — latest run per job
   - market_sync_meta (read_sync_meta)     — local mirror incremental sync
 """
 
@@ -172,8 +172,8 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
     jobs: Dict[str, Any] = {}
     try:
-        from src.service.job_runs_store import JobRunsStore
-        jobs = JobRunsStore(dal).latest_runs_by_name() or {}
+        from src.service.job_runs_store import get_job_runs_store
+        jobs = get_job_runs_store(dal).latest_runs_by_name() or {}
     except Exception as e:
         notes.append(f"job_runs failed: {e}")
 

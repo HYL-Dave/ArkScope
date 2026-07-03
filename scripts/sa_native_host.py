@@ -17,6 +17,7 @@ import os
 import re
 import struct
 import sys
+import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -659,12 +660,13 @@ def _handle_audit_unresolved(dal):
 
 
 def _handle_record_extension_job(dal, msg):
-    """Persist an extension-managed sync into job_runs (P0.4 commit 2).
+    """Best-effort record of an extension-managed sync via the sidecar.
 
     The extension only contacts native messaging *after* a sync flow
     finishes, so we land directly in the terminal state with the
-    extension's own start/finish timestamps. Best-effort: any DB error
-    is logged but never raised back to the extension.
+    extension's own start/finish timestamps. The native host must not
+    write app-state DB files directly (LOCK #9), so it POSTs to the
+    sidecar and silently degrades if unavailable.
     """
     job_name = msg.get("job_name") or ""
     status = msg.get("status") or ""
@@ -673,10 +675,8 @@ def _handle_record_extension_job(dal, msg):
     if not job_name:
         return {"status": "error", "error": "job_name required"}
 
-    started_at = _parse_iso_dt(msg.get("started_at"))
-    if started_at is None:
+    if _parse_iso_dt(msg.get("started_at")) is None:
         return {"status": "error", "error": "valid started_at required"}
-    finished_at = _parse_iso_dt(msg.get("finished_at"))
 
     payload = msg.get("payload") or {}
     result = msg.get("result")
@@ -690,29 +690,52 @@ def _handle_record_extension_job(dal, msg):
             duration_ms = None
     trigger_source = msg.get("trigger_source") or "extension"
 
+    sidecar_payload = {
+        "job_name": job_name,
+        "status": status,
+        "started_at": msg.get("started_at"),
+        "finished_at": msg.get("finished_at"),
+        "trigger_source": trigger_source,
+        "payload": payload if isinstance(payload, dict) else {"value": payload},
+        "result": result if isinstance(result, dict) else None,
+        "message": message_text,
+        "error": error_text,
+        "duration_ms": duration_ms,
+    }
     try:
-        from src.service.job_runs_store import JobRunsStore
-        store = JobRunsStore(dal)
-        run_id = store.record_completed_run(
-            job_name,
-            status=status,
-            started_at=started_at,
-            finished_at=finished_at,
-            trigger_source=trigger_source,
-            payload=payload if isinstance(payload, dict) else {"value": payload},
-            result=result if isinstance(result, dict) else None,
-            message=message_text,
-            error=error_text,
-            duration_ms=duration_ms,
-        )
+        response = _post_extension_job_to_sidecar(sidecar_payload)
         logger.info(
             "record_extension_job: name=%s status=%s run_id=%s duration_ms=%s",
-            job_name, status, run_id, duration_ms,
+            job_name, status, response.get("run_id"), duration_ms,
         )
-        return {"status": "ok", "run_id": run_id, "persisted": run_id is not None}
+        return {
+            "status": "ok",
+            "run_id": response.get("run_id"),
+            "persisted": bool(response.get("persisted")),
+        }
     except Exception as e:
-        logger.error("record_extension_job failed: %s", e)
-        return {"status": "error", "error": str(e)}
+        logger.error("record_extension_job sidecar post failed: %s", e)
+        return {"status": "ok", "run_id": None, "persisted": False}
+
+
+def _post_extension_job_to_sidecar(payload):
+    host = os.environ.get("ARKSCOPE_API_HOST", "127.0.0.1")
+    port = os.environ.get("ARKSCOPE_API_PORT", "8420")
+    base = os.environ.get("ARKSCOPE_API_BASE_URL", f"http://{host}:{port}").rstrip("/")
+    timeout = float(os.environ.get("ARKSCOPE_NATIVE_HOST_SIDECAR_TIMEOUT", "2.0"))
+    headers = {"Content-Type": "application/json"}
+    token = os.environ.get("ARKSCOPE_API_TOKEN")
+    if token:
+        headers["x-arkscope-token"] = token
+    req = urllib.request.Request(
+        f"{base}/jobs/extension-record",
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = resp.read().decode("utf-8")
+    return json.loads(body) if body else {}
 
 
 def _parse_iso_dt(value):

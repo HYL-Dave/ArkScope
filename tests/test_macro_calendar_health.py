@@ -34,6 +34,7 @@ from src.service.macro_calendar_health import (
     STATUS_EMPTY,
     STATUS_NEVER_RUN,
     _is_us_market_hours,
+    _query_job_runs,
     compute_macro_calendar_health,
     evaluate_health,
 )
@@ -425,6 +426,29 @@ class TestTableCoverage:
 
 
 class TestDbUnavailable:
+    def test_job_runs_query_uses_store_factory(self, monkeypatch):
+        class _Store:
+            def run_summary_by_name(self, job_names):
+                assert set(job_names) == set(_ALL_JOBS)
+                return {
+                    "fetch_economic_calendar_recent": {
+                        "last_success_at": "2026-03-11T14:20:00+00:00",
+                        "last_any_at": "2026-03-11T14:25:00+00:00",
+                    }
+                }
+
+        monkeypatch.setattr(
+            "src.service.job_runs_store.get_job_runs_store",
+            lambda dal: _Store(),
+        )
+
+        assert _query_job_runs(SimpleNamespace()) == {
+            "fetch_economic_calendar_recent": {
+                "last_success_at": "2026-03-11T14:20:00+00:00",
+                "last_any_at": "2026-03-11T14:25:00+00:00",
+            }
+        }
+
     def test_no_backend_returns_critical_with_full_shape(self):
         dal = SimpleNamespace(_backend=object())  # no _get_conn
         report = compute_macro_calendar_health(dal, now=WEEKDAY_OFF_HOURS_UTC)
@@ -449,7 +473,7 @@ class TestDbUnavailable:
         dal = SimpleNamespace(_backend=backend)
         monkeypatch.setattr(
             mod, "_run_health_queries",
-            lambda b: (_ for _ in ()).throw(RuntimeError("connection lost")),
+            lambda dal, b: (_ for _ in ()).throw(RuntimeError("connection lost")),
         )
         report = compute_macro_calendar_health(dal, now=WEEKDAY_OFF_HOURS_UTC)
         assert report["severity"] == SEVERITY_CRITICAL

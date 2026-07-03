@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_dal
-from src.service.job_runs_store import JobRunsStore
+from src.service.job_runs_store import get_job_runs_store
 from src.service.jobs import (
     JobDisabledError,
     JobNotRunnableError,
@@ -113,6 +113,30 @@ class JobsHistoryResponse(BaseModel):
     runs: List[JobRunRow]
 
 
+class ExtensionJobRecordRequest(BaseModel):
+    """Completed SA extension job telemetry submitted by the sidecar-owned endpoint."""
+
+    job_name: str
+    status: Literal["succeeded", "failed"]
+    started_at: str
+    finished_at: Optional[str] = None
+    trigger_source: str = "extension"
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    duration_ms: Optional[int] = None
+
+
+class ExtensionJobRecordResponse(BaseModel):
+    """Sanitized response for native-host best-effort recording."""
+
+    status: Literal["ok", "error"]
+    run_id: Optional[int] = None
+    persisted: bool = False
+    error_code: Optional[str] = None
+
+
 @router.get("/status", response_model=JobsStatusResponse)
 def jobs_status(dal=Depends(get_dal)):
     """List available jobs plus last known process-local execution state."""
@@ -160,11 +184,46 @@ def jobs_history(
     Reads from the ``job_runs`` table (sql/011). When DB is unavailable
     or the DAL is on FileBackend, returns an empty list with count=0.
     """
-    store = JobRunsStore(dal)
+    store = get_job_runs_store(dal)
     rows = store.list_runs(job_name=name, limit=limit, offset=offset)
     return JobsHistoryResponse(
         count=len(rows),
         limit=limit,
         offset=offset,
         runs=rows,
+    )
+
+
+@router.post("/extension-record", response_model=ExtensionJobRecordResponse)
+def record_extension_job(
+    request: ExtensionJobRecordRequest,
+    dal=Depends(get_dal),
+):
+    """Best-effort extension job telemetry recording.
+
+    The endpoint owns app-state writes so SA native hosts do not open
+    ``profile_state.db`` directly.
+    """
+    store = get_job_runs_store(dal)
+    try:
+        run_id = store.record_completed_run(
+            request.job_name,
+            status=request.status,
+            started_at=request.started_at,
+            finished_at=request.finished_at,
+            trigger_source=request.trigger_source,
+            payload=request.payload,
+            result=request.result,
+            message=request.message,
+            error=request.error,
+            duration_ms=request.duration_ms,
+        )
+    except ValueError:
+        return ExtensionJobRecordResponse(
+            status="error", persisted=False, error_code="invalid_job_record"
+        )
+    return ExtensionJobRecordResponse(
+        status="ok",
+        run_id=run_id,
+        persisted=run_id is not None,
     )

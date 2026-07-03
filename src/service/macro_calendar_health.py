@@ -137,7 +137,7 @@ def compute_macro_calendar_health(
     merged_thresholds = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
 
     # Local-first (§4c slice 2): when use_local_macro is on, table coverage comes from the
-    # local macro_calendar.db — computable with NO PG (job_runs stays best-effort PG).
+    # local macro_calendar.db; job_runs comes from the active S-H1 store factory.
     if getattr(dal, "_local_macro_enabled", None) and dal._local_macro_enabled():
         try:
             stats = _run_local_health_queries(dal)
@@ -151,7 +151,7 @@ def compute_macro_calendar_health(
         return _db_unavailable_report(now, merged_thresholds)
 
     try:
-        stats = _run_health_queries(backend)
+        stats = _run_health_queries(dal, backend)
     except Exception as exc:  # pragma: no cover — logged + degraded
         logger.error("macro_calendar health query failed: %s", exc)
         return _db_unavailable_report(now, merged_thresholds, error=str(exc))
@@ -444,15 +444,6 @@ def _evaluate_table(
 # ---------------------------------------------------------------------------
 
 
-_JOB_RUNS_SQL = """
-    SELECT job_name,
-           MAX(finished_at) FILTER (WHERE status = 'succeeded') AS last_success_at,
-           MAX(finished_at) AS last_any_at
-    FROM job_runs
-    WHERE job_name = ANY(%(job_names)s)
-    GROUP BY job_name
-"""
-
 # One round-trip for all six tables. Each branch coerces COUNT(*) to BIGINT
 # and MAX(fetched_at) to TIMESTAMPTZ so the union-typed columns stay sane.
 _TABLE_STATS_SQL = """
@@ -470,27 +461,18 @@ _TABLE_STATS_SQL = """
 """
 
 
-def _query_job_runs(conn) -> Dict[str, Dict[str, Any]]:
-    """job_runs cadence aggregation (best-effort; missing table → {}). Shared by the PG
-    and local-first paths — job_runs is the scheduler log, not part of §4c, so the local
-    path still reads it from PG when a backend is reachable."""
-    from psycopg2 import extras as _pg_extras
+def _query_job_runs(dal: Any) -> Dict[str, Dict[str, Any]]:
+    """job_runs cadence aggregation through the active S-H1 store factory."""
+    from src.service.job_runs_store import get_job_runs_store
 
-    jobs: Dict[str, Dict[str, Any]] = {}
     try:
-        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-            cur.execute(_JOB_RUNS_SQL, {"job_names": list(_JOB_CADENCES_SECONDS)})
-            for row in cur.fetchall():
-                jobs[row["job_name"]] = {
-                    "last_success_at": row.get("last_success_at"),
-                    "last_any_at": row.get("last_any_at"),
-                }
+        return get_job_runs_store(dal).run_summary_by_name(list(_JOB_CADENCES_SECONDS))
     except Exception as exc:
         logger.warning("macro_calendar health: job_runs lookup failed: %s", exc)
-    return jobs
+        return {}
 
 
-def _run_health_queries(backend: Any) -> Dict[str, Any]:
+def _run_health_queries(dal: Any, backend: Any) -> Dict[str, Any]:
     """Aggregate job_runs + 6 macro/cal tables (PG path).
 
     Each query degrades independently — a missing ``job_runs`` table
@@ -499,7 +481,7 @@ def _run_health_queries(backend: Any) -> Dict[str, Any]:
     from psycopg2 import extras as _pg_extras
 
     conn = backend._get_conn()
-    jobs = _query_job_runs(conn)
+    jobs = _query_job_runs(dal)
 
     tables: Dict[str, Dict[str, Any]] = {}
     with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
@@ -514,18 +496,11 @@ def _run_health_queries(backend: Any) -> Dict[str, Any]:
 
 
 def _run_local_health_queries(dal: Any) -> Dict[str, Any]:
-    """Local-first health: table coverage from the SQLite macro_calendar.db (no PG); jobs
-    best-effort from PG if a backend is reachable, else {} (degrades like the PG path)."""
+    """Local-first health: table coverage from SQLite; jobs from active job_runs store."""
     from src.macro_calendar import get_macro_calendar_store
 
     tables = get_macro_calendar_store(dal).table_stats()
-    jobs: Dict[str, Dict[str, Any]] = {}
-    backend = getattr(dal, "_backend", None)
-    if backend is not None and hasattr(backend, "_get_conn"):
-        try:
-            jobs = _query_job_runs(backend._get_conn())
-        except Exception as exc:
-            logger.warning("local macro_calendar health: job_runs best-effort failed: %s", exc)
+    jobs = _query_job_runs(dal)
     return {"jobs": jobs, "tables": tables}
 
 
