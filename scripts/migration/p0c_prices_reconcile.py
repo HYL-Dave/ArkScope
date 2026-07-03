@@ -5,10 +5,15 @@ import argparse
 import hashlib
 import json
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-from src.prices_reconcile import (
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.prices_reconcile import (  # noqa: E402
     PriceKey,
     classify_price_differences,
     compare_value_checksums,
