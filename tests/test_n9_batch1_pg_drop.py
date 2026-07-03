@@ -480,3 +480,233 @@ class _DropCursor:
             ("news_latest_scores", None),
             ("prices", "public.prices"),
         ]
+
+
+# --- review fixups: client env propagation / version guard / postcheck ---------------
+
+
+def test_pg_client_env_builds_libpq_vars_without_url_leak():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    env = cli.pg_client_env("postgres://user:p%40ss@192.168.0.185:15432/mindfulrl")
+
+    assert env == {
+        "PGHOST": "192.168.0.185",
+        "PGPORT": "15432",
+        "PGUSER": "user",
+        "PGPASSWORD": "p@ss",
+        "PGDATABASE": "mindfulrl",
+    }
+
+
+def test_pg_client_env_omits_missing_parts_and_overrides_dbname():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    env = cli.pg_client_env("postgresql://onlyhost/db", dbname="restore_db")
+
+    assert env["PGHOST"] == "onlyhost"
+    assert env["PGDATABASE"] == "restore_db"
+    assert "PGPORT" not in env
+    assert "PGUSER" not in env
+    assert "PGPASSWORD" not in env
+
+
+def test_run_checked_injects_pg_env_not_url(monkeypatch):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+
+    cli._run_checked(["createdb", "x"], database_url="postgres://u:pw@h:5/d")
+
+    env = captured["env"]
+    assert env["PGHOST"] == "h"
+    assert env["PGPORT"] == "5"
+    assert env["PGDATABASE"] == "d"
+    assert env["PGPASSWORD"] == "pw"
+    assert all("postgres://" not in str(v) for v in env.values())
+
+
+def test_verify_dump_passes_connection_to_every_client(tmp_path, monkeypatch):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 0},
+            ],
+            "row_fingerprints": {"news": "d41d8cd98f00b204e9800998ecf8427e"},
+        },
+    }
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    (archive_dir / "n9_batch1.dump").write_bytes(b"dump")
+    (archive_dir / "manifest.json").write_text(
+        cli._canonical_json({"dump_sha256": cli.file_sha256(archive_dir / "n9_batch1.dump")}),
+        encoding="utf-8",
+    )
+    (archive_dir / "function_ddl.sql").write_text("-- ddl\n", encoding="utf-8")
+
+    calls = []
+
+    def fake_run_checked(cmd, *, database_url=None, dbname=None):
+        calls.append((cmd[0], database_url, dbname))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli, "_run_checked", fake_run_checked)
+    monkeypatch.setattr(cli, "connect_pg", lambda _url: _FakeConn())
+
+    code = cli.main([
+        "verify-dump",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+        "--restore-db", "r_db",
+        "--confirm-create-drop-restore-db",
+    ])
+
+    assert code == 0
+    by_tool = {name: (url, dbname) for name, url, dbname in calls}
+    assert by_tool["createdb"][0] == "postgres://secret@example/db"
+    assert by_tool["pg_restore"] == ("postgres://secret@example/db", "r_db")
+    assert by_tool["psql"] == ("postgres://secret@example/db", "r_db")
+    assert by_tool["dropdb"][0] == "postgres://secret@example/db"
+
+
+def test_parse_pg_major_handles_client_and_server_strings():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    assert cli.parse_pg_major("pg_dump (PostgreSQL) 17.5 (Ubuntu 17.5-1)") == 17
+    assert cli.parse_pg_major("16.4") == 16
+
+
+def test_dump_refuses_when_pg_dump_client_older_than_server(tmp_path, monkeypatch):
+    import pytest
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "server_version": "17.5",
+            "objects": [],
+            "row_fingerprints": {},
+        },
+    }
+    report = tmp_path / "evidence.json"
+    report.write_text(cli._canonical_json(evidence), encoding="utf-8")
+
+    monkeypatch.setattr(
+        cli, "_pg_dump_client_version_text", lambda: "pg_dump (PostgreSQL) 16.4"
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main([
+            "dump",
+            "--database-url", "postgres://secret@example/db",
+            "--expected-report", str(report),
+            "--archive-dir", str(tmp_path / "archive"),
+        ])
+
+    assert "older than server" in str(exc.value)
+
+
+class _PostcheckConn:
+    def __init__(self, regclass_by_name):
+        self._map = regclass_by_name
+
+    def cursor(self):
+        conn = self
+
+        class _Cur:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def execute(self, sql, params=None):
+                self._params = params
+
+            def fetchall(self):
+                return [(name, conn._map.get(name)) for name in self._params[0]]
+
+        return _Cur()
+
+    def close(self):
+        pass
+
+
+def test_postcheck_ok_when_targets_gone_and_excluded_present(tmp_path, monkeypatch, capsys):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 1},
+                {"kind": "view", "name": "news_latest_scores", "status": "present"},
+                {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            ],
+            "row_fingerprints": {},
+        },
+    }
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    monkeypatch.setattr(
+        cli, "connect_pg",
+        lambda _url: _PostcheckConn({"news": None, "news_latest_scores": None, "prices": "public.prices"}),
+    )
+
+    code = cli.main([
+        "postcheck",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+    ])
+
+    out = capsys.readouterr().out
+    payload = json.loads(out)
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["targets_still_present"] == []
+    assert payload["excluded_missing"] == []
+    assert "secret" not in out
+
+
+def test_postcheck_fails_when_target_still_present(tmp_path, monkeypatch, capsys):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 1},
+                {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            ],
+            "row_fingerprints": {},
+        },
+    }
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    monkeypatch.setattr(
+        cli, "connect_pg",
+        lambda _url: _PostcheckConn({"news": "public.news", "prices": "public.prices"}),
+    )
+
+    code = cli.main([
+        "postcheck",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+    ])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert payload["ok"] is False
+    assert payload["targets_still_present"] == ["news"]

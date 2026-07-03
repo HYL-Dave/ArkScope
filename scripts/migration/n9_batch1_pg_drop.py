@@ -18,7 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 TARGET_TABLES = (
     "news",
@@ -442,6 +442,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     verify.add_argument("--restore-db", required=True)
     verify.add_argument("--confirm-create-drop-restore-db", action="store_true")
 
+    post = sub.add_parser("postcheck", help="Verify catalog state after the N9 batch-1 drop")
+    post.add_argument("--database-url", required=True)
+    post.add_argument("--archive-dir", required=True)
+
     drop = sub.add_parser("drop", help="Drop reviewed N9 batch-1 PG objects")
     drop.add_argument("--database-url", required=True)
     drop.add_argument("--archive-dir")
@@ -487,10 +491,52 @@ def _present_names(report: Mapping[str, Any], kind: str) -> list[str]:
     return sorted(out)
 
 
-def _run_checked(cmd: Sequence[str], *, database_url: str | None = None) -> subprocess.CompletedProcess[str]:
+
+def pg_client_env(database_url: str, dbname: str | None = None) -> dict[str, str]:
+    """libpq env vars for PG client tools (keeps credentials out of argv)."""
+    parts = urlsplit(database_url)
+    env: dict[str, str] = {}
+    if parts.hostname:
+        env["PGHOST"] = parts.hostname
+    if parts.port:
+        env["PGPORT"] = str(parts.port)
+    if parts.username:
+        env["PGUSER"] = unquote(parts.username)
+    if parts.password:
+        env["PGPASSWORD"] = unquote(parts.password)
+    name = dbname if dbname is not None else (parts.path.lstrip("/") or None)
+    if name:
+        env["PGDATABASE"] = name
+    return env
+
+
+def parse_pg_major(text: str) -> int:
+    """First integer in a PG client/server version string is the major version."""
+    match = re.search(r"(\d+)", str(text))
+    if not match:
+        raise ValueError(f"cannot parse PostgreSQL version from {text!r}")
+    return int(match.group(1))
+
+
+def _pg_dump_client_version_text() -> str:
+    return _run_checked(["pg_dump", "--version"]).stdout.strip()
+
+
+def ensure_pg_dump_client_compatible(server_version: Any) -> None:
+    client_text = _pg_dump_client_version_text()
+    if parse_pg_major(client_text) < parse_pg_major(server_version):
+        raise SystemExit(
+            "pg_dump client is older than server; install matching/newer "
+            "PostgreSQL client before destructive N9 dump."
+        )
+
+
+def _run_checked(
+    cmd: Sequence[str], *, database_url: str | None = None, dbname: str | None = None
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     if database_url:
-        env["PGDATABASE"] = database_url
+        env.update(pg_client_env(database_url, dbname))
     proc = subprocess.run(
         list(cmd),
         text=True,
@@ -508,6 +554,9 @@ def _cmd_dump(args: argparse.Namespace) -> int:
     archive_dir = Path(args.archive_dir)
     archive_dir.mkdir(parents=True, exist_ok=True)
     evidence = _load_json(args.expected_report)
+    server_version = evidence.get("pg_snapshot", {}).get("server_version")
+    if server_version:
+        ensure_pg_dump_client_compatible(server_version)
     evidence_path = archive_dir / "evidence.json"
     _write_json(evidence_path, evidence)
     dump_path = archive_dir / "n9_batch1.dump"
@@ -569,10 +618,18 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
     try:
         _run_checked(["createdb", restore_db], database_url=args.database_url)
         created = True
-        _run_checked(["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)])
+        _run_checked(
+            ["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)],
+            database_url=args.database_url,
+            dbname=restore_db,
+        )
         function_ddl = archive_dir / "function_ddl.sql"
         if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
-            _run_checked(["psql", "--dbname", restore_db, "--file", str(function_ddl)])
+            _run_checked(
+                ["psql", "--dbname", restore_db, "--file", str(function_ddl)],
+                database_url=args.database_url,
+                dbname=restore_db,
+            )
         conn = connect_pg(restore_url)
         try:
             restored = collect_pg_snapshot(conn)
@@ -762,6 +819,34 @@ def _cmd_drop(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_postcheck(args: argparse.Namespace) -> int:
+    archive_dir = Path(args.archive_dir)
+    evidence = _load_json(archive_dir / "evidence.json")
+    dropped_tables = _present_names(evidence, "table")
+    dropped_views = _present_names(evidence, "view")
+    excluded = _excluded_present_names(evidence)
+    conn = connect_pg(args.database_url)
+    try:
+        with conn.cursor() as cur:
+            statuses = _read_regclasses(cur, list(dropped_tables) + list(dropped_views) + excluded)
+    finally:
+        conn.close()
+    still_present = sorted(
+        name for name in set(dropped_tables) | set(dropped_views)
+        if statuses.get(name) is not None
+    )
+    excluded_missing = sorted(name for name in excluded if statuses.get(name) is None)
+    ok = not still_present and not excluded_missing
+    print(json.dumps({
+        "status": "postcheck",
+        "ok": ok,
+        "fingerprint": evidence.get("fingerprint"),
+        "targets_still_present": still_present,
+        "excluded_missing": excluded_missing,
+    }, sort_keys=True))
+    return 0 if ok else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -771,6 +856,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_dump(args)
     if args.cmd == "verify-dump":
         return _cmd_verify_dump(args)
+    if args.cmd == "postcheck":
+        return _cmd_postcheck(args)
     if args.cmd == "drop":
         return _cmd_drop(args)
     parser.error(f"unknown command: {args.cmd}")
