@@ -1,9 +1,10 @@
 # PG-Exit S-H1 Local Job Runs Plan
 
 - **Date:** 2026-07-03
-- **Status:** PLAN FOR REVIEW / NO CODE YET — review fixups folded 2026-07-03
+- **Status:** IMPLEMENTED + LIVE-APPLIED 2026-07-03
 - **Parent audit:** `PG_EXIT_S_H_ORPHAN_APP_STATE_AUDIT.md`
 - **Map check:** P0-B follow-up after S-H audit.
+- **Live proof:** reviewed fingerprint `38cf152141aae4304344baeeb46c6476f9870ff0f86fb793469bed96b0cad447`; `pg_rows=13,652`; local `job_runs=13,652`; `use_local_job_runs=true`; backup `data/profile_state.db.bak-pre-s-h1-job-runs-20260703T021241462312Z.db`; copy idempotence `already_applied=true`; live focused gate `216 passed`.
 
 ## 1. Decision
 
@@ -240,10 +241,16 @@ Live apply requires explicit approval after:
 
 After live apply:
 
-- run `/jobs/status` and `/jobs/history` smoke.
-- run one small API-triggered job smoke or a no-op/fake job test path.
-- confirm provider health no longer depends on PG `job_runs`.
-- keep PG table as archive through soak.
+- live DB read-only validation passed: `quick_check=ok`, `job_runs=13,652`,
+  one audit row for the reviewed fingerprint, and `use_local_job_runs=true`.
+- local store smoke passed for `sa_market_news_refresh`, `sa_alpha_picks_refresh`,
+  and `collect.local_incremental` summaries.
+- focused regression gate passed after live apply: `216 passed`
+  (`tests/test_job_runs.py`, `tests/test_job_runs_cutover.py`,
+  `tests/test_sa_local_readers.py::TestHealthSplit`,
+  `tests/test_sa_market_news_health.py`, `tests/test_macro_calendar_health.py`,
+  `tests/test_provider_health.py`, `tests/test_data_scheduler.py`).
+- keep PG table as archive through soak; N9 may drop it after final reader/script grep.
 
 ### Task 7 — Docs + N9 Marking
 

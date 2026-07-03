@@ -6,8 +6,8 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-IV, fundamentals, remaining price ingest, broader mirror retirement, SEC/dead paths, and UI
-collapse remain.
+remaining price ingest, IV, financial-cache fallback, macro/cal proof, broader mirror retirement,
+SEC/dead paths, and UI collapse remain. S-G `news_scores` and S-H1 `job_runs` are now local.
 
 ## Progress
 
@@ -31,8 +31,10 @@ collapse remain.
   audited `news_pg_exit_completed` marker forces hard-local news reads and retires the news
   PG-sync/mirror path. The broader mirror remains load-bearing for IV/fundamentals and other
   unfinished ingest paths.
-  Scoring is deliberately outside PG-exit: the current scorer is a local Parquet/OpenAI CLI and is
-  not a runtime PostgreSQL dependency.
+  S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
+  (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`
+  (`use_local_job_runs=true`, live 2026-07-03). PG copies of both tables are archive/N9 candidates,
+  not normal runtime authorities.
 
 ## Why this exists
 
@@ -90,13 +92,14 @@ re-fetch).
 | Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
 | News | ✅ hard-local | ✅ Polygon/Finnhub/IBKR normalized local writers + legacy projection | — | news-domain PG-exit done |
 | IV | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
-| Fundamentals | ✅ (mirror) + SEC/FD live | ❌ PG→mirror | ingest | (1) ingest |
+| Fundamentals | ✅ local SEC annual cache / honest empty | ✅ SEC/FD refetch cache | — | S-B done |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
 | SA capture | ✅ (sa_capture.db) | ✅ | verify db_backend SA dead | mostly done |
 | macro/cal | ✅ (toggle) | ✅ | — | done |
 | **Reports** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
 | **Memories** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
 | **agent_queries** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
+| job_runs | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive / N9 candidate after soak | **DONE (S-H1)** |
 | SEC filings | ❌ PG-only | (cache) | read | (1)-ish — step 4 |
 
 ## Locked direction (from prior PG-exit work)

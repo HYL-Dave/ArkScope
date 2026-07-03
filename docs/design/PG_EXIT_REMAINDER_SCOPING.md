@@ -1,7 +1,7 @@
 # PG-Exit Remainder Scoping (design skeleton v0)
 
 - **Date:** 2026-07-01
-- **Status:** DRAFT / survey v3 — local/runtime audit + S-C IV provider survey + S-H orphan/app-state audit folded; S-A1/S-B/S-G/S-J Phase 0-1 implemented; still not an implementation plan
+- **Status:** DRAFT / survey v4 — local/runtime audit + S-C IV provider survey + S-H orphan/app-state audit folded; S-A1/S-B/S-G/S-H1/S-J Phase 0-1 implemented; still not an implementation plan
 - **Context:** news-domain PG exit is LIVE-complete (`news_pg_exit_runs` id=1 completed, fail-closed). **Overall ArkScope PG exit is NOT complete.**
 - **Purpose of this doc:** scope the *remainder* of the PG exit — enumerate residual PG domains, assign a destination strategy per domain, define the `scripts/` retirement rule with a runtime-coupling inventory as its gating input, produce the N9 drop list, and sequence the remaining slices. **This document implements nothing.**
 
@@ -48,7 +48,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 | `iv_history` | ~24 | market | **drop + forward reboot** | abandon old data; rebuild capability |
 | `macro_*` / `cal_*` | ? | market | **audit done; proof still needed** | local `macro_calendar.db` is active under `use_local_macro=true`, but local economic/earnings tables are empty; S-H3 must compare PG rows before drop |
 | `financial_data_cache` | ? | market (cache) | **local-cache bridge pending** | not an orphan yet: generic `get_financial_cache()` still has PG read-through when market strict mode is unset |
-| `job_runs` | 13k | app-state | **relocate** | active operational log; local `scheduler_state` is partial continuity state, not full history |
+| `job_runs` | 13k | app-state | **relocated; N9 drop candidate after soak** | S-H1 live-applied 2026-07-03 into local `profile_state.db` (`job_runs=13,652`, reviewed fingerprint `38cf152141aae4304344baeeb46c6476f9870ff0f86fb793469bed96b0cad447`, backup `data/profile_state.db.bak-pre-s-h1-job-runs-20260703T021241462312Z.db`); local `scheduler_state` remains partial continuity state, not full history |
 | `agent_queries` / `research_reports` / `agent_memories` / `signals` | ? | app-state | **mostly local/retire** | app-records are already in `profile_state.db`; legacy PG `signals` has no runtime SQL reader found in S-H |
 
 ---
@@ -113,7 +113,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 5. **S-E | IV IBKR small-scope computed-IV prototype** (10–30 tickers, near-month/ATM, fixed DTE-or-delta bucket, append-only, no gap-fill). Extract `src/iv/`.
 6. **S-F | (optional) IV bulk provider backend** — only if the survey finds a fit; plugs into the same schema.
 7. **S-G | scorer (news_scores) cutover** — **implemented and live-applied 2026-07-03**. Local `news_article_scores` now carries the reviewed PG score history, score-dependent local reads use SQLite-local scores, future active score imports use `scripts/scoring/import_news_scores_local.py`, and PG `--scores` is archive-only. Proof: fingerprint `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`, `pg_score_rows=503,226`, `inserted_or_updated=491,808`, `rejected_rows=604`, `missing_legacy_rows=14`, idempotent reapply `inserted_or_updated=0`.
-8. **S-H | orphan/audit + app-state relocation** — **audit complete 2026-07-03** (`PG_EXIT_S_H_ORPHAN_APP_STATE_AUDIT.md`). Findings: PG `news`/`news_scores`/`fundamentals`/`iv_history` and likely `sa_*` are N9 candidates after final grep; app-records are local; `job_runs`, `financial_data_cache`, and macro/cal need targeted follow-up slices before drop. S-H1 job-runs local plan is drafted at `PG_EXIT_S_H1_JOB_RUNS_LOCAL_PLAN.md`.
+8. **S-H | orphan/audit + app-state relocation** — **audit complete 2026-07-03** (`PG_EXIT_S_H_ORPHAN_APP_STATE_AUDIT.md`). Findings: PG `news`/`news_scores`/`fundamentals`/`iv_history` and likely `sa_*` are N9 candidates after final grep; app-records are local; `financial_data_cache` and macro/cal need targeted follow-up slices before drop. **S-H1 job-runs local cutover live-applied 2026-07-03** from `PG_EXIT_S_H1_JOB_RUNS_LOCAL_PLAN.md`: fingerprint `38cf152141aae4304344baeeb46c6476f9870ff0f86fb793469bed96b0cad447`, `pg_rows=13,652`, local `job_runs=13,652`, idempotent reapply `already_applied=true`, `use_local_job_runs=true`, backup `data/profile_state.db.bak-pre-s-h1-job-runs-20260703T021241462312Z.db`.
 9. **S-I | N9 real drop** (§8).
 10. **S-J | provider-config authority hardening (DB-first, fail-closed)** — orthogonal to the domain slices (provider *config*, not market data). Kill the two silent `config/.env` fallbacks (per-field overlay + whole-store startup degrade), surface per-field provenance with an explicit import affordance, then flip strict-by-default behind a tri-state. Contract in §13. **Phase 0–1 must land before S-E** so new IV provider keys are DB-native from day one.
 
@@ -140,10 +140,11 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 - PG `iv_history` (old 24 rows)
 - PG `fundamentals` (130, after refetch)
 - PG `news_scores` (503k, after S-G local cutover and final reader grep)
+- PG `job_runs` (13,652, after S-H1 local cutover soak and final reader/script grep)
 - the news/fundamentals/iv `--sync` paths in `migrate_to_supabase.py`
 - verified-dead PG score helper: `src/tools/backends/db_backend.py::query_news_scores` (zero callers; local score reads go through `news_article_scores`)
 - verified-dead PG `signals` table if present (no runtime SQL reader/writer found in S-H)
-- **Retain for follow-up:** `prices` (pending migration slice), `job_runs` (relocate first), `financial_data_cache` (strict-local/promote first), unresolved `macro_*` / `cal_*`.
+- **Retain for follow-up:** `prices` (pending migration slice), `financial_data_cache` (strict-local/promote first), unresolved `macro_*` / `cal_*`. PG `job_runs` is retained only through S-H1 soak / N9 final grep.
 
 ---
 
@@ -151,7 +152,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H1 job-runs plan is ready for review, and S-H follow-up slices (`job_runs`, `financial_cache`, macro/cal proof) can run independently of P0-C prices. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete.
+- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live, and remaining S-H follow-up slices (`financial_cache`, macro/cal proof) can run independently of P0-C prices. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete.
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---
@@ -159,7 +160,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 ## 10. Open questions / decisions needed
 
 1. **IV forward strategy:** historical options backfill now looks plausible in principle, but only the proof packet can decide if it is usable. It must verify historical IV/greeks completeness/reliability, provider rate limits, tier/pricing gates, and timestamp/input comparability before switching from forward-only to "one-time backfill + forward".
-2. **app-state homes:** resolved for `agent_queries` / `research_reports` / `agent_memories` (local `profile_state.db`) and legacy `signals` (retire if present). Still open: `job_runs` home (`profile_state.db` vs new `ops.db`).
+2. **app-state homes:** resolved for `agent_queries` / `research_reports` / `agent_memories` and `job_runs` (local `profile_state.db`) and legacy `signals` (retire if present). `job_runs` may still move to a future `ops.db` only if real write contention or telemetry volume justifies that separate store.
 3. **macro/cal:** `macro_calendar.db` is active local authority when `use_local_macro=true`, but local `cal_economic_events` and `cal_earnings_events` are empty. S-H3 must query PG counts and decide re-fetch/seed/accept-empty before N9.
 4. **scorer timing:** resolved 2026-07-03 — S-G cut over `news_scores` before N8b reads, so hard-local score degradation is removed before the normalized-read upgrade.
 5. **prices:** confirm migrate (not refetch); when to schedule.
@@ -231,7 +232,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | Prices | local table has 2.3M rows and price data is core | migrate/direct-local slice; do not refetch 2.3M by default |
 | Macro/cal | `use_local_macro=true` selects `macro_calendar.db`; local macro/FRED and IPO rows exist, but economic/earnings event tables are empty | S-H3 must compare PG rows and decide re-fetch/seed/accept-empty before N9 |
 | Financial cache | local `financial_cache` exists, but generic `get_financial_cache()` still has PG read-through when market strict mode is unset | not drop-safe until S-H2 promotes/accepts cold cache and disables fallback |
-| App state / ops | profile app-records are local and `use_local_records=true`; `job_runs` remains PG-backed telemetry | relocate `job_runs`; PG app-records become archive/drop candidates after reader grep |
+| App state / ops | profile app-records are local and `use_local_records=true`; `job_runs` is local in `profile_state.db` with `use_local_job_runs=true` after S-H1 | PG `job_runs` and PG app-records become archive/drop candidates after soak + final reader grep; collapse the transitional unset/default PG path at N9 so fresh installs do not construct a dead PG store |
 
 ### 12.4 Fundamentals survey
 
