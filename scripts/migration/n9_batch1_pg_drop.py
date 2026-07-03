@@ -492,6 +492,18 @@ def _present_names(report: Mapping[str, Any], kind: str) -> list[str]:
 
 
 
+def collect_required_extensions(conn) -> list[str]:
+    """Non-builtin extensions the archive needs before a restore (e.g. pgvector)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT extname FROM pg_extension WHERE extname <> 'plpgsql' ORDER BY extname")
+        return [str(row[0]) for row in cur.fetchall()]
+
+
+def build_extension_statements(extnames) -> list[str]:
+    names = sorted({str(n) for n in extnames if str(n) != "plpgsql"})
+    return [f'CREATE EXTENSION IF NOT EXISTS "{name}"' for name in names]
+
+
 def pg_client_env(database_url: str, dbname: str | None = None) -> dict[str, str]:
     """libpq env vars for PG client tools (keeps credentials out of argv)."""
     parts = urlsplit(database_url)
@@ -574,6 +586,7 @@ def _cmd_dump(args: argparse.Namespace) -> int:
     conn = connect_pg(args.database_url)
     try:
         (archive_dir / "function_ddl.sql").write_text(read_function_ddl(conn), encoding="utf-8")
+        required_extensions = collect_required_extensions(conn)
     finally:
         conn.close()
 
@@ -582,6 +595,7 @@ def _cmd_dump(args: argparse.Namespace) -> int:
         "scope": "pg_exit_n9_batch1",
         "evidence_fingerprint": evidence["fingerprint"],
         "dump_sha256": file_sha256(dump_path),
+        "required_extensions": required_extensions,
         "dump_file": dump_path.name,
         "restore_list_file": "pg_restore_list.txt",
         "function_ddl_file": "function_ddl.sql",
@@ -618,6 +632,12 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
     try:
         _run_checked(["createdb", restore_db], database_url=args.database_url)
         created = True
+        for statement in build_extension_statements(manifest.get("required_extensions", [])):
+            _run_checked(
+                ["psql", "--dbname", restore_db, "-c", statement],
+                database_url=args.database_url,
+                dbname=restore_db,
+            )
         _run_checked(
             ["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)],
             database_url=args.database_url,

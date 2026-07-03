@@ -758,3 +758,104 @@ def test_postcheck_fails_when_target_function_still_present(tmp_path, monkeypatc
     assert payload["functions_still_present"] == [
         "news_sentiment_summary(character varying, integer, character varying)"
     ]
+
+
+def test_extension_statements_skip_builtin_and_quote_names():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    stmts = cli.build_extension_statements(["vector", "pg_trgm", "plpgsql"])
+
+    assert stmts == [
+        'CREATE EXTENSION IF NOT EXISTS "pg_trgm"',
+        'CREATE EXTENSION IF NOT EXISTS "vector"',
+    ]
+
+
+def test_dump_manifest_records_required_extensions(tmp_path, monkeypatch, capsys):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 0},
+            ],
+            "row_fingerprints": {"news": "d41d8cd98f00b204e9800998ecf8427e"},
+        },
+    }
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(cli._canonical_json(evidence), encoding="utf-8")
+    archive_dir = tmp_path / "archive"
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0] == "pg_dump":
+            output = next(part.split("=", 1)[1] for part in cmd if part.startswith("--file="))
+            Path(output).write_bytes(b"dump")
+        return SimpleNamespace(returncode=0, stdout="toc\n", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "read_function_ddl", lambda _conn: "")
+    monkeypatch.setattr(cli, "collect_required_extensions", lambda _conn: ["pg_trgm", "vector"])
+    monkeypatch.setattr(cli, "connect_pg", lambda _url: _FakeConn())
+
+    code = cli.main([
+        "dump",
+        "--database-url", "postgres://secret@example/db",
+        "--expected-report", str(evidence_path),
+        "--archive-dir", str(archive_dir),
+    ])
+
+    assert code == 0
+    manifest = cli._load_json(archive_dir / "manifest.json")
+    assert manifest["required_extensions"] == ["pg_trgm", "vector"]
+
+
+def test_verify_dump_creates_extensions_before_restore(tmp_path, monkeypatch):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 0},
+            ],
+            "row_fingerprints": {"news": "d41d8cd98f00b204e9800998ecf8427e"},
+        },
+    }
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    (archive_dir / "n9_batch1.dump").write_bytes(b"dump")
+    (archive_dir / "manifest.json").write_text(
+        cli._canonical_json({
+            "dump_sha256": cli.file_sha256(archive_dir / "n9_batch1.dump"),
+            "required_extensions": ["pg_trgm", "vector"],
+        }),
+        encoding="utf-8",
+    )
+    (archive_dir / "function_ddl.sql").write_text("", encoding="utf-8")
+
+    calls = []
+
+    def fake_run_checked(cmd, *, database_url=None, dbname=None):
+        calls.append((cmd[0], tuple(cmd[1:]), dbname))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli, "_run_checked", fake_run_checked)
+    monkeypatch.setattr(cli, "connect_pg", lambda _url: _FakeConn())
+
+    code = cli.main([
+        "verify-dump",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+        "--restore-db", "r_db",
+        "--confirm-create-drop-restore-db",
+    ])
+
+    assert code == 0
+    tools = [name for name, _args, _db in calls]
+    assert tools == ["createdb", "psql", "psql", "pg_restore", "dropdb"]
+    ext_cmds = [args for name, args, db in calls if name == "psql" and db == "r_db"]
+    joined = " ".join(" ".join(args) for args in ext_cmds)
+    assert 'CREATE EXTENSION IF NOT EXISTS "pg_trgm"' in joined
+    assert 'CREATE EXTENSION IF NOT EXISTS "vector"' in joined
