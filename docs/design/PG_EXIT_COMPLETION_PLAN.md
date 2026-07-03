@@ -6,9 +6,8 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8) — PG now holds only `prices`, frozen `job_runs`, and app-record tables.** Remaining: price ingest/migration, batch-2 (job_runs + dead paths), SEC/dead paths, and UI collapse. S-G
-`news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local. N9 batch-1 offline
-implementation is ready for live evidence/dump approval; no destructive live drop has been run.
+**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8) — PG now holds only `prices`, frozen `job_runs`, and app-record tables.** Remaining: price reconcile/direct-local cutover, batch-2 (job_runs + dead paths), SEC/dead paths, and UI collapse. S-G
+`news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
 
 ## Progress
 
@@ -60,7 +59,7 @@ writes**. The delta is the work.
 Prices are the remaining active mirror dependency. News writes direct-local through normalized
 writers; fundamentals refetch/cache is local; the old IV PG-mirror source is retired/fail-closed
 pending a separate IV reboot. Losing PG for the already-retired domains loses no desired runtime
-authority; the remaining fix is the prices migration/direct-local path plus N9 cleanup of the
+authority; the remaining fix is the prices reconcile/direct-local path plus N9 cleanup of the
 archive-only tables.
 
 **(2) App-records — PG-only, read AND write, USER/AGENT-AUTHORED (NOT regenerable).**

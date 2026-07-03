@@ -153,7 +153,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 - Orphaned PG function `news_search_vector_update()` (its trigger died with `news`).
 - verified-dead PG score helper: `src/tools/backends/db_backend.py::query_news_scores` + other `DatabaseBackend` methods now referencing absent tables.
 - `migrate_to_supabase.py` retired-domain code (physical removal).
-- **Retain:** `prices` (pending P0-C migration slice — the final PG dependency).
+- **Retain:** `prices` (pending P0-C reconcile + direct-local cutover — the final PG dependency; PG drop is batch-3).
 
 ---
 
@@ -172,7 +172,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 2. **app-state homes:** resolved for `agent_queries` / `research_reports` / `agent_memories` and `job_runs` (local `profile_state.db`) and legacy `signals` (retire if present). `job_runs` may still move to a future `ops.db` only if real write contention or telemetry volume justifies that separate store.
 3. **macro/cal:** resolved for sequencing 2026-07-03 — PG macro/cal tables were verified empty, so S-H3 is folded into N9 batch-1 evidence as grep + empty-table proof, not a separate implementation slice.
 4. **scorer timing:** resolved 2026-07-03 — S-G cut over `news_scores` before N8b reads, so hard-local score degradation is removed before the normalized-read upgrade.
-5. **prices:** confirm migrate (not refetch); when to schedule.
+5. **prices:** resolved 2026-07-03 — audit-first reconcile + direct-local cutover; no bulk copy unless unexplained PG-only rows prove a real local gap; PG drop is batch-3.
 6. **legacy `collect_ibkr_news.py`:** confirm it is dead post-exit → can it be retired directly?
 
 ---
@@ -238,7 +238,7 @@ Therefore "scripts retirement" must be a per-domain definition-of-done:
 | SA | local `sa_capture.db` is populated and SA tools prefer hard-local backend; a few health paths still use `job_runs` best-effort | S-H confirms PG `sa_*` is a likely orphan; grep-gate before drop; job telemetry belongs to app-state/ops, not SA market data |
 | Fundamentals | S-B retires the frozen `fundamentals` mirror table as an authority; `stored=true` reads only local positive SEC annual-analysis `financial_cache` rows (`fundamentals_analysis:sec_edgar:{TICKER}:annual:v1`) and otherwise returns honest empty; live cache may initially be cold; default analysis remains SEC EDGAR / Financial Datasets refetch with local cache | PG-free after S-B; old `fundamentals` table is an N9 drop-orphan |
 | IV | only 24 local rows; old scheduler `iv_history` PG-mirror source is fail-closed after N9 offline hardening; tools/UI read local and local misses are honest-empty | abandon old 24 rows as experimental; preserve capability via rebooted local schema + provider abstraction |
-| Prices | local table has 2.3M rows and price data is core | migrate/direct-local slice; do not refetch 2.3M by default |
+| Prices | local table has 2.3M rows and price data is core | P0-C reconcile + direct-local cutover; do not bulk-copy PG unless audit proves a real local gap |
 | Macro/cal | `use_local_macro=true` selects `macro_calendar.db`; local macro/FRED and IPO rows exist, but economic/earnings event tables are empty | PG macro/cal tables were verified empty; N9 batch-1 evidence records empty-table proof + reader grep, with no seed/refetch slice |
 | Financial cache | S-H2 made `LocalMarketDatabaseBackend.get_financial_cache()` local-only. Local miss is an honest miss; callers refetch SEC/FD and repopulate local cache | PG `financial_data_cache` is archive-only and an N9 batch-1 drop candidate after final reader grep + dump |
 | App state / ops | profile app-records are local and `use_local_records=true`; `job_runs` is local in `profile_state.db` with `use_local_job_runs=true` after S-H1 | PG `job_runs` and PG app-records become archive/drop candidates after soak + final reader grep; collapse the transitional unset/default PG path at N9 so fresh installs do not construct a dead PG store |
