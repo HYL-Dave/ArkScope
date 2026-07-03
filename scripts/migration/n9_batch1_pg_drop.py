@@ -738,6 +738,21 @@ def _read_regclasses(cur, names: Sequence[str]) -> dict[str, str | None]:
     return {name: found.get(name) for name in unique_names}
 
 
+def _read_regprocedures(cur, signatures: Sequence[str]) -> dict[str, str | None]:
+    unique_signatures = sorted(set(signatures))
+    if not unique_signatures:
+        return {}
+    cur.execute(
+        """
+        SELECT signature, to_regprocedure('public.' || signature) AS regprocedure
+        FROM unnest(%s::text[]) AS signature
+        """,
+        (unique_signatures,),
+    )
+    found = {str(signature): regprocedure for signature, regprocedure in cur.fetchall()}
+    return {signature: found.get(signature) for signature in unique_signatures}
+
+
 def _excluded_present_names(evidence: Mapping[str, Any]) -> list[str]:
     out: list[str] = []
     for obj in evidence.get("pg_snapshot", {}).get("objects", []):
@@ -753,16 +768,24 @@ def _verify_post_drop_catalog(
     *,
     dropped_tables: Sequence[str],
     dropped_views: Sequence[str],
+    dropped_functions: Sequence[str],
     excluded_tables: Sequence[str],
 ) -> None:
     statuses = _read_regclasses(cur, list(dropped_tables) + list(dropped_views) + list(excluded_tables))
+    function_statuses = _read_regprocedures(cur, dropped_functions)
     still_present = sorted(
         name for name in set(dropped_tables) | set(dropped_views)
         if statuses.get(name) is not None
     )
+    functions_still_present = sorted(
+        signature for signature in set(dropped_functions)
+        if function_statuses.get(signature) is not None
+    )
     missing_excluded = sorted(name for name in excluded_tables if statuses.get(name) is None)
     if still_present:
         raise RuntimeError("post_drop_target_still_present:" + ",".join(still_present))
+    if functions_still_present:
+        raise RuntimeError("post_drop_function_still_present:" + ",".join(functions_still_present))
     if missing_excluded:
         raise RuntimeError("post_drop_excluded_missing:" + ",".join(missing_excluded))
 
@@ -797,6 +820,7 @@ def _cmd_drop(args: argparse.Namespace) -> int:
                 cur,
                 dropped_tables=present_tables,
                 dropped_views=present_views,
+                dropped_functions=TARGET_FUNCTION_SIGNATURES,
                 excluded_tables=_excluded_present_names(evidence),
             )
         conn.commit()
@@ -829,19 +853,25 @@ def _cmd_postcheck(args: argparse.Namespace) -> int:
     try:
         with conn.cursor() as cur:
             statuses = _read_regclasses(cur, list(dropped_tables) + list(dropped_views) + excluded)
+            function_statuses = _read_regprocedures(cur, TARGET_FUNCTION_SIGNATURES)
     finally:
         conn.close()
     still_present = sorted(
         name for name in set(dropped_tables) | set(dropped_views)
         if statuses.get(name) is not None
     )
+    functions_still_present = sorted(
+        signature for signature in set(TARGET_FUNCTION_SIGNATURES)
+        if function_statuses.get(signature) is not None
+    )
     excluded_missing = sorted(name for name in excluded if statuses.get(name) is None)
-    ok = not still_present and not excluded_missing
+    ok = not still_present and not functions_still_present and not excluded_missing
     print(json.dumps({
         "status": "postcheck",
         "ok": ok,
         "fingerprint": evidence.get("fingerprint"),
         "targets_still_present": still_present,
+        "functions_still_present": functions_still_present,
         "excluded_missing": excluded_missing,
     }, sort_keys=True))
     return 0 if ok else 1

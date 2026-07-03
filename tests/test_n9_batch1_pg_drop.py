@@ -617,8 +617,9 @@ def test_dump_refuses_when_pg_dump_client_older_than_server(tmp_path, monkeypatc
 
 
 class _PostcheckConn:
-    def __init__(self, regclass_by_name):
+    def __init__(self, regclass_by_name, regprocedure_by_signature=None):
         self._map = regclass_by_name
+        self._procedures = regprocedure_by_signature or {}
 
     def cursor(self):
         conn = self
@@ -631,9 +632,12 @@ class _PostcheckConn:
                 return False
 
             def execute(self, sql, params=None):
+                self._sql = " ".join(sql.split())
                 self._params = params
 
             def fetchall(self):
+                if "to_regprocedure" in self._sql:
+                    return [(signature, conn._procedures.get(signature)) for signature in self._params[0]]
                 return [(name, conn._map.get(name)) for name in self._params[0]]
 
         return _Cur()
@@ -675,6 +679,7 @@ def test_postcheck_ok_when_targets_gone_and_excluded_present(tmp_path, monkeypat
     assert code == 0
     assert payload["ok"] is True
     assert payload["targets_still_present"] == []
+    assert payload["functions_still_present"] == []
     assert payload["excluded_missing"] == []
     assert "secret" not in out
 
@@ -710,3 +715,46 @@ def test_postcheck_fails_when_target_still_present(tmp_path, monkeypatch, capsys
     assert code == 1
     assert payload["ok"] is False
     assert payload["targets_still_present"] == ["news"]
+
+
+def test_postcheck_fails_when_target_function_still_present(tmp_path, monkeypatch, capsys):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = cli.build_evidence_report(
+        pg_snapshot={
+            "server_version": "17.5",
+            "objects": [
+                {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            ],
+            "row_fingerprints": {},
+        },
+        grep_summary={"blockers": [], "allowed_hits": []},
+    )
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    monkeypatch.setattr(
+        cli,
+        "connect_pg",
+        lambda _url: _PostcheckConn(
+            {"prices": "public.prices"},
+            {
+                "news_sentiment_summary(character varying, integer, character varying)": (
+                    "public.news_sentiment_summary(character varying, integer, character varying)"
+                )
+            },
+        ),
+    )
+
+    code = cli.main([
+        "postcheck",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+    ])
+
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert payload["ok"] is False
+    assert payload["functions_still_present"] == [
+        "news_sentiment_summary(character varying, integer, character varying)"
+    ]
