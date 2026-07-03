@@ -74,11 +74,7 @@ def _news_pg_exit_audit_state(db_path: str) -> bool | None:
 
 
 def _manual_update_domains(store: ProfileStateStore) -> tuple[str, ...] | None:
-    profile_done = parse_news_toggle(store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True
-    audit_state = _news_pg_exit_audit_state(resolve_market_db_path())
-    if profile_done or audit_state is True or audit_state is None:
-        return ("prices",)
-    return None
+    return ()
 
 
 def _setting_enabled(store: ProfileStateStore) -> bool:
@@ -143,13 +139,17 @@ def bootstrap_route():
 
 @router.post("/market-data/update")
 def update_route(store: ProfileStateStore = Depends(get_profile_store)):
-    """Start (or attach to) a background INCREMENTAL update (delta since latest;
-    prices + news + iv + fundamentals before news PG exit; prices only after
-    N9 batch-1 retired the PG IV mirror). Append-only to the live DB — routing can stay
-    active. A provider/PG failure in one domain is recorded (last_error), not
-    fatal to the others. Requires an existing local DB (bootstrap first)."""
+    """Reject the retired PG incremental mirror path.
+
+    P0-C routes scheduled price collection through the direct-local IBKR writer.
+    The legacy manual update endpoint used the PG mirror path, so it must fail
+    closed instead of creating a background mirror job.
+    """
     require_db_write("market_update", {"db": resolve_market_db_path()})
-    return start_update_job(domains=_manual_update_domains(store))
+    domains = _manual_update_domains(store)
+    if domains == ():
+        raise _retired_market_update_http_error()
+    return start_update_job(domains=domains)
 
 
 @router.get("/market-data/jobs/{job_id}")
@@ -219,6 +219,14 @@ def _retired_market_mirror_http_error(operation: str) -> HTTPException:
         status_code=409,
         detail=retired_market_mirror_result(operation),
     )
+
+
+def _retired_market_update_http_error() -> HTTPException:
+    from src.market_data_admin import retired_price_mirror_result
+
+    detail = retired_price_mirror_result("update_route")
+    detail["code"] = "pg_market_update_retired"
+    return HTTPException(status_code=409, detail=detail)
 
 
 class LocalMarketToggle(BaseModel):

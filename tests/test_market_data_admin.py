@@ -21,6 +21,10 @@ def _legacy_validate_market(*args, **kwargs):
     return mda.validate_market(*args, allow_retired_pg_mirror=True, **kwargs)
 
 
+def _legacy_incremental_update(*args, **kwargs):
+    return mda.incremental_update(*args, allow_retired_pg_mirror=True, **kwargs)
+
+
 # --- a minimal fake PG serving BOTH domains (no live DB needed) ---------------
 
 _PRICE_ROWS = [
@@ -270,7 +274,7 @@ def test_incremental_iv_and_fundamentals_add_new_rows(tmp_path, fake_pg, monkeyp
     # INSERT OR IGNORE dedups the existing ids the fake re-serves).
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(
         _PRICE_ROWS, _NEWS_ROWS, iv=_IV_ROWS + [_NEW_IV], fund=_FUND_ROWS + [_NEW_FUND]))
-    res = mda.incremental_update(out)
+    res = _legacy_incremental_update(out)
     assert res["ok"] is True
     assert res["iv"]["rows_added"] == 1 and res["fundamentals"]["rows_added"] == 1
     stats = mda.local_market_stats(out)
@@ -291,7 +295,7 @@ def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
     # PG now has one extra bar + one extra article (INSERT OR IGNORE dedups the rest)
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS + [_NEW_PRICE], _NEWS_ROWS + [_NEW_NEWS]))
-    res = mda.incremental_update(out)
+    res = _legacy_incremental_update(out)
     assert res["ok"] is True
     assert res["prices"]["rows_added"] == 1 and res["news"]["rows_added"] == 1
     stats = mda.local_market_stats(out)
@@ -329,7 +333,7 @@ def test_incremental_update_exclude_news_domain_skips_pg_news_query(tmp_path, fa
 
     monkeypatch.setattr(mda, "_pg_conn", lambda: _CapturePG())
 
-    res = mda.incremental_update(out, domains=("prices", "iv", "fundamentals"))
+    res = _legacy_incremental_update(out, domains=("prices", "iv", "fundamentals"))
 
     assert res["ok"] is True
     assert res["news"]["skipped"] == "domain disabled"
@@ -363,7 +367,7 @@ def test_incremental_update_exclude_news_and_other_omitted_domains_skip_pg_queri
 
     monkeypatch.setattr(mda, "_pg_conn", lambda: _CapturePG())
 
-    res = mda.incremental_update(out, domains=("prices",))
+    res = _legacy_incremental_update(out, domains=("prices",))
 
     assert res["ok"] is True
     assert res["prices"]["ok"] is True
@@ -395,7 +399,7 @@ def test_bootstrap_and_incremental_keep_fts_via_triggers(tmp_path, fake_pg, monk
     # incremental append (one new article) → fts synced by the trigger, counts stay equal
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS + [_NEW_PRICE], _NEWS_ROWS + [_NEW_NEWS]))
-    mda.incremental_update(out)
+    _legacy_incremental_update(out)
     conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
     try:
         news_n = conn.execute("SELECT COUNT(*) FROM news").fetchone()[0]
@@ -428,7 +432,7 @@ def test_incremental_prices_query_is_group_aware(tmp_path, fake_pg, monkeypatch)
             self._c = _CapCursor(_PRICE_ROWS, _NEWS_ROWS)
 
     monkeypatch.setattr(mda, "_pg_conn", lambda: _CapPG())
-    mda.incremental_update(out)
+    _legacy_incremental_update(out)
     assert "LEFT JOIN (VALUES" in captured["sql"]
     assert "v.maxdt IS NULL OR p.datetime > v.maxdt" in captured["sql"]
     assert len(captured["params"]) == 2 * 3  # one (ticker,interval,max) triple per local group
@@ -441,7 +445,7 @@ def test_incremental_prices_catches_new_ticker(tmp_path, fake_pg, monkeypatch):
     _legacy_bootstrap_market(out)
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS + [_NEW_TICKER_BAR], _NEWS_ROWS))
-    res = mda.incremental_update(out)
+    res = _legacy_incremental_update(out)
     assert res["prices"]["rows_added"] == 1
     conn = sqlite3.connect(f"file:{out}?mode=ro", uri=True)
     try:
@@ -454,7 +458,7 @@ def test_incremental_prices_catches_new_ticker(tmp_path, fake_pg, monkeypatch):
 def test_incremental_update_idempotent(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
     _legacy_bootstrap_market(out)
-    res = mda.incremental_update(out)  # nothing newer → 0 added each
+    res = _legacy_incremental_update(out)  # nothing newer → 0 added each
     assert res["prices"]["rows_added"] == 0 and res["news"]["rows_added"] == 0
 
 
@@ -471,7 +475,7 @@ def test_incremental_provider_failure_not_fatal(tmp_path, fake_pg, monkeypatch):
         raise RuntimeError("PG down")
 
     monkeypatch.setattr(mda, "_pg_conn", _boom)
-    res = mda.incremental_update(out)  # must NOT raise
+    res = _legacy_incremental_update(out)  # must NOT raise
     assert res["ok"] is False
     assert res["prices"]["ok"] is False and "PG down" in res["prices"]["error"]
     assert res["news"]["ok"] is False  # other domain also recorded, not crashed
@@ -668,7 +672,7 @@ def test_incremental_update_leaves_financial_cache_intact(tmp_path, fake_pg):
     _legacy_bootstrap_market(out)
     sb = SqliteBackend(out)
     sb.set_financial_cache("k", "AAPL", {"v": 1}, expires_at="2099-01-01T00:00:00+00:00")
-    res = mda.incremental_update(out)
+    res = _legacy_incremental_update(out)
     assert res["ok"] is True
     assert sb.get_financial_cache("k") == {"v": 1}  # untouched
     assert mda.local_market_stats(out)["financial_cache"]["row_count"] == 1
@@ -689,7 +693,38 @@ def test_manual_update_domains_after_news_pg_exit_requests_prices_only(store, mo
     monkeypatch.setattr(route, "_news_pg_exit_audit_state", lambda _: True)
     monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
 
-    assert route._manual_update_domains(store) == ("prices",)
+    assert route._manual_update_domains(store) == ()
+
+
+def test_p0c_incremental_update_prices_is_retired(tmp_path):
+    out = tmp_path / "market_data.db"
+    conn = sqlite3.connect(out)
+    conn.executescript(mda._PRICES_SCHEMA)
+    conn.close()
+
+    res = mda.incremental_update(str(out), domains=("prices",))
+
+    assert res["ok"] is False
+    assert res["prices"]["skipped"] == "prices PG mirror retired by P0-C"
+
+
+def test_p0c_manual_update_rejects_retired_mirror(store):
+    from src.api.routes import market_data as route
+
+    assert route._manual_update_domains(store) == ()
+
+
+def test_p0c_update_route_rejects_retired_mirror(store, monkeypatch):
+    from fastapi import HTTPException
+    from src.api.routes import market_data as route
+
+    monkeypatch.setattr(route, "require_db_write", lambda *args, **kwargs: None)
+
+    with pytest.raises(HTTPException) as exc:
+        route.update_route(store=store)
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_update_retired"
 
 
 def test_bootstrap_route_rejects_retired_pg_mirror(monkeypatch):
@@ -845,7 +880,8 @@ def test_job_not_found_404():
     assert exc.value.status_code == 404
 
 
-def test_update_route_excludes_news_after_pg_exit_audit(store, tmp_path, monkeypatch):
+def test_update_route_rejects_retired_prices_after_news_pg_exit_audit(store, tmp_path, monkeypatch):
+    from fastapi import HTTPException
     from src.api.routes import market_data as md
 
     db = tmp_path / "market_data.db"
@@ -857,19 +893,14 @@ def test_update_route_excludes_news_after_pg_exit_audit(store, tmp_path, monkeyp
     finally:
         conn.close()
 
-    calls = []
     monkeypatch.setattr(md, "resolve_market_db_path", lambda: str(db))
     monkeypatch.setattr(md, "require_db_write", lambda *a, **k: None)
-    monkeypatch.setattr(
-        md,
-        "start_update_job",
-        lambda domains=None: (calls.append(domains), {"status": "running"})[1],
-    )
 
-    out = md.update_route(store=store)
+    with pytest.raises(HTTPException) as exc:
+        md.update_route(store=store)
 
-    assert out == {"status": "running"}
-    assert calls == [("prices",)]
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_update_retired"
 
 
 def test_toggle_invalidates_dal_cache(store, monkeypatch):

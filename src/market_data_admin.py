@@ -340,6 +340,7 @@ _FIN_CACHE_INSERT = ("INSERT OR REPLACE INTO financial_cache "
 _CACHE_WRITE_LOCK = threading.Lock()
 
 RETIRED_MARKET_MIRROR_DOMAINS = ["news", "iv", "fundamentals"]
+RETIRED_PRICE_MIRROR_MESSAGE = "prices PG mirror retired by P0-C"
 
 
 def retired_market_mirror_result(operation: str) -> dict:
@@ -354,6 +355,18 @@ def retired_market_mirror_result(operation: str) -> dict:
             "News, IV, fundamentals, scores, and financial_cache are local/refetch "
             "authorities; prices migration remains a separate PG-exit slice."
         ),
+    }
+
+
+def retired_price_mirror_result(operation: str = "incremental_update") -> dict:
+    return {
+        "ok": False,
+        "rows_added": 0,
+        "error": RETIRED_PRICE_MIRROR_MESSAGE,
+        "skipped": RETIRED_PRICE_MIRROR_MESSAGE,
+        "operation": operation,
+        "retired_domains": ["prices"],
+        "message": "Use the direct-local IBKR prices writer instead of the PG mirror.",
     }
 
 
@@ -986,12 +999,15 @@ def incremental_update(
     out_path: Optional[str] = None,
     batch: int = 20000,
     domains: Optional[tuple[str, ...]] = None,
+    *,
+    allow_retired_pg_mirror: bool = False,
 ) -> dict:
-    """Append-only delta refresh of the local market DB (prices + news + iv +
-    fundamentals) from PG — only rows newer than the local max (prices: per
-    (ticker,interval) datetime; news/iv/fundamentals: id). Writes in place to the
-    live WAL DB (no atomic swap), so routing can stay active. A provider/PG failure
-    in one domain is recorded, not fatal to the others.
+    """Append-only delta refresh for legacy PG mirror domains.
+
+    The prices PG mirror is retired by P0-C; requesting it returns an explicit
+    retired result. N9 batch-1 already retired news/iv/fundamentals mirror tables.
+    ``allow_retired_pg_mirror`` exists only for legacy unit-test coverage of the
+    retired mirror query shape; runtime callers must use the default.
 
     Requires an existing local DB (bootstrap first). Returns per-domain results.
     ``domains=None`` preserves the historical all-domain refresh; otherwise only
@@ -1015,8 +1031,13 @@ def incremental_update(
         sconn.executescript(_IV_SCHEMA)    # tolerate a pre-iv/fundamentals DB
         sconn.executescript(_FUND_SCHEMA)
         _ensure_news_sentiment_columns(sconn)  # tolerate a pre-sentiment news table
-        prices = (_incr_prices(sconn, batch) if "prices" in active_domains
-                  else _domain_disabled_result())  # per-(ticker,interval); catches new tickers
+        prices = (
+            _incr_prices(sconn, batch)
+            if "prices" in active_domains and allow_retired_pg_mirror
+            else retired_price_mirror_result()
+            if "prices" in active_domains
+            else _domain_disabled_result()
+        )
         news = (_incr_domain(sconn, "news", "SELECT COALESCE(MAX(id), 0) FROM news",
                              _PG_NEWS_SELECT_INCR, _PG_NEWS_SELECT, _NEWS_INSERT, batch)
                 if "news" in active_domains else _domain_disabled_result())
