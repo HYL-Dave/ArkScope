@@ -40,7 +40,7 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 | PG table | ~rows | Cut A | Strategy | Notes |
 |---|---|---|---|---|
-| `prices` | 2.25M | market | **migrate** | re-fetchable but large; N7-style migration; own slice |
+| `prices` | 2.31M | market | **reconcile + direct-local cutover**（2026-07-03 改判,原 migrate） | LIVE MEASURED: local 2,324,172/149 tickers > PG 2,314,293/150（疑 LC→HAPN stitch）→ audit-first,無證明缺口不 bulk copy;主體=ingest 直寫本地+mirror 退役;PG drop=batch-3 |
 | `news_scores` | 503k | market | **cutover done; N9 drop candidate** | S-G live-applied 2026-07-03 into local `news_article_scores` (491,808 rows; reviewed fingerprint `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`; PG rows skipped: 604 N7-rejected legacy rows + 14 missing legacy IDs); future active imports use `scripts/scoring/import_news_scores_local.py`; PG `--scores` is archive-only |
 | `news` (PG) | 343k | market | **drop-orphan** | not read by app post-N8a → N9 drop |
 | `sa_*` (comments/signals/market_news/articles/alpha_picks) | ~95k | market | **likely drop-orphan** | S-H confirms active SA authority is local `sa_capture.db`; final N9 still needs a reader/script grep before destructive drop |
