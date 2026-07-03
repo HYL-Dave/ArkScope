@@ -135,6 +135,8 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ## 8. N9 real drop list (draft — grep-confirm "no training/report/migrate/other script still reads" before each drop)
 
+Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md` (authored 2026-07-03, pending review). The plan makes the destructive nature explicit: pre-drop runtime hardening first, then reader-free evidence, then compressed `pg_dump`, then mandatory restore verification, then a separate user-approved live drop. It also treats any remaining PG `iv_history` fallback as a blocker that must be removed before dropping the old PG `iv_history` table.
+
 - PG `news` (343k, orphaned)
 - PG `sa_*` (SA already local; final reader/script grep still required)
 - PG `iv_history` (old 24 rows)
