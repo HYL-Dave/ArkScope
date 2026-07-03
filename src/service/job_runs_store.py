@@ -356,37 +356,42 @@ class JobRunsStore:
             logger.warning("JobRunsStore.latest_runs_by_name failed: %s", exc)
             return {}
 
-    def run_summary_by_name(self, job_names: List[str]) -> Dict[str, Dict[str, Any]]:
+    def run_summary_by_name(self, job_names: List[str]) -> Optional[Dict[str, Dict[str, Any]]]:
         """Return last successful and last terminal run timestamps per job."""
         names = [str(name) for name in job_names if str(name)]
         if not names or not self.is_available():
-            return {}
+            return None
         try:
             conn = self._backend._get_conn()
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT job_name,
-                           MAX(finished_at) FILTER (WHERE status = 'succeeded')
-                               AS last_success_at,
-                           MAX(finished_at) AS last_any_at
-                    FROM job_runs
-                    WHERE job_name = ANY(%s)
-                    GROUP BY job_name
-                    """,
-                    (names,),
+            summary: Dict[str, Dict[str, Any]] = {}
+            for name in names:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """
+                        SELECT
+                            MAX(finished_at) FILTER (WHERE status = 'succeeded')
+                                AS last_success_at,
+                            MAX(finished_at) AS last_any_at
+                        FROM job_runs
+                        WHERE job_name = %s
+                        """,
+                        (name,),
+                    )
+                    row = cur.fetchone() or {}
+                last_success_at = row.get("last_success_at") or row.get(
+                    "extension_last_success_at"
                 )
-                rows = cur.fetchall()
-            return {
-                row["job_name"]: {
-                    "last_success_at": _to_iso(row.get("last_success_at")),
-                    "last_any_at": _to_iso(row.get("last_any_at")),
+                last_any_at = row.get("last_any_at") or last_success_at
+                if last_success_at is None and last_any_at is None:
+                    continue
+                summary[name] = {
+                    "last_success_at": _to_iso(last_success_at),
+                    "last_any_at": _to_iso(last_any_at),
                 }
-                for row in rows
-            }
+            return summary
         except Exception as exc:
             logger.warning("JobRunsStore.run_summary_by_name failed: %s", exc)
-            return {}
+            return None
 
 
 class JobRunsLocalStore:
@@ -610,7 +615,7 @@ class JobRunsLocalStore:
             logger.warning("JobRunsLocalStore.latest_runs_by_name failed: %s", exc)
             return {}
 
-    def run_summary_by_name(self, job_names: List[str]) -> Dict[str, Dict[str, Any]]:
+    def run_summary_by_name(self, job_names: List[str]) -> Optional[Dict[str, Dict[str, Any]]]:
         names = [str(name) for name in job_names if str(name)]
         if not names:
             return {}
@@ -638,7 +643,7 @@ class JobRunsLocalStore:
             }
         except Exception as exc:
             logger.warning("JobRunsLocalStore.run_summary_by_name failed: %s", exc)
-            return {}
+            return None
 
 
 def _serialize_local_row(row: Dict[str, Any]) -> Dict[str, Any]:

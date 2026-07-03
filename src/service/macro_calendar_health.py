@@ -466,7 +466,8 @@ def _query_job_runs(dal: Any) -> Dict[str, Dict[str, Any]]:
     from src.service.job_runs_store import get_job_runs_store
 
     try:
-        return get_job_runs_store(dal).run_summary_by_name(list(_JOB_CADENCES_SECONDS))
+        summary = get_job_runs_store(dal).run_summary_by_name(list(_JOB_CADENCES_SECONDS))
+        return summary or {}
     except Exception as exc:
         logger.warning("macro_calendar health: job_runs lookup failed: %s", exc)
         return {}

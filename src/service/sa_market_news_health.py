@@ -448,6 +448,8 @@ def _query_extension_run(dal: Any) -> Any:
     from src.service.job_runs_store import get_job_runs_store
 
     summary = get_job_runs_store(dal).run_summary_by_name([EXTENSION_JOB_NAME])
+    if summary is None:
+        raise RuntimeError("job_runs unavailable")
     return (summary.get(EXTENSION_JOB_NAME) or {}).get("last_success_at")
 
 

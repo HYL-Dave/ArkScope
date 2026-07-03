@@ -260,6 +260,47 @@ def test_latest_runs_by_name_swallows_db_error():
     assert JobRunsStore(dal).latest_runs_by_name() == {}
 
 
+def test_run_summary_by_name_returns_none_on_db_error():
+    dal, backend = _make_db_dal()
+    backend._get_conn.side_effect = RuntimeError("down")
+    assert JobRunsStore(dal).run_summary_by_name(["sa_market_news_refresh"]) is None
+
+
+def test_run_summary_by_name_uses_single_row_cursor_shape():
+    dal, backend = _make_db_dal()
+    conn = MagicMock()
+    backend._get_conn.return_value = conn
+
+    class _Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def execute(self, sql, params=None):
+            self.sql = sql
+            self.params = params
+
+        def fetchone(self):
+            return {
+                "job_name": "sa_market_news_refresh",
+                "last_success_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
+                "last_any_at": datetime(2026, 4, 25, 10, 5, tzinfo=timezone.utc),
+            }
+
+    conn.cursor.return_value = _Cursor()
+
+    summary = JobRunsStore(dal).run_summary_by_name(["sa_market_news_refresh"])
+
+    assert summary == {
+        "sa_market_news_refresh": {
+            "last_success_at": "2026-04-25T10:00:00+00:00",
+            "last_any_at": "2026-04-25T10:05:00+00:00",
+        }
+    }
+
+
 def test_serialize_row_converts_datetimes():
     row = {
         "started_at": datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc),
