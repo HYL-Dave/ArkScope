@@ -482,9 +482,13 @@ The current Parquet readers are explicit cutover dependencies, not reasons to pr
 the new authority:
 
 - `scripts/scoring/score_ibkr_news.py` remains the Parquet-producing/manual scorer for now. S-G
-  adds `scripts/scoring/import_news_scores_local.py` as the normalized SQLite import path before
-  PG `news_scores` can retire; a test must prove a scored article can be selected through the
-  normalized local mapping without PG.
+  added `scripts/scoring/import_news_scores_local.py` as the normalized SQLite import path and
+  live-applied the reviewed PG score cutover on 2026-07-03. Local `news_article_scores` is now the
+  runtime score authority; PG `news_scores` is archive-only and an N9 drop candidate after final
+  reader grep. Live proof: fingerprint
+  `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`, `491,808` local score
+  rows inserted/updated, `604` N7-rejected legacy rows skipped, and `14` missing legacy IDs
+  skipped.
 - `FileBackend` still reads Parquet when the DAL has no DSN. It is not the sidecar's primary news
   path, but its fallback must be replaced by the normalized local store or formally retired before
   historical Parquet files and their reader code can be deleted.

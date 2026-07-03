@@ -154,9 +154,16 @@
 
 ### 5.3 Scoring & enrichment（live scoring 留、研究腳本砍）
 
+> **S-G status (2026-07-03):** local `news_article_scores` is now the runtime
+> score authority. The reviewed live cutover imported `491,808` rows under
+> fingerprint `34607859293ae7ee20726448e1b733fe55b2cf9fc720a31f6c97a853dec76ab3`
+> (`604` N7-rejected legacy rows and `14` missing legacy IDs skipped). PG
+> `news_scores` is archive/drop-candidate state only; active DB imports use the
+> local importer.
+
 | 元件 | Verdict | 動作 |
 |---|---|---|
-| scoring read-path (detect/resolve_score_columns, local `news_article_scores`) | **preserve-adapt** | news/sentiment evidence panel；score-dependent reads use SQLite-local scores, not PG `news_scores` |
+| scoring read-path (detect/resolve_score_columns, local `news_article_scores`) | **preserve-adapt** | news/sentiment evidence panel；score-dependent reads use SQLite-local scores, not PG `news_scores`；S-G live cutover complete |
 | `score_ibkr_news.py` | **preserve-adapt** | keep as the Parquet-producing/manual scorer for now; active DB import is `scripts/scoring/import_news_scores_local.py`, not `migrate_to_supabase --scores` |
 | `score_sentiment_anthropic.py` + `score_risk_anthropic.py` | **preserve-adapt** | 丟 CSV --input/--output，收斂 parquet + --data-dir；provider switcher 的 Anthropic 後端 |
 | `openai_summary.py` | **preserve-adapt** | 解耦 CSV I/O，曝露為 callable enrichment step。*註：review 修正——它 **並未** 被 anthropic scorers import（原 rationale 錯），價值在 summarization-for-evidence，自帶獨立 routing* |
