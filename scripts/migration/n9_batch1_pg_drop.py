@@ -9,6 +9,7 @@ and must remain gated by reviewed evidence plus restore proof.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import json
 import os
@@ -61,6 +62,12 @@ _DROP_DOMAIN_RE = re.compile(
     r"\b(news_scores|news_latest_scores|news_sentiment_summary|financial_data_cache|"
     r"iv_history|fundamentals|sa_[A-Za-z0-9_]+|macro_[A-Za-z0-9_]+|cal_[A-Za-z0-9_]+|signals)\b"
 )
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    ok: bool
+    reason: str = ""
 
 
 def _sort_report_value(value: Any) -> Any:
@@ -401,7 +408,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     verify.add_argument("--restore-db", required=True)
     verify.add_argument("--confirm-create-drop-restore-db", action="store_true")
 
+    drop = sub.add_parser("drop", help="Drop reviewed N9 batch-1 PG objects")
+    drop.add_argument("--database-url", required=True)
+    drop.add_argument("--archive-dir")
+    drop.add_argument("--reviewed-fingerprint")
+    drop.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[2]))
+    drop.add_argument("--confirm-scheduler-paused", action="store_true")
+    drop.add_argument("--confirm-native-host-paused", action="store_true")
+    drop.add_argument("--confirm-destructive-drop", action="store_true")
+
     return parser
+
+
+def parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    return build_arg_parser().parse_args(argv)
 
 
 def _cmd_preview(args: argparse.Namespace) -> int:
@@ -543,6 +563,171 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
     return 0 if proof["ok"] else 1
 
 
+def build_drop_sql(
+    *,
+    present_tables: Sequence[str],
+    present_views: Sequence[str],
+    present_functions: Sequence[str],
+) -> list[str]:
+    statements: list[str] = []
+    for signature in present_functions:
+        statements.append(f"DROP FUNCTION IF EXISTS public.{signature}")
+    for view in present_views:
+        if not _IDENT_RE.match(view):
+            raise ValueError(f"unsafe view identifier: {view!r}")
+        statements.append(f"DROP VIEW IF EXISTS public.{view}")
+    tables = [table for table in present_tables if table not in EXCLUDED_TABLES]
+    if tables:
+        for table in tables:
+            if not _IDENT_RE.match(table):
+                raise ValueError(f"unsafe table identifier: {table!r}")
+        statements.append("DROP TABLE IF EXISTS " + ", ".join(f"public.{table}" for table in tables))
+    for statement in statements:
+        if "CASCADE" in statement.upper():
+            raise ValueError("drop SQL must not use CASCADE")
+    return statements
+
+
+def validate_drop_args(args: argparse.Namespace) -> ValidationResult:
+    if not getattr(args, "reviewed_fingerprint", None):
+        return ValidationResult(False, "missing_reviewed_fingerprint")
+    archive_dir = Path(getattr(args, "archive_dir", "") or "")
+    proof_path = archive_dir / "restore_proof.json"
+    if not proof_path.exists():
+        return ValidationResult(False, "missing_restore_proof")
+    proof = _load_json(proof_path)
+    if proof.get("ok") is not True:
+        return ValidationResult(False, "restore_proof_not_ok")
+    if proof.get("evidence_fingerprint") != args.reviewed_fingerprint:
+        return ValidationResult(False, "restore_proof_fingerprint_mismatch")
+    manifest_path = archive_dir / "manifest.json"
+    dump_path = archive_dir / "n9_batch1.dump"
+    if not manifest_path.exists():
+        return ValidationResult(False, "missing_archive_manifest")
+    if not dump_path.exists():
+        return ValidationResult(False, "missing_archive_dump")
+    manifest = _load_json(manifest_path)
+    if manifest.get("evidence_fingerprint") not in (None, args.reviewed_fingerprint):
+        return ValidationResult(False, "archive_manifest_fingerprint_mismatch")
+    if manifest.get("dump_sha256") != file_sha256(dump_path):
+        return ValidationResult(False, "archive_dump_sha256_mismatch")
+    if not getattr(args, "confirm_scheduler_paused", False):
+        return ValidationResult(False, "missing_scheduler_pause_confirmation")
+    if not getattr(args, "confirm_native_host_paused", False):
+        return ValidationResult(False, "missing_native_host_pause_confirmation")
+    if not getattr(args, "confirm_destructive_drop", False):
+        return ValidationResult(False, "missing_destructive_drop_confirmation")
+    return ValidationResult(True)
+
+
+def _current_evidence_report(*, database_url: str, repo_root: str | Path) -> dict[str, Any]:
+    conn = connect_pg(database_url)
+    try:
+        pg_snapshot = collect_pg_snapshot(conn)
+    finally:
+        conn.close()
+    return build_evidence_report(
+        pg_snapshot=pg_snapshot,
+        grep_summary=collect_repo_grep_summary(repo_root),
+    )
+
+
+def _read_regclasses(cur, names: Sequence[str]) -> dict[str, str | None]:
+    unique_names = sorted(set(names))
+    if not unique_names:
+        return {}
+    cur.execute(
+        """
+        SELECT name, to_regclass('public.' || name) AS regclass
+        FROM unnest(%s::text[]) AS name
+        """,
+        (unique_names,),
+    )
+    found = {str(name): regclass for name, regclass in cur.fetchall()}
+    return {name: found.get(name) for name in unique_names}
+
+
+def _excluded_present_names(evidence: Mapping[str, Any]) -> list[str]:
+    out: list[str] = []
+    for obj in evidence.get("pg_snapshot", {}).get("objects", []):
+        if not isinstance(obj, Mapping):
+            continue
+        if obj.get("kind") == "excluded_table" and obj.get("status") == "excluded_present":
+            out.append(str(obj["name"]))
+    return sorted(out)
+
+
+def _verify_post_drop_catalog(
+    cur,
+    *,
+    dropped_tables: Sequence[str],
+    dropped_views: Sequence[str],
+    excluded_tables: Sequence[str],
+) -> None:
+    statuses = _read_regclasses(cur, list(dropped_tables) + list(dropped_views) + list(excluded_tables))
+    still_present = sorted(
+        name for name in set(dropped_tables) | set(dropped_views)
+        if statuses.get(name) is not None
+    )
+    missing_excluded = sorted(name for name in excluded_tables if statuses.get(name) is None)
+    if still_present:
+        raise RuntimeError("post_drop_target_still_present:" + ",".join(still_present))
+    if missing_excluded:
+        raise RuntimeError("post_drop_excluded_missing:" + ",".join(missing_excluded))
+
+
+def _cmd_drop(args: argparse.Namespace) -> int:
+    validation = validate_drop_args(args)
+    if not validation.ok:
+        raise SystemExit(validation.reason)
+    archive_dir = Path(args.archive_dir)
+    evidence = _load_json(archive_dir / "evidence.json")
+    if evidence.get("fingerprint") != args.reviewed_fingerprint:
+        raise SystemExit("evidence fingerprint mismatch")
+    current = _current_evidence_report(database_url=args.database_url, repo_root=args.repo_root)
+    if current.get("fingerprint") != args.reviewed_fingerprint:
+        raise SystemExit("current evidence fingerprint mismatch")
+
+    present_tables = _present_names(evidence, "table")
+    present_views = _present_names(evidence, "view")
+    statements = build_drop_sql(
+        present_tables=present_tables,
+        present_views=present_views,
+        present_functions=list(TARGET_FUNCTION_SIGNATURES),
+    )
+    conn = connect_pg(args.database_url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET LOCAL lock_timeout = '5s'")
+            cur.execute("SET LOCAL statement_timeout = '60s'")
+            for statement in statements:
+                cur.execute(statement)
+            _verify_post_drop_catalog(
+                cur,
+                dropped_tables=present_tables,
+                dropped_views=present_views,
+                excluded_tables=_excluded_present_names(evidence),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        print(json.dumps({
+            "status": "failed",
+            "stage": "drop_transaction",
+            "reason": "dependency_blocked",
+        }))
+        raise
+    finally:
+        conn.close()
+    print(json.dumps({
+        "status": "dropped",
+        "fingerprint": args.reviewed_fingerprint,
+        "dropped_tables": len(present_tables),
+        "dropped_statements": len(statements),
+    }))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -552,6 +737,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_dump(args)
     if args.cmd == "verify-dump":
         return _cmd_verify_dump(args)
+    if args.cmd == "drop":
+        return _cmd_drop(args)
     parser.error(f"unknown command: {args.cmd}")
     return 2
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -257,6 +258,117 @@ def test_verify_dump_writes_restore_proof(tmp_path, monkeypatch):
     assert calls == ["createdb", "pg_restore", "dropdb"]
 
 
+def test_drop_refuses_without_reviewed_fingerprint(tmp_path):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    args = cli.parse_args(["drop", "--database-url", "postgres://x"])
+
+    result = cli.validate_drop_args(args)
+
+    assert result.ok is False
+    assert result.reason == "missing_reviewed_fingerprint"
+
+
+def test_drop_refuses_without_restore_proof(tmp_path):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    args = cli.parse_args([
+        "drop",
+        "--database-url",
+        "postgres://x",
+        "--reviewed-fingerprint",
+        "abc",
+        "--archive-dir",
+        str(tmp_path),
+        "--confirm-scheduler-paused",
+        "--confirm-native-host-paused",
+        "--confirm-destructive-drop",
+    ])
+
+    result = cli.validate_drop_args(args)
+
+    assert result.ok is False
+    assert result.reason == "missing_restore_proof"
+
+
+def test_drop_sql_is_explicit_and_never_cascade():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    sql = cli.build_drop_sql(
+        present_tables=["news_scores", "news"],
+        present_views=["news_latest_scores"],
+        present_functions=["news_sentiment_summary(character varying, integer, character varying)"],
+    )
+
+    joined = "\n".join(sql)
+    assert "CASCADE" not in joined.upper()
+    assert "DROP VIEW IF EXISTS public.news_latest_scores" in joined
+    assert (
+        "DROP FUNCTION IF EXISTS public.news_sentiment_summary"
+        "(character varying, integer, character varying)" in joined
+    )
+    assert "DROP TABLE IF EXISTS public.news_scores, public.news" in joined
+
+
+def test_drop_rechecks_current_evidence_and_postconditions(tmp_path, monkeypatch, capsys):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = cli.build_evidence_report(
+        pg_snapshot={
+            "server_version": "17.5",
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present"},
+                {"kind": "view", "name": "news_latest_scores", "status": "present"},
+                {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            ],
+            "row_counts": {"news": 1},
+            "row_fingerprints": {"news": "abc"},
+            "dependencies": [],
+        },
+        grep_summary={"blockers": [], "allowed_hits": []},
+    )
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    (archive_dir / "restore_proof.json").write_text(
+        cli._canonical_json({"ok": True, "evidence_fingerprint": evidence["fingerprint"]}),
+        encoding="utf-8",
+    )
+    (archive_dir / "n9_batch1.dump").write_bytes(b"dump")
+    (archive_dir / "manifest.json").write_text(
+        cli._canonical_json({"dump_sha256": cli.file_sha256(archive_dir / "n9_batch1.dump")}),
+        encoding="utf-8",
+    )
+
+    write_conn = _DropConn()
+    monkeypatch.setattr(cli, "connect_pg", lambda _url: write_conn)
+    monkeypatch.setattr(cli, "collect_pg_snapshot", lambda _conn: evidence["pg_snapshot"])
+    monkeypatch.setattr(cli, "collect_repo_grep_summary", lambda _root: evidence["grep_summary"])
+
+    code = cli.main([
+        "drop",
+        "--database-url",
+        "postgres://secret@example/db",
+        "--archive-dir",
+        str(archive_dir),
+        "--reviewed-fingerprint",
+        evidence["fingerprint"],
+        "--confirm-scheduler-paused",
+        "--confirm-native-host-paused",
+        "--confirm-destructive-drop",
+    ])
+
+    stdout = capsys.readouterr().out
+    payload = json.loads(stdout)
+    assert code == 0
+    assert "secret" not in stdout
+    assert payload["dropped_tables"] == 1
+    assert write_conn.committed is True
+    assert write_conn.rolled_back is False
+    assert any("DROP TABLE IF EXISTS public.news" in sql for sql in write_conn.sql)
+    assert any("to_regclass" in sql for sql in write_conn.sql)
+
+
 class _FakeConn:
     def cursor(self):
         return _FakeCursor()
@@ -291,3 +403,52 @@ class _FakeCursor:
         if "pg_depend" in self._sql:
             return []
         return []
+
+
+class _DropConn:
+    def __init__(self):
+        self.cursor_obj = _DropCursor()
+        self.sql = self.cursor_obj.sql
+        self.committed = False
+        self.rolled_back = False
+
+    def cursor(self):
+        return self.cursor_obj
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+    def close(self):
+        pass
+
+
+class _DropCursor:
+    def __init__(self):
+        self.sql = []
+        self._params = None
+        self._last_sql = ""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        compact = " ".join(sql.split())
+        assert "CASCADE" not in compact.upper()
+        self.sql.append(compact)
+        self._last_sql = compact
+        self._params = params
+
+    def fetchall(self):
+        if "to_regclass" not in self._last_sql:
+            return []
+        return [
+            ("news", None),
+            ("news_latest_scores", None),
+            ("prices", "public.prices"),
+        ]
