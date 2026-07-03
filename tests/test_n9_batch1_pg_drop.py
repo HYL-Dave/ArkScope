@@ -236,7 +236,9 @@ def test_dump_command_writes_archive_manifest(tmp_path, monkeypatch, capsys):
     assert (archive_dir / "n9_batch1.dump").exists()
     assert (archive_dir / "evidence.json").exists()
     assert (archive_dir / "manifest.json").exists()
-    assert (archive_dir / "function_ddl.sql").read_text(encoding="utf-8") == "-- function ddl\n"
+    assert (archive_dir / "function_ddl.sql").read_text(encoding="utf-8") == (
+        "SET check_function_bodies = off;\n\n-- function ddl\n\n"
+    )
 
 
 def test_verify_dump_writes_restore_proof(tmp_path, monkeypatch):
@@ -859,3 +861,81 @@ def test_verify_dump_creates_extensions_before_restore(tmp_path, monkeypatch):
     joined = " ".join(" ".join(args) for args in ext_cmds)
     assert 'CREATE EXTENSION IF NOT EXISTS "pg_trgm"' in joined
     assert 'CREATE EXTENSION IF NOT EXISTS "vector"' in joined
+
+
+def test_trigger_function_ddl_collected_for_target_tables():
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    class _TrigConn:
+        def cursor(self):
+            class _Cur:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+
+                def execute(self, sql, params=None):
+                    assert "pg_trigger" in sql and "tgisinternal" in sql
+
+                def fetchall(self):
+                    return [("CREATE OR REPLACE FUNCTION public.news_search_vector_update() ...",)]
+
+            return _Cur()
+
+    ddl = cli.collect_trigger_function_ddl(_TrigConn(), ["news"])
+
+    assert "news_search_vector_update" in ddl
+
+
+def test_verify_dump_applies_function_ddl_before_restore(tmp_path, monkeypatch):
+    from scripts.migration import n9_batch1_pg_drop as cli
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir()
+    evidence = {
+        "fingerprint": "abc",
+        "pg_snapshot": {
+            "objects": [
+                {"kind": "table", "name": "news", "status": "present", "row_count": 0},
+            ],
+            "row_fingerprints": {"news": "d41d8cd98f00b204e9800998ecf8427e"},
+        },
+    }
+    (archive_dir / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    (archive_dir / "n9_batch1.dump").write_bytes(b"dump")
+    (archive_dir / "manifest.json").write_text(
+        cli._canonical_json({
+            "dump_sha256": cli.file_sha256(archive_dir / "n9_batch1.dump"),
+            "required_extensions": ["vector"],
+        }),
+        encoding="utf-8",
+    )
+    (archive_dir / "function_ddl.sql").write_text(
+        "SET check_function_bodies = off;\nCREATE FUNCTION ...;", encoding="utf-8"
+    )
+
+    order = []
+
+    def fake_run_checked(cmd, *, database_url=None, dbname=None):
+        tag = cmd[0]
+        if tag == "psql" and any("function_ddl" in str(part) for part in cmd):
+            tag = "psql-function-ddl"
+        elif tag == "psql":
+            tag = "psql-extension"
+        order.append(tag)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli, "_run_checked", fake_run_checked)
+    monkeypatch.setattr(cli, "connect_pg", lambda _url: _FakeConn())
+
+    code = cli.main([
+        "verify-dump",
+        "--database-url", "postgres://secret@example/db",
+        "--archive-dir", str(archive_dir),
+        "--restore-db", "r_db",
+        "--confirm-create-drop-restore-db",
+    ])
+
+    assert code == 0
+    assert order == ["createdb", "psql-extension", "psql-function-ddl", "pg_restore", "dropdb"]

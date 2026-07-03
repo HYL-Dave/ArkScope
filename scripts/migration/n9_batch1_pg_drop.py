@@ -492,6 +492,26 @@ def _present_names(report: Mapping[str, Any], kind: str) -> list[str]:
 
 
 
+def collect_trigger_function_ddl(conn, tables) -> str:
+    """DDL for non-internal trigger functions attached to the target tables.
+
+    Table-scoped pg_dump emits CREATE TRIGGER but not the function it calls, so a
+    restore into a fresh DB needs these definitions applied first."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT pg_get_functiondef(p.oid)
+            FROM pg_trigger t
+            JOIN pg_class c ON t.tgrelid = c.oid
+            JOIN pg_proc p ON t.tgfoid = p.oid
+            WHERE NOT t.tgisinternal AND c.relname = ANY(%s)
+            ORDER BY 1
+            """,
+            (list(tables),),
+        )
+        return "\n\n".join(str(row[0]) for row in cur.fetchall())
+
+
 def collect_required_extensions(conn) -> list[str]:
     """Non-builtin extensions the archive needs before a restore (e.g. pgvector)."""
     with conn.cursor() as cur:
@@ -585,7 +605,14 @@ def _cmd_dump(args: argparse.Namespace) -> int:
 
     conn = connect_pg(args.database_url)
     try:
-        (archive_dir / "function_ddl.sql").write_text(read_function_ddl(conn), encoding="utf-8")
+        trigger_ddl = collect_trigger_function_ddl(conn, _present_names(evidence, "table"))
+        target_ddl = read_function_ddl(conn)
+        pieces = [piece for piece in (trigger_ddl, target_ddl) if piece.strip()]
+        function_ddl = (
+            "SET check_function_bodies = off;\n\n" + "\n\n".join(pieces) + "\n"
+            if pieces else ""
+        )
+        (archive_dir / "function_ddl.sql").write_text(function_ddl, encoding="utf-8")
         required_extensions = collect_required_extensions(conn)
     finally:
         conn.close()
@@ -638,18 +665,21 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
                 database_url=args.database_url,
                 dbname=restore_db,
             )
-        _run_checked(
-            ["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)],
-            database_url=args.database_url,
-            dbname=restore_db,
-        )
         function_ddl = archive_dir / "function_ddl.sql"
         if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
+            # Trigger functions must exist BEFORE pg_restore creates the tables'
+            # triggers; check_function_bodies=off lets functions referencing the
+            # not-yet-restored tables be created.
             _run_checked(
                 ["psql", "--dbname", restore_db, "--file", str(function_ddl)],
                 database_url=args.database_url,
                 dbname=restore_db,
             )
+        _run_checked(
+            ["pg_restore", "--exit-on-error", "--dbname", restore_db, str(dump_path)],
+            database_url=args.database_url,
+            dbname=restore_db,
+        )
         conn = connect_pg(restore_url)
         try:
             restored = collect_pg_snapshot(conn)
