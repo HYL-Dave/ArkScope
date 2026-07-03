@@ -21,7 +21,8 @@ Overridden, local-first with PG fallback on empty/miss:
     (optional 1-5 ``sentiment_score`` on the local row), so a scored miss is an
     honest empty. ``query_news_search`` (3b, FTS5) + ``query_news_stats`` (score-free
     scout stats; no PG fallback on local empty);
-  - ``query_iv_history`` (3c-A);
+  - ``query_iv_history`` (3c-A) — local-only after N9 batch-1; the old PG
+    ``iv_history`` mirror is intentionally abandoned;
   - ``get_available_tickers('prices'|'news'|'iv_history'|'fundamentals')``.
 
 The old ``fundamentals`` mirror table is retained for legacy inspection until N9,
@@ -162,12 +163,8 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         if df is not None and not df.empty:
             provenance.record("iv", "local")
             return df
-        if self._strict:
-            provenance.record("iv", "none")  # local-only: honest empty, no PG
-            return df if df is not None else pd.DataFrame()
-        pg = super().query_iv_history(ticker)
-        provenance.record("iv", "pg_fallback" if pg is not None and not pg.empty else "none")
-        return pg
+        provenance.record("iv", "none")
+        return df if df is not None else pd.DataFrame()
 
     def query_fundamentals(self, ticker: str) -> dict:
         """The PG-mirrored fundamentals table is retired as an authority.

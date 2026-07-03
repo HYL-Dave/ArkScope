@@ -3,15 +3,13 @@
 migrate_to_supabase.py — Import historical data files into PostgreSQL.
 
 Usage:
-    python scripts/migrate_to_supabase.py              # Import all data types
-    python scripts/migrate_to_supabase.py --news       # News articles only
+    python scripts/migrate_to_supabase.py              # Import active PG domains (prices only)
     python scripts/migrate_to_supabase.py --scores --archive-scores
                                                    # Archived PG news scores only
     python scripts/migrate_to_supabase.py --prices     # Prices only
-    python scripts/migrate_to_supabase.py --iv         # IV history only
-    python scripts/migrate_to_supabase.py --fundamentals  # Fundamentals only
     python scripts/migrate_to_supabase.py --dry-run    # Count rows without importing
 
+The --news, --iv, and --fundamentals flags are retired by N9 PG-exit hardening.
 The --scores flag is now an archive-only path for legacy PG news_scores.
 Use scripts/scoring/import_news_scores_local.py for active local score imports.
 Archived PG score import requires --archive-scores.
@@ -691,9 +689,12 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
 # Main
 # =============================================================================
 
-def main():
+N9_RETIRED_DOMAINS = ("news", "iv", "fundamentals")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Import data into PostgreSQL")
-    parser.add_argument("--news", action="store_true", help="Import news articles only")
+    parser.add_argument("--news", action="store_true", help="Retired N9 domain; refused")
     parser.add_argument(
         "--scores",
         action="store_true",
@@ -705,16 +706,35 @@ def main():
         help="Allow explicit archive import into PG news_scores",
     )
     parser.add_argument("--prices", action="store_true", help="Import prices only")
-    parser.add_argument("--iv", action="store_true", help="Import IV history only")
-    parser.add_argument("--fundamentals", action="store_true", help="Import fundamentals only")
+    parser.add_argument("--iv", action="store_true", help="Retired N9 domain; refused")
+    parser.add_argument("--fundamentals", action="store_true", help="Retired N9 domain; refused")
     parser.add_argument("--dry-run", action="store_true", help="Count rows without importing")
-    args = parser.parse_args()
+    return parser
+
+
+def validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     if args.scores and not args.archive_scores:
         parser.error(
             "--scores writes archived PG news_scores; use "
             "scripts/scoring/import_news_scores_local.py for active local imports, "
             "or pass --archive-scores for an explicit archive import"
         )
+    requested_retired = [
+        name for name in N9_RETIRED_DOMAINS
+        if getattr(args, {"news": "news", "iv": "iv", "fundamentals": "fundamentals"}[name])
+    ]
+    if requested_retired:
+        parser.error(
+            "PG import disabled for N9-retired domains: "
+            + ", ".join(requested_retired)
+            + ". Use local direct writers/refetch paths instead."
+        )
+
+
+def main():
+    parser = build_arg_parser()
+    args = parser.parse_args()
+    validate_args(args, parser)
 
     # If no specific flag, import all
     import_all = not (args.news or args.scores or args.prices or args.iv or args.fundamentals)
@@ -733,17 +753,8 @@ def main():
     totals = {}
 
     try:
-        if import_all or args.news:
-            totals["news"] = import_news(conn, dry_run=args.dry_run)
-
         if args.scores:
             totals["news_scores"] = import_news_scores(conn, dry_run=args.dry_run)
-
-        if import_all or args.iv:
-            totals["iv_history"] = import_iv_history(conn, dry_run=args.dry_run)
-
-        if import_all or args.fundamentals:
-            totals["fundamentals"] = import_fundamentals(conn, dry_run=args.dry_run)
 
         if import_all or args.prices:
             totals["prices"] = import_prices(conn, dry_run=args.dry_run)

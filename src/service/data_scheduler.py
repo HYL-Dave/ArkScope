@@ -658,7 +658,7 @@ def _local_refresh() -> Dict[str, Any]:
             if not Path(market_db).exists():
                 return {"skipped": "no local market DB (bootstrap first)"}
             domains = (
-                ("prices", "iv")
+                ("prices",)
                 if _news_pg_exit_assume_completed_for_refresh(market_db)
                 else None
             )

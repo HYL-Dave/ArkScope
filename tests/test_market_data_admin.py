@@ -12,6 +12,15 @@ import src.market_data_admin as mda
 from src.news_identity import canonical_article_hash
 from src.profile_state import ProfileStateStore
 
+
+def _legacy_bootstrap_market(*args, **kwargs):
+    return mda.bootstrap_market(*args, allow_retired_pg_mirror=True, **kwargs)
+
+
+def _legacy_validate_market(*args, **kwargs):
+    return mda.validate_market(*args, allow_retired_pg_mirror=True, **kwargs)
+
+
 # --- a minimal fake PG serving BOTH domains (no live DB needed) ---------------
 
 _PRICE_ROWS = [
@@ -149,7 +158,7 @@ def test_local_stats_missing(tmp_path):
 
 def test_bootstrap_builds_prices_and_news(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
     assert res["match"] is True
     assert res["prices"]["rows"] == 3 and res["news"]["rows"] == 2
     assert not (tmp_path / "market_data.db.building").exists()  # swapped in
@@ -177,7 +186,7 @@ def test_bootstrap_mismatch_keeps_existing_db(tmp_path, monkeypatch):
     # PG claims more price rows than it yields → validation mismatch
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS, _NEWS_ROWS, price_total=len(_PRICE_ROWS) + 99))
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
     assert res["match"] is False and res["prices"]["match"] is False
     assert not (tmp_path / "market_data.db.building").exists()  # discarded
     assert mda.local_market_stats(out)["prices"]["row_count"] == 1  # existing untouched
@@ -185,8 +194,8 @@ def test_bootstrap_mismatch_keeps_existing_db(tmp_path, monkeypatch):
 
 def test_validate_market(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
-    r = mda.validate_market(out)
+    _legacy_bootstrap_market(out)
+    r = _legacy_validate_market(out)
     assert r["match"] is True
     assert r["prices"]["local_rows"] == 3 and r["news"]["local_rows"] == 2
 
@@ -195,11 +204,11 @@ def test_news_checksum_catches_id_drift(tmp_path, fake_pg):
     # Hardening: same per-(source,ticker) COUNT but a different id set must be
     # caught via SUM(id) — the old per-source count alone would have passed.
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     conn = sqlite3.connect(out)
     conn.execute("UPDATE news SET id = 999 WHERE id = 1")  # same counts, different SUM(id)
     conn.commit(); conn.close()
-    r = mda.validate_market(out)
+    r = _legacy_validate_market(out)
     assert r["news"]["match"] is False and r["match"] is False
     assert r["news"]["local_rows"] == r["news"]["pg_rows"]  # counts still equal → only SUM(id) caught it
 
@@ -208,7 +217,7 @@ def test_news_checksum_catches_id_drift(tmp_path, fake_pg):
 
 def test_bootstrap_builds_iv_and_fundamentals(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
     assert res["match"] is True
     assert res["iv"]["rows"] == 3 and res["iv"]["match"] is True
     assert res["fundamentals"]["rows"] == 2 and res["fundamentals"]["match"] is True
@@ -220,8 +229,8 @@ def test_bootstrap_builds_iv_and_fundamentals(tmp_path, fake_pg):
 
 def test_validate_iv_and_fundamentals(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
-    r = mda.validate_market(out)
+    _legacy_bootstrap_market(out)
+    r = _legacy_validate_market(out)
     assert r["match"] is True
     assert r["iv"]["local_rows"] == 3 and r["iv"]["match"] is True
     assert r["fundamentals"]["local_rows"] == 2 and r["fundamentals"]["match"] is True
@@ -230,22 +239,22 @@ def test_validate_iv_and_fundamentals(tmp_path, fake_pg):
 def test_iv_checksum_catches_id_drift(tmp_path, fake_pg):
     # Same per-ticker COUNT but a different id set must be caught via SUM(id).
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     conn = sqlite3.connect(out)
     conn.execute("UPDATE iv_history SET id = 99 WHERE id = 1")  # same count, different SUM(id)
     conn.commit(); conn.close()
-    r = mda.validate_market(out)
+    r = _legacy_validate_market(out)
     assert r["iv"]["match"] is False and r["match"] is False
     assert r["iv"]["local_rows"] == r["iv"]["pg_rows"]  # counts equal → only SUM(id) caught it
 
 
 def test_fundamentals_checksum_catches_id_drift(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     conn = sqlite3.connect(out)
     conn.execute("UPDATE fundamentals SET id = 99 WHERE id = 1")
     conn.commit(); conn.close()
-    r = mda.validate_market(out)
+    r = _legacy_validate_market(out)
     assert r["fundamentals"]["match"] is False and r["match"] is False
     assert r["fundamentals"]["local_rows"] == r["fundamentals"]["pg_rows"]
 
@@ -256,7 +265,7 @@ _NEW_FUND = (3, "TSLA", "2026-06-02", '{"reports": {"ReportSnapshot": {"Name": "
 
 def test_incremental_iv_and_fundamentals_add_new_rows(tmp_path, fake_pg, monkeypatch):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)  # 3 iv, 2 fundamentals
+    _legacy_bootstrap_market(out)  # 3 iv, 2 fundamentals
     # PG now has one extra iv snapshot + one extra fundamentals row (id-based delta;
     # INSERT OR IGNORE dedups the existing ids the fake re-serves).
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(
@@ -278,7 +287,7 @@ _NEW_NEWS = (3, "AAPL", "Apple new product launch", "big reveal", "http://d", "R
 
 def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)  # 3 prices, 2 news
+    _legacy_bootstrap_market(out)  # 3 prices, 2 news
     # PG now has one extra bar + one extra article (INSERT OR IGNORE dedups the rest)
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS + [_NEW_PRICE], _NEWS_ROWS + [_NEW_NEWS]))
@@ -301,7 +310,7 @@ def test_incremental_update_adds_new_rows(tmp_path, fake_pg, monkeypatch):
 
 def test_incremental_update_exclude_news_domain_skips_pg_news_query(tmp_path, fake_pg, monkeypatch):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     queries = []
 
     class _CaptureCursor(_FakeCursor):
@@ -335,7 +344,7 @@ def test_incremental_update_exclude_news_and_other_omitted_domains_skip_pg_queri
     tmp_path, fake_pg, monkeypatch
 ):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     queries = []
 
     class _CaptureCursor(_FakeCursor):
@@ -372,7 +381,7 @@ def test_bootstrap_and_incremental_keep_fts_via_triggers(tmp_path, fake_pg, monk
     # rebuild); the incremental append then syncs news_fts via the trigger (manual insert removed)
     # — exactly one fts row per news row, no double-index, no orphan.
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     conn = sqlite3.connect(out)
     try:
         trigs = {r[0] for r in conn.execute(
@@ -404,7 +413,7 @@ _NEW_TICKER_BAR = ("TSLA", "2026-05-01T09:00:00+0000", "15min", 200.0, 202.0, 19
 def test_incremental_prices_query_is_group_aware(tmp_path, fake_pg, monkeypatch):
     # The prices delta must be per-(ticker,interval), NOT a single global datetime>max.
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     captured = {}
 
     class _CapCursor(_FakeCursor):
@@ -429,7 +438,7 @@ def test_incremental_prices_catches_new_ticker(tmp_path, fake_pg, monkeypatch):
     # A NEW ticker whose bars are OLDER than the global max — the old global
     # datetime>max would skip it; per-group catches it (v.maxdt IS NULL → all rows).
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     monkeypatch.setattr(mda, "_pg_conn",
                         lambda: _FakePG(_PRICE_ROWS + [_NEW_TICKER_BAR], _NEWS_ROWS))
     res = mda.incremental_update(out)
@@ -444,7 +453,7 @@ def test_incremental_prices_catches_new_ticker(tmp_path, fake_pg, monkeypatch):
 
 def test_incremental_update_idempotent(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     res = mda.incremental_update(out)  # nothing newer → 0 added each
     assert res["prices"]["rows_added"] == 0 and res["news"]["rows_added"] == 0
 
@@ -456,7 +465,7 @@ def test_incremental_update_missing_db(tmp_path):
 
 def test_incremental_provider_failure_not_fatal(tmp_path, fake_pg, monkeypatch):
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
 
     def _boom():
         raise RuntimeError("PG down")
@@ -472,10 +481,10 @@ def test_incremental_provider_failure_not_fatal(tmp_path, fake_pg, monkeypatch):
     assert mda.local_market_stats(out)["prices"]["row_count"] == 3
 
 
-def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
+def test_bootstrap_job_records_retired_pg_mirror_error(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
     job = mda.start_bootstrap_job(out)
-    assert job["status"] in ("running", "done")
+    assert job["status"] in ("running", "error")
     # Wait on a wall-clock DEADLINE, not a fixed iteration count: the daemon job's
     # work (4 domains → copy + commit + validate + atomic swap + WAL reopen) is real
     # disk I/O, so under contention it can take a few seconds. A generous deadline
@@ -487,7 +496,9 @@ def test_bootstrap_job_runs_to_done(tmp_path, fake_pg):
             break
         time.sleep(0.05)
     j = mda.get_job(job["id"])
-    assert j["status"] == "done" and j["result"]["match"] is True
+    assert j["status"] == "error"
+    assert j["result"]["code"] == "pg_market_bootstrap_retired"
+    assert "retired" in j["error"]
 
 
 def _drain_update_job(out, monkeypatch, fake_result, *, domains=None, expected_domains=None):
@@ -578,7 +589,7 @@ def test_update_job_ignores_skipped_domains_when_deciding_success(tmp_path, monk
 
 def test_bootstrap_creates_empty_financial_cache(tmp_path, fake_pg):
     out = str(tmp_path / "market_data.db")
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
     assert res["match"] is True
     assert res["financial_cache"]["carried_over"] == 0  # first build → nothing to carry
     assert mda.local_market_stats(out)["financial_cache"]["row_count"] == 0
@@ -589,11 +600,11 @@ def test_bootstrap_carries_over_financial_cache(tmp_path, fake_pg):
     # preserve its rows across the atomic swap rather than dropping them.
     from src.tools.backends.sqlite_backend import SqliteBackend
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)  # build once → empty financial_cache table exists
+    _legacy_bootstrap_market(out)  # build once → empty financial_cache table exists
     sb = SqliteBackend(out)
     sb.set_financial_cache("metrics_AAPL", "AAPL", {"pe": 30}, expires_at="2099-01-01T00:00:00+00:00")
     sb.set_financial_cache("metrics_NVDA", "NVDA", {"pe": 60}, expires_at="2099-01-01T00:00:00+00:00")
-    res = mda.bootstrap_market(out)  # rebuild → rows must survive
+    res = _legacy_bootstrap_market(out)  # rebuild → rows must survive
     assert res["match"] is True and res["financial_cache"]["carried_over"] == 2
     assert sb.get_financial_cache("metrics_AAPL") == {"pe": 30}
     assert sb.get_financial_cache("metrics_NVDA") == {"pe": 60}
@@ -602,7 +613,7 @@ def test_bootstrap_carries_over_financial_cache(tmp_path, fake_pg):
 def test_local_stats_financial_cache_counts(tmp_path, fake_pg):
     from src.tools.backends.sqlite_backend import SqliteBackend
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     sb = SqliteBackend(out)
     sb.set_financial_cache("valid", "AAPL", {"x": 1}, expires_at="2099-01-01T00:00:00+00:00")
     sb.set_financial_cache("expired", "AAPL", {"x": 2}, expires_at="2000-01-01T00:00:00+00:00")
@@ -624,12 +635,12 @@ def test_bootstrap_clean_state_after_rebuild_with_stale_sidecars(tmp_path, fake_
     # validated DB, no leftover sidecars, and intact carry-over.
     from src.tools.backends.sqlite_backend import SqliteBackend
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     SqliteBackend(out).set_financial_cache("CARRIED", "AAPL", {"v": 1},
                                            expires_at="2099-01-01T00:00:00+00:00")
     Path(out + "-wal").write_bytes(b"stale-wal-bytes")  # sidecars present at rebuild
     Path(out + "-shm").write_bytes(b"stale-shm-bytes")
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
     assert res["match"] is True
     assert not Path(out + "-wal").exists() and not Path(out + "-shm").exists()
     assert res["financial_cache"]["carried_over"] == 1
@@ -641,7 +652,7 @@ def test_local_ticker_coverage(tmp_path, fake_pg):
     # missing DB → exists False, all domains False
     cov = mda.local_ticker_coverage("AAPL", out)
     assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "iv", "fundamentals"))
-    mda.bootstrap_market(out)  # fake serves AAPL+NVDA across all domains
+    _legacy_bootstrap_market(out)  # fake serves AAPL+NVDA across all domains
     cov = mda.local_ticker_coverage("aapl", out)  # case-insensitive
     assert cov["exists"] is True
     assert cov["prices"] and cov["news"] and cov["iv"] and cov["fundamentals"]
@@ -654,7 +665,7 @@ def test_incremental_update_leaves_financial_cache_intact(tmp_path, fake_pg):
     # contract: the incremental updater does NOT touch financial_cache.
     from src.tools.backends.sqlite_backend import SqliteBackend
     out = str(tmp_path / "market_data.db")
-    mda.bootstrap_market(out)
+    _legacy_bootstrap_market(out)
     sb = SqliteBackend(out)
     sb.set_financial_cache("k", "AAPL", {"v": 1}, expires_at="2099-01-01T00:00:00+00:00")
     res = mda.incremental_update(out)
@@ -668,6 +679,77 @@ def test_incremental_update_leaves_financial_cache_intact(tmp_path, fake_pg):
 @pytest.fixture()
 def store(tmp_path):
     return ProfileStateStore(tmp_path / "profile_state.db")
+
+
+def test_manual_update_domains_after_news_pg_exit_requests_prices_only(store, monkeypatch):
+    from src.api.routes import market_data as route
+    from src.news_normalized.routing import NEWS_PG_EXIT_COMPLETED_KEY
+
+    store.set_setting(NEWS_PG_EXIT_COMPLETED_KEY, "true")
+    monkeypatch.setattr(route, "_news_pg_exit_audit_state", lambda _: True)
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
+
+    assert route._manual_update_domains(store) == ("prices",)
+
+
+def test_bootstrap_route_rejects_retired_pg_mirror(monkeypatch):
+    from fastapi import HTTPException
+    from src.api.routes import market_data as route
+
+    monkeypatch.setattr(route, "require_db_write", lambda *args, **kwargs: None)
+    monkeypatch.setattr(route, "resolve_market_db_path", lambda: "/tmp/market_data.db")
+
+    with pytest.raises(HTTPException) as exc:
+        route.bootstrap_route()
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_bootstrap_retired"
+    assert exc.value.detail["retired_domains"] == ["news", "iv", "fundamentals"]
+
+
+def test_validate_route_rejects_retired_pg_mirror():
+    from fastapi import HTTPException
+    from src.api.routes import market_data as route
+
+    with pytest.raises(HTTPException) as exc:
+        route.validate_route()
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "pg_market_bootstrap_retired"
+
+
+def test_bootstrap_market_refuses_retired_pg_mirror_before_pg_connect(monkeypatch, tmp_path):
+    called = False
+
+    def fake_pg_conn():
+        nonlocal called
+        called = True
+        raise AssertionError("retired bootstrap must not connect to PG")
+
+    monkeypatch.setattr(mda, "_pg_conn", fake_pg_conn)
+
+    res = mda.bootstrap_market(str(tmp_path / "market_data.db"))
+
+    assert called is False
+    assert res["ok"] is False
+    assert res["code"] == "pg_market_bootstrap_retired"
+
+
+def test_validate_market_refuses_retired_pg_mirror_before_pg_connect(monkeypatch, tmp_path):
+    called = False
+
+    def fake_pg_conn():
+        nonlocal called
+        called = True
+        raise AssertionError("retired validation must not connect to PG")
+
+    monkeypatch.setattr(mda, "_pg_conn", fake_pg_conn)
+
+    res = mda.validate_market(str(tmp_path / "market_data.db"))
+
+    assert called is False
+    assert res["ok"] is False
+    assert res["code"] == "pg_market_bootstrap_retired"
 
 
 def test_status_route_local_only(store, tmp_path, monkeypatch):
@@ -787,7 +869,7 @@ def test_update_route_excludes_news_after_pg_exit_audit(store, tmp_path, monkeyp
     out = md.update_route(store=store)
 
     assert out == {"status": "running"}
-    assert calls == [("prices", "iv")]
+    assert calls == [("prices",)]
 
 
 def test_toggle_invalidates_dal_cache(store, monkeypatch):
@@ -1090,7 +1172,7 @@ def test_bootstrap_with_alias_spellings_validates_then_canonicalizes(tmp_path, m
         (3, "AAPL", "Apple", "d", "http://c", "Reuters", "finnhub", "2026-06-01T12:00:00+0000", "h3"),
     ]
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
-    res = mda.bootstrap_market(out)
+    res = _legacy_bootstrap_market(out)
 
     assert res["match"] is True          # validation passed (compared in pre-canon space)
     assert res["news"]["rows"] == 3      # no row lost
@@ -1114,11 +1196,11 @@ def test_validate_market_folds_aliases_so_canon_db_matches_pg(tmp_path, monkeypa
         (3, "AAPL", "Apple", "d", "http://c", "Reuters", "finnhub", "2026-06-01T12:00:00+0000", "h3"),
     ]
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
-    assert mda.bootstrap_market(out)["match"] is True  # builds + canonicalizes the local DB
+    assert _legacy_bootstrap_market(out)["match"] is True  # builds + canonicalizes the local DB
 
     # re-validate the canonical DB against the SAME (pre-canon) PG → must still match
     monkeypatch.setattr(mda, "_pg_conn", lambda: _FakePG(_PRICE_ROWS, news))
-    res = mda.validate_market(out)
+    res = _legacy_validate_market(out)
     assert res["match"] is True and res["news"]["match"] is True
 
 

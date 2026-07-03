@@ -545,17 +545,18 @@ def test_available_tickers_routing(market_db, monkeypatch):
     assert b.get_available_tickers("options") == ["PGONLY"]          # non-local → PG (super)
 
 
-def test_iv_history_local_then_pg_fallback(market_db, monkeypatch):
+def test_iv_history_local_then_honest_empty_without_pg(market_db, monkeypatch):
     db, _ = market_db
     hit = []
-    pg = pd.DataFrame([("2020-01-01", 0.1, 0.1, 0.0, 1.0, 1)], columns=_IV_COLS)
     monkeypatch.setattr(DatabaseBackend, "query_iv_history",
-                        lambda self, ticker: (hit.append(ticker), pg)[1])
+                        lambda self, ticker: (_ for _ in ()).throw(
+                            AssertionError("PG iv_history fallback must not be used after N9 batch-1")
+                        ))
     b = _make(db)
     df = b.query_iv_history("AAPL")          # local has AAPL → PG not hit
     assert len(df) == 2 and hit == []
-    df = b.query_iv_history("UNKNOWN")        # local empty → PG fallback
-    assert df.iloc[0]["date"] == "2020-01-01" and hit == ["UNKNOWN"]
+    df = b.query_iv_history("UNKNOWN")        # local empty → honest empty, no PG fallback
+    assert df.empty and hit == []
 
 
 def test_fundamentals_mirror_table_retired_no_pg_fallback(market_db, monkeypatch):
@@ -623,11 +624,11 @@ def test_provenance_iv_recorded(market_db, monkeypatch):
     b = _make(db)
     provenance.reset(); b.query_iv_history("AAPL")           # local has AAPL
     assert provenance.read("iv") == "local"
-    monkeypatch.setattr(  # local miss → PG returns data → pg_fallback
+    monkeypatch.setattr(  # local miss → PG would return data, but N9 makes this honest empty
         DatabaseBackend, "query_iv_history",
         lambda self, t: pd.DataFrame([["2026-01-01", 0.3, 0.2, 0.1, 1.0, 5]], columns=_IV_COLS))
     provenance.reset(); b.query_iv_history("UNKNOWN")
-    assert provenance.read("iv") == "pg_fallback"
+    assert provenance.read("iv") == "none"
     monkeypatch.setattr(  # local miss → PG empty → none
         DatabaseBackend, "query_iv_history", lambda self, t: pd.DataFrame(columns=_IV_COLS))
     provenance.reset(); b.query_iv_history("UNKNOWN")
@@ -1071,10 +1072,10 @@ def test_news_hard_local_does_not_make_market_strict(market_db, monkeypatch):
     assert b.query_news_stats(ticker="ZZZZ").empty
 
     assert b.query_prices("UNKNOWN").iloc[0]["datetime"] == "PGSENTINEL"
-    assert b.query_iv_history("UNKNOWN").iloc[0]["date"] == "2026-01-01"
+    assert b.query_iv_history("UNKNOWN").empty
     assert b.query_fundamentals("UNKNOWN") == {}
     assert price_hit == ["UNKNOWN"]
-    assert iv_hit == ["UNKNOWN"]
+    assert iv_hit == []
     assert fund_hit == []
 
 

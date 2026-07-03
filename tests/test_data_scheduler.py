@@ -1082,7 +1082,7 @@ def test_ibkr_news_fails_closed_when_pg_exit_audit_cannot_be_read(
     assert calls == []
 
 
-def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch):
+def test_post_exit_ibkr_local_refresh_excludes_retired_pg_domains(tmp_path, monkeypatch):
     market_db = tmp_path / "market_data.db"
     conn = sqlite3.connect(market_db)
     try:
@@ -1114,7 +1114,7 @@ def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch
                 "ok": True,
                 "prices": {"ok": True, "rows_added": 1},
                 "news": {"skipped": "domain disabled"},
-                "iv": {"ok": True, "rows_added": 2},
+                "iv": {"skipped": "domain disabled"},
                 "fundamentals": {"skipped": "domain disabled"},
             },
         )[1],
@@ -1122,12 +1122,13 @@ def test_post_exit_ibkr_local_refresh_excludes_news_domain(tmp_path, monkeypatch
 
     res = _REAL_LOCAL_REFRESH()
 
-    assert calls == [("prices", "iv")]
+    assert calls == [("prices",)]
     assert res == {
         "ok": True,
-        "domains": {"prices": 1, "news": None, "iv": 2, "fundamentals": None},
+        "domains": {"prices": 1, "news": None, "iv": None, "fundamentals": None},
         "skipped_domains": {
             "news": "domain disabled",
+            "iv": "domain disabled",
             "fundamentals": "domain disabled",
         },
     }
@@ -1159,7 +1160,7 @@ def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path,
                 "ok": True,
                 "prices": {"ok": True, "rows_added": 1},
                 "news": {"skipped": "domain disabled"},
-                "iv": {"ok": True, "rows_added": 2},
+                "iv": {"skipped": "domain disabled"},
                 "fundamentals": {"skipped": "domain disabled"},
             },
         )[1],
@@ -1167,11 +1168,13 @@ def test_local_refresh_excludes_news_when_pg_exit_audit_cannot_be_read(tmp_path,
 
     res = _REAL_LOCAL_REFRESH()
 
-    assert calls == [("prices", "iv")]
+    assert calls == [("prices",)]
     assert res["domains"]["news"] is None
+    assert res["domains"]["iv"] is None
     assert res["domains"]["fundamentals"] is None
     assert res["skipped_domains"] == {
         "news": "domain disabled",
+        "iv": "domain disabled",
         "fundamentals": "domain disabled",
     }
 

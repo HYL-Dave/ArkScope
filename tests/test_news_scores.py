@@ -195,13 +195,13 @@ class TestMigrateScoresArchiveGate:
         monkeypatch.setattr(migrate, "import_news_scores", lambda conn, dry_run=False: calls.append("scores") or 1)
         return migrate, calls
 
-    def test_default_import_all_skips_pg_news_scores(self, monkeypatch):
+    def test_default_import_all_skips_retired_domains_and_pg_news_scores(self, monkeypatch):
         migrate, calls = self._patch_main(monkeypatch, [])
 
         migrate.main()
 
         assert "scores" not in calls
-        assert {"news", "prices", "iv", "fundamentals"} <= set(calls)
+        assert calls == ["prices", "close"]
 
     def test_scores_requires_archive_flag(self, monkeypatch):
         migrate, _calls = self._patch_main(monkeypatch, ["--scores"])
@@ -215,6 +215,16 @@ class TestMigrateScoresArchiveGate:
         migrate.main()
 
         assert calls == ["scores", "close"]
+
+    def test_retired_pg_domains_require_local_paths(self):
+        from scripts import migrate_to_supabase as migrate
+
+        parser = migrate.build_arg_parser()
+
+        for flag in ("--news", "--iv", "--fundamentals"):
+            args = parser.parse_args([flag])
+            with pytest.raises(SystemExit):
+                migrate.validate_args(args, parser)
 
 
 # ===========================================================================

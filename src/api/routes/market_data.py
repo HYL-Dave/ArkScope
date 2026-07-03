@@ -77,7 +77,7 @@ def _manual_update_domains(store: ProfileStateStore) -> tuple[str, ...] | None:
     profile_done = parse_news_toggle(store.get_setting(NEWS_PG_EXIT_COMPLETED_KEY)) is True
     audit_state = _news_pg_exit_audit_state(resolve_market_db_path())
     if profile_done or audit_state is True or audit_state is None:
-        return ("prices", "iv")
+        return ("prices",)
     return None
 
 
@@ -131,23 +131,21 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
 
 @router.post("/market-data/bootstrap")
 def bootstrap_route():
-    """Start (or attach to) a background full rebuild of the local market DB
-    (prices + news + iv + fundamentals).
+    """Reject the retired all-domain PG mirror rebuild path.
 
-    Returns the job; poll ``GET /market-data/jobs/{id}`` for progress. Idempotent
-    while running. The rebuild validates ALL (PG-mirrored) domains before atomically
-    swapping in, so a failure never destroys an existing good DB. The local-primary
-    financial_cache is carried over (preserved), not rebuilt from PG.
+    N9 batch-1 retires the old PG ``news``/``iv_history``/``fundamentals`` mirror
+    tables. Prices migration is a separate PG-exit slice, so this route must not
+    start the legacy all-domain bootstrap.
     """
     require_db_write("market_bootstrap", {"db": resolve_market_db_path()})
-    return start_bootstrap_job()
+    raise _retired_market_mirror_http_error("bootstrap_route")
 
 
 @router.post("/market-data/update")
 def update_route(store: ProfileStateStore = Depends(get_profile_store)):
     """Start (or attach to) a background INCREMENTAL update (delta since latest;
-    prices + news + iv + fundamentals before news PG exit; prices + iv after
-    news/fundamentals PG-exit slices). Append-only to the live DB — routing can stay
+    prices + news + iv + fundamentals before news PG exit; prices only after
+    N9 batch-1 retired the PG IV mirror). Append-only to the live DB — routing can stay
     active. A provider/PG failure in one domain is recorded (last_error), not
     fatal to the others. Requires an existing local DB (bootstrap first)."""
     require_db_write("market_update", {"db": resolve_market_db_path()})
@@ -209,9 +207,18 @@ def market_data_trading_days(
 
 @router.post("/market-data/validate")
 def validate_route():
-    """Validate the local market DB against PG per domain (row count + checksum):
-    prices + news + iv + fundamentals."""
-    return validate_market()
+    """Reject the retired all-domain PG mirror validation path."""
+    require_db_write("market_validate", {"db": resolve_market_db_path()})
+    raise _retired_market_mirror_http_error("validate_route")
+
+
+def _retired_market_mirror_http_error(operation: str) -> HTTPException:
+    from src.market_data_admin import retired_market_mirror_result
+
+    return HTTPException(
+        status_code=409,
+        detail=retired_market_mirror_result(operation),
+    )
 
 
 class LocalMarketToggle(BaseModel):

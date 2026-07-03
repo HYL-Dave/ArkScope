@@ -339,6 +339,23 @@ _FIN_CACHE_INSERT = ("INSERT OR REPLACE INTO financial_cache "
 # daemon thread, set_financial_cache on FastAPI worker threads. See SqliteBackend.
 _CACHE_WRITE_LOCK = threading.Lock()
 
+RETIRED_MARKET_MIRROR_DOMAINS = ["news", "iv", "fundamentals"]
+
+
+def retired_market_mirror_result(operation: str) -> dict:
+    return {
+        "ok": False,
+        "match": False,
+        "code": "pg_market_bootstrap_retired",
+        "operation": operation,
+        "retired_domains": list(RETIRED_MARKET_MIRROR_DOMAINS),
+        "error": (
+            "The old all-domain PG market mirror bootstrap/validation path is retired. "
+            "News, IV, fundamentals, scores, and financial_cache are local/refetch "
+            "authorities; prices migration remains a separate PG-exit slice."
+        ),
+    }
+
 
 def _now() -> str:
     """UTC ISO-8601 timestamp (seconds). Imported lazily to keep this off the hot path."""
@@ -636,11 +653,15 @@ def _read_fin_cache_rows(path: str) -> list:
 
 def bootstrap_market(out_path: Optional[str] = None,
                      progress_cb: Optional[Callable[[int, int], None]] = None,
-                     batch: int = 20000) -> dict:
+                     batch: int = 20000,
+                     *,
+                     allow_retired_pg_mirror: bool = False) -> dict:
     """Full rebuild of the local market DB (prices + news + iv + fundamentals) from
     PG. Builds to a ``.building`` temp and atomically swaps it in ONLY if ALL
     domains validate (row-count + checksum), so a failed rebuild leaves any
     existing DB untouched. Returns a per-domain result dict with overall ``match``."""
+    if not allow_retired_pg_mirror:
+        return retired_market_mirror_result("bootstrap_market")
     path = out_path or resolve_market_db_path()
     tmp = path + ".building"
     pg = _pg_conn()
@@ -774,9 +795,11 @@ def bootstrap_market(out_path: Optional[str] = None,
     }
 
 
-def validate_market(out_path: Optional[str] = None) -> dict:
+def validate_market(out_path: Optional[str] = None, *, allow_retired_pg_mirror: bool = False) -> dict:
     """Compare local vs PG per domain (prices + news + iv + fundamentals): row
     count + checksum (prices/news group sums; iv/fundamentals per-ticker id sums)."""
+    if not allow_retired_pg_mirror:
+        return retired_market_mirror_result("validate_market")
     path = out_path or resolve_market_db_path()
     if not Path(path).exists():
         return {"exists": False, "match": False}
@@ -1073,7 +1096,10 @@ def start_bootstrap_job(out_path: Optional[str] = None) -> dict:
                 _JOBS[job_id]["status"] = "done"
             else:
                 _JOBS[job_id]["status"] = "error"
-                _JOBS[job_id]["error"] = "validation mismatch (rebuild discarded; existing DB kept)"
+                _JOBS[job_id]["error"] = res.get(
+                    "error",
+                    "validation mismatch (rebuild discarded; existing DB kept)",
+                )
         except Exception as e:  # noqa: BLE001 — surface any failure to the UI
             _JOBS[job_id]["status"] = "error"
             _JOBS[job_id]["error"] = str(e)
