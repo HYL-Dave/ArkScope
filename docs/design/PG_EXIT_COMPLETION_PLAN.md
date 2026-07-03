@@ -6,8 +6,9 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-remaining price ingest, IV, macro/cal proof, broader mirror retirement, SEC/dead paths, and UI
-collapse remain. S-G `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
+Remaining price ingest, N9 batch-1 live drop, SEC/dead paths, and UI collapse remain. S-G
+`news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local. N9 batch-1 offline
+implementation is ready for live evidence/dump approval; no destructive live drop has been run.
 
 ## Progress
 
@@ -29,8 +30,8 @@ collapse remain. S-G `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_ca
   populated beside unchanged legacy `news`), and N8a is live-finalized (2026-07-01): Polygon,
   Finnhub, and IBKR route through normalized local writers with atomic legacy projection; the
   audited `news_pg_exit_completed` marker forces hard-local news reads and retires the news
-  PG-sync/mirror path. The broader mirror remains load-bearing for IV/fundamentals and other
-  unfinished ingest paths.
+  PG-sync/mirror path. The remaining active market mirror dependency is prices; old IV and
+  fundamentals PG paths have been retired or fail-closed ahead of N9.
   S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
   (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`
   (`use_local_job_runs=true`, live 2026-07-03). PG copies of both tables are archive/N9 candidates,
@@ -56,12 +57,11 @@ writes**. The delta is the work.
 ### Two fundamentally different sub-problems
 
 **(1) Ingest data — provider→PG→mirror (regenerable, not user-authored).**
-Prices / news / IV / fundamentals. Read locally (from the mirror) when the toggle is on, but the
-WRITE path is still `collector → PG → local_incremental mirror` for 5 of 7 scheduler sources
-(`polygon_news`, `finnhub_news`, `ibkr_news`, `ibkr_prices`, `iv_history`). Only `price_backfill`
-writes direct-local (the template). Losing PG here loses nothing permanent — it's re-fetchable from
-providers; the fix is **direct-local collectors** (apply the price_backfill pattern) + retire the
-mirror.
+Prices are the remaining active mirror dependency. News writes direct-local through normalized
+writers; fundamentals refetch/cache is local; the old IV PG-mirror source is retired/fail-closed
+pending a separate IV reboot. Losing PG for the already-retired domains loses no desired runtime
+authority; the remaining fix is the prices migration/direct-local path plus N9 cleanup of the
+archive-only tables.
 
 **(2) App-records — PG-only, read AND write, USER/AGENT-AUTHORED (NOT regenerable).**
 This is the load-bearing one. Verified PG-only, with **no local store and no mirror**:
@@ -92,7 +92,7 @@ re-fetch).
 |---|---|---|---|---|
 | Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
 | News | ✅ hard-local | ✅ Polygon/Finnhub/IBKR normalized local writers + legacy projection | — | news-domain PG-exit done |
-| IV | ✅ (mirror) | ❌ PG→mirror | ingest | (1) ingest |
+| IV | ✅ local legacy rows / honest-empty on miss | ❌ old PG source retired; future reboot pending | — | N9 drop + future IV reboot |
 | Fundamentals | ✅ local SEC annual cache / honest empty | ✅ SEC/FD refetch cache | — | S-B done |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
 | SA capture | ✅ (sa_capture.db) | ✅ | verify db_backend SA dead | mostly done |
@@ -123,12 +123,10 @@ early, and the UI only simplifies once each domain is truly local.
    local store in `profile_state.db`, local-primary read/write, with a **one-time PG→local migrate**
    of existing rows (these are the irreplaceable ones). This removes the runtime PG write that fires
    every time a report is saved / memory written — the biggest "still needs PG" surface.
-2. **Ingest collectors → direct-local.** Apply the `price_backfill` direct-write pattern to
-   news / IV / fundamentals collectors (provider→local, no PG), behind the same kind of toggle, then
-   make local the default. Prices' scheduler source switches to the direct path too.
-   **NEWS chosen first** (high-frequency, user-visible, recoverable) — scoped in
-   `NEWS_DIRECT_LOCAL_PLAN.md` (5 open decisions + a 2a–2d slice plan; note: news is provider→
-   Parquet→PG→mirror today, not provider→PG). IV deferred until its source strategy is clearer.
+2. **Ingest collectors → direct-local.** News is already direct-local through normalized writers,
+   fundamentals is local refetch/cache, and old IV collection is retired rather than migrated.
+   Prices remain the active large direct-local/migration slice. IV reboot is a separate capability
+   design, not a PG-exit blocker.
 3. **Retire the PG mirror.** Once all ingest is direct-local, `local_incremental` (本地鏡像增量) and
    the per-collector `sync_flag` PG-sync become dead — remove them. This is where the scheduler
    simplifies (and connects to the scheduler-hardening plan, which assumed direct-local).

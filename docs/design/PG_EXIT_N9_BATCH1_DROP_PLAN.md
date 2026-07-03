@@ -4,6 +4,8 @@
 
 **Goal:** Produce a reviewable, restorable evidence packet for the first destructive PostgreSQL drop batch, then drop only the PG objects whose runtime authority has already moved local or been explicitly abandoned.
 
+**Implementation status (2026-07-03):** Tasks 1-5 are implemented offline and verified (`324 passed`; repo grep classifier `blocker_count=0`). Tasks 6-9 are live evidence/dump/drop/docs gates and remain blocked on explicit user approval; no live PG evidence, dump, restore, or destructive drop has been run by this implementation commit.
+
 **Architecture:** N9 batch-1 is a destructive operation with a restore archive as the rollback basis, not a feature toggle. It therefore has two mandatory gates before live drop: a reader-free evidence gate and a dump-restore gate that proves the archive can restore into a disposable database with matching row fingerprints. The live drop itself must be a separate, explicit user-approved step, re-checking the reviewed evidence fingerprint immediately before any `DROP`.
 
 **Tech Stack:** Python 3, psycopg2, SQLite, `pg_dump`/`pg_restore`, PostgreSQL catalog queries, pytest, `rg`, existing ArkScope market/profile DB helpers.
