@@ -1443,7 +1443,7 @@ Before implementation starts, reviewer must confirm:
 
 ## Live Gate Record
 
-Status: **Task 3 audit + HAPN patch COMPLETE (2026-07-04). Local prices declared authority. Cutover Tasks 4-9 pending.**
+Status: **Tasks 3-8 COMPLETE (2026-07-04). Local prices declared authority; code cutover implemented; dry-run copy passed. Live Task 9 pending.**
 
 ```text
 Reviewed reconcile fingerprint (final): 61bbf613c1fe94dd6558dc4bcc2bae7f9624e238df9c8114ed9a4e23da2580d2
@@ -1461,7 +1461,23 @@ Bulk copy applied: NO. Scoped deterministic HAPN patch only:
   (315 INSERT + 269 UPDATE, insert-only outside preimage-verified updates;
   copy dry-run + idempotent rerun proven; audit row in prices_patch_runs).
 Backup path: data/market_data.db.bak-pre-p0c-hapn-patch-20260703T232813Z.db
-Live cutover: NOT YET (Tasks 4-9).
+Cutover implementation:
+  Task 4 commit 5deee9e — scheduled ibkr_prices routes to direct-local writer.
+  Task 5 commit e3218db — legacy price PG mirror update paths return retired/409.
+  Task 6 commit becdfa5 — price reads are local-only; misses are honest empty.
+  Task 7 commit d8ce7cd — status/provider health report local price authority.
+Dry-run copy: PASS (scratchpad/p0c-market-data-copy.db via SQLite backup API).
+Copy prices: 2,324,487 rows / 149 tickers / 2024-01-02T14:30:00+0000..2026-07-02T14:15:00+0000.
+Dry-run tests:
+  pytest tests/test_sqlite_backend.py::test_prices_local_when_present
+         tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg -q
+  → PASS (2 passed).
+Route-level price smoke on copy: PASS (prices_for_ticker("NVDA", interval="15min", days=7)
+  returned 81 bars through DataAccessLayer + LocalMarketDatabaseBackend).
+Full TestClient price smoke: BLOCKED in this worktree by app startup/TestClient lifespan hang
+  before request dispatch (faulthandler shows TestClient.__enter__ waiting on the portal while
+  the event-loop thread is idle). This was not used as a pass/fail signal for price route logic.
+Live cutover: NOT YET (Task 9).
 Post-cutover smoke: pending cutover.
 ```
 
