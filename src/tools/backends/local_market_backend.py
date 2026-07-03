@@ -30,9 +30,8 @@ SEC/Financial-Datasets analysis path and local ``financial_cache``.
 
 financial_cache (3c-C) is LOCAL-PRIMARY, not a mirror:
   - ``set_financial_cache`` writes the LOCAL cache ONLY (never PG);
-  - ``get_financial_cache`` is local-first, falls back to PG for legacy rows, and
-    READ-THROUGH PROMOTES a valid PG hit into the local cache (free, preserving its
-    TTL) so PG cache migrates local over time.
+  - ``get_financial_cache`` reads the LOCAL cache ONLY. A miss is an honest miss; callers that
+    need fresh data must refetch from SEC/Financial Datasets and write the local cache.
 """
 
 from __future__ import annotations
@@ -181,34 +180,14 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         provenance.record("fundamentals", "none")
         return {}
 
-    # --- financial_cache (3c-C): local-primary (set local-only; get local-first +
-    #     PG fallback + read-through promotion) -----------------------------------
+    # --- financial_cache (3c-C/S-H2): local-primary (set local-only; get local-only) ---
 
     def get_financial_cache(self, cache_key: str):
         try:
-            local = self._market.get_financial_cache(cache_key)
+            return self._market.get_financial_cache(cache_key)
         except Exception as e:
             logger.warning(f"local get_financial_cache failed ({e})")
-            local = None
-        if local is not None:
-            return local
-        if self._strict:
-            return None  # local-only: honest cache miss, no PG read-through
-        # PG fallback (legacy rows) + read-through promotion into local (free, not a
-        # paid call) so old PG cache migrates local over time.
-        data = super().get_financial_cache(cache_key)
-        if data is not None:
-            try:
-                row = self._pg_financial_cache_row(cache_key)
-                if row:
-                    source, ticker, fetched_at, expires_at = row
-                    self._market.set_financial_cache(
-                        cache_key, ticker, data, source=source,
-                        fetched_at=fetched_at, expires_at=expires_at,
-                    )
-            except Exception as e:
-                logger.debug(f"financial_cache promotion skipped for {cache_key}: {e}")
-        return data
+            return None
 
     def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
         # local-PRIMARY: write the LOCAL cache only, never PG.
@@ -219,29 +198,6 @@ class LocalMarketDatabaseBackend(DatabaseBackend):
         except Exception as e:
             logger.warning(f"local set_financial_cache failed ({e})")
             return False
-
-    def _pg_financial_cache_row(self, cache_key: str):
-        """Full valid PG cache row for read-through promotion:
-        ``(source, ticker, fetched_at_iso, expires_at_iso)`` or None. Timestamps are
-        formatted to the same UTC ISO-seconds string the local cache stores."""
-        from datetime import timezone
-
-        conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT source, ticker, fetched_at, expires_at FROM financial_data_cache "
-                "WHERE cache_key = %s AND expires_at > NOW()",
-                (cache_key,),
-            )
-            row = cur.fetchone()
-        if not row:
-            return None
-        source, ticker, fetched_dt, expires_dt = row
-
-        def _fmt(dt):
-            return dt.astimezone(timezone.utc).isoformat(timespec="seconds") if dt else None
-
-        return (source or "financial_datasets", ticker or "", _fmt(fetched_dt), _fmt(expires_dt))
 
     def query_health_stats(self):
         # Provider health / freshness reflect what the app actually SERVES — the local

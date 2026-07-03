@@ -598,18 +598,22 @@ def test_financial_cache_get_local_first(market_db, monkeypatch):
     assert b.get_financial_cache("mk") == {"v": "LOCAL"} and pg_get == []  # PG skipped on local hit
 
 
-def test_financial_cache_pg_fallback_and_promotion(market_db, monkeypatch):
-    # local miss → PG fallback → read-through promote into local (preserving PG TTL).
+def test_financial_cache_miss_is_honest_empty_without_pg(market_db, monkeypatch):
+    # S-H2: financial_cache is local-only in the desktop runtime. A local miss must
+    # not query PG or promote legacy rows, even when strict=False.
     db, _ = market_db
-    monkeypatch.setattr(DatabaseBackend, "get_financial_cache", lambda self, k: {"v": "fromPG"})
-    monkeypatch.setattr(
-        LocalMarketDatabaseBackend, "_pg_financial_cache_row",
-        lambda self, ck: ("sec_edgar", "NVDA", "2026-06-01T00:00:00+00:00", "2099-01-01T00:00:00+00:00"),
-    )
+    pg_get = []
+
+    def _pg_called(self, cache_key):
+        pg_get.append(cache_key)
+        raise AssertionError("financial_cache miss must not fall back to PG")
+
+    monkeypatch.setattr(DatabaseBackend, "get_financial_cache", _pg_called)
     b = _make(db)
-    assert b.get_financial_cache("mk_NVDA") == {"v": "fromPG"}        # PG fallback
-    # promoted into local with PG's (future) expiry → now a local hit
-    assert b._market.get_financial_cache("mk_NVDA") == {"v": "fromPG"}
+
+    assert b.get_financial_cache("mk_NVDA") is None
+    assert pg_get == []
+    assert b._market.get_financial_cache("mk_NVDA") is None
 
 
 def test_provenance_iv_recorded(market_db, monkeypatch):
