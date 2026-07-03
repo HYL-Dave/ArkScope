@@ -6,8 +6,8 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-remaining price ingest, IV, financial-cache fallback, macro/cal proof, broader mirror retirement,
-SEC/dead paths, and UI collapse remain. S-G `news_scores` and S-H1 `job_runs` are now local.
+remaining price ingest, IV, macro/cal proof, broader mirror retirement, SEC/dead paths, and UI
+collapse remain. S-G `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
 
 ## Progress
 
@@ -34,7 +34,8 @@ SEC/dead paths, and UI collapse remain. S-G `news_scores` and S-H1 `job_runs` ar
   S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
   (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`
   (`use_local_job_runs=true`, live 2026-07-03). PG copies of both tables are archive/N9 candidates,
-  not normal runtime authorities.
+  not normal runtime authorities. S-H2 removed the generic financial-cache PG read-through path;
+  `financial_cache` misses are now local honest misses that refetch from SEC/FD as needed.
 
 ## Why this exists
 

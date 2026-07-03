@@ -7,6 +7,11 @@
 **Goal:** Remove the last live PostgreSQL read-through path for `financial_data_cache`; local cache
 misses become honest misses and normal fundamentals/Financial Datasets flows refetch into SQLite.
 
+**Status:** IMPLEMENTED 2026-07-03. Runtime commits: `195d78f` removes the local-market PG
+fallback/promotion path; `0cbc739` updates in-code authority comments. Focused verification:
+`tests/test_sqlite_backend.py` 67 passed, Financial Datasets cache backend-mode tests 5 passed,
+and fundamentals cache/stored-mode tests 15 passed (87 focused tests total).
+
 **Architecture:** This is a deletion slice, not a migration. `LocalMarketDatabaseBackend` already
 has a local `SqliteBackend` cache; after S-H2 its `get_financial_cache()` reads only that local
 cache and never calls `DatabaseBackend.get_financial_cache()` or promotion helper code. Plain
@@ -322,7 +327,7 @@ Expected:
 - Modify: `docs/design/PG_EXIT_COMPLETION_PLAN.md` if it still implies financial cache has a live PG fallback.
 - Modify: this plan file.
 
-- [ ] **Step 1: Mark S-H2 done in `PG_EXIT_REMAINDER_SCOPING.md`**
+- [x] **Step 1: Mark S-H2 done in `PG_EXIT_REMAINDER_SCOPING.md`**
 
 Update:
 
@@ -331,7 +336,7 @@ Update:
 - N9 drop list to include PG `financial_data_cache` after final grep/dump;
 - domain disposition table so financial cache says local-only; no PG read-through.
 
-- [ ] **Step 2: Add a newest-first `PROJECT_PRIORITY_MAP.md` decision log entry**
+- [x] **Step 2: Add a newest-first `PROJECT_PRIORITY_MAP.md` decision log entry**
 
 Record:
 
@@ -340,11 +345,11 @@ Record:
 - focused tests passed;
 - next P0-B line is N9 batch-1 evidence/plan with S-H3 empty macro/cal proof folded in.
 
-- [ ] **Step 3: Update this plan header**
+- [x] **Step 3: Update this plan header**
 
 Change status from plan to implemented. Include the focused test count and commit hash.
 
-- [ ] **Step 4: Run docs grep**
+- [x] **Step 4: Run docs grep**
 
 Run:
 
@@ -357,7 +362,11 @@ rg -n "financial_cache.*PG fallback|financial_cache.*read-through|get_financial_
 Expected: no stale claims that runtime financial cache falls back to PG. Historical entries may mention
 the old behavior only if explicitly dated as historical provenance.
 
-- [ ] **Step 5: Commit**
+Observed at implementation closeout: matches are confined to this implemented plan's before/after
+instructions, rollback note, and dated decision-log/history/proof entries. No active runtime
+authority doc describes financial-cache PG fallback as current behavior.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/design/PG_EXIT_REMAINDER_SCOPING.md docs/design/PROJECT_PRIORITY_MAP.md \
