@@ -37,10 +37,13 @@ def test_factory_returns_pg_store_when_toggle_off_default():
     assert isinstance(get_macro_calendar_store(_FakeDal(local=False)), MacroCalendarStore)
 
 
-def test_dal_local_macro_toggle_default_off_and_env(monkeypatch):
+def test_dal_local_macro_toggle_default_off_and_env(monkeypatch, tmp_path):
     from src.tools.data_access import DataAccessLayer
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
-    monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+    # Hermetic: point at an EMPTY tmp profile DB — deleting the var would fall back
+    # to the real data/profile_state.db, whose use_local_macro=true breaks the
+    # default-OFF assertion on a configured host.
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     dal = DataAccessLayer()                       # FileBackend, no PG
     assert dal._local_macro_enabled() is False    # default OFF
     monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")
