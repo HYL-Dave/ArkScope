@@ -166,6 +166,10 @@ The read-only reconcile report must include:
   - canonical PG key `(canonical_ticker, interval, datetime)` using local `ticker_aliases`
   - local key `(ticker, interval, datetime)`
 - LC→HAPN and BRK.B→BRK B focused checks.
+- Per-`(ticker, interval)` OHLCV checksum comparison over common buckets.
+  - The checksum input must include `datetime`, `open`, `high`, `low`, `close`, `volume`, sorted by `datetime`.
+  - `value_checksum_mismatch_count` must be reviewed separately from key coverage.
+  - Expected live result is zero mismatched buckets; any mismatch blocks the "local is authority" declaration until explained.
 - Example rows for each unexplained bucket, sanitized to key + OHLCV only.
 - A deterministic fingerprint over the sorted report.
 
@@ -214,6 +218,7 @@ Add to `tests/test_prices_reconcile.py`:
 from src.prices_reconcile import (
     PriceKey,
     classify_price_differences,
+    compare_value_checksums,
     fingerprint_report,
 )
 
@@ -263,6 +268,22 @@ def test_reconcile_fingerprint_is_order_stable():
     }
 
     assert fingerprint_report(first) == fingerprint_report(second)
+
+
+def test_value_checksum_mismatch_is_reported_by_bucket():
+    mismatches = compare_value_checksums(
+        pg_checksums={("NVDA", "15min"): "pg-hash", ("AAPL", "15min"): "same"},
+        local_checksums={("NVDA", "15min"): "local-hash", ("AAPL", "15min"): "same"},
+    )
+
+    assert mismatches == (
+        {
+            "bucket": ("NVDA", "15min"),
+            "pg_checksum": "pg-hash",
+            "local_checksum": "local-hash",
+            "reason": "ohlcv_checksum_mismatch",
+        },
+    )
 ```
 
 - [ ] **Step 2: Run the tests and verify RED**
@@ -315,6 +336,24 @@ def _canonical_json(value: object) -> str:
 
 def fingerprint_report(report: Mapping[str, object]) -> str:
     return hashlib.sha256(_canonical_json(report).encode("utf-8")).hexdigest()
+
+
+def compare_value_checksums(
+    *,
+    pg_checksums: Mapping[tuple[str, str], str],
+    local_checksums: Mapping[tuple[str, str], str],
+) -> tuple[dict[str, object], ...]:
+    mismatches = []
+    common_buckets = sorted(set(pg_checksums) & set(local_checksums))
+    for bucket in common_buckets:
+        if pg_checksums[bucket] != local_checksums[bucket]:
+            mismatches.append({
+                "bucket": bucket,
+                "pg_checksum": pg_checksums[bucket],
+                "local_checksum": local_checksums[bucket],
+                "reason": "ohlcv_checksum_mismatch",
+            })
+    return tuple(mismatches)
 
 
 def classify_price_differences(
@@ -395,6 +434,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
             "max_datetime": "2026-01-02T14:30:00+0000",
         },
         "keys": [("LC", "15min", "2026-01-02T14:30:00+0000")],
+        "value_checksums": {("LC", "15min"): "pg-lc-hash"},
         "samples": [],
     })
     monkeypatch.setattr(cli, "load_sqlite_snapshot", lambda _db: {
@@ -406,6 +446,7 @@ def test_reconcile_cli_writes_deterministic_report(tmp_path, monkeypatch, capsys
             "max_datetime": "2026-01-02T14:30:00+0000",
         },
         "keys": [("HAPN", "15min", "2026-01-02T14:30:00+0000")],
+        "value_checksums": {("HAPN", "15min"): "local-hapn-hash"},
         "aliases": {"LC": "HAPN"},
         "samples": [],
     })
@@ -445,16 +486,29 @@ Create `scripts/migration/p0c_prices_reconcile.py`:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
-from src.prices_reconcile import PriceKey, classify_price_differences, fingerprint_report
+from src.prices_reconcile import (
+    PriceKey,
+    classify_price_differences,
+    compare_value_checksums,
+    fingerprint_report,
+)
 
 
 PRICE_KEY_SQL = """
 SELECT ticker, interval, datetime
+FROM prices
+WHERE interval = '15min'
+ORDER BY ticker, interval, datetime
+"""
+
+PRICE_VALUE_SQL = """
+SELECT ticker, interval, datetime, open, high, low, close, volume
 FROM prices
 WHERE interval = '15min'
 ORDER BY ticker, interval, datetime
@@ -469,6 +523,18 @@ def connect_pg(database_url: str):
     import psycopg2
 
     return psycopg2.connect(database_url)
+
+
+def _value_checksum_rows(rows: Iterable[tuple[object, ...]]) -> dict[tuple[str, str], str]:
+    hashes = {}
+    for ticker, interval, dt, open_, high, low, close, volume in rows:
+        bucket = (str(ticker), str(interval))
+        h = hashes.get(bucket)
+        if h is None:
+            h = hashlib.sha256()
+            hashes[bucket] = h
+        h.update(_canonical_json([str(dt), str(open_), str(high), str(low), str(close), str(volume)]).encode("utf-8"))
+    return {bucket: h.hexdigest() for bucket, h in sorted(hashes.items())}
 
 
 def load_pg_snapshot(database_url: str) -> dict[str, Any]:
@@ -493,6 +559,16 @@ def load_pg_snapshot(database_url: str) -> dict[str, Any]:
                 ORDER BY ticker, interval, datetime
             """)
             keys = [(str(t), str(i), str(dt)) for t, i, dt in cur.fetchall()]
+            cur.execute("""
+                SELECT ticker, interval,
+                       TO_CHAR(datetime AT TIME ZONE 'UTC',
+                               'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
+                       open, high, low, close, volume
+                FROM prices
+                WHERE interval = '15min'
+                ORDER BY ticker, interval, datetime
+            """)
+            value_checksums = _value_checksum_rows(cur.fetchall())
     finally:
         conn.close()
     return {
@@ -504,6 +580,7 @@ def load_pg_snapshot(database_url: str) -> dict[str, Any]:
             "max_datetime": str(max_dt),
         },
         "keys": keys,
+        "value_checksums": value_checksums,
         "samples": [],
     }
 
@@ -519,6 +596,7 @@ def load_sqlite_snapshot(market_db: str | Path) -> dict[str, Any]:
             "SELECT interval, COUNT(*) FROM prices GROUP BY interval ORDER BY interval"
         ).fetchall())
         keys = [tuple(row) for row in conn.execute(PRICE_KEY_SQL).fetchall()]
+        value_checksums = _value_checksum_rows(conn.execute(PRICE_VALUE_SQL).fetchall())
         aliases = {}
         if conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ticker_aliases'"
@@ -540,6 +618,7 @@ def load_sqlite_snapshot(market_db: str | Path) -> dict[str, Any]:
             "max_datetime": str(max_dt),
         },
         "keys": keys,
+        "value_checksums": value_checksums,
         "aliases": aliases,
         "samples": [],
     }
@@ -551,6 +630,10 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
         local_rows=[PriceKey(*row) for row in local_snapshot["keys"]],
         aliases=local_snapshot.get("aliases", {}),
     )
+    value_mismatches = compare_value_checksums(
+        pg_checksums=pg_snapshot["value_checksums"],
+        local_checksums=local_snapshot["value_checksums"],
+    )
     report = {
         "schema_version": 1,
         "scope": "p0c_prices_reconcile",
@@ -559,10 +642,12 @@ def build_report(*, pg_snapshot: Mapping[str, Any], local_snapshot: Mapping[str,
         "alias_explained_pg_only_count": len(diff.alias_explained_pg_only),
         "unexplained_pg_only_count": len(diff.unexplained_pg_only),
         "local_only_count": len(diff.local_only),
+        "value_checksum_mismatch_count": len(value_mismatches),
         "bulk_copy_allowed": diff.bulk_copy_allowed,
         "alias_explained_pg_only_samples": list(diff.alias_explained_pg_only[:20]),
         "unexplained_pg_only_samples": list(diff.unexplained_pg_only[:20]),
         "local_only_samples": list(diff.local_only[:20]),
+        "value_checksum_mismatch_samples": list(value_mismatches[:20]),
     }
     report["fingerprint"] = fingerprint_report(report)
     return report
@@ -587,6 +672,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "status": "previewed",
             "fingerprint": report["fingerprint"],
             "unexplained_pg_only_count": report["unexplained_pg_only_count"],
+            "value_checksum_mismatch_count": report["value_checksum_mismatch_count"],
         }, sort_keys=True))
         return 0
     parser.error(f"unknown command: {args.cmd}")
@@ -687,21 +773,22 @@ Reviewer checks:
 - `local_summary.row_count == 2,324,172` or explains drift.
 - `unexplained_pg_only_count == 0` to skip bulk copy.
 - If `unexplained_pg_only_count > 0`, review samples and grouping before any implementation can proceed.
+- `value_checksum_mismatch_count == 0`; any OHLCV mismatch bucket blocks cutover until explained.
 - LC→HAPN appears in `alias_explained_pg_only_samples` or the report explains why the original hypothesis was false.
 - no raw DB URL or secrets in stdout/report.
 
 - [ ] **Step 5: Gate result**
 
-If `unexplained_pg_only_count == 0`:
+If `unexplained_pg_only_count == 0` and `value_checksum_mismatch_count == 0`:
 
 ```text
 Decision: local prices is authority; no bulk copy.
 ```
 
-If `unexplained_pg_only_count > 0`:
+If `unexplained_pg_only_count > 0` or `value_checksum_mismatch_count > 0`:
 
 ```text
-Decision: P0-C implementation pauses. Write a small deterministic backfill plan scoped only to reviewed keys.
+Decision: P0-C implementation pauses. Write a small deterministic reconciliation/backfill plan scoped only to reviewed keys or mismatched buckets.
 ```
 
 Commit only docs describing the reviewed gate:
@@ -924,6 +1011,7 @@ Add to `tests/test_sqlite_backend.py`:
 def test_p0c_prices_miss_is_honest_empty_no_pg(market_db, monkeypatch):
     from src.tools.backends.db_backend import DatabaseBackend
 
+    db, _ = market_db
     hit = []
     monkeypatch.setattr(
         DatabaseBackend,
@@ -931,7 +1019,7 @@ def test_p0c_prices_miss_is_honest_empty_no_pg(market_db, monkeypatch):
         lambda self, *a, **k: hit.append(True) or (_ for _ in ()).throw(AssertionError("PG fallback forbidden")),
     )
 
-    b = _make(market_db, strict=False)
+    b = _make(db)
     assert b.query_prices("UNKNOWN", days=30).empty
     assert hit == []
 ```
@@ -945,6 +1033,11 @@ pytest tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg 
 ```
 
 Expected: FAIL because `LocalMarketDatabaseBackend.query_prices` currently falls back to `DatabaseBackend.query_prices` when not strict.
+
+This task must also flip the two existing fallback-contract tests that encode the old behavior:
+
+- `tests/test_sqlite_backend.py::test_prices_fallback_to_pg` currently expects `UNKNOWN` prices to return `_PG_SENTINEL`; rewrite it to expect honest empty and no `DatabaseBackend.query_prices` call.
+- `tests/test_sqlite_backend.py::test_news_hard_local_does_not_make_market_strict` currently asserts prices can still fall back to `_PG_SENTINEL` while news is hard-local; keep the news assertion and update the price assertion to post-P0-C local-only semantics.
 
 - [ ] **Step 3: Remove price fallback**
 
@@ -1210,7 +1303,7 @@ Expected:
 Run:
 
 ```bash
-pytest tests/test_api.py::TestAPI::test_get_prices \
+pytest tests/test_api.py::TestPriceEndpoints::test_get_prices \
        tests/test_sqlite_backend.py::test_prices_local_when_present \
        tests/test_provider_health.py -q
 ```
@@ -1273,6 +1366,7 @@ Before implementation starts, reviewer must confirm:
 
 - Audit task can falsify LC→HAPN instead of assuming it.
 - `bulk_copy_allowed` is false by default and cannot become true without reviewed unexplained PG-only rows.
+- Audit report compares OHLCV value checksums by `(ticker, interval)`, not only key coverage.
 - The scheduled price source no longer invokes `collect_ibkr_prices.py`, `migrate_to_supabase --prices`, or `_local_refresh()`.
 - Local price miss does not call PG.
 - Manual update no longer starts the PG price mirror.
