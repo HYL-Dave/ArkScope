@@ -62,6 +62,13 @@ _DROP_DOMAIN_RE = re.compile(
     r"\b(news_scores|news_latest_scores|news_sentiment_summary|financial_data_cache|"
     r"iv_history|fundamentals|sa_[A-Za-z0-9_]+|macro_[A-Za-z0-9_]+|cal_[A-Za-z0-9_]+|signals)\b"
 )
+_SQL_TARGET_RE = re.compile(
+    r"\b(FROM|JOIN|INTO|UPDATE|TABLE|DROP|DELETE\s+FROM)\s+"
+    r"(public\.)?"
+    r"(news_scores|news_latest_scores|financial_data_cache|iv_history|fundamentals|signals|"
+    r"sa_[A-Za-z0-9_]+|macro_[A-Za-z0-9_]+|cal_[A-Za-z0-9_]+)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -160,23 +167,50 @@ def _classify_single_hit(path: str, match: str) -> str:
     p = path.replace("\\", "/")
     if p.startswith(("tests/", "docs/", "sql/")):
         return "docs_or_tests"
+    if p == "scripts/migration/n9_batch1_pg_drop.py":
+        return "n9_batch1_orchestrator"
+    if p.startswith("scripts/"):
+        if p == "scripts/migrate_to_supabase.py":
+            return "retired_pg_importer_disabled_or_archive_only"
+        return "retired_cli_or_script"
+    if p == "src/service/data_scheduler.py" and (
+        "collect_iv_history.py" in match
+        or "\"--iv\"" in match
+        or "_N9_RETIRED_SOURCES" in match
+        or "iv_history" in match
+    ):
+        return "retired_source_guarded"
+    if any(token in p for token in (
+        "sqlite_backend.py",
+        "sa_capture_backend.py",
+        "src/sa_capture_store.py",
+        "macro_calendar/local_store.py",
+        "src/service/jobs.py",
+        "src/service/sa_market_news_health.py",
+        "src/tools/data_access.py",
+        "src/tools/data_coverage_tools.py",
+        "src/tools/sa_tools.py",
+        "src/tools/sa_digest_tools.py",
+        "src/sa/comment_signal_backfill.py",
+    )):
+        return "local_sqlite_authority"
+    if p == "src/news_normalized/score_cutover.py":
+        return "migration_cutover_dead_path_pending_n9_cleanup"
+    if p.startswith("src/agents/"):
+        return "agent_tool_surface"
     if "local_market_backend.py" in p and "super().query_iv_history" in match:
         return "runtime_reference_to_drop_target"
     if "api/routes/market_data.py" in p and ("prices\", \"iv" in match or "bootstrap_market" in match or "validate_market" in match):
         return "runtime_reference_to_drop_target"
-    if "market_data_admin.py" in p and (
-        "FROM iv_history" in match
-        or "FROM fundamentals" in match
-        or "FROM news" in match
-    ):
-        return "runtime_reference_to_drop_target"
-    if "migrate_to_supabase.py" in p and ("import_iv_history" in match or "import_fundamentals" in match or "import_news(" in match):
-        return "archive_script_pending_disable_check"
-    if "db_backend.py" in p:
+    if "market_data_admin.py" in p and _SQL_TARGET_RE.search(match):
         return "invalidated_rollback_lever_pending_n9_cleanup"
-    if any(token in p for token in ("sqlite_backend.py", "sa_capture_backend.py", "macro_calendar/local_store.py")):
-        return "local_sqlite_authority"
-    if _DROP_DOMAIN_RE.search(match):
+    if any(token in p for token in (
+        "db_backend.py",
+        "macro_calendar/store.py",
+        "service/macro_calendar_health.py",
+    )):
+        return "invalidated_rollback_lever_pending_n9_cleanup"
+    if _SQL_TARGET_RE.search(match):
         return "runtime_reference_to_drop_target"
     return "allowed_non_target"
 

@@ -168,6 +168,12 @@ _DAILY_UPDATE_ALIAS = {
     "ibkr_prices": "daily_update.ibkr_prices",
     "iv_history": "daily_update.iv_history",
 }
+_N9_RETIRED_SOURCES = {
+    "iv_history": (
+        "iv_history PG mirror source retired by N9 batch-1; "
+        "IV collection will return through the separate IV reboot path"
+    ),
+}
 
 # --- locks (single sidecar process) -------------------------------------------
 # The Gateway lock (in-process + cross-process) now lives in src.ibkr_gateway_lock so EVERY
@@ -702,6 +708,12 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
     d = SOURCES.get(source)
     if d is None:
         return {"source": source, "status": "unknown_source"}
+    if source in _N9_RETIRED_SOURCES:
+        return _record_result({
+            "source": source,
+            "status": "failed",
+            "error": _N9_RETIRED_SOURCES[source],
+        })
     from src.provider_config_runtime import provider_config_setup_state
 
     setup_state = provider_config_setup_state()

@@ -1417,6 +1417,18 @@ def test_run_source_collector_failure_short_circuits(monkeypatch):
     assert len(calls) == 1                                  # PG sync never attempted
 
 
+def test_run_source_iv_history_retired_before_provider_work(monkeypatch):
+    def _sub(argv):
+        raise AssertionError("retired iv_history source must not launch collector or PG sync")
+
+    monkeypatch.setattr(ds, "_run_subprocess", _sub)
+
+    res = ds.run_source("iv_history", trigger_source="api")
+
+    assert res["status"] == "failed"
+    assert "retired by N9 batch-1" in res["error"]
+
+
 def test_run_source_skips_when_already_running():
     lock = ds._SOURCE_LOCKS["polygon_news"]
     assert lock.acquire(blocking=False)
