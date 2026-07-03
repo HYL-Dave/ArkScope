@@ -12,10 +12,10 @@ Domains migrated:
                          index for local full-text search. Scored reads fall back to PG.
   - 3c-A IV_HISTORY    — daily IV/HV/VRP snapshots (id-keyed, id-based incremental).
   - 3c-A FUNDAMENTALS  — ReportSnapshot JSON snapshots (id-keyed, id-based incremental).
-  - 3c-C FINANCIAL_CACHE — LOCAL-PRIMARY provider/SEC cache (NOT a PG mirror): set
-                 writes local-only, get is local-first w/ PG fallback + read-through
-                 promotion. Preserved across rebuilds (carry-over), not validated vs
-                 PG, untouched by the incremental updater. See SqliteBackend get/set.
+  - 3c-C/S-H2 FINANCIAL_CACHE — LOCAL-PRIMARY provider/SEC cache (NOT a PG mirror):
+                 set writes local-only, get is local-only. Preserved across rebuilds
+                 (carry-over), not validated vs PG, untouched by the incremental updater.
+                 See SqliteBackend get/set.
 
 The bootstrap builds ALL domains into a single ``.building`` temp file and
 atomically swaps it in only after row-count + checksum validation passes, so a
@@ -307,8 +307,8 @@ _PG_FUND_COLS = "id, ticker, TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_da
 _PG_FUND_SELECT = f"SELECT {_PG_FUND_COLS} FROM fundamentals ORDER BY id"
 _PG_FUND_SELECT_INCR = f"SELECT {_PG_FUND_COLS} FROM fundamentals WHERE id > %s ORDER BY id"
 
-# 3c-C: financial_cache — LOCAL-PRIMARY (NOT a PG mirror). SqliteBackend.set writes
-# here; .get is local-first with PG fallback + read-through promotion. cache_key-keyed
+# 3c-C/S-H2: financial_cache — LOCAL-PRIMARY (NOT a PG mirror). SqliteBackend.set
+# writes here; .get is local-only. cache_key-keyed
 # with a TTL via expires_at (UTC ISO 'YYYY-MM-DDTHH:MM:SS+00:00' strings, which are
 # lexicographically comparable so expiry is a string compare). Because it is
 # local-primary it is PRESERVED across a full rebuild (carry-over), NOT validated
@@ -742,7 +742,7 @@ def bootstrap_market(out_path: Optional[str] = None,
                 fin_cache_carried = len(carried_rows)  # only after a successful write
             except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
                 logger.warning("financial_cache carry-over failed (%s); cache will "
-                               "re-populate via promotion/re-fetch", e)
+                               "re-populate via provider re-fetch", e)
             os.replace(tmp, path)  # atomic swap-in (cache already inside the new file)
             # CRITICAL: drop the OLD inode's WAL sidecars as part of the swap. ``tmp``
             # was built with a rollback journal (self-contained, no WAL of its own),

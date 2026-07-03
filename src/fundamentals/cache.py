@@ -1,8 +1,8 @@
 """Local-only fundamentals cache helpers.
 
-The generic LocalMarketDatabaseBackend.get_financial_cache path can still PG-fallback
-to migrate legacy cache rows. S-B needs a stricter contract for fundamentals:
-read local SQLite cache only, then return an honest miss.
+S-H2 makes the generic LocalMarketDatabaseBackend financial-cache path local-only.
+This helper still matters because stored fundamentals must also bypass plain
+PG DatabaseBackend rows and return an honest miss when no local SQLite cache exists.
 """
 
 from __future__ import annotations
