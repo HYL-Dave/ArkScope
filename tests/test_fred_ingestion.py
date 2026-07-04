@@ -639,12 +639,20 @@ class TestReleaseDateIngestion:
 
 
 class TestUnavailableDal:
-    def test_filebackend_short_circuits_with_error(self):
-        # FileBackend == no _get_conn → store unavailable.
+    def test_filebackend_uses_local_macro_store_not_unavailable(self, monkeypatch):
+        # After N9 batch-2, FileBackend/no _get_conn no longer makes macro
+        # ingestion unavailable; the factory returns a local macro store.
+        store = _FakeStore()
+        _patch_store(store, monkeypatch)
+        _patch_catalog(
+            _tiny_catalog(CatalogEntry("CPIAUCNS", "latest_only", 10)),
+            monkeypatch,
+        )
         dal = SimpleNamespace(_backend=object())
-        stats = fetch_fred_series(dal=dal, client=MagicMock(spec=FREDClient))
-        assert stats.errors and "unavailable" in stats.errors[0]
-        assert stats.series_processed == 0
+        stats = fetch_fred_series(dal=dal, client=_client_with_canned(metadata=None))
+        assert not any("unavailable" in err for err in stats.errors)
+        assert stats.errors == ["CPIAUCNS: metadata missing"]
+        assert stats.series_processed == 1
 
 
 # ---------------------------------------------------------------------------

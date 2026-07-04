@@ -41,3 +41,17 @@ def _isolate_profile_db(tmp_path_factory, monkeypatch):
     monkeypatch.setenv(
         "ARKSCOPE_PROFILE_DB",
         str(tmp_path_factory.mktemp("profile") / "profile_state.db"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_macro_calendar_db(tmp_path_factory, monkeypatch):
+    """Macro/calendar runtime defaults to data/macro_calendar.db.
+
+    After N9 batch-2 the macro store no longer depends on DAL backend shape, so
+    tests that pass a dummy/FileBackend DAL can still instantiate the real local
+    store. Point the default at a throwaway DB to avoid touching the developer's
+    live macro_calendar.db.
+    """
+    monkeypatch.setenv(
+        "ARKSCOPE_MACRO_CALENDAR_DB",
+        str(tmp_path_factory.mktemp("macro_calendar") / "macro_calendar.db"))

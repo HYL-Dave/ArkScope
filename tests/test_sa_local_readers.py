@@ -461,6 +461,24 @@ class TestHealthSplit:
         assert report["severity"] == "ok"
         assert not pg_calls
 
+    def test_local_job_runs_failure_degrades_pipeline_signal(self, local_dal, pg_calls, monkeypatch):
+        from src.service import sa_market_news_health as health
+
+        monkeypatch.setattr(
+            health,
+            "_query_extension_run",
+            lambda dal: (_ for _ in ()).throw(RuntimeError("local job_runs down")),
+        )
+
+        report = health.compute_market_news_health(local_dal)
+
+        assert not pg_calls
+        assert report["severity"] == "warning"
+        assert report["ok"] is False
+        codes = [r["code"] for r in report["reasons"]]
+        assert "pipeline_signal_unavailable" in codes
+        assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
+
     def test_pg_mode_dispatch_unchanged(self, pg_dal, pg_calls):
         from src.service.sa_market_news_health import compute_market_news_health
 

@@ -105,7 +105,7 @@ class TestEconomicCalendarRoute:
                 ]
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_economic_events",
                 fake_list,
                 raising=True,
             )
@@ -156,7 +156,7 @@ class TestEconomicCalendarRoute:
                 return []
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_economic_events",
                 fake_list,
                 raising=True,
             )
@@ -182,7 +182,7 @@ class TestEconomicCalendarRoute:
                 return []
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_economic_events",
                 fake_list,
                 raising=True,
             )
@@ -211,7 +211,7 @@ class TestEconomicCalendarRoute:
                 return []
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_economic_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_economic_events",
                 fake_list,
                 raising=True,
             )
@@ -246,7 +246,7 @@ class TestEarningsAndIpoRoutes:
                 return []
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_earnings_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_earnings_events",
                 fake_list,
                 raising=True,
             )
@@ -269,7 +269,7 @@ class TestEarningsAndIpoRoutes:
                 return []
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.list_ipo_events",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_ipo_events",
                 fake_list,
                 raising=True,
             )
@@ -293,7 +293,7 @@ class TestMacroSeriesRoute:
         undo = _enable_macro()
         try:
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.get_macro_observations",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.get_macro_observations",
                 lambda self, *a, **kw: None,
                 raising=True,
             )
@@ -320,7 +320,7 @@ class TestMacroSeriesRoute:
                 ],
             }
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.get_macro_observations",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.get_macro_observations",
                 lambda self, *a, **kw: payload,
                 raising=True,
             )
@@ -345,7 +345,7 @@ class TestMacroSeriesRoute:
                         "units": "x", "observations": []}
 
             monkeypatch.setattr(
-                "src.macro_calendar.store.MacroCalendarStore.get_macro_observations",
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.get_macro_observations",
                 fake,
                 raising=True,
             )
@@ -373,12 +373,12 @@ class TestGetEconomicCalendarTool:
         finally:
             undo()
 
-    def test_unavailable_dal_returns_helpful_string(self):
+    def test_filebackend_dal_returns_local_empty_message(self):
         undo = _enable_macro()
         try:
-            dal = SimpleNamespace(_backend=object())  # no _get_conn
+            dal = SimpleNamespace(_backend=object())  # no _get_conn; still local store
             out = get_economic_calendar(dal=dal)
-            assert "PostgreSQL" in out or "_get_conn" in out
+            assert out.startswith("No economic events in ")
         finally:
             undo()
 

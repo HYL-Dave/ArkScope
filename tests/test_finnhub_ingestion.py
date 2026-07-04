@@ -559,16 +559,19 @@ class TestEconomicIngestion:
         assert stats.events_skipped == 2
         assert len(stats.errors) == 2
 
-    def test_unavailable_dal_short_circuits(self):
+    def test_filebackend_uses_local_macro_store_not_unavailable(self, monkeypatch):
+        store = _FakeCalendarStore()
+        _patch_store(store, monkeypatch)
         dal = SimpleNamespace(_backend=object())
         stats = fetch_finnhub_economic_events(
             dal=dal,
             date_from=date(2024, 1, 1),
             date_to=date(2024, 1, 31),
-            client=MagicMock(spec=FinnhubCalendarClient),
+            client=_client_with_economic(_CPI_EVENT),
         )
-        assert stats.errors and "unavailable" in stats.errors[0]
-        assert stats.events_inserted == 0
+        assert stats.errors == []
+        assert stats.events_inserted == 1
+        assert store.economic_calls[0]["event_name"] == "CPI m/m"
 
 
 class TestEarningsIngestion:

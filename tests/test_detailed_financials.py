@@ -150,24 +150,18 @@ class TestFinancialCache:
             result = backend.get_financial_cache("metrics_TEST_annual")
             assert result is None
 
-    def test_cache_hit_returns_data(self):
-        """Mock DB returning cached data."""
+    def test_pg_cache_hit_path_is_retired(self):
+        """PG financial cache is retired; hits require local cache/refetch path."""
         from src.tools.backends.db_backend import DatabaseBackend
         backend = DatabaseBackend.__new__(DatabaseBackend)
         backend._conn = None
         backend._dsn = "mock"
         backend._sslmode = "prefer"
 
-        cached_data = {"standard": {"revenue_growth": 0.2}, "tech": {"sbc_to_revenue": 0.05}}
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_cursor.fetchone.return_value = (cached_data,)
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-
-        with patch.object(backend, '_get_conn', return_value=mock_conn):
+        with patch.object(backend, '_get_conn') as get_conn:
             result = backend.get_financial_cache("metrics_TEST_annual")
-            assert result == cached_data
+            assert result is None
+            get_conn.assert_not_called()
 
 
 # ============================================================
