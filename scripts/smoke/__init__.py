@@ -1,0 +1,2 @@
+"""Operational smoke-test scripts."""
+

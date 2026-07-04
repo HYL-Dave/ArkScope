@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import os
+
+import pytest
+
+
+def test_required_checks_cover_pg_exit_surfaces():
+    from scripts.smoke.pg_unreachable_e2e import REQUIRED_CHECKS
+
+    names = {check.name for check in REQUIRED_CHECKS}
+    assert {
+        "healthz",
+        "system_status",
+        "provider_config",
+        "provider_health",
+        "schedule_status",
+        "market_status",
+        "market_update_retired",
+        "price_read",
+        "price_coverage",
+        "news_status",
+        "news_feed",
+        "news_ticker",
+        "news_sentiment",
+        "fundamentals_stored",
+        "iv_history",
+        "sa_feed",
+        "sa_health",
+        "macro_status",
+        "macro_health",
+        "macro_ipo",
+        "reports",
+        "universe_summaries",
+    } <= names
+
+
+def test_report_sanitizes_poison_dsn(tmp_path):
+    from scripts.smoke.pg_unreachable_e2e import CheckResult, SmokeReport
+
+    report = SmokeReport(
+        ok=False,
+        poison_label="postgresql://user:secret@host/db?connect_timeout=1",
+        pg_attempts=["postgresql://user:secret@host/db?connect_timeout=1"],
+        checks=[CheckResult(name="x", ok=False, status_code=500, detail="password=secret123")],
+    )
+    data = report.to_sanitized_dict()
+    text = str(data)
+    assert "secret123" not in text
+    assert "user:secret" not in text
+    assert "postgresql://user:***@host/db" in text
+
+
+def test_pg_poison_records_and_raises():
+    from scripts.smoke.pg_unreachable_e2e import PgPoison
+
+    poison = PgPoison()
+    with pytest.raises(RuntimeError, match="PG_UNREACHABLE_E2E_POISON"):
+        poison.connect("postgresql://u:p@host/db")
+    assert len(poison.attempts) == 1
+    assert poison.attempts[0].startswith("postgresql://u:***@host/db")
+
+
+def test_smoke_fails_if_any_pg_attempt_is_recorded(monkeypatch):
+    from scripts.smoke import pg_unreachable_e2e as smoke
+
+    monkeypatch.setattr(smoke, "run_route_checks", lambda client: [])
+
+    class FakePoison(smoke.PgPoison):
+        def __init__(self):
+            super().__init__()
+            self.attempts.append("postgresql://u:***@host/db")
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(smoke, "PgPoison", FakePoison)
+    report = smoke.run_smoke(client_factory=FakeClient)
+    assert report.ok is False
+
+
+def test_smoke_fails_on_bad_route_status():
+    from scripts.smoke.pg_unreachable_e2e import CheckSpec, run_route_checks
+
+    class Response:
+        status_code = 500
+
+        def json(self):
+            return {"error": "boom"}
+
+    class Client:
+        def request(self, method, path):
+            return Response()
+
+    checks = [CheckSpec("bad", "GET", "/bad", 200)]
+    result = run_route_checks(Client(), checks)[0]
+    assert result.ok is False
+    assert result.status_code == 500
+
+
+def test_market_status_assertion_requires_no_pg_fallback():
+    from scripts.smoke.pg_unreachable_e2e import _assert_market_status
+
+    with pytest.raises(AssertionError):
+        _assert_market_status({
+            "pg_fallback_active": True,
+            "prices_authority": "pg",
+            "routing_enabled": False,
+        })
+
+
+def test_run_smoke_restores_environment_flags(monkeypatch):
+    from scripts.smoke import pg_unreachable_e2e as smoke
+
+    monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "already-set")
+    monkeypatch.delenv("ARKSCOPE_PG_UNREACHABLE_E2E", raising=False)
+    monkeypatch.setattr(smoke, "run_route_checks", lambda client: [])
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    smoke.run_smoke(client_factory=FakeClient)
+
+    assert os.environ["ARKSCOPE_DISABLE_SCHEDULER"] == "already-set"
+    assert "ARKSCOPE_PG_UNREACHABLE_E2E" not in os.environ
