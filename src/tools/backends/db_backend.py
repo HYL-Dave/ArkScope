@@ -1,8 +1,12 @@
 """
-DatabaseBackend — reads data from PostgreSQL.
+DatabaseBackend — reads data from PostgreSQL archive/runtime tables.
 
 Implements the DataBackend protocol using psycopg2 with direct SQL queries.
 Designed for both self-hosted PostgreSQL (Docker) and cloud services.
+After N9 batch-1/2, market-data runtime domains that moved local-first
+(``news``, ``news_scores``, ``iv_history``, ``fundamentals``,
+``financial_data_cache``) are retired stubs here. ``prices`` remains live until
+the batch-3 drop, and app-record archive methods are intentionally retained.
 
 Connection string format:
     postgresql://postgres:password@host:port/dbname
@@ -20,6 +24,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import psycopg2
 import psycopg2.extras
+
+from .sqlite_backend import _IV_COLS, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -337,153 +343,14 @@ class DatabaseBackend:
         scored_only: bool = True,
         model: Optional[str] = None,
     ) -> pd.DataFrame:
-        """Query news articles with scores from news_scores table.
-
-        Args:
-            ticker: Filter by ticker symbol.
-            days: Number of days to look back.
-            source: Data source filter ('ibkr', 'polygon', 'auto').
-            scored_only: Only return articles with at least one score.
-            model: Specific model to get scores from (e.g. 'gpt_5_2').
-                   If None, uses the latest score per article via
-                   the news_latest_scores view.
-        """
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
-
-        # Build score JOIN — either specific model or latest
-        if model:
-            # Use LATERAL subqueries to pick the latest score per
-            # (news_id, score_type, model) — the UNIQUE key includes
-            # reasoning_effort, so a plain JOIN can produce duplicates.
-            score_join = """
-                LEFT JOIN LATERAL (
-                    SELECT score, model FROM news_scores
-                    WHERE news_id = n.id AND score_type = 'sentiment'
-                      AND model = %s
-                    ORDER BY scored_at DESC LIMIT 1
-                ) s_sent ON true
-                LEFT JOIN LATERAL (
-                    SELECT score, model FROM news_scores
-                    WHERE news_id = n.id AND score_type = 'risk'
-                      AND model = %s
-                    ORDER BY scored_at DESC LIMIT 1
-                ) s_risk ON true
-            """
-            params: list = [model, model, cutoff]
-        else:
-            score_join = """
-                LEFT JOIN news_latest_scores s_sent
-                    ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
-                LEFT JOIN news_latest_scores s_risk
-                    ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
-            """
-            params = [cutoff]
-
-        conditions = ["n.published_at >= %s"]
-
-        if ticker:
-            conditions.append("n.ticker = %s")
-            params.append(ticker.upper())
-
-        if source != "auto":
-            conditions.append("n.source = %s")
-            params.append(source)
-
-        if scored_only:
-            conditions.append("(s_sent.score IS NOT NULL OR s_risk.score IS NOT NULL)")
-
-        where = " AND ".join(conditions)
-        sql = f"""
-            SELECT
-                TO_CHAR(n.published_at, 'YYYY-MM-DD') AS date,
-                n.ticker, n.title, n.source, n.url, n.publisher,
-                s_sent.score AS sentiment_score,
-                s_risk.score AS risk_score,
-                COALESCE(s_sent.model, s_risk.model) AS scored_model,
-                n.description
-            FROM news n
-            {score_join}
-            WHERE {where}
-            ORDER BY n.published_at DESC
-        """
-
-        empty_cols = [
-            "date", "ticker", "title", "source", "url",
-            "publisher", "sentiment_score", "risk_score", "description",
-        ]
-        df = self._query_df(sql, tuple(params))
-        if df.empty:
-            return pd.DataFrame(columns=empty_cols)
-        return df
+        """Retired PG news surface; runtime authority is local SQLite."""
+        return pd.DataFrame(columns=_NEWS_COLS)
 
     def query_news_feed(self, q: Optional[str] = None, ticker: Optional[str] = None,
                         source: Optional[str] = None, days: int = 30,
                         limit: int = 50, offset: int = 0) -> dict:
-        """Score-free news feed (新聞·事件 surface) — the PG counterpart of
-        SqliteBackend.query_news_feed: same shape (items with FULL published_at,
-        newest first, paginated; total / per-source / per-day facets over the same
-        filters). Search = tsvector plainto_tsquery (≥3 chars, when available)
-        with an ILIKE fallback — the AND-of-terms semantics the local FTS5
-        tokenized-AND mirrors."""
-        empty = {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
-        conds = ["n.published_at >= %s"]
-        params: list = [cutoff]
-        if ticker:
-            conds.append("n.ticker = %s")
-            params.append(ticker.upper())
-        if source and source != "auto":
-            conds.append("n.source = %s")
-            params.append(source)
-        ql = (q or "").strip()
-        use_fts = len(ql) >= 3 and self._has_search_vector()
-        if use_fts:
-            conds.append("n.search_vector @@ plainto_tsquery('english', %s)")
-            params.append(ql)
-        elif ql:
-            conds.append("(n.title ILIKE %s OR n.description ILIKE %s)")
-            params += [f"%{ql}%", f"%{ql}%"]
-        where = " AND ".join(conds)
-
-        # Searching → RELEVANCE order (ts_rank; the SQLite twin uses
-        # title-weighted bm25); browsing → chronological.
-        order, order_params = "n.published_at DESC", []
-        if use_fts:
-            order = ("ts_rank(n.search_vector, plainto_tsquery('english', %s)) DESC, "
-                     "n.published_at DESC")
-            order_params = [ql]
-
-        try:
-            conn = self._get_conn()
-            with conn.cursor() as cur:
-                cur.execute(f"SELECT COUNT(*) FROM news n WHERE {where}", params)
-                total = cur.fetchone()[0]
-                cur.execute(
-                    f"SELECT n.source, COUNT(*) FROM news n WHERE {where} "
-                    "GROUP BY n.source", params)
-                sources = dict(cur.fetchall())
-                cur.execute(
-                    "SELECT TO_CHAR(n.published_at AT TIME ZONE 'UTC', 'YYYY-MM-DD'), "
-                    f"COUNT(*) FROM news n WHERE {where} GROUP BY 1 ORDER BY 1", params)
-                day_counts = dict(cur.fetchall())
-                cur.execute(
-                    "SELECT TO_CHAR(n.published_at AT TIME ZONE 'UTC', "
-                    "'YYYY-MM-DD\"T\"HH24:MI:SS+0000') AS published_at, "
-                    "n.ticker, n.title, n.url, n.publisher, n.source, n.description "
-                    f"FROM news n WHERE {where} "
-                    f"ORDER BY {order} LIMIT %s OFFSET %s",
-                    [*params, *order_params, max(1, min(200, limit)), max(0, offset)])
-                rows = cur.fetchall()
-            from .sqlite_backend import clean_snippet
-            items = [{"published_at": r[0], "ticker": r[1], "title": r[2],
-                      "url": r[3], "publisher": r[4], "source": r[5],
-                      "description": clean_snippet(r[6])} for r in rows]
-            return {"available": True, "items": items, "total": total,
-                    "sources": sources, "days": day_counts}
-        except psycopg2.Error as e:
-            logger.error(f"query_news_feed failed: {e}")
-            self._conn = None
-            return empty
+        """Retired PG news feed surface."""
+        return {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
 
     def query_news_search(
         self,
@@ -493,147 +360,22 @@ class DatabaseBackend:
         limit: int = 20,
         scored_only: bool = True,
     ) -> pd.DataFrame:
-        """Search news with full-text search or trigram matching.
-
-        Uses PostgreSQL tsvector/GIN for multi-word queries and
-        pg_trgm ILIKE for short/partial matches. All filtering at DB level.
-        """
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
-        conditions = ["n.published_at >= %s"]
-        params: list = [cutoff]
-
-        # Score joins (latest scores)
-        score_join = """
-            LEFT JOIN news_latest_scores s_sent
-                ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
-            LEFT JOIN news_latest_scores s_risk
-                ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
-        """
-
-        if ticker:
-            conditions.append("n.ticker = %s")
-            params.append(ticker.upper())
-
-        if scored_only:
-            conditions.append("(s_sent.score IS NOT NULL OR s_risk.score IS NOT NULL)")
-
-        # Full-text search vs ILIKE fallback
-        use_fts = bool(query.strip()) and len(query.strip()) >= 3 and self._has_search_vector()
-        if use_fts:
-            conditions.append("n.search_vector @@ plainto_tsquery('english', %s)")
-            params.append(query)
-
-        where = " AND ".join(conditions)
-
-        if use_fts:
-            order = (
-                "ts_rank(n.search_vector, plainto_tsquery('english', %s)) DESC, "
-                "n.published_at DESC"
-            )
-            params.append(query)
-        else:
-            order = "n.published_at DESC"
-
-        # ILIKE fallback when FTS unavailable or short query
-        if query.strip() and not use_fts:
-            conditions.append("(n.title ILIKE %s OR n.description ILIKE %s)")
-            pattern = f"%{query.strip()}%"
-            params.append(pattern)
-            params.append(pattern)
-            where = " AND ".join(conditions)
-
-        sql = f"""
-            SELECT
-                TO_CHAR(n.published_at, 'YYYY-MM-DD') AS date,
-                n.ticker, n.title, n.source, n.url, n.publisher,
-                s_sent.score AS sentiment_score,
-                s_risk.score AS risk_score,
-                n.description
-            FROM news n
-            {score_join}
-            WHERE {where}
-            ORDER BY {order}
-            LIMIT %s
-        """
-        params.append(limit)
-
-        df = self._query_df(sql, tuple(params))
-        if df.empty:
-            return pd.DataFrame(columns=[
-                "date", "ticker", "title", "source", "url",
-                "publisher", "sentiment_score", "risk_score", "description",
-            ])
-        return df
+        """Retired PG news search surface."""
+        return pd.DataFrame(columns=_NEWS_SEARCH_COLS)
 
     def query_news_stats(
         self,
         ticker: Optional[str] = None,
         days: int = 30,
     ) -> pd.DataFrame:
-        """Get lightweight per-ticker news statistics.
-
-        Returns one row per ticker with article_count, scored_count,
-        date_range, avg_sentiment, avg_risk. Single GROUP BY query — very fast.
-        """
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
-        conditions = ["n.published_at >= %s"]
-        params: list = [cutoff]
-
-        if ticker:
-            conditions.append("n.ticker = %s")
-            params.append(ticker.upper())
-
-        where = " AND ".join(conditions)
-        sql = f"""
-            SELECT
-                n.ticker,
-                COUNT(*) AS article_count,
-                COUNT(s_sent.score) AS scored_count,
-                TO_CHAR(MIN(n.published_at), 'YYYY-MM-DD') AS earliest_date,
-                TO_CHAR(MAX(n.published_at), 'YYYY-MM-DD') AS latest_date,
-                ROUND(AVG(s_sent.score)::numeric, 2) AS avg_sentiment,
-                ROUND(AVG(s_risk.score)::numeric, 2) AS avg_risk,
-                COUNT(*) FILTER (WHERE s_sent.score >= 4) AS bullish_count,
-                COUNT(*) FILTER (WHERE s_sent.score <= 2) AS bearish_count
-            FROM news n
-            LEFT JOIN news_latest_scores s_sent
-                ON s_sent.news_id = n.id AND s_sent.score_type = 'sentiment'
-            LEFT JOIN news_latest_scores s_risk
-                ON s_risk.news_id = n.id AND s_risk.score_type = 'risk'
-            WHERE {where}
-            GROUP BY n.ticker
-            ORDER BY article_count DESC
-        """
-
-        df = self._query_df(sql, tuple(params))
-        if df.empty:
-            return pd.DataFrame(columns=[
-                "ticker", "article_count", "scored_count",
-                "earliest_date", "latest_date",
-                "avg_sentiment", "avg_risk",
-                "bullish_count", "bearish_count",
-            ])
-        return df
+        """Retired PG news stats surface."""
+        return pd.DataFrame(columns=_NEWS_STATS_COLS)
 
     def query_news_scores(self, news_id: int) -> pd.DataFrame:
-        """Get all scores for a specific news article (multi-model comparison).
-
-        Returns:
-            DataFrame with columns: score_type, model, reasoning_effort, score, scored_at
-        """
-        sql = """
-            SELECT score_type, model, reasoning_effort, score,
-                   TO_CHAR(scored_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS scored_at
-            FROM news_scores
-            WHERE news_id = %s
-            ORDER BY scored_at DESC
-        """
-        df = self._query_df(sql, (news_id,))
-        if df.empty:
-            return pd.DataFrame(columns=[
-                "score_type", "model", "reasoning_effort", "score", "scored_at",
-            ])
-        return df
+        """Retired PG news score surface."""
+        return pd.DataFrame(columns=[
+            "score_type", "model", "reasoning_effort", "score", "scored_at",
+        ])
 
     # --------------------------------------------------------
     # Prices
@@ -700,61 +442,16 @@ class DatabaseBackend:
     # --------------------------------------------------------
 
     def query_iv_history(self, ticker: str) -> pd.DataFrame:
-        """Query IV history from the database."""
-        ticker = ticker.upper()
-
-        sql = """
-            SELECT
-                TO_CHAR(date, 'YYYY-MM-DD') AS date,
-                atm_iv, hv_30d, vrp, spot_price, num_quotes
-            FROM iv_history
-            WHERE ticker = %s
-            ORDER BY date ASC
-        """
-
-        df = self._query_df(sql, (ticker,))
-        if df.empty:
-            return pd.DataFrame(columns=[
-                "date", "atm_iv", "hv_30d", "vrp", "spot_price", "num_quotes",
-            ])
-        return df
+        """Retired PG IV history surface."""
+        return pd.DataFrame(columns=_IV_COLS)
 
     # --------------------------------------------------------
     # Fundamentals
     # --------------------------------------------------------
 
     def query_fundamentals(self, ticker: str) -> dict:
-        """Query latest fundamental data from the database."""
-        ticker = ticker.upper()
-
-        sql = """
-            SELECT data, TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS snapshot_date
-            FROM fundamentals
-            WHERE ticker = %s
-            ORDER BY snapshot_date DESC, id DESC
-            LIMIT 1
-        """
-
-        df = self._query_df(sql, (ticker,))
-        if df.empty:
-            return {}
-
-        row = df.iloc[0]
-        data = row["data"]
-        if isinstance(data, str):
-            data = json.loads(data)
-
-        # Return in same format as FileBackend
-        reports = data.get("reports", data)
-        snapshot = reports.get("ReportSnapshot", {}) if isinstance(reports, dict) else {}
-
-        return {
-            "ticker": ticker,
-            "collected_at": row.get("snapshot_date", ""),
-            "snapshot": snapshot,
-            "fin_summary": reports.get("ReportsFinSummary", {}) if isinstance(reports, dict) else {},
-            "ownership": reports.get("ReportsOwnership", {}) if isinstance(reports, dict) else {},
-        }
+        """Retired PG fundamentals surface."""
+        return {}
 
     # --------------------------------------------------------
     # SEC Filings (same as FileBackend — API-based, not in DB)
@@ -783,10 +480,7 @@ class DatabaseBackend:
     def get_available_tickers(self, data_type: str) -> List[str]:
         """List tickers with available data of a given type."""
         table_map = {
-            "news": "news",
             "prices": "prices",
-            "iv_history": "iv_history",
-            "fundamentals": "fundamentals",
         }
 
         table = table_map.get(data_type)
@@ -1098,21 +792,8 @@ class DatabaseBackend:
     # --------------------------------------------------------
 
     def get_financial_cache(self, cache_key: str) -> Optional[dict]:
-        """Read from financial_data_cache if not expired."""
-        conn = self._get_conn()
-        sql = """
-            SELECT data FROM financial_data_cache
-            WHERE cache_key = %s AND expires_at > NOW()
-        """
-        try:
-            with conn.cursor() as cur:
-                cur.execute(sql, (cache_key,))
-                row = cur.fetchone()
-                return row[0] if row else None
-        except psycopg2.Error as e:
-            logger.error(f"Failed to read financial cache: {e}")
-            self._conn = None
-            return None
+        """Retired PG financial cache surface; runtime cache is local-only."""
+        return None
 
     def set_financial_cache(
         self,
@@ -1122,28 +803,8 @@ class DatabaseBackend:
         ttl_days: int = 90,
         source: str = "sec_edgar",
     ) -> bool:
-        """Write to financial_data_cache with TTL."""
-        conn = self._get_conn()
-        sql = """
-            INSERT INTO financial_data_cache (cache_key, source, ticker, data, expires_at)
-            VALUES (%s, %s, %s, %s, NOW() + INTERVAL '%s days')
-            ON CONFLICT (cache_key) DO UPDATE SET
-                data = EXCLUDED.data,
-                source = EXCLUDED.source,
-                fetched_at = NOW(),
-                expires_at = NOW() + INTERVAL '%s days'
-        """
-        try:
-            with conn.cursor() as cur:
-                cur.execute(sql, (
-                    cache_key, source, ticker.upper(),
-                    json.dumps(data), ttl_days, ttl_days,
-                ))
-            return True
-        except psycopg2.Error as e:
-            logger.error(f"Failed to write financial cache: {e}")
-            self._conn = None
-            return False
+        """Retired PG financial cache surface; runtime cache is local-only."""
+        return False
 
     # --------------------------------------------------------
     # Health / Freshness Statistics
@@ -1162,19 +823,11 @@ class DatabaseBackend:
             Each value is {"rows": ..., "error": str|None}.
         """
         conn = self._get_conn()
-        stats: Dict[str, Any] = {}
-
-        # News: global latest + recent 7d count per source
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT source, MAX(published_at) AS latest, "
-                    "COUNT(*) FILTER (WHERE published_at > NOW() - INTERVAL '7 days') AS recent_count "
-                    "FROM news GROUP BY source"
-                )
-                stats["news"] = {"rows": cur.fetchall(), "error": None}
-        except Exception as e:
-            stats["news"] = {"rows": [], "error": str(e)}
+        stats: Dict[str, Any] = {
+            "news": {"rows": [], "error": None},
+            "iv_history": {"rows": [], "error": None},
+            "financial_cache": {"rows": [], "error": None},
+        }
 
         # Prices: latest bar timestamp across ALL stored intervals. Do NOT filter
         # interval='1d' — only 15min bars are stored (1h/1d are derived on read),
@@ -1185,30 +838,6 @@ class DatabaseBackend:
                 stats["prices"] = {"rows": cur.fetchall(), "error": None}
         except Exception as e:
             stats["prices"] = {"rows": [], "error": str(e)}
-
-        # IV history: latest date
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT MAX(date) FROM iv_history")
-                stats["iv_history"] = {"rows": cur.fetchall(), "error": None}
-        except Exception as e:
-            stats["iv_history"] = {"rows": [], "error": str(e)}
-
-        # Financial cache: cached vs expired counts + latest fetch per source.
-        # (Consumers index rows positionally [0..2]; the appended MAX(fetched_at)
-        # at [3] is additive — provider_health reads it, freshness ignores it.)
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT source, "
-                    "COUNT(*) FILTER (WHERE expires_at > NOW()) AS cached, "
-                    "COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired, "
-                    "MAX(fetched_at) AS latest_fetched "
-                    "FROM financial_data_cache GROUP BY source"
-                )
-                stats["financial_cache"] = {"rows": cur.fetchall(), "error": None}
-        except Exception as e:
-            stats["financial_cache"] = {"rows": [], "error": str(e)}
 
         return stats
 

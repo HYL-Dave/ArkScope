@@ -15,6 +15,8 @@ Run:
 import pytest
 from pathlib import Path
 
+import pandas as pd
+
 from src.tools.backends import DataBackend
 from src.tools.backends.db_backend import DatabaseBackend
 from src.tools.data_access import DataAccessLayer
@@ -32,6 +34,84 @@ requires_db = pytest.mark.skipif(
     _DSN is None,
     reason="DATABASE_URL not configured in config/.env"
 )
+
+
+def _poison_dead_domain_pg(monkeypatch):
+    def fail(*_args, **_kwargs):
+        raise AssertionError("retired PG domain queried")
+
+    monkeypatch.setattr(DatabaseBackend, "_query_df", fail)
+    monkeypatch.setattr(DatabaseBackend, "_get_conn", fail)
+
+
+def test_retired_pg_domain_methods_do_not_query_dropped_tables(monkeypatch):
+    _poison_dead_domain_pg(monkeypatch)
+    backend = DatabaseBackend(dsn="postgresql://poisoned/arkscope")
+
+    assert backend.query_news(days=1).empty
+    assert backend.query_news_search(query="NVDA").empty
+    assert backend.query_news_stats(ticker="NVDA").empty
+    assert backend.query_news_scores(123).empty
+    assert backend.query_iv_history("NVDA").empty
+    assert backend.query_fundamentals("NVDA") == {}
+    assert backend.get_financial_cache("k") is None
+    assert backend.set_financial_cache("k", "NVDA", {"x": 1}) is False
+    assert backend.get_available_tickers("news") == []
+    assert backend.get_available_tickers("iv_history") == []
+    assert backend.get_available_tickers("fundamentals") == []
+
+    feed = backend.query_news_feed(q="nvda", ticker="NVDA")
+    assert feed == {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
+
+
+def test_query_prices_still_uses_pg_prices_until_batch3(monkeypatch):
+    calls = []
+
+    def fake_query_df(self, sql, params=()):
+        calls.append((sql, params))
+        return pd.DataFrame(
+            [{"datetime": "2026-07-03T20:00:00+0000", "open": 1.0, "high": 2.0,
+              "low": 0.5, "close": 1.5, "volume": 100}]
+        )
+
+    monkeypatch.setattr(DatabaseBackend, "_query_df", fake_query_df)
+
+    out = DatabaseBackend(dsn="postgresql://poisoned/arkscope").query_prices("NVDA")
+
+    assert len(out) == 1
+    assert calls and "FROM prices" in calls[0][0]
+
+
+def test_query_health_stats_ignores_retired_batch1_domains(monkeypatch):
+    executed = []
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def execute(self, sql, params=None):
+            executed.append(sql)
+            forbidden = ("FROM news", "FROM iv_history", "FROM financial_data_cache")
+            assert not any(token in sql for token in forbidden)
+
+        def fetchall(self):
+            return [("2026-07-03T20:00:00+0000",)]
+
+    class Conn:
+        def cursor(self, *args, **kwargs):
+            return Cursor()
+
+    monkeypatch.setattr(DatabaseBackend, "_get_conn", lambda self: Conn())
+
+    stats = DatabaseBackend(dsn="postgresql://poisoned/arkscope").query_health_stats()
+
+    assert any("FROM prices" in sql for sql in executed)
+    assert stats["prices"]["rows"] == [("2026-07-03T20:00:00+0000",)]
+    for key in ("news", "iv_history", "financial_cache"):
+        assert stats[key] == {"rows": [], "error": None}
 
 
 @pytest.fixture(scope="module")
@@ -71,38 +151,32 @@ class TestBackendProtocol:
 @requires_db
 class TestNewsDB:
     def test_query_news_all(self, backend):
-        """Can query news without ticker filter."""
+        """PG news table is retired after N9 batch-1."""
         df = backend.query_news(days=3650)
-        assert not df.empty
         assert set(df.columns) >= {"date", "ticker", "title", "source"}
+        assert df.empty
 
     def test_query_news_ticker(self, backend):
-        """Can filter news by ticker."""
+        """PG news ticker filter is a retired empty surface."""
         df = backend.query_news("NVDA", days=3650)
-        assert not df.empty
-        assert all(df["ticker"] == "NVDA")
+        assert df.empty
 
     def test_query_news_source_filter(self, backend):
-        """Can filter news by source."""
+        """PG news source filter is a retired empty surface."""
         df = backend.query_news("AAPL", days=3650, source="ibkr")
-        if not df.empty:
-            assert all(df["source"] == "ibkr")
+        assert df.empty
 
     def test_query_news_scored_only(self, backend):
-        """scored_only=True returns articles with scores."""
+        """PG news_scores is retired; scored PG reads are empty."""
         df = backend.query_news("NVDA", days=3650, scored_only=True)
-        if not df.empty:
-            has_score = df["sentiment_score"].notna() | df["risk_score"].notna()
-            assert has_score.all()
+        assert df.empty
 
     def test_news_schema_via_dal(self, dal):
-        """DAL wraps DB news in NewsQueryResult schema."""
+        """DAL wraps retired PG news in an empty NewsQueryResult schema."""
         result = dal.get_news("NVDA", days=3650)
         assert result.ticker == "NVDA"
-        assert result.count > 0
-        article = result.articles[0]
-        assert article.ticker == "NVDA"
-        assert article.title
+        assert result.count == 0
+        assert result.articles == []
 
 
 # ---------------------------------------------------------------------------
@@ -112,16 +186,15 @@ class TestNewsDB:
 @requires_db
 class TestIVHistoryDB:
     def test_query_iv_history(self, backend):
-        """Can query IV history."""
+        """PG iv_history is retired after N9 batch-1."""
         df = backend.query_iv_history("AMD")
-        assert not df.empty
         assert "atm_iv" in df.columns
+        assert df.empty
 
     def test_iv_via_dal(self, dal):
-        """DAL wraps DB IV data in IVHistoryPoint schema."""
+        """DAL wraps retired PG IV data as an empty sequence."""
         points = dal.get_iv_history("AMD")
-        assert len(points) > 0
-        assert points[0].atm_iv is not None
+        assert points == []
 
 
 # ---------------------------------------------------------------------------
@@ -131,11 +204,9 @@ class TestIVHistoryDB:
 @requires_db
 class TestFundamentalsDB:
     def test_query_fundamentals(self, backend):
-        """Can query fundamentals."""
+        """PG fundamentals is retired after S-B/N9."""
         data = backend.query_fundamentals("NVDA")
-        assert data
-        assert data["ticker"] == "NVDA"
-        assert "snapshot" in data
+        assert data == {}
 
     def test_fundamentals_empty_ticker(self, backend):
         """Unknown ticker returns empty dict."""
@@ -143,9 +214,10 @@ class TestFundamentalsDB:
         assert data == {}
 
     def test_fundamentals_via_dal(self, dal):
-        """DAL wraps DB fundamentals in FundamentalsResult schema."""
+        """DAL wraps retired PG fundamentals as not found."""
         result = dal.get_fundamentals("NVDA")
         assert result.ticker == "NVDA"
+        assert result.found is False
 
 
 # ---------------------------------------------------------------------------
@@ -155,15 +227,14 @@ class TestFundamentalsDB:
 @requires_db
 class TestAvailableTickersDB:
     def test_news_tickers(self, backend):
-        """Can list available news tickers."""
+        """PG news ticker listing is retired."""
         tickers = backend.get_available_tickers("news")
-        assert len(tickers) > 10
-        assert "NVDA" in tickers
+        assert tickers == []
 
     def test_fundamentals_tickers(self, backend):
-        """Can list available fundamentals tickers."""
+        """PG fundamentals ticker listing is retired."""
         tickers = backend.get_available_tickers("fundamentals")
-        assert len(tickers) > 10
+        assert tickers == []
 
 
 # ---------------------------------------------------------------------------
