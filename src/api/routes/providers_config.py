@@ -63,6 +63,30 @@ def _empty_view_with_setup() -> dict:
     return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
 
 
+def _client_id_domains() -> list[dict]:
+    """Derived-id table for the Settings hint — offsets/labels from the single
+    authority module; effective ids from the CURRENT env (None if unparsable)."""
+    from data_sources.ibkr_client_id import (
+        DOMAIN_LABELS_ZH,
+        DOMAIN_OFFSETS,
+        ibkr_client_id_for,
+    )
+
+    out = []
+    for domain, offset in sorted(DOMAIN_OFFSETS.items(), key=lambda kv: kv[1]):
+        try:
+            effective = ibkr_client_id_for(domain)
+        except ValueError:
+            effective = None
+        out.append({
+            "domain": domain,
+            "label": DOMAIN_LABELS_ZH.get(domain, domain),
+            "offset": offset,
+            "effective_id": effective,
+        })
+    return out
+
+
 def _view(store: DataProviderConfigStore) -> dict:
     from src.provider_config_runtime import provider_config_setup_state
 
@@ -83,7 +107,7 @@ def _view(store: DataProviderConfigStore) -> dict:
                     if candidate and os.getenv(candidate):
                         import_source = candidate
                         break
-            rows.append({
+            row = {
                 "field": f.field,
                 "label": f.label,
                 "secret": f.secret,
@@ -98,7 +122,10 @@ def _view(store: DataProviderConfigStore) -> dict:
                 "defaulted": f.defaulted and bool(raw),
                 "guarded": f.guarded,
                 "guard_reason": f.guard_reason,
-            })
+            }
+            if f.env_var == "IBKR_CLIENT_ID":
+                row["client_id_domains"] = _client_id_domains()
+            rows.append(row)
         providers[provider] = {
             "fields": rows,
             "testable": provider in _TESTABLE,

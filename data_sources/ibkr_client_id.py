@@ -29,6 +29,16 @@ DOMAIN_OFFSETS = {
     "iv": 40,       # reserved for the IV reboot line
 }
 
+# Display labels for the Settings hint — kept HERE so adding a domain is a
+# one-file change (offset + label) that the API view and UI pick up automatically.
+DOMAIN_LABELS_ZH = {
+    "manual": "基底",
+    "options": "選擇權",
+    "prices": "股價",
+    "news": "新聞",
+    "iv": "IV",
+}
+
 
 def ibkr_client_id_for(domain: str) -> int:
     """Derived client id for a domain.

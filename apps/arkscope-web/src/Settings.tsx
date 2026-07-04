@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
   addCredential,
   importOAuthCredential,
@@ -1407,22 +1407,21 @@ function compactMessage(value: string, max = 88): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
-// Mirror of data_sources/ibkr_client_id.py DOMAIN_OFFSETS (wire-level contract;
-// change only with a decision-log entry). Display-only: the backend derives the
-// real ids — this hint just shows what a given base implies.
-const IBKR_CLIENT_ID_DOMAINS: ReadonlyArray<readonly [string, number]> = [
-  ["選擇權", 10],
-  ["股價", 20],
-  ["新聞", 30],
-  ["IV", 40],
-];
-
-function ibkrDerivedClientIds(raw: string): string {
-  const s = raw.trim();
-  if (!/^\d+$/.test(s)) return "";  // parseInt("1abc")=1 would advertise ids the backend rejects
-  const base = Number(s);
-  const parts = IBKR_CLIENT_ID_DOMAINS.map(([label, off]) => `${label}=${base + off}`);
-  return `基底=${base} → ${parts.join("、")}`;
+// Derived client-id chips for the IBKR base field. Offsets/labels come from the
+// BACKEND (single authority: data_sources/ibkr_client_id.py via the config view) —
+// adding a domain there shows up here with no frontend change. A valid numeric
+// draft previews post-save ids; otherwise the backend's effective ids are shown
+// (parseInt would mis-preview "1abc"; the backend rejects such bases on save).
+function ibkrClientIdChips(
+  domains: NonNullable<ProviderConfigField["client_id_domains"]>,
+  draft: string,
+): { preview: boolean; text: string } {
+  const s = draft.trim();
+  const base = /^\d+$/.test(s) ? Number(s) : null;
+  const text = domains
+    .map((d) => `${d.label}=${base !== null ? base + d.offset : d.effective_id ?? "？"}`)
+    .join("、");
+  return { preview: base !== null, text };
 }
 
 function DataSourcesSection() {
@@ -1702,10 +1701,14 @@ function DataSourcesSection() {
                 .map(([pid, c]) => {
                   const label = health?.providers.find((p) => p.id === pid)?.label ?? pid;
                   const rows = c.fields.length > 0 ? c.fields : [null];
+                  const hintRows = rows.filter(
+                    (f) => f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0,
+                  ).length;
                   return rows.map((f, i) => (
-                    <tr key={`${pid}.${f?.field ?? "_"}`}>
+                    <Fragment key={`${pid}.${f?.field ?? "_"}`}>
+                    <tr>
                       {i === 0 && (
-                        <td rowSpan={rows.length}>
+                        <td rowSpan={rows.length + hintRows}>
                           {label}
                           {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
                         </td>
@@ -1758,22 +1761,11 @@ function DataSourcesSection() {
                                 清除
                               </button>
                             )}
-                            {f.env_var === "IBKR_CLIENT_ID" &&
-                              f.effective_source !== "env" &&
-                              ibkrDerivedClientIds(
-                                keyDrafts[`${pid}.${f.field}`] || f.app_value_masked || "",
-                              ) && (
-                                <div className="muted tiny">
-                                  {ibkrDerivedClientIds(
-                                    keyDrafts[`${pid}.${f.field}`] || f.app_value_masked || "",
-                                  )}
-                                </div>
-                              )}
                           </>
                         )}
                       </td>
                       {i === 0 && (
-                        <td rowSpan={rows.length}>
+                        <td rowSpan={rows.length + hintRows}>
                           {c.testable ? (
                             <>
                               <button className="btn-ghost" disabled={!!busy}
@@ -1790,6 +1782,20 @@ function DataSourcesSection() {
                         </td>
                       )}
                     </tr>
+                    {f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0 && (() => {
+                      const chips = ibkrClientIdChips(
+                        f.client_id_domains!,
+                        keyDrafts[`${pid}.${f.field}`] ?? "",
+                      );
+                      return (
+                        <tr>
+                          <td colSpan={3} className="muted tiny">
+                            {chips.preview ? "存檔後 ID：" : "各域用戶端 ID："}{chips.text}
+                          </td>
+                        </tr>
+                      );
+                    })()}
+                    </Fragment>
                   ));
                 })}
             </tbody>

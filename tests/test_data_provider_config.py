@@ -443,3 +443,41 @@ def test_import_env_rejects_non_numeric_client_id(store, monkeypatch):
         )
     assert e.value.status_code == 400
     assert e.value.detail["code"] == "provider_config_invalid_value"
+
+
+def test_view_exposes_client_id_domains(store, monkeypatch):
+    from src.api.routes import providers_config as pc
+
+    dpc.apply_env(store)  # seeds base "1" and injects env
+    row = next(
+        f for f in pc._view(store)["providers"]["ibkr"]["fields"]
+        if f["field"] == "client_id"
+    )
+    doms = row["client_id_domains"]
+    assert [d["domain"] for d in doms] == ["manual", "options", "prices", "news", "iv"]
+    assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40]
+    assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41]
+    assert doms[2]["label"] == "股價"
+
+    # a real-env override wins precedence — effective ids must reflect it
+    monkeypatch.setenv("IBKR_CLIENT_ID", "7")
+    doms = next(
+        f for f in pc._view(store)["providers"]["ibkr"]["fields"]
+        if f["field"] == "client_id"
+    )["client_id_domains"]
+    assert [d["effective_id"] for d in doms] == [7, 17, 27, 37, 47]
+
+    # unparsable env base → ids unknown, list still present (UI shows placeholders)
+    monkeypatch.setenv("IBKR_CLIENT_ID", "abc")
+    doms = next(
+        f for f in pc._view(store)["providers"]["ibkr"]["fields"]
+        if f["field"] == "client_id"
+    )["client_id_domains"]
+    assert all(d["effective_id"] is None for d in doms)
+
+    # only the client-id field carries the key
+    host = next(
+        f for f in pc._view(store)["providers"]["ibkr"]["fields"]
+        if f["field"] == "host"
+    )
+    assert "client_id_domains" not in host

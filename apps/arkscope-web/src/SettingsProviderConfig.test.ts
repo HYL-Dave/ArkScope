@@ -34,6 +34,13 @@ const mocked = vi.hoisted(() => ({
           label: "Client ID",
           secret: false,
           env_var: "IBKR_CLIENT_ID",
+          client_id_domains: [
+            { domain: "manual", label: "基底", offset: 0, effective_id: 1 },
+            { domain: "options", label: "選擇權", offset: 10, effective_id: 11 },
+            { domain: "prices", label: "股價", offset: 20, effective_id: 21 },
+            { domain: "news", label: "新聞", offset: 30, effective_id: 31 },
+            { domain: "iv", label: "IV", offset: 40, effective_id: 41 },
+          ],
           app_value_set: true,
           app_value_masked: "1",
           effective_source: "app",
@@ -213,9 +220,11 @@ describe("Settings provider config authority", () => {
     });
   });
 
-  it("shows derived IBKR client ids live from the client-id input", async () => {
+  it("shows backend-driven derived IBKR client ids with live draft preview", async () => {
     await renderDataSources();
-    // saved base "1" renders the derived table without any typing
+    // effective ids straight from the view — no typing needed
+    expect(host!.textContent).toContain("各域用戶端 ID：");
+    expect(host!.textContent).toContain("基底=1");
     expect(host!.textContent).toContain("選擇權=11");
     expect(host!.textContent).toContain("股價=21");
     expect(host!.textContent).toContain("新聞=31");
@@ -226,14 +235,16 @@ describe("Settings provider config authority", () => {
     await act(async () => {
       setInputValue(input, "7");
     });
-    expect(host!.textContent).toContain("基底=7");
+    // valid draft previews post-save ids
+    expect(host!.textContent).toContain("存檔後 ID：");
     expect(host!.textContent).toContain("選擇權=17");
     expect(host!.textContent).toContain("IV=47");
-    // non-numeric draft hides the hint instead of advertising ids the backend rejects
+    // invalid draft falls back to the backend's effective ids (never fabricates)
     await act(async () => {
       setInputValue(input, "abc");
     });
-    expect(host!.textContent).not.toContain("選擇權=");
+    expect(host!.textContent).toContain("各域用戶端 ID：");
+    expect(host!.textContent).toContain("選擇權=11");
   });
 
   it("keeps long last-run messages out of the schedule row summary", async () => {

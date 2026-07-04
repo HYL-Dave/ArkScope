@@ -1625,6 +1625,13 @@ export interface ProviderConfigField {
   defaulted: boolean;
   guarded: boolean;
   guard_reason: string | null;
+  // present only on the IBKR client_id field: derived per-domain ids
+  client_id_domains?: {
+    domain: string;
+    label: string;
+    offset: number;
+    effective_id: number | null;
+  }[];
 }
 
 export interface ProviderConfigEntry {
