@@ -1491,6 +1491,22 @@ Post-cutover smoke: PASS on live main checkout:
     local_incremental is retired with the P0-C message.
 ```
 
+### P0-C.1 Runtime Hardening Follow-up
+
+The first scheduler resume after P0-C exposed a runtime wiring flaw, not a data-authority flaw:
+`ibkr_prices` ran the `ib_insync` direct writer as an in-process adapter inside the
+`sched-ibkr_prices` worker thread and failed with `There is no current event loop in thread
+'sched-ibkr_prices'`. `price_backfill` shares the same adapter and therefore the same latent
+bug. The same resume also exposed `market_data.db write lock busy (timeout)` because
+`backfill_prices_direct()` held `market_write_lock` while fetching provider data across the
+active universe.
+
+P0-C.1 is the required follow-up plan:
+`docs/design/PG_EXIT_P0C1_PRICES_RUNTIME_HARDENING_PLAN.md`. It keeps the P0-C data gate
+unchanged, but moves both IBKR price sources behind a sanitized `python -m src.prices_runtime`
+worker, fetches provider rows outside the SQLite write lock, adds one-market-writer-per-tick
+backpressure, and classifies lock-busy as retryable skip rather than durable failed.
+
 ## Self-Review Notes
 
 - The plan covers user review points (a)-(e):
