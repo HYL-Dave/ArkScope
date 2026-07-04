@@ -247,6 +247,31 @@ describe("Settings provider config authority", () => {
     expect(host!.textContent).toContain("選擇權=11");
   });
 
+  it("env-controlled client id never shows a save preview (real env wins precedence)", async () => {
+    const field = mocked.providersConfig.providers.ibkr.fields[0] as { effective_source: string };
+    const original = field.effective_source;
+    field.effective_source = "env";
+    try {
+      await renderDataSources();
+      // effective ids come from the backend (which read the real env)
+      expect(host!.textContent).toContain("環境變數控制中");
+      expect(host!.textContent).toContain("選擇權=11");
+      const input = Array.from(host!.querySelectorAll("input")).find((node) =>
+        node.getAttribute("placeholder") === "Client ID") as HTMLInputElement | undefined;
+      if (!input) throw new Error("missing client-id input");
+      await act(async () => {
+        setInputValue(input, "7");
+      });
+      // a draft must NOT preview 存檔後 ids — saving the app value changes nothing
+      // while the shell env overrides it
+      expect(host!.textContent).not.toContain("存檔後 ID：");
+      expect(host!.textContent).toContain("選擇權=11");
+      expect(host!.textContent).not.toContain("選擇權=17");
+    } finally {
+      field.effective_source = original;
+    }
+  });
+
   it("keeps long last-run messages out of the schedule row summary", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>

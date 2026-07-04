@@ -1636,8 +1636,8 @@ function DataSourcesSection() {
           <h2>資料來源 · Data Sources</h2>
           <p className="muted tiny">
             App 直接發起資料抓取（免 cron）。每個來源獨立排程：自己的開關與間隔、平行執行
-            （IBKR 三項共用 Gateway 鎖序列化）。一次執行＝抓取並寫入本地（多數來源經 PG
-            同步→更新本地鏡像；新聞在 use_local_news 開啟時直寫本地 SQLite，略過 PG／鏡像）。
+            （IBKR 項目共用 Gateway 鎖序列化；同一輪最多啟動一個本地市場 DB 寫入者）。
+            一次執行＝抓取並直寫本地 SQLite（股價與新聞皆為 direct-local，已無 PG 同步／鏡像）。
             預設全部停用。
           </p>
         </div>
@@ -1783,14 +1783,22 @@ function DataSourcesSection() {
                       )}
                     </tr>
                     {f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0 && (() => {
+                      // real env > app DB: while the shell env controls the base, a saved
+                      // draft changes nothing at runtime — never show a save preview.
+                      const envControlled = f.effective_source === "env";
                       const chips = ibkrClientIdChips(
                         f.client_id_domains!,
-                        keyDrafts[`${pid}.${f.field}`] ?? "",
+                        envControlled ? "" : keyDrafts[`${pid}.${f.field}`] ?? "",
                       );
+                      const caption = envControlled
+                        ? "各域用戶端 ID（環境變數控制中）："
+                        : chips.preview
+                          ? "存檔後 ID："
+                          : "各域用戶端 ID：";
                       return (
                         <tr>
                           <td colSpan={3} className="muted tiny">
-                            {chips.preview ? "存檔後 ID：" : "各域用戶端 ID："}{chips.text}
+                            {caption}{chips.text}
                           </td>
                         </tr>
                       );
