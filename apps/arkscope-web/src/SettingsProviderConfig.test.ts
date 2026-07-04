@@ -29,28 +29,60 @@ const mocked = vi.hoisted(() => ({
         default_available: false,
       },
       ibkr: {
-        fields: [{
-          field: "client_id",
-          label: "Client ID",
-          secret: false,
-          env_var: "IBKR_CLIENT_ID",
-          client_id_domains: [
-            { domain: "manual", label: "基底", offset: 0, effective_id: 1 },
-            { domain: "options", label: "選擇權", offset: 10, effective_id: 11 },
-            { domain: "prices", label: "股價", offset: 20, effective_id: 21 },
-            { domain: "news", label: "新聞", offset: 30, effective_id: 31 },
-            { domain: "iv", label: "IV", offset: 40, effective_id: 41 },
-          ],
-          app_value_set: true,
-          app_value_masked: "1",
-          effective_source: "app",
-          needs_import: false,
-          import_source: null,
-          importable_env_vars: ["IBKR_CLIENT_ID"],
-          defaulted: true,
-          guarded: true,
-          guard_reason: "Changing IBKR client_id can disturb active Gateway sessions.",
-        }],
+        fields: [
+          {
+            field: "host",
+            label: "Gateway host",
+            secret: false,
+            env_var: "IBKR_HOST",
+            app_value_set: true,
+            app_value_masked: "192.168.0.153",
+            effective_source: "app",
+            needs_import: false,
+            import_source: null,
+            importable_env_vars: ["IBKR_HOST"],
+            defaulted: false,
+            guarded: false,
+            guard_reason: null,
+          },
+          {
+            field: "port",
+            label: "Gateway port",
+            secret: false,
+            env_var: "IBKR_PORT",
+            app_value_set: true,
+            app_value_masked: "4001",
+            effective_source: "app",
+            needs_import: false,
+            import_source: null,
+            importable_env_vars: ["IBKR_PORT"],
+            defaulted: false,
+            guarded: false,
+            guard_reason: null,
+          },
+          {
+            field: "client_id",
+            label: "Client ID",
+            secret: false,
+            env_var: "IBKR_CLIENT_ID",
+            client_id_domains: [
+              { domain: "manual", label: "基底", offset: 0, effective_id: 1 },
+              { domain: "options", label: "選擇權", offset: 10, effective_id: 11 },
+              { domain: "prices", label: "股價", offset: 20, effective_id: 21 },
+              { domain: "news", label: "新聞", offset: 30, effective_id: 31 },
+              { domain: "iv", label: "IV", offset: 40, effective_id: 41 },
+            ],
+            app_value_set: true,
+            app_value_masked: "1",
+            effective_source: "app",
+            needs_import: false,
+            import_source: null,
+            importable_env_vars: ["IBKR_CLIENT_ID"],
+            defaulted: true,
+            guarded: true,
+            guard_reason: "Changing IBKR client_id can disturb active Gateway sessions.",
+          },
+        ],
         testable: true,
         default_available: false,
       },
@@ -275,7 +307,10 @@ describe("Settings provider config authority", () => {
   });
 
   it("env-controlled client id never shows a save preview (real env wins precedence)", async () => {
-    const field = mocked.providersConfig.providers.ibkr.fields[0] as { effective_source: string };
+    const field = mocked.providersConfig.providers.ibkr.fields.find((f) => f.field === "client_id") as
+      | { effective_source: string }
+      | undefined;
+    if (!field) throw new Error("missing client_id field");
     const original = field.effective_source;
     field.effective_source = "env";
     try {
@@ -334,5 +369,15 @@ describe("Settings provider config authority", () => {
     if (!row) throw new Error("missing FRED provider row");
     expect(row.textContent).toContain("未啟用抓取");
     expect(row.textContent).not.toContain("已停用");
+  });
+
+  it("renders IBKR connection settings as one grouped block with derived ids below the client id", async () => {
+    await renderDataSources();
+    const group = host!.querySelector("[data-testid='ibkr-config-group']");
+    expect(group?.textContent).toContain("Gateway host");
+    expect(group?.textContent).toContain("Gateway port");
+    expect(group?.textContent).toContain("Client ID");
+    expect(group?.textContent).toContain("各域用戶端 ID：");
+    expect(group?.textContent).toContain("股價=21");
   });
 });

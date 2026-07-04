@@ -2174,6 +2174,35 @@ button.wl-railitem.active,
 
 .ds-keyinput { width: 180px; }
 .ds-config td { vertical-align: top; }
+.provider-config-group {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+}
+.provider-config-field {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.provider-config-field-edit,
+.provider-config-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.provider-config-field-hint {
+  grid-column: 2 / -1;
+}
+@media (max-width: 760px) {
+  .provider-config-field {
+    grid-template-columns: 1fr;
+  }
+  .provider-config-field-hint {
+    grid-column: 1;
+  }
+}
 
 /* ---- 新聞·事件 surface ---- */
 .news-toolbar {

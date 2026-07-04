@@ -1561,6 +1561,71 @@ function DataSourcesSection() {
     }
   }
 
+  function renderProviderConfigField(pid: string, f: ProviderConfigField) {
+    const draftKey = `${pid}.${f.field}`;
+    const draft = keyDrafts[draftKey] ?? "";
+    const envControlled = f.env_var === "IBKR_CLIENT_ID" && f.effective_source === "env";
+    const chips = f.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0
+      ? ibkrClientIdChips(f.client_id_domains!, envControlled ? "" : draft)
+      : null;
+    const caption = envControlled
+      ? "各域用戶端 ID（環境變數控制中）："
+      : chips?.preview
+        ? "存檔後 ID："
+        : "各域用戶端 ID：";
+
+    return (
+      <div className="provider-config-field" key={draftKey}>
+        <div className="provider-config-field-label">{f.label}</div>
+        <div className="provider-config-field-current">
+          {f.effective_source === "missing"
+            ? <span className="ds-chip ds-missing_key">未設定</span>
+            : <>
+                <span className="mono">{f.app_value_set ? f.app_value_masked : "（外部）"}</span>
+                {f.defaulted && <span className="muted tiny"> · 預設</span>}
+                <span className="muted tiny">（{providerConfigSourceLabel(f.effective_source)}）</span>
+                {f.needs_import && (
+                  <button className="btn-ghost tiny"
+                    disabled={busy === `import.${pid}.${f.field}`}
+                    onClick={() => void importField(pid, f.field, f.import_source)}>
+                    匯入
+                  </button>
+                )}
+                {f.needs_import && <span className="muted tiny">建議匯入</span>}
+              </>}
+        </div>
+        <div className="provider-config-field-edit">
+          <input
+            className="ds-interval ds-keyinput"
+            type={f.secret ? "password" : "text"}
+            placeholder={f.secret ? "貼上金鑰…" : f.label}
+            value={draft}
+            disabled={busy === draftKey}
+            onChange={(e) => setKeyDrafts((d) => ({ ...d, [draftKey]: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && draft) void saveField(pid, f.field, draft, f);
+            }}
+          />
+          {draft && (
+            <button className="btn-ghost tiny" onClick={() => void saveField(pid, f.field, draft, f)}>
+              儲存
+            </button>
+          )}
+          {f.app_value_set && (
+            <button className="btn-ghost tiny" onClick={() => void saveField(pid, f.field, null, f)}>
+              清除
+            </button>
+          )}
+        </div>
+        {chips && (
+          <div className="provider-config-field-hint muted tiny">
+            {caption}{chips.text}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function jobOutcome(jobName: string): string {
     const row = health?.jobs?.[jobName] as
       | { status?: string; finished_at?: string; error?: string }
@@ -1692,6 +1757,36 @@ function DataSourcesSection() {
                 .filter(([, c]) => c.fields.length > 0 || c.testable)
                 .map(([pid, c]) => {
                   const label = health?.providers.find((p) => p.id === pid)?.label ?? pid;
+                  if (pid === "ibkr" && c.fields.length > 0) {
+                    return (
+                      <tr key="ibkr.group">
+                        <td>
+                          {label}
+                          {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
+                        </td>
+                        <td colSpan={4}>
+                          <div data-testid="ibkr-config-group" className="provider-config-group">
+                            {c.fields.map((f) => renderProviderConfigField(pid, f))}
+                            <div className="provider-config-actions">
+                              {c.testable ? (
+                                <>
+                                  <button className="btn-ghost" disabled={!!busy}
+                                    onClick={() => void runTest(pid)}>
+                                    測試
+                                  </button>
+                                  {testResults[pid] && (
+                                    <div className="muted tiny">{testResults[pid]}</div>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="muted tiny">不提供（按次計費）</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
                   const rows = c.fields.length > 0 ? c.fields : [null];
                   const hintRows = rows.filter(
                     (f) => f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0,
