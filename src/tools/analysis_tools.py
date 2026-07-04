@@ -416,53 +416,56 @@ def get_watchlist_overview(
 
 
 def get_universe_summaries(dal: DataAccessLayer, days: int = 7) -> Dict[str, dict]:
-    """Batch market summary for the whole tracked universe in TWO queries.
+    """Batch market summary for the whole tracked universe from the LOCAL market DB.
 
-    Returns ``{TICKER: {latest_close, change_pct, total_volume, news_count_7d}}``
-    for every ticker with price data in the window — computed with one aggregate
-    SQL query over ``prices`` (not one round-trip per ticker) plus one news-count
-    query. This is the cheap read behind the Universe surface, so it can show
-    market data for all ~150 tickers, not just the curated overview.
+    Returns ``{TICKER: {latest_close, change_pct, total_volume, bars, news_count_7d}}``
+    via two aggregate queries over local ``market_data.db``. Post-P0-C/N9 this must
+    never touch PG: the PG ``news`` table no longer exists, and the old raw-PG path
+    aborted the WHOLE summary when that one query failed (live incident 2026-07-04).
+    The two domains degrade independently — a news failure keeps price summaries.
 
-    DB backend only; returns ``{}`` for a file backend (callers treat a missing
-    ticker as "no summary").
+    ``dal`` is unused (kept for caller signature compatibility).
     """
-    backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    from src.market_data_admin import resolve_market_db_path
+
+    path = resolve_market_db_path()
+    if not Path(path).exists():
         return {}
-
-    price_sql = """
-        WITH w AS (
-            SELECT ticker, datetime, open, close, volume
-            FROM prices
-            WHERE interval = '15min'
-              AND datetime >= NOW() - (%(pdays)s || ' days')::INTERVAL
-        )
-        SELECT ticker,
-               (ARRAY_AGG(close ORDER BY datetime DESC))[1] AS latest_close,
-               (ARRAY_AGG(open  ORDER BY datetime ASC))[1]  AS period_open,
-               SUM(volume) AS total_volume,
-               COUNT(*)    AS bars
-        FROM w GROUP BY ticker
-    """
-    news_sql = """
-        SELECT ticker, COUNT(*) AS n
-        FROM news
-        WHERE published_at >= NOW() - (%(ndays)s || ' days')::INTERVAL
-        GROUP BY ticker
-    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days))).strftime(
+        "%Y-%m-%dT%H:%M:%S+0000"
+    )
 
     out: Dict[str, dict] = {}
     try:
-        from psycopg2 import extras as _pg_extras
-
-        conn = backend._get_conn()
-        with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-            cur.execute(price_sql, {"pdays": int(days)})
-            for r in cur.fetchall():
-                t = str(r["ticker"]).upper()
-                latest = r["latest_close"]
-                opened = r["period_open"]
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error as e:
+        logger.warning("get_universe_summaries failed to open local market DB: %s", e)
+        return {}
+    try:
+        try:
+            rows = conn.execute(
+                """
+                SELECT p.ticker,
+                       (SELECT q.close FROM prices q WHERE q.ticker = p.ticker
+                          AND q.interval = '15min' AND q.datetime >= :cutoff
+                          ORDER BY q.datetime DESC LIMIT 1) AS latest_close,
+                       (SELECT q.open FROM prices q WHERE q.ticker = p.ticker
+                          AND q.interval = '15min' AND q.datetime >= :cutoff
+                          ORDER BY q.datetime ASC LIMIT 1) AS period_open,
+                       SUM(p.volume) AS total_volume,
+                       COUNT(*) AS bars
+                FROM prices p
+                WHERE p.interval = '15min' AND p.datetime >= :cutoff
+                GROUP BY p.ticker
+                """,
+                {"cutoff": cutoff},
+            ).fetchall()
+            for ticker, latest, opened, volume, bars in rows:
+                t = str(ticker).upper()
                 change = (
                     round((latest - opened) / opened * 100, 2)
                     if latest is not None and opened
@@ -471,26 +474,33 @@ def get_universe_summaries(dal: DataAccessLayer, days: int = 7) -> Dict[str, dic
                 out[t] = {
                     "latest_close": round(latest, 2) if latest is not None else None,
                     "change_pct": change,
-                    "total_volume": int(r["total_volume"]) if r["total_volume"] is not None else None,
-                    "bars": int(r["bars"]) if r["bars"] is not None else 0,
+                    "total_volume": int(volume) if volume is not None else None,
+                    "bars": int(bars) if bars is not None else 0,
                     "news_count_7d": 0,
                 }
-            cur.execute(news_sql, {"ndays": int(days)})
-            for r in cur.fetchall():
-                t = str(r["ticker"]).upper()
+        except sqlite3.Error as e:
+            logger.warning("get_universe_summaries prices query failed: %s", e)
+        try:
+            for ticker, n in conn.execute(
+                "SELECT UPPER(ticker), COUNT(*) FROM news "
+                "WHERE published_at >= :cutoff GROUP BY UPPER(ticker)",
+                {"cutoff": cutoff},
+            ):
+                t = str(ticker)
                 if t in out:
-                    out[t]["news_count_7d"] = int(r["n"])
+                    out[t]["news_count_7d"] = int(n)
                 else:
                     out[t] = {
                         "latest_close": None,
                         "change_pct": None,
                         "total_volume": None,
                         "bars": 0,
-                        "news_count_7d": int(r["n"]),
+                        "news_count_7d": int(n),
                     }
-    except Exception as e:  # pragma: no cover - defensive (DB hiccup degrades gracefully)
-        logger.warning("get_universe_summaries failed: %s", e)
-        return {}
+        except sqlite3.Error as e:
+            logger.warning("get_universe_summaries news query failed: %s", e)
+    finally:
+        conn.close()
     return out
 
 

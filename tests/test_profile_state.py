@@ -238,6 +238,10 @@ def api_store(tmp_path, monkeypatch):
         "src.api.routes.profile.get_watchlist_overview",
         lambda dal: CANNED_OVERVIEW,
     )
+    # Hermetic: get_universe_summaries reads the LOCAL market DB (post-N9 rewrite);
+    # point it at an absent tmp DB or the dev data/market_data.db leaks real prices
+    # into these route tests (same class as the macro-toggle hermeticity fix).
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent-market.db"))
     return test_store
 
 
