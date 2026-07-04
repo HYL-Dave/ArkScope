@@ -258,7 +258,8 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
              enabled: Optional[bool] = None, last_success: Optional[datetime] = None,
              last_attempt: Optional[datetime] = None, last_error: Optional[str] = None,
              weekend_maintenance: bool = False, detail: str = "",
-             signals: Optional[dict] = None) -> None:
+             signals: Optional[dict] = None,
+             disabled_reason: Optional[str] = None) -> None:
         providers.append({
             "id": pid,
             "label": label,
@@ -268,6 +269,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             "key_import_suggested": key["source"] == "config/.env",
             "key_vars": key["vars"],
             "enabled": enabled,
+            "disabled_reason": disabled_reason,
             "status": _status(
                 key_present=key["present"], enabled=enabled,
                 last_success_at=last_success,
@@ -316,14 +318,20 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         )
 
     fred = _job_signal("fetch_fred")
+    fred_disabled = macro_enabled is False
     _add(
         "fred", "FRED", "macro",
         _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
         enabled=macro_enabled,
         last_success=fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
-        detail=f"latest fred job success {_iso(fred['last_success']) or '—'}",
+        detail=(
+            "macro ingestion not enabled"
+            if fred_disabled
+            else f"latest fred job success {_iso(fred['last_success']) or '—'}"
+        ),
         signals={"jobs_prefix": "fetch_fred"},
+        disabled_reason="macro_ingestion_disabled" if fred_disabled else None,
     )
 
     # SEC EDGAR — free, no key; TTL-governed cache, never age-judged

@@ -1,5 +1,20 @@
 import type { CoverageStatus, MacroStatus, MarketDataStatus, NewsStatus, TradingDayRow } from "./api";
 
+export function providerHealthStatusLabel(p: { status: string; disabled_reason?: string | null }): string {
+  if (p.status === "disabled" && p.disabled_reason === "macro_ingestion_disabled") {
+    return "未啟用抓取";
+  }
+  const labels: Record<string, string> = {
+    connected: "正常",
+    stale: "過期",
+    maintenance: "維護中",
+    no_signal: "無訊號",
+    missing_key: "缺金鑰",
+    disabled: "已停用",
+  };
+  return labels[p.status] ?? p.status;
+}
+
 export function marketRoutingLabel(status: MarketDataStatus): string {
   if (status.routing_enabled) {
     return status.pg_fallback_active ? "啟用中（PG fallback）" : "啟用中（local-only strict）";

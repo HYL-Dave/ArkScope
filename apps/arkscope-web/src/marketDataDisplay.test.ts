@@ -8,6 +8,7 @@ import {
   newsReadSurfaceLabel,
   newsRoutingLabel,
   newsWriteRouteLabel,
+  providerHealthStatusLabel,
   schedulerStateLabel,
 } from "./marketDataDisplay";
 import type { MacroStatus, MarketDataStatus, NewsStatus } from "./api";
@@ -184,5 +185,25 @@ describe("schedulerStateLabel", () => {
   });
   it("partial with no deferred is not actionable", () => {
     expect(schedulerStateLabel({ last_status: "partial", continuation: { deferred: [] } }).needsContinue).toBe(false);
+  });
+});
+
+describe("providerHealthStatusLabel", () => {
+  it("labels disabled FRED macro ingestion as not-enabled ingestion, not a broken provider", () => {
+    expect(providerHealthStatusLabel({
+      id: "fred",
+      kind: "macro",
+      status: "disabled",
+      disabled_reason: "macro_ingestion_disabled",
+    })).toBe("未啟用抓取");
+  });
+
+  it("keeps generic disabled providers as disabled", () => {
+    expect(providerHealthStatusLabel({
+      id: "other",
+      kind: "news",
+      status: "disabled",
+      disabled_reason: null,
+    })).toBe("已停用");
   });
 });

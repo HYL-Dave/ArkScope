@@ -1530,6 +1530,7 @@ export interface ProviderHealth {
   key_import_suggested: boolean;
   key_vars: string[];
   enabled: boolean | null; // null = no toggle exists for this provider
+  disabled_reason?: string | null;
   status: ProviderStatus;
   last_success_at: string | null;
   last_attempt_at: string | null;

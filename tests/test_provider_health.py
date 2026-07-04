@@ -141,6 +141,8 @@ def test_fred_disabled_when_macro_calendar_feature_is_off(monkeypatch):
                         lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
     p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY), "fred")
     assert p["status"] == "disabled"
+    assert p["disabled_reason"] == "macro_ingestion_disabled"
+    assert "not enabled" in p["detail"].lower()
     assert p["enabled"] is False
 
 
