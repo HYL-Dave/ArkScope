@@ -58,8 +58,9 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Local market-data status (PURE READ; does not touch PG).
 
     Reports the local per-domain stats (prices + news + iv + fundamentals + the
-    local-primary financial_cache), whether routing is enabled (persisted setting or
-    env override), and whether PG fallback is therefore active.
+    local-primary financial_cache). Post-PG-exit local authority is the default:
+    the legacy persisted/env routing fields are exposed for provenance only, not
+    as live PG fallback controls.
     """
     path = resolve_market_db_path()
     stats = local_market_stats(path)
@@ -67,11 +68,10 @@ def market_data_status(store: ProfileStateStore = Depends(get_profile_store)):
     env_on = env_routing_enabled()
     strict_setting_on = _strict_setting_enabled(store)
     strict_env_on = env_strict_enabled()
-    # Routing only actually engages when enabled AND the DB exists (DAL guards this).
-    routing_enabled = (setting_on or env_on) and stats["exists"]
-    # Strict is a modifier of local-market routing: it only has runtime effect when
-    # routing itself is active.
-    strict_enabled = routing_enabled and (strict_setting_on or strict_env_on)
+    # Local authority is the post-PG-exit default even before the DB file exists.
+    # The SQLite layer returns honest-empty rows until ingestion creates it.
+    routing_enabled = True
+    strict_enabled = True
     sync = overlay_price_sync_retired(overlay_news_sync_status(read_sync_meta(path), path))
     return {
         "market_db": path,

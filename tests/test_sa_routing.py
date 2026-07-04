@@ -1,4 +1,4 @@
-"""Tests for the 3d SA-capture flip mechanism (prep-4): use_local_sa selection matrix."""
+"""Tests for SA-capture plus post-N9 local-market selection matrix."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class _StubPG:
 
 @pytest.fixture()
 def env(tmp_path, monkeypatch):
-    """Isolated profile DB + DB paths; both toggles off; stub backend classes."""
+    """Isolated profile DB + DB paths; local market defaults on; stub backend classes."""
     profile = tmp_path / "profile_state.db"
     ProfileStateStore(profile)  # create schema
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile))
@@ -66,8 +66,11 @@ def _make(env):
     return env.dal._make_db_backend("postgresql://fake/db", "prefer")
 
 
-def test_both_off_plain_pg(env):
-    assert isinstance(_make(env), _StubPG)
+def test_default_routes_local_market(env):
+    b = _make(env)
+    assert isinstance(b, _StubLMDB)
+    assert b.market_db == str(env.market_db)
+    assert b.strict is True
 
 
 def test_market_only(env):
@@ -75,16 +78,17 @@ def test_market_only(env):
     env.market_db.write_bytes(b"")  # exists
     b = _make(env)
     assert isinstance(b, _StubLMDB) and b.market_db == str(env.market_db)
-    assert b.strict is False
+    assert b.strict is True
 
 
-def test_sa_only_market_inert(env):
+def test_sa_only_still_threads_local_market(env):
     env.profile.set_setting("use_local_sa", "true")
     env.sa_db.write_bytes(b"")
     b = _make(env)
     assert isinstance(b, _StubSABackend)
     assert b.sa_db == str(env.sa_db)
-    assert b.market_db == ""  # market routing inert
+    assert b.market_db == str(env.market_db)
+    assert b.strict is True
 
 
 def test_both_on_one_instance_serves_both(env):
@@ -95,7 +99,7 @@ def test_both_on_one_instance_serves_both(env):
     b = _make(env)
     assert isinstance(b, _StubSABackend)
     assert b.sa_db == str(env.sa_db) and b.market_db == str(env.market_db)
-    assert b.strict is False
+    assert b.strict is True
 
 
 def test_market_strict_threads_to_selected_backend(env):
@@ -131,14 +135,16 @@ def test_news_exit_threads_news_strict_to_sa_backend_without_market_strict(env):
     assert b.sa_db == str(env.sa_db)
     assert b.market_db == str(env.market_db)
     assert b.news_strict is True
-    assert b.strict is False
+    assert b.strict is True
 
 
-def test_sa_toggle_without_db_stays_pg(env):
-    # flip-before-migration safety: enabling the toggle with no sa_capture.db on
-    # disk must keep PG — identical to the market-toggle guard.
+def test_sa_toggle_without_db_stays_local_market(env):
+    # SA still requires its local DB to engage, but market no longer falls back to PG.
     env.profile.set_setting("use_local_sa", "true")
-    assert isinstance(_make(env), _StubPG)
+    b = _make(env)
+    assert isinstance(b, _StubLMDB)
+    assert b.market_db == str(env.market_db)
+    assert b.strict is True
 
 
 def test_env_override_flips_without_setting(env, monkeypatch):
@@ -154,7 +160,10 @@ def test_rollback_is_instant_per_construction(env):
     env.sa_db.write_bytes(b"")
     assert isinstance(_make(env), _StubSABackend)
     env.profile.set_setting("use_local_sa", "false")   # rollback = flip back
-    assert isinstance(_make(env), _StubPG)
+    b = _make(env)
+    assert isinstance(b, _StubLMDB)
+    assert b.market_db == str(env.market_db)
+    assert b.strict is True
 
 
 def test_migration_cli_refuses_rebuild_post_flip(env, monkeypatch):

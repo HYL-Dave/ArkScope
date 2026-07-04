@@ -213,26 +213,26 @@ class DataAccessLayer:
         Subclasses keep ``isinstance(backend, DatabaseBackend)`` True everywhere, so
         DB-only code paths behave exactly as on plain PG.
 
-        Selection matrix (each toggle: persisted profile_settings key OR env
-        override, AND the corresponding local DB file exists):
+        Selection matrix after N9 batch-2 local-default collapse:
           - SA on              → SACaptureDatabaseBackend (3d): sa_* domain served
             from data/sa_capture.db — HARD cutover, no PG fallback for sa_*; it
             extends LocalMarketDatabaseBackend, so when local-market is ALSO on the
             same instance serves both routings (market_db="" keeps market inert).
-          - market on, SA off  → LocalMarketDatabaseBackend (3a-3c): market reads
-            local-first with PG fallback.
-          - both off           → plain DatabaseBackend.
-        Default = plain PG; flips are instant per fresh DAL construction (the
-        native host builds one per message), sidecar needs get_dal.cache_clear()."""
+          - market path known   → LocalMarketDatabaseBackend (3a-3c): market reads
+            hard-local. The DB file may be absent on a fresh profile; reads return
+            honest empty local results until ingestion creates it.
+          - no local path       → plain DatabaseBackend only for pathological/test
+            callers that explicitly request PG.
+        Default runtime = local authority; persisted legacy toggles are provenance
+        and rollback documentation, not live PG fallback levers."""
         import os
 
         market_db = os.environ.get("ARKSCOPE_MARKET_DB") or (
             str(self._base / "data" / "market_data.db") if self._base else None
         )
-        market_db_exists = bool(market_db) and Path(market_db).exists()
         local_market_requested = self._local_market_enabled()
-        news_strict = bool(market_db_exists) and self._news_pg_exit_completed(market_db)
-        market_on = bool(market_db_exists) and (local_market_requested or news_strict)
+        news_strict = self._news_pg_exit_completed(market_db)
+        market_on = bool(market_db) and (local_market_requested or news_strict)
 
         sa_db = None
         if self._local_sa_enabled():
@@ -242,10 +242,10 @@ class DataAccessLayer:
             if Path(candidate).exists():  # enabling before migration keeps PG (safe)
                 sa_db = candidate
 
-        # strict (local-only) market mode: market reads serve local-only, never PG. Only
-        # meaningful when market routing is active. A short PG connect_timeout makes any
-        # residual non-market PG path fail fast (desktop-app boot-without-PG).
-        strict = bool(market_db_exists and local_market_requested) and self._local_market_strict_enabled()
+        # Post-P0-C/N9 market mode is hard-local. The legacy strict flag remains
+        # exposed for provenance, but no longer controls whether market reads may
+        # fall back to PG.
+        strict = bool(market_on and local_market_requested)
         if sa_db:
             from src.tools.backends.sa_capture_backend import SACaptureDatabaseBackend
 
@@ -339,18 +339,14 @@ class DataAccessLayer:
         return value is not None and value.strip().lower() in truthy
 
     def _local_market_enabled(self) -> bool:
-        return self._profile_setting_truthy("use_local_market", "ARKSCOPE_USE_LOCAL_MARKET")
+        return True
 
     def _local_market_strict_enabled(self) -> bool:
-        """Strict (local-only) market mode: market reads never fall back to PG. Off by
-        default — opt in once the local mirror is trusted complete (PG-exit step R4).
+        """Legacy strict toggle reader kept for status/provenance.
 
-        NOTE (by design): this is a MODIFIER of ``use_local_market``, NOT an independent
-        "never use PG" kill switch. ``use_local_market_strict=true`` only takes effect when
-        ``use_local_market`` is also on AND market_data.db exists (see ``_make_db_backend``:
-        ``strict = market_on and …``). It hardens the MARKET domain only; non-market PG paths
-        (SA is hard-local separately; app-records are a later slice) are out of its scope —
-        their fail-fast comes from the short connect_timeout, not this flag."""
+        After P0-C/N9, market reads are hard-local by default. This flag no longer
+        controls whether market reads may fall back to PG.
+        """
         return self._profile_setting_truthy("use_local_market_strict", "ARKSCOPE_LOCAL_MARKET_STRICT")
 
     def _local_sa_enabled(self) -> bool:
@@ -358,11 +354,8 @@ class DataAccessLayer:
         return self._profile_setting_truthy("use_local_sa", "ARKSCOPE_USE_LOCAL_SA")
 
     def _local_macro_enabled(self) -> bool:
-        """Macro/calendar domain → local macro_calendar.db (PG-exit §4c slice 2). Off by
-        default; flip only once the local DB is migrated/seeded (slice 4). Selects the
-        SQLite twin in src.macro_calendar.get_macro_calendar_store."""
-        from src.macro_calendar import ENV_USE_LOCAL_MACRO, USE_LOCAL_MACRO_KEY
-        return self._profile_setting_truthy(USE_LOCAL_MACRO_KEY, ENV_USE_LOCAL_MACRO)
+        """Macro/calendar domain → local macro_calendar.db by default after N9."""
+        return True
 
     def _local_records_enabled(self) -> bool:
         """App-records domain (reports/memories/agent_queries) → local profile_state.db

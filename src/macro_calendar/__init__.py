@@ -8,24 +8,17 @@ read API/tools land in later commits.
 
 from typing import Any
 
-# profile_settings key + env override for the local-macro toggle (PG-exit §4c slice 2).
-# Shared by the DAL (data_access._local_macro_enabled) and the Settings route.
+# Legacy profile_settings key + env override retained for provenance. After N9
+# batch-2, macro/calendar runtime routing is local by default.
 USE_LOCAL_MACRO_KEY = "use_local_macro"
 ENV_USE_LOCAL_MACRO = "ARKSCOPE_USE_LOCAL_MACRO"
 
 
 def get_macro_calendar_store(dal: Any):
-    """Return the macro/cal store for the active mode (PG-exit §4c slice 2).
+    """Return the post-N9 local macro/calendar store.
 
-    ``use_local_macro`` on (env ``ARKSCOPE_USE_LOCAL_MACRO`` or the persisted
-    profile_settings key) → the SQLite ``MacroCalendarLocalStore`` over its own
-    ``macro_calendar.db`` (no PG). Off (default) → the PG ``MacroCalendarStore(dal)``.
-    Both expose the same method surface, so read call sites are mode-agnostic. Lazy
-    imports keep psycopg2 off the local path. A ``dal`` lacking the toggle (older/test
-    doubles) is treated as OFF → PG store, preserving current behavior.
+    The old PG ``MacroCalendarStore`` remains importable for legacy/drop tooling,
+    but normal runtime routing is always the SQLite ``MacroCalendarLocalStore``.
     """
-    if getattr(dal, "_local_macro_enabled", None) and dal._local_macro_enabled():
-        from src.macro_calendar.local_store import MacroCalendarLocalStore
-        return MacroCalendarLocalStore()
-    from src.macro_calendar.store import MacroCalendarStore
-    return MacroCalendarStore(dal)
+    from src.macro_calendar.local_store import MacroCalendarLocalStore
+    return MacroCalendarLocalStore()

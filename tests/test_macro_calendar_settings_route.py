@@ -38,8 +38,8 @@ def test_status_db_absent_is_honest_and_does_not_create(tmp_path, monkeypatch):
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
     out = routes.macro_status(store=_FakeProfileStore())
     assert out["exists"] is False and out["tables"] == {}
-    assert out["use_local_macro_setting"] is False  # default off
-    assert out["local_first_active"] is False
+    assert out["use_local_macro_setting"] is False  # no explicit legacy setting
+    assert out["local_first_active"] is True        # post-N9 local default
     assert not db.exists(), "status read must not create macro_calendar.db"
 
 
@@ -79,9 +79,11 @@ def test_local_first_active_when_toggle_on_even_if_db_absent(tmp_path, monkeypat
     monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")   # env-only path
     out2 = routes.macro_status(store=_FakeProfileStore())
     assert out2["local_first_active"] is True
-    # off → PG (unchanged)
+    # explicit false is retained as provenance, not as a PG fallback lever
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MACRO", raising=False)
-    assert routes.macro_status(store=_FakeProfileStore())["local_first_active"] is False
+    off = routes.macro_status(store=_FakeProfileStore({USE_LOCAL_MACRO_KEY: "false"}))
+    assert off["use_local_macro_setting"] is False
+    assert off["local_first_active"] is True
 
 
 def test_put_settings_persists_toggle(monkeypatch):

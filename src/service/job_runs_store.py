@@ -660,27 +660,28 @@ def _env_truthy(value: Optional[str]) -> Optional[bool]:
 
 
 def _local_job_runs_enabled(dal: Any) -> bool:
+    """Return the post-N9 effective routing state.
+
+    The legacy profile/env value is still read when available so existing
+    provenance tests and diagnostics can observe it, but false no longer routes
+    runtime writes back to PG.
+    """
     checker = getattr(dal, "_profile_setting_truthy", None)
     if callable(checker):
-        value = checker(USE_LOCAL_JOB_RUNS_KEY, ENV_USE_LOCAL_JOB_RUNS)
-        if isinstance(value, bool):
-            return value
-        return _env_truthy(str(value)) is True
-    env = _env_truthy(os.environ.get(ENV_USE_LOCAL_JOB_RUNS))
-    return bool(env)
+        checker(USE_LOCAL_JOB_RUNS_KEY, ENV_USE_LOCAL_JOB_RUNS)
+    return True
 
 
 def get_job_runs_store(dal: Any):
-    """Return the active job-runs store.
+    """Return the post-N9 local job-runs store.
 
-    The default remains PG-backed until the S-H1 migration apply flips
-    ``use_local_job_runs``. Explicit false is the rollback lever until N9.
+    Explicit false is retained only as a historical rollback/provenance value.
+    Runtime writes and reads use ``profile_state.db``.
     """
-    if _local_job_runs_enabled(dal):
-        from src.app_records_store import resolve_profile_state_db_path
+    _local_job_runs_enabled(dal)
+    from src.app_records_store import resolve_profile_state_db_path
 
-        return JobRunsLocalStore(resolve_profile_state_db_path(dal))
-    return JobRunsStore(dal)
+    return JobRunsLocalStore(resolve_profile_state_db_path(dal))
 
 
 def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:

@@ -334,9 +334,9 @@ def test_list_jobs_status_uses_db_latest_when_available():
     }
 
     with patch.object(
-        JobRunsStore, "is_available", return_value=True,
+        JobRunsLocalStore, "is_available", return_value=True,
     ), patch.object(
-        JobRunsStore,
+        JobRunsLocalStore,
         "latest_runs_by_name",
         return_value={"analysis_watchlist_batch": db_row},
     ):
@@ -439,8 +439,8 @@ def test_run_job_persists_start_and_finish_on_success():
 
     fake_result = {"success_count": 1, "processed_count": 1, "persisted_count": 0, "items": []}
 
-    with patch.object(JobRunsStore, "create_run", fake_create_run), \
-         patch.object(JobRunsStore, "finish_run", fake_finish_run), \
+    with patch.object(JobRunsLocalStore, "create_run", fake_create_run), \
+         patch.object(JobRunsLocalStore, "finish_run", fake_finish_run), \
          patch.object(jobs_module, "_run_analysis_watchlist_batch", return_value=fake_result):
         result = jobs_module.run_job(
             "analysis_watchlist_batch", dal=dal, trigger_source="cli",
@@ -469,8 +469,8 @@ def test_run_job_persists_failure():
         finish_calls.append((run_id, kwargs))
         return True
 
-    with patch.object(JobRunsStore, "create_run", fake_create_run), \
-         patch.object(JobRunsStore, "finish_run", fake_finish_run), \
+    with patch.object(JobRunsLocalStore, "create_run", fake_create_run), \
+         patch.object(JobRunsLocalStore, "finish_run", fake_finish_run), \
          patch.object(
              jobs_module, "_run_analysis_watchlist_batch",
              side_effect=RuntimeError("boom"),
@@ -522,7 +522,7 @@ def test_jobs_history_endpoint_returns_rows_from_store():
         }
     ]
 
-    with patch.object(JobRunsStore, "list_runs", return_value=fake_rows):
+    with patch.object(JobRunsLocalStore, "list_runs", return_value=fake_rows):
         response = jobs_history(name="foo", limit=10, offset=0, dal=fake_dal)
     data = response.model_dump()
     assert data["count"] == 1
@@ -751,14 +751,16 @@ def test_get_job_runs_store_uses_profile_toggle_for_local(tmp_path, monkeypatch)
     )
 
 
-def test_get_job_runs_store_explicit_false_keeps_pg_store(monkeypatch):
+def test_get_job_runs_store_explicit_false_uses_local_after_n9(tmp_path, monkeypatch):
     monkeypatch.delenv(ENV_USE_LOCAL_JOB_RUNS, raising=False)
     dal = MagicMock()
     dal._profile_setting_truthy.return_value = False
+    dal._base = None
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
 
     store = get_job_runs_store(dal)
 
-    assert isinstance(store, JobRunsStore)
+    assert isinstance(store, JobRunsLocalStore)
 
 
 def test_jobs_history_endpoint_uses_store_factory(monkeypatch):
@@ -983,7 +985,7 @@ def test_run_telemetry_records_terminal_rows(monkeypatch):
             calls.append((name, kw))
             return 1
 
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", _FakeStore)
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", _FakeStore)
     monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
     t = mod._RunTelemetry(enabled=True, payload={"scope": "active-universe"})
     assert t.timed("polygon", lambda: True) is True

@@ -103,7 +103,7 @@ def _poison_pg_news(monkeypatch) -> None:
         monkeypatch.setattr(DatabaseBackend, name, boom)
 
 
-def test_no_dsn_completed_news_exit_selects_local_backend_without_global_strict(tmp_path):
+def test_no_dsn_completed_news_exit_selects_local_backend_with_market_strict(tmp_path):
     seed_profile(
         tmp_path,
         **{NEWS_PG_EXIT_COMPLETED_KEY: "true", "use_local_market": "false"},
@@ -114,7 +114,7 @@ def test_no_dsn_completed_news_exit_selects_local_backend_without_global_strict(
 
     assert isinstance(dal._backend, LocalMarketDatabaseBackend)
     assert dal._backend._news_strict is True
-    assert dal._backend._strict is False
+    assert dal._backend._strict is True
     assert dal._backend._dsn == ""
 
 
@@ -147,7 +147,7 @@ def test_completed_audit_marker_forces_news_hard_local_without_profile_exit_sett
 
     assert isinstance(dal._backend, LocalMarketDatabaseBackend)
     assert dal._backend._news_strict is True
-    assert dal._backend._strict is False
+    assert dal._backend._strict is True
 
 
 def test_no_dsn_get_conn_fails_before_psycopg(monkeypatch):

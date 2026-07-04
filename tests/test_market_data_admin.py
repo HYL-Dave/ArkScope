@@ -794,7 +794,36 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     assert out["prices"]["row_count"] == 0 and out["news"]["row_count"] == 0
     assert out["fundamentals_mode"] == "local_cache_refetch"
     assert out["use_local_market_setting"] is False
-    assert out["routing_enabled"] is False  # no DB + setting off
+    assert out["prices_authority"] == "local"
+    assert out["pg_fallback_active"] is False
+    assert out["routing_enabled"] is True  # post-PG-exit default local, even before DB creation
+
+
+def test_fresh_profile_without_market_db_uses_local_backend_not_pg(tmp_path, monkeypatch):
+    from src.tools.backends.local_market_backend import LocalMarketDatabaseBackend
+    from src.tools.data_access import DataAccessLayer
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / ".env").write_text(
+        "DATABASE_URL=postgresql://invalid.invalid/arkscope\n",
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    profile = data_dir / "profile_state.db"
+    with sqlite3.connect(profile) as conn:
+        conn.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile))
+    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MARKET", raising=False)
+    monkeypatch.delenv("ARKSCOPE_MARKET_DB", raising=False)
+
+    dal = DataAccessLayer(base_path=tmp_path, db_dsn="auto")
+
+    assert isinstance(dal._backend, LocalMarketDatabaseBackend)
+    assert not (data_dir / "market_data.db").exists()
+    assert dal.get_prices("NVDA").bars == []
 
 
 def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatch):
@@ -869,14 +898,15 @@ def test_toggle_persists_and_dal_reads_it(store, tmp_path, monkeypatch):
     from src.api.routes.market_data import set_local_market, LocalMarketToggle, market_data_status
     set_local_market(LocalMarketToggle(enabled=True), store=store)
     assert store.get_setting("use_local_market") == "true"
-    # status reflects the setting even with no DB (routing still gated on DB existence)
+    # status reflects the persisted legacy setting, but routing is local by default
+    # even before the DB is created.
     monkeypatch.setattr("src.api.routes.market_data.resolve_market_db_path",
                         lambda: str(tmp_path / "nope.db"))
     monkeypatch.setattr("src.api.routes.market_data.env_routing_enabled", lambda: False)
     out = market_data_status(store=store)
-    assert out["use_local_market_setting"] is True and out["routing_enabled"] is False
+    assert out["use_local_market_setting"] is True and out["routing_enabled"] is True
 
-    # the DAL reads the same persisted setting (read-only) — enabled, but no DB → stays PG
+    # the DAL remains local by default; the setting is provenance, not a PG fallback lever.
     from src.tools.data_access import DataAccessLayer
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     monkeypatch.delenv("ARKSCOPE_USE_LOCAL_MARKET", raising=False)

@@ -9,7 +9,6 @@ import pytest
 
 from src.macro_calendar import get_macro_calendar_store
 from src.macro_calendar.local_store import MacroCalendarLocalStore
-from src.macro_calendar.store import MacroCalendarStore
 from src.service.macro_calendar_health import compute_macro_calendar_health
 
 
@@ -32,9 +31,10 @@ def test_factory_returns_local_store_when_toggle_on(tmp_path, monkeypatch):
     assert isinstance(get_macro_calendar_store(_FakeDal(local=True)), MacroCalendarLocalStore)
 
 
-def test_factory_returns_pg_store_when_toggle_off_default():
-    # default OFF → the PG store (current behavior preserved until the toggle flips)
-    assert isinstance(get_macro_calendar_store(_FakeDal(local=False)), MacroCalendarStore)
+def test_factory_returns_local_store_when_toggle_off_after_n9(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_MACRO_CALENDAR_DB", str(tmp_path / "macro_calendar.db"))
+    # post-N9 explicit/off legacy state no longer routes back to PG.
+    assert isinstance(get_macro_calendar_store(_FakeDal(local=False)), MacroCalendarLocalStore)
 
 
 def test_dal_local_macro_toggle_default_off_and_env(monkeypatch, tmp_path):
@@ -44,8 +44,10 @@ def test_dal_local_macro_toggle_default_off_and_env(monkeypatch, tmp_path):
     # to the real data/profile_state.db, whose use_local_macro=true breaks the
     # default-OFF assertion on a configured host.
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
-    dal = DataAccessLayer()                       # FileBackend, no PG
-    assert dal._local_macro_enabled() is False    # default OFF
+    (tmp_path / "config").mkdir()
+    (tmp_path / "data").mkdir(exist_ok=True)
+    dal = DataAccessLayer(base_path=tmp_path)     # FileBackend, no PG
+    assert dal._local_macro_enabled() is True     # post-N9 default local
     monkeypatch.setenv("ARKSCOPE_USE_LOCAL_MACRO", "1")
     assert dal._local_macro_enabled() is True      # env override
 
