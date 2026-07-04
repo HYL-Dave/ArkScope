@@ -397,4 +397,49 @@ def test_normalize_rejects_non_numeric_ibkr_client_id():
         dpc.normalize_provider_config_value(cid, "abc")
     with pytest.raises(ValueError):
         dpc.normalize_import_value(cid, "IBKR_CLIENT", "-5")
+    with pytest.raises(ValueError):
+        # '²'.isdigit() is True but int() rejects it — the validator must too
+        dpc.normalize_provider_config_value(cid, "²")
+    with pytest.raises(ValueError):
+        # Gateway client ids are int32; leave headroom for the +40 offset
+        dpc.normalize_provider_config_value(cid, str(2**31))
     assert dpc.normalize_provider_config_value(cid, " 7 ") == "7"
+    assert dpc.normalize_provider_config_value(cid, "００７") == "7"  # canonicalized ASCII
+
+
+def test_multi_field_put_is_atomic_on_invalid_value(store):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+
+    dpc.apply_env(store)
+    with pytest.raises(HTTPException) as e:
+        pc.put_provider_config(
+            "ibkr",
+            pc.ProviderConfigUpdate(
+                fields={"host": "10.0.0.9", "client_id": "abc"},
+                confirm_guarded={"client_id": True},
+            ),
+            store=store,
+        )
+    assert e.value.status_code == 400
+    # the earlier valid field must NOT have been persisted (validate-all-first)
+    assert (store.get_all().get("ibkr") or {}).get("host") is None
+
+
+def test_import_env_rejects_non_numeric_client_id(store, monkeypatch):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+
+    dpc.apply_env(store)
+    monkeypatch.setenv("IBKR_CLIENT_ID", "abc")  # real-env override of the injected base
+    with pytest.raises(HTTPException) as e:
+        pc.import_provider_config_field(
+            "ibkr",
+            "client_id",
+            pc.ProviderConfigImportEnv(confirm_guarded=True),
+            store=store,
+        )
+    assert e.value.status_code == 400
+    assert e.value.detail["code"] == "provider_config_invalid_value"

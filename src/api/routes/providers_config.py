@@ -151,6 +151,9 @@ def put_provider_config(
         "provider": provider, "fields": list(body.fields.keys()),  # names only, never values
     })
     current_fields = store.get_all().get(provider) or {}
+    # Pass 1 — validate/normalize EVERY field before persisting ANY: a mid-loop
+    # 400/409 must not leave earlier fields saved with apply_env never run.
+    normalized: dict[str, str] = {}
     for field, value in body.fields.items():
         value = (value or "").strip()
         if value:
@@ -173,6 +176,8 @@ def put_provider_config(
                     status_code=409,
                     detail=guarded_change_detail(provider, field, by_name[field]),
                 )
+        normalized[field] = value
+    for field, value in normalized.items():
         store.set_field(provider, field, value or None)
         if not value:
             unapply_env(by_name[field].env_var)

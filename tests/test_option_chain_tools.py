@@ -226,3 +226,17 @@ def test_get_ibkr_uses_options_domain_client_id(monkeypatch):
     assert seen["client_id"] == 11
     assert seen["readonly"] is True
     assert seen["connected"] is True
+
+    # the shared helper must be the authority — an inline base+10 would pass the
+    # value check above but miss this sentinel
+    def _sentinel(domain):
+        assert domain == "options"
+        return 777
+
+    seen.clear()
+    monkeypatch.setattr(oct_mod, "_ibkr", None)
+    monkeypatch.setattr("data_sources.ibkr_client_id.ibkr_client_id_for", _sentinel)
+
+    oct_mod._get_ibkr()
+
+    assert seen["client_id"] == 777

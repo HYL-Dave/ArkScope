@@ -17,7 +17,10 @@ import os
 
 # Wire-level contract (Gateway logs identify domains by these ids); change only
 # with a decision-log entry. options=+10 predates this module — it mirrors
-# option_chain_tools' original base+10 convention.
+# option_chain_tools' original base+10 convention. Legacy occupants to stay clear
+# of: collect_ibkr_news.py defaults to 50, collect_ibkr_fundamentals.py hardcodes
+# 103, and archived scan/iv scripts stomp the env with random 100–999 — keep the
+# base well under 60 so derived ids never enter that band.
 DOMAIN_OFFSETS = {
     "manual": 0,    # the base itself: manual smokes / legacy single-client paths
     "options": 10,  # option chain tools (readonly)
@@ -28,7 +31,14 @@ DOMAIN_OFFSETS = {
 
 
 def ibkr_client_id_for(domain: str) -> int:
-    """Derived client id for a domain; reads the base AFTER apply_env has run."""
+    """Derived client id for a domain.
+
+    Reads the env at call time: in the sidecar and both workers apply_env runs
+    first, so the app-DB base wins there. Standalone CLIs that never bridge the
+    store (e.g. the agent CLI) derive from config/.env — same family, possibly a
+    different base; the guarded Settings field is authoritative only for
+    sidecar-managed processes.
+    """
     try:
         offset = DOMAIN_OFFSETS[domain]
     except KeyError:
@@ -39,7 +49,7 @@ def ibkr_client_id_for(domain: str) -> int:
     try:
         base = int(raw)
     except ValueError:
-        # worker boundaries sanitize/truncate errors — name the env var here or the
-        # job payload shows a context-free "invalid literal for int()".
+        # Name the env var: the prices worker keeps a 240-char error message (the
+        # news worker keeps only the class), and sidecar logs get the full text.
         raise ValueError(f"IBKR_CLIENT_ID must be an integer, got {raw!r}") from None
     return base + offset

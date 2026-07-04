@@ -312,7 +312,9 @@ class IBKRDataSource(BaseDataSource):
         # Load from environment variables if not provided
         self.host = host or os.getenv('IBKR_HOST', '127.0.0.1')
         self.port = port or int(os.getenv('IBKR_PORT', '7497'))
-        self.client_id = client_id or int(os.getenv('IBKR_CLIENT_ID', '1'))
+        # `is not None` (not `or`): an explicit derived id of 0 must never be
+        # silently swapped for the env base (data_sources/ibkr_client_id.py).
+        self.client_id = client_id if client_id is not None else int(os.getenv('IBKR_CLIENT_ID', '1'))
         self.timeout = timeout
         self.readonly = readonly
 

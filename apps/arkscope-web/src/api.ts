@@ -497,6 +497,13 @@ async function responseErrorMessage(path: string, r: Response): Promise<string> 
     const body = (await r.json()) as { detail?: unknown };
     if (typeof body.detail === "string" && body.detail.trim()) {
       detail = `: ${body.detail.trim()}`;
+    } else if (body.detail && typeof body.detail === "object") {
+      // Structured FastAPI details ({code, message, ...}) — surface the human text.
+      const obj = body.detail as { message?: unknown; code?: unknown };
+      const text =
+        (typeof obj.message === "string" && obj.message.trim()) ||
+        (typeof obj.code === "string" && obj.code.trim()) || "";
+      if (text) detail = `: ${text}`;
     }
   } catch {
     // Some routes/proxies return non-JSON bodies; the status is still useful.

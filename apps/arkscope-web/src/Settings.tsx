@@ -1412,7 +1412,7 @@ function compactMessage(value: string, max = 88): string {
 // real ids — this hint just shows what a given base implies.
 const IBKR_CLIENT_ID_DOMAINS: ReadonlyArray<readonly [string, number]> = [
   ["選擇權", 10],
-  ["報價", 20],
+  ["股價", 20],
   ["新聞", 30],
   ["IV", 40],
 ];
@@ -1759,6 +1759,7 @@ function DataSourcesSection() {
                               </button>
                             )}
                             {f.env_var === "IBKR_CLIENT_ID" &&
+                              f.effective_source !== "env" &&
                               ibkrDerivedClientIds(
                                 keyDrafts[`${pid}.${f.field}`] || f.app_value_masked || "",
                               ) && (

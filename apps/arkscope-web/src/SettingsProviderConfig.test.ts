@@ -217,7 +217,7 @@ describe("Settings provider config authority", () => {
     await renderDataSources();
     // saved base "1" renders the derived table without any typing
     expect(host!.textContent).toContain("選擇權=11");
-    expect(host!.textContent).toContain("報價=21");
+    expect(host!.textContent).toContain("股價=21");
     expect(host!.textContent).toContain("新聞=31");
     expect(host!.textContent).toContain("IV=41");
     const input = Array.from(host!.querySelectorAll("input")).find((node) =>

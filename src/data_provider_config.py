@@ -141,10 +141,17 @@ def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
         ch.isspace() for ch in value
     ):
         return value if value.startswith("ArkScope ") else f"ArkScope {value}"
-    if fdef.env_var == "IBKR_CLIENT_ID" and not value.isdigit():
-        # every domain id derives from this base (data_sources/ibkr_client_id.py);
-        # a non-numeric base would crash every IBKR connect long after the save.
-        raise ValueError("IBKR client_id must be a non-negative integer")
+    if fdef.env_var == "IBKR_CLIENT_ID":
+        # Every domain id derives from this base (data_sources/ibkr_client_id.py); a
+        # bad base would crash every IBKR connect long after the save. isdecimal (not
+        # isdigit: '²'.isdigit() is True but int() rejects it) + int32 headroom for
+        # the largest offset, canonicalized to ASCII (int('７')==7, '007'→'7').
+        if not value.isdecimal():
+            raise ValueError("IBKR client_id must be a non-negative integer")
+        base = int(value)
+        if base > 2**31 - 1 - 40:
+            raise ValueError("IBKR client_id too large for a Gateway client id")
+        return str(base)
     return value
 
 
