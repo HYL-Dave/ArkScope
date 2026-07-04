@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import sqlite3
+import sys
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import json
@@ -1456,21 +1457,22 @@ def test_price_scope_required(monkeypatch):
     res = ds.run_source("ibkr_prices")
     assert res["status"] == "failed" and "scope" in res["error"]
 
-    import src.market_data_direct as mdd
-
     seen = {}
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(AssertionError("prices subprocess retired")))
     monkeypatch.setattr(
-        mdd,
-        "backfill_prices_direct",
-        lambda **kwargs: seen.update(kwargs) or {"tickers_scanned": 2, "rows_added": 0, "errors": {}},
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: seen.update({"argv": argv}) or {
+            "returncode": 0,
+            "payload": {"tickers_scanned": 2, "rows_added": 0, "error_count": 0},
+        },
     )
     res = ds.run_source("ibkr_prices")
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
-    assert seen["tickers_arg"] == "AAPL,NVDA"
-    assert seen["acquire_gateway_lock"] is False
+    assert "--tickers" in seen["argv"] and "AAPL,NVDA" in seen["argv"]
+    assert "--gateway-lock-held" in seen["argv"]
 
 
 def test_local_incremental_has_no_subprocess(monkeypatch):
@@ -1725,7 +1727,8 @@ def test_last_result_surfaces_skips_in_snapshot(tmp_path):
 
 def test_price_backfill_source_registered():
     d = ds.SOURCES["price_backfill"]
-    assert d.adapter == ("src.market_data_direct", "backfill_prices_direct")
+    assert d.prices_worker is True
+    assert d.adapter is None
     assert d.ibkr is True and d.universe_tickers is True and d.sync_flag is None
     assert ds.source_config("price_backfill")["enabled"] is False  # default-off
 
@@ -1733,50 +1736,122 @@ def test_price_backfill_source_registered():
 def test_price_backfill_uses_planner_scope_no_pg_no_mirror(monkeypatch):
     # v1.3: price_backfill is gap-planned → it runs the PLANNER for scope (NOT the full universe)
     # and passes the planned tickers + lookback_days to the executor; still no PG sync / mirror.
-    import src.market_data_direct as mdd
     from src.scheduler_planner import BackfillPlan
+
     seen = {}
-
-    def _fake_backfill(tickers_arg=None, lookback_days=None, progress_cb=None, **kw):
-        seen["tickers_arg"] = tickers_arg
-        seen["lookback_days"] = lookback_days
-        if progress_cb:
-            progress_cb(1, 1, "AAPL")
-        return {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 5, "errors": {}}
-
-    monkeypatch.setattr(mdd, "backfill_prices_direct", _fake_backfill)
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     # planner picks AAPL with a 3-day window (NVDA had no gaps)
     monkeypatch.setattr(ds, "_plan_price_backfill_scope",
                         lambda scope: BackfillPlan(tickers=["AAPL"], lookback_days=3,
                                                    candidate_count=1))
+    def _fake_worker(argv):
+        seen["argv"] = argv
+        return {
+            "returncode": 0,
+            "payload": {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 5, "error_count": 0},
+        }
+
+    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _fake_worker)
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync for direct writer")))
     monkeypatch.setattr(ds, "_local_refresh",
                         lambda: (_ for _ in ()).throw(AssertionError("no _local_refresh for direct writer")))
     res = ds.run_source("price_backfill")
     assert res["status"] == "succeeded"
-    assert seen["tickers_arg"] == "AAPL"          # PLANNED scope, not the full universe
-    assert seen["lookback_days"] == 3             # planned window
+    argv = seen["argv"]
+    assert "--tickers" in argv and "AAPL" in argv          # PLANNED scope, not the full universe
+    assert "--lookback-days" in argv and "3" in argv       # planned window
     assert res["plan"]["tickers"] == ["AAPL"]
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
 
 
+def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
+
+    def fake_worker(argv):
+        calls.append(argv)
+        return {
+            "returncode": 0,
+            "payload": {
+                "status": "succeeded",
+                "provider": "ibkr",
+                "tickers_scanned": 2,
+                "rows_added": 3,
+                "error_count": 0,
+            },
+        }
+
+    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", fake_worker)
+    monkeypatch.setattr(
+        ds,
+        "_local_refresh",
+        lambda: (_ for _ in ()).throw(AssertionError("no PG mirror")),
+    )
+
+    res = ds.run_source("ibkr_prices")
+
+    assert res["status"] == "succeeded"
+    argv = calls[-1]
+    assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
+    assert "--source" in argv and "ibkr_prices" in argv
+    assert "--tickers" in argv and "AAPL,NVDA" in argv
+    assert "--gateway-lock-held" in argv
+    assert "collect_ibkr_prices.py" not in " ".join(argv)
+    assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
+
+
+def test_p0c1_price_backfill_runs_prices_worker_with_planned_scope(monkeypatch):
+    from src.scheduler_planner import BackfillPlan
+
+    calls = []
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
+    monkeypatch.setattr(
+        ds,
+        "_plan_price_backfill_scope",
+        lambda scope: BackfillPlan(tickers=["AAPL"], lookback_days=3, candidate_count=1),
+    )
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: calls.append(argv) or {
+            "returncode": 0,
+            "payload": {
+                "status": "succeeded",
+                "provider": "ibkr",
+                "tickers_scanned": 1,
+                "rows_added": 26,
+                "error_count": 0,
+            },
+        },
+    )
+
+    res = ds.run_source("price_backfill")
+
+    assert res["status"] == "succeeded"
+    argv = calls[-1]
+    assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
+    assert "--source" in argv and "price_backfill" in argv
+    assert "--tickers" in argv and "AAPL" in argv
+    assert "--lookback-days" in argv and "3" in argv
+
+
 def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
-    import src.market_data_direct as mdd
-
     seen = {}
-
-    def fake_backfill(**kwargs):
-        seen.update(kwargs)
-        return {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 2, "errors": {}}
-
-    monkeypatch.setattr(mdd, "backfill_prices_direct", fake_backfill)
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["NVDA"])
+    def _fake_worker(argv):
+        seen["argv"] = argv
+        return {
+            "returncode": 0,
+            "payload": {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 2, "error_count": 0},
+        }
+
+    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _fake_worker)
     monkeypatch.setattr(
         ds,
         "_run_subprocess",
-        lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync/subprocess")),
+        lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync subprocess")),
     )
     monkeypatch.setattr(
         ds,
@@ -1787,8 +1862,10 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
     res = ds.run_source("ibkr_prices")
 
     assert res["status"] == "succeeded"
-    assert seen["tickers_arg"] == "NVDA"
-    assert seen["acquire_gateway_lock"] is False
+    argv = seen["argv"]
+    assert argv[:3] == [sys.executable, "-m", "src.prices_runtime"]
+    assert "--tickers" in argv and "NVDA" in argv
+    assert "--gateway-lock-held" in argv
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
 
 
@@ -1813,9 +1890,11 @@ def test_local_incremental_retirement_does_not_call_local_refresh(monkeypatch):
 
 
 def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
-    import src.market_data_direct as mdd
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: {"tickers_scanned": 0, "rows_added": 0, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: {"returncode": 0, "payload": {"rows_added": 0, "error_count": 0}},
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
     monkeypatch.setattr(ds, "_IBKR_LOCK_TIMEOUT_S", 0.05)  # fast timeout → skip, not 30min block
     assert ds._IBKR_LOCK.acquire(blocking=False)           # someone holds the gateway
@@ -1827,9 +1906,11 @@ def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
 
 
 def test_price_backfill_empty_scope_fails_loud(monkeypatch):
-    import src.market_data_direct as mdd
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: (_ for _ in ()).throw(AssertionError("must not run without scope")))
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: (_ for _ in ()).throw(AssertionError("must not run without scope")),
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
     res = ds.run_source("price_backfill")
     assert res["status"] == "failed" and "scope" in res["error"]
@@ -1980,10 +2061,15 @@ def test_v13_gate2_provider_errors_exclude_unresolvable(monkeypatch, tmp_path):
 
 
 def test_v13_partial_when_deferred_and_writes_continuation(monkeypatch):
-    import src.market_data_direct as mdd
     from src.scheduler_planner import BackfillPlan
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: {"tickers_scanned": 1, "rows_added": 3, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: {
+            "returncode": 0,
+            "payload": {"tickers_scanned": 1, "rows_added": 3, "error_count": 0},
+        },
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA", "TSLA"])
     monkeypatch.setattr(ds, "_plan_price_backfill_scope",
                         lambda scope: BackfillPlan(tickers=["AAPL"], lookback_days=5,
@@ -1996,15 +2082,20 @@ def test_v13_partial_when_deferred_and_writes_continuation(monkeypatch):
 
 
 def test_v13_attended_scheduler_skips_pending_continuation(monkeypatch):
-    import src.market_data_direct as mdd
     # a prior partial left a continuation
     ds._state_store().record_attempt("price_backfill",
                                      datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
     ds._state_store().record_outcome("price_backfill", status="partial", error=None,
                                      result={}, continuation={"deferred": ["NVDA"]})
     ran = {"n": 0}
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: ran.__setitem__("n", ran["n"] + 1) or {"rows_added": 0, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: ran.__setitem__("n", ran["n"] + 1) or {
+            "returncode": 0,
+            "payload": {"rows_added": 0, "error_count": 0},
+        },
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["NVDA"])
     # SCHEDULER trigger → must SKIP (attended; no auto-resume), executor not called
     sched = ds.run_source("price_backfill", trigger_source="scheduler")
@@ -2018,52 +2109,67 @@ def test_v13a_manual_continue_consumes_saved_deferred_not_fresh_plan(monkeypatch
     # v1.3a HIGH fix: a manual continue must execute the SAVED deferred scope, NOT a fresh
     # re-plan. Saved continuation = ['NVDA'], but the fresh planner would return ['AAPL'] —
     # the executor must receive NVDA (proving the saved remainder is what's serviced).
-    import src.market_data_direct as mdd
     from src.scheduler_planner import BackfillPlan
     ds._state_store().record_attempt("price_backfill",
                                      datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
     ds._state_store().record_outcome("price_backfill", status="partial", error=None,
                                      result={}, continuation={"deferred": ["NVDA"], "lookback_days": 7})
     seen = {}
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: seen.update(kw) or {"rows_added": 2, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: seen.update({"argv": argv}) or {
+            "returncode": 0,
+            "payload": {"rows_added": 2, "error_count": 0},
+        },
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     # the fresh planner would pick AAPL — but the manual continue must IGNORE it for the backlog
     monkeypatch.setattr(ds, "_plan_price_backfill_scope",
                         lambda scope, **k: BackfillPlan(tickers=["AAPL"], lookback_days=3, candidate_count=1))
     res = ds.run_source("price_backfill", trigger_source="api")
     assert res.get("resumed_continuation") is True
-    assert seen["tickers_arg"] == "NVDA"          # SAVED deferred, not the fresh-plan AAPL
-    assert seen["lookback_days"] == 7             # saved continuation's window
+    assert "--tickers" in seen["argv"] and "NVDA" in seen["argv"]      # SAVED deferred, not the fresh-plan AAPL
+    assert "--lookback-days" in seen["argv"] and "7" in seen["argv"]   # saved continuation's window
     assert res["status"] == "succeeded"           # remainder exhausted → partial cleared
     assert ds._state_store().get("price_backfill")["continuation"] is None
 
 
 def test_v13a_manual_continue_carries_remainder_when_over_budget(monkeypatch):
     # saved deferred larger than max_tickers → batch this run, carry the rest forward (still partial).
-    import src.market_data_direct as mdd
     ds._state_store().record_attempt("price_backfill",
                                      datetime(2026, 6, 24, 9, 0, tzinfo=timezone.utc))
     ds._state_store().record_outcome("price_backfill", status="partial", error=None, result={},
                                      continuation={"deferred": ["A", "B", "C", "D"], "lookback_days": 5})
     monkeypatch.setattr(ds, "_BACKFILL_MAX_TICKERS", 2)
     seen = {}
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: seen.update(kw) or {"rows_added": 1, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: seen.update({"argv": argv}) or {
+            "returncode": 0,
+            "payload": {"rows_added": 1, "error_count": 0},
+        },
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["A", "B", "C", "D"])
     res = ds.run_source("price_backfill", trigger_source="api")
-    assert seen["tickers_arg"] == "A,B"           # batch of max_tickers from the saved deferred
+    assert "--tickers" in seen["argv"] and "A,B" in seen["argv"]       # batch of max_tickers from the saved deferred
     assert res["status"] == "partial"
     cont = ds._state_store().get("price_backfill")["continuation"]
     assert cont["deferred"] == ["C", "D"]         # remainder carried forward
 
 
 def test_v13_no_gaps_is_noop_success(monkeypatch):
-    import src.market_data_direct as mdd
     from src.scheduler_planner import BackfillPlan
     called = {"n": 0}
-    monkeypatch.setattr(mdd, "backfill_prices_direct",
-                        lambda **kw: called.__setitem__("n", called["n"] + 1) or {"rows_added": 0, "errors": {}})
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: called.__setitem__("n", called["n"] + 1) or {
+            "returncode": 0,
+            "payload": {"rows_added": 0, "error_count": 0},
+        },
+    )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
     monkeypatch.setattr(ds, "_plan_price_backfill_scope",
                         lambda scope: BackfillPlan(tickers=[], lookback_days=0))

@@ -101,6 +101,9 @@ class SourceDef:
     # tickers + a window that reaches the oldest gap; a budget-bounded run finishes
     # `partial` with a saved continuation. Today only price_backfill.
     gap_planned: bool = False
+    # Direct-local prices worker: run through a sanitized subprocess so ib_insync
+    # stays out of scheduler worker threads.
+    prices_worker: bool = False
     # When set ('polygon'|'finnhub'), resolve the Task 1 news write route per source run.
     # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
     # chain; BLOCKED fails closed before provider work.
@@ -135,7 +138,7 @@ SOURCES: Dict[str, SourceDef] = {
             "ibkr_prices", "IBKR 股價",
             None, None,
             ibkr=True, universe_tickers=True, default_interval_min=60,
-            adapter=("src.market_data_direct", "backfill_prices_direct"),
+            prices_worker=True,
             description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
         ),
         SourceDef(
@@ -152,8 +155,8 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "price_backfill", "本地價格直連補抓",
             None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
-            adapter=("src.market_data_direct", "backfill_prices_direct"),
             gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
+            prices_worker=True,
             description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
                         "trading-day gaps for the active universe. sync_flag=None → no PG "
                         "sync AND no _local_refresh (it writes the local DB itself).",
@@ -536,6 +539,16 @@ def _sanitized_worker_failure_message(payload: Dict[str, Any]) -> str:
     return "normalized IBKR worker failed"
 
 
+def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
+    error = str(payload.get("error") or "").strip()
+    if error:
+        return error[:_ERROR_TAIL]
+    klass = str(payload.get("error_class") or "").strip()
+    if klass:
+        return f"prices worker failed ({klass})"
+    return "prices worker failed"
+
+
 def _resolve_price_scope() -> List[str]:
     """Active-universe tickers — delegates to the ONE shared resolver
     (src.universe_scope), same contract as the collectors' --scope flag."""
@@ -897,6 +910,86 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     progress_cb=lambda done, total, current: _set_progress(
                         source, done, total, current))
                 collected = True
+            elif d.prices_worker:
+                if d.gap_planned:
+                    scope = tickers if tickers is not None else _resolve_price_scope()
+                    if not scope:
+                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                    pending = pending_cont if trigger_source != "scheduler" else None
+                    if pending:
+                        from src.scheduler_planner import BackfillPlan
+
+                        deferred = list(pending["deferred"])
+                        batch, remainder = (deferred[:_BACKFILL_MAX_TICKERS],
+                                            deferred[_BACKFILL_MAX_TICKERS:])
+                        plan = BackfillPlan(
+                            tickers=batch,
+                            lookback_days=int(pending.get("lookback_days") or _BACKFILL_MAX_DAYS),
+                            deferred=remainder,
+                            candidate_count=len(deferred),
+                        )
+                        result["resumed_continuation"] = True
+                    else:
+                        plan = _plan_price_backfill_scope(scope)
+                    result["plan"] = {
+                        "tickers": plan.tickers,
+                        "lookback_days": plan.lookback_days,
+                        "candidate_count": plan.candidate_count,
+                        "deferred": plan.deferred,
+                        "excluded": plan.excluded,
+                    }
+                    if not plan.tickers:
+                        result["collect"] = {"planned": 0, "note": "no fillable gaps"}
+                        collected = True
+                    else:
+                        worker_tickers = plan.tickers
+                        lookback_days = plan.lookback_days
+                        result["ticker_count"] = len(worker_tickers)
+                        argv = [
+                            sys.executable,
+                            "-m",
+                            "src.prices_runtime",
+                            "--source",
+                            source,
+                            "--tickers",
+                            ",".join(worker_tickers),
+                            "--lookback-days",
+                            str(lookback_days),
+                            "--provider",
+                            "ibkr",
+                            "--gateway-lock-held",
+                        ]
+                        step = _run_sanitized_json_subprocess(argv)
+                        result["collect"] = step["payload"]
+                        if step["returncode"] != 0:
+                            raise RuntimeError(
+                                _sanitized_prices_worker_failure_message(step["payload"])
+                            )
+                        collected = True
+                else:
+                    scope = tickers if tickers is not None else _resolve_price_scope()
+                    if not scope:
+                        raise RuntimeError("active-universe scope empty/unavailable (profile DB)")
+                    result["ticker_count"] = len(scope)
+                    argv = [
+                        sys.executable,
+                        "-m",
+                        "src.prices_runtime",
+                        "--source",
+                        source,
+                        "--tickers",
+                        ",".join(scope),
+                        "--provider",
+                        "ibkr",
+                        "--gateway-lock-held",
+                    ]
+                    step = _run_sanitized_json_subprocess(argv)
+                    result["collect"] = step["payload"]
+                    if step["returncode"] != 0:
+                        raise RuntimeError(
+                            _sanitized_prices_worker_failure_message(step["payload"])
+                        )
+                    collected = True
             elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
                 # resolved lazily so tests can monkeypatch the module function and
@@ -994,7 +1087,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
                 # mirror refresh would pull nothing; do not touch PG or the local DB.
                 result["local_refresh"] = {"skipped": "collect-only run (no PG sync)"}
-            elif local_news_writer or (d.adapter is not None and d.sync_flag is None):
+            elif local_news_writer or d.prices_worker or (d.adapter is not None and d.sync_flag is None):
                 # DIRECT local writers already wrote market_data.db themselves — a PG→local mirror
                 # would be pointless and could re-pull stale PG news/prices.
                 result["local_refresh"] = {"skipped": "direct local writer (no PG mirror)"}
