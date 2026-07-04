@@ -6,7 +6,7 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04 — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-2 (job_runs + dead paths), batch-3 PG `prices` destructive drop, SEC/dead paths, and UI collapse. S-G
+**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04; P0-C.1 runtime hardening moved IBKR price jobs to sanitized subprocess workers and shortened price write locks — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-2 (job_runs + dead paths), batch-3 PG `prices` destructive drop, SEC/dead paths, and UI collapse. S-G
 `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
 
 ## Progress
@@ -31,7 +31,9 @@ the normalized local writer + legacy projection, and news reads are hard-local w
   audited `news_pg_exit_completed` marker forces hard-local news reads and retires the news
   PG-sync/mirror path. P0-C is now live (2026-07-04): scheduled `ibkr_prices` writes
   direct-local, manual/incremental price PG mirror paths are retired, price reads are
-  local-only, and status reports prices as local authority. Old IV and fundamentals PG paths
+  local-only, and status reports prices as local authority. P0-C.1 restored IBKR subprocess
+  isolation for `ibkr_prices`/`price_backfill`, moved provider fetch outside the price write
+  lock, and makes lock-busy contention a retryable skip. Old IV and fundamentals PG paths
   have been retired or fail-closed ahead of N9.
   S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
   (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`

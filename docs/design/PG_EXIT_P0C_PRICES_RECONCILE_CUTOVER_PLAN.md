@@ -1501,11 +1501,18 @@ bug. The same resume also exposed `market_data.db write lock busy (timeout)` bec
 `backfill_prices_direct()` held `market_write_lock` while fetching provider data across the
 active universe.
 
-P0-C.1 is the required follow-up plan:
+P0-C.1 was implemented as the required follow-up:
 `docs/design/PG_EXIT_P0C1_PRICES_RUNTIME_HARDENING_PLAN.md`. It keeps the P0-C data gate
 unchanged, but moves both IBKR price sources behind a sanitized `python -m src.prices_runtime`
 worker, fetches provider rows outside the SQLite write lock, adds one-market-writer-per-tick
 backpressure, and classifies lock-busy as retryable skip rather than durable failed.
+
+Offline gate:
+
+```text
+pytest tests/test_prices_runtime.py tests/test_data_scheduler.py tests/test_market_data_direct.py tests/test_provider_health.py -q
+→ 160 passed
+```
 
 ## Self-Review Notes
 

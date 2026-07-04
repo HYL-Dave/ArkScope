@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** IMPLEMENTED 2026-07-04. Offline gate:
+`pytest tests/test_prices_runtime.py tests/test_data_scheduler.py tests/test_market_data_direct.py tests/test_provider_health.py -q`
+→ `160 passed`.
+
 **Goal:** Fix the first live P0-C scheduler failures by restoring IBKR subprocess isolation, shortening `market_data.db` write-lock holds, and classifying transient market-write contention as retryable scheduler backpressure.
 
 **Architecture:** Keep P0-C's local price authority unchanged. Move scheduled IBKR price execution behind a sanitized `python -m src.prices_runtime` worker used by both `ibkr_prices` and `price_backfill`; refactor the direct writer so provider fetch happens outside `market_write_lock`; add scheduler-level market-writer backpressure so a restored scheduler does not launch multiple DB writers in the same tick.
@@ -20,7 +24,7 @@ This is not a new roadmap line. It is a P0-C runtime follow-up caused by the fir
 
 The P0-C implementation is still correct at the data-authority level: prices read/write local and PG prices is archive-only. The runtime wiring needs hardening because Task 4 chose the minimal in-process adapter path even though the scheduler file already documented that IBKR/`ib_insync` is safer in its own process.
 
-## Current Root Cause Evidence
+## Current Root Cause Evidence (Pre-Fix)
 
 1. `src/service/data_scheduler.py` currently declares `ibkr_prices` as:
 
