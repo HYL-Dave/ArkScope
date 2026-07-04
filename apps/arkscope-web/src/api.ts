@@ -1553,8 +1553,8 @@ export function getProvidersHealth(): Promise<ProvidersHealthResponse> {
 
 // --- per-source data-collection schedule (3e-D; app-owned, no cron) ---
 // All sources are DISABLED by default; enabling one makes the sidecar collect on its
-// own interval (non-news mirror domains still use PG sync → local refresh; news is
-// normalized-local after PG exit). Run-now is fire-and-return;
+// own interval. Post-PG-exit sources are either direct-local writers or explicitly
+// retired mirror routes; the backend owns those presentation labels. Run-now is fire-and-return;
 // poll getSchedule() for the per-source running flag and the job_runs row
 // (collect.<source>, visible in getProvidersHealth().jobs) for the outcome.
 
@@ -1563,6 +1563,11 @@ export interface ScheduleSourceState {
   description: string;
   ibkr: boolean;
   provider_fetch: boolean; // false = app-native (no external fetch)
+  source_mode: string;
+  write_target: string;
+  source_badges: string[];
+  retired: boolean;
+  retired_reason: string | null;
   enabled: boolean;
   interval_minutes: number;
   default_interval_minutes: number;

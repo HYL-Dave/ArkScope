@@ -81,6 +81,7 @@ const health: ProvidersHealthResponse = {
   providers: [
     { id: "polygon", label: "Polygon", kind: "news", status: "missing_key", enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: true },
     { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
+    { id: "fred", label: "FRED", kind: "macro", status: "disabled", disabled_reason: "macro_ingestion_disabled", enabled: false, key_present: true, key_source: "app", key_vars: ["FRED_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "macro ingestion not enabled", signals: {}, key_import_suggested: false },
   ],
   generated_at: "2026-07-02T00:00:00+00:00",
   jobs: {},
@@ -100,6 +101,11 @@ vi.mock("./api", async (importOriginal) => {
           description: "Polygon market-news collector",
           ibkr: false,
           provider_fetch: true,
+          source_mode: "direct_local",
+          write_target: "market_data.db",
+          source_badges: ["Polygon", "直寫本地"],
+          retired: false,
+          retired_reason: null,
           enabled: true,
           interval_minutes: 30,
           default_interval_minutes: 30,
@@ -121,6 +127,27 @@ vi.mock("./api", async (importOriginal) => {
             updated_at: "2026-07-04T00:01:00+00:00",
           },
           job_name: "collect.polygon_news",
+        },
+        price_backfill: {
+          label: "價格缺口補抓",
+          description: "IBKR/Polygon → market_data.db DIRECT (no PG)",
+          ibkr: true,
+          provider_fetch: false,
+          source_mode: "direct_local",
+          write_target: "market_data.db",
+          source_badges: ["IBKR/Polygon", "直寫本地", "缺口補抓"],
+          retired: false,
+          retired_reason: null,
+          enabled: false,
+          interval_minutes: 360,
+          default_interval_minutes: 360,
+          running: false,
+          progress: null,
+          last_attempt_at: null,
+          last_result: null,
+          gap_planned: true,
+          durable_state: null,
+          job_name: "collect.price_backfill",
         },
       },
     })),
@@ -287,5 +314,25 @@ describe("Settings provider config authority", () => {
     const details = row.querySelector("details.ds-last-run-details");
     expect(details?.textContent).toContain(mocked.longSkipReason);
     expect(details?.textContent).toContain(mocked.longDurableError);
+  });
+
+  it("renders scheduler source badges from backend metadata instead of provider_fetch heuristics", async () => {
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("價格缺口補抓"));
+    if (!row) throw new Error("missing price_backfill row");
+    expect(row.textContent).toContain("IBKR/Polygon");
+    expect(row.textContent).toContain("直寫本地");
+    expect(row.textContent).toContain("缺口補抓");
+    expect(row.textContent).not.toContain(" · 本地");
+  });
+
+  it("renders FRED disabled as not-enabled ingestion, not generic disabled provider", async () => {
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("FRED"));
+    if (!row) throw new Error("missing FRED provider row");
+    expect(row.textContent).toContain("未啟用抓取");
+    expect(row.textContent).not.toContain("已停用");
   });
 });

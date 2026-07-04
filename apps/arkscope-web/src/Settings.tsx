@@ -94,6 +94,7 @@ import {
   newsReadSurfaceLabel,
   newsRoutingLabel,
   newsWriteRouteLabel,
+  providerHealthStatusLabel,
   schedulerStateLabel,
 } from "./marketDataDisplay";
 
@@ -1380,15 +1381,6 @@ function AppRecordsSection() {
 
 // ---- Data Sources: provider health + per-source app-owned scheduling (3e) ----
 
-const PROVIDER_STATUS_LABEL: Record<string, string> = {
-  connected: "正常",
-  stale: "過期",
-  maintenance: "維護中",
-  no_signal: "無訊號",
-  missing_key: "缺金鑰",
-  disabled: "已停用",
-};
-
 function providerConfigSourceLabel(source: string): string {
   if (source === "app") return "App";
   if (source === "env") return "環境變數";
@@ -1661,7 +1653,7 @@ function DataSourcesSection() {
               {health.providers.map((p) => (
                 <tr key={p.id}>
                   <td title={p.detail}>{p.label}</td>
-                  <td><span className={`ds-chip ds-${p.status}`}>{PROVIDER_STATUS_LABEL[p.status] ?? p.status}</span></td>
+                  <td><span className={`ds-chip ds-${p.status}`}>{providerHealthStatusLabel(p)}</span></td>
                   <td>
                     {p.key_source === "not_required" ? "免金鑰" : p.key_source}
                     {p.key_import_suggested && <span className="muted tiny"> · 建議匯入</span>}
@@ -1827,8 +1819,10 @@ function DataSourcesSection() {
                 <tr key={id}>
                   <td title={s.description}>
                     {s.label}
-                    {s.ibkr && <span className="muted tiny"> · IBKR</span>}
-                    {!s.provider_fetch && <span className="muted tiny"> · 本地</span>}
+                    {(s.source_badges ?? []).map((badge) => (
+                      <span className="muted tiny" key={badge}> · {badge}</span>
+                    ))}
+                    {s.retired && <span className="ds-chip ds-disabled">已退役</span>}
                   </td>
                   <td>
                     <label className="ds-toggle">
