@@ -1401,6 +1401,12 @@ function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
 }
 
+function compactMessage(value: string, max = 88): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}
+
 function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
@@ -1556,6 +1562,54 @@ function DataSourcesSection() {
     if (row.status === "failed") return `✗ ${ts}${row.error ? `（${String(row.error).slice(0, 60)}）` : ""}`;
     if (row.status === "running") return "執行中…";
     return row.status ?? "—";
+  }
+
+  function renderLastRun(source: string, s: ScheduleSourceState) {
+    const details: Array<{ label: string; value: string; tone?: "bad" | "warn" }> = [];
+    const skippedReason = s.last_result?.status === "skipped" ? s.last_result.reason ?? "已在執行" : null;
+    if (skippedReason) details.push({ label: "跳過原因", value: skippedReason, tone: "warn" });
+    const ss = schedulerStateLabel(s.durable_state ?? null);
+    const durableError = s.durable_state?.last_status === "failed" ? s.durable_state.last_error : null;
+    if (durableError) details.push({ label: "失敗訊息", value: durableError, tone: "bad" });
+
+    return (
+      <div className="ds-last-run">
+        <div className="ds-last-run-summary">
+          <span>{jobOutcome(s.job_name)}</span>
+          {skippedReason && (
+            <span className="refresh-err" title={skippedReason}>
+              已跳過：{compactMessage(skippedReason)}
+            </span>
+          )}
+          {s.durable_state?.last_status && (
+            <span style={{ color: coverageToneColor(ss.tone) }} title={durableError ?? ss.label}>
+              {ss.label}{durableError ? `：${compactMessage(durableError)}` : ""}
+            </span>
+          )}
+          {ss.needsContinue && (
+            <button
+              className="btn-ghost"
+              disabled={!!busy || s.running}
+              onClick={() => void runNow(source)}
+              title="手動補抓上次部分完成剩餘的標的"
+            >
+              補抓
+            </button>
+          )}
+        </div>
+        {details.length > 0 && (
+          <details className="ds-last-run-details">
+            <summary>完整訊息</summary>
+            {details.map((d) => (
+              <div className={`ds-last-run-detail ${d.tone === "bad" ? "refresh-err" : ""}`} key={d.label}>
+                <span className="muted tiny">{d.label}</span>
+                <pre>{d.value}</pre>
+              </div>
+            ))}
+          </details>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -1779,37 +1833,8 @@ function DataSourcesSection() {
                       </button>
                     )}
                   </td>
-                  <td className="muted tiny">
-                    {jobOutcome(s.job_name)}
-                    {/* a skip writes no job_runs row — last_result is its only trace */}
-                    {s.last_result?.status === "skipped" && (
-                      <span className="refresh-err"> · 已跳過：{s.last_result.reason}</span>
-                    )}
-                    {/* v1.4: durable state — partial (待補抓) vs failed, survives restart */}
-                    {(() => {
-                      const ss = schedulerStateLabel(s.durable_state ?? null);
-                      if (!s.durable_state?.last_status) return null;
-                      return (
-                        <>
-                          {" · "}
-                          <span style={{ color: coverageToneColor(ss.tone) }}>{ss.label}</span>
-                          {s.durable_state.last_status === "failed" && s.durable_state.last_error && (
-                            <span className="refresh-err"> · {s.durable_state.last_error}</span>
-                          )}
-                          {ss.needsContinue && (
-                            <button
-                              className="btn-ghost"
-                              style={{ marginLeft: 6 }}
-                              disabled={!!busy || s.running}
-                              onClick={() => void runNow(id)}
-                              title="手動補抓上次部分完成剩餘的標的"
-                            >
-                              補抓
-                            </button>
-                          )}
-                        </>
-                      );
-                    })()}
+                  <td className="muted tiny ds-last-run-cell">
+                    {renderLastRun(id, s)}
                   </td>
                 </tr>
               ))}

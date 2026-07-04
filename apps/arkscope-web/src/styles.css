@@ -1690,6 +1690,14 @@ table.wl tbody tr.archived td {
 .ds-disabled { color: var(--muted); text-decoration: line-through; }
 .ds-running { color: #58a6ff; border-color: #58a6ff66; background: #58a6ff14; }
 .ds-schedule td { vertical-align: middle; }
+.ds-schedule {
+  table-layout: fixed;
+}
+.ds-schedule th:nth-child(1) { width: 22%; }
+.ds-schedule th:nth-child(2) { width: 10%; }
+.ds-schedule th:nth-child(3) { width: 16%; }
+.ds-schedule th:nth-child(4) { width: 16%; }
+.ds-schedule th:nth-child(5) { width: 36%; }
 .ds-interval {
   width: 72px;
   background: var(--bg);
@@ -1700,6 +1708,58 @@ table.wl tbody tr.archived td {
   font-size: 12px;
 }
 .btn-ghost.tiny { font-size: 11px; padding: 2px 8px; margin-left: 6px; }
+.ds-last-run-cell {
+  min-width: 220px;
+  text-align: left;
+  white-space: normal;
+}
+.ds-last-run {
+  max-width: 100%;
+}
+.ds-last-run-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-height: 3.2em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.ds-last-run-summary > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.ds-last-run-details {
+  margin-top: 4px;
+  max-width: 100%;
+}
+.ds-last-run-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  width: fit-content;
+}
+.ds-last-run-detail {
+  margin-top: 5px;
+}
+.ds-last-run-detail pre {
+  box-sizing: border-box;
+  max-height: 160px;
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 3px 0 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+}
 
 /* ---- Universe (full inventory) ---- */
 .universe-hint {

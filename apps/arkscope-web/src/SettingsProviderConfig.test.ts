@@ -50,6 +50,12 @@ const mocked = vi.hoisted(() => ({
     },
     setup: { required: false, code: null, reason: null },
   },
+  longSkipReason:
+    "scheduler lock refused because another collector process is still holding collect.polygon_news; " +
+    "pid=42391 host=ais elapsed=1842s lock_path=/mnt/md0/PycharmProjects/ArkScope/data/locks/collect.polygon_news.lock",
+  longDurableError:
+    "IBKR historical data request failed after bounded retries: HMDS query returned no data for HAPN on 2026-06-05 " +
+    "during afternoon recovery window; clientId=11 requestId=980123 pacing bucket=hist_15m",
   importCalls: [] as Array<{ provider: string; field: string; sourceEnvVar?: string | null }>,
   putCalls: [] as Array<{ provider: string; fields: Record<string, string | null>; confirmGuarded?: Record<string, boolean> }>,
 }));
@@ -80,7 +86,37 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     getModelCatalog: vi.fn(async () => emptyCatalog),
-    getSchedule: vi.fn(async () => ({ sources: {} })),
+    getSchedule: vi.fn(async () => ({
+      sources: {
+        polygon_news: {
+          label: "Polygon news",
+          description: "Polygon market-news collector",
+          ibkr: false,
+          provider_fetch: true,
+          enabled: true,
+          interval_minutes: 30,
+          default_interval_minutes: 30,
+          running: false,
+          progress: null,
+          last_attempt_at: "2026-07-04T00:00:00+00:00",
+          last_result: {
+            source: "polygon_news",
+            status: "skipped",
+            reason: mocked.longSkipReason,
+            at: "2026-07-04T00:00:00+00:00",
+          },
+          gap_planned: false,
+          durable_state: {
+            last_status: "failed",
+            last_error: mocked.longDurableError,
+            continuation: null,
+            last_attempt: "2026-07-04T00:00:00+00:00",
+            updated_at: "2026-07-04T00:01:00+00:00",
+          },
+          job_name: "collect.polygon_news",
+        },
+      },
+    })),
     getProvidersHealth: vi.fn(async () => health),
     getProvidersConfig: vi.fn(async () => mocked.providersConfig),
     importProviderConfigField: vi.fn(async (provider: string, field: string, sourceEnvVar?: string | null) => {
@@ -175,5 +211,22 @@ describe("Settings provider config authority", () => {
       fields: { client_id: "7" },
       confirmGuarded: { client_id: true },
     });
+  });
+
+  it("keeps long last-run messages out of the schedule row summary", async () => {
+    await renderDataSources();
+    const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
+      node.textContent?.includes("Polygon news"));
+    if (!row) throw new Error("missing schedule row");
+
+    const summary = row.querySelector(".ds-last-run-summary");
+    expect(summary?.textContent).toContain("已跳過");
+    expect(summary?.textContent).toContain("上次失敗");
+    expect(summary?.textContent).not.toContain(mocked.longSkipReason);
+    expect(summary?.textContent).not.toContain(mocked.longDurableError);
+
+    const details = row.querySelector("details.ds-last-run-details");
+    expect(details?.textContent).toContain(mocked.longSkipReason);
+    expect(details?.textContent).toContain(mocked.longDurableError);
   });
 });
