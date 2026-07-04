@@ -1495,7 +1495,7 @@ def test_price_scope_required(monkeypatch):
                         lambda argv: (_ for _ in ()).throw(AssertionError("prices subprocess retired")))
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: seen.update({"argv": argv}) or {
             "returncode": 0,
             "payload": {"tickers_scanned": 2, "rows_added": 0, "error_count": 0},
@@ -1783,7 +1783,7 @@ def test_price_backfill_uses_planner_scope_no_pg_no_mirror(monkeypatch):
             "payload": {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 5, "error_count": 0},
         }
 
-    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _fake_worker)
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", _fake_worker)
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (_ for _ in ()).throw(AssertionError("no PG sync for direct writer")))
     monkeypatch.setattr(ds, "_local_refresh",
@@ -1815,7 +1815,7 @@ def test_p0c1_ibkr_prices_runs_prices_worker_subprocess(monkeypatch):
             },
         }
 
-    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", fake_worker)
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", fake_worker)
     monkeypatch.setattr(
         ds,
         "_local_refresh",
@@ -1846,7 +1846,7 @@ def test_p0c1_price_backfill_runs_prices_worker_with_planned_scope(monkeypatch):
     )
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: calls.append(argv) or {
             "returncode": 0,
             "payload": {
@@ -1879,7 +1879,7 @@ def test_p0c_ibkr_prices_no_longer_uses_pg_sync(monkeypatch):
             "payload": {"provider": "ibkr", "tickers_scanned": 1, "rows_added": 2, "error_count": 0},
         }
 
-    monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _fake_worker)
+    monkeypatch.setattr(ds, "_run_sanitized_prices_worker_subprocess", _fake_worker)
     monkeypatch.setattr(
         ds,
         "_run_subprocess",
@@ -1999,7 +1999,7 @@ def test_prices_worker_retryable_lock_busy_is_skip_not_failure(monkeypatch):
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: {
             "returncode": 1,
             "payload": {
@@ -2176,7 +2176,7 @@ def test_v13a_manual_continue_consumes_saved_deferred_not_fresh_plan(monkeypatch
     seen = {}
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: seen.update({"argv": argv}) or {
             "returncode": 0,
             "payload": {"rows_added": 2, "error_count": 0},
@@ -2204,7 +2204,7 @@ def test_v13a_manual_continue_carries_remainder_when_over_budget(monkeypatch):
     seen = {}
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: seen.update({"argv": argv}) or {
             "returncode": 0,
             "payload": {"rows_added": 1, "error_count": 0},
@@ -2286,3 +2286,28 @@ def test_run_source_refuses_provider_work_when_provider_config_setup_required(mo
         assert res["code"] == "provider_config_setup_required"
     finally:
         runtime.clear_provider_config_setup_required()
+
+
+def test_prices_worker_stdout_parse_preserves_retryable_and_counts():
+    """Regression: the news-worker allowlist stripped the prices worker's fields,
+    making skipped_lock_busy classification dead code and zeroing telemetry."""
+    import json as _json
+
+    from src.prices_runtime import sanitize_error, sanitize_result
+
+    failure = _json.dumps(sanitize_error(TimeoutError("market_data.db write lock busy (timeout)")))
+    payload = ds._parse_sanitized_prices_worker_stdout(failure)
+    assert payload["retryable"] is True
+    assert payload["error_class"] == "TimeoutError"
+    assert "write lock busy" in payload["error"]
+    assert ds._prices_worker_retryable_skip_reason(payload) is not None
+
+    success = _json.dumps(sanitize_result({
+        "provider": "ibkr", "tickers_scanned": 3, "gaps_found": 2,
+        "rows_added": 55, "errors": {"NVDA": "boom"},
+    }))
+    ok = ds._parse_sanitized_prices_worker_stdout(success)
+    assert ok["status"] == "succeeded" and ok["rows_added"] == 55
+    assert ok["tickers_scanned"] == 3 and ok["gaps_found"] == 2
+    assert ok["error_count"] == 1 and ok["error_tickers"] == ["NVDA"]
+    assert ok["provider"] == "ibkr"

@@ -545,6 +545,51 @@ def _sanitized_worker_failure_message(payload: Dict[str, Any]) -> str:
     return "normalized IBKR worker failed"
 
 
+_PRICES_WORKER_COUNT_KEYS = ("tickers_scanned", "gaps_found", "rows_added", "error_count")
+
+
+def _parse_sanitized_prices_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
+    """Allowlist parse for src.prices_runtime stdout (the news-worker parser strips
+    the prices fields, which killed retryable-skip classification and telemetry)."""
+    try:
+        raw = json.loads(stdout or "")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    payload: Dict[str, Any] = {"status": str(raw.get("status") or "unknown")}
+    for key in _PRICES_WORKER_COUNT_KEYS:
+        payload[key] = _safe_int(raw.get(key))
+    provider = str(raw.get("provider") or "")
+    payload["provider"] = provider if provider in ("ibkr", "polygon") else None
+    tickers = raw.get("error_tickers")
+    payload["error_tickers"] = (
+        [str(t)[:12] for t in tickers[:25]] if isinstance(tickers, list) else []
+    )
+    error_class = str(raw.get("error_class") or "")
+    payload["error_class"] = error_class if error_class.replace("_", "").isalnum() else ""
+    payload["error"] = str(raw.get("error") or "")[:_ERROR_TAIL]
+    payload["retryable"] = raw.get("retryable") is True
+    return payload
+
+
+def _run_sanitized_prices_worker_subprocess(argv: List[str]) -> Dict[str, Any]:
+    proc = subprocess.run(argv, cwd=str(_REPO_ROOT), capture_output=True, text=True)
+    payload = _parse_sanitized_prices_worker_stdout(proc.stdout)
+    if payload is None:
+        payload = {
+            "status": "failed",
+            "error": "prices worker produced no parsable output",
+            "error_class": "",
+            "retryable": False,
+            "provider": None,
+            "error_tickers": [],
+            **{key: 0 for key in _PRICES_WORKER_COUNT_KEYS},
+        }
+        return {"returncode": proc.returncode or 1, "payload": payload}
+    return {"returncode": proc.returncode, "payload": payload}
+
+
 def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
     error = str(payload.get("error") or "").strip()
     if error:
@@ -974,7 +1019,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                             "ibkr",
                             "--gateway-lock-held",
                         ]
-                        step = _run_sanitized_json_subprocess(argv)
+                        step = _run_sanitized_prices_worker_subprocess(argv)
                         result["collect"] = step["payload"]
                         if step["returncode"] != 0:
                             reason = _prices_worker_retryable_skip_reason(step["payload"])
@@ -1006,7 +1051,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         "ibkr",
                         "--gateway-lock-held",
                     ]
-                    step = _run_sanitized_json_subprocess(argv)
+                    step = _run_sanitized_prices_worker_subprocess(argv)
                     result["collect"] = step["payload"]
                     if step["returncode"] != 0:
                         reason = _prices_worker_retryable_skip_reason(step["payload"])

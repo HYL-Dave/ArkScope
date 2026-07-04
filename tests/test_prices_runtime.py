@@ -62,3 +62,21 @@ def test_prices_worker_prints_sanitized_error_json(monkeypatch, capsys):
     assert payload["error_class"] == "RuntimeError"
     assert payload["retryable"] is True
     assert payload["error"] == "market_data.db write lock busy (timeout)"
+
+
+def test_apply_provider_config_passes_a_store(monkeypatch):
+    # Regression: the worker called apply_env() with no store and died at startup
+    # with TypeError on every real run (tests had mocked _apply_provider_config away).
+    import src.prices_runtime as worker
+    from src.data_provider_config import DataProviderConfigStore
+
+    seen = {}
+    monkeypatch.setattr(
+        "src.data_provider_config.apply_env",
+        lambda store: seen.setdefault("store", store) or frozenset(),
+    )
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", "/tmp/claude-1001/nonexistent-profile.db")
+
+    worker._apply_provider_config()
+
+    assert isinstance(seen["store"], DataProviderConfigStore)

@@ -19,9 +19,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _apply_provider_config() -> None:
-    from src.data_provider_config import apply_env
+    from src.data_provider_config import DataProviderConfigStore, apply_env
 
-    apply_env()
+    apply_env(DataProviderConfigStore())
 
 
 def _is_retryable_error(message: str) -> bool:
