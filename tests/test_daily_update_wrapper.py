@@ -93,3 +93,11 @@ def test_iv_history_opt_in_only():
     out = r.stdout + r.stderr
     assert r.returncode == 0
     assert "iv_history" in out and "polygon_news" not in out
+
+
+def test_scores_flag_is_retired_and_does_not_shell_to_pg_importer():
+    r = _run("--scores", "--dry-run")
+    out = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert "retired" in out.lower()
+    assert "migrate_to_supabase" not in out

@@ -195,36 +195,47 @@ class TestMigrateScoresArchiveGate:
         monkeypatch.setattr(migrate, "import_news_scores", lambda conn, dry_run=False: calls.append("scores") or 1)
         return migrate, calls
 
-    def test_default_import_all_skips_retired_domains_and_pg_news_scores(self, monkeypatch):
+    def test_default_import_all_refuses_pg_imports(self, monkeypatch):
         migrate, calls = self._patch_main(monkeypatch, [])
-
-        migrate.main()
-
-        assert "scores" not in calls
-        assert calls == ["prices", "close"]
-
-    def test_scores_requires_archive_flag(self, monkeypatch):
-        migrate, _calls = self._patch_main(monkeypatch, ["--scores"])
 
         with pytest.raises(SystemExit):
             migrate.main()
 
-    def test_scores_archive_flag_allows_explicit_pg_score_import(self, monkeypatch):
-        migrate, calls = self._patch_main(monkeypatch, ["--scores", "--archive-scores"])
+        assert calls == []
 
-        migrate.main()
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--news"],
+            ["--iv"],
+            ["--fundamentals"],
+            ["--scores"],
+            ["--scores", "--archive-scores"],
+            ["--archive-scores"],
+            ["--prices"],
+        ],
+    )
+    def test_all_pg_import_flags_refuse_after_n9(self, monkeypatch, argv):
+        migrate, calls = self._patch_main(monkeypatch, argv)
 
-        assert calls == ["scores", "close"]
+        with pytest.raises(SystemExit):
+            migrate.main()
+
+        assert calls == []
 
     def test_retired_pg_domains_require_local_paths(self):
         from scripts import migrate_to_supabase as migrate
 
         parser = migrate.build_arg_parser()
 
-        for flag in ("--news", "--iv", "--fundamentals"):
+        for flag in ("--news", "--iv", "--fundamentals", "--scores", "--prices"):
             args = parser.parse_args([flag])
             with pytest.raises(SystemExit):
                 migrate.validate_args(args, parser)
+
+        args = parser.parse_args(["--scores", "--archive-scores"])
+        with pytest.raises(SystemExit):
+            migrate.validate_args(args, parser)
 
 
 # ===========================================================================

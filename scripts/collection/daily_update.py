@@ -405,16 +405,14 @@ def show_status():
 
 
 def _sync_scores(dry_run: bool = False) -> bool:
-    """Push multi-model news_scores to the DB (opt-in, decoupled from --news /
-    --sync-db — locked Q6). The ONE step that stays a subprocess in the thin
-    wrapper: scores are not a scheduler source."""
-    migrate_script = SCRIPT_DIR.parent / "migrate_to_supabase.py"
-    if not migrate_script.exists():
-        logger.error(f"Migration script not found: {migrate_script}")
-        return False
-    logger.info("\nSyncing news scores to database...")
-    success, _ = run_command([sys.executable, str(migrate_script), "--scores"], dry_run)
-    return success
+    """Retired PG score sync hook.
+
+    Active score imports use scripts/scoring/import_news_scores_local.py.
+    """
+    logger.error(
+        "PG news score sync is retired; use scripts/scoring/import_news_scores_local.py"
+    )
+    return False
 
 
 def main():
@@ -442,7 +440,7 @@ Examples:
 
     # Collect and sync to DB in one step
     python daily_update.py --all --scope active-universe --sync-db
-    python daily_update.py --scores                  # sync news_scores (opt-in, separate)
+    python daily_update.py --scores                  # retired; use local score importer
 
 Note: IBKR sources require TWS/Gateway running.
       Every run is the SAME code path as the app's Run now (per-source locks,
@@ -483,7 +481,7 @@ Note: IBKR sources require TWS/Gateway running.
     parser.add_argument('--sync-db', action='store_true',
                        help='Sync collected data to database after collection')
     parser.add_argument('--scores', action='store_true',
-                       help='Sync multi-model news_scores to DB (opt-in; decoupled from --news/--sync-db)')
+                       help='Retired PG score sync; use scripts/scoring/import_news_scores_local.py')
     parser.add_argument('--tickers', type=str, default=None,
                        help='Explicit comma-separated ticker scope (overrides --scope)')
     parser.add_argument('--scope', choices=['active-universe'], default=None,
@@ -498,6 +496,12 @@ Note: IBKR sources require TWS/Gateway running.
 
     if args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
+
+    if args.scores:
+        logger.error(
+            "PG news score sync is retired; use scripts/scoring/import_news_scores_local.py"
+        )
+        sys.exit(2)
 
     # Default to status if no action specified (--scores is an action).
     if not any([args.status, args.all, args.news, args.polygon, args.finnhub,
@@ -555,9 +559,6 @@ Note: IBKR sources require TWS/Gateway running.
             # sync and no local-mirror refresh (PG unchanged → nothing to mirror)
             steps = "collect -> db sync -> local mirror refresh" if args.sync_db else "collect (only)"
             logger.info(f"  {s}: {steps}")
-        if args.scores:
-            logger.info("  db_sync_scores: migrate_to_supabase --scores")
-            _sync_scores(dry_run=True)
         logger.info("\nDry run complete (nothing executed).")
         sys.exit(0)
 

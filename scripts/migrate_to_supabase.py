@@ -1,22 +1,14 @@
 #!/usr/bin/env python3
 """
-migrate_to_supabase.py — Import historical data files into PostgreSQL.
+migrate_to_supabase.py — retired PostgreSQL import wrapper.
 
 Usage:
-    python scripts/migrate_to_supabase.py              # Import active PG domains (prices only)
-    python scripts/migrate_to_supabase.py --scores --archive-scores
-                                                   # Archived PG news scores only
-    python scripts/migrate_to_supabase.py --prices     # Prices only
-    python scripts/migrate_to_supabase.py --dry-run    # Count rows without importing
+    python scripts/migrate_to_supabase.py --help
 
-The --news, --iv, and --fundamentals flags are retired by N9 PG-exit hardening.
-The --scores flag is now an archive-only path for legacy PG news_scores.
-Use scripts/scoring/import_news_scores_local.py for active local score imports.
-Archived PG score import requires --archive-scores.
-It auto-detects score columns (sentiment_haiku, risk_gpt_5_2_xhigh, etc.)
-from parquet/CSV files and upserts them incrementally.
-
-Reads DATABASE_URL (or legacy SUPABASE_DB_URL) from config/.env.
+N9/P0-C retired active PG imports. Runtime writers now target local stores, and
+PG prices is a static archive basis until the batch-3 dump/drop gate. This file
+keeps a few pure parsing helpers importable for old tests/tools, but executing
+any PG import mode fails closed.
 """
 
 import argparse
@@ -689,46 +681,43 @@ def import_fundamentals(conn: psycopg2.extensions.connection, dry_run: bool = Fa
 # Main
 # =============================================================================
 
-N9_RETIRED_DOMAINS = ("news", "iv", "fundamentals")
+N9_RETIRED_DOMAINS = ("news", "scores", "archive_scores", "prices", "iv", "fundamentals")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Import data into PostgreSQL")
+    parser = argparse.ArgumentParser(description="Retired PostgreSQL import wrapper")
     parser.add_argument("--news", action="store_true", help="Retired N9 domain; refused")
     parser.add_argument(
         "--scores",
         action="store_true",
-        help="Import archived PG news scores only; requires --archive-scores",
+        help="Retired PG news score import; refused",
     )
     parser.add_argument(
         "--archive-scores",
         action="store_true",
-        help="Allow explicit archive import into PG news_scores",
+        help="Retired PG score archive import; refused",
     )
-    parser.add_argument("--prices", action="store_true", help="Import prices only")
+    parser.add_argument("--prices", action="store_true", help="Retired PG prices import; refused")
     parser.add_argument("--iv", action="store_true", help="Retired N9 domain; refused")
     parser.add_argument("--fundamentals", action="store_true", help="Retired N9 domain; refused")
-    parser.add_argument("--dry-run", action="store_true", help="Count rows without importing")
+    parser.add_argument("--dry-run", action="store_true", help="Retired; refused")
     return parser
 
 
 def validate_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
-    if args.scores and not args.archive_scores:
-        parser.error(
-            "--scores writes archived PG news_scores; use "
-            "scripts/scoring/import_news_scores_local.py for active local imports, "
-            "or pass --archive-scores for an explicit archive import"
-        )
     requested_retired = [
-        name for name in N9_RETIRED_DOMAINS
-        if getattr(args, {"news": "news", "iv": "iv", "fundamentals": "fundamentals"}[name])
+        name.replace("_", "-")
+        for name in N9_RETIRED_DOMAINS
+        if getattr(args, name, False)
     ]
-    if requested_retired:
-        parser.error(
-            "PG import disabled for N9-retired domains: "
-            + ", ".join(requested_retired)
-            + ". Use local direct writers/refetch paths instead."
-        )
+    if not requested_retired:
+        requested_retired = ["default"]
+    parser.error(
+        "PG imports retired after N9/P0-C: "
+        + ", ".join(requested_retired)
+        + ". Use local direct writers, SEC/refetch paths, or "
+        "scripts/scoring/import_news_scores_local.py as appropriate."
+    )
 
 
 def main():

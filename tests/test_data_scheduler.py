@@ -25,9 +25,9 @@ def hermetic(tmp_path, monkeypatch):
     the real DAL / subprocesses / local market DB — and CRITICALLY, stub both
     in-process news adapters so no test can fire a real provider API call."""
     store = ProfileStateStore(tmp_path / "profile_state.db")
-    # S3.2 defaults news direct-local ON. Most legacy scheduler tests below exercise
-    # the mirror path, so pin the rollback explicitly; the default-direct test clears it.
-    store.set_setting("use_local_news", "false")
+    # N9 retires the PG news mirror path. Default scheduler tests use the local
+    # writer route unless a test explicitly patches the route.
+    store.set_setting("use_local_news", None)
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
@@ -55,6 +55,17 @@ def hermetic(tmp_path, monkeypatch):
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     monkeypatch.setattr(cfn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
+    monkeypatch.setattr("src.news_providers.make_news_provider",
+                        lambda source, **k: object())
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda tickers, *, source, provider, progress_cb=None, **k: {
+            "source": source,
+            "tickers_scanned": len(tickers),
+            "articles_added": 0,
+            "errors": {},
+        },
+    )
 
     class _NoStore:
         def create_run(self, *a, **k):
@@ -63,7 +74,7 @@ def hermetic(tmp_path, monkeypatch):
         def finish_run(self, *a, **k):
             return False
 
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", lambda dal: _NoStore())
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", lambda profile_db: _NoStore())
     monkeypatch.setattr("src.api.dependencies.get_dal", lambda: object())
     yield store
 
@@ -75,6 +86,19 @@ def test_defaults_everything_disabled():
         cfg = ds.source_config(source)
         assert cfg["enabled"] is False  # nothing fetches until the user opts in
         assert cfg["interval_minutes"] == ds.SOURCES[source].default_interval_min
+
+
+def test_no_active_runtime_source_uses_migrate_to_supabase_sync():
+    offenders = []
+    for name, source_def in ds.SOURCES.items():
+        if (
+            source_def.sync_flag
+            and name not in ds._N9_RETIRED_SOURCES
+            and source_def.news_direct_source is None
+        ):
+            offenders.append((name, source_def.sync_flag))
+
+    assert offenders == []
 
 
 def test_set_config_roundtrip_and_clamp():
@@ -146,12 +170,14 @@ def test_tick_once_defers_extra_market_writers(monkeypatch):
 
 # --- run_source ------------------------------------------------------------------
 
-def test_run_source_adapter_success_sync_refresh(monkeypatch):
-    # polygon_news runs IN-PROCESS via the adapter; only the PG sync is a subprocess.
+def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
+    import src.news_normalized.routing as routing
     import scripts.collection.collect_polygon_news as cpn
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
+    _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
+                            "legacy PG test route")
     monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: {"mode": "incremental", "new_articles": 3})
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("legacy PG news route must not collect")))
     calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (calls.append(argv), {"returncode": 0})[1])
@@ -167,14 +193,13 @@ def test_run_source_adapter_success_sync_refresh(monkeypatch):
             finished["status"] = kw.get("status")
             return True
 
-    monkeypatch.setattr("src.service.job_runs_store.JobRunsStore", lambda dal: _Store())
+    monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", lambda profile_db: _Store())
     res = ds.run_source("polygon_news", trigger_source="api")
-    assert res["status"] == "succeeded"
-    assert res["collect"] == {"mode": "incremental", "new_articles": 3}  # structured stats
-    assert res["local_refresh"] == {"ok": True}
-    assert len(calls) == 1 and "--news" in calls[0]         # ONLY the PG sync subprocess
+    assert res["status"] == "failed"
+    assert "legacy PG news sync route retired" in res["error"]
+    assert calls == []
     assert finished == {"name": "collect.polygon_news", "trigger": "api",
-                        "status": "succeeded"}
+                        "status": "failed"}
 
 
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
@@ -864,8 +889,8 @@ def test_skip_sync_message_precedes_legacy_local_news_route(monkeypatch):
     assert res["local_refresh"]["skipped"] == "collect-only run (no PG sync)"
 
 
-def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
-    # LEGACY_PG keeps the old collector→PG sync→local mirror chain even if local-news is default-on.
+def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch):
+    # LEGACY_PG was the old collector→PG sync→local mirror chain; N9 retires it.
     import scripts.collection.collect_finnhub_news as cfn
     import src.news_normalized.routing as routing
 
@@ -878,8 +903,7 @@ def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
     seen = {}
 
     def _run_incremental(**kwargs):
-        seen["adapter_kwargs"] = kwargs
-        return {"mode": "incremental", "new_articles": 4}
+        raise AssertionError("legacy PG route must fail before collector work")
 
     monkeypatch.setattr(cfn, "run_incremental", _run_incremental)
     sync_calls = []
@@ -891,13 +915,12 @@ def test_legacy_news_route_pg_keeps_collector_sync_and_mirror(monkeypatch):
 
     res = ds.run_source("finnhub_news", trigger_source="api")
 
-    assert res["status"] == "succeeded"
+    assert res["status"] == "failed"
+    assert "legacy PG news sync route retired" in res["error"]
     assert len(route_calls) == 1
-    assert seen["adapter_kwargs"]["tickers_arg"] == "AAPL,NVDA"
-    assert res["collect"] == {"mode": "incremental", "new_articles": 4}
-    assert len(sync_calls) == 1 and "--news" in sync_calls[0]
-    assert refresh_calls == [True]
-    assert res["local_refresh"] == {"ok": True}
+    assert seen == {}
+    assert sync_calls == []
+    assert refresh_calls == []
 
 
 def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirror(
@@ -1424,11 +1447,11 @@ def test_run_source_subprocess_success_collect_sync_refresh(monkeypatch):
 
 
 def test_run_source_adapter_failure_short_circuits(monkeypatch):
-    # adapter raising (e.g. missing API key) → failed, PG sync never attempted
-    import scripts.collection.collect_finnhub_news as cfn
-    monkeypatch.setattr(cfn, "run_incremental",
-                        lambda *a, **k: (_ for _ in ()).throw(
-                            RuntimeError("FINNHUB_API_KEY not found")))
+    # direct-local writer raising (e.g. missing API key) → failed, PG sync never attempted
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("FINNHUB_API_KEY not found")),
+    )
     calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (calls.append(argv), {"returncode": 0})[1])
@@ -1572,8 +1595,8 @@ def test_run_source_releases_file_locks(tmp_path):
 # --- collect-only semantics (skip_sync) -------------------------------------------
 
 def test_skip_sync_is_true_collect_only(monkeypatch):
-    # CLI without --sync-db: Parquet only — NO PG sync subprocess AND no local
-    # mirror refresh (PG unchanged → nothing to mirror).
+    # CLI without --sync-db: collect only — NO PG sync subprocess AND no local
+    # mirror refresh.
     sync_calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (sync_calls.append(argv), {"returncode": 0})[1])
@@ -1583,10 +1606,10 @@ def test_skip_sync_is_true_collect_only(monkeypatch):
     assert res["status"] == "succeeded"
     assert sync_calls == []                                   # no PG sync
     assert "skipped" in res["local_refresh"]                  # no local refresh
-    # default (scheduler/API) path still refreshes
+    # default (scheduler/API) path also skips mirror refresh for direct-local writers
     monkeypatch.setattr(ds, "_local_refresh", lambda: {"ok": True})
     res = ds.run_source("polygon_news")
-    assert res["local_refresh"] == {"ok": True}
+    assert "skipped" in res["local_refresh"]
 
 
 # --- startup seed must not depend on PG -------------------------------------------
@@ -1688,24 +1711,24 @@ def test_run_now_fires_background_and_skips_running(monkeypatch):
 
 
 def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
-    # News adapters receive the ACTIVE UNIVERSE as the explicit ticker list (the
-    # collectors' own default is the legacy tickers_core.json) + a progress_cb
-    # that feeds the live progress the UI shows.
-    import scripts.collection.collect_polygon_news as cpn
+    # Direct-local news writers receive the ACTIVE UNIVERSE as the explicit ticker
+    # list + a progress_cb that feeds the live progress the UI shows.
     seen = {}
 
-    def _fake_run(tickers_arg=None, progress_cb=None, **kw):
-        seen["tickers_arg"] = tickers_arg
+    def _fake_direct(tickers, *, source, provider, progress_cb=None, **kw):
+        seen["tickers"] = list(tickers)
+        seen["source"] = source
         progress_cb(3, 10, "AAPL")           # simulate mid-run progress
         snap = ds.status_snapshot()["polygon_news"]  # while still inside the run
         seen["live_progress"] = snap["progress"]
-        return {"mode": "incremental", "new_articles": 1}
+        return {"source": source, "tickers_scanned": len(tickers), "articles_added": 1, "errors": {}}
 
-    monkeypatch.setattr(cpn, "run_incremental", _fake_run)
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _fake_direct)
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     res = ds.run_source("polygon_news")
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
-    assert seen["tickers_arg"] == "AAPL,NVDA"
+    assert seen["tickers"] == ["AAPL", "NVDA"]
+    assert seen["source"] == "polygon"
     assert seen["live_progress"] == {"done": 3, "total": 10, "current": "AAPL"}
     # progress cleared after the run
     assert ds.status_snapshot()["polygon_news"]["progress"] is None
@@ -1727,14 +1750,13 @@ def test_adapter_universe_unavailable_fails_loud(monkeypatch):
 def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
     # The daily_update thin wrapper passes an explicit ticker list (--tickers)
     # and collect-only mode (no --sync-db → skip_sync) through run_source.
-    import scripts.collection.collect_polygon_news as cpn
     seen = {}
 
-    def _fake_run(tickers_arg=None, progress_cb=None, **kw):
-        seen["tickers_arg"] = tickers_arg
-        return {"mode": "incremental", "new_articles": 1}
+    def _fake_direct(tickers, *, source, provider, progress_cb=None, **kw):
+        seen["tickers"] = list(tickers)
+        return {"source": source, "tickers_scanned": len(tickers), "articles_added": 1, "errors": {}}
 
-    monkeypatch.setattr(cpn, "run_incremental", _fake_run)
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _fake_direct)
     monkeypatch.setattr(ds, "_resolve_price_scope",
                         lambda: (_ for _ in ()).throw(AssertionError("must not resolve")))
     calls = []
@@ -1743,7 +1765,7 @@ def test_run_source_explicit_tickers_and_skip_sync(monkeypatch):
     res = ds.run_source("polygon_news", trigger_source="cli",
                         tickers=["AAPL", "NVDA"], skip_sync=True)
     assert res["status"] == "succeeded" and res["ticker_count"] == 2
-    assert seen["tickers_arg"] == "AAPL,NVDA"
+    assert seen["tickers"] == ["AAPL", "NVDA"]
     assert calls == []          # skip_sync: NO PG sync subprocess
 
 
@@ -1989,10 +2011,9 @@ def test_run_source_persists_attempt_and_outcome_to_local_state(monkeypatch):
 
 
 def test_run_source_failure_persists_error_locally(monkeypatch):
-    import scripts.collection.collect_polygon_news as cpn
     def _boom(*a, **k):
         raise RuntimeError("provider exploded")
-    monkeypatch.setattr(cpn, "run_incremental", _boom)
+    monkeypatch.setattr("src.news_direct.backfill_news_direct", _boom)
     res = ds.run_source("polygon_news", trigger_source="api")
     assert res["status"] == "failed"
     row = ds._state_store().get("polygon_news")
@@ -2002,9 +2023,10 @@ def test_run_source_failure_persists_error_locally(monkeypatch):
 def test_skip_does_not_overwrite_durable_outcome(monkeypatch):
     # a real failure is recorded; a later in-process SKIP (per-source lock busy) must NOT clobber
     # the durable last_error (skips aren't persisted to the state store).
-    import scripts.collection.collect_polygon_news as cpn
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("real failure")))
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("real failure")),
+    )
     ds.run_source("polygon_news")
     assert ds._state_store().get("polygon_news")["last_error"] == "real failure"[:200] or \
         "real failure" in ds._state_store().get("polygon_news")["last_error"]

@@ -16,19 +16,18 @@ Sources v1:
   - ibkr_prices                       — direct-local adapter into market_data.db
   - local_incremental                 — retired PG mirror path
 
-After a remaining non-news collector succeeds, its data is synced to PG
-(migrate_to_supabase --iv, serialized behind a global sync lock — concurrent
-syncs are idempotent but wasteful), then the local mirror refreshes
-(incremental_update, skip-if-busy). Prices are post-P0-C direct-local; news is
-post-N8a PG-exited: provider fetches write normalized SQLite and project the
-legacy local read surface directly.
+Active writers now write local stores directly. Prices are post-P0-C
+direct-local; news is post-N8a PG-exited: provider fetches write normalized
+SQLite and project the legacy local read surface directly. The old PG mirror
+sync hooks remain only as retired compatibility metadata until N9 cleanup
+removes the dead paths.
 
 Write-contention guarantees (the user's explicit SQLite concern):
   - collectors write per-source Parquet dirs — disjoint, safe in parallel;
-  - remaining PG writes are idempotent upserts, serialized by _SYNC_LOCK anyway;
-  - the local SQLite is written by direct-local writers and retired-domain
-    incremental paths only; financial_cache writes are already serialized by
-    _CACHE_WRITE_LOCK;
+  - active market writes go through direct-local writers; retired PG mirror
+    domains fail closed before provider work;
+  - the local SQLite is written by direct-local writers only; financial_cache
+    writes are already serialized by _CACHE_WRITE_LOCK;
   - per-source locks make same-source runs skip (never queue), so a slow run
     cannot pile up behind itself;
   - CROSS-PROCESS: every lock above has a file-lock twin (flock(2) under
@@ -80,7 +79,7 @@ class SourceDef:
     name: str
     label: str
     collector: Optional[List[str]]      # argv after sys.executable; None = no subprocess
-    sync_flag: Optional[str]            # migrate_to_supabase flag, None = no PG sync
+    sync_flag: Optional[str]            # retired PG mirror flag, None = no PG sync
     ibkr: bool = False                  # serialize behind the shared IBKR lock
     needs_price_scope: bool = False     # resolve active-universe tickers at run time
     default_interval_min: int = 60
@@ -911,6 +910,11 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             if d.news_direct_source is not None:
                 if news_route.mode == NewsWriteMode.BLOCKED:
                     raise RuntimeError(news_route.reason)
+                if news_route.mode == NewsWriteMode.LEGACY_PG:
+                    raise RuntimeError(
+                        "legacy PG news sync route retired by N9; use normalized/local "
+                        "news writers"
+                    )
                 local_news_writer = news_route.mode == NewsWriteMode.NORMALIZED or (
                     news_route.mode == NewsWriteMode.LEGACY_LOCAL
                     and d.news_direct_source != "ibkr"
