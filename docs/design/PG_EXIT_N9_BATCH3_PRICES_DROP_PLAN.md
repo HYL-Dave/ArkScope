@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** DRAFT for review. This plan is docs-only until merged and reviewed. It does not authorize a live PG `prices` drop.
+> **Status:** OFFLINE TASKS 1-3 IMPLEMENTED on branch `codex/batch3-prices-drop` (2026-07-05). This does not authorize a live PG `prices` drop.
+
+> **Offline gate:** `pytest tests/test_db_backend_retired_prices.py tests/test_n9_batch3_prices_drop.py tests/test_pg_unreachable_e2e.py tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg tests/test_provider_health.py tests/test_data_scheduler.py -q` -> 129 passed; `python -m compileall scripts/migration/n9_batch3_prices_drop.py scripts/smoke/pg_unreachable_e2e.py` -> pass; `git diff --check` -> pass; batch-3 grep classifier -> blockers 0 / allowed hits 197.
 
 **Goal:** Archive and physically drop the final PG market-data table (`prices`) after proving the local price store is the runtime authority and the PG `prices` table is archive-only.
 
