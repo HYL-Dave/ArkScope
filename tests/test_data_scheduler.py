@@ -1924,7 +1924,7 @@ def test_local_incremental_retirement_does_not_call_local_refresh(monkeypatch):
 def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: {"returncode": 0, "payload": {"rows_added": 0, "error_count": 0}},
     )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
@@ -1940,7 +1940,7 @@ def test_price_backfill_serializes_behind_ibkr_lock(monkeypatch):
 def test_price_backfill_empty_scope_fails_loud(monkeypatch):
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: (_ for _ in ()).throw(AssertionError("must not run without scope")),
     )
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: [])
@@ -2123,7 +2123,7 @@ def test_v13_partial_when_deferred_and_writes_continuation(monkeypatch):
     from src.scheduler_planner import BackfillPlan
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: {
             "returncode": 0,
             "payload": {"tickers_scanned": 1, "rows_added": 3, "error_count": 0},
@@ -2149,7 +2149,7 @@ def test_v13_attended_scheduler_skips_pending_continuation(monkeypatch):
     ran = {"n": 0}
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: ran.__setitem__("n", ran["n"] + 1) or {
             "returncode": 0,
             "payload": {"rows_added": 0, "error_count": 0},
@@ -2223,7 +2223,7 @@ def test_v13_no_gaps_is_noop_success(monkeypatch):
     called = {"n": 0}
     monkeypatch.setattr(
         ds,
-        "_run_sanitized_json_subprocess",
+        "_run_sanitized_prices_worker_subprocess",
         lambda argv: called.__setitem__("n", called["n"] + 1) or {
             "returncode": 0,
             "payload": {"rows_added": 0, "error_count": 0},
