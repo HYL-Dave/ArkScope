@@ -104,6 +104,9 @@ class SourceDef:
     # Direct-local prices worker: run through a sanitized subprocess so ib_insync
     # stays out of scheduler worker threads.
     prices_worker: bool = False
+    # Sources that write market_data.db. Scheduler ticks start at most one of these
+    # per pass; other due writers are deferred to avoid local SQLite lock storms.
+    writes_market_db: bool = False
     # When set ('polygon'|'finnhub'), resolve the Task 1 news write route per source run.
     # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
     # chain; BLOCKED fails closed before provider work.
@@ -118,6 +121,7 @@ SOURCES: Dict[str, SourceDef] = {
             None, "--news",
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
+            writes_market_db=True,
             description="Polygon news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
@@ -125,6 +129,7 @@ SOURCES: Dict[str, SourceDef] = {
             None, "--news",
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
+            writes_market_db=True,
             description="Finnhub news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
@@ -132,13 +137,14 @@ SOURCES: Dict[str, SourceDef] = {
             ["collect_ibkr_news.py", "--incremental"], "--news", ibkr=True,
             needs_price_scope=True, default_interval_min=120,
             news_direct_source="ibkr",
+            writes_market_db=True,
             description="IBKR news incremental (Gateway) → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",
             None, None,
             ibkr=True, universe_tickers=True, default_interval_min=60,
-            prices_worker=True,
+            prices_worker=True, writes_market_db=True,
             description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
         ),
         SourceDef(
@@ -156,7 +162,7 @@ SOURCES: Dict[str, SourceDef] = {
             "price_backfill", "本地價格直連補抓",
             None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
             gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
-            prices_worker=True,
+            prices_worker=True, writes_market_db=True,
             description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
                         "trading-day gaps for the active universe. sync_flag=None → no PG "
                         "sync AND no _local_refresh (it writes the local DB itself).",
@@ -1233,10 +1239,21 @@ def tick_once(now: Optional[datetime] = None, *, fire=None) -> List[str]:
     for testability; ``fire`` defaults to a thread-offloaded run_source."""
     now = now or datetime.now(timezone.utc)
     fired = []
-    for source in SOURCES:
+    market_writer_fired = False
+    for source, d in SOURCES.items():
         try:
             if _is_due(source, now):
+                if d.writes_market_db and market_writer_fired:
+                    _record_result({
+                        "source": source,
+                        "status": "skipped",
+                        "reason": "market_data.db writer already scheduled this tick",
+                        "skip_kind": "market_writer_backpressure",
+                    })
+                    continue
                 fired.append(source)
+                if d.writes_market_db:
+                    market_writer_fired = True
                 if fire is not None:
                     fire(source)
                 else:

@@ -112,6 +112,38 @@ def test_tick_fires_only_enabled_and_due():
     assert out == fired == ["finnhub_news"]
 
 
+def test_tick_once_defers_extra_market_writers(monkeypatch):
+    now = datetime(2026, 7, 4, tzinfo=timezone.utc)
+    fired = []
+    skipped = []
+
+    monkeypatch.setattr(
+        ds,
+        "source_config",
+        lambda source: {
+            "enabled": source in {"ibkr_prices", "polygon_news"},
+            "interval_minutes": 1,
+        },
+    )
+    monkeypatch.setattr(
+        ds,
+        "_is_due",
+        lambda source, current: source in {"ibkr_prices", "polygon_news"},
+    )
+    monkeypatch.setattr(ds, "_record_result", lambda result: skipped.append(result) or result)
+
+    out = ds.tick_once(now, fire=fired.append)
+
+    assert out == ["polygon_news"]
+    assert fired == ["polygon_news"]
+    assert skipped == [{
+        "source": "ibkr_prices",
+        "status": "skipped",
+        "reason": "market_data.db writer already scheduled this tick",
+        "skip_kind": "market_writer_backpressure",
+    }]
+
+
 # --- run_source ------------------------------------------------------------------
 
 def test_run_source_adapter_success_sync_refresh(monkeypatch):
