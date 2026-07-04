@@ -16,11 +16,9 @@ export function providerHealthStatusLabel<T extends { status: string; disabled_r
 }
 
 export function marketRoutingLabel(status: MarketDataStatus): string {
-  if (status.routing_enabled) {
-    return status.pg_fallback_active ? "啟用中（PG fallback）" : "啟用中（local-only strict）";
-  }
+  if (status.routing_enabled) return "本地權威（PG fallback 已退役）";
   if (status.use_local_market_setting) return "設定已開，待建立資料庫";
-  return "關閉（使用 PG）";
+  return "本地權威（設定尚未翻成預設；PG fallback 已退役）";
 }
 
 export function macroRoutingLabel(status: MacroStatus): string {
@@ -28,11 +26,11 @@ export function macroRoutingLabel(status: MacroStatus): string {
   // factory creates macro_calendar.db on first use and there is NO PG fallback in the local
   // path. So toggle-on is "本地優先" even before the DB is built (queries return empty until
   // ingestion fills it) — NOT a PG fallback.
-  if (!status.local_first_active) return "關閉（使用 PG）";
+  if (!status.local_first_active) return "本地功能未啟用（不會 fallback PG）";
   const envNote = status.env_override ? " · env 強制" : "";
   return status.exists
-    ? `啟用中（本地優先${envNote}）`
-    : `啟用中（本地優先${envNote}）· 待 ingestion 建立`;
+    ? `啟用中（本地${envNote}）`
+    : `啟用中（本地${envNote}）· 待 ingestion 建立`;
 }
 
 export function newsRoutingLabel(status: NewsStatus): string {

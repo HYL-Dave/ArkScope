@@ -33,18 +33,18 @@ const status = (over: Partial<MarketDataStatus>): MarketDataStatus => ({
 });
 
 describe("marketRoutingLabel", () => {
-  it("distinguishes local-only strict routing from PG fallback routing", () => {
+  it("renders prices as local authority after P0-C", () => {
     expect(marketRoutingLabel(status({ routing_enabled: true, pg_fallback_active: false, strict_enabled: true })))
-      .toBe("啟用中（local-only strict）");
+      .toBe("本地權威（PG fallback 已退役）");
     expect(marketRoutingLabel(status({ routing_enabled: true, pg_fallback_active: true, strict_enabled: false })))
-      .toBe("啟用中（PG fallback）");
+      .toBe("本地權威（PG fallback 已退役）");
   });
 
-  it("keeps the pending-db and disabled labels", () => {
+  it("keeps pending-db distinct while disabled setting is no longer PG fallback", () => {
     expect(marketRoutingLabel(status({ use_local_market_setting: true, routing_enabled: false })))
       .toBe("設定已開，待建立資料庫");
     expect(marketRoutingLabel(status({ use_local_market_setting: false, routing_enabled: false })))
-      .toBe("關閉（使用 PG）");
+      .toBe("本地權威（設定尚未翻成預設；PG fallback 已退役）");
   });
 });
 
@@ -61,21 +61,21 @@ const macroStatus = (over: Partial<MacroStatus>): MacroStatus => ({
 describe("macroRoutingLabel", () => {
   it("labels local-first active (toggle vs env), DB built", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: true, use_local_macro_setting: true })))
-      .toBe("啟用中（本地優先）");
+      .toBe("啟用中（本地）");
     expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: true, env_override: true })))
-      .toBe("啟用中（本地優先 · env 強制）");
+      .toBe("啟用中（本地 · env 強制）");
   });
 
   it("toggle-on but DB not built → local-first, pending ingestion (NOT PG fallback)", () => {
     // the fix: local active even before the DB exists; the factory creates it on first use,
     // no PG fallback. So this is 'pending ingestion', not 'reads go PG'.
     expect(macroRoutingLabel(macroStatus({ local_first_active: true, exists: false })))
-      .toBe("啟用中（本地優先）· 待 ingestion 建立");
+      .toBe("啟用中（本地）· 待 ingestion 建立");
   });
 
-  it("off → PG", () => {
+  it("never suggests PG fallback when local macro is inactive", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
-      .toBe("關閉（使用 PG）");
+      .toBe("本地功能未啟用（不會 fallback PG）");
   });
 });
 

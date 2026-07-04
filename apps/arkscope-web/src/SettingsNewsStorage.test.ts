@@ -97,8 +97,11 @@ describe("SettingsView news storage copy", () => {
     });
     await flush();
 
+    expect(host.textContent).toContain("新聞本地狀態 · News Ingestion");
     expect(host.textContent).toContain("已退出（不可回退到 PG）");
     expect(host.textContent).not.toContain("ARKSCOPE_USE_LOCAL_NEWS");
     expect(host.textContent).not.toContain("IBKR news 暫時仍使用 collector");
+    expect(host.textContent).not.toContain("Polygon／Finnhub 新聞直寫本地");
+    expect(host.textContent).not.toContain("Normalized news writes");
   });
 });

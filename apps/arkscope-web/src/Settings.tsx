@@ -8,10 +8,8 @@ import {
   cancelOpenAIOAuth,
   completeOpenAIOAuthManual,
   type ProbeResponse,
-  bootstrapMarketData,
   deleteCredential,
   discoverModels,
-  getMarketDataJob,
   getMarketDataStatus,
   deleteModelRoute,
   exportModelRoutes,
@@ -28,8 +26,6 @@ import {
   saveResearchRuntime,
   saveModelRoutes,
   testProvider,
-  setUseLocalMarket,
-  setUseLocalMacro,
   getMacroStatus,
   setUseLocalNews,
   setNormalizedNewsWrites,
@@ -41,11 +37,7 @@ import {
   type AppRecordsMigrationResult,
   testModelAccess,
   updateCredential,
-  updateMarketData,
-  validateMarketData,
-  type MarketDataJob,
   type MarketDataStatus,
-  type MarketDataValidate,
   type MacroStatus,
   type NewsStatus,
   type TradingDayCoverage,
@@ -135,7 +127,7 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "data_storage",
     title: "Data Storage",
-    description: "本地市場庫（價格＋新聞＋IV＋基本面）建立、驗證、啟用；PG 為 fallback。",
+    description: "本地市場庫（價格＋新聞＋IV＋基本面）狀態；PG mirror routes 已退役。",
     enabled: true,
   },
   {
@@ -147,7 +139,7 @@ const SETTINGS_SECTIONS: Array<{
   {
     id: "macro_storage",
     title: "Macro / Calendar",
-    description: "本地總經＋行事曆庫（FRED 序列、經濟／財報／IPO 行事曆）啟用；資料由 FRED/Finnhub 抓取。",
+    description: "本地總經＋行事曆庫（FRED 序列、經濟／財報／IPO 行事曆）；資料由 FRED/Finnhub 抓取。",
     enabled: true,
   },
   {
@@ -401,14 +393,13 @@ export function SettingsView({
           <aside className="settings-nav-card">
             <p className="eyebrow">設定分類</p>
             <div className="settings-section-list">
-              {SETTINGS_SECTIONS.map((item) => (
+              {SETTINGS_SECTIONS.filter((item) => item.enabled).map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   className={`settings-section-button ${section === item.id ? "active" : ""}`}
-                  disabled={!item.enabled}
-                  onClick={() => item.enabled && setSection(item.id)}
-                  title={item.enabled ? item.title : `${item.title} — 規劃中`}
+                  onClick={() => setSection(item.id)}
+                  title={item.title}
                 >
                   <strong>{item.title}</strong>
                   <span>{item.description}</span>
@@ -561,9 +552,6 @@ function syncLine(status: MarketDataStatus): string {
 function DataStorageSection() {
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"" | "bootstrap" | "update" | "validate" | "toggle">("");
-  const [job, setJob] = useState<MarketDataJob | null>(null);
-  const [validation, setValidation] = useState<MarketDataValidate | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -577,85 +565,12 @@ function DataStorageSection() {
     void load();
   }, [load]);
 
-  async function runBootstrap() {
-    if (busy) return;
-    setBusy("bootstrap");
-    setValidation(null);
-    setErr(null);
-    try {
-      let j = await bootstrapMarketData();
-      setJob(j);
-      while (j.status === "running") {
-        await new Promise((r) => setTimeout(r, 1000));
-        j = await getMarketDataJob(j.id);
-        setJob(j);
-      }
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function runUpdate() {
-    if (busy) return;
-    setBusy("update");
-    setValidation(null);
-    setErr(null);
-    try {
-      let j = await updateMarketData();
-      setJob(j);
-      while (j.status === "running") {
-        await new Promise((r) => setTimeout(r, 1000));
-        j = await getMarketDataJob(j.id);
-        setJob(j);
-      }
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function runValidate() {
-    if (busy) return;
-    setBusy("validate");
-    setErr(null);
-    try {
-      setValidation(await validateMarketData());
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function toggle(enabled: boolean) {
-    if (busy) return;
-    setBusy("toggle");
-    setErr(null);
-    try {
-      await setUseLocalMarket(enabled);
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy("");
-    }
-  }
-
   const exists = status?.exists ?? false;
   const pr = status?.prices;
   const nw = status?.news;
   const iv = status?.iv;
   const fd = status?.fundamentals;
   const fc = status?.financial_cache;
-  const pct =
-    job && job.progress.total > 0
-      ? Math.round((job.progress.written / job.progress.total) * 100)
-      : 0;
 
   return (
     <div>
@@ -663,13 +578,13 @@ function DataStorageSection() {
         <div>
           <h2>本地市場資料庫 · Market Data</h2>
           <p className="muted tiny">
-            把市場價格、新聞、IV、基本面從遠端 PostgreSQL 鏡像到本地 SQLite（local-first）。啟用後讀取走本地、
-            一般模式缺資料會 fallback 回 PG；local-only strict 模式不 fallback。財務快取為 local-primary（寫本地、讀本地優先、PG 僅作 legacy fallback）。
-            Seeking Alpha capture 已切到本地 SQLite（hard cutover 2026-06-13，無 PG 讀 fallback）；報告與分數仍在 PG。
+            市場資料現在以本地 SQLite 為權威。價格與新聞由 Data Sources 的 per-source scheduler 直寫本地；
+            PG mirror bootstrap / update / validation route 已退役，缺資料時不會 fallback 回 PG。
+            財務快取為 local-primary；Seeking Alpha capture 已切到本地 SQLite。
             最新資料時間沿用來源欄位；同步／抓取時間顯示本機時區 + 美股 ET 對照。
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()} disabled={!!busy}>↻ 重新整理</button>
+        <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
       </div>
 
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -706,71 +621,11 @@ function DataStorageSection() {
           </dl>
 
           <div className="settings-actions" style={{ marginTop: 12 }}>
-            <button className="btn-ghost" onClick={() => void runBootstrap()} disabled={!!busy}>
-              {busy === "bootstrap" ? "建立中…" : exists ? "重建本地市場庫" : "建立本地市場庫"}
-            </button>
-            <button className="btn-ghost" onClick={() => void runUpdate()} disabled={!!busy || !exists}>
-              {busy === "update" ? "更新中…" : "增量更新"}
-            </button>
-            <button
-              className="btn-ghost"
-              onClick={() => void runValidate()}
-              disabled={!!busy || !exists}
-            >
-              {busy === "validate" ? "驗證中…" : "驗證本地資料"}
-            </button>
-            <label className="ds-toggle">
-              <input
-                type="checkbox"
-                checked={status.use_local_market_setting}
-                disabled={!!busy}
-                onChange={(e) => void toggle(e.target.checked)}
-              />
-              使用本地 market data
-            </label>
+            <span className="ds-chip ds-connected">local authority</span>
+            <span className="muted tiny">
+              PG mirror bootstrap / update / validation routes are retired. Price and news ingestion now run from Data Sources.
+            </span>
           </div>
-
-          {busy === "bootstrap" && job && (
-            <p className="muted tiny" style={{ marginTop: 8 }}>
-              建立中… {job.progress.written.toLocaleString()} / {job.progress.total.toLocaleString()} ({pct}%)
-              {" "}— 進度在後端執行；建立期間請勿關閉 app（關閉會中斷，需重新建立）。
-            </p>
-          )}
-          {busy === "update" && <p className="muted tiny" style={{ marginTop: 8 }}>增量更新中…（補抓最新資料）</p>}
-          {!busy && job && job.status === "done" && job.result && (
-            <p className="tiny" style={{ marginTop: 8, color: "var(--ok)" }}>
-              {job.kind === "update_market"
-                ? `✓ 增量更新完成：價格 +${(job.result.prices?.rows_added ?? 0).toLocaleString()} 列、新聞 +${(job.result.news?.rows_added ?? 0).toLocaleString()} 篇、IV +${(job.result.iv?.rows_added ?? 0).toLocaleString()}、基本面 +${(job.result.fundamentals?.rows_added ?? 0).toLocaleString()}。`
-                : `✓ 建立完成：價格 ${(job.result.prices?.rows ?? 0).toLocaleString()} 列、新聞 ${(job.result.news?.rows ?? 0).toLocaleString()} 篇、IV ${(job.result.iv?.rows ?? 0).toLocaleString()}、基本面 ${(job.result.fundamentals?.rows ?? 0).toLocaleString()}，校驗一致；財務快取保留 ${(job.result.financial_cache?.carried_over ?? 0).toLocaleString()} 列。`}
-            </p>
-          )}
-          {!busy && job && job.status === "error" && (
-            <p className="tiny refresh-err" style={{ marginTop: 8 }}>
-              {job.kind === "update_market" ? "增量更新失敗" : "建立失敗"}：{job.error}（既有資料庫已保留）
-            </p>
-          )}
-          {validation && (
-            <p
-              className="tiny"
-              style={{ marginTop: 8, color: validation.match ? "var(--ok)" : "var(--bad)" }}
-            >
-              {validation.match ? "✓ 驗證一致" : "✗ 驗證不一致（建議重建）"}：{" "}
-              {(
-                [
-                  ["價格", validation.prices],
-                  ["新聞", validation.news],
-                  ["IV", validation.iv],
-                  ["基本面", validation.fundamentals],
-                ] as const
-              ).map(([label, dv], i) => (
-                <span key={label}>
-                  {i > 0 ? " · " : ""}
-                  {label} {(dv?.local_rows ?? 0).toLocaleString()}/{(dv?.pg_rows ?? 0).toLocaleString()}
-                  {dv?.match ? " ✓" : " ✗"}
-                </span>
-              ))}
-            </p>
-          )}
         </div>
       )}
 
@@ -837,10 +692,10 @@ function NewsStorageSection() {
     <div>
       <div className="settings-section-head">
         <div>
-          <h2>新聞直寫本地 · News Ingestion</h2>
+          <h2>新聞本地狀態 · News Ingestion</h2>
           <p className="muted tiny">
-            新聞排程在 PG exit 前可走 direct-local；PG exit 完成後，Polygon／Finnhub／IBKR
-            寫入 normalized SQLite，並投影到 legacy local 讀取面直到 N8b 完成。不再經 news PG sync／mirror。
+            Polygon／Finnhub／IBKR 新聞由 Data Sources 排程直寫 normalized SQLite，並投影到 legacy local
+            讀取面直到 N8b 完成。不再經 news PG sync／mirror；此頁只顯示本地新聞庫與 PG exit 狀態。
           </p>
         </div>
         <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
@@ -1120,7 +975,6 @@ const MACRO_TABLE_LABELS: Array<[string, string]> = [
 function MacroStorageSection() {
   const [status, setStatus] = useState<MacroStatus | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1134,20 +988,6 @@ function MacroStorageSection() {
     void load();
   }, [load]);
 
-  async function toggle(enabled: boolean) {
-    if (busy) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await setUseLocalMacro(enabled);
-      await load();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const exists = status?.exists ?? false;
   const tables = status?.tables ?? {};
   const totalObs = (tables.macro_observations?.row_count ?? 0).toLocaleString();
@@ -1160,12 +1000,12 @@ function MacroStorageSection() {
           <h2>本地總經／行事曆庫 · Macro / Calendar</h2>
           <p className="muted tiny">
             把 FRED 總經序列（含 ALFRED vintage 還原時點）與經濟／財報／IPO 行事曆存到本地 SQLite（macro_calendar.db）。
-            啟用後讀取走本地、不需 PG（PG 端目前為空，未做遷移）。資料由 FRED／Finnhub 抓取的 job 填入，非 PG 鏡像。
+            Macro / Calendar is local-only in the app；資料由 FRED／Finnhub 抓取的 job 填入，非 PG 鏡像。
             觀測值的 realtime_start 取 FRED 首次發布日（output_type=4），lookahead-safe。
             注意：經濟行事曆需 Finnhub 付費方案（目前 403）；財報行事曆待節流批次抓取。
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => void load()} disabled={busy}>↻ 重新整理</button>
+        <button className="btn-ghost" onClick={() => void load()}>↻ 重新整理</button>
       </div>
 
       {err && <div className="errorbox"><p className="muted">{err}</p></div>}
@@ -1197,21 +1037,14 @@ function MacroStorageSection() {
             </dd>
           </dl>
 
-          <div className="settings-actions" style={{ marginTop: 12 }}>
-            <label className="ds-toggle">
-              <input
-                type="checkbox"
-                checked={status.use_local_macro_setting}
-                disabled={busy}
-                onChange={(e) => void toggle(e.target.checked)}
-              />
-              使用本地 macro / calendar
-            </label>
-          </div>
+          <p className="muted tiny" style={{ marginTop: 12 }}>
+            Macro / Calendar is local-only in the app. FRED/Finnhub jobs populate macro_calendar.db;
+            when disabled or empty, reads return honest empty results rather than PG fallback.
+          </p>
 
           {status.local_first_active && !exists && (
             <p className="muted tiny" style={{ marginTop: 8 }}>
-              已啟用本地優先：讀寫即走本地，macro_calendar.db 會在首次使用時自動建立；未經 FRED／Finnhub
+              讀寫即走本地，macro_calendar.db 會在首次使用時自動建立；未經 FRED／Finnhub
               ingestion 填入前本地查詢回空（不會 fallback 回 PG）。
             </p>
           )}
