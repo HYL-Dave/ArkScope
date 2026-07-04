@@ -7,8 +7,8 @@ Covers (per the prep-3 contract):
       poisoning DatabaseBackend._get_conn and expecting the poison to fire);
       a backend WITH ``_sa_db`` never touches PG (poison never fires);
   (c) health split: capture metrics from SQLite while the job_runs lookup
-      stays PG — a PG outage degrades to a warning-severity
-      ``pipeline_signal_unavailable`` reason, never a crash;
+      uses the local job-runs store; missing extension-run history falls back
+      to capture-side ``last_fetched_at`` without touching PG;
   (d) comment_signal_backfill ROUTES to the sa_capture.db store in SA-local mode
       (follow-up #1 Layer A — the locked-L3 raise guard is gone) and to PG
       otherwise; the SA-local path never crosses to PG.
@@ -422,16 +422,15 @@ class _FakeConn:
 
 
 class TestHealthSplit:
-    def test_local_capture_metrics_with_pg_down(self, local_dal, pg_calls):
+    def test_local_capture_metrics_without_extension_run_uses_capture_signal(self, local_dal, pg_calls):
         from src.service.sa_market_news_health import compute_market_news_health
 
         report = compute_market_news_health(local_dal)
-        # job_runs lookup MUST have tried PG (locked L6) and degraded gracefully.
-        assert pg_calls
-        assert report["severity"] == "warning"
-        assert report["ok"] is False
+        assert not pg_calls
+        assert report["severity"] == "ok"
+        assert report["ok"] is True
         codes = [r["code"] for r in report["reasons"]]
-        assert "pipeline_signal_unavailable" in codes
+        assert "pipeline_signal_unavailable" not in codes
         # Capture-side metrics still computed from sa_capture.db:
         assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
         assert report["freshness"]["extension_last_success_at"] is None
@@ -442,20 +441,25 @@ class TestHealthSplit:
         assert report["detail_health"]["rows_with_detail_7d"] == 2  # n1 + n3
 
     def test_local_with_pg_up_uses_extension_signal(self, local_backend, pg_calls):
+        from src.service.job_runs_store import get_job_runs_store
         from src.service.sa_market_news_health import compute_market_news_health
 
         recent = datetime.now(timezone.utc) - timedelta(minutes=10)
-        # Instance attribute shadows the poisoned class method: "PG reachable".
-        local_backend._get_conn = lambda: _FakeConn(
-            {"extension_last_success_at": recent}
-        )
         dal = SimpleNamespace(_backend=local_backend)
+        get_job_runs_store(dal).record_completed_run(
+            "sa_market_news_refresh",
+            status="succeeded",
+            started_at=recent,
+            finished_at=recent,
+            trigger_source="extension",
+        )
+
         report = compute_market_news_health(dal)
         assert report["freshness"]["pipeline_signal"] == "extension_run"
         codes = [r["code"] for r in report["reasons"]]
         assert "pipeline_signal_unavailable" not in codes
         assert report["severity"] == "ok"
-        assert not pg_calls  # class-level poison untouched (instance shadow used)
+        assert not pg_calls
 
     def test_pg_mode_dispatch_unchanged(self, pg_dal, pg_calls):
         from src.service.sa_market_news_health import compute_market_news_health

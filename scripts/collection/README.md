@@ -320,7 +320,7 @@ python scripts/collection/daily_update.py --ibkr-news    # IBKR 新聞
 python scripts/collection/daily_update.py --ibkr-prices --scope active-universe
 python scripts/collection/daily_update.py --ibkr-prices --tickers AAPL,MSFT
 
-# news_scores 同步到 DB（opt-in，已與 --news/--sync-db 脫鉤）
+# 舊 PG news_scores 同步已退役；改用本地 score importer
 python scripts/collection/daily_update.py --scores
 
 # 模擬執行 (不實際收集)
@@ -334,16 +334,16 @@ python scripts/collection/daily_update.py --all --scope active-universe --dry-ru
 ### 排程 — app 是唯一 scheduler（3e-D/E，不要用 cron）
 
 排程由 app/sidecar 內建的 data scheduler 負責：**Settings → Data Sources** 對每個
-source 設 enable + interval（預設全關，逐源 opt-in）。每次排程執行 = collect →
-PG sync → 本地鏡像，與此 CLI 完全同一條 `run_source()` 路徑、同一組**跨進程鎖**
-（`data/locks/`，flock）、同一份 `job_runs` 遙測（`collect.<source>`）。
+source 設 enable + interval（預設全關，逐源 opt-in）。active sources 直寫本地
+store，與此 CLI 完全同一條 `run_source()` 路徑、同一組**跨進程鎖**
+（`data/locks/`，flock）、同一份本地 `job_runs` 遙測（`collect.<source>`）。
 
 此 CLI 保留給**手動 backfill / debug**：app 沒開時補資料、或用顯式 `--tickers`
-補特定標的的歷史。CLI 與 app 重疊跑同一 source 會被鎖 skip（不會雙抓）；
-不加 `--sync-db` 是純收集（只寫 Parquet，不碰 PG 與本地鏡像）。
+補特定標的的歷史。CLI 與 app 重疊跑同一 source 會被鎖 skip（不會雙抓）。
+`--sync-db` 是退役相容旗標；active sources 不再經 PG mirror。
 
 ```bash
-# 手動 backfill 範例（收集 + 入 PG + 本地鏡像）
+# 手動 backfill 範例（direct-local；不經 PG mirror）
 python scripts/collection/daily_update.py --news --scope active-universe --sync-db
 python scripts/collection/daily_update.py --ibkr-prices --scope active-universe --sync-db
 ```

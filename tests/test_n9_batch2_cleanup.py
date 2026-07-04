@@ -73,6 +73,7 @@ def test_grep_classifier_blocks_runtime_pg_job_runs_reader():
     summary = cli.classify_grep_hits([
         ("src/runtime/foo.py", "SELECT * FROM job_runs"),
         ("src/service/job_runs_store.py", "SELECT * FROM job_runs"),
+        ("src/service/job_runs_cutover.py", "\"FROM job_runs ORDER BY id\""),
         ("src/tools/backends/db_backend.py", "def query_news_scores(self): return []"),
         ("scripts/migration/n9_batch2_cleanup.py", "FROM job_runs"),
         ("docs/design/PG_EXIT_N9_BATCH2_CLEANUP_PLAN.md", "job_runs"),
@@ -87,6 +88,7 @@ def test_grep_classifier_blocks_runtime_pg_job_runs_reader():
     ]
     reasons = {hit["path"]: hit["reason"] for hit in summary["allowed_hits"]}
     assert reasons["src/service/job_runs_store.py"] == "local_sqlite_authority"
+    assert reasons["src/service/job_runs_cutover.py"] == "migration_cutover_dead_path_pending_batch2_cleanup"
     assert reasons["src/tools/backends/db_backend.py"] == "retired_pg_backend_stub"
     assert reasons["scripts/migration/n9_batch2_cleanup.py"] == "n9_batch2_orchestrator"
     assert reasons["docs/design/PG_EXIT_N9_BATCH2_CLEANUP_PLAN.md"] == "docs_or_tests"

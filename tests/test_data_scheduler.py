@@ -8,6 +8,7 @@ import sys
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -99,6 +100,10 @@ def test_no_active_runtime_source_uses_migrate_to_supabase_sync():
             offenders.append((name, source_def.sync_flag))
 
     assert offenders == []
+
+
+def test_scheduler_runtime_no_longer_references_migrate_to_supabase_script():
+    assert "migrate_to_supabase.py" not in Path(ds.__file__).read_text(encoding="utf-8")
 
 
 def test_set_config_roundtrip_and_clamp():
@@ -1371,7 +1376,7 @@ def test_normalized_ibkr_worker_invalid_stdout_is_generic_failure(monkeypatch):
     assert secret not in json.dumps(row, sort_keys=True)
 
 
-def test_ibkr_legacy_local_route_keeps_legacy_pg_collector_sync_and_mirror(
+def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
     monkeypatch,
 ):
     import src.news_normalized.routing as routing
@@ -1390,16 +1395,11 @@ def test_ibkr_legacy_local_route_keeps_legacy_pg_collector_sync_and_mirror(
 
     res = ds.run_source("ibkr_news", trigger_source="api")
 
-    assert res["status"] == "succeeded"
+    assert res["status"] == "failed"
     assert len(route_calls) == 1
-    assert len(calls) == 2
-    assert calls[0][1].endswith("collect_ibkr_news.py")
-    assert "--incremental" in calls[0]
-    assert "--tickers" in calls[0]
-    assert calls[0][calls[0].index("--tickers") + 1] == "AAPL,NVDA"
-    assert "--news" in calls[1]
-    assert refresh_calls == [True]
-    assert res["local_refresh"] == {"ok": True}
+    assert calls == []
+    assert refresh_calls == []
+    assert "legacy local IBKR news collector route retired" in res["error"]
 
 
 def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
@@ -1434,16 +1434,16 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
     assert "blocked test route" in row["last_error"]
 
 
-def test_run_source_subprocess_success_collect_sync_refresh(monkeypatch):
-    # IBKR sources stay subprocess: collector + PG sync = two child processes.
+def test_default_ibkr_legacy_news_route_fails_before_pg_sync(monkeypatch):
+    # A fresh profile without the normalized-writer marker must fail closed, not
+    # run the old collect_ibkr_news.py → PG sync → mirror chain.
     calls = []
     monkeypatch.setattr(ds, "_run_subprocess",
                         lambda argv: (calls.append(argv), {"returncode": 0})[1])
     res = ds.run_source("ibkr_news")
-    assert res["status"] == "succeeded"
-    assert len(calls) == 2
-    assert "collect_ibkr_news.py" in calls[0][1]
-    assert "--news" in calls[1]
+    assert res["status"] == "failed"
+    assert calls == []
+    assert "legacy local IBKR news collector route retired" in res["error"]
 
 
 def test_run_source_adapter_failure_short_circuits(monkeypatch):
@@ -1460,7 +1460,7 @@ def test_run_source_adapter_failure_short_circuits(monkeypatch):
     assert calls == []                                      # PG sync never attempted
 
 
-def test_run_source_collector_failure_short_circuits(monkeypatch):
+def test_default_ibkr_legacy_news_route_does_not_launch_collector(monkeypatch):
     calls = []
 
     def _sub(argv):
@@ -1469,8 +1469,9 @@ def test_run_source_collector_failure_short_circuits(monkeypatch):
 
     monkeypatch.setattr(ds, "_run_subprocess", _sub)
     res = ds.run_source("ibkr_news")
-    assert res["status"] == "failed" and "collector failed" in res["error"]
-    assert len(calls) == 1                                  # PG sync never attempted
+    assert res["status"] == "failed"
+    assert "legacy local IBKR news collector route retired" in res["error"]
+    assert calls == []
 
 
 def test_run_source_iv_history_retired_before_provider_work(monkeypatch):

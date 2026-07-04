@@ -150,6 +150,8 @@ def _classify_single_hit(path: str, match: str) -> str:
         return "retired_cli_or_script"
     if p == "src/service/job_runs_store.py":
         return "local_sqlite_authority"
+    if p == "src/service/job_runs_cutover.py":
+        return "migration_cutover_dead_path_pending_batch2_cleanup"
     if p == "src/tools/backends/db_backend.py":
         return "retired_pg_backend_stub"
     if any(token in p for token in (

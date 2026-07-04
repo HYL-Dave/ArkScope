@@ -5,9 +5,9 @@ Daily Data Update - thin CLI wrapper over the app scheduler core (3e-E)
 定位 (2026-06, F6 落定): 這是 app scheduler 的 CLI 薄包裝，不再自帶編排。每個
 source 都走 src/service/data_scheduler.run_source() —— 與 app Settings 的
 「Run now」完全同一條路：同 per-source 鎖（重疊直接 skip）、同 IBKR Gateway 鎖
-（序列化）、同 job_runs telemetry（collect.<source>，trigger='cli'）、同
-collect → PG sync → 本地鏡像 流程。news 來源在進程內跑（adapter），IBKR 來源
-維持 subprocess（進程隔離）。
+（序列化）、同 job_runs telemetry（collect.<source>，trigger='cli'）。PG data
+sync 已退役；active sources 直寫本地 store。news 來源在進程內跑（adapter），IBKR
+來源維持 subprocess（進程隔離）。
 
 CLI 與 app 跨進程共用 file lock（data/locks/，flock）：同一 source 重疊會直接
 skip，IBKR Gateway 跨進程序列化（等待，最長 30 分鐘）。app 排程開啟時手動跑同一
@@ -30,12 +30,10 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
     python daily_update.py --all --scope active-universe --dry-run
 
-    # 收集後同步 PG + 本地鏡像（不加 --sync-db 則純收集：只寫 Parquet，
-    # 不碰 PG 也不動本地鏡像）
+    # --sync-db 是退役相容旗標；active sources 已直寫本地 store。
     python daily_update.py --all --scope active-universe --sync-db
 
-    # 同步多模型 news_scores（opt-in，與 --news/--sync-db 脫鉤；唯一仍是
-    # 獨立 subprocess 的步驟）
+    # 舊 PG news_scores 同步已退役；使用 scripts/scoring/import_news_scores_local.py。
     python daily_update.py --scores
 
 重要限制 — 新 Ticker 的歷史資料:

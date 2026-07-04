@@ -67,7 +67,6 @@ logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COLLECT_DIR = _REPO_ROOT / "scripts" / "collection"
-_MIGRATE = _REPO_ROOT / "scripts" / "migrate_to_supabase.py"
 
 TICK_SECONDS = 30
 _IBKR_LOCK_TIMEOUT_S = 1800  # one slow IBKR job must not deadlock the others forever
@@ -217,12 +216,10 @@ from src.ibkr_gateway_lock import (  # noqa: E402
 )
 
 _SOURCE_LOCKS: Dict[str, threading.Lock] = {name: threading.Lock() for name in SOURCES}
-_SYNC_LOCK = threading.Lock()    # one migrate_to_supabase at a time
 _LOCAL_REFRESH_LOCK = threading.Lock()  # one incremental_update at a time (skip-if-busy)
 
 # --- cross-process lock twins (sidecar ⟷ daily_update CLI) ---------------------
 _SOURCE_FLOCKS: Dict[str, _FileLock] = {name: _FileLock(f"source_{name}") for name in SOURCES}
-_SYNC_FLOCK = _FileLock("pg_sync")
 _LOCAL_REFRESH_FLOCK = _FileLock("local_refresh")
 
 # in-memory last-attempt per source (UTC); seeded from job_runs on scheduler start
@@ -785,12 +782,12 @@ def _local_refresh() -> Dict[str, Any]:
 def run_source(source: str, trigger_source: str = "scheduler", *,
                tickers: Optional[List[str]] = None,
                skip_sync: bool = False) -> Dict[str, Any]:
-    """Execute one source end-to-end (collect → PG sync → local refresh) with
+    """Execute one source end-to-end (direct-local collect → local refresh) with
     telemetry. Same-source overlap SKIPS (never queues) — in-process AND
     cross-process (CLI vs sidecar); IBKR sources serialize behind the shared
     Gateway lock (also cross-process). ``skip_sync=True`` = TRUE collect-only for
-    DATA stores: Parquet only, no PG sync and no local-mirror refresh (PG was not
-    updated, so a refresh would be a pointless delta).
+    legacy collector paths: no local-mirror refresh. PG data sync is retired and
+    stale ``sync_flag`` paths fail closed before invoking any importer.
 
     DELIBERATE exception: job_runs TELEMETRY still runs for collect-only — it is
     metadata (not data), best-effort/swallowed, bounded by connect_timeout, and
@@ -914,6 +911,14 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     raise RuntimeError(
                         "legacy PG news sync route retired by N9; use normalized/local "
                         "news writers"
+                    )
+                if (
+                    news_route.mode == NewsWriteMode.LEGACY_LOCAL
+                    and d.news_direct_source == "ibkr"
+                ):
+                    raise RuntimeError(
+                        "legacy local IBKR news collector route retired by N9; use "
+                        "normalized IBKR news writer"
                     )
                 local_news_writer = news_route.mode == NewsWriteMode.NORMALIZED or (
                     news_route.mode == NewsWriteMode.LEGACY_LOCAL
@@ -1166,18 +1171,10 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 collected = True
 
             if collected and d.sync_flag and not skip_sync and not local_news_writer:
-                with _SYNC_LOCK:
-                    # cross-process: a CLI sync may be mid-flight — queue behind it
-                    # (in-process semantics are queue-not-skip too), bounded.
-                    if not _SYNC_FLOCK.acquire(timeout=_IBKR_LOCK_TIMEOUT_S):
-                        raise RuntimeError("PG sync lock busy in another process (timeout)")
-                    try:
-                        sync = _run_subprocess([sys.executable, str(_MIGRATE), d.sync_flag])
-                    finally:
-                        _SYNC_FLOCK.release()
-                result["sync"] = sync
-                if sync["returncode"] != 0:
-                    raise RuntimeError(f"PG sync failed: {sync.get('error_tail', '')[:200]}")
+                raise RuntimeError(
+                    f"retired PG mirror sync requested for {source} ({d.sync_flag}); "
+                    "use direct-local writers"
+                )
 
             if skip_sync:
                 # TRUE collect-only (CLI without --sync-db): PG untouched → a local
