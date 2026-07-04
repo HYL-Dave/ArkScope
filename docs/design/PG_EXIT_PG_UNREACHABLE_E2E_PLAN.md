@@ -12,6 +12,25 @@
 
 ---
 
+## TestClient Exception To The Route-Unit Convention
+
+Repository route-unit tests normally avoid `TestClient(create_app())` because ASGI lifespan can hang
+or become environment-coupled when PG is slow or unavailable. This plan intentionally makes a narrow
+exception for the live E2E smoke:
+
+- the goal is full app assembly, not isolated handler behavior;
+- `psycopg2.connect` is patched to raise immediately, so the historical "wait for PG timeout" hang
+  class is removed;
+- `ARKSCOPE_DISABLE_SCHEDULER=1` prevents scheduler startup side effects;
+- unit tests for the harness use an injected fake client factory, so only the live smoke constructs
+  the real app.
+
+Fallback rule: if the live E2E smoke still hangs in `TestClient`, do **not** add a longer timeout or
+skip the check. Rewrite the smoke to call route handlers directly with explicit dependencies, matching
+the repository's handler-direct convention, and keep the same required surface list.
+
+---
+
 ## Map Check
 
 Active authority:
@@ -165,11 +184,11 @@ def test_report_sanitizes_poison_dsn(tmp_path):
         ok=False,
         poison_label="postgresql://user:secret@host/db?connect_timeout=1",
         pg_attempts=["postgresql://user:secret@host/db?connect_timeout=1"],
-        checks=[CheckResult(name="x", ok=False, status_code=500, detail="secret")],
+        checks=[CheckResult(name="x", ok=False, status_code=500, detail="password=secret123")],
     )
     data = report.to_sanitized_dict()
     text = str(data)
-    assert "secret" not in text
+    assert "secret123" not in text
     assert "user:secret" not in text
     assert "postgresql://user:***@host/db" in text
 ```
@@ -282,7 +301,9 @@ def _assert_market_status(body: Any) -> None:
 
 
 def _assert_update_retired(body: Any) -> None:
-    assert body.get("code") in {"pg_market_update_retired", "pg_market_bootstrap_retired"}
+    detail = body.get("detail") if isinstance(body, dict) else None
+    payload = detail if isinstance(detail, dict) else body
+    assert payload.get("code") in {"pg_market_update_retired", "pg_market_bootstrap_retired"}
 
 
 def _assert_list_or_dict(_: Any) -> None:
