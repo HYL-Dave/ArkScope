@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 
@@ -232,6 +233,30 @@ def test_postcheck_reports_targets_absent_and_excluded_present(tmp_path, monkeyp
     assert payload["ok"] is True
     assert payload["targets_still_present"] == []
     assert payload["excluded_missing"] == []
+
+
+def test_main_without_explicit_argv_uses_process_argv(monkeypatch):
+    from scripts.migration import n9_batch2_cleanup as cli
+
+    calls = []
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "n9_batch2_cleanup.py",
+            "preview",
+            "--database-url",
+            "postgres://secret@example/db",
+            "--repo-root",
+            ".",
+            "--output",
+            "preview.json",
+        ],
+    )
+    monkeypatch.setattr(cli, "_cmd_preview", lambda args: calls.append(args.output) or 7)
+
+    assert cli.main() == 7
+    assert calls == ["preview.json"]
 
 
 class _FakeConn:
