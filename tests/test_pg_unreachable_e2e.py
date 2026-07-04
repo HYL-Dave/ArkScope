@@ -162,3 +162,50 @@ def test_bootstrap_repo_root_inserts_src_import_path(monkeypatch):
     smoke._bootstrap_repo_root()
 
     assert sys.path[0] == root
+
+
+def test_handler_direct_client_runs_healthz_without_testclient():
+    # The live PG-unreachable smoke intentionally bypasses FastAPI TestClient:
+    # in this environment TestClient/lifespan can hang before any route evidence
+    # is produced. The harness must still exercise the same handlers.
+    from scripts.smoke import pg_unreachable_e2e as smoke
+
+    client = smoke._HandlerDirectClient(
+        dal=object(),
+        registry=object(),
+        profile_store=object(),
+        provider_store=None,
+    )
+
+    with client as active:
+        response = active.request("GET", "/healthz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_handler_direct_client_preserves_http_exception_detail(monkeypatch):
+    from fastapi import HTTPException
+
+    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.api.routes import market_data
+
+    def reject_update(store):
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "pg_market_update_retired"},
+        )
+
+    monkeypatch.setattr(market_data, "update_route", reject_update)
+    client = smoke._HandlerDirectClient(
+        dal=object(),
+        registry=object(),
+        profile_store=object(),
+        provider_store=None,
+    )
+
+    with client as active:
+        response = active.request("POST", "/market-data/update")
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": {"code": "pg_market_update_retired"}}

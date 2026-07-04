@@ -8,6 +8,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
+from urllib.parse import parse_qs, urlsplit
 
 
 POISON_DSN = "postgresql://pg-poison.invalid/arkscope?connect_timeout=1"
@@ -53,6 +54,25 @@ class SmokeReport:
                 for check in self.checks
             ],
         }
+
+
+class _DirectResponse:
+    def __init__(self, status_code: int, body: Any):
+        self.status_code = status_code
+        self._body = _jsonable(body)
+
+    def json(self) -> Any:
+        return self._body
+
+
+def _jsonable(value: Any) -> Any:
+    if hasattr(value, "model_dump") and callable(value.model_dump):
+        return _jsonable(value.model_dump())
+    if isinstance(value, dict):
+        return {key: _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return value
 
 
 def sanitize_secret(value: Any) -> str:
@@ -188,11 +208,290 @@ def run_universe_summary_check() -> CheckResult:
         return CheckResult("universe_summaries", False, None, sanitize_secret(repr(exc)))
 
 
-def _make_live_client():
-    from fastapi.testclient import TestClient
-    from src.api.app import create_app
+class _HandlerDirectClient:
+    """Minimal route harness for the PG-unreachable smoke.
 
-    return TestClient(create_app())
+    This deliberately avoids FastAPI ``TestClient``/lifespan. In PG-unreachable
+    environments that stack can hang before route evidence is emitted; the smoke
+    needs direct, explicit dependencies and still preserves HTTPException body
+    shape for the checked routes.
+    """
+
+    def __init__(
+        self,
+        *,
+        dal: Any,
+        registry: Any,
+        profile_store: Any,
+        provider_store: Any,
+    ) -> None:
+        self.dal = dal
+        self.registry = registry
+        self.profile_store = profile_store
+        self.provider_store = provider_store
+
+    @classmethod
+    def from_live_dependencies(cls) -> "_HandlerDirectClient":
+        from src.api import dependencies
+        from src.api.routes import providers_config
+
+        return cls(
+            dal=dependencies.get_dal(),
+            registry=dependencies.get_registry(),
+            profile_store=dependencies.get_profile_store(),
+            provider_store=providers_config.get_data_provider_store_lenient(),
+        )
+
+    def __enter__(self) -> "_HandlerDirectClient":
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        return False
+
+    def request(self, method: str, path: str) -> _DirectResponse:
+        from fastapi import HTTPException
+
+        try:
+            return self._dispatch(method.upper(), path)
+        except HTTPException as exc:
+            return _DirectResponse(exc.status_code, {"detail": exc.detail})
+
+    def _dispatch(self, method: str, path: str) -> _DirectResponse:
+        from fastapi import Response
+
+        parsed = urlsplit(path)
+        route = parsed.path
+        query = parse_qs(parsed.query)
+
+        def qstr(name: str, default: str | None = None) -> str | None:
+            values = query.get(name)
+            return values[-1] if values else default
+
+        def qint(name: str, default: int) -> int:
+            raw = qstr(name)
+            return int(raw) if raw not in (None, "") else default
+
+        if method == "GET" and route == "/healthz":
+            from src.api.routes import health
+
+            return _DirectResponse(200, health.healthz())
+
+        if method == "GET" and route == "/status":
+            from src.api.routes import health
+
+            return _DirectResponse(200, health.status(dal=self.dal, registry=self.registry))
+
+        if method == "GET" and route == "/providers/config":
+            from src.api.routes import providers_config
+
+            return _DirectResponse(
+                200,
+                providers_config.providers_config(store=self.provider_store),
+            )
+
+        if method == "GET" and route == "/providers/health":
+            from src.api.routes import health
+
+            return _DirectResponse(200, health.providers_health(dal=self.dal))
+
+        if method == "GET" and route == "/schedule":
+            from src.api.routes import schedule
+
+            return _DirectResponse(200, schedule.get_schedule())
+
+        if method == "GET" and route == "/market-data/status":
+            from src.api.routes import market_data
+
+            return _DirectResponse(
+                200,
+                market_data.market_data_status(store=self.profile_store),
+            )
+
+        if method == "POST" and route == "/market-data/update":
+            from src.api.routes import market_data
+
+            return _DirectResponse(
+                200,
+                market_data.update_route(store=self.profile_store),
+            )
+
+        if method == "GET" and route.startswith("/prices/"):
+            from src.api.routes import prices
+
+            ticker = route.removeprefix("/prices/").split("/", 1)[0]
+            return _DirectResponse(
+                200,
+                prices.prices_for_ticker(
+                    ticker,
+                    interval=qstr("interval", "15min") or "15min",
+                    days=qint("days", 30),
+                    dal=self.dal,
+                ),
+            )
+
+        if method == "GET" and route.startswith("/market-data/coverage/"):
+            from src.api.routes import market_data
+
+            ticker = route.rsplit("/", 1)[-1]
+            return _DirectResponse(200, market_data.market_data_coverage(ticker))
+
+        if method == "GET" and route == "/news/status":
+            from src.api.routes import news
+
+            return _DirectResponse(200, news.news_status(store=self.profile_store))
+
+        if method == "GET" and route == "/news/feed":
+            from src.api.routes import news
+
+            return _DirectResponse(
+                200,
+                news.news_feed(
+                    q=qstr("q"),
+                    ticker=qstr("ticker"),
+                    source=qstr("source"),
+                    days=qint("days", 30),
+                    limit=qint("limit", 50),
+                    offset=qint("offset", 0),
+                    dal=self.dal,
+                ),
+            )
+
+        if method == "GET" and route.startswith("/news/") and route.endswith("/sentiment"):
+            from src.api.routes import news
+
+            ticker = route.removeprefix("/news/").removesuffix("/sentiment").strip("/")
+            return _DirectResponse(
+                200,
+                news.news_sentiment(ticker, days=qint("days", 7), dal=self.dal),
+            )
+
+        if method == "GET" and route.startswith("/news/"):
+            from src.api.routes import news
+
+            ticker = route.removeprefix("/news/").split("/", 1)[0]
+            return _DirectResponse(
+                200,
+                news.news_for_ticker(
+                    ticker,
+                    days=qint("days", 30),
+                    source=qstr("source", "auto") or "auto",
+                    dal=self.dal,
+                ),
+            )
+
+        if method == "GET" and route.startswith("/fundamentals/"):
+            from src.api.routes import fundamentals
+
+            ticker = route.rsplit("/", 1)[-1]
+            stored = (qstr("stored", "false") or "false").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            return _DirectResponse(
+                200,
+                fundamentals.fundamentals(ticker, stored=stored, dal=self.dal),
+            )
+
+        if method == "GET" and route.startswith("/options/") and route.endswith("/history"):
+            from src.api.routes import options
+
+            ticker = route.removeprefix("/options/").removesuffix("/history").strip("/")
+            return _DirectResponse(200, options.iv_history(ticker, dal=self.dal))
+
+        if method == "GET" and route == "/sa/feed":
+            from src.api.routes import seeking_alpha
+
+            return _DirectResponse(
+                200,
+                seeking_alpha.sa_feed(
+                    q=qstr("q"),
+                    ticker=qstr("ticker"),
+                    item_type=qstr("item_type"),
+                    days=qint("days", 30),
+                    limit=qint("limit", 50),
+                    offset=qint("offset", 0),
+                    dal=self.dal,
+                ),
+            )
+
+        if method == "GET" and route == "/sa/market-news/health":
+            from src.api.routes import seeking_alpha
+
+            response = Response()
+            body = seeking_alpha.market_news_health(
+                response=response,
+                strict=(qstr("strict", "false") or "false").lower() == "true",
+                dal=self.dal,
+            )
+            return _DirectResponse(response.status_code or 200, body)
+
+        if method == "GET" and route == "/macro/status":
+            from src.api.routes import macro_calendar
+
+            return _DirectResponse(
+                200,
+                macro_calendar.macro_status(store=self.profile_store),
+            )
+
+        if method == "GET" and route == "/macro/health":
+            from src.api.routes import macro_calendar
+
+            response = Response()
+            body = macro_calendar.macro_calendar_health(
+                response=response,
+                strict=(qstr("strict", "false") or "false").lower() == "true",
+                dal=self.dal,
+            )
+            return _DirectResponse(response.status_code or 200, body)
+
+        if method == "GET" and route == "/macro/ipo-calendar":
+            from src.api.routes import macro_calendar
+
+            return _DirectResponse(
+                200,
+                macro_calendar.ipo_calendar(
+                    status=qstr("status"),
+                    from_date=qstr("from_date"),
+                    to_date=qstr("to_date"),
+                    as_of=qstr("as_of"),
+                    limit=qint("limit", 100),
+                    dal=self.dal,
+                ),
+            )
+
+        if method == "GET" and route == "/reports":
+            from src.api.routes import reports
+
+            return _DirectResponse(
+                200,
+                reports.reports_list(
+                    ticker=qstr("ticker"),
+                    days=qint("days", 30),
+                    report_type=qstr("report_type"),
+                    limit=qint("limit", 20),
+                    dal=self.dal,
+                ),
+            )
+
+        raise AssertionError(f"PG-unreachable smoke has no handler for {method} {path}")
+
+
+def _make_live_client():
+    return _HandlerDirectClient.from_live_dependencies()
+
+
+def _clear_dependency_caches() -> None:
+    from src.api import dependencies
+
+    for name in (
+        "get_dal",
+        "get_registry",
+        "get_profile_store",
+        "get_data_provider_store",
+    ):
+        getattr(dependencies, name).cache_clear()
 
 
 def run_smoke(
@@ -206,10 +505,7 @@ def run_smoke(
     os.environ["ARKSCOPE_DISABLE_SCHEDULER"] = "1"
     os.environ["ARKSCOPE_PG_UNREACHABLE_E2E"] = "1"
 
-    from src.api import dependencies
-
-    dependencies.get_dal.cache_clear()
-    dependencies.get_registry.cache_clear()
+    _clear_dependency_caches()
 
     from src.tools import data_access as data_access_mod
 
@@ -233,8 +529,7 @@ def run_smoke(
         psycopg2.connect = original_connect
         _restore_env("ARKSCOPE_DISABLE_SCHEDULER", old_disable_scheduler)
         _restore_env("ARKSCOPE_PG_UNREACHABLE_E2E", old_e2e_marker)
-        dependencies.get_dal.cache_clear()
-        dependencies.get_registry.cache_clear()
+        _clear_dependency_caches()
 
     ok = all(check.ok for check in checks) and not poison.attempts
     return SmokeReport(
