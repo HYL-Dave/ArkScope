@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** DRAFT for review. No live PG action is authorized by this document until the plan is reviewed, implemented, and the live evidence packet is explicitly approved.
+> **Status:** LIVE COMPLETE 2026-07-05 Asia/Taipei. PG `job_runs` and `news_search_vector_update()` were dropped under the reviewed fingerprint below; PG `prices` and app-record archive tables remain for later batches.
 
 **Goal:** Finish the second N9 cleanup batch after S-H1/P0-C by dropping the frozen PG `job_runs` archive, removing dead PG-domain code paths, collapsing transitional local-toggle defaults so fresh profiles do not construct dead PG routes, and proving normal runtime remains local-only.
 
@@ -462,31 +462,47 @@ Post-drop PG-unreachable smoke:
 
 - Repeat the PG-poison or PG-unavailable smoke after live drop and record it in Task 10 docs. This is mandatory if the live drop was executed before the 2026-07-10 calendar soak.
 
+### Live Record (2026-07-05 Asia/Taipei / 2026-07-04 UTC)
+
+- Final approved evidence fingerprint: `1bd083754c2e3c56fe93ea57c1b540c7c4c980117d737361509b451cc1963478`.
+- Archive: `data/pg_archive/n9_batch2_20260704T162352Z/`.
+- Dump sha256: `dba8eb51bb3249f88d299047b30492867b11bdb531bfbb6d4d2a812e926ef71c`.
+- Restore proof: `ok:true`, `mismatches:[]`, disposable restore DB `arkscope_n9_batch2_restore_20260704162352`.
+- Pre-drop evidence: preview x2 byte-identical; grep blockers `0`; `job_runs=13,652`; row fingerprint `2caf9241c3e077c75f6624b630c4fe0a`; `news_search_vector_update()` present; protected tables `prices`, `agent_queries`, `research_reports`, and `agent_memories` present.
+- Local takeover proof: `profile_state.db.job_runs=13,672` at gate time, showing local telemetry had continued beyond frozen PG; post-drop poison smoke `186 passed`.
+- Drop result: single transaction, no CASCADE, dropped table `job_runs` and function `news_search_vector_update()`; postcheck `ok:true`, `targets_still_present:[]`, `excluded_missing:[]`.
+- Invalidated rollback levers are now operational fact: `use_local_market=false`, `use_local_macro=false`, `use_local_job_runs=false`, and old env equivalents no longer select PG for normal runtime. Recovery for dropped state means restoring the archive first.
+- Runbook lessons banked for batch-3:
+  - Live CLIs must be tested through real `sys.argv`; the first evidence attempt exposed and fixed an entrypoint bug (`5ff9581`).
+  - A read-only precheck must use a separate PG connection from the destructive transaction; the first drop attempt correctly rolled back on `ReadOnlySqlTransaction`, then `febec95` isolated precheck and write connections before evidence was regenerated and re-approved.
+  - Repo freeze is load-bearing because repo grep contributes to the fingerprint; both fixes invalidated prior approval packages as intended.
+
 ---
 
 ## Task 10 - Docs And Cleanup
 
-- [ ] Update `docs/design/PG_EXIT_REMAINDER_SCOPING.md`:
+- [x] Update `docs/design/PG_EXIT_REMAINDER_SCOPING.md`:
   - batch-2 live record;
   - archive path;
   - fingerprint;
   - remaining PG objects.
-- [ ] Update `docs/design/PROJECT_PRIORITY_MAP.md` §10:
+- [x] Update `docs/design/PROJECT_PRIORITY_MAP.md` §10:
   - batch-2 completion entry;
   - next active PG-exit item = batch-3 prices drop or PG-unreachable E2E, depending on reviewer decision.
-- [ ] Update `docs/design/PG_EXIT_COMPLETION_PLAN.md`:
+- [x] Update `docs/design/PG_EXIT_COMPLETION_PLAN.md`:
   - job_runs no longer PG archive;
   - dead paths removed;
   - local-default collapse done.
-- [ ] Update `docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md` or this file if a runbook lesson from batch-2 should be banked for batch-3.
-- [ ] Record invalidated levers:
+- [x] Update `docs/design/PG_EXIT_N9_BATCH1_DROP_PLAN.md` or this file if a runbook lesson from batch-2 should be banked for batch-3.
+- [x] Record invalidated levers:
   - `use_local_market=false`,
   - `use_local_macro=false`,
   - `use_local_job_runs=false`,
   - any old `.env` equivalents.
-- [ ] Remove or note cleanup of unreachable frontend exports:
+- [x] Remove or note cleanup of unreachable frontend exports:
   - `bootstrap/update/validate/setUseLocalMarket/setUseLocalMacro` if grep confirms no UI consumer remains.
   - generic provider-config `hintRows` / client-id sub-row paths left unreachable by the grouped IBKR renderer.
+  - Runtime-impacting UI cleanup already shipped in `4bcc6b9`; residual exports/dead render helpers are non-runtime cleanup and can be swept with the next frontend hygiene pass.
 
 ---
 

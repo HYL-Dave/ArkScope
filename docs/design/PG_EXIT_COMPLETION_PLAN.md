@@ -6,8 +6,8 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04; P0-C.1 runtime hardening moved IBKR price jobs to sanitized subprocess workers and shortened price write locks — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-2 (job_runs + dead paths), batch-3 PG `prices` destructive drop, SEC/dead paths, and UI collapse. S-G
-`news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
+**N9 batch-1 live drop EXECUTED 2026-07-03 and N9 batch-2 live drop EXECUTED 2026-07-05 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04; P0-C.1 runtime hardening moved IBKR price jobs to sanitized subprocess workers and shortened price write locks — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-3 PG `prices` destructive drop, final PG-unreachable E2E, and separate decisions for app-record archive tables. S-G
+`news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local; PG `job_runs` has been archived/dropped.
 
 ## Progress
 
@@ -37,8 +37,8 @@ the normalized local writer + legacy projection, and news reads are hard-local w
   have been retired or fail-closed ahead of N9.
   S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
   (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`
-  (`use_local_job_runs=true`, live 2026-07-03). PG copies of both tables are archive/N9 candidates,
-  not normal runtime authorities. S-H2 removed the generic financial-cache PG read-through path;
+  (`use_local_job_runs=true`, live 2026-07-03). N9 batch-2 dropped PG `job_runs` and the orphan
+  `news_search_vector_update()` function after archive/restore proof on 2026-07-05. S-H2 removed the generic financial-cache PG read-through path;
   `financial_cache` misses are now local honest misses that refetch from SEC/FD as needed.
 
 ## Why this exists
@@ -95,7 +95,7 @@ re-fetch).
 |---|---|---|---|---|
 | Prices | ✅ local-only after P0-C | ✅ scheduled `ibkr_prices` direct-local | PG table = archive/rollback until batch-3 | P0-C done |
 | News | ✅ hard-local | ✅ Polygon/Finnhub/IBKR normalized local writers + legacy projection | — | news-domain PG-exit done |
-| IV | ✅ local legacy rows / honest-empty on miss | ❌ old PG source retired; future reboot pending | — | N9 drop + future IV reboot |
+| IV | ✅ local legacy rows / honest-empty on miss | ❌ old PG source retired; future reboot pending | — | PG source archived/dropped; future IV reboot |
 | Fundamentals | ✅ local SEC annual cache / honest empty | ✅ SEC/FD refetch cache | — | S-B done |
 | financial_cache | ✅ | ✅ (local-primary) | — | done |
 | SA capture | ✅ (sa_capture.db) | ✅ | verify db_backend SA dead | mostly done |
@@ -103,7 +103,7 @@ re-fetch).
 | **Reports** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
 | **Memories** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
 | **agent_queries** | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive | **DONE (Slice 1)** |
-| job_runs | ✅ local (profile_state.db) | ✅ local | PG = pre-migration archive / N9 candidate after soak | **DONE (S-H1)** |
+| job_runs | ✅ local (profile_state.db) | ✅ local | — | **DONE (S-H1 + N9 batch-2 drop)** |
 | SEC filings | ❌ PG-only | (cache) | read | (1)-ish — step 4 |
 
 ## Locked direction (from prior PG-exit work)
