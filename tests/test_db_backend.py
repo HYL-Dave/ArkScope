@@ -64,53 +64,21 @@ def test_retired_pg_domain_methods_do_not_query_dropped_tables(monkeypatch):
     assert feed == {"available": False, "items": [], "total": 0, "sources": {}, "days": {}}
 
 
-def test_query_prices_still_uses_pg_prices_until_batch3(monkeypatch):
-    calls = []
-
-    def fake_query_df(self, sql, params=()):
-        calls.append((sql, params))
-        return pd.DataFrame(
-            [{"datetime": "2026-07-03T20:00:00+0000", "open": 1.0, "high": 2.0,
-              "low": 0.5, "close": 1.5, "volume": 100}]
-        )
-
-    monkeypatch.setattr(DatabaseBackend, "_query_df", fake_query_df)
+def test_query_prices_is_retired_after_batch3(monkeypatch):
+    _poison_dead_domain_pg(monkeypatch)
 
     out = DatabaseBackend(dsn="postgresql://poisoned/arkscope").query_prices("NVDA")
 
-    assert len(out) == 1
-    assert calls and "FROM prices" in calls[0][0]
+    assert list(out.columns) == ["datetime", "open", "high", "low", "close", "volume"]
+    assert out.empty
 
 
-def test_query_health_stats_ignores_retired_batch1_domains(monkeypatch):
-    executed = []
-
-    class Cursor:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_exc):
-            return False
-
-        def execute(self, sql, params=None):
-            executed.append(sql)
-            forbidden = ("FROM news", "FROM iv_history", "FROM financial_data_cache")
-            assert not any(token in sql for token in forbidden)
-
-        def fetchall(self):
-            return [("2026-07-03T20:00:00+0000",)]
-
-    class Conn:
-        def cursor(self, *args, **kwargs):
-            return Cursor()
-
-    monkeypatch.setattr(DatabaseBackend, "_get_conn", lambda self: Conn())
+def test_query_health_stats_is_retired_after_batch3(monkeypatch):
+    _poison_dead_domain_pg(monkeypatch)
 
     stats = DatabaseBackend(dsn="postgresql://poisoned/arkscope").query_health_stats()
 
-    assert any("FROM prices" in sql for sql in executed)
-    assert stats["prices"]["rows"] == [("2026-07-03T20:00:00+0000",)]
-    for key in ("news", "iv_history", "financial_cache"):
+    for key in ("news", "prices", "iv_history", "financial_cache"):
         assert stats[key] == {"rows": [], "error": None}
 
 

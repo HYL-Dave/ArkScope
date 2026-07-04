@@ -3,10 +3,11 @@ DatabaseBackend — reads data from PostgreSQL archive/runtime tables.
 
 Implements the DataBackend protocol using psycopg2 with direct SQL queries.
 Designed for both self-hosted PostgreSQL (Docker) and cloud services.
-After N9 batch-1/2, market-data runtime domains that moved local-first
-(``news``, ``news_scores``, ``iv_history``, ``fundamentals``,
-``financial_data_cache``) are retired stubs here. ``prices`` remains live until
-the batch-3 drop, and app-record archive methods are intentionally retained.
+After N9 batch-1/2 and batch-3, market-data runtime domains that moved
+local-first (``news``, ``news_scores``, ``prices``, ``iv_history``,
+``fundamentals``, ``financial_data_cache``) are retired stubs here.
+App-record archive methods are intentionally retained pending a separate
+archive-policy decision.
 
 Connection string format:
     postgresql://postgres:password@host:port/dbname
@@ -28,6 +29,8 @@ import psycopg2.extras
 from .sqlite_backend import _IV_COLS, _NEWS_COLS, _NEWS_SEARCH_COLS, _NEWS_STATS_COLS
 
 logger = logging.getLogger(__name__)
+
+_PRICE_COLS = ["datetime", "open", "high", "low", "close", "volume"]
 
 
 _COMMENT_SPACE_RE = re.compile(r"\s+")
@@ -387,55 +390,8 @@ class DatabaseBackend:
         interval: str = "15min",
         days: int = 30,
     ) -> pd.DataFrame:
-        """Query OHLCV price bars from the database.
-
-        For daily/hourly intervals, falls back to server-side aggregation
-        from 15min bars if no native rows exist at that interval.
-        """
-        ticker = ticker.upper()
-
-        # Normalize interval names
-        interval_map = {"1h": "1h", "hourly": "1h", "1d": "1d", "daily": "1d", "15min": "15min"}
-        db_interval = interval_map.get(interval, interval)
-
-        cutoff = (date.today() - timedelta(days=days)).isoformat()
-        empty = pd.DataFrame(columns=["datetime", "open", "high", "low", "close", "volume"])
-
-        sql = """
-            SELECT
-                TO_CHAR(datetime AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
-                open, high, low, close, volume
-            FROM prices
-            WHERE ticker = %s AND interval = %s AND datetime >= %s
-            ORDER BY datetime ASC
-        """
-
-        df = self._query_df(sql, (ticker, db_interval, cutoff))
-        if not df.empty:
-            return df
-
-        # Fallback: aggregate from 15min bars if requesting daily or hourly
-        if db_interval in ("1d", "1h") and db_interval != "15min":
-            trunc = "day" if db_interval == "1d" else "hour"
-            agg_sql = f"""
-                SELECT
-                    TO_CHAR(date_trunc('{trunc}', datetime AT TIME ZONE 'UTC'),
-                            'YYYY-MM-DD"T"HH24:MI:SS+0000') AS datetime,
-                    (array_agg(open ORDER BY datetime ASC))[1] AS open,
-                    MAX(high) AS high,
-                    MIN(low) AS low,
-                    (array_agg(close ORDER BY datetime DESC))[1] AS close,
-                    SUM(volume) AS volume
-                FROM prices
-                WHERE ticker = %s AND interval = '15min' AND datetime >= %s
-                GROUP BY date_trunc('{trunc}', datetime AT TIME ZONE 'UTC')
-                ORDER BY 1 ASC
-            """
-            df = self._query_df(agg_sql, (ticker, cutoff))
-            if not df.empty:
-                return df
-
-        return empty
+        """Retired PG prices surface; runtime authority is local SQLite after P0-C."""
+        return pd.DataFrame(columns=_PRICE_COLS)
 
     # --------------------------------------------------------
     # IV History
@@ -478,21 +434,8 @@ class DatabaseBackend:
     # --------------------------------------------------------
 
     def get_available_tickers(self, data_type: str) -> List[str]:
-        """List tickers with available data of a given type."""
-        table_map = {
-            "prices": "prices",
-        }
-
-        table = table_map.get(data_type)
-        if not table:
-            return []
-
-        sql = f"SELECT DISTINCT ticker FROM {table} ORDER BY ticker"
-        df = self._query_df(sql)
-
-        if df.empty:
-            return []
-        return df["ticker"].tolist()
+        """Retired PG ticker listing surface for market-data domains."""
+        return []
 
     # --------------------------------------------------------
     # Research Reports
@@ -811,35 +754,13 @@ class DatabaseBackend:
     # --------------------------------------------------------
 
     def query_health_stats(self) -> Dict[str, Any]:
-        """Return freshness/health statistics for all data sources.
-
-        Public API for FreshnessRegistry — isolates health queries from
-        internal implementation details. Each source query is independent
-        with its own cursor: partial failure returns error detail without
-        blocking other sources.
-
-        Returns:
-            Dict with keys: news, prices, iv_history, financial_cache.
-            Each value is {"rows": ..., "error": str|None}.
-        """
-        conn = self._get_conn()
-        stats: Dict[str, Any] = {
+        """Retired PG market-data health surface; provider health reads local stores."""
+        return {
             "news": {"rows": [], "error": None},
+            "prices": {"rows": [], "error": None},
             "iv_history": {"rows": [], "error": None},
             "financial_cache": {"rows": [], "error": None},
         }
-
-        # Prices: latest bar timestamp across ALL stored intervals. Do NOT filter
-        # interval='1d' — only 15min bars are stored (1h/1d are derived on read),
-        # so that filter returns NULL and freshness reports prices permanently stale.
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT MAX(datetime) FROM prices")
-                stats["prices"] = {"rows": cur.fetchall(), "error": None}
-        except Exception as e:
-            stats["prices"] = {"rows": [], "error": str(e)}
-
-        return stats
 
     # ================================================================
     # Seeking Alpha Alpha Picks (Phase 11c)
