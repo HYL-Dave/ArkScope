@@ -137,6 +137,29 @@ def test_postcheck_requires_prices_absent_and_app_records_present():
     assert ok["ok"] is True
 
 
+def test_grep_classifier_allows_retired_market_admin_price_sql():
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    out = cli.classify_grep_hits([
+        ("src/market_data_admin.py", '_PG_PRICES_SELECT = "SELECT * FROM prices"'),
+    ])
+
+    assert out["blockers"] == []
+    assert out["allowed_hits"][0]["reason"] == "retired_pg_mirror_guarded"
+
+
+def test_grep_classifier_allows_health_stats_interface_consumers():
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    out = cli.classify_grep_hits([
+        ("src/service/provider_health.py", "stats = backend.query_health_stats() or {}"),
+        ("src/tools/freshness.py", "stats = self._backend.query_health_stats()"),
+    ])
+
+    assert out["blockers"] == []
+    assert {item["reason"] for item in out["allowed_hits"]} == {"health_stats_interface_consumer"}
+
+
 def test_drop_repreview_uses_current_local_snapshot(monkeypatch, tmp_path):
     from scripts.migration import n9_batch3_prices_drop as cli
 

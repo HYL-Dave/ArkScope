@@ -316,11 +316,22 @@ def _classify_single_hit(path: str, match: str) -> str:
         "scripts/migration/n9_batch2_cleanup.py",
     }:
         return "prior_n9_archive_gate"
+    if p == "src/market_data_admin.py":
+        return "retired_pg_mirror_guarded"
     if p == "src/tools/backends/db_backend.py":
         return "retired_pg_backend_stub"
+    if p in {
+        "src/service/provider_health.py",
+        "src/tools/freshness.py",
+    }:
+        return "health_stats_interface_consumer"
     if any(token in p for token in (
+        "analysis_tools.py",
+        "data_coverage_tools.py",
         "sqlite_backend.py",
         "local_market_backend.py",
+        "backends/__init__.py",
+        "file_backend.py",
         "market_data_direct.py",
         "prices_runtime.py",
         "price_tools.py",
