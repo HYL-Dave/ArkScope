@@ -131,3 +131,18 @@ def test_run_smoke_restores_environment_flags(monkeypatch):
 
     assert os.environ["ARKSCOPE_DISABLE_SCHEDULER"] == "already-set"
     assert "ARKSCOPE_PG_UNREACHABLE_E2E" not in os.environ
+
+
+def test_pg_poison_redacts_kwarg_credentials():
+    # All current call sites pass a positional DSN, but psycopg2.connect(host=...,
+    # password=...) is legal — a future call site must not leak credentials into
+    # pg_attempts (dict repr defeats the URL/key=value sanitizer regexes).
+    from scripts.smoke.pg_unreachable_e2e import PgPoison
+
+    poison = PgPoison()
+    with pytest.raises(RuntimeError, match="PG_UNREACHABLE_E2E_POISON"):
+        poison.connect(host="h", dbname="d", user="u", password="s3cret", connect_timeout=3)
+
+    label = poison.attempts[0]
+    assert "s3cret" not in label
+    assert "password" in label  # key survives for diagnostics; value is redacted

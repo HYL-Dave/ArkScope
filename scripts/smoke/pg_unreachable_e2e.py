@@ -60,12 +60,25 @@ def sanitize_secret(value: Any) -> str:
     return text
 
 
+_SENSITIVE_CONNECT_KWARGS = {"password", "sslpassword", "passfile"}
+
+
 class PgPoison:
     def __init__(self) -> None:
         self.attempts: list[str] = []
 
     def connect(self, *args: Any, **kwargs: Any) -> None:
-        label = args[0] if args else kwargs.get("dsn") or kwargs
+        if args:
+            label: Any = args[0]
+        elif "dsn" in kwargs:
+            label = kwargs["dsn"]
+        else:
+            # kwargs dict repr defeats the URL/key=value sanitizer regexes —
+            # redact credential values before the label is recorded.
+            label = {
+                key: ("***" if key in _SENSITIVE_CONNECT_KWARGS else value)
+                for key, value in kwargs.items()
+            }
         self.attempts.append(sanitize_secret(label))
         raise RuntimeError("PG_UNREACHABLE_E2E_POISON: PostgreSQL connection attempted")
 
