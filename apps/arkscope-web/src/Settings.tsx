@@ -762,7 +762,7 @@ function NewsStorageSection() {
                   disabled={busy || status.env_override}
                   onChange={(e) => void toggleLocalNews(e.target.checked)}
                 />
-                Polygon／Finnhub 新聞直寫本地
+                Legacy local writer（pre-exit）
               </label>
               <label className="ds-toggle">
                 <input
