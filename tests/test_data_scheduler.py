@@ -1995,6 +1995,33 @@ def test_skip_does_not_overwrite_durable_outcome(monkeypatch):
     assert "real failure" in ds._state_store().get("polygon_news")["last_error"]
 
 
+def test_prices_worker_retryable_lock_busy_is_skip_not_failure(monkeypatch):
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: {
+            "returncode": 1,
+            "payload": {
+                "status": "failed",
+                "error_class": "TimeoutError",
+                "error": "market_data.db write lock busy (timeout)",
+                "retryable": True,
+            },
+        },
+    )
+
+    res = ds.run_source("ibkr_prices")
+
+    assert res["status"] == "skipped"
+    assert res["skip_kind"] == "skipped_lock_busy"
+    assert "write lock busy" in res["reason"]
+    row = ds._state_store().get("ibkr_prices")
+    assert row["last_status"] == "skipped"
+    assert row["last_error"] is None
+    assert row["last_result"]["skip_kind"] == "skipped_lock_busy"
+
+
 def test_seed_last_attempts_from_local_state(monkeypatch):
     # seed continuity from the LOCAL store (no PG): a recorded attempt seeds _LAST_ATTEMPT.
     from datetime import datetime, timezone

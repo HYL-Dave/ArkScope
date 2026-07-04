@@ -555,6 +555,15 @@ def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
     return "prices worker failed"
 
 
+def _prices_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optional[str]:
+    if payload.get("retryable") is not True:
+        return None
+    error = str(payload.get("error") or "").strip()
+    if "market_data.db write lock busy" not in error:
+        return None
+    return error[:_ERROR_TAIL] or "market_data.db write lock busy (timeout)"
+
+
 def _resolve_price_scope() -> List[str]:
     """Active-universe tickers — delegates to the ONE shared resolver
     (src.universe_scope), same contract as the collectors' --scope flag."""
@@ -968,9 +977,17 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         step = _run_sanitized_json_subprocess(argv)
                         result["collect"] = step["payload"]
                         if step["returncode"] != 0:
-                            raise RuntimeError(
-                                _sanitized_prices_worker_failure_message(step["payload"])
-                            )
+                            reason = _prices_worker_retryable_skip_reason(step["payload"])
+                            if reason is not None:
+                                result.update({
+                                    "status": "skipped",
+                                    "reason": reason,
+                                    "skip_kind": "skipped_lock_busy",
+                                })
+                            else:
+                                raise RuntimeError(
+                                    _sanitized_prices_worker_failure_message(step["payload"])
+                                )
                         collected = True
                 else:
                     scope = tickers if tickers is not None else _resolve_price_scope()
@@ -992,9 +1009,17 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     step = _run_sanitized_json_subprocess(argv)
                     result["collect"] = step["payload"]
                     if step["returncode"] != 0:
-                        raise RuntimeError(
-                            _sanitized_prices_worker_failure_message(step["payload"])
-                        )
+                        reason = _prices_worker_retryable_skip_reason(step["payload"])
+                        if reason is not None:
+                            result.update({
+                                "status": "skipped",
+                                "reason": reason,
+                                "skip_kind": "skipped_lock_busy",
+                            })
+                        else:
+                            raise RuntimeError(
+                                _sanitized_prices_worker_failure_message(step["payload"])
+                            )
                     collected = True
             elif d.adapter is not None:
                 # In-process provider adapter (import-safe collector module);
@@ -1108,7 +1133,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         # Partial runs persist their continuation so the UI/manual follow-up can surface the
         # unfinished scope instead of clearing it as a success.
         continuation = None
-        if ok and writer_partial:
+        if result.get("status") == "skipped":
+            continuation = pending_cont if pending_cont is not None else None
+        elif ok and writer_partial:
             result["status"] = "partial"
             continuation = writer_continuation
             if continuation is not None:
