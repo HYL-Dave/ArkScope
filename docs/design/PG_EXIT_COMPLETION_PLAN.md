@@ -6,7 +6,7 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8) — PG now holds only `prices`, frozen `job_runs`, and app-record tables.** Remaining: price reconcile/direct-local cutover, batch-2 (job_runs + dead paths), SEC/dead paths, and UI collapse. S-G
+**N9 batch-1 live drop EXECUTED 2026-07-03 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04 — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-2 (job_runs + dead paths), batch-3 PG `prices` destructive drop, SEC/dead paths, and UI collapse. S-G
 `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local.
 
 ## Progress
@@ -29,8 +29,10 @@ the normalized local writer + legacy projection, and news reads are hard-local w
   populated beside unchanged legacy `news`), and N8a is live-finalized (2026-07-01): Polygon,
   Finnhub, and IBKR route through normalized local writers with atomic legacy projection; the
   audited `news_pg_exit_completed` marker forces hard-local news reads and retires the news
-  PG-sync/mirror path. The remaining active market mirror dependency is prices; old IV and
-  fundamentals PG paths have been retired or fail-closed ahead of N9.
+  PG-sync/mirror path. P0-C is now live (2026-07-04): scheduled `ibkr_prices` writes
+  direct-local, manual/incremental price PG mirror paths are retired, price reads are
+  local-only, and status reports prices as local authority. Old IV and fundamentals PG paths
+  have been retired or fail-closed ahead of N9.
   S-G moved the historical PG `news_scores` runtime surface into local `news_article_scores`
   (live 2026-07-03), and S-H1 moved operational `job_runs` into `profile_state.db`
   (`use_local_job_runs=true`, live 2026-07-03). PG copies of both tables are archive/N9 candidates,
@@ -56,11 +58,11 @@ writes**. The delta is the work.
 ### Two fundamentally different sub-problems
 
 **(1) Ingest data — provider→PG→mirror (regenerable, not user-authored).**
-Prices are the remaining active mirror dependency. News writes direct-local through normalized
-writers; fundamentals refetch/cache is local; the old IV PG-mirror source is retired/fail-closed
-pending a separate IV reboot. Losing PG for the already-retired domains loses no desired runtime
-authority; the remaining fix is the prices reconcile/direct-local path plus N9 cleanup of the
-archive-only tables.
+Prices are now direct-local after P0-C. News writes direct-local through normalized writers;
+fundamentals refetch/cache is local; the old IV PG-mirror source is retired/fail-closed pending a
+separate IV reboot. Losing PG for these domains loses no desired runtime authority; remaining work
+is N9-style cleanup of archive-only tables, including a future batch-3 physical drop of PG
+`prices` after a fresh dump/restore/drop approval packet.
 
 **(2) App-records — PG-only, read AND write, USER/AGENT-AUTHORED (NOT regenerable).**
 This is the load-bearing one. Verified PG-only, with **no local store and no mirror**:
@@ -89,7 +91,7 @@ re-fetch).
 
 | Domain | Read local? | Write local? | PG still needed for | Class |
 |---|---|---|---|---|
-| Prices | ✅ (mirror + direct) | ⚠️ direct only via price_backfill; scheduler default = PG→mirror | scheduler ingest | (1) ingest |
+| Prices | ✅ local-only after P0-C | ✅ scheduled `ibkr_prices` direct-local | PG table = archive/rollback until batch-3 | P0-C done |
 | News | ✅ hard-local | ✅ Polygon/Finnhub/IBKR normalized local writers + legacy projection | — | news-domain PG-exit done |
 | IV | ✅ local legacy rows / honest-empty on miss | ❌ old PG source retired; future reboot pending | — | N9 drop + future IV reboot |
 | Fundamentals | ✅ local SEC annual cache / honest empty | ✅ SEC/FD refetch cache | — | S-B done |

@@ -1443,7 +1443,7 @@ Before implementation starts, reviewer must confirm:
 
 ## Live Gate Record
 
-Status: **Tasks 3-8 COMPLETE (2026-07-04). Local prices declared authority; code cutover implemented; dry-run copy passed. Live Task 9 pending.**
+Status: **P0-C LIVE COMPLETE (2026-07-04). Local prices are the runtime authority; scheduled ingest is direct-local; legacy PG mirror/read fallback is retired. PG `prices` physical drop remains batch-3.**
 
 ```text
 Reviewed reconcile fingerprint (final): 61bbf613c1fe94dd6558dc4bcc2bae7f9624e238df9c8114ed9a4e23da2580d2
@@ -1461,11 +1461,13 @@ Bulk copy applied: NO. Scoped deterministic HAPN patch only:
   (315 INSERT + 269 UPDATE, insert-only outside preimage-verified updates;
   copy dry-run + idempotent rerun proven; audit row in prices_patch_runs).
 Backup path: data/market_data.db.bak-pre-p0c-hapn-patch-20260703T232813Z.db
+Cutover backup path: data/market_data.db.bak-pre-p0c-cutover-20260704T000609505759Z.db
 Cutover implementation:
   Task 4 commit 5deee9e — scheduled ibkr_prices routes to direct-local writer.
   Task 5 commit e3218db — legacy price PG mirror update paths return retired/409.
   Task 6 commit becdfa5 — price reads are local-only; misses are honest empty.
   Task 7 commit d8ce7cd — status/provider health report local price authority.
+  Task 8 commit bc2ab0f — dry-run copy record.
 Dry-run copy: PASS (scratchpad/p0c-market-data-copy.db via SQLite backup API).
 Copy prices: 2,324,487 rows / 149 tickers / 2024-01-02T14:30:00+0000..2026-07-02T14:15:00+0000.
 Dry-run tests:
@@ -1477,8 +1479,16 @@ Route-level price smoke on copy: PASS (prices_for_ticker("NVDA", interval="15min
 Full TestClient price smoke: BLOCKED in this worktree by app startup/TestClient lifespan hang
   before request dispatch (faulthandler shows TestClient.__enter__ waiting on the portal while
   the event-loop thread is idle). This was not used as a pass/fail signal for price route logic.
-Live cutover: NOT YET (Task 9).
-Post-cutover smoke: pending cutover.
+Live cutover: FF-merged to master at bc2ab0f after final preview ×2 byte-identical.
+Final live preview: fingerprint 61bbf613c1fe94dd6558dc4bcc2bae7f9624e238df9c8114ed9a4e23da2580d2,
+  unexplained_pg_only_count=0, value_checksum_mismatch_count=10, value_checksum_mismatch_row_count=19.
+Post-cutover smoke: PASS on live main checkout:
+  - prices_for_ticker("NVDA", interval="15min", days=7) returned 81 bars.
+  - LocalMarketDatabaseBackend.query_prices("ZZZZ") returned honest empty without PG.
+  - /market-data/status route function reports prices_authority=local,
+    price_mirror_retired=true, pg_fallback_active=false.
+  - data_scheduler.SOURCES["ibkr_prices"].adapter == ("src.market_data_direct", "backfill_prices_direct");
+    local_incremental is retired with the P0-C message.
 ```
 
 ## Self-Review Notes
