@@ -111,6 +111,11 @@ class SourceDef:
     # NORMALIZED and LEGACY_LOCAL write local DB directly; LEGACY_PG keeps the collector→PG→mirror
     # chain; BLOCKED fails closed before provider work.
     news_direct_source: Optional[str] = None
+    # Presentation-only status metadata for Settings/Data Sources. These fields
+    # do not affect execution.
+    source_mode: str = "provider_fetch"
+    write_target: str = "market_data.db"
+    source_badges: tuple[str, ...] = ()
 
 
 SOURCES: Dict[str, SourceDef] = {
@@ -145,6 +150,9 @@ SOURCES: Dict[str, SourceDef] = {
             None, None,
             ibkr=True, universe_tickers=True, default_interval_min=60,
             prices_worker=True, writes_market_db=True,
+            source_mode="direct_local",
+            write_target="market_data.db",
+            source_badges=("IBKR", "直寫本地"),
             description="IBKR/Polygon 15min bars for the active universe → market_data.db DIRECT (no PG sync/mirror)",
         ),
         SourceDef(
@@ -156,13 +164,19 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "local_incremental", "本地鏡像增量",
             None, None, default_interval_min=15,
+            source_mode="retired_pg_mirror",
+            write_target="none",
+            source_badges=("已退役",),
             description="Retired PG → market_data.db delta path; use direct-local sources",
         ),
         SourceDef(
-            "price_backfill", "本地價格直連補抓",
+            "price_backfill", "價格缺口補抓",
             None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
             gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
             prices_worker=True, writes_market_db=True,
+            source_mode="direct_local",
+            write_target="market_data.db",
+            source_badges=("IBKR/Polygon", "直寫本地", "缺口補抓"),
             description="IBKR/Polygon → market_data.db DIRECT (no PG); fills missing "
                         "trading-day gaps for the active universe. sync_flag=None → no PG "
                         "sync AND no _local_refresh (it writes the local DB itself).",
@@ -1390,6 +1404,11 @@ def status_snapshot() -> Dict[str, Any]:
             "description": d.description,
             "ibkr": d.ibkr,
             "provider_fetch": (d.collector is not None) or (d.adapter is not None),
+            "source_mode": d.source_mode,
+            "write_target": d.write_target,
+            "source_badges": list(d.source_badges),
+            "retired": source in _N9_RETIRED_SOURCES,
+            "retired_reason": _N9_RETIRED_SOURCES.get(source),
             "enabled": cfg["enabled"],
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,

@@ -1630,6 +1630,25 @@ def test_get_schedule_snapshot_shape():
     assert out["ibkr_prices"]["ibkr"] is True
 
 
+def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
+    snap = ds.status_snapshot()
+
+    prices = snap["ibkr_prices"]
+    assert prices["source_mode"] == "direct_local"
+    assert prices["write_target"] == "market_data.db"
+    assert prices["source_badges"] == ["IBKR", "直寫本地"]
+    assert prices["retired"] is False
+
+    backfill = snap["price_backfill"]
+    assert backfill["source_mode"] == "direct_local"
+    assert backfill["source_badges"] == ["IBKR/Polygon", "直寫本地", "缺口補抓"]
+
+    retired = snap["local_incremental"]
+    assert retired["source_mode"] == "retired_pg_mirror"
+    assert retired["retired"] is True
+    assert "PG mirror retired" in retired["retired_reason"]
+
+
 def test_put_schedule_validates():
     from fastapi import HTTPException
     from src.api.routes.schedule import ScheduleUpdate, put_schedule
