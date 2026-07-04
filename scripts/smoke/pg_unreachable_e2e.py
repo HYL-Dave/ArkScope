@@ -136,6 +136,26 @@ def _assert_list_or_dict(_: Any) -> None:
     assert True
 
 
+def _is_macro_disabled_body(body: Any) -> bool:
+    if not isinstance(body, dict):
+        return False
+    detail = body.get("detail")
+    return isinstance(detail, str) and "macro_calendar.enabled is false" in detail
+
+
+def _assert_macro_health_or_disabled(body: Any) -> None:
+    if _is_macro_disabled_body(body):
+        return
+    assert isinstance(body, dict)
+    assert "severity" in body
+
+
+def _assert_macro_payload_or_disabled(body: Any) -> None:
+    if _is_macro_disabled_body(body):
+        return
+    _assert_list_or_dict(body)
+
+
 REQUIRED_CHECKS: tuple[CheckSpec, ...] = (
     CheckSpec("healthz", "GET", "/healthz", 200, _assert_key("status")),
     CheckSpec("system_status", "GET", "/status", 200, _assert_key("data_sources")),
@@ -161,8 +181,20 @@ REQUIRED_CHECKS: tuple[CheckSpec, ...] = (
     CheckSpec("sa_feed", "GET", "/sa/feed?limit=5", 200, _assert_list_or_dict),
     CheckSpec("sa_health", "GET", "/sa/market-news/health", 200, _assert_key("severity")),
     CheckSpec("macro_status", "GET", "/macro/status", 200, _assert_key("local_first_active")),
-    CheckSpec("macro_health", "GET", "/macro/health", (200, 503), _assert_key("severity")),
-    CheckSpec("macro_ipo", "GET", "/macro/ipo-calendar?limit=5", 200, _assert_list_or_dict),
+    CheckSpec(
+        "macro_health",
+        "GET",
+        "/macro/health",
+        (200, 503),
+        _assert_macro_health_or_disabled,
+    ),
+    CheckSpec(
+        "macro_ipo",
+        "GET",
+        "/macro/ipo-calendar?limit=5",
+        (200, 503),
+        _assert_macro_payload_or_disabled,
+    ),
     CheckSpec("reports", "GET", "/reports", 200, _assert_list_or_dict),
     CheckSpec("universe_summaries", "DIRECT", "get_universe_summaries", 200, _assert_list_or_dict),
 )

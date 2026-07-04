@@ -209,3 +209,30 @@ def test_handler_direct_client_preserves_http_exception_detail(monkeypatch):
 
     assert response.status_code == 409
     assert response.json() == {"detail": {"code": "pg_market_update_retired"}}
+
+
+def test_macro_disabled_503_is_explicit_config_state_not_pg_failure():
+    from scripts.smoke.pg_unreachable_e2e import REQUIRED_CHECKS, run_route_checks
+
+    class Response:
+        status_code = 503
+
+        def json(self):
+            return {
+                "detail": "macro_calendar.enabled is false in config. "
+                "Enable it in config/user_profile.yaml to activate the FRED layer."
+            }
+
+    class Client:
+        def request(self, method, path):
+            return Response()
+
+    checks = [
+        check
+        for check in REQUIRED_CHECKS
+        if check.name in {"macro_health", "macro_ipo"}
+    ]
+
+    results = run_route_checks(Client(), checks)
+
+    assert [result.ok for result in results] == [True, True]
