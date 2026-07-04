@@ -127,6 +127,7 @@ SOURCES: Dict[str, SourceDef] = {
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
+            source_badges=("Polygon", "直寫本地"),
             description="Polygon news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
@@ -135,6 +136,7 @@ SOURCES: Dict[str, SourceDef] = {
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
+            source_badges=("Finnhub", "直寫本地"),
             description="Finnhub news incremental → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
@@ -143,6 +145,7 @@ SOURCES: Dict[str, SourceDef] = {
             needs_price_scope=True, default_interval_min=120,
             news_direct_source="ibkr",
             writes_market_db=True,
+            source_badges=("IBKR", "直寫本地"),
             description="IBKR news incremental (Gateway) → normalized SQLite + legacy local projection (no news PG sync/mirror)",
         ),
         SourceDef(
@@ -166,7 +169,6 @@ SOURCES: Dict[str, SourceDef] = {
             None, None, default_interval_min=15,
             source_mode="retired_pg_mirror",
             write_target="none",
-            source_badges=("已退役",),
             description="Retired PG → market_data.db delta path; use direct-local sources",
         ),
         SourceDef(

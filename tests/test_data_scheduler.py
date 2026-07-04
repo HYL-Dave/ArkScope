@@ -1643,8 +1643,13 @@ def test_schedule_status_exposes_post_pg_exit_presentation_metadata():
     assert backfill["source_mode"] == "direct_local"
     assert backfill["source_badges"] == ["IBKR/Polygon", "直寫本地", "缺口補抓"]
 
+    assert snap["polygon_news"]["source_badges"] == ["Polygon", "直寫本地"]
+    assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
+    assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
+
     retired = snap["local_incremental"]
     assert retired["source_mode"] == "retired_pg_mirror"
+    assert retired["source_badges"] == []
     assert retired["retired"] is True
     assert "PG mirror retired" in retired["retired_reason"]
 
