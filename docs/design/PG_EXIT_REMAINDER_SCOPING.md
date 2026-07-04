@@ -160,6 +160,9 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 
 **Batch-3 queue:**
 
+- PG-unreachable E2E proof is green (2026-07-05): `scratchpad/pg-unreachable-e2e-20260704T172555Z/`
+  contains two passing runs, each `ok:true`, `pg_attempts:[]`, and 22/22 checks green. The live harness
+  uses handler-direct route calls after the reviewed `TestClient` fallback rule was triggered by a hang.
 - PG `prices` destructive drop after P0-C has soaked. Requires a fresh targeted dump, restore proof,
   explicit approval, and conscious removal of `prices` from the N9 excluded-table protection.
 
@@ -169,7 +172,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1 and batch-2 live drops are complete. P0-C prices direct-local cutover is complete; batch-3 is the future physical PG `prices` drop.
+- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1 and batch-2 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green; batch-3 is the future physical PG `prices` drop.
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---

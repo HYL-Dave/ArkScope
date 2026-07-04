@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** DRAFT for review. This plan is non-destructive and does not authorize batch-3 `prices` drop. It builds and runs the final PG-unreachable runtime proof before the physical PG `prices` archive/drop.
+> **Status:** LIVE VERIFIED 2026-07-05 Asia/Taipei. This plan is non-destructive and does not authorize batch-3 `prices` drop. It built and ran the final PG-unreachable runtime proof before the physical PG `prices` archive/drop.
 
 **Goal:** Prove normal ArkScope desktop/API runtime works when PostgreSQL is unreachable, and turn that proof into a repeatable gate for batch-3 and future regressions.
 
 **Architecture:** Add a dedicated smoke harness that injects a poisoned PG DSN, patches PG connection attempts to fail immediately, disables scheduler startup, exercises the route/tool surfaces that make up normal desktop usage, and emits a sanitized JSON report. If the smoke finds a PG attempt or a runtime 500, stop and open a focused fix slice; do not proceed to batch-3 until the smoke is green.
 
-**Tech Stack:** Python, FastAPI `TestClient`, pytest, existing local SQLite stores (`market_data.db`, `profile_state.db`, `sa_capture.db`, `macro_calendar.db`), existing route handlers, no PostgreSQL writes, no provider fetches.
+**Tech Stack:** Python, handler-direct route calls, pytest, existing local SQLite stores (`market_data.db`, `profile_state.db`, `sa_capture.db`, `macro_calendar.db`), existing route handlers, no PostgreSQL writes, no provider fetches.
 
 ---
 
@@ -29,6 +29,11 @@ Fallback rule: if the live E2E smoke still hangs in `TestClient`, do **not** add
 skip the check. Rewrite the smoke to call route handlers directly with explicit dependencies, matching
 the repository's handler-direct convention, and keep the same required surface list.
 
+**Live outcome:** the fallback rule was triggered on 2026-07-05: `TestClient` hung before producing
+route evidence, so the harness was rewritten to a narrow handler-direct client. The smoke still
+exercises the same required surface list and preserves FastAPI `HTTPException(detail=...)` body shape
+for checked routes.
+
 ---
 
 ## Map Check
@@ -40,6 +45,16 @@ Active authority:
 - `PG_EXIT_REMAINDER_SCOPING.md` §8 says runtime authority is local; remaining PG physical objects are archive-only `prices` plus app-record archive tables.
 
 This plan chooses **PG-unreachable E2E first** because it is non-destructive and can reveal the last universe-summaries-style runtime leak before batch-3.
+
+## Live Record
+
+2026-07-05 Asia/Taipei:
+
+- Focused harness verification: `pytest tests/test_pg_unreachable_e2e.py -q` → `12 passed`; `python -m compileall scripts/smoke/pg_unreachable_e2e.py` passed.
+- Live smoke output: `scratchpad/pg-unreachable-e2e-20260704T172555Z/run-1.json` and `run-2.json`.
+- Both runs: `ok:true`, `pg_attempts:[]`, `22` checks, `0` failed checks.
+- Macro endpoints returned explicit config-disabled `503` (`macro_calendar.enabled is false`) because macro ingestion is disabled on this profile; this is an accepted feature-state result, not a PG failure.
+- Harness lessons: direct script entrypoints need repo-root `sys.path` bootstrap; `psycopg2.connect(**kwargs)` credential labels must be redacted before recording; PG-unreachable route evidence should use handler-direct calls rather than `TestClient` in this environment.
 
 ## Scope
 
@@ -95,8 +110,8 @@ The smoke must exercise at least these surfaces:
 | SA feed | `GET /sa/feed?limit=5` | `200`, local `sa_capture.db` path |
 | SA health | `GET /sa/market-news/health` | `200`, may be warning but not PG error |
 | Macro status | `GET /macro/status` | `200`, local-first active |
-| Macro health | `GET /macro/health` | `200` or documented non-500 health status; no PG attempt |
-| Macro IPO | `GET /macro/ipo-calendar?limit=5` | `200`, local result shape |
+| Macro health | `GET /macro/health` | `200` with health shape, or explicit config-disabled `503`; no PG attempt |
+| Macro IPO | `GET /macro/ipo-calendar?limit=5` | `200` local result shape, or explicit config-disabled `503`; no PG attempt |
 | Reports | `GET /reports` | `200`, local `profile_state.db` path |
 | App records preview | `GET /app-records/migration/preview` | excluded from normal-runtime smoke; archive/migration path may require PG |
 | Universe summaries | direct call `get_universe_summaries(None, days=7)` | returns dict, no PG attempt |
