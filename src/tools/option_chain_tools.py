@@ -12,7 +12,6 @@ Provides get_option_chain() — live option chain from IBKR with computed metric
 from __future__ import annotations
 
 import logging
-import os
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
@@ -34,10 +33,10 @@ def _get_ibkr():
             pass
         _ibkr = None
 
+    from data_sources.ibkr_client_id import ibkr_client_id_for
     from data_sources.ibkr_source import IBKRDataSource
 
-    base_id = int(os.getenv("IBKR_CLIENT_ID", "1"))
-    _ibkr = IBKRDataSource(client_id=base_id + 10, readonly=True)
+    _ibkr = IBKRDataSource(client_id=ibkr_client_id_for("options"), readonly=True)
     _ibkr.connect()
     return _ibkr
 

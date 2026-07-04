@@ -154,7 +154,18 @@ def put_provider_config(
     for field, value in body.fields.items():
         value = (value or "").strip()
         if value:
-            value = normalize_provider_config_value(by_name[field], value)
+            try:
+                value = normalize_provider_config_value(by_name[field], value)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "code": "provider_config_invalid_value",
+                        "provider": provider,
+                        "field": field,
+                        "message": str(exc),
+                    },
+                )
         current = current_fields.get(field)
         if by_name[field].guarded and (value or None) != (current or None):
             if not body.confirm_guarded.get(field):
@@ -211,7 +222,18 @@ def import_provider_config_field(
             },
         )
     current = (store.get_all().get(provider) or {}).get(field)
-    value = normalize_import_value(fdef, source_env_var, raw)
+    try:
+        value = normalize_import_value(fdef, source_env_var, raw)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "provider_config_invalid_value",
+                "provider": provider,
+                "field": field,
+                "message": str(exc),
+            },
+        )
     if fdef.guarded and value != (current or "") and not body.confirm_guarded:
         raise HTTPException(
             status_code=409,

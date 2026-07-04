@@ -90,7 +90,8 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             guarded=True,
             guard_reason=(
                 "Changing IBKR client_id can disturb active Gateway sessions; this is the "
-                "base id, and option_chain_tools uses base+10."
+                "base id — all domains derive from it (options=+10, prices=+20, news=+30, "
+                "iv=+40; see data_sources/ibkr_client_id.py)."
             ),
         ),
     ],
@@ -140,6 +141,10 @@ def normalize_provider_config_value(fdef: FieldDef, value: str) -> str:
         ch.isspace() for ch in value
     ):
         return value if value.startswith("ArkScope ") else f"ArkScope {value}"
+    if fdef.env_var == "IBKR_CLIENT_ID" and not value.isdigit():
+        # every domain id derives from this base (data_sources/ibkr_client_id.py);
+        # a non-numeric base would crash every IBKR connect long after the save.
+        raise ValueError("IBKR client_id must be a non-negative integer")
     return value
 
 

@@ -900,3 +900,23 @@ def test_backfill_polygon_path_no_gateway_lock(tmp_path, monkeypatch):
                                db_path=str(db), polygon_src=poly, today=date(2026, 6, 18))
     assert entered["n"] == 0                                  # polygon path never takes the gateway lock
     assert not gw.IBKR_THREAD_LOCK.locked()
+
+
+def test_default_ibkr_src_uses_prices_domain_client_id(monkeypatch):
+    # Real-shape seam test (seam-mock discipline): the construction itself must carry
+    # the partitioned prices client id, not the raw base.
+    import src.market_data_direct as mdd
+
+    seen = {}
+
+    class _FakeSrc:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+    monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _FakeSrc)
+
+    mdd._default_ibkr_src()
+
+    assert seen["client_id"] == 21
+    assert seen["timeout"] == mdd._IBKR_CONNECT_TIMEOUT_S

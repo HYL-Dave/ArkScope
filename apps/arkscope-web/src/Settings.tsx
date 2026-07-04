@@ -1407,6 +1407,24 @@ function compactMessage(value: string, max = 88): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
+// Mirror of data_sources/ibkr_client_id.py DOMAIN_OFFSETS (wire-level contract;
+// change only with a decision-log entry). Display-only: the backend derives the
+// real ids — this hint just shows what a given base implies.
+const IBKR_CLIENT_ID_DOMAINS: ReadonlyArray<readonly [string, number]> = [
+  ["選擇權", 10],
+  ["報價", 20],
+  ["新聞", 30],
+  ["IV", 40],
+];
+
+function ibkrDerivedClientIds(raw: string): string {
+  const s = raw.trim();
+  if (!/^\d+$/.test(s)) return "";  // parseInt("1abc")=1 would advertise ids the backend rejects
+  const base = Number(s);
+  const parts = IBKR_CLIENT_ID_DOMAINS.map(([label, off]) => `${label}=${base + off}`);
+  return `基底=${base} → ${parts.join("、")}`;
+}
+
 function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
@@ -1740,6 +1758,16 @@ function DataSourcesSection() {
                                 清除
                               </button>
                             )}
+                            {f.env_var === "IBKR_CLIENT_ID" &&
+                              ibkrDerivedClientIds(
+                                keyDrafts[`${pid}.${f.field}`] || f.app_value_masked || "",
+                              ) && (
+                                <div className="muted tiny">
+                                  {ibkrDerivedClientIds(
+                                    keyDrafts[`${pid}.${f.field}`] || f.app_value_masked || "",
+                                  )}
+                                </div>
+                              )}
                           </>
                         )}
                       </td>

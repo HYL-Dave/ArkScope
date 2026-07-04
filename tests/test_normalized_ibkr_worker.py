@@ -216,7 +216,14 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
             events.append("provider_operation")
         return {"status": "succeeded", "errors": {}}
 
-    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", lambda: Source())
+    seen_source_kwargs = {}
+
+    def _fake_ibkr_source(**kwargs):
+        seen_source_kwargs.update(kwargs)
+        return Source()
+
+    monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _fake_ibkr_source)
     monkeypatch.setattr("src.ibkr_gateway_lock.ibkr_gateway_lock", ibkr_lock)
     monkeypatch.setattr("src.news_normalized.ibkr_adapter.ibkr_gateway_lock", ibkr_lock)
     monkeypatch.setattr(worker.sqlite3, "connect", lambda *a, **k: Conn())
@@ -238,6 +245,8 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     assert events.index("write") < events.index("market_exit")
     assert events.index("market_exit") < events.index("ibkr_exit")
     assert "provider_operation" in events
+    # news domain rides its own partitioned client id (base 1 + 30), never the raw base
+    assert seen_source_kwargs.get("client_id") == 31
 
 
 def test_legacy_ibkr_worker_script_delegates_to_src_module(monkeypatch):

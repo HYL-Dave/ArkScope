@@ -368,3 +368,33 @@ def test_guarded_ibkr_client_id_requires_confirmation(store):
     row = next(f for f in out["fields"] if f["field"] == "client_id")
     assert row["app_value_masked"] == "7"
     assert row["effective_source"] == "app"
+
+
+def test_ibkr_client_id_save_rejects_non_numeric(store):
+    from fastapi import HTTPException
+
+    from src.api.routes import providers_config as pc
+
+    dpc.apply_env(store)  # seeds ibkr.client_id=1
+    with pytest.raises(HTTPException) as e:
+        pc.put_provider_config(
+            "ibkr",
+            pc.ProviderConfigUpdate(
+                fields={"client_id": "abc"}, confirm_guarded={"client_id": True}
+            ),
+            store=store,
+        )
+    assert e.value.status_code == 400
+    assert e.value.detail["code"] == "provider_config_invalid_value"
+    assert os.environ["IBKR_CLIENT_ID"] == "1"  # bad base never persisted/injected
+
+
+def test_normalize_rejects_non_numeric_ibkr_client_id():
+    cid = next(
+        f for f in dpc.PROVIDER_FIELDS["ibkr"] if f.env_var == "IBKR_CLIENT_ID"
+    )
+    with pytest.raises(ValueError):
+        dpc.normalize_provider_config_value(cid, "abc")
+    with pytest.raises(ValueError):
+        dpc.normalize_import_value(cid, "IBKR_CLIENT", "-5")
+    assert dpc.normalize_provider_config_value(cid, " 7 ") == "7"

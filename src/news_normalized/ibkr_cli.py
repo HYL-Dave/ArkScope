@@ -132,6 +132,7 @@ def _run_worker(
     max_body_fetches: int,
     gateway_lock_held: bool,
 ) -> Any:
+    from data_sources.ibkr_client_id import ibkr_client_id_for
     from data_sources.ibkr_source import IBKRDataSource
     from src.ibkr_gateway_lock import ibkr_gateway_lock
     from src.market_data_admin import resolve_market_db_path
@@ -142,7 +143,7 @@ def _run_worker(
     from src.news_normalized.store import NormalizedNewsStore
     from src.news_normalized.writer import write_news_batch
 
-    source = IBKRDataSource()
+    source = IBKRDataSource(client_id=ibkr_client_id_for("news"))
     gateway = IBKRRuntimeGateway(source)
     conn = None
     gateway_lock = nullcontext() if gateway_lock_held else ibkr_gateway_lock()

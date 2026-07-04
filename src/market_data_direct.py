@@ -588,9 +588,12 @@ def _polygon_results_to_rows(canon: str, results, interval: str) -> List[tuple]:
 _IBKR_CONNECT_TIMEOUT_S = 15  # short cold-connect timeout (default 60 churned ~5min when down)
 
 
-def _default_ibkr_src():  # pragma: no cover - exercised live (or via monkeypatch in tests)
+def _default_ibkr_src():
+    from data_sources.ibkr_client_id import ibkr_client_id_for
     from data_sources.ibkr_source import IBKRDataSource
-    return IBKRDataSource(timeout=_IBKR_CONNECT_TIMEOUT_S)
+    return IBKRDataSource(
+        timeout=_IBKR_CONNECT_TIMEOUT_S, client_id=ibkr_client_id_for("prices")
+    )
 
 
 def _default_polygon_src():  # pragma: no cover - exercised live (or via monkeypatch in tests)

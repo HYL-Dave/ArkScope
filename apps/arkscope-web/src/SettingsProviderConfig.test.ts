@@ -213,6 +213,29 @@ describe("Settings provider config authority", () => {
     });
   });
 
+  it("shows derived IBKR client ids live from the client-id input", async () => {
+    await renderDataSources();
+    // saved base "1" renders the derived table without any typing
+    expect(host!.textContent).toContain("選擇權=11");
+    expect(host!.textContent).toContain("報價=21");
+    expect(host!.textContent).toContain("新聞=31");
+    expect(host!.textContent).toContain("IV=41");
+    const input = Array.from(host!.querySelectorAll("input")).find((node) =>
+      node.getAttribute("placeholder") === "Client ID") as HTMLInputElement | undefined;
+    if (!input) throw new Error("missing client-id input");
+    await act(async () => {
+      setInputValue(input, "7");
+    });
+    expect(host!.textContent).toContain("基底=7");
+    expect(host!.textContent).toContain("選擇權=17");
+    expect(host!.textContent).toContain("IV=47");
+    // non-numeric draft hides the hint instead of advertising ids the backend rejects
+    await act(async () => {
+      setInputValue(input, "abc");
+    });
+    expect(host!.textContent).not.toContain("選擇權=");
+  });
+
   it("keeps long last-run messages out of the schedule row summary", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>

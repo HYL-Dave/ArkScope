@@ -201,3 +201,28 @@ class TestLiveOptionChain:
         assert "metrics" in result
         assert "term_structure" in result
         assert result["metrics"]["max_pain_strike"] is not None
+
+
+def test_get_ibkr_uses_options_domain_client_id(monkeypatch):
+    # The pre-existing base+10 convention must now flow through the shared helper.
+    import src.tools.option_chain_tools as oct_mod
+
+    seen = {}
+
+    class _FakeSrc:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+            self._ib = None
+
+        def connect(self):
+            seen["connected"] = True
+
+    monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
+    monkeypatch.setattr(oct_mod, "_ibkr", None)
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _FakeSrc)
+
+    oct_mod._get_ibkr()
+
+    assert seen["client_id"] == 11
+    assert seen["readonly"] is True
+    assert seen["connected"] is True
