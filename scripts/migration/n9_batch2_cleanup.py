@@ -181,9 +181,10 @@ def connect_pg(database_url: str):
     return psycopg2.connect(database_url)
 
 
-def collect_pg_snapshot(conn) -> dict[str, Any]:
+def collect_pg_snapshot(conn, *, read_only: bool = True) -> dict[str, Any]:
     with conn.cursor() as cur:
-        cur.execute("SET TRANSACTION READ ONLY")
+        if read_only:
+            cur.execute("SET TRANSACTION READ ONLY")
         cur.execute("SET LOCAL statement_timeout = '30s'")
         cur.execute("SHOW server_version")
         server_version = cur.fetchone()[0]
@@ -707,19 +708,24 @@ def _cmd_drop(args: argparse.Namespace) -> int:
     archive_dir = Path(args.archive_dir)
     evidence = _load_json(archive_dir / "evidence.json")
 
-    conn = connect_pg(args.database_url)
+    precheck_conn = connect_pg(args.database_url)
     try:
         current = build_evidence_report(
-            pg_snapshot=collect_pg_snapshot(conn),
+            pg_snapshot=collect_pg_snapshot(precheck_conn),
             grep_summary=collect_repo_grep_summary(args.repo_root),
             local_default_proof=collect_local_default_proof(),
         )
-        if current.get("fingerprint") != evidence.get("fingerprint"):
-            raise SystemExit("current evidence fingerprint differs from reviewed archive evidence")
-        statements = build_drop_sql(
-            present_tables=_present_names(evidence, "table"),
-            present_functions=_present_functions(evidence),
-        )
+    finally:
+        precheck_conn.close()
+    if current.get("fingerprint") != evidence.get("fingerprint"):
+        raise SystemExit("current evidence fingerprint differs from reviewed archive evidence")
+    statements = build_drop_sql(
+        present_tables=_present_names(evidence, "table"),
+        present_functions=_present_functions(evidence),
+    )
+
+    conn = connect_pg(args.database_url)
+    try:
         try:
             with conn.cursor() as cur:
                 cur.execute("BEGIN")
@@ -727,7 +733,7 @@ def _cmd_drop(args: argparse.Namespace) -> int:
                 cur.execute("SET LOCAL statement_timeout = '60s'")
                 for statement in statements:
                     cur.execute(statement)
-                post = collect_pg_snapshot(conn)
+                post = collect_pg_snapshot(conn, read_only=False)
                 status = _verify_post_drop_snapshot(post)
                 if not status["ok"]:
                     raise RuntimeError(f"post-drop validation failed: {status}")

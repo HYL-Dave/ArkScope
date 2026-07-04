@@ -211,6 +211,93 @@ def test_drop_sql_is_explicit_and_never_cascade():
     assert "DROP TABLE IF EXISTS public.job_runs" in joined
 
 
+def test_drop_uses_fresh_write_connection_after_read_only_evidence(tmp_path, monkeypatch):
+    from scripts.migration import n9_batch2_cleanup as cli
+
+    current_snapshot = {
+        "server_version": "17.8",
+        "objects": [
+            {"kind": "table", "name": "job_runs", "status": "present", "row_count": 2},
+            {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "agent_queries", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "research_reports", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "agent_memories", "status": "excluded_present"},
+        ],
+        "functions": [{"kind": "function", "name": "news_search_vector_update()", "status": "present"}],
+        "row_counts": {"job_runs": 2},
+        "row_fingerprints": {"job_runs": "abc"},
+        "dependencies": [],
+    }
+    post_drop_snapshot = {
+        **current_snapshot,
+        "objects": [
+            {"kind": "table", "name": "job_runs", "status": "missing_unexpected"},
+            {"kind": "excluded_table", "name": "prices", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "agent_queries", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "research_reports", "status": "excluded_present"},
+            {"kind": "excluded_table", "name": "agent_memories", "status": "excluded_present"},
+        ],
+        "functions": [{"kind": "function", "name": "news_search_vector_update()", "status": "missing_unexpected"}],
+    }
+    grep_summary = {"blockers": [], "allowed_hits": []}
+    local_default_proof = {"market_unset_routes_local": True}
+    evidence = cli.build_evidence_report(
+        pg_snapshot=current_snapshot,
+        grep_summary=grep_summary,
+        local_default_proof=local_default_proof,
+    )
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    dump_path = archive / "n9_batch2.dump"
+    dump_path.write_bytes(b"dump")
+    (archive / "evidence.json").write_text(cli._canonical_json(evidence), encoding="utf-8")
+    (archive / "restore_proof.json").write_text(
+        cli._canonical_json({"ok": True, "evidence_fingerprint": evidence["fingerprint"]}),
+        encoding="utf-8",
+    )
+    (archive / "manifest.json").write_text(
+        cli._canonical_json({"dump_sha256": cli.file_sha256(dump_path)}),
+        encoding="utf-8",
+    )
+
+    conns = [_DropConn("precheck"), _DropConn("write")]
+
+    def fake_connect(_url):
+        return conns.pop(0)
+
+    collect_calls = []
+
+    def fake_collect(conn, *, read_only=True):
+        collect_calls.append((conn.name, read_only, conn.dropped))
+        if read_only:
+            conn.read_only = True
+        return post_drop_snapshot if conn.dropped else current_snapshot
+
+    monkeypatch.setattr(cli, "connect_pg", fake_connect)
+    monkeypatch.setattr(cli, "collect_pg_snapshot", fake_collect)
+    monkeypatch.setattr(cli, "collect_repo_grep_summary", lambda _root: grep_summary)
+    monkeypatch.setattr(cli, "collect_local_default_proof", lambda: local_default_proof)
+
+    code = cli.main([
+        "drop",
+        "--database-url",
+        "postgres://secret@example/db",
+        "--archive-dir",
+        str(archive),
+        "--reviewed-fingerprint",
+        evidence["fingerprint"],
+        "--confirm-scheduler-paused",
+        "--confirm-native-host-paused",
+        "--confirm-destructive-drop",
+    ])
+
+    assert code == 0
+    assert collect_calls == [
+        ("precheck", True, False),
+        ("write", False, True),
+    ]
+
+
 def test_postcheck_reports_targets_absent_and_excluded_present(tmp_path, monkeypatch, capsys):
     from scripts.migration import n9_batch2_cleanup as cli
 
@@ -323,3 +410,42 @@ class _PostcheckCursor:
                 ("agent_memories", "public.agent_memories"),
             ]
         return []
+
+
+class _DropConn:
+    def __init__(self, name):
+        self.name = name
+        self.read_only = False
+        self.dropped = False
+        self.committed = False
+        self.rolled_back = False
+
+    def cursor(self):
+        return _DropCursor(self)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+    def close(self):
+        pass
+
+
+class _DropCursor:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql, params=None):
+        statement = " ".join(str(sql).split()).upper()
+        if statement.startswith("DROP") and self.conn.read_only:
+            raise AssertionError("drop attempted on read-only evidence connection")
+        if statement.startswith("DROP"):
+            self.conn.dropped = True
