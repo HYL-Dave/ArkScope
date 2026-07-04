@@ -13,6 +13,12 @@ from typing import Any, Callable, Iterable
 POISON_DSN = "postgresql://pg-poison.invalid/arkscope?connect_timeout=1"
 
 
+def _bootstrap_repo_root() -> None:
+    repo_root = str(Path(__file__).resolve().parents[2])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+
 @dataclass(frozen=True)
 class CheckSpec:
     name: str
@@ -194,6 +200,7 @@ def run_smoke(
     poison_dsn: str = POISON_DSN,
     client_factory: Callable[[], Any] = _make_live_client,
 ) -> SmokeReport:
+    _bootstrap_repo_root()
     old_disable_scheduler = os.environ.get("ARKSCOPE_DISABLE_SCHEDULER")
     old_e2e_marker = os.environ.get("ARKSCOPE_PG_UNREACHABLE_E2E")
     os.environ["ARKSCOPE_DISABLE_SCHEDULER"] = "1"

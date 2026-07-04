@@ -146,3 +146,19 @@ def test_pg_poison_redacts_kwarg_credentials():
     label = poison.attempts[0]
     assert "s3cret" not in label
     assert "password" in label  # key survives for diagnostics; value is redacted
+
+
+def test_bootstrap_repo_root_inserts_src_import_path(monkeypatch):
+    # Running `python scripts/smoke/pg_unreachable_e2e.py` sets sys.path[0] to
+    # scripts/smoke, not the repo root. The harness must repair that before
+    # importing src.* inside run_smoke().
+    import sys
+    from pathlib import Path
+    from scripts.smoke import pg_unreachable_e2e as smoke
+
+    root = str(Path(smoke.__file__).resolve().parents[2])
+    monkeypatch.setattr(sys, "path", [p for p in sys.path if p != root])
+
+    smoke._bootstrap_repo_root()
+
+    assert sys.path[0] == root
