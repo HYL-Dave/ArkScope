@@ -9,6 +9,7 @@ scheduler — those are 2b.
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 
 import pytest
@@ -792,6 +793,50 @@ def test_backfill_polygon_provider_skips_ibkr_preflight(tmp_path, monkeypatch):
                                      db_path=str(db), polygon_src=poly,
                                      now_et=datetime(2026, 6, 23, 17, 0, tzinfo=_ET))
     assert res["rows_added"] == 1  # no IBKR involved, no preflight needed
+
+
+def test_backfill_fetches_provider_rows_outside_market_write_lock(tmp_path, monkeypatch):
+    db = _backfill_db(tmp_path)
+    in_lock = {"value": False}
+    fetch_observed_lock = []
+
+    @contextmanager
+    def fake_market_lock(timeout=30.0, poll=0.5):
+        in_lock["value"] = True
+        try:
+            yield
+        finally:
+            in_lock["value"] = False
+
+    def fake_fetch(*args, **kwargs):
+        fetch_observed_lock.append(in_lock["value"])
+        return [(
+            "AAPL",
+            "2026-07-03T13:30:00+0000",
+            "15min",
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            100,
+        )]
+
+    monkeypatch.setattr(mdd, "market_write_lock", fake_market_lock)
+    monkeypatch.setattr(mdd, "_fetch_rows_for_gaps", fake_fetch)
+    monkeypatch.setattr(mdd, "detect_price_gaps", lambda *a, **k: {"AAPL": ["2026-07-03"]})
+
+    res = mdd.backfill_prices_direct(
+        tickers_arg="AAPL",
+        db_path=str(db),
+        ibkr_src=_FakeIBKR(),
+        polygon_src=_FakePolygon(),
+        today=date(2026, 7, 4),
+        now_et=datetime(2026, 7, 4, 12, 0, tzinfo=_ET),
+        acquire_gateway_lock=False,
+    )
+
+    assert res["rows_added"] == 1
+    assert fetch_observed_lock == [False]
 
 
 # --- PG-exit: standalone backfill acquires the shared IBKR Gateway lock -------------

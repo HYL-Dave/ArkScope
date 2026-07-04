@@ -666,12 +666,12 @@ def backfill_prices_direct(
     completes on a later run after close. NOTE: INSERT OR IGNORE only ADDS missing bars — it
     does not correct an existing wrong OHLCV value (out of scope; the problem is missing/sparse).
 
-    Holds ``market_write_lock`` ONCE (serializes vs the PG→local mirror); inside it
-    ``preflight_canonicalize`` (does NOT re-take the lock — no nested flock) → per-ticker
-    fetch → canonical-row INSERT OR IGNORE → telemetry. Tickers canonicalized + deduped
-    before fetch/insert. Per-ticker failure isolated (never aborts the batch); EMPTY scope
-    fails loud. ``ibkr_src``/``polygon_src`` injectable for tests, else lazily constructed.
-    Scheduler adapter calls with ``tickers_arg`` (CSV) + ``progress_cb``."""
+    Uses short ``market_write_lock`` sections only for local SQLite writes: prepare/schema +
+    canonicalization first, then provider fetch happens outside the lock, then a commit lock
+    inserts rows + telemetry. Tickers canonicalized + deduped before fetch/insert. Per-ticker
+    failure isolated (never aborts the batch); EMPTY scope fails loud. ``ibkr_src``/
+    ``polygon_src`` injectable for tests, else lazily constructed. Scheduler worker calls with
+    ``tickers_arg`` (CSV) + ``progress_cb``."""
     path = db_path or resolve_market_db_path()
     if tickers_arg is not None:
         raw = [t.strip() for t in tickers_arg.split(",") if t.strip()]
@@ -715,9 +715,9 @@ def backfill_prices_direct(
 
 def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                        lookback_days, today, now_et, progress_cb) -> dict:
-    """The backfill work (preflight → window → write-lock → per-ticker fetch/insert/telemetry),
-    extracted so backfill_prices_direct can wrap it in the shared Gateway lock. Preflight stays
-    BEFORE market_write_lock (2e: fail fast before holding the DB write lock)."""
+    """The backfill work, extracted so backfill_prices_direct can wrap it in the shared
+    Gateway lock. IBKR connection preflight stays BEFORE market_write_lock (2e: fail fast before
+    holding the DB write lock). Provider fetch happens outside the DB write lock."""
     # 2e PREFLIGHT: for the IBKR path, verify the Gateway API handshake BEFORE taking the
     # market write lock. A cold-connect failure fails the run FAST and LOUD here — never
     # holding the DB write lock while churning (the unattended-scheduler hazard the live
@@ -751,48 +751,64 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                 conn.execute("PRAGMA journal_mode = WAL")
             except sqlite3.OperationalError:
                 pass
-            # Setup (schema / ensure-tables / load-aliases / _start_provider_run) runs
-            # BEFORE the run is recorded, so a failure here is intentionally fail-loud with
-            # NO provider_sync_runs audit row — it cannot be: the run/table don't exist yet.
-            # The conn is still closed + the lock released (outer try/finally + the `with`).
             conn.executescript(_PRICES_SCHEMA)  # tolerate a fresh DB
             _ensure_provider_sync_tables(conn)
             aliases = _load_ticker_aliases(conn)
-            # canonicalize + dedupe scope (lock 2: never fetch/insert an alias spelling)
             scope, seen = [], set()
             for t in raw:
                 c = aliases.get(t.upper(), t.upper())
                 if c not in seen:
                     seen.add(c)
                     scope.append(c)
-            run_id = _start_provider_run(conn, provider=provider, interval=interval)
-            total = len(scope)
+        finally:
+            conn.close()
+
+    buffered: dict[str, dict[str, object]] = {}
+    total = len(scope)
+    for i, canon in enumerate(scope, 1):
+        try:
+            # TOP-UP: fetch the WHOLE complete-day window (not just zero-bar days)
+            # so sparse/partial days heal. INSERT OR IGNORE dedupes present bars.
+            # zero-bar days are still counted for reporting (informative only).
+            zero_bar = detect_price_gaps([canon], interval=interval,
+                                         lookback_days=lookback_days, db_path=path,
+                                         today=end, now_et=now_et)[canon]
+            rows = (
+                _fetch_rows_for_gaps(canon, fetch_days, interval, provider,
+                                     ibkr_src, polygon_src)
+                if fetch_days else []
+            )
+            buffered[canon] = {"rows": rows, "gaps": zero_bar, "error": None}
+        except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
+            buffered[canon] = {"rows": [], "gaps": [], "error": str(e)}
+        if progress_cb:
+            progress_cb(i, total, canon)
+
+    with market_write_lock():
+        conn = sqlite3.connect(path, timeout=10.0)
+        try:
+            conn.execute("PRAGMA busy_timeout = 10000")
             try:
-                for i, canon in enumerate(scope, 1):
+                conn.execute("PRAGMA journal_mode = WAL")
+            except sqlite3.OperationalError:
+                pass
+            # Setup (schema / ensure-tables / load-aliases / _start_provider_run) runs
+            # BEFORE the run is recorded, so a failure here is intentionally fail-loud with
+            # NO provider_sync_runs audit row — it cannot be: the run/table don't exist yet.
+            # The conn is still closed + the lock released (outer try/finally + the `with`).
+            conn.executescript(_PRICES_SCHEMA)  # tolerate a fresh DB
+            _ensure_provider_sync_tables(conn)
+            run_id = _start_provider_run(conn, provider=provider, interval=interval)
+            try:
+                for canon in scope:
+                    item = buffered.get(canon, {"rows": [], "gaps": [], "error": None})
                     rollup["tickers_scanned"] += 1
-                    try:
-                        # TOP-UP: fetch the WHOLE complete-day window (not just zero-bar days)
-                        # so sparse/partial days heal. INSERT OR IGNORE dedupes present bars.
-                        # zero-bar days are still counted for reporting (informative only).
-                        zero_bar = detect_price_gaps([canon], interval=interval,
-                                                     lookback_days=lookback_days, db_path=path,
-                                                     today=end, now_et=now_et)[canon]
-                        rollup["gaps_found"] += len(zero_bar)
-                        if fetch_days:
-                            rows = _fetch_rows_for_gaps(canon, fetch_days, interval, provider,
-                                                        ibkr_src, polygon_src)
-                            added = _insert_rows(conn, rows)
-                            rollup["rows_added"] += added
-                            last_bar = rows[-1][1] if rows else None
-                            _upsert_provider_meta(conn, provider=provider, ticker=canon,
-                                                  interval=interval, last_bar_datetime=last_bar,
-                                                  rows_added=added, error=None)
-                        else:
-                            _upsert_provider_meta(conn, provider=provider, ticker=canon,
-                                                  interval=interval, last_bar_datetime=None,
-                                                  rows_added=0, error=None)
-                    except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
-                        rollup["errors"][canon] = str(e)
+                    gaps = item.get("gaps")
+                    if isinstance(gaps, list):
+                        rollup["gaps_found"] += len(gaps)
+                    error = item.get("error")
+                    if error:
+                        rollup["errors"][canon] = str(error)
                         # The recovery telemetry write must itself be best-effort: if it
                         # raises (same conn already faulting — disk/lock), it must NOT escape
                         # to the outer handler and reclassify a per-ticker error as a fatal
@@ -800,12 +816,29 @@ def _run_backfill_body(*, provider, ibkr_src, polygon_src, raw, path, interval,
                         try:
                             _upsert_provider_meta(conn, provider=provider, ticker=canon,
                                                   interval=interval, last_bar_datetime=None,
-                                                  rows_added=0, error=str(e))
+                                                  rows_added=0, error=str(error))
                         except Exception:  # noqa: BLE001
                             logger.warning("provider_sync_meta write failed for %s (per-ticker "
                                            "error recovery); continuing", canon, exc_info=True)
-                    if progress_cb:
-                        progress_cb(i, total, canon)
+                        continue
+                    try:
+                        rows = item.get("rows")
+                        rows = rows if isinstance(rows, list) else []
+                        added = _insert_rows(conn, rows)
+                        rollup["rows_added"] += added
+                        last_bar = rows[-1][1] if rows else None
+                        _upsert_provider_meta(conn, provider=provider, ticker=canon,
+                                              interval=interval, last_bar_datetime=last_bar,
+                                              rows_added=added, error=None)
+                    except Exception as e:  # noqa: BLE001 — per-ticker isolation, never fatal
+                        rollup["errors"][canon] = str(e)
+                        try:
+                            _upsert_provider_meta(conn, provider=provider, ticker=canon,
+                                                  interval=interval, last_bar_datetime=None,
+                                                  rows_added=0, error=str(e))
+                        except Exception:  # noqa: BLE001
+                            logger.warning("provider_sync_meta write failed for %s (per-ticker "
+                                           "commit error recovery); continuing", canon, exc_info=True)
             except Exception as e:  # a non-per-ticker failure (rare) fails the whole run
                 # Best-effort finalize: if the 'failed' write itself raises, it must NOT
                 # mask the original error (the bare `raise` re-propagates it + its traceback).
