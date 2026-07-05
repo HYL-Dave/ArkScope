@@ -291,6 +291,40 @@ def test_apply_env_seeds_ibkr_client_id_default(store):
     assert dpc.effective_source("IBKR_CLIENT_ID") == "app"
 
 
+# --- structured missing config -----------------------------------------------------
+
+def test_required_provider_missing_detail_uses_machine_contract():
+    detail = dpc.provider_config_missing_detail("polygon", "api_key")
+    assert detail == {
+        "code": "provider_config_missing",
+        "status": "not_configured",
+        "provider": "polygon",
+        "field": "api_key",
+    }
+
+
+def test_missing_required_provider_fields_ignores_optional_sec_user_agent():
+    assert dpc.missing_required_provider_fields("sec_edgar") == []
+    missing = dpc.missing_required_provider_fields("polygon")
+    assert missing == [dpc.provider_config_missing_detail("polygon", "api_key")]
+
+
+def test_provider_test_missing_required_config_returns_structured_detail(store):
+    from fastapi import HTTPException
+    from src.api.routes import providers_config as pc
+
+    with pytest.raises(HTTPException) as e:
+        pc.test_provider("polygon", store=store)
+
+    assert e.value.status_code == 409
+    assert e.value.detail == {
+        "code": "provider_config_missing",
+        "status": "not_configured",
+        "provider": "polygon",
+        "field": "api_key",
+    }
+
+
 # --- connection tests ----------------------------------------------------------------
 
 def test_ibkr_test_socket(monkeypatch):

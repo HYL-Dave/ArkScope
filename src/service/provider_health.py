@@ -12,7 +12,7 @@ ProviderRun telemetry so Slice 5's per-call layer can plug in without reshaping
 the API — but 3e deliberately ports NO DSA code.
 
 Status vocabulary (plan §2): ``connected | stale | maintenance | no_signal |
-missing_key | disabled``.
+not_configured | missing_key | disabled``.
   - ``maintenance`` is DERIVED-only in v1: an IBKR signal that would read stale
     during the US-market weekend is reported as maintenance instead — gateway
     weekend maintenance is expected, not an error (locked F1+F2 directive:
@@ -113,12 +113,15 @@ def _key_info(loaded_from_file: frozenset, app_keys: frozenset, *names: str) -> 
 
 def _status(*, key_present: bool, enabled: Optional[bool],
             last_success_at: Optional[datetime], threshold_hours: Optional[float],
-            now: datetime, weekend_maintenance: bool = False) -> str:
+            now: datetime, weekend_maintenance: bool = False,
+            config_error: Optional[dict] = None) -> str:
     # disabled OUTRANKS missing_key: a provider the user explicitly turned off is
     # "disabled" regardless of credentials — surfacing missing_key for it would
     # nag about a key the user does not want used.
     if enabled is False:
         return "disabled"
+    if config_error:
+        return "not_configured"
     if not key_present:
         return "missing_key"
     if last_success_at is None:
@@ -140,21 +143,29 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     backend = getattr(dal, "_backend", None)
     notes: List[str] = []
 
-    # Load config/.env before presence checks, then layer app-applied provenance on
-    # top so source reporting mirrors the env bridge's effective precedence.
     loaded_file_keys: frozenset = frozenset()
     app_keys: frozenset = frozenset()
+    missing_required_provider_fields = None
     try:
-        from src.env_keys import ensure_env_loaded, keys_loaded_from_file
-        ensure_env_loaded()
+        from src.env_keys import keys_loaded_from_file
         loaded_file_keys = keys_loaded_from_file()
     except Exception as e:
-        notes.append(f"env load failed: {e}")
+        notes.append(f"env provenance read failed: {e}")
     try:
-        from src.data_provider_config import app_applied_keys
+        from src.data_provider_config import app_applied_keys, missing_required_provider_fields
         app_keys = app_applied_keys()
     except Exception as e:  # noqa: BLE001
         notes.append(f"app key tracking failed: {e}")
+
+    def _config_error(pid: str) -> Optional[dict]:
+        if missing_required_provider_fields is None:
+            return None
+        try:
+            missing = missing_required_provider_fields(pid)
+            return missing[0] if missing else None
+        except Exception as e:  # noqa: BLE001
+            notes.append(f"{pid} config check failed: {e}")
+            return None
 
     # --- signal collection (each best-effort) ---------------------------------
     stats: Dict[str, Any] = {}
@@ -259,14 +270,15 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
              last_attempt: Optional[datetime] = None, last_error: Optional[str] = None,
              weekend_maintenance: bool = False, detail: str = "",
              signals: Optional[dict] = None,
-             disabled_reason: Optional[str] = None) -> None:
+             disabled_reason: Optional[str] = None,
+             config_error: Optional[dict] = None) -> None:
         providers.append({
             "id": pid,
             "label": label,
             "kind": kind,
             "key_present": key["present"],
             "key_source": key["source"],
-            "key_import_suggested": key["source"] == "config/.env",
+            "key_import_suggested": key["source"] == "config/.env" and config_error is None,
             "key_vars": key["vars"],
             "enabled": enabled,
             "disabled_reason": disabled_reason,
@@ -275,7 +287,9 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
                 last_success_at=last_success,
                 threshold_hours=_THRESHOLD_HOURS.get(pid), now=now,
                 weekend_maintenance=weekend_maintenance,
+                config_error=config_error,
             ),
+            "config_error": config_error,
             "last_success_at": _iso(last_success),
             "last_attempt_at": _iso(last_attempt),
             "last_error": last_error,
@@ -290,6 +304,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     _add(
         "ibkr", "IBKR Gateway", "market",
         _key_info(loaded_file_keys, app_keys, "IBKR_HOST", "IBKR_PORT"),
+        config_error=_config_error("ibkr"),
         last_success=ibkr_success,
         weekend_maintenance=True,
         detail=(f"prices latest {_iso(prices_latest) or '—'} · iv latest "
@@ -305,6 +320,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         _add(
             pid, label, "news",
             _key_info(loaded_file_keys, app_keys, f"{pid.upper()}_API_KEY"),
+            config_error=_config_error(pid),
             last_success=(_to_dt(direct.get("last_success")) if direct else None)
             if direct_news_enabled else n.get("latest"),
             last_attempt=(_to_dt(direct.get("last_attempt")) if direct else None),
@@ -322,6 +338,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     _add(
         "fred", "FRED", "macro",
         _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
+        config_error=_config_error("fred"),
         enabled=macro_enabled,
         last_success=fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
@@ -348,6 +365,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     _add(
         "financial_datasets", "Financial Datasets (paid)", "fundamentals",
         _key_info(loaded_file_keys, app_keys, "FINANCIAL_DATASETS_API_KEY"),
+        config_error=_config_error("financial_datasets"),
         enabled=fd_enabled,
         last_success=fd.get("latest_fetched") if fd.get("cached") else None,
         detail=f"cache {fd.get('cached', 0)} valid · {fd.get('expired', 0)} expired",

@@ -9,6 +9,7 @@ export function providerHealthStatusLabel<T extends { status: string; disabled_r
     stale: "過期",
     maintenance: "維護中",
     no_signal: "無訊號",
+    not_configured: "未設定",
     missing_key: "缺金鑰",
     disabled: "已停用",
   };

@@ -29,6 +29,8 @@ from src.data_provider_config import (
     normalize_provider_config_value,
     normalize_import_value,
     provider_default_available,
+    ProviderConfigMissing,
+    require_provider_configured,
     run_connection_test,
     unapply_env,
 )
@@ -285,11 +287,18 @@ def import_provider_config_field(
 
 
 @router.post("/providers/test/{provider}")
-def test_provider(provider: str):
+def test_provider(
+    provider: str,
+    store: DataProviderConfigStore = Depends(get_data_provider_store),
+):
     """Run one explicit, cheap, timeout-bounded connection test."""
     from src.provider_config_runtime import require_provider_config_ready
 
     require_provider_config_ready("provider_test")
     if provider not in PROVIDER_FIELDS:
         raise HTTPException(status_code=404, detail=f"unknown provider {provider!r}")
+    try:
+        require_provider_configured(provider, store)
+    except ProviderConfigMissing as exc:
+        raise HTTPException(status_code=409, detail=exc.as_dict()) from exc
     return {"provider": provider, **run_connection_test(provider)}

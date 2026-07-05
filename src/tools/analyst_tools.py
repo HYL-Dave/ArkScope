@@ -206,6 +206,13 @@ def get_analyst_consensus(ticker: str) -> Dict[str, Any]:
     Returns a dict with all data, suitable for JSON serialization.
     """
     ticker = ticker.upper()
+    try:
+        from src.data_provider_config import ProviderConfigMissing, require_provider_configured
+
+        require_provider_configured("finnhub")
+    except ProviderConfigMissing as exc:
+        return {"ticker": ticker, **exc.as_dict()}
+
     recommendations = _fetch_recommendations(ticker)
     earnings_history = _fetch_earnings_history(ticker)
     upcoming = _fetch_upcoming_earnings(ticker)

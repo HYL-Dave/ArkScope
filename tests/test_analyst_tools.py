@@ -202,12 +202,30 @@ class TestPriceTarget:
 # ============================================================
 
 class TestConsensus:
+    def test_missing_finnhub_returns_provider_config_missing(self, monkeypatch):
+        import src.tools.analyst_tools as mod
+
+        mod._session = None
+        mod._api_key = None
+        monkeypatch.setattr("src.env_keys._loaded_keys", set())
+        with patch.dict("os.environ", {}, clear=True):
+            result = get_analyst_consensus("nvda")
+
+        assert result == {
+            "ticker": "NVDA",
+            "code": "provider_config_missing",
+            "status": "not_configured",
+            "provider": "finnhub",
+            "field": "api_key",
+        }
+
     @patch("src.tools.analyst_tools._fetch_price_target")
     @patch("src.tools.analyst_tools._fetch_upcoming_earnings")
     @patch("src.tools.analyst_tools._fetch_earnings_history")
     @patch("src.tools.analyst_tools._fetch_recommendations")
-    def test_full_aggregation(self, mock_rec, mock_earn, mock_up, mock_pt):
+    def test_full_aggregation(self, mock_rec, mock_earn, mock_up, mock_pt, monkeypatch):
         """Aggregates all 4 endpoints into structured dict."""
+        monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
         mock_rec.return_value = {
             "current": {"strongBuy": 5, "buy": 10, "hold": 3, "sell": 0, "strongSell": 0, "period": "2025-03"},
             "trend": [],
@@ -227,8 +245,9 @@ class TestConsensus:
     @patch("src.tools.analyst_tools._fetch_upcoming_earnings")
     @patch("src.tools.analyst_tools._fetch_earnings_history")
     @patch("src.tools.analyst_tools._fetch_recommendations")
-    def test_ticker_uppercase(self, mock_rec, mock_earn, mock_up, mock_pt):
+    def test_ticker_uppercase(self, mock_rec, mock_earn, mock_up, mock_pt, monkeypatch):
         """Ticker is uppercased in result."""
+        monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
         mock_rec.return_value = {"current": None, "trend": []}
         mock_earn.return_value = []
         mock_up.return_value = None
@@ -241,8 +260,9 @@ class TestConsensus:
     @patch("src.tools.analyst_tools._fetch_upcoming_earnings")
     @patch("src.tools.analyst_tools._fetch_earnings_history")
     @patch("src.tools.analyst_tools._fetch_recommendations")
-    def test_json_serializable(self, mock_rec, mock_earn, mock_up, mock_pt):
+    def test_json_serializable(self, mock_rec, mock_earn, mock_up, mock_pt, monkeypatch):
         """Result is JSON-serializable."""
+        monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
         mock_rec.return_value = {"current": None, "trend": []}
         mock_earn.return_value = []
         mock_up.return_value = None

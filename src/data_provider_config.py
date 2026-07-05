@@ -449,6 +449,52 @@ def effective_source(env_var: str) -> str:
     return "env"
 
 
+def provider_config_missing_detail(provider: str, field: str) -> dict[str, str]:
+    return {
+        "code": "provider_config_missing",
+        "status": "not_configured",
+        "provider": provider,
+        "field": field,
+    }
+
+
+class ProviderConfigMissing(RuntimeError):
+    def __init__(self, provider: str, field: str):
+        super().__init__(f"{provider}.{field} is not configured")
+        self.provider = provider
+        self.field = field
+
+    def as_dict(self) -> dict[str, str]:
+        return provider_config_missing_detail(self.provider, self.field)
+
+
+def missing_required_provider_fields(
+    provider: str,
+    store: DataProviderConfigStore | None = None,
+) -> list[dict[str, str]]:
+    """Required app-managed fields missing under current strict/fallback policy."""
+    defs = PROVIDER_FIELDS.get(provider) or []
+    fallback = provider_env_fallback_enabled(store)
+    out: list[dict[str, str]] = []
+    for fdef in defs:
+        if fdef.optional or fdef.defaulted:
+            continue
+        source = effective_source(fdef.env_var)
+        if source == "missing" or (source == "config/.env" and not fallback):
+            out.append(provider_config_missing_detail(provider, fdef.field))
+    return out
+
+
+def require_provider_configured(
+    provider: str,
+    store: DataProviderConfigStore | None = None,
+) -> None:
+    missing = missing_required_provider_fields(provider, store)
+    if missing:
+        first = missing[0]
+        raise ProviderConfigMissing(first["provider"], first["field"])
+
+
 # --- connection tests -------------------------------------------------------------
 
 _TEST_TIMEOUT_S = 8

@@ -112,11 +112,18 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
     assert _by_id(out2, "ibkr")["status"] == "stale"
 
 
-def test_missing_key_wins_over_signal():
+def test_provider_health_missing_managed_key_is_not_configured():
     # no POLYGON_API_KEY in env (hermetic fixture) — even with a fresh signal
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=1), 9)])))
-    assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")["status"] == "missing_key"
+    p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "polygon")
+    assert p["status"] == "not_configured"
+    assert p["config_error"] == {
+        "code": "provider_config_missing",
+        "status": "not_configured",
+        "provider": "polygon",
+        "field": "api_key",
+    }
 
 
 def test_fd_disabled_is_a_state(monkeypatch):
@@ -169,6 +176,8 @@ def test_key_source_reports_effective_origin(monkeypatch):
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
     assert _by_id(out, "polygon")["key_source"] == "env"
     assert _by_id(out, "finnhub")["key_source"] == "config/.env"
+    assert _by_id(out, "finnhub")["status"] == "not_configured"
+    assert _by_id(out, "finnhub")["config_error"]["field"] == "api_key"
     assert _by_id(out, "ibkr")["key_source"] == "mixed"
     assert _by_id(out, "fred")["key_source"] == "missing"
 
@@ -179,7 +188,9 @@ def test_config_file_key_source_sets_import_suggestion(monkeypatch):
     out = compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY)
     p = _by_id(out, "polygon")
     assert p["key_source"] == "config/.env"
-    assert p["key_import_suggested"] is True
+    assert p["status"] == "not_configured"
+    assert p["key_import_suggested"] is False
+    assert p["config_error"]["code"] == "provider_config_missing"
 
 
 def test_disabled_outranks_missing_key(monkeypatch):
@@ -190,6 +201,7 @@ def test_disabled_outranks_missing_key(monkeypatch):
                "financial_datasets")
     assert p["key_present"] is False
     assert p["status"] == "disabled"
+    assert p["config_error"]["code"] == "provider_config_missing"
 
 
 def test_sa_capture_error_and_success_merge():

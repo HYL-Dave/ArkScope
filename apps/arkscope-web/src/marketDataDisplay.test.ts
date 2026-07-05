@@ -206,4 +206,13 @@ describe("providerHealthStatusLabel", () => {
       disabled_reason: null,
     })).toBe("已停用");
   });
+
+  it("labels strict missing provider config as not configured", () => {
+    expect(providerHealthStatusLabel({
+      id: "polygon",
+      kind: "news",
+      status: "not_configured",
+      disabled_reason: null,
+    })).toBe("未設定");
+  });
 });

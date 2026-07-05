@@ -1514,12 +1514,19 @@ export function getSAFeed(params: {
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a
-// state, never an HTTP error. Key info is presence+source only (effective source =
-// real env > app DB > config/.env; the entry UI is the Data Sources "連線與金鑰"
+// state, never an HTTP error. Key info is presence+source only (strict default =
+// real env > app DB; config/.env is import material unless explicit fallback is on; the entry UI is the Data Sources "連線與金鑰"
 // panel — see getProvidersConfig/putProviderConfig below).
 
 export type ProviderStatus =
-  | "connected" | "stale" | "maintenance" | "no_signal" | "missing_key" | "disabled";
+  | "connected" | "stale" | "maintenance" | "no_signal" | "not_configured" | "missing_key" | "disabled";
+
+export interface ProviderConfigError {
+  code: "provider_config_missing";
+  status: "not_configured";
+  provider: string;
+  field: string;
+}
 
 export interface ProviderHealth {
   id: string;
@@ -1532,6 +1539,7 @@ export interface ProviderHealth {
   enabled: boolean | null; // null = no toggle exists for this provider
   disabled_reason?: string | null;
   status: ProviderStatus;
+  config_error?: ProviderConfigError | null;
   last_success_at: string | null;
   last_attempt_at: string | null;
   last_error: string | null;
@@ -1614,8 +1622,8 @@ export function runScheduleNow(
 // --- app-managed provider keys / connection settings -------------------------
 // Secrets never come back readable (masked only). Saving re-applies the env
 // bridge immediately — the sidecar is the parent of every collector subprocess,
-// so the change reaches all call sites without a restart. Effective precedence:
-// real env var > app value > config/.env.
+// so the change reaches all call sites without a restart. Strict precedence:
+// real env var > app value; config/.env is import material unless explicit fallback is on.
 
 export interface ProviderConfigField {
   field: string; // api_key | host | port
