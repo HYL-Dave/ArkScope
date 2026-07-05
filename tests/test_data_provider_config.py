@@ -147,7 +147,80 @@ def test_app_overrides_file_loaded_value(store, monkeypatch):
     assert dpc.effective_source("FINNHUB_API_KEY") == "app"
 
 
-def test_unapply_falls_back_to_file(store, monkeypatch):
+def test_apply_env_strict_excludes_managed_file_key_but_keeps_legacy_env_only(
+    store, monkeypatch, tmp_path
+):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "POLYGON_API_KEY=pk_file\n"
+        "SEC_CONTACT_EMAIL=legacy@example.com\n"
+        "ALPHA_VANTAGE_API_KEY=av_file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.delenv("SEC_CONTACT_EMAIL", raising=False)
+    monkeypatch.delenv("ALPHA_VANTAGE_API_KEY", raising=False)
+
+    dpc.apply_env(store)
+
+    assert "POLYGON_API_KEY" not in os.environ
+    assert "SEC_CONTACT_EMAIL" not in os.environ
+    assert os.environ["ALPHA_VANTAGE_API_KEY"] == "av_file"
+    assert dpc.effective_source("POLYGON_API_KEY") == "missing"
+
+
+def test_apply_env_strict_db_value_wins_without_file_source_tracking(
+    store, monkeypatch, tmp_path
+):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("POLYGON_API_KEY=pk_file\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    store.set_field("polygon", "api_key", "pk_app")
+
+    dpc.apply_env(store)
+
+    assert os.environ["POLYGON_API_KEY"] == "pk_app"
+    assert "POLYGON_API_KEY" not in env_keys.keys_loaded_from_file()
+    assert dpc.effective_source("POLYGON_API_KEY") == "app"
+
+
+def test_apply_env_explicit_fallback_true_restores_legacy_file_fallback(
+    store, monkeypatch, tmp_path
+):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("POLYGON_API_KEY=pk_file\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    store.set_setting("provider_env_fallback", "true")
+
+    dpc.apply_env(store)
+
+    assert os.environ["POLYGON_API_KEY"] == "pk_file"
+    assert dpc.effective_source("POLYGON_API_KEY") == "config/.env"
+
+
+def test_unapply_strict_unsets_app_value(store, monkeypatch):
+    store.set_field("finnhub", "api_key", "fk_app")
+    dpc.apply_env(store)
+    assert os.environ["FINNHUB_API_KEY"] == "fk_app"
+    dpc.unapply_env("FINNHUB_API_KEY", store)
+    assert "FINNHUB_API_KEY" not in os.environ
+    assert dpc.effective_source("FINNHUB_API_KEY") == "missing"
+
+
+def test_unapply_explicit_fallback_reloads_file_value(store, monkeypatch):
     calls = []
 
     def _reload(name):
@@ -156,13 +229,13 @@ def test_unapply_falls_back_to_file(store, monkeypatch):
         return True
 
     monkeypatch.setattr("src.env_keys.reload_var_from_file", _reload)
+    store.set_setting("provider_env_fallback", "true")
     store.set_field("finnhub", "api_key", "fk_app")
     dpc.apply_env(store)
-    assert os.environ["FINNHUB_API_KEY"] == "fk_app"
-    dpc.unapply_env("FINNHUB_API_KEY")
+    calls.clear()
+    dpc.unapply_env("FINNHUB_API_KEY", store)
     assert calls == ["FINNHUB_API_KEY"]
     assert os.environ["FINNHUB_API_KEY"] == "fk_from_file_again"
-    assert dpc.effective_source("FINNHUB_API_KEY") != "app"
 
 
 # --- IBKR client id (Slice A: was env-only @ ibkr_source.py:277, now app-managed) -----

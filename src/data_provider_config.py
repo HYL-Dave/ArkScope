@@ -14,16 +14,17 @@ leave the machine; reads return MASKED values only.
 Env bridge (why this is now cheap): the sidecar is the parent of every collector
 subprocess (the app-owned scheduler spawns them), so injecting a stored value into
 ``os.environ`` makes it visible to ALL call sites — in-process ``os.getenv`` users
-AND child processes — with no per-client plumbing. Effective precedence per var:
+AND child processes — with no per-client plumbing. Default strict precedence per
+managed provider var:
 
-    real environment variable  >  app-stored value  >  config/.env
+    real environment variable  >  app-stored value  >  missing
 
 "Real" = present in the environment before ``ensure_env_loaded()`` and not loaded
 from the file — the operator escape hatch. An app value OVERWRITES a file-loaded
-value (entering a key in Settings must actually take effect); clearing the app
-value falls back to config/.env via ``reload_var_from_file``. ``app_applied_keys``
-records what the app injected so provider-health can report ``app`` as a key's
-effective source.
+value only when explicit ``provider_env_fallback=true`` is enabled. In strict
+mode, clearing the app value unsets the process value; config/.env stays import
+material rather than runtime authority. ``app_applied_keys`` records what the app
+injected so provider-health can report ``app`` as a key's effective source.
 """
 
 from __future__ import annotations
@@ -172,6 +173,24 @@ def provider_env_fallback_source(store: DataProviderConfigStore | None = None) -
         except Exception:  # noqa: BLE001
             return "default"
     return "default"
+
+
+def managed_env_vars() -> frozenset[str]:
+    return frozenset(f.env_var for defs in PROVIDER_FIELDS.values() for f in defs)
+
+
+def managed_import_aliases() -> frozenset[str]:
+    return frozenset(
+        alias
+        for defs in PROVIDER_FIELDS.values()
+        for f in defs
+        for alias in f.import_aliases
+    )
+
+
+def managed_runtime_file_keys() -> frozenset[str]:
+    """Keys config/.env must not load into runtime authority under strict mode."""
+    return managed_env_vars() | managed_import_aliases()
 
 # env-var names the APP injected this process (effective source = 'app')
 _APP_APPLIED: set = set()
@@ -336,37 +355,79 @@ class DataProviderConfigStore:
 # --- env bridge -----------------------------------------------------------------
 
 def apply_env(store: DataProviderConfigStore) -> frozenset:
-    """Inject stored values into os.environ (precedence in the module docstring).
-    Idempotent; call at sidecar startup and after every save."""
-    from src.env_keys import ensure_env_loaded, keys_loaded_from_file
+    """Inject stored values into os.environ.
+
+    Default strict mode:
+      real shell env > app DB > missing
+    Explicit provider_env_fallback=true:
+      real shell env > app DB > config/.env
+    """
+    from src.env_keys import (
+        discard_loaded_key,
+        ensure_env_loaded,
+        ensure_env_loaded_excluding,
+        keys_loaded_from_file,
+        reload_var_from_file,
+    )
 
     store.seed_defaults()
-    ensure_env_loaded()
+    fallback = provider_env_fallback_enabled(store)
+    excluded = managed_runtime_file_keys()
+    if fallback:
+        ensure_env_loaded()
+    else:
+        ensure_env_loaded_excluding(excluded)
+
     file_keys = keys_loaded_from_file()
     stored = store.get_all()
+    configured_vars: set[str] = set()
     for provider, fields in stored.items():
         for field, value in fields.items():
             fdef = _FIELD_BY_KEY.get((provider, field))
             if fdef is None or not value:
                 continue
             var = fdef.env_var
+            configured_vars.add(var)
             # a REAL env var (pre-existing, not file-loaded, not ours) wins
             if var in os.environ and var not in file_keys and var not in _APP_APPLIED:
                 continue
             os.environ[var] = value
             _APP_APPLIED.add(var)
+
+    if fallback:
+        for var in managed_env_vars() - configured_vars:
+            if var in os.environ and var not in file_keys and var not in _APP_APPLIED:
+                continue
+            if var in os.environ and var in file_keys and var not in _APP_APPLIED:
+                continue
+            reload_var_from_file(var)
+        logger.warning(
+            "provider_env_fallback=true: managed provider fields may use config/.env"
+        )
+    else:
+        for var in excluded:
+            if var in configured_vars:
+                continue
+            if var in _APP_APPLIED:
+                _APP_APPLIED.discard(var)
+                os.environ.pop(var, None)
+            else:
+                discard_loaded_key(var)
     return frozenset(_APP_APPLIED)
 
 
-def unapply_env(env_var: str) -> None:
-    """After clearing an app value: drop our injection and fall back to the
-    config/.env value (or unset entirely)."""
+def unapply_env(env_var: str, store: DataProviderConfigStore | None = None) -> None:
+    """After clearing an app value: strict mode unsets it; fallback mode reloads file."""
     if env_var not in _APP_APPLIED:
         return
     _APP_APPLIED.discard(env_var)
-    from src.env_keys import reload_var_from_file
 
-    reload_var_from_file(env_var)
+    if store is not None and provider_env_fallback_enabled(store):
+        from src.env_keys import reload_var_from_file
+
+        reload_var_from_file(env_var)
+    else:
+        os.environ.pop(env_var, None)
 
 
 def app_applied_keys() -> frozenset:
