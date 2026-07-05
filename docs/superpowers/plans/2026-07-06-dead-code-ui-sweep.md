@@ -53,7 +53,11 @@ Stop and report before continuing if any of these happen:
 5. `pytest tests/test_tools.py tests/test_agents.py tests/test_analyst_tools.py tests/test_sec_tools.py -q` passes or has only already-known live-data failures with an A/B-identical set.
 6. Frontend gates pass: `npm test -- SettingsProviderConfig.test.ts SettingsPostPgExitStorage.test.ts marketDataDisplay.test.ts` and `npm run build`.
 7. PG-unreachable smoke stays green: `ARKSCOPE_DISABLE_SCHEDULER=1 python -m scripts.smoke.pg_unreachable_e2e`.
-8. Full A/B failure set is identical.
+8. Full A/B failure set is identical except for up to two named base-only ledger
+   fixes that this plan intentionally repairs:
+   `tests/test_agents.py::TestAnthropicToolSchemas::test_tool_names` and
+   `tests/test_sec_tools.py::TestBridgeIntegration::test_analysis_category_6`.
+   Zero head-only deterministic failures are allowed.
 
 ---
 
@@ -333,7 +337,7 @@ git commit -m "refactor: remove retired data-source ui helpers"
 Run:
 
 ```bash
-pytest tests/test_tools.py::TestRegistry::test_tool_names tests/test_agents.py::TestAnthropicToolExecution::test_tool_names tests/test_analyst_tools.py::TestBridgeIntegration tests/test_sec_tools.py::TestBridgeIntegration -q
+pytest tests/test_tools.py::TestRegistry::test_tool_names tests/test_agents.py::TestAnthropicToolSchemas::test_tool_names tests/test_analyst_tools.py::TestBridgeIntegration tests/test_sec_tools.py::TestBridgeIntegration -q
 ```
 
 Expected before implementation: at least one stale tool-name/count assertion fails. `get_ticker_data_coverage` is already registered in both bridge layers and should be treated as a test-ledger lag, not a feature gap.
@@ -489,7 +493,15 @@ Expected: no live-code hits except explicitly reviewed economic-calendar descrip
 
 - [ ] **Step 3: Full A/B**
 
-Run the standard virgin-to-virgin A/B suite against the branch base and head. Expected: identical failure set. Any head-only deterministic failure blocks merge.
+Run the standard virgin-to-virgin A/B suite against the branch base and head.
+Expected: identical failure set except up to two named base-only entries:
+
+- `tests/test_agents.py::TestAnthropicToolSchemas::test_tool_names`
+- `tests/test_sec_tools.py::TestBridgeIntegration::test_analysis_category_6`
+
+These two are intentional stale-ledger fixes from Task 4. Any head-only deterministic
+failure blocks merge. The existing `TestAnthropicToolExecution` / OpenAI live-data
+setup errors are not ledger fixes and should remain A/B-identical.
 
 - [ ] **Step 4: Docs closeout**
 
