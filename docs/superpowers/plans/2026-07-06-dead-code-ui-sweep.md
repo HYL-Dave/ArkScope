@@ -1,4 +1,4 @@
-# Dead-Code / UI Sweep Implementation Plan
+# Dead-Code / UI Sweep Implementation Plan — LIVE COMPLETE
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -7,6 +7,16 @@
 **Architecture:** This is a sweep, not a product redesign. Runtime-dead PG readers become explicit tombstone stubs or unreachable-code removals at existing boundaries; UI cleanup removes misleading controls/copy that no longer map to live behavior; one live profile cleanup is approval-gated and data-only. Legacy `use_local_*` keys remain as provenance unless this plan explicitly says otherwise.
 
 **Tech Stack:** Python 3, pytest, SQLite local stores, React/TypeScript/Vitest, existing PG-unreachable smoke.
+
+## Live Closeout
+
+- **Branch / range:** `codex/dead-code-ui-sweep`, `dd00c04..38a06d9` before docs closeout.
+- **Runtime dead paths closed:** PG `sa_*` methods on `DatabaseBackend` are explicit tombstone stubs; SA market-news health no longer has a PG branch and fails closed when the local capture backend is absent.
+- **UI/API sweep:** retired market bootstrap/update/validate and legacy local-toggle frontend helpers were removed; the unreachable generic `hintRows` provider-config path was removed while the grouped IBKR renderer remains the authority.
+- **Copy / ledger sweep:** local-first runtime comments and macro/FRED copy were aligned; `get_ticker_data_coverage` and the analysis-category count were corrected in stale tool ledgers.
+- **Live profile cleanup:** exact-match `scheduler_state` row `source=price_backfill`, `last_status=failed`, `last_error="REAL RUNNER CALLED"` was approved and cleared. Backup: `data/profile_state.db.bak-pre-dead-code-sweep-scheduler-marker-20260705T173056Z.db`. Postcheck: `REAL RUNNER CALLED` rows = `0`; `price_backfill` stale fields are `NULL`.
+- **Verification:** focused backend gate `65 passed`; frontend gate `29 passed`; `npm run build` passed; PG-unreachable smoke `ok:true`, `pg_attempts:[]`, 24/24 checks. Full A/B round 2 was reviewer-run: base/head failure sets identical except the two named base-only stale-ledger fixes and zero head-only deterministic failures.
+- **Next queue:** IBKR news long-catch-up audit. Future decisions remain FRED refresh cadence, Finnhub calendar enablement, and C-2/C-3 macro context.
 
 ---
 
