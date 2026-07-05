@@ -37,13 +37,26 @@
 ## Decisions Locked
 
 1. **Three-axis FRED status.** Provider/key state, local snapshot state, and auto-refresh state are separate. FRED may be "configured + local snapshot available + auto-refresh off"; that is not a provider-disabled state.
-2. **`macro_calendar.enabled` becomes refresh-only for FRED.** It continues to gate manual ingestion/jobs and Finnhub calendar routes. It no longer gates FRED series reads, the curated snapshot route, or `get_macro_value()`.
+2. **`macro_calendar.enabled` becomes refresh-only for FRED.** It continues to gate manual ingestion/jobs and Finnhub calendar routes. It no longer gates FRED series reads, the curated snapshot route, or `get_macro_value()`. In provider health, FRED's provider `enabled` field becomes `None` because there is no provider-level toggle after this decision; refresh state lives in `signals.auto_refresh_enabled`.
 3. **Curated snapshot is a new read route.** Add `GET /macro/snapshot` instead of making the frontend fan out to eleven `/macro/series/{id}` requests. The route reads only local SQLite and returns honest-empty when the DB is missing.
 4. **Every displayed value carries freshness.** Snapshot items include `observation_date` and `fetched_at`. Series observations should include `fetched_at`; `get_macro_value()` output must mention fetched freshness for found values.
 5. **Calendar surfaces stay out.** `/macro/economic-calendar`, `/macro/earnings-calendar`, `/macro/ipo-calendar`, and `get_economic_calendar()` remain feature-gated because their adopted product semantics were not changed and two local Finnhub tables are empty.
 6. **Release dates are included only as metadata.** `macro_release_dates` may inform provider health/Data Sources snapshot coverage, but there is no release-calendar UI in this slice unless it can be shown as simple coverage text. Do not create a scheduling/alert feature.
 7. **Missing DB does not create a file.** Status/snapshot reads must not materialize `macro_calendar.db`. Return `available=false` / empty items when absent, mirroring `read_macro_table_stats()`.
 8. **PG-unreachable invariant remains.** New macro snapshot reads must work under the existing PG poison smoke with `pg_attempts=[]`.
+9. **Refresh-off snapshot is not age-judged as provider failure.** FRED's 192h freshness threshold applies only when refresh is enabled. When refresh is off, snapshot age is displayed as information (`latest_fetched_at`) but does not turn the provider status `stale`.
+
+## Old Contracts To Flip
+
+Do not write "flip old expectations" generically. The known old contracts are:
+
+- `tests/test_macro_calendar_read.py::TestGetMacroValueTool::test_disabled_returns_helpful_string` flips to "refresh disabled still reads macro value".
+- `tests/test_macro_calendar_read.py::TestEconomicCalendarRoute::test_disabled_returns_503` stays unchanged.
+- `tests/test_macro_calendar_read.py::TestGetEconomicCalendarTool::test_disabled_returns_helpful_string` stays unchanged.
+- `tests/test_provider_health.py::test_fred_disabled_when_macro_calendar_feature_is_off` is replaced by the two Task 3 contracts.
+- `apps/arkscope-web/src/marketDataDisplay.test.ts` providerHealthStatusLabel case for `macro_ingestion_disabled` is either removed or converted to a legacy-backcompat mapping that is not used by the normal FRED mock.
+- `apps/arkscope-web/src/SettingsProviderConfig.test.ts` FRED mock at the top of the file and the FRED assertion around `toContain("未啟用抓取")` are updated per Task 5.
+- `TestMacroSeriesRoute` has no existing disabled pin; Task 1 Step 2 adds a new regression test rather than flipping an old one.
 
 ## File Map
 
@@ -154,7 +167,7 @@ Test intent:
 def test_macro_snapshot_readable_when_refresh_disabled(seed_macro_db):
     undo = _disable_macro()
     try:
-        result = macro_snapshot(dal=object())
+        result = macro_snapshot()
     finally:
         undo()
     assert result["available"] is True
@@ -170,7 +183,7 @@ Use real `MacroCalendarLocalStore` against `ARKSCOPE_MACRO_CALENDAR_DB` temp pat
 
 - [ ] **Step 2: RED - `/macro/series/{series_id}` includes `fetched_at` and ignores refresh flag**
 
-Flip/add tests:
+Add this regression test:
 
 ```python
 def test_macro_series_readable_when_refresh_disabled(monkeypatch, seeded_macro_store):
@@ -364,7 +377,7 @@ pytest tests/test_macro_calendar_read.py -q
 - Modify `src/service/provider_health.py`
 - Test `tests/test_provider_health.py`
 
-- [ ] **Step 1: RED - FRED snapshot available is not disabled**
+- [ ] **Step 1: RED - FRED snapshot available is connected, not disabled or stale**
 
 Replace `test_fred_disabled_when_macro_calendar_feature_is_off` with a snapshot-aware contract:
 
@@ -385,16 +398,21 @@ def test_fred_snapshot_available_when_refresh_is_off(monkeypatch, tmp_path):
             "macro_release_dates": {"row_count": 4659, "last_fetched_at": "2026-06-25T01:09:52Z"},
         },
     )
-    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY), "fred")
-    assert p["status"] in {"connected", "no_signal"}
+    # Use a date after the current live snapshot. If the implementation leaves
+    # FRED on the 192h threshold while refresh is intentionally off, this turns
+    # stale and the test catches the false-red UI state.
+    now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=now), "fred")
+    assert p["status"] == "connected"
     assert p["disabled_reason"] is None
-    assert p["enabled"] is False
+    assert p["enabled"] is None
     assert p["signals"]["auto_refresh_enabled"] is False
     assert p["signals"]["local_snapshot"]["observation_count"] == 29571
     assert "local snapshot" in p["detail"].lower()
+    assert "auto-refresh off" in p["detail"].lower()
 ```
 
-If the desired status is `connected`, pass `last_success` as the snapshot `latest_fetched_at` rather than job success. This is the recommended choice because the row has a usable local snapshot even though refresh is off.
+Required semantics: pass `last_success` as the snapshot `latest_fetched_at`, set provider `enabled=None`, and suppress FRED's 192h threshold while refresh is off. Otherwise `_status()` returns either `disabled` (`enabled=False`) or `stale` (age > 192h), both of which contradict the adopted product meaning.
 
 - [ ] **Step 2: Add missing-snapshot contract**
 
@@ -409,6 +427,7 @@ def test_fred_refresh_off_without_snapshot_is_no_signal(monkeypatch):
     p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY), "fred")
     assert p["status"] == "no_signal"
     assert p["disabled_reason"] is None
+    assert p["enabled"] is None
     assert p["signals"]["auto_refresh_enabled"] is False
     assert p["signals"]["local_snapshot"]["observation_count"] == 0
 ```
@@ -443,33 +462,63 @@ snapshot = {
 }
 ```
 
+Change `_add()` so a caller can override freshness threshold without changing every provider:
+
+```python
+_DEFAULT_THRESHOLD = object()
+
+def _effective_threshold(pid: str, threshold_hours: Any) -> Optional[int]:
+    if threshold_hours is _DEFAULT_THRESHOLD:
+        return _THRESHOLD_HOURS.get(pid)
+    return threshold_hours
+```
+
+Then add a keyword-only `threshold_hours: Any = _DEFAULT_THRESHOLD` parameter to the existing `_add` helper and replace its `_status` threshold argument with:
+
+```python
+effective_threshold = _effective_threshold(pid, threshold_hours)
+"status": _status(
+    key_present=key["present"],
+    enabled=enabled,
+    last_success_at=last_success,
+    threshold_hours=effective_threshold,
+    now=now,
+    weekend_maintenance=weekend_maintenance,
+    config_error=config_error,
+),
+```
+
+Do not alter existing callers. The default path remains byte-for-byte semantic parity for all non-FRED providers.
+
 FRED `_add()` call:
 
 ```python
+fred_refresh_enabled = bool(macro_enabled)
 _add(
     "fred", "FRED", "macro",
     _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
     config_error=_config_error("fred"),
-    enabled=macro_enabled,
+    enabled=None,
     last_success=snapshot_latest or fred["last_success"],
     last_attempt=fred["last_attempt"],
     last_error=fred["last_error"],
+    threshold_hours=(_THRESHOLD_HOURS.get("fred") if fred_refresh_enabled else None),
     detail=(
         f"local snapshot {snapshot['observation_count']} observations"
         f" · {snapshot['series_count']} series"
         f" · latest fetched {_iso(snapshot_latest) or '—'}"
-        f" · auto-refresh {'on' if macro_enabled else 'off'}"
+        f" · auto-refresh {'on' if fred_refresh_enabled else 'off'}"
     ),
     signals={
         "jobs_prefix": "fetch_fred",
-        "auto_refresh_enabled": bool(macro_enabled),
+        "auto_refresh_enabled": fred_refresh_enabled,
         "local_snapshot": snapshot,
     },
     disabled_reason=None,
 )
 ```
 
-Do not set `disabled_reason="macro_ingestion_disabled"` for this provider after the decision. Refresh-off is represented by `signals.auto_refresh_enabled=false` and visible detail.
+Do not set `enabled=False` or `disabled_reason="macro_ingestion_disabled"` for this provider after the decision. Refresh-off is represented by `signals.auto_refresh_enabled=false` and visible detail.
 
 Run:
 
@@ -539,7 +588,7 @@ Update the mocked `fred` provider in `SettingsProviderConfig.test.ts`:
   label: "FRED",
   kind: "macro",
   status: "connected",
-  enabled: false,
+  enabled: null,
   key_present: true,
   key_source: "app",
   key_vars: ["FRED_API_KEY"],
@@ -653,11 +702,11 @@ Run:
 
 ```bash
 cd apps/arkscope-web
-npm test -- SettingsProviderConfig.test.ts marketDataDisplay.test.ts --runInBand
+npm test -- SettingsProviderConfig.test.ts marketDataDisplay.test.ts
 npm run build
 ```
 
-If this repo's Vitest command differs, use the established local command from recent frontend slices.
+This package's test script is `vitest run`; do not use Jest-only serial-run flags.
 
 ## Task 6: Focused Integration + Full Regression Gate
 
@@ -678,7 +727,7 @@ Run focused frontend suites:
 
 ```bash
 cd apps/arkscope-web
-npm test -- SettingsProviderConfig.test.ts SettingsPostPgExitStorage.test.ts marketDataDisplay.test.ts --runInBand
+npm test -- SettingsProviderConfig.test.ts SettingsPostPgExitStorage.test.ts marketDataDisplay.test.ts
 npm run build
 ```
 
@@ -694,7 +743,9 @@ After merge to master, with the sidecar/app running:
 
 1. `GET /providers/health`
    - FRED key source is `app` or `env`.
+   - FRED status is `connected` when a local snapshot exists, even if the snapshot is older than 192h and auto-refresh is off.
    - FRED does not report `disabled_reason="macro_ingestion_disabled"`.
+   - FRED `enabled` is `null`; refresh state is `signals.auto_refresh_enabled=false`.
    - `signals.local_snapshot.observation_count` matches the local DB (currently expected around `29,571`).
    - `signals.auto_refresh_enabled=false` is visible.
 2. `GET /macro/snapshot`
