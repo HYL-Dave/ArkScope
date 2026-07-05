@@ -155,6 +155,7 @@ class TestAnthropicToolSchemas:
             "get_earnings_impact",
             "scan_alerts",
             "check_data_freshness",
+            "get_ticker_data_coverage",
             "get_sa_alpha_picks",
             "get_sa_pick_detail",
             "refresh_sa_alpha_picks",
