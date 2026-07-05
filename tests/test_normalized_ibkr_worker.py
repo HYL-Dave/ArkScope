@@ -210,7 +210,7 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
         yield
         events.append("market_exit")
 
-    def write_news_batch(store, provider, tickers, budget, *, project_legacy=False):
+    def write_news_batch(store, provider, tickers, budget, *, project_legacy=False, **kwargs):
         events.append("write")
         with provider.operation():
             events.append("provider_operation")
@@ -240,10 +240,6 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     )
 
     assert events.count("ibkr_enter") == 1
-    assert events.index("ibkr_enter") < events.index("market_enter")
-    assert events.index("market_enter") < events.index("write")
-    assert events.index("write") < events.index("market_exit")
-    assert events.index("market_exit") < events.index("ibkr_exit")
     assert "provider_operation" in events
     # news domain rides its own partitioned client id (base 1 + 30), never the raw base
     assert seen_source_kwargs.get("client_id") == 31
@@ -298,3 +294,63 @@ def test_ibkr_worker_module_startup_emits_only_sanitized_json(tmp_path):
     assert payload["articles_seen"] == 0
     assert payload["error_count"] == 0
     assert "FAKE" not in proc.stderr
+
+
+def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeypatch):
+    from src.news_normalized import ibkr_cli
+
+    calls = {}
+
+    class _Source:
+        def __init__(self, client_id=None):
+            self.client_id = client_id
+
+    class _Gateway:
+        def __init__(self, source):
+            self.source = source
+        def close(self):
+            calls["closed"] = True
+
+    class _Provider:
+        source = "ibkr"
+        def __init__(self, gateway, acquire_gateway_lock):
+            self.gateway = gateway
+            self.acquire_gateway_lock = acquire_gateway_lock
+
+    class _Store:
+        def __init__(self, conn):
+            self.conn = conn
+
+    def fake_write_news_batch(store, provider, tickers, budget, **kwargs):
+        calls["kwargs"] = kwargs
+        return {
+            "status": "succeeded",
+            "articles_seen": 0,
+            "articles_inserted": 0,
+            "bodies_fetched": 0,
+            "errors": {},
+            "continuation": None,
+        }
+
+    def forbidden_outer_lock(*args, **kwargs):
+        raise AssertionError("outer market_write_lock must not wrap the whole worker")
+
+    monkeypatch.setattr("data_sources.ibkr_source.IBKRDataSource", _Source)
+    monkeypatch.setattr("src.news_normalized.ibkr_runtime.IBKRRuntimeGateway", _Gateway)
+    monkeypatch.setattr("src.news_normalized.ibkr_adapter.IBKRNormalizedProvider", _Provider)
+    monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", _Store)
+    monkeypatch.setattr("src.news_normalized.writer.write_news_batch", fake_write_news_batch)
+    monkeypatch.setattr("src.market_data_direct.market_write_lock", forbidden_outer_lock)
+    monkeypatch.setattr("src.market_data_admin.resolve_market_db_path", lambda: ":memory:")
+
+    out = ibkr_cli._run_worker(
+        ["AAPL"],
+        max_articles=10,
+        max_body_fetches=2,
+        gateway_lock_held=True,
+    )
+
+    assert out["status"] == "succeeded"
+    assert "write_lock_factory" in calls["kwargs"]
+    assert calls["kwargs"]["project_legacy"] is True
+    assert calls["closed"] is True

@@ -154,15 +154,15 @@ def _run_worker(
                 acquire_gateway_lock=False,
             )
             conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
-            with market_write_lock():
-                store = NormalizedNewsStore(conn)
-                return write_news_batch(
-                    store,
-                    provider,
-                    tickers,
-                    WriterBudget(max_articles, max_body_fetches),
-                    project_legacy=True,
-                )
+            store = NormalizedNewsStore(conn)
+            return write_news_batch(
+                store,
+                provider,
+                tickers,
+                WriterBudget(max_articles, max_body_fetches),
+                project_legacy=True,
+                write_lock_factory=market_write_lock,
+            )
     finally:
         if conn is not None:
             conn.close()
