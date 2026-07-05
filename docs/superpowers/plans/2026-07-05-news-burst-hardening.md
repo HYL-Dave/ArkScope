@@ -947,6 +947,30 @@ git commit -m "fix: preserve retryable ibkr news worker errors"
 
 ---
 
+### Task 3.6: Writer Re-raises Lock-Busy From Write Phases (post-review P1 fix)
+
+> **Reviewer finding (2026-07-05, post-implementation):** with the lock moved inside
+> `write_news_batch()`, the writer's resumable-error catch blocks could swallow a
+> `TimeoutError("market_data.db write lock busy (timeout)")` raised by a write-phase lock
+> acquisition into the per-article/per-ticker `errors` dict, returning `status="partial"`
+> instead of propagating — so mid-batch lock contention surfaced as a durable partial
+> (and, via the rc=0 IBKR worker path, as `error_classes=["ProviderError"]`), violating
+> the slice contract that lock contention is always a retryable `skipped_lock_busy`.
+> Reproduced with a lock factory that succeeds at run-start and times out on the first
+> article write.
+>
+> **Fix (shipped):** `src/news_normalized/writer.py` adds `_is_market_lock_busy()`
+> (substring match on the `market_write_lock` message) and re-raises before resumable
+> handling at all four swallow sites: the deferred-body resume catch, the candidate
+> upsert catch, the body-update catch, and the per-ticker outer catch. Three RED-first
+> tests in `tests/test_news_normalized_writer_locking.py` inject a flaky lock factory
+> (succeeds at run-start, times out at acquisition N) and assert `write_news_batch()`
+> raises the lock-busy `TimeoutError` from the upsert, body-update, and deferred-resume
+> phases. Classification then composes with Task 2 (in-process) and Task 3.5 (worker)
+> untouched. Commit: `fix: reraise lock busy from news write phases`.
+
+---
+
 ### Task 4: Startup Burst Regression Gate
 
 **Files:**
