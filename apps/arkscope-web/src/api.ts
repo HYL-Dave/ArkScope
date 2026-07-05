@@ -1264,21 +1264,6 @@ export interface MarketDataJob {
   error: string | null;
 }
 
-interface DomainValidate {
-  local_rows: number;
-  pg_rows: number;
-  match: boolean;
-}
-
-export interface MarketDataValidate {
-  exists: boolean;
-  match: boolean;
-  prices?: DomainValidate;
-  news?: DomainValidate;
-  iv?: DomainValidate;
-  fundamentals?: DomainValidate;
-}
-
 export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
 }
