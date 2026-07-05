@@ -179,6 +179,7 @@ def test_feed_pg_mode_requires_local(tmp_path):
     dal._backend = MagicMock(spec=["_get_conn"])  # no _sa_db
     res = sa_tools.get_sa_feed(dal, days=30)
     assert res["available"] is False and res["empty_reason"] == "requires_local_sa"
+    assert "use_local_sa" not in res["error"]
 
 
 def test_feed_clamps_params(tmp_path):

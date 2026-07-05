@@ -254,7 +254,7 @@ function SAFeedBody({
   const degraded =
     feed && !feed.available
       ? feed.empty_reason === "requires_local_sa"
-        ? "Seeking Alpha 尚未切到本地（use_local_sa 未啟用）。"
+        ? "Seeking Alpha 本地資料路徑尚未就緒。"
         : "Seeking Alpha 資料尚未就緒。"
       : null;
 

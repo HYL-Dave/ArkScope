@@ -163,6 +163,7 @@ def test_focus_pg_mode_requires_local(tmp_path):
     dal._backend = backend
     res = sa_tools.get_sa_comment_focus(dal, window_days=14)
     assert res["empty_reason"] == "requires_local_sa"
+    assert "use_local_sa" not in res["error"]
     assert "error" in res and res["top_tickers"] == []
 
 

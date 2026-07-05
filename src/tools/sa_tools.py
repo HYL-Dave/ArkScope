@@ -529,13 +529,13 @@ def get_sa_comment_focus(
 
         sa_db = getattr(backend, "_sa_db", None)
         if sa_db is None:
-            # Post-3d-cutover primitive: SA is local-first, so focus reads
-            # sa_capture.db directly. PG mode = pre-flip / rollback only.
+            # SA is local-only; a backend without _sa_db is an invalid caller
+            # shape left from the retired PG routing path.
             return _empty_focus(
                 window_days, min_score, rule_set_version=ver,
                 empty_reason="requires_local_sa",
                 error="get_sa_comment_focus requires the local sa_capture.db "
-                      "(use_local_sa); SA is local-first after the 3d cutover.")
+                      "routing; this backend has no SA capture store.")
 
         from src import sa_capture_store as store
 
@@ -792,7 +792,7 @@ def get_sa_feed(
         if sa_db is None:
             return _empty_feed(days, empty_reason="requires_local_sa",
                                error="get_sa_feed requires the local sa_capture.db "
-                                     "(use_local_sa); SA is local-first after the 3d cutover.")
+                                     "routing; this backend has no SA capture store.")
         return _sa_feed_local(sa_db, q=q, ticker=tkr, item_type=item_type,
                               days=days, limit=limit, offset=offset)
     except Exception as e:
