@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status:** LIVE COMPLETE 2026-07-05. FF-merged `codex/sa-local-default-collapse` at `4d2f6f1`; documented by `docs: close sa local default collapse`.
+
+**Verification:** focused SA gate `325 passed`; fresh-profile poison E2E changed from `pg_attempts: 2` before the slice to `pg_attempts: []` after the slice; routine real-profile E2E remained `ok:true` / `pg_attempts: []`; final A/B was identical (base `4883ac4`: 3,704 passed / 39 known failures; head `4d2f6f1`: 3,709 passed / same 39 failures).
+
+**Closeout notes:** Task 1's plan text was corrected mid-implementation from routing flips x3 to x5 after the green gate exposed two same-class old-contract tests; this was transparent and review-accounted, but it is a recorded deviation from the ideal stop-and-report discipline. Three absent-file tests were regression pins rather than red-first tests because the backend helper already handled absent files; the true gap lived in direct store callers. The final regression fix (`4d2f6f1`) closed a plan blind spot where the collapse made baseless DAL construction silent-half-built instead of loud-failing; `_base` gating now mirrors market routing.
+
 **Goal:** Collapse the SA capture domain to local-by-default: `use_local_sa` unset, explicit `false`, and env-unset all route SA reads/writes to `data/sa_capture.db` via `SACaptureDatabaseBackend`. The persisted flag and `ARKSCOPE_USE_LOCAL_SA` become provenance/rollback documentation only. This closes the last fresh-profile stranding hole found by the S-J Phase 2 poison-DSN smoke: on an empty profile, `DataAccessLayer._local_sa_enabled()` resolves `False` and SA readers reach the PostgreSQL backend even though the PG `sa_*` tables were dropped in N9 batch-1.
 
 **Architecture:** One-line collapse at the existing family choke point (`_local_sa_enabled`, mirroring `_local_macro_enabled` / `_local_records_enabled`), plus removal of the pre-cutover `sa_capture.db`-exists guard in `_make_db_backend()`. Both stack-proved PG callsites (`provider_health.py:181` → `get_sa_refresh_meta`; `sa_market_news_health.py:409` `_run_health_query`) are fixed transitively: they duck-type on the backend, and `SACaptureDatabaseBackend` already overrides `get_sa_refresh_meta()` and carries `_sa_db` (which selects the local health-query branch). No per-callsite rewiring.

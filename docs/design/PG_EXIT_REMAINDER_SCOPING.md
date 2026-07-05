@@ -567,21 +567,26 @@ DB-native instead of expanding `.env` fallback.
   is the exact four-key contract `{code, status, provider, field}`. Wrapping
   surfaces may add context fields, but the PG-unreachable smoke policy asserts
   the invariant rather than localized message text.
-- Follow-up opened: SA `use_local_sa` local-default collapse. Phase 2 poison
-  smoke exposed an existing fresh-profile stranding hole outside provider config:
-  unset `use_local_sa` can still leave some SA surfaces dependent on the old
-  toggle semantics. Root cause: `DataAccessLayer._local_sa_enabled`
-  (`src/tools/data_access.py:354`) is a truthy check — unset resolves False and
-  routes to the PG backend. Stack-proved callsites (base-reproduced, both under
-  an empty profile with a DSN configured): `src/service/provider_health.py:181`
-  → `DatabaseBackend.get_sa_refresh_meta`, and
-  `src/service/sa_market_news_health.py:409` `_run_health_query` →
-  `DatabaseBackend._get_conn`. Scope a small TDD slice to collapse
-  unset/explicit-false to local SA authority (batch-2/closeout semantics),
-  audit `src/sa_capture_store.py`, `src/service/provider_health.py`,
-  `src/service/sa_market_news_health.py`, `src/tools/sa_tools.py`,
-  `src/tools/sa_digest_tools.py`, and SA route call sites, then prove it with
-  fresh-profile poison smoke (expect `pg_attempts: []`) plus full A/B.
+- Follow-up complete 2026-07-05: SA `use_local_sa` local-default collapse
+  landed at `4d2f6f1`. The Phase 2 poison smoke exposed an existing
+  fresh-profile stranding hole outside provider config: unset `use_local_sa`
+  could still leave some SA surfaces dependent on old toggle semantics. Root
+  cause: `DataAccessLayer._local_sa_enabled` was a truthy check — unset
+  resolved False and routed to the PG backend. Stack-proved callsites were
+  `src/service/provider_health.py:181` → `DatabaseBackend.get_sa_refresh_meta`
+  and `src/service/sa_market_news_health.py:409` `_run_health_query` →
+  `DatabaseBackend._get_conn`. The fix collapses unset/explicit-false/env-unset
+  to local SA authority, removes the pre-cutover local-file-exists guard,
+  tombstones all three `scripts/migrate_sa_to_sqlite.py` PG modes (build,
+  `--validate-only`, `--dry-run`), and makes absent-file read-only
+  `sa_capture_store.connect()` return an in-memory honest-empty schema. Proof:
+  fresh-profile poison E2E `pg_attempts` went `2 → 0`; routine real-profile E2E
+  stayed `ok:true` / `pg_attempts: []`; final A/B was identical (base `4883ac4`
+  3,704 passed / 39 known failures; head `4d2f6f1` 3,709 passed / same failure
+  set). Review accounting: Task 1 routing flips were corrected from x3 to x5
+  mid-implementation, three absent-file tests became regression pins because
+  the backend helper already handled the case, and `4d2f6f1` closed the
+  baseless-DAL blind spot by keeping `_base is None` as a loud-fail boundary.
 
 ### 13.7 Decisions (locked at review, 2026-07-02)
 
