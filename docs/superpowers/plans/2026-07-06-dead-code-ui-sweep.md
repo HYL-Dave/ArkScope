@@ -49,7 +49,7 @@ Stop and report before continuing if any of these happen:
 1. `rg -n "REAL RUNNER CALLED" src apps tests docs --glob '!docs/superpowers/plans/**'` returns no code/test hit after the live cleanup record is documented.
 2. `rg -n "Default-OFF|inherited PG behaviour|requires PostgreSQL DAL backend|Requires macro_calendar.enabled=true" src apps tests` returns only explicitly allowed historical docs or economic-calendar-only copy.
 3. `rg -n "bootstrapMarketData|updateMarketData|validateMarketData|setUseLocalMarket|setUseLocalMacro|hintRows" apps/arkscope-web/src` shows no unreachable exports/paths, or the remaining hits are justified in comments/tests.
-4. `pytest tests/test_db_backend_retired_pg_sa.py tests/test_sa_local_readers.py -q` passes.
+4. `pytest tests/test_db_backend_retired_pg_sa.py tests/test_sa_local_readers.py tests/test_sa_market_news_health.py tests/test_sa_tools.py -q` passes — the last two files were missed by the original focused list and caught by A/B (three retired-PG contract flips: the orchestrator now-threading fake gains `_sa_db`; the two `test_db_apply_refresh_*` PG storage-contract tests are deleted as superseded by the SACapture roundtrip family + the retired-stub pins).
 5. `pytest tests/test_tools.py tests/test_agents.py tests/test_analyst_tools.py tests/test_sec_tools.py -q` passes or has only already-known live-data failures with an A/B-identical set.
 6. Frontend gates pass: `npm test -- SettingsProviderConfig.test.ts SettingsPostPgExitStorage.test.ts marketDataDisplay.test.ts` and `npm run build`.
 7. PG-unreachable smoke stays green: `ARKSCOPE_DISABLE_SCHEDULER=1 python -m scripts.smoke.pg_unreachable_e2e`.
@@ -181,7 +181,7 @@ In `src/service/sa_market_news_health.py`:
 Run:
 
 ```bash
-pytest tests/test_db_backend_retired_pg_sa.py tests/test_sa_local_readers.py -q
+pytest tests/test_db_backend_retired_pg_sa.py tests/test_sa_local_readers.py tests/test_sa_market_news_health.py tests/test_sa_tools.py -q
 ```
 
 Expected: PASS.
