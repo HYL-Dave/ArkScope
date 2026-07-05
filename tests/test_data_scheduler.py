@@ -173,6 +173,62 @@ def test_tick_once_defers_extra_market_writers(monkeypatch):
     }]
 
 
+def test_startup_burst_defers_all_extra_market_writers(monkeypatch):
+    import src.service.data_scheduler as ds
+    now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+    due_sources = {
+        "polygon_news",
+        "finnhub_news",
+        "ibkr_news",
+        "ibkr_prices",
+        "price_backfill",
+    }
+    fired = []
+    skipped = []
+
+    monkeypatch.setattr(
+        ds,
+        "source_config",
+        lambda source: {"enabled": source in due_sources, "interval_minutes": 1},
+    )
+    monkeypatch.setattr(ds, "_is_due", lambda source, current: source in due_sources)
+    monkeypatch.setattr(ds, "_record_result", lambda result: skipped.append(result) or result)
+
+    out = ds.tick_once(now, fire=fired.append)
+
+    assert out == fired
+    assert len(fired) == 1
+    assert fired[0] in due_sources
+    deferred = [row for row in skipped if row.get("skip_kind") == "market_writer_backpressure"]
+    assert {row["source"] for row in deferred} == due_sources - {fired[0]}
+    assert all(row["status"] == "skipped" for row in deferred)
+
+
+def test_market_writer_backpressure_is_not_failed(monkeypatch):
+    import src.service.data_scheduler as ds
+    now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(
+        ds,
+        "source_config",
+        lambda source: {
+            "enabled": source in {"polygon_news", "finnhub_news"},
+            "interval_minutes": 1,
+        },
+    )
+    monkeypatch.setattr(
+        ds,
+        "_is_due",
+        lambda source, current: source in {"polygon_news", "finnhub_news"},
+    )
+
+    ds.tick_once(now, fire=lambda source: None)
+
+    row = ds._state_store().get("finnhub_news")
+    if row is not None:
+        assert row["last_status"] != "failed"
+
+
 # --- run_source ------------------------------------------------------------------
 
 def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
