@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** OFFLINE TASKS 1-3 IMPLEMENTED on branch `codex/batch3-prices-drop` (2026-07-05). This does not authorize a live PG `prices` drop.
+> **Status:** OFFLINE TASKS 1-3 IMPLEMENTED + FUNCTION-DEPENDENCY FIXUP on branch `codex/batch3-prices-drop` (2026-07-05). This does not authorize a live PG `prices` drop.
 
-> **Offline gate:** `pytest tests/test_db_backend_retired_prices.py tests/test_n9_batch3_prices_drop.py tests/test_pg_unreachable_e2e.py tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg tests/test_provider_health.py tests/test_data_scheduler.py -q` -> 129 passed; `python -m compileall scripts/migration/n9_batch3_prices_drop.py scripts/smoke/pg_unreachable_e2e.py` -> pass; `git diff --check` -> pass; batch-3 grep classifier -> blockers 0 / allowed hits 197.
+> **Offline gate:** `pytest tests/test_db_backend_retired_prices.py tests/test_n9_batch3_prices_drop.py tests/test_pg_unreachable_e2e.py tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg tests/test_provider_health.py tests/test_data_scheduler.py -q` -> 134 passed; `python -m compileall scripts/migration/n9_batch3_prices_drop.py scripts/smoke/pg_unreachable_e2e.py` -> pass; `git diff --check` -> pass; batch-3 grep classifier -> blockers 0 / allowed hits 197.
+
+> **Invalidated live packet:** evidence fingerprint `b0ca91b932484191a551f0679cdbf12f2f4233d614f768540cd8a15b8e69e24e` / archive `data/pg_archive/n9_batch3_prices_20260705T003318Z/` is rejected because `get_recent_prices(character varying,character varying,integer)` has a normal rowtype dependency on `prices`. Task 4-5 must be rerun after this fixup to produce a new approval packet.
 
 **Goal:** Archive and physically drop the final PG market-data table (`prices`) after proving the local price store is the runtime authority and the PG `prices` table is archive-only.
 
@@ -123,7 +125,9 @@ Use this manifest in the batch-3 CLI:
 
 ```python
 TARGET_TABLES = ("prices",)
-TARGET_FUNCTION_SIGNATURES = ()
+TARGET_FUNCTION_SIGNATURES = (
+    "get_recent_prices(character varying,character varying,integer)",
+)
 PROTECTED_TABLES = (
     "agent_queries",
     "research_reports",
@@ -137,6 +141,8 @@ ARCHIVE_SEMANTIC_NOTE = (
 ```
 
 The evidence command must fail if `prices` is listed as protected in the batch-3 mode.
+It must also fail if the dependency scan finds any normal `pg_proc` rowtype
+dependency on `prices` that is not covered by `TARGET_FUNCTION_SIGNATURES`.
 
 ## Task 1 - Stub Final PG Price Runtime Methods
 
@@ -437,6 +443,7 @@ postcheck --database-url --archive-dir
   - PG `prices` presence, row count, row fingerprint, distinct ticker count, min/max datetime, interval distribution.
   - Protected app-record table presence.
   - Dependency scan through `pg_depend`, including rowtype dependencies.
+  - Dependency coverage: `get_recent_prices(character varying,character varying,integer)` is the only approved normal `pg_proc` rowtype dependency on `prices`; any other normal `pg_proc` dependency rejects the evidence.
   - Repo grep summary for runtime `FROM prices` / `JOIN prices` / `DatabaseBackend.query_prices` blockers.
   - Local `market_data.db.prices` row count, ticker count, latest datetime, and database path.
   - E2E summary loaded from the reviewed PG-unreachable smoke JSON (`ok:true`, `pg_attempts:[]`).
@@ -444,20 +451,21 @@ postcheck --database-url --archive-dir
 - [ ] `dump` must:
   - refuse if the evidence fingerprint is absent;
   - verify `pg_dump` client major is not older than the server major;
-  - write `evidence.json`, `manifest.json`, `pg_restore_list.txt`, and `n9_batch3_prices.dump`;
+  - write `evidence.json`, `manifest.json`, `pg_restore_list.txt`, `function_ddl.sql`, and `n9_batch3_prices.dump`;
   - include `ARCHIVE_SEMANTIC_NOTE` in `manifest.json`.
 - [ ] `verify-dump` must:
   - create a disposable DB;
   - restore the dump;
-  - compare row count and row fingerprint to evidence;
+  - apply `function_ddl.sql` after table restore;
+  - compare row count, row fingerprint, and target function presence to evidence;
   - drop the disposable DB;
   - write `restore_proof.json`.
 - [ ] `drop` must:
   - validate restore proof, manifest, dump sha, reviewed fingerprint, and confirmations;
   - re-run `preview` using the same live E2E report and compare fingerprint;
-  - execute `DROP TABLE IF EXISTS public.prices` in one transaction;
+  - execute `DROP FUNCTION IF EXISTS public.get_recent_prices(character varying,character varying,integer)` before `DROP TABLE IF EXISTS public.prices` in one transaction;
   - use `SET LOCAL lock_timeout` and `SET LOCAL statement_timeout`;
-  - verify in the same transaction that `prices` is absent and protected app-record tables are present;
+  - verify in the same transaction that `get_recent_prices` and `prices` are absent and protected app-record tables are present;
   - commit only after post-drop catalog validation passes.
 - [ ] `postcheck` must return sanitized JSON:
 

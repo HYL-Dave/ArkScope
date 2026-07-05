@@ -22,7 +22,9 @@ from typing import Any, Mapping, Sequence
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 TARGET_TABLES = ("prices",)
-TARGET_FUNCTION_SIGNATURES: tuple[str, ...] = ()
+TARGET_FUNCTION_SIGNATURES = (
+    "get_recent_prices(character varying,character varying,integer)",
+)
 PROTECTED_TABLES = (
     "agent_queries",
     "research_reports",
@@ -112,6 +114,7 @@ def build_evidence_report(
     e2e_summary: Mapping[str, Any],
 ) -> dict[str, Any]:
     e2e = stable_e2e_summary(e2e_summary)
+    dependency_coverage = validate_dependency_coverage(pg_snapshot)
     payload: dict[str, Any] = {
         "schema_version": 1,
         "scope": SCOPE,
@@ -125,9 +128,15 @@ def build_evidence_report(
         "local_snapshot": _sort_report_value(local_snapshot),
         "grep_summary": _sort_report_value(grep_summary),
         "e2e_summary": e2e,
+        "dependency_coverage": dependency_coverage,
     }
     if "prices" in PROTECTED_TABLES:
         raise ValueError("batch-3 must not protect prices")
+    if dependency_coverage["uncovered_normal_pg_proc_dependencies"]:
+        raise ValueError(
+            "uncovered normal pg_proc dependency: "
+            + ", ".join(dependency_coverage["uncovered_normal_pg_proc_dependencies"])
+        )
     payload["fingerprint"] = _sha256(payload)
     return payload
 
@@ -141,10 +150,38 @@ def build_manifest(*, evidence: Mapping[str, Any], dump_sha256: str, dump_file: 
         "dump_sha256": dump_sha256,
         "dump_file": dump_file,
         "restore_list_file": "pg_restore_list.txt",
+        "function_ddl_file": "function_ddl.sql",
     }
 
 
-def classify_catalog_objects(regclass_by_name: Mapping[str, str | None]) -> dict[str, list[dict[str, Any]]]:
+def validate_dependency_coverage(pg_snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    uncovered: list[str] = []
+    covered: list[str] = []
+    target_functions = set(TARGET_FUNCTION_SIGNATURES)
+    for dep in pg_snapshot.get("dependencies", []) or []:
+        if not isinstance(dep, Mapping):
+            continue
+        if dep.get("dependency_type") != "n":
+            continue
+        if dep.get("dependent_catalog") != "pg_proc":
+            continue
+        if dep.get("referenced_object") != "prices (rowtype)":
+            continue
+        obj = str(dep.get("dependent_object") or "")
+        if obj in target_functions:
+            covered.append(obj)
+        else:
+            uncovered.append(obj)
+    return {
+        "covered_normal_pg_proc_dependencies": sorted(set(covered)),
+        "uncovered_normal_pg_proc_dependencies": sorted(set(uncovered)),
+    }
+
+
+def classify_catalog_objects(
+    regclass_by_name: Mapping[str, str | None],
+    functions_by_signature: Mapping[str, bool],
+) -> dict[str, list[dict[str, Any]]]:
     objects: list[dict[str, Any]] = []
     for name in sorted(TARGET_TABLES):
         objects.append({
@@ -158,7 +195,15 @@ def classify_catalog_objects(regclass_by_name: Mapping[str, str | None]) -> dict
             "name": name,
             "status": "protected_present" if regclass_by_name.get(name) is not None else "protected_missing",
         })
-    return {"objects": objects, "functions": []}
+    functions = [
+        {
+            "kind": "function",
+            "name": signature,
+            "status": "present" if functions_by_signature.get(signature) else "missing_unexpected",
+        }
+        for signature in sorted(TARGET_FUNCTION_SIGNATURES)
+    ]
+    return {"objects": objects, "functions": functions}
 
 
 def connect_pg(database_url: str):
@@ -184,7 +229,11 @@ def collect_pg_snapshot(conn, *, read_only: bool = True) -> dict[str, Any]:
             (names,),
         )
         regclass_by_name = {name: regclass for name, regclass in cur.fetchall()}
-        classified = classify_catalog_objects(regclass_by_name)
+        function_presence: dict[str, bool] = {}
+        for signature in TARGET_FUNCTION_SIGNATURES:
+            cur.execute("SELECT to_regprocedure(%s)", (signature,))
+            function_presence[signature] = cur.fetchone()[0] is not None
+        classified = classify_catalog_objects(regclass_by_name, function_presence)
 
         row_counts: dict[str, int] = {}
         row_fingerprints: dict[str, str] = {}
@@ -413,9 +462,25 @@ def build_pg_dump_command(
     return cmd
 
 
-def build_drop_sql(*, present_tables: Sequence[str]) -> list[str]:
+def read_function_ddl(conn) -> str:
+    ddl: list[str] = []
+    with conn.cursor() as cur:
+        for signature in TARGET_FUNCTION_SIGNATURES:
+            cur.execute("SELECT pg_get_functiondef(%s::regprocedure::oid)", (signature,))
+            row = cur.fetchone()
+            if row and row[0]:
+                ddl.append(str(row[0]).rstrip().rstrip(";") + ";\n")
+    return "\n".join(ddl)
+
+
+def build_drop_sql(*, present_tables: Sequence[str], present_functions: Sequence[str]) -> list[str]:
+    statements: list[str] = []
+    for signature in sorted(present_functions):
+        if signature in TARGET_FUNCTION_SIGNATURES:
+            statements.append(f"DROP FUNCTION IF EXISTS public.{signature}")
     tables = [table for table in sorted(present_tables) if table in TARGET_TABLES]
-    statements = [f"DROP TABLE IF EXISTS public.{table}" for table in tables]
+    for table in tables:
+        statements.append(f"DROP TABLE IF EXISTS public.{table}")
     for statement in statements:
         if "CASCADE" in statement.upper():
             raise ValueError("drop SQL must not use CASCADE")
@@ -431,6 +496,17 @@ def _object_counts(snapshot: Mapping[str, Any]) -> dict[str, int]:
         if isinstance(item, Mapping) and item.get("status") == "present" and "row_count" in item:
             counts[str(item["name"])] = int(item["row_count"])
     return counts
+
+
+def _function_statuses(snapshot: Mapping[str, Any]) -> dict[str, str]:
+    statuses: dict[str, str] = {}
+    for item in snapshot.get("functions", []) or []:
+        if not isinstance(item, Mapping):
+            continue
+        name = str(item.get("name") or "")
+        if name in TARGET_FUNCTION_SIGNATURES:
+            statuses[name] = str(item.get("status") or "")
+    return statuses
 
 
 def compare_restore_to_evidence(restored: Mapping[str, Any], evidence: Mapping[str, Any]) -> dict[str, Any]:
@@ -452,6 +528,18 @@ def compare_restore_to_evidence(restored: Mapping[str, Any], evidence: Mapping[s
             mismatches.append({
                 "table": table,
                 "field": "row_fingerprint",
+                "expected": expected,
+                "actual": actual,
+            })
+    expected_functions = _function_statuses(expected_snapshot)
+    restored_functions = _function_statuses(restored)
+    for function in sorted(expected_functions):
+        expected = expected_functions.get(function)
+        actual = restored_functions.get(function)
+        if expected != actual:
+            mismatches.append({
+                "function": function,
+                "field": "presence",
                 "expected": expected,
                 "actual": actual,
             })
@@ -540,6 +628,14 @@ def _present_names(report: Mapping[str, Any], kind: str) -> list[str]:
     )
 
 
+def _present_functions(report: Mapping[str, Any]) -> list[str]:
+    return sorted(
+        str(item["name"])
+        for item in report.get("pg_snapshot", {}).get("functions", [])
+        if isinstance(item, Mapping) and item.get("status") == "present"
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="N9 batch-3 PG prices archive/drop gate")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -624,6 +720,11 @@ def _cmd_dump(args: argparse.Namespace) -> int:
     _run_checked(cmd, database_url=args.database_url)
     restore_list = _run_checked(["pg_restore", "--list", str(dump_path)])
     (archive_dir / "pg_restore_list.txt").write_text(restore_list.stdout, encoding="utf-8")
+    conn = connect_pg(args.database_url)
+    try:
+        (archive_dir / "function_ddl.sql").write_text(read_function_ddl(conn), encoding="utf-8")
+    finally:
+        conn.close()
 
     manifest = build_manifest(
         evidence=evidence,
@@ -663,6 +764,13 @@ def _cmd_verify_dump(args: argparse.Namespace) -> int:
             database_url=args.database_url,
             dbname=restore_db,
         )
+        function_ddl = archive_dir / "function_ddl.sql"
+        if function_ddl.exists() and function_ddl.read_text(encoding="utf-8").strip():
+            _run_checked(
+                ["psql", "-v", "ON_ERROR_STOP=1", "--dbname", restore_db, "--file", str(function_ddl)],
+                database_url=args.database_url,
+                dbname=restore_db,
+            )
         conn = connect_pg(restore_url)
         try:
             restored = collect_pg_snapshot(conn)
@@ -715,6 +823,11 @@ def validate_drop_args(args: argparse.Namespace) -> ValidationResult:
         return ValidationResult(False, "manifest_scope_mismatch")
     if manifest.get("archive_semantics") != ARCHIVE_SEMANTIC_NOTE:
         return ValidationResult(False, "manifest_archive_semantics_mismatch")
+    function_ddl_file = manifest.get("function_ddl_file")
+    if TARGET_FUNCTION_SIGNATURES and not function_ddl_file:
+        return ValidationResult(False, "manifest_missing_function_ddl")
+    if function_ddl_file and not (archive_dir / str(function_ddl_file)).exists():
+        return ValidationResult(False, "missing_function_ddl")
     if proof.get("evidence_fingerprint") not in (None, args.reviewed_fingerprint):
         return ValidationResult(False, "restore_proof_fingerprint_mismatch")
     if manifest.get("dump_sha256") != file_sha256(dump_path):
@@ -734,14 +847,19 @@ def verify_post_drop_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         for item in snapshot.get("objects", [])
         if item.get("kind") == "table" and item.get("name") in TARGET_TABLES and item.get("status") == "present"
     ]
+    functions_still_present = [
+        item["name"]
+        for item in snapshot.get("functions", [])
+        if item.get("name") in TARGET_FUNCTION_SIGNATURES and item.get("status") == "present"
+    ]
     protected_missing = [
         item["name"]
         for item in snapshot.get("objects", [])
         if item.get("kind") == "protected_table" and item.get("status") != "protected_present"
     ]
     return {
-        "ok": not targets_still_present and not protected_missing,
-        "targets_still_present": sorted(targets_still_present),
+        "ok": not targets_still_present and not functions_still_present and not protected_missing,
+        "targets_still_present": sorted(targets_still_present + functions_still_present),
         "protected_missing": sorted(protected_missing),
     }
 
@@ -772,7 +890,10 @@ def _cmd_drop(args: argparse.Namespace) -> int:
         precheck_conn.close()
     if current.get("fingerprint") != evidence.get("fingerprint"):
         raise SystemExit("current evidence fingerprint differs from reviewed archive evidence")
-    statements = build_drop_sql(present_tables=_present_names(evidence, "table"))
+    statements = build_drop_sql(
+        present_tables=_present_names(evidence, "table"),
+        present_functions=_present_functions(evidence),
+    )
 
     conn = connect_pg(args.database_url)
     try:

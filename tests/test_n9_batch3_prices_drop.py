@@ -5,6 +5,9 @@ def test_target_and_protected_tables_are_batch3_specific():
     from scripts.migration import n9_batch3_prices_drop as cli
 
     assert cli.TARGET_TABLES == ("prices",)
+    assert cli.TARGET_FUNCTION_SIGNATURES == (
+        "get_recent_prices(character varying,character varying,integer)",
+    )
     assert "prices" not in cli.PROTECTED_TABLES
     assert set(cli.PROTECTED_TABLES) == {
         "agent_queries",
@@ -26,6 +29,7 @@ def test_archive_manifest_declares_pre_cutover_mirror_semantics():
     assert "pre-cutover" in note
     assert "not a backup of current local" in note
     assert manifest["scope"] == "pg_exit_n9_batch3_prices"
+    assert manifest["function_ddl_file"] == "function_ddl.sql"
 
 
 def test_evidence_fingerprint_is_order_stable():
@@ -99,10 +103,110 @@ def test_dump_command_targets_prices_only_and_keeps_dsn_out_of_argv(tmp_path):
 def test_drop_sql_has_no_cascade():
     from scripts.migration import n9_batch3_prices_drop as cli
 
-    sql = cli.build_drop_sql(present_tables=["prices"])
+    sql = cli.build_drop_sql(
+        present_tables=["prices"],
+        present_functions=["get_recent_prices(character varying,character varying,integer)"],
+    )
 
-    assert sql == ["DROP TABLE IF EXISTS public.prices"]
+    assert sql == [
+        "DROP FUNCTION IF EXISTS public.get_recent_prices(character varying,character varying,integer)",
+        "DROP TABLE IF EXISTS public.prices",
+    ]
     assert "CASCADE" not in " ".join(sql).upper()
+
+
+def test_uncovered_normal_pg_proc_dependency_rejects_evidence():
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    pg_snapshot = {
+        "row_counts": {"prices": 2},
+        "objects": [{"name": "prices", "status": "present"}],
+        "dependencies": [
+            {
+                "dependency_type": "n",
+                "dependent_catalog": "pg_proc",
+                "dependent_object": "untracked_prices_helper(integer)",
+                "referenced_object": "prices (rowtype)",
+            }
+        ],
+    }
+
+    try:
+        cli.build_evidence_report(
+            pg_snapshot=pg_snapshot,
+            local_snapshot={"row_count": 3, "ticker_count": 1},
+            grep_summary={"allowed_hits": [], "blockers": []},
+            e2e_summary={"ok": True, "pg_attempts": []},
+        )
+    except ValueError as exc:
+        assert "uncovered normal pg_proc dependency" in str(exc)
+    else:
+        raise AssertionError("uncovered pg_proc dependency should reject evidence")
+
+
+def test_covered_get_recent_prices_dependency_allows_evidence():
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    report = cli.build_evidence_report(
+        pg_snapshot={
+            "row_counts": {"prices": 2},
+            "objects": [{"name": "prices", "status": "present"}],
+            "dependencies": [
+                {
+                    "dependency_type": "n",
+                    "dependent_catalog": "pg_proc",
+                    "dependent_object": "get_recent_prices(character varying,character varying,integer)",
+                    "referenced_object": "prices (rowtype)",
+                }
+            ],
+        },
+        local_snapshot={"row_count": 3, "ticker_count": 1},
+        grep_summary={"allowed_hits": [], "blockers": []},
+        e2e_summary={"ok": True, "pg_attempts": []},
+    )
+
+    assert report["dependency_coverage"]["uncovered_normal_pg_proc_dependencies"] == []
+
+
+def test_restore_comparison_requires_target_function_presence():
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    evidence = {
+        "pg_snapshot": {
+            "row_counts": {"prices": 1},
+            "row_fingerprints": {"prices": "abc"},
+            "functions": [
+                {
+                    "kind": "function",
+                    "name": "get_recent_prices(character varying,character varying,integer)",
+                    "status": "present",
+                }
+            ],
+        }
+    }
+    restored = {
+        "row_counts": {"prices": 1},
+        "row_fingerprints": {"prices": "abc"},
+        "functions": [
+            {
+                "kind": "function",
+                "name": "get_recent_prices(character varying,character varying,integer)",
+                "status": "missing_unexpected",
+            }
+        ],
+    }
+
+    out = cli.compare_restore_to_evidence(restored, evidence)
+
+    assert out["ok"] is False
+    assert out["mismatches"] == [
+        {
+            "function": "get_recent_prices(character varying,character varying,integer)",
+            "field": "presence",
+            "expected": "present",
+            "actual": "missing_unexpected",
+        }
+    ]
 
 
 def test_validate_drop_args_requires_restore_proof_and_e2e(tmp_path):
@@ -122,6 +226,82 @@ def test_validate_drop_args_requires_restore_proof_and_e2e(tmp_path):
     assert result.reason == "missing_restore_proof"
 
 
+def test_validate_drop_args_requires_function_ddl_when_manifest_lists_it(tmp_path):
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    archive = tmp_path
+    (archive / "restore_proof.json").write_text(
+        __import__("json").dumps({"ok": True, "evidence_fingerprint": "abc"}),
+        encoding="utf-8",
+    )
+    (archive / "evidence.json").write_text(
+        __import__("json").dumps({"fingerprint": "abc"}),
+        encoding="utf-8",
+    )
+    dump = archive / "n9_batch3_prices.dump"
+    dump.write_bytes(b"dump")
+    sha = cli.file_sha256(dump)
+    (archive / "manifest.json").write_text(
+        __import__("json").dumps({
+            "scope": cli.SCOPE,
+            "archive_semantics": cli.ARCHIVE_SEMANTIC_NOTE,
+            "dump_sha256": sha,
+            "function_ddl_file": "function_ddl.sql",
+        }),
+        encoding="utf-8",
+    )
+    args = Namespace(
+        archive_dir=str(archive),
+        reviewed_fingerprint="abc",
+        confirm_scheduler_paused=True,
+        confirm_native_host_paused=True,
+        confirm_destructive_drop=True,
+    )
+
+    result = cli.validate_drop_args(args)
+
+    assert result.ok is False
+    assert result.reason == "missing_function_ddl"
+
+
+def test_validate_drop_args_requires_manifest_function_ddl_entry(tmp_path):
+    from scripts.migration import n9_batch3_prices_drop as cli
+
+    archive = tmp_path
+    (archive / "restore_proof.json").write_text(
+        __import__("json").dumps({"ok": True, "evidence_fingerprint": "abc"}),
+        encoding="utf-8",
+    )
+    (archive / "evidence.json").write_text(
+        __import__("json").dumps({"fingerprint": "abc"}),
+        encoding="utf-8",
+    )
+    dump = archive / "n9_batch3_prices.dump"
+    dump.write_bytes(b"dump")
+    sha = cli.file_sha256(dump)
+    (archive / "function_ddl.sql").write_text("-- ddl\n", encoding="utf-8")
+    (archive / "manifest.json").write_text(
+        __import__("json").dumps({
+            "scope": cli.SCOPE,
+            "archive_semantics": cli.ARCHIVE_SEMANTIC_NOTE,
+            "dump_sha256": sha,
+        }),
+        encoding="utf-8",
+    )
+    args = Namespace(
+        archive_dir=str(archive),
+        reviewed_fingerprint="abc",
+        confirm_scheduler_paused=True,
+        confirm_native_host_paused=True,
+        confirm_destructive_drop=True,
+    )
+
+    result = cli.validate_drop_args(args)
+
+    assert result.ok is False
+    assert result.reason == "manifest_missing_function_ddl"
+
+
 def test_postcheck_requires_prices_absent_and_app_records_present():
     from scripts.migration import n9_batch3_prices_drop as cli
 
@@ -131,6 +311,13 @@ def test_postcheck_requires_prices_absent_and_app_records_present():
             {"kind": "protected_table", "name": "agent_queries", "status": "protected_present"},
             {"kind": "protected_table", "name": "research_reports", "status": "protected_present"},
             {"kind": "protected_table", "name": "agent_memories", "status": "protected_present"},
+        ],
+        "functions": [
+            {
+                "kind": "function",
+                "name": "get_recent_prices(character varying,character varying,integer)",
+                "status": "missing_expected",
+            },
         ],
     })
 
