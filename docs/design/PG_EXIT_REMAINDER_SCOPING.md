@@ -570,10 +570,18 @@ DB-native instead of expanding `.env` fallback.
 - Follow-up opened: SA `use_local_sa` local-default collapse. Phase 2 poison
   smoke exposed an existing fresh-profile stranding hole outside provider config:
   unset `use_local_sa` can still leave some SA surfaces dependent on the old
-  toggle semantics. Scope a small TDD slice to collapse unset/explicit-false to
-  local SA authority, audit `src/sa_capture_store.py`, `src/service/sa_market_news_health.py`,
-  `src/tools/sa_tools.py`, `src/tools/sa_digest_tools.py`, and SA route call
-  sites, then prove it with fresh-profile poison smoke plus full A/B.
+  toggle semantics. Root cause: `DataAccessLayer._local_sa_enabled`
+  (`src/tools/data_access.py:354`) is a truthy check — unset resolves False and
+  routes to the PG backend. Stack-proved callsites (base-reproduced, both under
+  an empty profile with a DSN configured): `src/service/provider_health.py:181`
+  → `DatabaseBackend.get_sa_refresh_meta`, and
+  `src/service/sa_market_news_health.py:409` `_run_health_query` →
+  `DatabaseBackend._get_conn`. Scope a small TDD slice to collapse
+  unset/explicit-false to local SA authority (batch-2/closeout semantics),
+  audit `src/sa_capture_store.py`, `src/service/provider_health.py`,
+  `src/service/sa_market_news_health.py`, `src/tools/sa_tools.py`,
+  `src/tools/sa_digest_tools.py`, and SA route call sites, then prove it with
+  fresh-profile poison smoke (expect `pg_attempts: []`) plus full A/B.
 
 ### 13.7 Decisions (locked at review, 2026-07-02)
 
