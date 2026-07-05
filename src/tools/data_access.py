@@ -213,8 +213,8 @@ class DataAccessLayer:
         Subclasses keep ``isinstance(backend, DatabaseBackend)`` True everywhere, so
         DB-only code paths behave exactly as on plain PG.
 
-        Selection matrix after N9 batch-2 local-default collapse:
-          - SA on              → SACaptureDatabaseBackend (3d): sa_* domain served
+        Selection matrix after N9 batch-2/S-J follow-up local-default collapse:
+          - SA (always)        → SACaptureDatabaseBackend (3d): sa_* domain served
             from data/sa_capture.db — HARD cutover, no PG fallback for sa_*; it
             extends LocalMarketDatabaseBackend, so when local-market is ALSO on the
             same instance serves both routings (market_db="" keeps market inert).
@@ -238,9 +238,10 @@ class DataAccessLayer:
         if self._local_sa_enabled():
             from src.sa_capture_store import resolve_sa_db_path
 
-            candidate = resolve_sa_db_path()
-            if Path(candidate).exists():  # enabling before migration keeps PG (safe)
-                sa_db = candidate
+            # SA domain is hard-local after N9 batch-1. A missing sa_capture.db
+            # must still route local: PG sa_* was dropped, so the local store is
+            # the only authority and an absent file reads as honest empty.
+            sa_db = resolve_sa_db_path()
 
         # Post-P0-C/N9 market mode is hard-local. The legacy strict flag remains
         # exposed for provenance, but no longer controls whether market reads may
@@ -350,8 +351,14 @@ class DataAccessLayer:
         return self._profile_setting_truthy("use_local_market_strict", "ARKSCOPE_LOCAL_MARKET_STRICT")
 
     def _local_sa_enabled(self) -> bool:
-        """3d flip toggle: SA capture domain → local sa_capture.db (hard cutover)."""
-        return self._profile_setting_truthy("use_local_sa", "ARKSCOPE_USE_LOCAL_SA")
+        """SA capture domain → local sa_capture.db by default.
+
+        PG sa_* tables were dropped in N9 batch-1, so unset and explicit false
+        both resolve local, matching market/macro/job_runs/records collapse
+        semantics. The legacy use_local_sa flag and ARKSCOPE_USE_LOCAL_SA are
+        provenance only.
+        """
+        return True
 
     def _local_macro_enabled(self) -> bool:
         """Macro/calendar domain → local macro_calendar.db by default after N9."""

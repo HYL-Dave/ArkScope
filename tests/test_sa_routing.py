@@ -66,9 +66,10 @@ def _make(env):
     return env.dal._make_db_backend("postgresql://fake/db", "prefer")
 
 
-def test_default_routes_local_market(env):
+def test_default_routes_sa_local(env):
     b = _make(env)
-    assert isinstance(b, _StubLMDB)
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
     assert b.market_db == str(env.market_db)
     assert b.strict is True
 
@@ -77,7 +78,9 @@ def test_market_only(env):
     env.profile.set_setting("use_local_market", "true")
     env.market_db.write_bytes(b"")  # exists
     b = _make(env)
-    assert isinstance(b, _StubLMDB) and b.market_db == str(env.market_db)
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
+    assert b.market_db == str(env.market_db)
     assert b.strict is True
 
 
@@ -107,7 +110,8 @@ def test_market_strict_threads_to_selected_backend(env):
     env.profile.set_setting("use_local_market_strict", "true")
     env.market_db.write_bytes(b"")
     b = _make(env)
-    assert isinstance(b, _StubLMDB)
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
     assert b.market_db == str(env.market_db)
     assert b.strict is True
 
@@ -138,13 +142,13 @@ def test_news_exit_threads_news_strict_to_sa_backend_without_market_strict(env):
     assert b.strict is True
 
 
-def test_sa_toggle_without_db_stays_local_market(env):
-    # SA still requires its local DB to engage, but market no longer falls back to PG.
-    env.profile.set_setting("use_local_sa", "true")
+def test_sa_routes_local_even_without_existing_db_file(env):
+    # PG sa_* tables are dropped (N9 batch-1): a missing local file must still
+    # route local (honest empty), never resurrect the PG path.
+    assert not env.sa_db.exists()
     b = _make(env)
-    assert isinstance(b, _StubLMDB)
-    assert b.market_db == str(env.market_db)
-    assert b.strict is True
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
 
 
 def test_env_override_flips_without_setting(env, monkeypatch):
@@ -153,17 +157,11 @@ def test_env_override_flips_without_setting(env, monkeypatch):
     assert isinstance(_make(env), _StubSABackend)
 
 
-def test_rollback_is_instant_per_construction(env):
-    # the flip/rollback story: fresh DAL constructions (native host = one per
-    # message) re-read the persisted key each time.
-    env.profile.set_setting("use_local_sa", "true")
-    env.sa_db.write_bytes(b"")
-    assert isinstance(_make(env), _StubSABackend)
-    env.profile.set_setting("use_local_sa", "false")   # rollback = flip back
+def test_explicit_false_is_provenance_only(env):
+    env.profile.set_setting("use_local_sa", "false")
     b = _make(env)
-    assert isinstance(b, _StubLMDB)
-    assert b.market_db == str(env.market_db)
-    assert b.strict is True
+    assert isinstance(b, _StubSABackend)
+    assert b.sa_db == str(env.sa_db)
 
 
 def test_migration_cli_refuses_rebuild_post_flip(env, monkeypatch):

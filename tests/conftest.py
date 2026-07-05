@@ -55,3 +55,18 @@ def _isolate_macro_calendar_db(tmp_path_factory, monkeypatch):
     monkeypatch.setenv(
         "ARKSCOPE_MACRO_CALENDAR_DB",
         str(tmp_path_factory.mktemp("macro_calendar") / "macro_calendar.db"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_sa_db(tmp_path_factory, monkeypatch):
+    """SA capture runtime defaults to data/sa_capture.db.
+
+    After the use_local_sa local-default collapse, every DAL construction routes
+    the SA domain to SACaptureDatabaseBackend, so a test that builds a DAL would
+    otherwise resolve the developer's real sa_capture.db. Override
+    unconditionally like _isolate_macro_calendar_db; tests that need a specific
+    DB set it themselves after this autouse fixture.
+    """
+    monkeypatch.setenv(
+        "ARKSCOPE_SA_DB",
+        str(tmp_path_factory.mktemp("sa_capture") / "sa_capture.db"))

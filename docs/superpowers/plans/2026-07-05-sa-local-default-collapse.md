@@ -41,7 +41,7 @@
 - Modify `src/sa_capture_store.py` — `connect(read_only=True)` on an absent file returns an in-memory schema-ensured connection (covers all seven direct callers).
 - Modify `src/tools/sa_tools.py` — reword the two `requires_local_sa` error strings that instruct enabling the retired toggle.
 - Modify `apps/arkscope-web/src/News.tsx` — reword the user-visible 「use_local_sa 未啟用」 degraded-state copy.
-- Modify `tests/test_sa_routing.py` — flip the named old contracts (routing ×3 + migration CLI); add the toggleless/fresh-profile pins.
+- Modify `tests/test_sa_routing.py` — flip the named old contracts (routing ×5 + migration CLI); add the toggleless/fresh-profile pins.
 - Modify `tests/test_sa_local_readers.py` — fresh-profile (absent file) surface behavior pins + the two callsite proofs.
 - No changes expected: `src/service/provider_health.py`, `src/service/sa_market_news_health.py`, `src/tools/backends/sa_capture_backend.py`, `src/sa/comment_signal_backfill.py` (all duck-type on the backend / go through the store choke point and are fixed transitively).
 
@@ -78,7 +78,7 @@ Run `pytest tests/test_sa_routing.py -q` — expected: PASS (pure isolation, no 
 
 - [ ] **Step 1: Flip the three named old routing contracts (RED)**
 
-In `tests/test_sa_routing.py`, these are the ONLY pre-existing tests that encode "unset/false/missing-file means not-SA-local". Do not touch other tests in the file.
+In `tests/test_sa_routing.py`, these are the pre-existing tests that encode "unset/false/missing-file means not-SA-local" or "market-only selects the non-SA backend". Do not touch other tests in the file.
 
 1. `test_default_routes_local_market` — default construction now selects the SA backend (which still threads local market). Replace with:
 
@@ -91,7 +91,11 @@ def test_default_routes_sa_local(env):
     assert b.strict is True
 ```
 
-2. `test_sa_toggle_without_db_stays_local_market` — the exists-guard pin. Replace with:
+2. `test_market_only` — market routing now threads through the always-on SA backend. Replace only the backend assertion with `_StubSABackend`, keeping the market/strict assertions.
+
+3. `test_market_strict_threads_to_selected_backend` — same always-on SA backend selection; keep the strict threading assertion.
+
+4. `test_sa_toggle_without_db_stays_local_market` — the exists-guard pin. Replace with:
 
 ```python
 def test_sa_routes_local_even_without_existing_db_file(env):
@@ -103,7 +107,7 @@ def test_sa_routes_local_even_without_existing_db_file(env):
     assert b.sa_db == str(env.sa_db)
 ```
 
-3. `test_rollback_is_instant_per_construction` — explicit `false` no longer selects a non-SA backend. Replace with:
+5. `test_rollback_is_instant_per_construction` — explicit `false` no longer selects a non-SA backend. Replace with:
 
 ```python
 def test_explicit_false_is_provenance_only(env):
@@ -119,7 +123,7 @@ def test_explicit_false_is_provenance_only(env):
 pytest tests/test_sa_routing.py -q
 ```
 
-Expected: the three rewritten tests FAIL (current code selects `_StubLMDB` for default/false, and the exists-guard keeps `_StubLMDB` for the missing-file case). Every other test in the file must still PASS — if any OTHER test fails, STOP and report (unexpected contract coupling).
+Expected: the five rewritten tests FAIL (current code selects `_StubLMDB` for default/false/market-only, and the exists-guard keeps `_StubLMDB` for the missing-file case). Every other test in the file must still PASS — if any OTHER test fails, STOP and report (unexpected contract coupling).
 
 - [ ] **Step 3: Collapse the toggle and drop the exists-guard**
 
@@ -482,7 +486,7 @@ git commit -m "docs: close sa local default collapse"
 5. `test_env_override_flips_without_setting` still passes unmodified (env-true unchanged); the flag stays readable as provenance.
 6. No user-visible surface (backend error strings, News.tsx) still instructs enabling `use_local_sa`; `empty_reason` machine codes unchanged.
 7. No new code path reads PG `sa_*`; the dead PG readers are queued for the sweep, not deleted here.
-8. Full A/B failure sets identical; only the named contracts (routing ×3 + migration CLI ×1) were flipped, surgically.
+8. Full A/B failure sets identical; only the named contracts (routing ×5 + migration CLI ×1) were flipped, surgically.
 
 ## Known Watch Items For Review
 
