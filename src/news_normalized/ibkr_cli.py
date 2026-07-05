@@ -99,12 +99,23 @@ def sanitize_worker_result(result: Any) -> dict[str, Any]:
     return payload
 
 
+_MAX_ERROR_LEN = 600
+
+
+def _is_retryable_worker_error(message: str) -> bool:
+    return "market_data.db write lock busy" in message
+
+
 def sanitize_worker_error(exc: BaseException) -> dict[str, Any]:
+    message = str(exc)[:_MAX_ERROR_LEN]
+    retryable = _is_retryable_worker_error(message)
     payload = {"status": "failed"}
     for key in _COUNT_KEYS:
         payload[key] = 0
     payload["error_count"] = 1
     payload["error_classes"] = [type(exc).__name__]
+    payload["error"] = message if retryable else ""
+    payload["retryable"] = retryable
     return payload
 
 

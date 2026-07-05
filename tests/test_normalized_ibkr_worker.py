@@ -354,3 +354,27 @@ def test_ibkr_worker_passes_market_lock_factory_without_outer_write_lock(monkeyp
     assert "write_lock_factory" in calls["kwargs"]
     assert calls["kwargs"]["project_legacy"] is True
     assert calls["closed"] is True
+
+
+def test_sanitize_worker_error_marks_market_lock_busy_retryable():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = sanitize_worker_error(
+        TimeoutError("market_data.db write lock busy (timeout)")
+    )
+
+    assert payload["status"] == "failed"
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert payload["retryable"] is True
+    assert payload["error"] == "market_data.db write lock busy (timeout)"
+
+
+def test_sanitize_worker_error_does_not_mark_generic_timeout_retryable():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = sanitize_worker_error(TimeoutError("provider request timed out"))
+
+    assert payload["status"] == "failed"
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert payload["retryable"] is False
+    assert payload["error"] == ""

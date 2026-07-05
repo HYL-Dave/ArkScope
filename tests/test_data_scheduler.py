@@ -2428,3 +2428,79 @@ def test_scheduler_passes_market_lock_factory_to_normalized_news_writer(monkeypa
     assert out["status"] == "succeeded"
     assert captured["write_lock_factory"] is not None
     assert captured["project_legacy"] is True
+
+
+def test_ibkr_news_worker_stdout_parse_preserves_retryable_lock_busy():
+    import json as _json
+    import src.service.data_scheduler as ds
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    failure = _json.dumps(
+        sanitize_worker_error(
+            TimeoutError("market_data.db write lock busy (timeout)")
+        )
+    )
+    payload = ds._parse_sanitized_worker_stdout(failure)
+
+    assert payload["retryable"] is True
+    assert "write lock busy" in payload["error"]
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert ds._normalized_worker_retryable_skip_reason(payload) is not None
+
+    provider_failure = _json.dumps(
+        sanitize_worker_error(TimeoutError("provider request timed out"))
+    )
+    provider_payload = ds._parse_sanitized_worker_stdout(provider_failure)
+    assert provider_payload["retryable"] is False
+    assert provider_payload["error"] == ""
+    assert ds._normalized_worker_retryable_skip_reason(provider_payload) is None
+
+
+def test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure(monkeypatch):
+    import src.service.data_scheduler as ds
+    import src.news_normalized.routing as routing
+
+    class _Lock:
+        def acquire(self, *args, **kwargs):
+            return True
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(
+        ds,
+        "_read_news_write_route_for_scheduler",
+        lambda: routing.NewsWriteRoute(
+            mode=routing.NewsWriteMode.NORMALIZED,
+            reason="normalized",
+        ),
+    )
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+    monkeypatch.setattr(ds, "_IBKR_LOCK", _Lock())
+    monkeypatch.setattr(ds, "_IBKR_FLOCK", _Lock())
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: {
+            "returncode": 1,
+            "payload": {
+                "status": "failed",
+                "articles_seen": 0,
+                "articles_inserted": 0,
+                "bodies_fetched": 0,
+                "error_count": 1,
+                "error_classes": ["TimeoutError"],
+                "error": "market_data.db write lock busy (timeout)",
+                "retryable": True,
+            },
+        },
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="scheduler")
+
+    assert res["status"] == "skipped"
+    assert res["skip_kind"] == "skipped_lock_busy"
+    assert "write lock busy" in res["reason"]
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "skipped"
+    assert row["last_error"] is None

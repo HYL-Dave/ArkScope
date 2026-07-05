@@ -510,6 +510,9 @@ def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
     for key in _SANITIZED_WORKER_COUNT_KEYS:
         payload[key] = _safe_int(raw.get(key))
     payload["error_count"] = _safe_int(raw.get("error_count"))
+    error = str(raw.get("error") or "").strip()
+    payload["error"] = error[:_ERROR_TAIL] if error else ""
+    payload["retryable"] = raw.get("retryable") is True
     classes = raw.get("error_classes")
     if isinstance(classes, list):
         payload["error_classes"] = [
@@ -620,6 +623,12 @@ def _market_write_lock_busy_reason(error: Any) -> Optional[str]:
 
 
 def _prices_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optional[str]:
+    if payload.get("retryable") is not True:
+        return None
+    return _market_write_lock_busy_reason(payload.get("error"))
+
+
+def _normalized_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optional[str]:
     if payload.get("retryable") is not True:
         return None
     return _market_write_lock_busy_reason(payload.get("error"))
@@ -963,9 +972,17 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     step = _run_sanitized_json_subprocess(argv)
                     result["collect"] = step["payload"]
                     if step["returncode"] != 0:
-                        raise RuntimeError(
-                            _sanitized_worker_failure_message(step["payload"])
-                        )
+                        reason = _normalized_worker_retryable_skip_reason(step["payload"])
+                        if reason is not None:
+                            result.update({
+                                "status": "skipped",
+                                "reason": reason,
+                                "skip_kind": "skipped_lock_busy",
+                            })
+                        else:
+                            raise RuntimeError(
+                                _sanitized_worker_failure_message(step["payload"])
+                            )
                 else:
                     result["collect"] = _run_normalized_news_writer(
                         d.news_direct_source,
