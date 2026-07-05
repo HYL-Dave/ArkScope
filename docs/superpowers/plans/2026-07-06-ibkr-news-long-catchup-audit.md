@@ -35,7 +35,7 @@
 2. **Do not "fix" by raising writer budgets.** The provider-side 300 cap is the risk; `DEFAULT_MAX_ARTICLES=50_000` is already above observed run size.
 3. **No initial live IBKR Gateway probe.** The first pass must be local read-only only. A live Gateway dry-run requires a separate explicit approval because it spends provider/Gateway calls and can be affected by subscriptions/session state.
 4. **Normal cadence is distinct from long catch-up.** A 7-day local window currently stays well below the cap; a 30-day quiet window does not. The report must state this distinction instead of labeling IBKR news generally broken.
-5. **No fake continuation.** Current sanitized IBKR worker output carries only continuation counts and scheduler explicitly refuses normalized IBKR continuation resume. Do not add a partial/continue mechanism unless a follow-up plan defines a real provider-side cursor or replacement strategy.
+5. **No fake continuation.** Current sanitized IBKR worker output carries only continuation counts, so the scheduler cannot reconstruct a full `WriterContinuation`; attended-mode also does not auto-resume saved normalized-news partials. Do not add a partial/continue mechanism unless a follow-up plan defines a real provider-side cursor or replacement strategy.
 
 ## Stop-Loss Triggers
 
@@ -51,11 +51,12 @@ Stop and report before continuing if any of these happen:
 
 1. Static grep proves the audit utility has no IBKR/Gateway imports and no write SQL verbs.
 2. Unit tests prove the utility opens SQLite read-only, computes per-window cap risk, and emits stable JSON.
-3. A live local read-only audit report is produced twice; core counts are byte-identical or the report records the active-writer explanation.
+3. A live local read-only audit report is produced twice with the same explicit `--as-of`; core counts are byte-identical or the report records the active-writer explanation. Do not require byte identity across different `--as-of` values because trailing windows intentionally drift by date.
 4. The report distinguishes:
    - current cadence safety,
    - long quiet-window cap risk,
    - provider/API limitation,
+   - methodology caveats,
    - non-goals.
 5. `pytest tests/test_ibkr_news_catchup_audit.py -q` passes.
 6. Focused existing tests pass: `pytest tests/test_normalized_ibkr_worker.py tests/test_news_normalized_ibkr_adapter.py tests/test_data_scheduler.py -q`.
@@ -84,8 +85,23 @@ Create fixtures with minimal `news_articles`, `news_article_tickers`, `provider_
         "30d": {"max_rows": 549, "tickers_ge_300": 6, ...},
     },
     "top_tickers": [...],
+    "gap_checks": [
+        {
+            "label": "observed_quiet_window_2026_06_25_to_2026_07_05",
+            "start_date": "2026-06-25",
+            "end_date": "2026-07-05",
+            "max_rows": 180,
+            "tickers_ge_300": 0,
+            "assessment": "below_cap",
+        }
+    ],
     "scheduler_state": {...},
     "provider_runs": [...],
+    "caveats": [
+        "Local SQLite counts are a lower bound: articles already missed by a prior provider-side 300 cap cannot be counted locally.",
+        "A ticker-window below 300 proves only that observed local rows are below the cap, not that no historical tail was ever truncated before this audit.",
+        "days_to_300 estimates assume roughly stable article arrival rates and should be treated as planning guidance, not a guarantee.",
+    ],
     "risk": {
         "current_cadence": "ok",
         "long_quiet_window": "at_risk",
@@ -105,11 +121,18 @@ Implementation rules:
 - Query only local tables.
 - Normalize dates using `substr(published_at, 1, 10)` for the existing mixed `Z` / `+0000` timestamp suffixes.
 - Compute at least these windows: 7d, 14d, 30d.
+- Compute a named historical `gap_checks` list. The first required gap check is the real quiet window that motivated this audit:
+  - label: `observed_quiet_window_2026_06_25_to_2026_07_05`
+  - start date: `2026-06-25`
+  - end date: `2026-07-05`
+  - per-ticker article counts compared against the 300/ticker provider cap
+  - top tickers by count and `tickers_ge_300` / `tickers_ge_250`
 - Include per-ticker:
   - total IBKR article links,
   - window counts,
   - oldest/newest article timestamps,
   - estimated days-to-300 from 30d rate when possible.
+- Include a `caveats` array with the lower-bound / prior-truncation / rate-stability warnings verbatim or semantically equivalent. These caveats are load-bearing: the report must not present local rows as complete provider truth.
 
 - [ ] **Step 3: Add CLI wrapper**
 
@@ -159,6 +182,8 @@ The report should include `writer_budget_note` or equivalent text stating that `
 
 Run the utility twice against live local DBs. No scheduler shutdown is required for read-only audit, but if a run is active and counts drift, record that and rerun after the source is idle.
 
+Both runs must use the same explicit `--as-of` date. This makes the trailing windows deterministic. Different `--as-of` values are allowed to drift, and that drift is expected.
+
 - [ ] **Step 2: Validate expected current facts**
 
 The report must confirm or update:
@@ -167,6 +192,8 @@ The report must confirm or update:
 - Recent `provider_sync_runs` are succeeded, not failed.
 - 7d cap risk is below 300 for all tickers.
 - 30d cap risk identifies the high-volume tickers.
+- The `observed_quiet_window_2026_06_25_to_2026_07_05` gap check is below 300 for all tickers or explicitly lists the tickers that hit/approach the cap.
+- The report caveats are present. Reviewer interpretation rule: local counts are evidence for operational risk, not proof of complete provider-side coverage; possible already-missed tail rows remain unknowable without a different data source or live/provider-specific strategy.
 
 - [ ] **Step 3: Decide follow-up**
 
