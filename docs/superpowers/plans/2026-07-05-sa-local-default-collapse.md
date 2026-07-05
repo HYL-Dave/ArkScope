@@ -6,7 +6,7 @@
 
 **Architecture:** One-line collapse at the existing family choke point (`_local_sa_enabled`, mirroring `_local_macro_enabled` / `_local_records_enabled`), plus removal of the pre-cutover `sa_capture.db`-exists guard in `_make_db_backend()`. Both stack-proved PG callsites (`provider_health.py:181` → `get_sa_refresh_meta`; `sa_market_news_health.py:409` `_run_health_query`) are fixed transitively: they duck-type on the backend, and `SACaptureDatabaseBackend` already overrides `get_sa_refresh_meta()` and carries `_sa_db` (which selects the local health-query branch). No per-callsite rewiring.
 
-**Tech Stack:** Python 3, SQLite `sa_capture.db`, pytest; no frontend changes.
+**Tech Stack:** Python 3, SQLite `sa_capture.db`, pytest; one user-visible copy change in `apps/arkscope-web/src/News.tsx` (retired-toggle wording).
 
 ---
 
@@ -21,26 +21,29 @@
 
 - Deleting the now-dead PG SA reader code (`sa_market_news_health` PG branch + `_HEALTH_SQL`, `db_backend.py` `sa_*` methods) — queue for the dead-code sweep; this slice only stops routing to them.
 - `sa_comment_signals` writer unpause (follow-up #1 stays parked).
-- The SA migration CLI rebuild guard (`test_migration_cli_refuses_rebuild_post_flip` semantics): the flag stays writable and the guard keeps reading it; with PG gone the rebuild path is permanently refused anyway.
-- FileBackend DALs: SA capture remains unavailable there (no backend `_sa_db`); only the two stale toggle-referencing error strings are reworded.
+- FileBackend DALs: SA capture remains unavailable there (no backend `_sa_db`); only the stale toggle-referencing strings (backend errors + News.tsx copy) are reworded.
 
 ## Decisions Locked For This Slice
 
 1. **Collapse semantics (batch-2/closeout pattern):** `_local_sa_enabled()` returns `True`. Unset, explicit `false`, and `ARKSCOPE_USE_LOCAL_SA` all resolve local. Flag/env stay readable for provenance; no behavior.
 2. **Missing `sa_capture.db` no longer keeps PG.** The `Path(candidate).exists()` guard in `_make_db_backend()` (comment: "enabling before migration keeps PG (safe)") is removed — post-batch-1 the PG branch reads dropped tables, so keep-PG is the unsafe branch. A fresh profile routes to `SACaptureDatabaseBackend` with an absent file and must degrade to honest-empty per surface (Task 2 pins the exact surface shapes).
-3. **Suite-wide SA DB isolation.** Collapsing means every DAL construction in tests resolves an SA DB path. Add a conftest autouse `_isolate_sa_db` (`ARKSCOPE_SA_DB` → tmp), following the `_isolate_macro_calendar_db` precedent, so no test can touch the developer's real `data/sa_capture.db`.
-4. **Acceptance = the criterion that exposed the hole:** fresh-profile poison-DSN E2E (`scripts.smoke.pg_unreachable_e2e` with `ARKSCOPE_PROFILE_DB` pointed at an empty DB) must report `ok: true`, `pg_attempts: []`.
-5. **Explicit-DSN constructor path unchanged:** `DataAccessLayer(db_dsn="postgresql://…")` (a non-"auto" literal DSN) still builds plain `DatabaseBackend` — the docstring already classifies that as a pathological/test caller, and the runtime path is `db_dsn="auto"` → `_make_db_backend`.
+3. **Missing-file read behavior lives in the store choke point.** `sa_capture_store.connect(read_only=True)` — NOT `SACaptureDatabaseBackend._sa_read()` — because seven direct callers bypass the backend helper: `src/service/sa_market_news_health.py:436`, `src/tools/sa_tools.py:384`/`:585`/`:876`, `src/tools/sa_digest_tools.py:517`/`:583`, `src/tools/data_access.py:1301`. Chosen shape: when the file is absent, `connect(read_only=True)` returns an in-memory connection with the schema ensured — every SELECT returns honest-empty rows, no caller changes, **no file creation on read, no PG fallback**.
+4. **Migration CLI PG paths are retired (tombstone refusal).** `scripts/migrate_sa_to_sqlite.py` currently lets `use_local_sa=false`/unset PASS its guard and proceed to `_pg_conn()` — and its refusal message still instructs the dead "flip the toggle off … then re-run" rollback. Post-batch-1 there is no PG `sa_*` to rebuild from or validate against: BOTH the build path and `--validate-only` refuse unconditionally (exit 2) with a message pointing at the N9 batch-1 archive dump as the recovery/comparison basis. The flag-mirroring helper `_use_local_sa_enabled()` becomes dead and is removed with the guard. The script stays as a tombstone; deletion is dead-code-sweep material.
+5. **Suite-wide SA DB isolation, UNCONDITIONAL.** Add conftest autouse `_isolate_sa_db` (`ARKSCOPE_SA_DB` → tmp) exactly like `_isolate_macro_calendar_db`: unconditional `setenv`, so an ambient `ARKSCOPE_SA_DB` on a developer machine can never leak the real SA DB into the suite (the hermeticity failure family this slice exists to prevent). Tests that need a specific DB set it themselves after the autouse (test_sa_routing.py already does).
+6. **Acceptance = the criterion that exposed the hole:** fresh-profile poison-DSN E2E (`scripts.smoke.pg_unreachable_e2e` with `ARKSCOPE_PROFILE_DB` pointed at an empty DB) must report `ok: true`, `pg_attempts: []`.
+7. **Explicit-DSN constructor path unchanged:** `DataAccessLayer(db_dsn="postgresql://…")` (a non-"auto" literal DSN) still builds plain `DatabaseBackend` — the docstring already classifies that as a pathological/test caller, and the runtime path is `db_dsn="auto"` → `_make_db_backend`.
 
 ## File Map
 
-- Modify `tests/conftest.py` — add `_isolate_sa_db` autouse.
+- Modify `tests/conftest.py` — add `_isolate_sa_db` autouse (unconditional).
 - Modify `src/tools/data_access.py` — collapse `_local_sa_enabled()`; remove the exists-guard in `_make_db_backend()`; refresh the selection-matrix docstring.
+- Modify `scripts/migrate_sa_to_sqlite.py` — build + `--validate-only` become unconditional tombstone refusals; remove `_use_local_sa_enabled()`.
+- Modify `src/sa_capture_store.py` — `connect(read_only=True)` on an absent file returns an in-memory schema-ensured connection (covers all seven direct callers).
 - Modify `src/tools/sa_tools.py` — reword the two `requires_local_sa` error strings that instruct enabling the retired toggle.
-- Modify `tests/test_sa_routing.py` — flip the three named old contracts; add the toggleless/fresh-profile pins.
-- Modify `tests/test_sa_local_readers.py` and/or `tests/test_sa_capture_backend.py` — fresh-profile (absent file) surface behavior pins.
-- Possibly modify `src/tools/backends/sa_capture_backend.py` and/or `src/sa_capture_store.py` — ONLY if the Task 2 absent-file RED tests reveal a surface that raises instead of degrading; prefer the smallest read-only-connect guard.
-- No changes expected: `src/service/provider_health.py`, `src/service/sa_market_news_health.py`, `src/sa/comment_signal_backfill.py` (all duck-type on the backend and are fixed transitively).
+- Modify `apps/arkscope-web/src/News.tsx` — reword the user-visible 「use_local_sa 未啟用」 degraded-state copy.
+- Modify `tests/test_sa_routing.py` — flip the named old contracts (routing ×3 + migration CLI); add the toggleless/fresh-profile pins.
+- Modify `tests/test_sa_local_readers.py` — fresh-profile (absent file) surface behavior pins + the two callsite proofs.
+- No changes expected: `src/service/provider_health.py`, `src/service/sa_market_news_health.py`, `src/tools/backends/sa_capture_backend.py`, `src/sa/comment_signal_backfill.py` (all duck-type on the backend / go through the store choke point and are fixed transitively).
 
 ## Task 1: Hermeticity + Routing Collapse
 
@@ -60,16 +63,16 @@ def _isolate_sa_db(tmp_path_factory, monkeypatch):
 
     After the use_local_sa local-default collapse, every DAL construction routes
     the SA domain to SACaptureDatabaseBackend, so a test that builds a DAL would
-    otherwise resolve the developer's real sa_capture.db. Point the default at a
-    throwaway path; tests that inject an explicit sa_db are unaffected.
+    otherwise resolve the developer's real sa_capture.db. Override UNCONDITIONALLY
+    (like _isolate_macro_calendar_db): honoring an ambient ARKSCOPE_SA_DB would let
+    a developer-machine env leak the real SA DB into the whole suite. Tests that
+    need a specific DB set it themselves after this autouse (test_sa_routing.py
+    already does).
     """
-    if "ARKSCOPE_SA_DB" not in os.environ:
-        monkeypatch.setenv(
-            "ARKSCOPE_SA_DB",
-            str(tmp_path_factory.mktemp("sa_capture") / "sa_capture.db"))
+    monkeypatch.setenv(
+        "ARKSCOPE_SA_DB",
+        str(tmp_path_factory.mktemp("sa_capture") / "sa_capture.db"))
 ```
-
-Note the conditional mirrors `_isolate_locks`, NOT `_isolate_profile_db`: `test_sa_routing.py` and the SA reader tests set `ARKSCOPE_SA_DB` per-test via `monkeypatch.setenv`, which layers fine either way, but an ambient operator override must not be silently discarded for suites that intentionally target a prepared fixture DB. (The profile DB is unconditional because it carries credentials; an SA capture DB does not.)
 
 Run `pytest tests/test_sa_routing.py -q` — expected: PASS (pure isolation, no behavior change yet).
 
@@ -165,7 +168,7 @@ Update the selection-matrix docstring bullet for SA from "SA on →" to "SA (alw
 pytest tests/test_sa_routing.py -q
 ```
 
-Expected: PASS (all tests, including `test_env_override_flips_without_setting` — env `true` still selects SA — and `test_migration_cli_refuses_rebuild_post_flip`, which reads the flag value, not the routing).
+Expected: PASS (all tests, including `test_env_override_flips_without_setting` — env `true` still selects SA — and `test_migration_cli_refuses_rebuild_post_flip`, whose CLI-side flag mirror is untouched until Task 1.5).
 
 - [ ] **Step 5: Commit Task 1**
 
@@ -174,13 +177,73 @@ git add tests/conftest.py tests/test_sa_routing.py src/tools/data_access.py
 git commit -m "fix: collapse sa capture to local default"
 ```
 
+## Task 1.5: Migration CLI Tombstone Refusal
+
+**Files:**
+- Modify: `scripts/migrate_sa_to_sqlite.py`
+- Modify: `tests/test_sa_routing.py`
+
+The CLI's build guard currently lets `use_local_sa=false`/unset PASS and proceed to `_pg_conn()` (`scripts/migrate_sa_to_sqlite.py:365-371` refuses only `true`; its message still instructs the dead "flip the toggle off … then re-run" rollback), and `--validate-only` compares against live PG `sa_*`. Both targets were dropped in N9 batch-1.
+
+- [ ] **Step 1: Flip the CLI contract test (RED)**
+
+In `tests/test_sa_routing.py`, replace `test_migration_cli_refuses_rebuild_post_flip` with:
+
+```python
+def test_migration_cli_permanently_refuses_pg_paths(env, monkeypatch):
+    # N9 batch-1 dropped PG sa_* — there is nothing to rebuild from or validate
+    # against. Build AND validate refuse for true/false/unset alike; the batch-1
+    # archive dump is the recovery basis.
+    import scripts.migrate_sa_to_sqlite as mig
+
+    monkeypatch.setattr(mig, "_pg_conn",
+                        lambda: (_ for _ in ()).throw(AssertionError("must not touch PG")))
+
+    for setting in ("true", "false", None):
+        if setting is None:
+            env.profile.set_setting("use_local_sa", None)
+        else:
+            env.profile.set_setting("use_local_sa", setting)
+        monkeypatch.setattr(sys, "argv",
+                            ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db)])
+        assert mig.main() == 2  # refused, no PG attempt
+
+    monkeypatch.setattr(sys, "argv",
+                        ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--validate-only"])
+    assert mig.main() == 2  # validate is also a PG reader — refused
+```
+
+Run: `pytest tests/test_sa_routing.py::test_migration_cli_permanently_refuses_pg_paths -q` — expected: FAIL (the `false`/unset iterations raise `AssertionError("must not touch PG")` through the stubbed `_pg_conn`, proving the live-PG path is reachable today).
+
+- [ ] **Step 2: Implement the tombstone refusal**
+
+In `scripts/migrate_sa_to_sqlite.py`: at the top of `main()`'s build AND validate dispatch, refuse unconditionally:
+
+```python
+    print("REFUSED: PG sa_* tables were dropped in N9 batch-1 — there is no live PG "
+          "source to rebuild from or validate against. sa_capture.db is the sole "
+          "authority; the batch-1 archive dump (data/pg_archive/) is the recovery "
+          "basis. This CLI is retained as a tombstone only.")
+    return 2
+```
+
+Remove `_use_local_sa_enabled()` and the old flag-gated refusal block. Keep argument parsing intact so the tombstone message is what any invocation gets.
+
+- [ ] **Step 3: Run the routing file to GREEN + commit**
+
+```bash
+pytest tests/test_sa_routing.py -q
+git add scripts/migrate_sa_to_sqlite.py tests/test_sa_routing.py
+git commit -m "fix: tombstone sa migration cli pg paths"
+```
+
 ## Task 2: Fresh-Profile (Absent File) Surface Behavior
 
 **Files:**
 - Test: `tests/test_sa_local_readers.py`
-- Modify (only if RED reveals a raise): `src/tools/backends/sa_capture_backend.py`, `src/sa_capture_store.py`
+- Modify: `src/sa_capture_store.py`
 
-The exists-guard used to shield these paths; now an absent `sa_capture.db` is a reachable runtime state (fresh profile, first boot). `sa_capture_store.connect()` (write mode) already does `Path(path).parent.mkdir(parents=True, exist_ok=True)`, but read-only connects use a `mode=ro` URI, which raises `sqlite3.OperationalError` when the file is missing. Pin the surface behavior:
+The exists-guard used to shield these paths; now an absent `sa_capture.db` is a reachable runtime state (fresh profile, first boot). `sa_capture_store.connect()` (write mode) already does `Path(path).parent.mkdir(parents=True, exist_ok=True)`, but read-only connects use a `mode=ro` URI, which raises `sqlite3.OperationalError` when the file is missing. Per Decision 3 the fix lives in the store choke point — `connect(read_only=True)` — because seven direct callers bypass `SACaptureDatabaseBackend._sa_read()` (`sa_market_news_health.py:436`, `sa_tools.py:384/:585/:876`, `sa_digest_tools.py:517/:583`, `data_access.py:1301`). Pin the surface behavior:
 
 - [ ] **Step 1: Add RED tests for absent-file reads**
 
@@ -200,7 +263,19 @@ def test_absent_sa_db_market_news_query_is_honest_empty(tmp_path):
     assert rows == [] or rows.get("items") == []
 ```
 
-Adjust the exact call signatures to the real methods when writing the tests (the plan pins INTENT: honest empty, no exception, no file creation on read). If the current code already passes, keep the tests as regression pins and record "no code change needed" in the implementation notes.
+Adjust the exact call signatures to the real methods when writing the tests (the plan pins INTENT: honest empty, no exception, no file creation on read). Add a third RED test that exercises a DIRECT store caller — the health aggregation — so the choke-point coverage is proven beyond the backend helper:
+
+```python
+def test_absent_sa_db_health_query_degrades_honestly(tmp_path):
+    from datetime import datetime, timezone
+    from src.service.sa_market_news_health import _query_capture_stats_local
+
+    now = datetime(2026, 7, 5, 12, 0, tzinfo=timezone.utc)
+    out = _query_capture_stats_local(str(tmp_path / "missing.db"), now=now)
+    # exact keys per the real return shape: zero counts / None timestamps,
+    # no exception, and the file must not be created
+    assert not (tmp_path / "missing.db").exists()
+```
 
 - [ ] **Step 2: Run the RED tests**
 
@@ -208,11 +283,26 @@ Adjust the exact call signatures to the real methods when writing the tests (the
 pytest tests/test_sa_local_readers.py -q
 ```
 
-Expected: the new tests either FAIL with `sqlite3.OperationalError: unable to open database file` (→ Step 3 applies) or PASS (→ skip Step 3, keep the pins).
+Expected: the new tests FAIL with `sqlite3.OperationalError: unable to open database file` (read-only URI on a missing file). If any already passes, keep it as a regression pin and record that in the implementation notes.
 
-- [ ] **Step 3 (conditional): Add the smallest read-only guard**
+- [ ] **Step 3: Implement the store choke-point guard**
 
-Prefer ONE guard at the choke point rather than per-method try/except: in `src/sa_capture_store.py`, make the read-only branch of `connect()` raise a typed sentinel or return honest-empty via the caller — the minimal shape is an existence check in `SACaptureDatabaseBackend._sa_read()` that raises the store's existing "empty" semantics. Whatever shape is chosen: no PG fallback, no file creation on read, and every SA read override degrades to its empty result. Re-run Step 2 to GREEN.
+In `src/sa_capture_store.py`, change the `read_only=True` branch of `connect()`: when `Path(path)` does not exist, return an in-memory connection with the schema ensured instead of opening the `mode=ro` URI:
+
+```python
+    if read_only:
+        if not Path(path).exists():
+            # Fresh profile: the capture DB does not exist yet. Serve an empty
+            # schema from memory so every reader gets honest-empty rows — never
+            # create the file on a read path, never fall back to PG.
+            conn = sqlite3.connect(":memory:")
+            conn.row_factory = sqlite3.Row
+            ensure_schema(conn)
+            return conn
+        ...
+```
+
+Use the module's real schema-ensure function name. All seven direct callers and every `SACaptureDatabaseBackend` read override inherit the behavior with zero caller changes. Re-run Step 2 to GREEN.
 
 - [ ] **Step 4: End-to-end callsite proof (the two stack-proved sites)**
 
@@ -250,17 +340,26 @@ Expected: PASS.
 - [ ] **Step 6: Commit Task 2**
 
 ```bash
-git add tests/test_sa_local_readers.py
-git commit -m "test: pin fresh-profile sa local degradation"
+git add src/sa_capture_store.py tests/test_sa_local_readers.py
+git commit -m "fix: serve honest-empty sa reads on missing db"
 ```
 
-Include `src/tools/backends/sa_capture_backend.py` / `src/sa_capture_store.py` in the `git add` only if Step 3 was needed.
-
-## Task 3: Stale Toggle Messaging
+## Task 3: Stale Toggle Messaging (backend + frontend)
 
 **Files:**
 - Modify: `src/tools/sa_tools.py`
+- Modify: `apps/arkscope-web/src/News.tsx`
 - Test: `tests/test_sa_tools.py` (only if a message is asserted verbatim)
+
+- [ ] **Step 0: Reword the user-visible News degraded copy**
+
+`apps/arkscope-web/src/News.tsx:253-258` still renders 「Seeking Alpha 尚未切到本地（use_local_sa 未啟用）。」 for `empty_reason === "requires_local_sa"` — a user-visible instruction to enable a retired toggle. Change that branch's text to:
+
+```
+Seeking Alpha 本地資料尚未就緒（此後端未接 SA capture routing）。
+```
+
+Keep the `empty_reason` machine-code branch structure unchanged. Run the frontend checks that Task 4 Step 2 lists after the edit.
 
 - [ ] **Step 1: Reword the two toggle-instructing error strings**
 
@@ -284,8 +383,8 @@ Flip any test asserting the old message text; update any active-doc copy that st
 
 ```bash
 pytest tests/test_sa_tools.py -q
-git add src/tools/sa_tools.py tests/test_sa_tools.py
-git commit -m "fix: retire use_local_sa wording from sa tool errors"
+git add src/tools/sa_tools.py apps/arkscope-web/src/News.tsx tests/test_sa_tools.py
+git commit -m "fix: retire use_local_sa wording from sa surfaces"
 ```
 
 ## Task 4: Focused Regression Gates
@@ -309,7 +408,16 @@ pytest \
 
 Expected: PASS. `test_provider_health.py` and `test_data_scheduler.py` are included because their DALs now route SA locally — any hidden dependence on the old PG default surfaces here, isolated by the new conftest autouse.
 
-- [ ] **Step 2: Commit any gate fixes**
+- [ ] **Step 2: Frontend checks (News.tsx copy change)**
+
+```bash
+npm --prefix apps/arkscope-web test
+npm --prefix apps/arkscope-web run build
+```
+
+Expected: PASS (flip any test asserting the old 「use_local_sa 未啟用」 string).
+
+- [ ] **Step 3: Commit any gate fixes**
 
 Only commit real corrections; no empty commit.
 
@@ -363,16 +471,18 @@ git commit -m "docs: close sa local default collapse"
 ## Review Gates
 
 1. Default, explicit-false, and env-unset DAL constructions all select `SACaptureDatabaseBackend`; missing `sa_capture.db` does not resurrect PG.
-2. Fresh-profile poison E2E: `pg_attempts` goes 2 → 0; routine real-profile E2E unchanged.
-3. Absent-file SA reads are honest-empty, never create the file, never raise out of the health/feed surfaces.
-4. `test_migration_cli_refuses_rebuild_post_flip` and `test_env_override_flips_without_setting` still pass unmodified (flag readability and env-true are unchanged).
-5. No new code path reads PG `sa_*`; the dead PG readers are queued for the sweep, not deleted here.
-6. Full A/B failure sets identical; only the named routing contracts were flipped, surgically.
+2. Migration CLI: build AND `--validate-only` refuse (exit 2) for `true`/`false`/unset alike, with zero PG connection attempts (stubbed-`_pg_conn` proof); `_use_local_sa_enabled()` removed.
+3. Missing-file behavior is enforced at `sa_capture_store.connect(read_only=True)` — verified through a DIRECT store caller (health aggregation), not only through the backend helper; reads never create the file, never fall back to PG.
+4. Fresh-profile poison E2E: `pg_attempts` goes 2 → 0; routine real-profile E2E unchanged.
+5. `test_env_override_flips_without_setting` still passes unmodified (env-true unchanged); the flag stays readable as provenance.
+6. No user-visible surface (backend error strings, News.tsx) still instructs enabling `use_local_sa`; `empty_reason` machine codes unchanged.
+7. No new code path reads PG `sa_*`; the dead PG readers are queued for the sweep, not deleted here.
+8. Full A/B failure sets identical; only the named contracts (routing ×3 + migration CLI ×1) were flipped, surgically.
 
 ## Known Watch Items For Review
 
 - `_StubSABackend` in `test_sa_routing.py` masks real-backend behavior by design (selection tests); the absent-file behavior pins live in `test_sa_local_readers.py` against the REAL backend — do not conflate the two layers.
-- The conftest `_isolate_sa_db` conditional (`if not in os.environ`) differs from `_isolate_profile_db`'s unconditional override — the justification is in the fixture docstring; reviewers should confirm no test relies on an ambient real `ARKSCOPE_SA_DB`.
+- The in-memory honest-empty connection must use the store's real schema-ensure path so column shapes match a real empty DB (a drifted in-memory schema would make honest-empty reads lie about shape).
 - `sa_market_news_health`'s PG branch and `db_backend.py` `sa_*` methods become unreachable from runtime after this slice but are NOT removed — sweep item. Verify no test imports them in a way that forces earlier removal.
 - `comment_signal_backfill` duck-types `_sa_db` and gains the local route automatically; its writer remains paused (follow-up #1) — this slice must not unpause it.
 - Scheduler/provider-health tests construct DALs broadly; if Task 4 Step 1 surfaces failures outside the named flips, STOP and report (per the plan-test-layer discipline) rather than patching ad hoc.
