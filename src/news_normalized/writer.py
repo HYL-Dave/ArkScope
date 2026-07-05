@@ -67,6 +67,18 @@ def _body_fetch_due(body: BodyCandidate) -> bool:
     return retry_at <= datetime.now(timezone.utc)
 
 
+# Raised by src.market_data_direct.market_write_lock on contention timeout.
+_MARKET_LOCK_BUSY_MARKER = "market_data.db write lock busy"
+
+
+def _is_market_lock_busy(exc: BaseException) -> bool:
+    """Market-lock contention is batch-fatal and retryable: run_source classifies
+    it as skipped_lock_busy, so it must never be swallowed into resumable
+    per-article/provider errors (that would surface as a durable partial result
+    and misattribute lock waits as ProviderError in worker telemetry)."""
+    return _MARKET_LOCK_BUSY_MARKER in str(exc)
+
+
 def write_news_batch(
     store,
     provider: NewsProvider,
@@ -211,6 +223,8 @@ def write_news_batch(
                         errors[f"body:{provider_id}"] = error
                         record_resumed_body_error(restored, error)
                 except Exception as exc:  # provider failure remains resumable
+                    if _is_market_lock_busy(exc):
+                        raise
                     update_body(
                         restored,
                         BodyCandidate(status=BodyStatus.FAILED, error=str(exc)),
@@ -246,7 +260,7 @@ def write_news_batch(
                                 else pending
                             )
                         except Exception as exc:
-                            if not project_legacy:
+                            if not project_legacy or _is_market_lock_busy(exc):
                                 raise
                             key = candidate.provider_article_id or f"ticker:{ticker}"
                             errors[key] = str(exc)
@@ -300,6 +314,8 @@ def write_news_batch(
                                 ticker_error = body.error or "body fetch failed"
                                 errors[f"body:{provider_id}"] = ticker_error
                         except Exception as exc:  # metadata remains durable
+                            if _is_market_lock_busy(exc):
+                                raise
                             update_body(
                                 restored,
                                 BodyCandidate(status=BodyStatus.FAILED, error=str(exc)),
@@ -322,6 +338,8 @@ def write_news_batch(
                     if not budget_hit and progress_cb:
                         progress_cb(ticker_index + 1, total, ticker)
                 except Exception as exc:  # one ticker must not abort the batch
+                    if _is_market_lock_busy(exc):
+                        raise
                     errors[ticker] = str(exc)
                     with write_lock():
                         _upsert_provider_meta(
