@@ -77,6 +77,22 @@ articles2 = ibkr._fetch_news_single_query(
 
 > **結論**: 對 FinRL 訓練而言，NVDA/AAPL/TSLA 等重要股票只有 1-2 個月數據，**完全不足以訓練有效模型**。
 
+### Post-normalized Scheduler Note (Verified 2026-07-06)
+
+The normalized local scheduler makes regular IBKR news collection operationally safe, but it does not change the provider-side 300-article cap.
+
+Read-only local audit result (`--as-of 2026-07-06`):
+
+| Window | Result |
+|--------|--------|
+| Last 7 days | max 129 articles/ticker; 0 tickers >= 200/250/300 |
+| Observed quiet window 2026-06-25 to 2026-07-05 | max 227 (`MU`); 0 tickers >= 250/300 |
+| Last 30 days | max 532; 6 tickers >= 300; 8 tickers >= 250 |
+
+Operational ruling: keep normal IBKR news scheduling enabled. If IBKR news is disabled for multi-week periods, treat historical catch-up as potentially incomplete for high-volume tickers. Raising writer budgets does not fix this because the bottleneck is `reqHistoricalNews`, not the local writer.
+
+Methodology caveat: local SQLite counts are a lower bound. Articles already missed because they fell out of IBKR's 300-most-recent provider window cannot be recovered or counted after the fact.
+
 ---
 
 ## Workarounds

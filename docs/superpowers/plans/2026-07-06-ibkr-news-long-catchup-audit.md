@@ -1,4 +1,4 @@
-# IBKR News Long-Catch-Up Audit Plan
+# IBKR News Long-Catch-Up Audit Plan — AUDIT COMPLETE
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:test-driven-development for the audit utility and superpowers:verification-before-completion before claiming the slice is complete. This is an audit-first slice; do not change runtime ingestion behavior unless a reviewed follow-up plan is opened.
 
@@ -7,6 +7,31 @@
 **Architecture:** The current runtime is scheduler -> sanitized `src.news_normalized.ibkr_cli` subprocess -> `IBKRRuntimeGateway.fetch_headlines()` -> `IBKRDataSource.fetch_news()` -> `reqHistoricalNews(..., totalResults=300)`. The normalized writer uses a local latest-cursor per ticker, but IBKR ignores the requested date range, so the provider call is not a true cursor. This slice measures the risk from local SQLite evidence and code-level facts; it does not attempt to page IBKR because there is no supported provider cursor in the existing API.
 
 **Tech Stack:** Python 3, pytest, SQLite read-only URI connections, existing normalized-news tables, local scheduler state.
+
+## Live Audit Closeout
+
+**Status:** ✅ Complete on 2026-07-06. This slice made no runtime ingestion changes.
+
+**Artifacts:** two live read-only reports were produced with the same explicit `--as-of 2026-07-06`:
+
+- `scratchpad/ibkr-news-catchup-audit-run1.json`
+- `scratchpad/ibkr-news-catchup-audit-run2.json`
+
+Both files were byte-identical with sha256 `a89238907f2b54514824ac2b5a2c4a5da8fec05bc343bd4bcd60fe73b2dc14ef`.
+
+**Key live numbers:**
+
+- Source summary: `84,381` local normalized IBKR news rows; newest article `2026-07-04T16:24:00Z`.
+- Durable scheduler state: `ibkr_news last_status=succeeded`, `continuation=NULL`, latest result `ticker_count=148`, `articles_seen=15068`, `articles_inserted=0`.
+- Recent `provider_sync_runs` for `ibkr/news`: succeeded; latest three scanned 148 tickers and added 0 rows.
+- 7d window: `130` tickers, max `129` articles/ticker, `0` tickers >=200/250/300.
+- 14d window: max `370`, `1` ticker >=300.
+- 30d window: max `532`, `6` tickers >=300, `8` tickers >=250, `11` tickers >=200.
+- Observed quiet-window check (`2026-06-25` to `2026-07-05`): max `227` (`MU`), `0` tickers >=250/300, assessment `below_cap`.
+
+**Interpretation:** current scheduled cadence is safe; the specific 10-day quiet window that motivated the audit did not hit the observed local 300/ticker cap. A 30-day quiet window is at-risk for high-volume tickers. The report caveats remain load-bearing: local SQLite evidence is a lower bound, and any article already missed by a prior provider-side 300 cap cannot be counted after the fact.
+
+**Final decision:** `runbook_only`. No runtime follow-up is opened. Keep normal IBKR news scheduling enabled; do not treat IBKR historical news as a complete long-backfill source after multi-week downtime. If IBKR news is disabled for weeks, accept that the historical tail may be incomplete or open a separate reviewed plan for real-time capture, a warning surface, or cross-provider backfill. Raising writer budgets is explicitly not a fix.
 
 ## Map Check
 
@@ -26,8 +51,8 @@
   - `scheduler_state.ibkr_news`: `last_status=succeeded`, `continuation=NULL`, last result `ticker_count=148`, `articles_seen=15068`, `articles_inserted=0`.
   - Recent `provider_sync_runs` for `ibkr/news`: all succeeded; latest runs scanned 148 tickers and added 0 rows after the first post-burst catch-up.
   - Local normalized IBKR articles: 84,381 unique `news_articles` rows; 150 ticker links have IBKR coverage.
-  - Last 7 days: max per ticker = 130 (`GOOG`/`GOOGL`), no ticker >= 200, no ticker >= 300.
-  - Last 30 days: 6 tickers >= 300, 8 tickers >= 250, 14 tickers >= 200; max = 549 (`MU`).
+  - Last 7 days: max per ticker = 129, no ticker >= 200, no ticker >= 300.
+  - Last 30 days: 6 tickers >= 300, 8 tickers >= 250, 11 tickers >= 200; max = 532.
 
 ## Decisions Locked
 
@@ -72,7 +97,7 @@ Stop and report before continuing if any of these happen:
 - Add: `scripts/audit/ibkr_news_catchup_audit.py`
 - Add: `tests/test_ibkr_news_catchup_audit.py`
 
-- [ ] **Step 1: Write RED tests for report shape**
+- [x] **Step 1: Write RED tests for report shape**
 
 Create fixtures with minimal `news_articles`, `news_article_tickers`, `provider_sync_runs`, and `scheduler_state` schemas. The utility should return:
 
@@ -112,7 +137,7 @@ Create fixtures with minimal `news_articles`, `news_article_tickers`, `provider_
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 2: Implement read-only SQLite collectors**
+- [x] **Step 2: Implement read-only SQLite collectors**
 
 Implementation rules:
 
@@ -134,7 +159,7 @@ Implementation rules:
   - estimated days-to-300 from 30d rate when possible.
 - Include a `caveats` array with the lower-bound / prior-truncation / rate-stability warnings verbatim or semantically equivalent. These caveats are load-bearing: the report must not present local rows as complete provider truth.
 
-- [ ] **Step 3: Add CLI wrapper**
+- [x] **Step 3: Add CLI wrapper**
 
 CLI:
 
@@ -158,7 +183,7 @@ Rules:
 
 - Modify: `tests/test_ibkr_news_catchup_audit.py`
 
-- [ ] **Step 1: Prove no Gateway access**
+- [x] **Step 1: Prove no Gateway access**
 
 Test that the audit module source does not contain these imports or names:
 
@@ -167,7 +192,7 @@ Test that the audit module source does not contain these imports or names:
 - `ib_insync`
 - `reqHistoricalNews`
 
-- [ ] **Step 2: Prove writer budget is not the reported bottleneck**
+- [x] **Step 2: Prove writer budget is not the reported bottleneck**
 
 The report should include `writer_budget_note` or equivalent text stating that `DEFAULT_MAX_ARTICLES=50_000` exceeds observed run size and the bottleneck is provider-side 300/ticker, not scheduler budget.
 
@@ -178,13 +203,13 @@ The report should include `writer_budget_note` or equivalent text stating that `
 - Output only: `scratchpad/ibkr-news-catchup-audit-*.json` (not committed)
 - Modify docs only after review: this plan and `docs/design/PROJECT_PRIORITY_MAP.md`
 
-- [ ] **Step 1: Run report twice**
+- [x] **Step 1: Run report twice**
 
 Run the utility twice against live local DBs. No scheduler shutdown is required for read-only audit, but if a run is active and counts drift, record that and rerun after the source is idle.
 
 Both runs must use the same explicit `--as-of` date. This makes the trailing windows deterministic. Different `--as-of` values are allowed to drift, and that drift is expected.
 
-- [ ] **Step 2: Validate expected current facts**
+- [x] **Step 2: Validate expected current facts**
 
 The report must confirm or update:
 
@@ -195,7 +220,7 @@ The report must confirm or update:
 - The `observed_quiet_window_2026_06_25_to_2026_07_05` gap check is below 300 for all tickers or explicitly lists the tickers that hit/approach the cap.
 - The report caveats are present. Reviewer interpretation rule: local counts are evidence for operational risk, not proof of complete provider-side coverage; possible already-missed tail rows remain unknowable without a different data source or live/provider-specific strategy.
 
-- [ ] **Step 3: Decide follow-up**
+- [x] **Step 3: Decide follow-up**
 
 Choose one:
 
@@ -215,7 +240,7 @@ Choose one:
 - Modify: this plan
 - Optionally modify: `docs/data/IBKR_NEWS_API_LIMITATIONS.md`
 
-- [ ] **Step 1: Record live audit result**
+- [x] **Step 1: Record live audit result**
 
 Update this plan with:
 
@@ -224,7 +249,7 @@ Update this plan with:
 - risk classification,
 - final follow-up decision.
 
-- [ ] **Step 2: Update map**
+- [x] **Step 2: Update map**
 
 Add newest-first §10 entry:
 
@@ -232,7 +257,7 @@ Add newest-first §10 entry:
 - whether any runtime follow-up was opened,
 - queue after this audit.
 
-- [ ] **Step 3: Optional docs/data update**
+- [x] **Step 3: Optional docs/data update**
 
 Only if the audit adds new practical operator guidance, append a short "Post-normalized scheduler note" to `docs/data/IBKR_NEWS_API_LIMITATIONS.md`. Do not rewrite the historical API finding.
 
