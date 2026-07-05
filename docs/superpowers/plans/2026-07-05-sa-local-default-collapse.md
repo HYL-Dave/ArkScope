@@ -28,7 +28,7 @@
 1. **Collapse semantics (batch-2/closeout pattern):** `_local_sa_enabled()` returns `True`. Unset, explicit `false`, and `ARKSCOPE_USE_LOCAL_SA` all resolve local. Flag/env stay readable for provenance; no behavior.
 2. **Missing `sa_capture.db` no longer keeps PG.** The `Path(candidate).exists()` guard in `_make_db_backend()` (comment: "enabling before migration keeps PG (safe)") is removed — post-batch-1 the PG branch reads dropped tables, so keep-PG is the unsafe branch. A fresh profile routes to `SACaptureDatabaseBackend` with an absent file and must degrade to honest-empty per surface (Task 2 pins the exact surface shapes).
 3. **Missing-file read behavior lives in the store choke point.** `sa_capture_store.connect(read_only=True)` — NOT `SACaptureDatabaseBackend._sa_read()` — because seven direct callers bypass the backend helper: `src/service/sa_market_news_health.py:436`, `src/tools/sa_tools.py:384`/`:585`/`:876`, `src/tools/sa_digest_tools.py:517`/`:583`, `src/tools/data_access.py:1301`. Chosen shape: when the file is absent, `connect(read_only=True)` returns an in-memory connection with the schema ensured — every SELECT returns honest-empty rows, no caller changes, **no file creation on read, no PG fallback**.
-4. **Migration CLI PG paths are retired (tombstone refusal).** `scripts/migrate_sa_to_sqlite.py` currently lets `use_local_sa=false`/unset PASS its guard and proceed to `_pg_conn()` — and its refusal message still instructs the dead "flip the toggle off … then re-run" rollback. Post-batch-1 there is no PG `sa_*` to rebuild from or validate against: BOTH the build path and `--validate-only` refuse unconditionally (exit 2) with a message pointing at the N9 batch-1 archive dump as the recovery/comparison basis. The flag-mirroring helper `_use_local_sa_enabled()` becomes dead and is removed with the guard. The script stays as a tombstone; deletion is dead-code-sweep material.
+4. **Migration CLI PG paths are retired (tombstone refusal), ALL THREE modes.** `scripts/migrate_sa_to_sqlite.py` has three live-PG dispatch branches: `--dry-run` (`:344-352`, straight to `_pg_conn()` → `_fingerprints_pg` — the FIRST branch), `--validate-only` (compares against PG), and build (`use_local_sa=false`/unset PASSES the guard and proceeds to `_pg_conn()`; the refusal message still instructs the dead "flip the toggle off … then re-run" rollback). Post-batch-1 there is no PG `sa_*` to count, validate against, or rebuild from: the refusal goes at the VERY TOP of `main()` after argparse — before ANY mode dispatch — so build, `--validate-only`, and `--dry-run` all exit 2 with a message pointing at the N9 batch-1 archive dump as the recovery/comparison basis. The flag-mirroring helper `_use_local_sa_enabled()` becomes dead and is removed with the guard. The script stays as a tombstone; deletion is dead-code-sweep material.
 5. **Suite-wide SA DB isolation, UNCONDITIONAL.** Add conftest autouse `_isolate_sa_db` (`ARKSCOPE_SA_DB` → tmp) exactly like `_isolate_macro_calendar_db`: unconditional `setenv`, so an ambient `ARKSCOPE_SA_DB` on a developer machine can never leak the real SA DB into the suite (the hermeticity failure family this slice exists to prevent). Tests that need a specific DB set it themselves after the autouse (test_sa_routing.py already does).
 6. **Acceptance = the criterion that exposed the hole:** fresh-profile poison-DSN E2E (`scripts.smoke.pg_unreachable_e2e` with `ARKSCOPE_PROFILE_DB` pointed at an empty DB) must report `ok: true`, `pg_attempts: []`.
 7. **Explicit-DSN constructor path unchanged:** `DataAccessLayer(db_dsn="postgresql://…")` (a non-"auto" literal DSN) still builds plain `DatabaseBackend` — the docstring already classifies that as a pathological/test caller, and the runtime path is `db_dsn="auto"` → `_make_db_backend`.
@@ -183,7 +183,7 @@ git commit -m "fix: collapse sa capture to local default"
 - Modify: `scripts/migrate_sa_to_sqlite.py`
 - Modify: `tests/test_sa_routing.py`
 
-The CLI's build guard currently lets `use_local_sa=false`/unset PASS and proceed to `_pg_conn()` (`scripts/migrate_sa_to_sqlite.py:365-371` refuses only `true`; its message still instructs the dead "flip the toggle off … then re-run" rollback), and `--validate-only` compares against live PG `sa_*`. Both targets were dropped in N9 batch-1.
+The CLI has THREE live-PG paths, all reading tables dropped in N9 batch-1: `--dry-run` (`:344-352`) calls `_pg_conn()` directly for PG fingerprints; `--validate-only` compares the local DB against live PG `sa_*`; and the build guard lets `use_local_sa=false`/unset PASS and proceed to `_pg_conn()` (`:365-371` refuses only `true`; its message still instructs the dead "flip the toggle off … then re-run" rollback).
 
 - [ ] **Step 1: Flip the CLI contract test (RED)**
 
@@ -211,19 +211,24 @@ def test_migration_cli_permanently_refuses_pg_paths(env, monkeypatch):
     monkeypatch.setattr(sys, "argv",
                         ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--validate-only"])
     assert mig.main() == 2  # validate is also a PG reader — refused
+
+    monkeypatch.setattr(sys, "argv",
+                        ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--dry-run"])
+    assert mig.main() == 2  # dry-run calls _pg_conn() directly — refused
 ```
 
-Run: `pytest tests/test_sa_routing.py::test_migration_cli_permanently_refuses_pg_paths -q` — expected: FAIL (the `false`/unset iterations raise `AssertionError("must not touch PG")` through the stubbed `_pg_conn`, proving the live-PG path is reachable today).
+Run: `pytest tests/test_sa_routing.py::test_migration_cli_permanently_refuses_pg_paths -q` — expected: FAIL (the `false`/unset build iterations AND the `--dry-run` case raise `AssertionError("must not touch PG")` through the stubbed `_pg_conn`, proving the live-PG paths are reachable today).
 
 - [ ] **Step 2: Implement the tombstone refusal**
 
-In `scripts/migrate_sa_to_sqlite.py`: at the top of `main()`'s build AND validate dispatch, refuse unconditionally:
+In `scripts/migrate_sa_to_sqlite.py`: at the VERY TOP of `main()`, immediately after `args = ap.parse_args()` and BEFORE the `--dry-run` / `--validate-only` / build dispatch, refuse unconditionally:
 
 ```python
     print("REFUSED: PG sa_* tables were dropped in N9 batch-1 — there is no live PG "
-          "source to rebuild from or validate against. sa_capture.db is the sole "
-          "authority; the batch-1 archive dump (data/pg_archive/) is the recovery "
-          "basis. This CLI is retained as a tombstone only.")
+          "source to count (--dry-run), rebuild from, or validate against. "
+          "sa_capture.db is the sole authority; the batch-1 archive dump "
+          "(data/pg_archive/) is the recovery basis. This CLI is retained as a "
+          "tombstone only.")
     return 2
 ```
 
@@ -471,7 +476,7 @@ git commit -m "docs: close sa local default collapse"
 ## Review Gates
 
 1. Default, explicit-false, and env-unset DAL constructions all select `SACaptureDatabaseBackend`; missing `sa_capture.db` does not resurrect PG.
-2. Migration CLI: build AND `--validate-only` refuse (exit 2) for `true`/`false`/unset alike, with zero PG connection attempts (stubbed-`_pg_conn` proof); `_use_local_sa_enabled()` removed.
+2. Migration CLI: build, `--validate-only`, AND `--dry-run` all refuse (exit 2) for `true`/`false`/unset alike, with zero PG connection attempts (stubbed-`_pg_conn` proof); `_use_local_sa_enabled()` removed.
 3. Missing-file behavior is enforced at `sa_capture_store.connect(read_only=True)` — verified through a DIRECT store caller (health aggregation), not only through the backend helper; reads never create the file, never fall back to PG.
 4. Fresh-profile poison E2E: `pg_attempts` goes 2 → 0; routine real-profile E2E unchanged.
 5. `test_env_override_flips_without_setting` still passes unmodified (env-true unchanged); the flag stays readable as provenance.
