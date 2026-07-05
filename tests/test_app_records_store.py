@@ -170,9 +170,12 @@ class _FakeDal:
     def _local_records_enabled(self): return self._local
 
 
-def test_factory_off_returns_backend_unchanged():
-    be = _FakeBackend()
-    assert get_app_records_store(_FakeDal(local=False, backend=be)) is be   # OFF → exact PG behavior
+def test_factory_explicit_false_still_returns_local_store(tmp_path, monkeypatch):
+    # PG-exit closeout: explicit false is provenance only — records never route back
+    # to the PG backend (the three PG app-record tables are archive-only).
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    store = get_app_records_store(_FakeDal(local=False, backend=_FakeBackend()))
+    assert isinstance(store, AppRecordsLocalStore)
 
 
 def test_factory_on_returns_local_store(tmp_path, monkeypatch):
@@ -181,11 +184,24 @@ def test_factory_on_returns_local_store(tmp_path, monkeypatch):
     assert isinstance(store, AppRecordsLocalStore)
 
 
-def test_factory_toggleless_dal_is_off():
-    be = _FakeBackend()
+def test_create_store_makes_missing_parent_dirs(tmp_path):
+    # Fresh-profile safety (PG-exit closeout): default-create store must mkdir absent
+    # parents — a brand-new base without data/ must not OperationalError at construction.
+    path = tmp_path / "fresh" / "data" / "profile_state.db"
+    store = AppRecordsLocalStore(path)
+    mid = store.insert_memory(title="t", content="c", category="note",
+                              tickers=None, tags=None, importance=5, source="test")
+    assert isinstance(mid, int)
+    assert path.exists()
+
+
+def test_factory_toggleless_dal_routes_local(tmp_path, monkeypatch):
+    # A dal lacking the legacy toggle (older/test double) also gets the local store —
+    # fresh/reset profiles must never strand on the retired PG app-record path.
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     class _Bare:  # no _local_records_enabled (older/test double)
-        _backend = be
-    assert get_app_records_store(_Bare()) is be
+        _backend = _FakeBackend()
+    assert isinstance(get_app_records_store(_Bare()), AppRecordsLocalStore)
 
 
 def test_resolver_no_api_import_and_env_precedence(tmp_path, monkeypatch):
@@ -199,13 +215,17 @@ def test_resolver_no_api_import_and_env_precedence(tmp_path, monkeypatch):
     assert "src.api" not in inspect.getsource(mod)
 
 
-def test_dal_local_records_toggle_default_off(monkeypatch):
+def test_dal_local_records_default_is_local(tmp_path, monkeypatch):
+    # PG-exit closeout: unset AND explicit false both resolve local — matches the
+    # batch-2 collapse semantics of use_local_market / use_local_macro / use_local_job_runs.
     from src.tools.data_access import DataAccessLayer
     monkeypatch.delenv(ENV_USE_LOCAL_RECORDS, raising=False)
-    monkeypatch.delenv("ARKSCOPE_PROFILE_DB", raising=False)
+    # hermetic: empty tmp profile DB so the host's persisted use_local_records=true
+    # cannot leak in — "unset" must mean truly unset (macro-toggle a5b0496 lesson)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "empty_profile_state.db"))
     dal = DataAccessLayer()
-    assert dal._local_records_enabled() is False
-    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "1")
+    assert dal._local_records_enabled() is True
+    monkeypatch.setenv(ENV_USE_LOCAL_RECORDS, "false")
     assert dal._local_records_enabled() is True
 
 

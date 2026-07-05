@@ -27,26 +27,23 @@ from src.tools.memory_tools import (
 
 @pytest.fixture
 def mock_dal(tmp_path):
-    """Create a mock DAL pointing to a tmp directory (no DB)."""
+    """Mock DAL pointing at a tmp base. Post-PG-exit closeout, memory tools always
+    route to the local AppRecordsLocalStore at <base>/data/profile_state.db —
+    there is no PG/backend path left to force."""
     dal = MagicMock()
     dal._base = tmp_path
-    dal._local_records_enabled = lambda: False  # PG-exit 1b: default-off → backend/file path
-    # No DB backend — force file fallback
-    del dal._backend
+    del dal._backend  # records tools must not touch dal._backend anymore
     return dal
 
 
 @pytest.fixture
 def mock_dal_with_db(tmp_path):
-    """Create a mock DAL with a mock DB backend."""
+    """Alias shape kept for the *_with_db test names: same local-store routing.
+    The old MagicMock PG backend is gone — the closeout collapsed records routing
+    to the local store regardless of flags or backend presence."""
     dal = MagicMock()
     dal._base = tmp_path
-    dal._local_records_enabled = lambda: False  # PG-exit 1b: default-off → routes dal._backend
-    dal._backend = MagicMock()
-    dal._backend.insert_memory = MagicMock(return_value=42)
-    dal._backend.query_memories = MagicMock()
-    dal._backend.list_memories_meta = MagicMock()
-    dal._backend.delete_memory = MagicMock()
+    del dal._backend
     return dal
 
 
@@ -82,7 +79,7 @@ class TestSaveMemory:
         assert result["title"] == "Test Memory"
         assert result["file_path"].startswith(_MEMORY_DIR)
         assert result["file_path"].endswith(".md")
-        assert result["id"] is None  # No DB
+        assert isinstance(result["id"], int)  # local store always available post-closeout
 
         # File should exist
         full_path = mock_dal._base / result["file_path"]
@@ -146,6 +143,7 @@ class TestSaveMemory:
         assert "**Importance**: 10/10" in text
 
     def test_save_with_db(self, mock_dal_with_db):
+        # Round-trip through the real local store: saved fields must be recallable.
         result = save_memory(
             mock_dal_with_db,
             title="DB Memory",
@@ -153,15 +151,19 @@ class TestSaveMemory:
             category="fact",
             tickers=["TSLA"],
         )
-        assert result["id"] == 42
-        mock_dal_with_db._backend.insert_memory.assert_called_once()
-        call_kwargs = mock_dal_with_db._backend.insert_memory.call_args
-        assert call_kwargs[1]["title"] == "DB Memory"
-        assert call_kwargs[1]["category"] == "fact"
-        assert call_kwargs[1]["tickers"] == ["TSLA"]
+        assert isinstance(result["id"], int)
+        recalled = recall_memories(mock_dal_with_db, category="fact")
+        assert len(recalled) == 1
+        assert recalled[0]["title"] == "DB Memory"
+        assert "TSLA" in (recalled[0].get("tickers") or "")
 
-    def test_save_db_failure_graceful(self, mock_dal_with_db):
-        mock_dal_with_db._backend.insert_memory.side_effect = Exception("DB down")
+    def test_save_db_failure_graceful(self, mock_dal_with_db, monkeypatch):
+        # local store insert failure stays best-effort: file is still written, id None.
+        from src.app_records_store import AppRecordsLocalStore
+        monkeypatch.setattr(
+            AppRecordsLocalStore, "insert_memory",
+            lambda self, **k: (_ for _ in ()).throw(Exception("DB down")),
+        )
         result = save_memory(
             mock_dal_with_db,
             title="Test",
@@ -229,16 +231,14 @@ class TestRecallMemories:
         assert len(results) == 1
 
     def test_recall_with_db(self, mock_dal_with_db):
-        import pandas as pd
-        mock_dal_with_db._backend.query_memories.return_value = pd.DataFrame([
-            {"id": 1, "title": "DB Memory", "content": "Content",
-             "category": "note", "tickers": None, "tags": None,
-             "importance": 5, "source": "agent_auto",
-             "created_at": "2026-02-19T12:00:00"},
-        ])
-        results = recall_memories(mock_dal_with_db, query="test")
+        # Real local-store row must come back with the mapped dict shape.
+        save_memory(mock_dal_with_db, title="DB Memory", content="Content about testing",
+                    category="note", importance=5)
+        results = recall_memories(mock_dal_with_db, query="testing")
         assert len(results) == 1
         assert results[0]["title"] == "DB Memory"
+        assert results[0]["category"] == "note"
+        assert results[0]["importance"] == 5
 
 
 # ── List Memories ────────────────────────────────────────────
@@ -269,14 +269,11 @@ class TestListMemories:
         assert results == []
 
     def test_list_with_db(self, mock_dal_with_db):
-        import pandas as pd
-        mock_dal_with_db._backend.list_memories_meta.return_value = pd.DataFrame([
-            {"id": 1, "title": "DB Mem", "category": "note",
-             "tickers": None, "tags": None, "importance": 5,
-             "created_at": "2026-02-19T12:00:00"},
-        ])
+        # Meta listing served by the real local store.
+        save_memory(mock_dal_with_db, title="DB Mem", content="C", category="note")
         results = list_memories(mock_dal_with_db)
         assert len(results) == 1
+        assert results[0]["title"] == "DB Mem"
 
 
 # ── Delete Memory ────────────────────────────────────────────
@@ -284,14 +281,13 @@ class TestListMemories:
 
 class TestDeleteMemory:
     def test_delete_with_db(self, mock_dal_with_db):
-        # DB returns file_path of deleted memory
-        mock_dal_with_db._backend.delete_memory.return_value = "data/agent_memory/test.md"
-        result = delete_memory(mock_dal_with_db, memory_id=1)
+        # Delete a really-saved row by its real local-store id.
+        saved = save_memory(mock_dal_with_db, title="Del Me", content="Tmp")
+        result = delete_memory(mock_dal_with_db, memory_id=saved["id"])
         assert result["deleted"] is True
-        assert result["id"] == 1
+        assert result["id"] == saved["id"]
 
     def test_delete_not_found(self, mock_dal_with_db):
-        mock_dal_with_db._backend.delete_memory.return_value = None
         result = delete_memory(mock_dal_with_db, memory_id=999)
         assert result["deleted"] is False
         assert "not found" in result["error"]
@@ -305,14 +301,17 @@ class TestDeleteMemory:
         full_path = mock_dal_with_db._base / rel_path
         assert full_path.exists()
 
-        # Now delete — DB returns the file_path
-        mock_dal_with_db._backend.delete_memory.return_value = rel_path
-        result = delete_memory(mock_dal_with_db, memory_id=42)
+        # Delete via the real local store — it returns the file_path for cleanup.
+        result = delete_memory(mock_dal_with_db, memory_id=save_result["id"])
         assert result["deleted"] is True
         assert not full_path.exists()
 
-    def test_delete_db_failure(self, mock_dal_with_db):
-        mock_dal_with_db._backend.delete_memory.side_effect = Exception("DB down")
+    def test_delete_db_failure(self, mock_dal_with_db, monkeypatch):
+        from src.app_records_store import AppRecordsLocalStore
+        monkeypatch.setattr(
+            AppRecordsLocalStore, "delete_memory",
+            lambda self, memory_id: (_ for _ in ()).throw(Exception("DB down")),
+        )
         result = delete_memory(mock_dal_with_db, memory_id=1)
         assert result["deleted"] is False
 

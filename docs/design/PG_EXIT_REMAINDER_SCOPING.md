@@ -165,7 +165,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 - Dropped in one transaction, no CASCADE, function first: `get_recent_prices(...)` + table `prices` (2,314,293 rows, frozen at `2026-07-02 14:15 UTC`, row fingerprint `e4b8e5d3…`).
 - Postcheck ok; pre-drop E2E ×2 and post-drop E2E ×2 all `ok:true` / `pg_attempts:[]` / 22 checks; local NVDA smoke 104 bars.
 - **Archive semantics (restated): the batch-3 dump is a frozen pre-cutover PG prices mirror archive, not a backup of current local `market_data.db` prices. Current price recovery depends on the local market_data.db backup chain.**
-- **Remaining PG objects: the three app-record archive tables only (`agent_queries`, `research_reports`, `agent_memories`) — separate policy ruling pending.**
+- **Remaining PG objects: the three app-record archive tables only (`agent_queries`, `research_reports`, `agent_memories`) — RULED 2026-07-05 (closeout): accepted as out-of-runtime archive-only tables. `use_local_records` collapsed to local-default in the same closeout commit (unset/false/toggleless → `AppRecordsLocalStore`; the fresh-profile PG stranding hole is closed). PG-exit is CLOSED.**
 
 ---
 
@@ -173,7 +173,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1, batch-2, and batch-3 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green pre- and post-batch-3; PG now holds only the three app-record archive tables (separate policy ruling pending).
+- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1, batch-2, and batch-3 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green pre- and post-batch-3; PG holds only the three app-record archive tables, ruled archive-only in the 2026-07-05 closeout (`use_local_records` collapsed to local-default). PG-exit is CLOSED.
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---

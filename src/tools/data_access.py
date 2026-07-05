@@ -358,13 +358,12 @@ class DataAccessLayer:
         return True
 
     def _local_records_enabled(self) -> bool:
-        """App-records domain (reports/memories/agent_queries) → local profile_state.db
-        (PG-exit Slice 1, live-migrated 2026-06-26 + use_local_records flipped on). Selects the
-        local store in app_records_store.get_app_records_store; PG is now the pre-migration archive.
-        No Settings UI toggle (env/profile flag only) — the flip was gated behind the one-time
-        id-preserving migration so the local autoincrement couldn't collide with migrated PG ids."""
-        from src.app_records_store import ENV_USE_LOCAL_RECORDS, USE_LOCAL_RECORDS_KEY
-        return self._profile_setting_truthy(USE_LOCAL_RECORDS_KEY, ENV_USE_LOCAL_RECORDS)
+        """App-records domain (reports/memories/agent_queries) → local profile_state.db by
+        default after the PG-exit closeout (2026-07-05 ruling): the three PG app-record
+        tables are archive-only, so unset AND explicit false both resolve local — same
+        collapse semantics as market/macro/job_runs (N9 batch-2). The legacy
+        use_local_records flag is provenance only."""
+        return True
 
     @property
     def backend_type(self) -> str:

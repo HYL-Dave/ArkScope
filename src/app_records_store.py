@@ -137,6 +137,9 @@ class AppRecordsLocalStore:
         return conn
 
     def _ensure_schema(self) -> None:
+        # fresh-profile safety: a default-create store must not OperationalError just
+        # because <base>/data/ doesn't exist yet (same pattern as JobRunsLocalStore).
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         conn = self._connect()
         try:
             conn.executescript(_SCHEMA)
@@ -418,15 +421,12 @@ def resolve_profile_state_db_path(dal: Any = None) -> str:
 
 
 def get_app_records_store(dal: Any):
-    """Return the app-records store for the active mode (PG-exit 1b). When use_local_records is
-    on (env ARKSCOPE_USE_LOCAL_RECORDS or the persisted profile_settings key) → the local
-    AppRecordsLocalStore over profile_state.db. OFF (default) → ``dal._backend`` (PG/File),
-    i.e. exactly the current behavior. Both expose the same app-record surface, so the 10 call
-    sites are mode-agnostic. A dal lacking the toggle (older/test double) → OFF.
+    """Return the post-PG-exit local app-records store.
 
-    NOTE (gate #1): there is intentionally NO Settings UI to flip this in 1b — the local store
-    autoincrements ids from 1, so writing local rows BEFORE the 1c id-preserving PG→local
-    migration would collide with the migrated PG ids. Keep it env/profile-flag-only until 1c."""
-    if getattr(dal, "_local_records_enabled", None) and dal._local_records_enabled():
-        return AppRecordsLocalStore(resolve_profile_state_db_path(dal))
-    return getattr(dal, "_backend", None)
+    Closeout ruling (2026-07-05): the three PG app-record tables (agent_queries /
+    research_reports / agent_memories) are accepted as archive-only — never a runtime
+    target. Routing therefore always resolves to ``AppRecordsLocalStore`` over
+    profile_state.db, including for dals with the legacy flag unset/false and for
+    older/test doubles lacking the flag entirely (no fresh-profile PG stranding).
+    The legacy ``use_local_records`` value is provenance only."""
+    return AppRecordsLocalStore(resolve_profile_state_db_path(dal))
