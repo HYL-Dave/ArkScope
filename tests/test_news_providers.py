@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 
 import src.news_providers as np
-from scripts.collection.collect_polygon_news import NewsArticle
+from src.collectors.polygon_news import NewsArticle
 from src.news_identity import canonical_article_hash
 
 

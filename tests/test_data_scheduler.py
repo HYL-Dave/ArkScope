@@ -58,8 +58,8 @@ def hermetic(tmp_path, monkeypatch):
     # active-universe scope: stub a non-empty default so price/universe sources are
     # hermetic (no real profile DB). Tests asserting the empty-scope path override this.
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
-    import scripts.collection.collect_finnhub_news as cfn
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.finnhub_news as cfn
+    import src.collectors.polygon_news as cpn
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     monkeypatch.setattr(cfn, "run_incremental",
@@ -275,7 +275,7 @@ def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
 
 def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
     import src.news_normalized.routing as routing
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
                             "legacy PG test route")
     monkeypatch.setattr(cpn, "run_incremental",
@@ -308,7 +308,7 @@ def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
 def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
     # NO --news PG sync subprocess, NO local mirror. (OFF path = the test above, unchanged.)
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
     calls = {"run_incremental": 0, "sync": 0, "refresh": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
@@ -356,9 +356,9 @@ def _patch_news_write_route(monkeypatch, mode, reason="test route"):
     ("source", "direct_source", "collector_module", "config_name", "collector_name",
      "provider_name"),
     [
-        ("polygon_news", "polygon", "scripts.collection.collect_polygon_news",
+        ("polygon_news", "polygon", "src.collectors.polygon_news",
          "CollectionConfig", "PolygonNewsCollector", "PolygonNormalizedProvider"),
-        ("finnhub_news", "finnhub", "scripts.collection.collect_finnhub_news",
+        ("finnhub_news", "finnhub", "src.collectors.finnhub_news",
          "FinnhubConfig", "FinnhubNewsCollector", "FinnhubNormalizedProvider"),
     ],
 )
@@ -660,7 +660,7 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
 
 
 def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypatch):
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     import src.news_normalized.routing as routing
 
     continuation = {
@@ -924,7 +924,7 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
 
 def test_legacy_news_route_local_keeps_direct_writer_without_pg_or_mirror(monkeypatch):
     # LEGACY_LOCAL is the pre-exit rollback/current local path: provider→news_direct only.
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     import src.news_normalized.routing as routing
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
@@ -989,7 +989,7 @@ def test_skip_sync_message_precedes_legacy_local_news_route(monkeypatch):
 
 def test_legacy_news_route_pg_fails_before_collector_sync_and_mirror(monkeypatch):
     # LEGACY_PG was the old collector→PG sync→local mirror chain; N9 retires it.
-    import scripts.collection.collect_finnhub_news as cfn
+    import src.collectors.finnhub_news as cfn
     import src.news_normalized.routing as routing
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_PG,
@@ -1497,7 +1497,7 @@ def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
 
 def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
     # BLOCKED must fail closed before any provider, subprocess, or mirror work starts.
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     import src.news_normalized.routing as routing
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
@@ -1831,7 +1831,7 @@ def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
 def test_adapter_universe_unavailable_fails_loud(monkeypatch):
     # 3e-E: the collectors' legacy tickers_core default is retired — no scope
     # means the run FAILS (fail loud), never silently-collect-something-else.
-    import scripts.collection.collect_finnhub_news as cfn
+    import src.collectors.finnhub_news as cfn
     monkeypatch.setattr(cfn, "run_incremental",
                         lambda **kw: (_ for _ in ()).throw(
                             AssertionError("adapter must not run without scope")))
@@ -2093,7 +2093,7 @@ def test_price_backfill_empty_scope_fails_loud(monkeypatch):
 def test_run_source_persists_attempt_and_outcome_to_local_state(monkeypatch):
     # a real run_source records last_attempt + the succeeded outcome in the LOCAL state store
     # (recoverable + visible-failure), independently of PG telemetry.
-    import scripts.collection.collect_polygon_news as cpn
+    import src.collectors.polygon_news as cpn
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     ds.run_source("polygon_news", trigger_source="api")

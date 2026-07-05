@@ -23,7 +23,7 @@ def _write_env(tmp_path, key, value):
 # --- polygon ---------------------------------------------------------------
 
 def test_polygon_env_wins_over_file(tmp_path, monkeypatch):
-    cpn = importlib.import_module("scripts.collection.collect_polygon_news")
+    cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("POLYGON_API_KEY", "env_key")  # apply_env injects the DB value here
@@ -31,7 +31,7 @@ def test_polygon_env_wins_over_file(tmp_path, monkeypatch):
 
 
 def test_polygon_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
-    cpn = importlib.import_module("scripts.collection.collect_polygon_news")
+    cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("POLYGON_API_KEY", raising=False)
@@ -39,7 +39,7 @@ def test_polygon_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
 
 
 def test_polygon_placeholder_env_does_not_shadow_file(tmp_path, monkeypatch):
-    cpn = importlib.import_module("scripts.collection.collect_polygon_news")
+    cpn = importlib.import_module("src.collectors.polygon_news")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("POLYGON_API_KEY", "your_key_here")  # stub must not win over a real file key
@@ -49,7 +49,7 @@ def test_polygon_placeholder_env_does_not_shadow_file(tmp_path, monkeypatch):
 # --- finnhub ---------------------------------------------------------------
 
 def test_finnhub_env_wins_over_file(tmp_path, monkeypatch):
-    cfn = importlib.import_module("scripts.collection.collect_finnhub_news")
+    cfn = importlib.import_module("src.collectors.finnhub_news")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FINNHUB_API_KEY", "env_key")
@@ -57,7 +57,7 @@ def test_finnhub_env_wins_over_file(tmp_path, monkeypatch):
 
 
 def test_finnhub_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
-    cfn = importlib.import_module("scripts.collection.collect_finnhub_news")
+    cfn = importlib.import_module("src.collectors.finnhub_news")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
@@ -65,7 +65,7 @@ def test_finnhub_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
 
 
 def test_finnhub_placeholder_env_does_not_shadow_file(tmp_path, monkeypatch):
-    cfn = importlib.import_module("scripts.collection.collect_finnhub_news")
+    cfn = importlib.import_module("src.collectors.finnhub_news")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FINNHUB_API_KEY", "your_key_here")

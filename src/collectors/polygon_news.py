@@ -651,8 +651,6 @@ def load_tickers(tickers_arg: Optional[str] = None,
     if tickers_arg:
         return [t.strip().upper() for t in tickers_arg.split(',') if t.strip()]
     if scope == "active-universe":
-        if str(_REPO_ROOT) not in sys.path:  # script-mode: src/ not importable yet
-            sys.path.insert(0, str(_REPO_ROOT))
         from src.universe_scope import resolve_active_universe
 
         tickers = resolve_active_universe()

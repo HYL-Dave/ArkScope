@@ -80,7 +80,7 @@ def test_direct_dedups_against_mirror_sha_row(tmp_path, monkeypatch):
     db = _news_db(tmp_path)
     from src.news_identity import canonical_article_hash as canonical
     import src.news_providers as npv
-    from scripts.collection.collect_polygon_news import NewsArticle
+    from src.collectors.polygon_news import NewsArticle
 
     tk, title, pub = "AAPL", "Massive News for Apple Stock Investors!", "2026-06-27T00:20:57+0000"
     sha = canonical(tk, title, pub[:10])

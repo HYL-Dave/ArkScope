@@ -120,7 +120,7 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "polygon_news", "Polygon 新聞",
             "--news",
-            adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
+            adapter=("src.collectors.polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
             source_badges=("Polygon", "直寫本地"),
@@ -129,7 +129,7 @@ SOURCES: Dict[str, SourceDef] = {
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
             "--news",
-            adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
+            adapter=("src.collectors.finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
             source_badges=("Finnhub", "直寫本地"),
@@ -320,7 +320,7 @@ _SANITIZED_WORKER_COUNT_KEYS = (
 def _make_normalized_news_provider(source: str):
     """Build the Parquet-free normalized REST provider for a scheduler news source."""
     if source == "polygon":
-        from scripts.collection.collect_polygon_news import (
+        from src.collectors.polygon_news import (
             CollectionConfig,
             PolygonNewsCollector,
             load_env,
@@ -332,7 +332,7 @@ def _make_normalized_news_provider(source: str):
             raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
         return PolygonNormalizedProvider(PolygonNewsCollector(api_key, CollectionConfig()))
     if source == "finnhub":
-        from scripts.collection.collect_finnhub_news import (
+        from src.collectors.finnhub_news import (
             FinnhubConfig,
             FinnhubNewsCollector,
             load_env,

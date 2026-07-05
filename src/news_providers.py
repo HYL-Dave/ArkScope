@@ -129,11 +129,11 @@ def make_news_provider(source: str, collector: Any = None) -> _CollectorNewsProv
     tests; otherwise the real collector is built lazily (needs the provider API key in config/.env)."""
     if collector is None:
         if source == "polygon":
-            from scripts.collection.collect_polygon_news import (
+            from src.collectors.polygon_news import (
                 CollectionConfig, PolygonNewsCollector, load_env)
             collector = PolygonNewsCollector(load_env(), CollectionConfig())
         elif source == "finnhub":
-            from scripts.collection.collect_finnhub_news import (
+            from src.collectors.finnhub_news import (
                 FinnhubConfig, FinnhubNewsCollector, load_env)
             collector = FinnhubNewsCollector(load_env(), FinnhubConfig())
         else:

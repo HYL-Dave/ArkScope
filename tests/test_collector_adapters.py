@@ -12,8 +12,26 @@ from datetime import datetime, timedelta
 
 import pytest
 
-import scripts.collection.collect_finnhub_news as cfn
-import scripts.collection.collect_polygon_news as cpn
+import src.collectors.finnhub_news as cfn
+import src.collectors.polygon_news as cpn
+
+
+def test_collectors_expose_contract_from_src_package():
+    import src.collectors.finnhub_news as src_finnhub
+    import src.collectors.polygon_news as src_polygon
+
+    for mod, names in (
+        (
+            src_polygon,
+            ("CollectionConfig", "PolygonNewsCollector", "load_env", "run_incremental"),
+        ),
+        (
+            src_finnhub,
+            ("FinnhubConfig", "FinnhubNewsCollector", "load_env", "run_incremental"),
+        ),
+    ):
+        for name in names:
+            assert hasattr(mod, name)
 
 
 def test_import_is_side_effect_free():
