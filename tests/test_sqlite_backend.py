@@ -683,7 +683,8 @@ def test_provenance_fundamentals_records_none_after_mirror_retirement(
 
 def test_inherited_vs_overridden_methods(market_db):
     # market-domain reads + the local-primary financial_cache are overridden;
-    # everything else (SA/reports/memories/stats) is inherited PG behaviour.
+    # app-records/SA/job-runs now have separate local stores, while remaining
+    # inherited PG methods are archive/tombstone surfaces.
     db, _ = market_db
     b = _make(db)
     assert type(b).query_prices is not DatabaseBackend.query_prices

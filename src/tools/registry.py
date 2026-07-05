@@ -1284,8 +1284,8 @@ class ToolRegistry:
                 "series for a specific observation_date, optionally "
                 "constrained by an as_of vintage (ALFRED replay). Use this "
                 "to read CPI / FFR / GDP / unemployment / yield-spread "
-                "values lookahead-safely from a backtest perspective. "
-                "Requires macro_calendar.enabled=true."
+                "values lookahead-safely from a backtest perspective. Reads "
+                "the local FRED snapshot even when automatic refresh is disabled."
             ),
             function=get_macro_value,
             category="analysis",

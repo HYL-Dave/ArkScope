@@ -9,8 +9,9 @@ merely forwarded calls would FAIL those isinstance checks → every DB-only path
 short-circuits to empty/file behavior → the cockpit shows wrong/empty data. By
 subclassing, this IS a DatabaseBackend (isinstance passes, ``_get_conn`` + all ~41
 methods inherited and hit PG); we override ONLY the migrated market-domain reads
-to go local-first. Everything else — Seeking-Alpha, reports, memories, news
-SCORES — is the inherited PG behaviour, unchanged.
+to go local-first. App-records, Seeking Alpha, and job-runs now route through
+their own local stores; remaining inherited PG methods are archive or tombstone
+surfaces that must fail closed rather than revive a runtime fallback.
 
 Overridden market reads:
   - ``query_prices`` (3a) — local-only after P0-C; a miss is an honest empty,

@@ -1281,7 +1281,8 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "Point-in-time macro lookup. Returns the value of a FRED series for a "
                 "specific observation_date, optionally constrained by an as_of vintage "
                 "(ALFRED replay). Use for lookahead-safe reads of CPI / FFR / GDP / "
-                "unemployment / yield-spread values. Requires macro_calendar.enabled=true."
+                "unemployment / yield-spread values. Reads the local FRED snapshot even "
+                "when automatic refresh is disabled."
             ),
             "input_schema": {
                 "type": "object",

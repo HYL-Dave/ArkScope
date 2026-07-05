@@ -44,7 +44,7 @@ describe("marketRoutingLabel", () => {
     expect(marketRoutingLabel(status({ use_local_market_setting: true, routing_enabled: false })))
       .toBe("設定已開，待建立資料庫");
     expect(marketRoutingLabel(status({ use_local_market_setting: false, routing_enabled: false })))
-      .toBe("本地權威（設定尚未翻成預設；PG fallback 已退役）");
+      .toBe("本地權威（legacy flag 未設定；PG fallback 已退役）");
   });
 });
 
@@ -75,7 +75,7 @@ describe("macroRoutingLabel", () => {
 
   it("never suggests PG fallback when local macro is inactive", () => {
     expect(macroRoutingLabel(macroStatus({ local_first_active: false })))
-      .toBe("本地功能未啟用（不會 fallback PG）");
+      .toBe("本地快照讀取可用；自動刷新未啟用");
   });
 });
 

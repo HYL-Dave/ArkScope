@@ -37,8 +37,8 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Toggle for routing app-records local (PG-exit 1b). Default-OFF. Per-domain (mirrors
-# use_local_market / _macro / _sa); read by DataAccessLayer._local_records_enabled.
+# Legacy provenance key for app-records routing. Runtime defaults local after
+# PG-exit closeout; retained to record old profile state rather than to gate routing.
 USE_LOCAL_RECORDS_KEY = "use_local_records"
 ENV_USE_LOCAL_RECORDS = "ARKSCOPE_USE_LOCAL_RECORDS"
 
