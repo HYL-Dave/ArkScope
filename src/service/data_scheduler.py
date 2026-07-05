@@ -346,20 +346,20 @@ def _run_normalized_news_writer(
     provider = _make_normalized_news_provider(source)
     conn = sqlite3.connect(resolve_market_db_path(), timeout=10.0)
     try:
-        with market_write_lock():
-            store = NormalizedNewsStore(conn)
-            result = write_news_batch(
-                store,
-                provider,
-                scope,
-                WriterBudget(
-                    max_articles=_NORMALIZED_NEWS_MAX_ARTICLES,
-                    max_body_fetches=_NORMALIZED_NEWS_MAX_BODY_FETCHES,
-                ),
-                project_legacy=True,
-                continuation=continuation,
-                progress_cb=progress_cb,
-            )
+        store = NormalizedNewsStore(conn)
+        result = write_news_batch(
+            store,
+            provider,
+            scope,
+            WriterBudget(
+                max_articles=_NORMALIZED_NEWS_MAX_ARTICLES,
+                max_body_fetches=_NORMALIZED_NEWS_MAX_BODY_FETCHES,
+            ),
+            project_legacy=True,
+            continuation=continuation,
+            progress_cb=progress_cb,
+            write_lock_factory=market_write_lock,
+        )
         return asdict(result) if hasattr(result, "__dataclass_fields__") else result
     finally:
         conn.close()
@@ -612,13 +612,17 @@ def _sanitized_prices_worker_failure_message(payload: Dict[str, Any]) -> str:
     return "prices worker failed"
 
 
+def _market_write_lock_busy_reason(error: Any) -> Optional[str]:
+    text = str(error or "").strip()
+    if "market_data.db write lock busy" not in text:
+        return None
+    return text[:_ERROR_TAIL] or "market_data.db write lock busy (timeout)"
+
+
 def _prices_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optional[str]:
     if payload.get("retryable") is not True:
         return None
-    error = str(payload.get("error") or "").strip()
-    if "market_data.db write lock busy" not in error:
-        return None
-    return error[:_ERROR_TAIL] or "market_data.db write lock busy (timeout)"
+    return _market_write_lock_busy_reason(payload.get("error"))
 
 
 def _resolve_price_scope() -> List[str]:
@@ -1187,10 +1191,24 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             else:
                 result["local_refresh"] = _local_refresh()
         except Exception as e:  # noqa: BLE001
-            ok = False
-            error = str(e)[:_ERROR_TAIL]
-            result["error"] = error
-            logger.warning(f"scheduler source {source} failed: {error}")
+            lock_busy_reason = (
+                _market_write_lock_busy_reason(e)
+                if d.news_direct_source is not None
+                else None
+            )
+            if lock_busy_reason is not None:
+                result.update({
+                    "status": "skipped",
+                    "reason": lock_busy_reason,
+                    "skip_kind": "skipped_lock_busy",
+                })
+                ok = True
+                error = None
+            else:
+                ok = False
+                error = str(e)[:_ERROR_TAIL]
+                result["error"] = error
+                logger.warning(f"scheduler source {source} failed: {error}")
 
         # Partial runs persist their continuation so the UI/manual follow-up can surface the
         # unfinished scope instead of clearing it as a success.

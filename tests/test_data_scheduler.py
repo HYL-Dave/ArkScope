@@ -364,9 +364,6 @@ def test_normalized_news_route_calls_writer_under_market_lock(
             "project_legacy": project_legacy,
             "progress_cb": progress_cb,
         }
-        assert "lock_enter" in events
-        assert events.index("lock_enter") < events.index("write")
-        assert "lock_exit" not in events
         return WriterResult(
             status="succeeded",
             articles_seen=2,
@@ -396,10 +393,8 @@ def test_normalized_news_route_calls_writer_under_market_lock(
     assert res["local_refresh"]["skipped"] == "direct local writer (no PG mirror)"
     assert events == [
         ("connect", "/tmp/test-market-data.db", 10.0),
-        "lock_enter",
         ("store", fake_conn),
         "write",
-        "lock_exit",
         "close",
     ]
 
@@ -2358,3 +2353,78 @@ def test_prices_worker_stdout_parse_preserves_retryable_and_counts():
     assert ok["tickers_scanned"] == 3 and ok["gaps_found"] == 2
     assert ok["error_count"] == 1 and ok["error_tickers"] == ["NVDA"]
     assert ok["provider"] == "ibkr"
+
+
+def test_normalized_news_lock_busy_is_retryable_skip(monkeypatch):
+    import src.service.data_scheduler as ds
+    import src.news_normalized.routing as routing
+
+    monkeypatch.setattr(
+        ds,
+        "_read_news_write_route_for_scheduler",
+        lambda: routing.NewsWriteRoute(
+            mode=routing.NewsWriteMode.NORMALIZED,
+            reason="normalized",
+        ),
+    )
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+
+    def fake_writer(*args, **kwargs):
+        raise TimeoutError("market_data.db write lock busy (timeout)")
+
+    monkeypatch.setattr(ds, "_run_normalized_news_writer", fake_writer)
+
+    res = ds.run_source("polygon_news", trigger_source="scheduler")
+
+    assert res["status"] == "skipped"
+    assert res["skip_kind"] == "skipped_lock_busy"
+    assert "write lock busy" in res["reason"]
+    row = ds._state_store().get("polygon_news")
+    assert row["last_status"] == "skipped"
+    assert row["last_error"] is None
+    assert row["last_result"]["skip_kind"] == "skipped_lock_busy"
+
+
+def test_scheduler_passes_market_lock_factory_to_normalized_news_writer(monkeypatch, tmp_path):
+    import src.service.data_scheduler as ds
+    import src.news_normalized.routing as routing
+
+    captured = {}
+
+    class _Provider:
+        source = "polygon"
+
+    class _Store:
+        def __init__(self, conn):
+            self.conn = conn
+
+    class _Budget:
+        def __init__(self, max_articles, max_body_fetches):
+            self.max_articles = max_articles
+            self.max_body_fetches = max_body_fetches
+
+    def fake_write_news_batch(store, provider, scope, budget, **kwargs):
+        captured.update(kwargs)
+        return {
+            "status": "succeeded",
+            "articles_seen": 0,
+            "articles_inserted": 0,
+            "bodies_fetched": 0,
+            "errors": {},
+            "continuation": None,
+        }
+
+    monkeypatch.setattr(ds, "_make_normalized_news_provider", lambda source: _Provider())
+    monkeypatch.setattr(
+        "src.market_data_admin.resolve_market_db_path",
+        lambda: str(tmp_path / "market_data.db"),
+    )
+    monkeypatch.setattr("src.news_normalized.store.NormalizedNewsStore", _Store)
+    monkeypatch.setattr("src.news_normalized.models.WriterBudget", _Budget)
+    monkeypatch.setattr("src.news_normalized.writer.write_news_batch", fake_write_news_batch)
+
+    out = ds._run_normalized_news_writer("polygon", ["AAPL"])
+
+    assert out["status"] == "succeeded"
+    assert captured["write_lock_factory"] is not None
+    assert captured["project_legacy"] is True
