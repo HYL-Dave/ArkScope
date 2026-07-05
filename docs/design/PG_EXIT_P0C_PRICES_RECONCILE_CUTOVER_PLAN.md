@@ -1514,6 +1514,8 @@ pytest tests/test_prices_runtime.py tests/test_data_scheduler.py tests/test_mark
 → 160 passed
 ```
 
+**P0-C.2 news burst hardening (2026-07-05):** normalized Polygon/Finnhub/IBKR news writers now use short `market_write_lock` sections only around SQLite write/telemetry phases; provider fetches occur outside the market DB lock. Residual `market_data.db write lock busy` errors are classified as retryable `skipped_lock_busy`, and same-tick market writer bursts remain deferred via `market_writer_backpressure`.
+
 ## Self-Review Notes
 
 - The plan covers user review points (a)-(e):
