@@ -182,3 +182,38 @@ def test_missing_db_does_not_create_file(tmp_path):
 
     assert not market_db.exists()
     assert not profile_db.exists()
+
+
+def test_audit_source_has_no_gateway_access_or_write_sql():
+    source = Path("scripts/audit/ibkr_news_catchup_audit.py").read_text()
+
+    for forbidden in (
+        "IBKRDataSource",
+        "IBKRRuntimeGateway",
+        "ib_insync",
+        "reqHistoricalNews",
+    ):
+        assert forbidden not in source
+    for forbidden_sql in (
+        "INSERT ",
+        "UPDATE ",
+        "DELETE ",
+        "CREATE ",
+        "DROP ",
+        "REPLACE ",
+    ):
+        assert forbidden_sql not in source.upper()
+
+
+def test_report_records_writer_budget_is_not_bottleneck(tmp_path):
+    from scripts.audit.ibkr_news_catchup_audit import build_report
+
+    market_db = tmp_path / "market.db"
+    profile_db = tmp_path / "profile.db"
+    _make_market_db(market_db)
+    _make_profile_db(profile_db)
+
+    report = build_report(market_db, profile_db, as_of="2026-07-05")
+
+    assert "50000" in report["writer_budget_note"]
+    assert "provider-side 300/ticker" in report["writer_budget_note"]

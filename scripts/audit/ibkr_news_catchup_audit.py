@@ -245,8 +245,8 @@ def build_report(market_db: str | Path, profile_db: str | Path, *, as_of: str | 
                 "current_cadence": current_cadence,
                 "long_quiet_window": long_quiet,
                 "reason": (
-                    "IBKR reqHistoricalNews returns only the 300 most-recent "
-                    "headlines per ticker"
+                "IBKR historical-news endpoint returns only the 300 most-recent "
+                "headlines per ticker"
                 ),
             },
         }
