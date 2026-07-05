@@ -189,13 +189,13 @@ describe("schedulerStateLabel", () => {
 });
 
 describe("providerHealthStatusLabel", () => {
-  it("labels disabled FRED macro ingestion as not-enabled ingestion, not a broken provider", () => {
+  it("labels legacy disabled FRED macro ingestion as generic disabled", () => {
     expect(providerHealthStatusLabel({
       id: "fred",
       kind: "macro",
       status: "disabled",
       disabled_reason: "macro_ingestion_disabled",
-    })).toBe("未啟用抓取");
+    })).toBe("已停用");
   });
 
   it("keeps generic disabled providers as disabled", () => {

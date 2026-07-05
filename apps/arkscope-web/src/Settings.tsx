@@ -27,6 +27,7 @@ import {
   saveModelRoutes,
   testProvider,
   getMacroStatus,
+  getMacroSnapshot,
   setUseLocalNews,
   setNormalizedNewsWrites,
   getNewsStatus,
@@ -38,6 +39,8 @@ import {
   testModelAccess,
   updateCredential,
   type MarketDataStatus,
+  type MacroSnapshot,
+  type MacroSnapshotItem,
   type MacroStatus,
   type NewsStatus,
   type TradingDayCoverage,
@@ -46,6 +49,7 @@ import {
   type ProviderEnvFallbackState,
   type ProviderConfigField,
   type ProviderConfigSetupState,
+  type ProviderHealth,
   type ProvidersHealthResponse,
   type ScheduleSourceState,
   type SyncMeta,
@@ -1233,6 +1237,67 @@ function compactMessage(value: string, max = 88): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
+function shortDate(iso: string | null | undefined): string {
+  return iso ? iso.slice(0, 10) : "—";
+}
+
+function formatCount(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toLocaleString("en-US")
+    : "—";
+}
+
+function formatMacroValue(item: MacroSnapshotItem): string {
+  if (item.value == null || !Number.isFinite(item.value)) return "—";
+  const value = item.value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return item.units ? `${value} ${item.units}` : value;
+}
+
+type FredSnapshotSignal = {
+  available: boolean;
+  series_count: number | null;
+  observation_count: number | null;
+  release_dates_count: number | null;
+  latest_fetched_at: string | null;
+};
+
+function fredSnapshotFromSignals(signals: ProviderHealth["signals"] | undefined): FredSnapshotSignal | null {
+  const raw = signals?.local_snapshot;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  const numberField = (key: string): number | null =>
+    typeof obj[key] === "number" && Number.isFinite(obj[key]) ? obj[key] as number : null;
+  return {
+    available: obj.available === true,
+    series_count: numberField("series_count"),
+    observation_count: numberField("observation_count"),
+    release_dates_count: numberField("release_dates_count"),
+    latest_fetched_at: typeof obj.latest_fetched_at === "string" ? obj.latest_fetched_at : null,
+  };
+}
+
+function boolSignal(signals: ProviderHealth["signals"] | undefined, key: string): boolean | null {
+  const value = signals?.[key];
+  return typeof value === "boolean" ? value : null;
+}
+
+function fredProviderDetail(p: ProviderHealth): string | null {
+  if (p.id !== "fred") return null;
+  const snap = fredSnapshotFromSignals(p.signals);
+  const auto = boolSignal(p.signals, "auto_refresh_enabled");
+  const parts: string[] = [];
+  if (snap?.available) {
+    parts.push(
+      `本地快照可用：${formatCount(snap.series_count)} 序列 · ${formatCount(snap.observation_count)} 觀測值`,
+    );
+  } else {
+    parts.push("本地快照尚無資料");
+  }
+  if (snap?.latest_fetched_at) parts.push(`最後抓取 ${shortDate(snap.latest_fetched_at)}`);
+  parts.push(auto ? "自動刷新已啟用" : "自動刷新未啟用");
+  return parts.join(" · ");
+}
+
 // Derived client-id chips for the IBKR base field. Offsets/labels come from the
 // BACKEND (single authority: data_sources/ibkr_client_id.py via the config view) —
 // adding a domain there shows up here with no frontend change. A valid numeric
@@ -1253,6 +1318,7 @@ function ibkrClientIdChips(
 function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
+  const [macroSnapshot, setMacroSnapshot] = useState<MacroSnapshot | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
   const [cfgEnvFallback, setCfgEnvFallback] = useState<ProviderEnvFallbackState | null>(null);
@@ -1263,8 +1329,8 @@ function DataSourcesSection() {
   const [testResults, setTestResults] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    const [rs, rh, rc] = await Promise.allSettled([
-      getSchedule(), getProvidersHealth(), getProvidersConfig()]);
+    const [rs, rh, rc, rm] = await Promise.allSettled([
+      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot()]);
     if (rs.status === "fulfilled") setSchedule(rs.value.sources);
     if (rh.status === "fulfilled") setHealth(rh.value);
     if (rc.status === "fulfilled") {
@@ -1272,7 +1338,8 @@ function DataSourcesSection() {
       setCfgSetup(rc.value.setup);
       setCfgEnvFallback(rc.value.env_fallback);
     }
-    const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (rm.status === "fulfilled") setMacroSnapshot(rm.value);
+    const bad = [rs, rh, rc, rm].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
@@ -1553,7 +1620,12 @@ function DataSourcesSection() {
             <tbody>
               {health.providers.map((p) => (
                 <tr key={p.id}>
-                  <td title={p.detail}>{p.label}</td>
+                  <td title={p.detail}>
+                    {p.label}
+                    {fredProviderDetail(p) && (
+                      <div className="muted tiny">{fredProviderDetail(p)}</div>
+                    )}
+                  </td>
                   <td><span className={`ds-chip ds-${p.status}`}>{providerHealthStatusLabel(p)}</span></td>
                   <td>
                     {p.key_source === "not_required" ? "免金鑰" : p.key_source}
@@ -1565,6 +1637,43 @@ function DataSourcesSection() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="settings-panel" style={{ marginTop: 16 }}>
+        <h4 className="detail-section">FRED 本地快照</h4>
+        {!macroSnapshot ? (
+          <p className="muted tiny">loading…</p>
+        ) : (
+          <>
+            <p className="muted tiny">
+              {macroSnapshot.available
+                ? `${formatCount(macroSnapshot.series_count)} 序列 · ${formatCount(macroSnapshot.observation_count)} 觀測值 · 最後抓取 ${shortDate(macroSnapshot.latest_fetched_at)} · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`
+                : `尚無本地快照 · 自動刷新${macroSnapshot.auto_refresh_enabled ? "開啟" : "關閉"}`}
+            </p>
+            {macroSnapshot.items.length > 0 ? (
+              <table className="data-table" style={{ tableLayout: "fixed", width: "100%" }}>
+                <thead>
+                  <tr><th>指標</th><th>值</th><th>觀測日</th><th>抓取時間</th></tr>
+                </thead>
+                <tbody>
+                  {macroSnapshot.items.slice(0, 11).map((item) => (
+                    <tr key={item.series_id}>
+                      <td style={{ overflowWrap: "anywhere" }}>
+                        {item.label}
+                        <div className="muted tiny">{item.series_id}{item.title ? ` · ${item.title}` : ""}</div>
+                      </td>
+                      <td>{formatMacroValue(item)}</td>
+                      <td>{shortDate(item.observation_date)}</td>
+                      <td>{shortDate(item.fetched_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="muted tiny">本地 macro_calendar.db 尚無可顯示的 FRED 觀測值。</p>
+            )}
+          </>
         )}
       </div>
 

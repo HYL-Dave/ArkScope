@@ -1,9 +1,6 @@
 import type { CoverageStatus, MacroStatus, MarketDataStatus, NewsStatus, TradingDayRow } from "./api";
 
 export function providerHealthStatusLabel<T extends { status: string; disabled_reason?: string | null }>(p: T): string {
-  if (p.status === "disabled" && p.disabled_reason === "macro_ingestion_disabled") {
-    return "未啟用抓取";
-  }
   const labels: Record<string, string> = {
     connected: "正常",
     stale: "過期",

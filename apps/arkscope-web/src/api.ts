@@ -1344,6 +1344,34 @@ export function getMacroStatus(): Promise<MacroStatus> {
   return getJSON<MacroStatus>("/macro/status");
 }
 
+export interface MacroSnapshotItem {
+  series_id: string;
+  label: string;
+  title: string | null;
+  units: string | null;
+  value: number | null;
+  observation_date: string | null;
+  fetched_at: string | null;
+  realtime_start: string | null;
+  realtime_end: string | null;
+}
+
+export interface MacroSnapshot {
+  available: boolean;
+  macro_db: string;
+  series_count: number;
+  observation_count: number;
+  release_dates_count: number;
+  latest_fetched_at: string | null;
+  auto_refresh_enabled: boolean;
+  items: MacroSnapshotItem[];
+  missing_series: string[];
+}
+
+export function getMacroSnapshot(): Promise<MacroSnapshot> {
+  return getJSON<MacroSnapshot>("/macro/snapshot");
+}
+
 export function setUseLocalMacro(enabled: boolean): Promise<{ use_local_macro_setting: boolean }> {
   return sendJSON("/macro/settings", "PUT", { enabled });
 }

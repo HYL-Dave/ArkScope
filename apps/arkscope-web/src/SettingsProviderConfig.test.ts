@@ -114,7 +114,31 @@ const health: ProvidersHealthResponse = {
   providers: [
     { id: "polygon", label: "Polygon", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
     { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
-    { id: "fred", label: "FRED", kind: "macro", status: "disabled", disabled_reason: "macro_ingestion_disabled", enabled: false, key_present: true, key_source: "app", key_vars: ["FRED_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "macro ingestion not enabled", signals: {}, key_import_suggested: false },
+    {
+      id: "fred",
+      label: "FRED",
+      kind: "macro",
+      status: "connected",
+      enabled: null,
+      key_present: true,
+      key_source: "app",
+      key_vars: ["FRED_API_KEY"],
+      last_success_at: "2026-06-25T01:09:52Z",
+      last_attempt_at: null,
+      last_error: null,
+      detail: "local snapshot 29571 observations · 11 series · latest fetched 2026-06-25T01:09:52Z · auto-refresh off",
+      signals: {
+        auto_refresh_enabled: false,
+        local_snapshot: {
+          available: true,
+          series_count: 11,
+          observation_count: 29571,
+          release_dates_count: 4659,
+          latest_fetched_at: "2026-06-25T01:09:52Z",
+        },
+      },
+      key_import_suggested: false,
+    },
   ],
   generated_at: "2026-07-02T00:00:00+00:00",
   jobs: {},
@@ -185,6 +209,40 @@ vi.mock("./api", async (importOriginal) => {
       },
     })),
     getProvidersHealth: vi.fn(async () => health),
+    getMacroSnapshot: vi.fn(async () => ({
+      available: true,
+      macro_db: "/tmp/macro_calendar.db",
+      series_count: 11,
+      observation_count: 29571,
+      release_dates_count: 4659,
+      latest_fetched_at: "2026-06-25T01:09:52Z",
+      auto_refresh_enabled: false,
+      missing_series: [],
+      items: [
+        {
+          series_id: "FEDFUNDS",
+          label: "Fed Funds",
+          title: "Federal Funds Effective Rate",
+          units: "Percent",
+          value: 5.33,
+          observation_date: "2026-06-01",
+          fetched_at: "2026-06-25T01:09:52Z",
+          realtime_start: "2026-06-01",
+          realtime_end: "9999-12-31",
+        },
+        {
+          series_id: "DGS10",
+          label: "10Y",
+          title: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity",
+          units: "Percent",
+          value: 4.24,
+          observation_date: "2026-06-24",
+          fetched_at: "2026-06-25T01:09:52Z",
+          realtime_start: "2026-06-24",
+          realtime_end: "9999-12-31",
+        },
+      ],
+    })),
     getProvidersConfig: vi.fn(async () => mocked.providersConfig),
     importProviderConfigField: vi.fn(async (provider: string, field: string, sourceEnvVar?: string | null) => {
       mocked.importCalls.push({ provider, field, sourceEnvVar });
@@ -364,13 +422,29 @@ describe("Settings provider config authority", () => {
     expect(row.textContent).not.toContain(" · 本地");
   });
 
-  it("renders FRED disabled as not-enabled ingestion, not generic disabled provider", async () => {
+  it("renders FRED as configured local snapshot with refresh off", async () => {
     await renderDataSources();
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("FRED"));
     if (!row) throw new Error("missing FRED provider row");
-    expect(row.textContent).toContain("未啟用抓取");
+    expect(row.textContent).toContain("正常");
+    expect(row.textContent).toContain("app");
+    expect(row.textContent).toContain("本地快照");
+    expect(row.textContent).toContain("自動刷新未啟用");
+    expect(row.textContent).not.toContain("未啟用抓取");
     expect(row.textContent).not.toContain("已停用");
+  });
+
+  it("renders the FRED local snapshot panel", async () => {
+    await renderDataSources();
+    expect(host!.textContent).toContain("FRED 本地快照");
+    expect(host!.textContent).toContain("11 序列");
+    expect(host!.textContent).toContain("29,571 觀測值");
+    expect(host!.textContent).toContain("最後抓取 2026-06-25");
+    expect(host!.textContent).toContain("自動刷新關閉");
+    expect(host!.textContent).toContain("Fed Funds");
+    expect(host!.textContent).toContain("5.33");
+    expect(host!.textContent).toContain("2026-06-01");
   });
 
   it("renders IBKR connection settings as one grouped block with derived ids below the client id", async () => {
