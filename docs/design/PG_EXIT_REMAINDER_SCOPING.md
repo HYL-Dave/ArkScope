@@ -158,13 +158,14 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 - `migrate_to_supabase.py` retired-domain code is fail-closed, including `--prices` after P0-C.
 - **Retain:** `prices` (P0-C reconcile + direct-local cutover live-complete; PG table is archive/rollback only. Physical drop is batch-3 with a fresh N9-style dump/restore/drop approval packet).
 
-**Batch-3 queue:**
+**Batch-3 live record (2026-07-05):**
 
-- PG-unreachable E2E proof is green (2026-07-05): `scratchpad/pg-unreachable-e2e-20260704T172555Z/`
-  contains two passing runs, each `ok:true`, `pg_attempts:[]`, and 22/22 checks green. The live harness
-  uses handler-direct route calls after the reviewed `TestClient` fallback rule was triggered by a hang.
-- PG `prices` destructive drop after P0-C has soaked. Requires a fresh targeted dump, restore proof,
-  explicit approval, and conscious removal of `prices` from the N9 excluded-table protection.
+- Approved evidence fingerprint `028efacdc3a41f917eb6fa795ca97e5dff3e3c7f3508715d2d133a37711b902b` (second approval package; the first, `b0ca91b9…`, was rejected pre-drop because `get_recent_prices(character varying,character varying,integer)` holds a normal rowtype dependency on `prices` — caught in external second-opinion review, empirically confirmed in a disposable DB, and closed by hardening the gate: dependency-coverage machine refusal for any uncovered normal `pg_proc` rowtype dependency, `function_ddl.sql` in the archive, two-stage restore proof, and function-before-table drop order).
+- Archive `data/pg_archive/n9_batch3_prices_20260705T010022Z/` — dump sha256 `76b6cb6d…`, `function_ddl.sql`, restore proof `ok:true`, `mismatches:[]` (row count + row fingerprint + function presence in the disposable DB).
+- Dropped in one transaction, no CASCADE, function first: `get_recent_prices(...)` + table `prices` (2,314,293 rows, frozen at `2026-07-02 14:15 UTC`, row fingerprint `e4b8e5d3…`).
+- Postcheck ok; pre-drop E2E ×2 and post-drop E2E ×2 all `ok:true` / `pg_attempts:[]` / 22 checks; local NVDA smoke 104 bars.
+- **Archive semantics (restated): the batch-3 dump is a frozen pre-cutover PG prices mirror archive, not a backup of current local `market_data.db` prices. Current price recovery depends on the local market_data.db backup chain.**
+- **Remaining PG objects: the three app-record archive tables only (`agent_queries`, `research_reports`, `agent_memories`) — separate policy ruling pending.**
 
 ---
 
@@ -172,7 +173,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1 and batch-2 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green; batch-3 is the future physical PG `prices` drop.
+- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1, batch-2, and batch-3 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green pre- and post-batch-3; PG now holds only the three app-record archive tables (separate policy ruling pending).
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---

@@ -2,7 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** OFFLINE TASKS 1-3 IMPLEMENTED + FUNCTION-DEPENDENCY FIXUP on branch `codex/batch3-prices-drop` (2026-07-05). This does not authorize a live PG `prices` drop.
+> **Status:** ✅ **LIVE COMPLETE 2026-07-05.** PG `prices` (2,314,293 rows, frozen at `2026-07-02 14:15 UTC`, row fingerprint `e4b8e5d304bd45775f9c33f8986deeda`) and its dependent function `get_recent_prices(character varying,character varying,integer)` were dropped in one no-`CASCADE` transaction after explicit user approval.
+>
+> **Live record:**
+> - Approved evidence fingerprint: `028efacdc3a41f917eb6fa795ca97e5dff3e3c7f3508715d2d133a37711b902b` (second package; the first was invalidated — see the invalidated-packet note below).
+> - Archive: `data/pg_archive/n9_batch3_prices_20260705T010022Z/` — dump sha256 `76b6cb6d33a5b66d861612d24746517b358bb0c3f75c923bfa0bbe0731b27f7b`, `function_ddl.sql` included, two-stage restore proof (`pg_restore` + function DDL apply) `ok:true`, `mismatches:[]` (`restore_proof.json`).
+> - Preview ×2 byte-identical (each consuming a different green E2E report file); reviewer independently reproduced the PG row fingerprint hours apart via a second path.
+> - Drop: 13-check validation → in-CLI re-preview fingerprint match → single txn `DROP FUNCTION` → `DROP TABLE` → in-txn catalog verification → commit. Output `{"status": "dropped", "dropped_tables": 1}`.
+> - Postcheck `ok:true`, `targets_still_present:[]`, `protected_missing:[]`.
+> - Pre-drop E2E ×2: `scratchpad/pg-unreachable-e2e-batch3-20260705T005907Z/`; post-drop E2E ×2: `scratchpad/pg-unreachable-e2e-post-batch3-20260705T012220Z/` — all four runs `ok:true`, `pg_attempts:[]`, 22/22 checks. Local NVDA smoke: 104 bars, no PG attempt.
+> - PG public schema now contains exactly the three protected app-record archive tables: `agent_memories`, `agent_queries`, `research_reports`.
 
 > **Offline gate:** `pytest tests/test_db_backend_retired_prices.py tests/test_n9_batch3_prices_drop.py tests/test_pg_unreachable_e2e.py tests/test_sqlite_backend.py::test_p0c_prices_miss_is_honest_empty_no_pg tests/test_provider_health.py tests/test_data_scheduler.py -q` -> 134 passed; `python -m compileall scripts/migration/n9_batch3_prices_drop.py scripts/smoke/pg_unreachable_e2e.py` -> pass; `git diff --check` -> pass; batch-3 grep classifier -> blockers 0 / allowed hits 197.
 

@@ -6,7 +6,7 @@ cutover completed and live-verified 2026-06-27. The all-source normalized-news N
 live-applied and validated (2026-06-29). N8a news PG-exit finalized live (2026-07-01):
 `news_pg_exit_completed=true`, normalized news writes are required, `ibkr_news` now routes through
 the normalized local writer + legacy projection, and news reads are hard-local without PostgreSQL.
-**N9 batch-1 live drop EXECUTED 2026-07-03 and N9 batch-2 live drop EXECUTED 2026-07-05 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04; P0-C.1 runtime hardening moved IBKR price jobs to sanitized subprocess workers and shortened price write locks; final PG-unreachable E2E smoke is LIVE VERIFIED 2026-07-05 — PG `prices` is archive/rollback only until batch-3.** Remaining: batch-3 PG `prices` destructive drop and separate decisions for app-record archive tables. S-G
+**N9 batch-1 live drop EXECUTED 2026-07-03, batch-2 EXECUTED 2026-07-05, and batch-3 EXECUTED 2026-07-05 (see PG_EXIT_REMAINDER_SCOPING.md §8). P0-C prices direct-local cutover LIVE COMPLETE 2026-07-04; P0-C.1 runtime hardening moved IBKR price jobs to sanitized subprocess workers and shortened price write locks; PG-unreachable E2E smoke is LIVE VERIFIED 2026-07-05 both before and after the batch-3 drop — the market-data PG exit is physically complete, and PG public schema now holds exactly the three app-record archive tables.** Remaining: a separate policy decision for app-record archive tables (`agent_queries`, `research_reports`, `agent_memories`); accepting them as out-of-runtime archives closes PG-exit. S-G
 `news_scores`, S-H1 `job_runs`, and S-H2 `financial_data_cache` are now local; PG `job_runs` has been archived/dropped.
 
 ## Progress
@@ -149,7 +149,7 @@ early, and the UI only simplifies once each domain is truly local.
 5. Settings no longer needs PG-fallback / local-mirror / strict dual-mode controls.
 6. Tests include a "PG unreachable" scenario proving normal use doesn't stall or fall back.
 
-**2026-07-05 status:** criteria 1, 2, 3, 5, and 6 are satisfied for normal runtime: the PG-unreachable smoke ran twice with `ok:true`, `pg_attempts:[]`, and 22/22 checks green (`scratchpad/pg-unreachable-e2e-20260704T172555Z/`). Criterion 4 is functionally true for runtime; physical PG `prices` remains as archive/import-only until batch-3.
+**2026-07-05 status (post-batch-3):** all six criteria are satisfied for market data. The PG-unreachable smoke ran green twice before and twice after the batch-3 drop (`scratchpad/pg-unreachable-e2e-batch3-20260705T005907Z/`, `scratchpad/pg-unreachable-e2e-post-batch3-20260705T012220Z/`), each `ok:true`, `pg_attempts:[]`, 22/22 checks. Criterion 4 is now physically true: PG `prices` was archived (restore-proven) and dropped 2026-07-05, and PG public schema holds only the three app-record archive tables — never in the normal app path. PG-exit closes once the app-record archive policy is ruled (keep-as-archive / migrate / drop).
 
 ## Resolved decisions (were open questions)
 
