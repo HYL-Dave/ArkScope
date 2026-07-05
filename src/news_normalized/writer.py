@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Callable, Iterable, Optional, Protocol
+from typing import Any, Callable, Iterable, Optional, Protocol
 
 from src.market_data_direct import (
     _ensure_provider_sync_tables,
@@ -76,6 +76,7 @@ def write_news_batch(
     continuation: Optional[WriterContinuation] = None,
     progress_cb: Optional[Callable[[int, int, str], None]] = None,
     project_legacy: bool = False,
+    write_lock_factory: Optional[Callable[[], Any]] = None,
 ) -> WriterResult:
     """Persist metadata first, then spend bounded provider calls on article bodies."""
     source = provider.source.strip().casefold()
@@ -99,6 +100,9 @@ def write_news_batch(
     body_fetch_attempts = 0
     tickers_scanned = 0
 
+    def write_lock():
+        return write_lock_factory() if write_lock_factory is not None else nullcontext()
+
     def record_projection(result: ProjectionResult, article_id: Optional[int]) -> None:
         nonlocal legacy_rows_inserted
         nonlocal legacy_rows_updated
@@ -115,36 +119,40 @@ def write_news_batch(
 
     def upsert_candidate(candidate: ArticleCandidate):
         if not project_legacy:
-            return store.upsert(candidate)
+            with write_lock():
+                return store.upsert(candidate)
 
         projection = ProjectionResult()
-        store.conn.execute("BEGIN IMMEDIATE")
-        try:
-            upsert = store.upsert_uncommitted(candidate)
-            if upsert.article_id is not None and not upsert.quarantined:
-                projection = project_article_uncommitted(store.conn, upsert.article_id)
-            store.conn.commit()
-        except Exception:
-            store.conn.rollback()
-            raise
+        with write_lock():
+            store.conn.execute("BEGIN IMMEDIATE")
+            try:
+                upsert = store.upsert_uncommitted(candidate)
+                if upsert.article_id is not None and not upsert.quarantined:
+                    projection = project_article_uncommitted(store.conn, upsert.article_id)
+                store.conn.commit()
+            except Exception:
+                store.conn.rollback()
+                raise
         record_projection(projection, upsert.article_id)
         return upsert
 
     def update_body(candidate: ArticleCandidate, body: BodyCandidate) -> None:
         if not project_legacy:
-            store.update_body(candidate, body)
+            with write_lock():
+                store.update_body(candidate, body)
             return
 
         projection = ProjectionResult()
         article_id: Optional[int] = None
-        store.conn.execute("BEGIN IMMEDIATE")
-        try:
-            article_id = store.update_body_uncommitted(candidate, body)
-            projection = project_article_uncommitted(store.conn, article_id)
-            store.conn.commit()
-        except Exception:
-            store.conn.rollback()
-            raise
+        with write_lock():
+            store.conn.execute("BEGIN IMMEDIATE")
+            try:
+                article_id = store.update_body_uncommitted(candidate, body)
+                projection = project_article_uncommitted(store.conn, article_id)
+                store.conn.commit()
+            except Exception:
+                store.conn.rollback()
+                raise
         record_projection(projection, article_id)
 
     def record_resumed_body_error(
@@ -152,20 +160,22 @@ def write_news_batch(
     ) -> None:
         ticker = article.primary_ticker or next(iter(article.related_tickers), None)
         if ticker:
-            _upsert_provider_meta(
-                store.conn,
-                provider=source,
-                ticker=ticker,
-                interval="news",
-                last_bar_datetime=article.published_at,
-                rows_added=0,
-                error=error,
-            )
+            with write_lock():
+                _upsert_provider_meta(
+                    store.conn,
+                    provider=source,
+                    ticker=ticker,
+                    interval="news",
+                    last_bar_datetime=article.published_at,
+                    rows_added=0,
+                    error=error,
+                )
 
-    _ensure_provider_sync_tables(store.conn)
-    run_id = _start_provider_run(
-        store.conn, provider=source, interval="news", domain="news"
-    )
+    with write_lock():
+        _ensure_provider_sync_tables(store.conn)
+        run_id = _start_provider_run(
+            store.conn, provider=source, interval="news", domain="news"
+        )
     operation = getattr(provider, "operation", nullcontext)
     try:
         with operation():
@@ -299,51 +309,55 @@ def write_news_batch(
                             still_deferred_bodies.append(provider_id)
 
                     newest = store.latest_cursor(source, ticker)
-                    _upsert_provider_meta(
-                        store.conn,
-                        provider=source,
-                        ticker=ticker,
-                        interval="news",
-                        last_bar_datetime=newest,
-                        rows_added=inserted_for_ticker,
-                        error=ticker_error,
-                    )
+                    with write_lock():
+                        _upsert_provider_meta(
+                            store.conn,
+                            provider=source,
+                            ticker=ticker,
+                            interval="news",
+                            last_bar_datetime=newest,
+                            rows_added=inserted_for_ticker,
+                            error=ticker_error,
+                        )
                     if not budget_hit and progress_cb:
                         progress_cb(ticker_index + 1, total, ticker)
                 except Exception as exc:  # one ticker must not abort the batch
                     errors[ticker] = str(exc)
-                    _upsert_provider_meta(
-                        store.conn,
-                        provider=source,
-                        ticker=ticker,
-                        interval="news",
-                        last_bar_datetime=None,
-                        rows_added=inserted_for_ticker,
-                        error=str(exc),
-                    )
+                    with write_lock():
+                        _upsert_provider_meta(
+                            store.conn,
+                            provider=source,
+                            ticker=ticker,
+                            interval="news",
+                            last_bar_datetime=None,
+                            rows_added=inserted_for_ticker,
+                            error=str(exc),
+                        )
                 if budget_hit:
                     break
     except Exception as exc:
+        with write_lock():
+            _finish_provider_run(
+                store.conn,
+                run_id,
+                status="failed",
+                tickers_scanned=tickers_scanned,
+                gaps_found=0,
+                rows_added=articles_inserted,
+                error=str(exc),
+            )
+        raise
+
+    with write_lock():
         _finish_provider_run(
             store.conn,
             run_id,
-            status="failed",
+            status="succeeded",
             tickers_scanned=tickers_scanned,
             gaps_found=0,
             rows_added=articles_inserted,
-            error=str(exc),
+            error=None,
         )
-        raise
-
-    _finish_provider_run(
-        store.conn,
-        run_id,
-        status="succeeded",
-        tickers_scanned=tickers_scanned,
-        gaps_found=0,
-        rows_added=articles_inserted,
-        error=None,
-    )
     continuation_out = None
     if deferred_tickers or still_deferred_bodies:
         continuation_out = WriterContinuation(
