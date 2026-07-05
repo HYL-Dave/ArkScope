@@ -28,6 +28,7 @@ def test_required_checks_cover_pg_exit_surfaces():
         "sa_feed",
         "sa_health",
         "macro_status",
+        "macro_snapshot",
         "macro_health",
         "macro_ipo",
         "reports",

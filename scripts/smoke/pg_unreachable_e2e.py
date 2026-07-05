@@ -156,6 +156,13 @@ def _assert_macro_payload_or_disabled(body: Any) -> None:
     _assert_list_or_dict(body)
 
 
+def _assert_macro_snapshot(body: Any) -> None:
+    assert isinstance(body, dict)
+    assert "items" in body
+    assert "auto_refresh_enabled" in body
+    assert "available" in body
+
+
 def _assert_provider_config_policy(body: Any) -> None:
     """S-J Phase 2 strict-flip invariants, profile-agnostic so routine E2E runs
     (real profile, env unset) stay green: an explicit ARKSCOPE_PROVIDER_ENV_FALLBACK
@@ -207,6 +214,7 @@ REQUIRED_CHECKS: tuple[CheckSpec, ...] = (
     CheckSpec("sa_feed", "GET", "/sa/feed?limit=5", 200, _assert_list_or_dict),
     CheckSpec("sa_health", "GET", "/sa/market-news/health", 200, _assert_key("severity")),
     CheckSpec("macro_status", "GET", "/macro/status", 200, _assert_key("local_first_active")),
+    CheckSpec("macro_snapshot", "GET", "/macro/snapshot", 200, _assert_macro_snapshot),
     CheckSpec(
         "macro_health",
         "GET",
@@ -492,6 +500,11 @@ class _HandlerDirectClient:
                 200,
                 macro_calendar.macro_status(store=self.profile_store),
             )
+
+        if method == "GET" and route == "/macro/snapshot":
+            from src.api.routes import macro_calendar
+
+            return _DirectResponse(200, macro_calendar.macro_snapshot())
 
         if method == "GET" and route == "/macro/health":
             from src.api.routes import macro_calendar
