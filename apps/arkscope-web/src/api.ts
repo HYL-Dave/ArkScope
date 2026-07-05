@@ -1283,29 +1283,8 @@ export function getMarketDataStatus(): Promise<MarketDataStatus> {
   return getJSON<MarketDataStatus>("/market-data/status");
 }
 
-// Full rebuild of the local market DB (prices + news + iv + fundamentals).
-// Returns a job to poll.
-export function bootstrapMarketData(): Promise<MarketDataJob> {
-  return sendJSON<MarketDataJob>("/market-data/bootstrap", "POST");
-}
-
-// Incremental delta refresh (append-only; prices + news + iv + fundamentals).
-// Returns a job to poll.
-export function updateMarketData(): Promise<MarketDataJob> {
-  return sendJSON<MarketDataJob>("/market-data/update", "POST");
-}
-
 export function getMarketDataJob(jobId: string): Promise<MarketDataJob> {
   return getJSON<MarketDataJob>(`/market-data/jobs/${encodeURIComponent(jobId)}`);
-}
-
-// Validation runs PG aggregates over all domains (prices/news/iv/fundamentals) — allow time.
-export function validateMarketData(): Promise<MarketDataValidate> {
-  return sendJSON<MarketDataValidate>("/market-data/validate", "POST", undefined, 60_000);
-}
-
-export function setUseLocalMarket(enabled: boolean): Promise<{ use_local_market_setting: boolean }> {
-  return sendJSON("/market-data/settings", "PUT", { enabled });
 }
 
 // News direct-local ingest. After news PG exit, polygon/finnhub/ibkr write
@@ -1370,10 +1349,6 @@ export interface MacroSnapshot {
 
 export function getMacroSnapshot(): Promise<MacroSnapshot> {
   return getJSON<MacroSnapshot>("/macro/snapshot");
-}
-
-export function setUseLocalMacro(enabled: boolean): Promise<{ use_local_macro_setting: boolean }> {
-  return sendJSON("/macro/settings", "PUT", { enabled });
 }
 
 // --- 交易日 / 價格覆蓋唯讀診斷 (Slice A/B; read-only over market_data.db) ---

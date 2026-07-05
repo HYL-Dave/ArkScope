@@ -1741,14 +1741,11 @@ function DataSourcesSection() {
                     );
                   }
                   const rows = c.fields.length > 0 ? c.fields : [null];
-                  const hintRows = rows.filter(
-                    (f) => f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0,
-                  ).length;
                   return rows.map((f, i) => (
                     <Fragment key={`${pid}.${f?.field ?? "_"}`}>
                     <tr>
                       {i === 0 && (
-                        <td rowSpan={rows.length + hintRows}>
+                        <td rowSpan={rows.length}>
                           {label}
                           {c.default_available && <div className="muted tiny">免金鑰 · 預設可用</div>}
                         </td>
@@ -1805,7 +1802,7 @@ function DataSourcesSection() {
                         )}
                       </td>
                       {i === 0 && (
-                        <td rowSpan={rows.length + hintRows}>
+                        <td rowSpan={rows.length}>
                           {c.testable ? (
                             <>
                               <button className="btn-ghost" disabled={!!busy}
@@ -1822,27 +1819,6 @@ function DataSourcesSection() {
                         </td>
                       )}
                     </tr>
-                    {f?.env_var === "IBKR_CLIENT_ID" && (f.client_id_domains?.length ?? 0) > 0 && (() => {
-                      // real env > app DB: while the shell env controls the base, a saved
-                      // draft changes nothing at runtime — never show a save preview.
-                      const envControlled = f.effective_source === "env";
-                      const chips = ibkrClientIdChips(
-                        f.client_id_domains!,
-                        envControlled ? "" : keyDrafts[`${pid}.${f.field}`] ?? "",
-                      );
-                      const caption = envControlled
-                        ? "各域用戶端 ID（環境變數控制中）："
-                        : chips.preview
-                          ? "存檔後 ID："
-                          : "各域用戶端 ID：";
-                      return (
-                        <tr>
-                          <td colSpan={3} className="muted tiny">
-                            {caption}{chips.text}
-                          </td>
-                        </tr>
-                      );
-                    })()}
                     </Fragment>
                   ));
                 })}
