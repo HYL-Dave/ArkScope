@@ -97,6 +97,26 @@
 - Modify: `src/data_provider_config.py`
 - Test: `tests/test_data_provider_config.py`
 
+- [ ] **Step 0: Make `test_data_provider_config.py` file-loader hermetic**
+
+Update the existing `hermetic()` autouse fixture in `tests/test_data_provider_config.py` so the whole file uses a throwaway empty env file. This is required because strict `apply_env()` will discard unmanaged file-loaded managed keys; without an isolated `env_file_path`, a developer machine with a real `config/.env` and a virgin worktree without one take different paths.
+
+Add this inside the fixture before the `delenv` loop:
+
+```python
+    empty_env = tmp_path / ".env"
+    empty_env.write_text("", encoding="utf-8")
+    monkeypatch.setattr("src.env_keys.env_file_path", lambda: empty_env)
+```
+
+Change the fixture signature:
+
+```python
+def hermetic(monkeypatch, tmp_path):
+```
+
+Keep the existing `_loaded=True`, `_loaded_keys=set()`, `_APP_APPLIED=set()`, and `reload_var_from_file` stubbing. Tests that need a non-empty env file override `env_file_path` themselves.
+
 - [ ] **Step 1: Add RED tests for the tri-state setting**
 
 Append these tests near the env bridge tests in `tests/test_data_provider_config.py`:
@@ -867,6 +887,34 @@ In `src/tools/analyst_tools.py`, import `ProviderConfigMissing` / `require_provi
 
 Keep `_get_finnhub_session()` as a low-level helper; the public tool surface is the structured contract.
 
+- [ ] **Step 11.5: Flip named old contracts surgically**
+
+Do not use a vague "fix whatever fails" pass here. These are the old contracts known to be superseded by strict mode:
+
+In `tests/test_provider_health.py`:
+
+1. `test_missing_key_wins_over_signal`
+   - Rename to `test_missing_required_config_wins_over_signal`.
+   - Change status expectation from `"missing_key"` to `"not_configured"`.
+   - Add `config_error["code"] == "provider_config_missing"` and `field == "api_key"`.
+2. `test_key_source_reports_effective_origin`
+   - Keep the real-env cases (`POLYGON_API_KEY`, `IBKR_HOST`) as `env`.
+   - Remove the expectation that a file-loaded managed key is effective `config/.env`.
+   - Add a separate assertion that file-loaded `FINNHUB_API_KEY` is ignored under strict and yields `not_configured`.
+3. `test_config_file_key_source_sets_import_suggestion`
+   - Move the import-suggestion assertion to `tests/test_data_provider_config.py::test_strict_view_peeks_config_file_for_import_without_effective_source`.
+   - Change provider-health expectation to `not_configured` with `provider_config_missing`; provider-health no longer re-blesses `.env` as source.
+4. `test_disabled_outranks_missing_key`
+   - Keep the status expectation as `"disabled"` for Financial Datasets when disabled.
+   - Add an assertion that disabled state still outranks `provider_config_missing`.
+
+In `tests/test_analyst_tools.py`:
+
+1. `TestFinnhubGet.test_no_api_key`
+   - Keep the low-level `_finnhub_get("/test")` / `_get_finnhub_session()` exception behavior because that helper still models the raw client.
+   - Add the public-tool test from Step 10 so `get_analyst_consensus()` returns structured `provider_config_missing`.
+   - Do not delete the low-level test; it still protects the helper surface.
+
 - [ ] **Step 12: Run Task 3 focused tests**
 
 Run:
@@ -875,7 +923,7 @@ Run:
 pytest tests/test_data_provider_config.py tests/test_provider_health.py tests/test_analyst_tools.py -q
 ```
 
-Expected: PASS after flipping any old `missing_key` expectations to `not_configured` where the provider is required and enabled.
+Expected: PASS after only the named old contracts in Step 11.5 are flipped. Do not delete unrelated assertions; preserve coverage outside the superseded `.env` authority expectations.
 
 - [ ] **Step 13: Commit Task 3**
 
@@ -895,6 +943,24 @@ git commit -m "feat: surface missing provider config structurally"
 - Test: `tests/test_data_scheduler.py`
 - Test: `tests/test_normalized_ibkr_worker.py`
 - Test: `tests/test_prices_runtime.py`
+
+- [ ] **Step 0: Seed provider config in the scheduler hermetic fixture**
+
+Update the existing autouse `hermetic()` fixture in `tests/test_data_scheduler.py`. Add dummy configured values after the `ARKSCOPE_MARKET_DB` / lock-dir setup and before provider stubs:
+
+```python
+    # S-J Phase 2 strict preflight reads the resolved runtime env before provider
+    # construction. Scheduler tests stub providers/writers, so seed dummy values
+    # here to exercise the configured path without touching config/.env or live
+    # credentials. Tests for not_configured explicitly delenv the relevant key.
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_test")
+    monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
+    monkeypatch.setenv("IBKR_HOST", "127.0.0.1")
+    monkeypatch.setenv("IBKR_PORT", "4001")
+    monkeypatch.setenv("IBKR_CLIENT_ID", "1")
+```
+
+Do **not** monkeypatch `_provider_config_missing_for_source` globally; the point is to test the real preflight happy path for existing scheduler tests.
 
 - [ ] **Step 1: Add RED scheduler test for Polygon/Finnhub strict missing**
 
@@ -989,10 +1055,10 @@ assert calls == ["store"]
 Run:
 
 ```bash
-pytest tests/test_data_scheduler.py::test_run_source_provider_config_missing_returns_not_configured tests/test_prices_runtime.py tests/test_normalized_ibkr_worker.py -q
+pytest tests/test_data_scheduler.py tests/test_prices_runtime.py tests/test_normalized_ibkr_worker.py -q
 ```
 
-Expected: PASS.
+Expected: PASS for the full scheduler file. This is intentional: the new preflight is cross-cutting, and a single new node-id test would miss existing `run_source(...)` tests that rely on stubbed providers.
 
 - [ ] **Step 5: Commit Task 4**
 
@@ -1310,6 +1376,32 @@ If no corrections were needed, do not create an empty commit.
 - No code expected
 - Scratch output under `scratchpad/` is allowed and must not be committed
 
+- [ ] **Step 0: Verify the live flip precondition**
+
+Before running any smoke, confirm the primary profile has no remaining managed fields sourced from `config/.env`:
+
+```bash
+python - <<'PY'
+from src.api.routes.providers_config import providers_config
+from src.data_provider_config import DataProviderConfigStore, apply_env
+
+store = DataProviderConfigStore()
+apply_env(store)
+cfg = providers_config(store=store)["providers"]
+rows = [
+    (provider, field["field"], field["effective_source"])
+    for provider, info in cfg.items()
+    for field in info["fields"]
+]
+bad = [row for row in rows if row[2] == "config/.env"]
+print({"fields": len(rows), "config_env_fields": bad})
+if bad:
+    raise SystemExit(1)
+PY
+```
+
+Expected on the primary machine before the flip: `fields` is 8 and `config_env_fields` is `[]` (8/8 app/env/missing but not config/.env; on the reviewed machine it was 8/8 app). If any managed field still reports `config/.env`, stop and import or consciously record the exception before continuing.
+
 - [ ] **Step 1: Record base SHA**
 
 Run:
@@ -1342,12 +1434,17 @@ Expected:
 If `scripts.smoke.pg_unreachable_e2e` does not cover provider config endpoints yet, extend the smoke in this slice with:
 
 ```python
-Check(
-    name="provider_config_strict_missing",
-    method="GET",
-    path="/providers/config",
-    assert_fn=lambda body: body["env_fallback"]["enabled"] is False
-        and body["providers"]["polygon"]["fields"][0]["effective_source"] == "missing",
+def _assert_provider_config_strict_missing(body):
+    assert body["env_fallback"]["enabled"] is False
+    assert body["providers"]["polygon"]["fields"][0]["effective_source"] == "missing"
+
+
+CheckSpec(
+    "provider_config_strict_missing",
+    "GET",
+    "/providers/config",
+    200,
+    _assert_provider_config_strict_missing,
 )
 ```
 
