@@ -77,7 +77,6 @@ Create `tests/test_news_normalized_writer_locking.py` with:
 ```python
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
 
 from src.news_normalized.models import (
     ArticleCandidate,
@@ -105,7 +104,7 @@ class _FakeProvider:
                 provider_article_id=f"{ticker}-1",
                 title=f"{ticker} headline",
                 url=f"https://example.test/{ticker}/1",
-                published_at=datetime(2026, 7, 5, 12, 0, tzinfo=timezone.utc),
+                published_at="2026-07-05T12:00:00Z",
                 primary_ticker=ticker,
                 related_tickers=(ticker,),
                 body=BodyCandidate(status=BodyStatus.PENDING),
@@ -115,7 +114,7 @@ class _FakeProvider:
     def fetch_body(self, candidate):
         self._events.append(("fetch_body", candidate.provider_article_id, self._lock_state["held"]))
         assert self._lock_state["held"] is False
-        return BodyCandidate(status=BodyStatus.FETCHED, text="body")
+        return BodyCandidate(status=BodyStatus.FETCHED, raw_body="<p>body</p>", raw_format="html")
 
 
 @contextmanager
@@ -133,6 +132,7 @@ def _tracking_lock(lock_state, events):
 def test_write_news_batch_fetches_outside_injected_write_lock(tmp_path):
     db = tmp_path / "market_data.db"
     conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
     store = NormalizedNewsStore(conn)
     lock_state = {"held": False}
     events = []
@@ -142,7 +142,7 @@ def test_write_news_batch_fetches_outside_injected_write_lock(tmp_path):
         _FakeProvider(lock_state, events),
         ["AAPL"],
         WriterBudget(max_articles=10, max_body_fetches=10),
-        project_legacy=True,
+        project_legacy=False,
         write_lock_factory=lambda: _tracking_lock(lock_state, events),
     )
 
@@ -466,6 +466,8 @@ with:
         )
 ```
 
+> **Obsolete-test cleanup (shipped in this commit):** removing the outer `market_write_lock` makes the pre-existing `test_normalized_news_route_calls_writer_under_market_lock` (`tests/test_data_scheduler.py`) assert a lock ordering that no longer exists — the writer now takes the lock internally via the injected factory. Delete only its `lock_enter`/`lock_exit` assertions (the inline pair and the final `events == [...]` list); keep its route/collector/provider/scope/budget/`project_legacy`/counts coverage. Its lock intent is now covered by the Step-6 companion test.
+
 - [ ] **Step 6: Add companion test for real writer argument shape**
 
 In `tests/test_data_scheduler.py`, add a test that does not mock the final writer result shape:
@@ -651,6 +653,8 @@ with:
                 write_lock_factory=market_write_lock,
             )
 ```
+
+> **Obsolete-test cleanup (shipped in this commit):** removing the worker's outer `market_write_lock` makes the pre-existing `test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock` (`tests/test_normalized_ibkr_worker.py`) obsolete — the worker no longer calls `market_write_lock()` itself (it delegates it to the writer as a factory), so its `market_enter < write < market_exit` ordering can never hold and its local fake `write_news_batch` lacks `**kwargs`. Widen that fake's signature with `**kwargs` and delete only the `market_enter`/`market_exit` ordering assertions; keep the gateway-lock and `client_id == 31` coverage. The Step-1 factory test now covers the no-outer-lock intent.
 
 - [ ] **Step 4: Run worker tests**
 
