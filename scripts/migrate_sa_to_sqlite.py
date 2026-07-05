@@ -78,6 +78,14 @@ _ARRAY_COLS = {
     ],
 }
 
+_TOMBSTONE_REFUSAL = (
+    "REFUSED: PG sa_* tables were dropped in N9 batch-1 — there is no live PG "
+    "source to count (--dry-run), rebuild from, or validate against. "
+    "sa_capture.db is the sole authority; the batch-1 archive dump "
+    "(data/pg_archive/) is the recovery basis. This CLI is retained as a "
+    "tombstone only."
+)
+
 
 def _canon(kind, value):
     if value is None:
@@ -93,29 +101,6 @@ def _canon(kind, value):
     if kind is None:  # NUMERIC → float
         return float(value)
     return value
-
-
-def _use_local_sa_enabled() -> bool:
-    """Mirror the DAL toggle read (env OR profile_settings) — build-path guard."""
-    import sqlite3
-
-    truthy = ("1", "true", "yes", "on")
-    if os.environ.get("ARKSCOPE_USE_LOCAL_SA", "").strip().lower() in truthy:
-        return True
-    root = Path(__file__).resolve().parents[1]
-    profile = os.environ.get("ARKSCOPE_PROFILE_DB") or str(root / "data" / "profile_state.db")
-    if not Path(profile).exists():
-        return False
-    try:
-        conn = sqlite3.connect(f"file:{profile}?mode=ro", uri=True)
-        try:
-            row = conn.execute(
-                "SELECT value FROM profile_settings WHERE key = 'use_local_sa'").fetchone()
-        finally:
-            conn.close()
-        return bool(row) and str(row[0]).strip().lower() in truthy
-    except sqlite3.OperationalError:
-        return False
 
 
 def _pg_columns(cur, table) -> list:
@@ -341,6 +326,9 @@ def main() -> int:
     ap.add_argument("--validate-only", action="store_true")
     args = ap.parse_args()
 
+    print(_TOMBSTONE_REFUSAL)
+    return 2
+
     if args.dry_run:
         pg = _pg_conn()
         try:
@@ -355,20 +343,9 @@ def main() -> int:
         if not Path(args.out).exists():
             print(f"{args.out} does not exist.")
             return 1
-        if _use_local_sa_enabled():
-            print("NOTE: use_local_sa is ON — the local store is the live authority; "
-                  "divergence from the frozen PG is EXPECTED after capture resumes.")
         ok = validate(args.out)
         print("✓ MATCH" if ok else "✗ MISMATCH")
         return 0 if ok else 1
-
-    # --- build (one-shot; refuses post-flip) ---
-    if _use_local_sa_enabled():
-        print("REFUSED: use_local_sa is enabled — sa_capture.db is the write authority; "
-              "rebuilding from PG would DESTROY captures PG never saw. There is no "
-              "override (runbook L1/L5). Flip the toggle off only as a deliberate "
-              "rollback, then re-run.")
-        return 2
 
     out = args.out
     tmp = out + ".building"

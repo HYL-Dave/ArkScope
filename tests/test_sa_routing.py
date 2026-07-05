@@ -164,15 +164,32 @@ def test_explicit_false_is_provenance_only(env):
     assert b.sa_db == str(env.sa_db)
 
 
-def test_migration_cli_refuses_rebuild_post_flip(env, monkeypatch):
-    # runbook L1/L5: after the flip sa_capture.db is the AUTHORITY — a rebuild from
-    # PG would destroy captures PG never saw. The build path must refuse, no override.
+def test_migration_cli_permanently_refuses_pg_paths(env, monkeypatch):
+    # N9 batch-1 dropped PG sa_* — there is nothing to rebuild from, validate
+    # against, or dry-run count. The batch-1 archive dump is the recovery basis.
     import scripts.migrate_sa_to_sqlite as mig
-    env.profile.set_setting("use_local_sa", "true")
-    monkeypatch.setattr(sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db)])
-    assert mig.main() == 2  # refused
 
-    env.profile.set_setting("use_local_sa", "false")  # deliberate rollback → allowed
-    monkeypatch.setattr(mig, "_pg_conn", lambda: (_ for _ in ()).throw(RuntimeError("no PG in test")))
-    with pytest.raises(RuntimeError):
-        mig.main()  # passes the guard, fails only at the (stubbed) PG connect
+    monkeypatch.setattr(
+        mig,
+        "_pg_conn",
+        lambda: (_ for _ in ()).throw(AssertionError("must not touch PG")),
+    )
+
+    for setting in ("true", "false", None):
+        env.profile.set_setting("use_local_sa", setting)
+        monkeypatch.setattr(
+            sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db)]
+        )
+        assert mig.main() == 2
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--validate-only"],
+    )
+    assert mig.main() == 2
+
+    monkeypatch.setattr(
+        sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--dry-run"]
+    )
+    assert mig.main() == 2
