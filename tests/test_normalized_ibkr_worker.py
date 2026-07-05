@@ -178,6 +178,22 @@ def test_worker_applies_provider_config_before_gateway_construction(monkeypatch,
     assert order == ["apply", "run_worker"]
 
 
+def test_apply_provider_config_passes_a_store(monkeypatch):
+    import src.news_normalized.ibkr_cli as worker
+    from src.data_provider_config import DataProviderConfigStore
+
+    seen = {}
+    monkeypatch.setattr(
+        "src.data_provider_config.apply_env",
+        lambda store: seen.setdefault("store", store) or frozenset(),
+    )
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", "/tmp/claude-1001/nonexistent-profile.db")
+
+    worker._apply_provider_config()
+
+    assert isinstance(seen["store"], DataProviderConfigStore)
+
+
 def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     monkeypatch,
 ):

@@ -39,6 +39,14 @@ def hermetic(tmp_path, monkeypatch):
     # N8a cutover writes a durable audit marker to the real market DB. Scheduler tests are
     # hermetic and must not let that live marker change legacy-route expectations.
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market_data.db"))
+    # S-J strict provider preflight reads process env after apply_env. Seed dummy
+    # managed keys so existing scheduler tests keep exercising their mocked
+    # writers; explicit not_configured tests delenv what they need.
+    monkeypatch.setenv("POLYGON_API_KEY", "pk_test")
+    monkeypatch.setenv("FINNHUB_API_KEY", "fk_test")
+    monkeypatch.setenv("IBKR_HOST", "127.0.0.1")
+    monkeypatch.setenv("IBKR_PORT", "4001")
+    monkeypatch.setenv("IBKR_CLIENT_ID", "1")
     from src.scheduler_state import SchedulerStateStore
     monkeypatch.setattr(ds, "_SCHED_STATE", SchedulerStateStore(tmp_path / "profile_state.db"))
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
@@ -230,6 +238,25 @@ def test_market_writer_backpressure_is_not_failed(monkeypatch):
 
 
 # --- run_source ------------------------------------------------------------------
+
+def test_run_source_provider_config_missing_returns_not_configured(monkeypatch):
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "src.news_direct.backfill_news_direct",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("provider must not run")),
+    )
+
+    res = ds.run_source("polygon_news", trigger_source="api")
+
+    assert res == {
+        "source": "polygon_news",
+        "code": "provider_config_missing",
+        "status": "not_configured",
+        "provider": "polygon",
+        "field": "api_key",
+    }
+    assert ds._LAST_RESULT["polygon_news"]["status"] == "not_configured"
+
 
 def test_stale_legacy_pg_news_route_is_retired_before_sync(monkeypatch):
     import src.news_normalized.routing as routing

@@ -233,12 +233,33 @@ _LAST_ATTEMPT_LOCK = threading.Lock()
 _LAST_RESULT: Dict[str, Dict[str, Any]] = {}
 _LAST_RESULT_LOCK = threading.Lock()
 
+_SOURCE_PROVIDER_CONFIG = {
+    "polygon_news": "polygon",
+    "finnhub_news": "finnhub",
+    "ibkr_news": "ibkr",
+    "ibkr_prices": "ibkr",
+    "price_backfill": "ibkr",
+}
+
 
 def _record_result(result: Dict[str, Any]) -> Dict[str, Any]:
     with _LAST_RESULT_LOCK:
         _LAST_RESULT[result.get("source", "?")] = {
             **result, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     return result
+
+
+def _provider_config_missing_for_source(source: str) -> dict[str, Any] | None:
+    provider = _SOURCE_PROVIDER_CONFIG.get(source)
+    if not provider:
+        return None
+    from src.data_provider_config import ProviderConfigMissing, require_provider_configured
+
+    try:
+        require_provider_configured(provider)
+        return None
+    except ProviderConfigMissing as exc:
+        return {"source": source, **exc.as_dict()}
 
 # live per-source progress, fed by the in-process adapters' progress_cb (the
 # rough estimate the UI shows: ticker N of TOTAL — only adapter sources have it;
@@ -827,6 +848,9 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             "error": setup_state.reason or "provider config setup required",
             "code": setup_state.code,
         })
+    missing_config = _provider_config_missing_for_source(source)
+    if missing_config is not None:
+        return _record_result(missing_config)
 
     lock = _SOURCE_LOCKS[source]
     if not lock.acquire(blocking=False):
