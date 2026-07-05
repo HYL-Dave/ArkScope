@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS data_provider_config (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (provider, field)
 );
+
+CREATE TABLE IF NOT EXISTS profile_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -118,6 +124,54 @@ def provider_default_available(provider: str) -> bool:
     if defs is None:
         return False
     return provider != "seeking_alpha" and all(f.optional for f in defs)
+
+
+PROVIDER_ENV_FALLBACK_KEY = "provider_env_fallback"
+ENV_PROVIDER_ENV_FALLBACK = "ARKSCOPE_PROVIDER_ENV_FALLBACK"
+_TRUTHY = ("1", "true", "yes", "on")
+_FALSY = ("0", "false", "no", "off")
+
+
+def parse_provider_env_fallback(value: Any) -> Optional[bool]:
+    text = str(value).strip().lower() if value is not None else ""
+    if text in _TRUTHY:
+        return True
+    if text in _FALSY:
+        return False
+    return None
+
+
+def provider_env_fallback_enabled(store: DataProviderConfigStore | None = None) -> bool:
+    env_value = parse_provider_env_fallback(os.environ.get(ENV_PROVIDER_ENV_FALLBACK))
+    if env_value is not None:
+        return env_value
+    if store is not None:
+        try:
+            profile_value = parse_provider_env_fallback(
+                store.get_setting(PROVIDER_ENV_FALLBACK_KEY)
+            )
+            if profile_value is not None:
+                return profile_value
+        except Exception:  # noqa: BLE001 - fail strict on settings read failure
+            logger.warning(
+                "provider_env_fallback setting read failed; defaulting strict",
+                exc_info=True,
+            )
+    return False
+
+
+def provider_env_fallback_source(store: DataProviderConfigStore | None = None) -> str:
+    if parse_provider_env_fallback(os.environ.get(ENV_PROVIDER_ENV_FALLBACK)) is not None:
+        return "env"
+    if store is not None:
+        try:
+            if parse_provider_env_fallback(
+                store.get_setting(PROVIDER_ENV_FALLBACK_KEY)
+            ) is not None:
+                return "profile"
+        except Exception:  # noqa: BLE001
+            return "default"
+    return "default"
 
 # env-var names the APP injected this process (effective source = 'app')
 _APP_APPLIED: set = set()
@@ -225,6 +279,29 @@ class DataProviderConfigStore:
                     "DELETE FROM data_provider_config WHERE provider = ? AND field = ?",
                     (provider, field),
                 )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_setting(self, key: str) -> Optional[str]:
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT value FROM profile_settings WHERE key = ?", (key,)
+            ).fetchone()
+        finally:
+            conn.close()
+        return row[0] if row else None
+
+    def set_setting(self, key: str, value: Optional[str]) -> None:
+        conn = self._connect()
+        try:
+            conn.execute(
+                "INSERT INTO profile_settings (key, value, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
+                "updated_at = excluded.updated_at",
+                (key, value, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+            )
             conn.commit()
         finally:
             conn.close()

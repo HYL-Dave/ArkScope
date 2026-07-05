@@ -16,10 +16,13 @@ def store(tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def hermetic(monkeypatch):
+def hermetic(monkeypatch, tmp_path):
     """Never touch the real env keys / config/.env / app-applied tracking.
     reload_var_from_file is stubbed to "file defines nothing" — tests that care
     about the fallback override it themselves."""
+    empty_env = tmp_path / ".env"
+    empty_env.write_text("", encoding="utf-8")
+    monkeypatch.setattr("src.env_keys.env_file_path", lambda: empty_env)
     monkeypatch.setattr("src.env_keys._loaded", True)
     monkeypatch.setattr("src.env_keys._loaded_keys", set())
     monkeypatch.setattr(dpc, "_APP_APPLIED", set())
@@ -50,6 +53,67 @@ def test_store_rejects_unknown_field(store):
 
 
 # --- env bridge --------------------------------------------------------------------
+
+def test_provider_env_fallback_defaults_strict(store, monkeypatch):
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
+    assert dpc.provider_env_fallback_enabled(store) is False
+    assert dpc.provider_env_fallback_source(store) == "default"
+
+
+def test_provider_env_fallback_profile_true_is_legacy_rollback(store, monkeypatch):
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
+    store.set_setting("provider_env_fallback", "true")
+    assert dpc.provider_env_fallback_enabled(store) is True
+    assert dpc.provider_env_fallback_source(store) == "profile"
+
+
+def test_provider_env_fallback_env_override_wins(store, monkeypatch):
+    store.set_setting("provider_env_fallback", "true")
+    monkeypatch.setenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", "false")
+    assert dpc.provider_env_fallback_enabled(store) is False
+    assert dpc.provider_env_fallback_source(store) == "env"
+
+    monkeypatch.setenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", "yes")
+    assert dpc.provider_env_fallback_enabled(store) is True
+    assert dpc.provider_env_fallback_source(store) == "env"
+
+
+def test_env_file_peek_reads_without_mutating_process(monkeypatch, tmp_path):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "POLYGON_API_KEY='pk_file'\nALPHA_VANTAGE_API_KEY=av_file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+
+    assert env_keys.peek_env_file_value("POLYGON_API_KEY") == "pk_file"
+    assert "POLYGON_API_KEY" not in os.environ
+    assert "POLYGON_API_KEY" not in env_keys.keys_loaded_from_file()
+
+
+def test_env_loader_excludes_managed_key_but_loads_legacy_key(monkeypatch, tmp_path):
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "POLYGON_API_KEY=pk_file\nALPHA_VANTAGE_API_KEY=av_file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.setattr(env_keys, "_loaded", False)
+    monkeypatch.setattr(env_keys, "_loaded_keys", set())
+    monkeypatch.delenv("POLYGON_API_KEY", raising=False)
+    monkeypatch.delenv("ALPHA_VANTAGE_API_KEY", raising=False)
+
+    env_keys.ensure_env_loaded_excluding({"POLYGON_API_KEY"})
+
+    assert "POLYGON_API_KEY" not in os.environ
+    assert os.environ["ALPHA_VANTAGE_API_KEY"] == "av_file"
+    assert env_keys.keys_loaded_from_file() == frozenset({"ALPHA_VANTAGE_API_KEY"})
+
 
 def test_apply_env_injects_and_tracks(store):
     store.set_field("polygon", "api_key", "pk_app")
