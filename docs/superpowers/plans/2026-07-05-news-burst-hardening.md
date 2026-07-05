@@ -29,9 +29,11 @@
 
 1. **Do not add a queue.** Keep the scheduler's tick model: defer/skip and retry on the next due tick rather than queueing work behind a long writer.
 2. **Do not expand source concurrency.** The one-market-writer-per-tick backpressure remains. This plan reduces lock hold time inside the one fired source.
-3. **IBKR news participates in the same write-lock hardening.** Gateway serialization remains controlled by `ibkr_gateway_lock`; market DB writes still use `market_write_lock` but only around SQLite writes.
-4. **Lock-busy is not provider failure.** A `market_data.db write lock busy (timeout)` while writing normalized news is a retryable scheduler skip (`status="skipped"`, `skip_kind="skipped_lock_busy"`, `last_error=None`), not a red provider failure.
-5. **No live provider calls in tests.** All tests use fake providers, fake stores, or monkeypatches. The live soak is manual and happens after merge.
+3. **Cross-tick contention is handled by short locks, not another scheduler-wide running flag.** The 2026-07-04 concern was "defer while a market writer is actively running." P0-C.1 already added same-tick backpressure; this slice deliberately solves cross-tick overlap by making every fired market writer hold `market_write_lock` only for short SQLite write phases, with residual contention classified as retryable skip. No long-running queue or global "market writer active" latch is added.
+4. **IBKR news participates in the same write-lock hardening.** Gateway serialization remains controlled by `ibkr_gateway_lock`; market DB writes still use `market_write_lock` but only around SQLite writes.
+5. **Lock-busy is not provider failure.** A `market_data.db write lock busy (timeout)` while writing normalized news is a retryable scheduler skip (`status="skipped"`, `skip_kind="skipped_lock_busy"`, `last_error=None`), not a red provider failure.
+6. **Sanitized subprocess seams must carry classification fields.** IBKR news cannot classify lock-busy from `TimeoutError` class alone because provider/network timeouts share that class. The worker stdout contract must include bounded `error` text and a `retryable` bool, mirroring `src.prices_runtime.sanitize_error()`.
+7. **No live provider calls in tests.** All tests use fake providers, fake stores, or monkeypatches. The live soak is manual and happens after merge.
 
 ## File Map
 
@@ -47,7 +49,7 @@
 - Modify: `src/news_normalized/ibkr_cli.py`
   - Remove the outer market lock from `_run_worker()`.
   - Pass `market_write_lock` into `write_news_batch()`.
-  - Preserve existing sanitized stdout contract.
+  - Extend sanitized failure stdout with bounded retryability fields without exposing provider payloads.
 - Test: create `tests/test_news_normalized_writer_locking.py`; run existing `tests/test_news_normalized_writer.py` and `tests/test_news_normalized_projection.py`
   - Pin provider fetches outside the injected write lock.
   - Pin SQLite write phases inside the injected write lock.
@@ -667,6 +669,276 @@ Run:
 ```bash
 git add src/news_normalized/ibkr_cli.py tests/test_normalized_ibkr_worker.py
 git commit -m "fix: shorten ibkr news worker write locks"
+```
+
+---
+
+### Task 3.5: IBKR News Sanitized Lock-Busy Classification
+
+**Files:**
+- Modify: `src/news_normalized/ibkr_cli.py`
+- Modify: `src/service/data_scheduler.py`
+- Test: `tests/test_normalized_ibkr_worker.py`
+- Test: `tests/test_data_scheduler.py`
+
+- [ ] **Step 1: Add failing worker sanitization tests**
+
+In `tests/test_normalized_ibkr_worker.py`, add:
+
+```python
+def test_sanitize_worker_error_marks_market_lock_busy_retryable():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = sanitize_worker_error(
+        TimeoutError("market_data.db write lock busy (timeout)")
+    )
+
+    assert payload["status"] == "failed"
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert payload["retryable"] is True
+    assert payload["error"] == "market_data.db write lock busy (timeout)"
+
+
+def test_sanitize_worker_error_does_not_mark_generic_timeout_retryable():
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    payload = sanitize_worker_error(TimeoutError("provider request timed out"))
+
+    assert payload["status"] == "failed"
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert payload["retryable"] is False
+    assert payload["error"] == ""
+```
+
+- [ ] **Step 2: Run the RED worker sanitization tests**
+
+Run:
+
+```bash
+pytest tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_marks_market_lock_busy_retryable tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_does_not_mark_generic_timeout_retryable -q
+```
+
+Expected: FAIL because `retryable` and `error` are not currently in the sanitized worker payload.
+
+- [ ] **Step 3: Add bounded retryability fields to IBKR worker errors**
+
+In `src/news_normalized/ibkr_cli.py`, add:
+
+```python
+_MAX_ERROR_LEN = 600
+
+
+def _is_retryable_worker_error(message: str) -> bool:
+    return "market_data.db write lock busy" in message
+```
+
+Then change `sanitize_worker_error()` so only retryable lock-busy errors expose bounded text:
+
+```python
+def sanitize_worker_error(exc: BaseException) -> dict[str, Any]:
+    message = str(exc)[:_MAX_ERROR_LEN]
+    retryable = _is_retryable_worker_error(message)
+    payload = {"status": "failed"}
+    for key in _COUNT_KEYS:
+        payload[key] = 0
+    payload["error_count"] = 1
+    payload["error_classes"] = [type(exc).__name__]
+    payload["error"] = message if retryable else ""
+    payload["retryable"] = retryable
+    return payload
+```
+
+Do not include article title, URL, provider id, body fields, or arbitrary exception text. The bounded message is allowed only for the known `market_data.db write lock busy` string because the scheduler needs that classifier. Generic provider/network `TimeoutError` remains classified by `error_classes` only.
+
+- [ ] **Step 4: Run worker sanitization tests**
+
+Run:
+
+```bash
+pytest tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_marks_market_lock_busy_retryable tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_does_not_mark_generic_timeout_retryable -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Add failing parser/classifier test for real sanitized shape**
+
+In `tests/test_data_scheduler.py`, add:
+
+```python
+def test_ibkr_news_worker_stdout_parse_preserves_retryable_lock_busy():
+    import json as _json
+    import src.service.data_scheduler as ds
+    from src.news_normalized.ibkr_cli import sanitize_worker_error
+
+    failure = _json.dumps(
+        sanitize_worker_error(
+            TimeoutError("market_data.db write lock busy (timeout)")
+        )
+    )
+    payload = ds._parse_sanitized_worker_stdout(failure)
+
+    assert payload["retryable"] is True
+    assert "write lock busy" in payload["error"]
+    assert payload["error_classes"] == ["TimeoutError"]
+    assert ds._normalized_worker_retryable_skip_reason(payload) is not None
+
+    provider_failure = _json.dumps(
+        sanitize_worker_error(TimeoutError("provider request timed out"))
+    )
+    provider_payload = ds._parse_sanitized_worker_stdout(provider_failure)
+    assert provider_payload["retryable"] is False
+    assert provider_payload["error"] == ""
+    assert ds._normalized_worker_retryable_skip_reason(provider_payload) is None
+```
+
+- [ ] **Step 6: Run RED parser/classifier test**
+
+Run:
+
+```bash
+pytest tests/test_data_scheduler.py::test_ibkr_news_worker_stdout_parse_preserves_retryable_lock_busy -q
+```
+
+Expected: FAIL because `_parse_sanitized_worker_stdout()` does not allowlist `error` / `retryable`, and `_normalized_worker_retryable_skip_reason()` does not exist yet.
+
+- [ ] **Step 7: Allowlist error/retryable in normalized worker stdout parser**
+
+In `src/service/data_scheduler.py`, update `_parse_sanitized_worker_stdout()` after `error_count`:
+
+```python
+    error = str(raw.get("error") or "").strip()
+    payload["error"] = error[:_ERROR_TAIL] if error else ""
+    payload["retryable"] = raw.get("retryable") is True
+```
+
+Then add:
+
+```python
+def _normalized_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optional[str]:
+    if payload.get("retryable") is not True:
+        return None
+    return _market_write_lock_busy_reason(payload.get("error"))
+```
+
+- [ ] **Step 8: Classify IBKR news worker payload before raising failure**
+
+In the `ibkr_news` normalized subprocess branch inside `run_source()`, change:
+
+```python
+                    if step["returncode"] != 0:
+                        raise RuntimeError(
+                            _sanitized_worker_failure_message(step["payload"])
+                        )
+```
+
+to:
+
+```python
+                    if step["returncode"] != 0:
+                        reason = _normalized_worker_retryable_skip_reason(step["payload"])
+                        if reason is not None:
+                            result.update({
+                                "status": "skipped",
+                                "reason": reason,
+                                "skip_kind": "skipped_lock_busy",
+                            })
+                        else:
+                            raise RuntimeError(
+                                _sanitized_worker_failure_message(step["payload"])
+                            )
+```
+
+- [ ] **Step 9: Add run_source payload classification test**
+
+In `tests/test_data_scheduler.py`, add:
+
+```python
+def test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure(monkeypatch):
+    import src.service.data_scheduler as ds
+    import src.news_normalized.routing as routing
+
+    class _Lock:
+        def acquire(self, *args, **kwargs):
+            return True
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(
+        ds,
+        "_read_news_write_route_for_scheduler",
+        lambda: routing.NewsWriteRoute(
+            mode=routing.NewsWriteMode.NORMALIZED,
+            reason="normalized",
+        ),
+    )
+    monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL"])
+    monkeypatch.setattr(ds, "_IBKR_LOCK", _Lock())
+    monkeypatch.setattr(ds, "_IBKR_FLOCK", _Lock())
+    monkeypatch.setattr(
+        ds,
+        "_run_sanitized_json_subprocess",
+        lambda argv: {
+            "returncode": 1,
+            "payload": {
+                "status": "failed",
+                "articles_seen": 0,
+                "articles_inserted": 0,
+                "bodies_fetched": 0,
+                "error_count": 1,
+                "error_classes": ["TimeoutError"],
+                "error": "market_data.db write lock busy (timeout)",
+                "retryable": True,
+            },
+        },
+    )
+
+    res = ds.run_source("ibkr_news", trigger_source="scheduler")
+
+    assert res["status"] == "skipped"
+    assert res["skip_kind"] == "skipped_lock_busy"
+    assert "write lock busy" in res["reason"]
+    row = ds._state_store().get("ibkr_news")
+    assert row["last_status"] == "skipped"
+    assert row["last_error"] is None
+```
+
+- [ ] **Step 10: Run Task 3.5 tests**
+
+Run:
+
+```bash
+pytest \
+  tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_marks_market_lock_busy_retryable \
+  tests/test_normalized_ibkr_worker.py::test_sanitize_worker_error_does_not_mark_generic_timeout_retryable \
+  tests/test_data_scheduler.py::test_ibkr_news_worker_stdout_parse_preserves_retryable_lock_busy \
+  tests/test_data_scheduler.py::test_ibkr_news_worker_lock_busy_payload_is_skip_not_failure \
+  -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 11: Run existing sanitization secrecy tests**
+
+Run:
+
+```bash
+pytest \
+  tests/test_normalized_ibkr_worker.py \
+  tests/test_data_scheduler.py::test_normalized_ibkr_worker_failure_hides_raw_child_stderr \
+  tests/test_data_scheduler.py::test_normalized_ibkr_worker_invalid_stdout_is_generic_failure \
+  -q
+```
+
+Expected: PASS. Existing assertions that worker stdout does not include article title/url/id/body/provider payload must remain green. The new `error` field must not reintroduce arbitrary exception text.
+
+- [ ] **Step 12: Commit Task 3.5**
+
+Run:
+
+```bash
+git add src/news_normalized/ibkr_cli.py src/service/data_scheduler.py tests/test_normalized_ibkr_worker.py tests/test_data_scheduler.py
+git commit -m "fix: preserve retryable ibkr news worker errors"
 ```
 
 ---
