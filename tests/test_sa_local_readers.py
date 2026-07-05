@@ -528,13 +528,14 @@ class TestHealthSplit:
         assert "pipeline_signal_unavailable" in codes
         assert report["freshness"]["pipeline_signal"] == "last_fetched_at"
 
-    def test_pg_mode_dispatch_unchanged(self, pg_dal, pg_calls):
+    def test_non_local_sa_backend_does_not_query_pg(self, pg_dal, pg_calls):
         from src.service.sa_market_news_health import compute_market_news_health
 
         report = compute_market_news_health(pg_dal)
-        assert pg_calls, "no _sa_db → the capture query itself goes to PG"
+        assert not pg_calls
         assert report["severity"] == "critical"
         assert any(r["code"] == "db_unavailable" for r in report["reasons"])
+        assert "SA capture local backend unavailable" in report["reasons"][0]["message"]
 
 
 # ---------------------------------------------------------------------------

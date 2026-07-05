@@ -101,7 +101,7 @@ def compute_market_news_health(
     """Read sa_market_news stats and return a structured health report.
 
     Args:
-        dal: DAL instance whose ``_backend`` exposes ``_get_conn()``.
+        dal: DAL instance whose ``_backend`` exposes the local ``_sa_db`` path.
         now: clock override (UTC). Defaults to ``datetime.now(tz=UTC)``.
         thresholds: optional overrides merged onto ``DEFAULT_THRESHOLDS``.
 
@@ -119,8 +119,14 @@ def compute_market_news_health(
     merged_thresholds = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
 
     backend = getattr(dal, "_backend", None)
-    if backend is None or not hasattr(backend, "_get_conn"):
+    if backend is None:
         return _db_unavailable_report(now, merged_thresholds)
+    if getattr(backend, "_sa_db", None) is None:
+        return _db_unavailable_report(
+            now,
+            merged_thresholds,
+            error="SA capture local backend unavailable; PG sa_* health path is retired.",
+        )
 
     try:
         stats = _run_health_query(dal, backend, now=now)
@@ -325,30 +331,7 @@ def evaluate_health(
 # ---------------------------------------------------------------------------
 
 
-_HEALTH_SQL = """
-    SELECT
-        MAX(fetched_at)   AS last_fetched_at,
-        MAX(published_at) AS last_published_at,
-        COUNT(*) FILTER (
-            WHERE fetched_at >= %(now)s::timestamptz - INTERVAL '24 hours'
-        ) AS rows_24h_fetched,
-        COUNT(*) FILTER (
-            WHERE published_at >= %(now)s::timestamptz - INTERVAL '24 hours'
-        ) AS items_24h_published,
-        COUNT(*) FILTER (
-            WHERE COALESCE(published_at, fetched_at) >=
-                  %(now)s::timestamptz - INTERVAL '7 days'
-        ) AS items_7d,
-        COUNT(*) FILTER (
-            WHERE COALESCE(published_at, fetched_at) >=
-                  %(now)s::timestamptz - INTERVAL '7 days'
-              AND body_markdown IS NOT NULL
-              AND body_markdown <> ''
-        ) AS detail_present_7d
-    FROM sa_market_news
-"""
-
-# SQLite (sa_capture.db) twin of _HEALTH_SQL — slice 3d prep-3 health split.
+# SQLite (sa_capture.db) health query — slice 3d prep-3 health split.
 # Dialect sweep (runbook §1): COUNT(*) FILTER (WHERE …) → SUM(CASE …);
 # ``%(now)s::timestamptz - INTERVAL`` → Python-computed canonical TEXT cutoffs
 # passed positionally (timestamps on disk are canonical UTC ISO strings, so
@@ -388,42 +371,17 @@ def _run_health_query(dal: Any, backend: Any, *, now: datetime) -> Dict[str, Any
     to signal=None plus a warning-severity ``pipeline_signal_unavailable``
     reason instead of crashing the endpoint.
     """
-    sa_db = getattr(backend, "_sa_db", None)
-    if sa_db is not None:
-        out = _query_capture_stats_local(sa_db, now=now)
-        try:
-            out["extension_last_success_at"] = _query_extension_run(dal)
-        except Exception as exc:
-            logger.warning(
-                "sa_market_news health: extension_last_success_at lookup failed "
-                "(job_runs degraded): %s",
-                exc,
-            )
-            out["extension_last_success_at"] = None
-            out["pipeline_signal_unavailable"] = True
-        return out
-
-    # ---- PG mode (pre-cutover): unchanged --------------------------------
-    from psycopg2 import extras as _pg_extras
-
-    conn = backend._get_conn()
-    with conn.cursor(cursor_factory=_pg_extras.RealDictCursor) as cur:
-        cur.execute(_HEALTH_SQL, {"now": now})
-        market_row = cur.fetchone() or {}
-
-    extension_last_success_at: Any = None
+    out = _query_capture_stats_local(backend._sa_db, now=now)
     try:
-        extension_last_success_at = _query_extension_run(dal)
+        out["extension_last_success_at"] = _query_extension_run(dal)
     except Exception as exc:
-        # job_runs absent (pre-P0.2) or transient DB error — fall back to
-        # row-level signals only. Log once; do not raise.
         logger.warning(
-            "sa_market_news health: extension_last_success_at lookup failed: %s",
+            "sa_market_news health: extension_last_success_at lookup failed "
+            "(job_runs degraded): %s",
             exc,
         )
-
-    out = dict(market_row)
-    out["extension_last_success_at"] = extension_last_success_at
+        out["extension_last_success_at"] = None
+        out["pipeline_signal_unavailable"] = True
     return out
 
 
