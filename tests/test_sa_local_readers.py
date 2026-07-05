@@ -207,6 +207,55 @@ def sa_enabled(monkeypatch):
     monkeypatch.setattr("src.tools.sa_digest_tools._is_sa_enabled", lambda: True)
 
 
+def test_absent_sa_db_refresh_meta_is_honest_empty(tmp_path):
+    path = tmp_path / "missing.db"
+    backend = SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(path))
+
+    assert backend.get_sa_refresh_meta() == {}
+    assert not path.exists()
+
+
+def test_absent_sa_db_market_news_query_is_honest_empty(tmp_path):
+    path = tmp_path / "missing.db"
+    backend = SACaptureDatabaseBackend(FAKE_DSN, sa_db=str(path))
+
+    assert backend.query_sa_market_news(limit=5) == []
+    assert not path.exists()
+
+
+def test_provider_health_sa_meta_never_touches_pg_on_fresh_profile(monkeypatch, tmp_path):
+    import psycopg2
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("SA health path must not attempt PostgreSQL")
+
+    path = tmp_path / "missing.db"
+    monkeypatch.setattr(psycopg2, "connect", _forbidden)
+    backend = SACaptureDatabaseBackend(
+        "postgresql://poison.invalid/arkscope", sa_db=str(path)
+    )
+
+    assert backend.get_sa_refresh_meta() == {}
+    assert not path.exists()
+
+
+def test_absent_sa_db_health_query_degrades_honestly(tmp_path):
+    from src.service.sa_market_news_health import _query_capture_stats_local
+
+    path = tmp_path / "missing.db"
+    now = datetime(2026, 7, 5, 12, 0, tzinfo=timezone.utc)
+
+    out = _query_capture_stats_local(str(path), now=now)
+
+    assert out["rows_24h_fetched"] == 0
+    assert out["items_24h_published"] == 0
+    assert out["items_7d"] == 0
+    assert out["detail_present_7d"] == 0
+    assert out["last_fetched_at"] is None
+    assert out["last_published_at"] is None
+    assert not path.exists()
+
+
 # ---------------------------------------------------------------------------
 # 1. list_high_value_comments (sa_tools)
 # ---------------------------------------------------------------------------

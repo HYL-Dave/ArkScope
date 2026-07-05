@@ -295,6 +295,15 @@ def connect(db_path: Optional[str] = None, *, read_only: bool = False) -> sqlite
     """
     path = db_path or resolve_sa_db_path()
     if read_only:
+        if not Path(path).exists():
+            # Fresh profile: the capture DB does not exist yet. Serve an empty
+            # in-memory schema so readers get honest-empty rows without creating
+            # the file or falling back to the dropped PG sa_* tables.
+            conn = sqlite3.connect(":memory:", timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA busy_timeout = 10000")
+            ensure_schema(conn)
+            return conn
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 10000")
