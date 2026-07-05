@@ -125,10 +125,10 @@ class TestNativeHost:
     def test_handle_refresh_calls_dal(self):
         """Native host handle_message calls DAL.apply_sa_refresh."""
         sys.path.insert(0, str(project_root))
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("scripts.sa_native_host._try_ticker_sync"):
+             patch("src.sa_native_host._try_ticker_sync"):
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 3
             MockDAL.return_value = mock_dal
@@ -156,7 +156,7 @@ class TestNativeHost:
 
     def test_handle_failure_records_meta(self):
         """Native host records failure via DAL."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
@@ -175,18 +175,19 @@ class TestNativeHost:
 
     def test_handle_ping(self):
         """Native host responds to ping."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer"):
             result = handle_message({"action": "ping"})
             assert result["status"] == "ok"
+            assert result["project_root"] == str(project_root)
 
     def test_batch_ts_z_suffix_parsed(self):
         """JS Date.toISOString() Z suffix is parsed correctly."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("scripts.sa_native_host._try_ticker_sync"):
+             patch("src.sa_native_host._try_ticker_sync"):
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 0
             MockDAL.return_value = mock_dal
@@ -202,10 +203,10 @@ class TestNativeHost:
 
     def test_detail_url_in_raw_data_survives_dal(self):
         """Extension pick with raw_data.detail_url is passed through to DAL."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL, \
-             patch("scripts.sa_native_host._try_ticker_sync"):
+             patch("src.sa_native_host._try_ticker_sync"):
             mock_dal = MagicMock()
             mock_dal.apply_sa_refresh.return_value = 1
             MockDAL.return_value = mock_dal
@@ -233,7 +234,7 @@ class TestNativeHost:
 
     def test_closed_refresh_rejects_current_page_payload(self):
         """Native host refuses to persist current-shaped rows as closed picks."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
@@ -263,7 +264,7 @@ class TestNativeHost:
 
     def test_current_refresh_rejects_closed_page_payload(self):
         """Native host refuses to persist closed-shaped rows as current picks."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
@@ -292,7 +293,7 @@ class TestNativeHost:
 
     def test_closed_refresh_accepts_closed_page_payload(self):
         """Closed-shaped rows still persist through the normal refresh path."""
-        from scripts.sa_native_host import handle_message
+        from src.sa_native_host import handle_message
 
         with patch("src.tools.data_access.DataAccessLayer") as MockDAL:
             mock_dal = MagicMock()
@@ -991,7 +992,7 @@ class TestDataAccessMarketNews:
 class TestNativeHostDetailCache:
     def test_null_detail_needs_fetch(self):
         """Picks without detail_report are returned in need_detail."""
-        from scripts.sa_native_host import _handle_check_detail_cache
+        from src.sa_native_host import _handle_check_detail_cache
 
         dal = MagicMock()
         dal.get_sa_pick_detail.return_value = {"symbol": "NVDA", "detail_report": None}
@@ -1006,7 +1007,7 @@ class TestNativeHostDetailCache:
 
     def test_fresh_detail_skipped(self):
         """Picks with fresh detail_report are skipped."""
-        from scripts.sa_native_host import _handle_check_detail_cache
+        from src.sa_native_host import _handle_check_detail_cache
 
         dal = MagicMock()
         fresh = datetime.now(timezone.utc).isoformat()
@@ -1023,7 +1024,7 @@ class TestNativeHostDetailCache:
 
     def test_expired_detail_needs_refetch(self):
         """Picks with expired detail are returned in need_detail."""
-        from scripts.sa_native_host import _handle_check_detail_cache
+        from src.sa_native_host import _handle_check_detail_cache
 
         dal = MagicMock()
         old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
@@ -1040,7 +1041,7 @@ class TestNativeHostDetailCache:
 
     def test_no_article_for_pick_skipped(self):
         """Pick without matching article is skipped (not failed)."""
-        from scripts.sa_native_host import _handle_check_detail_cache
+        from src.sa_native_host import _handle_check_detail_cache
 
         dal = MagicMock()
         dal.get_sa_pick_detail.return_value = {"symbol": "XYZ", "detail_report": None}
@@ -1056,7 +1057,7 @@ class TestNativeHostDetailCache:
 class TestNativeHostSaveDetail:
     def test_save_success(self):
         """save_detail calls DAL and returns ok."""
-        from scripts.sa_native_host import _handle_save_detail
+        from src.sa_native_host import _handle_save_detail
 
         dal = MagicMock()
         dal.save_sa_pick_detail.return_value = True
@@ -1070,7 +1071,7 @@ class TestNativeHostSaveDetail:
 
     def test_save_failure_returns_error(self):
         """save_detail returns error when DAL reports failure."""
-        from scripts.sa_native_host import _handle_save_detail
+        from src.sa_native_host import _handle_save_detail
 
         dal = MagicMock()
         dal.save_sa_pick_detail.return_value = False
@@ -1511,7 +1512,7 @@ class TestDataAccessArticleMeta:
 class TestNativeHostArticles:
     def test_save_market_news(self):
         """save_market_news calls DAL and returns result."""
-        from scripts.sa_native_host import _handle_save_market_news
+        from src.sa_native_host import _handle_save_market_news
         dal = MagicMock()
         dal.save_sa_market_news.return_value = {"status": "ok", "saved": 2}
         result = _handle_save_market_news(dal, {
@@ -1527,7 +1528,7 @@ class TestNativeHostArticles:
 
     def test_save_market_news_passes_detail_limits(self):
         """save_market_news forwards current/backfill detail quotas."""
-        from scripts.sa_native_host import _handle_save_market_news
+        from src.sa_native_host import _handle_save_market_news
         dal = MagicMock()
         dal.save_sa_market_news.return_value = {"status": "ok", "saved": 1}
         result = _handle_save_market_news(dal, {
@@ -1544,7 +1545,7 @@ class TestNativeHostArticles:
 
     def test_save_market_news_detail(self):
         """save_market_news_detail calls DAL and returns result."""
-        from scripts.sa_native_host import _handle_save_market_news_detail
+        from src.sa_native_host import _handle_save_market_news_detail
         dal = MagicMock()
         dal.save_sa_market_news_detail.return_value = True
         result = _handle_save_market_news_detail(dal, {
@@ -1559,7 +1560,7 @@ class TestNativeHostArticles:
 
     def test_get_market_news_recent_ids(self):
         """get_market_news_recent_ids returns recent ids from DAL."""
-        from scripts.sa_native_host import _handle_get_market_news_recent_ids
+        from src.sa_native_host import _handle_get_market_news_recent_ids
         dal = MagicMock()
         dal.get_sa_market_news_recent_ids.return_value = ["123", "124"]
 
@@ -1570,7 +1571,7 @@ class TestNativeHostArticles:
 
     def test_save_articles_meta(self):
         """save_articles_meta calls DAL and returns result."""
-        from scripts.sa_native_host import _handle_save_articles_meta
+        from src.sa_native_host import _handle_save_articles_meta
         dal = MagicMock()
         dal.save_sa_articles_meta.return_value = {
             "status": "ok", "saved": 5, "need_content": [],
@@ -1584,7 +1585,7 @@ class TestNativeHostArticles:
 
     def test_save_article_content(self):
         """save_article_content calls compound DAL method."""
-        from scripts.sa_native_host import _handle_save_article_content
+        from src.sa_native_host import _handle_save_article_content
         dal = MagicMock()
         dal.save_sa_article_with_comments.return_value = {"ok": True, "synced_picks": 1}
         result = _handle_save_article_content(dal, {
@@ -1597,7 +1598,7 @@ class TestNativeHostArticles:
 
     def test_audit_unresolved(self):
         """audit_unresolved calls DAL and returns result."""
-        from scripts.sa_native_host import _handle_audit_unresolved
+        from src.sa_native_host import _handle_audit_unresolved
         dal = MagicMock()
         dal.audit_sa_unresolved_symbols.return_value = {
             "unresolved_symbols": ["CVSA"],
@@ -1610,7 +1611,7 @@ class TestNativeHostArticles:
 
 class TestCommentNormalization:
     def test_normalize_comment_ids_merges_null_and_dated_duplicate(self):
-        from scripts.sa_native_host import _normalize_comment_ids
+        from src.sa_native_host import _normalize_comment_ids
 
         comments = [
             {
@@ -1638,7 +1639,7 @@ class TestCommentNormalization:
         assert normalized[0]["upvotes"] == 4
 
     def test_normalize_comment_ids_preserves_distinct_dated_duplicates(self):
-        from scripts.sa_native_host import _normalize_comment_ids
+        from src.sa_native_host import _normalize_comment_ids
 
         comments = [
             {
@@ -1668,7 +1669,7 @@ class TestCommentNormalization:
         }
 
     def test_normalize_comment_ids_merges_naive_and_utc_same_wall_clock(self):
-        from scripts.sa_native_host import _normalize_comment_ids
+        from src.sa_native_host import _normalize_comment_ids
 
         comments = [
             {
@@ -1696,7 +1697,7 @@ class TestCommentNormalization:
         assert normalized[0]["upvotes"] == 3
 
     def test_normalize_comment_ids_remaps_parent_after_merge(self):
-        from scripts.sa_native_host import _normalize_comment_ids
+        from src.sa_native_host import _normalize_comment_ids
 
         comments = [
             {

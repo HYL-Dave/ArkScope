@@ -828,7 +828,7 @@ def test_extension_record_endpoint_records_via_store_factory(monkeypatch):
 
 
 def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
-    from scripts.sa_native_host import _handle_record_extension_job
+    from src.sa_native_host import _handle_record_extension_job
 
     calls = []
 
@@ -836,7 +836,7 @@ def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
         calls.append(payload)
         return {"status": "ok", "run_id": 99, "persisted": True}
 
-    monkeypatch.setattr("scripts.sa_native_host._post_extension_job_to_sidecar", fake_post)
+    monkeypatch.setattr("src.sa_native_host._post_extension_job_to_sidecar", fake_post)
     msg = {
         "job_name": "sa_extension:market_news_quick",
         "status": "succeeded",
@@ -862,12 +862,12 @@ def test_native_host_record_extension_job_posts_to_sidecar(monkeypatch):
 
 
 def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monkeypatch):
-    from scripts.sa_native_host import _handle_record_extension_job
+    from src.sa_native_host import _handle_record_extension_job
 
     def fake_post(payload):
         raise OSError("sidecar down")
 
-    monkeypatch.setattr("scripts.sa_native_host._post_extension_job_to_sidecar", fake_post)
+    monkeypatch.setattr("src.sa_native_host._post_extension_job_to_sidecar", fake_post)
     msg = {
         "job_name": "sa_extension:alpha_picks_quick",
         "status": "failed",
@@ -882,7 +882,7 @@ def test_native_host_record_extension_job_degrades_when_sidecar_unreachable(monk
 
 
 def test_record_extension_job_rejects_invalid_status():
-    from scripts.sa_native_host import _handle_record_extension_job
+    from src.sa_native_host import _handle_record_extension_job
 
     result = _handle_record_extension_job(
         MagicMock(),
@@ -893,7 +893,7 @@ def test_record_extension_job_rejects_invalid_status():
 
 
 def test_record_extension_job_rejects_missing_started_at():
-    from scripts.sa_native_host import _handle_record_extension_job
+    from src.sa_native_host import _handle_record_extension_job
 
     result = _handle_record_extension_job(
         MagicMock(), {"job_name": "x", "status": "succeeded"}
@@ -903,7 +903,7 @@ def test_record_extension_job_rejects_missing_started_at():
 
 
 def test_record_extension_job_rejects_missing_job_name():
-    from scripts.sa_native_host import _handle_record_extension_job
+    from src.sa_native_host import _handle_record_extension_job
 
     result = _handle_record_extension_job(
         MagicMock(),
@@ -915,7 +915,7 @@ def test_record_extension_job_rejects_missing_job_name():
 
 def test_record_extension_job_dispatched_via_handle_message():
     """handle_message routes action=record_extension_job to the helper."""
-    from scripts import sa_native_host
+    from src import sa_native_host
 
     msg = {
         "action": "record_extension_job",
@@ -936,7 +936,7 @@ def test_record_extension_job_dispatched_via_handle_message():
 
 
 def test_native_host_does_not_construct_job_runs_store_or_profile_writer():
-    text = Path("scripts/sa_native_host.py").read_text()
+    text = Path("src/sa_native_host.py").read_text()
     assert "JobRunsStore(" not in text
     assert "profile_state.db" not in text
 
