@@ -15,31 +15,31 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
 
 使用方式:
     # 查看所有資料狀態
-    python daily_update.py --status
+    python -m src.daily_update --status
 
     # 更新所有新聞 (顯式 scope 必填——tickers_core.json 已非 runtime 預設)
-    python daily_update.py --news --scope active-universe
+    python -m src.daily_update --news --scope active-universe
 
     # 更新所有新聞 + 股價 (--all 不含 IV)
-    python daily_update.py --all --scope active-universe
+    python -m src.daily_update --all --scope active-universe
 
     # 單一 source / 顯式清單
-    python daily_update.py --polygon --scope active-universe
-    python daily_update.py --ibkr-prices --tickers AAPL,MSFT,NVDA
+    python -m src.daily_update --polygon --scope active-universe
+    python -m src.daily_update --ibkr-prices --tickers AAPL,MSFT,NVDA
 
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
-    python daily_update.py --all --scope active-universe --dry-run
+    python -m src.daily_update --all --scope active-universe --dry-run
 
     # --sync-db 是退役相容旗標；active sources 已直寫本地 store。
-    python daily_update.py --all --scope active-universe --sync-db
+    python -m src.daily_update --all --scope active-universe --sync-db
 
     # 舊 PG news_scores 同步已退役；使用 scripts/scoring/import_news_scores_local.py。
-    python daily_update.py --scores
+    python -m src.daily_update --scores
 
 重要限制 — 新 Ticker 的歷史資料:
     --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
     新加入的 ticker 不會被自動補抓歷史新聞。補抓方式 (Polygon 為例):
-        python scripts/collection/collect_polygon_news.py \\
+        python -m src.collectors.polygon_news \\
             --tickers GM,NEM,AFRM --start 2022-01-01
 """
 
@@ -62,11 +62,12 @@ logger = logging.getLogger(__name__)
 
 # Script directory
 SCRIPT_DIR = Path(__file__).parent
-CONFIG_DIR = SCRIPT_DIR.parent.parent / "config"
+REPO_ROOT = SCRIPT_DIR.parent
+CONFIG_DIR = REPO_ROOT / "config"
 
 # Repo root on sys.path so `--scope active-universe` can read the local
-# profile-state DB (scripts/collection/ -> scripts/ -> repo root). Read-only.
-sys.path.insert(0, str(SCRIPT_DIR.parent.parent))
+# profile-state DB when this module is executed from outside the repo root.
+sys.path.insert(0, str(REPO_ROOT))
 
 
 def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) -> tuple:
@@ -382,16 +383,16 @@ def show_status():
     logger.info("\n📋 RECOMMENDED ACTIONS:")
 
     if not polygon['exists'] or (polygon['latest_date'] and (today - polygon['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --polygon")
+        logger.info("   - Run: python -m src.daily_update --polygon")
 
     if not finnhub['exists'] or (finnhub['latest_date'] and (today - finnhub['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --finnhub")
+        logger.info("   - Run: python -m src.daily_update --finnhub")
 
     if not ibkr_news['exists'] or (ibkr_news['latest_date'] and (today - ibkr_news['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --ibkr-news (requires TWS/Gateway)")
+        logger.info("   - Run: python -m src.daily_update --ibkr-news (requires TWS/Gateway)")
 
     if not ibkr_prices['exists'] or (ibkr_prices['latest_date'] and (today - ibkr_prices['latest_date']).days > 1):
-        logger.info("   - Run: python daily_update.py --ibkr-prices --scope active-universe (requires TWS/Gateway)")
+        logger.info("   - Run: python -m src.daily_update --ibkr-prices --scope active-universe (requires TWS/Gateway)")
 
     if polygon['exists'] and finnhub['exists'] and ibkr_news['exists']:
         if (polygon['latest_date'] and (today - polygon['latest_date']).days <= 1 and
@@ -420,25 +421,25 @@ def main():
         epilog="""
 Examples:
     # Show all data status
-    python daily_update.py --status
+    python -m src.daily_update --status
 
     # Update all news (Polygon + Finnhub + IBKR news)
-    python daily_update.py --news --scope active-universe
+    python -m src.daily_update --news --scope active-universe
 
     # Update all news + prices (explicit scope required; nothing guesses)
-    python daily_update.py --all --scope active-universe
+    python -m src.daily_update --all --scope active-universe
 
     # Update specific source
-    python daily_update.py --polygon --scope active-universe
-    python daily_update.py --ibkr-prices --tickers AAPL,MSFT
-    python daily_update.py --iv-history --scope active-universe   # heavy, opt-in (NOT in --all)
+    python -m src.daily_update --polygon --scope active-universe
+    python -m src.daily_update --ibkr-prices --tickers AAPL,MSFT
+    python -m src.daily_update --iv-history --scope active-universe   # heavy, opt-in (NOT in --all)
 
     # Dry run (prints the per-source plan; never touches IBKR/DB)
-    python daily_update.py --all --scope active-universe --dry-run
+    python -m src.daily_update --all --scope active-universe --dry-run
 
     # Collect and sync to DB in one step
-    python daily_update.py --all --scope active-universe --sync-db
-    python daily_update.py --scores                  # retired; use local score importer
+    python -m src.daily_update --all --scope active-universe --sync-db
+    python -m src.daily_update --scores                  # retired; use local score importer
 
 Note: IBKR sources require TWS/Gateway running.
       Every run is the SAME code path as the app's Run now (per-source locks,

@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SCRIPT = str(Path(__file__).resolve().parents[1] / "scripts" / "collection" / "daily_update.py")
+_MODULE = "src.daily_update"
 
 
 def _profile_db(tmp_path: Path) -> str:
@@ -36,7 +36,7 @@ def _run(*flags: str, profile_db: str | None = None) -> subprocess.CompletedProc
     env = os.environ.copy()
     if profile_db is not None:
         env["ARKSCOPE_PROFILE_DB"] = profile_db
-    return subprocess.run([sys.executable, _SCRIPT, *flags],
+    return subprocess.run([sys.executable, "-m", _MODULE, *flags],
                           capture_output=True, text=True, timeout=120, env=env)
 
 

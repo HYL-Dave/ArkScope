@@ -9,28 +9,28 @@ Polygon.io 新聞收集腳本
 
 使用方式:
     # 收集所有 tier1 股票的完整歷史 (3 年)
-    python collect_polygon_news.py --full-history
+    python -m src.collectors.polygon_news --full-history
 
     # 收集指定日期範圍
-    python collect_polygon_news.py --start 2024-01-01 --end 2024-12-31
+    python -m src.collectors.polygon_news --start 2024-01-01 --end 2024-12-31
 
     # 收集最近 N 天
-    python collect_polygon_news.py --days 30
+    python -m src.collectors.polygon_news --days 30
 
     # 僅收集指定股票
-    python collect_polygon_news.py --tickers AAPL,MSFT --days 30
+    python -m src.collectors.polygon_news --tickers AAPL,MSFT --days 30
 
     # 從 checkpoint 繼續
-    python collect_polygon_news.py --resume
+    python -m src.collectors.polygon_news --resume
 
     # 增量更新 (只抓取最後收集日期之後的新聞)
-    python collect_polygon_news.py --incremental
+    python -m src.collectors.polygon_news --incremental
 
     # 查看現有資料狀態
-    python collect_polygon_news.py --status
+    python -m src.collectors.polygon_news --status
 
     # 補抓新加入的 ticker (incremental 不會補歷史)
-    python collect_polygon_news.py --tickers GM,NEM,AFRM --start 2022-01-01
+    python -m src.collectors.polygon_news --tickers GM,NEM,AFRM --start 2022-01-01
 
 重要限制:
     --incremental 使用「所有 ticker 中最新一篇文章的時間」作為起始點，
@@ -971,19 +971,19 @@ def main():
         epilog="""
 Examples:
     # Full 3-year history for all tier1 stocks
-    python collect_polygon_news.py --full-history
+    python -m src.collectors.polygon_news --full-history
 
     # Specific date range
-    python collect_polygon_news.py --start 2024-01-01 --end 2024-06-30
+    python -m src.collectors.polygon_news --start 2024-01-01 --end 2024-06-30
 
     # Last 30 days
-    python collect_polygon_news.py --days 30
+    python -m src.collectors.polygon_news --days 30
 
     # Specific tickers
-    python collect_polygon_news.py --tickers AAPL,MSFT,GOOGL --days 30
+    python -m src.collectors.polygon_news --tickers AAPL,MSFT,GOOGL --days 30
 
     # Resume interrupted collection
-    python collect_polygon_news.py --resume
+    python -m src.collectors.polygon_news --resume
         """
     )
 

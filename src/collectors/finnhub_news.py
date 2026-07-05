@@ -13,22 +13,22 @@ Finnhub 特點:
 
 使用方式:
     # 收集最近 7 天新聞
-    python collect_finnhub_news.py
+    python -m src.collectors.finnhub_news
 
     # 收集指定日期範圍 (注意: 只有最近 ~7 天有效)
-    python collect_finnhub_news.py --start 2025-12-08 --end 2025-12-15
+    python -m src.collectors.finnhub_news --start 2025-12-08 --end 2025-12-15
 
     # 僅收集指定股票
-    python collect_finnhub_news.py --tickers AAPL,MSFT
+    python -m src.collectors.finnhub_news --tickers AAPL,MSFT
 
     # 查看現有資料狀態
-    python collect_finnhub_news.py --status
+    python -m src.collectors.finnhub_news --status
 
     # 增量更新 (每日執行)
-    python collect_finnhub_news.py --incremental
+    python -m src.collectors.finnhub_news --incremental
 
     # 補抓新加入的 ticker (incremental 不會補)
-    python collect_finnhub_news.py --tickers GM,NEM,AFRM
+    python -m src.collectors.finnhub_news --tickers GM,NEM,AFRM
 
 重要限制:
     --incremental 使用全域最新 timestamp 作為起始點，新加入 tickers_core.json
@@ -690,16 +690,16 @@ def main():
         epilog="""
 Examples:
     # Collect last 7 days for all tier1 stocks
-    python collect_finnhub_news.py
+    python -m src.collectors.finnhub_news
 
     # Specific tickers
-    python collect_finnhub_news.py --tickers AAPL,MSFT,GOOGL
+    python -m src.collectors.finnhub_news --tickers AAPL,MSFT,GOOGL
 
     # Specific date range (max 7 days back)
-    python collect_finnhub_news.py --start 2025-12-08 --end 2025-12-15
+    python -m src.collectors.finnhub_news --start 2025-12-08 --end 2025-12-15
 
 Note: Finnhub free tier only provides ~7 days of history!
-For historical news, use collect_polygon_news.py instead.
+For historical news, use python -m src.collectors.polygon_news instead.
         """
     )
 

@@ -80,8 +80,6 @@ def test_grep_classifier_allows_local_authority_and_retired_scripts():
         ("src/macro_calendar/local_store.py", "FROM cal_economic_events"),
         ("src/market_data_admin.py", "_IV_INSERT = (\"INSERT OR IGNORE INTO iv_history \""),
         ("src/news_normalized/score_cutover.py", "\"FROM news_scores ORDER BY news_id\""),
-        ("scripts/collection/daily_update.py", "python daily_update.py --scores"),
-        ("scripts/migrate_sa_to_sqlite.py", "FROM sa_alpha_picks ORDER BY id"),
     ])
 
     assert summary["blockers"] == []
@@ -93,8 +91,6 @@ def test_grep_classifier_allows_local_authority_and_retired_scripts():
     assert reasons["src/macro_calendar/local_store.py"] == "local_sqlite_authority"
     assert reasons["src/market_data_admin.py"] == "invalidated_rollback_lever_pending_n9_cleanup"
     assert reasons["src/news_normalized/score_cutover.py"] == "migration_cutover_dead_path_pending_n9_cleanup"
-    assert reasons["scripts/collection/daily_update.py"] == "retired_cli_or_script"
-    assert reasons["scripts/migrate_sa_to_sqlite.py"] == "retired_cli_or_script"
 
 
 def test_preview_output_is_sanitized_and_written(tmp_path, monkeypatch, capsys):

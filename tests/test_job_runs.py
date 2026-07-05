@@ -947,14 +947,9 @@ def test_native_host_does_not_construct_job_runs_store_or_profile_writer():
 
 
 def _load_daily_update():
-    import importlib.util
-    from pathlib import Path
+    import importlib
 
-    path = Path(__file__).resolve().parents[1] / "scripts" / "collection" / "daily_update.py"
-    spec = importlib.util.spec_from_file_location("_daily_update_under_test", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    return importlib.import_module("src.daily_update")
 
 
 def test_run_telemetry_disabled_is_inert(monkeypatch):
