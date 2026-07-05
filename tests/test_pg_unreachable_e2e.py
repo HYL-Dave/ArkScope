@@ -6,7 +6,7 @@ import pytest
 
 
 def test_required_checks_cover_pg_exit_surfaces():
-    from scripts.smoke.pg_unreachable_e2e import REQUIRED_CHECKS
+    from src.smoke.pg_unreachable_e2e import REQUIRED_CHECKS
 
     names = {check.name for check in REQUIRED_CHECKS}
     assert {
@@ -37,7 +37,7 @@ def test_required_checks_cover_pg_exit_surfaces():
 
 
 def test_report_sanitizes_poison_dsn(tmp_path):
-    from scripts.smoke.pg_unreachable_e2e import CheckResult, SmokeReport
+    from src.smoke.pg_unreachable_e2e import CheckResult, SmokeReport
 
     report = SmokeReport(
         ok=False,
@@ -53,7 +53,7 @@ def test_report_sanitizes_poison_dsn(tmp_path):
 
 
 def test_pg_poison_records_and_raises():
-    from scripts.smoke.pg_unreachable_e2e import PgPoison
+    from src.smoke.pg_unreachable_e2e import PgPoison
 
     poison = PgPoison()
     with pytest.raises(RuntimeError, match="PG_UNREACHABLE_E2E_POISON"):
@@ -63,7 +63,7 @@ def test_pg_poison_records_and_raises():
 
 
 def test_smoke_fails_if_any_pg_attempt_is_recorded(monkeypatch):
-    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.smoke import pg_unreachable_e2e as smoke
 
     monkeypatch.setattr(smoke, "run_route_checks", lambda client: [])
 
@@ -85,7 +85,7 @@ def test_smoke_fails_if_any_pg_attempt_is_recorded(monkeypatch):
 
 
 def test_smoke_fails_on_bad_route_status():
-    from scripts.smoke.pg_unreachable_e2e import CheckSpec, run_route_checks
+    from src.smoke.pg_unreachable_e2e import CheckSpec, run_route_checks
 
     class Response:
         status_code = 500
@@ -104,7 +104,7 @@ def test_smoke_fails_on_bad_route_status():
 
 
 def test_market_status_assertion_requires_no_pg_fallback():
-    from scripts.smoke.pg_unreachable_e2e import _assert_market_status
+    from src.smoke.pg_unreachable_e2e import _assert_market_status
 
     with pytest.raises(AssertionError):
         _assert_market_status({
@@ -115,7 +115,7 @@ def test_market_status_assertion_requires_no_pg_fallback():
 
 
 def test_run_smoke_restores_environment_flags(monkeypatch):
-    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.smoke import pg_unreachable_e2e as smoke
 
     monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "already-set")
     monkeypatch.delenv("ARKSCOPE_PG_UNREACHABLE_E2E", raising=False)
@@ -138,7 +138,7 @@ def test_pg_poison_redacts_kwarg_credentials():
     # All current call sites pass a positional DSN, but psycopg2.connect(host=...,
     # password=...) is legal — a future call site must not leak credentials into
     # pg_attempts (dict repr defeats the URL/key=value sanitizer regexes).
-    from scripts.smoke.pg_unreachable_e2e import PgPoison
+    from src.smoke.pg_unreachable_e2e import PgPoison
 
     poison = PgPoison()
     with pytest.raises(RuntimeError, match="PG_UNREACHABLE_E2E_POISON"):
@@ -150,12 +150,12 @@ def test_pg_poison_redacts_kwarg_credentials():
 
 
 def test_bootstrap_repo_root_inserts_src_import_path(monkeypatch):
-    # Running `python scripts/smoke/pg_unreachable_e2e.py` sets sys.path[0] to
-    # scripts/smoke, not the repo root. The harness must repair that before
-    # importing src.* inside run_smoke().
+    # Running the harness by file path sets sys.path[0] to the module directory,
+    # not the repo root. The harness must repair that before importing src.*
+    # inside run_smoke().
     import sys
     from pathlib import Path
-    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.smoke import pg_unreachable_e2e as smoke
 
     root = str(Path(smoke.__file__).resolve().parents[2])
     monkeypatch.setattr(sys, "path", [p for p in sys.path if p != root])
@@ -169,7 +169,7 @@ def test_handler_direct_client_runs_healthz_without_testclient():
     # The live PG-unreachable smoke intentionally bypasses FastAPI TestClient:
     # in this environment TestClient/lifespan can hang before any route evidence
     # is produced. The harness must still exercise the same handlers.
-    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.smoke import pg_unreachable_e2e as smoke
 
     client = smoke._HandlerDirectClient(
         dal=object(),
@@ -188,7 +188,7 @@ def test_handler_direct_client_runs_healthz_without_testclient():
 def test_handler_direct_client_preserves_http_exception_detail(monkeypatch):
     from fastapi import HTTPException
 
-    from scripts.smoke import pg_unreachable_e2e as smoke
+    from src.smoke import pg_unreachable_e2e as smoke
     from src.api.routes import market_data
 
     def reject_update(store):
@@ -213,7 +213,7 @@ def test_handler_direct_client_preserves_http_exception_detail(monkeypatch):
 
 
 def test_macro_disabled_503_is_explicit_config_state_not_pg_failure():
-    from scripts.smoke.pg_unreachable_e2e import REQUIRED_CHECKS, run_route_checks
+    from src.smoke.pg_unreachable_e2e import REQUIRED_CHECKS, run_route_checks
 
     class Response:
         status_code = 503
@@ -240,7 +240,7 @@ def test_macro_disabled_503_is_explicit_config_state_not_pg_failure():
 
 
 def test_provider_config_policy_assertion_is_env_and_invariant_aware(monkeypatch):
-    from scripts.smoke.pg_unreachable_e2e import (
+    from src.smoke.pg_unreachable_e2e import (
         REQUIRED_CHECKS,
         _assert_provider_config_policy,
     )

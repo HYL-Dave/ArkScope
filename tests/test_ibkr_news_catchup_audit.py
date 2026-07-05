@@ -129,7 +129,7 @@ def _make_profile_db(path: Path) -> None:
 
 
 def test_build_report_shape_and_caveats(tmp_path):
-    from scripts.audit.ibkr_news_catchup_audit import build_report
+    from src.audit.ibkr_news_catchup_audit import build_report
 
     market_db = tmp_path / "market.db"
     profile_db = tmp_path / "profile.db"
@@ -153,7 +153,7 @@ def test_build_report_shape_and_caveats(tmp_path):
 
 
 def test_report_includes_observed_quiet_window_gap_check(tmp_path):
-    from scripts.audit.ibkr_news_catchup_audit import build_report
+    from src.audit.ibkr_news_catchup_audit import build_report
 
     market_db = tmp_path / "market.db"
     profile_db = tmp_path / "profile.db"
@@ -172,7 +172,7 @@ def test_report_includes_observed_quiet_window_gap_check(tmp_path):
 
 
 def test_missing_db_does_not_create_file(tmp_path):
-    from scripts.audit.ibkr_news_catchup_audit import build_report
+    from src.audit.ibkr_news_catchup_audit import build_report
 
     market_db = tmp_path / "missing-market.db"
     profile_db = tmp_path / "missing-profile.db"
@@ -185,7 +185,7 @@ def test_missing_db_does_not_create_file(tmp_path):
 
 
 def test_audit_source_has_no_gateway_access_or_write_sql():
-    source = Path("scripts/audit/ibkr_news_catchup_audit.py").read_text()
+    source = Path("src/audit/ibkr_news_catchup_audit.py").read_text()
 
     for forbidden in (
         "IBKRDataSource",
@@ -206,7 +206,7 @@ def test_audit_source_has_no_gateway_access_or_write_sql():
 
 
 def test_report_records_writer_budget_is_not_bottleneck(tmp_path):
-    from scripts.audit.ibkr_news_catchup_audit import build_report
+    from src.audit.ibkr_news_catchup_audit import build_report
 
     market_db = tmp_path / "market.db"
     profile_db = tmp_path / "profile.db"
