@@ -173,7 +173,7 @@ Authoritative batch-1 evidence/drop plan: `docs/design/PG_EXIT_N9_BATCH1_DROP_PL
 
 - **Parallel / can-go-first:** S-A (demonstrator conversion), S-B (fundamentals fast win), S-C (survey).
 - **Dependency chain:** S-C → S-D → S-E → (optional) S-F → wire scheduler/UI/tool.
-- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 is complete and Phase 2 can be scheduled when convenient. S-G scorer cutover is complete. N9 batch-1, batch-2, and batch-3 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green pre- and post-batch-3; PG holds only the three app-record archive tables, ruled archive-only in the 2026-07-05 closeout (`use_local_records` collapsed to local-default). PG-exit is CLOSED.
+- **Independent:** S-H audit is complete; S-H1 job-runs local cutover is live; S-H2 financial-cache cold-start is implemented; remaining macro/cal proof was folded into N9 batch-1. S-J provider-config Phase 0–1 and Phase 2 are complete. S-G scorer cutover is complete. N9 batch-1, batch-2, and batch-3 live drops are complete. P0-C prices direct-local cutover is complete; PG-unreachable E2E is green pre- and post-batch-3; PG holds only the three app-record archive tables, ruled archive-only in the 2026-07-05 closeout (`use_local_records` collapsed to local-default). PG-exit is CLOSED.
 - **Endgame:** S-I (N9), after each domain is localised and confirmed reader-free.
 
 ---
@@ -545,17 +545,35 @@ DB-native instead of expanding `.env` fallback.
 - **Phase 0–1 land before S-E**, so the IV prototype's provider wiring is born
   DB-first and never grows a `.env` dependency.
 - Phase 0-1 implementation status: audit table recorded; SEC UA and IBKR
-  client-id defaults are app-managed; `config/.env` fallback is still allowed but
-  visible/importable; profile DB startup failure now enters setup-only mode.
-  Phase 2 strict-by-default remains pending.
+  client-id defaults are app-managed; `config/.env` fallback is visible/importable;
+  profile DB startup failure now enters setup-only mode.
 - Soak-gate status 2026-07-02: primary machine has no `config/.env`-sourced
   managed fields left (provider keys migrated 2026-06-27; `config/.env` never
   contained SEC UA keys, so SEC ran on the placeholder UA until the user set
-  `sec_edgar.user_agent` manually in Settings today). Phase 2 can be scheduled;
-  it should include the §13.4 carried micro-fix.
-- Phase 2 flips only after Phase 1 has soaked: Settings shows no remaining
-  "from config/.env" managed fields on the primary machine (or each is a
-  conscious keep), then default-strict is turned on.
+  `sec_edgar.user_agent` manually in Settings that day).
+- Phase 2 implementation status 2026-07-05: **complete** at `33a0cc4`.
+  Strict-by-default is live. Unset `provider_env_fallback` resolves strict;
+  explicit `true` is the documented rollback lever; explicit `false` pins strict.
+  FieldDefs-managed vars no longer use `config/.env` as runtime authority by
+  default. Real shell env remains the operator escape hatch; `legacy_env_only`
+  vars remain warning-only.
+- Live proof: primary profile preflight showed 8/8 managed fields sourced from
+  App config; fresh-profile poison smoke, rollback smoke, focused gates, and
+  full A/B passed. Final A/B accounting: base `38d52c6` had 3,684 passed with a
+  41-item known failure set; head `33a0cc4` had 3,704 passed with a 39-item
+  failure set. The only difference was two base-only pre-existing analyst test
+  fixes; there were zero head-only regressions.
+- Smoke policy decision: the canonical `provider_config_missing` machine shape
+  is the exact four-key contract `{code, status, provider, field}`. Wrapping
+  surfaces may add context fields, but the PG-unreachable smoke policy asserts
+  the invariant rather than localized message text.
+- Follow-up opened: SA `use_local_sa` local-default collapse. Phase 2 poison
+  smoke exposed an existing fresh-profile stranding hole outside provider config:
+  unset `use_local_sa` can still leave some SA surfaces dependent on the old
+  toggle semantics. Scope a small TDD slice to collapse unset/explicit-false to
+  local SA authority, audit `src/sa_capture_store.py`, `src/service/sa_market_news_health.py`,
+  `src/tools/sa_tools.py`, `src/tools/sa_digest_tools.py`, and SA route call
+  sites, then prove it with fresh-profile poison smoke plus full A/B.
 
 ### 13.7 Decisions (locked at review, 2026-07-02)
 

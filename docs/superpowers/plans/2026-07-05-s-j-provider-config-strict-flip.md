@@ -1,5 +1,11 @@
 # S-J Provider Config Strict Flip Implementation Plan
 
+**Status:** LIVE COMPLETE 2026-07-05. Implementation FF-merged at `33a0cc4`; Task 8 docs closeout completed after merge.
+
+**Verification:** focused backend gates, SettingsProviderConfig vitest/build, fresh-profile poison smoke, rollback smoke, PG-unreachable smoke policy check, and full A/B all passed. Final A/B: base `38d52c6` = 3,684 passed / 41 known failures; head `33a0cc4` = 3,704 passed / 39 known failures; difference = two base-only pre-existing analyst test fixes and zero head-only regressions.
+
+**Closeout notes:** `provider_config_missing` is recorded as the exact four-key machine contract `{code, status, provider, field}`; surfaces may wrap it with extra context. The two analyst fixes were stale analysis tool-count expectations and a bridge test that depended on FileBackend auto-detection instead of a hermetic backend. Follow-up opened separately: SA `use_local_sa` local-default collapse, because poison smoke found an existing fresh-profile toggle stranding hole outside this provider-config scope.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Flip FieldDef-managed provider configuration to strict DB-first authority by default, with `provider_env_fallback=true` as the explicit legacy rollback lever and structured `provider_config_missing` results at runtime surfaces.
@@ -1497,7 +1503,7 @@ If no harness changes were needed, do not create an empty commit.
 - Modify: `docs/design/PROJECT_PRIORITY_MAP.md`
 - Modify: `docs/superpowers/plans/2026-07-05-s-j-provider-config-strict-flip.md`
 
-- [ ] **Step 1: Update scoping doc §13.6**
+- [x] **Step 1: Update scoping doc §13.6**
 
 Change Phase 2 status from pending to complete. Include:
 
@@ -1509,7 +1515,7 @@ use `config/.env` as runtime authority by default. Real shell env remains the
 operator escape hatch; `legacy_env_only` vars remain warning-only.
 ```
 
-- [ ] **Step 2: Update priority map P0-D**
+- [x] **Step 2: Update priority map P0-D**
 
 In `docs/design/PROJECT_PRIORITY_MAP.md`, change P0-D status to shipped and add a top §10 entry:
 
@@ -1517,7 +1523,7 @@ In `docs/design/PROJECT_PRIORITY_MAP.md`, change P0-D status to shipped and add 
 - **2026-07-05 (S-J Phase 2 provider-config strict flip COMPLETE)**: FieldDefs-managed provider configuration now defaults strict (`provider_env_fallback` unset/false => no `config/.env` runtime fallback); explicit `provider_env_fallback=true` is the rollback lever. Missing required managed fields surface `provider_config_missing` across provider health, routes, scheduler, and agent tool surfaces. Fresh-profile poison smoke and full A/B passed. `config/.env` remains import/export and legacy-env-only material, not desktop provider authority.
 ```
 
-- [ ] **Step 3: Mark this plan complete**
+- [x] **Step 3: Mark this plan complete**
 
 At the top of this plan, add:
 
@@ -1531,7 +1537,7 @@ Under it, record:
 **Verification:** focused backend suite, SettingsProviderConfig vitest/build, fresh-profile poison smoke, rollback smoke, full A/B.
 ```
 
-- [ ] **Step 4: Commit docs closeout**
+- [x] **Step 4: Commit docs closeout**
 
 Run:
 
