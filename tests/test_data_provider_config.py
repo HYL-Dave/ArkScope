@@ -436,6 +436,45 @@ def test_route_marks_file_source_as_importable(store, monkeypatch):
     assert row["importable_env_vars"] == ["POLYGON_API_KEY"]
 
 
+def test_strict_view_peeks_config_file_for_import_without_effective_source(
+    store, monkeypatch, tmp_path
+):
+    from src.api.routes import providers_config as pc
+    import src.env_keys as env_keys
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("SEC_CONTACT_EMAIL=ops@example.com\n", encoding="utf-8")
+    monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)
+    monkeypatch.delenv("SEC_CONTACT_EMAIL", raising=False)
+    monkeypatch.delenv("ARKSCOPE_SEC_USER_AGENT", raising=False)
+
+    view = pc.providers_config(store=store)
+
+    row = next(f for f in view["providers"]["sec_edgar"]["fields"] if f["field"] == "user_agent")
+    assert row["effective_source"] == "missing"
+    assert row["needs_import"] is True
+    assert row["import_source"] == "SEC_CONTACT_EMAIL"
+    assert "SEC_CONTACT_EMAIL" not in os.environ
+
+
+def test_provider_env_fallback_route_sets_profile_setting(store):
+    from src.api.routes import providers_config as pc
+
+    out = pc.put_provider_env_fallback(
+        pc.ProviderEnvFallbackUpdate(enabled=True),
+        store=store,
+    )
+    assert out == {"enabled": True, "source": "profile"}
+    assert store.get_setting("provider_env_fallback") == "true"
+
+    out = pc.put_provider_env_fallback(
+        pc.ProviderEnvFallbackUpdate(enabled=False),
+        store=store,
+    )
+    assert out == {"enabled": False, "source": "profile"}
+    assert store.get_setting("provider_env_fallback") == "false"
+
+
 def test_import_env_field_promotes_file_value_to_db(store, monkeypatch):
     from src.api.routes import providers_config as pc
 

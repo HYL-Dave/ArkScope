@@ -1660,9 +1660,15 @@ export interface ProviderConfigSetupState {
   reason: string | null;
 }
 
+export interface ProviderEnvFallbackState {
+  enabled: boolean;
+  source: "default" | "profile" | "env" | string;
+}
+
 export interface ProvidersConfigResponse {
   providers: Record<string, ProviderConfigEntry>;
   setup: ProviderConfigSetupState;
+  env_fallback: ProviderEnvFallbackState;
 }
 
 export function getProvidersConfig(): Promise<ProvidersConfigResponse> {
@@ -1680,6 +1686,12 @@ export function putProviderConfig(
     { fields, confirm_guarded: confirmGuarded ?? {} },
     8_000,
   );
+}
+
+export function putProviderEnvFallback(
+  enabled: boolean | null,
+): Promise<ProviderEnvFallbackState> {
+  return sendJSON("/providers/config/env-fallback", "PUT", { enabled }, 8_000);
 }
 
 export function importProviderConfigField(

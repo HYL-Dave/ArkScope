@@ -43,6 +43,7 @@ import {
   type TradingDayCoverage,
   type TradingDayRow,
   type ProviderConfigEntry,
+  type ProviderEnvFallbackState,
   type ProviderConfigField,
   type ProviderConfigSetupState,
   type ProvidersHealthResponse,
@@ -1254,6 +1255,7 @@ function DataSourcesSection() {
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
+  const [cfgEnvFallback, setCfgEnvFallback] = useState<ProviderEnvFallbackState | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string>(""); // source id with an in-flight mutation
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -1268,6 +1270,7 @@ function DataSourcesSection() {
     if (rc.status === "fulfilled") {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
+      setCfgEnvFallback(rc.value.env_fallback);
     }
     const bad = [rs, rh, rc].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
@@ -1569,8 +1572,16 @@ function DataSourcesSection() {
         <h4 className="detail-section">連線與金鑰</h4>
         <p className="muted tiny">
           App 管理各 provider 的金鑰與連線設定（存本地、僅顯示遮罩值）。真實環境變數仍可作為 operator escape hatch；
-          若目前來源是 config/.env，請逐欄匯入到 App 設定。儲存即生效（毋須重啟）。
+          config/.env 只作為逐欄匯入來源。儲存即生效（毋須重啟）。
         </p>
+        {cfgEnvFallback && (
+          <p className="muted tiny">
+            Provider runtime policy：
+            {cfgEnvFallback.enabled
+              ? ` legacy config/.env fallback enabled（${cfgEnvFallback.source}）`
+              : ` strict DB-first（${cfgEnvFallback.source}）`}
+          </p>
+        )}
         {cfgSetup?.required && (
           <div className="errorbox">
             <p className="muted">

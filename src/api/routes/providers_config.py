@@ -29,12 +29,14 @@ from src.data_provider_config import (
     normalize_provider_config_value,
     normalize_import_value,
     provider_default_available,
+    provider_env_fallback_enabled,
+    provider_env_fallback_source,
     ProviderConfigMissing,
     require_provider_configured,
     run_connection_test,
     unapply_env,
 )
-from src.env_keys import ensure_env_loaded
+from src.env_keys import ensure_env_loaded, peek_env_file_value
 
 router = APIRouter(tags=["providers"])
 
@@ -62,7 +64,18 @@ def _empty_view_with_setup() -> dict:
         }
         for provider in PROVIDER_FIELDS
     }
-    return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
+    return {
+        "providers": providers,
+        "setup": provider_config_setup_state().as_dict(),
+        "env_fallback": _fallback_state(None),
+    }
+
+
+def _fallback_state(store: DataProviderConfigStore | None) -> dict[str, object]:
+    return {
+        "enabled": provider_env_fallback_enabled(store),
+        "source": provider_env_fallback_source(store),
+    }
 
 
 def _client_id_domains() -> list[dict]:
@@ -104,9 +117,8 @@ def _view(store: DataProviderConfigStore) -> dict:
             if source == "config/.env":
                 import_source = f.env_var
             elif source == "missing":
-                ensure_env_loaded()
-                for candidate in f.import_aliases:
-                    if candidate and os.getenv(candidate):
+                for candidate in imports:
+                    if candidate and peek_env_file_value(candidate):
                         import_source = candidate
                         break
             row = {
@@ -134,7 +146,11 @@ def _view(store: DataProviderConfigStore) -> dict:
             # key-free + extension-free providers are available by default
             "default_available": provider_default_available(provider),
         }
-    return {"providers": providers, "setup": provider_config_setup_state().as_dict()}
+    return {
+        "providers": providers,
+        "setup": provider_config_setup_state().as_dict(),
+        "env_fallback": _fallback_state(store),
+    }
 
 
 @router.get("/providers/config")
@@ -157,6 +173,29 @@ class ProviderConfigUpdate(BaseModel):
 class ProviderConfigImportEnv(BaseModel):
     source_env_var: str | None = None
     confirm_guarded: bool = False
+
+
+class ProviderEnvFallbackUpdate(BaseModel):
+    enabled: bool | None
+
+
+@router.put("/providers/config/env-fallback")
+def put_provider_env_fallback(
+    body: ProviderEnvFallbackUpdate,
+    store: DataProviderConfigStore = Depends(get_data_provider_store),
+):
+    require_profile_state_write("set_provider_env_fallback", {
+        "enabled": body.enabled,
+    })
+    if body.enabled is None:
+        store.set_setting("provider_env_fallback", None)
+    else:
+        store.set_setting("provider_env_fallback", "true" if body.enabled else "false")
+    apply_env(store)
+    from src.provider_config_runtime import clear_provider_config_setup_required
+
+    clear_provider_config_setup_required()
+    return _fallback_state(store)
 
 
 @router.put("/providers/config/{provider}")
@@ -209,7 +248,7 @@ def put_provider_config(
     for field, value in normalized.items():
         store.set_field(provider, field, value or None)
         if not value:
-            unapply_env(by_name[field].env_var)
+            unapply_env(by_name[field].env_var, store)
     apply_env(store)
     from src.provider_config_runtime import clear_provider_config_setup_required
 

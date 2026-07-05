@@ -88,6 +88,7 @@ const mocked = vi.hoisted(() => ({
       },
     },
     setup: { required: false, code: null, reason: null },
+    env_fallback: { enabled: false, source: "default" },
   },
   longSkipReason:
     "scheduler lock refused because another collector process is still holding collect.polygon_news; " +
@@ -111,7 +112,7 @@ const emptyCatalog: ModelCatalog = {
 
 const health: ProvidersHealthResponse = {
   providers: [
-    { id: "polygon", label: "Polygon", kind: "news", status: "missing_key", enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: true },
+    { id: "polygon", label: "Polygon", kind: "news", status: "not_configured", config_error: { code: "provider_config_missing", status: "not_configured", provider: "polygon", field: "api_key" }, enabled: true, key_present: true, key_source: "config/.env", key_vars: ["POLYGON_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
     { id: "ibkr", label: "IBKR", kind: "market", status: "no_signal", enabled: true, key_present: true, key_source: "app", key_vars: ["IBKR_HOST", "IBKR_PORT"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "", signals: {}, key_import_suggested: false },
     { id: "fred", label: "FRED", kind: "macro", status: "disabled", disabled_reason: "macro_ingestion_disabled", enabled: false, key_present: true, key_source: "app", key_vars: ["FRED_API_KEY"], last_success_at: null, last_attempt_at: null, last_error: null, detail: "macro ingestion not enabled", signals: {}, key_import_suggested: false },
   ],
@@ -240,6 +241,7 @@ function setInputValue(el: HTMLInputElement, value: string) {
 describe("Settings provider config authority", () => {
   it("renders config-file provenance with per-field import", async () => {
     await renderDataSources();
+    expect(host!.textContent).toContain("strict DB-first");
     expect(host!.textContent).toContain("config/.env");
     expect(host!.textContent).toContain("建議匯入");
     const polygonRow = Array.from(host!.querySelectorAll("tr")).find((row) =>
