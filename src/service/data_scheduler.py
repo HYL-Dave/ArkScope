@@ -331,7 +331,7 @@ def _make_normalized_news_provider(source: str):
 
         api_key = load_env()
         if not api_key:
-            raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
+            raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
         return PolygonNormalizedProvider(PolygonNewsCollector(api_key, CollectionConfig()))
     if source == "finnhub":
         from scripts.collection.collect_finnhub_news import (
@@ -343,7 +343,7 @@ def _make_normalized_news_provider(source: str):
 
         api_key = load_env()
         if not api_key:
-            raise RuntimeError("FINNHUB_API_KEY not found in config/.env or environment")
+            raise RuntimeError("FINNHUB_API_KEY is not configured in app/env")
         return FinnhubNormalizedProvider(FinnhubNewsCollector(api_key, FinnhubConfig()))
     raise ValueError(f"unknown normalized news source: {source!r}")
 

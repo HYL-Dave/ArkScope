@@ -289,8 +289,8 @@ class TestBridgeIntegration:
         """Analysis category includes get_economic_calendar + get_macro_value."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        # +2 for macro_calendar both registered as category="analysis"
-        assert len(registry.list_by_category("analysis")) == 12
+        # Includes macro/calendar, SA feed, and local coverage diagnostics.
+        assert len(registry.list_by_category("analysis")) == 13
 
     def test_anthropic_includes(self):
         """Anthropic bridge includes get_analyst_consensus."""
@@ -303,7 +303,7 @@ class TestBridgeIntegration:
         """OpenAI bridge includes get_analyst_consensus."""
         from src.tools.data_access import DataAccessLayer
         from src.agents.openai_agent.tools import create_openai_tools
-        dal = DataAccessLayer()
+        dal = DataAccessLayer(backend=MagicMock())
         tools = create_openai_tools(dal)
         names = {t.name for t in tools}
         assert "tool_get_analyst_consensus" in names

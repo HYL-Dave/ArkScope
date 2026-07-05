@@ -545,7 +545,7 @@ def collect_news(
     # record a FAILED run; the CLI catches this and exits 1.
     api_key = load_env()
     if not api_key:
-        raise RuntimeError("FINNHUB_API_KEY not found in config/.env or environment")
+        raise RuntimeError("FINNHUB_API_KEY is not configured in app/env")
 
     # Initialize
     config = FinnhubConfig()

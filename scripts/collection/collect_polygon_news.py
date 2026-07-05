@@ -733,7 +733,7 @@ def collect_news(
     # scheduler — record a FAILED run; the CLI catches this and exits 1)
     api_key = load_env()
     if not api_key:
-        raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
+        raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
 
     # Initialize
     config = CollectionConfig()
@@ -920,7 +920,7 @@ def run_incremental(tickers_arg: Optional[str] = None,
 
     api_key = load_env()
     if not api_key:
-        raise RuntimeError("POLYGON_API_KEY not found in config/.env or environment")
+        raise RuntimeError("POLYGON_API_KEY is not configured in app/env")
 
     collector = PolygonNewsCollector(api_key, config)
     tickers = load_tickers(tickers_arg, scope=scope)
