@@ -142,15 +142,50 @@ def test_no_signal_when_nothing_recorded(monkeypatch):
     assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "fred")["status"] == "no_signal"
 
 
-def test_fred_disabled_when_macro_calendar_feature_is_off(monkeypatch):
+def test_fred_snapshot_available_when_refresh_is_off(monkeypatch, tmp_path):
     monkeypatch.setenv("FRED_API_KEY", "k")
     monkeypatch.setattr("src.agents.config.get_agent_config",
                         lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
+    monkeypatch.setattr(
+        "src.service.provider_health.resolve_macro_calendar_db_path",
+        lambda: str(tmp_path / "macro_calendar.db"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "src.service.provider_health.read_macro_table_stats",
+        lambda path: {
+            "macro_series": {"row_count": 11, "last_fetched_at": "2026-06-25T01:09:52Z"},
+            "macro_observations": {"row_count": 29571, "last_fetched_at": "2026-06-25T01:09:52Z"},
+            "macro_release_dates": {"row_count": 4659, "last_fetched_at": "2026-06-25T01:09:52Z"},
+        },
+        raising=False,
+    )
+    now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=now), "fred")
+    assert p["status"] == "connected"
+    assert p["disabled_reason"] is None
+    assert p["enabled"] is None
+    assert p["signals"]["auto_refresh_enabled"] is False
+    assert p["signals"]["local_snapshot"]["observation_count"] == 29571
+    assert "local snapshot" in p["detail"].lower()
+    assert "auto-refresh off" in p["detail"].lower()
+
+
+def test_fred_refresh_off_without_snapshot_is_no_signal(monkeypatch):
+    monkeypatch.setenv("FRED_API_KEY", "k")
+    monkeypatch.setattr("src.agents.config.get_agent_config",
+                        lambda: type("Cfg", (), {"macro_calendar_enabled": False})())
+    monkeypatch.setattr(
+        "src.service.provider_health.read_macro_table_stats",
+        lambda path: {},
+        raising=False,
+    )
     p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY), "fred")
-    assert p["status"] == "disabled"
-    assert p["disabled_reason"] == "macro_ingestion_disabled"
-    assert "not enabled" in p["detail"].lower()
-    assert p["enabled"] is False
+    assert p["status"] == "no_signal"
+    assert p["disabled_reason"] is None
+    assert p["enabled"] is None
+    assert p["signals"]["auto_refresh_enabled"] is False
+    assert p["signals"]["local_snapshot"]["observation_count"] == 0
 
 
 def test_sec_edgar_ttl_governed_never_stale():

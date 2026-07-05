@@ -39,6 +39,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
+from src.macro_calendar.local_store import read_macro_table_stats, resolve_macro_calendar_db_path
+
 logger = logging.getLogger(__name__)
 
 _NY_TZ = ZoneInfo("America/New_York")
@@ -56,6 +58,13 @@ _THRESHOLD_HOURS: Dict[str, Optional[float]] = {
     "sec_edgar": None,
     "financial_datasets": None,
 }
+_DEFAULT_THRESHOLD = object()
+
+
+def _effective_threshold(pid: str, threshold_hours: Any) -> Optional[float]:
+    if threshold_hours is _DEFAULT_THRESHOLD:
+        return _THRESHOLD_HOURS.get(pid)
+    return threshold_hours
 
 
 def _is_us_weekend(now: datetime) -> bool:
@@ -227,6 +236,12 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     except Exception as e:
         notes.append(f"macro config check failed: {e}")
 
+    macro_stats: Dict[str, Any] = {}
+    try:
+        macro_stats = read_macro_table_stats(resolve_macro_calendar_db_path())
+    except Exception as e:
+        notes.append(f"macro local stats failed: {e}")
+
     # --- per-source decomposition ---------------------------------------------
     # news rows: (source, latest, recent_count) per provider
     news_by_src: Dict[str, Dict[str, Any]] = {}
@@ -271,7 +286,9 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
              weekend_maintenance: bool = False, detail: str = "",
              signals: Optional[dict] = None,
              disabled_reason: Optional[str] = None,
-             config_error: Optional[dict] = None) -> None:
+             config_error: Optional[dict] = None,
+             threshold_hours: Any = _DEFAULT_THRESHOLD) -> None:
+        effective_threshold = _effective_threshold(pid, threshold_hours)
         providers.append({
             "id": pid,
             "label": label,
@@ -285,7 +302,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             "status": _status(
                 key_present=key["present"], enabled=enabled,
                 last_success_at=last_success,
-                threshold_hours=_THRESHOLD_HOURS.get(pid), now=now,
+                threshold_hours=effective_threshold, now=now,
                 weekend_maintenance=weekend_maintenance,
                 config_error=config_error,
             ),
@@ -334,21 +351,39 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         )
 
     fred = _job_signal("fetch_fred")
-    fred_disabled = macro_enabled is False
+    macro_obs = macro_stats.get("macro_observations") or {}
+    macro_series = macro_stats.get("macro_series") or {}
+    macro_releases = macro_stats.get("macro_release_dates") or {}
+    snapshot_latest = _to_dt(macro_obs.get("last_fetched_at"))
+    snapshot_count = int(macro_obs.get("row_count") or 0)
+    fred_snapshot = {
+        "available": snapshot_count > 0,
+        "series_count": int(macro_series.get("row_count") or 0),
+        "observation_count": snapshot_count,
+        "release_dates_count": int(macro_releases.get("row_count") or 0),
+        "latest_fetched_at": _iso(snapshot_latest),
+    }
+    fred_refresh_enabled = bool(macro_enabled)
     _add(
         "fred", "FRED", "macro",
         _key_info(loaded_file_keys, app_keys, "FRED_API_KEY"),
         config_error=_config_error("fred"),
-        enabled=macro_enabled,
-        last_success=fred["last_success"], last_attempt=fred["last_attempt"],
+        enabled=None,
+        last_success=snapshot_latest or fred["last_success"], last_attempt=fred["last_attempt"],
         last_error=fred["last_error"],
+        threshold_hours=(_THRESHOLD_HOURS.get("fred") if fred_refresh_enabled else None),
         detail=(
-            "macro ingestion not enabled"
-            if fred_disabled
-            else f"latest fred job success {_iso(fred['last_success']) or '—'}"
+            f"local snapshot {fred_snapshot['observation_count']} observations"
+            f" · {fred_snapshot['series_count']} series"
+            f" · latest fetched {_iso(snapshot_latest) or '—'}"
+            f" · auto-refresh {'on' if fred_refresh_enabled else 'off'}"
         ),
-        signals={"jobs_prefix": "fetch_fred"},
-        disabled_reason="macro_ingestion_disabled" if fred_disabled else None,
+        signals={
+            "jobs_prefix": "fetch_fred",
+            "auto_refresh_enabled": fred_refresh_enabled,
+            "local_snapshot": fred_snapshot,
+        },
+        disabled_reason=None,
     )
 
     # SEC EDGAR — free, no key; TTL-governed cache, never age-judged
