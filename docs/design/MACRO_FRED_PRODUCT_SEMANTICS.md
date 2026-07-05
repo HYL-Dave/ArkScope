@@ -1,15 +1,23 @@
 # Macro / FRED Product Semantics — Decision Document
 
 - **Date:** 2026-07-05
-- **Status:** DRAFT — awaiting user ruling on §6. **This document implements nothing.**
-- **Queue authority:** `PROJECT_PRIORITY_MAP.md` queued "FRED product semantics decision doc" after the PG-exit close (§10, 2026-07-05 entries). The standing rule for this item: decision document ONLY; no implementation until a real consumer exists.
+- **Status:** **RULED 2026-07-05 (§8)** — semantics adopted: *readable local snapshot, refresh disabled* (§6). Implementation is a separate follow-up slice with its own plan; **this document itself implements nothing.**
+- **Queue authority:** `PROJECT_PRIORITY_MAP.md` queued "FRED product semantics decision doc" after the PG-exit close (§10, 2026-07-05 entries).
 - **Predecessors:** `P1_2_SPEC.md` (+ `P1_2_PROVIDER_DISCOVERY.md`) — the layer's design, written 2026-04-26, six days before the 2026-05-02 product pivot; `DESKTOP_APP_CARRYOVER_ANALYSIS.md` — post-pivot preservation ruling.
 
 ---
 
-## 1. The question
+## 1. The question (reframed at ruling)
 
-Post-pivot (local-first research workbench), what is the **product role** of the macro/calendar layer (FRED series + Finnhub economic/earnings/IPO calendars)? Today it is fully built, locally stored, recently fed on one side — and switched off at every product surface. That combination is stable but semantically undefined: every adjacent slice (S-J provider health, PG-unreachable E2E, Data Sources UI) has had to hand-craft a special case for "FRED: built, keyed, disabled, not broken". This document defines the semantics once so future slices stop paying that tax.
+The draft framed this as "what is the product role of the macro layer — keep dormant or retire?". The user's ruling reframed it: **that was never the question.** The FRED key is configured, the provider is free, and 29k observations of useful data sit locally — the actual problem is that the app *displays and gates* all of that as if it were unusable. The Data Sources row collapses **three orthogonal states into one**:
+
+1. **Provider/key state** — is the FRED key configured and working? (Yes.)
+2. **Local data state** — is there usable data, and how fresh is it? (Yes — snapshot @ 2026-06-25.)
+3. **Auto-refresh / ingestion enablement** — is scheduled fetching turned on? (No — and that is fine.)
+
+Today 「未啟用抓取」 is literally a statement about axis 3, but the UI renders it where axes 1 and 2 should be visible, so a configured provider with real local data reads as "not usable". The question this document answers: **what are the correct product semantics for these three axes, and what should the app display and let the user/agent use?**
+
+A code fact makes the answer cheap: `macro_calendar_enabled` today gates only the READ surfaces (two agent tools + `/macro/*` payload routes). The scheduler has no macro source at all — ingestion is manual-jobs-only — so opening reads creates **zero refresh obligation**. "Readable snapshot with refresh off" is the natural shape of the existing code, not a compromise.
 
 ## 2. Grounded inventory (verified 2026-07-05)
 
@@ -45,27 +53,32 @@ P1.2's defining sophistication — append-only revision logs, ALFRED vintages, `
 
 **C. Enable now (flip `macro_calendar.enabled=true`, define cadence, wire the research surface).** This is implementation without a consumer: nothing in C-2 today asks macro questions that fail, no user workflow has surfaced the need, and enabling creates an ops obligation (freshness, cadence, calendar backfill for the two never-run Finnhub domains). Premature under the consumer-first rule.
 
-**D. Dormant-capability semantics with named wake triggers (recommended).** Keep the layer exactly as it is — built, keyed, off — but *define* that state and its exit conditions in writing, so it is a decision rather than an ambiguity.
+**D. Dormant-capability semantics with named wake triggers (the draft's recommendation).** Keep the layer built-keyed-off but define the state and its exit conditions in writing.
 
-## 6. Recommendation (awaiting ruling)
+> §5's option space (A–D) is preserved as the draft's reasoning record. The ruling **superseded D** with the reframed semantics below: D still treated "off" as the resting state and made reads wait for a wake trigger; the ruling observed that the user IS the consumer, the data is real, and only the *refresh* axis should rest.
 
-Adopt **D** with the following semantics:
+## 6. ADOPTED semantics — readable local snapshot, refresh disabled (ruled 2026-07-05)
 
-1. **Product role (post-pivot):** macro/FRED is a **research-context layer** — dormant capability of the locked layer-4 architecture. It is NOT a signal/backtest layer; P1.2's vintage/revision machinery stays dormant with it (kept because removal buys nothing and the carryover lock protects it, not because a backtest consumer is expected).
-2. **Dormant-state contract:** flag stays default-off; tools keep refusing with the disabled error; Data Sources keeps 「未啟用抓取」; provider-health keeps `disabled` outranking config errors; the frozen data (FRED @ 2026-06-25, IPO @ 2026-06-24, economic/earnings empty) stays in place with **no refresh obligation**. Manual `POST /jobs/run/…` remains available for ad-hoc refresh without any semantics change.
-3. **Wake triggers (any one suffices to open an enablement slice):**
-   - a C-2 research workflow demonstrably degraded by missing macro context (a real transcript where the agent needed CPI/FFR/calendar data and had to refuse), or
-   - C-3 ticker-detail design names macro context as a section, or
-   - the user states a direct research need for the series/calendars.
-4. **Enablement contract (when woken):** the first slice is **freshness/ops semantics, not architecture** — staleness display, refresh cadence (manual-job cadence may suffice; a scheduler source is optional), and scoping WHICH sub-domains wake (FRED series alone is the cheap core; the never-run Finnhub economic/earnings calendars are a separate decision with their own backfill cost). Consumer named first, per the standing rule.
-5. **Dormancy expiry:** if no wake trigger fires by **end of 2026-Q4**, revisit retirement (option B) as a deliberate agenda item WITH the carryover-lock amendment — dormancy is a parking state with an expiry, not a forever-limbo.
-6. **Dead-code sweep guardrail:** the sweep must treat `src/macro_calendar/`, the two agent tools, `/macro/*` routes, and `scripts/p1_2/` as **protected dormant capability** (hard-lock #5), not dead code — sweep scope explicitly excludes them.
+1. **Three-axis model (the core fix).** Provider/key state, local-data state, and refresh enablement are three independent axes and must never again be collapsed into one displayed status. For FRED today: provider **已設定/可用** · local snapshot **available** (11 core series, 29,571 observations, last fetched 2026-06-25) · auto-refresh **off** (an ops state, NOT a provider-disabled state).
+2. **Reads open, honestly labeled.** The app may read and display the local snapshot even with refresh off. Every displayed value carries `observation_date` + `fetched_at` so snapshot data never masquerades as live data. Staleness is information, not an error.
+3. **Display contract (Data Sources row).** Target copy shape:
+   > FRED · 已設定 · 本地快照可用
+   > 11 個核心序列，最後更新 2026-06-25；自動刷新未啟用
+   「未啟用抓取」 as the *headline* status is retired — it described axis 3 while occupying the slot users read as axes 1+2.
+4. **What surfaces first (the named follow-up slice, "macro snapshot display"):**
+   - **Macro Snapshot** display: Fed Funds, 10Y / 2Y, 10Y−2Y spread, CPI / Core CPI, Unemployment, Payrolls, GDP, VIX — each with observation date + fetched-at.
+   - **Agent value lookup** (`get_macro_value`) usable, so research answers can cite "FFR / CPI / yield spread per the local snapshot (as of …)".
+   - **FRED release dates** = a *candidate* "release schedule" surface — decided within the slice, not committed here.
+   - **Finnhub economic/earnings calendars stay OUT** — both tables are empty (never ran); surfacing them would be dishonest until a deliberate backfill decision.
+5. **Refresh stays off; manual jobs remain.** No scheduler source, no cadence obligation. `POST /jobs/run/…` remains the ad-hoc refresh path. *Refresh enablement* (cadence, staleness thresholds, which sub-domains auto-update) is a separate, consumer-gated future decision — the P1.2 vintage/revision machinery stays dormant with it.
+6. **Gate mechanics belong to the implementation plan.** The current single flag (`macro_calendar_enabled`) conflates the axes; the slice decides whether to re-scope it to mean "auto-refresh enabled" (reads always-on) or flip-plus-label. Constraint either way: provider-health/E2E must keep "refresh off" ≠ "provider broken" (the existing `disabled`-outranks discipline generalizes to the new wording).
+7. **Dead-code sweep guardrail (unchanged from draft):** `src/macro_calendar/`, the two agent tools, `/macro/*` routes, and `scripts/p1_2/` are **protected capability** (carryover hard-lock #5) — not dead code. The sweep MAY fix stale copy inside them (e.g. `macro_calendar_tools.py` still says "requires PostgreSQL DAL backend") but must not remove capability.
 
 ## 7. Non-goals now
 
-- No `macro_calendar.enabled=true` flip, no scheduler source, no UI surface, no new providers, no Finnhub calendar backfill, no vintage/as_of consumer work.
-- No change to provider-health/E2E semantics (already correct for the dormant state).
+- No scheduler source, no refresh cadence, no new providers, no Finnhub economic/earnings calendar backfill, no vintage/`as_of` consumer work.
+- No further provider-health/E2E semantic change beyond the display re-labeling in §6.3 (mechanics per §6.6).
 
 ## 8. Decision log
 
-- *(awaiting user ruling on §6)*
+- **2026-07-05 (user ruling):** Facts of §2 independently verified GREEN (DB counts, flag default, scheduler absence, gating, carryover lock all reproduced). Draft recommendation D **superseded**: the question was reframed from "keep dormant vs retire" to "why does a configured, free, data-rich provider display as unusable — and what should the app show and let be used?". Adopted: **readable local snapshot, refresh disabled** (§6) — three-axis display decomposition, reads open with staleness honesty, refresh stays off, Finnhub calendars excluded, follow-up implementation slice named ("macro snapshot display"). Non-blocking note routed to the dead-code/copy sweep under §6.7's protection boundary: stale "requires PostgreSQL DAL backend" wording in `macro_calendar_tools.py`.
