@@ -193,3 +193,15 @@ def test_migration_cli_permanently_refuses_pg_paths(env, monkeypatch):
         sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--dry-run"]
     )
     assert mig.main() == 2
+
+
+def test_baseless_dal_gets_no_implicit_local_routing(env, monkeypatch):
+    # A DAL without a detected project root (virgin checkout before data/ exists,
+    # zip-and-go before first boot) must keep the pre-collapse contract: no
+    # implicit local routing, so the auto path falls through to FileBackend's
+    # loud construction failure instead of a half-built DAL whose config reads
+    # crash later with _base=None. Mirrors the market_db `if self._base` guard.
+    monkeypatch.delenv("ARKSCOPE_MARKET_DB", raising=False)
+    env.dal._base = None
+    b = _make(env)
+    assert isinstance(b, _StubPG)

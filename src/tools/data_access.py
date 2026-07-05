@@ -235,12 +235,16 @@ class DataAccessLayer:
         market_on = bool(market_db) and (local_market_requested or news_strict)
 
         sa_db = None
-        if self._local_sa_enabled():
+        if self._local_sa_enabled() and self._base is not None:
             from src.sa_capture_store import resolve_sa_db_path
 
             # SA domain is hard-local after N9 batch-1. A missing sa_capture.db
             # must still route local: PG sa_* was dropped, so the local store is
             # the only authority and an absent file reads as honest empty.
+            # The `_base is not None` gate mirrors market_db above: a DAL with no
+            # detected project root gets NO implicit local routing, preserving the
+            # pre-collapse loud FileBackend failure instead of a half-built DAL
+            # whose _base-dependent config reads crash later.
             sa_db = resolve_sa_db_path()
 
         # Post-P0-C/N9 market mode is hard-local. The legacy strict flag remains
