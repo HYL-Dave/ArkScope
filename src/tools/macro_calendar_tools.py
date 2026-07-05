@@ -7,10 +7,11 @@ Two tools:
   - ``get_macro_value(series_id, observation_date, as_of)`` — point-in-time
     macro lookup with FRED/ALFRED vintage replay.
 
-Both tools are read-only, gated on ``macro_calendar.enabled`` (callers
-get a one-line "feature disabled" string when it's off so the agent
-can keep planning), and degrade to a clear text message when the DAL
-backend can't reach PostgreSQL.
+Both tools are read-only. ``get_economic_calendar`` remains gated on
+``macro_calendar.enabled`` because the Finnhub calendar surface is still a
+refresh-enabled feature. ``get_macro_value`` reads the local FRED snapshot even
+when refresh is disabled. Both degrade to clear text when the local store is
+unavailable.
 
 Output is intentionally a Markdown-ish string. The agent reads it,
 not a downstream pipeline — keeping the surface as text avoids forcing
@@ -34,8 +35,8 @@ _DISABLED_MSG = (
     "config/user_profile.yaml to use this tool."
 )
 _BACKEND_MSG = (
-    "macro_calendar tools require the PostgreSQL DAL backend; the current "
-    "DAL has no _get_conn (probably FileBackend)."
+    "macro_calendar local store is unavailable for this DAL/profile; "
+    "no PostgreSQL fallback exists after PG-exit."
 )
 
 
@@ -120,7 +121,7 @@ def get_macro_value(
     """Point-in-time macro lookup. Returns a one-line value summary.
 
     Args:
-        dal: DAL with PostgreSQL backend.
+        dal: DAL/profile used to resolve the local macro calendar store.
         series_id: FRED series id (e.g. "CPIAUCNS"). Case-insensitive.
         observation_date: ISO YYYY-MM-DD — the date the value REFERS to
                           (e.g. "2024-03-01" for March 2024 CPI).
@@ -128,8 +129,6 @@ def get_macro_value(
                reading. Picks the ALFRED vintage window that contained
                this date. Default = current vintage.
     """
-    if not get_agent_config().macro_calendar_enabled:
-        return _DISABLED_MSG
     store = get_macro_calendar_store(dal)
     if not store.is_available():
         return _BACKEND_MSG
@@ -175,10 +174,12 @@ def get_macro_value(
     value = row.get("value")
     rt_start = row.get("realtime_start")
     rt_end = row.get("realtime_end")
+    fetched = row.get("fetched_at")
     value_str = "missing" if value is None else f"{value} {units}".strip()
+    freshness = f"; fetched {fetched}" if fetched else ""
     return (
         f"{sid} ({title}) on {obs.isoformat()}: {value_str} "
-        f"(vintage {rt_start} → {rt_end})"
+        f"(vintage {rt_start} -> {rt_end}{freshness})"
     )
 
 

@@ -555,15 +555,35 @@ class TestGetEconomicCalendarTool:
 
 
 class TestGetMacroValueTool:
-    def test_disabled_returns_helpful_string(self):
+    def test_refresh_disabled_still_reads_local_macro_value(self, monkeypatch):
         undo = _disable_macro()
         try:
+            monkeypatch.setattr(
+                "src.tools.macro_calendar_tools.get_macro_calendar_store",
+                lambda dal: MagicMock(
+                    is_available=MagicMock(return_value=True),
+                    get_macro_observations=MagicMock(return_value={
+                        "series_id": "FEDFUNDS",
+                        "title": "Federal Funds Effective Rate",
+                        "units": "Percent",
+                        "observations": [{
+                            "observation_date": date(2026, 6, 1),
+                            "value": 4.33,
+                            "realtime_start": date(2026, 7, 1),
+                            "realtime_end": date(9999, 12, 31),
+                            "fetched_at": "2026-06-25T01:09:52Z",
+                        }],
+                    }),
+                ),
+            )
             out = get_macro_value(
                 dal=object(),
-                series_id="CPIAUCNS",
-                observation_date="2024-03-01",
+                series_id="FEDFUNDS",
+                observation_date="2026-06-01",
             )
-            assert "disabled" in out.lower()
+            assert "FEDFUNDS" in out
+            assert "4.33" in out
+            assert "fetched 2026-06-25T01:09:52Z" in out
         finally:
             undo()
 
