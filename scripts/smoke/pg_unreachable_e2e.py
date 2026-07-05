@@ -156,10 +156,36 @@ def _assert_macro_payload_or_disabled(body: Any) -> None:
     _assert_list_or_dict(body)
 
 
+def _assert_provider_config_policy(body: Any) -> None:
+    """S-J Phase 2 strict-flip invariants, profile-agnostic so routine E2E runs
+    (real profile, env unset) stay green: an explicit ARKSCOPE_PROVIDER_ENV_FALLBACK
+    must be mirrored by the resolver (env wins), and whenever strict is active no
+    managed provider field may report config/.env as its effective source."""
+    env_raw = os.environ.get("ARKSCOPE_PROVIDER_ENV_FALLBACK", "").strip().lower()
+    env_fallback = body["env_fallback"]
+    if env_raw in ("1", "true", "yes", "on"):
+        assert env_fallback["enabled"] is True
+        assert env_fallback["source"] == "env"
+    elif env_raw in ("0", "false", "no", "off"):
+        assert env_fallback["enabled"] is False
+        assert env_fallback["source"] == "env"
+    if env_fallback["enabled"] is False:
+        for info in body["providers"].values():
+            for field in info["fields"]:
+                assert field["effective_source"] != "config/.env"
+
+
 REQUIRED_CHECKS: tuple[CheckSpec, ...] = (
     CheckSpec("healthz", "GET", "/healthz", 200, _assert_key("status")),
     CheckSpec("system_status", "GET", "/status", 200, _assert_key("data_sources")),
     CheckSpec("provider_config", "GET", "/providers/config", 200, _assert_key("providers")),
+    CheckSpec(
+        "provider_config_policy",
+        "GET",
+        "/providers/config",
+        200,
+        _assert_provider_config_policy,
+    ),
     CheckSpec("provider_health", "GET", "/providers/health", 200, _assert_list_or_dict),
     CheckSpec("schedule_status", "GET", "/schedule", 200, _assert_key("sources")),
     CheckSpec("market_status", "GET", "/market-data/status", 200, _assert_market_status),

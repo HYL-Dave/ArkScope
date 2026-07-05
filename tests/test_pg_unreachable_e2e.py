@@ -236,3 +236,44 @@ def test_macro_disabled_503_is_explicit_config_state_not_pg_failure():
     results = run_route_checks(Client(), checks)
 
     assert [result.ok for result in results] == [True, True]
+
+
+def test_provider_config_policy_assertion_is_env_and_invariant_aware(monkeypatch):
+    from scripts.smoke.pg_unreachable_e2e import (
+        REQUIRED_CHECKS,
+        _assert_provider_config_policy,
+    )
+
+    assert "provider_config_policy" in {check.name for check in REQUIRED_CHECKS}
+
+    strict_body = {
+        "env_fallback": {"enabled": False, "source": "env"},
+        "providers": {"polygon": {"fields": [
+            {"field": "api_key", "effective_source": "missing"}]}},
+    }
+    fallback_body = {
+        "env_fallback": {"enabled": True, "source": "env"},
+        "providers": {"polygon": {"fields": [
+            {"field": "api_key", "effective_source": "missing"}]}},
+    }
+    leaking_body = {
+        "env_fallback": {"enabled": False, "source": "default"},
+        "providers": {"polygon": {"fields": [
+            {"field": "api_key", "effective_source": "config/.env"}]}},
+    }
+
+    monkeypatch.setenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", "false")
+    _assert_provider_config_policy(strict_body)
+    with pytest.raises(AssertionError):
+        _assert_provider_config_policy(fallback_body)
+
+    monkeypatch.setenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", "true")
+    _assert_provider_config_policy(fallback_body)
+    with pytest.raises(AssertionError):
+        _assert_provider_config_policy(strict_body)
+
+    # env unset: no expectation on enabled, but strict-active responses must
+    # never report a managed field sourced from config/.env.
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
+    with pytest.raises(AssertionError):
+        _assert_provider_config_policy(leaking_body)
