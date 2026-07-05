@@ -10,9 +10,9 @@ Sources v1:
   - polygon_news / finnhub_news      — IN-PROCESS adapters (the collector modules
     are import-safe; run_incremental() returns structured stats like new_articles
     instead of an opaque exit code); independent, can run concurrently
-  - ibkr_news / iv_history — collector SUBPROCESSES, serialized
-    behind ONE shared IBKR lock (one Gateway session; client-id hygiene + the
-    ib_insync asyncio loop is safer in its own process)
+  - ibkr_news                         — sanitized src.news_normalized.ibkr_cli
+    subprocess, serialized behind ONE shared IBKR lock (one Gateway session;
+    client-id hygiene + the ib_insync asyncio loop is safer in its own process)
   - ibkr_prices                       — direct-local adapter into market_data.db
   - local_incremental                 — retired PG mirror path
 
@@ -23,7 +23,7 @@ sync hooks remain only as retired compatibility metadata until N9 cleanup
 removes the dead paths.
 
 Write-contention guarantees (the user's explicit SQLite concern):
-  - collectors write per-source Parquet dirs — disjoint, safe in parallel;
+  - provider fetches happen outside market_data.db write locks where possible;
   - active market writes go through direct-local writers; retired PG mirror
     domains fail closed before provider work;
   - the local SQLite is written by direct-local writers only; financial_cache
@@ -66,7 +66,6 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_COLLECT_DIR = _REPO_ROOT / "scripts" / "collection"
 
 TICK_SECONDS = 30
 _IBKR_LOCK_TIMEOUT_S = 1800  # one slow IBKR job must not deadlock the others forever
@@ -77,7 +76,6 @@ _ERROR_TAIL = 600
 class SourceDef:
     name: str
     label: str
-    collector: Optional[List[str]]      # argv after sys.executable; None = no subprocess
     sync_flag: Optional[str]            # retired PG mirror flag, None = no PG sync
     ibkr: bool = False                  # serialize behind the shared IBKR lock
     needs_price_scope: bool = False     # resolve active-universe tickers at run time
@@ -121,7 +119,7 @@ SOURCES: Dict[str, SourceDef] = {
     for s in (
         SourceDef(
             "polygon_news", "Polygon 新聞",
-            None, "--news",
+            "--news",
             adapter=("scripts.collection.collect_polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
@@ -130,7 +128,7 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
-            None, "--news",
+            "--news",
             adapter=("scripts.collection.collect_finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
@@ -139,7 +137,7 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "ibkr_news", "IBKR 新聞",
-            ["collect_ibkr_news.py", "--incremental"], "--news", ibkr=True,
+            "--news", ibkr=True,
             needs_price_scope=True, default_interval_min=120,
             news_direct_source="ibkr",
             writes_market_db=True,
@@ -148,7 +146,7 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "ibkr_prices", "IBKR 股價",
-            None, None,
+            None,
             ibkr=True, universe_tickers=True, default_interval_min=60,
             prices_worker=True, writes_market_db=True,
             source_mode="direct_local",
@@ -158,20 +156,20 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "iv_history", "IV 歷史",
-            ["collect_iv_history.py"], "--iv", ibkr=True,
+            "--iv", ibkr=True,
             needs_price_scope=True, default_interval_min=1440,
             description="ATM IV snapshot (heavy; Gateway) → PG → local mirror",
         ),
         SourceDef(
             "local_incremental", "本地鏡像增量",
-            None, None, default_interval_min=15,
+            None, default_interval_min=15,
             source_mode="retired_pg_mirror",
             write_target="none",
             description="Retired PG → market_data.db delta path; use direct-local sources",
         ),
         SourceDef(
             "price_backfill", "價格缺口補抓",
-            None, None, ibkr=True, universe_tickers=True, default_interval_min=360,
+            None, ibkr=True, universe_tickers=True, default_interval_min=360,
             gap_planned=True,   # v1.3: planner decides scope from coverage, not the full universe
             prices_worker=True, writes_market_db=True,
             source_mode="direct_local",
@@ -1201,20 +1199,6 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                         kwargs["acquire_gateway_lock"] = False
                     result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
                     collected = True
-            elif d.collector is not None:
-                argv = [sys.executable, str(_COLLECT_DIR / d.collector[0]), *d.collector[1:]]
-                if d.needs_price_scope:
-                    scope = tickers if tickers is not None else _resolve_price_scope()
-                    if not scope:
-                        raise RuntimeError("no active-universe scope (profile DB empty/unavailable)")
-                    argv += ["--tickers", ",".join(scope)]
-                    result["ticker_count"] = len(scope)
-                step = _run_subprocess(argv)
-                result["collect"] = step
-                if step["returncode"] != 0:
-                    raise RuntimeError(f"collector failed: {step.get('error_tail', '')[:200]}")
-                collected = True
-
             if collected and d.sync_flag and not skip_sync and not local_news_writer:
                 raise RuntimeError(
                     f"retired PG mirror sync requested for {source} ({d.sync_flag}); "
@@ -1465,7 +1449,11 @@ def status_snapshot() -> Dict[str, Any]:
             "label": d.label,
             "description": d.description,
             "ibkr": d.ibkr,
-            "provider_fetch": (d.collector is not None) or (d.adapter is not None),
+            "provider_fetch": (
+                d.adapter is not None
+                or d.news_direct_source is not None
+                or d.prices_worker
+            ),
             "source_mode": d.source_mode,
             "write_target": d.write_target,
             "source_badges": list(d.source_badges),

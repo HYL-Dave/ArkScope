@@ -2,7 +2,6 @@
 
 Centralizes DSN loading and SSL mode detection used by:
 - src/tools/data_access.py (DAL auto-detect)
-- scripts/migrate_to_supabase.py (retired PG import wrapper)
 - tests/test_db_backend.py (integration tests)
 """
 

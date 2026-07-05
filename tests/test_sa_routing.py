@@ -164,37 +164,6 @@ def test_explicit_false_is_provenance_only(env):
     assert b.sa_db == str(env.sa_db)
 
 
-def test_migration_cli_permanently_refuses_pg_paths(env, monkeypatch):
-    # N9 batch-1 dropped PG sa_* — there is nothing to rebuild from, validate
-    # against, or dry-run count. The batch-1 archive dump is the recovery basis.
-    import scripts.migrate_sa_to_sqlite as mig
-
-    monkeypatch.setattr(
-        mig,
-        "_pg_conn",
-        lambda: (_ for _ in ()).throw(AssertionError("must not touch PG")),
-    )
-
-    for setting in ("true", "false", None):
-        env.profile.set_setting("use_local_sa", setting)
-        monkeypatch.setattr(
-            sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db)]
-        )
-        assert mig.main() == 2
-
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--validate-only"],
-    )
-    assert mig.main() == 2
-
-    monkeypatch.setattr(
-        sys, "argv", ["migrate_sa_to_sqlite.py", "--out", str(env.sa_db), "--dry-run"]
-    )
-    assert mig.main() == 2
-
-
 def test_baseless_dal_gets_no_implicit_local_routing(env, monkeypatch):
     # A DAL without a detected project root (virgin checkout before data/ exists,
     # zip-and-go before first boot) must keep the pre-collapse contract: no

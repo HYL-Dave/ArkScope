@@ -10,13 +10,10 @@ resolves through this one read-only query.
 Remaining tickers_core.json touchpoints OUTSIDE this path (scoped, not zero):
   - sa_native_host._try_ticker_sync WRITES the tier3 ``sa_alpha_picks_auto``
     bucket on every SA refresh (live, protected extension path — slated for
-    retirement in slice 3d when SA moves to sa_capture.db);
-  - legacy/orphan standalone readers (collect_ibkr_fundamentals,
-    collect_alphavantage_news, collect_eodhd_news) and the collectors'
-    explicit ``--tier`` debug escape hatch.
+    retirement once the native-host path is moved under src/).
 
-Self-contained on purpose (sqlite3 + os only): collectors lazy-import this from
-script context where heavier src imports are unwelcome.
+Self-contained on purpose (sqlite3 + os only): provider runners import this
+without pulling in the heavier DAL stack.
 """
 
 from __future__ import annotations

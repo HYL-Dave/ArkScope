@@ -19,8 +19,8 @@ Domains migrated:
 
 The bootstrap builds ALL domains into a single ``.building`` temp file and
 atomically swaps it in only after row-count + checksum validation passes, so a
-failed rebuild never destroys an existing good DB. ``scripts/migrate_market_to_sqlite.py``
-is a thin CLI over this module; the app uses the API. Incremental (delta) updates
+failed rebuild never destroys an existing good DB. The app uses this API directly.
+Incremental (delta) updates
 append rows newer than the local max in place to the live WAL DB (no swap).
 """
 

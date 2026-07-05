@@ -114,6 +114,21 @@ def test_scheduler_runtime_no_longer_references_migrate_to_supabase_script():
     assert "migrate_to_supabase.py" not in Path(ds.__file__).read_text(encoding="utf-8")
 
 
+def test_scheduler_source_defs_have_no_legacy_collector_plumbing():
+    from dataclasses import fields
+
+    assert "collector" not in {field.name for field in fields(ds.SourceDef)}
+    assert all(not hasattr(source_def, "collector") for source_def in ds.SOURCES.values())
+
+
+def test_status_snapshot_provider_fetch_tracks_live_fetch_paths():
+    snap = ds.status_snapshot()
+
+    for source in ("polygon_news", "finnhub_news", "ibkr_news", "ibkr_prices"):
+        assert snap[source]["provider_fetch"] is True
+    assert snap["local_incremental"]["provider_fetch"] is False
+
+
 def test_set_config_roundtrip_and_clamp():
     cfg = ds.set_source_config("polygon_news", enabled=True, interval_minutes=1)
     assert cfg["enabled"] is True

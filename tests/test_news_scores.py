@@ -1,6 +1,6 @@
 """
 Tests for multi-model news scoring: detect_score_columns, resolve_score_columns,
-FileBackend model selection, and migrate_to_supabase score import logic.
+and FileBackend model selection.
 
 Run:
     pytest tests/test_news_scores.py -v
@@ -147,95 +147,6 @@ class TestResolveScoreColumns:
         sent, risk = self._resolve(cols)
         assert sent == "sentiment_gpt_5_2_xhigh"
         assert risk is None
-
-
-# ===========================================================================
-# detect_score_columns from migrate_to_supabase
-# ===========================================================================
-
-class TestMigrateDetectScoreColumns:
-    """Test the detect_score_columns in the migration script."""
-
-    def test_same_behavior(self):
-        import sys
-        sys.path.insert(0, ".")
-        try:
-            from scripts.migrate_to_supabase import detect_score_columns
-            df = pd.DataFrame(columns=[
-                "sentiment_gpt_5_2_xhigh", "risk_gpt_5_2_xhigh",
-                "sentiment_haiku", "risk_haiku",
-                "sentiment_score", "title",
-            ])
-            cols = detect_score_columns(df)
-            assert len(cols) == 4
-            models = {c[1] for c in cols}
-            assert "gpt_5_2" in models
-            assert "haiku" in models
-        finally:
-            sys.path.pop(0)
-
-
-class TestMigrateScoresArchiveGate:
-    def _patch_main(self, monkeypatch, argv):
-        from scripts import migrate_to_supabase as migrate
-
-        calls = []
-
-        class FakeConn:
-            def close(self):
-                calls.append("close")
-
-        monkeypatch.setattr("sys.argv", ["migrate_to_supabase.py", *argv])
-        monkeypatch.setattr(migrate, "load_db_url", lambda: "postgres://archive")
-        monkeypatch.setattr(migrate, "get_connection", lambda _dsn: FakeConn())
-        monkeypatch.setattr(migrate, "import_news", lambda conn, dry_run=False: calls.append("news") or 1)
-        monkeypatch.setattr(migrate, "import_prices", lambda conn, dry_run=False: calls.append("prices") or 1)
-        monkeypatch.setattr(migrate, "import_iv_history", lambda conn, dry_run=False: calls.append("iv") or 1)
-        monkeypatch.setattr(migrate, "import_fundamentals", lambda conn, dry_run=False: calls.append("fundamentals") or 1)
-        monkeypatch.setattr(migrate, "import_news_scores", lambda conn, dry_run=False: calls.append("scores") or 1)
-        return migrate, calls
-
-    def test_default_import_all_refuses_pg_imports(self, monkeypatch):
-        migrate, calls = self._patch_main(monkeypatch, [])
-
-        with pytest.raises(SystemExit):
-            migrate.main()
-
-        assert calls == []
-
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            ["--news"],
-            ["--iv"],
-            ["--fundamentals"],
-            ["--scores"],
-            ["--scores", "--archive-scores"],
-            ["--archive-scores"],
-            ["--prices"],
-        ],
-    )
-    def test_all_pg_import_flags_refuse_after_n9(self, monkeypatch, argv):
-        migrate, calls = self._patch_main(monkeypatch, argv)
-
-        with pytest.raises(SystemExit):
-            migrate.main()
-
-        assert calls == []
-
-    def test_retired_pg_domains_require_local_paths(self):
-        from scripts import migrate_to_supabase as migrate
-
-        parser = migrate.build_arg_parser()
-
-        for flag in ("--news", "--iv", "--fundamentals", "--scores", "--prices"):
-            args = parser.parse_args([flag])
-            with pytest.raises(SystemExit):
-                migrate.validate_args(args, parser)
-
-        args = parser.parse_args(["--scores", "--archive-scores"])
-        with pytest.raises(SystemExit):
-            migrate.validate_args(args, parser)
 
 
 # ===========================================================================

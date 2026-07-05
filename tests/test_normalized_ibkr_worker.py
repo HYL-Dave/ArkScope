@@ -261,22 +261,6 @@ def test_ibkr_worker_standalone_acquires_gateway_lock_before_market_lock(
     assert seen_source_kwargs.get("client_id") == 31
 
 
-def test_legacy_ibkr_worker_script_delegates_to_src_module(monkeypatch):
-    import scripts.collection.collect_ibkr_news_normalized as legacy
-    import src.news_normalized.ibkr_cli as worker
-
-    calls = []
-
-    def fake_main(argv=None):
-        calls.append(argv)
-        return 17
-
-    monkeypatch.setattr(worker, "main", fake_main)
-
-    assert legacy.main(["--tickers", "AAPL"]) == 17
-    assert calls == [["--tickers", "AAPL"]]
-
-
 def test_ibkr_worker_module_startup_emits_only_sanitized_json(tmp_path):
     env = os.environ.copy()
     env["ARKSCOPE_MARKET_DB"] = str(tmp_path / "market_data.db")

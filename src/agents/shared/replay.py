@@ -1,9 +1,8 @@
 """Replay harness — minimal-spike (P0.1).
 
 Captures one agent turn (user query → tool loop → final answer) into a
-provider-neutral JSON fixture. The companion CLI ``scripts/replay_run.py``
-validates fixtures statically against the current ``ToolRegistry`` and
-system prompt — no LLM re-run.
+provider-neutral JSON fixture. Static validation is handled by the replay test
+suite against the current ``ToolRegistry`` and system prompt — no LLM re-run.
 
 Goal: before refactors that touch agent core (Phase B compression /
 Phase C unified runner), capture a few real turns. After the refactor,

@@ -78,7 +78,7 @@ def test_direct_dedups_against_mirror_sha_row(tmp_path, monkeypatch):
     # collector's MD5 dedup_hash, so the same article re-entered as a duplicate.)
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
     db = _news_db(tmp_path)
-    from scripts.migrate_to_supabase import article_hash as canonical
+    from src.news_identity import canonical_article_hash as canonical
     import src.news_providers as npv
     from scripts.collection.collect_polygon_news import NewsArticle
 
