@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status:** DRAFT PLAN 2026-07-05. Docs-only; no runtime changes authorized until review.
+> **Status:** LIVE COMPLETE 2026-07-06. FF-merged `codex/macro-snapshot-display` at `8642b1a`; Task 7 live verification done (user, real sidecar + UI); documented by `docs: close macro snapshot display`.
+
+> **Verification:** backend focused gates 56 + 49; frontend 26 + 29 + tsc + vite build; three reviewer RED replays; PG-unreachable smoke 24 checks `ok:true` / `pg_attempts:[]` (standing `macro_snapshot` check added); full A/B identical (base `edd9d81` 3,709 / 39 vs head `8642b1a` 3,712 / same 39, +3 = net-new tests). Live: FRED row 正常 · app · visible snapshot detail; 11-series panel no overflow; no 「未啟用抓取」/「已停用」.
 
 **Goal:** Make FRED visible and useful as a local readable snapshot without enabling automatic macro ingestion. The Data Sources page should stop presenting FRED as "not enabled" when the API key is configured and local FRED observations exist; the app should expose a small curated macro snapshot and let agent tools read `get_macro_value()` from `macro_calendar.db`, with every displayed value carrying both `observation_date` and `fetched_at`.
 
