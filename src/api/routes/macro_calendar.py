@@ -2,16 +2,18 @@
 
 Endpoints:
 
+  - ``GET /macro/snapshot``             — readable local FRED snapshot
   - ``GET /macro/health``               — pipeline health (commit 5)
   - ``GET /macro/economic-calendar``    — economic events with filters (commit 6)
   - ``GET /macro/earnings-calendar``    — earnings calendar (commit 6)
   - ``GET /macro/ipo-calendar``         — IPO pipeline (commit 6)
   - ``GET /macro/series/{series_id}``   — macro time series + as-of (commit 6)
 
-All endpoints are gated on ``macro_calendar.enabled``. Read endpoints
-support ``?as_of=`` for lookahead-safe replay (calendar uses
-``cal_*_event_revisions``; macro series uses ALFRED's
-``realtime_start``/``realtime_end`` window).
+``macro_calendar.enabled`` gates refresh/manual-ingestion and Finnhub
+calendar surfaces. FRED series/snapshot reads are open local snapshot
+surfaces; they do not imply automatic refresh. Read endpoints support
+``?as_of=`` for lookahead-safe replay (calendar uses ``cal_*_event_revisions``;
+macro series uses ALFRED's ``realtime_start``/``realtime_end`` window).
 """
 
 from __future__ import annotations
@@ -32,14 +34,33 @@ from src.macro_calendar import (
     USE_LOCAL_MACRO_KEY,
     get_macro_calendar_store,
 )
-from src.macro_calendar.local_store import read_macro_table_stats, resolve_macro_calendar_db_path
+from src.macro_calendar.local_store import (
+    read_macro_snapshot,
+    read_macro_table_stats,
+    resolve_macro_calendar_db_path,
+)
 from src.service.macro_calendar_health import compute_macro_calendar_health
 
 router = APIRouter(prefix="/macro", tags=["macro_calendar"])
 
 _DISABLED_MSG = (
     "macro_calendar.enabled is false in config. Enable it in "
-    "config/user_profile.yaml to activate the FRED + Finnhub calendar layer."
+    "config/user_profile.yaml to activate macro refresh jobs and Finnhub "
+    "calendar surfaces."
+)
+
+MACRO_SNAPSHOT_SERIES = (
+    ("FEDFUNDS", "Fed Funds"),
+    ("DGS10", "10Y Treasury"),
+    ("DGS2", "2Y Treasury"),
+    ("T10Y2Y", "10Y-2Y Spread"),
+    ("CPIAUCNS", "CPI"),
+    ("CPILFESL", "Core CPI"),
+    ("UNRATE", "Unemployment"),
+    ("PAYEMS", "Payrolls"),
+    ("GDP", "GDP"),
+    ("GDPC1", "Real GDP"),
+    ("VIXCLS", "VIX"),
 )
 
 
@@ -99,6 +120,13 @@ def set_local_macro(body: LocalMacroToggle, store=Depends(get_profile_store)):
     require_profile_state_write("set_use_local_macro", {"enabled": body.enabled})
     store.set_setting(USE_LOCAL_MACRO_KEY, "true" if body.enabled else "false")
     return {"use_local_macro_setting": body.enabled}
+
+
+@router.get("/snapshot")
+def macro_snapshot():
+    payload = read_macro_snapshot(resolve_macro_calendar_db_path(), MACRO_SNAPSHOT_SERIES)
+    payload["auto_refresh_enabled"] = bool(get_agent_config().macro_calendar_enabled)
+    return payload
 
 
 def _parse_iso_datetime_impl(
@@ -338,8 +366,6 @@ def macro_series(
 ):
     """Return macro time series + observations. ``?as_of=`` selects the
     vintage window that contained that date."""
-    _require_enabled()
-
     df = _parse_iso_date(from_date, "from_date")
     dt = _parse_iso_date(to_date, "to_date")
     _validate_window(df, dt)

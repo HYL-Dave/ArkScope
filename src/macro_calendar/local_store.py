@@ -25,7 +25,7 @@ import os
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from src.macro_calendar.store import (
     ECONOMIC_TRACKED_FIELDS,
@@ -612,7 +612,7 @@ class MacroCalendarLocalStore:
                 clause += " AND observation_date<=?"; params.append(_iso(date_to))
             params.append(lim)
             obs = conn.execute(
-                "SELECT observation_date,value,realtime_start,realtime_end FROM macro_observations "
+                "SELECT observation_date,value,realtime_start,realtime_end,fetched_at FROM macro_observations "
                 f"WHERE series_id=?{clause} ORDER BY observation_date ASC LIMIT ?", params).fetchall()
             return {**dict(meta), "observations": [dict(o) for o in obs]}
         except sqlite3.OperationalError as exc:
@@ -654,3 +654,61 @@ def read_macro_table_stats(db_path: str | Path) -> Dict[str, Dict[str, Any]]:
     finally:
         conn.close()
     return out
+
+
+def read_macro_snapshot(
+    db_path: str | Path,
+    series: Sequence[tuple[str, str]],
+) -> Dict[str, Any]:
+    """Read a curated FRED snapshot without creating ``macro_calendar.db``.
+
+    This is a display/read surface: it returns honest-empty payloads when the DB
+    or tables are absent, and it never instantiates ``MacroCalendarLocalStore``
+    because the constructor creates the DB.
+    """
+    stats = read_macro_table_stats(db_path)
+    obs_stats = stats.get("macro_observations", {})
+    base = {
+        "macro_db": str(db_path),
+        "series_count": int((stats.get("macro_series") or {}).get("row_count") or 0),
+        "observation_count": int(obs_stats.get("row_count") or 0),
+        "release_dates_count": int((stats.get("macro_release_dates") or {}).get("row_count") or 0),
+        "latest_fetched_at": obs_stats.get("last_fetched_at"),
+    }
+    missing_all = [sid for sid, _ in series]
+    if not Path(db_path).exists() or base["observation_count"] == 0:
+        return {**base, "available": False, "items": [], "missing_series": missing_all}
+
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    items: List[Dict[str, Any]] = []
+    missing: List[str] = []
+    try:
+        for sid, label in series:
+            try:
+                row = conn.execute(
+                    "SELECT s.series_id, s.title, s.units, "
+                    "o.value, o.observation_date, o.realtime_start, o.realtime_end, o.fetched_at "
+                    "FROM macro_series s "
+                    "JOIN macro_observations o ON o.series_id = s.series_id "
+                    "WHERE s.series_id = ? AND o.realtime_end = ? "
+                    "ORDER BY o.observation_date DESC LIMIT 1",
+                    (sid, _OPEN_VINTAGE),
+                ).fetchone()
+            except sqlite3.OperationalError:
+                return {**base, "available": False, "items": [], "missing_series": missing_all}
+            if row is None:
+                missing.append(sid)
+                continue
+            item = dict(row)
+            item["label"] = label
+            items.append(item)
+    finally:
+        conn.close()
+
+    return {
+        **base,
+        "available": bool(items),
+        "items": items,
+        "missing_series": missing,
+    }

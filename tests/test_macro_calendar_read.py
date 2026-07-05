@@ -12,6 +12,7 @@ Coverage:
 from __future__ import annotations
 
 import sys
+import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -30,6 +31,8 @@ from src.api.routes.macro_calendar import (
     ipo_calendar,
     macro_series,
 )
+import src.api.routes.macro_calendar as macro_routes
+from src.macro_calendar.local_store import MacroCalendarLocalStore, resolve_macro_calendar_db_path
 from src.tools.macro_calendar_tools import (
     get_economic_calendar,
     get_macro_value,
@@ -39,6 +42,20 @@ from src.tools.macro_calendar_tools import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+_SNAPSHOT_SERIES = (
+    "FEDFUNDS",
+    "DGS10",
+    "DGS2",
+    "T10Y2Y",
+    "CPIAUCNS",
+    "CPILFESL",
+    "UNRATE",
+    "PAYEMS",
+    "GDP",
+    "GDPC1",
+    "VIXCLS",
+)
 
 
 def _enable_macro(monkeypatch_or_cfg=None):
@@ -62,6 +79,40 @@ def _disable_macro():
         cfg.macro_calendar_enabled = original
 
     return undo
+
+
+def _seed_fred_snapshot(fetched_at: str = "2026-06-25T01:09:52Z") -> None:
+    store = MacroCalendarLocalStore()
+    for idx, sid in enumerate(_SNAPSHOT_SERIES):
+        store.upsert_macro_series({
+            "series_id": sid,
+            "title": f"{sid} title",
+            "frequency": "Monthly",
+            "units": "Index",
+            "seasonal_adjustment": None,
+            "last_updated": datetime(2026, 6, 25, tzinfo=timezone.utc),
+            "revision_strategy": "latest_only",
+        })
+        store.upsert_macro_observation(
+            series_id=sid,
+            observation_date=date(2026, 6, 1),
+            value=float(idx + 1),
+            realtime_start=date(2026, 6, 25),
+            realtime_end=None,
+        )
+    db_path = resolve_macro_calendar_db_path()
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("UPDATE macro_series SET fetched_at=?", (fetched_at,))
+        conn.execute("UPDATE macro_observations SET fetched_at=?", (fetched_at,))
+        conn.execute(
+            "INSERT INTO macro_release_dates (release_id, release_name, release_date, fetched_at) "
+            "VALUES (1, 'FOMC', '2026-07-01', ?)",
+            (fetched_at,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +340,39 @@ class TestEarningsAndIpoRoutes:
 
 
 class TestMacroSeriesRoute:
+    def test_snapshot_readable_when_refresh_disabled(self):
+        _seed_fred_snapshot()
+        undo = _disable_macro()
+        try:
+            result = macro_routes.macro_snapshot()
+        finally:
+            undo()
+        assert result["available"] is True
+        assert result["auto_refresh_enabled"] is False
+        assert result["series_count"] == 11
+        assert result["observation_count"] == 11
+        assert result["release_dates_count"] == 1
+        fedfunds = next(item for item in result["items"] if item["series_id"] == "FEDFUNDS")
+        assert fedfunds["observation_date"] == "2026-06-01"
+        assert fedfunds["fetched_at"] == "2026-06-25T01:09:52Z"
+
+    def test_macro_series_readable_when_refresh_disabled(self):
+        _seed_fred_snapshot()
+        undo = _disable_macro()
+        try:
+            result = macro_series(
+                "FEDFUNDS",
+                from_date=None,
+                to_date=None,
+                as_of=None,
+                limit=5,
+                dal=object(),
+            )
+        finally:
+            undo()
+        assert result["series_id"] == "FEDFUNDS"
+        assert result["observations"][0]["fetched_at"] == "2026-06-25T01:09:52Z"
+
     def test_unknown_series_returns_404(self, monkeypatch):
         undo = _enable_macro()
         try:
