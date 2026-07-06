@@ -84,23 +84,44 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ---
 
-## 5. `scripts/` retirement rule (principle)
+## 5. `scripts/` retirement rule — **FINAL (consolidation executed 2026-07-06, merge `bde732d`)**
 
+**The rule (final form):**
+
+- **`scripts/` holds only app-unrelated or historical material.** `src/` never imports `scripts/`.
+  Anything runnable that the app, its gates, or its operators actively depend on is
+  `python -m src.<module>` — the only exceptions are the explicitly user-ruled retained families
+  in the survivor table below.
 - **Provider clients stay in `data_sources/` unless deliberately migrated.** That is the existing
   provider layer (`data_sources/ibkr_source.py`, `sec_edgar_financials.py`,
   `financial_datasets_client.py`, `polygon_source.py`, ...). Runtime orchestration / domain logic
-  moves into `src/<domain>/...` modules (`src/news_normalized/`, `src/iv/`,
-  `src/fundamentals/`, ...). Do **not** accidentally create a second provider layer under
+  lives in `src/<domain>/...` modules. Do **not** create a second provider layer under
   `src/providers/`.
-- **Runtime imports `src/` only.** Subprocess isolation may stay, but its **target becomes `python -m src.<module>`, never `scripts/*.py`**.
-- **Retirement = definition-of-done of each domain's cutover**, riding along that domain's migration. **Not** a standalone mega-refactor (avoid stalling PG-exit momentum).
-- **First conversion candidate = the N8a IBKR news worker:** `scripts/collection/collect_ibkr_news_normalized.py`
-  is **not** a trivial shell. `src/news_normalized/ibkr_runtime.py` holds the Gateway adapter, but
-  the script still owns worker orchestration, DB/write locking, provider config injection,
-  `stderr` suppression, sanitized stdout JSON, sanitized error classes, and continuation-count
-  redaction. S-A1 must move this whole worker boundary into `src/news_normalized/ibkr_cli.py` and
-  repoint the scheduler to `python -m src.news_normalized.ibkr_cli` while preserving the
-  sanitization contract.
+
+**Execution record** (plan `docs/superpowers/plans/2026-07-06-scripts-runtime-consolidation.md`):
+collectors → `src/collectors/{polygon_news,finnhub_news}.py`; `daily_update` →
+`python -m src.daily_update`; smoke/audit → `src/smoke/pg_unreachable_e2e.py`,
+`src/audit/ibkr_news_catchup_audit.py`; SA native host → `src/sa_native_host.py` (browser
+manifests untouched — they point at the stable launcher; only
+`~/.config/arkscope/sa_native_host.json` `host_script` was re-pointed). Dead batch deleted at
+`f9d00c7` (recover any file via `git show f9d00c7^:scripts/<path>`); av/eodhd reference
+implementations tracked in map §P2.5. Full A/B failure sets strictly identical; live Firefox
+round-trip verified post-cutover.
+
+**Survivor table (authoritative; anything else appearing under `scripts/` is residue):**
+
+| Retained | Why (one line) |
+|---|---|
+| `scripts/analysis/` | One-off options research scans (BS-vs-American, mispricing, unusual activity) — research, not runtime |
+| `scripts/diagnostics/` | Manual operator probes (`probe_ibkr_news_bodies.py`) — ad hoc, keyed, never scheduled |
+| `scripts/huggingface/` | Open-data release tooling + scoring prompts — historical record (user-ruled retained) |
+| `scripts/live/` | Manual live-API smokes (SDK driver/route) — operator-run with real keys, deliberately outside CI |
+| `scripts/migration/` | Completed PG-exit migration CLIs kept as gate evidence (N8a/N9 batches, cutovers, reconciles) |
+| `scripts/p1_2/` | FRED provider-evaluation smoke — historical evidence for P1.2 |
+| `scripts/scoring/` | Scoring archive + occasional local score-import CLI (`import_news_scores_local.py`, §6 S-G) — user-ruled retained |
+| `scripts/testing/` | Manual paid-API experiments (financial datasets) — exploratory, not gates |
+| `scripts/visualization/` | Legacy news dashboard/data-loader — historical |
+| `scripts/__init__.py` | Retained package marker: historical tests import `scripts.scoring` / `scripts.migration` namespaces |
 
 ---
 

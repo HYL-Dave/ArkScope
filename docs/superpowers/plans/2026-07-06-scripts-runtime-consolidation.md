@@ -1,5 +1,12 @@
 # Scripts Runtime Consolidation Implementation Plan
 
+> **Status: ✅ LIVE COMPLETE 2026-07-06.** FF-merged at `bde732d` (Tasks 1–5 + 4 reviewer
+> amendment commits). Full A/B failure sets strictly identical (37=37; passed −6 = −14
+> deleted / +8 added, fully accounted). Live cutover done: `host_script` re-pointed to
+> `src/sa_native_host.py`, simulated host round-trip green, user Firefox Quick Refresh
+> verified in `sa_capture.db` (`sa_refresh_meta` current 49+1 / closed 61+1). Scoping §5
+> rewritten to final form with the survivor table. Closeout entry in map §10.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Finish the ruled `scripts/` → `src/` consolidation: runtime never imports `scripts/`, every runnable app tool lives under `python -m src.*`, dead post-exit collectors are deleted with evidence, and `scripts/` retains ONLY app-unrelated/historical material. Zero residue: no compatibility wrappers, no tombstone scripts, no orphan stubs left at old locations.
@@ -126,9 +133,9 @@ Stop and report before continuing if any of these happen:
 
 **Files:** `docs/design/PG_EXIT_REMAINDER_SCOPING.md` (§5), `docs/design/PROJECT_PRIORITY_MAP.md`, this plan.
 
-- [ ] **Step 1: Finalize §5** to the ruled end-state: `scripts/` = app-unrelated/historical only (enumerate the survivors: `huggingface/`, `scoring/`, `migration/` gate evidence, `p1_2/`, `analysis/`, `visualization/`, `testing/`, `diagnostics/`, `live/` — each with one-line justification); `src/` never imports `scripts/`; all runnable app tooling is `python -m src.*`. `scripts/__init__.py` disposition is explicit, not implicit: DEFAULT = delete it and verify nothing still does `import scripts` (`rg -n "import scripts" src/ tests/` = zero after Tasks 1-5); if a retained historical script provably needs package-ness, keep it and LIST it as "retained package marker" in the survivor table. The final physical scan must be pycache-safe: `find scripts -type f -not -path "*__pycache__*"` (or clean generated caches first) so stale `.pyc` files cannot masquerade as residue.
-- [ ] **Step 2: Map closeout entry** (newest-first §10): what moved, what died (with the pre-deletion sha for av/eodhd recovery), the deleted-test accounting, gates + A/B result, native host manifest evidence.
-- [ ] **Step 3: Plan header → LIVE COMPLETE.** Commit: `docs: close scripts runtime consolidation`.
+- [x] **Step 1: Finalize §5** to the ruled end-state: `scripts/` = app-unrelated/historical only (enumerate the survivors: `huggingface/`, `scoring/`, `migration/` gate evidence, `p1_2/`, `analysis/`, `visualization/`, `testing/`, `diagnostics/`, `live/` — each with one-line justification); `src/` never imports `scripts/`; all runnable app tooling is `python -m src.*`. `scripts/__init__.py` disposition is explicit, not implicit: DEFAULT = delete it and verify nothing still does `import scripts` (`rg -n "import scripts" src/ tests/` = zero after Tasks 1-5); if a retained historical script provably needs package-ness, keep it and LIST it as "retained package marker" in the survivor table. The final physical scan must be pycache-safe: `find scripts -type f -not -path "*__pycache__*"` (or clean generated caches first) so stale `.pyc` files cannot masquerade as residue.
+- [x] **Step 2: Map closeout entry** (newest-first §10): what moved, what died (with the pre-deletion sha for av/eodhd recovery), the deleted-test accounting, gates + A/B result, native host manifest evidence.
+- [x] **Step 3: Plan header → LIVE COMPLETE.** Commit: `docs: close scripts runtime consolidation`.
 
 ## Full A/B (after Task 4; rerun after Task 5 only if it touched runtime beyond the move)
 
