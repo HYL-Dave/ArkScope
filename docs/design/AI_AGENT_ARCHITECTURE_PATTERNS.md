@@ -1,5 +1,7 @@
 # AI Agent 可借鑑架構模式
 
+> **Status: REFERENCE (dated)** — external-patterns research notes; not ArkScope architecture authority.
+
 > ⚠️ **定位說明**: 本文檔整理 Dexter 專案的設計模式，僅作為 **部分參考**。
 > ArkScope 的完整架構設計請參閱 [LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md](./LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md) §1.3。
 >

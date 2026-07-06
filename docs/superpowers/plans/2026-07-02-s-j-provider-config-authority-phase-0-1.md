@@ -1,5 +1,7 @@
 # S-J Provider-Config Authority Phase 0-1 Implementation Plan
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make data-provider configuration visibly DB-first for the desktop runtime by auditing provider env use, promoting SEC UA and IBKR client-id defaults into app-managed config, adding per-field `.env` import, and failing closed into setup-only mode when the provider config store is unavailable.

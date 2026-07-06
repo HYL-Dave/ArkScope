@@ -1,5 +1,7 @@
 # 情緒衍生特徵定義
 
+> **Status: HISTORICAL (RL line paused 2026-04-25)** — feature definitions for RL training; see RL_COLLAPSE_FINDINGS.
+
 > **目的**: 定義從基礎情緒分數衍生的技術特徵，用於 RL 訓練
 > **版本**: 1.0 (2026-01-04)
 

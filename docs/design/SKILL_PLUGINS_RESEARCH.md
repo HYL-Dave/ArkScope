@@ -1,5 +1,7 @@
 # Skills & Plugins 架構研究
 
+> **Status: REFERENCE (dated)** — research notes; skills implementation lives in resources/skills/ + src/agents.
+
 > **目的**: 研究 Anthropic Financial Services Plugins 架構，評估如何將類似能力整合到本專案
 > **調研日期**: 2026-03-23
 > **來源**: [anthropics/financial-services-plugins](https://github.com/anthropics/financial-services-plugins) (Apache 2.0, 6.7k stars)

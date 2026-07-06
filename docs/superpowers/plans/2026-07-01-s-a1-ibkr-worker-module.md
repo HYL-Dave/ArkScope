@@ -1,5 +1,7 @@
 # S-A1 IBKR News Worker Module Implementation Plan
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move the N8a IBKR normalized-news worker runtime boundary from `scripts/collection/collect_ibkr_news_normalized.py` into `src/news_normalized/ibkr_cli.py`, and repoint the scheduler to `python -m src.news_normalized.ibkr_cli` without changing behavior or weakening sanitized-output guarantees.

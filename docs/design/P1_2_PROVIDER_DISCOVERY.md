@@ -1,5 +1,7 @@
 # P1.2 Provider Discovery — FRED + Finnhub
 
+> **Status: HISTORICAL RECORD** — provider smoke evidence behind P1.2 (shipped 2026-04-27).
+
 > **Purpose**: Lock in what FRED and Finnhub actually provide on the free tier *before* writing the P1.2 spec. Schema, ingestion jobs, freshness telemetry, API/tool surfaces all depend on these constraints.
 >
 > **Scope**: pure research from official docs. **No spec, no code, no schema decisions yet** — only facts, gaps, and risks the next doc has to resolve.

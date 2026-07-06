@@ -1,5 +1,7 @@
 # IBKR News Error 10172 Capture Implementation Plan
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Preserve IBKR news-body request error 10172 as a sanitized, typed unavailable result instead of silently classifying it as a successful empty body.

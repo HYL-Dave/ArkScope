@@ -1,5 +1,7 @@
 # News Normalization Offline Foundation Implementation Plan
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build and verify the all-source normalized news identity, schema, cleaner, read-only migration preview, common writer, and provider adapters without Gateway access or live database writes.

@@ -1,5 +1,7 @@
 # P0-C Prices Reconcile + Direct-Local Cutover Implementation Plan
 
+> **Status: EXECUTED 2026-07-04** — local prices = authority; direct-local cutover complete; historical record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove whether local `market_data.db.prices` is already the correct authority, then cut price ingest/reads away from PostgreSQL without bulk-copying PG rows unless the audit proves a real local gap.

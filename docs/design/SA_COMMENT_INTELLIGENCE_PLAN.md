@@ -1,5 +1,7 @@
 # SA Comment Intelligence Plan
 
+> **Status: STAGE 1 SHIPPED** — comment signals live; kept as reference for C-3 / future stages.
+
 > 目的: 將 Seeking Alpha / Alpha Picks 留言區從「原始資料庫」提升為可用的社群訊號來源，抽取高價值資訊、社群共識與待驗證訊息。
 > 建立日期: 2026-04-14
 > 依賴: SA comments 抓取已穩定、去重與 comment_date 問題已修復；後續可受益於 Unified Runner / Knowledge Graph / Analysis Pipeline

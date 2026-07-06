@@ -1,5 +1,7 @@
 # News N8a PG-Exit Implementation Plan
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Route Polygon, Finnhub, and IBKR news through one normalized local writer with an atomic legacy projection, then remove news PostgreSQL sync/fallback while preserving current reader behavior.

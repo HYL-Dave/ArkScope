@@ -1,5 +1,7 @@
 # Agent 架構演進追蹤
 
+> **Status: HISTORICAL BUILD LOG** — pre-pivot agent-era phases; paths/flows described here predate the local-first pivot.
+
 > **目的**: 追蹤 agent 系統從 MVP 到成熟架構的演進，記錄設計決策與實作狀態
 > **創建日期**: 2026-02-08
 > **最後更新**: 2026-04-25

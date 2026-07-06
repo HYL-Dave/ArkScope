@@ -1,5 +1,7 @@
 # Slice 3d — SA Capture Cutover Runbook（PG → data/sa_capture.db）
 
+> **Status: HISTORICAL RECORD — cutover executed 2026-06-13, all cuts passed.** Write-path text below is the PG-era pre-cutover state; the CURRENT host write path lives in `SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md` §"Host write path".
+
 > 狀態：LOCKED 2026-06-11 · Rehearsal 2026-06-12（台灣上午）· 正式 cutover 2026-06-13（週六，美股休市）
 > 範圍一句話：**SA cutover 只做「SA DB local hard cutover + 寫者暫停/恢復 + 讀寫 smoke」。
 > 不順手重構 provenance、不 port comment extraction job、不刪 PG 舊列、不做 PG fallback。**

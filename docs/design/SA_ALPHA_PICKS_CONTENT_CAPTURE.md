@@ -1,5 +1,7 @@
 # SA Alpha Picks Content Capture
 
+> **Status: SHIPPED** — capture pipeline live; kept as reference for C-3 ticker-detail SA sections.
+
 Last updated: 2026-04-03
 
 ## Current behavior

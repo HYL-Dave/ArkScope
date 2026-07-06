@@ -1,5 +1,7 @@
 # Dead-Code / UI Sweep Implementation Plan — LIVE COMPLETE
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove post-PG-exit dead runtime paths and stale Data Sources/UI copy without deleting protected macro/SA capabilities or legacy provenance flags.

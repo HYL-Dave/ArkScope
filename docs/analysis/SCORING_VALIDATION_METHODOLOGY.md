@@ -1,5 +1,7 @@
 # LLM 評分驗證方法論
 
+> **Status: HISTORICAL RECORD** — scoring-era validation methodology; the open dataset shipped and active scorers are archived under scripts/scoring/.
+
 本文件說明驗證 LLM 情緒/風險評分預測能力所使用的量化金融方法。
 
 ## 驗證工具

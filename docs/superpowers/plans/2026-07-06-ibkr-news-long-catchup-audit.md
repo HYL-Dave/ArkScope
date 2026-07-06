@@ -1,5 +1,7 @@
 # IBKR News Long-Catch-Up Audit Plan — AUDIT COMPLETE
 
+> **Status: COMPLETED — historical implementation record; closeout entry in `PROJECT_PRIORITY_MAP.md` §10.**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:test-driven-development for the audit utility and superpowers:verification-before-completion before claiming the slice is complete. This is an audit-first slice; do not change runtime ingestion behavior unless a reviewed follow-up plan is opened.
 
 **Goal:** Quantify whether normalized IBKR news can miss tail articles after a long quiet window because IBKR historical news returns only the 300 most-recent headlines per ticker, then document the operational boundary and any follow-up decision.

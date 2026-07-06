@@ -1,5 +1,7 @@
 # 多因子信號檢測系統設計
 
+> **Status: SHIPPED 2026-04-26 (P1.1)** — signal factors tool + factor-rank API live; historical design record.
+
 > **目標**: 從多個獨立信號組合中檢測潛在的板塊/個股爆發機會
 > **動機**: 單篇新聞情緒不足以捕捉複雜市場動態，需要事件鏈+板塊聚合+異常檢測
 > **版本**: 1.2 (2026-04-22)
