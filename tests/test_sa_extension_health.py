@@ -210,6 +210,42 @@ def test_run_host_ping_uses_real_native_host_protocol(tmp_path, monkeypatch):
     assert "secret-token" not in json.dumps(reply)
 
 
+def test_run_host_ping_simulates_browser_env_not_sidecar_env(tmp_path, monkeypatch):
+    """The probe must report what a BROWSER-spawned host would resolve.
+
+    Inside dev:desktop the sidecar's own env carries the Electron-injected
+    ARKSCOPE_API_HOST/PORT/TOKEN; passing them through to the probed host
+    makes it report source=env, which a real browser-spawned host never
+    sees. The probe strips them so the panel shows the browser reality.
+    """
+    from src.service.sa_extension_health import SAExtensionHealthPaths, run_host_ping
+
+    config = tmp_path / "sa_native_host.json"
+    _write_json(config, {"api_base": "http://127.0.0.1:45678", "api_token": "secret-token"})
+    monkeypatch.setenv("ARKSCOPE_SA_NATIVE_HOST_CONFIG", str(config))
+    monkeypatch.setenv("ARKSCOPE_API_HOST", "127.0.0.1")
+    monkeypatch.setenv("ARKSCOPE_API_PORT", "9999")
+    monkeypatch.setenv("ARKSCOPE_API_TOKEN", "sidecar-run-token")
+
+    project_root = Path(__file__).resolve().parents[1]
+    paths = SAExtensionHealthPaths(
+        project_root=project_root,
+        config_path=config,
+        firefox_manifest_path=tmp_path / "missing-firefox.json",
+        chrome_manifest_path=tmp_path / "missing-chrome.json",
+        launcher_path=tmp_path / "missing-launcher.sh",
+        sa_db_path=tmp_path / "sa_capture.db",
+        host_script=project_root / "src" / "sa_native_host.py",
+    )
+
+    reply = run_host_ping(paths, timeout_seconds=15)
+
+    assert reply["status"] == "ok"
+    assert reply["telemetry_source"] == "config"
+    assert reply["telemetry_target"] == "http://127.0.0.1:45678"
+    assert "sidecar-run-token" not in json.dumps(reply)
+
+
 def test_sa_extension_health_route_returns_service_payload(monkeypatch):
     from src.api.routes import seeking_alpha
 

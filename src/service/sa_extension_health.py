@@ -229,6 +229,17 @@ def run_host_ping(paths: SAExtensionHealthPaths, *, timeout_seconds: int = 15) -
     msg = json.dumps({"action": "ping"}).encode("utf-8")
     wire = struct.pack("=I", len(msg)) + msg
     env = dict(os.environ)
+    # Simulate the browser environment: a real browser-spawned host never sees
+    # the Electron-injected ARKSCOPE_API_* vars that live in the sidecar's own
+    # env, so the probe must not leak them or it reports source=env for a host
+    # that would actually resolve source=config.
+    for key in (
+        "ARKSCOPE_API_BASE_URL",
+        "ARKSCOPE_API_HOST",
+        "ARKSCOPE_API_PORT",
+        "ARKSCOPE_API_TOKEN",
+    ):
+        env.pop(key, None)
     env["ARKSCOPE_SA_NATIVE_HOST_CONFIG"] = str(paths.config_path)
     proc = subprocess.run(
         [sys.executable, str(paths.host_script)],
