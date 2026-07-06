@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from src.agents.config import get_agent_config
 from src.api.dependencies import get_dal
+from src.service.sa_extension_health import collect_sa_extension_health
 from src.service.sa_market_news_health import compute_market_news_health
 from src.tools.sa_tools import (
     _DISABLED_MSG,
@@ -147,3 +148,18 @@ def market_news_health(
     if strict and report.get("severity") != "ok":
         response.status_code = 503
     return report
+
+
+@router.get("/extension-health")
+def sa_extension_health(dal=Depends(get_dal)):
+    """Return the local SA extension/native-host setup checklist."""
+    try:
+        return collect_sa_extension_health(dal=dal)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "sa_extension_health_unavailable",
+                "message": str(exc),
+            },
+        ) from exc

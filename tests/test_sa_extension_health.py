@@ -208,3 +208,32 @@ def test_run_host_ping_uses_real_native_host_protocol(tmp_path, monkeypatch):
     assert reply["status"] == "ok"
     assert reply["telemetry_target"] == "http://127.0.0.1:45678"
     assert "secret-token" not in json.dumps(reply)
+
+
+def test_sa_extension_health_route_returns_service_payload(monkeypatch):
+    from src.api.routes import seeking_alpha
+
+    payload = {"ok": True, "segments": [{"key": "config", "state": "ok", "detail": "ok"}]}
+    monkeypatch.setattr(
+        seeking_alpha,
+        "collect_sa_extension_health",
+        lambda *, dal: payload,
+    )
+
+    assert seeking_alpha.sa_extension_health(dal=object()) == payload
+
+
+def test_sa_extension_health_route_raises_structured_503(monkeypatch):
+    from fastapi import HTTPException
+    from src.api.routes import seeking_alpha
+
+    def boom(*, dal):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(seeking_alpha, "collect_sa_extension_health", boom)
+
+    with pytest.raises(HTTPException) as exc:
+        seeking_alpha.sa_extension_health(dal=object())
+
+    assert exc.value.status_code == 503
+    assert exc.value.detail["code"] == "sa_extension_health_unavailable"
