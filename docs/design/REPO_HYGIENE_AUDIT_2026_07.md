@@ -1,6 +1,8 @@
 # Repo Hygiene Audit — 2026-07-06
 
-> **Status**: inventory delivered, READ-ONLY (nothing deleted/moved yet). This executes the
+> **Status**: inventory delivered 2026-07-06; owner rulings received same day (§7 answers
+> folded into §8); **B1–B3 EXECUTED 2026-07-06** (§8 deletion record below); B4/B5 have
+> their own plan (`docs/superpowers/plans/2026-07-06-repo-hygiene-b4-b5.md`). This executes the
 > long-pending "module-level cleanup pass" from the docs-governance line
 > (`DOCS_GOVERNANCE_AUDIT_2026_05.md` scoped it; scripts-runtime-consolidation proved the
 > method). Every disposition below is a RECOMMENDATION; §7 lists the rulings the owner must
@@ -145,11 +147,40 @@ intentional) or revert. They add permanent noise to every `git status` read.
   one commit per bucket, dispositions listed in the commit).
 - **B6 — nothing else**: scripts/ survivors, config/, analysis/, resources/, sql/ = no action.
 
-## 7. Rulings needed from the owner
+## 7. Rulings needed from the owner — ANSWERED 2026-07-06
 
-1. `training/data_prep/output` (917M) + `scripts/huggingface/output` (984M) +
-   `comparison_results/` + `data_lake/`: delete, or move to external storage first?
-2. `trained_models/` checkpoints (1.2G): keep on disk, or archive out? gitignore them?
-3. Working-tree M/D trio: commit as-is or revert?
-4. docker password rotation: schedule now (with B4) or separately?
-5. docs sweep depth: headers+archive only, or also delete misleading-HOW docs where found?
+1. Disk artifacts: **delete directly, no external copy** (data + training code remain;
+   retraining is cheap). Manifest required (→ §8), no checksums.
+2. `trained_models/`: delete AND still gitignore (deletion cleans the present; ignore
+   prevents the next training run from re-polluting `git status`).
+3. M/D trio: `tickers_core.json` diff identified as rename-fix + SA Alpha Picks auto
+   ticker-sync → **commit separately (B3)**; `trained_models` M/D resolves inside the B2
+   `git rm` (no transitional commit). Config db-ification stays a future migration
+   (readers first), NOT a pre-emptive file deletion.
+4. docker: keep **archive-access-only** (not a dev quickstart — app runtime has zero PG);
+   rewrite README/compose copy; rotation in the same batch (B4).
+5. docs sweep: **deeper** — 4-tier rule (keep+update canonical / fold-summary-then-delete
+   completed HOW / status-header big-migration evidence / decision log untouchable), with
+   fold-then-delete verified per file (B5).
+
+## 8. Deletion record — B2 executed 2026-07-06 (owner-ruled: delete, no external copy)
+
+Disk artifacts deleted permanently (NOT git-recoverable). Manifest per ruling:
+
+| Path | Size | Purpose | Rebuild basis |
+|---|---|---|---|
+| `trained_models/` (37 run dirs, 131 files) | 1.2G | 2026-04 PPO/SB3 multi-seed checkpoints behind RL_COLLAPSE_FINDINGS | Retrain via `training/train_*_sb3.py` (code + prepared-data pipeline intact); conclusions live in `RL_COLLAPSE_FINDINGS.md`; run metadata history in git (`registry.json` pre-deletion state at this commit's parent) |
+| `scripts/huggingface/output/` | 984M | HF open-dataset release build | Dataset published on HuggingFace; rebuild via `merge_for_release.py` |
+| `training/data_prep/output/` | 917M | Prepared RL training CSVs | Regenerate via `training/data_prep/prepare_training_data.py` from local news/price stores |
+| `comparison_results/` | 752K | 2025-12〜2026-01 provider-comparison outputs | Conclusions absorbed into `docs/data/NEWS_PROVIDER_DATA_DICTIONARY.md` |
+| `data_lake/` | 2.7M | `collect_ibkr_fundamentals.py` outputs (script deleted in scripts-consolidation) | Re-collect via IBKR if ever needed |
+
+Tracked deletions in the same commit: `trained_models/registry.json` +
+`trained_models/ppo_test_.../metadata.json` (checkpoints gone → registry rows point at
+nothing; `model_registry._load_index` returns `[]` on missing file and future training
+recreates it). `tests/test_inference_offline.py` now skips (by design — it `pytest.skip`s
+on missing artifacts; un-skips after any retraining).
+
+**Artifact policy (standing)**: model checkpoints / training outputs / HF build outputs
+never enter the repo — `.gitignore` carries `trained_models/`; keeping a specific model
+means an explicit export outside the working tree, never the repo.

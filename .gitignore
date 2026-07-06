@@ -211,3 +211,4 @@ apps/*/release/
 *.tsbuildinfo
 
 scratchpad/
+trained_models/
