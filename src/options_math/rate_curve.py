@@ -6,7 +6,7 @@ B2 (deferred): Replace get_yield_curve() internals with real multi-tenor
 source (FRED API, yfinance T-bill ladder, etc.).
 
 Usage:
-    from analysis.rate_curve import get_rate_for_dte, get_yield_curve
+    from src.options_math.rate_curve import get_rate_for_dte, get_yield_curve
 
     curve = get_yield_curve()
     r_30d = get_rate_for_dte(30, curve)   # interpolated rate for 30 DTE

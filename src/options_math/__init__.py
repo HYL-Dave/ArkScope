@@ -1,7 +1,7 @@
 """
-Analysis Module for ArkScope.
+Options Math Module for ArkScope.
 
-This module provides analytical tools for options pricing, volatility analysis,
+This package provides analytical tools for options pricing, volatility analysis,
 and trading signal generation.
 
 Modules:

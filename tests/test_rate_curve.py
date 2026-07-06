@@ -1,8 +1,8 @@
-"""Tests for analysis.rate_curve — yield curve abstraction + interpolation."""
+"""Tests for src.options_math.rate_curve — yield curve abstraction + interpolation."""
 
 import pytest
 
-from analysis.rate_curve import (
+from src.options_math.rate_curve import (
     RateCurve,
     get_rate_for_dte,
     make_flat_curve,
@@ -238,7 +238,7 @@ class TestGetYieldCurve:
     def test_fallback_uses_short_ttl(self):
         """Fallback curves should be cached with short TTL, not 24h."""
         from unittest.mock import patch
-        from analysis.rate_curve import (
+        from src.options_math.rate_curve import (
             _curve_cache,
             _FALLBACK_CACHE_TTL_SECONDS,
             _CACHE_TTL_SECONDS,
@@ -248,7 +248,7 @@ class TestGetYieldCurve:
         _curve_cache.pop("treasury_curve", None)
 
         # Mock _fetch_treasury_curve to fail, forcing fallback path
-        with patch("analysis.rate_curve._fetch_treasury_curve", return_value=None):
+        with patch("src.options_math.rate_curve._fetch_treasury_curve", return_value=None):
             curve = get_yield_curve(fallback_rate=0.05)
             assert isinstance(curve, RateCurve)
             assert curve.source in ("irx_fallback", "hardcoded_fallback")
@@ -287,7 +287,7 @@ class TestRealisticScenarios:
 
     def test_backward_compat_with_flat(self):
         """Wrapping existing get_risk_free_rate() in flat curve preserves behavior."""
-        from analysis.option_pricing import get_risk_free_rate
+        from src.options_math.option_pricing import get_risk_free_rate
 
         old_rate = get_risk_free_rate()
         flat = make_flat_curve(old_rate, source="irx_compat")
