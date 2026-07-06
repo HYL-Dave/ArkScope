@@ -32,7 +32,10 @@ Repo moves/renames only ever require editing the config JSON — never the brows
 **App-owned (configurable / repairable from the app)**
 - Launcher + config existence and validity checks; repair/rewrite of
   `~/.config/arkscope/sa_native_host.json` (`project_root`, `python_path`, `host_script`).
-- Sidecar URL/port the host POSTs telemetry to.
+- Sidecar telemetry endpoint the host POSTs to — **display it** (default
+  `http://127.0.0.1:8420`, from `ARKSCOPE_API_HOST/PORT/BASE_URL` + optional
+  `ARKSCOPE_API_TOKEN`, `sa_native_host.py:721-730`), and the one-click test must cover the
+  telemetry leg, not just the ping.
 - SA DB path + read/write health (freshness of last capture).
 - **Simulated round-trip**: app spawns the host exactly as the launcher does and sends a
   length-prefixed `{"action":"ping"}` over stdin — verifies python/config/host/DB
@@ -50,6 +53,23 @@ Repo moves/renames only ever require editing the config JSON — never the brows
   config points at the current repo; simulated host ping OK.
 - Last real extension write (timestamp via `job_runs` telemetry) and whether the app can
   read it back — the indirect evidence for the browser-owned hop.
+
+## Incident grounding (2026-07-06 cutover test)
+
+During the consolidation cutover test, every `record_extension_job` POST got Connection
+refused while all `sa_capture.db` writes succeeded: the web dev server (8430) was up, the
+Python sidecar (8420) was not, and nothing surfaced the split — the extension saw "ok"
+(best-effort by design), the data landed, the `job_runs` telemetry silently vanished. That
+invisible partial-health state is exactly what this surface must show. Port map for the
+record: sidecar API **8420** (`src/api/__main__.py`), web dev **8430** (`vite.config.ts`),
+both in the ArkScope-owned 84xx block.
+
+**Design constraint (dynamic ports)**: the native host inherits the **browser's**
+environment, not the app's — `ARKSCOPE_API_*` env vars set by a future desktop shell never
+reach it. If the shell spawns the sidecar on an ephemeral port, the current API base MUST
+travel through the app-writable config file (add `api_base` to
+`~/.config/arkscope/sa_native_host.json`; the launcher exports it, or the host reads the
+config directly). Env-var-only steering of the telemetry target is not a viable mechanism.
 
 ## Existing building blocks (reuse, don't redesign)
 
