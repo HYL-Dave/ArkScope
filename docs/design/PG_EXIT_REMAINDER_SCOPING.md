@@ -84,19 +84,11 @@ Companion docs: `docs/design/PG_EXIT_COMPLETION_PLAN.md`, `docs/design/NEWS_DIRE
 
 ---
 
-## 5. `scripts/` retirement rule — **FINAL (consolidation executed 2026-07-06, merge `bde732d`)**
+## 5. `scripts/` retirement rule — FINAL; **AUTHORITY RELOCATED 2026-07-06 (docs sweep B5b)**
 
-**The rule (final form):**
-
-- **`scripts/` holds only app-unrelated or historical material.** `src/` never imports `scripts/`.
-  Anything runnable that the app, its gates, or its operators actively depend on is
-  `python -m src.<module>` — the only exceptions are the explicitly user-ruled retained families
-  in the survivor table below.
-- **Provider clients stay in `data_sources/` unless deliberately migrated.** That is the existing
-  provider layer (`data_sources/ibkr_source.py`, `sec_edgar_financials.py`,
-  `financial_datasets_client.py`, `polygon_source.py`, ...). Runtime orchestration / domain logic
-  lives in `src/<domain>/...` modules. Do **not** create a second provider layer under
-  `src/providers/`.
+> The rule + survivor table now live in **`REFACTOR_PROTECTION_SMOKE_GATES.md` §6** (the
+> refactor-protection home). This section stays as the PG-exit-thread record only — do not
+> edit the table here; pre-relocation text is at this commit's parent.
 
 **Execution record** (plan `docs/superpowers/plans/2026-07-06-scripts-runtime-consolidation.md`):
 collectors → `src/collectors/{polygon_news,finnhub_news}.py`; `daily_update` →
@@ -107,21 +99,6 @@ manifests untouched — they point at the stable launcher; only
 `f9d00c7` (recover any file via `git show f9d00c7^:scripts/<path>`); av/eodhd reference
 implementations tracked in map §P2.5. Full A/B failure sets strictly identical; live Firefox
 round-trip verified post-cutover.
-
-**Survivor table (authoritative; anything else appearing under `scripts/` is residue):**
-
-| Retained | Why (one line) |
-|---|---|
-| `scripts/analysis/` | One-off options research scans (BS-vs-American, mispricing, unusual activity) — research, not runtime |
-| `scripts/diagnostics/` | Manual operator probes (`probe_ibkr_news_bodies.py`) — ad hoc, keyed, never scheduled |
-| `scripts/huggingface/` | Open-data release tooling + scoring prompts — historical record (user-ruled retained) |
-| `scripts/live/` | Manual live-API smokes (SDK driver/route) — operator-run with real keys, deliberately outside CI |
-| `scripts/migration/` | Completed PG-exit migration CLIs kept as gate evidence (N8a/N9 batches, cutovers, reconciles) |
-| `scripts/p1_2/` | FRED provider-evaluation smoke — historical evidence for P1.2 |
-| `scripts/scoring/` | Scoring archive + occasional local score-import CLI (`import_news_scores_local.py`, §6 S-G) — user-ruled retained |
-| `scripts/testing/` | Manual paid-API experiments (financial datasets) — exploratory, not gates |
-| `scripts/visualization/` | Legacy news dashboard/data-loader — historical |
-| `scripts/__init__.py` | Retained package marker: historical tests import `scripts.scoring` / `scripts.migration` namespaces |
 
 ---
 

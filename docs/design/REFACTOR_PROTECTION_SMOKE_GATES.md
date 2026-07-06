@@ -167,3 +167,34 @@ Passing evidence is a timestamped `record_extension_job ... status=succeeded` fo
 - Do not create the old repo path symlink as normal architecture; use it only as emergency recovery.
 - When a file is deleted, record where any residual useful fact was absorbed, or state that git history is the recovery path.
 - For risky changes, run the smallest gate that covers the touched surface; do not turn every docs edit into a live crawler run.
+
+---
+
+## 6. `scripts/` survivor rule (AUTHORITY — relocated from `PG_EXIT_REMAINDER_SCOPING.md` §5, 2026-07-06)
+
+- **`scripts/` holds only app-unrelated or historical material.** `src/` never imports
+  `scripts/`. Anything runnable that the app, its gates, or its operators actively depend
+  on is `python -m src.<module>` — the only exceptions are the explicitly user-ruled
+  retained families below.
+- **Provider clients stay in `data_sources/` unless deliberately migrated.** Runtime
+  orchestration / domain logic lives in `src/<domain>/...` modules. Do **not** create a
+  second provider layer under `src/providers/`.
+
+**Survivor table (anything else appearing under `scripts/` is residue):**
+
+| Retained | Why (one line) |
+|---|---|
+| `scripts/analysis/` | One-off options research scans (BS-vs-American, mispricing, unusual activity) — research, not runtime |
+| `scripts/diagnostics/` | Manual operator probes (`probe_ibkr_news_bodies.py`) — ad hoc, keyed, never scheduled |
+| `scripts/huggingface/` | Open-data release tooling + scoring prompts — historical record (user-ruled retained) |
+| `scripts/live/` | Manual live-API smokes (SDK driver/route) — operator-run with real keys, deliberately outside CI |
+| `scripts/migration/` | Completed PG-exit migration CLIs kept as gate evidence (N8a/N9 batches, cutovers, reconciles) |
+| `scripts/p1_2/` | FRED provider-evaluation smoke — historical evidence for P1.2 |
+| `scripts/scoring/` | Scoring archive + occasional local score-import CLI (`import_news_scores_local.py`) — user-ruled retained |
+| `scripts/testing/` | Manual paid-API experiments (financial datasets) — exploratory, not gates |
+| `scripts/visualization/` | Legacy news dashboard/data-loader — historical |
+| `scripts/__init__.py` | Retained package marker: historical tests import `scripts.scoring` / `scripts.migration` namespaces |
+
+Changing this table = changing a standing ruling (owner decision + map §10 entry), not a
+refactor detail. Execution record of the consolidation that finalized it:
+`docs/superpowers/plans/2026-07-06-scripts-runtime-consolidation.md` + map §10 2026-07-06.

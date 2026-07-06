@@ -27,6 +27,21 @@ Firefox/Chrome manifest (~/.mozilla/native-messaging-hosts/com.mindfulrl.sa_alph
 Host id `com.mindfulrl.sa_alpha_picks` is **locked** (intentionally lowercase `mindfulrl`).
 Repo moves/renames only ever require editing the config JSON — never the browser manifests.
 
+## Host write path (current; relocated here from `SA_CUTOVER_3D_RUNBOOK.md` 2026-07-06)
+
+Every message spawns a **fresh, short-lived host process** which builds its own DAL and
+dispatches on `action` (`src/sa_native_host.py` `handle_message`). Storage is
+**`data/sa_capture.db` only** (`SACaptureDatabaseBackend`, HARD local — zero PG); app
+state is never written directly (LOCK #9) — job telemetry goes by best-effort POST to the
+sidecar's `/jobs/extension-record`. Action catalog:
+
+- `ping` (DAL-free; returns `project_root` + `telemetry_target`/`telemetry_source`)
+- Alpha Picks: `refresh` (scope `current`|`closed`) · `refresh_failure`
+- Articles/comments: `check_detail_cache` · `save_detail` · `save_detail_by_symbol` ·
+  `save_articles_meta` · `save_article_content` · `save_comments_only` · `audit_unresolved`
+- Market news: `save_market_news` · `get_market_news_recent_ids` · `save_market_news_detail`
+- Telemetry: `record_extension_job` (terminal-state row, `trigger_source=extension`)
+
 ## Ownership boundary
 
 **App-owned (configurable / repairable from the app)**
