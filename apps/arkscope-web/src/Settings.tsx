@@ -1333,8 +1333,8 @@ function DataSourcesSection() {
   const [testResults, setTestResults] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    const [rs, rh, rc, rm, rsa] = await Promise.allSettled([
-      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot(), getSAExtensionHealth()]);
+    const [rs, rh, rc, rm] = await Promise.allSettled([
+      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot()]);
     if (rs.status === "fulfilled") setSchedule(rs.value.sources);
     if (rh.status === "fulfilled") setHealth(rh.value);
     if (rc.status === "fulfilled") {
@@ -1343,8 +1343,7 @@ function DataSourcesSection() {
       setCfgEnvFallback(rc.value.env_fallback);
     }
     if (rm.status === "fulfilled") setMacroSnapshot(rm.value);
-    if (rsa.status === "fulfilled") setSaExtensionHealth(rsa.value);
-    const bad = [rs, rh, rc, rm, rsa].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    const bad = [rs, rh, rc, rm].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
@@ -1353,6 +1352,23 @@ function DataSourcesSection() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Extension health spawns a native-host subprocess server-side — fetch once
+  // on mount and via the manual 重新檢查 button only, NEVER on the 5s
+  // scheduler-status poll.
+  useEffect(() => {
+    let cancelled = false;
+    getSAExtensionHealth()
+      .then((v) => {
+        if (!cancelled) setSaExtensionHealth(v);
+      })
+      .catch(() => {
+        if (!cancelled) setSaExtensionHealth(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Run-now / scheduled runs flip `running` server-side — poll while any is active.
   const anyRunning = !!schedule && Object.values(schedule).some((s) => s.running);
