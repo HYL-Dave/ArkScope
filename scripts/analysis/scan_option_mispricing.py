@@ -48,7 +48,7 @@ import os
 os.environ['IBKR_CLIENT_ID'] = str(random.randint(100, 999))
 
 from data_sources import IBKRDataSource, OptionFilter
-from analysis import (
+from src.options_math import (
     calculate_historical_volatility,
     calculate_implied_volatility,
     analyze_option_mispricing,

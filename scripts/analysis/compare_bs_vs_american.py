@@ -24,7 +24,7 @@ from typing import Dict, List, Optional
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from analysis import (
+from src.options_math import (
     american_greeks,
     bjerksund_stensland_2002,
     black_scholes_greeks,

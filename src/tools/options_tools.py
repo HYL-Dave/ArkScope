@@ -37,7 +37,7 @@ def get_iv_analysis(
     Returns:
         IVAnalysisResult with current_iv, hv, vrp, iv_rank, iv_percentile, signal
     """
-    from analysis import (
+    from src.options_math import (
         analyze_iv_environment,
         calculate_iv_percentile,
         calculate_iv_rank,
@@ -148,8 +148,8 @@ def scan_mispricing(
     Returns:
         List of MispricingResult for options exceeding the threshold
     """
-    from analysis import scan_options_for_mispricing
-    from analysis.rate_curve import get_yield_curve, get_rate_for_dte
+    from src.options_math import scan_options_for_mispricing
+    from src.options_math.rate_curve import get_yield_curve, get_rate_for_dte
 
     curve = get_yield_curve()
     results: List[MispricingResult] = []
@@ -184,7 +184,7 @@ def scan_mispricing(
         # (scan_options_for_mispricing passes a single rate to all quotes;
         #  for mixed-expiry sets, group by expiry for best accuracy)
         try:
-            from analysis.option_pricing import calculate_days_to_expiry
+            from src.options_math.option_pricing import calculate_days_to_expiry
             # Approximate median DTE for this set of quotes
             dtes = []
             for q in quotes:
@@ -261,10 +261,10 @@ def calculate_greeks(
         Dict with delta, gamma, theta, vega, rho, model
     """
     if model == "american":
-        from analysis import american_greeks
+        from src.options_math import american_greeks
         greeks = american_greeks(S, K, T, r, sigma, dividend_yield, option_type)
     else:
-        from analysis import black_scholes_greeks
+        from src.options_math import black_scholes_greeks
         greeks = black_scholes_greeks(S, K, T, r, sigma, option_type)
 
     return {
