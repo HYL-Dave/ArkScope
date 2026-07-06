@@ -1,6 +1,6 @@
 # B7 — `analysis/` → `src/options_math/` Migration Implementation Plan
 
-> **Status: REVIEWED — cleared for implementation (user implements, reviewer verifies).**
+> **Status: IMPLEMENTED FOR REVIEW — reviewer full A/B pending before merge.**
 > 2026-07-06 review folded in: MF1 the consumer inventory missed two real sites in
 > `tests/test_rate_curve.py` (`:251` patch-target string, `:290` second import) — root
 > cause was a `head -2` on the per-file site grep, the session's third capped-inventory
@@ -8,6 +8,12 @@
 > SF focused suite re-centered on option/rate/tools. Approved as a slice by the
 > 2026-07-06 B6 ruling 1 — a TARGETED exception to the packaging-deferred domain-reorg
 > lock: exactly one root-level package moves; nothing else in `src/` re-organizes.
+> Implementation branch evidence: T1 RED matched the predicted `ModuleNotFoundError`;
+> T2 `tests/test_option_pricing.py tests/test_rate_curve.py` = 94 passed; T3 focused
+> gate = same 9 pre-existing `tests/test_tools.py` data/network failures and 113 passed,
+> plus the two targeted options-tool tests passed, scripts compiled, and optional
+> evidence/compressor suites passed; T4 real residue gate zero. Full A/B did not finish
+> in this Codex environment, so reviewer full A/B remains the merge gate.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (or
 > subagent-driven-development). TDD shape for a migration: rewire imports first (RED:
@@ -65,21 +71,21 @@ False-positive class (do NOT touch): `src.analysis`/`analysis_cards` route impor
 
 ## Tasks
 
-- [ ] **T1 (RED):** rewire the two test files to `src.options_math` — ALL five
+- [x] **T1 (RED):** rewire the two test files to `src.options_math` — ALL five
   `tests/test_rate_curve.py` sites (`:1` docstring, `:5`, `:241`, **`:251` patch target
   string**, `:290`) + `tests/test_option_pricing.py:22` → run
   `pytest tests/test_option_pricing.py tests/test_rate_curve.py -q` → predicted failure:
   `ModuleNotFoundError: No module named 'src.options_math'` (anything else = STOP).
-- [ ] **T2 (GREEN):** `git mv` the three files to `src/options_math/`; update the
+- [x] **T2 (GREEN):** `git mv` the three files to `src/options_math/`; update the
   `__init__` docstring path mention + `rate_curve.py:9` usage-example docstring; rerun
   the two files → green.
-- [ ] **T3:** rewire the remaining 8 sites (6 in `options_tools.py`, 2 in
+- [x] **T3:** rewire the remaining 8 sites (6 in `options_tools.py`, 2 in
   `scripts/analysis/`). Core gate (SF):
   `pytest tests/test_option_pricing.py tests/test_rate_curve.py tests/test_tools.py -q`
   + `python -m py_compile scripts/analysis/*.py` (no tests cover those two).
   Additive (optional, indirect surfaces): `tests/test_evidence_packet.py`,
   `tests/test_compressor_reducers.py`.
-- [ ] **T4 (residue gate, single hard sweep — MF2):**
+- [x] **T4 (residue gate, single hard sweep — MF2):**
   `rg -n "from analysis|import analysis|analysis\.(option_pricing|rate_curve)|patch\([\"']analysis" src tests scripts --glob "*.py"`
   = **zero** (catches patch-target strings and docstrings, not just imports; the
   `src.analysis`/`analysis_cards` false-positive class is excluded by inspection if it
@@ -88,10 +94,14 @@ False-positive class (do NOT touch): `src.analysis`/`analysis_cards` route impor
   covers it in virgin env.
 - [ ] **T5 (full A/B):** virgin `git archive` both sides, sequential, failure SETS.
   **Acceptance is the crispest form yet: NO tests added or deleted → failure sets
-  strictly identical AND passed counts EQUAL.** Any delta = finding.
-- [ ] **T6 (closeout):** B6 doc §1 status flip; map §10 entry; PROJECT docs mention?
+  strictly identical AND passed counts EQUAL.** Any delta = finding. Codex evidence so
+  far: scoped virgin A/B over `tests/test_option_pricing.py tests/test_rate_curve.py
+  tests/test_tools.py` is identical (`9 failed, 113 passed` on both sides; same 9
+  pre-existing `tests/test_tools.py` data/network failures). The full suite hung in this
+  environment and is intentionally left for reviewer execution per the review protocol.
+- [x] **T6 (branch closeout docs):** B6 doc §1 status flip; map §10 entry; PROJECT docs mention?
   (root README/PROJECT_STRUCTURE do not list `analysis/` — verified, no edits needed);
-  memory sync.
+  memory sync deferred until reviewer full A/B + merge.
 
 ## Stop-Loss
 

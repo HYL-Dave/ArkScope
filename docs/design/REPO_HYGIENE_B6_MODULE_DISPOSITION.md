@@ -1,33 +1,36 @@
 # Repo Hygiene B6 — Module/Root-Dir Disposition (analysis · config · scripts · resources)
 
-> **Status: READ-ONLY INVENTORY — awaiting owner approval.** Third table of the hygiene
-> line (after `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`).
+> **Status: PARTIALLY EXECUTED — B7 options-math migration branch implemented, reviewer
+> full A/B + merge pending.** Third table of the hygiene line (after
+> `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`).
 > Boundary defaults come from the 2026-07-06 review ruling: analysis→src is a TDD slice;
 > resources/skills = packaged data, never into src/; config = future db-ification, no
 > deletions now; scripts survivor-table changes = standing-ruling changes.
 > Nothing here executes anything.
 
-## 1. `analysis/` — LIVE runtime; migrate as its own TDD slice (proposed B7)
+## 1. `analysis/` — migrated by B7 branch; awaiting reviewer full A/B
 
 Root-level package (`option_pricing.py`, `rate_curve.py`, `__init__.py`) predating `src/`
 conventions. **Name collision is real**: `src/analysis/` already exists (the AI-card
-analysis pipeline: context_builder/contracts/factory) → migration target should be
-**`src/options_math/`** (per review suggestion).
+analysis pipeline: context_builder/contracts/factory), so B7 moves the options pricing
+math package to **`src/options_math/`**.
 
-Complete consumer inventory (all must rewire in the migration slice):
+Complete consumer inventory (rewired by the B7 implementation branch):
 
 | Consumer | Sites |
 |---|---|
 | `src/tools/options_tools.py` | lazy imports at `:40` `:151` `:152` `:187` `:264` `:267` |
 | `scripts/analysis/compare_bs_vs_american.py` | `:27` (retained survivor — must keep working) |
 | `scripts/analysis/scan_option_mispricing.py` | `:51` (same) |
-| `tests/test_option_pricing.py`, `tests/test_rate_curve.py` | direct imports |
+| `tests/test_option_pricing.py`, `tests/test_rate_curve.py` | direct imports, in-function imports, and `patch("analysis.rate_curve...")` string target |
 
 (`tests/test_analysis_cards_api.py` is a false match — it imports the routes module.)
 
-**Disposition**: keep as-is in B6; open **B7 "options_math migration"** = verbatim move +
-rewire 4 consumers + tests, zero-residue (no shim at `analysis/`), full A/B. Small,
-mechanical, same shape as the scripts consolidation.
+**Disposition**: B7 implementation branch `codex/b7-options-math` performs the verbatim
+move + consumer rewiring with zero residue (no shim at `analysis/`). Branch evidence:
+T1 RED matched `ModuleNotFoundError`, option/rate suites passed after the move, scripts
+compiled, residue gates are clean, and scoped virgin A/B over the affected tests is
+identical. Merge remains gated on reviewer full A/B.
 
 ## 2. `config/` — all live; nothing to clean
 
@@ -83,7 +86,8 @@ which starts from this Phase G inventory instead of re-designing the loader.
 
 ## 5. Owner decisions for B6
 
-1. Approve **B7 = `analysis/` → `src/options_math/`** migration slice (TDD, zero-residue,
-   full A/B; rewires the 4 consumers incl. the two retained scripts)?
+1. Review and merge **B7 = `analysis/` → `src/options_math/`** migration branch after
+   reviewer full A/B (TDD, zero-residue; rewires the retained scripts and test string
+   patch target as well as import sites).
 2. Confirm **scripts survivor table stands** (no re-ruling this round)?
 3. Confirm **`config/skills/` question moves to the skills design line** (not hygiene)?
