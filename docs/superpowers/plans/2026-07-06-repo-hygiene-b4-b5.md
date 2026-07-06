@@ -101,9 +101,9 @@ filename, NOT just intuition).
 - [ ] **Step 1:** produce the table (append as audit doc §9 or a standalone
   `DOCS_SWEEP_DISPOSITION_2026_07.md`). Uncapped inventory — no head/tail. The table also
   inventories **publication-policy violations** (internal IPs/hosts per
-  `PUBLICATION_REVIEW.md`) — two known pre-existing `192.168.0.153` instances in older
-  plan docs (`2026-06-28-news-normalization…:1297`, `2026-07-04-data-sources…:451`) get a
-  generalize-or-keep verdict alongside the tier verdict.
+  `PUBLICATION_REVIEW.md`) — two known pre-existing internal-IBKR-gateway-IP instances in
+  older plan docs (`2026-06-28-news-normalization…:1297`, `2026-07-04-data-sources…:451`)
+  get a generalize-or-keep verdict alongside the tier verdict.
 - [ ] **Step 2: APPROVAL CHECKPOINT.** Owner reviews/edits verdicts. No deletion before
   approval.
 

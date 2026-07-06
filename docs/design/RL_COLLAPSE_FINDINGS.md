@@ -355,3 +355,14 @@ The decision is updated as follows:
 - **Decided**: focus shifts back to mainline architecture work — see `docs/design/PROJECT_PRIORITY_MAP.md` and SA / market-news data plans.
 
 If RL re-investment is revisited, append to this section with date, rationale, and acceptance criteria.
+## Evidence figures (linked 2026-07-06; checkpoints deleted, these are the surviving visuals)
+
+The 2026-04 model checkpoints behind these findings were deleted in the repo-hygiene pass
+(`REPO_HYGIENE_AUDIT_2026_07.md` §8 — retraining is cheap, conclusions live here). The
+backtest figures remain as low-cost visual evidence:
+
+![PPO polygon best single (Sharpe 1.657)](../figures/backtest_archive/ppo_polygon_best_single_sharpe1.657.png)
+![PPO SB3 polygon best (Sharpe 1.151)](../figures/backtest_archive/ppo_sb3_polygon_best_sharpe1.151.png)
+![CPPO SB3 gpt5 nanofilled (Sharpe 1.022)](../figures/backtest_archive/cppo_sb3_gpt5_nanofilled_sharpe1.022.png)
+![PPO SB3 claude opus nanofilled (Sharpe 1.005)](../figures/backtest_archive/ppo_sb3_claude_opus_nanofilled_sharpe1.005.png)
+![Ensemble backtest](../figures/backtest_archive/ensemble_backtest.png)

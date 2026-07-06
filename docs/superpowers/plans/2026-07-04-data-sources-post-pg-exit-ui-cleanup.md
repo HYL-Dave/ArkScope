@@ -448,7 +448,7 @@ Extend the mocked IBKR provider fields to include `host` and `port` before `clie
   secret: false,
   env_var: "IBKR_HOST",
   app_value_set: true,
-  app_value_masked: "192.168.0.153",
+  app_value_masked: "<ibkr-gateway-host>",
   effective_source: "app",
   needs_import: false,
   import_source: null,

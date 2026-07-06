@@ -1296,7 +1296,7 @@ pytest -q tests/test_news_normalized_ibkr_adapter.py
 ```
 
 Expected: all tests pass; fake Gateway call counts prove store-once body behavior; no network socket
-is opened. Do not run the diagnostics script against `192.168.0.153` in this plan.
+is opened. Do not run the diagnostics script against `<ibkr-gateway-host>` in this plan.
 
 - [ ] **Step 6: Commit**
 
