@@ -32,9 +32,12 @@ scratch database, verify presence, then inspect — never restore over a live DB
 
 ```bash
 # 1. Create a scratch DB and restore the dump into it
+#    (dump filenames differ per batch — read the "dump_file" field in the
+#     batch's manifest.json: n9_batch1.dump / n9_batch3_prices.dump /
+#     app_records.dump / ...)
 docker exec -i mindfulrl-postgres createdb -U postgres archive_scratch
 docker exec -i mindfulrl-postgres pg_restore -U postgres -d archive_scratch \
-  < ../data/pg_archive/<batch-dir>/dump.backup
+  < ../data/pg_archive/<batch-dir>/<dump-file-from-manifest>
 
 # 2. Apply any archived function DDL (batch-3+ archives carry function_ddl.sql)
 docker exec -i mindfulrl-postgres psql -U postgres -d archive_scratch \
