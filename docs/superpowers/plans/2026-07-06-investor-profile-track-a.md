@@ -416,6 +416,57 @@ Add optional `personalization_context: str = ""` to:
 Only pass the context into `build_system_prompt(...)` / `_build_effective_prompt(...)`.
 Do not alter tool lists or history selection.
 
+**Subscription credential branches:**
+
+`src/api/routes/query.py` has three AI Research execution branches, and Track A must
+cover all three:
+
+1. API-key/env provider branch via `run_query_stream(...)`;
+2. Claude subscription branch via `_anthropic_subscription_stream(...)`;
+3. ChatGPT subscription branch via `_openai_subscription_stream(...)`.
+
+Add optional `personalization_context: str = ""` to both subscription helpers:
+
+```python
+def _anthropic_subscription_stream(
+    *,
+    credential_id,
+    question,
+    model,
+    effort,
+    dal,
+    history,
+    personalization_context: str = "",
+):
+    ...
+    instructions = build_system_prompt(personalization_context=personalization_context)
+```
+
+```python
+def _openai_subscription_stream(
+    *,
+    credential_id,
+    question,
+    model,
+    effort,
+    dal,
+    history,
+    personalization_context: str = "",
+):
+    ...
+    instructions = _build_effective_prompt(
+        dal,
+        config,
+        personalization_context=personalization_context,
+    )
+```
+
+Preserve the existing multi-turn history suffix after the base+personalization prompt.
+The route must pass `personalization_context=context` into subscription helpers only
+when the context is non-empty, matching the API-key branch's strict-fake compatibility
+rule. The trace attached to `done` events and persisted messages must only claim an
+active stance when the branch actually received the same context.
+
 **Query route request:**
 
 Add to `QueryRequest`:
@@ -428,6 +479,16 @@ Resolve profile context inside `query_agent` and `query_agent_stream` using
 `get_investor_profile_store`. If the context is empty, do **not** pass a
 `personalization_context` kwarg to legacy fake streams; this preserves existing tests and
 off behavior. If non-empty, pass `personalization_context=context`.
+
+Validate `assistant_stance` route overrides before stream dispatch. Invalid values return
+HTTP 400 with machine detail:
+
+```json
+{"code": "invalid_assistant_stance", "field": "assistant_stance"}
+```
+
+Do not silently fall back to the saved default; a fallback would make the run trace
+ambiguous.
 
 When a `done` event is observed, attach trace metadata:
 
@@ -457,6 +518,9 @@ Migration rule: add the column idempotently in `_ensure_schema`; old rows read w
 - `tests/test_personalization_prompt.py::test_context_appends_after_base_prompt`
 - `tests/test_research_routes.py::test_query_stream_profile_off_does_not_pass_personalization_kwarg`
 - `tests/test_research_routes.py::test_query_stream_enabled_profile_passes_context_and_persists_trace`
+- `tests/test_research_routes.py::test_query_stream_subscription_branches_receive_personalization_context`
+- `tests/test_research_routes.py::test_query_stream_subscription_profile_off_does_not_pass_personalization_kwarg`
+- `tests/test_research_routes.py::test_query_stream_invalid_assistant_stance_returns_400`
 - `tests/test_research_threads.py::test_message_personalization_round_trip`
 
 Important assertion for the off case:
@@ -534,7 +598,13 @@ Add to `GenerateBody`:
 assistant_stance: Optional[str] = None
 ```
 
-Resolve context/trace from `InvestorProfileStore`.
+Resolve context/trace from `InvestorProfileStore`. Validate route-level
+`assistant_stance` overrides before calling `gather_evidence(...)` or
+`synthesize_card(...)`. Invalid values return HTTP 400 with machine detail:
+
+```json
+{"code": "invalid_assistant_stance", "field": "assistant_stance"}
+```
 
 Return and persist:
 
@@ -556,6 +626,7 @@ Also include personalization metadata in `list_cards` and `get_card`.
 - `tests/test_card_runs.py::test_card_run_personalization_round_trip`
 - `tests/test_analysis_cards_api.py::test_generate_card_profile_off_does_not_change_gather_or_synthesis_context`
 - `tests/test_analysis_cards_api.py::test_generate_card_enabled_profile_passes_synthesis_context_only`
+- `tests/test_analysis_cards_api.py::test_generate_card_invalid_assistant_stance_returns_400`
 - `tests/test_analysis_cards_api.py::test_get_card_returns_personalization_metadata`
 
 Run:
@@ -771,12 +842,11 @@ npm run build
 **Standing smoke:**
 
 ```bash
-python -m scripts.smoke.pg_unreachable_e2e
+python -m src.smoke.pg_unreachable_e2e
 ```
 
-Expected: `ok:true`, `pg_attempts:[]`. If import path has moved to `src.smoke` in the
-current checkout, use the standing gate command recorded in
-`docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`.
+Expected: `ok:true`, `pg_attempts:[]`. `scripts/smoke` was retired by scripts runtime
+consolidation; do not use the historical `python -m scripts.smoke...` path for new gates.
 
 **Off-byte-identical gate (workbench surface):**
 
