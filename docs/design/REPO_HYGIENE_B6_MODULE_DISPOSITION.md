@@ -1,14 +1,14 @@
 # Repo Hygiene B6 — Module/Root-Dir Disposition (analysis · config · scripts · resources)
 
-> **Status: PARTIALLY EXECUTED — B7 options-math migration branch implemented, reviewer
-> full A/B + merge pending.** Third table of the hygiene line (after
+> **Status: ✅ EXECUTED — B7 merged 2026-07-06 (`cf4ec92`; A/B 37=37 + passed 3730=3730);
+> rulings 2 (survivor table stands) + 3 (config/skills → skills design line) confirmed.** Third table of the hygiene line (after
 > `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`).
 > Boundary defaults come from the 2026-07-06 review ruling: analysis→src is a TDD slice;
 > resources/skills = packaged data, never into src/; config = future db-ification, no
 > deletions now; scripts survivor-table changes = standing-ruling changes.
 > Nothing here executes anything.
 
-## 1. `analysis/` — migrated by B7 branch; awaiting reviewer full A/B
+## 1. `analysis/` — ✅ MIGRATED (B7 merged; `src/options_math/` live)
 
 Root-level package (`option_pricing.py`, `rate_curve.py`, `__init__.py`) predating `src/`
 conventions. **Name collision is real**: `src/analysis/` already exists (the AI-card

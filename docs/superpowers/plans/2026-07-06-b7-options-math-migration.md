@@ -1,6 +1,9 @@
 # B7 — `analysis/` → `src/options_math/` Migration Implementation Plan
 
-> **Status: IMPLEMENTED FOR REVIEW — reviewer full A/B pending before merge.**
+> **Status: ✅ COMPLETE — FF-merged to master 2026-07-06 (`cf4ec92`).** Reviewer full A/B
+> delivered the pure-move ideal: failure sets 37=37 (diff empty) AND passed counts
+> EXACTLY equal (3730=3730; skips/warnings/errors also identical). Reviewer re-ran the
+> residue gate, patch-target check, focused suites, and __init__ surface diff — all green.
 > 2026-07-06 review folded in: MF1 the consumer inventory missed two real sites in
 > `tests/test_rate_curve.py` (`:251` patch-target string, `:290` second import) — root
 > cause was a `head -2` on the per-file site grep, the session's third capped-inventory
@@ -92,7 +95,7 @@ False-positive class (do NOT touch): `src.analysis`/`analysis_cards` route impor
   appears); `test ! -e analysis` (root dir gone, pycache included).
   Do NOT run `tests/test_agents.py` on the main checkout (live-key hazard) — the A/B
   covers it in virgin env.
-- [ ] **T5 (full A/B):** virgin `git archive` both sides, sequential, failure SETS.
+- [x] **T5 (full A/B):** virgin `git archive` both sides, sequential, failure SETS.
   **Acceptance is the crispest form yet: NO tests added or deleted → failure sets
   strictly identical AND passed counts EQUAL.** Any delta = finding. Codex evidence so
   far: scoped virgin A/B over `tests/test_option_pricing.py tests/test_rate_curve.py
