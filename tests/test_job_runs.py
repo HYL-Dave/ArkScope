@@ -710,6 +710,31 @@ def test_local_store_record_completed_preserves_ids_and_payload(tmp_path):
     assert row["started_at"].startswith("2026-04-25T12:00:00")
 
 
+def test_local_store_list_runs_filters_by_trigger_source(tmp_path):
+    db = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(db)
+
+    store.record_completed_run(
+        "sa_market_news_refresh",
+        status="succeeded",
+        started_at="2026-07-05T16:00:00Z",
+        finished_at="2026-07-05T16:01:00Z",
+        trigger_source="api",
+    )
+    store.record_completed_run(
+        "sa_extension:alpha_picks_quick",
+        status="succeeded",
+        started_at="2026-07-06T02:00:00Z",
+        finished_at="2026-07-06T02:01:00Z",
+        trigger_source="extension",
+    )
+
+    rows = store.list_runs(trigger_source="extension", limit=10)
+
+    assert [row["job_name"] for row in rows] == ["sa_extension:alpha_picks_quick"]
+    assert rows[0]["trigger_source"] == "extension"
+
+
 def test_local_store_run_summary_distinguishes_latest_success_and_latest_any(tmp_path):
     db = tmp_path / "profile_state.db"
     store = JobRunsLocalStore(db)

@@ -287,6 +287,7 @@ class JobRunsStore:
         self,
         *,
         job_name: Optional[str] = None,
+        trigger_source: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -298,31 +299,27 @@ class JobRunsStore:
         try:
             conn = self._backend._get_conn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                where: List[str] = []
+                params: List[Any] = []
                 if job_name:
-                    cur.execute(
-                        """
-                        SELECT id, job_name, status, trigger_source, payload, result,
-                               message, error, started_at, finished_at, duration_ms,
-                               created_at, updated_at
-                        FROM job_runs
-                        WHERE job_name = %s
-                        ORDER BY started_at DESC
-                        LIMIT %s OFFSET %s
-                        """,
-                        (job_name, limit, offset),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT id, job_name, status, trigger_source, payload, result,
-                               message, error, started_at, finished_at, duration_ms,
-                               created_at, updated_at
-                        FROM job_runs
-                        ORDER BY started_at DESC
-                        LIMIT %s OFFSET %s
-                        """,
-                        (limit, offset),
-                    )
+                    where.append("job_name = %s")
+                    params.append(job_name)
+                if trigger_source:
+                    where.append("trigger_source = %s")
+                    params.append(trigger_source)
+                where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+                cur.execute(
+                    f"""
+                    SELECT id, job_name, status, trigger_source, payload, result,
+                           message, error, started_at, finished_at, duration_ms,
+                           created_at, updated_at
+                    FROM job_runs
+                    {where_sql}
+                    ORDER BY started_at DESC
+                    LIMIT %s OFFSET %s
+                    """,
+                    (*params, limit, offset),
+                )
                 rows = cur.fetchall()
             return [_serialize_row(dict(r)) for r in rows]
         except Exception as exc:
@@ -556,6 +553,7 @@ class JobRunsLocalStore:
         self,
         *,
         job_name: Optional[str] = None,
+        trigger_source: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
@@ -563,31 +561,27 @@ class JobRunsLocalStore:
         offset = max(0, int(offset))
         try:
             with self._connect() as conn:
+                where: List[str] = []
+                params: List[Any] = []
                 if job_name:
-                    rows = conn.execute(
-                        """
-                        SELECT id, job_name, status, trigger_source, payload, result,
-                               message, error, started_at, finished_at, duration_ms,
-                               created_at, updated_at
-                        FROM job_runs
-                        WHERE job_name=?
-                        ORDER BY started_at DESC, id DESC
-                        LIMIT ? OFFSET ?
-                        """,
-                        (job_name, limit, offset),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        """
-                        SELECT id, job_name, status, trigger_source, payload, result,
-                               message, error, started_at, finished_at, duration_ms,
-                               created_at, updated_at
-                        FROM job_runs
-                        ORDER BY started_at DESC, id DESC
-                        LIMIT ? OFFSET ?
-                        """,
-                        (limit, offset),
-                    ).fetchall()
+                    where.append("job_name=?")
+                    params.append(job_name)
+                if trigger_source:
+                    where.append("trigger_source=?")
+                    params.append(trigger_source)
+                where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+                rows = conn.execute(
+                    f"""
+                    SELECT id, job_name, status, trigger_source, payload, result,
+                           message, error, started_at, finished_at, duration_ms,
+                           created_at, updated_at
+                    FROM job_runs
+                    {where_sql}
+                    ORDER BY started_at DESC, id DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (*params, limit, offset),
+                ).fetchall()
             return [_serialize_local_row(dict(row)) for row in rows]
         except Exception as exc:
             logger.warning("JobRunsLocalStore.list_runs failed: %s", exc)
