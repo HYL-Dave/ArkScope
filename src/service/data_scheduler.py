@@ -59,7 +59,7 @@ import sys
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -69,6 +69,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 TICK_SECONDS = 30
 _IBKR_LOCK_TIMEOUT_S = 1800  # one slow IBKR job must not deadlock the others forever
+_IBKR_NEWS_WORKER_TIMEOUT_S = 3600
+_RUNNING_STALE_AFTER = timedelta(hours=2)
 _ERROR_TAIL = 600
 
 
@@ -557,9 +559,22 @@ def _parse_sanitized_worker_stdout(stdout: str) -> Optional[Dict[str, Any]]:
 
 def _run_sanitized_json_subprocess(argv: List[str]) -> Dict[str, Any]:
     """Run a child whose stdout contract is sanitized JSON; never surface stderr."""
-    proc = subprocess.run(
-        argv, cwd=str(_REPO_ROOT), capture_output=True, text=True,
-    )
+    try:
+        proc = subprocess.run(
+            argv,
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=_IBKR_NEWS_WORKER_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        payload = {
+            "status": "failed",
+            "error_count": 1,
+            "error_classes": ["TimeoutExpired"],
+            **{key: 0 for key in _SANITIZED_WORKER_COUNT_KEYS},
+        }
+        return {"returncode": 1, "payload": payload}
     payload = _parse_sanitized_worker_stdout(proc.stdout)
     if payload is None:
         payload = {
@@ -1284,6 +1299,62 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
 
 # --- supervisor loop -------------------------------------------------------------
 
+def _sqlite_table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone() is not None
+
+
+def reconcile_interrupted_runtime_state(
+    *,
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Repair durable ``running`` rows left by a previous sidecar/worker lifetime.
+
+    Scheduler-state rows are process-owned, so any ``running`` row at boot is
+    interrupted. Provider-sync rows can be written by subprocesses, so only rows
+    older than the stale threshold are terminalized.
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    scheduler_sources: list[str] = []
+    provider_run_ids: list[int] = []
+    scheduler_error = "sidecar restarted before scheduler source reached a terminal outcome"
+    provider_error = "provider worker interrupted before terminal telemetry"
+    try:
+        scheduler_sources = _state_store().reconcile_interrupted_running(
+            error=scheduler_error,
+        )
+    except Exception:  # noqa: BLE001 — startup repair must not block app boot
+        logger.debug("scheduler_state interrupted-running reconciliation failed", exc_info=True)
+    try:
+        from src.market_data_admin import resolve_market_db_path
+        from src.market_data_direct import _reconcile_interrupted_provider_runs
+
+        market_db = Path(resolve_market_db_path())
+        if market_db.exists():
+            conn = sqlite3.connect(str(market_db), timeout=10.0)
+            try:
+                if _sqlite_table_exists(conn, "provider_sync_runs"):
+                    cutoff = (now - _RUNNING_STALE_AFTER).isoformat(timespec="seconds")
+                    provider_run_ids = _reconcile_interrupted_provider_runs(
+                        conn,
+                        started_before=cutoff,
+                        error=provider_error,
+                    )
+            finally:
+                conn.close()
+    except Exception:  # noqa: BLE001 — startup repair must not block app boot
+        logger.debug("provider_sync interrupted-running reconciliation failed", exc_info=True)
+    if scheduler_sources or provider_run_ids:
+        logger.warning(
+            "reconciled interrupted scheduler/provider runs: scheduler=%s provider_runs=%s",
+            scheduler_sources,
+            provider_run_ids,
+        )
+    return {"scheduler_sources": scheduler_sources, "provider_run_ids": provider_run_ids}
+
+
 def _pg_reachable(timeout: float = 3.0) -> bool:
     """Fast TCP probe of the PG host before the seed touches job_runs.
 
@@ -1443,8 +1514,17 @@ def status_snapshot() -> Dict[str, Any]:
         durable = read_all_if_exists(resolve_profile_state_db_path(None))
     except Exception:  # noqa: BLE001 — display must never fail on a store hiccup
         durable = {}
+    now = datetime.now(timezone.utc)
     for source, d in SOURCES.items():
         cfg = source_config(source)
+        source_running = _SOURCE_LOCKS[source].locked()
+        durable_state = durable.get(source)
+        if durable_state is not None:
+            durable_state = _annotate_durable_state_for_snapshot(
+                durable_state,
+                source_running=source_running,
+                now=now,
+            )
         out[source] = {
             "label": d.label,
             "description": d.description,
@@ -1462,7 +1542,7 @@ def status_snapshot() -> Dict[str, Any]:
             "enabled": cfg["enabled"],
             "interval_minutes": cfg["interval_minutes"],
             "default_interval_minutes": d.default_interval_min,
-            "running": _SOURCE_LOCKS[source].locked(),
+            "running": source_running,
             "progress": progress.get(source),
             "last_attempt_at": attempts.get(source).isoformat() if attempts.get(source) else None,
             # last run_source outcome INCLUDING skips (skips write no job_runs row;
@@ -1472,7 +1552,48 @@ def status_snapshot() -> Dict[str, Any]:
             # v1.4 durable state (survives restart): {last_status, last_error, continuation,
             # last_result, last_attempt, updated_at}. last_status 'partial' → needs manual 補抓;
             # 'skipped' is transient (not persisted here → absent unless a real run set it).
-            "durable_state": durable.get(source),
+            "durable_state": durable_state,
             "job_name": job_name(source),
         }
+    return out
+
+
+def _parse_scheduler_state_time(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        elif len(text) >= 5 and text[-5] in "+-" and text[-3] != ":":
+            text = text[:-2] + ":" + text[-2:]
+        parsed = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _annotate_durable_state_for_snapshot(
+    durable_state: Dict[str, Any],
+    *,
+    source_running: bool,
+    now: datetime,
+) -> Dict[str, Any]:
+    out = dict(durable_state)
+    if out.get("last_status") != "running":
+        return out
+    started = _parse_scheduler_state_time(out.get("last_attempt") or out.get("updated_at"))
+    age_seconds = None
+    stale = not source_running
+    reason = "running without an in-process scheduler lock" if stale else None
+    if started is not None:
+        age_seconds = max(0, int((now - started).total_seconds()))
+        if age_seconds >= int(_RUNNING_STALE_AFTER.total_seconds()):
+            stale = True
+            reason = "running longer than configured stale threshold"
+    out["running_for_seconds"] = age_seconds
+    out["running_stale"] = stale
+    out["running_stale_reason"] = reason
     return out

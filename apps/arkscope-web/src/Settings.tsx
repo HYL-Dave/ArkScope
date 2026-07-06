@@ -1577,7 +1577,15 @@ function DataSourcesSection() {
   function renderLastRun(source: string, s: ScheduleSourceState) {
     const details: Array<{ label: string; value: string; tone?: "bad" | "warn" }> = [];
     const skippedReason = s.last_result?.status === "skipped" ? s.last_result.reason ?? "已在執行" : null;
-    if (skippedReason) details.push({ label: "跳過原因", value: skippedReason, tone: "warn" });
+    const alreadyRunningSkip = skippedReason?.includes("already running") ?? false;
+    const skippedSummary = alreadyRunningSkip ? "已有執行中" : compactMessage(skippedReason ?? "");
+    if (skippedReason) {
+      details.push({
+        label: alreadyRunningSkip ? "新觸發略過" : "跳過原因",
+        value: skippedReason,
+        tone: "warn",
+      });
+    }
     const ss = schedulerStateLabel(s.durable_state ?? null);
     const durableError = s.durable_state?.last_status === "failed" ? s.durable_state.last_error : null;
     if (durableError) details.push({ label: "失敗訊息", value: durableError, tone: "bad" });
@@ -1588,7 +1596,7 @@ function DataSourcesSection() {
           <span>{jobOutcome(s.job_name)}</span>
           {skippedReason && (
             <span className="refresh-err" title={skippedReason}>
-              已跳過：{compactMessage(skippedReason)}
+              {alreadyRunningSkip ? "新觸發已略過" : "已跳過"}：{skippedSummary}
             </span>
           )}
           {s.durable_state?.last_status && (

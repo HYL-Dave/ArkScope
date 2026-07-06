@@ -1034,8 +1034,9 @@ def test_normalized_ibkr_news_route_launches_isolated_worker_without_pg_or_mirro
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(tmp_path / "pre_exit.db"))
     calls = []
 
-    def _subprocess(argv, cwd=None, capture_output=False, text=False):
+    def _subprocess(argv, cwd=None, capture_output=False, text=False, timeout=None):
         calls.append(argv)
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(
@@ -1100,8 +1101,9 @@ def test_post_exit_ibkr_audit_routes_to_normalized_worker_without_pg_or_mirror(
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: str(market_db))
     calls = []
 
-    def _subprocess(argv, cwd=None, capture_output=False, text=False):
+    def _subprocess(argv, cwd=None, capture_output=False, text=False, timeout=None):
         calls.append(argv)
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(
@@ -1160,8 +1162,9 @@ def test_post_exit_ibkr_audit_routes_to_normalized_when_profile_store_unavailabl
     monkeypatch.setattr(ds, "_store", lambda: (_ for _ in ()).throw(RuntimeError("profile down")))
     calls = []
 
-    def _subprocess(argv, cwd=None, capture_output=False, text=False):
+    def _subprocess(argv, cwd=None, capture_output=False, text=False, timeout=None):
         calls.append(argv)
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(
@@ -1360,8 +1363,9 @@ def test_normalized_ibkr_worker_partial_stdout_marks_scheduler_partial(
     }
     subprocess_calls = []
 
-    def _run(argv, cwd=None, capture_output=False, text=False):
+    def _run(argv, cwd=None, capture_output=False, text=False, timeout=None):
         subprocess_calls.append(argv)
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
 
     monkeypatch.setattr(ds.subprocess, "run", _run)
@@ -1412,7 +1416,8 @@ def test_normalized_ibkr_worker_failure_hides_raw_child_stderr(
         "error_classes": ["ProviderError"],
     }
 
-    def _run(argv, cwd=None, capture_output=False, text=False):
+    def _run(argv, cwd=None, capture_output=False, text=False, timeout=None):
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(
             returncode=1,
             stdout=json.dumps(payload),
@@ -1449,7 +1454,8 @@ def test_normalized_ibkr_worker_invalid_stdout_is_generic_failure(monkeypatch):
     )
     secret = "DJ-N$raw-secret-id raw provider stdout"
 
-    def _run(argv, cwd=None, capture_output=False, text=False):
+    def _run(argv, cwd=None, capture_output=False, text=False, timeout=None):
+        assert timeout == ds._IBKR_NEWS_WORKER_TIMEOUT_S
         return SimpleNamespace(
             returncode=0,
             stdout=f"not-json {secret}",
@@ -2394,6 +2400,60 @@ def test_v14_status_snapshot_exposes_durable_state_and_gap_planned(monkeypatch):
     assert snap["polygon_news"]["gap_planned"] is False
 
 
+def test_status_snapshot_marks_stale_running_durable_state(monkeypatch):
+    ds._state_store().record_attempt(
+        "ibkr_news", datetime(2000, 1, 1, 0, 0, tzinfo=timezone.utc)
+    )
+
+    snap = ds.status_snapshot()["ibkr_news"]["durable_state"]
+
+    assert snap["last_status"] == "running"
+    assert snap["running_stale"] is True
+    assert snap["running_for_seconds"] > 0
+    assert "running longer than" in snap["running_stale_reason"]
+
+
+def test_reconcile_interrupted_runtime_state_marks_local_running_rows(tmp_path, monkeypatch):
+    market_db = tmp_path / "market_data.db"
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(market_db))
+    ds._state_store().record_attempt(
+        "ibkr_news", datetime(2026, 6, 24, 10, 0, tzinfo=timezone.utc)
+    )
+
+    import src.market_data_direct as mdd
+
+    conn = sqlite3.connect(market_db)
+    mdd._ensure_provider_sync_tables(conn)
+    stale_id = mdd._start_provider_run(conn, provider="ibkr", interval="news", domain="news")
+    fresh_id = mdd._start_provider_run(conn, provider="polygon", interval="news", domain="news")
+    conn.execute(
+        "UPDATE provider_sync_runs SET started_at=? WHERE id=?",
+        ("2026-06-24T09:30:00+00:00", stale_id),
+    )
+    conn.execute(
+        "UPDATE provider_sync_runs SET started_at=? WHERE id=?",
+        ("2026-06-24T11:30:00+00:00", fresh_id),
+    )
+    conn.commit()
+    conn.close()
+
+    result = ds.reconcile_interrupted_runtime_state(
+        now=datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    )
+
+    assert result["scheduler_sources"] == ["ibkr_news"]
+    assert result["provider_run_ids"] == [stale_id]
+    assert ds._state_store().get("ibkr_news")["last_status"] == "failed"
+    conn = sqlite3.connect(market_db)
+    assert conn.execute(
+        "SELECT status FROM provider_sync_runs WHERE id=?", (stale_id,)
+    ).fetchone()[0] == "failed"
+    assert conn.execute(
+        "SELECT status FROM provider_sync_runs WHERE id=?", (fresh_id,)
+    ).fetchone()[0] == "running"
+    conn.close()
+
+
 def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):
     # v1.4a MED fix: a pure status read must NOT materialize profile_state.db / scheduler_state.
     # Point at a FRESH (absent) profile DB, reset the cached store, call status_snapshot → the
@@ -2408,6 +2468,22 @@ def test_v14a_status_snapshot_no_create_on_fresh_db(tmp_path, monkeypatch):
     # and a no-create read of an absent DB returns {} (helper-level)
     from src.scheduler_state import read_all_if_exists
     assert read_all_if_exists(str(fresh)) == {} and not fresh.exists()
+
+
+def test_sanitized_ibkr_news_worker_timeout_returns_failed_payload(monkeypatch):
+    import subprocess as _subprocess
+
+    def _timeout(argv, **kwargs):
+        raise _subprocess.TimeoutExpired(cmd=argv, timeout=1)
+
+    monkeypatch.setattr(ds.subprocess, "run", _timeout)
+    monkeypatch.setattr(ds, "_IBKR_NEWS_WORKER_TIMEOUT_S", 1)
+
+    step = ds._run_sanitized_json_subprocess(["python", "-m", "worker"])
+
+    assert step["returncode"] == 1
+    assert step["payload"]["status"] == "failed"
+    assert step["payload"]["error_classes"] == ["TimeoutExpired"]
 
 
 def test_run_source_refuses_provider_work_when_provider_config_setup_required(monkeypatch):

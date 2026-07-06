@@ -30,7 +30,10 @@ async def lifespan(app: FastAPI):
     # scheduling; single-sidecar locks like _CACHE_WRITE_LOCK assume one process).
     import asyncio
 
-    from src.service.data_scheduler import scheduler_loop
+    from src.service.data_scheduler import (
+        reconcile_interrupted_runtime_state,
+        scheduler_loop,
+    )
 
     # Apply app-managed provider keys / IBKR host+port into os.environ BEFORE the
     # scheduler exists: the sidecar is the parent of every collector subprocess, so
@@ -50,6 +53,10 @@ async def lifespan(app: FastAPI):
         provider_config_ready = False
         mark_provider_config_setup_required(str(e))
         logger.warning("data-provider env bridge failed; booting setup-only: %s", e)
+    try:
+        reconcile_interrupted_runtime_state()
+    except Exception as e:  # noqa: BLE001 — stale telemetry repair must not block startup
+        logger.debug("interrupted scheduler/provider reconciliation failed: %s", e)
 
     # Test hygiene: TestClient(create_app()) runs this lifespan, and the scheduler's
     # seed/tick threads reach the real PG/network — tests/conftest.py disables it so

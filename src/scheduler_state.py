@@ -132,6 +132,38 @@ class SchedulerStateStore:
                     continue
         return out
 
+    def reconcile_interrupted_running(self, *, error: str) -> list[str]:
+        """Terminalize rows left ``running`` by a previous sidecar lifetime.
+
+        A fresh process cannot own those in-memory source locks anymore. Keeping the
+        durable row as ``running`` makes the UI show normal work forever and causes
+        later skip results to read as if the original job were still healthy.
+        """
+        now = _now_iso()
+        changed: list[str] = []
+        with self._write_lock, self._connect() as conn:
+            rows = conn.execute(
+                "SELECT source,last_attempt FROM scheduler_state WHERE last_status='running' "
+                "ORDER BY source"
+            ).fetchall()
+            for row in rows:
+                source = str(row["source"])
+                result = {
+                    "source": source,
+                    "status": "failed",
+                    "error": error,
+                    "last_attempt": row["last_attempt"],
+                }
+                cur = conn.execute(
+                    "UPDATE scheduler_state SET last_status='failed', last_error=?, "
+                    "continuation=NULL, last_result=?, updated_at=? "
+                    "WHERE source=? AND last_status='running'",
+                    (error, json.dumps(result), now, source),
+                )
+                if cur.rowcount:
+                    changed.append(source)
+        return changed
+
     @staticmethod
     def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
         d = dict(row)

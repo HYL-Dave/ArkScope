@@ -266,6 +266,42 @@ def test_provider_sync_run_lifecycle(tmp_path):
     conn.close()
 
 
+def test_reconcile_interrupted_provider_runs_marks_stale_running(tmp_path):
+    db = tmp_path / "m.db"
+    conn = sqlite3.connect(db)
+    mdd._ensure_provider_sync_tables(conn)
+    stale_id = mdd._start_provider_run(conn, provider="ibkr", interval="news", domain="news")
+    fresh_id = mdd._start_provider_run(conn, provider="polygon", interval="news", domain="news")
+    conn.execute(
+        "UPDATE provider_sync_runs SET started_at=? WHERE id=?",
+        ("2026-06-24T10:00:00+00:00", stale_id),
+    )
+    conn.execute(
+        "UPDATE provider_sync_runs SET started_at=? WHERE id=?",
+        ("2026-06-24T12:00:00+00:00", fresh_id),
+    )
+    conn.commit()
+
+    changed = mdd._reconcile_interrupted_provider_runs(
+        conn,
+        started_before="2026-06-24T11:00:00+00:00",
+        error="provider worker interrupted before terminal telemetry",
+    )
+
+    assert changed == [stale_id]
+    stale = conn.execute(
+        "SELECT status,finished_at,error FROM provider_sync_runs WHERE id=?",
+        (stale_id,),
+    ).fetchone()
+    assert stale[0] == "failed"
+    assert stale[1] is not None
+    assert stale[2] == "provider worker interrupted before terminal telemetry"
+    assert conn.execute(
+        "SELECT status FROM provider_sync_runs WHERE id=?", (fresh_id,)
+    ).fetchone()[0] == "running"
+    conn.close()
+
+
 def test_provider_run_status_constrained_to_valid_set(tmp_path):
     # JobRunsStore only allows running/succeeded/failed — 'partial' is NOT a status here.
     db = tmp_path / "m.db"

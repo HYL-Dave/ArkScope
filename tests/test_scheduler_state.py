@@ -87,6 +87,22 @@ def test_attempt_does_not_clobber_prior_outcome_fields(store):
     assert row["last_error"] == "boom"          # preserved until the new outcome
 
 
+def test_reconcile_interrupted_running_marks_terminal(store):
+    store.record_attempt("ibkr_news", _dt("2026-06-24T10:00:00"))
+    store.record_outcome("polygon_news", status="succeeded", error=None, result={"ok": True})
+    store.record_attempt("price_backfill", _dt("2026-06-24T11:00:00"))
+
+    changed = store.reconcile_interrupted_running(error="sidecar restarted before run finished")
+
+    assert changed == ["ibkr_news", "price_backfill"]
+    ibkr = store.get("ibkr_news")
+    assert ibkr["last_status"] == "failed"
+    assert ibkr["last_error"] == "sidecar restarted before run finished"
+    assert ibkr["last_result"]["status"] == "failed"
+    assert "sidecar restarted" in ibkr["last_result"]["error"]
+    assert store.get("polygon_news")["last_status"] == "succeeded"
+
+
 def test_no_pg_dependency():
     import src.scheduler_state as mod
     assert not hasattr(mod, "psycopg2")

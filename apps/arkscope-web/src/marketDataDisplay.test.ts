@@ -183,6 +183,16 @@ describe("schedulerStateLabel", () => {
     expect(schedulerStateLabel({ last_status: "running", continuation: null }).label).toBe("執行中");
     expect(schedulerStateLabel(null).label).toBe("尚未執行");
   });
+  it("labels stale running as an interrupted/stuck state", () => {
+    const r = schedulerStateLabel({
+      last_status: "running",
+      continuation: null,
+      running_stale: true,
+      running_stale_reason: "running longer than configured stale threshold",
+    });
+    expect(r.label).toBe("執行過久");
+    expect(r.tone).toBe("warn");
+  });
   it("partial with no deferred is not actionable", () => {
     expect(schedulerStateLabel({ last_status: "partial", continuation: { deferred: [] } }).needsContinue).toBe(false);
   });

@@ -1602,6 +1602,9 @@ export interface ScheduleSourceState {
     continuation: { deferred?: string[]; lookback_days?: number; candidate_count?: number } | null;
     last_attempt: string | null;
     updated_at: string | null;
+    running_for_seconds?: number | null;
+    running_stale?: boolean;
+    running_stale_reason?: string | null;
   } | null;
   job_name: string; // collect.<source>
 }

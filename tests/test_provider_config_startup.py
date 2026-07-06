@@ -6,6 +6,30 @@ import asyncio
 import pytest
 
 
+def test_lifespan_reconciles_interrupted_scheduler_state(monkeypatch):
+    from src.api.app import create_app, lifespan
+
+    called = {"reconcile": False}
+
+    def _reconcile():
+        called["reconcile"] = True
+        return {"scheduler_sources": ["ibkr_news"], "provider_run_ids": [106]}
+
+    monkeypatch.setenv("ARKSCOPE_DISABLE_SCHEDULER", "1")
+    monkeypatch.setattr("src.data_provider_config.apply_env", lambda store: None)
+    monkeypatch.setattr("src.api.dependencies.get_data_provider_store", lambda: object())
+    monkeypatch.setattr(
+        "src.service.data_scheduler.reconcile_interrupted_runtime_state",
+        _reconcile,
+    )
+
+    async def _run_lifespan():
+        async with lifespan(create_app()):
+            assert called["reconcile"] is True
+
+    asyncio.run(_run_lifespan())
+
+
 def test_profile_db_failure_boots_setup_only(monkeypatch):
     from src.api.app import create_app, lifespan
     from src.api.routes.health import healthz

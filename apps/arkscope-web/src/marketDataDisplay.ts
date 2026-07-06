@@ -102,6 +102,8 @@ export function schedulerStateLabel(
   durable: {
     last_status: string | null;
     continuation: { deferred?: string[] } | null;
+    running_stale?: boolean;
+    running_stale_reason?: string | null;
   } | null,
 ): { label: string; tone: "ok" | "warn" | "muted" | "bad"; needsContinue: boolean } {
   const st = durable?.last_status ?? null;
@@ -115,6 +117,9 @@ export function schedulerStateLabel(
     case "failed":
       return { label: "上次失敗", tone: "bad", needsContinue: false };
     case "running":
+      if (durable?.running_stale) {
+        return { label: "執行過久", tone: "warn", needsContinue: false };
+      }
       return { label: "執行中", tone: "muted", needsContinue: false };
     default:
       return { label: "尚未執行", tone: "muted", needsContinue: false };

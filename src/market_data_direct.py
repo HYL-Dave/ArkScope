@@ -516,6 +516,36 @@ def _finish_provider_run(conn, run_id: int, *, status: str, tickers_scanned: int
     conn.commit()
 
 
+def _reconcile_interrupted_provider_runs(
+    conn,
+    *,
+    started_before: str,
+    error: str,
+) -> list[int]:
+    """Terminalize stale provider_sync_runs rows left ``running`` by dead workers.
+
+    This is telemetry repair, not data repair. It lets provider-health surfaces stop
+    presenting an orphaned worker as normal live activity while preserving the row
+    as a failed attempt with the original started_at.
+    """
+    rows = conn.execute(
+        "SELECT id FROM provider_sync_runs WHERE status='running' AND started_at < ? "
+        "ORDER BY id",
+        (started_before,),
+    ).fetchall()
+    changed: list[int] = []
+    for row in rows:
+        run_id = int(row[0])
+        conn.execute(
+            "UPDATE provider_sync_runs SET finished_at=?, status='failed', error=? "
+            "WHERE id=? AND status='running'",
+            (_now(), error, run_id),
+        )
+        changed.append(run_id)
+    conn.commit()
+    return changed
+
+
 def _upsert_provider_meta(conn, *, provider: str, ticker: str, interval: str,
                           last_bar_datetime: Optional[str], rows_added: int,
                           error: Optional[str]) -> None:
