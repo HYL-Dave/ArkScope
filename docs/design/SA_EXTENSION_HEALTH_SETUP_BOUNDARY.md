@@ -54,22 +54,35 @@ Repo moves/renames only ever require editing the config JSON — never the brows
 - Last real extension write (timestamp via `job_runs` telemetry) and whether the app can
   read it back — the indirect evidence for the browser-owned hop.
 
-## Incident grounding (2026-07-06 cutover test)
+## Incident grounding (2026-07-06 cutover test) — structural, not ops
 
 During the consolidation cutover test, every `record_extension_job` POST got Connection
-refused while all `sa_capture.db` writes succeeded: the web dev server (8430) was up, the
-Python sidecar (8420) was not, and nothing surfaced the split — the extension saw "ok"
-(best-effort by design), the data landed, the `job_runs` telemetry silently vanished. That
-invisible partial-health state is exactly what this surface must show. Port map for the
-record: sidecar API **8420** (`src/api/__main__.py`), web dev **8430** (`vite.config.ts`),
-both in the ArkScope-owned 84xx block.
+refused while all `sa_capture.db` writes succeeded — and follow-up tracing showed this is
+**structural under the daily `npm run dev:desktop` workflow**, not a forgotten process:
 
-**Design constraint (dynamic ports)**: the native host inherits the **browser's**
-environment, not the app's — `ARKSCOPE_API_*` env vars set by a future desktop shell never
-reach it. If the shell spawns the sidecar on an ephemeral port, the current API base MUST
-travel through the app-writable config file (add `api_base` to
-`~/.config/arkscope/sa_native_host.json`; the launcher exports it, or the host reads the
-config directly). Env-var-only steering of the telemetry target is not a viable mechanism.
+- The Electron shell **already** spawns the sidecar on an **ephemeral port with a per-run
+  token** (`apps/arkscope-desktop/main.js:98-112`; observed live: `python -m src.api` on
+  127.0.0.1:34145). The renderer learns the port from the shell; the **native host cannot**
+  — it is spawned by the browser and inherits the browser's environment, so it POSTs to the
+  default `127.0.0.1:8420` (`sa_native_host.py:721-730`) and would be rejected by the token
+  check (`src/api/app.py:151-153`) even if it guessed the port.
+- Consequence: extension telemetry only ever lands when a **standalone** no-token sidecar
+  happens to be listening on 8420 (true during live-verification sessions — last successful
+  row `sa_market_news_refresh/extension` at `2026-07-05T16:05Z`); under dev:desktop alone it
+  silently fails while the extension sees "ok" (best-effort by design) and the data lands.
+  That invisible split is exactly what this surface must show.
+- Port map for the record: sidecar API default **8420** (`src/api/__main__.py`), web dev
+  **8430** (`vite.config.ts`), ArkScope-owned 84xx block; dev:desktop sidecar = ephemeral.
+
+**Design constraint (dynamic ports)**: the API base + token MUST travel through the
+app-writable config file (add `api_base`/`api_token` to
+`~/.config/arkscope/sa_native_host.json`; the launcher exports them, or the host reads the
+config directly), written by the Electron shell at spawn time — it already knows both.
+Env-var-only steering of the telemetry target is not a viable mechanism.
+
+**Sub-fix not gated on Desktop App Vision**: this config-file plumbing (shell writes
+`api_base`/`api_token` on spawn; host prefers config over env defaults) is a small
+standalone slice with no UI — it can ship before the rest of P2.6 whenever prioritized.
 
 ## Existing building blocks (reuse, don't redesign)
 
