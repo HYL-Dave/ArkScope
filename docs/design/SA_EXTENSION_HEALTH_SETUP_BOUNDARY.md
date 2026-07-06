@@ -84,6 +84,13 @@ Env-var-only steering of the telemetry target is not a viable mechanism.
 `api_base`/`api_token` on spawn; host prefers config over env defaults) is a small
 standalone slice with no UI — it can ship before the rest of P2.6 whenever prioritized.
 
+**RESOLVED 2026-07-06**: part 1 shipped + live-proven (plan
+`2026-07-06-sa-extension-telemetry-health.md`, map §10 closeout). Both resolution paths
+verified with real Quick Refresh rows in `job_runs`: dev:desktop via `source=config`
+(run_id=13702) and standalone-8420 via `default` (run_id=13703); clean shutdown clears the
+config api fields. Precedence shipped as env > config > default. The health panel covers
+the segment checklist; part 2 (embedded browser question) stays open.
+
 ## Existing building blocks (reuse, don't redesign)
 
 - Native host → sidecar **job telemetry POST** (S-H1) → local `job_runs`

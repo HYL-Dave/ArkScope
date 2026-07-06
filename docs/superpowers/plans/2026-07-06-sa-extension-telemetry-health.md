@@ -1,9 +1,16 @@
 # SA Extension Telemetry Plumbing + Health Surface Implementation Plan
 
-> **Status: REVIEWED — cleared for implementation (Tasks 1→6).** 3 must-fixes + 2
-> should-fixes from the 2026-07-06 user review are folded in below (marked MF1-3/SF1-2).
-> User priority ruling: this slice runs **ahead of the other P1 items** — it builds the
-> desktop/extension observability foundation.
+> **Status: ✅ LIVE COMPLETE 2026-07-06.** Implemented (codex `1dda248..c98a055` + dev.js
+> shutdown fix `7b98b7a`) + 3 reviewer fixes (`8cd9210` probe simulates browser env,
+> `5ddd902` import-side-effect purge after A/B round-1 diff root-cause, `b804c27` health
+> fetch off the 5s schedule poll). Full A/B round 2 strictly identical (37=37, +18 = new
+> tests). Live: dev:desktop path → `job_runs` run_id=13702 `persisted:true` via
+> `source=config` (target 41229, the previously-impossible row); clean-quit cleared the
+> config api fields; standalone-8420 path → run_id=13703 via `default`. Smoke 24 checks
+> `pg_attempts:[]`. Closeout in map §10.
+>
+> Original review record: 3 must-fixes + 2 should-fixes folded in below (MF1-3/SF1-2);
+> user priority ruling: ran ahead of the other P1 items.
 > Authority for the boundary: `docs/design/SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -104,7 +111,7 @@ the panel, existing PG-unreachable smoke.
 
 **Files:** `src/sa_native_host.py`; NEW `tests/test_sa_native_host_telemetry.py`.
 
-- [ ] **Step 1 (RED):** New test file; import `src.sa_native_host` directly (module import
+- [x] **Step 1 (RED):** New test file; import `src.sa_native_host` directly (module import
   is side-effect-safe for helpers; mirror how `tests/test_job_runs.py` exercises
   `_post_extension_job_to_sidecar` seams). Cases, each with env cleared via
   `monkeypatch.delenv(..., raising=False)` and a tmp config via
@@ -124,18 +131,18 @@ the panel, existing PG-unreachable smoke.
      `handle_message` constructs `DataAccessLayer(db_dsn="auto")` at
      `sa_native_host.py:75` before the ping branch at `:118` — a broken profile/DAL
      poisons even the health probe.
-- [ ] **Step 2 (GREEN):** Implement `_resolve_sidecar_target() -> (base, token, source)`
+- [x] **Step 2 (GREEN):** Implement `_resolve_sidecar_target() -> (base, token, source)`
   and rewire `_post_extension_job_to_sidecar` (keep `/jobs/extension-record`, headers,
   2.0s timeout); **(MF2) move the ping branch ABOVE the `DataAccessLayer` construction**
   (`:75`) so ping never touches DAL/profile state; failure log line gains target+source.
-- [ ] **Step 3:** Run Gate 1; record RED→GREEN evidence.
+- [x] **Step 3:** Run Gate 1; record RED→GREEN evidence.
 
 ## Task 2: Electron shell writes/clears the api fields
 
 **Files:** NEW `apps/arkscope-desktop/sidecarConfig.js` + `sidecarConfig.test.js`;
 `apps/arkscope-desktop/main.js`.
 
-- [ ] **Step 1 (RED):** `sidecarConfig.test.js` (node:test, `navigation.test.js` pattern,
+- [x] **Step 1 (RED):** `sidecarConfig.test.js` (node:test, `navigation.test.js` pattern,
   tmp dirs via `fs.mkdtempSync`): write-into-absent-file creates parents + only api keys;
   write-into-existing preserves `project_root`/`python_path`/`host_script`; mode is 0600;
   clear removes only the two api keys (file + other keys survive); clear on absent file =
@@ -147,11 +154,11 @@ the panel, existing PG-unreachable smoke.
   attempted. Rationale: `main.js:120` early-returns on `!sidecar || sidecar.exitCode !==
   null` — a clear placed after that guard leaves stale `api_base`/`api_token` exactly when
   the sidecar crashed, defeating this slice.
-- [ ] **Step 2 (GREEN):** Implement `writeSidecarApiConfig(configPath, {apiBase, apiToken})`,
+- [x] **Step 2 (GREEN):** Implement `writeSidecarApiConfig(configPath, {apiBase, apiToken})`,
   `clearSidecarApiConfig(configPath)`, and `stopSidecarCleanup(child, configPath, {kill})`
   (clears config FIRST unconditionally, then applies the existing kill/guard dance to
   `child`; injectable `kill` for tests) — pure `fs`/`path`, no Electron imports.
-- [ ] **Step 3:** Wire `main.js`: default config path
+- [x] **Step 3:** Wire `main.js`: default config path
   `process.env.ARKSCOPE_SA_NATIVE_HOST_CONFIG || ~/.config/arkscope/sa_native_host.json`;
   call write **after** `waitForHealth(port, token)` returns true (`createWindow`);
   `stopSidecar()` delegates to `stopSidecarCleanup` so the config clear is its FIRST
@@ -162,7 +169,7 @@ the panel, existing PG-unreachable smoke.
 
 **Files:** NEW `src/service/sa_extension_health.py`; NEW `tests/test_sa_extension_health.py`.
 
-- [ ] **Step 1 (RED):** Tests build a fake HOME layout under `tmp_path` (config json,
+- [x] **Step 1 (RED):** Tests build a fake HOME layout under `tmp_path` (config json,
   Firefox/Chrome manifest jsons, executable launcher stub) and inject paths via the
   service's explicit `SAExtensionHealthPaths` dataclass (no real-HOME reads in tests).
   Segments asserted: `config` (exists/parses/host_script exists + under project root/
@@ -188,13 +195,13 @@ the panel, existing PG-unreachable smoke.
   `sa_capture_store.connect(read_only=True)` honest-empty → "no capture yet", populated
   fixture → freshness timestamps). Failure of one segment never hides the others (each
   row independent).
-- [ ] **Step 2 (GREEN):** Implement. **(SF1) Segments are tri-state
+- [x] **Step 2 (GREEN):** Implement. **(SF1) Segments are tri-state
   `{key, state: ok|warn|fail, detail}`**: `telemetry_last` and `capture_readback` with NO
   history (fresh install / just-reset profile, before the first capture) are **`warn`
   (「尚未有第一次擷取」), never `fail`** — a fresh install must not show hard-red before
   it has ever captured. Overall `ok` = no `fail` among required segments (`warn` allowed);
   manifests require ≥1 browser found.
-- [ ] **Step 3 (seam-mock discipline):** ONE real-shape integration test that spawns the
+- [x] **Step 3 (seam-mock discipline):** ONE real-shape integration test that spawns the
   REAL host (`[sys.executable, "src/sa_native_host.py"]`, length-prefixed ping, 15s
   timeout, repo cwd) and asserts the service parses its actual reply — the sibling for the
   mocked spawn seam. Mark `@pytest.mark.integration` if collection cost demands. Gate 3
@@ -206,13 +213,13 @@ the panel, existing PG-unreachable smoke.
 `tests/test_sa_extension_health.py` (or `tests/test_sa_routing.py` — follow that file's
 handler-direct style: call the handler with a fake service, NO TestClient).
 
-- [ ] **Step 1 (RED):** handler returns the service payload verbatim + 200; service raising
+- [x] **Step 1 (RED):** handler returns the service payload verbatim + 200; service raising
   → **(SF2)** `HTTPException(status_code=503, detail={"code":
   "sa_extension_health_unavailable"})` — the test asserts the raised exception's
   `.detail["code"]`, and any HTTP-level check asserts the FastAPI wire shape
   `{"detail": {"code": ...}}`, NOT a top-level `code` key (the `detail.code`-vs-`code`
   false-red from earlier slices).
-- [ ] **Step 2 (GREEN):** implement thin route (service injected the same way the file's
+- [x] **Step 2 (GREEN):** implement thin route (service injected the same way the file's
   existing routes take dependencies). Run Gate 3.
 
 ## Task 5: Frontend panel
@@ -221,23 +228,23 @@ handler-direct style: call the handler with a fake service, NO TestClient).
 NEW `apps/arkscope-web/src/saExtensionHealthDisplay.ts` + `.test.ts` (pure display helper,
 `marketDataDisplay.ts` pattern).
 
-- [ ] **Step 1 (RED):** vitest on the display helper: segment → {label(zh), state ✓/✗/—,
+- [x] **Step 1 (RED):** vitest on the display helper: segment → {label(zh), state ✓/✗/—,
   detail}; ordering fixed (鏈路順序: 設定檔 → 瀏覽器註冊 → 啟動器 → 主機測試 → 遙測綁定 →
   最近遙測 → 資料回讀); unknown segment key → safe fallback row.
-- [ ] **Step 2 (GREEN):** `getSAExtensionHealth()` in api.ts; Settings 資料來源 SA area
+- [x] **Step 2 (GREEN):** `getSAExtensionHealth()` in api.ts; Settings 資料來源 SA area
   gains the 「SA Extension 健康」 disclosure (macro 本地快照 panel precedent): checklist
   rows + 重新檢查 button (re-fetch), loading/error states. Run Gate 4.
 
 ## Task 6: Live verification + closeout
 
-- [ ] **Step 1 (live, the structural proof):** with ONLY `npm run dev:desktop` running:
+- [x] **Step 1 (live, the structural proof):** with ONLY `npm run dev:desktop` running:
   panel all-green (telemetry binding = 綁定本次 sidecar), then Firefox Quick Refresh →
   `job_runs` gains a NEW `*/extension` row — the outcome that was structurally impossible
   before this slice. Evidence: row timestamp + host log line with `source=config`.
-- [ ] **Step 2 (live, regression):** clean-quit dev:desktop (config api fields cleared) →
+- [x] **Step 2 (live, regression):** clean-quit dev:desktop (config api fields cleared) →
   standalone `python -m src.api` (8420, no token) → Quick Refresh → telemetry lands via
   `default` source. Also run Gate 5 smoke.
-- [ ] **Step 3 (docs):** map §10 closeout entry + §P2.6 status update (part 1 shipped;
+- [x] **Step 3 (docs):** map §10 closeout entry + §P2.6 status update (part 1 shipped;
   embedded-browser decision explicitly still open); boundary doc status flip; memory sync.
   Commit: `docs: close sa extension telemetry health slice`.
 
