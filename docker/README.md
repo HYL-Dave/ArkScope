@@ -48,6 +48,12 @@ docker exec -i mindfulrl-postgres dropdb -U postgres archive_scratch
 Each `data/pg_archive/<batch-dir>/` carries its own manifest + sha256; verify
 the dump checksum against the manifest before trusting a restore.
 
+> **The original remote PG instance was STOPPED on 2026-07-06** after the three
+> app-record archive tables were dumped to
+> `data/pg_archive/app_records_20260706T121127Z/` (with restore proof). There is
+> no live ArkScope PG anywhere; this compose + the dumps are the complete
+> archive story.
+
 ## Password rotation
 
 The pre-2026-07 dev password was published and is COMPROMISED

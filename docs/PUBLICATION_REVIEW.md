@@ -63,6 +63,10 @@ the `filter=git-crypt` line from `.gitattributes` and `git add --renormalize`.
   published in plaintext (docker/, config/.env.template) and is COMPROMISED —
   it remains readable in git history forever. 2026-07-06 (hygiene B4a): all
   tracked copies purged; compose now requires `ARKSCOPE_ARCHIVE_PG_PASSWORD`
-  with no default. **Rotation of the live archive DB password = pending (B4b,
-  user-executed)**; until rotated, treat the archive DB as reachable with a
-  public credential on the LAN.
+  with no default. **RESOLVED 2026-07-06 (B4b, option A — stop, not rotate)**:
+  the three app-record archive tables were dumped locally with restore proof
+  (`data/pg_archive/app_records_20260706T121127Z/`, dump sha256
+  `486f6fae01519794405d88b7180188b615e5dfb7c094bf6071f0853e11ab0e92`, 5 rows
+  total) and the remote PG container was stopped (connection-refused verified).
+  No live service carries the compromised credential. Any future archive access
+  = start a fresh PG via `docker/README.md` and restore the dumps.

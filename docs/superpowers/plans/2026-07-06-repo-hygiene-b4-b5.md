@@ -1,6 +1,10 @@
 # Repo Hygiene B4/B5 — Docker Archive-Only + Docs Deep Sweep Implementation Plan
 
-> **Status: B4a ✅ + B5a ✅ + B5b ✅ EXECUTED 2026-07-06; ONLY B4b (user-executed rotation) remains open.**
+> **Status: ✅ ALL EXECUTED 2026-07-06 (B4a/B4b/B5a/B5b).** B4b ran as owner-ruled OPTION A
+> (dump-then-stop, NOT rotate): three app-record tables dumped with restore proof
+> (`data/pg_archive/app_records_20260706T121127Z/`, sha `486f6fae…`, 5 rows total), remote
+> PG container stopped (connection-refused verified) — no live service carries the
+> compromised credential, so rotation is moot.
 > B5b note: `P0_1_FULL_V1_SPEC` deletion was vetoed at execution by the fold-then-delete
 > verification (live Replay Harness spec authority) — 2 of 3 approved deletions executed. 2026-07-06 review folded in: MF1 `config/.env.template` secret
 > purge added to Task 1; MF2 root `README.md` "current stack" quickstart added to Task 1;
@@ -84,8 +88,8 @@ still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
   `config/.env` `DATABASE_URL`, update the MCP postgres server config, export
   `ARKSCOPE_ARCHIVE_PG_PASSWORD` where compose is used. Agents never see/choose the new
   value.
-- [ ] **Step 2 (user):** execute rotation.
-- [ ] **Step 3 (verify):** read-only connectivity check to the archive DB with the new
+- [x] **Step 2 (user):** ~~execute rotation~~ OPTION A executed: user stopped the remote container after the dump.
+- [x] **Step 3 (verify):** (option-A form) connection-refused verified post-stop; dump restore proof OK; PUBLICATION_REVIEW §5 flipped to RESOLVED. Original rotate-form text below kept for the record: read-only connectivity check to the archive DB with the new
   credential (e.g., `SELECT count(*) FROM agent_queries` via MCP) succeeds; old password
   refused; `PUBLICATION_REVIEW.md` compromised-password item flipped to ROTATED with
   date. Commit `docs: record archive PG rotation (B4b)`.
