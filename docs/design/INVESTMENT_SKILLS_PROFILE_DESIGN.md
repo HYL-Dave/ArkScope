@@ -48,8 +48,20 @@ complementary to the user's own tendencies.
 - `match_skill_trigger(question)`, `expand_skill(name, params)`, and
   `build_auto_apply_context(skill, question)`.
 
-This means v2 auto-trigger is technically reachable, but product controls and trace are
-not yet adequate for enabling it by default.
+Important current-state split:
+
+- **Workbench / web research paths** do not currently use trigger matching or auto-apply.
+  For those surfaces, `off` can be tested as byte-identical current behavior.
+- **Legacy CLI and Discord paths already auto-apply some skills by default.**
+  `SkillDefinition.auto_apply` defaults true, `can_auto_apply()` allows paramless skills,
+  `src/agents/cli.py` injects `build_auto_apply_context()` for a unique auto-applicable
+  match, and `src/monitor/discord_bot.py` has the same pattern.
+
+So v2 auto-trigger is not merely "technically reachable"; a legacy version exists today
+outside the workbench control model. This design does not bless that behavior as the
+future contract. Track B must bring CLI under `skill_mode` semantics. The Discord surface
+must be proven live and then either brought under the same contract or retired as a
+pre-pivot surface in its own implementation plan.
 
 ### 2.2 Existing packaged skills
 
@@ -75,6 +87,15 @@ This design inherits those boundaries. Creating or editing Investor Profile is a
 profile-state write. Suggesting skills is a read-only planning action. Automatically
 applying skills may increase tool usage and must be explainable and controlled.
 
+### 2.4 Evidence boundary
+
+`ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md` §2 and Tool Catalog rule 9 make the EvidencePacket a
+hard boundary: evidence is objective, source-labeled, and gathered before synthesis.
+Investor Profile, Assistant Stance, and skill-selection policy must not change what counts
+as evidence, silently filter evidence, or weaken required counter-thesis. They may shape
+the synthesis/chat layer: what the assistant emphasizes, how it challenges the user, and
+which explicit analysis frameworks it suggests or applies with trace.
+
 ## 3. Product Decisions
 
 ### 3.1 Split the user from the assistant
@@ -93,13 +114,20 @@ user's own bias.
 
 Personalized profile/stance behavior is off by default. When disabled, the agent behaves
 like the current workbench: no profile-derived judgment posture, no personalized skill
-suggestion, and no automatic skill application.
+suggestion, and no automatic skill application. This statement is scoped to the workbench
+surface. The legacy CLI/Discord auto-apply call sites described in §2.1 are existing
+out-of-contract behavior and must be handled by Track B before the product can claim a
+global skill-mode policy.
 
 The UI should make the active state visible:
 
 - Profile personalization: off/on.
 - Assistant stance for this run.
 - Skill mode: off/suggest-only/auto-with-trace, where only the first two are v1/v1.5.
+
+`profile.enabled=false` is the master switch. It forces effective stance to `off` and
+disables profile-derived skill suggestions or auto-trigger, regardless of any saved
+default stance.
 
 ### 3.3 v1 prioritizes profile and stance
 
@@ -213,12 +241,19 @@ Recommended v1 stances:
 The UI should not bury this in advanced settings. The user should be able to choose it
 near the query/run surface, because it is a run-level behavior control.
 
+When `profile.enabled=false`, the effective stance is `off`. Saved stance preferences may
+remain in storage, but they are inert until profile personalization is enabled again.
+
 ## 6. Skill Selection Policy
 
 ### 6.1 v1: no skill selection
 
-v1 may include the current explicit `/skill` command and existing manual skills UI, but
-profile/stance does not automatically choose skills.
+For the workbench surface, v1 may include the current explicit `/skill` command and
+existing manual skills UI, but profile/stance does not automatically choose skills.
+
+This does not describe the whole repository today: CLI and Discord currently have legacy
+trigger-based auto-injection. Track B must explicitly settle those call sites instead of
+letting them remain a parallel policy.
 
 ### 6.2 v1.5: suggest-only
 
@@ -249,6 +284,15 @@ Output:
 ```
 
 No prompt expansion occurs in v1.5 unless the user accepts the suggestion.
+
+Track B must include the legacy call sites:
+
+- CLI: move from implicit unique-match auto-injection to the shared `skill_mode` contract.
+  Default should be `suggest_only`, so existing users still see useful skill guidance
+  without hidden context injection.
+- Discord: first prove whether the bot surface is still live. If live, bring it under the
+  same `skill_mode` contract. If not live, mark it as pre-pivot and retire or defer it in
+  the implementation plan.
 
 ### 6.3 v2: auto-with-trace
 
@@ -300,6 +344,12 @@ Each research run should show:
 - skill mode;
 - applied/suggested skills trace when relevant.
 
+Persisted outputs must also record the personalization context. A card run or research run
+generated under `strict_risk_control` is not directly comparable to one generated under
+`growth_opportunity` unless the stored metadata says so. Store at least:
+`profile_active`, `assistant_stance`, `skill_mode`, `suggested_skills`, and
+`applied_skills`.
+
 For v1, the trace may simply say:
 
 > Profile personalization active. Stance: complementary. This run will emphasize
@@ -349,6 +399,11 @@ semantics.
 When profile personalization is active, the agent context should contain a compact,
 structured block. It should not dump raw questionnaire text unless useful.
 
+This block belongs in synthesis/chat context only. It must not be passed into
+`gather_evidence()` or any deterministic evidence collector, and it must not change the
+EvidencePacket rules from ProductSpec §2. In card generation, stance can change emphasis
+inside the synthesis prompt, not evidence eligibility.
+
 Example:
 
 ```text
@@ -383,7 +438,12 @@ working model.
 5. Auto-trigger v2 must expose trace and allow rerun without skills.
 6. The assistant should challenge clearly harmful mismatches between stated appetite and
    plausible capacity.
-7. The feature must not be marketed as financial advice or suitability determination. It
+7. Investor Profile and Assistant Stance must not alter deterministic evidence gathering,
+   filter EvidencePacket items, or weaken required counter-thesis. Aligned stance still
+   includes the strongest good-faith opposing view. Complementary stance amplifies
+   counter-thesis and invalidation emphasis in synthesis; it does not change evidence
+   rules.
+8. The feature must not be marketed as financial advice or suitability determination. It
    is a research-personalization aid.
 
 ## 11. Implementation Tracks
@@ -397,14 +457,18 @@ Build:
 - freeform profile draft flow;
 - stance selector;
 - prompt-context injection;
-- profile/stance visible in run trace.
+- profile/stance visible in run trace;
+- persisted card/research run metadata for `profile_active`, `assistant_stance`,
+  `skill_mode`, `suggested_skills`, and `applied_skills`.
 
 Acceptance:
 
-- feature off means byte-identical agent prompt behavior;
+- workbench feature off means byte-identical agent prompt behavior;
 - enabled profile creates explicit stance context;
 - risk appetite/capacity mismatch is represented;
-- profile edits require profile-state permission.
+- profile edits require profile-state permission;
+- when `profile.enabled=false`, workbench prompt behavior is byte-identical and effective
+  stance is `off`.
 
 ### Track B - v1.5 skill suggestion
 
@@ -414,6 +478,10 @@ Build:
 - reason strings;
 - UI/trace display;
 - accept suggestion action that expands selected skills.
+- CLI legacy auto-apply call site brought under `skill_mode` with default
+  `suggest_only`;
+- Discord legacy auto-apply call site either brought under `skill_mode` if live or
+  explicitly retired/deferred if proven pre-pivot.
 
 Acceptance:
 
@@ -421,6 +489,7 @@ Acceptance:
 - multiple matches are shown as choices;
 - trace records why a skill was suggested;
 - no hidden tool execution occurs.
+- legacy CLI/Discord behavior no longer bypasses the product skill-mode policy.
 
 ### Track C - v2 auto-trigger
 
@@ -460,4 +529,3 @@ These are planning questions, not blockers for this design:
 4. What exact UI surface owns the stance selector: query composer, Settings, or both?
 5. Should profile export/import be part of the first implementation plan or deferred to
    the larger profile-portability track?
-
