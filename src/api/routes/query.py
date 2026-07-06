@@ -33,6 +33,9 @@ class QueryRequest(BaseModel):
     thread_id: Optional[str] = None
     ticker: Optional[str] = None
     retry_last_failed: bool = False
+    # Track A: per-run Assistant Stance override (validated against STANCES;
+    # invalid values are a 400, never a silent fallback — trace must stay honest).
+    assistant_stance: Optional[str] = None
 
 
 def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
@@ -40,6 +43,32 @@ def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
     keeps the raw question (so history is clean, not prefixed)."""
     t = (ticker or "").strip().upper()
     return f"針對 {t}：{question}" if t else question
+
+
+def _resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]:
+    """Track A: resolve the profile-driven prompt block + run trace.
+
+    Invalid overrides are a 400 BEFORE any stream/gather starts — never a
+    silent fallback, or the persisted trace would be ambiguous. The returned
+    context goes to SYNTHESIS/CHAT only (ProductSpec §2 evidence boundary).
+    """
+    from src.investor_profile import (
+        STANCES,
+        build_personalization_context,
+        personalization_trace,
+    )
+
+    if assistant_stance is not None and assistant_stance not in STANCES:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_assistant_stance", "field": "assistant_stance"},
+        )
+    from src.api.dependencies import get_investor_profile_store
+
+    profile = get_investor_profile_store().get()
+    context = build_personalization_context(profile, override=assistant_stance)
+    trace = personalization_trace(profile, override=assistant_stance)
+    return context, trace
 
 
 def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:
@@ -65,7 +94,7 @@ def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:
     return [{"name": r["name"], "input": r["input"], "result_preview": r["result_preview"]} for r in rows]
 
 
-def _anthropic_subscription_stream(*, credential_id, question, model, effort, dal, history):
+def _anthropic_subscription_stream(*, credential_id, question, model, effort, dal, history, personalization_context: str = ""):
     """7B-6: drive AI 研究 on the Claude SUBSCRIPTION via the in-process Agent-SDK
     driver, returning an ``AsyncIterator[AgentEvent]`` (the SAME vocabulary
     ``run_query_stream`` yields, so the downstream SSE / reducer / thread-persistence
@@ -110,7 +139,7 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     # (src/agents/anthropic_agent/agent.py builds build_system_prompt(freshness)).
     # We pass no freshness summary — matching the agent's freshness-off default —
     # so subscription Research uses the identical research instructions as API-key.
-    instructions = build_system_prompt()
+    instructions = build_system_prompt(personalization_context=personalization_context)
     # Multi-turn parity: when prior turns seed the conversation, the API-key
     # anthropic loop appends a [多輪脈絡] staleness guard to the system prompt
     # (src/agents/anthropic_agent/agent.py:235-240) telling the model to treat the
@@ -132,7 +161,7 @@ def _anthropic_subscription_stream(*, credential_id, question, model, effort, da
     return driver.stream_llm(req)
 
 
-def _openai_subscription_stream(*, credential_id, question, model, effort, dal, history):
+def _openai_subscription_stream(*, credential_id, question, model, effort, dal, history, personalization_context: str = ""):
     """S3: drive AI 研究 on the ChatGPT subscription backend via the raw
     chatgpt_oauth driver.
 
@@ -166,7 +195,7 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
         timeout_s=runtime.session_timeout_s,
         per_tool_timeout_s=runtime.per_tool_timeout_s,
     )
-    instructions = _build_effective_prompt(dal, config)
+    instructions = _build_effective_prompt(dal, config, personalization_context=personalization_context)
     if history:
         instructions = (
             instructions
@@ -182,7 +211,7 @@ def _openai_subscription_stream(*, credential_id, question, model, effort, dal, 
     return driver.stream_llm(req)
 
 
-def _research_provider_stream(*, provider: str, question: str, model: str, effort: Optional[str], dal, history):
+def _research_provider_stream(*, provider: str, question: str, model: str, effort: Optional[str], dal, history, personalization_context: str = ""):
     """Return the provider AgentEvent stream for AI 研究.
 
     This is the single dispatch point shared by the legacy page-owned
@@ -194,19 +223,23 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
     from src.research_runtime_config import resolve_research_runtime
     runtime = resolve_research_runtime()
     from src.auth_drivers.live_resolver import resolve_live_auth
+    # Track A: pass the personalization block ONLY when non-empty, so legacy
+    # strict-signature fakes/drivers see an unchanged call shape when the
+    # profile is off (off = byte-identical workbench behavior).
+    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
 
     if provider == "openai":
         _auth = resolve_live_auth("openai")
         if _auth.source == "oauth_driver_unwired":
             return _openai_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
-                model=model, effort=effort, dal=dal, history=history,
+                model=model, effort=effort, dal=dal, history=history, **_pctx,
             )
         from src.agents.openai_agent.agent import run_query_stream
         return run_query_stream(
             question=question, model=model, dal=dal,
             reasoning_effort=effort, history=history,
-            max_tool_calls=runtime.max_tool_calls,
+            max_tool_calls=runtime.max_tool_calls, **_pctx,
         )
 
     if provider == "anthropic":
@@ -214,13 +247,13 @@ def _research_provider_stream(*, provider: str, question: str, model: str, effor
         if _auth.source == "oauth_driver_unwired":
             return _anthropic_subscription_stream(
                 credential_id=_auth.credential_id, question=question,
-                model=model, effort=effort, dal=dal, history=history,
+                model=model, effort=effort, dal=dal, history=history, **_pctx,
             )
         from src.agents.anthropic_agent.agent import run_query_stream
         return run_query_stream(
             question=question, model=model, dal=dal,
             effort=effort, history=history,
-            max_tool_calls=runtime.max_tool_calls,
+            max_tool_calls=runtime.max_tool_calls, **_pctx,
         )
 
     raise ValueError(f"Unknown provider: {provider}")
@@ -235,7 +268,7 @@ def _persist_user_turn(store, *, thread_id, question, ticker, provider, model, t
         logger.warning("research persist (user turn) failed, continuing: %s", e)
 
 
-def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed, effort=None) -> None:
+def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed, effort=None, personalization=None) -> None:
     """Best-effort assistant persistence on a `done` terminal (#3 tool_calls from
     the trace, #4 safe). accumulate_tool_calls runs INSIDE the guard (SF1)."""
     try:
@@ -246,12 +279,13 @@ def _persist_assistant_turn(store, *, thread_id, done_data, collected, elapsed, 
             effort=effort,
             tools_used=done_data.get("tools_used"), tool_calls=accumulate_tool_calls(collected),
             token_usage=done_data.get("token_usage"), elapsed_seconds=elapsed,
+            personalization=personalization,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
         logger.warning("research persist (assistant turn) failed, continuing: %s", e)
 
 
-def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed, effort=None) -> None:
+def _persist_error_turn(store, *, thread_id, content, collected, provider, model, elapsed, effort=None, personalization=None) -> None:
     """Best-effort persistence of a NON-`done` terminal (agent error / stream
     exception) as an is_error assistant turn — so reload doesn't show a dangling
     user question with no reply (MUST-FIX 2). Partial trace preserved."""
@@ -259,7 +293,7 @@ def _persist_error_turn(store, *, thread_id, content, collected, provider, model
         store.append_message(
             thread_id=thread_id, role="assistant", content=content or "(error)",
             provider=provider, model=model, effort=effort, tool_calls=accumulate_tool_calls(collected),
-            elapsed_seconds=elapsed, is_error=True,
+            elapsed_seconds=elapsed, is_error=True, personalization=personalization,
         )
     except Exception as e:  # noqa: BLE001 — best-effort by design
         logger.warning("research persist (error turn) failed, continuing: %s", e)
@@ -297,6 +331,8 @@ async def query_agent(
         - "Generate a morning brief"
     """
     provider = request.provider.lower()
+    personalization_context, _ptrace = _resolve_personalization(request.assistant_stance)
+    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
     # No explicit model → the AI 研究 route (or the provider's default tier).
     model, effort = request.model, None
     if model is None and provider in ("openai", "anthropic"):
@@ -311,6 +347,7 @@ async def query_agent(
                 model=model,
                 dal=dal,
                 reasoning_effort=effort,
+                **_pctx,
             )
         except ImportError as e:
             raise HTTPException(
@@ -329,6 +366,7 @@ async def query_agent(
                 model=model,
                 dal=dal,
                 effort=effort,
+                **_pctx,
             )
         except ImportError as e:
             raise HTTPException(
@@ -369,6 +407,9 @@ async def query_agent_stream(
         - done: Final answer with full result
     """
     provider = request.provider.lower()
+    # Track A: validate the stance override + resolve profile context BEFORE the
+    # stream starts, so an invalid value is a clean 400 (not a mid-stream error).
+    personalization_context, personalization = _resolve_personalization(request.assistant_stance)
     # #2: the agent sees the ticker-framed question; the store keeps the raw one.
     agent_question = _compose_agent_question(request.question, request.ticker)
     # C-2b persistence gated on a valid client-owned thread id (#5). Invalid →
@@ -419,11 +460,16 @@ async def query_agent_stream(
                 effort=res_effort,
                 dal=dal,
                 history=history,
+                personalization_context=personalization_context,
             )
 
             async for event in stream:
+                etype = getattr(event.type, "value", event.type)
+                if etype == "done":
+                    # Track A: the SSE consumer sees the SAME trace that gets
+                    # persisted — and only for the context actually injected.
+                    event.data["personalization"] = dict(personalization)
                 if persist:
-                    etype = getattr(event.type, "value", event.type)
                     if etype in ("tool_start", "tool_end"):
                         collected.append((etype, event.data))
                     elif etype == "done":
@@ -445,9 +491,9 @@ async def query_agent_stream(
             if persist:
                 elapsed = round(_time.monotonic() - t0, 3)
                 if done_data is not None:
-                    _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed, effort=res_effort)
+                    _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed, effort=res_effort, personalization=personalization)
                 elif error_content is not None:
-                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, effort=res_effort, elapsed=elapsed)
+                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, effort=res_effort, elapsed=elapsed, personalization=personalization)
 
     return StreamingResponse(
         event_generator(),

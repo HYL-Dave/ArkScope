@@ -239,3 +239,20 @@ def test_build_thread_history_rejects_unimplemented_policy(store):
     # NOT be silently honored as a cap in this cut — raise so it can't ship implicitly.
     with pytest.raises(ValueError):
         build_thread_history(store, "t1", policy="recent_messages")
+
+
+def test_message_personalization_round_trip(tmp_path):
+    store = ResearchThreadStore(tmp_path / "threads.db")
+    store.ensure_thread(id="tp", title="t")
+    trace = {
+        "profile_active": True,
+        "assistant_stance": "complementary",
+        "skill_mode": "off",
+        "suggested_skills": [],
+        "applied_skills": [],
+    }
+    store.append_message(thread_id="tp", role="assistant", content="a", personalization=trace)
+    store.append_message(thread_id="tp", role="assistant", content="b")  # old-style write
+    msgs = store.list_messages("tp")
+    assert msgs[0].personalization == trace
+    assert msgs[1].personalization is None

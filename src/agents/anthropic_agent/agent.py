@@ -177,6 +177,7 @@ async def run_query_stream(
     attachments: list | None = None,
     history: list | None = None,
     max_tool_calls: Optional[int] = None,
+    personalization_context: str = "",
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a natural language query, yielding events as the agent progresses.
@@ -230,7 +231,7 @@ async def run_query_stream(
     freshness_summary = ""
     if config.freshness_in_prompt:
         freshness_summary = _get_freshness_summary(dal) or ""
-    effective_prompt = build_system_prompt(freshness_summary)
+    effective_prompt = build_system_prompt(freshness_summary, personalization_context=personalization_context)
     # Multi-turn (C-2c): prior thread turns seed the conversation. They are
     # context only — note that time-sensitive facts must still be re-fetched.
     _hist = [{"role": h["role"], "content": h["content"]} for h in (history or [])]
@@ -568,6 +569,7 @@ def run_query(
     dal: Optional[Any] = None,
     effort: Optional[str] = None,
     thinking: Optional[bool] = None,
+    personalization_context: str = "",
 ) -> Dict[str, Any]:
     """
     Run a natural language query using Anthropic SDK with tool use.
@@ -594,6 +596,7 @@ def run_query(
         result: Dict[str, Any] = {}
         async for event in run_query_stream(
             question, model, dal, effort=effort, thinking=thinking,
+            personalization_context=personalization_context,
         ):
             if event.type == EventType.done:
                 result = event.data

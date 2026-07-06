@@ -148,6 +148,7 @@ class ResearchMessage:
     tickers: Optional[list]
     elapsed_seconds: Optional[float]
     is_error: bool
+    personalization: Optional[dict]
     created_at: str
 
 
@@ -188,6 +189,11 @@ class ResearchThreadStore:
                     conn.execute("ALTER TABLE research_messages ADD COLUMN effort TEXT")
                 except sqlite3.OperationalError:
                     pass
+            if "personalization_json" not in cols:
+                try:
+                    conn.execute("ALTER TABLE research_messages ADD COLUMN personalization_json TEXT")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     # --- row mappers -----------------------------------------------------
@@ -211,6 +217,7 @@ class ResearchThreadStore:
             tickers=_loads(r["tickers_json"]),
             elapsed_seconds=r["elapsed_seconds"],
             is_error=bool(r["is_error"]),
+            personalization=_loads(r["personalization_json"]),
             created_at=r["created_at"],
         )
 
@@ -255,6 +262,7 @@ class ResearchThreadStore:
         tickers: Optional[list] = None,
         elapsed_seconds: Optional[float] = None,
         is_error: bool = False,
+        personalization: Optional[dict] = None,
         now: Optional[str] = None,
     ) -> ResearchMessage:
         ts = now or _now()
@@ -264,8 +272,8 @@ class ResearchThreadStore:
                 INSERT INTO research_messages
                     (thread_id, role, content, provider, model, effort, tools_used_json,
                      tool_calls_json, token_usage_json, tickers_json, elapsed_seconds,
-                     is_error, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     is_error, personalization_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     thread_id, role, content, provider, model, effort,
@@ -273,7 +281,9 @@ class ResearchThreadStore:
                     json.dumps(tool_calls) if tool_calls is not None else None,
                     json.dumps(token_usage) if token_usage is not None else None,
                     json.dumps(tickers) if tickers is not None else None,
-                    elapsed_seconds, 1 if is_error else 0, ts,
+                    elapsed_seconds, 1 if is_error else 0,
+                    json.dumps(personalization) if personalization is not None else None,
+                    ts,
                 ),
             )
             # Bump the parent thread's activity so list_threads orders it first.

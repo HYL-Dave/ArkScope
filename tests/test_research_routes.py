@@ -877,3 +877,167 @@ def test_api_key_stream_receives_research_max_turns(store, monkeypatch, tmp_path
 
     asyncio.run(drive())
     assert captured["max_tool_calls"] == 31
+
+
+# ─── Track A: investor profile personalization on /query/stream ──────────────
+
+
+def _profile_store(tmp_path, monkeypatch, *, enabled):
+    from src.investor_profile import InvestorProfileStore
+
+    pstore = InvestorProfileStore(tmp_path / "investor_profile.db")
+    if enabled:
+        pstore.save(
+            {
+                "enabled": True,
+                "risk_appetite": 8,
+                "risk_capacity": 4,
+                "behavioral_flags": ["FOMO"],
+                "default_stance": "complementary",
+            }
+        )
+    monkeypatch.setattr(
+        "src.api.dependencies.get_investor_profile_store", lambda: pstore
+    )
+    return pstore
+
+
+def _drive(req, store):
+    import asyncio
+
+    frames = []
+
+    async def go():
+        resp = await q.query_agent_stream(req, dal=object(), store=store)
+        async for chunk in resp.body_iterator:
+            frames.append(chunk if isinstance(chunk, str) else chunk.decode("utf-8"))
+
+    asyncio.run(go())
+    return frames
+
+
+def test_query_stream_profile_off_does_not_pass_personalization_kwarg(
+    store, tmp_path, monkeypatch
+):
+    _profile_store(tmp_path, monkeypatch, enabled=False)
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _apikey_active()
+    )
+
+    async def strict_fake(*, question, model, dal, history, effort=None, max_tool_calls=None):
+        # NO **kwargs on purpose: an unexpected personalization kwarg = TypeError.
+        from src.agents.shared.events import AgentEvent, EventType
+
+        yield AgentEvent(
+            EventType.done,
+            {"answer": "ok", "tools_used": [], "provider": "anthropic", "model": model, "token_usage": {}},
+        )
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", strict_fake)
+    store.ensure_thread(id="tpo", title="x")
+    req = q.QueryRequest(question="hi", provider="anthropic", thread_id="tpo")
+    frames = _drive(req, store)
+    assert any('"done"' in f for f in frames)
+    last = store.list_messages("tpo")[-1]
+    assert last.personalization is None or last.personalization["profile_active"] is False
+
+
+def test_query_stream_enabled_profile_passes_context_and_persists_trace(
+    store, tmp_path, monkeypatch
+):
+    _profile_store(tmp_path, monkeypatch, enabled=True)
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _apikey_active()
+    )
+    captured = {}
+
+    async def fake_stream(*, question, model, dal, history, **kwargs):
+        captured.update(kwargs)
+        from src.agents.shared.events import AgentEvent, EventType
+
+        yield AgentEvent(
+            EventType.done,
+            {"answer": "ok", "tools_used": [], "provider": "anthropic", "model": model, "token_usage": {}},
+        )
+
+    monkeypatch.setattr("src.agents.anthropic_agent.agent.run_query_stream", fake_stream)
+    store.ensure_thread(id="tpe", title="x")
+    req = q.QueryRequest(question="hi", provider="anthropic", thread_id="tpe")
+    frames = _drive(req, store)
+
+    ctx = captured.get("personalization_context", "")
+    assert "[Assistant Stance]" in ctx and "complementary" in ctx
+    assert "appetite_above_capacity" in ctx
+    # done SSE event carries the trace
+    import json as _json
+
+    done_frames = [f for f in frames if '"done"' in f]
+    payload = _json.loads(done_frames[-1].split("data: ", 1)[1])
+    assert payload["data"]["personalization"]["assistant_stance"] == "complementary"
+    assert payload["data"]["personalization"]["profile_active"] is True
+    # persisted assistant message carries the same trace
+    last = store.list_messages("tpe")[-1]
+    assert last.personalization["assistant_stance"] == "complementary"
+    assert last.personalization["suggested_skills"] == []
+
+
+@pytest.mark.parametrize("provider,helper", [
+    ("anthropic", "_anthropic_subscription_stream"),
+    ("openai", "_openai_subscription_stream"),
+])
+def test_query_stream_subscription_branches_receive_personalization_context(
+    store, tmp_path, monkeypatch, provider, helper
+):
+    _profile_store(tmp_path, monkeypatch, enabled=True)
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda p, **k: _oauth_active(provider=p),
+    )
+    captured = {}
+
+    def fake_sub(*, credential_id, question, model, effort, dal, history, **kwargs):
+        captured.update(kwargs)
+        return _canned_events(model=model)
+
+    monkeypatch.setattr(q, helper, fake_sub)
+    store.ensure_thread(id=f"ts-{provider}", title="x")
+    req = q.QueryRequest(question="hi", provider=provider, thread_id=f"ts-{provider}")
+    _drive(req, store)
+    ctx = captured.get("personalization_context", "")
+    assert "[Assistant Stance]" in ctx and "complementary" in ctx
+
+
+def test_query_stream_subscription_profile_off_does_not_pass_personalization_kwarg(
+    store, tmp_path, monkeypatch
+):
+    _profile_store(tmp_path, monkeypatch, enabled=False)
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth", lambda p, **k: _oauth_active()
+    )
+
+    def strict_sub(*, credential_id, question, model, effort, dal, history):
+        # NO **kwargs — matches the legacy strict fake shape; off must omit the kwarg.
+        return _canned_events(model=model)
+
+    monkeypatch.setattr(q, "_anthropic_subscription_stream", strict_sub)
+    store.ensure_thread(id="tso", title="x")
+    req = q.QueryRequest(question="hi", provider="anthropic", thread_id="tso")
+    frames = _drive(req, store)
+    assert any('"done"' in f for f in frames)
+
+
+def test_query_stream_invalid_assistant_stance_returns_400(store, tmp_path, monkeypatch):
+    import asyncio
+
+    from fastapi import HTTPException
+
+    _profile_store(tmp_path, monkeypatch, enabled=True)
+    req = q.QueryRequest(question="hi", provider="anthropic", assistant_stance="yolo")
+
+    async def go():
+        await q.query_agent_stream(req, dal=object(), store=store)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(go())
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "invalid_assistant_stance", "field": "assistant_stance"}

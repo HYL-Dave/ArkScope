@@ -297,11 +297,13 @@ def _get_skills_list() -> str:
     return "\n".join(lines)
 
 
-def build_system_prompt(freshness_summary: str = "") -> str:
+def build_system_prompt(freshness_summary: str = "", personalization_context: str = "") -> str:
     """Build system prompt with optional dynamic sections.
 
     The static SYSTEM_PROMPT is always the base. Dynamic sections
-    (freshness, RL status) are appended when available.
+    (freshness, personalization) are appended when available. The
+    personalization block adjusts SYNTHESIS/CHAT emphasis only (Track A);
+    it never reaches evidence gathering.
     """
     result = SYSTEM_PROMPT.replace("{skills_list}", _get_skills_list())
     sections = []
@@ -312,6 +314,14 @@ def build_system_prompt(freshness_summary: str = "") -> str:
         clean = clean[:_MAX_FRESHNESS_LEN]
         if clean:
             sections.append(f"─── DATA FRESHNESS ───\n\n{clean}")
+
+    # Investor Profile / Assistant Stance section (Track A, opt-in)
+    if personalization_context:
+        clean_p = personalization_context.strip()
+        if clean_p:
+            sections.append(
+                f"─── INVESTOR PROFILE / ASSISTANT STANCE ───\n\n{clean_p}"
+            )
 
     if sections:
         result += "\n\n" + "\n\n".join(sections) + "\n"

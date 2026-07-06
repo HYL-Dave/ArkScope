@@ -377,6 +377,7 @@ async def run_query(
     reasoning_effort: Optional[ReasoningEffort] = None,
     max_tool_calls: Optional[int] = None,
     attachments: list | None = None,
+    personalization_context: str = "",
 ) -> Dict[str, Any]:
     """
     Run a natural language query using OpenAI Agents SDK.
@@ -418,7 +419,7 @@ async def run_query(
     tools = create_openai_tools(dal)
 
     # Build effective prompt: always includes RL status; freshness only when flag is on
-    effective_prompt = _build_effective_prompt(dal, config)
+    effective_prompt = _build_effective_prompt(dal, config, personalization_context=personalization_context)
 
     # Create agent with reasoning settings
     agent = _build_agent(
@@ -719,6 +720,7 @@ async def run_query_stream(
     reasoning_effort: Optional[ReasoningEffort] = None,
     history: list | None = None,
     max_tool_calls: Optional[int] = None,
+    personalization_context: str = "",
 ) -> AsyncGenerator[AgentEvent, None]:
     """
     Run a query yielding events for progress tracking.
@@ -760,7 +762,7 @@ async def run_query_stream(
     tools = create_openai_tools(dal)
 
     # Build effective prompt: always includes RL status; freshness only when flag is on
-    effective_prompt = _build_effective_prompt(dal, config)
+    effective_prompt = _build_effective_prompt(dal, config, personalization_context=personalization_context)
 
     # Multi-turn (C-2c): prior thread turns are context only — note staleness.
     _hist = [{"role": h["role"], "content": h["content"]} for h in (history or [])]
@@ -893,7 +895,7 @@ async def run_query_stream(
 
 # ── Freshness prompt helper ──────────────────────────────────
 
-def _get_freshness_prompt(dal) -> Optional[str]:
+def _get_freshness_prompt(dal, personalization_context: str = "") -> Optional[str]:
     """Build system prompt with freshness summary if DB backend available."""
     try:
         from src.tools.backends.db_backend import DatabaseBackend
@@ -905,23 +907,24 @@ def _get_freshness_prompt(dal) -> Optional[str]:
                 fr.scan()
                 summary = fr.format_summary()
                 if summary:
-                    return build_system_prompt(summary)
+                    return build_system_prompt(summary, personalization_context=personalization_context)
     except Exception as e:
         logger.debug("Freshness prompt build failed: %s", e)
     return None
 
 
-def _build_effective_prompt(dal, config) -> str:
+def _build_effective_prompt(dal, config, personalization_context: str = "") -> str:
     """Build system prompt with dynamic sections (always includes RL status).
 
     Freshness is only included when config.freshness_in_prompt is True.
-    RL status section is always included regardless of any flag.
+    RL status section is always included regardless of any flag. The optional
+    personalization block threads through BOTH paths (Track A).
     """
     from ..shared.prompts import build_system_prompt
     freshness_summary = ""
     if config.freshness_in_prompt:
-        prompt = _get_freshness_prompt(dal)
+        prompt = _get_freshness_prompt(dal, personalization_context=personalization_context)
         if prompt:
             return prompt  # Already includes RL status via build_system_prompt
         # Freshness unavailable but flag on — still build with RL status
-    return build_system_prompt(freshness_summary)
+    return build_system_prompt(freshness_summary, personalization_context=personalization_context)
