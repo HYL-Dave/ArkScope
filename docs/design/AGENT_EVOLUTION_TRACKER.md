@@ -51,7 +51,7 @@ archive/  (見 archive/README.md — pre-pivot design + RL-phase + deployment no
 > `SERVICE_FIRST_EXPANSION_PLAN.md`, `MAJOR_REFACTORING_PLAN.md`, `DATA_STORAGE_ACCESS.md`,
 > `RL_INFERENCE_SERVICE.md`, `ARCHITECTURE_VISION.md`, `NEWS_STORAGE_DESIGN.md`, + 8 scoring/data reports.
 > Extracted residuals live in `DATA_SOURCE_QUIRKS.md`, `PHASE_A_KNOWLEDGE_GRAPH_SKETCH.md`,
-> `SCORING_VALIDATION_METHODOLOGY.md` §五. Full tracker: [DESIGN_DOCS_CONSOLIDATION_REVIEW.md](DESIGN_DOCS_CONSOLIDATION_REVIEW.md).
+> `SCORING_VALIDATION_METHODOLOGY.md` §五. Full tracker: `DESIGN_DOCS_CONSOLIDATION_REVIEW.md` (folded into `docs/PROJECT_HISTORY.md` §"Docs governance lineage" and deleted 2026-07-06; recover via git history).
 
 **與已歸檔 `AI_AGENT_IMPLEMENTATION_PLAN.md` 的關係**：
 - PLAN 是 2026-01 的初始框架選型文件，規劃了 Phase 1-6
