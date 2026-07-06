@@ -26,11 +26,11 @@ Complete consumer inventory (rewired by the B7 implementation branch):
 
 (`tests/test_analysis_cards_api.py` is a false match — it imports the routes module.)
 
-**Disposition**: B7 implementation branch `codex/b7-options-math` performs the verbatim
-move + consumer rewiring with zero residue (no shim at `analysis/`). Branch evidence:
-T1 RED matched `ModuleNotFoundError`, option/rate suites passed after the move, scripts
-compiled, residue gates are clean, and scoped virgin A/B over the affected tests is
-identical. Merge remains gated on reviewer full A/B.
+**Disposition**: B7 merged on 2026-07-06. The branch performed the verbatim move +
+consumer rewiring with zero residue (no shim at `analysis/`). Evidence: T1 RED matched
+`ModuleNotFoundError`, option/rate suites passed after the move, scripts compiled,
+residue gates were clean, scoped virgin A/B over the affected tests was identical, and
+reviewer full A/B passed with failure sets and passed counts exactly equal.
 
 ## 2. `config/` — all live; nothing to clean
 
@@ -86,8 +86,6 @@ which starts from this Phase G inventory instead of re-designing the loader.
 
 ## 5. Owner decisions for B6
 
-1. Review and merge **B7 = `analysis/` → `src/options_math/`** migration branch after
-   reviewer full A/B (TDD, zero-residue; rewires the retained scripts and test string
-   patch target as well as import sites).
+1. **B7 = `analysis/` → `src/options_math/`** migration is complete.
 2. Confirm **scripts survivor table stands** (no re-ruling this round)?
 3. Confirm **`config/skills/` question moves to the skills design line** (not hygiene)?
