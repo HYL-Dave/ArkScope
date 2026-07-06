@@ -14,10 +14,16 @@ const crypto = require("node:crypto");
 const http = require("node:http");
 const path = require("node:path");
 const { shouldOpenExternal } = require("./navigation");
+const {
+  nativeHostConfigPath,
+  stopSidecarCleanup,
+  writeSidecarApiConfig,
+} = require("./sidecarConfig");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const WEB_DIST = path.join(__dirname, "..", "arkscope-web", "dist", "index.html");
 const PYTHON = process.env.ARKSCOPE_PYTHON || "python";
+const NATIVE_HOST_CONFIG = nativeHostConfigPath();
 const ECHO_SIDECAR =
   process.env.ARKSCOPE_SIDECAR_LOG === "1" || Boolean(process.env.ARKSCOPE_WEB_DEV_URL);
 
@@ -117,21 +123,11 @@ function startSidecar(port, token) {
 }
 
 function stopSidecar() {
-  if (!sidecar || sidecar.exitCode !== null) return;
   const child = sidecar;
-  sidecar = null;
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    /* already gone */
-  }
-  setTimeout(() => {
-    try {
-      child.kill("SIGKILL");
-    } catch {
-      /* already gone */
-    }
-  }, 4000);
+  if (child && child.exitCode === null) sidecar = null;
+  stopSidecarCleanup(child, NATIVE_HOST_CONFIG, {
+    onError: (error) => pushTail(Buffer.from(`[native host config cleanup error] ${error.message || error}`), "stderr"),
+  });
 }
 
 function openExternal(url) {
@@ -185,6 +181,13 @@ async function createWindow() {
       search: "msg=" + encodeURIComponent(msg),
     });
     return;
+  }
+
+  try {
+    writeSidecarApiConfig(NATIVE_HOST_CONFIG, { apiBase, apiToken: token });
+    pushTail(Buffer.from(`[native-host-config] sidecar api target written to ${NATIVE_HOST_CONFIG}`));
+  } catch (e) {
+    pushTail(Buffer.from(`[native-host-config error] ${e.message || e}`), "stderr");
   }
 
   const devUrl = process.env.ARKSCOPE_WEB_DEV_URL;

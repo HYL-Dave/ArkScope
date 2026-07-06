@@ -91,7 +91,7 @@ the panel, existing PG-unreachable smoke.
 ## Review Gates
 
 - Gate 1 (after Task 1): `python -m pytest tests/test_sa_native_host_telemetry.py tests/test_job_runs.py -q` green; RED evidence recorded for each new test.
-- Gate 2 (after Task 2): `node --test apps/arkscope-desktop/` green (navigation tests still pass).
+- Gate 2 (after Task 2): `node --test apps/arkscope-desktop/*.test.js` green (navigation tests still pass; directory form loads the Electron entrypoint and requires the `electron` runtime).
 - Gate 3 (after Task 4): `python -m pytest tests/test_sa_extension_health.py tests/test_sa_routing.py tests/test_sa_tools.py -q` green.
 - Gate 4 (after Task 5): `npm run test --workspace apps/arkscope-web` + `npm run build` green.
 - Gate 5: PG-unreachable smoke unchanged (`python src/smoke/pg_unreachable_e2e.py` 24 checks, `pg_attempts:[]`).
