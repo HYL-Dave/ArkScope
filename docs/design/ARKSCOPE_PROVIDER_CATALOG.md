@@ -299,7 +299,7 @@ Formal rubric for *which* providers earn a Settings slot and *when* — so the s
 |-------|-------|
 | **provider** | Seeking Alpha. **NOT an API** — captured via browser extension (Chrome/Firefox) → Native Messaging host → DB. **This pipeline is a PROTECTED runtime surface — do not break it.** |
 | **implementation_status** | **protected-pipeline** (foundation tier). |
-| **connected_via** | `extension → scripts/sa_native_host.py → DB`; reader `data_sources/sa_alpha_picks_client.py` + the SA tool layer. |
+| **connected_via** | `extension → src/sa_native_host.py → DB`; reader `data_sources/sa_alpha_picks_client.py` + the SA tool layer. |
 | **asset_classes** | US equities (curated picks + community + news). |
 | **data_types** | **Alpha Picks** (rank/score, open & closed); **comment intelligence** (rule-based community signals, `sql/012`); SA **market news** + article bodies. |
 | **history_depth** | Per-capture (whatever has been scraped into the local DB). |

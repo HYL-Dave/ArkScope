@@ -40,8 +40,8 @@ cp config/.env.template config/.env            # then fill in API keys
 docker compose -f docker/docker-compose.yml up -d postgres
 
 # 3. data collection
-python scripts/collection/daily_update.py --status         # check data freshness
-python scripts/collection/daily_update.py --all --sync-db  # collect everything + sync to DB
+python -m src.daily_update --status         # check data freshness
+python -m src.daily_update --all --sync-db  # collect everything + sync to DB
 
 # 4. run the agent
 python -m src.agents                           # interactive CLI (--provider openai for GPT-5.x)
@@ -66,9 +66,9 @@ High-level only; for the authoritative structure see
 `docs/design/CURRENT_PROJECT_CONTEXT.md` (or `PROJECT_STRUCTURE.md` for the pointer
 stub).
 
-- `src/` — agent, tools, DAL, analysis pipeline, monitor, signals
+- `src/` — agent, tools, DAL, analysis pipeline, monitor, signals, data ingestion (`src/collectors/`, `src/daily_update.py`)
 - `data_sources/` — data-source API clients
-- `scripts/collection/` — data ingestion (protected runtime path)
+- `scripts/` — historical / one-off utilities only (no runtime paths; those live in `src/`)
 - `extensions/sa_alpha_picks/` — SA browser extension + native host
 - `docs/design/` — current specs & decision log (`PROJECT_PRIORITY_MAP.md` first)
 - `training/` — RL training (paused; see `docs/design/RL_COLLAPSE_FINDINGS.md`)

@@ -10,7 +10,7 @@
 
 These paths must keep working through docs cleanup, local-first migration, and module-level refactors:
 
-- `python scripts/collection/daily_update.py --all --scope active-universe --sync-db`
+- `python -m src.daily_update --all --scope active-universe --sync-db`
   — protection level since 3e-E / F6 (2026-06-11): **flag-compatible + same effects**,
   NOT byte-identical. daily_update is now a thin CLI wrapper over the app scheduler
   core (`src/service/data_scheduler.run_source`): same flag set, same per-source step
@@ -92,10 +92,10 @@ bash -n extensions/sa_alpha_picks/install.sh
 bash -n extensions/sa_alpha_picks/install_firefox.sh
 bash -n training/scripts/run_polygon_production.sh
 bash -n training/scripts/run_feature_comparison.sh
-python scripts/collection/daily_update.py --help
+python -m src.daily_update --help
 # Plan-only (must list polygon_news/finnhub_news/ibkr_news/ibkr_prices and exit 0
 # without touching IBKR/DB/job_runs):
-python scripts/collection/daily_update.py --all --scope active-universe --sync-db --dry-run
+python -m src.daily_update --all --scope active-universe --sync-db --dry-run
 ```
 
 ### Level 2 -- SA/native-host/API/DB-touching changes
@@ -142,7 +142,7 @@ Use before/after storage migration cuts, collection refactors, installer changes
 ```bash
 # News + prices (prices need an explicit scope since slice 2). Add --scores to
 # also push news_scores (now a separate opt-in).
-python scripts/collection/daily_update.py --all --scope active-universe --sync-db
+python -m src.daily_update --all --scope active-universe --sync-db
 ```
 
 For browser extension validation:

@@ -302,7 +302,7 @@ The SA capture pipeline is an **existing, protected ingestion path** — the mig
 
 ### 5a. Write path (extension → native host → DAL → backend)
 1. **Browser extension** `extensions/sa_alpha_picks/background.js` captures SA pages → `chrome.runtime.sendNativeMessage`.
-2. **Native messaging host** `scripts/sa_native_host.py` (host id `com.mindfulrl.sa_alpha_picks` — **intentionally lowercase `mindfulrl`, do not "fix"**) — Chrome spawns a **fresh, short-lived process per message**, reads length-prefixed JSON, then `dal = DataAccessLayer(db_dsn="auto")` and dispatches by action (`sa_native_host.py:59-90`).
+2. **Native messaging host** `src/sa_native_host.py` (host id `com.mindfulrl.sa_alpha_picks` — **intentionally lowercase `mindfulrl`, do not "fix"**) — Chrome spawns a **fresh, short-lived process per message**, reads length-prefixed JSON, then `dal = DataAccessLayer(db_dsn="auto")` and dispatches by action (`sa_native_host.py:59-90`).
 3. **All persistence flows through DAL → `DatabaseBackend` → PG today**, e.g. `refresh` → `dal.apply_sa_refresh(...)` (`sa_native_host.py:210`; `db_backend.py:1137-1234`), `refresh_failure` → `dal.record_sa_refresh_failure(...)` (`:236`/`:1257`), `save_detail[_by_symbol]` (`:320/350`), market news (`:387/423`), articles/comments (`:443/607/627`).
 
 ### 5b. Alpha Picks open → closed lifecycle (lives in `sa_alpha_picks`)
@@ -373,7 +373,7 @@ Implement as a small pure-Python/pandas (or SQL-window) module in the FastAPI si
 > snapshot); the code has since shifted — they document what *was* found, not current
 > line numbers.**
 
-**File:** `scripts/collection/daily_update.py` (historically 881 lines before the 3e-E step-down). It used to be a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`, touching **remote PG only**. Current direction: keep it as a compatibility/backfill wrapper over the same app-owned source runners and local write paths; no RL/reward/PPO references belong here.
+**File:** `src/daily_update.py` (formerly `scripts/collection/daily_update.py`; historically 881 lines before the 3e-E step-down). It used to be a **subprocess orchestrator** over sibling `collect_*.py` and `migrate_to_supabase.py`, touching **remote PG only**. Current direction: keep it as a compatibility/backfill wrapper over the same app-owned source runners and local write paths; no RL/reward/PPO references belong here.
 
 ### New positioning
 Reframe as a **manual / on-demand backfill runner / legacy compatibility wrapper** — explicitly *not* the desktop app's continuous-sync engine. The always-on workbench sidecar owns product scheduling. During the transition, the CLI can still run operational backfills, but it must converge toward the same provider adapters and local write paths as the app.
