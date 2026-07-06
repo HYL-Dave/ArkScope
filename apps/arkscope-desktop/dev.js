@@ -12,6 +12,7 @@
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
+const { clearSidecarApiConfig, nativeHostConfigPath } = require("./sidecarConfig");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const PORT = process.env.ARKSCOPE_WEB_DEV_PORT || "8430";
@@ -39,6 +40,11 @@ function killTree(child) {
 function shutdown(code) {
   if (shuttingDown) return;
   shuttingDown = true;
+  try {
+    clearSidecarApiConfig(nativeHostConfigPath());
+  } catch (e) {
+    console.error(`[dev] native host config cleanup failed: ${e.message || e}`);
+  }
   killTree(vite);
   killTree(electron);
   setTimeout(() => process.exit(code), 500); // let the groups die first
