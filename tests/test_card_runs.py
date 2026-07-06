@@ -128,3 +128,39 @@ def test_translation_roundtrip(store):
     assert store.get(run.id).translations["zh-Hant"]["conclusion"] == "看多"
     # unknown id is a no-op (no crash)
     store.set_translation(999999, "zh-Hant", {"x": 1})
+
+
+# ─── Track A: personalization metadata on card runs ─────────────────────────
+
+_OFF_TRACE = {
+    "profile_active": False,
+    "assistant_stance": "off",
+    "skill_mode": "off",
+    "suggested_skills": [],
+    "applied_skills": [],
+}
+
+
+def test_card_run_personalization_defaults_off(tmp_path):
+    from src.card_runs import CardRunStore
+
+    store = CardRunStore(tmp_path / "cards.db")
+    run = store.record(ticker="NVDA", result_card={"conclusion": "x"})
+    assert run.personalization == _OFF_TRACE
+    assert store.get(run.id).personalization == _OFF_TRACE
+
+
+def test_card_run_personalization_round_trip(tmp_path):
+    from src.card_runs import CardRunStore
+
+    store = CardRunStore(tmp_path / "cards.db")
+    trace = {
+        "profile_active": True,
+        "assistant_stance": "strict_risk_control",
+        "skill_mode": "off",
+        "suggested_skills": [],
+        "applied_skills": [],
+    }
+    run = store.record(ticker="NVDA", result_card={"conclusion": "x"}, personalization=trace)
+    assert store.get(run.id).personalization == trace
+    assert store.record(ticker="AMD", result_card={}).personalization == _OFF_TRACE

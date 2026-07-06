@@ -74,6 +74,7 @@ class CardRun:
     saved_report_id: Optional[int]
     expires_at: Optional[str]
     translations: Optional[dict] = None  # {lang: translated result_card dict}
+    personalization: Optional[dict] = None  # Track A run trace (profile/stance/skills)
 
 
 class CardRunStore:
@@ -103,6 +104,18 @@ class CardRunStore:
             # of the same concurrent-first-construct race the WAL line guards: a
             # duplicate-column error just means another constructor added it.
             cols = {r[1] for r in conn.execute("PRAGMA table_info(ai_card_runs)").fetchall()}
+            for _pcol, _pddl in (
+                ("profile_active", "INTEGER NOT NULL DEFAULT 0"),
+                ("assistant_stance", "TEXT NOT NULL DEFAULT 'off'"),
+                ("skill_mode", "TEXT NOT NULL DEFAULT 'off'"),
+                ("suggested_skills_json", "TEXT NOT NULL DEFAULT '[]'"),
+                ("applied_skills_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ):
+                if _pcol not in cols:
+                    try:
+                        conn.execute(f"ALTER TABLE ai_card_runs ADD COLUMN {_pcol} {_pddl}")
+                    except sqlite3.OperationalError:
+                        pass
             if "translations_json" not in cols:
                 try:
                     conn.execute("ALTER TABLE ai_card_runs ADD COLUMN translations_json TEXT")
@@ -130,6 +143,13 @@ class CardRunStore:
             translations=json.loads(r["translations_json"])
             if r["translations_json"]
             else None,
+            personalization={
+                "profile_active": bool(r["profile_active"]),
+                "assistant_stance": r["assistant_stance"],
+                "skill_mode": r["skill_mode"],
+                "suggested_skills": json.loads(r["suggested_skills_json"] or "[]"),
+                "applied_skills": json.loads(r["applied_skills_json"] or "[]"),
+            },
         )
 
     # --- writes ----------------------------------------------------------
@@ -147,18 +167,22 @@ class CardRunStore:
         model: Optional[str] = None,
         as_of: Optional[str] = None,
         generated_at: Optional[str] = None,
+        personalization: Optional[dict] = None,
     ) -> CardRun:
         t = _norm(ticker)
         if not t:
             raise ValueError("ticker is required")
         gen = generated_at or _now()
+        p = personalization or {}
         with self._write_lock, self._connect() as conn:
             cur = conn.execute(
                 """
                 INSERT INTO ai_card_runs
                     (ticker, question, horizon, card_type, result_card_json,
-                     evidence_packet_json, provider, model, generated_at, as_of, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated')
+                     evidence_packet_json, provider, model, generated_at, as_of, status,
+                     profile_active, assistant_stance, skill_mode,
+                     suggested_skills_json, applied_skills_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'generated', ?, ?, ?, ?, ?)
                 """,
                 (
                     t,
@@ -171,6 +195,11 @@ class CardRunStore:
                     model,
                     gen,
                     as_of,
+                    1 if p.get("profile_active") else 0,
+                    p.get("assistant_stance") or "off",
+                    p.get("skill_mode") or "off",
+                    json.dumps(p.get("suggested_skills") or []),
+                    json.dumps(p.get("applied_skills") or []),
                 ),
             )
             conn.commit()

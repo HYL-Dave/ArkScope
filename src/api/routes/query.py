@@ -11,6 +11,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+
+from src.api.personalization import resolve_personalization as _resolve_personalization
 from pydantic import BaseModel
 
 from ..dependencies import get_dal, get_thread_store
@@ -44,31 +46,6 @@ def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
     t = (ticker or "").strip().upper()
     return f"針對 {t}：{question}" if t else question
 
-
-def _resolve_personalization(assistant_stance: Optional[str]) -> tuple[str, dict]:
-    """Track A: resolve the profile-driven prompt block + run trace.
-
-    Invalid overrides are a 400 BEFORE any stream/gather starts — never a
-    silent fallback, or the persisted trace would be ambiguous. The returned
-    context goes to SYNTHESIS/CHAT only (ProductSpec §2 evidence boundary).
-    """
-    from src.investor_profile import (
-        STANCES,
-        build_personalization_context,
-        personalization_trace,
-    )
-
-    if assistant_stance is not None and assistant_stance not in STANCES:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "invalid_assistant_stance", "field": "assistant_stance"},
-        )
-    from src.api.dependencies import get_investor_profile_store
-
-    profile = get_investor_profile_store().get()
-    context = build_personalization_context(profile, override=assistant_stance)
-    trace = personalization_trace(profile, override=assistant_stance)
-    return context, trace
 
 
 def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:

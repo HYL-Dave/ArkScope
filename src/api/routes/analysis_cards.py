@@ -32,6 +32,7 @@ from src.card_synthesis import (
     translate_card,
 )
 from src.evidence_packet import gather_evidence
+from src.api.personalization import resolve_personalization
 from src.result_card import ResultCard
 from src.tools.data_access import DataAccessLayer
 from src.tools.report_tools import save_report
@@ -48,6 +49,8 @@ class GenerateBody(BaseModel):
     question: Optional[str] = None
     horizon: Optional[str] = None
     provider: Optional[str] = None
+    # Track A: per-run Assistant Stance override (invalid → 400 before gather).
+    assistant_stance: Optional[str] = None
     include_sa: Optional[bool] = None  # override config.sa_enabled for this run
     # Evidence news window: how recent + how many headlines feed the card.
     # Defaults (None) → gather_evidence's 21 days / 12 most-recent articles.
@@ -83,6 +86,7 @@ def _summary(run: CardRun) -> dict:
         "saved_report_id": run.saved_report_id,
         "conclusion": card.get("conclusion"),
         "confidence_level": card.get("confidence_level"),
+        "personalization": run.personalization,
     }
 
 
@@ -99,6 +103,10 @@ def generate_card(
     if provider not in _VALID_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"unknown provider: {provider}")
     model = route.model if provider == route.provider else None
+    # Track A: validate + resolve BEFORE gather_evidence — the context feeds
+    # synthesis ONLY; evidence gathering never sees profile/stance values.
+    personalization_context, personalization = resolve_personalization(body.assistant_stance)
+    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
 
     now = _utcnow()
     sa_enabled = body.include_sa if body.include_sa is not None else get_agent_config().sa_enabled
@@ -128,6 +136,7 @@ def generate_card(
             model=model,
             question=body.question,
             horizon=body.horizon,
+            **_pctx,
         )
     except Exception as exc:
         logger.warning("Card synthesis failed for %s: %s", ticker, exc)
@@ -146,6 +155,7 @@ def generate_card(
         model=meta["model"],
         as_of=now,
         generated_at=now,
+        personalization=personalization,
     )
     return {
         "run_id": run.id,
@@ -158,6 +168,7 @@ def generate_card(
         "generated_at": run.generated_at,
         "card": card.model_dump(),
         "evidence_packet": packet.model_dump(),
+        "personalization": run.personalization,
     }
 
 
@@ -195,6 +206,7 @@ def get_card(
         "generated_at": run.generated_at,
         "as_of": run.as_of,
         "saved_report_id": run.saved_report_id,
+        "personalization": run.personalization,
         "card": run.result_card,
         "evidence_packet": run.evidence_packet,
     }

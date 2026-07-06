@@ -116,7 +116,7 @@ Rules:
 7. Respond ONLY by calling the emit_result_card tool exactly once. Do not write prose outside the tool call."""
 
 
-def _build_user_message(packet: EvidencePacket) -> str:
+def _build_user_message(packet: EvidencePacket, personalization_context: str = "") -> str:
     parts: list[str] = []
     if packet.question:
         parts.append(f"Question: {packet.question}")
@@ -125,6 +125,11 @@ def _build_user_message(packet: EvidencePacket) -> str:
     parts.append(f"Ticker: {packet.ticker}")
     parts.append("EvidencePacket (objective evidence only — LLM scores excluded):")
     parts.append(json.dumps(packet.model_dump(), default=str, indent=2))
+    # Track A: stance shapes EMPHASIS in synthesis only. The packet above is
+    # already gathered — this block cannot and must not alter evidence.
+    if personalization_context.strip():
+        parts.append("Synthesis personalization context (emphasis only; does not alter evidence):")
+        parts.append(personalization_context.strip())
     return "\n".join(parts)
 
 
@@ -135,6 +140,7 @@ def _synthesize_anthropic(
     packet: EvidencePacket,
     model: str,
     effort: str = "default",
+    personalization_context: str = "",
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
@@ -147,7 +153,7 @@ def _synthesize_anthropic(
             model=model,
             max_tokens=_MAX_TOKENS,
             system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": _build_user_message(packet)}],
+            messages=[{"role": "user", "content": _build_user_message(packet, personalization_context)}],
             tools=[
                 {
                     "name": _TOOL_NAME,
@@ -183,6 +189,7 @@ def _synthesize_openai(
     packet: EvidencePacket,
     model: str,
     effort: str = "default",
+    personalization_context: str = "",
 ) -> tuple[CardSynthesis, dict[str, Any]]:
 
     def run_once(selected_effort: str) -> CardSynthesis:
@@ -196,7 +203,7 @@ def _synthesize_openai(
             max_completion_tokens=_MAX_TOKENS,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_message(packet)},
+                {"role": "user", "content": _build_user_message(packet, personalization_context)},
             ],
             tools=[
                 {
@@ -302,6 +309,7 @@ def synthesize_card(
     model: Optional[str] = None,
     question: Optional[str] = None,
     horizon: Optional[str] = None,
+    personalization_context: str = "",
 ) -> tuple[ResultCard, dict]:
     """Synthesize a validated ResultCard from an objective EvidencePacket.
 
@@ -313,11 +321,11 @@ def synthesize_card(
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         effort = route.effort if route.provider == "anthropic" else "default"
-        synth, effort_meta = _synthesize_anthropic(packet, model, effort)
+        synth, effort_meta = _synthesize_anthropic(packet, model, effort, personalization_context=personalization_context)
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         effort = route.effort if route.provider == "openai" else "default"
-        synth, effort_meta = _synthesize_openai(packet, model, effort)
+        synth, effort_meta = _synthesize_openai(packet, model, effort, personalization_context=personalization_context)
     else:
         raise ValueError(f"unknown provider: {provider}")
     card = _merge_to_card(

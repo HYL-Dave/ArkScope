@@ -180,3 +180,105 @@ def test_bad_provider_is_400(store, stub_generation):
     with pytest.raises(HTTPException) as ei:
         generate_card("AAPL", GenerateBody(provider="grok", include_sa=False), dal=object(), store=store)
     assert ei.value.status_code == 400
+
+
+# ─── Track A: investor profile personalization on card generation ───────────
+
+
+def _profile(tmp_path, monkeypatch, *, enabled):
+    from src.investor_profile import InvestorProfileStore
+
+    pstore = InvestorProfileStore(tmp_path / "investor_profile.db")
+    if enabled:
+        pstore.save({"enabled": True, "risk_appetite": 8, "risk_capacity": 4,
+                     "default_stance": "complementary"})
+    monkeypatch.setattr("src.api.dependencies.get_investor_profile_store", lambda: pstore)
+    return pstore
+
+
+def test_generate_card_profile_off_does_not_change_gather_or_synthesis_context(
+    store, tmp_path, monkeypatch
+):
+    _profile(tmp_path, monkeypatch, enabled=False)
+    gather_kw, synth_kw = {}, {}
+
+    def capture_gather(dal, ticker, **kw):
+        gather_kw.update(kw)
+        return _packet()
+
+    def capture_synth(packet, **kw):
+        synth_kw.update(kw)
+        return _card(), {"provider": "anthropic", "model": "m"}
+
+    monkeypatch.setattr(routes, "gather_evidence", capture_gather)
+    monkeypatch.setattr(routes, "synthesize_card", capture_synth)
+    resp = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)
+    assert "personalization_context" not in synth_kw  # off → kwarg omitted
+    assert "personalization_context" not in gather_kw
+    assert resp["personalization"]["profile_active"] is False
+    assert store.get(resp["run_id"]).personalization["profile_active"] is False
+
+
+def test_generate_card_enabled_profile_passes_synthesis_context_only(
+    store, tmp_path, monkeypatch
+):
+    _profile(tmp_path, monkeypatch, enabled=True)
+    gather_kw, synth_kw = {}, {}
+
+    def capture_gather(dal, ticker, **kw):
+        gather_kw.update(kw)
+        return _packet()
+
+    def capture_synth(packet, **kw):
+        synth_kw.update(kw)
+        return _card(), {"provider": "anthropic", "model": "m"}
+
+    monkeypatch.setattr(routes, "gather_evidence", capture_gather)
+    monkeypatch.setattr(routes, "synthesize_card", capture_synth)
+    resp = generate_card(
+        "AAPL",
+        GenerateBody(include_sa=False, assistant_stance="strict_risk_control"),
+        dal=object(),
+        store=store,
+    )
+    ctx = synth_kw["personalization_context"]
+    assert "[Assistant Stance]" in ctx and "strict_risk_control" in ctx
+    # evidence boundary: gather_evidence never sees profile/stance values
+    assert "personalization_context" not in gather_kw
+    assert "assistant_stance" not in gather_kw
+    assert resp["personalization"]["assistant_stance"] == "strict_risk_control"
+    assert resp["personalization"]["profile_active"] is True
+    assert store.get(resp["run_id"]).personalization == resp["personalization"]
+
+
+def test_get_card_returns_personalization_metadata(store, tmp_path, monkeypatch):
+    _profile(tmp_path, monkeypatch, enabled=True)
+    monkeypatch.setattr(routes, "gather_evidence", lambda dal, ticker, **kw: _packet())
+    monkeypatch.setattr(
+        routes, "synthesize_card",
+        lambda packet, **kw: (_card(), {"provider": "anthropic", "model": "m"}),
+    )
+    rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    detail = routes.get_card(rid, store=store)
+    assert detail["personalization"]["assistant_stance"] == "complementary"
+    summaries = routes.list_cards(store=store)
+    assert summaries["cards"][0]["personalization"]["assistant_stance"] == "complementary"
+
+
+def test_generate_card_invalid_assistant_stance_returns_400(store, tmp_path, monkeypatch):
+    _profile(tmp_path, monkeypatch, enabled=True)
+    called = {"gather": False}
+    monkeypatch.setattr(
+        routes, "gather_evidence",
+        lambda *a, **k: called.__setitem__("gather", True) or _packet(),
+    )
+    with pytest.raises(HTTPException) as exc:
+        generate_card(
+            "AAPL",
+            GenerateBody(include_sa=False, assistant_stance="yolo"),
+            dal=object(),
+            store=store,
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "invalid_assistant_stance", "field": "assistant_stance"}
+    assert called["gather"] is False  # validation precedes evidence gathering
