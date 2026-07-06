@@ -53,6 +53,19 @@ def get_card_store():
 
 
 @lru_cache(maxsize=1)
+def get_investor_profile_store():
+    """Singleton Investor Profile store (same local SQLite as profile state).
+
+    Track A personalization: durable investor profile + assistant stance live
+    in the local profile DB, never the remote PG. Path overridable via
+    ``ARKSCOPE_PROFILE_DB``.
+    """
+    from src.investor_profile import InvestorProfileStore
+
+    return InvestorProfileStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_thread_store():
     """Singleton local store for AI 研究 conversation threads/messages (same local
     SQLite). Threads live alongside profile state in the local DB, never PG."""
