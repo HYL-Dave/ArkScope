@@ -97,6 +97,7 @@ import {
   schedulerStateLabel,
 } from "./marketDataDisplay";
 import { displaySAExtensionSegments } from "./saExtensionHealthDisplay";
+import { InvestorProfilePanel } from "./InvestorProfilePanel";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -106,6 +107,7 @@ const TASK_LABELS: Record<ModelTask, string> = {
 
 type SettingsSection =
   | "models"
+  | "investor_profile"
   | "providers"
   | "data_storage"
   | "news_storage"
@@ -124,6 +126,12 @@ const SETTINGS_SECTIONS: Array<{
     id: "models",
     title: "Models",
     description: "任務路由、model id、effort。",
+    enabled: true,
+  },
+  {
+    id: "investor_profile",
+    title: "投資人設定",
+    description: "Investor Profile + 助手立場（opt-in 研究個人化；非投資建議）。",
     enabled: true,
   },
   {
@@ -476,6 +484,8 @@ export function SettingsView({
                   />
                 )}
               </>
+            ) : section === "investor_profile" ? (
+              <InvestorProfilePanel />
             ) : section === "providers" ? (
               <ProviderSection
                 catalog={catalog}

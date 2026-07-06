@@ -67,3 +67,22 @@ describe("streamQuery", () => {
     await expect(collect(streamQuery({ question: "q", provider: "anthropic" }))).rejects.toThrow();
   });
 });
+
+describe("streamQuery assistant_stance transport (Track A)", () => {
+  it("includes assistant_stance when supplied and omits it when not", async () => {
+    const bodies: string[] = [];
+    const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return new Response(streamFromChunks([wire("done", { answer: "ok" })]), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await collect(
+      streamQuery({ question: "q", provider: "anthropic", assistant_stance: "complementary" }),
+    );
+    await collect(streamQuery({ question: "q", provider: "anthropic" }));
+
+    expect(JSON.parse(bodies[0]).assistant_stance).toBe("complementary");
+    expect("assistant_stance" in JSON.parse(bodies[1])).toBe(false);
+  });
+});

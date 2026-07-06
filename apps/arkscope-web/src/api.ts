@@ -291,6 +291,63 @@ export interface Note {
 
 // --- §2 AI cards (recent runs) ---
 
+export type InvestorPreset =
+  | "growth" | "value" | "momentum" | "income" | "event_driven" | "balanced" | "custom";
+export type AssistantStance =
+  | "off" | "neutral" | "aligned" | "complementary"
+  | "strict_risk_control" | "valuation_rationalist" | "growth_opportunity";
+export type SkillMode = "off" | "suggest_only";
+
+export interface PersonalizationTrace {
+  profile_active: boolean;
+  assistant_stance: AssistantStance;
+  skill_mode: SkillMode;
+  suggested_skills: string[];
+  applied_skills: string[];
+}
+
+export interface InvestorProfile {
+  enabled: boolean;
+  primary_preset: InvestorPreset;
+  risk_appetite: number | null;
+  risk_capacity: number | null;
+  risk_mismatch: "none" | "appetite_above_capacity" | "capacity_above_appetite" | "unclear";
+  holding_horizon: string;
+  drawdown_tolerance_pct: number | null;
+  concentration_limit_pct: number | null;
+  preferred_edge: string[];
+  avoidances: string[];
+  behavioral_flags: string[];
+  freeform_notes: string;
+  default_stance: AssistantStance;
+  skill_mode: SkillMode;
+  last_reviewed_at: string | null;
+  updated_at: string | null;
+}
+
+export interface InvestorProfileResponse {
+  profile: InvestorProfile;
+  effective_stance: AssistantStance;
+  trace: PersonalizationTrace;
+  context_preview: string;
+}
+
+export function getInvestorProfile(): Promise<InvestorProfileResponse> {
+  return getJSON<InvestorProfileResponse>("/profile/investor");
+}
+
+export function draftInvestorProfile(
+  profile: Partial<InvestorProfile>,
+): Promise<InvestorProfileResponse> {
+  return sendJSON<InvestorProfileResponse>("/profile/investor/draft", "POST", profile);
+}
+
+export function saveInvestorProfile(
+  profile: Partial<InvestorProfile>,
+): Promise<InvestorProfileResponse> {
+  return sendJSON<InvestorProfileResponse>("/profile/investor", "PUT", profile);
+}
+
 export interface CardSummary {
   run_id: number;
   ticker: string;
@@ -304,6 +361,7 @@ export interface CardSummary {
   saved_report_id: number | null;
   conclusion: string | null;
   confidence_level: "high" | "medium" | "low" | null;
+  personalization?: PersonalizationTrace | null;
 }
 
 export interface DataSourceRef {
@@ -378,6 +436,7 @@ export interface GenerateResult {
   generated_at: string;
   card: ResultCard;
   evidence_packet: EvidencePacket | null;
+  personalization?: PersonalizationTrace | null;
 }
 export interface CardDetail extends GenerateResult {
   ticker: string;
@@ -431,6 +490,7 @@ export async function* streamQuery(
     thread_id?: string;
     ticker?: string | null;
     retry_last_failed?: boolean;
+    assistant_stance?: AssistantStance;
   },
   signal?: AbortSignal,
 ): AsyncGenerator<SSEFrame> {
@@ -1126,6 +1186,7 @@ export function generateCard(
     include_sa?: boolean;
     news_days?: number;
     max_news?: number;
+    assistant_stance?: AssistantStance;
   } = {},
 ): Promise<GenerateResult> {
   return sendJSON<GenerateResult>(
