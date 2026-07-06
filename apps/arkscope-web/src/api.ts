@@ -1499,6 +1499,22 @@ export function getSAFeed(params: {
   return getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000);
 }
 
+export interface SAExtensionHealthSegment {
+  key: string;
+  state: "ok" | "warn" | "fail";
+  detail: string;
+}
+
+export interface SAExtensionHealthResponse {
+  ok: boolean;
+  generated_at: string;
+  segments: SAExtensionHealthSegment[];
+}
+
+export function getSAExtensionHealth(): Promise<SAExtensionHealthResponse> {
+  return getJSON<SAExtensionHealthResponse>("/sa/extension-health", 8_000);
+}
+
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a

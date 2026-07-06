@@ -16,6 +16,7 @@ import {
   getModelCatalog,
   getProvidersConfig,
   getProvidersHealth,
+  getSAExtensionHealth,
   getSchedule,
   importProviderConfigField,
   importModelRoutes,
@@ -51,6 +52,7 @@ import {
   type ProviderConfigSetupState,
   type ProviderHealth,
   type ProvidersHealthResponse,
+  type SAExtensionHealthResponse,
   type ScheduleSourceState,
   type SyncMeta,
   type ModelCatalog,
@@ -94,6 +96,7 @@ import {
   providerHealthStatusLabel,
   schedulerStateLabel,
 } from "./marketDataDisplay";
+import { displaySAExtensionSegments } from "./saExtensionHealthDisplay";
 
 const TASK_LABELS: Record<ModelTask, string> = {
   card_synthesis: "AI 卡片生成",
@@ -1319,6 +1322,7 @@ function DataSourcesSection() {
   const [schedule, setSchedule] = useState<Record<string, ScheduleSourceState> | null>(null);
   const [health, setHealth] = useState<ProvidersHealthResponse | null>(null);
   const [macroSnapshot, setMacroSnapshot] = useState<MacroSnapshot | null>(null);
+  const [saExtensionHealth, setSaExtensionHealth] = useState<SAExtensionHealthResponse | null>(null);
   const [cfg, setCfg] = useState<Record<string, ProviderConfigEntry> | null>(null);
   const [cfgSetup, setCfgSetup] = useState<ProviderConfigSetupState | null>(null);
   const [cfgEnvFallback, setCfgEnvFallback] = useState<ProviderEnvFallbackState | null>(null);
@@ -1329,8 +1333,8 @@ function DataSourcesSection() {
   const [testResults, setTestResults] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    const [rs, rh, rc, rm] = await Promise.allSettled([
-      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot()]);
+    const [rs, rh, rc, rm, rsa] = await Promise.allSettled([
+      getSchedule(), getProvidersHealth(), getProvidersConfig(), getMacroSnapshot(), getSAExtensionHealth()]);
     if (rs.status === "fulfilled") setSchedule(rs.value.sources);
     if (rh.status === "fulfilled") setHealth(rh.value);
     if (rc.status === "fulfilled") {
@@ -1339,7 +1343,8 @@ function DataSourcesSection() {
       setCfgEnvFallback(rc.value.env_fallback);
     }
     if (rm.status === "fulfilled") setMacroSnapshot(rm.value);
-    const bad = [rs, rh, rc, rm].filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (rsa.status === "fulfilled") setSaExtensionHealth(rsa.value);
+    const bad = [rs, rh, rc, rm, rsa].filter((r): r is PromiseRejectedResult => r.status === "rejected");
     setErr(bad.length
       ? bad.map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason))).join("；")
       : null);
@@ -1459,6 +1464,18 @@ function DataSourcesSection() {
       }));
     } catch (e) {
       setTestResults((t) => ({ ...t, [provider]: `✗ ${e instanceof Error ? e.message : String(e)}` }));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function reloadSAExtensionHealth() {
+    if (busy) return;
+    setBusy("sa.extension-health");
+    try {
+      setSaExtensionHealth(await getSAExtensionHealth());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy("");
     }
@@ -1637,6 +1654,51 @@ function DataSourcesSection() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="settings-panel" style={{ marginTop: 16 }}>
+        <div className="settings-panel-head">
+          <div>
+            <h4 className="detail-section">SA Extension 健康</h4>
+            <p className="muted tiny">
+              Firefox/Chrome extension → native host → sidecar telemetry → 本地 SA DB 的分段檢查。
+            </p>
+          </div>
+          <button
+            className="btn-ghost"
+            disabled={busy === "sa.extension-health"}
+            onClick={() => void reloadSAExtensionHealth()}
+          >
+            重新檢查
+          </button>
+        </div>
+        {!saExtensionHealth ? (
+          <p className="muted tiny">loading…</p>
+        ) : (
+          <>
+            <p className="muted tiny">
+              {saExtensionHealth.ok ? "鏈路可用" : "鏈路有中斷"} · {shortTs(saExtensionHealth.generated_at)}
+            </p>
+            <table className="data-table" style={{ tableLayout: "fixed", width: "100%" }}>
+              <thead>
+                <tr><th>段落</th><th>狀態</th><th>細節</th></tr>
+              </thead>
+              <tbody>
+                {displaySAExtensionSegments(saExtensionHealth.segments).map((row) => (
+                  <tr key={row.key}>
+                    <td>{row.label}</td>
+                    <td>
+                      <span className={`ds-chip ds-${row.tone === "ok" ? "connected" : row.tone === "warn" ? "stale" : "disabled"}`}>
+                        {row.mark}
+                      </span>
+                    </td>
+                    <td className="muted" style={{ overflowWrap: "anywhere" }}>{row.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
 
