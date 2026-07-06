@@ -1,7 +1,4 @@
-# Package marker. Keeps `scripts` a regular package so `import scripts.<sub>`
-# resolves deterministically under full-suite pytest collection. Without this,
-# `scripts` was a PEP-420 namespace package whose resolution was collection-order
-# dependent and intermittently broke `import scripts.scoring` (ModuleNotFoundError)
-# in the full suite while passing in isolation. Runtime entrypoints are run by
-# path (scripts/collection/daily_update.py, scripts/sa_native_host.py) and do not
-# import the `scripts` package, so this has no runtime effect.
+# Package marker. Keeps historical/ops script namespaces such as
+# `scripts.scoring` and `scripts.migration` deterministic under full-suite pytest
+# collection. App runtime code lives under `src/`; the `scripts` package is not a
+# runtime import surface.
