@@ -22,22 +22,29 @@ import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 
-# Fix cwd — Chrome starts native hosts with unpredictable cwd.
-# DAL and config use relative paths (data/cache/seeking_alpha/, config/user_profile.yaml).
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(PROJECT_ROOT)
 sys.path.insert(0, PROJECT_ROOT)
 
-# Ensure log directory exists BEFORE configuring logging
-_log_dir = os.path.join(PROJECT_ROOT, "data", "logs")
-os.makedirs(_log_dir, exist_ok=True)
-
-logging.basicConfig(
-    filename=os.path.join(_log_dir, "sa_native_host.log"),
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-)
 logger = logging.getLogger(__name__)
+
+
+def _init_script_runtime():
+    """Script-mode side effects — only when executed as the native host.
+
+    Chrome starts native hosts with unpredictable cwd, and DAL/config use
+    relative paths (data/cache/seeking_alpha/, config/user_profile.yaml), so
+    the script chdirs to the repo and logs to data/logs/. Importing this
+    module (tests, the extension-health probe) must stay side-effect-free:
+    no chdir, no mkdir, no root-logger reconfiguration.
+    """
+    os.chdir(PROJECT_ROOT)
+    log_dir = os.path.join(PROJECT_ROOT, "data", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    logging.basicConfig(
+        filename=os.path.join(log_dir, "sa_native_host.log"),
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
 
 
 def read_message():
@@ -845,6 +852,7 @@ def _try_ticker_sync(dal, picks):
 
 
 def main():
+    _init_script_runtime()
     try:
         msg = read_message()
         if msg is None:

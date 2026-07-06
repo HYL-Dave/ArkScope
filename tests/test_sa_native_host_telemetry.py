@@ -1,12 +1,44 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import urllib.error
 from pathlib import Path
 
 import pytest
 
 import src.sa_native_host as host
+
+
+def test_import_has_no_script_side_effects(tmp_path):
+    """Importing the host module must not chdir, mkdir, or configure logging.
+
+    Tests and the health probe import this module at pytest collection time;
+    its script-mode side effects created data/ in virgin environments and
+    mutated whole-process cwd/root-logger state, changing OTHER tests'
+    behavior (2026-07-06 full A/B diff in tests/test_agents.py).
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    code = (
+        "import os, logging\n"
+        "start_cwd = os.getcwd()\n"
+        "import src.sa_native_host\n"
+        "assert os.getcwd() == start_cwd, 'import changed cwd'\n"
+        "assert not logging.getLogger().handlers, 'import configured root logging'\n"
+        "print('IMPORT_PURE')\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=str(tmp_path),
+        env={**os.environ, "PYTHONPATH": str(repo_root)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "IMPORT_PURE" in proc.stdout
 
 
 _API_ENV_KEYS = [
