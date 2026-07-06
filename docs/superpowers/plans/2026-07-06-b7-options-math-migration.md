@@ -1,8 +1,13 @@
 # B7 — `analysis/` → `src/options_math/` Migration Implementation Plan
 
-> **Status: DRAFT — pending user review.** Approved as a slice by the 2026-07-06 B6
-> ruling 1. This is a TARGETED exception to the packaging-deferred domain-reorg lock:
-> exactly one root-level package moves; nothing else in `src/` re-organizes.
+> **Status: REVIEWED — cleared for implementation (user implements, reviewer verifies).**
+> 2026-07-06 review folded in: MF1 the consumer inventory missed two real sites in
+> `tests/test_rate_curve.py` (`:251` patch-target string, `:290` second import) — root
+> cause was a `head -2` on the per-file site grep, the session's third capped-inventory
+> incident; MF2 residue gate widened to catch patch-target strings + docstring mentions;
+> SF focused suite re-centered on option/rate/tools. Approved as a slice by the
+> 2026-07-06 B6 ruling 1 — a TARGETED exception to the packaging-deferred domain-reorg
+> lock: exactly one root-level package moves; nothing else in `src/` re-organizes.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans (or
 > subagent-driven-development). TDD shape for a migration: rewire imports first (RED:
@@ -32,7 +37,15 @@ table change); no other `src/` reorganization.
 | `scripts/analysis/compare_bs_vs_american.py:27` | `from analysis import (…)` |
 | `scripts/analysis/scan_option_mispricing.py:51` | `from analysis import (…)` |
 | `tests/test_option_pricing.py:22` | `from analysis.option_pricing import (…)` |
-| `tests/test_rate_curve.py:5` **and `:241`** | top-level AND in-function imports (two sites) |
+| `tests/test_rate_curve.py:5` | top-level import |
+| `tests/test_rate_curve.py:241` | in-function import |
+| `tests/test_rate_curve.py:251` | **`patch("analysis.rate_curve._fetch_treasury_curve", …)` — STRING patch target, invisible to import-greps** |
+| `tests/test_rate_curve.py:290` | in-function `from analysis.option_pricing import get_risk_free_rate` |
+
+**13 functional sites total.** Docstring mentions to update in the same pass (zero-residue
+semantics must be unambiguous): `tests/test_rate_curve.py:1` ("Tests for
+analysis.rate_curve …") and `analysis/rate_curve.py:9` (usage example) — plus anything
+else the T4 gate surfaces.
 
 `analysis/__init__.py` re-exports 30+ names (`__all__` incl. dataclasses + version) — it
 moves VERBATIM (only the docstring's module path mention updates); the public surface
@@ -52,17 +65,25 @@ False-positive class (do NOT touch): `src.analysis`/`analysis_cards` route impor
 
 ## Tasks
 
-- [ ] **T1 (RED):** rewire the two test files to `src.options_math` → run
+- [ ] **T1 (RED):** rewire the two test files to `src.options_math` — ALL five
+  `tests/test_rate_curve.py` sites (`:1` docstring, `:5`, `:241`, **`:251` patch target
+  string**, `:290`) + `tests/test_option_pricing.py:22` → run
   `pytest tests/test_option_pricing.py tests/test_rate_curve.py -q` → predicted failure:
   `ModuleNotFoundError: No module named 'src.options_math'` (anything else = STOP).
 - [ ] **T2 (GREEN):** `git mv` the three files to `src/options_math/`; update the
-  `__init__` docstring path mention; rerun the two files → green.
+  `__init__` docstring path mention + `rate_curve.py:9` usage-example docstring; rerun
+  the two files → green.
 - [ ] **T3:** rewire the remaining 8 sites (6 in `options_tools.py`, 2 in
-  `scripts/analysis/`). Gate: `python -m py_compile scripts/analysis/*.py` (they have no
-  tests) + `pytest tests/test_tools.py tests/test_evidence_packet.py tests/test_compressor_reducers.py -q`.
-- [ ] **T4 (residue gates, all uncapped):**
-  `git grep -n "from analysis import\|from analysis\." -- ':!docs'` = zero;
-  `test ! -e analysis` (root dir gone); `git grep -rn "import analysis\b" -- src/ tests/ scripts/` = zero.
+  `scripts/analysis/`). Core gate (SF):
+  `pytest tests/test_option_pricing.py tests/test_rate_curve.py tests/test_tools.py -q`
+  + `python -m py_compile scripts/analysis/*.py` (no tests cover those two).
+  Additive (optional, indirect surfaces): `tests/test_evidence_packet.py`,
+  `tests/test_compressor_reducers.py`.
+- [ ] **T4 (residue gate, single hard sweep — MF2):**
+  `rg -n "from analysis|import analysis|analysis\.(option_pricing|rate_curve)|patch\([\"']analysis" src tests scripts --glob "*.py"`
+  = **zero** (catches patch-target strings and docstrings, not just imports; the
+  `src.analysis`/`analysis_cards` false-positive class is excluded by inspection if it
+  appears); `test ! -e analysis` (root dir gone, pycache included).
   Do NOT run `tests/test_agents.py` on the main checkout (live-key hazard) — the A/B
   covers it in virgin env.
 - [ ] **T5 (full A/B):** virgin `git archive` both sides, sequential, failure SETS.
@@ -75,6 +96,6 @@ False-positive class (do NOT touch): `src.analysis`/`analysis_cards` route impor
 ## Stop-Loss
 
 - T1's RED differs from the predicted ModuleNotFoundError → STOP.
-- Any consumer discovered beyond the 10 inventoried sites → STOP, re-inventory (the
+- Any consumer discovered beyond the 13 inventoried sites → STOP, re-inventory (the
   grep above is the contract).
 - Any behavior/test-count change → STOP (this slice is a pure move).
