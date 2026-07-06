@@ -1,7 +1,12 @@
 # Repo Hygiene B4/B5 — Docker Archive-Only + Docs Deep Sweep Implementation Plan
 
-> **Status: DRAFT — pending user review.** B1–B3 already executed directly
-> (`ff538b4`/`17bcf00`/`1c076bf`; deletion record in `REPO_HYGIENE_AUDIT_2026_07.md` §8).
+> **Status: REVIEWED — cleared for B4a/B4b/B5a; B5b gated on the disposition-table
+> approval checkpoint.** 2026-07-06 review folded in: MF1 `config/.env.template` secret
+> purge added to Task 1; MF2 root `README.md` "current stack" quickstart added to Task 1;
+> MF3 internal IP generalized to `<archive-pg-host>` per publication policy; SF decision-log
+> acceptance reworded append-only; SF audit §1 stale registry row superseded-noted.
+> B1–B3 already executed directly (`ff538b4`/`17bcf00`/`1c076bf`; deletion record in
+> `REPO_HYGIENE_AUDIT_2026_07.md` §8).
 > Authority: that audit's §7 answered rulings + §4 docs classification;
 > governance = `REFACTOR_PROTECTION_SMOKE_GATES.md` + the ⑤-era 4-col-table method.
 
@@ -45,27 +50,39 @@ stays (schema lineage).
 - Rotation verification fails (archive DB unreachable with new credential) → STOP, do not
   disable the old credential path until read-back works.
 
-## Task 1 (B4a): compose de-hardcode + README repurpose
+## Task 1 (B4a): compose de-hardcode + README repurpose + secret purge
 
-**Files:** `docker/docker-compose.yml`, `docker/README.md`,
-`docs/PUBLICATION_REVIEW.md` (status note only).
+**Files:** `docker/docker-compose.yml`, `docker/README.md`, **`config/.env.template`**
+(MF1: lines 150+152 still carry `mindfulrl_dev_2026`), **root `README.md`** (MF2: `:39`
+still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
+(status note only).
 
 - [ ] **Step 1:** compose: password → `${ARKSCOPE_ARCHIVE_PG_PASSWORD:?...}` (no default);
   container/network names unchanged (archive restore parity). Gate:
   `docker compose -f docker/docker-compose.yml config` parses with a dummy env value and
   FAILS with the `:?` message when unset (both asserted).
-- [ ] **Step 2:** README rewrite: "the app does NOT need docker; this compose exists only
-  to restore/inspect `data/pg_archive/*` dumps" + minimal restore/inspect recipe (mirror
-  the n9 gate CLIs' two-stage restore-proof pattern) + rotation pointer. Repo-wide grep:
-  no other doc still presents docker as runtime/dev quickstart.
-- [ ] **Step 3:** commit `chore: repurpose docker to archive-access-only (B4a)`.
+- [ ] **Step 2:** `config/.env.template`: replace the two `mindfulrl_dev_2026` lines with
+  a COMMENTED archive-only example using placeholders only —
+  `# DATABASE_URL=postgresql://postgres:<archive-pg-password>@<archive-pg-host>:15432/mindfulrl`
+  — plus one line stating the app runtime needs no PG.
+- [ ] **Step 3:** root `README.md`: drop the "# 2. database (current stack)" quickstart
+  step (renumber); PG/docker mention moves to a one-liner pointing at `docker/README.md`
+  for archive access only.
+- [ ] **Step 4:** `docker/README.md` rewrite: "the app does NOT need docker; this compose
+  exists only to restore/inspect `data/pg_archive/*` dumps" + minimal restore/inspect
+  recipe (mirror the n9 gate CLIs' two-stage restore-proof pattern) + rotation pointer.
+- [ ] **Step 5:** Gate: repo-wide `git grep mindfulrl_dev_2026` = ZERO tracked hits;
+  repo-wide grep shows no doc presenting docker as runtime/dev quickstart. Commit
+  `chore: repurpose docker to archive-access-only (B4a)`.
 
 ## Task 2 (B4b): password rotation — USER-EXECUTED, approval-gated
 
 - [ ] **Step 1:** prepare (do not run) the exact user steps: `ALTER USER ... PASSWORD` on
-  the remote container (192.168.0.185), update `config/.env` `DATABASE_URL`, update the
-  MCP postgres server config, export `ARKSCOPE_ARCHIVE_PG_PASSWORD` where compose is
-  used. Agents never see/choose the new value.
+  the remote container at `<archive-pg-host>` (real host lives in the user's private
+  operational context + `config/.env`, never in tracked docs — publication policy), update
+  `config/.env` `DATABASE_URL`, update the MCP postgres server config, export
+  `ARKSCOPE_ARCHIVE_PG_PASSWORD` where compose is used. Agents never see/choose the new
+  value.
 - [ ] **Step 2 (user):** execute rotation.
 - [ ] **Step 3 (verify):** read-only connectivity check to the archive DB with the new
   credential (e.g., `SELECT count(*) FROM agent_queries` via MCP) succeeds; old password
@@ -82,7 +99,11 @@ why / absorption-or-inbound-link evidence` (inbound links via repo-wide grep of 
 filename, NOT just intuition).
 
 - [ ] **Step 1:** produce the table (append as audit doc §9 or a standalone
-  `DOCS_SWEEP_DISPOSITION_2026_07.md`). Uncapped inventory — no head/tail.
+  `DOCS_SWEEP_DISPOSITION_2026_07.md`). Uncapped inventory — no head/tail. The table also
+  inventories **publication-policy violations** (internal IPs/hosts per
+  `PUBLICATION_REVIEW.md`) — two known pre-existing `192.168.0.153` instances in older
+  plan docs (`2026-06-28-news-normalization…:1297`, `2026-07-04-data-sources…:451`) get a
+  generalize-or-keep verdict alongside the tier verdict.
 - [ ] **Step 2: APPROVAL CHECKPOINT.** Owner reviews/edits verdicts. No deletion before
   approval.
 
@@ -113,5 +134,6 @@ filename, NOT just intuition).
   app needs no docker.
 - Rotation live-verified; PUBLICATION_REVIEW item closed.
 - Every tracked doc has an explicit tier verdict; approved deletions executed with named
-  absorption targets; zero dangling links; decision log byte-identical.
+  absorption targets; zero dangling links; **existing decision-log entries byte-identical
+  (new closeout entries are allowed — append-only)**.
 - P2.5 receives the user-facing-content list as input.

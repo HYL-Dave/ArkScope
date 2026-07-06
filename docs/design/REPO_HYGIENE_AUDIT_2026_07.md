@@ -14,7 +14,7 @@
 | Area | What it is | Verdict class |
 |---|---|---|
 | `training/` (53 tracked) | Paused RL line code+docs (FinRL_DeepSeek lineage) | KEEP per P3.1 paused-preserve; artifacts = disk policy |
-| `trained_models/` (2 tracked + **131 untracked**, 1.2G) | RL run registry + model checkpoints | Registry stays tracked; checkpoints → gitignore + disk policy; resolve pending M/D |
+| `trained_models/` (2 tracked + **131 untracked**, 1.2G) | RL run registry + model checkpoints | ~~Registry stays tracked~~ **SUPERSEDED by §7 ruling / §8 execution: registry git-rm'd with the checkpoints; whole dir gitignored** |
 | `docker/` (2 files) | PG compose (**compromised password**) | KEEP as archive-access tool; rotate password + README repurpose |
 | `scripts/` (35 tracked, ruled 07-06) | Survivor table is authoritative | No change; `huggingface/output` 984M = disk policy |
 | `analysis/` (3 tracked) | **LIVE runtime** (options pricing, imported by `src/tools/options_tools.py`) | Not cleanup; future home = packaging-slice domain reorg |
