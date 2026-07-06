@@ -17,6 +17,7 @@ import os
 import re
 import struct
 import sys
+import urllib.error
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -59,9 +60,18 @@ def write_message(msg):
 
 def handle_message(msg):
     """Process a message from the extension."""
+    action = msg.get("action")
+    if action == "ping":
+        base, _token, source = _resolve_sidecar_target()
+        return {
+            "status": "ok",
+            "project_root": PROJECT_ROOT,
+            "telemetry_target": base,
+            "telemetry_source": source,
+        }
+
     from src.tools.data_access import DataAccessLayer
 
-    action = msg.get("action")
     scope = msg.get("scope")
 
     # batch_ts from extension (shared across scopes), fallback to now()
@@ -114,9 +124,6 @@ def handle_message(msg):
 
     elif action == "record_extension_job":
         return _handle_record_extension_job(dal, msg)
-
-    elif action == "ping":
-        return {"status": "ok", "project_root": PROJECT_ROOT}
 
     return {"status": "error", "error": f"unknown action: {action}"}
 
@@ -714,17 +721,71 @@ def _handle_record_extension_job(dal, msg):
             "persisted": bool(response.get("persisted")),
         }
     except Exception as e:
-        logger.error("record_extension_job sidecar post failed: %s", e)
+        logger.error(
+            "record_extension_job sidecar post failed target=%s source=%s: %s",
+            getattr(e, "target", None),
+            getattr(e, "source", None),
+            e,
+        )
         return {"status": "ok", "run_id": None, "persisted": False}
 
 
-def _post_extension_job_to_sidecar(payload):
-    host = os.environ.get("ARKSCOPE_API_HOST", "127.0.0.1")
-    port = os.environ.get("ARKSCOPE_API_PORT", "8420")
-    base = os.environ.get("ARKSCOPE_API_BASE_URL", f"http://{host}:{port}").rstrip("/")
-    timeout = float(os.environ.get("ARKSCOPE_NATIVE_HOST_SIDECAR_TIMEOUT", "2.0"))
+class _SidecarPostError(RuntimeError):
+    def __init__(self, message, *, target, source):
+        super().__init__(message)
+        self.target = target
+        self.source = source
+
+
+def _default_sidecar_target():
+    return "http://127.0.0.1:8420", None, "default"
+
+
+def _sidecar_config_path():
+    return os.environ.get(
+        "ARKSCOPE_SA_NATIVE_HOST_CONFIG",
+        os.path.expanduser("~/.config/arkscope/sa_native_host.json"),
+    )
+
+
+def _resolve_sidecar_target():
+    env_keys = (
+        "ARKSCOPE_API_BASE_URL",
+        "ARKSCOPE_API_HOST",
+        "ARKSCOPE_API_PORT",
+        "ARKSCOPE_API_TOKEN",
+    )
+    if any(os.environ.get(key) is not None for key in env_keys):
+        base = os.environ.get("ARKSCOPE_API_BASE_URL")
+        if not base:
+            host = os.environ.get("ARKSCOPE_API_HOST", "127.0.0.1")
+            port = os.environ.get("ARKSCOPE_API_PORT", "8420")
+            base = f"http://{host}:{port}"
+        token = os.environ.get("ARKSCOPE_API_TOKEN")
+        return base.rstrip("/"), token or None, "env"
+
+    try:
+        with open(_sidecar_config_path(), "r", encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        base = str(cfg.get("api_base") or "").strip()
+        if base:
+            token = cfg.get("api_token")
+            return base.rstrip("/"), (str(token) if token else None), "config"
+    except Exception:
+        pass
+    return _default_sidecar_target()
+
+
+def _connection_refused(exc):
+    if isinstance(exc, ConnectionRefusedError):
+        return True
+    if isinstance(exc, urllib.error.URLError):
+        return _connection_refused(exc.reason)
+    return isinstance(exc, OSError) and getattr(exc, "errno", None) in (111, 61)
+
+
+def _post_extension_job_once(payload, *, base, token, source):
     headers = {"Content-Type": "application/json"}
-    token = os.environ.get("ARKSCOPE_API_TOKEN")
     if token:
         headers["x-arkscope-token"] = token
     req = urllib.request.Request(
@@ -733,9 +794,29 @@ def _post_extension_job_to_sidecar(payload):
         headers=headers,
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        body = resp.read().decode("utf-8")
-    return json.loads(body) if body else {}
+    timeout = float(os.environ.get("ARKSCOPE_NATIVE_HOST_SIDECAR_TIMEOUT", "2.0"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+        return json.loads(body) if body else {}
+    except Exception as exc:
+        raise _SidecarPostError(str(exc), target=base, source=source) from exc
+
+
+def _post_extension_job_to_sidecar(payload):
+    base, token, source = _resolve_sidecar_target()
+    try:
+        return _post_extension_job_once(payload, base=base, token=token, source=source)
+    except _SidecarPostError as exc:
+        if source == "config" and _connection_refused(exc.__cause__):
+            fallback_base, fallback_token, fallback_source = _default_sidecar_target()
+            return _post_extension_job_once(
+                payload,
+                base=fallback_base,
+                token=fallback_token,
+                source=fallback_source,
+            )
+        raise
 
 
 def _parse_iso_dt(value):
