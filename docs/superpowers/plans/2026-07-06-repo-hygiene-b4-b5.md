@@ -1,7 +1,8 @@
 # Repo Hygiene B4/B5 — Docker Archive-Only + Docs Deep Sweep Implementation Plan
 
-> **Status: REVIEWED — cleared for B4a/B4b/B5a; B5b gated on the disposition-table
-> approval checkpoint.** 2026-07-06 review folded in: MF1 `config/.env.template` secret
+> **Status: B4a ✅ + B5a ✅ + B5b ✅ EXECUTED 2026-07-06; ONLY B4b (user-executed rotation) remains open.**
+> B5b note: `P0_1_FULL_V1_SPEC` deletion was vetoed at execution by the fold-then-delete
+> verification (live Replay Harness spec authority) — 2 of 3 approved deletions executed. 2026-07-06 review folded in: MF1 `config/.env.template` secret
 > purge added to Task 1; MF2 root `README.md` "current stack" quickstart added to Task 1;
 > MF3 internal IP generalized to `<archive-pg-host>` per publication policy; SF decision-log
 > acceptance reworded append-only; SF audit §1 stale registry row superseded-noted.
@@ -57,27 +58,27 @@ stays (schema lineage).
 still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
 (status note only).
 
-- [ ] **Step 1:** compose: password → `${ARKSCOPE_ARCHIVE_PG_PASSWORD:?...}` (no default);
+- [x] **Step 1:** compose: password → `${ARKSCOPE_ARCHIVE_PG_PASSWORD:?...}` (no default);
   container/network names unchanged (archive restore parity). Gate:
   `docker compose -f docker/docker-compose.yml config` parses with a dummy env value and
   FAILS with the `:?` message when unset (both asserted).
-- [ ] **Step 2:** `config/.env.template`: replace the two compromised-dev-password lines with
+- [x] **Step 2:** `config/.env.template`: replace the two compromised-dev-password lines with
   a COMMENTED archive-only example using placeholders only —
   `# DATABASE_URL=postgresql://postgres:<archive-pg-password>@<archive-pg-host>:15432/mindfulrl`
   — plus one line stating the app runtime needs no PG.
-- [ ] **Step 3:** root `README.md`: drop the "# 2. database (current stack)" quickstart
+- [x] **Step 3:** root `README.md`: drop the "# 2. database (current stack)" quickstart
   step (renumber); PG/docker mention moves to a one-liner pointing at `docker/README.md`
   for archive access only.
-- [ ] **Step 4:** `docker/README.md` rewrite: "the app does NOT need docker; this compose
+- [x] **Step 4:** `docker/README.md` rewrite: "the app does NOT need docker; this compose
   exists only to restore/inspect `data/pg_archive/*` dumps" + minimal restore/inspect
   recipe (mirror the n9 gate CLIs' two-stage restore-proof pattern) + rotation pointer.
-- [ ] **Step 5:** Gate: repo-wide grep for the old dev-password string = ZERO tracked hits (string deliberately not repeated here; it lives only in git history);
+- [x] **Step 5:** Gate: repo-wide grep for the old dev-password string = ZERO tracked hits (string deliberately not repeated here; it lives only in git history);
   repo-wide grep shows no doc presenting docker as runtime/dev quickstart. Commit
   `chore: repurpose docker to archive-access-only (B4a)`.
 
 ## Task 2 (B4b): password rotation — USER-EXECUTED, approval-gated
 
-- [ ] **Step 1:** prepare (do not run) the exact user steps: `ALTER USER ... PASSWORD` on
+- [x] **Step 1:** prepare (do not run) the exact user steps: `ALTER USER ... PASSWORD` on
   the remote container at `<archive-pg-host>` (real host lives in the user's private
   operational context + `config/.env`, never in tracked docs — publication policy), update
   `config/.env` `DATABASE_URL`, update the MCP postgres server config, export
@@ -98,25 +99,25 @@ completed-record; confirm headers). Method: ⑤-era 4-col table per file —
 why / absorption-or-inbound-link evidence` (inbound links via repo-wide grep of the
 filename, NOT just intuition).
 
-- [ ] **Step 1:** produce the table (append as audit doc §9 or a standalone
+- [x] **Step 1:** produce the table (append as audit doc §9 or a standalone
   `DOCS_SWEEP_DISPOSITION_2026_07.md`). Uncapped inventory — no head/tail. The table also
   inventories **publication-policy violations** (internal IPs/hosts per
   `PUBLICATION_REVIEW.md`) — two known pre-existing internal-IBKR-gateway-IP instances in
   older plan docs (`2026-06-28-news-normalization…:1297`, `2026-07-04-data-sources…:451`)
   get a generalize-or-keep verdict alongside the tier verdict.
-- [ ] **Step 2: APPROVAL CHECKPOINT.** Owner reviews/edits verdicts. No deletion before
+- [x] **Step 2: APPROVAL CHECKPOINT.** Owner reviews/edits verdicts. No deletion before
   approval.
 
 ## Task 4 (B5b): execute the approved table in small commits
 
-- [ ] **Step 1:** relocations first (live-law sections → canonical homes; each commit
+- [x] **Step 1:** relocations first (live-law sections → canonical homes; each commit
   names source§ → destination§).
-- [ ] **Step 2:** status-header batch (completed records gain/verify a one-line header).
-- [ ] **Step 3:** fold-then-delete batch(es) — each deleted file's commit line records the
+- [x] **Step 2:** status-header batch (completed records gain/verify a one-line header).
+- [x] **Step 3:** fold-then-delete batch(es) — each deleted file's commit line records the
   absorption target; after each batch run the dangling-link grep and fix hits.
-- [ ] **Step 4:** canonical stale-copy fixes surfaced by the sweep (e.g., docs still
+- [x] **Step 4:** canonical stale-copy fixes surfaced by the sweep (e.g., docs still
   teaching `scripts/collection` paths, PG-first flows, `use_local_*` toggles).
-- [ ] **Step 5:** closeout — audit doc status flip, map §10 entry, user-facing-content
+- [x] **Step 5:** closeout — audit doc status flip, map §10 entry, user-facing-content
   list (「使用者該知道但埋在內部文件」) handed to P2.5, memory sync.
 
 ## Review Gates

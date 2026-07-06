@@ -1,8 +1,9 @@
 # Repo Hygiene Audit — 2026-07-06
 
-> **Status**: inventory delivered 2026-07-06; owner rulings received same day (§7 answers
-> folded into §8); **B1–B3 EXECUTED 2026-07-06** (§8 deletion record below); B4/B5 have
-> their own plan (`docs/superpowers/plans/2026-07-06-repo-hygiene-b4-b5.md`). This executes the
+> **Status**: inventory delivered 2026-07-06; owner rulings received same day (§7);
+> **B1–B3 + B4a + B5a + B5b ALL EXECUTED 2026-07-06** (§8 deletion record; docs sweep in
+> `DOCS_SWEEP_DISPOSITION_2026_07.md`). Open: B4b rotation (user) + B6 root-dir/module
+> disposition (next thread). This executes the
 > long-pending "module-level cleanup pass" from the docs-governance line
 > (`DOCS_GOVERNANCE_AUDIT_2026_05.md` scoped it; scripts-runtime-consolidation proved the
 > method). Every disposition below is a RECOMMENDATION; §7 lists the rulings the owner must

@@ -1,8 +1,14 @@
 # Docs Sweep Disposition Table — 2026-07 (B5a)
 
-> **Status: AWAITING OWNER APPROVAL — no file has been touched.** This is B5a of
-> `2026-07-06-repo-hygiene-b4-b5.md`. Edit verdicts inline or reply with overrides;
-> B5b executes only the approved table.
+> **Status: ✅ EXECUTED 2026-07-06 (B5b) after owner approval**, with ONE verdict
+> corrected at execution time per the fold-then-delete verification discipline:
+> `P0_1_FULL_V1_SPEC` was mislabeled in this table (name-pattern guess) — it is the LIVE
+> Replay Harness spec authority (cited by `src/agents/shared/bridge_tools.py:15`; Phase C
+> inherited contract) and was KEPT. Everything else executed as approved: 2 relocations,
+> 22 status headers added (24 verified pre-existing), 2 journal deletions folded into
+> `PROJECT_HISTORY.md`, figures linked from `RL_COLLAPSE_FINDINGS.md`, 2+1 internal-IP
+> generalizations. Follow-up (B6-adjacent): `bridge_tools.py:15` doc citation is fine
+> (doc kept), no src/ edits were needed.
 >
 > **Verdicts**: `keep-current` (live canonical/reference, no action) ·
 > `keep-record+header` (stays as historical evidence; B5b adds/verifies a one-line
