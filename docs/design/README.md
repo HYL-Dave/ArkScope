@@ -100,8 +100,10 @@ contents were removed 2026-06-07, recoverable via git.)
 | File | Read as | One-line |
 |---|---|---|
 | `LOCAL_FIRST_RESEARCH_WORKBENCH_AUDIT.md` | **Pre-Spec Pivot Audit** | Factual base that fed the SPEC; SPEC now supersedes. |
-| `DOCS_GOVERNANCE_AUDIT_2026_05.md` | **Docs Governance Audit (superseded)** | Baseline docs-cleanup audit; superseded by the consolidation review. |
-| `DESIGN_DOCS_CONSOLIDATION_REVIEW.md` | **Docs Consolidation Tracker** | Operating journal of the file-by-file docs cleanup. |
+
+*(2026-07 docs sweep: the two 2026-05/06 docs-cleanup journals were folded into
+`docs/PROJECT_HISTORY.md` §"Docs governance lineage" and deleted — git history is the
+archive. Current sweep records: `REPO_HYGIENE_AUDIT_2026_07.md` + `DOCS_SWEEP_DISPOSITION_2026_07.md`.)*
 
 ---
 

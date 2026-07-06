@@ -29,7 +29,7 @@
 
 | File | Why | Absorption target |
 |---|---|---|
-| `design/P0_1_FULL_V1_SPEC.md` | Pre-pivot v1 product spec; reads as current but is superseded — the misleading-HOW class | `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md` is the successor; one provenance line → `docs/PROJECT_HISTORY.md` |
+| ~~`design/P0_1_FULL_V1_SPEC.md`~~ | **VERDICT CORRECTED AT EXECUTION (B5b): keep-current.** My table mislabeled it "pre-pivot product spec" from the name pattern; the file is the **Replay Harness Spec** — live authority cited by `src/agents/shared/bridge_tools.py:15` and named a Phase C inherited contract. Fold-then-delete verification caught it before deletion | (not deleted) |
 | `design/DESIGN_DOCS_CONSOLIDATION_REVIEW.md` | Completed process journal (Groups 1–5 executed 2026-06-01) — PUBLICATION_REVIEW §3 says journals fold, not standalone authority | Outcomes already executed; one-line summary → `PROJECT_HISTORY.md`; method lives in `DOCS_GOVERNANCE_AUDIT` successor line below |
 | `design/DOCS_GOVERNANCE_AUDIT_2026_05.md` | Same class — the audit that produced the policy; policy itself lives in `REFACTOR_PROTECTION_SMOKE_GATES.md` | Policy = gates doc; one-line summary → `PROJECT_HISTORY.md` |
 

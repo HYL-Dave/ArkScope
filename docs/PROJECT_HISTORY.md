@@ -80,3 +80,14 @@ clients + collection pipeline, the LLM scoring tooling, the multi-factor signal
 system (`src/signals/`), and the agent capability stack (tools, episodic memory,
 reports, compression, replay, subagents). Current carry-over inventory:
 `docs/design/DESKTOP_APP_CARRYOVER_ANALYSIS.md`.
+
+## Docs governance lineage (2026-05 → 2026-07)
+
+Two process journals were folded here and deleted in the 2026-07 docs sweep (git
+history is the archive): `DOCS_GOVERNANCE_AUDIT_2026_05.md` (the May baseline
+audit that produced the cleanup policy — the policy itself lives in
+`docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`) and
+`DESIGN_DOCS_CONSOLIDATION_REVIEW.md` (the file-by-file consolidation journal;
+its Groups 1–5 verdicts were executed 2026-06-01). The 2026-07 module-level pass
+is recorded in `docs/design/REPO_HYGIENE_AUDIT_2026_07.md` +
+`DOCS_SWEEP_DISPOSITION_2026_07.md`.
