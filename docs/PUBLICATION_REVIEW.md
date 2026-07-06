@@ -56,3 +56,13 @@ author wants to release deliberately, per-file, when ready:
 Unlocked now: **`docs/design/**` + `docs/features/**`** (after the §1 sanitization).
 To unlock more later: sanitize per §1, confirm maturity-labeled per §2, then remove
 the `filter=git-crypt` line from `.gitattributes` and `git add --renormalize`.
+
+## 5. Known incidents
+
+- **Dev DB password (pre-2026-07)**: the docker-compose default password was
+  published in plaintext (docker/, config/.env.template) and is COMPROMISED —
+  it remains readable in git history forever. 2026-07-06 (hygiene B4a): all
+  tracked copies purged; compose now requires `ARKSCOPE_ARCHIVE_PG_PASSWORD`
+  with no default. **Rotation of the live archive DB password = pending (B4b,
+  user-executed)**; until rotated, treat the archive DB as reachable with a
+  public credential on the LAN.

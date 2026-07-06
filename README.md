@@ -22,9 +22,9 @@ machines.
 - **Where the project came from + open data** → `docs/PROJECT_HISTORY.md`
 - **LLM auth / Claude-subscription Research driver** (design) → `docs/design/LLM_AUTH_DRIVER_PLAN.md` and `docs/design/SLICE_7B3_SDK_DRIVER_DESIGN.md`
 
-> **Status**: local-first SQLite + DuckDB storage is the target per the spec;
-> **today** the stack still runs PostgreSQL-backed. The migration is sequenced in
-> the priority map.
+> **Status**: local-first SQLite storage is **live** — the PG exit completed
+> 2026-07-05. PostgreSQL holds frozen archives only (restore/inspect via
+> `docker/README.md`); the app runtime needs no database server.
 
 ## Operational quickstart
 
@@ -36,16 +36,16 @@ Currently-supported runtime paths. These are **protected** during refactors — 
 pip install -r requirements.txt
 cp config/.env.template config/.env            # then fill in API keys
 
-# 2. database (current stack)
-docker compose -f docker/docker-compose.yml up -d postgres
-
-# 3. data collection
+# 2. data collection
 python -m src.daily_update --status         # check data freshness
 python -m src.daily_update --all --sync-db  # collect everything + sync to DB
 
-# 4. run the agent
+# 3. run the agent
 python -m src.agents                           # interactive CLI (--provider openai for GPT-5.x)
 ```
+
+(No database server needed — storage is local SQLite under `data/`. Docker
+exists only for PG **archive** access: `docker/README.md`.)
 
 ### Seeking Alpha Alpha Picks (optional)
 

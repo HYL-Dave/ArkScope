@@ -50,7 +50,7 @@ paused-line evidence, not repo content; (c) resolve the pending working-tree `M 
 ### docker/ — archive-access tool with a known compromised secret
 `docker-compose.yml` + README. PG is archive-only since PG-exit closed (3 app-record
 tables) — the compose's ONLY remaining purpose is spinning PG up to read archives /
-restore `data/pg_archive/*` dumps. Password `mindfulrl_dev_2026` is plaintext and ruled
+restore `data/pg_archive/*` dumps. The dev password (published pre-2026-07; literal deliberately not repeated) is ruled
 COMPROMISED (publication review) — rotation is a standing pending item.
 **Recommendation**: keep both files; one small batch = rotate password (user executes,
 archive DB) + rewrite README to "archive access only; PG is not a runtime dependency".

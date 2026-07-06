@@ -1,111 +1,72 @@
-# ArkScope: PostgreSQL + pgvector
+# ArkScope: PostgreSQL — archive access only
 
-## Quick Start
+> **The app does NOT need docker.** ArkScope's runtime is local-first
+> (SQLite/DuckDB under `data/`); the PG exit completed 2026-07-05 and PostgreSQL
+> holds only frozen archives. This compose exists for exactly one purpose:
+> **restoring / inspecting `data/pg_archive/*` dumps** (and reading the three
+> remaining archive tables: `agent_queries`, `research_reports`,
+> `agent_memories`). If you are setting up ArkScope for development, skip this
+> directory entirely — see the root `README.md` quickstart.
+
+## Start (requires an explicit password — no default)
 
 ```bash
-# On the DB machine (remote):
 cd docker/
-docker compose up -d
-
-# Check status:
+ARKSCOPE_ARCHIVE_PG_PASSWORD=<archive-pg-password> docker compose up -d
 docker compose ps          # STATUS should be "healthy"
-docker exec mindfulrl-postgres pg_isready -U postgres -d mindfulrl
-
-# Verify tables (should see 7 tables):
-docker exec mindfulrl-postgres psql -U postgres -d mindfulrl -c "\dt"
 ```
 
-Default connection string:
-```
-postgresql://postgres:mindfulrl_dev_2026@<DB_HOST>:15432/mindfulrl
-```
-
-## Configuration
+The compose refuses to start without `ARKSCOPE_ARCHIVE_PG_PASSWORD` — no
+password is stored in this repo. Schema auto-initializes from `../sql/` on
+first startup (schema lineage record).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `POSTGRES_PASSWORD` | `mindfulrl_dev_2026` | Database password |
+| `ARKSCOPE_ARCHIVE_PG_PASSWORD` | *(required)* | Archive DB password |
 | `POSTGRES_PORT` | `15432` | Host port mapping |
 
-Override via environment:
-```bash
-POSTGRES_PORT=25432 POSTGRES_PASSWORD=my_secret docker compose up -d
-```
+## Restore an archive dump (two-stage proof pattern)
 
-## Schema
-
-Tables are auto-created on first startup from `sql/` directory:
-- `001_init_schema.sql` — news, prices, iv_history, fundamentals, signals, agent_queries
-- `002_add_news_scores.sql` — news_scores (multi-model scoring) + news_latest_scores view
-
-Extensions: `pgvector` (semantic search ready), `pg_trgm` (text search).
-
-## Backup & Restore
-
-### Backup
+Mirrors the PG-exit gate CLIs (`scripts/migration/n9_*.py`): restore into a
+scratch database, verify presence, then inspect — never restore over a live DB.
 
 ```bash
-# Option A: Via docker exec (no local pg_dump needed)
-ssh user@<DB_HOST> "docker exec mindfulrl-postgres pg_dump -U postgres -Fc mindfulrl" > backup.dump
+# 1. Create a scratch DB and restore the dump into it
+docker exec -i mindfulrl-postgres createdb -U postgres archive_scratch
+docker exec -i mindfulrl-postgres pg_restore -U postgres -d archive_scratch \
+  < ../data/pg_archive/<batch-dir>/dump.backup
 
-# Option B: Local pg_dump (if installed)
-pg_dump -h <DB_HOST> -p 15432 -U postgres -Fc mindfulrl > backup.dump
+# 2. Apply any archived function DDL (batch-3+ archives carry function_ddl.sql)
+docker exec -i mindfulrl-postgres psql -U postgres -d archive_scratch \
+  < ../data/pg_archive/<batch-dir>/function_ddl.sql   # if present
 
-# Check size
-ls -lh backup.dump
+# 3. Inspect, then drop the scratch DB when done
+docker exec -it mindfulrl-postgres psql -U postgres -d archive_scratch -c "\dt"
+docker exec -i mindfulrl-postgres dropdb -U postgres archive_scratch
 ```
 
-### Restore
+Each `data/pg_archive/<batch-dir>/` carries its own manifest + sha256; verify
+the dump checksum against the manifest before trusting a restore.
+
+## Password rotation
+
+The pre-2026-07 dev password was published and is COMPROMISED
+(`docs/PUBLICATION_REVIEW.md`). Rotation runbook (user-executed):
 
 ```bash
-# On the new machine, start a fresh container first:
-docker compose up -d
-
-# Wait for healthy, then restore:
-docker exec -i mindfulrl-postgres pg_restore -U postgres -d mindfulrl --clean --if-exists < backup.dump
+docker exec -it mindfulrl-postgres psql -U postgres -d mindfulrl \
+  -c "ALTER USER postgres PASSWORD '<new-password>';"
 ```
 
-## Migration to Another Machine
-
-1. **Backup** current data (see above)
-2. **Copy files** to new machine:
-   ```bash
-   scp -r docker/ sql/ user@new-host:/path/to/mindfulrl/
-   scp backup.dump user@new-host:/tmp/
-   ```
-3. **Start container** on new machine:
-   ```bash
-   ssh user@new-host
-   cd /path/to/mindfulrl/docker
-   docker compose up -d
-   ```
-4. **Restore** data:
-   ```bash
-   docker exec -i mindfulrl-postgres pg_restore -U postgres -d mindfulrl --clean --if-exists < /tmp/backup.dump
-   ```
-5. **Update** `config/.env` on dev machine with new `DATABASE_URL`
-
-## Firewall
-
-If the DB machine has a firewall, allow inbound on the configured port:
-```bash
-sudo ufw allow 15432/tcp
-```
+Then update `config/.env` `DATABASE_URL` (if set) and any MCP postgres server
+config. The new password lives only in your private environment — never in
+tracked files.
 
 ## Troubleshooting
 
 ```bash
-# View logs
 docker compose logs -f postgres
-
-# Connect interactively
 docker exec -it mindfulrl-postgres psql -U postgres -d mindfulrl
-
-# Check disk usage
-docker exec mindfulrl-postgres psql -U postgres -d mindfulrl \
-  -c "SELECT pg_size_pretty(pg_database_size('mindfulrl'))"
-
-# Reset (destroys all data!)
-docker compose down -v
-docker compose up -d
+docker compose down          # stop (keeps the volume)
+docker compose down -v       # reset — destroys the archive volume!
 ```

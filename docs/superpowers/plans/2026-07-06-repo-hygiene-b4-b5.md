@@ -53,7 +53,7 @@ stays (schema lineage).
 ## Task 1 (B4a): compose de-hardcode + README repurpose + secret purge
 
 **Files:** `docker/docker-compose.yml`, `docker/README.md`, **`config/.env.template`**
-(MF1: lines 150+152 still carry `mindfulrl_dev_2026`), **root `README.md`** (MF2: `:39`
+(MF1: lines 150+152 still carried the compromised dev password), **root `README.md`** (MF2: `:39`
 still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
 (status note only).
 
@@ -61,7 +61,7 @@ still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
   container/network names unchanged (archive restore parity). Gate:
   `docker compose -f docker/docker-compose.yml config` parses with a dummy env value and
   FAILS with the `:?` message when unset (both asserted).
-- [ ] **Step 2:** `config/.env.template`: replace the two `mindfulrl_dev_2026` lines with
+- [ ] **Step 2:** `config/.env.template`: replace the two compromised-dev-password lines with
   a COMMENTED archive-only example using placeholders only —
   `# DATABASE_URL=postgresql://postgres:<archive-pg-password>@<archive-pg-host>:15432/mindfulrl`
   — plus one line stating the app runtime needs no PG.
@@ -71,7 +71,7 @@ still frames docker as "current stack" quickstart), `docs/PUBLICATION_REVIEW.md`
 - [ ] **Step 4:** `docker/README.md` rewrite: "the app does NOT need docker; this compose
   exists only to restore/inspect `data/pg_archive/*` dumps" + minimal restore/inspect
   recipe (mirror the n9 gate CLIs' two-stage restore-proof pattern) + rotation pointer.
-- [ ] **Step 5:** Gate: repo-wide `git grep mindfulrl_dev_2026` = ZERO tracked hits;
+- [ ] **Step 5:** Gate: repo-wide grep for the old dev-password string = ZERO tracked hits (string deliberately not repeated here; it lives only in git history);
   repo-wide grep shows no doc presenting docker as runtime/dev quickstart. Commit
   `chore: repurpose docker to archive-access-only (B4a)`.
 
