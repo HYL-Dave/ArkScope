@@ -1,6 +1,9 @@
 # SA Extension Telemetry Plumbing + Health Surface Implementation Plan
 
-> **Status: DRAFT — pending user review.** P2.6 part 1 (the sub-fix ruled buildable-now).
+> **Status: REVIEWED — cleared for implementation (Tasks 1→6).** 3 must-fixes + 2
+> should-fixes from the 2026-07-06 user review are folded in below (marked MF1-3/SF1-2).
+> User priority ruling: this slice runs **ahead of the other P1 items** — it builds the
+> desktop/extension observability foundation.
 > Authority for the boundary: `docs/design/SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -115,9 +118,16 @@ the panel, existing PG-unreachable smoke.
   6. source `env`/`default` refused → NO second call (fallback only from config)
   7. `handle_message({"action":"ping"})` response includes `telemetry_target` +
      `telemetry_source` and does NOT include any token value
+  8. **(MF2) ping is DAL-free**: monkeypatch `src.tools.data_access.DataAccessLayer` to
+     raise on construction → `handle_message({"action":"ping"})` STILL returns
+     `status:"ok"` with `telemetry_target`/`telemetry_source`. Today this fails because
+     `handle_message` constructs `DataAccessLayer(db_dsn="auto")` at
+     `sa_native_host.py:75` before the ping branch at `:118` — a broken profile/DAL
+     poisons even the health probe.
 - [ ] **Step 2 (GREEN):** Implement `_resolve_sidecar_target() -> (base, token, source)`
   and rewire `_post_extension_job_to_sidecar` (keep `/jobs/extension-record`, headers,
-  2.0s timeout); extend the `:118` ping branch; failure log line gains target+source.
+  2.0s timeout); **(MF2) move the ping branch ABOVE the `DataAccessLayer` construction**
+  (`:75`) so ping never touches DAL/profile state; failure log line gains target+source.
 - [ ] **Step 3:** Run Gate 1; record RED→GREEN evidence.
 
 ## Task 2: Electron shell writes/clears the api fields
@@ -130,12 +140,22 @@ the panel, existing PG-unreachable smoke.
   write-into-existing preserves `project_root`/`python_path`/`host_script`; mode is 0600;
   clear removes only the two api keys (file + other keys survive); clear on absent file =
   no-op; write is tmp+rename (no partial JSON on interrupt — assert no `*.tmp` leftover).
-- [ ] **Step 2 (GREEN):** Implement `writeSidecarApiConfig(configPath, {apiBase, apiToken})`
-  and `clearSidecarApiConfig(configPath)` (pure `fs`/`path`, no Electron imports).
+  **(MF1) stop-cleanup cases on `stopSidecarCleanup(child, configPath, {kill})`:**
+  `child = null` → config api keys STILL cleared, no throw, kill not called;
+  `child = {exitCode: 0}` (already crashed/exited) → config STILL cleared, kill not
+  called; `child = {exitCode: null, pid: 123}` (running) → config cleared AND kill
+  attempted. Rationale: `main.js:120` early-returns on `!sidecar || sidecar.exitCode !==
+  null` — a clear placed after that guard leaves stale `api_base`/`api_token` exactly when
+  the sidecar crashed, defeating this slice.
+- [ ] **Step 2 (GREEN):** Implement `writeSidecarApiConfig(configPath, {apiBase, apiToken})`,
+  `clearSidecarApiConfig(configPath)`, and `stopSidecarCleanup(child, configPath, {kill})`
+  (clears config FIRST unconditionally, then applies the existing kill/guard dance to
+  `child`; injectable `kill` for tests) — pure `fs`/`path`, no Electron imports.
 - [ ] **Step 3:** Wire `main.js`: default config path
   `process.env.ARKSCOPE_SA_NATIVE_HOST_CONFIG || ~/.config/arkscope/sa_native_host.json`;
-  call write **after** `waitForHealth(port, token)` returns true (`createWindow`), call
-  clear at the top of `stopSidecar()`; one `pushTail`/console line each; failures logged,
+  call write **after** `waitForHealth(port, token)` returns true (`createWindow`);
+  `stopSidecar()` delegates to `stopSidecarCleanup` so the config clear is its FIRST
+  effect, **before any early return**; one `pushTail`/console line each; failures logged,
   never fatal to the app. Run Gate 2.
 
 ## Task 3: Health service (`src/service/sa_extension_health.py`)
@@ -150,13 +170,30 @@ the panel, existing PG-unreachable smoke.
   (exists+exec), `host_ping` (spawn seam injected: fake returns ping payload with
   `telemetry_target`), `telemetry_binding` (config api_base+api_token vs this process's
   `ARKSCOPE_API_HOST/PORT/TOKEN` → match/mismatch/absent with which-side detail),
-  `telemetry_last` (fake `JobRunsLocalStore.run_summary_by_name` rows → last succeeded
-  extension timestamp), `capture_readback` (tmp `sa_capture.db` via
-  `sa_capture_store.connect(read_only=True)` honest-empty → segment reports "no capture
-  yet", populated fixture → freshness timestamps). Failure of one segment never hides the
-  others (each row independent).
-- [ ] **Step 2 (GREEN):** Implement; every segment returns `{key, ok, detail}`; overall
-  `ok = all(segment.ok for required segments)` with manifests requiring ≥1 browser.
+  `telemetry_last` **(MF3 — query by trigger_source, never by fixed job names)**: the
+  extension sends `job_name` shapes the host passes through VERBATIM
+  (`sa_native_host.py:672` `msg.get("job_name")`) — canonical (`sa_market_news_refresh`)
+  AND `sa_extension:<slug>` both exist in real `job_runs` data
+  (`sa_extension:manual_fetch` observed live). A fixed-name
+  `run_summary_by_name([...])` lookup misses the slug shape, and a bare
+  `list_runs(limit=200)` scan drowns old extension rows under scheduler rows (13k+
+  `collect.*` rows). Therefore: extend `JobRunsLocalStore.list_runs`
+  (`src/service/job_runs_store.py:555`, currently `job_name`/`limit`/`offset` only) with
+  an optional `trigger_source: Optional[str] = None` filter (its own RED in
+  `tests/test_job_runs.py`), and `telemetry_last` = newest terminal
+  (`succeeded`/`failed`) row with `trigger_source='extension'` regardless of job_name.
+  Fixture MUST include both a `sa_market_news_refresh` row and a NEWER
+  `sa_extension:alpha_picks_quick` row and assert the slug row is the one found.
+  `capture_readback` (tmp `sa_capture.db` via
+  `sa_capture_store.connect(read_only=True)` honest-empty → "no capture yet", populated
+  fixture → freshness timestamps). Failure of one segment never hides the others (each
+  row independent).
+- [ ] **Step 2 (GREEN):** Implement. **(SF1) Segments are tri-state
+  `{key, state: ok|warn|fail, detail}`**: `telemetry_last` and `capture_readback` with NO
+  history (fresh install / just-reset profile, before the first capture) are **`warn`
+  (「尚未有第一次擷取」), never `fail`** — a fresh install must not show hard-red before
+  it has ever captured. Overall `ok` = no `fail` among required segments (`warn` allowed);
+  manifests require ≥1 browser found.
 - [ ] **Step 3 (seam-mock discipline):** ONE real-shape integration test that spawns the
   REAL host (`[sys.executable, "src/sa_native_host.py"]`, length-prefixed ping, 15s
   timeout, repo cwd) and asserts the service parses its actual reply — the sibling for the
@@ -170,7 +207,11 @@ the panel, existing PG-unreachable smoke.
 handler-direct style: call the handler with a fake service, NO TestClient).
 
 - [ ] **Step 1 (RED):** handler returns the service payload verbatim + 200; service raising
-  → 503 with `{code:"sa_extension_health_unavailable"}` body shape.
+  → **(SF2)** `HTTPException(status_code=503, detail={"code":
+  "sa_extension_health_unavailable"})` — the test asserts the raised exception's
+  `.detail["code"]`, and any HTTP-level check asserts the FastAPI wire shape
+  `{"detail": {"code": ...}}`, NOT a top-level `code` key (the `detail.code`-vs-`code`
+  false-red from earlier slices).
 - [ ] **Step 2 (GREEN):** implement thin route (service injected the same way the file's
   existing routes take dependencies). Run Gate 3.
 
@@ -213,6 +254,10 @@ NEW `apps/arkscope-web/src/saExtensionHealthDisplay.ts` + `.test.ts` (pure displ
 - Standalone-8420 workflow still lands telemetry (fallback + cleared config proven).
 - Host never crashes on absent/malformed config; token never appears in logs, ping
   replies, or API responses (only match/mismatch verdicts).
-- Panel shows per-segment 鏈路 status and names the broken segment on failure.
+- Panel shows per-segment 鏈路 status and names the broken segment on failure; a fresh
+  install (no capture history) shows warn (—), never hard-red (SF1).
+- A crashed sidecar still gets its stale `api_base`/`api_token` cleared on shutdown (MF1);
+  host ping succeeds even when DAL construction raises (MF2); `sa_extension:<slug>`
+  telemetry rows are found by the health view (MF3).
 - Installer-overwrite and crash-stale-config behaviors documented in the boundary doc.
 - PG-unreachable smoke unchanged (24 checks); full A/B strictly identical.
