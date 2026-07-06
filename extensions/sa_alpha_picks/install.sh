@@ -11,7 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOST_NAME="com.mindfulrl.sa_alpha_picks"
-HOST_PATH="$PROJECT_ROOT/scripts/sa_native_host.py"
+HOST_PATH="$PROJECT_ROOT/src/sa_native_host.py"
 LAUNCHER_SOURCE="$SCRIPT_DIR/native_host_launcher.sh"
 LAUNCHER_DIR="${ARKSCOPE_NATIVE_HOST_DIR:-$HOME/.local/share/arkscope/native-hosts}"
 LAUNCHER_PATH="$LAUNCHER_DIR/sa_alpha_picks_host.sh"

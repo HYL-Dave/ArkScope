@@ -25,7 +25,7 @@ read_config() {
 cfg = json.load(open(sys.argv[1], encoding="utf-8"))
 key = sys.argv[2]
 if key == "host_script":
-    value = cfg.get("host_script") or (cfg.get("project_root", "") + "/scripts/sa_native_host.py")
+    value = cfg.get("host_script") or (cfg.get("project_root", "") + "/src/sa_native_host.py")
 else:
     value = cfg.get(key)
 if not value:
