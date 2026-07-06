@@ -180,6 +180,18 @@ therefore defaults to defer until the hypothesis gate exists.
 ### P2.4 Key Markets snapshot / Factor Grades
 - **Status**: optional supplementary data. Not blocking, not high-value. Can be picked up opportunistically alongside P1.3 SA Digest.
 
+### P2.5 Provider capability display (app Data Sources panel + README)
+- **Status**: backlog, filed 2026-07-06 (scripts-consolidation review). Not started.
+- **What**: surface per-provider data differences where the user decides about API keys — Settings 資料來源 panel gets a static per-provider capability blurb (content type 摘要 vs 完整內文、有無內建情緒分數、歷史深度、免費層限制), README gets a short "why get API keys" table.
+- **Source material**: `docs/data/NEWS_PROVIDER_DATA_DICTIONARY.md` provider-comparison sections (2025-12 measurements — re-verify numbers or rewrite qualitatively before they enter UI; see that file's status header).
+- **Absorbs the av/eodhd future-provider item**: `collect_alphavantage_news.py` + `collect_eodhd_news.py` were test-era collectors retired in scripts-consolidation Task 1 (recover via `git show f9d00c7^:scripts/collection/<file>`); user intends to re-add Alpha Vantage / EODHD as proper Data Sources providers later — the same capability-blurb mechanism describes them when they land.
+
+### P2.6 SA Extension Integration Health / Setup Surface
+- **Status**: backlog, filed 2026-07-06. Gated on Desktop App Vision product decisions (`DESKTOP_APP_VISION_DRAFT.md` not yet finalized) — record boundary now, build later.
+- **What**: desktop-app-facing setup + diagnostic view for the SA extension pipeline (manifest/launcher/config checks, app-side simulated host ping, SA DB write/read freshness).
+- **Boundary note (authoritative)**: `docs/design/SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md` — App-owned vs Browser-owned vs App-display split, incl. the direction constraint (app cannot initiate the browser→host hop; it verifies preconditions + simulates the host directly).
+- **Existing building blocks** (don't redesign): native host → sidecar job telemetry POST (S-H1) → `job_runs`; `sa_market_news_health`; gates-doc Level 2 host smoke; `extensions/sa_alpha_picks/install*.sh` are the CLI precursors the app setup surface will absorb.
+
 ---
 
 ## 5. P3 — Paused / Deferred

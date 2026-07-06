@@ -143,3 +143,33 @@ Stop and report before continuing if any of these happen:
 - No wrappers, tombstones, or orphan stubs remain at any old location.
 - Native host works from `src/` with the manifest re-pointed and user-verified.
 - Map + scoping §5 record the finished rule; av/eodhd future-provider backlog note carries the recovery sha.
+
+## Post-implementation review amendments (2026-07-06, reviewer)
+
+Applied on the branch after Tasks 1–5, before full A/B. Two classes the plan's inventories
+missed (import consumers were swept; shell-script and live-doc PATH references were not):
+
+1. **Installer/launcher stale paths** — `extensions/sa_alpha_picks/install.sh` (`HOST_PATH`),
+   `install_firefox.sh` (`HOST_SCRIPT`), `native_host_launcher.sh` (config fallback) all still
+   pointed at `scripts/sa_native_host.py`; a fresh install would have registered a dead path.
+   Fixed to `src/sa_native_host.py` with a new self-maintaining pin
+   `tests/test_extension_install_paths.py` (parses the referenced path out of the shell
+   sources, asserts it exists — RED before fix, GREEN after).
+2. **Live-doc entrypoints** — `README.md` quickstart + layout, `PROJECT_STRUCTURE.md` table,
+   `REFACTOR_PROTECTION_SMOKE_GATES.md` gate commands (4×) now say `python -m src.daily_update`
+   / `src/collectors/`; path tokens updated in `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
+   (LOCK #9, 2 lines — path only; the psycopg2→PG "today" description there predates the SA
+   local cutover and is a separate freshness item), `ARKSCOPE_PROVIDER_CATALOG.md` §3.9,
+   `DATA_COLLECTION_AND_LOCAL_STORAGE_PLAN.md` §5a. Historical docs untouched per plan rule.
+3. **DATA_DICTIONARY disposition revised** (user ruling): Task 2 had deleted it; restored from
+   `e4ecc2b` to `docs/data/NEWS_PROVIDER_DATA_DICTIONARY.md` with a status header separating
+   durable provider-difference facts (2025-12 measurements) from superseded architecture
+   (parquet layout, MD5 dedup, old script paths).
+4. **Backlog filed** (user ruling): map §P2.5 provider capability display (absorbs av/eodhd
+   future-provider note incl. recovery sha `f9d00c7^`) + §P2.6 SA extension health/setup
+   surface with boundary note `SA_EXTENSION_HEALTH_SETUP_BOUNDARY.md`.
+5. **Live cutover discipline** (recorded for the merge step): stop sidecar + close Firefox
+   before merge (running sidecar lazy-imports adapter modules per tick; SA host spawns fresh
+   per message); after merge, flip `~/.config/arkscope/sa_native_host.json` `host_script` to
+   `src/sa_native_host.py` (single approval-gated live edit — covers Firefox AND Chrome, both
+   manifests point at the stable launcher), restart, then extension round-trip.
