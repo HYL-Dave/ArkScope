@@ -261,11 +261,28 @@ class ToolRegistry:
         ))
 
     def _register_price_tools(self) -> None:
+        from .current_quote import get_current_quote
         from .price_tools import (
             get_ticker_prices,
             get_price_change,
             get_sector_performance,
         )
+
+        self.register(ToolDefinition(
+            name="get_current_quote",
+            description=(
+                "Get a read-through current quote for a stock ticker. Uses IBKR snapshot "
+                "when available; source='auto' may fall back to the latest local bar, "
+                "explicitly marked as local_last_bar."
+            ),
+            function=get_current_quote,
+            category="prices",
+            parameters=[
+                ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("source", "string", "Quote source", required=False, default="auto",
+                              enum=["auto", "ibkr", "local"]),
+            ],
+        ))
 
         self.register(ToolDefinition(
             name="get_ticker_prices",

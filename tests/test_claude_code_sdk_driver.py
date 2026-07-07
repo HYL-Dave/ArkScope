@@ -535,6 +535,15 @@ def test_bridge_builds_one_tool_per_allowlisted_name():
     assert names == set(_RESEARCH_READONLY_TOOLS)
 
 
+def test_current_quote_is_research_readonly_allowlisted():
+    from src.auth_drivers.chatgpt_oauth_driver import (
+        _RESEARCH_READONLY_TOOLS as openai_tools,
+    )
+
+    assert "get_current_quote" in _RESEARCH_READONLY_TOOLS
+    assert "get_current_quote" in openai_tools
+
+
 def test_bridge_fail_fast_on_missing_registry_tool():
     # Drop one allow-listed tool from the registry -> build must raise.
     reg = _full_fake_registry()

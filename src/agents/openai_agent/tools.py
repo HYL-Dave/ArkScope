@@ -59,6 +59,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_news_brief,
         search_news_advanced,
     )
+    from src.tools.current_quote import get_current_quote
     from src.tools.price_tools import (
         get_ticker_prices,
         get_price_change,
@@ -240,6 +241,17 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         """
         result = get_ticker_prices(dal, ticker, interval=interval, days=days)
         return _serialize_result(result, "get_ticker_prices")
+
+    @function_tool
+    def tool_get_current_quote(ticker: str, source: str = "auto") -> str:
+        """Get a read-through current quote for a stock ticker.
+
+        source='auto' tries IBKR first and may fall back to latest local bar.
+        source='ibkr' is strict IBKR snapshot.
+        source='local' returns latest stored local bar only.
+        """
+        result = get_current_quote(dal, ticker, source=source)
+        return _serialize_result(result, "get_current_quote")
 
     @function_tool
     def tool_get_price_change(ticker: str, days: int = 7) -> str:
@@ -1159,6 +1171,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_news_brief,
         tool_search_news_advanced,
         tool_get_ticker_prices,
+        tool_get_current_quote,
         tool_get_price_change,
         tool_get_sector_performance,
         tool_get_iv_analysis,

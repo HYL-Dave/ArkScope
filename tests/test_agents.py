@@ -94,7 +94,7 @@ class TestAnthropicToolSchemas:
         """All bridge tools (registry + delegate_to_subagent)."""
         from src.agents.anthropic_agent.tools import get_anthropic_tools
         tools = get_anthropic_tools()
-        assert len(tools) == 55
+        assert len(tools) == 56
 
     def test_tool_schema_structure(self):
         """Each tool has required fields."""
@@ -120,6 +120,7 @@ class TestAnthropicToolSchemas:
             "get_news_brief",
             "search_news_advanced",
             "get_ticker_prices",
+            "get_current_quote",
             "get_price_change",
             "get_sector_performance",
             "get_iv_analysis",
@@ -291,7 +292,7 @@ class TestOpenAIToolCreation:
         """OpenAI bridge tools (registry + delegate_to_subagent)."""
         from src.agents.openai_agent.tools import create_openai_tools
         tools = create_openai_tools(dal)
-        assert len(tools) == 55
+        assert len(tools) == 56
 
     def test_tools_have_names(self, dal):
         """All tools have names (FunctionTool objects)."""
@@ -526,7 +527,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_openai_schema()
 
-        assert len(schemas) == 54
+        assert len(schemas) == 55
         for schema in schemas:
             assert schema["type"] == "function"
             assert "function" in schema
@@ -540,7 +541,7 @@ class TestRegistrySchemaExport:
         registry = create_default_registry()
         schemas = registry.to_anthropic_schema()
 
-        assert len(schemas) == 54
+        assert len(schemas) == 55
         for schema in schemas:
             assert "name" in schema
             assert "description" in schema

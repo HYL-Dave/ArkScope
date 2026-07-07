@@ -193,6 +193,29 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             }
         },
         {
+            "name": "get_current_quote",
+            "description": (
+                "Get a read-through current quote for a stock ticker. Uses IBKR snapshot "
+                "when available; source='auto' may fall back to latest local bar."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": "string",
+                        "description": "Stock ticker symbol"
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["auto", "ibkr", "local"],
+                        "description": "Quote source. auto=IBKR then explicit local fallback.",
+                        "default": "auto"
+                    }
+                },
+                "required": ["ticker"]
+            }
+        },
+        {
             "name": "get_price_change",
             "description": "Calculate price change percentage and high/low range for a ticker over a period.",
             "input_schema": {
@@ -1386,6 +1409,7 @@ def execute_tool(
         get_news_brief,
         search_news_advanced,
     )
+    from src.tools.current_quote import get_current_quote
     from src.tools.price_tools import (
         get_ticker_prices,
         get_price_change,
@@ -1476,6 +1500,11 @@ def execute_tool(
             tool_input["ticker"],
             interval=tool_input.get("interval", "15min"),
             days=tool_input.get("days", 30)
+        ),
+        "get_current_quote": lambda: get_current_quote(
+            dal,
+            tool_input["ticker"],
+            source=tool_input.get("source", "auto"),
         ),
         "get_price_change": lambda: get_price_change(
             dal,
