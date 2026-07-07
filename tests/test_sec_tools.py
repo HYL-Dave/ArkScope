@@ -147,7 +147,7 @@ class TestBridgeIntegration:
         """Registry includes SEC plus macro/calendar, SA, and coverage tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 54
+        assert len(registry.list_all()) == 55
 
     def test_analysis_category_6(self):
         """Analysis category has 13 tools (incl. macro snapshot + coverage diagnostics)."""

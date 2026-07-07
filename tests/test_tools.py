@@ -4,6 +4,7 @@ Integration tests for the 17 tool functions + ToolRegistry.
 Tests run against real data to verify each tool produces correct output.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -91,6 +92,13 @@ class TestRegistry:
             assert "description" in tool
             assert "input_schema" in tool
             assert tool["input_schema"]["type"] == "object"
+
+    def test_tool_catalog_live_table_matches_registry(self, registry):
+        """The canonical Tool Catalog live table must match ToolRegistry."""
+        catalog = (project_root / "docs/design/ARKSCOPE_TOOL_CATALOG.md").read_text()
+        live_tables = catalog.split("### 1.4 Retire-adapt", 1)[0]
+        catalog_names = set(re.findall(r"^\| `([^`]+)` \|", live_tables, re.MULTILINE))
+        assert catalog_names == set(registry.list_names())
 
     def test_get_tool(self, registry):
         """Lookup by name should return correct tool."""

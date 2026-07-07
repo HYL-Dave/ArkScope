@@ -69,6 +69,7 @@ Current code has price history, but not current quote:
   - `tests/test_agents.py`
   - `tests/test_claude_code_sdk_driver.py`
   - `tests/test_prices_quote_route.py` (new)
+  - Tool-count ledger tests in `tests/test_api.py`, `tests/test_memory_tools.py`, `tests/test_sec_tools.py`, `tests/test_portfolio_tools.py`, `tests/test_analyst_tools.py`, `tests/test_sa_tools.py`, and `tests/test_subagent.py`
 
 ---
 
@@ -498,6 +499,7 @@ git commit -m "feat: wire ibkr quote client id"
 - Modify: `tests/test_tools.py`
 - Modify: `tests/test_agents.py`
 - Modify: `tests/test_claude_code_sdk_driver.py`
+- Modify: tool-count ledger tests in `tests/test_api.py`, `tests/test_memory_tools.py`, `tests/test_sec_tools.py`, `tests/test_portfolio_tools.py`, `tests/test_analyst_tools.py`, `tests/test_sa_tools.py`, and `tests/test_subagent.py`
 
 - [ ] **Step 1: Write/update failing registry and agent tests**
 
@@ -522,6 +524,13 @@ def test_tool_count(self):
 ```
 
 and include `"get_current_quote"` after `"get_ticker_prices"` in `TestAnthropicToolSchemas::test_tool_names`.
+
+Update every registry/bridge ledger in the test suite:
+
+- Registry/schema count `54` -> `55`
+- Bridge count `55` -> `56`
+- `test_api` `/status` expectation `tools_registered == 55`
+- Add a true catalog-sync test that compares live `ToolRegistry().list_names()` with the live tool rows in `docs/design/ARKSCOPE_TOOL_CATALOG.md` (not just string-grep counts).
 
 Modify `tests/test_claude_code_sdk_driver.py` by adding this test near the allowlist tests:
 
@@ -654,18 +663,19 @@ Add `"get_current_quote"` to `_RESEARCH_READONLY_TOOLS` next to `"get_ticker_pri
 
 - [ ] **Step 7: Update catalog and stale-count comment**
 
-Modify `docs/design/ARKSCOPE_TOOL_CATALOG.md` in the same commit:
+Modify `docs/design/ARKSCOPE_TOOL_CATALOG.md` in the same commit. This is a reconciliation to the actual live registry, not just the quote row:
 
-- Header count: `51 registry tools` -> `52 registry tools`.
-- Bridge count: `52` -> `53`.
-- Stable primitives heading: `28 tools` -> `29 tools`.
+- Header count: `51 registry tools` -> `55 registry tools`.
+- Bridge count: `52` -> `56`.
+- Stable primitives heading: `28 tools` -> `32 tools`.
+- Fold the three already-registered post-catalog drift tools: `get_sa_feed`, `get_sa_comment_focus`, and `get_ticker_data_coverage`.
 - Add row next to `get_ticker_prices`:
 
 ```markdown
 | `get_current_quote` | prices | ticker*, source? | IBKR snapshot + local last-bar fallback | keep-current |
 ```
 
-- Verdict roll-up: keep-current `45` -> `46`, SP count `28` -> `29`, total live equation `46 + 2 + 1 + 2 + 1 = 52`.
+- Verdict roll-up: keep-current `45` -> `49`, SP count `28` -> `32`, total live equation `49 + 2 + 1 + 2 + 1 = 55`.
 
 Modify `src/auth_drivers/claude_code_sdk_driver.py` comment:
 
@@ -688,7 +698,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/tools/registry.py src/agents/openai_agent/tools.py src/agents/anthropic_agent/tools.py src/auth_drivers/claude_code_sdk_driver.py src/auth_drivers/chatgpt_oauth_driver.py docs/design/ARKSCOPE_TOOL_CATALOG.md tests/test_tools.py tests/test_agents.py tests/test_claude_code_sdk_driver.py
+git add src/tools/registry.py src/agents/openai_agent/tools.py src/agents/anthropic_agent/tools.py src/auth_drivers/claude_code_sdk_driver.py src/auth_drivers/chatgpt_oauth_driver.py docs/design/ARKSCOPE_TOOL_CATALOG.md tests/test_tools.py tests/test_agents.py tests/test_claude_code_sdk_driver.py tests/test_api.py tests/test_memory_tools.py tests/test_sec_tools.py tests/test_portfolio_tools.py tests/test_analyst_tools.py tests/test_sa_tools.py tests/test_subagent.py
 git commit -m "feat: expose current quote as agent tool"
 ```
 
@@ -840,10 +850,28 @@ Expected: PASS. If `tests/test_claude_code_sdk_driver.py` contains unrelated exi
 Also verify catalog synchronization:
 
 ```bash
-rg -n "get_current_quote|52 registry tools|53\\)|Stable primitives \\(SP\\) — 29 tools|Total live = 46 \\+ 2 \\+ 1 \\+ 2 \\+ 1 = 52" docs/design/ARKSCOPE_TOOL_CATALOG.md
+python - <<'PY'
+from pathlib import Path
+import re
+from src.tools.registry import create_default_registry
+text = Path("docs/design/ARKSCOPE_TOOL_CATALOG.md").read_text()
+live = text.split("### 1.4 Retire-adapt", 1)[0]
+catalog = set(re.findall(r"^\| `([^`]+)` \|", live, re.M))
+registry = set(create_default_registry().list_names())
+assert catalog == registry, {"missing": sorted(registry - catalog), "extra": sorted(catalog - registry)}
+PY
 ```
 
-Expected: all four catalog/count facts present.
+Expected: exact catalog/registry name parity.
+
+Also run the wider ledger suite:
+
+```bash
+pytest tests/test_memory_tools.py tests/test_sec_tools.py tests/test_portfolio_tools.py tests/test_analyst_tools.py tests/test_subagent.py tests/test_sa_tools.py -q
+pytest tests/test_api.py::TestHealth::test_status -q
+```
+
+If `test_api` hangs in a sandboxed TestClient/lifespan environment, verify the same source route directly and report the environment limitation.
 
 - [ ] **Step 2: Run PG-unreachable smoke**
 
