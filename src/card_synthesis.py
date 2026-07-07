@@ -317,15 +317,18 @@ def synthesize_card(
     record. Raises on provider failure or malformed output (validated by Pydantic).
     """
     ensure_env_loaded()
+    # Off = byte-identical INTERNAL call shape too: pass the kwarg only when
+    # non-empty so strict test fakes of _synthesize_* stay valid (house rule).
+    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
     route = task_route("card_synthesis")
     if provider == "anthropic":
         model = model or (route.model if route.provider == "anthropic" else get_agent_config().anthropic_model_advanced)
         effort = route.effort if route.provider == "anthropic" else "default"
-        synth, effort_meta = _synthesize_anthropic(packet, model, effort, personalization_context=personalization_context)
+        synth, effort_meta = _synthesize_anthropic(packet, model, effort, **_pctx)
     elif provider == "openai":
         model = model or (route.model if route.provider == "openai" else get_agent_config().openai_model_advanced)
         effort = route.effort if route.provider == "openai" else "default"
-        synth, effort_meta = _synthesize_openai(packet, model, effort, personalization_context=personalization_context)
+        synth, effort_meta = _synthesize_openai(packet, model, effort, **_pctx)
     else:
         raise ValueError(f"unknown provider: {provider}")
     card = _merge_to_card(
