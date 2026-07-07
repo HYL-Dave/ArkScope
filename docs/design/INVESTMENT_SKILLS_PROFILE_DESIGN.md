@@ -239,6 +239,9 @@ wizard:
   edit, or reject it.
 - Future implementations may use the accumulated journal to re-calibrate over time, but
   v1 of this slice does not automatically rewrite the profile from historical messages.
+- Read-side boundary: research/card prompt assembly reads only the approved structured
+  `investor_profile` (via the existing personalization context builder); raw calibration
+  text is never an input to prompt construction.
 
 This avoids the false finality of a one-time questionnaire while keeping the first
 implementation small.
@@ -420,7 +423,9 @@ Recommended v1 flow:
 1. User opens Investor Profile calibration and starts the active calibration session.
 2. User describes goals, observations, constraints, or hopes in natural language.
 3. Assistant asks targeted follow-up questions about risk appetite, risk capacity,
-   drawdown behavior, concentration, horizon, and behavioral patterns.
+   drawdown behavior, concentration, horizon, and behavioral patterns. The calibration
+   assistant asks and organizes; it must not give investment advice or security
+   recommendations during calibration (same non-advice copy rule as the panel).
 4. Assistant produces a structured proposal with field-level rationales.
 5. User reviews the proposal in the existing form surface, edits any field, and approves
    or rejects it.
