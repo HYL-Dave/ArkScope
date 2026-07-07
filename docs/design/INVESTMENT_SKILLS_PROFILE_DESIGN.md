@@ -448,7 +448,12 @@ working model.
 
 ## 11. Implementation Tracks
 
-### Track A - v1 profile and stance
+### Track A - v1 profile and stance — ✅ IMPLEMENTED + MERGED 2026-07-07 (`b770826`)
+
+Shipped exactly this scope plus two reviewed amendments: stance rides the server-owned
+research runs (the current workbench execution path), and persisted traces cover
+success/error/cancelled terminals. Off = byte-identical is pinned at the prompt, route,
+and card-synthesis seams.
 
 Build:
 

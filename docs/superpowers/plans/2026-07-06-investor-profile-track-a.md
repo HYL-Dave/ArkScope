@@ -1,6 +1,11 @@
 # Investment Profile Track A Implementation Plan
 
-> **Status: IMPLEMENTED FOR REVIEW (2026-07-07) — reviewer full A/B running; not merged.**
+> **Status: ✅ COMPLETE — FF-merged to master 2026-07-07 (`b770826`).** Review found 3
+> findings (tracked node_modules symlink; explicit-null could not clear fields —
+> model_fields_set fix; cancelled runs lost the trace) — all fixed with tests and
+> re-verified by the reviewer. Final full A/B: failure sets 37=37 (diff empty), passed
+> +38 = exactly the new tests. Live verification of the panel/stance flow = owner's
+> next session.
 > Implementation notes: (1) PLAN AMENDMENT executed — the workbench Research UI runs on
 > server-owned runs (createResearchRun + poll), so stance rides research_runs
 > (assistant_stance column, create-time 400 validation, execute-time resolution with
