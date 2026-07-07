@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InvestorProfilePanel } from "./InvestorProfilePanel";
-import type { InvestorProfileResponse } from "./api";
+import type { CalibrationProposal, CalibrationState, InvestorProfileResponse } from "./api";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -48,7 +48,12 @@ const disabledResponse = (): InvestorProfileResponse => ({
   context_preview: "",
 });
 
-function stubFetch(handler: (url: string, init?: RequestInit) => InvestorProfileResponse) {
+type PanelApiResponse =
+  | InvestorProfileResponse
+  | CalibrationState
+  | { profile: InvestorProfileResponse["profile"]; proposal: Partial<CalibrationProposal> };
+
+function stubFetch(handler: (url: string, init?: RequestInit) => PanelApiResponse) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
   vi.stubGlobal(
     "fetch",
@@ -75,6 +80,23 @@ async function mount() {
   await act(async () => {
     root!.render(<InvestorProfilePanel />);
   });
+}
+
+async function flush() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+async function buttonByText(text: string): Promise<HTMLButtonElement> {
+  for (let i = 0; i < 6; i += 1) {
+    const found = Array.from(host!.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes(text),
+    );
+    if (found) return found;
+    await flush();
+  }
+  throw new Error(`button not found: ${text}; text=${host?.textContent ?? ""}`);
 }
 
 describe("InvestorProfilePanel", () => {
@@ -139,5 +161,157 @@ describe("InvestorProfilePanel", () => {
     const putCall = calls.find((c) => c.method === "PUT");
     expect(putCall?.url).toContain("/profile/investor");
     expect(host!.textContent).toContain("互補投資人");
+  });
+
+  it("starts_calibration_sends_message_and_shows_proposal_rationale", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/profile/investor")) return disabledResponse();
+      if (url.endsWith("/profile/investor/calibration/sessions")) {
+        return {
+          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
+          messages: [],
+          latest_proposal: null,
+        };
+      }
+      if (url.endsWith("/profile/investor/calibration/messages")) {
+        return {
+          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
+          messages: [
+            { id: "m1", session_id: "s1", role: "user", content: "I chase AI stocks.", created_at: "t" },
+            { id: "m2", session_id: "s1", role: "assistant", content: "Draft ready.", created_at: "t" },
+          ],
+          latest_proposal: {
+            id: "p1",
+            session_id: "s1",
+            status: "draft",
+            profile_patch: {
+              enabled: true,
+              risk_appetite: 8,
+              risk_capacity: 4,
+              risk_mismatch: "appetite_above_capacity",
+              default_stance: "complementary",
+            },
+            raw_profile_patch: { enabled: true, risk_appetite: 8, risk_capacity: 4, default_stance: "complementary" },
+            rationales: { risk_capacity: "User said 10% drawdown would likely trigger selling." },
+            changed_fields: [],
+            created_at: "t",
+            approved_at: null,
+            rejected_at: null,
+          },
+        };
+      }
+      return {
+        active_session: null,
+        sessions: [],
+        messages: [],
+        latest_proposal: null,
+      };
+    });
+    await mount();
+    await flush();
+    await flush();
+
+    const startBtn = await buttonByText("開始校準對話");
+    await act(async () => {
+      startBtn.click();
+    });
+    const textarea = host!.querySelector<HTMLTextAreaElement>('textarea[aria-label="校準訊息"]')!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(textarea, "I chase AI stocks.");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const sendBtn = await buttonByText("送出校準訊息");
+    await act(async () => {
+      sendBtn.click();
+    });
+
+    expect(host!.textContent).toContain("Draft ready.");
+    expect(host!.textContent).toContain("User said 10% drawdown");
+    expect(host!.textContent).toContain("風險承受能力");
+  });
+
+  it("approves_calibration_proposal_through_dedicated_endpoint", async () => {
+    const calls = stubFetch((url) => {
+      if (url.includes("/profile/investor/calibration/proposals/p1/approve")) {
+        const resp = disabledResponse();
+        resp.profile.enabled = true;
+        resp.profile.risk_appetite = 8;
+        return { profile: resp.profile, proposal: { id: "p1", status: "approved", approved_at: "t" } };
+      }
+      if (url.endsWith("/profile/investor/calibration/sessions")) {
+        return {
+          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
+          messages: [],
+          latest_proposal: null,
+        };
+      }
+      if (url.endsWith("/profile/investor/calibration/messages")) {
+        return {
+          active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+          sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
+          messages: [
+            { id: "m1", session_id: "s1", role: "user", content: "I chase AI stocks.", created_at: "t" },
+            { id: "m2", session_id: "s1", role: "assistant", content: "Draft ready.", created_at: "t" },
+          ],
+          latest_proposal: {
+            id: "p1",
+            session_id: "s1",
+            status: "draft",
+            profile_patch: { enabled: true, risk_appetite: 8, risk_capacity: 4, default_stance: "complementary" },
+            raw_profile_patch: {},
+            rationales: {},
+            changed_fields: [],
+            created_at: "t",
+            approved_at: null,
+            rejected_at: null,
+          },
+        };
+      }
+      if (url.endsWith("/profile/investor/calibration")) {
+        return {
+          active_session: null,
+          sessions: [],
+          messages: [],
+          latest_proposal: null,
+        };
+      }
+      if (url.endsWith("/profile/investor")) return disabledResponse();
+      return disabledResponse();
+    });
+    await mount();
+    await flush();
+    await flush();
+    expect(calls.some((c) => c.url.endsWith("/profile/investor/calibration"))).toBe(true);
+    const startBtn = await buttonByText("開始校準對話");
+    await act(async () => {
+      startBtn.click();
+    });
+    const textarea = host!.querySelector<HTMLTextAreaElement>('textarea[aria-label="校準訊息"]')!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(textarea, "I chase AI stocks.");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const sendBtn = await buttonByText("送出校準訊息");
+    await act(async () => {
+      sendBtn.click();
+    });
+    const approveBtn = await buttonByText("套用校準提案");
+    await act(async () => {
+      approveBtn.click();
+    });
+
+    const approve = calls.find((c) => c.url.includes("/proposals/p1/approve"));
+    expect(approve).toBeTruthy();
   });
 });

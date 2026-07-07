@@ -332,6 +332,42 @@ export interface InvestorProfileResponse {
   context_preview: string;
 }
 
+export interface CalibrationSession {
+  id: string;
+  status: "active" | "closed" | "superseded";
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+}
+
+export interface CalibrationMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface CalibrationProposal {
+  id: string;
+  session_id: string;
+  status: "draft" | "approved" | "rejected";
+  profile_patch: Partial<InvestorProfile>;
+  raw_profile_patch: Partial<InvestorProfile>;
+  rationales: Record<string, string>;
+  changed_fields: string[];
+  created_at: string;
+  approved_at: string | null;
+  rejected_at: string | null;
+}
+
+export interface CalibrationState {
+  active_session: CalibrationSession | null;
+  sessions: CalibrationSession[];
+  messages: CalibrationMessage[];
+  latest_proposal: CalibrationProposal | null;
+}
+
 export function getInvestorProfile(): Promise<InvestorProfileResponse> {
   return getJSON<InvestorProfileResponse>("/profile/investor");
 }
@@ -346,6 +382,51 @@ export function saveInvestorProfile(
   profile: Partial<InvestorProfile>,
 ): Promise<InvestorProfileResponse> {
   return sendJSON<InvestorProfileResponse>("/profile/investor", "PUT", profile);
+}
+
+export function getCalibrationState(): Promise<CalibrationState> {
+  return getJSON<CalibrationState>("/profile/investor/calibration", 8_000);
+}
+
+export function startCalibrationSession(supersede_active = false): Promise<CalibrationState> {
+  return sendJSON<CalibrationState>(
+    "/profile/investor/calibration/sessions",
+    "POST",
+    { supersede_active },
+    8_000,
+  );
+}
+
+export function sendCalibrationMessage(body: {
+  session_id?: string;
+  content: string;
+  provider?: string;
+  model?: string;
+}): Promise<CalibrationState> {
+  return sendJSON<CalibrationState>("/profile/investor/calibration/messages", "POST", body, 60_000);
+}
+
+export function approveCalibrationProposal(
+  proposalId: string,
+  profilePatch: Partial<InvestorProfile>,
+): Promise<{ profile: InvestorProfile; proposal: CalibrationProposal }> {
+  return sendJSON(
+    `/profile/investor/calibration/proposals/${encodeURIComponent(proposalId)}/approve`,
+    "POST",
+    { profile_patch: profilePatch },
+    20_000,
+  );
+}
+
+export function rejectCalibrationProposal(
+  proposalId: string,
+): Promise<{ proposal: CalibrationProposal }> {
+  return sendJSON(
+    `/profile/investor/calibration/proposals/${encodeURIComponent(proposalId)}/reject`,
+    "POST",
+    undefined,
+    8_000,
+  );
 }
 
 export interface CardSummary {

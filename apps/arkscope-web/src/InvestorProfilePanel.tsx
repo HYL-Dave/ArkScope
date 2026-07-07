@@ -5,10 +5,16 @@
 import React, { useEffect, useState } from "react";
 
 import {
+  approveCalibrationProposal,
   draftInvestorProfile,
+  getCalibrationState,
   getInvestorProfile,
+  rejectCalibrationProposal,
   saveInvestorProfile,
+  sendCalibrationMessage,
+  startCalibrationSession,
   type AssistantStance,
+  type CalibrationState,
   type InvestorProfile,
   type InvestorProfileResponse,
   type InvestorPreset,
@@ -63,14 +69,23 @@ export function InvestorProfilePanel() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [calibration, setCalibration] = useState<CalibrationState | null>(null);
+  const [calibrationText, setCalibrationText] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     getInvestorProfile()
-      .then((r) => {
+      .then(async (r) => {
         if (!cancelled) {
           setResp(r);
           setForm(r.profile);
+        }
+        try {
+          const c = await getCalibrationState();
+          if (!cancelled) applyCalibrationState(c);
+        } catch {
+          // Calibration is advisory. A temporary route failure must not block
+          // the base Investor Profile form.
         }
       })
       .catch((e) => {
@@ -92,6 +107,14 @@ export function InvestorProfilePanel() {
 
   const set = <K extends keyof InvestorProfile>(key: K, value: InvestorProfile[K]) =>
     setForm({ ...form, [key]: value });
+
+  const applyCalibrationState = (state: CalibrationState) => {
+    setCalibration(state);
+    const proposal = state.latest_proposal;
+    if (proposal?.status === "draft") {
+      setForm((cur) => (cur ? { ...cur, ...proposal.profile_patch } : cur));
+    }
+  };
 
   const toggleIn = (key: "preferred_edge" | "behavioral_flags", item: string) => {
     const cur = form[key];
@@ -130,7 +153,67 @@ export function InvestorProfilePanel() {
     }
   };
 
+  const runCalibration = async (fn: () => Promise<CalibrationState>, doneNote: string) => {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    setNotice(null);
+    try {
+      const r = await fn();
+      applyCalibrationState(r);
+      setNotice(doneNote);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendCalibration = async () => {
+    const text = calibrationText.trim();
+    if (!text) return;
+    await runCalibration(
+      () => sendCalibrationMessage({ session_id: calibration?.active_session?.id, content: text }),
+      "校準回覆已更新",
+    );
+    setCalibrationText("");
+  };
+
+  const approveProposal = async () => {
+    const proposal = calibration?.latest_proposal;
+    if (!proposal || proposal.status !== "draft") return;
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    setNotice(null);
+    try {
+      await approveCalibrationProposal(proposal.id, payload());
+      const profileResp = await getInvestorProfile();
+      setResp(profileResp);
+      setForm(profileResp.profile);
+      const refreshed = await getCalibrationState();
+      applyCalibrationState(refreshed);
+      setNotice("校準提案已套用");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rejectProposal = async () => {
+    const proposal = calibration?.latest_proposal;
+    if (!proposal || proposal.status !== "draft") return;
+    await runCalibration(async () => {
+      await rejectCalibrationProposal(proposal.id);
+      return getCalibrationState();
+    }, "校準提案已拒絕");
+  };
+
   const mismatch = resp?.profile.risk_mismatch ?? form.risk_mismatch;
+  const messages = calibration?.messages ?? [];
+  const latestProposal = calibration?.latest_proposal?.status === "draft" ? calibration.latest_proposal : null;
+  const rationaleEntries = Object.entries(latestProposal?.rationales ?? {});
 
   return (
     <div className="investor-profile-panel">
@@ -311,6 +394,65 @@ export function InvestorProfilePanel() {
           onChange={(e) => set("freeform_notes", e.target.value)}
         />
       </label>
+
+      <section className="ip-calibration">
+        <h4>校準對話</h4>
+        <p className="muted">
+          校準對話只用來整理投資人輪廓,不是投資建議或個股推薦。只有你核准的結構化設定會影響研究;原始對話不會進入研究 prompt。
+        </p>
+        <div className="ip-actions">
+          <button
+            disabled={busy || Boolean(calibration?.active_session)}
+            onClick={() => void runCalibration(() => startCalibrationSession(false), "校準對話已開始")}
+          >
+            開始校準對話
+          </button>
+        </div>
+        {messages.length ? (
+          <div className="ip-calibration-log">
+            {messages.map((m) => (
+              <div key={m.id} className="muted">
+                {m.role === "user" ? "你" : "助手"}:{m.content}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <label>
+          校準訊息
+          <textarea
+            aria-label="校準訊息"
+            value={calibrationText}
+            onChange={(e) => setCalibrationText(e.target.value)}
+          />
+        </label>
+        <div className="ip-actions">
+          <button disabled={busy || !calibration?.active_session || !calibrationText.trim()} onClick={() => void sendCalibration()}>
+            送出校準訊息
+          </button>
+        </div>
+        {latestProposal ? (
+          <div className="ip-guardrail">
+            <strong>校準提案</strong>
+            {rationaleEntries.length ? (
+              <ul>
+                {rationaleEntries.map(([field, rationale]) => (
+                  <li key={field}>
+                    {field}:{rationale}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="ip-actions">
+              <button disabled={busy} onClick={() => void approveProposal()}>
+                套用校準提案
+              </button>
+              <button disabled={busy} onClick={() => void rejectProposal()}>
+                拒絕提案
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <div className="ip-guardrail">
         風險胃納 vs 承受能力:{mismatchLabel(mismatch)}
