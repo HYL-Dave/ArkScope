@@ -826,8 +826,9 @@ def test_reject_proposal_keeps_profile_unchanged(stores, monkeypatch):
 
 
 def test_calibration_router_mounts_on_real_app():
-    from src.api.app import app
+    from src.api.app import create_app
 
+    app = create_app()
     paths = {getattr(route, "path", None) for route in app.routes}
     assert "/profile/investor/calibration" in paths
 ```
