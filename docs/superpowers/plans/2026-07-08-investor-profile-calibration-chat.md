@@ -775,10 +775,10 @@ def test_send_message_appends_user_assistant_and_inert_proposal(stores, monkeypa
             rationales={"risk_capacity": "User described likely selling after a 10% drawdown."},
         )
 
+    monkeypatch.setattr(routes, "_default_responder", fake_responder)
     data = asyncio.run(routes.send_calibration_message(
         routes.CalibrationMessageBody(session_id=sess["id"], content="I chase AI stocks but panic at drawdowns."),
         store=cstore,
-        responder=fake_responder,
     ))
 
     assert [m["role"] for m in data["messages"]] == ["user", "assistant"]
@@ -808,7 +808,7 @@ def test_approve_proposal_uses_existing_profile_save_and_records_provenance(stor
     assert calls[0][0] == "investor_profile_calibration_approve"
     assert data["proposal"]["status"] == "approved"
     assert data["proposal"]["approved_at"] is not None
-    assert data["proposal"]["changed_fields"] == ["enabled", "risk_appetite", "risk_capacity"]
+    assert data["proposal"]["changed_fields"] == ["enabled", "risk_appetite", "risk_capacity", "risk_mismatch"]
     assert data["profile"]["risk_mismatch"] == "appetite_above_capacity"
     assert pstore.get().risk_appetite == 7
 
@@ -823,6 +823,13 @@ def test_reject_proposal_keeps_profile_unchanged(stores, monkeypatch):
 
     assert data["proposal"]["status"] == "rejected"
     assert pstore.get().enabled is False
+
+
+def test_calibration_router_mounts_on_real_app():
+    from src.api.app import app
+
+    paths = {getattr(route, "path", None) for route in app.routes}
+    assert "/profile/investor/calibration" in paths
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -870,9 +877,26 @@ from src.api.dependencies import get_investor_calibration_store, get_investor_pr
 from src.api.permissions import require_profile_state_write
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import CalibrationStore
-from src.investor_profile_calibration_agent import CalibrationResponder, unavailable_responder
+from src.investor_profile_calibration_agent import unavailable_responder
 
 router = APIRouter(prefix="/profile/investor/calibration", tags=["investor_profile"])
+_default_responder = unavailable_responder
+_PROFILE_PROVENANCE_FIELDS = (
+    "enabled",
+    "primary_preset",
+    "risk_appetite",
+    "risk_capacity",
+    "risk_mismatch",
+    "holding_horizon",
+    "drawdown_tolerance_pct",
+    "concentration_limit_pct",
+    "preferred_edge",
+    "avoidances",
+    "behavioral_flags",
+    "freeform_notes",
+    "default_stance",
+    "skill_mode",
+)
 
 
 class StartCalibrationBody(BaseModel):
@@ -958,7 +982,6 @@ def close_calibration_session(
 async def send_calibration_message(
     body: CalibrationMessageBody,
     store: CalibrationStore = Depends(get_investor_calibration_store),
-    responder: CalibrationResponder = unavailable_responder,
 ):
     active = store.get_active_session()
     sid = body.session_id or (active.id if active else None)
@@ -968,7 +991,7 @@ async def send_calibration_message(
     try:
         store.append_message(sid, role="user", content=body.content)
         messages = [{"role": m.role, "content": m.content} for m in store.list_messages(sid)]
-        result = await responder(messages=messages, provider=body.provider, model=body.model)
+        result = await _default_responder(messages=messages, provider=body.provider, model=body.model)
         store.append_message(sid, role="assistant", content=result.assistant_message)
         if result.profile_patch is not None:
             store.create_proposal(session_id=sid, profile_patch=result.profile_patch, rationales=result.rationales)
@@ -997,7 +1020,7 @@ def approve_calibration_proposal(
     before = asdict(profile_store.get())
     profile = profile_store.save(payload)
     after = asdict(profile)
-    changed = sorted(k for k, v in after.items() if before.get(k) != v)
+    changed = sorted(k for k in _PROFILE_PROVENANCE_FIELDS if before.get(k) != after.get(k))
     approved = store.mark_proposal_approved(proposal_id, changed_fields=changed)
     return {"profile": after, "proposal": _proposal(approved)}
 
@@ -1066,7 +1089,22 @@ git commit -m "feat: add investor calibration routes"
 
 - [ ] **Step 1: Add failing frontend tests**
 
-Append tests to `apps/arkscope-web/src/InvestorProfilePanel.test.tsx`:
+First widen the existing test response helper in `apps/arkscope-web/src/InvestorProfilePanel.test.tsx`; the current helper is typed to return only `InvestorProfileResponse`, but calibration calls return a different shape:
+
+```tsx
+import type { InvestorProfileResponse, CalibrationState, CalibrationProposal } from "./api";
+
+type PanelApiResponse =
+  | InvestorProfileResponse
+  | CalibrationState
+  | { profile: InvestorProfileResponse["profile"]; proposal: Partial<CalibrationProposal> };
+
+function stubFetch(handler: (url: string, init?: RequestInit) => PanelApiResponse) {
+  // existing body unchanged
+}
+```
+
+Then append tests using the existing `mount()`, `stubFetch()`, `disabledResponse()`, `host`, and `act()` helpers:
 
 ```tsx
 it("starts calibration, sends a message, and shows proposal rationale", async () => {
@@ -1077,6 +1115,7 @@ it("starts calibration, sends a message, and shows proposal rationale", async ()
     if (url.endsWith("/profile/investor/calibration/sessions")) {
       return {
         active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+        sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
         messages: [],
         latest_proposal: null,
       };
@@ -1084,6 +1123,7 @@ it("starts calibration, sends a message, and shows proposal rationale", async ()
     if (url.endsWith("/profile/investor/calibration/messages")) {
       return {
         active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+        sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
         messages: [
           { id: "m1", session_id: "s1", role: "user", content: "I chase AI stocks.", created_at: "t" },
           { id: "m2", session_id: "s1", role: "assistant", content: "Draft ready.", created_at: "t" },
@@ -1104,14 +1144,19 @@ it("starts calibration, sends a message, and shows proposal rationale", async ()
     }
     return disabledResponse();
   });
-  const host = await renderPanel();
+  await mount();
 
-  buttonByText("開始校準對話").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  await tick();
-  textareaByLabel("校準訊息").value = "I chase AI stocks.";
-  textareaByLabel("校準訊息").dispatchEvent(new Event("input", { bubbles: true }));
-  buttonByText("送出校準訊息").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  await tick();
+  const startBtn = Array.from(host!.querySelectorAll("button")).find((b) =>
+    b.textContent?.includes("開始校準對話"),
+  )!;
+  await act(async () => startBtn.click());
+  const textarea = host!.querySelector<HTMLTextAreaElement>('textarea[aria-label="校準訊息"]')!;
+  textarea.value = "I chase AI stocks.";
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  const sendBtn = Array.from(host!.querySelectorAll("button")).find((b) =>
+    b.textContent?.includes("送出校準訊息"),
+  )!;
+  await act(async () => sendBtn.click());
 
   expect(host!.textContent).toContain("Draft ready.");
   expect(host!.textContent).toContain("User said 10% drawdown");
@@ -1131,6 +1176,7 @@ it("approves calibration proposal through the dedicated endpoint", async () => {
     }
     return {
       active_session: { id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null },
+      sessions: [{ id: "s1", status: "active", created_at: "t", updated_at: "t", closed_at: null }],
       messages: [],
       latest_proposal: {
         id: "p1", session_id: "s1", status: "draft",
@@ -1140,17 +1186,16 @@ it("approves calibration proposal through the dedicated endpoint", async () => {
       },
     };
   });
-  await renderPanel();
-
-  buttonByText("套用校準提案").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  await tick();
+  await mount();
+  const approveBtn = Array.from(host!.querySelectorAll("button")).find((b) =>
+    b.textContent?.includes("套用校準提案"),
+  )!;
+  await act(async () => approveBtn.click());
 
   const approve = calls.find((c) => c.url.includes("/proposals/p1/approve"));
   expect(approve).toBeTruthy();
 });
 ```
-
-Adjust helper names (`buttonByText`, `textareaByLabel`, `tick`, `renderPanel`) to match the existing test helpers in the file. If those helpers do not exist, define them next to the existing helpers.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1324,7 +1369,8 @@ Add route test:
 
 ```python
 def test_route_default_responder_is_live_seam_not_unavailable():
-    assert routes.default_calibration_responder is not routes.unavailable_responder
+    assert routes._default_responder is routes.default_calibration_responder
+    assert routes._default_responder is not routes.unavailable_responder
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1393,14 +1439,13 @@ Modify `src/api/routes/investor_profile_calibration.py`:
 
 ```python
 from src.investor_profile_calibration_agent import (
-    CalibrationResponder,
     live_calibration_responder as default_calibration_responder,
 )
 ...
-responder: CalibrationResponder = default_calibration_responder
+_default_responder = default_calibration_responder
 ```
 
-Keep tests able to inject a fake responder by passing the handler arg directly.
+Keep tests able to inject a fake responder by monkeypatching the module-level `_default_responder`.
 
 - [ ] **Step 5: Add grep gates for no tools/no research leakage**
 
