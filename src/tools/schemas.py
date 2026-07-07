@@ -106,6 +106,31 @@ class PriceQueryResult(BaseModel):
     )
 
 
+class CurrentQuoteResult(BaseModel):
+    """Read-through current quote result.
+
+    ``mode`` is intentionally explicit:
+      - ibkr_snapshot: IBKR returned a snapshot; live-vs-delayed depends on account entitlement.
+      - local_last_bar: fallback to latest stored OHLCV close; not current.
+      - unavailable: no usable quote from the requested source.
+    """
+
+    ticker: str
+    provider: str
+    mode: str
+    price: Optional[float] = None
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    last: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[int] = None
+    timestamp: Optional[str] = None
+    currency: Optional[str] = None
+    stale: bool = False
+    source_note: str = ""
+    error: Optional[str] = None
+
+
 # ============================================================
 # Options / IV
 # ============================================================
