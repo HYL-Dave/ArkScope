@@ -7,6 +7,11 @@ from src.investor_profile_calibration import (
     CalibrationStore,
     normalize_proposal_payload,
 )
+from src.investor_profile_calibration_agent import (
+    CALIBRATION_SYSTEM_PROMPT,
+    CalibrationAgentResult,
+    parse_calibration_model_json,
+)
 
 
 def test_start_session_enforces_single_active_and_explicit_supersede(tmp_path):
@@ -83,3 +88,39 @@ def test_reject_and_approve_proposal_status_are_terminal(tmp_path):
 def test_normalize_proposal_rejects_agent_supplied_mismatch():
     with pytest.raises(ValueError, match="risk_mismatch"):
         normalize_proposal_payload({"risk_mismatch": "none"}, rationales={})
+
+
+def test_calibration_prompt_forbids_research_advice_and_tools():
+    p = CALIBRATION_SYSTEM_PROMPT.lower()
+    assert "do not give investment advice" in p
+    assert "do not recommend securities" in p
+    assert "no market data" in p
+    assert "profile proposal" in p
+
+
+def test_parse_calibration_json_followup_without_proposal():
+    result = parse_calibration_model_json(
+        '{"assistant_message":"What drawdown would make you sell?","proposal":null}'
+    )
+    assert result == CalibrationAgentResult(
+        assistant_message="What drawdown would make you sell?",
+        profile_patch=None,
+        rationales={},
+    )
+
+
+def test_parse_calibration_json_with_proposal_rejects_direct_mismatch():
+    with pytest.raises(ValueError, match="risk_mismatch"):
+        parse_calibration_model_json(
+            '{"assistant_message":"Draft ready","proposal":{"profile_patch":{"risk_mismatch":"none"},"rationales":{}}}'
+        )
+
+
+def test_parse_calibration_json_with_default_stance_proposal():
+    result = parse_calibration_model_json(
+        '{"assistant_message":"Draft ready","proposal":{"profile_patch":'
+        '{"enabled":true,"risk_appetite":8,"risk_capacity":4,"default_stance":"complementary"},'
+        '"rationales":{"default_stance":"User asked to be challenged."}}}'
+    )
+    assert result.profile_patch["default_stance"] == "complementary"
+    assert result.rationales["default_stance"] == "User asked to be challenged."
