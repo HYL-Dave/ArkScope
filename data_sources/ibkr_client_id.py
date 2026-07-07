@@ -23,6 +23,7 @@ import os
 # base well under 60 so derived ids never enter that band.
 DOMAIN_OFFSETS = {
     "manual": 0,    # the base itself: manual smokes / legacy single-client paths
+    "quotes": 5,    # ad hoc read-through quote snapshots
     "options": 10,  # option chain tools (readonly)
     "prices": 20,   # src.prices_runtime direct-local worker
     "news": 30,     # normalized IBKR news worker
@@ -33,6 +34,7 @@ DOMAIN_OFFSETS = {
 # one-file change (offset + label) that the API view and UI pick up automatically.
 DOMAIN_LABELS_ZH = {
     "manual": "基底",
+    "quotes": "即時股價",
     "options": "選擇權",
     "prices": "股價",
     "news": "新聞",

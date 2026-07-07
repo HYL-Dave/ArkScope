@@ -240,3 +240,11 @@ def test_get_ibkr_uses_options_domain_client_id(monkeypatch):
     oct_mod._get_ibkr()
 
     assert seen["client_id"] == 777
+
+
+def test_ibkr_client_id_quotes_domain(monkeypatch):
+    from data_sources.ibkr_client_id import ibkr_client_id_for
+
+    monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
+
+    assert ibkr_client_id_for("quotes") == 6
