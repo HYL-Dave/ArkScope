@@ -66,6 +66,19 @@ def get_investor_profile_store():
 
 
 @lru_cache(maxsize=1)
+def get_investor_calibration_store():
+    """Singleton Investor Profile calibration journal/proposal store.
+
+    Track A.5 calibration messages and inert proposals live in the same local
+    profile DB as the approved investor profile. Raw calibration text is never
+    research history and never a prompt input.
+    """
+    from src.investor_profile_calibration import CalibrationStore
+
+    return CalibrationStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_thread_store():
     """Singleton local store for AI 研究 conversation threads/messages (same local
     SQLite). Threads live alongside profile state in the local DB, never PG."""

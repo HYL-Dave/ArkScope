@@ -113,6 +113,7 @@ def create_app() -> FastAPI:
     from .routes.macro_calendar import router as macro_calendar_router
     from .routes.profile import router as profile_router
     from .routes.investor_profile import router as investor_profile_router
+    from .routes.investor_profile_calibration import router as investor_profile_calibration_router
     from .routes.analysis_cards import router as analysis_cards_router
     from .routes.symbols import router as symbols_router
     from .routes.consensus import router as consensus_router
@@ -138,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(macro_calendar_router)
     app.include_router(profile_router)
     app.include_router(investor_profile_router)
+    app.include_router(investor_profile_calibration_router)
     app.include_router(analysis_cards_router)
     app.include_router(symbols_router)
     app.include_router(consensus_router)
