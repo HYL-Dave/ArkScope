@@ -1,5 +1,20 @@
 # Investment Profile Track A Implementation Plan
 
+> **Status: IMPLEMENTED FOR REVIEW (2026-07-07) — reviewer full A/B running; not merged.**
+> Implementation notes: (1) PLAN AMENDMENT executed — the workbench Research UI runs on
+> server-owned runs (createResearchRun + poll), so stance rides research_runs
+> (assistant_stance column, create-time 400 validation, execute-time resolution with
+> honest degrade-to-off) in addition to the three /query/stream branches; without this the
+> real product surface would silently ignore stance. (2) Pre-existing fresh-checkout bug
+> found by the Task 7 smoke gate and fixed with TDD: baseless auto-DSN DAL crashed on
+> `_base / "config"` (sslmode member of the baseless-DAL family) — reproduced on the merge
+> base, guarded via infer_sslmode; the PG-unreachable smoke now passes on VIRGIN checkouts.
+> (3) Preflight Discord evidence: zero launchers/imports of src/monitor/discord_bot.py
+> (its launcher scripts/monitor_service.py was deleted in hygiene B1) — likely
+> unreachable, pending Track B retirement. (4) vitest include widened to .test.tsx.
+>
+> Original header below.
+>
 > **Status: REVIEW DRAFT (2026-07-06).** Built from
 > `docs/design/INVESTMENT_SKILLS_PROFILE_DESIGN.md` after review commit `cc0c71e`.
 > Track A implements only v1 Investor Profile + Assistant Stance. It does **not**
@@ -89,7 +104,7 @@ The design doc §13 leaves five planning questions. Track A locks them as follow
 
 ## Preflight (No Commit)
 
-- [ ] Run the legacy auto-apply inventory:
+- [x] Run the legacy auto-apply inventory:
 
 ```bash
 rg -n "build_auto_apply_context|match_skill_trigger|can_auto_apply" src/agents src/monitor scripts apps tests --glob "*.py" --glob "*.tsx" --glob "*.ts"
@@ -102,7 +117,7 @@ Expected current-state shape:
 - workbench routes (`src/api/routes/query.py`, `src/api/routes/analysis_cards.py`) have no
   trigger matching.
 
-- [ ] Run the Discord live-surface check:
+- [x] Run the Discord live-surface check:
 
 ```bash
 rg -n "discord_bot|DISCORD|Discord|monitor_service|discord" README.md docs src scripts tests --glob "*.py" --glob "*.md" --glob "*.sh"
