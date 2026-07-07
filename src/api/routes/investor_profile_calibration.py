@@ -16,10 +16,13 @@ from src.api.dependencies import get_investor_calibration_store, get_investor_pr
 from src.api.permissions import require_profile_state_write
 from src.investor_profile import InvestorProfileStore
 from src.investor_profile_calibration import CalibrationStore
-from src.investor_profile_calibration_agent import unavailable_responder
+from src.investor_profile_calibration_agent import (
+    live_calibration_responder as default_calibration_responder,
+    unavailable_responder,
+)
 
 router = APIRouter(prefix="/profile/investor/calibration", tags=["investor_profile"])
-_default_responder = unavailable_responder
+_default_responder = default_calibration_responder
 _PROFILE_PROVENANCE_FIELDS = (
     "enabled",
     "primary_preset",

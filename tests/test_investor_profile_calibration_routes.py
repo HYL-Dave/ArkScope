@@ -137,3 +137,8 @@ def test_calibration_router_mounts_on_real_app():
     app = create_app()
     paths = {getattr(route, "path", None) for route in app.routes}
     assert "/profile/investor/calibration" in paths
+
+
+def test_route_default_responder_is_live_seam_not_unavailable():
+    assert routes._default_responder is routes.default_calibration_responder
+    assert routes._default_responder is not routes.unavailable_responder

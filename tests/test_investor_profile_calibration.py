@@ -1,5 +1,7 @@
 """Track A.5: Investor Profile calibration journal + proposal store."""
 
+import asyncio
+
 import pytest
 
 from src.investor_profile import InvestorProfileStore
@@ -124,3 +126,33 @@ def test_parse_calibration_json_with_default_stance_proposal():
     )
     assert result.profile_patch["default_stance"] == "complementary"
     assert result.rationales["default_stance"] == "User asked to be challenged."
+
+
+def test_responder_request_contains_no_tool_or_market_language(monkeypatch):
+    import src.investor_profile_calibration_agent as mod
+
+    captured = {}
+
+    async def fake_call(*, provider, model, instructions, input_messages):
+        captured.update(
+            {
+                "provider": provider,
+                "model": model,
+                "instructions": instructions,
+                "input_messages": input_messages,
+            }
+        )
+        return '{"assistant_message":"What is your maximum tolerable drawdown?","proposal":null}'
+
+    monkeypatch.setattr(mod, "_call_calibration_llm", fake_call)
+    result = asyncio.run(
+        mod.live_calibration_responder(
+            messages=[{"role": "user", "content": "I want growth."}],
+            provider="openai",
+            model="gpt-5.4-mini",
+        )
+    )
+    assert result.assistant_message.startswith("What")
+    blob = captured["instructions"].lower()
+    assert "no market data" in blob
+    assert "tool" not in captured
