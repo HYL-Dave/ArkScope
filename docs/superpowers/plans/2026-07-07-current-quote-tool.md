@@ -31,6 +31,8 @@ Current code has price history, but not current quote:
 - `data_sources/ibkr_source.py::IBKRDataSource.get_current_quote()` already exists and uses `reqMktData(..., snapshot=True)`.
 - `src/tools/option_chain_tools.py` already calls `ibkr.get_current_quote(ticker)` internally for option-chain spot price.
 - `src/auth_drivers/claude_code_sdk_driver.py` and `src/auth_drivers/chatgpt_oauth_driver.py` have hardcoded read-only allowlists. Adding a registry tool is not enough for subscription-backed research.
+- `docs/design/ARKSCOPE_TOOL_CATALOG.md` is the canonical registry inventory and roll-up; adding a registry tool must update its table and counts in the same slice.
+- `src/auth_drivers/claude_code_sdk_driver.py` has a stale-count comment for the research allowlist (`12 read-only tools`). `rg` found no matching numeric read-only count in `chatgpt_oauth_driver.py`.
 
 ---
 
@@ -44,6 +46,8 @@ Current code has price history, but not current quote:
 6. **Separate IBKR client id domain.** Add `quotes` to `data_sources.ibkr_client_id.DOMAIN_OFFSETS` with offset `5`, avoiding collision with `options=10`, `prices=20`, `news=30`, and `iv=40`.
 7. **No Polygon/Finnhub in v1.** Provider quote capability display can add those later with explicit free-tier semantics.
 8. **No UI panel in v1 unless a later review requests it.** This slice delivers the agent tool and API surface. Existing UI can call the API later.
+9. **Catalog stays synchronized with code.** `ARKSCOPE_TOOL_CATALOG.md` row + roll-up counts are part of the implementation, not closeout-only docs.
+10. **Client-id hints are backend-derived.** Adding the `quotes` domain automatically makes Settings show the derived hint (`即時股價=base+5`); that UI diff is expected and comes from `ibkr_client_id.py` as the single authority.
 
 ---
 
@@ -57,6 +61,7 @@ Current code has price history, but not current quote:
 - Modify `src/agents/anthropic_agent/tools.py` — expose Anthropic tool schema + dispatcher.
 - Modify `src/auth_drivers/claude_code_sdk_driver.py` and `src/auth_drivers/chatgpt_oauth_driver.py` — add quote to read-only allowlists.
 - Modify `src/api/routes/prices.py` — add `GET /prices/{ticker}/quote`.
+- Modify `docs/design/ARKSCOPE_TOOL_CATALOG.md` — add catalog row and bump registry/bridge roll-up counts.
 - Modify tests:
   - `tests/test_current_quote_tools.py` (new)
   - `tests/test_option_chain_tools.py`
@@ -438,12 +443,12 @@ Modify `data_sources/ibkr_client_id.py`:
 
 ```python
 DOMAIN_OFFSETS = {
-    "manual": 0,
-    "quotes": 5,   # ad hoc read-through quote snapshots
-    "options": 10,
-    "prices": 20,
-    "news": 30,
-    "iv": 40,
+    "manual": 0,    # the base itself: manual smokes / legacy single-client paths
+    "quotes": 5,    # ad hoc read-through quote snapshots
+    "options": 10,  # option chain tools (readonly)
+    "prices": 20,   # src.prices_runtime direct-local worker
+    "news": 30,     # normalized IBKR news worker
+    "iv": 40,       # reserved for the IV reboot line
 }
 ```
 
@@ -459,6 +464,8 @@ DOMAIN_LABELS_ZH = {
     "iv": "IV",
 }
 ```
+
+Use insertion edits only; do not rewrite the dicts in a way that drops existing inline comments. Settings derives the displayed client-id hint from this backend authority, so `即時股價=6` with default base `1` is expected.
 
 - [ ] **Step 4: Run tests**
 
@@ -487,6 +494,7 @@ git commit -m "feat: wire ibkr quote client id"
 - Modify: `src/agents/anthropic_agent/tools.py`
 - Modify: `src/auth_drivers/claude_code_sdk_driver.py`
 - Modify: `src/auth_drivers/chatgpt_oauth_driver.py`
+- Modify: `docs/design/ARKSCOPE_TOOL_CATALOG.md`
 - Modify: `tests/test_tools.py`
 - Modify: `tests/test_agents.py`
 - Modify: `tests/test_claude_code_sdk_driver.py`
@@ -644,7 +652,30 @@ Modify both:
 
 Add `"get_current_quote"` to `_RESEARCH_READONLY_TOOLS` next to `"get_ticker_prices"`.
 
-- [ ] **Step 7: Run focused tests**
+- [ ] **Step 7: Update catalog and stale-count comment**
+
+Modify `docs/design/ARKSCOPE_TOOL_CATALOG.md` in the same commit:
+
+- Header count: `51 registry tools` -> `52 registry tools`.
+- Bridge count: `52` -> `53`.
+- Stable primitives heading: `28 tools` -> `29 tools`.
+- Add row next to `get_ticker_prices`:
+
+```markdown
+| `get_current_quote` | prices | ticker*, source? | IBKR snapshot + local last-bar fallback | keep-current |
+```
+
+- Verdict roll-up: keep-current `45` -> `46`, SP count `28` -> `29`, total live equation `46 + 2 + 1 + 2 + 1 = 52`.
+
+Modify `src/auth_drivers/claude_code_sdk_driver.py` comment:
+
+```python
+# §3 Tier-1 allowlist (13 read-only tools). Hardcoded frozenset — NOT derived
+```
+
+No equivalent numeric stale-count comment exists in `src/auth_drivers/chatgpt_oauth_driver.py`.
+
+- [ ] **Step 8: Run focused tests**
 
 Run:
 
@@ -654,10 +685,10 @@ pytest tests/test_tools.py::TestRegistry tests/test_agents.py::TestAnthropicTool
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/tools/registry.py src/agents/openai_agent/tools.py src/agents/anthropic_agent/tools.py src/auth_drivers/claude_code_sdk_driver.py src/auth_drivers/chatgpt_oauth_driver.py tests/test_tools.py tests/test_agents.py tests/test_claude_code_sdk_driver.py
+git add src/tools/registry.py src/agents/openai_agent/tools.py src/agents/anthropic_agent/tools.py src/auth_drivers/claude_code_sdk_driver.py src/auth_drivers/chatgpt_oauth_driver.py docs/design/ARKSCOPE_TOOL_CATALOG.md tests/test_tools.py tests/test_agents.py tests/test_claude_code_sdk_driver.py
 git commit -m "feat: expose current quote as agent tool"
 ```
 
@@ -806,6 +837,14 @@ pytest tests/test_current_quote_tools.py tests/test_prices_quote_route.py tests/
 
 Expected: PASS. If `tests/test_claude_code_sdk_driver.py` contains unrelated existing failures, stop and report exact failures before changing scope.
 
+Also verify catalog synchronization:
+
+```bash
+rg -n "get_current_quote|52 registry tools|53\\)|Stable primitives \\(SP\\) — 29 tools|Total live = 46 \\+ 2 \\+ 1 \\+ 2 \\+ 1 = 52" docs/design/ARKSCOPE_TOOL_CATALOG.md
+```
+
+Expected: all four catalog/count facts present.
+
 - [ ] **Step 2: Run PG-unreachable smoke**
 
 Run:
@@ -846,6 +885,7 @@ Stop and report if any of these occur:
 4. OAuth research bridge rejects the registry because `get_current_quote` is not allowlisted.
 5. Tests require live IB Gateway. Unit tests must use fakes only.
 6. Full A/B shows head-only failures outside named tool ledger changes.
+7. `ARKSCOPE_TOOL_CATALOG.md` counts or roll-up are stale relative to `ToolRegistry`.
 
 ---
 
@@ -858,4 +898,3 @@ Stop and report if any of these occur:
 5. Tool registry, Anthropic tools, OpenAI tools, and OAuth read-only allowlists all include `get_current_quote`.
 6. `/prices/{ticker}/quote` returns the same model shape as the tool.
 7. PG-unreachable smoke remains clean.
-
