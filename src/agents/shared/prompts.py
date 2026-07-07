@@ -145,7 +145,7 @@ WHEN TO USE WHICH:
 
 Do NOT use web search for:
 - Data available via existing tools (prices, scored news, fundamentals)
-- Simple ticker lookups — use get_ticker_news, get_ticker_prices first
+- Simple ticker lookups — use get_current_quote for current price, get_ticker_prices for bars/history, and get_ticker_news for news
 
 ─── WEB SEARCH STRATEGY ───
 
