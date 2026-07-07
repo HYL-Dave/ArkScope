@@ -222,6 +222,50 @@ The setup should allow the user to write observations or hopes in their own word
 The agent may ask follow-up questions to infer bias and capacity. The output should be a
 structured profile proposal that the user confirms before saving.
 
+### 4.4 Calibration chat as long-lived journal
+
+Track A shipped a form-first version of freeform calibration. That is useful as a review
+surface, but it is too abstract as the primary acquisition surface: most users do not know
+how to translate their own behavior into fields such as `risk_capacity`,
+`behavioral_flags`, or `default_stance`.
+
+The next profile slice should treat calibration as a long-lived journal, not a one-time
+wizard:
+
+- Raw calibration dialogue is append-only and preserved for review.
+- The active investor profile changes only through a user-approved structured proposal.
+- The first implementation stays wizard-sized: start one calibration conversation, let
+  the assistant ask follow-up questions, produce one proposal, and let the user confirm,
+  edit, or reject it.
+- Future implementations may use the accumulated journal to re-calibrate over time, but
+  v1 of this slice does not automatically rewrite the profile from historical messages.
+
+This avoids the false finality of a one-time questionnaire while keeping the first
+implementation small.
+
+### 4.5 Proposal authority
+
+Calibration chat produces a proposal, not an active profile mutation.
+
+The proposal may include any existing investor-profile field, including
+`default_stance`. This is deliberate: the assistant may infer that the user is best served
+by a complementary, strict-risk-control, valuation-rationalist, or growth-opportunity
+default. The proposal still has no effect until the user approves or edits it.
+
+The server remains the authority for derived fields:
+
+- `risk_mismatch` is always derived by the server from `risk_appetite` and
+  `risk_capacity`.
+- The assistant may explain why it proposes `risk_appetite=8` and `risk_capacity=4`, but
+  it must not persist `risk_mismatch` directly.
+- Proposal validation must use the same normalization path as Track A profile draft/save.
+
+The Track A form should become the proposal review/edit surface. After a calibration
+conversation, the form is prefilled with the proposed values and each changed field can
+carry a short rationale such as "User said a 10% drawdown would cause likely selling;
+proposed risk_capacity=4." This gives the abstract fields context without replacing the
+structured profile contract.
+
 ## 5. Assistant Stance Model
 
 Assistant Stance is separate from Investor Profile and can be changed per run.
@@ -367,6 +411,32 @@ Examples:
 - "I can tolerate 30% drawdowns in individual positions."
 - "For crypto-related equities, be stricter than usual."
 
+### 7.4 Calibration chat flow
+
+Track A.5 adds a dedicated calibration flow before Track B skill suggestions.
+
+Recommended v1 flow:
+
+1. User opens Investor Profile calibration and starts the active calibration session.
+2. User describes goals, observations, constraints, or hopes in natural language.
+3. Assistant asks targeted follow-up questions about risk appetite, risk capacity,
+   drawdown behavior, concentration, horizon, and behavioral patterns.
+4. Assistant produces a structured proposal with field-level rationales.
+5. User reviews the proposal in the existing form surface, edits any field, and approves
+   or rejects it.
+6. Approved proposals update `investor_profile` through the existing profile-state write
+   gate. Rejected proposals stay in history.
+
+v1 session lifecycle is intentionally simple:
+
+- At most one active calibration session exists at a time.
+- Historical sessions are read-only records.
+- Starting a new calibration session closes or supersedes the prior active session only
+  through an explicit implementation-plan rule; silent merging is not allowed.
+
+This flow is distinct from research threads. Calibration messages must not appear in the
+research history UI, research hydration path, or report/card evidence history.
+
 ## 8. Storage Boundary
 
 ### 8.1 Recommended storage
@@ -394,6 +464,31 @@ delete it immediately, but it changes the desired end state:
 This requires its own implementation plan because it changes skill loading and export
 semantics.
 
+### 8.3 Calibration storage
+
+Calibration state belongs in local `profile_state.db` alongside the investor profile.
+Do not store calibration messages in `research_threads`: those are research artefacts,
+while calibration is user-profile state.
+
+Recommended tables for Track A.5:
+
+- `investor_profile_calibration_sessions`: one row per calibration session, with status
+  such as `active`, `closed`, or `superseded`.
+- `investor_profile_calibration_messages`: append-only raw dialogue for that session.
+- `investor_profile_calibration_proposals`: structured proposed profile diff, field-level
+  rationales, status `draft` / `approved` / `rejected`, and timestamps.
+
+Approved writes must record provenance:
+
+- `proposal_id`;
+- `approved_at`;
+- the profile fields changed by approval;
+- enough room for a future `profile_version` or equivalent profile-run version reference.
+
+Track A.5 does not have to implement profile-versioned research traces, but its schema
+must not block that later. A future research/card trace should be able to say which
+approved profile/proposal version shaped the run.
+
 ## 9. Agent Prompt Contract
 
 When profile personalization is active, the agent context should contain a compact,
@@ -403,6 +498,10 @@ This block belongs in synthesis/chat context only. It must not be passed into
 `gather_evidence()` or any deterministic evidence collector, and it must not change the
 EvidencePacket rules from ProductSpec §2. In card generation, stance can change emphasis
 inside the synthesis prompt, not evidence eligibility.
+
+Calibration raw dialogue has an even narrower boundary: it must not be injected into
+research prompts, card prompts, EvidencePacket gathering, or report generation. Only the
+user-approved structured profile can shape research behavior.
 
 Example:
 
@@ -445,6 +544,9 @@ working model.
    rules.
 8. The feature must not be marketed as financial advice or suitability determination. It
    is a research-personalization aid.
+9. Calibration chat is profile acquisition, not investment research. Track A.5 should not
+   give the calibration assistant market-data, news, web, code-execution, or write tools.
+   Its only output is a structured profile proposal for user approval.
 
 ## 11. Implementation Tracks
 
@@ -474,6 +576,56 @@ Acceptance:
 - profile edits require profile-state permission;
 - when `profile.enabled=false`, workbench prompt behavior is byte-identical and effective
   stance is `off`.
+
+### Track A.5 - calibration chat journal and proposal flow
+
+Build before Track B. This is the correction to Track A's overly abstract form-first
+setup: calibration becomes a long-lived profile journal, while the first implementation
+remains wizard-sized.
+
+Build:
+
+- append-only calibration session/message/proposal storage in `profile_state.db`;
+- one active calibration session at a time, with historical sessions read-only;
+- calibration chat UI in the Investor Profile area;
+- assistant follow-up prompts focused on risk appetite, risk capacity, drawdown behavior,
+  concentration, horizon, behavioral patterns, and desired assistant behavior;
+- structured profile proposal with field-level rationales;
+- proposal review/edit using the existing Investor Profile form;
+- approval path that writes through the existing profile normalization and
+  `profile_state_write` permission gate;
+- proposal provenance (`proposal_id`, `approved_at`, changed fields, future-proof slot for
+  profile-version trace).
+
+Explicit decisions:
+
+- Calibration is long-lived journal data, not a one-time form replacement.
+- v1 UI scope is one active calibration conversation -> one proposal -> approve/edit/reject.
+- Raw calibration messages never shape research directly.
+- The proposal may include `default_stance`, subject to user confirmation.
+- `risk_mismatch` remains server-derived and is never accepted from the assistant.
+- v1 calibration assistant has no market-data, news, web, code-execution, or write tools.
+
+Open for the implementation plan:
+
+- Execution path. Option A: reuse the server-owned run manager for streaming, cancellation,
+  and replay mechanics, but store calibration threads in dedicated calibration tables and
+  hard-block leakage into research history/hydration. Option B: build a smaller dedicated
+  calibration loop. Recommendation to evaluate in the plan: Option A plus independent
+  storage, unless the reuse surface would force research-thread coupling.
+- Exact active-session rule when a user starts a second session: close, supersede, or
+  require explicit discard.
+
+Acceptance:
+
+- calibration messages are append-only and separate from research threads;
+- draft proposal does not mutate `investor_profile`;
+- approving a proposal writes through the same validation/permission path as Track A;
+- rejected proposals remain inspectable but inert;
+- research/card prompts remain byte-identical except for already-approved structured
+  profile fields;
+- profile trace can later point to the approved proposal/profile version without schema
+  redesign.
 
 ### Track B - v1.5 skill suggestion
 
@@ -529,8 +681,10 @@ These are planning questions, not blockers for this design:
 1. Which profile-store API should own the new tables: a new `investor_profile_store.py` or
    an extension of an existing profile-state store?
 2. Should v1 start with only Growth Investor preset, or ship a small preset set?
-3. Should freeform calibration call an LLM in the setup flow, or first save raw notes and
-   add structured inference later?
+3. Track A.5 execution path: reuse the server-owned run manager with separate calibration
+   storage, or build a dedicated lightweight calibration loop?
 4. What exact UI surface owns the stance selector: query composer, Settings, or both?
 5. Should profile export/import be part of the first implementation plan or deferred to
    the larger profile-portability track?
+6. When starting a second calibration session, should the previous active session close,
+   become superseded, or require explicit discard?
