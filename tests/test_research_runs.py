@@ -343,3 +343,34 @@ def test_execute_run_off_omits_personalization_kwarg(stores, tmp_path, monkeypat
     assert run_store.get_run("ro").status == "succeeded"
     last = thread_store.list_messages("t1")[-1]
     assert last.personalization is None or last.personalization["profile_active"] is False
+
+
+def test_cancelled_run_persists_personalization_trace(stores, tmp_path, monkeypatch):
+    import asyncio
+
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    _tracka_profile(tmp_path, monkeypatch, enabled=True)
+    thread_store.ensure_thread(id="t1", title="q")
+    thread_store.append_message(thread_id="t1", role="user", content="q")
+    run_store.create_run(
+        id="rc", thread_id="t1", question="q", ticker=None,
+        provider="anthropic", model="m", effort=None,
+        auth_mode="api_key", credential_id=None,
+        assistant_stance="complementary",
+    )
+
+    async def cancelling_factory(**kwargs):
+        raise asyncio.CancelledError()
+        yield  # pragma: no cover — makes this an async generator
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(execute_research_run(
+            run_id="rc", run_store=run_store, thread_store=thread_store,
+            dal=object(), history=[], stream_factory=cancelling_factory,
+        ))
+    last = thread_store.list_messages("t1")[-1]
+    assert last.is_error is True
+    assert last.personalization["assistant_stance"] == "complementary"
+    assert last.personalization["profile_active"] is True

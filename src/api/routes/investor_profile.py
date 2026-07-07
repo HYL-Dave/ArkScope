@@ -42,8 +42,13 @@ class InvestorProfileBody(BaseModel):
     skill_mode: Optional[str] = None
 
     def payload(self) -> dict:
-        """Only fields the client actually sent (merge semantics)."""
-        return {k: v for k, v in self.model_dump().items() if v is not None}
+        """Only fields the client actually sent (merge semantics).
+
+        Uses model_fields_set so an EXPLICIT null clears a field (the UI sends
+        null when the user resets e.g. risk_appetite) while omitted fields
+        still mean "no change".
+        """
+        return {k: v for k, v in self.model_dump().items() if k in self.model_fields_set}
 
 
 def _response(profile: InvestorProfile) -> dict:

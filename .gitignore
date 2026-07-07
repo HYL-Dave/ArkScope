@@ -205,6 +205,7 @@ scripts/huggingface/output/
 # Desktop shell (Node / Electron) — build + dependency artifacts
 # -----------------------------------------------------------------------------
 node_modules/
+node_modules
 apps/*/dist/
 apps/*/dist-electron/
 apps/*/release/

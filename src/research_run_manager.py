@@ -107,6 +107,7 @@ async def execute_research_run(
             collected=collected, provider=run.provider, model=run.model,
             effort=run.effort,
             elapsed=round(time.monotonic() - t0, 3),
+            personalization=personalization,
         )
         raise
     except Exception as exc:  # noqa: BLE001 — terminal error, not route crash

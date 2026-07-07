@@ -87,3 +87,24 @@ def test_disabled_profile_response_context_preview_empty(store, monkeypatch):
     assert data["effective_stance"] == "off"
     assert data["context_preview"] == ""
     assert data["trace"]["profile_active"] is False
+
+
+def test_put_explicit_null_clears_field_but_omitted_keeps(store, monkeypatch):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    routes.put_investor_profile(
+        routes.InvestorProfileBody(enabled=True, risk_appetite=8, risk_capacity=4),
+        store=store,
+    )
+    assert store.get().risk_appetite == 8
+
+    # explicit null = clear (the UI sends null when the user resets a field)
+    body = routes.InvestorProfileBody.model_validate(
+        {"risk_appetite": None, "drawdown_tolerance_pct": None}
+    )
+    data = routes.put_investor_profile(body, store=store)
+    assert data["profile"]["risk_appetite"] is None
+    assert data["profile"]["drawdown_tolerance_pct"] is None
+    assert store.get().risk_appetite is None
+    # omitted fields stay unchanged
+    assert store.get().risk_capacity == 4
+    assert store.get().enabled is True
