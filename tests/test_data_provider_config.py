@@ -664,9 +664,9 @@ def test_view_exposes_client_id_domains(store, monkeypatch):
         if f["field"] == "client_id"
     )
     doms = row["client_id_domains"]
-    assert [d["domain"] for d in doms] == ["manual", "options", "prices", "news", "iv"]
-    assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40]
-    assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41]
+    assert [d["domain"] for d in doms] == ["manual", "options", "prices", "news", "iv", "quotes"]
+    assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40, 50]
+    assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41, 51]
     assert doms[2]["label"] == "股價"
 
     # a real-env override wins precedence — effective ids must reflect it
@@ -675,7 +675,7 @@ def test_view_exposes_client_id_domains(store, monkeypatch):
         f for f in pc._view(store)["providers"]["ibkr"]["fields"]
         if f["field"] == "client_id"
     )["client_id_domains"]
-    assert [d["effective_id"] for d in doms] == [7, 17, 27, 37, 47]
+    assert [d["effective_id"] for d in doms] == [7, 17, 27, 37, 47, 57]
 
     # unparsable env base → ids unknown, list still present (UI shows placeholders)
     monkeypatch.setenv("IBKR_CLIENT_ID", "abc")

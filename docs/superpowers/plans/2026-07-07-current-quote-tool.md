@@ -43,7 +43,7 @@ Current code has price history, but not current quote:
 3. **Fallback is explicit.** If `source="auto"` and IBKR fails or returns no usable price, return the latest local bar as `mode="local_last_bar"` with `stale=True`; do not pretend it is current.
 4. **`source="ibkr"` is strict.** If IBKR fails, return `mode="unavailable"` and do not fall back.
 5. **`source="local"` never touches IBKR.** It returns latest local bar or unavailable.
-6. **Separate IBKR client id domain.** Add `quotes` to `data_sources.ibkr_client_id.DOMAIN_OFFSETS` with offset `5`, avoiding collision with `options=10`, `prices=20`, `news=30`, and `iv=40`.
+6. **Separate IBKR client id domain.** Add `quotes` to `data_sources.ibkr_client_id.DOMAIN_OFFSETS` with offset `50` — the next 10-wide band (reviewer adjudication after the full A/B caught `test_offsets_are_distinct_and_spaced`: the module enforces >=10 spacing between offsets, so the originally planned `5` violated the band policy; with seeded base 1 the effective id 51 stays distinct from legacy collect_ibkr_news.py's absolute 50 for any base >= 1).
 7. **No Polygon/Finnhub in v1.** Provider quote capability display can add those later with explicit free-tier semantics.
 8. **No UI panel in v1 unless a later review requests it.** This slice delivers the agent tool and API surface. Existing UI can call the API later.
 9. **Catalog stays synchronized with code.** `ARKSCOPE_TOOL_CATALOG.md` row + roll-up counts are part of the implementation, not closeout-only docs.
@@ -425,7 +425,7 @@ def test_ibkr_client_id_quotes_domain(monkeypatch):
 
     monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
 
-    assert ibkr_client_id_for("quotes") == 6
+    assert ibkr_client_id_for("quotes") == 51
 ```
 
 - [ ] **Step 2: Run tests to verify failure**
@@ -466,7 +466,7 @@ DOMAIN_LABELS_ZH = {
 }
 ```
 
-Use insertion edits only; do not rewrite the dicts in a way that drops existing inline comments. Settings derives the displayed client-id hint from this backend authority, so `即時股價=6` with default base `1` is expected.
+Use insertion edits only; do not rewrite the dicts in a way that drops existing inline comments. Settings derives the displayed client-id hint from this backend authority, so `即時股價=51` with default base `1` is expected. The domain-enum ledger extends beyond tool counts: `tests/test_ibkr_client_id.py` (offset spacing invariant) and `tests/test_data_provider_config.py::test_view_exposes_client_id_domains` (exact domain/offset/effective-id lists, in BOTH the default and override-precedence sections) must gain the new domain.
 
 - [ ] **Step 4: Run tests**
 

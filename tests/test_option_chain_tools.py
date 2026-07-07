@@ -247,4 +247,4 @@ def test_ibkr_client_id_quotes_domain(monkeypatch):
 
     monkeypatch.delenv("IBKR_CLIENT_ID", raising=False)
 
-    assert ibkr_client_id_for("quotes") == 6
+    assert ibkr_client_id_for("quotes") == 51
