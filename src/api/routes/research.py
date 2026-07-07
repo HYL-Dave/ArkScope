@@ -91,6 +91,7 @@ def _message_dict(m: ResearchMessage) -> dict:
         "tools_used": m.tools_used, "tool_calls": m.tool_calls,
         "token_usage": m.token_usage, "tickers": m.tickers,
         "elapsed_seconds": m.elapsed_seconds, "is_error": m.is_error, "created_at": m.created_at,
+        "personalization": m.personalization,
     }
 
 

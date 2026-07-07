@@ -7,6 +7,7 @@
 // (sse.ts) — the reducer must tolerate an under-populated frame.data.
 // ============================================================================
 
+import type { PersonalizationTrace } from "./api";
 import type { SSEFrame } from "./sse";
 
 export type Provider = "anthropic" | "openai" | string; // string: unknown-provider route errors
@@ -53,6 +54,7 @@ export interface Message {
   isError?: boolean; // error frame / streamError / '連線中斷'
   maxTurns?: boolean; // true IFF provider==='anthropic' AND content === sentinel
   synthesized?: boolean; // true ONLY for the client-fabricated '連線中斷' bubble
+  personalization?: PersonalizationTrace | null; // Track A trace from done.data / store
 }
 
 export interface RetryCandidate {
@@ -235,6 +237,7 @@ function onDone(state: State, p: PendingTurn, data: Record<string, unknown>, ts:
     tool_calls: toolCalls(p.trace), token_usage, tickers: p.tickers,
     elapsed_seconds: (ts - p.startedAt) / 1000, created_at: iso(ts),
     isError: false, maxTurns,
+    personalization: (data.personalization as PersonalizationTrace | undefined) ?? null,
   };
   return {
     ...commit(state, p, msg, maxTurns ? "maxTurns" : "done", ts),

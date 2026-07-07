@@ -9,6 +9,9 @@
 // CardView / CardModal are exported so Home can read a card in place.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace } from "./api";
+import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import {
   generateCard,
   getCard,
@@ -31,6 +34,10 @@ export function AICardTab({ ticker }: { ticker: string }) {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Track A: opt-in stance override for card synthesis + trace of the run shown.
+  const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
+  const [cardStance, setCardStance] = useState<AssistantStance>("off");
+  const [lastTrace, setLastTrace] = useState<PersonalizationTrace | null>(null);
   // Evidence news window (defaults match the backend: 21 days / 12 articles).
   const [showAdv, setShowAdv] = useState(false);
   const [newsDays, setNewsDays] = useState(21);
@@ -55,7 +62,24 @@ export function AICardTab({ ticker }: { ticker: string }) {
   }, [ticker]);
 
   useEffect(() => {
+    let cancelled = false;
+    getInvestorProfile()
+      .then((r) => {
+        if (cancelled) return;
+        setInvestorProfile(r);
+        if (r.profile.enabled) setCardStance(r.profile.default_stance);
+      })
+      .catch(() => {
+        /* personalization optional — failed load = feature off */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     reqRef.current++; // invalidate any in-flight response from a prior ticker
+    setLastTrace(null);
     setCard(null);
     setEvidencePacket(null);
     setRunId(null);
@@ -83,8 +107,10 @@ export function AICardTab({ ticker }: { ticker: string }) {
         // include_sa intentionally omitted → backend uses config.sa_enabled.
         news_days: newsDays,
         max_news: maxNews,
+        assistant_stance: investorProfile?.profile.enabled ? cardStance : undefined,
       });
       if (id !== reqRef.current) return; // superseded (ticker switch / new action)
+      setLastTrace(r.personalization ?? null);
       setCard(r.card);
       setEvidencePacket(r.evidence_packet);
       setRunId(r.run_id);
@@ -102,6 +128,7 @@ export function AICardTab({ ticker }: { ticker: string }) {
     try {
       const d = await getCard(rid);
       if (id !== reqRef.current) return;
+      setLastTrace(d.personalization ?? null);
       setCard(d.card);
       setEvidencePacket(d.evidence_packet);
       setRunId(d.run_id);
@@ -163,11 +190,24 @@ export function AICardTab({ ticker }: { ticker: string }) {
               onChange={(e) => setMaxNews(clampInt(e.target.value, 1, 50, 12))} /> 篇（最近期）
           </label>
           <span className="muted tiny">預設 21 天 / 12 篇；不會用上全部保留的新聞。</span>
+          {investorProfile?.profile.enabled && (
+            <label>立場
+              <select value={cardStance} disabled={busy}
+                onChange={(e) => setCardStance(e.target.value as AssistantStance)}>
+                {(["off", "neutral", "aligned", "complementary", "strict_risk_control", "valuation_rationalist", "growth_opportunity"] as AssistantStance[]).map((s) => (
+                  <option key={s} value={s}>{stanceLabel(s)}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       )}
       {busy && <p className="muted tiny">蒐集客觀證據 + 合成卡片，單檔約 1–2 分鐘…</p>}
       {err && <p className="refresh-err tiny">{err}</p>}
 
+      {lastTrace && traceSummary(lastTrace) && (
+        <p className="muted tiny">{traceSummary(lastTrace)}</p>
+      )}
       {card ? (
         <CardView
           key={runId ?? "none"}

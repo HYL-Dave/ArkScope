@@ -38,6 +38,8 @@ import {
   type ResearchProviderId,
 } from "./researchProvider";
 import { activeCredential, defaultModel, effortNote, lastAssistantSelection, modelOptions } from "./researchModels";
+import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
+import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
 import {
   initialState,
@@ -64,6 +66,7 @@ const toClientMessage = (m: ResearchMessageDTO): Message => ({
   tools_used: m.tools_used ?? [], tool_calls: m.tool_calls ?? [],
   token_usage: m.token_usage, tickers: m.tickers,
   elapsed_seconds: m.elapsed_seconds, created_at: m.created_at,
+  personalization: m.personalization ?? null,
   isError: m.is_error ?? false, // persisted error turns (MUST-FIX 2) restore as error bubbles
   // store has no maxTurns column — re-derive the badge the same way the reducer does (SF2)
   maxTurns: m.provider === "anthropic" && m.content === MAX_TURNS_SENTINEL,
@@ -135,6 +138,9 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
   const [discovered, setDiscovered] = useState<Record<string, string[]>>({}); // credentialId → discovered model ids
   const [selModel, setSelModel] = useState("");
   const [selEffort, setSelEffort] = useState("default");
+  // Track A: opt-in investor profile → per-run assistant stance override.
+  const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
+  const [runStance, setRunStance] = useState<AssistantStance>("off");
   const [activeRunsByThread, setActiveRunsByThread] = useState<Record<string, ResearchRunDTO>>({});
 
   const abortRef = useRef<AbortController | null>(null);
@@ -285,7 +291,7 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     }
   }, []);
 
-  const runManaged = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean }) => {
+  const runManaged = useCallback(async (body: { question: string; provider: ProviderId; model?: string; effort?: string; thread_id: string; ticker: string | null; retry_last_failed?: boolean; assistant_stance?: AssistantStance }) => {
     try {
       const { run } = await createResearchRun(body);
       setActiveRunsByThread((prev) => ({ ...prev, [run.thread_id]: run }));
@@ -311,6 +317,25 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     void pollRun(run);
   }, [activeRunsByThread, pollRun, state.activeThreadId, state.pending?.threadId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getInvestorProfile()
+      .then((r) => {
+        if (cancelled) return;
+        setInvestorProfile(r);
+        if (r.profile.enabled) setRunStance(r.profile.default_stance);
+      })
+      .catch(() => {
+        /* personalization is optional — a failed load = feature off */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stanceEnabled = investorProfile?.profile.enabled ?? false;
+  const stanceForRun = stanceEnabled ? runStance : undefined;
+
   const submit = useCallback(() => {
     const q = question.trim();
     if (!q || !provider || state.pending) return; // disabled while pending (defensive)
@@ -326,8 +351,8 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setThreadError(null);
     // raw question; server frames + persists. model/effort = the picker selection
     // (server falls back to the ai_research route only when model is omitted).
-    void runManaged({ question: q, provider, model: model ?? undefined, effort, thread_id: threadId, ticker });
-  }, [question, tickerInput, provider, selModel, selEffort, state.pending, state.activeThreadId, runManaged]);
+    void runManaged({ question: q, provider, model: model ?? undefined, effort, thread_id: threadId, ticker, assistant_stance: stanceForRun });
+  }, [question, tickerInput, provider, selModel, selEffort, state.pending, state.activeThreadId, runManaged, stanceForRun]);
 
   // Abort the live stream + drop the pending turn (explicit Stop only).
   const stopStream = useCallback(() => {
@@ -495,8 +520,9 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
       thread_id: state.activeThreadId,
       ticker: retryCandidate.ticker,
       retry_last_failed: true,
+      assistant_stance: stanceForRun,
     });
-  }, [provider, retryCandidate, runManaged, selEffort, state.activeThreadId, state.pending]);
+  }, [provider, retryCandidate, runManaged, selEffort, state.activeThreadId, state.pending, stanceForRun]);
 
   return (
     <main className="main research">
@@ -663,6 +689,16 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
                       </select>
                     </label>
                     {pickerEffortNote && <span className="warn-text tiny">{pickerEffortNote}</span>}
+                    {stanceEnabled && (
+                      <label className="tiny">
+                        立場
+                        <select value={runStance} onChange={(e) => setRunStance(e.target.value as AssistantStance)} disabled={!!state.pending}>
+                          {(["off", "neutral", "aligned", "complementary", "strict_risk_control", "valuation_rationalist", "growth_opportunity"] as AssistantStance[]).map((s) => (
+                            <option key={s} value={s}>{stanceLabel(s)}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                   </div>
                 )}
                 <div className="research-inputrow">
@@ -740,6 +776,7 @@ function Bubble({
           {m.model && <span className="research-model">{m.provider}/{m.model}{m.effort && m.effort !== "default" ? ` · ${m.effort}` : ""}</span>}
           {m.maxTurns && <span className="research-maxturns"> · 已達工具呼叫上限</span>}
           {typeof m.elapsed_seconds === "number" && <span> · {m.elapsed_seconds.toFixed(1)}s</span>}
+          {traceSummary(m.personalization) && <span> · {traceSummary(m.personalization)}</span>}
         </div>
       )}
       <div className="research-bubble-body">

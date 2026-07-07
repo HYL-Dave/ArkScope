@@ -626,6 +626,7 @@ export interface ResearchMessageDTO {
   tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
   elapsed_seconds: number | null; is_error: boolean; created_at: string;
+  personalization?: PersonalizationTrace | null;
 }
 export interface ResearchRunDTO {
   id: string;
@@ -669,6 +670,7 @@ export function createResearchRun(body: {
   model?: string;
   effort?: string;
   retry_last_failed?: boolean;
+  assistant_stance?: AssistantStance;
 }): Promise<{ run: ResearchRunDTO }> {
   return sendJSON<{ run: ResearchRunDTO }>("/research/runs", "POST", body, 8_000);
 }
