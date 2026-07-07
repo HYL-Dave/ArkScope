@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from src.api.dependencies import get_dal
 from src.tools.data_access import DataAccessLayer
+from src.tools.current_quote import get_current_quote
 from src.tools.price_tools import (
     get_ticker_prices,
     get_price_change,
@@ -11,6 +12,17 @@ from src.tools.price_tools import (
 )
 
 router = APIRouter(prefix="/prices", tags=["prices"])
+
+
+@router.get("/{ticker}/quote")
+def current_quote(
+    ticker: str,
+    source: str = Query("auto", pattern="^(auto|ibkr|local)$"),
+    dal: DataAccessLayer = Depends(get_dal),
+):
+    """Get a read-through current quote for a ticker."""
+    result = get_current_quote(dal, ticker=ticker, source=source)
+    return result.model_dump()
 
 
 @router.get("/{ticker}")
