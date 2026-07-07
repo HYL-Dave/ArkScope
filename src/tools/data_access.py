@@ -187,8 +187,16 @@ class DataAccessLayer:
             # Auto-detect from config/.env
             env_dsn = self._load_env_db_dsn()
             if env_dsn:
-                from src.tools.db_config import load_sslmode
-                sslmode = load_sslmode(self._base / "config" / ".env", env_dsn)
+                from src.tools.db_config import infer_sslmode, load_sslmode
+                # Fresh checkout: _base can be None (no data/ found) — there is
+                # no config/.env to read, which is exactly load_sslmode's
+                # missing-file fallback. Same baseless-DAL family as the
+                # market_db/SA guards.
+                sslmode = (
+                    load_sslmode(self._base / "config" / ".env", env_dsn)
+                    if self._base is not None
+                    else infer_sslmode(env_dsn)
+                )
                 self._backend = self._make_db_backend(env_dsn, sslmode)
             else:
                 # No DSN: still try local composite routing first so completed news

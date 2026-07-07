@@ -266,3 +266,19 @@ class TestDALBackendSwitch:
             db_fields = set(type(db_result.articles[0]).model_fields.keys())
             file_fields = set(type(file_result.articles[0]).model_fields.keys())
             assert db_fields == file_fields
+
+
+def test_auto_dal_survives_fresh_checkout_without_base(tmp_path, monkeypatch):
+    """Fresh checkout (no data/ anywhere up the tree) → _base is None; auto
+    DSN detection must not crash on `self._base / "config"` (the baseless-DAL
+    family: market_db guard, SA guard — this was the sslmode member)."""
+    from src.tools.data_access import DataAccessLayer
+
+    monkeypatch.chdir(tmp_path)  # nothing resolvable as a repo/data base here
+    monkeypatch.setattr(
+        DataAccessLayer,
+        "_load_env_db_dsn",
+        lambda self: "postgresql://smoke-poison.invalid/arkscope?connect_timeout=1",
+    )
+    dal = DataAccessLayer(db_dsn="auto")  # must not raise TypeError
+    assert dal is not None
