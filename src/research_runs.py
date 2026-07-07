@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
     provider         TEXT NOT NULL,
     model            TEXT NOT NULL,
     effort           TEXT,
+    assistant_stance TEXT,
     auth_mode        TEXT,
     credential_id    TEXT,
     started_at       TEXT,
@@ -69,6 +70,7 @@ class ResearchRun:
     provider: str
     model: str
     effort: Optional[str]
+    assistant_stance: Optional[str]
     auth_mode: Optional[str]
     credential_id: Optional[str]
     started_at: Optional[str]
@@ -111,6 +113,14 @@ class ResearchRunStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
+            # Migration: pre-existing research_runs tables gain the Track A
+            # stance column (same tolerant ALTER pattern as the other stores).
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(research_runs)").fetchall()}
+            if "assistant_stance" not in cols:
+                try:
+                    conn.execute("ALTER TABLE research_runs ADD COLUMN assistant_stance TEXT")
+                except sqlite3.OperationalError:
+                    pass
             conn.commit()
 
     @staticmethod
@@ -118,7 +128,8 @@ class ResearchRunStore:
         return ResearchRun(
             id=r["id"], thread_id=r["thread_id"], status=r["status"],
             question=r["question"], ticker=r["ticker"], provider=r["provider"],
-            model=r["model"], effort=r["effort"], auth_mode=r["auth_mode"],
+            model=r["model"], effort=r["effort"],
+            assistant_stance=r["assistant_stance"], auth_mode=r["auth_mode"],
             credential_id=r["credential_id"], started_at=r["started_at"],
             completed_at=r["completed_at"], error=r["error"],
             token_usage=_loads(r["token_usage_json"]), created_at=r["created_at"],
@@ -144,6 +155,7 @@ class ResearchRunStore:
         effort: Optional[str],
         auth_mode: Optional[str],
         credential_id: Optional[str],
+        assistant_stance: Optional[str] = None,
     ) -> ResearchRun:
         ts = _now()
         with self._write_lock, self._connect() as conn:
@@ -151,11 +163,11 @@ class ResearchRunStore:
                 """
                 INSERT INTO research_runs
                   (id, thread_id, status, question, ticker, provider, model, effort,
-                   auth_mode, credential_id, created_at, updated_at)
-                VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   assistant_stance, auth_mode, credential_id, created_at, updated_at)
+                VALUES (?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (id, thread_id, question, ticker, provider, model, effort,
-                 auth_mode, credential_id, ts, ts),
+                 assistant_stance, auth_mode, credential_id, ts, ts),
             )
             conn.commit()
         got = self.get_run(id)

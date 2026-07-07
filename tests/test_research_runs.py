@@ -232,3 +232,114 @@ def test_cancel_run_route_terminalizes_when_no_in_memory_task(stores, monkeypatc
     assert res["run"]["status"] == "cancelled"
     assert run_store.get_run("r1").status == "cancelled"
     assert run_store.list_events("r1")[-1].type == "error"
+
+
+# ─── Track A: personalization on server-owned runs ───────────────────────────
+
+
+def _tracka_profile(tmp_path, monkeypatch, *, enabled):
+    from src.investor_profile import InvestorProfileStore
+
+    pstore = InvestorProfileStore(tmp_path / "investor_profile.db")
+    if enabled:
+        pstore.save({"enabled": True, "risk_appetite": 9, "risk_capacity": 3,
+                     "default_stance": "complementary"})
+    monkeypatch.setattr("src.api.dependencies.get_investor_profile_store", lambda: pstore)
+    return pstore
+
+
+def test_create_run_stores_stance_and_rejects_invalid(stores, tmp_path, monkeypatch):
+    import asyncio
+
+    from fastapi import HTTPException
+
+    run_store, thread_store = stores
+    _tracka_profile(tmp_path, monkeypatch, enabled=True)
+    monkeypatch.setattr(r, "schedule_research_run", lambda **k: None)
+    monkeypatch.setattr(r, "resolve_research_route", lambda provider: ("gpt-5.4-mini", "low"))
+    monkeypatch.setattr(r, "_resolve_auth_metadata", lambda provider: ("api_key", None))
+
+    body = r.ResearchRunCreate(
+        question="q", provider="openai", assistant_stance="strict_risk_control"
+    )
+    out = asyncio.run(
+        r.create_research_run(body, dal=object(), thread_store=thread_store, run_store=run_store)
+    )
+    assert out["run"]["assistant_stance"] == "strict_risk_control"
+    assert run_store.get_run(out["run"]["id"]).assistant_stance == "strict_risk_control"
+
+    bad = r.ResearchRunCreate(question="q", provider="openai", assistant_stance="yolo")
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            r.create_research_run(bad, dal=object(), thread_store=thread_store, run_store=run_store)
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.detail == {"code": "invalid_assistant_stance", "field": "assistant_stance"}
+
+
+def test_execute_run_injects_context_and_persists_trace(stores, tmp_path, monkeypatch):
+    import asyncio
+
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    _tracka_profile(tmp_path, monkeypatch, enabled=True)
+    thread_store.ensure_thread(id="t1", title="q")
+    thread_store.append_message(thread_id="t1", role="user", content="q")
+    run_store.create_run(
+        id="rp", thread_id="t1", question="q", ticker=None,
+        provider="anthropic", model="m", effort=None,
+        auth_mode="api_key", credential_id=None,
+        assistant_stance="strict_risk_control",
+    )
+    captured = {}
+
+    async def stream_factory(**kwargs):
+        captured.update(kwargs)
+        yield AgentEvent(EventType.done, {
+            "answer": "a", "provider": "anthropic", "model": "m",
+            "tools_used": [], "token_usage": {},
+        })
+
+    asyncio.run(execute_research_run(
+        run_id="rp", run_store=run_store, thread_store=thread_store,
+        dal=object(), history=[], stream_factory=stream_factory,
+    ))
+    ctx = captured.get("personalization_context", "")
+    assert "[Assistant Stance]" in ctx and "strict_risk_control" in ctx
+    done = [e for e in run_store.list_events("rp") if e.type == "done"][-1]
+    assert done.data["personalization"]["assistant_stance"] == "strict_risk_control"
+    last = thread_store.list_messages("t1")[-1]
+    assert last.personalization["assistant_stance"] == "strict_risk_control"
+    assert last.personalization["profile_active"] is True
+
+
+def test_execute_run_off_omits_personalization_kwarg(stores, tmp_path, monkeypatch):
+    import asyncio
+
+    from src.research_run_manager import execute_research_run
+
+    run_store, thread_store = stores
+    _tracka_profile(tmp_path, monkeypatch, enabled=False)
+    thread_store.ensure_thread(id="t1", title="q")
+    thread_store.append_message(thread_id="t1", role="user", content="q")
+    run_store.create_run(
+        id="ro", thread_id="t1", question="q", ticker=None,
+        provider="anthropic", model="m", effort=None,
+        auth_mode="api_key", credential_id=None,
+    )
+
+    async def strict_factory(*, provider, question, model, effort, dal, history):
+        # NO **kwargs: an unexpected personalization kwarg = TypeError.
+        yield AgentEvent(EventType.done, {
+            "answer": "a", "provider": provider, "model": model,
+            "tools_used": [], "token_usage": {},
+        })
+
+    asyncio.run(execute_research_run(
+        run_id="ro", run_store=run_store, thread_store=thread_store,
+        dal=object(), history=[], stream_factory=strict_factory,
+    ))
+    assert run_store.get_run("ro").status == "succeeded"
+    last = thread_store.list_messages("t1")[-1]
+    assert last.personalization is None or last.personalization["profile_active"] is False

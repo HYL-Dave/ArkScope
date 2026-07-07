@@ -59,6 +59,20 @@ async def execute_research_run(
         from src.api.routes.query import _research_provider_stream
         stream_factory = _research_provider_stream
 
+    # Track A: resolve the profile/stance AT EXECUTION (stance was validated at
+    # create). Resolution failure degrades to off — the trace must never claim
+    # a stance the prompt did not actually receive.
+    try:
+        from src.api.personalization import resolve_personalization
+
+        personalization_context, personalization = resolve_personalization(run.assistant_stance)
+    except Exception:  # noqa: BLE001 — degrade to un-personalized, honestly
+        personalization_context, personalization = "", {
+            "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
+            "suggested_skills": [], "applied_skills": [],
+        }
+    _pctx = {"personalization_context": personalization_context} if personalization_context else {}
+
     try:
         stream = await _maybe_await(stream_factory(
             provider=run.provider,
@@ -67,10 +81,15 @@ async def execute_research_run(
             effort=run.effort,
             dal=dal,
             history=history,
+            **_pctx,
         ))
         async for event in stream:
             etype = _etype(event)
             data = event.data or {}
+            if etype == "done":
+                # Enrich BEFORE persisting: the replay event and the transcript
+                # must carry the same trace the prompt actually received.
+                data = {**data, "personalization": dict(personalization)}
             run_store.append_event(run_id, etype, data)
             if etype in ("tool_start", "tool_end"):
                 collected.append((etype, data))
@@ -100,6 +119,7 @@ async def execute_research_run(
         _persist_assistant_turn(
             thread_store, thread_id=run.thread_id, done_data=done_data,
             collected=collected, elapsed=elapsed, effort=run.effort,
+            personalization=personalization,
         )
         run_store.mark_terminal(
             run_id, "succeeded",
@@ -110,6 +130,7 @@ async def execute_research_run(
         _persist_error_turn(
             thread_store, thread_id=run.thread_id, content=content, collected=collected,
             provider=run.provider, model=run.model, effort=run.effort, elapsed=elapsed,
+            personalization=personalization,
         )
         run_store.mark_terminal(run_id, "failed", error=content)
 

@@ -35,6 +35,8 @@ class ResearchRunCreate(BaseModel):
     model: str | None = None
     effort: str | None = None
     retry_last_failed: bool = False
+    # Track A: per-run Assistant Stance override (invalid → 400 at create).
+    assistant_stance: str | None = None
 
 
 def _run_dict(run: ResearchRun | None) -> dict | None:
@@ -49,6 +51,7 @@ def _run_dict(run: ResearchRun | None) -> dict | None:
         "provider": run.provider,
         "model": run.model,
         "effort": run.effort,
+        "assistant_stance": run.assistant_stance,
         "auth_mode": run.auth_mode,
         "credential_id": run.credential_id,
         "started_at": run.started_at,
@@ -156,6 +159,11 @@ async def create_research_run(
     question = request.question.strip()
     if not question:
         raise HTTPException(status_code=422, detail="question is required")
+    # Track A: reject invalid stance overrides at CREATE — a queued run must
+    # never fail later on a value the client could have been told about now.
+    from src.api.personalization import resolve_personalization
+
+    resolve_personalization(request.assistant_stance)
 
     thread_id = request.thread_id or str(uuid.uuid4())
     if not valid_thread_id(thread_id):
@@ -203,6 +211,7 @@ async def create_research_run(
         effort=effort,
         auth_mode=auth_mode,
         credential_id=credential_id,
+        assistant_stance=request.assistant_stance,
     )
     schedule_research_run(
         run_id=run.id,
