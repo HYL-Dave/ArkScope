@@ -1,5 +1,9 @@
 # Investor Profile Calibration Chat Implementation Plan
 
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-08 on `codex/investor-profile-calibration`.**
+> Tasks 1-6 are implemented with focused backend/frontend gates and PG-unreachable smoke
+> passing. Full virgin A/B is still the merge gate unless reviewer runs it before merge.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Track A.5: an opt-in Investor Profile calibration chat that stores raw calibration dialogue as a long-lived journal, produces inert structured proposals, and updates the active profile only after explicit user approval.

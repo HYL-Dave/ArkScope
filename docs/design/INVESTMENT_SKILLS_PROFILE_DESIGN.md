@@ -1,6 +1,6 @@
 # Investment Skills + Investor Profile Design
 
-> **Status: ACTIVE DESIGN - no implementation plan yet.** Drafted 2026-07-06 after the
+> **Status: ACTIVE DESIGN - Track A shipped, Track A.5 implemented for review.** Drafted 2026-07-06 after the
 > B6 repo-hygiene ruling moved `config/skills/` and the packaged skill boundary out of
 > cleanup and into product design. This document is the authority for how ArkScope should
 > personalize investment analysis with user profile, assistant stance, and skills. It
@@ -582,11 +582,19 @@ Acceptance:
 - when `profile.enabled=false`, workbench prompt behavior is byte-identical and effective
   stance is `off`.
 
-### Track A.5 - calibration chat journal and proposal flow
+### Track A.5 - calibration chat journal and proposal flow — IMPLEMENTED FOR REVIEW 2026-07-08
 
 Build before Track B. This is the correction to Track A's overly abstract form-first
 setup: calibration becomes a long-lived profile journal, while the first implementation
 remains wizard-sized.
+
+Implementation branch `codex/investor-profile-calibration` implements this as a dedicated
+non-streaming calibration loop with profile-state storage, not research-thread reuse. It is
+review-ready but not merged or live-verified yet. Focused evidence at implementation time:
+backend profile/research/card gate `100 passed`, frontend calibration/personalization gate
+`14 passed`, frontend typecheck passed, and PG-unreachable smoke returned `ok:true` with
+`pg_attempts:[]`. Full virgin A/B remains the merge gate unless reviewer runs it before
+merge.
 
 Build:
 
@@ -611,15 +619,17 @@ Explicit decisions:
 - `risk_mismatch` remains server-derived and is never accepted from the assistant.
 - v1 calibration assistant has no market-data, news, web, code-execution, or write tools.
 
-Open for the implementation plan:
+Implementation decisions:
 
-- Execution path. Option A: reuse the server-owned run manager for streaming, cancellation,
-  and replay mechanics, but store calibration threads in dedicated calibration tables and
-  hard-block leakage into research history/hydration. Option B: build a smaller dedicated
-  calibration loop. Recommendation to evaluate in the plan: Option A plus independent
-  storage, unless the reuse surface would force research-thread coupling.
-- Exact active-session rule when a user starts a second session: close, supersede, or
-  require explicit discard.
+- Execution path: a dedicated lightweight loop, not the server-owned research run manager.
+  This deliberately gives up streaming/cancel/replay reuse in v1 to keep calibration out
+  of research history, hydration, reports, and card evidence paths.
+- Active-session rule: starting a second calibration session returns
+  `calibration_session_active` unless the caller explicitly requests `supersede_active`.
+- Live responder limitation: calibration never enables market/news/web/code/write tools.
+  OpenAI API-key/env and ChatGPT OAuth paths run with no tool registry. Claude Code OAuth
+  no-tool calibration is intentionally refused until a tool-free subscription path is
+  wired; the implementation raises a hard error instead of enabling MCP/tools.
 
 Acceptance:
 
