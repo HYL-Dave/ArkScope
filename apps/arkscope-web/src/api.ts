@@ -985,6 +985,96 @@ export function getUniverse(includeArchived = true): Promise<UniverseResponse> {
   return getJSON<UniverseResponse>(`/profile/universe?include_archived=${includeArchived}`);
 }
 
+export interface PortfolioAccount {
+  id: number;
+  label: string;
+  broker: string;
+  broker_account_id?: string | null;
+  broker_account_id_hash?: string | null;
+  sync_mode: "manual" | "ibkr_review" | "ibkr_auto" | string;
+  base_currency?: string | null;
+  include_in_total?: boolean;
+  archived_at?: string | null;
+}
+
+export interface PortfolioPosition {
+  id: number;
+  account_id: number;
+  broker?: string;
+  broker_con_id?: string | null;
+  symbol: string;
+  asset_class: string;
+  quantity: number;
+  avg_cost?: number | null;
+  currency: string;
+  market_value?: number | null;
+  unrealized_pnl?: number | null;
+  source?: string;
+  sync_status?: string;
+  last_sync_at?: string | null;
+  closed_at?: string | null;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface PortfolioCurrencyTotal {
+  position_count: number;
+  market_value?: number | null;
+  unrealized_pnl?: number | null;
+}
+
+export interface PortfolioTotals {
+  currency_basis: "per_currency" | "broker_base" | string;
+  per_currency: Record<string, PortfolioCurrencyTotal>;
+  broker_base: Record<string, number> | null;
+}
+
+export interface PortfolioSnapshot {
+  accounts: PortfolioAccount[];
+  positions: PortfolioPosition[];
+  totals: PortfolioTotals;
+}
+
+export interface PortfolioSyncChange {
+  kind: string;
+  account_id?: number;
+  broker_account_id?: string;
+  broker_con_id?: string;
+  symbol: string;
+  quantity?: number;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+
+export interface PortfolioSyncPreview {
+  changes: PortfolioSyncChange[];
+  applies: boolean;
+}
+
+export function getPortfolio(): Promise<PortfolioSnapshot> {
+  return getJSON<PortfolioSnapshot>("/portfolio");
+}
+
+export function createManualPosition(body: {
+  account_id?: number | null;
+  symbol: string;
+  asset_class?: string;
+  quantity: number;
+  avg_cost?: number | null;
+  currency?: string;
+  notes?: string;
+}): Promise<PortfolioPosition> {
+  return sendJSON<PortfolioPosition>("/portfolio/positions", "POST", body);
+}
+
+export function previewIbkrPortfolioSync(): Promise<PortfolioSyncPreview> {
+  return sendJSON<PortfolioSyncPreview>("/portfolio/ibkr/preview", "POST", undefined, 30_000);
+}
+
+export function applyIbkrPortfolioSync(): Promise<PortfolioSyncPreview> {
+  return sendJSON<PortfolioSyncPreview>("/portfolio/ibkr/apply", "POST", undefined, 30_000);
+}
+
 export function getProfileLists(includeArchived = false): Promise<{ lists: WatchlistSummary[] }> {
   return getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`);
 }

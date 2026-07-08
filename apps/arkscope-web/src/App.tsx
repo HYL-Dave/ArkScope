@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiBase, getRuntimeConfig, getStatus, type RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
+import { HoldingsView } from "./Holdings";
 import { HomeView } from "./Home";
 import { SettingsView } from "./Settings";
 import { NewsView } from "./News";
@@ -27,7 +28,7 @@ const NAV = [
 ] as const;
 type Nav = (typeof NAV)[number];
 
-const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "Research", "News", "System", "Settings"];
+const ENABLED: Nav[] = ["Home", "Watchlist", "Universe", "Research", "Holdings", "News", "System", "Settings"];
 
 const LABELS: Record<Nav, string> = {
   Home: "工作台",
@@ -158,6 +159,8 @@ export function App() {
           <NewsView onOpenTicker={openTicker} />
         ) : view === "Research" ? (
           <ResearchView onOpenTicker={openTicker} />
+        ) : view === "Holdings" ? (
+          <HoldingsView />
         ) : view === "System" ? (
           <DashboardView status={status} runtime={runtime} onRetry={refresh} />
         ) : view === "Settings" ? (
