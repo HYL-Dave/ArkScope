@@ -248,14 +248,14 @@ Recommended v1 tables in `profile_state.db`:
     source, sync status, timestamps;
 - `portfolio_position_notes`
   - user-owned notes/thesis/tags/strategy bucket/target allocation/links;
-- `portfolio_sync_snapshots`
-  - raw-ish broker snapshot metadata sufficient for diff/provenance, with secrets and
-    account PII redacted;
-- `portfolio_sync_events`
-  - review/auto/manual write events and row counts.
+Sync-history tables are deferred from v1. Preview is a strict zero-write operation, while
+apply mutates the three tables above; shipping empty `portfolio_sync_snapshots` /
+`portfolio_sync_events` tables would imply an audit contract that does not exist. A later
+audit slice may add redacted apply-event provenance without weakening preview purity.
 
-Exact schema belongs in the implementation plan. The design requirement is that broker
-fields and user fields are separable.
+Exact schema belongs in the implementation plan. The design requirements are that broker
+fields and user fields are separable and that a broker snapshot can soft-close a missing
+position without deleting its user-owned notes.
 
 Mixed-currency totals must be honest. V1 may use broker-provided base-currency market
 value/P&L where IBKR supplies it; otherwise it should show per-currency subtotals rather

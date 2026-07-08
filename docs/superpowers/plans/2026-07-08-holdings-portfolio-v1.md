@@ -2,8 +2,9 @@
 
 > **Status: IMPLEMENTED FOR REVIEW 2026-07-08.** Implements
 > `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. Branch
-> `codex/holdings-portfolio-v1` is review-ready; full A/B, merge, and live IBKR
-> verification are intentionally pending reviewer sign-off.
+> `codex/holdings-portfolio-v1` completed its first review-repair pass on
+> 2026-07-09; final reviewer A/B, merge, and live IBKR verification are intentionally
+> pending reviewer sign-off.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:test-driven-development` and either
@@ -316,26 +317,23 @@ Create `src/portfolio_state.py` with:
   - `portfolio_accounts`
   - `portfolio_positions`
   - `portfolio_position_notes`
-  - `portfolio_sync_runs`
-  - `portfolio_sync_diffs`
 
-Schema-name note: the adopted design spec uses conceptual names
-`portfolio_sync_snapshots` / `portfolio_sync_events`; this implementation plan
-materializes that concept as `portfolio_sync_runs` / `portfolio_sync_diffs` so the
-API can expose review/apply attempts and row-level changes directly. This is the
-canonical exact schema for v1.
+Review correction: v1 does not create `portfolio_sync_runs` / `portfolio_sync_diffs`.
+They had no reader or writer, and persisting preview attempts would violate the stricter
+zero-write preview contract. Redacted apply-event provenance remains a separate future
+slice.
 - Dataclasses:
   - `PortfolioAccount`
   - `PortfolioPosition`
   - `BrokerPosition`
   - `PortfolioTotals`
   - `PortfolioSnapshot`
-  - `PortfolioSyncRun`
-  - `PortfolioSyncDiff`
 - Store:
   - `PortfolioStore(path)`
   - `ensure_manual_account()`
   - `list_accounts(include_archived=False)`
+  - `get_account(account_id)`
+  - `update_account(account_id, ...)`
   - `upsert_broker_account(...)`
   - `list_positions(account_id=None, include_closed=False)`
   - `upsert_manual_position(...)`
@@ -1004,7 +1002,27 @@ desktop frontend, and tool ledger.
   passed.
 - Static gates: no order API matches and no PG/DSN matches in holdings modules.
 - PG-unreachable smoke: `ok:true`, `pg_attempts:[]`, 24 checks.
-- Full A/B: pending reviewer run before merge.
+- Initial reviewer full A/B at `b63f93e`: strict PASS (failure sets 30=30,
+  bidirectional diff empty, passed +17 exactly matching the original new tests).
+
+**Review repair evidence (2026-07-09):**
+
+- Preview no longer persists newly discovered IBKR accounts; apply remains the first
+  mutation and still requires `profile_state_write`.
+- Complete-account snapshots emit `remove` changes and soft-close missing broker
+  positions while preserving user-owned notes.
+- Agent payloads omit raw broker account ids, report the included local account scope,
+  and keep positions/totals consistent when `include_closed=true`.
+- Account PATCH is local-id based and supports label, sync mode, base currency,
+  include-in-total, and archive state with structured 400/404 errors.
+- Aggregate totals honor account inclusion. The UI exposes the toggle, identifies IBKR
+  sync as read-only/no-order, and separates options with the advanced-risk warning.
+- Empty sync-history tables were removed; SQLite now uses best-effort WAL plus a
+  5-second busy timeout.
+- Focused backend/ledger verification: `254 passed` (`74 passed` in the holdings/config
+  core). Frontend: `Holdings.test.tsx` `5 passed`, typecheck and production build pass.
+  Static no-order/no-PG gates remain empty; PG-unreachable smoke remains `ok:true`,
+  `pg_attempts:[]`, 24 checks. Final full A/B is pending reviewer rerun against this tip.
 
 - [x] Step 1: Focused backend.
 
