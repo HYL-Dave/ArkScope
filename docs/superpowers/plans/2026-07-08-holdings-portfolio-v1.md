@@ -1,7 +1,9 @@
 # Holdings + Portfolio V1 Implementation Plan
 
-> **Status: PLAN FOR REVIEW 2026-07-08.** Implements
-> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`.
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-08.** Implements
+> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. Branch
+> `codex/holdings-portfolio-v1` is review-ready; full A/B, merge, and live IBKR
+> verification are intentionally pending reviewer sign-off.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:test-driven-development` and either
@@ -988,7 +990,23 @@ git commit -m "feat: expose local portfolio holdings tool"
 **Purpose:** prove the slice is safe in fresh profiles, PG-unreachable environments,
 desktop frontend, and tool ledger.
 
-- [ ] Step 1: Focused backend.
+**Implementation evidence (2026-07-08):**
+
+- Holdings/config backend core: `61 passed`
+  (`tests/test_data_provider_config.py`, `tests/test_portfolio_state.py`,
+  `tests/test_portfolio_ibkr.py`, `tests/test_portfolio_routes.py`,
+  `tests/test_portfolio_holdings_tools.py`).
+- Tool ledger targeted set: `26 passed` across registry/catalog/bridge/count
+  assertions. The full `tests/test_tools.py` file still carries pre-existing
+  data/network-dependent failures in this worktree; `tests/test_api.py::TestHealth::test_status`
+  hangs in the TestClient path and is not counted as a holdings finding.
+- Frontend: `Holdings.test.tsx` `3 passed`; `npm run typecheck` passed; `npm run build`
+  passed.
+- Static gates: no order API matches and no PG/DSN matches in holdings modules.
+- PG-unreachable smoke: `ok:true`, `pg_attempts:[]`, 24 checks.
+- Full A/B: pending reviewer run before merge.
+
+- [x] Step 1: Focused backend.
 
 Run:
 
@@ -999,7 +1017,7 @@ pytest tests/test_data_provider_config.py tests/test_portfolio_state.py tests/te
   tests/test_sec_tools.py tests/test_portfolio_tools.py tests/test_analyst_tools.py tests/test_sa_tools.py
 ```
 
-- [ ] Step 2: Frontend.
+- [x] Step 2: Frontend.
 
 Run:
 
@@ -1010,7 +1028,7 @@ npm run typecheck
 npm run build
 ```
 
-- [ ] Step 3: Static gates.
+- [x] Step 3: Static gates.
 
 Run:
 
@@ -1032,7 +1050,7 @@ Use virgin worktrees. Acceptance:
 - passed delta equals the net new tests;
 - skips/errors/warnings explained if changed.
 
-- [ ] Step 5: Docs closeout.
+- [x] Step 5: Docs closeout.
 
 Update:
 

@@ -1,9 +1,10 @@
 # Holdings + Portfolio Design
 
-> **Status: ADOPTED DESIGN — implementation plan opened 2026-07-08.** Drafted
-> 2026-07-08 after Investor Profile Track A.5. This document defines ArkScope's
-> first-class holdings model and its IBKR sync boundary. Runtime changes are
-> authorized only by the linked implementation plan.
+> **Status: ADOPTED DESIGN — implementation branch review-ready 2026-07-08.**
+> Drafted 2026-07-08 after Investor Profile Track A.5. This document defines
+> ArkScope's first-class holdings model and its IBKR sync boundary. Runtime
+> changes are authorized only by the linked implementation plan; live completion
+> waits for review, full A/B, merge, and IBKR verification.
 
 ## 1. Problem
 
