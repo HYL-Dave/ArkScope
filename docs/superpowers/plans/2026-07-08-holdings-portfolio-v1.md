@@ -71,8 +71,8 @@ Modify:
 - `src/api/dependencies.py`
 - `src/api/app.py`
 - `src/tools/registry.py`
-- `src/agents/openai/tools.py`
-- `src/agents/anthropic/tools.py`
+- `src/agents/openai_agent/tools.py`
+- `src/agents/anthropic_agent/tools.py`
 - `docs/design/ARKSCOPE_TOOL_CATALOG.md`
 - `apps/arkscope-web/src/api.ts`
 - `apps/arkscope-web/src/App.tsx`
@@ -162,7 +162,7 @@ assert [d["domain"] for d in doms] == [
     "manual", "options", "prices", "news", "iv", "quotes", "holdings",
 ]
 assert [d["offset"] for d in doms] == [0, 10, 20, 30, 40, 50, 60]
-assert [d["effective_client_id"] for d in doms] == [1, 11, 21, 31, 41, 51, 61]
+assert [d["effective_id"] for d in doms] == [1, 11, 21, 31, 41, 51, 61]
 assert doms[-1]["label"] == "持倉"
 ```
 
@@ -255,7 +255,7 @@ def test_manual_position_round_trip_and_totals(tmp_path):
     assert snapshot.positions[0].symbol == "NVDA"
     assert snapshot.positions[0].notes == "long-term core"
     assert snapshot.totals.currency_basis == "per_currency"
-    assert snapshot.totals.per_currency["USD"].quantity_positions == 1
+    assert snapshot.totals.per_currency["USD"].position_count == 1
 
 
 def test_ibkr_position_identity_uses_conid_not_symbol(tmp_path):
@@ -316,6 +316,12 @@ Create `src/portfolio_state.py` with:
   - `portfolio_position_notes`
   - `portfolio_sync_runs`
   - `portfolio_sync_diffs`
+
+Schema-name note: the adopted design spec uses conceptual names
+`portfolio_sync_snapshots` / `portfolio_sync_events`; this implementation plan
+materializes that concept as `portfolio_sync_runs` / `portfolio_sync_diffs` so the
+API can expose review/apply attempts and row-level changes directly. This is the
+canonical exact schema for v1.
 - Dataclasses:
   - `PortfolioAccount`
   - `PortfolioPosition`
@@ -412,6 +418,27 @@ def test_reader_uses_holdings_client_id_and_readonly(monkeypatch):
     }
 
 
+def test_connect_false_raises_unavailable_and_never_reads_positions(monkeypatch):
+    class FakeSource:
+        def __init__(self, *, client_id, readonly):
+            self.client_id = client_id
+            self.readonly = readonly
+        def connect(self):
+            return False
+        def disconnect(self):
+            pass
+
+    monkeypatch.setattr(portfolio_ibkr, "IBKRDataSource", FakeSource)
+    monkeypatch.setattr(
+        portfolio_ibkr,
+        "_read_connected_ibkr",
+        lambda source: (_ for _ in ()).throw(AssertionError("positions read after failed connect")),
+    )
+
+    with pytest.raises(IBKRHoldingsUnavailable):
+        read_ibkr_portfolio_snapshot()
+
+
 def test_review_mode_returns_diff_without_writing(tmp_path):
     store = PortfolioStore(tmp_path / "profile_state.db")
     account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123", sync_mode="ibkr_review")
@@ -450,7 +477,8 @@ Create `src/portfolio_ibkr.py`:
 ```python
 source = IBKRDataSource(client_id=ibkr_client_id_for("holdings"), readonly=True)
 try:
-    source.connect()
+    if not source.connect():
+        raise IBKRHoldingsUnavailable("IBKR Gateway connection failed")
     return _read_connected_ibkr(source)
 finally:
     source.disconnect()
@@ -467,8 +495,12 @@ through small private helpers and pin them with fake object tests.
 
 Provider-config behavior:
 
-- If S-J runtime marks provider setup required, route layer returns
-  `provider_config_missing`; the adapter should not invent fallback config.
+- Route layer calls `require_provider_configured("ibkr", data_provider_store)` before
+  attempting a snapshot and converts `ProviderConfigMissing.as_dict()` to a `503`
+  `HTTPException`. This is the data-provider missing-key contract
+  (`code/status/provider/field`), not the separate setup-only
+  `require_provider_config_ready()` contract (`provider_config_setup_required`).
+- The adapter should not invent fallback config.
 - The adapter itself may raise a structured `IBKRHoldingsUnavailable` for connection
   failures; routes convert it to `503`.
 
@@ -556,14 +588,37 @@ def test_ibkr_apply_requires_profile_state_write(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "require_profile_state_write", lambda action, detail=None: calls.append((action, detail)))
     routes.apply_ibkr_sync(store=store)
     assert calls == [("portfolio_ibkr_sync", {"mode": "apply"})]
+
+
+def test_ibkr_unavailable_returns_503_and_store_is_unchanged(monkeypatch, tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    data_provider_store = DataProviderConfigStore(tmp_path / "provider_state.db")
+    data_provider_store.set_field("ibkr", "host", "127.0.0.1")
+    data_provider_store.set_field("ibkr", "port", "4002")
+    before = store.snapshot()
+    monkeypatch.setattr(
+        routes,
+        "read_ibkr_portfolio_snapshot",
+        lambda: (_ for _ in ()).throw(IBKRHoldingsUnavailable("IBKR Gateway connection failed")),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        routes.preview_ibkr_sync(store=store, data_provider_store=data_provider_store)
+
+    assert exc.value.status_code == 503
+    assert store.snapshot() == before
 ```
 
-Add a provider-config missing test that monkeypatches the same runtime predicate used
-by other provider routes and expects:
+Add a provider-config missing test that uses the real missing-field contract:
+create an empty `DataProviderConfigStore`, make sure IBKR host/port are unset,
+call the route with that store, and expect:
 
 ```python
 assert exc.value.status_code == 503
 assert exc.value.detail["code"] == "provider_config_missing"
+assert exc.value.detail["status"] == "not_configured"
+assert exc.value.detail["provider"] == "ibkr"
+assert exc.value.detail["field"] in {"host", "port"}
 ```
 
 - [ ] Step 2: Implement routes.
@@ -584,9 +639,14 @@ Create `src/api/routes/portfolio.py`:
 Rules:
 
 - Use `Depends(get_portfolio_store)`.
+- Use `Depends(get_data_provider_store)` on IBKR preview/apply routes.
 - Mutations call `require_profile_state_write`.
 - IBKR preview never writes.
 - IBKR apply calls write gate once before store mutation.
+- IBKR preview/apply call `require_provider_configured("ibkr", data_provider_store)`
+  and catch `ProviderConfigMissing` as `HTTPException(status_code=503, detail=exc.as_dict())`.
+- If `read_ibkr_portfolio_snapshot()` raises `IBKRHoldingsUnavailable`, return a
+  structured `503` and leave the store untouched.
 - Do not expose account hashes as the primary display label.
 - All responses include `currency_basis`.
 
@@ -627,34 +687,127 @@ surface.
 Create `apps/arkscope-web/src/Holdings.test.tsx`:
 
 ```tsx
-it("renders accounts, positions, and currency basis", async () => {
-  stubFetch({
-    accounts: [{ id: 1, label: "Manual", broker: "manual", sync_mode: "manual", base_currency: "USD" }],
-    positions: [{ id: 10, account_id: 1, symbol: "NVDA", asset_class: "stock", quantity: 3, currency: "USD", notes: "core" }],
-    totals: { currency_basis: "per_currency", per_currency: { USD: { market_value: null, position_count: 1 } } },
+/** @vitest-environment jsdom */
+import React from "react";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { HoldingsView } from "./Holdings";
+import type { PortfolioSnapshot, PortfolioSyncPreview } from "./api";
+
+let root: ReturnType<typeof createRoot> | null = null;
+let host: HTMLDivElement | null = null;
+
+afterEach(() => {
+  if (root) act(() => root!.unmount());
+  root = null;
+  host?.remove();
+  host = null;
+  vi.unstubAllGlobals();
+});
+
+const snapshot = (over: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot => ({
+  accounts: [{ id: 1, label: "Manual", broker: "manual", sync_mode: "manual", base_currency: "USD" }],
+  positions: [],
+  totals: { currency_basis: "per_currency", per_currency: {}, broker_base: null },
+  ...over,
+});
+
+type PortfolioApiResponse = PortfolioSnapshot | PortfolioSyncPreview | { ok: true };
+
+function stubFetch(handler: (url: string, init?: RequestInit) => PortfolioApiResponse) {
+  const calls: Array<{ url: string; method: string; body: unknown }> = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: unknown, init?: RequestInit) => {
+      const u = String(url);
+      calls.push({
+        url: u,
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return new Response(JSON.stringify(handler(u, init)), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }),
+  );
+  return calls;
+}
+
+async function mount() {
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  root = createRoot(host);
+  await act(async () => {
+    root!.render(<HoldingsView />);
   });
-  const host = render(<HoldingsView />);
-  await screen.findByText("Manual");
-  expect(host.textContent).toContain("NVDA");
-  expect(host.textContent).toContain("per-currency");
+}
+
+async function flush() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+async function buttonByText(text: string): Promise<HTMLButtonElement> {
+  for (let i = 0; i < 6; i += 1) {
+    const found = Array.from(host!.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes(text),
+    );
+    if (found) return found;
+    await flush();
+  }
+  throw new Error(`button not found: ${text}; text=${host?.textContent ?? ""}`);
+}
+
+it("renders accounts, positions, and currency basis", async () => {
+  stubFetch(() => snapshot({
+    positions: [
+      { id: 10, account_id: 1, symbol: "NVDA", asset_class: "stock", quantity: 3, currency: "USD", notes: "core" },
+    ],
+    totals: { currency_basis: "per_currency", per_currency: { USD: { market_value: null, position_count: 1 } }, broker_base: null },
+  }));
+  await mount();
+  await flush();
+  expect(host!.textContent).toContain("Manual");
+  expect(host!.textContent).toContain("NVDA");
+  expect(host!.textContent).toContain("per-currency");
 });
 
 it("can add a manual holding", async () => {
-  const calls: unknown[] = [];
-  stubFetchWithPostCapture(calls);
-  render(<HoldingsView />);
-  await user.type(screen.getByLabelText("Ticker"), "AAPL");
-  await user.type(screen.getByLabelText("Quantity"), "2");
-  await user.click(screen.getByRole("button", { name: "新增持倉" }));
-  expect(calls).toContainEqual(expect.objectContaining({ symbol: "AAPL", quantity: 2 }));
+  const calls = stubFetch((url, init) => {
+    if (init?.method === "POST") return { ok: true };
+    return snapshot();
+  });
+  await mount();
+  const ticker = host!.querySelector<HTMLInputElement>('input[aria-label="Ticker"]')!;
+  const quantity = host!.querySelector<HTMLInputElement>('input[aria-label="Quantity"]')!;
+  await act(async () => {
+    ticker.value = "AAPL";
+    ticker.dispatchEvent(new Event("input", { bubbles: true }));
+    quantity.value = "2";
+    quantity.dispatchEvent(new Event("input", { bubbles: true }));
+    (await buttonByText("新增持倉")).click();
+  });
+  expect(calls.some((c) => c.method === "POST" && (c.body as any)?.symbol === "AAPL")).toBe(true);
 });
 
 it("shows ibkr preview as review before applying", async () => {
-  stubFetchWithIbkrPreview({ changes: [{ kind: "add", symbol: "MSFT", quantity: 1 }] });
-  render(<HoldingsView />);
-  await user.click(screen.getByRole("button", { name: "預覽 IBKR 同步" }));
-  expect(await screen.findByText("MSFT")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "套用同步" })).toBeTruthy();
+  stubFetch((url) => {
+    if (url.endsWith("/portfolio/ibkr/preview")) {
+      return { changes: [{ kind: "add", symbol: "MSFT", quantity: 1 }], applies: false };
+    }
+    return snapshot();
+  });
+  await mount();
+  await act(async () => {
+    (await buttonByText("預覽 IBKR 同步")).click();
+  });
+  await flush();
+  expect(host!.textContent).toContain("MSFT");
+  expect(host!.textContent).toContain("套用同步");
 });
 ```
 
@@ -724,8 +877,8 @@ them mutate holdings or call broker APIs.
 
 - `src/tools/portfolio_holdings_tools.py`
 - `src/tools/registry.py`
-- `src/agents/openai/tools.py`
-- `src/agents/anthropic/tools.py`
+- `src/agents/openai_agent/tools.py`
+- `src/agents/anthropic_agent/tools.py`
 - `docs/design/ARKSCOPE_TOOL_CATALOG.md`
 - tests listed in the ledger section.
 
@@ -748,7 +901,8 @@ def test_get_portfolio_holdings_reads_local_store(tmp_path, monkeypatch):
     assert out["totals"]["currency_basis"] == "per_currency"
 
 
-def test_get_portfolio_holdings_never_touches_ibkr(monkeypatch):
+def test_get_portfolio_holdings_never_touches_ibkr(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
     monkeypatch.setattr("src.portfolio_ibkr.read_ibkr_portfolio_snapshot", lambda: (_ for _ in ()).throw(AssertionError("IBKR touched")))
     out = get_portfolio_holdings()
     assert out["source"] == "local_profile"
@@ -823,7 +977,7 @@ Expected: no output.
 Commit:
 
 ```bash
-git add src/tools/portfolio_holdings_tools.py src/tools/registry.py src/agents/openai/tools.py src/agents/anthropic/tools.py docs/design/ARKSCOPE_TOOL_CATALOG.md tests/test_*.py
+git add src/tools/portfolio_holdings_tools.py src/tools/registry.py src/agents/openai_agent/tools.py src/agents/anthropic_agent/tools.py docs/design/ARKSCOPE_TOOL_CATALOG.md tests/test_*.py
 git commit -m "feat: expose local portfolio holdings tool"
 ```
 
@@ -910,4 +1064,3 @@ are loaded:
 5. Apply only after explicitly approving; user notes survive a second sync.
 6. Ask the agent for local holdings summary; trace shows `get_portfolio_holdings`, not
    `get_portfolio_analysis` with ad hoc JSON and not IBKR access.
-
