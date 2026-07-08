@@ -1,0 +1,608 @@
+"""Local portfolio/holdings state.
+
+Holdings are profile state: local SQLite, never PG, and never broker-authoritative
+without an explicit sync path.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sqlite3
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _norm_symbol(value: str) -> str:
+    return (value or "").strip().upper()
+
+
+def _account_hash(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _json_loads(value: str | None, default: Any) -> Any:
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+@dataclass(frozen=True)
+class PortfolioAccount:
+    id: int
+    label: str
+    broker: str
+    broker_account_id: str | None = None
+    broker_account_id_hash: str | None = None
+    sync_mode: str = "manual"
+    base_currency: str | None = None
+    include_in_total: bool = True
+    archived_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+@dataclass(frozen=True)
+class BrokerPosition:
+    broker: str
+    broker_account_id: str
+    broker_con_id: str
+    symbol: str
+    asset_class: str
+    quantity: float
+    avg_cost: float | None = None
+    currency: str = "USD"
+    market_value: float | None = None
+    unrealized_pnl: float | None = None
+    market_value_base: float | None = None
+    unrealized_pnl_base: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PortfolioPosition:
+    id: int
+    account_id: int
+    broker: str
+    broker_con_id: str | None
+    symbol: str
+    asset_class: str
+    quantity: float
+    avg_cost: float | None = None
+    currency: str = "USD"
+    market_value: float | None = None
+    unrealized_pnl: float | None = None
+    market_value_base: float | None = None
+    unrealized_pnl_base: float | None = None
+    source: str = "manual"
+    sync_status: str = "local"
+    last_sync_at: str | None = None
+    closed_at: str | None = None
+    notes: str = ""
+    thesis: str = ""
+    tags: list[str] = field(default_factory=list)
+    strategy_bucket: str | None = None
+    target_allocation: float | None = None
+
+
+@dataclass(frozen=True)
+class CurrencyTotal:
+    position_count: int
+    market_value: float | None = None
+    unrealized_pnl: float | None = None
+
+
+@dataclass(frozen=True)
+class PortfolioTotals:
+    currency_basis: str
+    per_currency: dict[str, CurrencyTotal]
+    broker_base: dict[str, float] | None = None
+
+
+@dataclass(frozen=True)
+class PortfolioSnapshot:
+    accounts: list[PortfolioAccount]
+    positions: list[PortfolioPosition]
+    totals: PortfolioTotals
+
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS portfolio_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL,
+    broker TEXT NOT NULL,
+    broker_account_id TEXT,
+    broker_account_id_hash TEXT,
+    sync_mode TEXT NOT NULL DEFAULT 'manual',
+    base_currency TEXT,
+    include_in_total INTEGER NOT NULL DEFAULT 1,
+    archived_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolio_accounts_broker_hash
+ON portfolio_accounts(broker, broker_account_id_hash)
+WHERE broker_account_id_hash IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS portfolio_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES portfolio_accounts(id) ON DELETE CASCADE,
+    broker TEXT NOT NULL DEFAULT 'manual',
+    broker_con_id TEXT,
+    symbol TEXT NOT NULL,
+    asset_class TEXT NOT NULL DEFAULT 'stock',
+    quantity REAL NOT NULL DEFAULT 0,
+    avg_cost REAL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    market_value REAL,
+    unrealized_pnl REAL,
+    market_value_base REAL,
+    unrealized_pnl_base REAL,
+    broker_snapshot_json TEXT NOT NULL DEFAULT '{}',
+    source TEXT NOT NULL DEFAULT 'manual',
+    sync_status TEXT NOT NULL DEFAULT 'local',
+    last_sync_at TEXT,
+    closed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolio_positions_broker_conid
+ON portfolio_positions(account_id, broker, broker_con_id)
+WHERE broker_con_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS portfolio_position_notes (
+    position_id INTEGER PRIMARY KEY REFERENCES portfolio_positions(id) ON DELETE CASCADE,
+    notes TEXT NOT NULL DEFAULT '',
+    thesis TEXT NOT NULL DEFAULT '',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    strategy_bucket TEXT,
+    target_allocation REAL,
+    alert_preferences_json TEXT NOT NULL DEFAULT '{}',
+    research_links_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_sync_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    broker TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    result_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_sync_diffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_run_id INTEGER REFERENCES portfolio_sync_runs(id) ON DELETE CASCADE,
+    account_id INTEGER,
+    position_id INTEGER,
+    kind TEXT NOT NULL,
+    broker_con_id TEXT,
+    symbol TEXT,
+    before_json TEXT NOT NULL DEFAULT '{}',
+    after_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+"""
+
+
+class PortfolioStore:
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
+        self._ensure_schema()
+
+    def _connect(self) -> sqlite3.Connection:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self.path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as conn:
+            conn.executescript(_SCHEMA)
+
+    def ensure_manual_account(self) -> PortfolioAccount:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM portfolio_accounts WHERE broker='manual' AND archived_at IS NULL ORDER BY id LIMIT 1"
+            ).fetchone()
+            if row is None:
+                now = _now()
+                cur = conn.execute(
+                    """
+                    INSERT INTO portfolio_accounts
+                    (label,broker,sync_mode,base_currency,include_in_total,created_at,updated_at)
+                    VALUES ('Manual','manual','manual','USD',1,?,?)
+                    """,
+                    (now, now),
+                )
+                row = conn.execute(
+                    "SELECT * FROM portfolio_accounts WHERE id=?",
+                    (cur.lastrowid,),
+                ).fetchone()
+            return self._account_from_row(row)
+
+    def list_accounts(self, *, include_archived: bool = False) -> list[PortfolioAccount]:
+        self.ensure_manual_account()
+        sql = "SELECT * FROM portfolio_accounts"
+        if not include_archived:
+            sql += " WHERE archived_at IS NULL"
+        sql += " ORDER BY CASE WHEN broker='manual' THEN 0 ELSE 1 END, label, id"
+        with self._connect() as conn:
+            return [self._account_from_row(row) for row in conn.execute(sql)]
+
+    def upsert_broker_account(
+        self,
+        broker: str,
+        broker_account_id: str,
+        label: str,
+        sync_mode: str = "ibkr_review",
+        base_currency: str | None = None,
+    ) -> PortfolioAccount:
+        broker = (broker or "").strip().lower()
+        if not broker or broker == "manual":
+            raise ValueError("broker account requires non-manual broker")
+        broker_account_id = (broker_account_id or "").strip()
+        if not broker_account_id:
+            raise ValueError("broker_account_id is required")
+        sync_mode = _validate_sync_mode(sync_mode)
+        acct_hash = _account_hash(broker_account_id)
+        now = _now()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM portfolio_accounts WHERE broker=? AND broker_account_id_hash=?",
+                (broker, acct_hash),
+            ).fetchone()
+            if row is None:
+                cur = conn.execute(
+                    """
+                    INSERT INTO portfolio_accounts
+                    (label,broker,broker_account_id,broker_account_id_hash,sync_mode,base_currency,include_in_total,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,1,?,?)
+                    """,
+                    (label, broker, broker_account_id, acct_hash, sync_mode, base_currency, now, now),
+                )
+                row = conn.execute("SELECT * FROM portfolio_accounts WHERE id=?", (cur.lastrowid,)).fetchone()
+            else:
+                conn.execute(
+                    """
+                    UPDATE portfolio_accounts
+                    SET label=?, broker_account_id=?, sync_mode=?, base_currency=?, archived_at=NULL, updated_at=?
+                    WHERE id=?
+                    """,
+                    (label, broker_account_id, sync_mode, base_currency, now, row["id"]),
+                )
+                row = conn.execute("SELECT * FROM portfolio_accounts WHERE id=?", (row["id"],)).fetchone()
+            return self._account_from_row(row)
+
+    def upsert_manual_position(
+        self,
+        *,
+        account_id: int,
+        symbol: str,
+        asset_class: str = "stock",
+        quantity: float,
+        avg_cost: float | None = None,
+        currency: str = "USD",
+        notes: str = "",
+    ) -> PortfolioPosition:
+        symbol = _norm_symbol(symbol)
+        if not symbol:
+            raise ValueError("symbol is required")
+        now = _now()
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO portfolio_positions
+                (account_id,broker,symbol,asset_class,quantity,avg_cost,currency,source,sync_status,created_at,updated_at)
+                VALUES (?,'manual',?,?,?,?,?,'manual','local',?,?)
+                """,
+                (account_id, symbol, asset_class, float(quantity), avg_cost, currency.upper(), now, now),
+            )
+            position_id = int(cur.lastrowid)
+            self._upsert_notes(conn, position_id=position_id, notes=notes, tags=None, now=now)
+            return self._position_from_id(conn, position_id)
+
+    def apply_broker_positions(
+        self,
+        *,
+        account_id: int,
+        positions: list[BrokerPosition],
+        source: str,
+    ) -> list[PortfolioPosition]:
+        now = _now()
+        out: list[PortfolioPosition] = []
+        with self._connect() as conn:
+            for pos in positions:
+                broker = (pos.broker or "").strip().lower()
+                con_id = str(pos.broker_con_id or "").strip()
+                symbol = _norm_symbol(pos.symbol)
+                if not broker or not con_id or not symbol:
+                    raise ValueError("broker positions require broker, conId, and symbol")
+                existing = conn.execute(
+                    """
+                    SELECT id FROM portfolio_positions
+                    WHERE account_id=? AND broker=? AND broker_con_id=?
+                    """,
+                    (account_id, broker, con_id),
+                ).fetchone()
+                payload = _json_dumps(pos.metadata or {})
+                params = (
+                    symbol,
+                    pos.asset_class,
+                    float(pos.quantity),
+                    pos.avg_cost,
+                    (pos.currency or "USD").upper(),
+                    pos.market_value,
+                    pos.unrealized_pnl,
+                    pos.market_value_base,
+                    pos.unrealized_pnl_base,
+                    payload,
+                    source,
+                    "synced",
+                    now,
+                    now,
+                )
+                if existing is None:
+                    cur = conn.execute(
+                        """
+                        INSERT INTO portfolio_positions
+                        (account_id,broker,broker_con_id,symbol,asset_class,quantity,avg_cost,currency,
+                         market_value,unrealized_pnl,market_value_base,unrealized_pnl_base,
+                         broker_snapshot_json,source,sync_status,last_sync_at,created_at,updated_at)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        """,
+                        (
+                            account_id,
+                            broker,
+                            con_id,
+                            symbol,
+                            pos.asset_class,
+                            float(pos.quantity),
+                            pos.avg_cost,
+                            (pos.currency or "USD").upper(),
+                            pos.market_value,
+                            pos.unrealized_pnl,
+                            pos.market_value_base,
+                            pos.unrealized_pnl_base,
+                            payload,
+                            source,
+                            "synced",
+                            now,
+                            now,
+                            now,
+                        ),
+                    )
+                    position_id = int(cur.lastrowid)
+                    self._upsert_notes(conn, position_id=position_id, notes="", tags=None, now=now)
+                else:
+                    position_id = int(existing["id"])
+                    conn.execute(
+                        """
+                        UPDATE portfolio_positions
+                        SET symbol=?, asset_class=?, quantity=?, avg_cost=?, currency=?,
+                            market_value=?, unrealized_pnl=?, market_value_base=?, unrealized_pnl_base=?,
+                            broker_snapshot_json=?, source=?, sync_status=?, last_sync_at=?, updated_at=?,
+                            closed_at=NULL
+                        WHERE id=?
+                        """,
+                        (*params, position_id),
+                    )
+                out.append(self._position_from_id(conn, position_id))
+            return out
+
+    def update_position_notes(
+        self,
+        position_id: int,
+        *,
+        notes: str | None = None,
+        thesis: str | None = None,
+        tags: list[str] | None = None,
+        strategy_bucket: str | None = None,
+        target_allocation: float | None = None,
+    ) -> PortfolioPosition:
+        now = _now()
+        with self._connect() as conn:
+            current = self._position_from_id(conn, position_id)
+            self._upsert_notes(
+                conn,
+                position_id=position_id,
+                notes=current.notes if notes is None else notes,
+                thesis=current.thesis if thesis is None else thesis,
+                tags=current.tags if tags is None else tags,
+                strategy_bucket=current.strategy_bucket if strategy_bucket is None else strategy_bucket,
+                target_allocation=current.target_allocation if target_allocation is None else target_allocation,
+                now=now,
+            )
+            return self._position_from_id(conn, position_id)
+
+    def get_position(self, position_id: int) -> PortfolioPosition:
+        with self._connect() as conn:
+            return self._position_from_id(conn, position_id)
+
+    def list_positions(
+        self,
+        *,
+        account_id: int | None = None,
+        include_closed: bool = False,
+    ) -> list[PortfolioPosition]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if account_id is not None:
+            clauses.append("p.account_id=?")
+            params.append(account_id)
+        if not include_closed:
+            clauses.append("p.closed_at IS NULL")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"""
+            SELECT p.*, n.notes, n.thesis, n.tags_json, n.strategy_bucket, n.target_allocation
+            FROM portfolio_positions p
+            LEFT JOIN portfolio_position_notes n ON n.position_id=p.id
+            {where}
+            ORDER BY p.symbol, p.id
+        """
+        with self._connect() as conn:
+            return [self._position_from_row(row) for row in conn.execute(sql, params)]
+
+    def snapshot(self, *, account_id: int | None = None) -> PortfolioSnapshot:
+        accounts = self.list_accounts()
+        positions = self.list_positions(account_id=account_id)
+        return PortfolioSnapshot(accounts=accounts, positions=positions, totals=_totals(positions))
+
+    def _upsert_notes(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        position_id: int,
+        notes: str,
+        now: str,
+        thesis: str = "",
+        tags: list[str] | None,
+        strategy_bucket: str | None = None,
+        target_allocation: float | None = None,
+    ) -> None:
+        conn.execute(
+            """
+            INSERT INTO portfolio_position_notes
+            (position_id,notes,thesis,tags_json,strategy_bucket,target_allocation,updated_at)
+            VALUES (?,?,?,?,?,?,?)
+            ON CONFLICT(position_id) DO UPDATE SET
+                notes=excluded.notes,
+                thesis=excluded.thesis,
+                tags_json=excluded.tags_json,
+                strategy_bucket=excluded.strategy_bucket,
+                target_allocation=excluded.target_allocation,
+                updated_at=excluded.updated_at
+            """,
+            (
+                position_id,
+                notes or "",
+                thesis or "",
+                _json_dumps(tags or []),
+                strategy_bucket,
+                target_allocation,
+                now,
+            ),
+        )
+
+    def _position_from_id(self, conn: sqlite3.Connection, position_id: int) -> PortfolioPosition:
+        row = conn.execute(
+            """
+            SELECT p.*, n.notes, n.thesis, n.tags_json, n.strategy_bucket, n.target_allocation
+            FROM portfolio_positions p
+            LEFT JOIN portfolio_position_notes n ON n.position_id=p.id
+            WHERE p.id=?
+            """,
+            (position_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"portfolio position not found: {position_id}")
+        return self._position_from_row(row)
+
+    @staticmethod
+    def _account_from_row(row: sqlite3.Row) -> PortfolioAccount:
+        return PortfolioAccount(
+            id=int(row["id"]),
+            label=row["label"],
+            broker=row["broker"],
+            broker_account_id=row["broker_account_id"],
+            broker_account_id_hash=row["broker_account_id_hash"],
+            sync_mode=row["sync_mode"],
+            base_currency=row["base_currency"],
+            include_in_total=bool(row["include_in_total"]),
+            archived_at=row["archived_at"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _position_from_row(row: sqlite3.Row) -> PortfolioPosition:
+        return PortfolioPosition(
+            id=int(row["id"]),
+            account_id=int(row["account_id"]),
+            broker=row["broker"],
+            broker_con_id=row["broker_con_id"],
+            symbol=row["symbol"],
+            asset_class=row["asset_class"],
+            quantity=float(row["quantity"]),
+            avg_cost=row["avg_cost"],
+            currency=row["currency"],
+            market_value=row["market_value"],
+            unrealized_pnl=row["unrealized_pnl"],
+            market_value_base=row["market_value_base"],
+            unrealized_pnl_base=row["unrealized_pnl_base"],
+            source=row["source"],
+            sync_status=row["sync_status"],
+            last_sync_at=row["last_sync_at"],
+            closed_at=row["closed_at"],
+            notes=row["notes"] or "",
+            thesis=row["thesis"] or "",
+            tags=list(_json_loads(row["tags_json"], [])),
+            strategy_bucket=row["strategy_bucket"],
+            target_allocation=row["target_allocation"],
+        )
+
+
+def _validate_sync_mode(value: str) -> str:
+    mode = (value or "").strip()
+    if mode not in {"manual", "ibkr_review", "ibkr_auto"}:
+        raise ValueError(f"invalid portfolio sync_mode: {value!r}")
+    return mode
+
+
+def _totals(positions: list[PortfolioPosition]) -> PortfolioTotals:
+    by_currency: dict[str, dict[str, Any]] = {}
+    has_base_values = bool(positions) and all(p.market_value_base is not None for p in positions)
+    base_market_value = 0.0
+    base_unrealized = 0.0
+    for pos in positions:
+        currency = (pos.currency or "USD").upper()
+        bucket = by_currency.setdefault(
+            currency,
+            {"position_count": 0, "market_value": None, "unrealized_pnl": None},
+        )
+        bucket["position_count"] += 1
+        if pos.market_value is not None:
+            bucket["market_value"] = (bucket["market_value"] or 0.0) + float(pos.market_value)
+        if pos.unrealized_pnl is not None:
+            bucket["unrealized_pnl"] = (bucket["unrealized_pnl"] or 0.0) + float(pos.unrealized_pnl)
+        if pos.market_value_base is not None:
+            base_market_value += float(pos.market_value_base)
+        if pos.unrealized_pnl_base is not None:
+            base_unrealized += float(pos.unrealized_pnl_base)
+
+    per_currency = {
+        currency: CurrencyTotal(
+            position_count=int(values["position_count"]),
+            market_value=values["market_value"],
+            unrealized_pnl=values["unrealized_pnl"],
+        )
+        for currency, values in sorted(by_currency.items())
+    }
+    if has_base_values:
+        return PortfolioTotals(
+            currency_basis="broker_base",
+            per_currency=per_currency,
+            broker_base={"market_value": base_market_value, "unrealized_pnl": base_unrealized},
+        )
+    return PortfolioTotals(currency_basis="per_currency", per_currency=per_currency, broker_base=None)

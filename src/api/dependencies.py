@@ -79,6 +79,14 @@ def get_investor_calibration_store():
 
 
 @lru_cache(maxsize=1)
+def get_portfolio_store():
+    """Singleton local portfolio/holdings store (same local SQLite profile DB)."""
+    from src.portfolio_state import PortfolioStore
+
+    return PortfolioStore(_local_state_db_path())
+
+
+@lru_cache(maxsize=1)
 def get_thread_store():
     """Singleton local store for AI 研究 conversation threads/messages (same local
     SQLite). Threads live alongside profile state in the local DB, never PG."""
