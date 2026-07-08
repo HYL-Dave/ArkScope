@@ -120,6 +120,7 @@ class PortfolioSnapshot:
     accounts: list[PortfolioAccount]
     positions: list[PortfolioPosition]
     totals: PortfolioTotals
+    included_account_ids: list[int]
 
 
 _SCHEMA = """
@@ -180,29 +181,9 @@ CREATE TABLE IF NOT EXISTS portfolio_position_notes (
     updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS portfolio_sync_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    broker TEXT NOT NULL,
-    mode TEXT NOT NULL,
-    status TEXT NOT NULL,
-    started_at TEXT NOT NULL,
-    finished_at TEXT,
-    result_json TEXT NOT NULL DEFAULT '{}'
-);
-
-CREATE TABLE IF NOT EXISTS portfolio_sync_diffs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sync_run_id INTEGER REFERENCES portfolio_sync_runs(id) ON DELETE CASCADE,
-    account_id INTEGER,
-    position_id INTEGER,
-    kind TEXT NOT NULL,
-    broker_con_id TEXT,
-    symbol TEXT,
-    before_json TEXT NOT NULL DEFAULT '{}',
-    after_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL
-);
 """
+
+_UNSET = object()
 
 
 class PortfolioStore:
@@ -212,8 +193,13 @@ class PortfolioStore:
 
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.path)
+        conn = sqlite3.connect(self.path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 
@@ -250,6 +236,66 @@ class PortfolioStore:
         sql += " ORDER BY CASE WHEN broker='manual' THEN 0 ELSE 1 END, label, id"
         with self._connect() as conn:
             return [self._account_from_row(row) for row in conn.execute(sql)]
+
+    def get_account(self, account_id: int) -> PortfolioAccount:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM portfolio_accounts WHERE id=?",
+                (account_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"portfolio account not found: {account_id}")
+        return self._account_from_row(row)
+
+    def update_account(
+        self,
+        account_id: int,
+        *,
+        label: str | None = None,
+        sync_mode: str | None = None,
+        base_currency: str | None | object = _UNSET,
+        include_in_total: bool | None = None,
+        archived: bool | None = None,
+    ) -> PortfolioAccount:
+        current = self.get_account(account_id)
+        next_sync_mode = current.sync_mode if sync_mode is None else _validate_sync_mode(sync_mode)
+        if current.broker == "manual" and next_sync_mode != "manual":
+            raise ValueError("manual portfolio accounts require manual sync_mode")
+        next_label = current.label if label is None else label.strip()
+        if not next_label:
+            raise ValueError("portfolio account label is required")
+        next_base_currency = (
+            current.base_currency
+            if base_currency is _UNSET
+            else ((base_currency or "").strip().upper() or None)
+        )
+        next_include = current.include_in_total if include_in_total is None else bool(include_in_total)
+        archived_at = current.archived_at
+        if archived is True and archived_at is None:
+            archived_at = _now()
+        elif archived is False:
+            archived_at = None
+
+        now = _now()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE portfolio_accounts
+                SET label=?, sync_mode=?, base_currency=?, include_in_total=?,
+                    archived_at=?, updated_at=?
+                WHERE id=?
+                """,
+                (
+                    next_label,
+                    next_sync_mode,
+                    next_base_currency,
+                    int(next_include),
+                    archived_at,
+                    now,
+                    account_id,
+                ),
+            )
+        return self.get_account(account_id)
 
     def upsert_broker_account(
         self,
@@ -332,19 +378,25 @@ class PortfolioStore:
     ) -> list[PortfolioPosition]:
         now = _now()
         out: list[PortfolioPosition] = []
+        account = self.get_account(account_id)
+        broker = account.broker
+        incoming_con_ids: set[str] = set()
         with self._connect() as conn:
             for pos in positions:
-                broker = (pos.broker or "").strip().lower()
+                position_broker = (pos.broker or "").strip().lower()
                 con_id = str(pos.broker_con_id or "").strip()
                 symbol = _norm_symbol(pos.symbol)
-                if not broker or not con_id or not symbol:
+                if not position_broker or not con_id or not symbol:
                     raise ValueError("broker positions require broker, conId, and symbol")
+                if position_broker != broker:
+                    raise ValueError("broker position does not match portfolio account")
+                incoming_con_ids.add(con_id)
                 existing = conn.execute(
                     """
                     SELECT id FROM portfolio_positions
                     WHERE account_id=? AND broker=? AND broker_con_id=?
                     """,
-                    (account_id, broker, con_id),
+                    (account_id, position_broker, con_id),
                 ).fetchone()
                 payload = _json_dumps(pos.metadata or {})
                 params = (
@@ -374,7 +426,7 @@ class PortfolioStore:
                         """,
                         (
                             account_id,
-                            broker,
+                            position_broker,
                             con_id,
                             symbol,
                             pos.asset_class,
@@ -409,6 +461,25 @@ class PortfolioStore:
                         (*params, position_id),
                     )
                 out.append(self._position_from_id(conn, position_id))
+            existing_rows = conn.execute(
+                """
+                SELECT id, broker_con_id
+                FROM portfolio_positions
+                WHERE account_id=? AND broker=? AND broker_con_id IS NOT NULL
+                  AND closed_at IS NULL
+                """,
+                (account_id, broker),
+            ).fetchall()
+            for row in existing_rows:
+                if str(row["broker_con_id"]) not in incoming_con_ids:
+                    conn.execute(
+                        """
+                        UPDATE portfolio_positions
+                        SET closed_at=?, sync_status='closed', last_sync_at=?, updated_at=?
+                        WHERE id=?
+                        """,
+                        (now, now, now, row["id"]),
+                    )
             return out
 
     def update_position_notes(
@@ -440,6 +511,20 @@ class PortfolioStore:
         with self._connect() as conn:
             return self._position_from_id(conn, position_id)
 
+    def close_position(self, position_id: int) -> PortfolioPosition:
+        now = _now()
+        with self._connect() as conn:
+            self._position_from_id(conn, position_id)
+            conn.execute(
+                """
+                UPDATE portfolio_positions
+                SET closed_at=?, sync_status='closed', updated_at=?
+                WHERE id=?
+                """,
+                (now, now, position_id),
+            )
+            return self._position_from_id(conn, position_id)
+
     def list_positions(
         self,
         *,
@@ -464,10 +549,45 @@ class PortfolioStore:
         with self._connect() as conn:
             return [self._position_from_row(row) for row in conn.execute(sql, params)]
 
-    def snapshot(self, *, account_id: int | None = None) -> PortfolioSnapshot:
+    def snapshot(
+        self,
+        *,
+        account_id: int | None = None,
+        include_closed: bool = False,
+        included_only: bool = False,
+    ) -> PortfolioSnapshot:
         accounts = self.list_accounts()
-        positions = self.list_positions(account_id=account_id)
-        return PortfolioSnapshot(accounts=accounts, positions=positions, totals=_totals(positions))
+        if account_id is not None:
+            accounts = [account for account in accounts if account.id == account_id]
+            if not accounts:
+                raise KeyError(f"portfolio account not found: {account_id}")
+        elif included_only:
+            accounts = [account for account in accounts if account.include_in_total]
+
+        selected_ids = {account.id for account in accounts}
+        positions = [
+            position
+            for position in self.list_positions(include_closed=include_closed)
+            if position.account_id in selected_ids
+        ]
+        if account_id is not None or included_only:
+            included_account_ids = sorted(selected_ids)
+            total_positions = positions
+        else:
+            included_account_ids = sorted(
+                account.id for account in accounts if account.include_in_total
+            )
+            total_positions = [
+                position
+                for position in positions
+                if position.account_id in included_account_ids
+            ]
+        return PortfolioSnapshot(
+            accounts=accounts,
+            positions=positions,
+            totals=_totals(total_positions),
+            included_account_ids=included_account_ids,
+        )
 
     def _upsert_notes(
         self,

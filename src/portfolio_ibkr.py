@@ -47,7 +47,7 @@ class BrokerSnapshot:
 @dataclass(frozen=True)
 class PortfolioSyncChange:
     kind: str
-    account_id: int
+    account_id: int | None
     broker_account_id: str
     broker_con_id: str
     symbol: str
@@ -144,46 +144,56 @@ def preview_or_apply_ibkr_snapshot(
         for account in store.list_accounts()
         if account.broker == "ibkr" and account.broker_account_id
     }
-    for broker_account in snapshot.accounts:
-        existing = account_by_broker_id.get(broker_account.account_id)
-        if existing is None:
-            existing = store.upsert_broker_account(
-                "ibkr",
-                broker_account.account_id,
-                broker_account.label,
-                sync_mode="ibkr_review",
-                base_currency=broker_account.base_currency,
+    snapshot_accounts = {
+        account.account_id: account
+        for account in snapshot.accounts
+    }
+    for broker_position in snapshot.positions:
+        snapshot_accounts.setdefault(
+            broker_position.account_id,
+            BrokerAccountSnapshot(
+                account_id=broker_position.account_id,
+                label=f"IBKR {broker_position.account_id}",
             )
-            account_by_broker_id[broker_account.account_id] = existing
+        )
+
+    if apply:
+        for broker_account in snapshot_accounts.values():
+            if broker_account.account_id not in account_by_broker_id:
+                account_by_broker_id[broker_account.account_id] = store.upsert_broker_account(
+                    "ibkr",
+                    broker_account.account_id,
+                    broker_account.label,
+                    sync_mode="ibkr_review",
+                    base_currency=broker_account.base_currency,
+                )
 
     changes: list[PortfolioSyncChange] = []
-    positions_by_account: dict[int, list[BrokerPosition]] = {}
+    positions_by_broker_account: dict[str, list[BrokerPosition]] = {
+        account_id: [] for account_id in snapshot_accounts
+    }
+    incoming_con_ids: dict[str, set[str]] = {
+        account_id: set() for account_id in snapshot_accounts
+    }
     for broker_pos in snapshot.positions:
         account = account_by_broker_id.get(broker_pos.account_id)
-        if account is None:
-            account = store.upsert_broker_account(
-                "ibkr",
-                broker_pos.account_id,
-                f"IBKR {broker_pos.account_id}",
-                sync_mode="ibkr_review",
+        existing = None
+        if account is not None:
+            existing = next(
+                (
+                    p
+                    for p in store.list_positions(account_id=account.id, include_closed=True)
+                    if p.broker == "ibkr" and p.broker_con_id == broker_pos.con_id
+                ),
+                None,
             )
-            account_by_broker_id[broker_pos.account_id] = account
-
-        existing = next(
-            (
-                p
-                for p in store.list_positions(account_id=account.id, include_closed=True)
-                if p.broker == "ibkr" and p.broker_con_id == broker_pos.con_id
-            ),
-            None,
-        )
         after = _position_after_dict(broker_pos)
         kind = "add" if existing is None else ("update" if _position_changed(existing, broker_pos) else "unchanged")
         if kind != "unchanged":
             changes.append(
                 PortfolioSyncChange(
                     kind=kind,
-                    account_id=account.id,
+                    account_id=account.id if account is not None else None,
                     broker_account_id=broker_pos.account_id,
                     broker_con_id=broker_pos.con_id,
                     symbol=broker_pos.symbol,
@@ -192,11 +202,41 @@ def preview_or_apply_ibkr_snapshot(
                     after=after,
                 )
             )
-        positions_by_account.setdefault(account.id, []).append(_to_store_position(broker_pos))
+        positions_by_broker_account[broker_pos.account_id].append(
+            _to_store_position(broker_pos)
+        )
+        incoming_con_ids[broker_pos.account_id].add(broker_pos.con_id)
+
+    for broker_account_id in snapshot_accounts:
+        account = account_by_broker_id.get(broker_account_id)
+        if account is None:
+            continue
+        for existing in store.list_positions(account_id=account.id):
+            if (
+                existing.broker == "ibkr"
+                and existing.broker_con_id
+                and existing.broker_con_id not in incoming_con_ids[broker_account_id]
+            ):
+                changes.append(
+                    PortfolioSyncChange(
+                        kind="remove",
+                        account_id=account.id,
+                        broker_account_id=broker_account_id,
+                        broker_con_id=existing.broker_con_id,
+                        symbol=existing.symbol,
+                        quantity=0,
+                        before=_position_before_dict(existing),
+                        after=None,
+                    )
+                )
 
     if apply:
-        for account_id, positions in positions_by_account.items():
-            store.apply_broker_positions(account_id=account_id, positions=positions, source="ibkr")
+        for broker_account_id, positions in positions_by_broker_account.items():
+            store.apply_broker_positions(
+                account_id=account_by_broker_id[broker_account_id].id,
+                positions=positions,
+                source="ibkr",
+            )
     return PortfolioSyncPreview(changes=changes, applies=apply)
 
 
@@ -275,7 +315,10 @@ def _to_store_position(pos: BrokerPositionSnapshot) -> BrokerPosition:
 
 
 def _position_changed(existing: Any, pos: BrokerPositionSnapshot) -> bool:
-    return _position_before_dict(existing) != _position_after_dict(pos)
+    return (
+        getattr(existing, "closed_at", None) is not None
+        or _position_before_dict(existing) != _position_after_dict(pos)
+    )
 
 
 def _position_before_dict(pos: Any) -> dict[str, Any]:

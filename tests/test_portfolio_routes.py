@@ -89,6 +89,7 @@ def test_ibkr_preview_does_not_write(monkeypatch, tmp_path):
 
     assert out["changes"]
     assert store.list_positions() == []
+    assert [a for a in store.list_accounts() if a.broker == "ibkr"] == []
 
 
 def test_ibkr_apply_requires_profile_state_write(monkeypatch, tmp_path):
@@ -138,3 +139,72 @@ def test_ibkr_missing_config_returns_provider_config_missing(monkeypatch, tmp_pa
     assert exc.value.detail["status"] == "not_configured"
     assert exc.value.detail["provider"] == "ibkr"
     assert exc.value.detail["field"] in {"host", "port"}
+
+
+def test_patch_account_updates_path_target_and_aggregate_flag(monkeypatch, tmp_path):
+    calls = []
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "Before")
+    monkeypatch.setattr(
+        routes,
+        "require_profile_state_write",
+        lambda action, detail=None: calls.append((action, detail)),
+    )
+
+    out = routes.update_account(
+        account.id,
+        routes.PortfolioAccountUpdateBody(
+            label="After",
+            sync_mode="ibkr_auto",
+            include_in_total=False,
+        ),
+        store=store,
+    )
+
+    assert out["id"] == account.id
+    assert out["label"] == "After"
+    assert out["include_in_total"] is False
+    assert calls == [("portfolio_account_write", {"account_id": account.id})]
+
+
+def test_patch_missing_account_returns_404(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+
+    with pytest.raises(HTTPException) as exc:
+        routes.update_account(
+            999,
+            routes.PortfolioAccountUpdateBody(label="Missing"),
+            store=store,
+        )
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail["code"] == "portfolio_account_not_found"
+
+
+def test_invalid_account_sync_mode_returns_400(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "Before")
+
+    with pytest.raises(HTTPException) as exc:
+        routes.update_account(
+            account.id,
+            routes.PortfolioAccountUpdateBody(sync_mode="invalid"),
+            store=store,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "invalid_portfolio_account"
+
+
+def test_patch_missing_position_returns_404(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+
+    with pytest.raises(HTTPException) as exc:
+        routes.update_position_notes(
+            999,
+            routes.PositionNotesBody(notes="missing"),
+            store=store,
+        )
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail["code"] == "portfolio_position_not_found"

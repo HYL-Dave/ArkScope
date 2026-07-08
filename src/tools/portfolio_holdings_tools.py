@@ -20,10 +20,20 @@ def get_portfolio_holdings(
     does not mutate profile state.
     """
     store = PortfolioStore(_profile_db_path())
-    snapshot = store.snapshot(account_id=account_id)
-    positions = store.list_positions(account_id=account_id, include_closed=include_closed)
+    snapshot = store.snapshot(
+        account_id=account_id,
+        include_closed=include_closed,
+        included_only=account_id is None,
+    )
     payload = asdict(snapshot)
-    payload["positions"] = [asdict(position) for position in positions]
+    payload["accounts"] = [
+        {
+            key: value
+            for key, value in asdict(account).items()
+            if key != "broker_account_id"
+        }
+        for account in snapshot.accounts
+    ]
     payload["source"] = "local_profile"
     return payload
 

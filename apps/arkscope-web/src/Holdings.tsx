@@ -4,6 +4,8 @@ import {
   createManualPosition,
   getPortfolio,
   previewIbkrPortfolioSync,
+  updatePortfolioAccount,
+  type PortfolioPosition,
   type PortfolioSnapshot,
   type PortfolioSyncPreview,
 } from "./api";
@@ -93,7 +95,22 @@ export function HoldingsView() {
     }
   }
 
+  async function onToggleAggregate(accountId: number, include: boolean) {
+    setBusy(`account-${accountId}`);
+    setErr(null);
+    try {
+      await updatePortfolioAccount(accountId, { include_in_total: include });
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const positions = snapshot?.positions ?? [];
+  const optionPositions = positions.filter((position) => position.asset_class === "option");
+  const standardPositions = positions.filter((position) => position.asset_class !== "option");
   const accounts = snapshot?.accounts ?? [];
   const totals = snapshot?.totals;
 
@@ -118,6 +135,18 @@ export function HoldingsView() {
               <span className="metric-label">{account.label}</span>
               <strong>{account.sync_mode}</strong>
               <span className="muted tiny">{account.broker}{account.base_currency ? ` · ${account.base_currency}` : ""}</span>
+              <label className="muted tiny">
+                <input
+                  type="checkbox"
+                  aria-label={`${account.label} 納入總計`}
+                  checked={account.include_in_total !== false}
+                  disabled={busy === `account-${account.id}`}
+                  onChange={(event) => {
+                    void onToggleAggregate(account.id, event.currentTarget.checked);
+                  }}
+                />
+                納入總計
+              </label>
             </div>
           ))}
           <div className="metric">
@@ -165,6 +194,9 @@ export function HoldingsView() {
             )}
           </div>
         </div>
+        <p className="muted">
+          唯讀同步，只讀取 Gateway 可見帳戶與持倉；ArkScope 不會下單。
+        </p>
         {preview && (
           <div className="table-wrap">
             <table>
@@ -194,40 +226,65 @@ export function HoldingsView() {
       <section className="section-band">
         <div className="section-head">
           <h2>Positions</h2>
-          <span className="muted tiny">{positions.length} rows</span>
+          <span className="muted tiny">{standardPositions.length} rows</span>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Asset</th>
-                <th>Qty</th>
-                <th>Currency</th>
-                <th>Market Value</th>
-                <th>P&L</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {positions.length === 0 ? (
-                <tr><td colSpan={7}>尚無持倉</td></tr>
-              ) : positions.map((position) => (
-                <tr key={position.id}>
-                  <td>{position.symbol}</td>
-                  <td>{position.asset_class}</td>
-                  <td>{formatNum(position.quantity)}</td>
-                  <td>{position.currency}</td>
-                  <td>{formatMaybe(position.market_value)}</td>
-                  <td>{formatMaybe(position.unrealized_pnl)}</td>
-                  <td>{position.notes ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PositionsTable positions={standardPositions} emptyText="尚無一般持倉" />
       </section>
+
+      {optionPositions.length > 0 && (
+        <section className="section-band">
+          <div className="section-head">
+            <h2>Options</h2>
+            <span className="muted tiny">{optionPositions.length} rows</span>
+          </div>
+          <p className="muted">
+            進階選擇權風險尚未建模；此區只呈現 broker 回傳的持倉快照。
+          </p>
+          <PositionsTable positions={optionPositions} emptyText="尚無選擇權持倉" />
+        </section>
+      )}
     </main>
+  );
+}
+
+function PositionsTable({
+  positions,
+  emptyText,
+}: {
+  positions: PortfolioPosition[];
+  emptyText: string;
+}) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Asset</th>
+            <th>Qty</th>
+            <th>Currency</th>
+            <th>Market Value</th>
+            <th>P&amp;L</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {positions.length === 0 ? (
+            <tr><td colSpan={7}>{emptyText}</td></tr>
+          ) : positions.map((position) => (
+            <tr key={position.id}>
+              <td>{position.symbol}</td>
+              <td>{position.asset_class}</td>
+              <td>{formatNum(position.quantity)}</td>
+              <td>{position.currency}</td>
+              <td>{formatMaybe(position.market_value)}</td>
+              <td>{formatMaybe(position.unrealized_pnl)}</td>
+              <td>{position.notes ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -5,7 +5,11 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HoldingsView } from "./Holdings";
-import type { PortfolioSnapshot, PortfolioSyncPreview } from "./api";
+import type {
+  PortfolioAccount,
+  PortfolioSnapshot,
+  PortfolioSyncPreview,
+} from "./api";
 
 let root: ReturnType<typeof createRoot> | null = null;
 let host: HTMLDivElement | null = null;
@@ -19,13 +23,25 @@ afterEach(() => {
 });
 
 const snapshot = (over: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot => ({
-  accounts: [{ id: 1, label: "Manual", broker: "manual", sync_mode: "manual", base_currency: "USD" }],
+  accounts: [{
+    id: 1,
+    label: "Manual",
+    broker: "manual",
+    sync_mode: "manual",
+    base_currency: "USD",
+    include_in_total: true,
+  }],
   positions: [],
   totals: { currency_basis: "per_currency", per_currency: {}, broker_base: null },
+  included_account_ids: [1],
   ...over,
 });
 
-type PortfolioApiResponse = PortfolioSnapshot | PortfolioSyncPreview | { ok: true };
+type PortfolioApiResponse =
+  | PortfolioAccount
+  | PortfolioSnapshot
+  | PortfolioSyncPreview
+  | { ok: true };
 
 function stubFetch(handler: (url: string, init?: RequestInit) => PortfolioApiResponse) {
   const calls: Array<{ url: string; method: string; body: unknown }> = [];
@@ -138,5 +154,68 @@ describe("HoldingsView", () => {
 
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("套用同步");
+  });
+
+  it("updates whether an account participates in aggregate totals", async () => {
+    const calls = stubFetch((url, init) => {
+      if (init?.method === "PATCH") {
+        return {
+          id: 1,
+          label: "Manual",
+          broker: "manual",
+          sync_mode: "manual",
+          include_in_total: false,
+        };
+      }
+      return snapshot();
+    });
+    await mount();
+    const toggle = host!.querySelector<HTMLInputElement>(
+      'input[aria-label="Manual 納入總計"]',
+    )!;
+
+    await act(async () => {
+      toggle.click();
+    });
+
+    expect(
+      calls.some(
+        (call) =>
+          call.url.endsWith("/portfolio/accounts/1") &&
+          call.method === "PATCH" &&
+          (call.body as any)?.include_in_total === false,
+      ),
+    ).toBe(true);
+  });
+
+  it("states read-only sync and separates options with a risk warning", async () => {
+    stubFetch(() => snapshot({
+      positions: [
+        {
+          id: 11,
+          account_id: 1,
+          symbol: "NVDA",
+          asset_class: "stock",
+          quantity: 1,
+          currency: "USD",
+        },
+        {
+          id: 12,
+          account_id: 1,
+          symbol: "NVDA 260116C00150000",
+          asset_class: "option",
+          quantity: 1,
+          currency: "USD",
+        },
+      ],
+    }));
+
+    await mount();
+    await flush();
+
+    expect(host!.textContent).toContain("唯讀同步");
+    expect(host!.textContent).toContain("不會下單");
+    expect(host!.textContent).toContain("Options");
+    expect(host!.textContent).toContain("進階選擇權風險尚未建模");
   });
 });

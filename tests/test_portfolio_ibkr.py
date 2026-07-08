@@ -102,6 +102,20 @@ def test_review_mode_returns_diff_without_writing(tmp_path):
     assert store.list_positions(account_id=account.id) == []
 
 
+def test_review_mode_does_not_create_discovered_broker_account(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+
+    diff = preview_or_apply_ibkr_snapshot(
+        store,
+        snapshot_with_pos(account="DU999", con_id=1),
+        apply=False,
+    )
+
+    assert diff.changes[0].account_id is None
+    assert diff.changes[0].broker_account_id == "DU999"
+    assert [a for a in store.list_accounts() if a.broker == "ibkr"] == []
+
+
 def test_auto_mode_applies_broker_owned_fields_only(tmp_path):
     store = PortfolioStore(tmp_path / "profile_state.db")
     account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123", sync_mode="ibkr_auto")
@@ -122,3 +136,37 @@ def test_auto_mode_applies_broker_owned_fields_only(tmp_path):
     row = store.get_position(row.id)
     assert row.quantity == 2
     assert row.notes == "do not touch"
+
+
+def test_snapshot_removal_is_previewed_then_closes_position_on_apply(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    preview_or_apply_ibkr_snapshot(
+        store,
+        snapshot_with_pos(account="DU123", con_id=1, quantity=1),
+        apply=True,
+    )
+    position = store.list_positions(account_id=account.id)[0]
+    store.update_position_notes(position.id, notes="preserve me")
+    empty = BrokerSnapshot(
+        accounts=[
+            BrokerAccountSnapshot(
+                account_id="DU123",
+                label="IBKR DU123",
+                base_currency="USD",
+            )
+        ],
+        positions=[],
+    )
+
+    preview = preview_or_apply_ibkr_snapshot(store, empty, apply=False)
+
+    assert [(change.kind, change.broker_con_id) for change in preview.changes] == [
+        ("remove", "1")
+    ]
+    assert store.get_position(position.id).closed_at is None
+
+    preview_or_apply_ibkr_snapshot(store, empty, apply=True)
+
+    assert store.get_position(position.id).closed_at is not None
+    assert store.get_position(position.id).notes == "preserve me"

@@ -1033,11 +1033,12 @@ export interface PortfolioSnapshot {
   accounts: PortfolioAccount[];
   positions: PortfolioPosition[];
   totals: PortfolioTotals;
+  included_account_ids: number[];
 }
 
 export interface PortfolioSyncChange {
   kind: string;
-  account_id?: number;
+  account_id?: number | null;
   broker_account_id?: string;
   broker_con_id?: string;
   symbol: string;
@@ -1065,6 +1066,23 @@ export function createManualPosition(body: {
   notes?: string;
 }): Promise<PortfolioPosition> {
   return sendJSON<PortfolioPosition>("/portfolio/positions", "POST", body);
+}
+
+export function updatePortfolioAccount(
+  accountId: number,
+  body: {
+    label?: string;
+    sync_mode?: string;
+    base_currency?: string | null;
+    include_in_total?: boolean;
+    archived?: boolean;
+  },
+): Promise<PortfolioAccount> {
+  return sendJSON<PortfolioAccount>(
+    `/portfolio/accounts/${encodeURIComponent(accountId)}`,
+    "PATCH",
+    body,
+  );
 }
 
 export function previewIbkrPortfolioSync(): Promise<PortfolioSyncPreview> {

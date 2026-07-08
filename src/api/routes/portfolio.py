@@ -51,6 +51,14 @@ class PortfolioAccountBody(BaseModel):
     base_currency: str | None = None
 
 
+class PortfolioAccountUpdateBody(BaseModel):
+    label: str | None = None
+    sync_mode: str | None = None
+    base_currency: str | None = None
+    include_in_total: bool | None = None
+    archived: bool | None = None
+
+
 @router.get("")
 def get_portfolio(
     store: PortfolioStore = Depends(get_portfolio_store),
@@ -75,37 +83,42 @@ def create_account(
         return _to_json(store.ensure_manual_account())
     if not body.broker_account_id:
         raise HTTPException(status_code=400, detail={"code": "broker_account_id_required"})
-    return _to_json(
-        store.upsert_broker_account(
-            body.broker,
-            body.broker_account_id,
-            body.label,
-            sync_mode=body.sync_mode,
-            base_currency=body.base_currency,
+    try:
+        return _to_json(
+            store.upsert_broker_account(
+                body.broker,
+                body.broker_account_id,
+                body.label,
+                sync_mode=body.sync_mode,
+                base_currency=body.base_currency,
+            )
         )
-    )
+    except ValueError as exc:
+        raise _invalid_account(exc) from exc
 
 
 @router.patch("/accounts/{account_id}")
 def update_account(
     account_id: int,
-    body: PortfolioAccountBody,
+    body: PortfolioAccountUpdateBody,
     store: PortfolioStore = Depends(get_portfolio_store),
 ) -> dict[str, Any]:
     require_profile_state_write("portfolio_account_write", {"account_id": account_id})
-    if body.broker == "manual":
-        return _to_json(store.ensure_manual_account())
-    if not body.broker_account_id:
-        raise HTTPException(status_code=400, detail={"code": "broker_account_id_required"})
-    return _to_json(
-        store.upsert_broker_account(
-            body.broker,
-            body.broker_account_id,
-            body.label,
-            sync_mode=body.sync_mode,
-            base_currency=body.base_currency,
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        return _to_json(
+            store.update_account(
+                account_id,
+                **changes,
+            )
         )
-    )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "portfolio_account_not_found", "account_id": account_id},
+        ) from exc
+    except ValueError as exc:
+        raise _invalid_account(exc) from exc
 
 
 @router.get("/positions")
@@ -148,16 +161,22 @@ def update_position_notes(
     store: PortfolioStore = Depends(get_portfolio_store),
 ) -> dict[str, Any]:
     require_profile_state_write("portfolio_position_write", {"position_id": position_id})
-    return _to_json(
-        store.update_position_notes(
-            position_id,
-            notes=body.notes,
-            thesis=body.thesis,
-            tags=body.tags,
-            strategy_bucket=body.strategy_bucket,
-            target_allocation=body.target_allocation,
+    try:
+        return _to_json(
+            store.update_position_notes(
+                position_id,
+                notes=body.notes,
+                thesis=body.thesis,
+                tags=body.tags,
+                strategy_bucket=body.strategy_bucket,
+                target_allocation=body.target_allocation,
+            )
         )
-    )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "portfolio_position_not_found", "position_id": position_id},
+        ) from exc
 
 
 @router.post("/ibkr/preview")
@@ -196,6 +215,13 @@ def _read_ibkr_snapshot_or_503():
             status_code=503,
             detail={"code": "ibkr_holdings_unavailable", "detail": str(exc)},
         ) from exc
+
+
+def _invalid_account(exc: ValueError) -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={"code": "invalid_portfolio_account", "detail": str(exc)},
+    )
 
 
 def _to_json(value: Any) -> Any:
