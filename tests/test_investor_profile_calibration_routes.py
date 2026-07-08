@@ -79,6 +79,31 @@ def test_send_message_appends_user_assistant_and_inert_proposal(stores, monkeypa
     assert pstore.get().enabled is False
 
 
+def test_send_message_wraps_responder_runtime_failure(stores, monkeypatch):
+    cstore, _pstore = stores
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    sess = routes.start_calibration_session(routes.StartCalibrationBody(), store=cstore)["active_session"]
+
+    async def failing_responder(*, messages, provider, model):
+        raise RuntimeError("claude_code_oauth calibration no-tool path is not wired")
+
+    monkeypatch.setattr(routes, "_default_responder", failing_responder)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            routes.send_calibration_message(
+                routes.CalibrationMessageBody(session_id=sess["id"], content="Help calibrate me."),
+                store=cstore,
+            )
+        )
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == {
+        "code": "calibration_responder_failed",
+        "message": "claude_code_oauth calibration no-tool path is not wired",
+    }
+
+
 def test_approve_proposal_uses_existing_profile_save_and_records_provenance(stores, monkeypatch):
     cstore, pstore = stores
     calls = []

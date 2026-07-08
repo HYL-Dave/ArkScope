@@ -135,7 +135,15 @@ async def send_calibration_message(
     try:
         store.append_message(sid, role="user", content=body.content)
         messages = [{"role": m.role, "content": m.content} for m in store.list_messages(sid)]
+    except ValueError as exc:
+        raise _bad(400, "invalid_calibration_message", str(exc)) from exc
+    try:
         result = await _default_responder(messages=messages, provider=body.provider, model=body.model)
+    except ValueError as exc:
+        raise _bad(400, "invalid_calibration_message", str(exc)) from exc
+    except Exception as exc:
+        raise _bad(502, "calibration_responder_failed", str(exc) or "calibration responder failed") from exc
+    try:
         store.append_message(sid, role="assistant", content=result.assistant_message)
         if result.profile_patch is not None:
             store.create_proposal(session_id=sid, profile_patch=result.profile_patch, rationales=result.rationales)
