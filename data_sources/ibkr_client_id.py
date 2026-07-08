@@ -19,8 +19,9 @@ import os
 # with a decision-log entry. options=+10 predates this module — it mirrors
 # option_chain_tools' original base+10 convention. Legacy occupants to stay clear
 # of: collect_ibkr_news.py defaults to 50, collect_ibkr_fundamentals.py hardcodes
-# 103, and archived scan/iv scripts stomp the env with random 100–999 — keep the
-# base well under 60 so derived ids never enter that band.
+# 103, and archived scan/iv scripts stomp the env with random 100–999. quotes=+50
+# and holdings=+60 are the current high bands; if future trading/execution reserves
+# +70, the app-managed base must stay <= 29 so derived ids never enter that legacy band.
 DOMAIN_OFFSETS = {
     "manual": 0,    # the base itself: manual smokes / legacy single-client paths
     "options": 10,  # option chain tools (readonly)
@@ -31,6 +32,7 @@ DOMAIN_OFFSETS = {
     # deliberately DISTINCT from legacy collect_ibkr_news.py's absolute
     # default 50 (adjacent but never equal for any base, since base >= 1).
     "quotes": 50,   # ad hoc read-through quote snapshots
+    "holdings": 60,  # read-only portfolio/position snapshots
 }
 
 # Display labels for the Settings hint — kept HERE so adding a domain is a
@@ -42,6 +44,7 @@ DOMAIN_LABELS_ZH = {
     "news": "新聞",
     "iv": "IV",
     "quotes": "即時股價",
+    "holdings": "持倉",
 }
 
 

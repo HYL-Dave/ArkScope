@@ -98,7 +98,7 @@ PROVIDER_FIELDS: Dict[str, List[FieldDef]] = {
             guard_reason=(
                 "Changing IBKR client_id can disturb active Gateway sessions; this is the "
                 "base id — all domains derive from it (options=+10, prices=+20, news=+30, "
-                "iv=+40; see data_sources/ibkr_client_id.py)."
+                "iv=+40, quotes=+50, holdings=+60; see data_sources/ibkr_client_id.py)."
             ),
         ),
     ],
