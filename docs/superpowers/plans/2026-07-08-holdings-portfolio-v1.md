@@ -1,10 +1,12 @@
 # Holdings + Portfolio V1 Implementation Plan
 
-> **Status: IMPLEMENTED FOR REVIEW 2026-07-08.** Implements
-> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. Branch
-> `codex/holdings-portfolio-v1` completed its first review-repair pass on
-> 2026-07-09; final reviewer A/B, merge, and live IBKR verification are intentionally
-> pending reviewer sign-off.
+> **Status: MERGED 2026-07-09 (`446cf5e`) — live IBKR verification pending.** Implements
+> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. First build reviewed
+> 2026-07-09 (6 must-fix + 4 should-fix, two with concrete repros); repair pass `40b5b8a`
+> re-reviewed with repro re-runs. Final virgin A/B (91ca631 vs 446cf5e): failure sets
+> identical 30=30, passed +30 = exactly the 17 first-build + 13 repair tests. FF-merged to
+> master; after restarting the sidecar run the Live Verification After Merge checklist
+> below, then flip this header to LIVE COMPLETE.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:test-driven-development` and either
