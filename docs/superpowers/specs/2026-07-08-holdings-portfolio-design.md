@@ -40,6 +40,13 @@ A broker connection is the external API session used to discover/read broker dat
 IBKR, this is the Gateway/TWS host, port, base client id, and account visibility returned
 by the API.
 
+V1 does not create a new `broker_connections` table. The only IBKR connection authority is
+the existing S-J provider configuration (`ibkr.host`, `ibkr.port`, guarded
+`ibkr.client_id`, enabled/config state). Holdings uses that connection to discover broker
+accounts and positions. A physical `broker_connections` table should be introduced only
+if ArkScope later supports multiple simultaneous Gateway endpoints or multiple broker
+providers that need independently stored connection profiles.
+
 Important properties:
 
 - one IBKR Gateway connection may expose one account, multiple accounts, only a subaccount,
@@ -67,9 +74,15 @@ update IBKR-backed portfolio accounts, but manual accounts are first-class too.
 A position belongs to one portfolio account. Positions carry both broker-owned and
 user-owned fields.
 
+For IBKR-backed positions, the sync identity is IBKR `conId` plus account scope, not the
+display symbol. Symbols can change across renames and corporate actions; a symbol-keyed
+diff would misclassify a rename as one deleted position plus one new position. Symbol is
+display metadata. Manual positions may use a local generated id until linked to a broker
+contract.
+
 Broker-owned fields may be refreshed from IBKR:
 
-- symbol / contract identifier;
+- symbol / contract identifier (`conId` for IBKR-backed positions);
 - asset class;
 - quantity;
 - average cost;
@@ -202,6 +215,14 @@ Existing IBKR client ids are domain-partitioned by `data_sources/ibkr_client_id.
 (`manual`, `options`, `prices`, `news`, `iv`, `quotes`). Holdings should add its own
 read-only domain, for example `holdings`, in a future implementation plan.
 
+Client-id bands are finite because old scripts already occupied awkward ranges:
+`collect_ibkr_fundamentals.py` hardcoded `103`, and archived scan/IV scripts used random
+`100-999` ids. The current highest domain offset is `quotes=50`. A future `holdings=60`
+band implies the base client id must stay low enough that derived ids avoid the legacy
+range; a future trading/execution band would make that tighter. The implementation plan
+must update `data_sources/ibkr_client_id.py` comments/tests and the Settings domain hint
+contracts together.
+
 Future trading/execution must not reuse the holdings read id. It needs independent ids:
 
 - an execution client-id domain such as `orders` or `trading`;
@@ -220,8 +241,9 @@ Recommended v1 tables in `profile_state.db`:
   - account id, display label, type, broker, broker account id/hash, sync mode, base
     currency, include-in-total, archived status, timestamps;
 - `portfolio_positions`
-  - account id, symbol, contract metadata, asset class, quantity, average cost, currency,
-    broker market value/P&L, source, sync status, timestamps;
+  - account id, local position id, broker contract id (`conId` for IBKR), symbol, contract
+    metadata, asset class, quantity, average cost, currency, broker market value/P&L,
+    source, sync status, timestamps;
 - `portfolio_position_notes`
   - user-owned notes/thesis/tags/strategy bucket/target allocation/links;
 - `portfolio_sync_snapshots`
@@ -232,6 +254,11 @@ Recommended v1 tables in `profile_state.db`:
 
 Exact schema belongs in the implementation plan. The design requirement is that broker
 fields and user fields are separable.
+
+Mixed-currency totals must be honest. V1 may use broker-provided base-currency market
+value/P&L where IBKR supplies it; otherwise it should show per-currency subtotals rather
+than silently summing unlike currencies. The UI/API must state which currency basis an
+aggregate uses.
 
 ## 10. UI Shape
 
