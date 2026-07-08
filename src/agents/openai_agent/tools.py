@@ -74,6 +74,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     from src.tools.option_chain_tools import get_option_chain as _get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis as _get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis as _get_portfolio_analysis
+    from src.tools.portfolio_holdings_tools import get_portfolio_holdings as _get_portfolio_holdings
     from src.tools.earnings_tools import get_earnings_impact as _get_earnings_impact
     from src.tools.signal_tools import (
         detect_anomalies,
@@ -595,6 +596,18 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
                 return json.dumps({"error": f"Invalid holdings_json: {holdings_json}"})
         result = _get_portfolio_analysis(dal, tickers=tickers, holdings=holdings)
         return _serialize_result(result, "get_portfolio_analysis")
+
+    @function_tool
+    def tool_get_portfolio_holdings(
+        account_id: Optional[int] = None,
+        include_closed: bool = False,
+    ) -> str:
+        """Read local portfolio holdings from profile_state.db. Does not sync or call IBKR."""
+        result = _get_portfolio_holdings(
+            account_id=account_id,
+            include_closed=include_closed,
+        )
+        return _serialize_result(result, "get_portfolio_holdings")
 
     # ================================================================
     # Earnings Impact (Batch 3c)
@@ -1193,6 +1206,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_morning_brief,
         tool_get_analyst_consensus,
         tool_get_portfolio_analysis,
+        tool_get_portfolio_holdings,
         tool_get_earnings_impact,
         tool_execute_python_analysis,
         tool_delegate_to_subagent,

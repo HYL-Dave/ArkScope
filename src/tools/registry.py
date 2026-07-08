@@ -673,6 +673,7 @@ class ToolRegistry:
 
     def _register_portfolio_tools(self) -> None:
         from .portfolio_tools import get_portfolio_analysis
+        from .portfolio_holdings_tools import get_portfolio_holdings
 
         self.register(ToolDefinition(
             name="get_portfolio_analysis",
@@ -692,6 +693,20 @@ class ToolRegistry:
                 ToolParameter("holdings", "object",
                               'Holdings dict: {"NVDA": {"qty": 100, "entry_price": 120.50}, ...}',
                               required=False),
+            ],
+        ))
+        self.register(ToolDefinition(
+            name="get_portfolio_holdings",
+            description=(
+                "Read the user's local portfolio holdings from profile_state.db. "
+                "This is a local read-only snapshot; it never calls IBKR and never syncs."
+            ),
+            function=get_portfolio_holdings,
+            category="portfolio",
+            requires_dal=False,
+            parameters=[
+                ToolParameter("account_id", "integer", "Optional portfolio account id", required=False),
+                ToolParameter("include_closed", "boolean", "Include closed/archived positions", required=False),
             ],
         ))
 

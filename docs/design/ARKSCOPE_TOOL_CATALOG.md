@@ -1,11 +1,11 @@
 # ArkScope Tool Catalog (canonical)
 
 **Date**: 2026-06-04
-**Status**: CANONICAL tool authority — introspection table from live `ToolRegistry` + **gpt-5.5 review folded 2026-06-04**; verdicts locked for every contested tool (web 3-way split, `codex_web_research` retire, CA definition-only narrowing, `synthesize_signal` preserve-adapt, `refresh_sa_alpha_picks` → `profile_state_write`). Third and last canonical doc (ProductSpec → ProviderCatalog → **ToolCatalog**). Code follow-ups now **done**: `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only status (842b5bf); post-catalog drift rows folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`); `get_current_quote` added as read-through quote primitive. **Live registry now 55** (bridges 56). Next → build the desktop-app shell.
+**Status**: CANONICAL tool authority — introspection table from live `ToolRegistry` + **gpt-5.5 review folded 2026-06-04**; verdicts locked for every contested tool (web 3-way split, `codex_web_research` retire, CA definition-only narrowing, `synthesize_signal` preserve-adapt, `refresh_sa_alpha_picks` → `profile_state_write`). Third and last canonical doc (ProductSpec → ProviderCatalog → **ToolCatalog**). Code follow-ups now **done**: `codex_web_research` removed (2a168e9); `refresh_sa_alpha_picks` stripped to read-only status (842b5bf); post-catalog drift rows folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`); `get_current_quote` added as read-through quote primitive; `get_portfolio_holdings` added as the local holdings snapshot primitive. **Live registry now 56** (bridges 57). Next → build the desktop-app shell.
 
 **Authority**: this doc owns the **registry tool layer** — what each tool is, which of the four capability classes it belongs to, and its keep/adapt/definition-only/retire verdict + the tool-design rules. Product/agent boundaries = `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; per-provider facts the tools consume = `ARKSCOPE_PROVIDER_CATALOG.md`; architecture = `LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`.
 
-> 中文摘要：直接從 `ToolRegistry` introspect 出的 **55 個工具**（codex_web_research 已於 2a168e9 移除；catalog 定稿後漂移的三個工具已補列；`get_current_quote` 已新增）逐一分類（穩定 primitive／composed-analysis／agent-control／retire-adapt）並標 keep/adapt/preserve-adapt/definition-only/retire。**這份是 code-introspection 出來的事實表，不是文件印象**；verdict 已折入 gpt-5.5 2026-06-04 review（web 三分、codex 退場、CA 收窄、`refresh_sa_alpha_picks`→`profile_state_write`），僅 §4「still open」待 build 時定序。
+> 中文摘要：直接從 `ToolRegistry` introspect 出的 **56 個工具**（codex_web_research 已於 2a168e9 移除；catalog 定稿後漂移的三個工具已補列；`get_current_quote` 與 `get_portfolio_holdings` 已新增）逐一分類（穩定 primitive／composed-analysis／agent-control／retire-adapt）並標 keep/adapt/preserve-adapt/definition-only/retire。**這份是 code-introspection 出來的事實表，不是文件印象**；verdict 已折入 gpt-5.5 2026-06-04 review（web 三分、codex 退場、CA 收窄、`refresh_sa_alpha_picks`→`profile_state_write`），僅 §4「still open」待 build 時定序。
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### 0.1 Source of truth = live introspection (NOT doc impression)
 
-Every tool below was enumerated by constructing `ToolRegistry` and calling `register_all()` + `list_all()` on **2026-06-04**, then reconciled to the current live registry after post-catalog drift and the 2026-07 current quote primitive — name, category, and parameters are authoritative from code. **Count: 55 registry tools** (+`delegate_to_subagent` injected at each agent bridge = **56** in bridges), across 11 categories. Lineage: post-RL-retirement baseline 52/53; `codex_web_research` removed 2026-06-04 (2a168e9) → 51/52; three already-registered drift tools folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`) → 54/55; `get_current_quote` added 2026-07 → **55/56**.
+Every tool below was enumerated by constructing `ToolRegistry` and calling `register_all()` + `list_all()` on **2026-06-04**, then reconciled to the current live registry after post-catalog drift and the 2026-07 quote/holdings primitives — name, category, and parameters are authoritative from code. **Count: 56 registry tools** (+`delegate_to_subagent` injected at each agent bridge = **57** in bridges), across 11 categories. Lineage: post-RL-retirement baseline 52/53; `codex_web_research` removed 2026-06-04 (2a168e9) → 51/52; three already-registered drift tools folded (`get_sa_feed`, `get_sa_comment_focus`, `get_ticker_data_coverage`) → 54/55; `get_current_quote` added 2026-07 → 55/56; `get_portfolio_holdings` added 2026-07 → **56/57**.
 
 > Re-run to refresh: `python -c "from src.tools.registry import ToolRegistry; r=ToolRegistry(); r.register_all(); print(len(r.list_all()))"`.
 
@@ -32,9 +32,9 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 ---
 
-## 1. Introspection table — all 55 tools (grouped by capability class)
+## 1. Introspection table — all 56 tools (grouped by capability class)
 
-### 1.1 Stable primitives (SP) — 32 tools · verdict: **keep-current** (keep the implementation)
+### 1.1 Stable primitives (SP) — 33 tools · verdict: **keep-current** (keep the implementation)
 
 > gpt-5.5 Q1: "which are stable primitive — keep the implementation, don't let the agent rewrite the wiring." These are the data/compute primitives. DAL/provider-backed; the agent calls them, never re-implements them.
 
@@ -58,6 +58,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | SA capture | keep-current |
 | `get_sa_article_detail` | portfolio | article_id* | SA capture | keep-current |
 | `get_sa_pick_detail` | portfolio | symbol*, picked_date? | SA capture | keep-current |
+| `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local profile_state.db portfolio | keep-current |
 | `get_detailed_financials` | analysis | ticker* | SEC EDGAR / Financial Datasets | keep-current |
 | `get_fundamentals_analysis` | analysis | ticker*, period? | IBKR→SEC→FinancialDatasets chain | keep-current |
 | `get_sec_filings` | analysis | ticker*, filing_types?, limit? | SEC EDGAR | keep-current |
@@ -112,7 +113,7 @@ Every tool below was enumerated by constructing `ToolRegistry` and calling `regi
 
 *(`codex_web_research` was here — **removed** 2a168e9, see §1.4; the deep-research capability re-homes provider-neutral in §1.5.)*
 
-*(+ `delegate_to_subagent` — injected at each agent bridge, not in the registry's 55; AC class; `subagent_mode`-bounded per ProductSpec §4.1.)*
+*(+ `delegate_to_subagent` — injected at each agent bridge, not in the registry's 56; AC class; `subagent_mode`-bounded per ProductSpec §4.1.)*
 
 ### 1.4 Retire-adapt (RA) flags — scenario changed
 
@@ -141,7 +142,7 @@ The old "web" category conflated three distinct capabilities with different gate
 - **`web_browse` backend is pluggable** behind one `external_browser_automation` gate: `playwright_builtin` (today) / `user_chrome` / `cloakbrowser_spike`. CloakBrowser (source-patched Chromium, Playwright/CDP drop-in, persistent profiles) is a **backend spike** (ProductSpec §7) — *not* a v1 replacement for the SA Chrome/Firefox extension pipeline (binary supply-chain, profile/session mgmt, packaging, ToS, CDP security all open).
 - **`deep_research` must be provider-neutral.** `codex_web_research` was removed (2a168e9) because it hard-binds the external Codex CLI + OpenAI OAuth / `--full-auto --search`, bypassing BYOK and the §2 output contract — *not* because the capability is unwanted. Rebuild on OpenAI SDK **and** Anthropic SDK paths, same §2 card out.
 
-**Planned tools (NOT in the live 55)** — recorded so the permission model stays ahead of them:
+**Planned tools (NOT in the live 56)** — recorded so the permission model stays ahead of them:
 
 | Planned tool | Purpose | Gate |
 |-------------|---------|------|
@@ -155,14 +156,14 @@ The old "web" category conflated three distinct capabilities with different gate
 
 | Verdict | Count | Tools |
 |---------|------:|-------|
-| **keep-current** | 49 | all SP (32) · 3 signal impls (detect_anomalies, detect_event_chains, get_signal_factors) · 3 CA compute tools (get_peer_comparison, get_earnings_impact, get_portfolio_analysis — *adapt output to §2 where they conclude*) · 11 AC (memory R/W ×4, reports R ×2, execute_python_analysis, tavily ×2, scan_alerts, refresh_sa_alpha_picks — read-only, adapt done 842b5bf) |
+| **keep-current** | 50 | all SP (33) · 3 signal impls (detect_anomalies, detect_event_chains, get_signal_factors) · 3 CA compute tools (get_peer_comparison, get_earnings_impact, get_portfolio_analysis — *adapt output to §2 where they conclude*) · 11 AC (memory R/W ×4, reports R ×2, execute_python_analysis, tavily ×2, scan_alerts, refresh_sa_alpha_picks — read-only, adapt done 842b5bf) |
 | **definition-only / adapt-to-card** | 2 | get_morning_brief, get_watchlist_overview |
 | **preserve-adapt** | 1 | synthesize_signal |
 | **adapt** | 2 | scan_mispricing, save_report |
 | **keep/adapt** (gate + backend) | 1 | web_browse |
 | **retired ✓** (not in live 51) | — | codex_web_research (2026-06-04, `2a168e9`) · RL tools (2026-06-03, `94861f7`+`6b49c74`) |
 
-**Total live = 49 + 2 + 1 + 2 + 1 = 55 ✓**
+**Total live = 50 + 2 + 1 + 2 + 1 = 56 ✓**
 
 ---
 

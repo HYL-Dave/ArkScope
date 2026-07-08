@@ -192,4 +192,4 @@ class TestPortfolioToolRegistration:
         assert tool.category == "portfolio"
         assert tool.requires_dal is True
         # Includes macro/calendar, SA, and local coverage diagnostics.
-        assert len(registry.list_all()) == 55
+        assert len(registry.list_all()) == 56

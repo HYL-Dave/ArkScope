@@ -692,6 +692,27 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "required": []
             }
         },
+        {
+            "name": "get_portfolio_holdings",
+            "description": (
+                "Read the user's local portfolio holdings from profile_state.db. "
+                "This is a local read-only snapshot; it never syncs and never calls IBKR."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "integer",
+                        "description": "Optional portfolio account id"
+                    },
+                    "include_closed": {
+                        "type": "boolean",
+                        "description": "Include closed/archived positions"
+                    }
+                },
+                "required": []
+            }
+        },
         # Earnings Impact (Batch 3c)
         {
             "name": "get_earnings_impact",
@@ -1424,6 +1445,7 @@ def execute_tool(
     from src.tools.option_chain_tools import get_option_chain
     from src.tools.iv_skew_tools import get_iv_skew_analysis
     from src.tools.portfolio_tools import get_portfolio_analysis
+    from src.tools.portfolio_holdings_tools import get_portfolio_holdings
     from src.tools.earnings_tools import get_earnings_impact
     from src.tools.signal_tools import (
         detect_anomalies,
@@ -1618,6 +1640,10 @@ def execute_tool(
             dal,
             tickers=tool_input.get("tickers"),
             holdings=tool_input.get("holdings"),
+        ),
+        "get_portfolio_holdings": lambda: get_portfolio_holdings(
+            account_id=tool_input.get("account_id"),
+            include_closed=tool_input.get("include_closed", False),
         ),
         # Earnings Impact (Batch 3c)
         "get_earnings_impact": lambda: get_earnings_impact(
