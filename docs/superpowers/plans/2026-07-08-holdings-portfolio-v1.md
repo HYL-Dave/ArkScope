@@ -7,6 +7,15 @@
 > identical 30=30, passed +30 = exactly the 17 first-build + 13 repair tests. FF-merged to
 > master; after restarting the sidecar run the Live Verification After Merge checklist
 > below, then flip this header to LIVE COMPLETE.
+>
+> **Live finding 2026-07-09:** the first merged preview reached
+> `IBKRDataSource.connect()` from FastAPI's AnyIO worker thread, where no asyncio event
+> loop existed; `ib_insync.IB.connect()` failed before any account/position method ran
+> and left an unawaited `connectAsync` warning. Hotfix branch
+> `codex/ibkr-worker-loop-fix` makes `IBKRDataSource` own a temporary loop only when the
+> calling thread lacks one, then releases it on disconnect/failure. A direct read-only
+> Gateway probe from that branch returned 1 visible account and 9 positions. Merge and
+> desktop preview/apply verification remain pending.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:test-driven-development` and either
