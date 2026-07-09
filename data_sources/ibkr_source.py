@@ -18,6 +18,7 @@ Free with IBKR account:
 Documentation: https://ib-insync.readthedocs.io/
 """
 
+import asyncio
 import os
 import time
 import logging
@@ -300,6 +301,7 @@ class IBKRDataSource(BaseDataSource):
 
         self._ib: Optional[IB] = None
         self._connected = False
+        self._owned_event_loop = None
         self._last_request_time = 0
         self._request_count = 0
 
@@ -351,6 +353,7 @@ class IBKRDataSource(BaseDataSource):
             return True
 
         try:
+            self._ensure_event_loop()
             self._ib = IB()
 
             # Register error handler to suppress noisy non-critical errors
@@ -373,18 +376,46 @@ class IBKRDataSource(BaseDataSource):
         except Exception as e:
             logger.error(f"Failed to connect to IBKR: {e}")
             self._connected = False
+            self._release_owned_event_loop()
             return False
 
     def disconnect(self):
         """Disconnect from TWS/IB Gateway."""
-        if self._ib:
-            try:
+        try:
+            if self._ib:
                 self._ib.disconnect()
-            except Exception as e:
-                logger.warning(f"Error during disconnect: {e}")
-            finally:
-                self._connected = False
-                logger.info("Disconnected from IBKR")
+        except Exception as e:
+            logger.warning(f"Error during disconnect: {e}")
+        finally:
+            self._connected = False
+            self._release_owned_event_loop()
+            logger.info("Disconnected from IBKR")
+
+    def _ensure_event_loop(self):
+        """Provide the current worker thread with a loop for ib_insync."""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None or loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._owned_event_loop = loop
+        return loop
+
+    def _release_owned_event_loop(self):
+        loop = self._owned_event_loop
+        if loop is None:
+            return
+        self._owned_event_loop = None
+        if not loop.is_closed():
+            loop.close()
+        try:
+            current = asyncio.get_event_loop()
+        except RuntimeError:
+            current = None
+        if current is loop:
+            asyncio.set_event_loop(None)
 
     class _IbErrorFilter(logging.Filter):
         """Filter to suppress non-critical ib_insync error messages."""
