@@ -14,8 +14,14 @@
 > and left an unawaited `connectAsync` warning. Hotfix branch
 > `codex/ibkr-worker-loop-fix` makes `IBKRDataSource` own a temporary loop only when the
 > calling thread lacks one, then releases it on disconnect/failure. A direct read-only
-> Gateway probe from that branch returned 1 visible account and 9 positions. Merge and
-> desktop preview/apply verification remain pending.
+> Gateway probe returned 1 visible account and 9 positions (reviewer re-verified with a
+> master-vs-hotfix worker-thread probe, both before and after the review fix). Review
+> added a `getattr` guard so `__del__`-time cleanup tolerates instances created without
+> `__init__` — caught by A/B warnings accounting (+4 unraisable → 0). **Hotfix MERGED
+> 2026-07-09 (`d1680c3`)**; desktop preview/apply verification remains the LIVE COMPLETE
+> gate. Caveat for future refactors: `import ib_insync` itself requires an event loop at
+> import time (eventkit) — keep its first import on the main thread (today guaranteed by
+> the sidecar's eager route import at startup).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:test-driven-development` and either
