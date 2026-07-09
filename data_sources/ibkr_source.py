@@ -404,7 +404,7 @@ class IBKRDataSource(BaseDataSource):
         return loop
 
     def _release_owned_event_loop(self):
-        loop = self._owned_event_loop
+        loop = getattr(self, "_owned_event_loop", None)
         if loop is None:
             return
         self._owned_event_loop = None

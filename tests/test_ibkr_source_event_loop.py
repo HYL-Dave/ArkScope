@@ -49,3 +49,10 @@ def test_connect_owns_event_loop_in_worker_thread_and_releases_it(monkeypatch):
     assert connected is True
     assert loop_closed is True
     assert current_loop is None
+
+
+def test_disconnect_tolerates_instance_created_without_init():
+    source = ibkr_source.IBKRDataSource.__new__(ibkr_source.IBKRDataSource)
+    source._ib = None
+
+    source.disconnect()
