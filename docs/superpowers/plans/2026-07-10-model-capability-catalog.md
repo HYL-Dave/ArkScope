@@ -1,6 +1,32 @@
 # Model Capability Registry + Discovery Cache + Effective Picker (P2.7)
 
-> **Status: IMPLEMENTED FOR REVIEW 2026-07-10.** Branch
+> **Status: COMPLETE — MERGED FF `7e4f5b7` to master 2026-07-11.** Two
+> implementation review rounds closed before GREEN. Round 1 (6 must-fix +
+> 2 should-fix, two user-repro'd): verified-first picker bypassed by the
+> legacy full-seed selector → collapsed 手動覆寫 `<details>`; no catalog
+> refetch after discovery; `resolve_active_credential` fabricated identity
+> (inactive fallback + pool coerced to api_key) → active-only + real
+> auth_type; dated discovery ids vanished → classified via
+> `capability_for(discovered_id)` keeping the provider's real id; 129
+> registry-unknown openai models flooded Advanced → excluded except route
+> pin; refusal entered the effort-retry heuristic → `except
+> AnthropicRefusalError: raise` ahead of the heuristic + call_count==1
+> pins. Round 2 (2 must-fix + 1 test gap, MF1 user-repro'd): resolver
+> hashed the whole `OPENAI_API_KEYS` string while discovery hashed the
+> selected single key → resolver unified on `_resolve_api_credential`
+> (fingerprints now provably match, cache round-trip test); oauth route
+> reported `cached: false` despite a landed write → `out["cached"]=True`
+> only in the record_run try/else, failure path pinned uncached;
+> cross-provider manual-override interaction test + extracted
+> `runDiscoveryAndRefreshCatalog` helper. Final virgin A/B `e92778b` →
+> `7e4f5b7`: failure sets identical 30=30 (both direction diffs empty),
+> passed 3853 → 3901 = +48 = exact collect diff (48 added / 0 removed),
+> skips/warnings/errors flat. User verdict GREEN 2026-07-11. Post-merge
+> remaining: live verification (Settings discovery round per credential,
+> per-task picker inspection) + Task 5C smoke (gpt-5.6-luna + claude-sonnet-5;
+> Fable 5 smoke user-gated at $10/$50).
+>
+> Prior status (2026-07-10): IMPLEMENTED FOR REVIEW. Branch
 > `claude/model-capability-catalog`, six TDD commits (registry / convergence /
 > discovery cache / effective view+picker / new generation+refusal / ledger
 > sweep). All five ruled fixes (A-E) landed and pinned; the five new-generation
