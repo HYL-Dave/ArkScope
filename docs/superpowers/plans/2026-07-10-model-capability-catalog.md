@@ -1,6 +1,26 @@
 # Model Capability Registry + Discovery Cache + Effective Picker (P2.7)
 
-> **Status: DRAFT FOR REVIEW (round 7) 2026-07-10.** Round-6 returned 1 must-fix
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-10.** Branch
+> `claude/model-capability-catalog`, six TDD commits (registry / convergence /
+> discovery cache / effective view+picker / new generation+refusal / ledger
+> sweep). All five ruled fixes (A-E) landed and pinned; the five new-generation
+> models (Fable 5, Sonnet 5, Sol/Terra/Luna) are registry entries with Task 0
+> provenance; refusal handling covers the three seams (agent loop emits
+> EventType.error code=model_refusal; synthesis+translation raise
+> AnthropicRefusalError; no fallback, no empty-success). Evidence: backend
+> focused sweep 340+ passed (4 pre-existing env failures unchanged), frontend
+> 26 files / 245 tests + typecheck + build, no-PG static gate clean, smoke
+> `ok:true` `pg_attempts:[]`. Two ledger notes for the reviewer: (1) two
+> existing tests used `claude-sonnet-5-20260501` as an UNKNOWN-model stand-in —
+> sonnet-5 is now real, so the stand-in moved to `claude-nova-1-…` (intent
+> unchanged) and sonnet-5's real 1M limit is separately pinned; (2)
+> `test_monitor`'s sonnet effort pin asserted the pre-Fix-E contract ("max not
+> in opts") and now pins the ruled Fix-E tuple. Full virgin A/B + reviewer
+> sign-off remain before merge; Task 5C live smoke (Luna + Sonnet 5; Fable
+> user-gated) runs post-merge with the Settings discovery round.
+> (Round-7 plan-review history preserved below.)
+>
+> Round-6 returned 1 must-fix
 > (refusal test vs the REAL harness: `mock_deps` yields a dict, collection goes
 > through `self._collect_events`, `run_query_stream` imported in-test,
 > `dal=MagicMock()` for hermeticity) + 1 should-fix (oauth route test now also
