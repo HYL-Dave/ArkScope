@@ -103,6 +103,22 @@ User-owned fields are never overwritten by IBKR:
 - alert preferences;
 - research-note links.
 
+### 3.4 Row-action ownership (post-V1 follow-up)
+
+Every position may edit user-owned notes, thesis, and tags. Broker ownership still
+governs the financial fields:
+
+- manual positions may edit symbol, asset class, quantity, average cost, and currency;
+- IBKR-backed positions must never expose manual edits for those broker-owned fields;
+- a request that tries to edit broker-owned fields on an IBKR position must fail
+  explicitly rather than accepting a value that the next sync will silently replace.
+
+Position removal is soft-close by default so user-owned research context remains
+attached. Users may close manual positions only. IBKR-backed positions are closed or
+reopened exclusively by broker snapshot diffs; a manual close affordance would be false
+because the next sync would reopen the row. Closed manual positions remain available
+through an explicit include-closed view. Hard delete and manual restore are deferred.
+
 ## 4. Sync Modes
 
 Sync mode is primarily account-level, with optional position-level exceptions later.
@@ -278,6 +294,10 @@ V1 should be functional, not decorative:
 Cards are appropriate for account summaries. Positions themselves should stay dense and
 scannable.
 
+The post-V1 row-actions follow-up extends this surface with notes/thesis/tags editing on
+every row, manual-only financial-field editing and soft close, and an include-closed
+toggle. These additions do not retroactively reopen the shipped V1 cut line.
+
 ## 11. Agent and Tool Access
 
 Agents should read holdings through a controlled local accessor, not by asking the user to
@@ -338,6 +358,13 @@ Out of scope:
 - No code path in this slice calls IBKR order APIs.
 - IBKR client-id usage is domain-separated from quotes/prices/news/options, and future
   trading ids are reserved as separate from holdings.
+
+### 13.1 Row-actions follow-up acceptance
+
+- IBKR rows cannot be manually closed or have broker-owned fields edited.
+- Every row can edit notes/thesis/tags without broker sync overwriting them.
+- Manual rows can edit manual financial fields and be soft-closed.
+- Manual soft-close preserves user-owned fields and closed rows remain inspectable.
 
 ## 14. Open Questions for the Implementation Plan
 
