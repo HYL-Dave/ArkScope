@@ -1,6 +1,12 @@
 # Model Capability Registry + Discovery Cache + Effective Picker (P2.7)
 
-> **Status: DRAFT FOR REVIEW (round 6) 2026-07-10.** Implements PROJECT_PRIORITY_MAP
+> **Status: DRAFT FOR REVIEW (round 7) 2026-07-10.** Round-6 returned 1 must-fix
+> (refusal test vs the REAL harness: `mock_deps` yields a dict, collection goes
+> through `self._collect_events`, `run_query_stream` imported in-test,
+> `dal=MagicMock()` for hermeticity) + 1 should-fix (oauth route test now also
+> pins the additive `cache_state`/`cached_at` response fields) — both applied
+> verbatim from the review.
+> Implements PROJECT_PRIORITY_MAP
 > §P2.7. Round-5 review returned 2 must-fix (both test-layer) + 1 should-fix, all
 > verified and folded: the Task 5B loop test is now built on the EXISTING
 > `tests/test_events.py` harness (`_make_mock_response(stop_reason="refusal",
@@ -955,7 +961,9 @@ def test_discovery_route_records_seed_only_for_oauth_all_seed(monkeypatch, tmp_p
     assert recorded["credential_id"] == "local:oauth-1"
     assert recorded["secret_fingerprint"] == "oauth"
     assert recorded["models"] == []                               # seeds are not entitlement rows
-    assert out["status"] == "ok" and "models" in out              # response shape additive
+    assert out["status"] == "ok" and "models" in out              # old fields intact
+    assert out["cache_state"] == "seed_only"                      # additive fields present
+    assert out["cached_at"]
 ```
 
 (`ModelDiscoveryRequest`/`ModelDiscoveryResult`/`DiscoveredModel` are the
@@ -1121,42 +1129,44 @@ env-fallback client that the loop's function-local `live_anthropic_client()`
 builds, exactly as the file's existing tests do):**
 
 ```python
-    @pytest.mark.anyio
-    async def test_refusal_stop_surfaces_error_not_done(self, mock_deps):
+    def test_refusal_stop_surfaces_error_not_done(self, mock_deps):
         # Today (RED reason): stop_reason="refusal" falls into the generic
-        # non-tool_use branch and becomes a successful empty done event.
-        mock_client, _mock_exec = mock_deps
+        # non-tool_use branch → a successful empty done event + log_final_answer.
+        mock_client = mock_deps["client"]          # mock_deps yields a dict
         refusal = _make_mock_response(stop_reason="refusal", content_blocks=[])
         refusal.stop_details = {"category": "safety"}
         mock_client.messages.stream.return_value = _make_stream_cm(refusal)
 
+        from src.agents.anthropic_agent.agent import run_query_stream
+
         with patch(
             "src.agents.shared.scratchpad.Scratchpad.log_final_answer"
         ) as mock_final:
-            events = []
-            async for ev in run_query_stream("q"):
-                events.append(ev)
+            events = self._collect_events(         # class helper (asyncio.run)
+                run_query_stream("q", dal=MagicMock())   # hermetic: no real DAL
+            )
 
         types = [e.type for e in events]
         assert EventType.done not in types                     # no success event
         error_events = [e for e in events if e.type == EventType.error]
         assert error_events, types
-        assert error_events[-1].data.get("code") == "model_refusal"
-        assert error_events[-1].data.get("stop_details") == {"category": "safety"}
+        assert error_events[-1].data["code"] == "model_refusal"
+        assert error_events[-1].data["stop_details"] == {"category": "safety"}
         mock_final.assert_not_called()                         # never logged as answer
 ```
 
 (`_make_mock_response` builds `usage` as a SimpleNamespace so the token tracker
 records normally — a hand-rolled `usage=None` fake would crash the logger before
-refusal classification, which is why the harness helper is mandatory here. The
-`mock_deps` unpacking and `run_query_stream` import follow the file's existing
-tests; `Scratchpad.log_final_answer`'s patch target is transcribed from the real
-import at implementation time — if the scratchpad class lives elsewhere, the
-patch string moves with it, the assertion contract stays. If the loop cannot
-route refusals to `EventType.error` without refactor depth beyond this branch,
-the Decision-10 escape hatch fires: Fable ships `runtime_ready=False`, this test
-moves to the follow-up slice, and synthesis/translation refusal handling still
-lands.)
+refusal classification. Harness facts verified: `mock_deps` yields a DICT keyed
+`client`/`mock_tools`/`mock_exec`/`config`; the class collects via
+`self._collect_events(...)` (asyncio.run), not `@pytest.mark.anyio`; `dal` must
+be a MagicMock or the loop builds a real DataAccessLayer.
+`src.agents.shared.scratchpad.Scratchpad` is the real import path
+(agent.py:26). RED reason today: the run yields `done` and calls
+`log_final_answer`. If the loop cannot route refusals to `EventType.error`
+without refactor depth beyond this branch, the Decision-10 escape hatch fires:
+Fable ships `runtime_ready=False`, this test moves to the follow-up slice, and
+synthesis/translation refusal handling still lands.)
 
 ### 5C: Ledger sweep + live smoke
 
