@@ -19,6 +19,7 @@ from src.agents.config import (
     save_local_override,
     task_route,
 )
+from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_route_store import ModelRouteStore
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
@@ -615,8 +616,44 @@ def discover_provider_models(
         driver = build_driver(
             provider=cred.provider, auth_mode=cred.auth_type, credential=cred, token_store=token_store,
         )
-        return _run_coro(driver.discover_models()).model_dump()
-    return discover_models(body.provider, body.credential_id, store).model_dump()
+        result = _run_coro(driver.discover_models())
+        out = result.model_dump()
+        if result.status == "ok":
+            # P2.7 write-through: live listings cache as ok; an all-seed result
+            # means this channel has no live listing → seed_only (badge in the
+            # picker, not an endless discovery nudge). Seeds are candidates,
+            # never entitlement rows. OAuth tokens rotate by design → the scope
+            # fingerprint is the constant "oauth".
+            live = [m for m in result.models if m.source == "provider_api"]
+            all_seed = not live and bool(result.models)
+            cache_status = "seed_only" if all_seed else "ok"
+            cache = ModelDiscoveryCache(store.db_path)
+            cache.record_run(
+                provider=body.provider,
+                auth_mode=cred.auth_type,
+                credential_id=body.credential_id or f"local:{cred.id}",
+                secret_fingerprint="oauth",
+                status=cache_status,
+                models=[
+                    {"id": m.id, "label": m.label, "source": m.source} for m in live
+                ],
+            )
+            out["cache_state"] = cache_status
+            out["cached_at"] = _utc_now_iso()
+        return out
+    result = discover_models(body.provider, body.credential_id, store)
+    out = result.model_dump()
+    if result.status == "ok":
+        # discover_models() already wrote the cache; surface the state additively.
+        out["cache_state"] = "ok"
+        out["cached_at"] = _utc_now_iso()
+    return out
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 @router.post("/config/model-test")

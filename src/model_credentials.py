@@ -19,11 +19,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+import logging
+
 import httpx
 from pydantic import BaseModel
 
 from src.env_keys import ensure_env_loaded, unquote_env_value
+from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_routing import MODEL_CATALOG, Provider
+
+logger = logging.getLogger(__name__)
 
 CredentialAuthType = Literal["api_key", "api_key_pool", "chatgpt_oauth", "claude_code_oauth"]
 DiscoveryStatus = Literal["ok", "missing_credential", "unsupported", "error"]
@@ -898,12 +903,59 @@ def _resolve_api_credential(
     )
 
 
+def secret_fingerprint(secret: str) -> str:
+    """One-way scope fingerprint for the discovery cache (never the secret)."""
+    import hashlib
+
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()[:16]
+
+
+def _record_discovery(
+    *,
+    provider: Provider,
+    auth_mode: str,
+    credential_id: str,
+    fingerprint: str,
+    status: str,
+    models: list[DiscoveredModel],
+    source_url: str = "",
+) -> None:
+    """Write-through to the discovery cache; best-effort (a cache write must
+    never fail a successful discovery)."""
+    try:
+        cache = ModelDiscoveryCache(_profile_db_path())
+        cache.record_run(
+            provider=provider,
+            auth_mode=auth_mode,
+            credential_id=credential_id,
+            secret_fingerprint=fingerprint,
+            status=status,
+            models=[
+                {"id": m.id, "label": m.label, "source": m.source} for m in models
+            ],
+            source_url=source_url,
+        )
+    except Exception:  # noqa: BLE001 - observational cache only
+        logger.warning("model discovery cache write failed", exc_info=True)
+
+
+def _profile_db_path() -> str:
+    return os.environ.get("ARKSCOPE_PROFILE_DB") or str(
+        Path(__file__).resolve().parents[1] / "data" / "profile_state.db"
+    )
+
+
 def discover_models(
     provider: Provider,
     credential_id: str | None = None,
     store: CredentialStore | None = None,
 ) -> ModelDiscoveryResult:
-    """Discover models for a provider/key when supported; fall back to seeds."""
+    """Discover models for a provider/key when supported; fall back to seeds.
+
+    Successful live listings are written through to the per-credential
+    discovery cache (P2.7); failure/missing-credential paths return exactly
+    what they always did and leave the cache untouched.
+    """
     cred = _resolve_api_credential(provider, credential_id, store)
     if not cred or not cred.secret:
         return ModelDiscoveryResult(
@@ -924,35 +976,24 @@ def discover_models(
                 DiscoveredModel(id=item.id, provider="openai", label=item.id, source="provider_api")
                 for item in data.data
             ]
-            return ModelDiscoveryResult(
-                provider=provider,
-                credential_id=cred.id,
-                status="ok",
-                models=sorted(models, key=lambda m: m.id),
-                source_url="https://platform.openai.com/docs/api-reference/models/list",
-            )
-        headers = {"x-api-key": cred.secret, "anthropic-version": "2023-06-01"}
-        resp = httpx.get("https://api.anthropic.com/v1/models", headers=headers, timeout=15)
-        resp.raise_for_status()
-        payload = resp.json()
-        items = payload.get("data", [])
-        models = [
-            DiscoveredModel(
-                id=item.get("id", ""),
-                provider="anthropic",
-                label=item.get("display_name") or item.get("id", ""),
-                source="provider_api",
-            )
-            for item in items
-            if item.get("id")
-        ]
-        return ModelDiscoveryResult(
-            provider=provider,
-            credential_id=cred.id,
-            status="ok",
-            models=sorted(models, key=lambda m: m.id),
-            source_url="https://docs.anthropic.com/en/api/models-list",
-        )
+            source_url = "https://platform.openai.com/docs/api-reference/models/list"
+        else:
+            headers = {"x-api-key": cred.secret, "anthropic-version": "2023-06-01"}
+            resp = httpx.get("https://api.anthropic.com/v1/models", headers=headers, timeout=15)
+            resp.raise_for_status()
+            payload = resp.json()
+            items = payload.get("data", [])
+            models = [
+                DiscoveredModel(
+                    id=item.get("id", ""),
+                    provider="anthropic",
+                    label=item.get("display_name") or item.get("id", ""),
+                    source="provider_api",
+                )
+                for item in items
+                if item.get("id")
+            ]
+            source_url = "https://docs.anthropic.com/en/api/models-list"
     except Exception as exc:  # pragma: no cover - live provider variability
         return ModelDiscoveryResult(
             provider=provider,
@@ -961,6 +1002,24 @@ def discover_models(
             models=_seed_models(provider),
             error=str(exc),
         )
+
+    ordered = sorted(models, key=lambda m: m.id)
+    _record_discovery(
+        provider=provider,
+        auth_mode=cred.auth_type,
+        credential_id=cred.id,
+        fingerprint=secret_fingerprint(cred.secret),
+        status="ok",
+        models=ordered,
+        source_url=source_url,
+    )
+    return ModelDiscoveryResult(
+        provider=provider,
+        credential_id=cred.id,
+        status="ok",
+        models=ordered,
+        source_url=source_url,
+    )
 
 
 def test_model(

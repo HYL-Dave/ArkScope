@@ -599,3 +599,132 @@ def test_export_cleared_reports_only_tasks_whose_keys_were_removed(make_route_st
     # overcount card_translation / ai_research (which had nothing to clear).
     assert res["cleared"] == ["card_synthesis"]
     assert res["exported"] == []
+
+
+# ── P2.7 Task 3: discovery cache write-through (caller seam) ──────
+
+
+def test_discover_models_success_writes_cache(monkeypatch, tmp_path):
+    import src.model_credentials as mc
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    recorded = {}
+
+    class _FakeCache:
+        def __init__(self, *a, **k): ...
+        def record_run(self, **kw):
+            recorded.update(kw)
+
+    monkeypatch.setattr(mc, "ModelDiscoveryCache", _FakeCache)
+
+    class _Cred:  # round-4 MF5: scope needs auth_mode — carry auth_type
+        id = "c1"
+        provider = "openai"
+        auth_type = "api_key"
+        secret = "sk-x"
+
+    monkeypatch.setattr(mc, "_resolve_api_credential", lambda *a, **k: _Cred())
+
+    class _FakeModels:
+        data = [type("M", (), {"id": "gpt-5.6-luna"})()]
+
+    class _FakeClient:
+        def __init__(self, **kw): ...
+        class models:  # noqa: N801 - mirrors sdk attribute
+            @staticmethod
+            def list():
+                return _FakeModels()
+
+    monkeypatch.setattr("openai.OpenAI", _FakeClient)
+
+    out = mc.discover_models("openai", "c1")
+    assert out.status == "ok"
+    assert recorded["status"] == "ok"
+    assert recorded["provider"] == "openai"
+    assert recorded["auth_mode"] == "api_key"
+    assert recorded["credential_id"] == "c1"
+    assert recorded["secret_fingerprint"] == mc.secret_fingerprint("sk-x")
+    assert [m["id"] for m in recorded["models"]] == ["gpt-5.6-luna"]
+
+
+def test_discover_models_failure_records_nothing(monkeypatch, tmp_path):
+    import src.model_credentials as mc
+
+    calls = []
+
+    class _FakeCache:
+        def __init__(self, *a, **k): ...
+        def record_run(self, **kw):
+            calls.append(kw)
+
+    monkeypatch.setattr(mc, "ModelDiscoveryCache", _FakeCache)
+
+    class _Cred:
+        id = "c1"
+        provider = "openai"
+        auth_type = "api_key"
+        secret = "sk-x"
+
+    monkeypatch.setattr(mc, "_resolve_api_credential", lambda *a, **k: _Cred())
+
+    class _Boom:
+        def __init__(self, **kw):
+            raise RuntimeError("network down")
+
+    monkeypatch.setattr("openai.OpenAI", _Boom)
+    out = mc.discover_models("openai", "c1")
+    assert out.status == "error" and calls == []
+
+
+def test_discovery_route_records_seed_only_for_oauth_all_seed(monkeypatch, tmp_path):
+    # round-5 MF2: the OAuth branch of discover_provider_models must write a
+    # seed_only run to the cache when the driver returns only seeds — otherwise
+    # the picker's discovery nudge loops forever on that channel.
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import DiscoveredModel, ModelDiscoveryResult
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    recorded = {}
+
+    class _FakeCache:
+        def __init__(self, *a, **k): ...
+        def record_run(self, **kw):
+            recorded.update(kw)
+
+    monkeypatch.setattr(cr, "ModelDiscoveryCache", _FakeCache)
+
+    class _OauthCred:
+        id = 1
+        provider = "anthropic"
+        auth_type = "claude_code_oauth"
+
+    class _FakeStore:
+        db_path = str(tmp_path / "profile_state.db")
+
+        def get(self, credential_id):
+            return _OauthCred()
+
+    class _FakeDriver:
+        async def discover_models(self):
+            return ModelDiscoveryResult(
+                provider="anthropic", credential_id="local:1", status="ok",
+                models=[DiscoveredModel(id="claude-opus-4-8", provider="anthropic",
+                                        label="Opus 4.8", source="seed")],
+            )
+
+    monkeypatch.setattr(cr, "_credential_store", lambda store: _FakeStore())
+    monkeypatch.setattr("src.auth_drivers.factory.build_driver",
+                        lambda **kw: _FakeDriver())
+
+    body = cr.ModelDiscoveryRequest(provider="anthropic", credential_id="local:1")
+    out = cr.discover_provider_models(body, store=_FakeStore(), token_store=object())
+
+    assert recorded["status"] == "seed_only"                      # the write-through
+    assert recorded["provider"] == "anthropic"
+    assert recorded["auth_mode"] == "claude_code_oauth"
+    assert recorded["credential_id"] == "local:1"
+    assert recorded["secret_fingerprint"] == "oauth"
+    assert recorded["models"] == []                               # seeds are not entitlement rows
+    assert out["status"] == "ok" and "models" in out              # old fields intact
+    assert out["cache_state"] == "seed_only"                      # additive fields present
+    assert out["cached_at"]
