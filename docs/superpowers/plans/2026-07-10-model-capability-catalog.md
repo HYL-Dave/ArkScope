@@ -1,24 +1,28 @@
 # Model Capability Registry + Discovery Cache + Effective Picker (P2.7)
 
-> **Status: DRAFT FOR REVIEW (round 5) 2026-07-10.** Implements PROJECT_PRIORITY_MAP
-> §P2.7. Round-4 review returned 6 must-fix + 3 should-fix; all verified and
-> folded: `pinned_only` now means NOT SHOWN unless route-pinned (with both
-> polarity tests), the Anthropic-OAuth research case got its own anthropic-routed
-> fixture (no more masking), the refusal tests target the REAL seams
-> (`src.auth_drivers.live_resolver.live_anthropic_client` patch point — the
-> synthesis/translation imports are function-local; the agent loop is STREAMING
-> via `client.messages.stream`, so the fake fakes a stream context manager) and a
-> shared `AnthropicRefusalError` covers synthesis AND `_translate_anthropic`
-> (`card_synthesis.py:460`), `adaptive_default_on` got an implementable wire
-> semantic under today's bool toggle (True→adaptive / False→explicit disabled —
-> because omit would silently leave thinking ON for these models; tri-state
-> deferred), the route test uses the real handler name `model_catalog` with a
-> real store, the discovery fakes carry `auth_type`, registry membership became
-> necessary-plus-relevance (Mythos 5 does NOT auto-enter), the OpenAI effort
-> completeness test gained gpt-5.2-codex, and the exact `_build_thinking_param`
-> outputs are pinned from live runs (adaptive/128000; budget 55808/64000; off →
-> (None, 8192)). Tasks 2/3 are fully expanded in-document. Docs-only; no runtime
-> implementation has started. Author: Claude (implementer); reviewer: user.
+> **Status: DRAFT FOR REVIEW (round 6) 2026-07-10.** Implements PROJECT_PRIORITY_MAP
+> §P2.7. Round-5 review returned 2 must-fix (both test-layer) + 1 should-fix, all
+> verified and folded: the Task 5B loop test is now built on the EXISTING
+> `tests/test_events.py` harness (`_make_mock_response(stop_reason="refusal",
+> content_blocks=[])` — its SimpleNamespace usage keeps the token tracker alive —
+> `_make_stream_cm`, the `mock_deps` fixture; the loop's `live_anthropic_client`
+> import is function-local at agent.py:220, and `mock_deps`'s `anthropic.Anthropic`
+> patch already intercepts the env-fallback client construction), asserts
+> `EventType.error` with `data["code"] == "model_refusal"` and ZERO `done` events
+> (**no new EventType member** — `test_events.py:18` pins the full enum value set,
+> so reusing `error` avoids a needless enum break), and patches
+> `Scratchpad.log_final_answer` directly instead of a nonexistent seam; the card
+> fixtures use the real `_packet()` helper (`tests/test_card_synthesis.py:22`);
+> Task 4 gained a REAL handler-direct `discover_provider_models` test pinning the
+> OAuth all-seed → `seed_only` cache write-through (scope + fingerprint + additive
+> response); and the Anthropic seed_only effective-view test now also asserts
+> pinned_only Claude models do not resurface as seed candidates. Rounds 1-5
+> history: three-layer architecture (registry=code / cache=DB / picker=per-task
+> intersection), live-helper equivalence gate, exact view-membership pins,
+> pool-fail-closed, credential fingerprint, five-mode thinking with implementable
+> wire mapping, three-seam refusal handling, membership = official docs +
+> ArkScope relevance. Docs-only; no runtime implementation has started. Author:
+> Claude (implementer); reviewer: user.
 
 **Goal:** One code-reviewed **capability registry** is the single source for model
 facts; a **DB discovery cache** records per-credential visibility; an **effective
@@ -73,11 +77,20 @@ mapping).
    `from src.auth_drivers.live_resolver import live_anthropic_client`;
    `client.messages.create` with a forced tool) AND card translation
    (`_translate_anthropic` at card_synthesis.py:460, same pattern) both need the
-   shared refusal error. **Patch point for both card seams =
-   `src.auth_drivers.live_resolver.live_anthropic_client`** (imports happen at
-   call time); patch point for the loop =
-   `src.agents.anthropic_agent.agent.live_anthropic_client` (module-namespace
-   import, called at :221).
+   shared refusal error. **The loop's import is ALSO function-local**
+   (agent.py:220-221) — there is no `mod.live_anthropic_client` to patch. Card
+   seams patch `src.auth_drivers.live_resolver.live_anthropic_client`; the loop
+   test reuses `tests/test_events.py`'s `mock_deps` fixture, whose
+   `anthropic.Anthropic` patch intercepts the env-fallback client that
+   `live_anthropic_client()` constructs (the existing TestAnthropicStream tests
+   already drive `run_query_stream` this way). `EventType`
+   (src/agents/shared/events.py:19) has NO `refusal` member and
+   `test_events.py:18` pins the full enum value set — refusals surface as
+   `EventType.error` with `data["code"] == "model_refusal"`; no enum change.
+   `tests/test_events.py` helpers: `_make_mock_response(stop_reason=,
+   content_blocks=)` (usage is a SimpleNamespace so the token tracker records
+   normally — a bare `usage=None` fake would crash the logger before refusal
+   classification) and `_make_stream_cm(response)`.
 4. **Executability grounding**: `resolve_live_auth()` resolves only DB `api_key`
    or env fallback; OAuth-active → fail-closed for sync clients (cards);
    **`api_key_pool` appears nowhere in live_resolver.py** → False for every task
@@ -689,7 +702,8 @@ def test_discover_models_failure_records_nothing(monkeypatch, tmp_path):
 ```
 
 (The oauth route branch — all-seed result records `status="seed_only"` — is pinned
-handler-direct in Task 4's route tests, same fake-cache idiom.)
+handler-direct in Task 4's
+`test_discovery_route_records_seed_only_for_oauth_all_seed`, full code there.)
 
 ### Step 3: Implement
 
@@ -841,6 +855,9 @@ def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp
     assert research["verified"] == []
     assert research["cache_state"] == "seed_only"
     assert any(m["badge"] == "seed" for m in research["advanced"])
+    # round-5 SF: pinned_only Claude models must NOT resurface as seed candidates
+    seed_ids = {m["id"] for m in research["advanced"]}
+    assert not ({"claude-sonnet-4-5", "claude-opus-4-5"} & seed_ids)
     # cards under oauth are not even executable:
     assert view["tasks"]["card_synthesis"]["verified"] == []
 
@@ -869,7 +886,7 @@ def test_resolver_covers_env_only_keys(monkeypatch, tmp_path):
     assert resolve_active_credential("openai").secret_fingerprint == _fp("sk-rotated")
 ```
 
-**Route RED test (handler-direct, real handler name `model_catalog`):**
+**Route RED tests (handler-direct, real handler names):**
 
 ```python
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
@@ -887,7 +904,64 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
+
+
+def test_discovery_route_records_seed_only_for_oauth_all_seed(monkeypatch, tmp_path):
+    # round-5 MF2: the OAuth branch of discover_provider_models
+    # (config_routes.py:589) returns the driver result directly; when every model
+    # is source="seed" (claude_code_oauth has no live listing) the route must
+    # write a seed_only run to the cache — otherwise the discovery nudge loops
+    # forever. Handler-direct with the real signature (body, store, token_store).
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import DiscoveredModel, ModelDiscoveryResult
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    recorded = {}
+
+    class _FakeCache:
+        def record_run(self, **kw):
+            recorded.update(kw)
+
+    monkeypatch.setattr(cr, "ModelDiscoveryCache", lambda *a, **k: _FakeCache())
+
+    class _OauthCred:
+        id = "local:oauth-1"
+        provider = "anthropic"
+        auth_type = "claude_code_oauth"
+
+    class _FakeStore:
+        db_path = str(tmp_path / "profile_state.db")
+        def get(self, credential_id):
+            return _OauthCred()
+
+    class _FakeDriver:
+        async def discover_models(self):
+            return ModelDiscoveryResult(
+                provider="anthropic", credential_id="local:oauth-1", status="ok",
+                models=[DiscoveredModel(id="claude-opus-4-8", provider="anthropic",
+                                        label="Opus 4.8", source="seed")],
+            )
+
+    monkeypatch.setattr(cr, "_credential_store", lambda store: _FakeStore())
+    monkeypatch.setattr("src.auth_drivers.factory.build_driver",
+                        lambda **kw: _FakeDriver())
+
+    body = cr.ModelDiscoveryRequest(provider="anthropic", credential_id="local:oauth-1")
+    out = cr.discover_provider_models(body, store=_FakeStore(), token_store=object())
+
+    assert recorded["status"] == "seed_only"                      # the write-through
+    assert recorded["provider"] == "anthropic"
+    assert recorded["auth_mode"] == "claude_code_oauth"
+    assert recorded["credential_id"] == "local:oauth-1"
+    assert recorded["secret_fingerprint"] == "oauth"
+    assert recorded["models"] == []                               # seeds are not entitlement rows
+    assert out["status"] == "ok" and "models" in out              # response shape additive
 ```
+
+(`ModelDiscoveryRequest`/`ModelDiscoveryResult`/`DiscoveredModel` are the
+existing pydantic models the route already uses; if `_credential_store` wraps
+differently at implementation time the fake moves to the same seam the real
+handler calls — the pinned contract is the `record_run` payload.)
 
 ### Step 2: RED tests — frontend (house harness; extends the file's `catalog()` fixture)
 
@@ -952,7 +1026,10 @@ Commit: `feat: verified-first per-task model picker`.
 
 **Files:** `src/model_capabilities.py`, `src/anthropic_refusal.py`,
 `src/agents/anthropic_agent/agent.py`, `src/card_synthesis.py`,
-`tests/test_card_synthesis.py`, ledger-swept tests. **No default flips.**
+`tests/test_card_synthesis.py`, **`tests/test_events.py`** (loop refusal test
+joins the existing `TestAnthropicStream` class), ledger-swept tests.
+**No default flips. No `src/agents/shared/events.py` change** (refusals reuse
+`EventType.error`; the enum value-set pin at `test_events.py:18` stays intact).
 
 ### 5A: Registry entries (RED first)
 
@@ -993,35 +1070,33 @@ New `src/anthropic_refusal.py`: `class AnthropicRefusalError(RuntimeError)`
 (carries `stop_details`) + `def is_refusal(message) -> bool`
 (`getattr(message, "stop_reason", None) == "refusal"`).
 
+**Card seams (in `tests/test_card_synthesis.py`; `_packet()` is the file's
+existing helper at :22):**
+
 ```python
-import pytest
-
-
-def _refusal_message():
-    return type("R", (), {
-        "stop_reason": "refusal", "content": [],
-        "stop_details": {"category": "safety"}, "usage": None,
-    })()
+def _refusal_response():
+    # Match _make_mock_response's discipline: content empty, stop_reason refusal;
+    # no MagicMock-usage pitfalls apply here (cards read .content/.stop_reason).
+    response = MagicMock()
+    response.stop_reason = "refusal"
+    response.content = []
+    response.stop_details = {"category": "safety"}
+    return response
 
 
 def test_card_synthesis_raises_structured_refusal(monkeypatch):
     from src import card_synthesis as cs
     from src.anthropic_refusal import AnthropicRefusalError
 
-    class _FakeClient:
-        class messages:  # noqa: N801
-            @staticmethod
-            def create(**kw):
-                return _refusal_message()
-
+    client = MagicMock()
+    client.messages.create.return_value = _refusal_response()
     # Function-local import → patch the SOURCE module (round-4 MF3).
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.live_anthropic_client",
-        lambda **kw: _FakeClient(),
+        lambda **kw: client,
     )
-    packet = make_min_packet()   # reuse the existing packet fixture in tests/test_card_synthesis.py
     with pytest.raises(AnthropicRefusalError):
-        cs._synthesize_anthropic(packet, "claude-fable-5")
+        cs._synthesize_anthropic(_packet(), "claude-fable-5")
 
 
 def test_card_translation_raises_structured_refusal(monkeypatch):
@@ -1029,66 +1104,59 @@ def test_card_translation_raises_structured_refusal(monkeypatch):
     from src import card_synthesis as cs
     from src.anthropic_refusal import AnthropicRefusalError
 
-    class _FakeClient:
-        class messages:  # noqa: N801
-            @staticmethod
-            def create(**kw):
-                return _refusal_message()
-
+    client = MagicMock()
+    client.messages.create.return_value = _refusal_response()
     monkeypatch.setattr(
         "src.auth_drivers.live_resolver.live_anthropic_client",
-        lambda **kw: _FakeClient(),
+        lambda **kw: client,
     )
     with pytest.raises(AnthropicRefusalError):
         cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW")
-
-
-@pytest.mark.anyio
-async def test_agent_loop_surfaces_refusal_not_final_answer(monkeypatch):
-    # The loop is STREAMING: fake the stream context manager whose final message
-    # is a refusal; assert the event stream contains a refusal-typed event and
-    # NO successful done/final-text, and pad.log_final_answer is never called.
-    from src.agents.anthropic_agent import agent as mod
-
-    class _FakeStream:
-        def __enter__(self):
-            return self
-        def __exit__(self, *a):
-            return False
-        def __iter__(self):
-            return iter(())              # no text/tool events before the refusal
-        def get_final_message(self):
-            return _refusal_message()
-
-    class _FakeMessages:
-        def stream(self, **kw):
-            return _FakeStream()
-
-    class _FakeClient:
-        messages = _FakeMessages()
-
-    monkeypatch.setattr(mod, "live_anthropic_client", lambda **kw: _FakeClient())
-    final_calls = []
-    monkeypatch.setattr(mod, "_log_final_answer_for_test", final_calls.append,
-                        raising=False)   # implementation exposes the seam it uses
-
-    events = []
-    async for ev in mod.run_query_stream("q", dal=object()):
-        events.append(ev)
-    kinds = [getattr(e, "type", getattr(e, "kind", None)) for e in events]
-    assert "refusal" in kinds
-    assert final_calls == []
-    assert not any(k == "done" and getattr(e, "text", "") for k, e in zip(kinds, events))
 ```
 
-(Exact fake-stream surface — sync vs async iteration, `get_final_message` vs
-`.get_final_message()` awaitable, and how `pad.log_final_answer` is interceptable
-— is transcribed from the real loop at implementation time; RED must fail for
-the RIGHT reason: today the loop treats the refusal as a successful empty final
-answer. If the loop cannot expose a clean interception seam without refactor
-depth, the Decision-10 escape hatch fires: Fable ships `runtime_ready=False` and
-this loop test moves to the follow-up slice — synthesis/translation refusal
-handling still lands.)
+**Loop seam (round-5 MF1 — extends `tests/test_events.py`'s existing
+`TestAnthropicStream` harness verbatim: `_make_mock_response`, `_make_stream_cm`,
+`mock_deps`; the fixture's `anthropic.Anthropic` patch intercepts the
+env-fallback client that the loop's function-local `live_anthropic_client()`
+builds, exactly as the file's existing tests do):**
+
+```python
+    @pytest.mark.anyio
+    async def test_refusal_stop_surfaces_error_not_done(self, mock_deps):
+        # Today (RED reason): stop_reason="refusal" falls into the generic
+        # non-tool_use branch and becomes a successful empty done event.
+        mock_client, _mock_exec = mock_deps
+        refusal = _make_mock_response(stop_reason="refusal", content_blocks=[])
+        refusal.stop_details = {"category": "safety"}
+        mock_client.messages.stream.return_value = _make_stream_cm(refusal)
+
+        with patch(
+            "src.agents.shared.scratchpad.Scratchpad.log_final_answer"
+        ) as mock_final:
+            events = []
+            async for ev in run_query_stream("q"):
+                events.append(ev)
+
+        types = [e.type for e in events]
+        assert EventType.done not in types                     # no success event
+        error_events = [e for e in events if e.type == EventType.error]
+        assert error_events, types
+        assert error_events[-1].data.get("code") == "model_refusal"
+        assert error_events[-1].data.get("stop_details") == {"category": "safety"}
+        mock_final.assert_not_called()                         # never logged as answer
+```
+
+(`_make_mock_response` builds `usage` as a SimpleNamespace so the token tracker
+records normally — a hand-rolled `usage=None` fake would crash the logger before
+refusal classification, which is why the harness helper is mandatory here. The
+`mock_deps` unpacking and `run_query_stream` import follow the file's existing
+tests; `Scratchpad.log_final_answer`'s patch target is transcribed from the real
+import at implementation time — if the scratchpad class lives elsewhere, the
+patch string moves with it, the assertion contract stays. If the loop cannot
+route refusals to `EventType.error` without refactor depth beyond this branch,
+the Decision-10 escape hatch fires: Fable ships `runtime_ready=False`, this test
+moves to the follow-up slice, and synthesis/translation refusal handling still
+lands.)
 
 ### 5C: Ledger sweep + live smoke
 
