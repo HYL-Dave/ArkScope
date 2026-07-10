@@ -638,7 +638,7 @@ def discover_provider_models(
         )
         result = _run_coro(driver.discover_models())
         out = result.model_dump()
-        if result.status == "ok":
+        if out.get("status") == "ok":
             # P2.7 write-through: live listings cache as ok; an all-seed result
             # means this channel has no live listing → seed_only (badge in the
             # picker, not an endless discovery nudge). Seeds are candidates,
@@ -661,9 +661,8 @@ def discover_provider_models(
             out["cache_state"] = cache_status
             out["cached_at"] = _utc_now_iso()
         return out
-    result = discover_models(body.provider, body.credential_id, store)
-    out = result.model_dump()
-    if result.status == "ok":
+    out = discover_models(body.provider, body.credential_id, store).model_dump()
+    if out.get("status") == "ok":
         # discover_models() already wrote the cache; surface the state additively.
         out["cache_state"] = "ok"
         out["cached_at"] = _utc_now_iso()

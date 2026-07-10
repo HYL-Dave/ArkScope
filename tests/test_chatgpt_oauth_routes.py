@@ -223,7 +223,9 @@ def test_model_discovery_api_key_uses_module_path_not_driver(stores, monkeypatch
     out = cr.discover_provider_models(
         cr.ModelDiscoveryRequest(provider="openai", credential_id="local:1"), store=cred, token_store=tok,
     )
-    assert hit.get("v") and out == sentinel  # module path used, driver NOT dispatched
+    assert hit.get("v")                                  # module path used, driver NOT dispatched
+    assert {k: out[k] for k in sentinel} == sentinel     # original payload intact
+    assert out["cache_state"] == "ok" and out["cached_at"]  # P2.7 additive cache fields
 
 
 def test_probe_route_still_supports_anthropic(stores, monkeypatch):
