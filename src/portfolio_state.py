@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -21,6 +22,20 @@ def _now() -> str:
 
 def _norm_symbol(value: str) -> str:
     return (value or "").strip().upper()
+
+
+def _float_or_error(value: Any, field_name: str, *, allow_none: bool) -> float | None:
+    if value is None:
+        if allow_none:
+            return None
+        raise ValueError(f"{field_name} must be a finite number")
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a finite number") from None
+    if not math.isfinite(out):
+        raise ValueError(f"{field_name} must be a finite number")
+    return out
 
 
 def _account_hash(value: str | None) -> str | None:
@@ -184,6 +199,20 @@ CREATE TABLE IF NOT EXISTS portfolio_position_notes (
 """
 
 _UNSET = object()
+
+# Row-update ownership sets: user-owned fields are editable on every position;
+# manual-financial fields only when the row's broker is "manual" (broker-synced
+# values are owned by the next IBKR snapshot).
+_USER_OWNED_FIELDS = frozenset(
+    {"notes", "thesis", "tags", "strategy_bucket", "target_allocation"}
+)
+_MANUAL_FINANCIAL_FIELDS = frozenset(
+    {"symbol", "asset_class", "quantity", "avg_cost", "currency"}
+)
+
+
+class BrokerPositionManagedBySync(ValueError):
+    """Manual-only mutation attempted on a broker-synced position."""
 
 
 class PortfolioStore:
@@ -492,29 +521,130 @@ class PortfolioStore:
         strategy_bucket: str | None = None,
         target_allocation: float | None = None,
     ) -> PortfolioPosition:
+        """Compatibility wrapper: keeps the old ``None means unchanged`` contract."""
+        fields: dict[str, Any] = {}
+        if notes is not None:
+            fields["notes"] = notes
+        if thesis is not None:
+            fields["thesis"] = thesis
+        if tags is not None:
+            fields["tags"] = tags
+        if strategy_bucket is not None:
+            fields["strategy_bucket"] = strategy_bucket
+        if target_allocation is not None:
+            fields["target_allocation"] = target_allocation
+        return self.update_position(position_id, fields=fields)
+
+    def update_position(
+        self,
+        position_id: int,
+        *,
+        fields: dict[str, Any],
+    ) -> PortfolioPosition:
+        """One transactional row update with key-presence semantics.
+
+        A key absent from ``fields`` is unchanged. An explicit ``None`` clears the
+        nullable fields (``avg_cost``, ``strategy_bucket``, ``target_allocation``);
+        ``None`` for notes/thesis/tags means no change (empty string/list clears).
+        Manual-financial keys on a broker-synced row raise before any write.
+        """
+        unknown = sorted(set(fields) - _USER_OWNED_FIELDS - _MANUAL_FINANCIAL_FIELDS)
+        if unknown:
+            raise ValueError(f"unknown position fields: {unknown}")
         now = _now()
         with self._connect() as conn:
             current = self._position_from_id(conn, position_id)
-            self._upsert_notes(
-                conn,
-                position_id=position_id,
-                notes=current.notes if notes is None else notes,
-                thesis=current.thesis if thesis is None else thesis,
-                tags=current.tags if tags is None else tags,
-                strategy_bucket=current.strategy_bucket if strategy_bucket is None else strategy_bucket,
-                target_allocation=current.target_allocation if target_allocation is None else target_allocation,
-                now=now,
-            )
+            manual_keys = sorted(set(fields) & _MANUAL_FINANCIAL_FIELDS)
+            if manual_keys and current.broker != "manual":
+                raise BrokerPositionManagedBySync(
+                    f"broker-synced position fields are managed by sync: {manual_keys}"
+                )
+
+            sets = self._validated_manual_sets(fields)
+            if sets:
+                sets["updated_at"] = now
+                assignments = ", ".join(f"{key}=?" for key in sets)
+                conn.execute(
+                    f"UPDATE portfolio_positions SET {assignments} WHERE id=?",
+                    (*sets.values(), position_id),
+                )
+
+            if set(fields) & _USER_OWNED_FIELDS:
+                notes = current.notes
+                if fields.get("notes") is not None:
+                    notes = str(fields["notes"])
+                thesis = current.thesis
+                if fields.get("thesis") is not None:
+                    thesis = str(fields["thesis"])
+                tags = current.tags
+                if fields.get("tags") is not None:
+                    tags = [str(tag) for tag in fields["tags"]]
+                strategy_bucket = current.strategy_bucket
+                if "strategy_bucket" in fields:
+                    raw_bucket = fields["strategy_bucket"]
+                    strategy_bucket = None if raw_bucket is None else str(raw_bucket)
+                target_allocation = current.target_allocation
+                if "target_allocation" in fields:
+                    target_allocation = _float_or_error(
+                        fields["target_allocation"], "target_allocation", allow_none=True
+                    )
+                self._upsert_notes(
+                    conn,
+                    position_id=position_id,
+                    notes=notes,
+                    thesis=thesis,
+                    tags=tags,
+                    strategy_bucket=strategy_bucket,
+                    target_allocation=target_allocation,
+                    now=now,
+                )
             return self._position_from_id(conn, position_id)
+
+    @staticmethod
+    def _validated_manual_sets(fields: dict[str, Any]) -> dict[str, Any]:
+        sets: dict[str, Any] = {}
+        if "symbol" in fields:
+            symbol = _norm_symbol(fields["symbol"])
+            if not symbol:
+                raise ValueError("symbol is required")
+            sets["symbol"] = symbol
+        if "asset_class" in fields:
+            asset_class = str(fields["asset_class"] or "").strip().lower()
+            if not asset_class:
+                raise ValueError("asset_class is required")
+            sets["asset_class"] = asset_class
+        if "quantity" in fields:
+            quantity = _float_or_error(fields["quantity"], "quantity", allow_none=False)
+            if quantity == 0:
+                raise ValueError("quantity must be a finite non-zero number")
+            sets["quantity"] = quantity
+        if "avg_cost" in fields:
+            avg_cost = _float_or_error(fields["avg_cost"], "avg_cost", allow_none=True)
+            if avg_cost is not None and avg_cost < 0:
+                raise ValueError("avg_cost must be null or a finite non-negative number")
+            sets["avg_cost"] = avg_cost
+        if "currency" in fields:
+            currency = str(fields["currency"] or "").strip().upper()
+            if not currency:
+                raise ValueError("currency is required")
+            sets["currency"] = currency
+        return sets
 
     def get_position(self, position_id: int) -> PortfolioPosition:
         with self._connect() as conn:
             return self._position_from_id(conn, position_id)
 
     def close_position(self, position_id: int) -> PortfolioPosition:
+        """Soft-close a manual position (idempotent). Broker rows are closed by sync."""
         now = _now()
         with self._connect() as conn:
-            self._position_from_id(conn, position_id)
+            current = self._position_from_id(conn, position_id)
+            if current.broker != "manual":
+                raise BrokerPositionManagedBySync(
+                    "broker-synced positions are closed by the next sync, not manually"
+                )
+            if current.closed_at is not None:
+                return current
             conn.execute(
                 """
                 UPDATE portfolio_positions

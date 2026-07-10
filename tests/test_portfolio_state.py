@@ -209,3 +209,182 @@ def test_fresh_schema_does_not_create_deferred_sync_history_tables(tmp_path):
 
     assert "portfolio_sync_runs" not in tables
     assert "portfolio_sync_diffs" not in tables
+
+
+def test_update_manual_position_changes_financial_and_user_fields(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id,
+        symbol="NVDA",
+        quantity=3,
+        avg_cost=100,
+        currency="USD",
+        notes="original",
+    )
+
+    updated = store.update_position(
+        row.id,
+        fields={
+            "symbol": "amd ",
+            "asset_class": "ETF",
+            "quantity": -2,
+            "avg_cost": 55.5,
+            "currency": "twd",
+            "notes": "rewritten",
+            "thesis": "cycle bet",
+            "tags": ["swing", "semis"],
+        },
+    )
+
+    assert updated.symbol == "AMD"
+    assert updated.asset_class == "etf"
+    assert updated.quantity == -2
+    assert updated.avg_cost == 55.5
+    assert updated.currency == "TWD"
+    assert updated.notes == "rewritten"
+    assert updated.thesis == "cycle bet"
+    assert updated.tags == ["swing", "semis"]
+
+
+def test_update_manual_position_explicit_null_clears_avg_cost(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, avg_cost=100
+    )
+
+    omitted = store.update_position(row.id, fields={"quantity": 4})
+    assert omitted.avg_cost == 100
+
+    cleared = store.update_position(row.id, fields={"avg_cost": None})
+    assert cleared.avg_cost is None
+    assert cleared.quantity == 4
+
+
+def test_update_manual_position_rejects_invalid_values(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+
+    import pytest
+
+    with pytest.raises(ValueError):
+        store.update_position(row.id, fields={"quantity": 0})
+    with pytest.raises(ValueError):
+        store.update_position(row.id, fields={"quantity": None})
+    with pytest.raises(ValueError):
+        store.update_position(row.id, fields={"symbol": "  "})
+    with pytest.raises(ValueError):
+        store.update_position(row.id, fields={"avg_cost": -1})
+    with pytest.raises(ValueError):
+        store.update_position(row.id, fields={"unknown_field": 1})
+    assert store.get_position(row.id).quantity == 3
+
+
+def test_update_broker_position_allows_user_fields(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    row = store.apply_broker_positions(
+        account_id=account.id,
+        positions=[broker_pos(con_id=1, symbol="AAPL", quantity=1)],
+        source="test",
+    )[0]
+
+    updated = store.update_position(
+        row.id,
+        fields={"notes": "keep", "thesis": "moat", "tags": ["core"]},
+    )
+
+    assert updated.notes == "keep"
+    assert updated.thesis == "moat"
+    assert updated.tags == ["core"]
+    assert updated.quantity == 1
+
+
+def test_update_broker_position_rejects_manual_fields_without_partial_write(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    row = store.apply_broker_positions(
+        account_id=account.id,
+        positions=[broker_pos(con_id=1, symbol="AAPL", quantity=1)],
+        source="test",
+    )[0]
+
+    import pytest
+
+    from src.portfolio_state import BrokerPositionManagedBySync
+
+    with pytest.raises(BrokerPositionManagedBySync):
+        store.update_position(
+            row.id,
+            fields={"quantity": 99, "notes": "should not land"},
+        )
+
+    after = store.get_position(row.id)
+    assert after.quantity == 1
+    assert after.notes == ""
+
+
+def test_manual_soft_close_preserves_user_fields_and_is_visible_when_requested(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, notes="thesis intact"
+    )
+
+    closed = store.close_position(row.id)
+    assert closed.closed_at is not None
+    assert closed.notes == "thesis intact"
+
+    again = store.close_position(row.id)
+    assert again.closed_at == closed.closed_at
+
+    assert store.list_positions(account_id=account.id) == []
+    visible = store.list_positions(account_id=account.id, include_closed=True)
+    assert [p.id for p in visible] == [row.id]
+    assert visible[0].notes == "thesis intact"
+
+    edited = store.update_position(row.id, fields={"avg_cost": 12.5})
+    assert edited.avg_cost == 12.5
+    assert edited.closed_at == closed.closed_at
+
+
+def test_broker_position_cannot_be_manually_closed(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    row = store.apply_broker_positions(
+        account_id=account.id,
+        positions=[broker_pos(con_id=1, symbol="AAPL", quantity=1)],
+        source="test",
+    )[0]
+
+    import pytest
+
+    from src.portfolio_state import BrokerPositionManagedBySync
+
+    with pytest.raises(BrokerPositionManagedBySync):
+        store.close_position(row.id)
+
+    assert store.get_position(row.id).closed_at is None
+
+
+def test_nullable_user_fields_distinguish_omitted_from_explicit_null(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(account_id=account.id, symbol="NVDA", quantity=3)
+    store.update_position(
+        row.id,
+        fields={"strategy_bucket": "core", "target_allocation": 0.2},
+    )
+
+    untouched = store.update_position(row.id, fields={"notes": "hi"})
+    assert untouched.strategy_bucket == "core"
+    assert untouched.target_allocation == 0.2
+
+    cleared = store.update_position(
+        row.id,
+        fields={"strategy_bucket": None, "target_allocation": None},
+    )
+    assert cleared.strategy_bucket is None
+    assert cleared.target_allocation is None

@@ -125,7 +125,9 @@ def test_auto_mode_applies_broker_owned_fields_only(tmp_path):
         apply=True,
     )
     row = store.list_positions(account_id=account.id)[0]
-    store.update_position_notes(row.id, notes="do not touch")
+    store.update_position_notes(
+        row.id, notes="do not touch", thesis="broker cannot own this", tags=["hold", "core"]
+    )
 
     preview_or_apply_ibkr_snapshot(
         store,
@@ -136,6 +138,8 @@ def test_auto_mode_applies_broker_owned_fields_only(tmp_path):
     row = store.get_position(row.id)
     assert row.quantity == 2
     assert row.notes == "do not touch"
+    assert row.thesis == "broker cannot own this"
+    assert row.tags == ["hold", "core"]
 
 
 def test_snapshot_removal_is_previewed_then_closes_position_on_apply(tmp_path):
