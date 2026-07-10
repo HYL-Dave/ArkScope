@@ -56,6 +56,7 @@ import {
   type ScheduleSourceState,
   type SyncMeta,
   type ModelCatalog,
+  type EffectiveTaskModels,
   type ModelDiscoveryResult,
   type ModelOption,
   type ModelProvider,
@@ -2008,6 +2009,82 @@ function DataSourcesSection() {
   );
 }
 
+const EFFECTIVE_BADGE_LABELS: Record<string, string> = {
+  advanced: "舊版",
+  seed: "未驗證 seed",
+  custom: "自訂",
+  route: "目前路由",
+};
+
+// P2.7 verified-first picker: default list = 已驗證可用 (registry ∩ discovery ∩
+// executability);其餘 (舊版/seed/自訂/目前路由) 收進「顯示進階模型」。
+function EffectiveModelPicker({
+  task,
+  effective,
+  row,
+  onDraft,
+}: {
+  task: ModelTask;
+  effective: EffectiveTaskModels;
+  row: DraftRoute;
+  onDraft: Dispatch<SetStateAction<Partial<Record<ModelTask, DraftRoute>>>>;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const entries = showAdvanced
+    ? [...effective.verified, ...effective.advanced]
+    : effective.verified;
+  return (
+    <div className="field">
+      <span>已驗證可用模型</span>
+      {effective.cache_state === "never_discovered" && (
+        <p className="muted tiny">尚未探索——跑一次模型探索以驗證此 credential 可見的模型。</p>
+      )}
+      {effective.cache_state === "seed_only" && (
+        <p className="muted tiny">此通道無法線上列出模型；以下為 seed 候選（未驗證）。</p>
+      )}
+      {effective.discovered_at && (
+        <p className="muted tiny">最後驗證可見 {effective.discovered_at}</p>
+      )}
+      <select
+        aria-label={`已驗證模型 ${task}`}
+        value={entries.some((m) => m.id === row.model) ? row.model : ""}
+        onChange={(e) => {
+          const id = e.target.value;
+          if (!id) return;
+          const inferred = inferProvider(id);
+          onDraft((prev) => ({
+            ...prev,
+            [task]: {
+              provider: inferred ?? row.provider,
+              model: id,
+              effort: (inferred ?? row.provider) === row.provider ? row.effort : "default",
+              custom: false,
+            },
+          }));
+        }}
+      >
+        <option value="">選擇模型…</option>
+        {entries.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+            {m.badge ? ` · ${EFFECTIVE_BADGE_LABELS[m.badge] ?? m.badge}` : ""}
+          </option>
+        ))}
+      </select>
+      <label className="muted tiny">
+        <input
+          type="checkbox"
+          aria-label="顯示進階模型"
+          checked={showAdvanced}
+          onChange={(e) => setShowAdvanced(e.currentTarget.checked)}
+        />
+        顯示進階模型（舊版 / 未驗證 / 自訂 / 目前路由）
+      </label>
+    </div>
+  );
+}
+
+
 export function ModelRoutingSection({
   catalog,
   draft,
@@ -2044,8 +2121,9 @@ export function ModelRoutingSection({
           const effective = catalog.routes[task.id];
           const envLocked = effective?.source === "env";
           const currentTest = testState[task.id];
+          const taskEffective = catalog.effective?.tasks?.[task.id];
           return (
-            <div className="settings-panel" key={task.id}>
+            <div className="settings-panel" key={task.id} data-testid={`route-${task.id}`}>
               <div className="settings-panel-head">
                 <div>
                   <h2>{TASK_LABELS[task.id]}</h2>
@@ -2065,6 +2143,14 @@ export function ModelRoutingSection({
                 </p>
               )}
               {effective?.warning && <p className="warn-text">{effective.warning}</p>}
+              {taskEffective && (
+                <EffectiveModelPicker
+                  task={task.id}
+                  effective={taskEffective}
+                  row={row}
+                  onDraft={onDraft}
+                />
+              )}
 
               <label className="field">
                 <span>Model</span>

@@ -90,6 +90,19 @@ export interface TaskInfo {
   recommended_model: string;
 }
 
+export interface EffectiveModelEntry {
+  id: string;
+  label: string;
+  badge: "advanced" | "seed" | "custom" | "route" | null;
+}
+
+export interface EffectiveTaskModels {
+  verified: EffectiveModelEntry[];
+  advanced: EffectiveModelEntry[];
+  cache_state: "ok" | "seed_only" | "never_discovered" | string;
+  discovered_at: string | null;
+}
+
 export interface ModelCatalog {
   providers: ModelProvider[];
   tasks: TaskInfo[];
@@ -98,6 +111,9 @@ export interface ModelCatalog {
   routes: Record<ModelTask, TaskRoute>;
   credentials: Record<ModelProvider, ProviderCredential[]>;
   custom_allowed: boolean;
+  // P2.7 additive: per-task verified/advanced partition (may be absent on old
+  // sidecars — the picker falls back to the seed list).
+  effective?: { tasks: Partial<Record<ModelTask, EffectiveTaskModels>> };
 }
 
 // Explicit auth modes (backend normalizes legacy oauth/setup_token → these; it
