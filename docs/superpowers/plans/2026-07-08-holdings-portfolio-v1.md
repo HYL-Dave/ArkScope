@@ -1,12 +1,19 @@
 # Holdings + Portfolio V1 Implementation Plan
 
-> **Status: MERGED 2026-07-09 (`446cf5e`) — live IBKR verification pending.** Implements
+> **Status: LIVE COMPLETE 2026-07-10.** Implements
 > `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. First build reviewed
 > 2026-07-09 (6 must-fix + 4 should-fix, two with concrete repros); repair pass `40b5b8a`
 > re-reviewed with repro re-runs. Final virgin A/B (91ca631 vs 446cf5e): failure sets
-> identical 30=30, passed +30 = exactly the 17 first-build + 13 repair tests. FF-merged to
-> master; after restarting the sidecar run the Live Verification After Merge checklist
-> below, then flip this header to LIVE COMPLETE.
+> identical 30=30, passed +30 = exactly the 17 first-build + 13 repair tests. FF-merged
+> `446cf5e` 2026-07-09. Post-merge live fixes on the way to completion: worker-loop
+> hotfix `d1680c3` (AnyIO thread had no asyncio loop — real Gateway now returns
+> 1 account / 9 positions), financial-columns fix `6c46c6a` (preview/positions show
+> avg cost / market value / P&L), row-actions follow-up `fcdbd94` (see
+> `2026-07-10-holdings-row-actions.md`). Live verification completed 2026-07-10 by the
+> user against the real Gateway: preview → apply persisted 9 positions with fresh
+> financial fields (reviewer independently re-checked `profile_state.db`), user notes
+> survive re-sync, agent reads holdings via `get_portfolio_holdings` with redacted
+> account ids and no IBKR access.
 >
 > **Live finding 2026-07-09:** the first merged preview reached
 > `IBKRDataSource.connect()` from FastAPI's AnyIO worker thread, where no asyncio event

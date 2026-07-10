@@ -12,8 +12,12 @@
 > probes; NaN-guard confirmed incl. `1e999`/whitespace/`Number("  ")===0` trap), backend
 > 48 passed / no-hard-delete / smoke, frontend 26 files / 242 + typecheck + build. Final
 > virgin A/B (03e1277 vs fcdbd94): failure sets identical 30=30, passed +18 exact,
-> warnings 18=18. FF-merged with user approval. Remaining: restart sidecar + rebuild
-> frontend, run Step 5 Live UI verification below, then flip to LIVE COMPLETE.
+> warnings 18=18. FF-merged with user approval. **LIVE COMPLETE 2026-07-10**: user ran
+> the Step 5 checklist against the real Gateway — IBKR-row notes/thesis/tags edited and
+> survived a re-sync, manual financial edits + blank-clears-avg-cost worked, `abc` avg
+> cost was blocked client-side with the 均價 error and no request, manual close required
+> confirmation and the row reappeared under 顯示已關閉 with totals unchanged, IBKR rows
+> showed broker·synced with no close control.
 
 **Goal:** Complete the Holdings position lifecycle: every position can edit its
 user-owned notes/thesis/tags, manual positions can edit their financial fields and be
