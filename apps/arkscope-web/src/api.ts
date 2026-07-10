@@ -151,6 +151,10 @@ export interface ModelDiscoveryResult {
   models: DiscoveredModel[];
   error: string | null;
   source_url: string | null;
+  // P2.7 additive: present only when the discovery run landed in the cache.
+  cache_state?: "ok" | "seed_only" | string;
+  cached_at?: string | null;
+  cached?: boolean;
 }
 
 export interface ModelTestResult {

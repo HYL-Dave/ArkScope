@@ -208,7 +208,7 @@ def test_model_discovery_api_key_uses_module_path_not_driver(stores, monkeypatch
     import src.api.routes.config_routes as crmod
 
     sentinel = {"provider": "openai", "credential_id": "local:1", "status": "ok",
-                "models": [], "error": None, "source_url": None}
+                "models": [], "error": None, "source_url": None, "cached": True}
     hit = {}
 
     class _R:

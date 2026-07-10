@@ -85,6 +85,7 @@ class ModelDiscoveryResult(BaseModel):
     models: list[DiscoveredModel]
     error: str | None = None
     source_url: str | None = None
+    cached: bool = False   # True only when the discovery cache write landed (SF1)
 
 
 class ModelTestResult(BaseModel):
@@ -919,11 +920,13 @@ def _record_discovery(
     status: str,
     models: list[DiscoveredModel],
     source_url: str = "",
-) -> None:
+    db_path: str | None = None,
+) -> bool:
     """Write-through to the discovery cache; best-effort (a cache write must
-    never fail a successful discovery)."""
+    never fail a successful discovery). Returns True only when the run actually
+    landed — callers report cached-ness from this, never assume it (SF1)."""
     try:
-        cache = ModelDiscoveryCache(_profile_db_path())
+        cache = ModelDiscoveryCache(db_path or _profile_db_path())
         cache.record_run(
             provider=provider,
             auth_mode=auth_mode,
@@ -937,6 +940,8 @@ def _record_discovery(
         )
     except Exception:  # noqa: BLE001 - observational cache only
         logger.warning("model discovery cache write failed", exc_info=True)
+        return False
+    return True
 
 
 def _profile_db_path() -> str:
@@ -972,8 +977,10 @@ def resolve_active_credential(
     ensure_env_loaded()
     store = store or CredentialStore()
     creds = provider_credentials(store)[provider]
-    active = next((c for c in creds if c.active and c.available), None) \
-        or next((c for c in creds if c.available), None)
+    # ONLY the truly-active credential resolves (review MF3): falling back to
+    # "first available" would fabricate an identity the user never selected and
+    # build the cache scope / executability answer on it.
+    active = next((c for c in creds if c.active and c.available), None)
     if active is None:
         return None
     if active.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
@@ -981,13 +988,27 @@ def resolve_active_credential(
             provider=provider, credential_id=active.id,
             auth_mode=active.auth_type, secret_fingerprint="oauth",
         )
+    if active.auth_type == "api_key_pool":
+        # Pools keep their REAL auth mode (review MF3): executability is
+        # fail-closed for pools (unwired for direct clients) and the cache
+        # scope must not collide with a plain api_key scope. Fingerprint =
+        # digest of the raw pool value so rotation still invalidates.
+        pool_raw = os.environ.get(
+            "OPENAI_API_KEYS" if provider == "openai" else "ANTHROPIC_API_KEYS", ""
+        )
+        if not pool_raw:
+            return None
+        return ActiveCredential(
+            provider=provider, credential_id=active.id,
+            auth_mode="api_key_pool",
+            secret_fingerprint=secret_fingerprint(pool_raw),
+        )
     resolved = _resolve_api_credential(provider, active.id, store)
-    if resolved is None or not resolved.secret:
-        # inventory row without a resolvable secret (e.g. retired pool) → no scope
+    if resolved is None or not resolved.secret or resolved.auth_type != "api_key":
         return None
     return ActiveCredential(
         provider=provider, credential_id=active.id,
-        auth_mode="api_key",
+        auth_mode=resolved.auth_type,   # the REAL mode, never coerced (review MF3)
         secret_fingerprint=secret_fingerprint(resolved.secret),
     )
 
@@ -1051,7 +1072,7 @@ def discover_models(
         )
 
     ordered = sorted(models, key=lambda m: m.id)
-    _record_discovery(
+    cached = _record_discovery(
         provider=provider,
         auth_mode=cred.auth_type,
         credential_id=cred.id,
@@ -1059,6 +1080,7 @@ def discover_models(
         status="ok",
         models=ordered,
         source_url=source_url,
+        db_path=(store.db_path if store is not None else None),
     )
     return ModelDiscoveryResult(
         provider=provider,
@@ -1066,6 +1088,7 @@ def discover_models(
         status="ok",
         models=ordered,
         source_url=source_url,
+        cached=cached,
     )
 
 

@@ -647,23 +647,27 @@ def discover_provider_models(
             live = [m for m in result.models if m.source == "provider_api"]
             all_seed = not live and bool(result.models)
             cache_status = "seed_only" if all_seed else "ok"
-            cache = ModelDiscoveryCache(store.db_path)
-            cache.record_run(
-                provider=body.provider,
-                auth_mode=cred.auth_type,
-                credential_id=body.credential_id or f"local:{cred.id}",
-                secret_fingerprint="oauth",
-                status=cache_status,
-                models=[
-                    {"id": m.id, "label": m.label, "source": m.source} for m in live
-                ],
-            )
-            out["cache_state"] = cache_status
-            out["cached_at"] = _utc_now_iso()
+            try:
+                cache = ModelDiscoveryCache(store.db_path)
+                cache.record_run(
+                    provider=body.provider,
+                    auth_mode=cred.auth_type,
+                    credential_id=body.credential_id or f"local:{cred.id}",
+                    secret_fingerprint="oauth",
+                    status=cache_status,
+                    models=[
+                        {"id": m.id, "label": m.label, "source": m.source} for m in live
+                    ],
+                )
+            except Exception:  # noqa: BLE001 - best-effort like the api_key path (SF1)
+                logger.warning("oauth discovery cache write failed", exc_info=True)
+            else:
+                out["cache_state"] = cache_status
+                out["cached_at"] = _utc_now_iso()
         return out
     out = discover_models(body.provider, body.credential_id, store).model_dump()
-    if out.get("status") == "ok":
-        # discover_models() already wrote the cache; surface the state additively.
+    if out.get("status") == "ok" and out.get("cached"):
+        # report cached-ness only when the write actually landed (SF1).
         out["cache_state"] = "ok"
         out["cached_at"] = _utc_now_iso()
     return out

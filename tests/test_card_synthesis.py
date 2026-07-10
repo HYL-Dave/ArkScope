@@ -184,3 +184,28 @@ def test_card_translation_raises_structured_refusal(monkeypatch):
     )
     with pytest.raises(AnthropicRefusalError):
         cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW")
+
+
+def test_refusal_never_triggers_effort_fallback(monkeypatch):
+    # Review MF6: AnthropicRefusalError's text/category can contain "effort",
+    # which the effort-fallback heuristic matches — a refusal must NEVER retry
+    # (zero-fallback contract); pin exactly one provider call.
+    from src import card_synthesis as cs
+    from src.anthropic_refusal import AnthropicRefusalError
+
+    client = MagicMock()
+    refusal = _refusal_response()
+    refusal.stop_details = {"category": "effort_extraction"}
+    client.messages.create.return_value = refusal
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: client,
+    )
+    with pytest.raises(AnthropicRefusalError):
+        cs._synthesize_anthropic(_packet(), "claude-fable-5", effort="xhigh")
+    assert client.messages.create.call_count == 1
+
+    client.messages.create.reset_mock()
+    with pytest.raises(AnthropicRefusalError):
+        cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW", effort="xhigh")
+    assert client.messages.create.call_count == 1

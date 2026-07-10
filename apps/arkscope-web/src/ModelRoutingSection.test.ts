@@ -153,6 +153,25 @@ describe("ModelRoutingSection effective picker (P2.7)", () => {
     expect(trans.textContent).not.toContain("跑一次模型探索以驗證");
   });
 
+  it("collapses the full-seed selector into a manual override when effective is present", () => {
+    // Review MF1: the legacy full-seed selector must not remain a default path
+    // around verified-first — it lives inside a collapsed <details>.
+    render(vi.fn(), catalogWithEffective());
+    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
+    const override = research.querySelector('[data-testid="manual-override-ai_research"]') as HTMLDetailsElement;
+    expect(override).toBeTruthy();
+    expect(override.tagName.toLowerCase()).toBe("details");
+    expect(override.open).toBe(false);                       // collapsed by default
+    expect(override.textContent).toContain("手動覆寫");
+  });
+
+  it("renders the legacy selector directly when effective is absent", () => {
+    render(vi.fn());  // shared fixture has no effective block (old sidecar)
+    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
+    expect(research.querySelector('[data-testid="manual-override-ai_research"]')).toBeNull();
+    expect(research.querySelectorAll("select").length).toBeGreaterThan(0);
+  });
+
   it("keeps the saved route model selectable from advanced", () => {
     render(vi.fn(), catalogWithEffective());
 

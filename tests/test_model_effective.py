@@ -182,3 +182,71 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
+
+
+def test_resolver_does_not_fabricate_identity(monkeypatch, tmp_path):
+    # Review MF3: (a) no active credential → None (never "first available");
+    # (b) an api_key_pool credential keeps its REAL auth_mode so the
+    # executability contract stays fail-closed and the cache scope is honest.
+    from src.model_credentials import resolve_active_credential
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEYS", "sk-pool-a,sk-pool-b")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+    cred = resolve_active_credential("openai")
+    assert cred is None or cred.auth_mode == "api_key_pool"
+    # pool must never masquerade as api_key
+    if cred is not None:
+        assert cred.auth_mode != "api_key"
+
+
+def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):
+    # Review MF4: providers return DATED ids (claude-haiku-4-5-20251001); exact
+    # canonical comparison missed them from verified, while capability_for
+    # recognizing them kept them out of custom — they vanished entirely. The
+    # view must classify via capability_for(discovered_id) and keep the
+    # provider's REAL executable id in the option.
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(provider="anthropic", auth_mode="api_key", credential_id="a1",
+                     secret_fingerprint=_fp("sk-ant"), status="ok",
+                     models=[{"id": "claude-haiku-4-5-20251001", "label": "Haiku 4.5",
+                              "source": "provider_api"}])
+    creds = {
+        "anthropic": ActiveCredential(provider="anthropic", credential_id="a1",
+                                      auth_mode="api_key",
+                                      secret_fingerprint=_fp("sk-ant")),
+        "openai": None,
+    }
+    view = effective_model_view(cache=cache, routes=_routes_mixed(), credentials=creds)
+    synth = view["tasks"]["card_synthesis"]
+    verified_ids = [m["id"] for m in synth["verified"]]
+    assert "claude-haiku-4-5-20251001" in verified_ids   # real executable id kept
+    all_ids = verified_ids + [m["id"] for m in synth["advanced"]]
+    assert "claude-haiku-4-5-20251001" in all_ids        # never vanishes
+
+
+def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
+    # Review MF5: an OpenAI key lists ~129 models (voice/embeddings/images) the
+    # app cannot execute; registry-unknown ids must NOT auto-enter advanced —
+    # unknown ids are for the explicit custom input; only a route pin survives.
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(provider="openai", auth_mode="api_key", credential_id="o1",
+                     secret_fingerprint=_fp("sk-oai"), status="ok",
+                     models=[{"id": "gpt-5.6-luna", "label": "Luna", "source": "provider_api"},
+                             {"id": "whisper-1", "label": "whisper", "source": "provider_api"},
+                             {"id": "text-embedding-3-large", "label": "emb", "source": "provider_api"},
+                             {"id": "mystery-model", "label": "?", "source": "provider_api"}])
+    routes = _routes_mixed()  # ai_research pins mystery-model
+    creds = {
+        "anthropic": None,
+        "openai": ActiveCredential(provider="openai", credential_id="o1",
+                                   auth_mode="api_key",
+                                   secret_fingerprint=_fp("sk-oai")),
+    }
+    view = effective_model_view(cache=cache, routes=routes, credentials=creds)
+    research = view["tasks"]["ai_research"]
+    advanced_ids = {m["id"] for m in research["advanced"]}
+    assert "whisper-1" not in advanced_ids               # unknown, unpinned → absent
+    assert "text-embedding-3-large" not in advanced_ids
+    assert "mystery-model" in advanced_ids               # route pin survives (badge route)
+    assert [m["id"] for m in research["verified"]] == ["gpt-5.6-luna"]

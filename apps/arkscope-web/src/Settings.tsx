@@ -508,6 +508,14 @@ export function SettingsView({
                       ...prev,
                       [provider]: { loading: false, result, credentialId },
                     }));
+                    // MF2: the discovery run just updated the entitlement cache —
+                    // refetch the catalog so the effective picker leaves
+                    // never_discovered without an app reload.
+                    try {
+                      setCatalog(await getModelCatalog());
+                    } catch {
+                      // catalog refresh is best-effort; discovery result already shown
+                    }
                   } catch (e) {
                     setDiscovery((prev) => ({
                       ...prev,
@@ -2152,6 +2160,13 @@ export function ModelRoutingSection({
                 />
               )}
 
+              {/* MF1: with the effective picker present, the full-seed
+                  selector + custom-id input become a collapsed manual override —
+                  no default path around verified-first. Without `effective`
+                  (older sidecar) they render as before. */}
+              {taskEffective ? (
+                <details className="field" data-testid={`manual-override-${task.id}`}>
+                  <summary className="muted tiny">手動覆寫（全部 seed 模型 / 自訂 id）</summary>
               <label className="field">
                 <span>Model</span>
                 <select
@@ -2210,6 +2225,72 @@ export function ModelRoutingSection({
                     由 prefix 自動判斷 provider（gpt-… → openai，claude-… → anthropic）；判斷不出時沿用目前 provider（{row.provider}）。
                   </span>
                 </label>
+              )}
+
+                </details>
+              ) : (
+                <>
+              <label className="field">
+                <span>Model</span>
+                <select
+                  value={row.custom ? MODEL_OPTION_CUSTOM : encodeModelOption(row.provider, row.model)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === MODEL_OPTION_CUSTOM) {
+                      // switch to custom-id mode; keep the current provider/model as the starting point
+                      onDraft((prev) => ({ ...prev, [task.id]: { ...row, custom: true } }));
+                      return;
+                    }
+                    const dec = decodeModelOption(v);
+                    if (!dec) return;
+                    onDraft((prev) => ({
+                      ...prev,
+                      [task.id]: {
+                        provider: dec.provider,
+                        model: dec.model,
+                        // reset effort only when the provider changed (effort sets differ)
+                        effort: dec.provider === row.provider ? row.effort : "default",
+                        custom: false,
+                      },
+                    }));
+                  }}
+                >
+                  {catalog.providers.map((p) => (
+                    <optgroup key={p} label={p}>
+                      {(modelsByProvider[p] ?? []).map((m) => (
+                        <option key={`${p}:${m.id}`} value={encodeModelOption(p, m.id)}>
+                          {p} · {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value={MODEL_OPTION_CUSTOM}>自訂 model id…</option>
+                </select>
+                <span className="field-help">直接選模型即可，provider 會自動設定；或選「自訂 model id」手動輸入。</span>
+              </label>
+
+              {row.custom && (
+                <label className="field">
+                  <span>自訂 model id</span>
+                  <input
+                    value={row.model}
+                    placeholder={row.provider === "anthropic" ? "claude-…" : "gpt-…"}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      const inferred = inferProvider(value);
+                      onDraft((prev) => ({
+                        ...prev,
+                        [task.id]: { ...row, provider: inferred ?? row.provider, model: value, custom: true },
+                      }));
+                    }}
+                  />
+                  <span className="field-help">
+                    由 prefix 自動判斷 provider（gpt-… → openai，claude-… → anthropic）；判斷不出時沿用目前 provider（{row.provider}）。
+                  </span>
+                </label>
+              )}
+
+                </>
               )}
 
               <label className="field">

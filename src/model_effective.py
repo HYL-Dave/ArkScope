@@ -98,18 +98,30 @@ def effective_model_view(
         advanced: list[dict[str, Any]] = []
         seen: set[str] = set()
 
-        for cap in all_models(provider):
-            if cap.id in visible_ids and cap.picker_visibility == "default" \
+        # Verified: walk the DISCOVERED ids (providers return dated snapshots —
+        # review MF4), classify each via capability_for, and keep the provider's
+        # REAL executable id in the option. Registry-unknown ids never enter
+        # here or advanced (review MF5) — the custom input / route pin is their
+        # only path.
+        canonical_verified: set[str] = set()
+        for model_id in sorted(visible_ids):
+            cap = capability_for(model_id)
+            if cap is None or cap.id in canonical_verified:
+                continue
+            if cap.picker_visibility == "default" \
                     and task_auth_executable(task, provider, auth_mode, cap):
-                verified.append(_entry(cap, None))
-                seen.add(cap.id)
+                entry = _entry(cap, None)
+                entry["id"] = model_id       # the id the provider actually serves
+                verified.append(entry)
+                canonical_verified.add(cap.id)
+                seen.add(model_id)
 
         # Advanced: previous-generation path (advanced visibility) always
-        # offered; default-visibility models that exist but aren't verified
-        # surface as seeds ONLY when the channel cannot live-list (seed_only)
-        # or was never discovered — pinned_only models never appear here.
+        # offered; default-visibility models surface as seeds ONLY when the
+        # channel cannot live-list (seed_only) or was never discovered —
+        # pinned_only models never appear here.
         for cap in all_models(provider):
-            if cap.id in seen:
+            if cap.id in canonical_verified or cap.id in seen:
                 continue
             if cap.picker_visibility == "advanced":
                 advanced.append(_entry(cap, "advanced"))
@@ -119,13 +131,6 @@ def effective_model_view(
             ):
                 advanced.append(_entry(cap, "seed"))
                 seen.add(cap.id)
-
-        # Visible-but-unknown ids (not in the registry) = custom candidates.
-        for model_id in sorted(visible_ids - seen):
-            cap = capability_for(model_id)
-            if cap is None:
-                advanced.append(_entry(model_id, "custom"))
-                seen.add(model_id)
 
         # The saved route model is ALWAYS selectable (flagged, never hidden).
         if route_model and route_model not in seen \

@@ -176,6 +176,8 @@ def _synthesize_anthropic(
 
     try:
         return run_once(effort), {"effort": effort}
+    except AnthropicRefusalError:
+        raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
         if effort != "default" and looks_like_effort_error(exc):
             synth = run_once("default")
@@ -501,6 +503,8 @@ def _translate_anthropic(
 
     try:
         return run_once(effort)
+    except AnthropicRefusalError:
+        raise  # zero-fallback contract: a refusal is never retried (MF6)
     except Exception as exc:
         if effort != "default" and looks_like_effort_error(exc):
             logger.warning(
