@@ -56,7 +56,9 @@ function catalog(): ModelCatalog {
   };
 }
 
-function render(onReset = vi.fn(), catOverride?: ModelCatalog) {
+type DraftDispatch = Parameters<typeof ModelRoutingSection>[0]["onDraft"];
+
+function render(onReset = vi.fn(), catOverride?: ModelCatalog, onDraftOverride?: DraftDispatch) {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -72,7 +74,7 @@ function render(onReset = vi.fn(), catOverride?: ModelCatalog) {
       },
       modelsByProvider,
       testState: {},
-      onDraft: vi.fn(),
+      onDraft: onDraftOverride ?? vi.fn(),
       onTest: vi.fn(),
       onReset,
     }));
@@ -170,6 +172,37 @@ describe("ModelRoutingSection effective picker (P2.7)", () => {
     const research = host!.querySelector('[data-testid="route-ai_research"]')!;
     expect(research.querySelector('[data-testid="manual-override-ai_research"]')).toBeNull();
     expect(research.querySelectorAll("select").length).toBeGreaterThan(0);
+  });
+
+  it("manual override still switches provider and updates the draft", () => {
+    // Review round-2 test gap: the collapsed override must keep full
+    // cross-provider selection working — selecting the other provider's model
+    // dispatches an onDraft update carrying the new provider.
+    const drafts: unknown[] = [];
+    const onDraft = vi.fn((updater: unknown) => {
+      if (typeof updater === "function") {
+        drafts.push((updater as (p: Record<string, unknown>) => unknown)({
+          ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
+        }));
+      }
+    }) as unknown as DraftDispatch;
+    render(vi.fn(), catalogWithEffective(), onDraft);
+
+    const research = host!.querySelector('[data-testid="route-ai_research"]')!;
+    const override = research.querySelector('[data-testid="manual-override-ai_research"]') as HTMLDetailsElement;
+    act(() => { override.open = true; });
+    const legacySelect = override.querySelector("select") as HTMLSelectElement;
+    // pick the anthropic seed from the legacy selector (cross-provider switch)
+    const anthropicOption = Array.from(legacySelect.options)
+      .find((o) => o.value.includes("anthropic") && o.value.includes("claude-opus-4-8"))!;
+    act(() => {
+      legacySelect.value = anthropicOption.value;
+      legacySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(onDraft).toHaveBeenCalled();
+    const updated = drafts.at(-1) as Record<string, { provider: string; model: string }>;
+    expect(updated.ai_research.provider).toBe("anthropic");
+    expect(updated.ai_research.model).toBe("claude-opus-4-8");
   });
 
   it("keeps the saved route model selectable from advanced", () => {

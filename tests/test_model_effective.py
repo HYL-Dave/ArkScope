@@ -184,20 +184,39 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
 
 
-def test_resolver_does_not_fabricate_identity(monkeypatch, tmp_path):
-    # Review MF3: (a) no active credential → None (never "first available");
-    # (b) an api_key_pool credential keeps its REAL auth_mode so the
-    # executability contract stays fail-closed and the cache scope is honest.
-    from src.model_credentials import resolve_active_credential
+def test_resolver_pool_identity_and_fingerprint_match_discovery(monkeypatch, tmp_path):
+    # Review round-2 MF1: the pool scope must be built from the SAME
+    # (_resolve_api_credential) identity that discovery writes with — real
+    # auth_mode api_key_pool (fail-closed stays) AND the fingerprint of the
+    # SELECTED single key, so the cache round-trips.
+    from src.model_credentials import (
+        _resolve_api_credential,
+        resolve_active_credential,
+        secret_fingerprint,
+    )
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEYS", "sk-pool-a,sk-pool-b")
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+
     cred = resolve_active_credential("openai")
-    assert cred is None or cred.auth_mode == "api_key_pool"
-    # pool must never masquerade as api_key
-    if cred is not None:
-        assert cred.auth_mode != "api_key"
+    assert cred is not None                                  # pool DOES resolve
+    assert cred.auth_mode == "api_key_pool"                  # never masquerades
+    resolved = _resolve_api_credential("openai", cred.credential_id)
+    assert cred.secret_fingerprint == secret_fingerprint(resolved.secret)
+
+    # discovery write → cache read-back under the resolver's scope
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(provider="openai", auth_mode=cred.auth_mode,
+                     credential_id=cred.credential_id,
+                     secret_fingerprint=cred.secret_fingerprint,
+                     status="ok",
+                     models=[{"id": "gpt-5.6-luna", "label": "Luna", "source": "provider_api"}])
+    scope = cache.get(provider="openai", auth_mode=cred.auth_mode,
+                      credential_id=cred.credential_id,
+                      secret_fingerprint=cred.secret_fingerprint)
+    assert scope.status == "ok"
+    assert [m.model_id for m in scope.models] == ["gpt-5.6-luna"]
 
 
 def test_dated_discovery_ids_resolve_to_registry_capability(tmp_path):

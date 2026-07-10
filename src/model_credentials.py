@@ -988,27 +988,17 @@ def resolve_active_credential(
             provider=provider, credential_id=active.id,
             auth_mode=active.auth_type, secret_fingerprint="oauth",
         )
-    if active.auth_type == "api_key_pool":
-        # Pools keep their REAL auth mode (review MF3): executability is
-        # fail-closed for pools (unwired for direct clients) and the cache
-        # scope must not collide with a plain api_key scope. Fingerprint =
-        # digest of the raw pool value so rotation still invalidates.
-        pool_raw = os.environ.get(
-            "OPENAI_API_KEYS" if provider == "openai" else "ANTHROPIC_API_KEYS", ""
-        )
-        if not pool_raw:
-            return None
-        return ActiveCredential(
-            provider=provider, credential_id=active.id,
-            auth_mode="api_key_pool",
-            secret_fingerprint=secret_fingerprint(pool_raw),
-        )
+    # Both api_key and api_key_pool build the scope from the SAME resolution
+    # discovery writes with (review round-2 MF1): _resolve_api_credential
+    # returns the REAL auth_type (pool never masquerades — executability stays
+    # fail-closed for pools) and the SELECTED secret, so the fingerprint
+    # round-trips against the cache rows discover_models() records.
     resolved = _resolve_api_credential(provider, active.id, store)
-    if resolved is None or not resolved.secret or resolved.auth_type != "api_key":
+    if resolved is None or not resolved.secret:
         return None
     return ActiveCredential(
         provider=provider, credential_id=active.id,
-        auth_mode=resolved.auth_type,   # the REAL mode, never coerced (review MF3)
+        auth_mode=resolved.auth_type,
         secret_fingerprint=secret_fingerprint(resolved.secret),
     )
 

@@ -728,3 +728,50 @@ def test_discovery_route_records_seed_only_for_oauth_all_seed(monkeypatch, tmp_p
     assert out["status"] == "ok" and "models" in out              # old fields intact
     assert out["cache_state"] == "seed_only"                      # additive fields present
     assert out["cached_at"]
+    assert out["cached"] is True                                   # round-2 MF2
+
+
+def test_discovery_route_oauth_cache_write_failure_reports_uncached(monkeypatch, tmp_path):
+    # Round-2 MF2: when record_run raises, the route must stay 200 (best-effort)
+    # and must NOT claim cached-ness: cached False, no cache_state/cached_at.
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import DiscoveredModel, ModelDiscoveryResult
+
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
+
+    class _BoomCache:
+        def __init__(self, *a, **k): ...
+        def record_run(self, **kw):
+            raise RuntimeError("disk full")
+
+    monkeypatch.setattr(cr, "ModelDiscoveryCache", _BoomCache)
+
+    class _OauthCred:
+        id = 1
+        provider = "anthropic"
+        auth_type = "claude_code_oauth"
+
+    class _FakeStore:
+        db_path = str(tmp_path / "profile_state.db")
+
+        def get(self, credential_id):
+            return _OauthCred()
+
+    class _FakeDriver:
+        async def discover_models(self):
+            return ModelDiscoveryResult(
+                provider="anthropic", credential_id="local:1", status="ok",
+                models=[DiscoveredModel(id="claude-opus-4-8", provider="anthropic",
+                                        label="Opus 4.8", source="seed")],
+            )
+
+    monkeypatch.setattr(cr, "_credential_store", lambda store: _FakeStore())
+    monkeypatch.setattr("src.auth_drivers.factory.build_driver",
+                        lambda **kw: _FakeDriver())
+
+    body = cr.ModelDiscoveryRequest(provider="anthropic", credential_id="local:1")
+    out = cr.discover_provider_models(body, store=_FakeStore(), token_store=object())
+
+    assert out["status"] == "ok"          # discovery itself still succeeds
+    assert out.get("cached") is not True
+    assert "cache_state" not in out and "cached_at" not in out

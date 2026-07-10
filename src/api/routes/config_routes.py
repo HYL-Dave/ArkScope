@@ -662,6 +662,7 @@ def discover_provider_models(
             except Exception:  # noqa: BLE001 - best-effort like the api_key path (SF1)
                 logger.warning("oauth discovery cache write failed", exc_info=True)
             else:
+                out["cached"] = True          # round-2 MF2: only on a landed write
                 out["cache_state"] = cache_status
                 out["cached_at"] = _utc_now_iso()
         return out

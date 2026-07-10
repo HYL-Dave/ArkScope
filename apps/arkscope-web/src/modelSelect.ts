@@ -31,3 +31,24 @@ export function inferProvider(modelId: string): ModelProvider | null {
   if (m.startsWith("gpt") || /^o[134](-|$)/.test(m)) return "openai";
   return null;
 }
+
+
+// P2.7 (review round-2 test gap): discovery-then-refresh sequencing, extracted
+// from the Settings inline handler so the contract is unit-testable — a
+// SUCCESSFUL discovery must refetch the catalog (the effective picker leaves
+// never_discovered without an app reload); a failed catalog refetch must not
+// clobber the discovery result.
+export async function runDiscoveryAndRefreshCatalog<TResult, TCatalog>(deps: {
+  discover: () => Promise<TResult>;
+  fetchCatalog: () => Promise<TCatalog>;
+  onResult: (result: TResult) => void;
+  onCatalog: (catalog: TCatalog) => void;
+}): Promise<void> {
+  const result = await deps.discover();
+  deps.onResult(result);
+  try {
+    deps.onCatalog(await deps.fetchCatalog());
+  } catch {
+    // catalog refresh is best-effort; the discovery result is already shown
+  }
+}

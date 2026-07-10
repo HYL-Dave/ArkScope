@@ -45,3 +45,30 @@ describe("inferProvider (custom model id)", () => {
     expect(inferProvider("   ")).toBeNull();
   });
 });
+
+
+describe("runDiscoveryAndRefreshCatalog (P2.7)", () => {
+  it("refetches the catalog after a successful discovery", async () => {
+    const { runDiscoveryAndRefreshCatalog } = await import("./modelSelect");
+    const calls: string[] = [];
+    await runDiscoveryAndRefreshCatalog({
+      discover: async () => { calls.push("discover"); return "R"; },
+      fetchCatalog: async () => { calls.push("catalog"); return "C"; },
+      onResult: (r) => calls.push(`result:${r}`),
+      onCatalog: (c) => calls.push(`set:${c}`),
+    });
+    expect(calls).toEqual(["discover", "result:R", "catalog", "set:C"]);
+  });
+
+  it("keeps the discovery result when the catalog refetch fails", async () => {
+    const { runDiscoveryAndRefreshCatalog } = await import("./modelSelect");
+    const calls: string[] = [];
+    await runDiscoveryAndRefreshCatalog({
+      discover: async () => { calls.push("discover"); return "R"; },
+      fetchCatalog: async () => { throw new Error("boom"); },
+      onResult: (r) => calls.push(`result:${r}`),
+      onCatalog: () => calls.push("set"),
+    });
+    expect(calls).toEqual(["discover", "result:R"]);   // no clobber, no throw
+  });
+});

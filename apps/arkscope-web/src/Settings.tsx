@@ -67,7 +67,7 @@ import {
   type RuntimeConfig,
   type TaskRoute,
 } from "./api";
-import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider } from "./modelSelect";
+import { MODEL_OPTION_CUSTOM, decodeModelOption, encodeModelOption, inferProvider, runDiscoveryAndRefreshCatalog } from "./modelSelect";
 import {
   activeFirst,
   addApiKeyButtonLabel,
@@ -503,19 +503,19 @@ export function SettingsView({
                     [provider]: { loading: true, result: null, credentialId },
                   }));
                   try {
-                    const result = await discoverModels(provider, credentialId);
-                    setDiscovery((prev) => ({
-                      ...prev,
-                      [provider]: { loading: false, result, credentialId },
-                    }));
-                    // MF2: the discovery run just updated the entitlement cache —
-                    // refetch the catalog so the effective picker leaves
-                    // never_discovered without an app reload.
-                    try {
-                      setCatalog(await getModelCatalog());
-                    } catch {
-                      // catalog refresh is best-effort; discovery result already shown
-                    }
+                    // MF2: a successful discovery updates the entitlement cache —
+                    // the helper refetches the catalog so the effective picker
+                    // leaves never_discovered without an app reload.
+                    await runDiscoveryAndRefreshCatalog({
+                      discover: () => discoverModels(provider, credentialId),
+                      fetchCatalog: getModelCatalog,
+                      onResult: (result) =>
+                        setDiscovery((prev) => ({
+                          ...prev,
+                          [provider]: { loading: false, result, credentialId },
+                        })),
+                      onCatalog: setCatalog,
+                    });
                   } catch (e) {
                     setDiscovery((prev) => ({
                       ...prev,
