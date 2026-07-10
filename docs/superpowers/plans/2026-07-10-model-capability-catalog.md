@@ -139,10 +139,14 @@ mapping).
    mirror.
 3. **Behavior-identical consolidation, verified against the LIVE old helpers**;
    ruled fixes are the only enumerated exceptions.
-4. **Ruled fixes**: Fix A (opus-4.8 CLI effort options None → opus tuple), Fix B
-   (opus-4.8 context 200_000-fallback → 1_000_000 + `context_mode="ga_1m"`;
-   `_use_extended_context_beta` wire output unchanged — False both sides).
-   Opus-4.8 compaction = Task 0 item → explicit Fix C proposal if supported.
+4. **Ruled fixes (all user-acked 2026-07-10 post-Task 0)**:
+   - Fix A: opus-4.8 CLI effort options None → opus tuple.
+   - Fix B: opus-4.8 context 200_000-fallback → 1_000_000 +
+     `context_mode="ga_1m"` (`_use_extended_context_beta` wire unchanged).
+   - Fix C: opus-4.8 `supports_compaction` False → True (compaction beta list).
+   - Fix D: sonnet-4.6 `max_output` 64_000 → 128_000 (models-overview table).
+   - Fix E: sonnet-4.6 effort tuple → `("max","high","medium","low")` (effort
+     doc; no xhigh).
 5. **Compat views keep EXACT current membership** via `in_routing_seed` /
    `in_cli_catalog`; Task 5 additions set both flags (ruled, diff-visible).
 6. **`picker_visibility: "default" | "advanced" | "pinned_only"`**:
@@ -304,27 +308,46 @@ verified non-issue).
 - **Fix B CONFIRMED**: context-windows doc — Opus 4.8 is in the 1M group and
   "For every model with a 1M-token context window, 1M is the default: you don't
   need a beta header." → `context_limit 1_000_000` + `context_mode "ga_1m"`.
-- **Fix C PROPOSED (needs your ack)**: compaction is "available in beta for
-  Claude Fable 5, …, **Claude Opus 4.8**, …" — today's `_COMPACTION_MODELS`
-  omits opus-4.8, so `_supports_compaction("claude-opus-4-8")` is False. Propose
-  flipping to True in Task 2 (wire effect only when the user enables the
-  CLI/server compaction toggle; same beta header `compact-2026-01-12`). If not
-  acked, opus-4.8 stays False and the Task 2 test keeps pinning False.
+- **Fix C ADOPTED (user ack 2026-07-10)**: compaction beta list includes Opus
+  4.8 → `supports_compaction("claude-opus-4-8")` flips True in Task 2 (wire
+  effect only when the user enables the compaction toggle; same beta header).
+  **Standing design concern recorded with the ack (user)**: official server
+  compaction is an opt-in convenience, NOT our context-management strategy —
+  compacted context can lose retrieval-critical detail on complex problems
+  (post-compaction re-search may be needed), and compaction summaries are
+  model-bound (a model switch renders them useless). Claude Code / Codex CLI
+  pair provider compaction with their OWN context-management logic; adopting
+  their compaction does not give us theirs. Whether ArkScope's client-side
+  ContextManager + memory layers are coherent WITH server compaction is an open
+  audit question → filed as a map backlog item; out of this slice's scope.
 - Legacy 1M-beta story: current docs list Sonnet 4.5 as plain 200k and no longer
   advertise `context-1m-2025-08-07` for 4.5 models. Registry keeps the
   `beta_1m` transcription (behavior-identical; the header path is legacy code we
   are not changing).
 
-**Observed doc-vs-code drift on EXISTING models (flagged, NOT changed — outside
-the two/three ruled fixes; each would alter wire behavior and deserves its own
-ruling in a follow-up):**
+**Doc-vs-code drift on EXISTING models — user RULED 2026-07-10 (「應參考正式文
+件,舊的方式有問題就該改」):**
 
-1. Sonnet 4.6 max output: docs comparison table says 128k; code
-   (`_MODEL_MAX_OUTPUT`) uses 64,000 (affects budget_tokens/max_tokens math).
-2. Sonnet 4.6 effort: effort doc includes `max` for Sonnet 4.6; CLI tuple is
-   `("high","medium","low")`.
+1. **Fix D ADOPTED** — Sonnet 4.6 max output: docs say 128k, code
+   (`_MODEL_MAX_OUTPUT`) says 64,000 → registry records 128,000 and
+   `_get_model_max_output("claude-sonnet-4-6")` flips in Task 2. Wire effect:
+   thinking-mode requests on sonnet-4.6 get effective max_tokens 128k instead
+   of 64k (user flagged: watch that this cannot leak onto new-model behavior —
+   it cannot; the value is keyed per model id).
+2. **Fix E ADOPTED (via registry; CLI benefits incidentally)** — Sonnet 4.6
+   effort tuple gains `max` per the effort doc:
+   `("max","high","medium","low")` (docs exclude xhigh for Sonnet 4.6). User
+   note recorded: this is a CLI-surface bug and **the CLI is a
+   deprioritized/removal-candidate surface** — we fix it only because the
+   registry records doc-truth and the CLI helper inherits it for free; no
+   CLI-specific investment. CLI-retirement direction filed in the map.
 3. Haiku 4.5 canonical dated id is `claude-haiku-4-5-20251001` with dateless
-   alias — registry id stays `claude-haiku-4-5` (prefix matching covers dated).
+   alias — registry id stays `claude-haiku-4-5` (prefix matching covers dated);
+   no change needed. **User proposal recorded (deferred enhancement, not v1)**:
+   for seed_only OAuth channels, the picker could BORROW the same provider's
+   api_key-scope verified list as an import hint (clearly badged as borrowed —
+   entitlements differ per channel, which is exactly why it can only ever be a
+   hint). Filed in the map with P2.7 follow-ups.
 
 **Live entitlement table (read-only discovery, 2026-07-10):**
 
@@ -375,9 +398,12 @@ _PRE_CONSOLIDATION_IDS = {
 }
 
 _RULED_FIXES = {
-    ("claude-opus-4-8", "context_limit"),
-    ("claude-opus-4-8", "context_mode"),
-    ("claude-opus-4-8", "effort_options"),
+    ("claude-opus-4-8", "context_limit"),        # Fix B
+    ("claude-opus-4-8", "context_mode"),         # Fix B
+    ("claude-opus-4-8", "effort_options"),       # Fix A
+    ("claude-opus-4-8", "supports_compaction"),  # Fix C
+    ("claude-sonnet-4-6", "max_output"),         # Fix D
+    ("claude-sonnet-4-6", "effort_options"),     # Fix E
 }
 
 
@@ -407,7 +433,10 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
             old_out = next((v for k, v in OLD_ANTH_OUT.items() if mid.startswith(k)), 64_000)
         else:
             old_out = _get_openai_max_output(mid)
-        assert cap.max_output == old_out, mid
+        if (mid, "max_output") in _RULED_FIXES:               # Fix D
+            assert cap.max_output == 128_000 and old_out == 64_000, mid
+        else:
+            assert cap.max_output == old_out, mid
         if cap.provider == "anthropic":
             expected_mode = (
                 "adaptive_opt_in"
@@ -419,11 +448,19 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
         assert cap.thinking_mode == expected_mode, mid
         old_tuple = get_effort_options(mid)
         if (mid, "effort_options") in _RULED_FIXES:
-            assert old_tuple is None
-            assert cap.effort_options == ("max", "xhigh", "high", "medium", "low"), mid
+            if mid == "claude-opus-4-8":                      # Fix A
+                assert old_tuple is None
+                assert cap.effort_options == ("max", "xhigh", "high", "medium", "low"), mid
+            else:                                             # Fix E (sonnet-4-6)
+                assert tuple(old_tuple) == ("high", "medium", "low")
+                assert cap.effort_options == ("max", "high", "medium", "low"), mid
         elif cap.provider == "anthropic":
             assert cap.effort_options == (tuple(old_tuple) if old_tuple else ()), mid
-        assert cap.supports_compaction == any(mid.startswith(m) for m in OLD_COMPACT), mid
+        old_compact = any(mid.startswith(m) for m in OLD_COMPACT)
+        if (mid, "supports_compaction") in _RULED_FIXES:      # Fix C
+            assert cap.supports_compaction is True and old_compact is False, mid
+        else:
+            assert cap.supports_compaction == old_compact, mid
         old_mode = (
             "ga_1m" if mid in _1M_GA_MODELS
             else "beta_1m" if mid in _1M_BETA_MODELS
@@ -538,11 +575,12 @@ def test_agent_helpers_now_read_the_registry():
     from src.agents.shared.subagent import _use_extended_context_beta
 
     assert _get_model_max_output("claude-opus-4-8") == 128_000
+    assert _get_model_max_output("claude-sonnet-4-6") == 128_000   # ruled Fix D
     assert _get_model_max_output("unknown-claude") == 64_000
     assert _supports_adaptive_thinking("claude-sonnet-4-6-future") is True
     assert _supports_effort("claude-haiku-4-5") is False
     assert _supports_compaction("claude-sonnet-4-6") is True
-    assert _supports_compaction("claude-opus-4-8") is False   # pending Task 0/Fix C
+    assert _supports_compaction("claude-opus-4-8") is True    # ruled Fix C
     assert _get_openai_max_output("gpt-5.4-nano") == 128_000
     assert _get_openai_max_output("totally-unknown") == 128_000
     assert get_model_context_limit("gpt-5.4-mini") == 400_000
@@ -574,7 +612,7 @@ def test_cli_effort_helper_contract_preserved_plus_fix_a():
     from src.agents.shared.model_catalog import get_effort_options
     assert get_effort_options("claude-opus-4-8") == ("max", "xhigh", "high", "medium", "low")
     assert get_effort_options("claude-opus-4-7") == ("max", "xhigh", "high", "medium", "low")
-    assert get_effort_options("claude-sonnet-4-6") == ("high", "medium", "low")
+    assert get_effort_options("claude-sonnet-4-6") == ("max", "high", "medium", "low")  # ruled Fix E
     for openai_id in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2"):
         assert get_effort_options(openai_id) is None
 
