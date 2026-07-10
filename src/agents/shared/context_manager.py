@@ -51,20 +51,14 @@ _SUMMARY_MARKERS: Tuple[str, ...] = (
     _COMPACTION_SUMMARY_MARKER,
 )
 
-# Model context window sizes (input tokens)
-# Order matters: more specific prefixes first (prefix match)
+# Model context window sizes (input tokens) — registry facts
+# (src/model_capabilities.py); P2.7 convergence. Resolution goes through
+# capability_for (structural longest-prefix, no list-order dependence).
+from src.model_capabilities import all_models as _all_capabilities
+from src.model_capabilities import capability_for as _capability_for
+
 _MODEL_CONTEXT_LIMITS: Dict[str, int] = {
-    # Anthropic — 1M context GA (no beta header, standard pricing)
-    "claude-opus-4-7": 1_000_000,   # 1M context / 128K output ($5/$25)
-    "claude-sonnet-4-6": 1_000_000, # 1M context / 64K output ($3/$15)
-    "claude-haiku": 200_000,        # Haiku 4.5: 200K context / 64K output
-    # OpenAI — https://developers.openai.com/api/docs/models
-    # NOTE: prefix-match — list more specific keys first
-    "gpt-5.5": 1_050_000,           # 1M context / 128K output (default)
-    "gpt-5.4-mini": 400_000,        # 400K context / 128K output ($0.75/$4.50)
-    "gpt-5.4-nano": 400_000,        # 400K context / 128K output ($0.20/$1.25)
-    "gpt-5.4": 1_050_000,           # 1M context / 128K output (legacy / fallback)
-    "gpt-5.2": 400_000,             # 400K context / 128K output (legacy)
+    c.id: c.context_limit for c in _all_capabilities()
 }
 
 _DEFAULT_CONTEXT_LIMIT = 200_000
@@ -73,10 +67,10 @@ _COMPACT_MARKER = "[Compacted]"
 
 
 def get_model_context_limit(model: str) -> int:
-    """Get the context window size for a model (prefix match)."""
-    for prefix, limit in _MODEL_CONTEXT_LIMITS.items():
-        if model.startswith(prefix):
-            return limit
+    """Get the context window size for a model (registry prefix match)."""
+    cap = _capability_for(model)
+    if cap is not None:
+        return cap.context_limit
     return _DEFAULT_CONTEXT_LIMIT
 
 

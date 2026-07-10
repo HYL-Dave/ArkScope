@@ -33,11 +33,19 @@ def test_registry_covers_every_pre_consolidation_id():
     assert {m for m in _PRE_CONSOLIDATION_IDS if capability_for(m) is None} == set()
 
 
-def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
+def test_registry_and_helpers_agree_for_every_pre_consolidation_id():
+    """Post-convergence consistency: every helper output equals the registry.
+
+    MIGRATION EVIDENCE: the pre-convergence version of this test (commit
+    02fe47d, Task 1) ran against the genuinely-old hardcoded tables and proved
+    the registry reproduced them exactly, with the five user-ruled fixes (A-E)
+    as the only divergences. Post-Task-2 the old tables are registry-derived,
+    so this test pins the CONVERGED state plus the fixes' absolute values.
+    """
     from src.agents.anthropic_agent.agent import (
-        _MODEL_MAX_OUTPUT as OLD_ANTH_OUT,
-        _ADAPTIVE_THINKING_MODELS as OLD_ADAPTIVE,
-        _COMPACTION_MODELS as OLD_COMPACT,
+        _get_model_max_output,
+        _supports_adaptive_thinking,
+        _supports_compaction,
     )
     from src.agents.openai_agent.agent import _get_openai_max_output
     from src.agents.shared.context_manager import get_model_context_limit
@@ -46,52 +54,30 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
 
     for mid in sorted(_PRE_CONSOLIDATION_IDS):
         cap = capability_for(mid)
-        old_ctx = get_model_context_limit(mid)
-        if (mid, "context_limit") in _RULED_FIXES:
-            assert cap.context_limit == 1_000_000 and old_ctx == 200_000, mid
-        else:
-            assert cap.context_limit == old_ctx, mid
+        assert get_model_context_limit(mid) == cap.context_limit, mid
         if cap.provider == "anthropic":
-            old_out = next((v for k, v in OLD_ANTH_OUT.items() if mid.startswith(k)), 64_000)
+            assert _get_model_max_output(mid) == cap.max_output, mid
+            assert _supports_adaptive_thinking(mid) == cap.thinking_mode.startswith("adaptive"), mid
+            assert _supports_compaction(mid) == cap.supports_compaction, mid
+            expected_tuple = tuple(cap.effort_options) if cap.effort_options else None
+            assert get_effort_options(mid) == expected_tuple, mid
+            assert (mid in _1M_GA_MODELS) == (cap.context_mode == "ga_1m"), mid
+            assert (mid in _1M_BETA_MODELS) == (cap.context_mode == "beta_1m"), mid
         else:
-            old_out = _get_openai_max_output(mid)
-        if (mid, "max_output") in _RULED_FIXES:               # Fix D
-            assert cap.max_output == 128_000 and old_out == 64_000, mid
-        else:
-            assert cap.max_output == old_out, mid
-        if cap.provider == "anthropic":
-            expected_mode = (
-                "adaptive_opt_in"
-                if any(mid.startswith(m) for m in OLD_ADAPTIVE)
-                else "manual_budget"
-            )
-        else:
-            expected_mode = "none"
-        assert cap.thinking_mode == expected_mode, mid
-        old_tuple = get_effort_options(mid)
-        if (mid, "effort_options") in _RULED_FIXES:
-            if mid == "claude-opus-4-8":                      # Fix A
-                assert old_tuple is None
-                assert cap.effort_options == ("max", "xhigh", "high", "medium", "low"), mid
-            else:                                             # Fix E (sonnet-4-6)
-                assert tuple(old_tuple) == ("high", "medium", "low")
-                assert cap.effort_options == ("max", "high", "medium", "low"), mid
-        elif cap.provider == "anthropic":
-            assert cap.effort_options == (tuple(old_tuple) if old_tuple else ()), mid
-        old_compact = any(mid.startswith(m) for m in OLD_COMPACT)
-        if (mid, "supports_compaction") in _RULED_FIXES:      # Fix C
-            assert cap.supports_compaction is True and old_compact is False, mid
-        else:
-            assert cap.supports_compaction == old_compact, mid
-        old_mode = (
-            "ga_1m" if mid in _1M_GA_MODELS
-            else "beta_1m" if mid in _1M_BETA_MODELS
-            else "standard"
-        )
-        if (mid, "context_mode") in _RULED_FIXES:
-            assert cap.context_mode == "ga_1m" and old_mode == "standard", mid
-        else:
-            assert cap.context_mode == old_mode, mid
+            assert _get_openai_max_output(mid) == cap.max_output, mid
+            assert get_effort_options(mid) is None, mid
+
+
+def test_ruled_fixes_absolute_values():
+    """The five user-acked fixes (2026-07-10), pinned as absolute values."""
+    opus48 = capability_for("claude-opus-4-8")
+    assert opus48.effort_options == ("max", "xhigh", "high", "medium", "low")  # Fix A
+    assert opus48.context_limit == 1_000_000                                   # Fix B
+    assert opus48.context_mode == "ga_1m"                                      # Fix B
+    assert opus48.supports_compaction is True                                  # Fix C
+    sonnet46 = capability_for("claude-sonnet-4-6")
+    assert sonnet46.max_output == 128_000                                      # Fix D
+    assert sonnet46.effort_options == ("max", "high", "medium", "low")         # Fix E
 
 
 def test_openai_models_record_provider_wide_effort_set():
@@ -153,3 +139,109 @@ def test_every_entry_carries_provenance_visibility_and_mode():
             "none", "manual_budget", "adaptive_opt_in",
             "adaptive_default_on", "adaptive_always_on",
         ), cap.id
+
+
+# ── Task 2: convergence tests ────────────────────────────────────
+
+
+def test_agent_helpers_now_read_the_registry():
+    from src.agents.anthropic_agent.agent import (
+        _get_model_max_output, _supports_adaptive_thinking, _supports_effort,
+        _supports_compaction,
+    )
+    from src.agents.openai_agent.agent import _get_openai_max_output
+    from src.agents.shared.context_manager import get_model_context_limit
+    from src.agents.shared.subagent import _use_extended_context_beta
+
+    assert _get_model_max_output("claude-opus-4-8") == 128_000
+    assert _get_model_max_output("claude-sonnet-4-6") == 128_000   # ruled Fix D
+    assert _get_model_max_output("unknown-claude") == 64_000
+    assert _supports_adaptive_thinking("claude-sonnet-4-6-future") is True
+    assert _supports_effort("claude-haiku-4-5") is False
+    assert _supports_compaction("claude-sonnet-4-6") is True
+    assert _supports_compaction("claude-opus-4-8") is True    # ruled Fix C
+    assert _get_openai_max_output("gpt-5.4-nano") == 128_000
+    assert _get_openai_max_output("totally-unknown") == 128_000
+    assert get_model_context_limit("gpt-5.4-mini") == 400_000
+    assert get_model_context_limit("claude-opus-4-8") == 1_000_000   # ruled Fix B
+    assert get_model_context_limit("unknown") == 200_000
+    # wire behavior of the beta-header helper is UNCHANGED incl. opus-4.8 (=False)
+    assert _use_extended_context_beta("claude-opus-4-8", True) is False
+    assert _use_extended_context_beta("claude-opus-4-7", True) is False
+    assert _use_extended_context_beta("claude-sonnet-4-5", True) is True
+
+
+def test_build_thinking_param_wire_shapes_pinned():
+    # Exact values from live runs (plan grounding §2) — GREEN before the swap,
+    # pins the baseline so the registry-driven rewrite cannot drift it.
+    from src.agents.anthropic_agent.agent import _build_thinking_param
+
+    class _Cfg:
+        max_tokens = 8192
+        anthropic_thinking = True
+
+    assert _build_thinking_param("claude-opus-4-8", True, _Cfg()) == (
+        {"type": "adaptive"}, 128000,
+    )
+    assert _build_thinking_param("claude-haiku-4-5", True, _Cfg()) == (
+        {"type": "enabled", "budget_tokens": 55808}, 64000,
+    )
+    assert _build_thinking_param("claude-haiku-4-5", False, _Cfg()) == (None, 8192)
+
+
+def test_cli_effort_helper_contract_preserved_plus_fix_a():
+    from src.agents.shared.model_catalog import get_effort_options
+    assert get_effort_options("claude-opus-4-8") == ("max", "xhigh", "high", "medium", "low")  # Fix A
+    assert get_effort_options("claude-opus-4-7") == ("max", "xhigh", "high", "medium", "low")
+    assert get_effort_options("claude-sonnet-4-6") == ("max", "high", "medium", "low")  # ruled Fix E
+    for openai_id in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2"):
+        assert get_effort_options(openai_id) is None     # anthropic-only contract kept
+
+
+def test_route_wire_effort_values_untouched():
+    from src.model_routing import EFFORT_OPTIONS
+    assert [o.id for o in EFFORT_OPTIONS["openai"]] == [
+        "default", "none", "minimal", "low", "medium", "high", "xhigh",
+    ]
+    assert [o.id for o in EFFORT_OPTIONS["anthropic"]] == [
+        "default", "low", "medium", "high", "xhigh", "max",
+    ]
+
+
+def test_derived_views_keep_exact_membership_and_aliases():
+    from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
+    from src.agents.shared.model_catalog import MODEL_CATALOG as CLI_VIEW, find_model
+
+    assert {m.id for m in ROUTING_VIEW} == {
+        "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
+        "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+    }
+    assert {m.id for m in CLI_VIEW} == {
+        "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
+        "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
+    }
+    assert find_model("opus").id == "claude-opus-4-7"    # exact, not startswith
+    assert find_model("mini").id == "gpt-5.4-mini"
+    assert find_model("codex").id == "gpt-5.2-codex"
+    assert is_seed_model("openai", "gpt-5.5")
+
+    for option in ROUTING_VIEW:
+        cap = capability_for(option.id)
+        assert option.supports_structured_output == cap.supports_structured_output
+        assert option.supports_tool_calling == cap.supports_tool_calling
+
+
+def test_single_source_no_local_fact_tables():
+    """Review Gate 3: after convergence the four agent modules hold no model-id
+    fact tables (registry reads only). Checked structurally: the OLD table
+    globals must be derived (registry-built), which we assert by identity of
+    values with the registry rather than greping source here — the grep gate
+    runs in CI/steps."""
+    from src.agents.anthropic_agent import agent as anth
+    from src.model_capabilities import all_models
+
+    reg_compact = {c.id for c in all_models("anthropic") if c.supports_compaction}
+    assert set(anth._COMPACTION_MODELS) == reg_compact
+    reg_adaptive = {c.id for c in all_models("anthropic")
+                    if c.thinking_mode.startswith("adaptive")}
+    assert set(anth._ADAPTIVE_THINKING_MODELS) == reg_adaptive

@@ -1,13 +1,20 @@
 """
-Shared model catalog — canonical model list, matching, and effort constants.
+Shared model catalog — CLI/discord view over the capability registry.
 
 Used by both CLI (src/agents/cli.py) and Discord bot (src/monitor/discord_bot.py).
+P2.7 convergence: model FACTS live in src/model_capabilities.py; this module
+keeps only the CLI presentation layer (menu membership via `in_cli_catalog`,
+nicknames, display copy) plus the effort helpers the CLI already imports.
+CLI nicknames stay HERE by design — runtime helpers resolve through the
+registry, which must never alias-match a bare "claude"/"opus"/"mini".
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+from src.model_capabilities import all_models, capability_for
 
 
 @dataclass
@@ -20,76 +27,83 @@ class ModelEntry:
     description: str = ""
 
 
-# Canonical model list — update here when new models are available
-MODEL_CATALOG: List[ModelEntry] = [
-    ModelEntry(
-        id="claude-opus-4-7",
-        provider="anthropic",
-        name="Opus 4.7",
-        aliases=["opus", "opus4.7", "opus-4.7", "o47", "claude-opus"],
-        description="Most intelligent — deep analysis & reasoning (128K output, $5/$25)",
+# CLI presentation (nicknames + menu copy) keyed by registry id. Membership in
+# the menu itself comes from the registry's `in_cli_catalog` flag.
+_CLI_PRESENTATION: dict[str, tuple[str, list, str]] = {
+    "claude-opus-4-7": (
+        "Opus 4.7",
+        ["opus", "opus4.7", "opus-4.7", "o47", "claude-opus"],
+        "Most intelligent — deep analysis & reasoning (128K output, $5/$25)",
     ),
-    ModelEntry(
-        id="claude-sonnet-4-6",
-        provider="anthropic",
-        name="Sonnet 4.6",
-        aliases=["sonnet", "sonnet4.6", "sonnet-4.6", "s46", "claude-sonnet", "claude"],
-        description="Fast + intelligent — financial analysis (64K output, $3/$15)",
+    "claude-sonnet-4-6": (
+        "Sonnet 4.6",
+        ["sonnet", "sonnet4.6", "sonnet-4.6", "s46", "claude-sonnet", "claude"],
+        "Fast + intelligent — financial analysis ($3/$15)",
     ),
-    ModelEntry(
-        id="gpt-5.5",
-        provider="openai",
-        name="GPT-5.5",
-        aliases=["gpt5", "gpt-5", "gpt5.5", "5.5"],
-        description="SOTA reasoning with configurable effort (default)",
+    "gpt-5.5": (
+        "GPT-5.5",
+        ["gpt5", "gpt-5", "gpt5.5", "5.5"],
+        "SOTA reasoning with configurable effort (default)",
     ),
-    ModelEntry(
-        id="gpt-5.4-mini",
-        provider="openai",
-        name="GPT-5.4 Mini",
-        aliases=["gpt5-mini", "gpt-5-mini", "5.4-mini", "mini"],
-        description="Fast + cost-efficient reasoning",
+    "gpt-5.4-mini": (
+        "GPT-5.4 Mini",
+        ["gpt5-mini", "gpt-5-mini", "5.4-mini", "mini"],
+        "Fast + cost-efficient reasoning",
     ),
-    ModelEntry(
-        id="gpt-5.4-nano",
-        provider="openai",
-        name="GPT-5.4 Nano",
-        aliases=["gpt5-nano", "gpt-5-nano", "5.4-nano", "nano"],
-        description="Fastest, cheapest — simple tasks",
+    "gpt-5.4-nano": (
+        "GPT-5.4 Nano",
+        ["gpt5-nano", "gpt-5-nano", "5.4-nano", "nano"],
+        "Fastest, cheapest — simple tasks",
     ),
-    # Legacy / fallback models — kept resolvable so configs that pin a
-    # specific id still work if the newer default isn't yet served.
-    ModelEntry(
-        id="gpt-5.4",
-        provider="openai",
-        name="GPT-5.4 (legacy)",
-        aliases=["gpt5.4", "5.4"],
-        description="Legacy — fallback if gpt-5.5 unavailable",
+    "gpt-5.4": (
+        "GPT-5.4 (legacy)",
+        ["gpt5.4", "5.4"],
+        "Legacy — fallback if gpt-5.5 unavailable",
     ),
-    ModelEntry(
-        id="gpt-5.2",
-        provider="openai",
-        name="GPT-5.2 (legacy)",
-        aliases=["gpt5.2", "5.2"],
-        description="Legacy — consider upgrading to gpt-5.5",
+    "gpt-5.2": (
+        "GPT-5.2 (legacy)",
+        ["gpt5.2", "5.2"],
+        "Legacy — consider upgrading to gpt-5.5",
     ),
-    ModelEntry(
-        id="gpt-5.2-codex",
-        provider="openai",
-        name="GPT-5.2 Codex (legacy)",
-        aliases=["codex", "codex5.2", "5.2-codex"],
-        description="Legacy — codex removed in 5.4 family, use gpt-5.4 instead",
+    "gpt-5.2-codex": (
+        "GPT-5.2 Codex (legacy)",
+        ["codex", "codex5.2", "5.2-codex"],
+        "Legacy — codex removed in 5.4 family, use gpt-5.4 instead",
     ),
-]
+}
 
-# Effort level constants
+
+def _build_cli_catalog() -> List[ModelEntry]:
+    entries: List[ModelEntry] = []
+    for cap in all_models():
+        if not cap.in_cli_catalog:
+            continue
+        name, aliases, description = _CLI_PRESENTATION.get(
+            cap.id, (cap.label, [], cap.notes)
+        )
+        entries.append(ModelEntry(
+            id=cap.id,
+            provider=cap.provider,
+            name=name,
+            aliases=list(aliases),
+            description=description,
+        ))
+    return entries
+
+
+# Derived CLI view — membership pinned by tests against the registry flags.
+MODEL_CATALOG: List[ModelEntry] = _build_cli_catalog()
+
+# Effort level constants (wire vocabularies; unchanged)
 VALID_ANTHROPIC_EFFORT = ("max", "xhigh", "high", "medium", "low")
 VALID_REASONING_EFFORT = ("none", "minimal", "low", "medium", "high", "xhigh")
 
-# Per-model Anthropic effort options (prefix match)
+# Per-model Anthropic effort options — registry-derived (cli.py iterates
+# .items() with prefix matching; the derived dict keeps that contract).
 EFFORT_OPTIONS_BY_MODEL = {
-    "claude-opus-4-7": ("max", "xhigh", "high", "medium", "low"),
-    "claude-sonnet-4-6": ("high", "medium", "low"),
+    c.id: tuple(c.effort_options)
+    for c in all_models("anthropic")
+    if c.effort_options
 }
 
 
@@ -109,8 +123,12 @@ def find_model(query: str) -> Optional[ModelEntry]:
 
 
 def get_effort_options(model: str) -> Optional[tuple]:
-    """Return valid effort options for the given model, or None if unsupported."""
-    for prefix, options in EFFORT_OPTIONS_BY_MODEL.items():
-        if model.startswith(prefix):
-            return options
-    return None
+    """Return valid effort options for the given model, or None if unsupported.
+
+    Anthropic-only contract preserved: OpenAI ids and unknown models return
+    None (OpenAI reasoning effort is validated elsewhere).
+    """
+    cap = capability_for(model)
+    if cap is None or cap.provider != "anthropic" or not cap.effort_options:
+        return None
+    return tuple(cap.effort_options)

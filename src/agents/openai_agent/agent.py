@@ -58,26 +58,23 @@ def _configure_openai_responses_transport(*, set_transport=None) -> None:
 _configure_openai_responses_transport()
 
 # ── Model output limits ────────────────────────────────────────
-# GPT-5.x 全系列 max output tokens = 128K
 # max_output_tokens 包含 reasoning tokens + visible output（跟 Anthropic max_tokens 相同概念）
-# 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠
+# 不設此值時 API 預設未文件化，可能僅 2K-4K，對高 reasoning effort 不夠。
+# 值為 registry 事實（src/model_capabilities.py）— P2.7 convergence。
+from src.model_capabilities import all_models as _all_capabilities
+from src.model_capabilities import capability_for as _capability_for
+
 _OPENAI_MODEL_MAX_OUTPUT = {
-    "gpt-5.5": 128000,
-    "gpt-5.4-mini": 128000,
-    "gpt-5.4-nano": 128000,
-    # Legacy / fallback (kept resolvable so configs that pin gpt-5.4 still
-    # work — useful if gpt-5.5 isn't yet served by the API for an account).
-    "gpt-5.4": 128000,
-    "gpt-5.2": 128000,
+    c.id: c.max_output for c in _all_capabilities("openai")
 }
 _OPENAI_DEFAULT_MAX_OUTPUT = 128000
 
 
 def _get_openai_max_output(model: str) -> int:
     """Return the model's maximum output token limit."""
-    for prefix, limit in _OPENAI_MODEL_MAX_OUTPUT.items():
-        if model.startswith(prefix):
-            return limit
+    cap = _capability_for(model)
+    if cap is not None and cap.provider == "openai":
+        return cap.max_output
     return _OPENAI_DEFAULT_MAX_OUTPUT
 
 

@@ -19,11 +19,17 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ── 1M context ─────────────────────────────────────────────────
-# Opus 4.7 / Sonnet 4.6: 1M context is GA (2026-03), no beta header needed.
-# Legacy models (Sonnet 4.5, Sonnet 4): still require beta header for 1M.
+# GA models need no beta header; legacy beta models still do. Membership is a
+# registry fact (context_mode in src/model_capabilities.py) — P2.7 convergence.
+# The header string itself is a wire constant and stays here.
+from src.model_capabilities import all_models as _all_capabilities
 
-_1M_GA_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
-_1M_BETA_MODELS = {"claude-sonnet-4-5", "claude-opus-4-5"}
+_1M_GA_MODELS = frozenset(
+    c.id for c in _all_capabilities("anthropic") if c.context_mode == "ga_1m"
+)
+_1M_BETA_MODELS = frozenset(
+    c.id for c in _all_capabilities("anthropic") if c.context_mode == "beta_1m"
+)
 _EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
 
 

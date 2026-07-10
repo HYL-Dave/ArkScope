@@ -27,9 +27,15 @@ from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from ..shared.token_tracker import TokenTracker
 
+from src.model_capabilities import all_models, capability_for
+
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
+# The beta header is a wire constant; WHICH models support compaction is a
+# registry fact (src/model_capabilities.py) — P2.7 convergence.
 _COMPACTION_BETA = "compact-2026-01-12"
-_COMPACTION_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
+_COMPACTION_MODELS = frozenset(
+    c.id for c in all_models("anthropic") if c.supports_compaction
+)
 
 
 def _supports_compaction(model: str) -> bool:
@@ -98,34 +104,35 @@ def _build_anthropic_tools_list(config) -> list:
     return tools
 
 # ── Model capability detection ──────────────────────────────────
+# Derived views over the registry: kept as module globals because tests and
+# callers reference them by name; the FACTS live in src/model_capabilities.py.
 
-_ADAPTIVE_THINKING_MODELS = {"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6"}
-_EFFORT_MODELS = {"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6"}
+_ADAPTIVE_THINKING_MODELS = frozenset(
+    c.id for c in all_models("anthropic") if c.thinking_mode.startswith("adaptive")
+)
+_EFFORT_MODELS = frozenset(
+    c.id for c in all_models("anthropic") if c.effort_options
+)
 
-# 各模型最大 output tokens（API 硬限制）
-# 用於 thinking 模式自動設定 max_tokens
-_MODEL_MAX_OUTPUT = {
-    "claude-opus-4-8": 128000,
-    "claude-opus-4-7": 128000,
-    "claude-sonnet-4-6": 64000,
-}
+# 各模型最大 output tokens（API 硬限制）— registry-derived
+_MODEL_MAX_OUTPUT = {c.id: c.max_output for c in all_models("anthropic")}
 
 
 def _get_model_max_output(model: str) -> int:
     """Return the model's maximum output token limit."""
-    for prefix, limit in _MODEL_MAX_OUTPUT.items():
-        if model.startswith(prefix):
-            return limit
-    return 64000  # safe fallback
+    cap = capability_for(model)
+    if cap is not None and cap.provider == "anthropic":
+        return cap.max_output
+    return 64000  # safe fallback (unknown / non-anthropic ids)
 
 
 def _supports_adaptive_thinking(model: str) -> bool:
-    """Opus 4.7 / Sonnet 4.6 support adaptive thinking (no budget_tokens needed)."""
+    """Adaptive-thinking-capable models per the registry (any adaptive mode)."""
     return any(model.startswith(m) for m in _ADAPTIVE_THINKING_MODELS)
 
 
 def _supports_effort(model: str) -> bool:
-    """Opus 4.7 / Sonnet 4.6 support output_config.effort."""
+    """output_config.effort support per the registry."""
     return any(model.startswith(m) for m in _EFFORT_MODELS)
 
 
@@ -147,25 +154,42 @@ def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
     Returns:
         (thinking_dict_or_None, effective_max_tokens)
     """
+    cap = capability_for(model)
+    mode = (
+        cap.thinking_mode
+        if cap is not None and cap.provider == "anthropic"
+        else "manual_budget"  # unknown claude-* ids keep the legacy budget path
+    )
+
+    if mode == "adaptive_always_on":
+        # Fable-class: thinking runs server-side regardless of the toggle —
+        # never send disabled/budget; omit the param (unset = on per docs) and
+        # leave headroom for thinking + response.
+        return None, _get_model_max_output(model)
+
     if not thinking_enabled:
+        if mode == "adaptive_default_on":
+            # Sonnet-5-class: omitting the param means ON — the user's "off"
+            # intent needs the explicit documented disable shape.
+            return {"type": "disabled"}, config.max_tokens
         return None, config.max_tokens
 
     # Thinking 開啟 → 用模型最大 output 作為 max_tokens
     effective_max_tokens = _get_model_max_output(model)
 
-    if _supports_adaptive_thinking(model):
-        # Opus 4.7: Claude 自動判斷思考深度，不需 budget
+    if mode in ("adaptive_opt_in", "adaptive_default_on"):
+        # Claude 自動判斷思考深度，不需 budget
         return {"type": "adaptive"}, effective_max_tokens
-    else:
-        # 其他模型: 留 config.max_tokens 給 response，其餘全給 thinking
-        budget = effective_max_tokens - config.max_tokens
-        # 確保 budget 合理（至少 1024，且 < effective_max_tokens）
-        budget = max(budget, 1024)
-        budget = min(budget, effective_max_tokens - 1)
-        return {
-            "type": "enabled",
-            "budget_tokens": budget,
-        }, effective_max_tokens
+
+    # manual_budget: 留 config.max_tokens 給 response，其餘全給 thinking
+    budget = effective_max_tokens - config.max_tokens
+    # 確保 budget 合理（至少 1024，且 < effective_max_tokens）
+    budget = max(budget, 1024)
+    budget = min(budget, effective_max_tokens - 1)
+    return {
+        "type": "enabled",
+        "budget_tokens": budget,
+    }, effective_max_tokens
 
 
 async def run_query_stream(

@@ -48,7 +48,9 @@ class ModelCapability:
     runtime_ready: bool = True
     in_routing_seed: bool = False
     in_cli_catalog: bool = False
-    aliases: tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()      # OFFICIAL aliases only (e.g. "gpt-5.6"→Sol);
+                                       # CLI nicknames live in the CLI view, so
+                                       # runtime helpers can never alias-match "claude".
     quality: str = "high"             # frontier | high | balanced | fast
     speed: str = "medium"             # slow | medium | fast
     cost_tier: str = "medium"         # high | medium | low
@@ -81,7 +83,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
-        aliases=("opus", "opus4.7", "opus-4.7", "o47", "claude-opus"),
         quality="high", speed="slow", cost_tier="high",
         recommended_for=("card_synthesis",),
         source_url=_ANTHROPIC_DOCS, verified_at="2026-06-06",
@@ -95,7 +96,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         context_limit=1_000_000,
         max_output=128_000,                    # Fix D (was 64_000; models table)
         in_routing_seed=True, in_cli_catalog=True,
-        aliases=("sonnet", "sonnet4.6", "sonnet-4.6", "s46", "claude-sonnet", "claude"),
         quality="balanced", speed="medium", cost_tier="medium",
         recommended_for=("card_translation",),
         source_url=_ANTHROPIC_OVERVIEW, verified_at="2026-07-10",
@@ -138,22 +138,10 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPENAI_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
-        aliases=("gpt5", "gpt-5", "gpt5.5", "5.5"),
         quality="frontier", speed="medium", cost_tier="high",
         recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
         notes="Superseded by gpt-5.6-terra at half the price (user ruling 2026-07-10).",
-    ),
-    ModelCapability(
-        id="gpt-5.4", provider="openai", label="GPT-5.4",
-        picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
-        context_mode="standard", context_limit=1_050_000, max_output=128_000,
-        in_routing_seed=True, in_cli_catalog=True,
-        aliases=("gpt5.4", "5.4"),
-        quality="high", speed="medium", cost_tier="medium",
-        recommended_for=("card_synthesis",),
-        source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
     ModelCapability(
         id="gpt-5.4-mini", provider="openai", label="GPT-5.4 mini",
@@ -161,7 +149,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPENAI_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
-        aliases=("gpt5-mini", "gpt-5-mini", "5.4-mini", "mini"),
         quality="balanced", speed="fast", cost_tier="low",
         recommended_for=("card_translation",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
@@ -173,8 +160,17 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPENAI_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
-        aliases=("gpt5-nano", "gpt-5-nano", "5.4-nano", "nano"),
         quality="fast", speed="fast", cost_tier="low",
+        source_url=_OPENAI_DOCS, verified_at="2026-06-06",
+    ),
+    ModelCapability(
+        id="gpt-5.4", provider="openai", label="GPT-5.4",
+        picker_visibility="pinned_only", thinking_mode="none",
+        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        quality="high", speed="medium", cost_tier="medium",
+        recommended_for=("card_synthesis",),
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
     ModelCapability(
@@ -183,7 +179,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPENAI_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
-        aliases=("gpt5.2", "5.2"),
         quality="high", speed="medium", cost_tier="medium",
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
@@ -193,7 +188,6 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         effort_options=_OPENAI_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
-        aliases=("codex", "codex5.2", "5.2-codex"),
         quality="high", speed="medium", cost_tier="medium",
         source_url=_OPENAI_DOCS, verified_at="2026-06-06",
     ),
