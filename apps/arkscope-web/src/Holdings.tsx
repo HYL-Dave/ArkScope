@@ -86,7 +86,8 @@ export function HoldingsView() {
     setBusy("apply");
     setErr(null);
     try {
-      setPreview(await applyIbkrPortfolioSync());
+      await applyIbkrPortfolioSync();
+      setPreview(null);
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -198,27 +199,52 @@ export function HoldingsView() {
           唯讀同步，只讀取 Gateway 可見帳戶與持倉；ArkScope 不會下單。
         </p>
         {preview && (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Change</th>
-                  <th>Symbol</th>
-                  <th>Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.changes.length === 0 ? (
-                  <tr><td colSpan={3}>沒有差異</td></tr>
-                ) : preview.changes.map((change, idx) => (
-                  <tr key={`${change.broker_con_id ?? change.symbol}-${idx}`}>
-                    <td>{change.kind}</td>
-                    <td>{change.symbol}</td>
-                    <td>{change.quantity ?? ""}</td>
+          <div>
+            <p className="muted tiny">
+              預覽結果，尚未寫入本地持倉；按「套用同步」後才會保存。
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Change</th>
+                    <th>Symbol</th>
+                    <th>Qty</th>
+                    <th>Avg Cost</th>
+                    <th>Market Value</th>
+                    <th>Unrealized P&amp;L</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {preview.changes.length === 0 ? (
+                    <tr><td colSpan={6}>沒有差異</td></tr>
+                  ) : preview.changes.map((change, idx) => (
+                    <tr key={`${change.broker_con_id ?? change.symbol}-${idx}`}>
+                      <td>{change.kind}</td>
+                      <td>{change.symbol}</td>
+                      <td>
+                        {formatChangeMetric(
+                          change.kind,
+                          change.before,
+                          change.after,
+                          "quantity",
+                          change.quantity,
+                        )}
+                      </td>
+                      <td>
+                        {formatChangeMetric(change.kind, change.before, change.after, "avg_cost")}
+                      </td>
+                      <td>
+                        {formatChangeMetric(change.kind, change.before, change.after, "market_value")}
+                      </td>
+                      <td>
+                        {formatChangeMetric(change.kind, change.before, change.after, "unrealized_pnl")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>
@@ -263,20 +289,22 @@ function PositionsTable({
             <th>Asset</th>
             <th>Qty</th>
             <th>Currency</th>
+            <th>Avg Cost</th>
             <th>Market Value</th>
-            <th>P&amp;L</th>
+            <th>Unrealized P&amp;L</th>
             <th>Notes</th>
           </tr>
         </thead>
         <tbody>
           {positions.length === 0 ? (
-            <tr><td colSpan={7}>{emptyText}</td></tr>
+            <tr><td colSpan={8}>{emptyText}</td></tr>
           ) : positions.map((position) => (
             <tr key={position.id}>
               <td>{position.symbol}</td>
               <td>{position.asset_class}</td>
               <td>{formatNum(position.quantity)}</td>
               <td>{position.currency}</td>
+              <td>{formatMaybe(position.avg_cost)}</td>
               <td>{formatMaybe(position.market_value)}</td>
               <td>{formatMaybe(position.unrealized_pnl)}</td>
               <td>{position.notes ?? ""}</td>
@@ -286,6 +314,32 @@ function PositionsTable({
       </table>
     </div>
   );
+}
+
+function formatChangeMetric(
+  kind: string,
+  before: Record<string, unknown> | null | undefined,
+  after: Record<string, unknown> | null | undefined,
+  field: string,
+  fallback?: number,
+): string {
+  const beforeValue = finiteNumber(before?.[field]);
+  const afterValue = finiteNumber(after?.[field]) ?? finiteNumber(fallback);
+  if (
+    kind === "update" &&
+    beforeValue != null &&
+    afterValue != null &&
+    beforeValue !== afterValue
+  ) {
+    return `${formatNum(beforeValue)} → ${formatNum(afterValue)}`;
+  }
+  if (kind === "remove") return formatMaybe(beforeValue);
+  return formatMaybe(afterValue ?? beforeValue);
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return value;
 }
 
 function currencySummary(totals: PortfolioSnapshot["totals"] | undefined): string {

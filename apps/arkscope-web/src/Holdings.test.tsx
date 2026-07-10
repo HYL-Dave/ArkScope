@@ -99,7 +99,10 @@ describe("HoldingsView", () => {
           symbol: "NVDA",
           asset_class: "stock",
           quantity: 3,
+          avg_cost: 212.84,
           currency: "USD",
+          market_value: 61086,
+          unrealized_pnl: -2765,
           notes: "core",
         },
       ],
@@ -116,6 +119,10 @@ describe("HoldingsView", () => {
     expect(host!.textContent).toContain("Manual");
     expect(host!.textContent).toContain("NVDA");
     expect(host!.textContent).toContain("per-currency");
+    expect(host!.textContent).toContain("Avg Cost");
+    expect(host!.textContent).toContain("212.84");
+    expect(host!.textContent).toContain("61,086");
+    expect(host!.textContent).toContain("-2,765");
   });
 
   it("can add a manual holding", async () => {
@@ -141,7 +148,24 @@ describe("HoldingsView", () => {
   it("shows ibkr preview as review before applying", async () => {
     stubFetch((url) => {
       if (url.endsWith("/portfolio/ibkr/preview")) {
-        return { changes: [{ kind: "add", symbol: "MSFT", quantity: 1 }], applies: false };
+        return {
+          changes: [{
+            kind: "update",
+            symbol: "MSFT",
+            quantity: 1,
+            before: {
+              avg_cost: 90,
+              market_value: 1200,
+              unrealized_pnl: -50,
+            },
+            after: {
+              avg_cost: 100.25,
+              market_value: 1250,
+              unrealized_pnl: -25.5,
+            },
+          }],
+          applies: false,
+        };
       }
       return snapshot();
     });
@@ -154,6 +178,66 @@ describe("HoldingsView", () => {
 
     expect(host!.textContent).toContain("MSFT");
     expect(host!.textContent).toContain("套用同步");
+    expect(host!.textContent).toContain("尚未寫入本地持倉");
+    expect(host!.textContent).toContain("Avg Cost");
+    expect(host!.textContent).toContain("90 → 100.25");
+    expect(host!.textContent).toContain("1,200 → 1,250");
+    expect(host!.textContent).toContain("-50 → -25.5");
+  });
+
+  it("clears preview and shows persisted positions after applying", async () => {
+    let applied = false;
+    const calls = stubFetch((url, init) => {
+      if (url.endsWith("/portfolio/ibkr/preview")) {
+        return {
+          changes: [{
+            kind: "add",
+            symbol: "AMD",
+            quantity: 400,
+            after: { avg_cost: 92.26, market_value: 206704, unrealized_pnl: 169800 },
+          }],
+          applies: false,
+        };
+      }
+      if (url.endsWith("/portfolio/ibkr/apply") && init?.method === "POST") {
+        applied = true;
+        return { changes: [], applies: true };
+      }
+      if (applied && url.endsWith("/portfolio")) {
+        return snapshot({
+          positions: [{
+            id: 20,
+            account_id: 1,
+            symbol: "AMD",
+            asset_class: "stock",
+            quantity: 400,
+            avg_cost: 92.26,
+            currency: "USD",
+            market_value: 206704,
+            unrealized_pnl: 169800,
+          }],
+        });
+      }
+      return snapshot();
+    });
+    await mount();
+
+    await act(async () => {
+      (await buttonByText("預覽 IBKR 同步")).click();
+    });
+    await flush();
+    await act(async () => {
+      (await buttonByText("套用同步")).click();
+    });
+    await flush();
+
+    expect(calls.some((call) => call.url.endsWith("/portfolio/ibkr/apply"))).toBe(true);
+    expect(
+      calls.filter((call) => call.url.endsWith("/portfolio")).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(host!.textContent).toContain("AMD");
+    expect(host!.textContent).toContain("92.26");
+    expect(host!.textContent).not.toContain("尚未寫入本地持倉");
   });
 
   it("updates whether an account participates in aggregate totals", async () => {
