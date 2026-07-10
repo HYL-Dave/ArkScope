@@ -276,6 +276,80 @@ behavior.
 Commit: `docs: verify new model generation facts`.
 **Gate**: reviewer acks both tables + any Fix C before Task 1.
 
+### Task 0 RESULTS (executed 2026-07-10 — awaiting reviewer ack)
+
+**Verified capability table (new generation — registry seed values for Task 5):**
+
+| id | provider | context | max output | thinking_mode | effort_options | compaction | context_mode | structured_output | tool_calling | pricing (in/out per MTok) | source |
+|----|----------|---------|-----------|---------------|----------------|------------|--------------|-------------------|--------------|---------------------------|--------|
+| `claude-fable-5` | anthropic | 1,000,000 (default, no beta) | 128,000 | `adaptive_always_on` — "It applies whenever the `thinking` parameter is unset. `thinking: {"type": "disabled"}` is not supported." Wire shape for the toggle-ignored branch: **omit the param** (unset = on) | `("max","xhigh","high","medium","low")` (effort doc lists Fable in all five) | **True** (launch features + compaction beta list) | `ga_1m` | True | True | $10 / $50 | introducing-claude-fable-5 page + effort + context-windows |
+| `claude-sonnet-5` | anthropic | 1,000,000 (default, no beta) | 128,000 | `adaptive_default_on` — "adaptive thinking is on by default; pass `thinking: {type: "disabled"}` to turn it off. Manual `{type: "enabled"}` is rejected with a 400" | `("max","xhigh","high","medium","low")` (effort doc: xhigh + max both list Sonnet 5) | True (compaction beta list) | `ga_1m` | True | True | $3 / $15 (**intro $2 / $10 through 2026-08-31**) | models overview (comparison table + footnote 4) + adaptive-thinking |
+| `gpt-5.6-sol` | openai | 1,050,000 | 128,000 | `none` | provider six-value set (Decision 7) | False | `standard` | True | True | $5 / $30 (cached in $0.50) | gpt-5.6-sol page; **official alias: "The `gpt-5.6` alias routes requests to GPT-5.6 Sol"** |
+| `gpt-5.6-terra` | openai | 1,050,000 | 128,000 | `none` | provider six-value set | False | `standard` | True | True | $2.50 / $15 (cached in $0.25) | gpt-5.6-terra page |
+| `gpt-5.6-luna` | openai | 1,050,000 | 128,000 | `none` | provider six-value set | False | `standard` | True | True | $1 / $6 (cached in $0.10) | gpt-5.6-luna page ("cost-sensitive, high-volume… nano model tier") |
+
+Refusal contract (for the Task 5B fakes — verified against refusals-and-fallback):
+HTTP 200, `stop_reason: "refusal"`, `stop_details: {"type": "refusal", "category":
+<str|null>, "explanation": <str|null>}` (both fields null when uncategorized;
+`stop_details` null for every other stop reason); pre-output refusal has
+`content: []` and is NOT billed; mid-stream refusal bills what streamed; batch
+results may carry `stop_details: null` → **branch on `stop_reason` only** (the
+5B fakes and implementation follow this; `data["stop_details"]` passthrough is
+display-only). Fable/Sonnet 5/Opus 4.7+ also reject non-default
+`temperature/top_p/top_k` with 400 (our config has no temperature field —
+verified non-issue).
+
+**Contested existing facts:**
+
+- **Fix B CONFIRMED**: context-windows doc — Opus 4.8 is in the 1M group and
+  "For every model with a 1M-token context window, 1M is the default: you don't
+  need a beta header." → `context_limit 1_000_000` + `context_mode "ga_1m"`.
+- **Fix C PROPOSED (needs your ack)**: compaction is "available in beta for
+  Claude Fable 5, …, **Claude Opus 4.8**, …" — today's `_COMPACTION_MODELS`
+  omits opus-4.8, so `_supports_compaction("claude-opus-4-8")` is False. Propose
+  flipping to True in Task 2 (wire effect only when the user enables the
+  CLI/server compaction toggle; same beta header `compact-2026-01-12`). If not
+  acked, opus-4.8 stays False and the Task 2 test keeps pinning False.
+- Legacy 1M-beta story: current docs list Sonnet 4.5 as plain 200k and no longer
+  advertise `context-1m-2025-08-07` for 4.5 models. Registry keeps the
+  `beta_1m` transcription (behavior-identical; the header path is legacy code we
+  are not changing).
+
+**Observed doc-vs-code drift on EXISTING models (flagged, NOT changed — outside
+the two/three ruled fixes; each would alter wire behavior and deserves its own
+ruling in a follow-up):**
+
+1. Sonnet 4.6 max output: docs comparison table says 128k; code
+   (`_MODEL_MAX_OUTPUT`) uses 64,000 (affects budget_tokens/max_tokens math).
+2. Sonnet 4.6 effort: effort doc includes `max` for Sonnet 4.6; CLI tuple is
+   `("high","medium","low")`.
+3. Haiku 4.5 canonical dated id is `claude-haiku-4-5-20251001` with dateless
+   alias — registry id stays `claude-haiku-4-5` (prefix matching covers dated).
+
+**Live entitlement table (read-only discovery, 2026-07-10):**
+
+| credential | auth_mode | discovery | new-generation visible |
+|------------|-----------|-----------|------------------------|
+| anthropic `local:4`/`local:5` (api_key, inactive) | api_key | ok, 10 models | `claude-fable-5`, `claude-sonnet-5` |
+| anthropic `local:1` (**ACTIVE**) | claude_code_oauth | seed-only channel (no live listing) | n/a — cache will be `seed_only` |
+| openai `local:3` (api_key, **ACTIVE**) | api_key | ok, 129 models | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
+| openai `local:7` (chatgpt_oauth, inactive) | chatgpt_oauth | not probed (driver dispatch; inactive) | unknown until user runs Settings discovery |
+
+**Live-verification note**: with the CURRENT active anthropic credential
+(claude_code_oauth), the effective picker will show `seed_only` + seeds in
+Advanced — switching the active anthropic credential to an api_key is what
+lights up `verified` for Anthropic models. This is correct behavior, worth
+knowing before judging the picker live.
+
+**Smoke targets (5C, per verified pricing)**: OpenAI = `gpt-5.6-luna` ($1/$6 —
+cheapest confirmed); Anthropic = `claude-sonnet-5` (intro $2/$10). Fable 5
+($10/$50) stays user-gated.
+
+**Decision-6 visibility re-confirmed** against verified pricing: Terra at
+$2.50/$15 ≈ gpt-5.5 capability at half its $5/$30 price; Luna $1/$6 above
+mini's cost with a bigger capability step; Sol $5/$30 = the frontier pick —
+the default set stands as ruled.
+
 ---
 
 ## Task 1: Capability Registry Module (existing models only)
