@@ -1,188 +1,196 @@
 # Model Capability Registry + Discovery Cache + Effective Picker (P2.7)
 
-> **Status: DRAFT FOR REVIEW (round 4) 2026-07-10.** Implements PROJECT_PRIORITY_MAP
-> §P2.7. Round-3 review returned 5 must-fix + a picker policy ruling; all code
-> claims re-verified and folded: the effective view now takes per-provider
-> credentials (mixed-provider routes tested), `api_key_pool` fails closed everywhere
-> until actually wired into the live resolver, card tasks require tool calling
-> (forced-tool synthesis verified at `card_synthesis.py:152`), the thinking schema
-> grew to five modes with `manual_budget` matching today's non-adaptive Anthropic
-> path, **structured refusal handling is in scope** (Fable's HTTP-200 refusal
-> contract vs `agent.py:412` treating any non-tool_use stop as success), the
-> `current|legacy` tier is replaced by `picker_visibility:
-> default|advanced|pinned_only` per the adopted policy, the new-generation scope
-> gains **Claude Sonnet 5**, and every remaining prose-only RED block is now
-> complete executable test code. Docs-only; no runtime implementation has started.
-> Author: Claude (implementer); reviewer: user.
+> **Status: DRAFT FOR REVIEW (round 5) 2026-07-10.** Implements PROJECT_PRIORITY_MAP
+> §P2.7. Round-4 review returned 6 must-fix + 3 should-fix; all verified and
+> folded: `pinned_only` now means NOT SHOWN unless route-pinned (with both
+> polarity tests), the Anthropic-OAuth research case got its own anthropic-routed
+> fixture (no more masking), the refusal tests target the REAL seams
+> (`src.auth_drivers.live_resolver.live_anthropic_client` patch point — the
+> synthesis/translation imports are function-local; the agent loop is STREAMING
+> via `client.messages.stream`, so the fake fakes a stream context manager) and a
+> shared `AnthropicRefusalError` covers synthesis AND `_translate_anthropic`
+> (`card_synthesis.py:460`), `adaptive_default_on` got an implementable wire
+> semantic under today's bool toggle (True→adaptive / False→explicit disabled —
+> because omit would silently leave thinking ON for these models; tri-state
+> deferred), the route test uses the real handler name `model_catalog` with a
+> real store, the discovery fakes carry `auth_type`, registry membership became
+> necessary-plus-relevance (Mythos 5 does NOT auto-enter), the OpenAI effort
+> completeness test gained gpt-5.2-codex, and the exact `_build_thinking_param`
+> outputs are pinned from live runs (adaptive/128000; budget 55808/64000; off →
+> (None, 8192)). Tasks 2/3 are fully expanded in-document. Docs-only; no runtime
+> implementation has started. Author: Claude (implementer); reviewer: user.
 
 **Goal:** One code-reviewed **capability registry** is the single source for model
 facts; a **DB discovery cache** records per-credential visibility; an **effective
 picker** shows, per task, only models that are visible to the active credential,
 default-visibility, and executable under that task's auth mode. New generation
 (Anthropic Fable 5 + Sonnet 5; OpenAI gpt-5.6 Sol/Terra/Luna) lands with
-slice-time-verified facts and honest runtime support (refusal handling — no silent
-fallback).
+slice-time-verified facts and honest runtime support (structured refusal handling
+— no silent fallback, no empty-success).
 
-**Non-goals:** ANY default or recommendation flip (`agents/config.py`,
-`model_routing.TASKS` — separate slice); `config/user_profile.yaml` scoring models;
-scheduled discovery refresh; Ollama / OpenAI-compatible providers (schema must not
-preclude; no entries); pricing display beyond `cost_tier`; removing
-`model_catalog.py`; run/replay storage changes; route-validation authority
-migration (`model_routing.EFFORT_OPTIONS` stays); **wiring `api_key_pool` into the
-live resolver** (pool stays discovery/test-layer; executability returns False for
-it until a dedicated slice wires it).
+**Non-goals:** ANY default or recommendation flip; `config/user_profile.yaml`
+scoring models; scheduled discovery refresh; Ollama / OpenAI-compatible providers;
+pricing display beyond `cost_tier`; removing `model_catalog.py`; run/replay
+changes; route-validation authority migration (`model_routing.EFFORT_OPTIONS`
+stays); `api_key_pool` wiring; **thinking tri-state migration** (None = provider
+default — follow-up; this slice keeps the bool toggle with the Decision-8 wire
+mapping).
 
 ---
 
-## Current Grounding (verified against code 2026-07-10, round-4 corrected)
+## Current Grounding (verified 2026-07-10, round-5 corrected)
 
-1. **Nine drift sites** (contents as previously verified, unchanged): routing
-   `MODEL_CATALOG` (exactly 7 ids) + `TASKS` + `EFFORT_OPTIONS` (wire values) +
-   `model_provider()` + `is_seed_model()`; CLI `MODEL_CATALOG` (exactly 8 ids,
-   `find_model("opus") == "claude-opus-4-7"` exact) + `EFFORT_OPTIONS_BY_MODEL`
-   (anthropic-only; opus-4.8 missing = ruled Fix A) + `VALID_*_EFFORT`;
-   `_ADAPTIVE_THINKING_MODELS`/`_EFFORT_MODELS`/`_MODEL_MAX_OUTPUT` (agent.py:102);
-   `_COMPACTION_MODELS` (agent.py:32; opus-4.8 absent — Task 0 item);
-   `_1M_GA_MODELS`/`_1M_BETA_MODELS` (subagent.py:25; opus-4.8 in neither —
-   `_use_extended_context_beta("claude-opus-4-8", True)` returns False, wire
-   preserved by Fix B); `_OPENAI_MODEL_MAX_OUTPUT` (agent.py:64);
-   `_MODEL_CONTEXT_LIMITS` (context_manager.py:58; **opus-4.8 missing → 200_000
-   fallback today** = ruled Fix B); `agents/config.py:43` (NOT changed);
-   `ModelRoutingSection` at `Settings.tsx:2011` (test file uses the house
-   createRoot/act harness with a local `catalog()` fixture + `render()` helper —
-   verified by reading it).
-2. **Thinking reality (round-3 MF4, verified)**: `_build_thinking_param`
-   (agent.py:132) — adaptive-set models get `thinking: adaptive` when enabled
-   (opt-in); **every other Anthropic model gets `enabled` + derived
-   `budget_tokens`** (manual budget path); OpenAI models have no thinking param
-   (reasoning effort instead). So today's truthful modes: opus-4.8/4.7,
-   sonnet-4.6 = `adaptive_opt_in`; haiku-4.5, sonnet-4.5, opus-4.5 =
-   `manual_budget`; all OpenAI = `none`.
-3. **Refusal gap (round-3 MF4, verified)**: `agent.py:412` — any
-   `stop_reason != "tool_use"` (except `"compaction"`) extracts text and logs a
-   FINAL ANSWER. Fable's documented refusal contract (HTTP 200 +
-   `stop_reason="refusal"`, possibly empty content) would therefore surface as a
-   successful empty answer. `card_synthesis.py` similarly checks only for its
-   forced tool block. Structured refusal handling is REQUIRED before Fable can be
-   marked runtime-ready.
-4. **Executability grounding (round-3 MF2, verified)**:
-   - `live_resolver.resolve_live_auth()` resolves ONLY a DB `api_key` row
-     (`db_api_key`) or falls through to env (`env_fallback`); OAuth-active →
-     fail-closed for the sync clients that card tasks use
-     (`card_synthesis.py:152` calls `live_anthropic_client()` and posts a
-     **forced tool** — cards therefore require `supports_tool_calling`).
-   - **`api_key_pool` appears NOWHERE in `live_resolver.py`** (grep zero hits for
-     `OPENAI_API_KEYS`/`api_key_pool`): pools exist in the credential
-     inventory/discovery/test layer only. A pool-active credential is NOT
-     resolvable by the direct clients today → executability must return False for
-     `api_key_pool` on every task until a wiring slice lands.
-   - AI 研究 streaming supports api_key AND both OAuth driver paths.
-5. **Credential identity is mutable under a fixed id**: `PUT
-   /config/credentials/{id}` replaces `local:` secrets in place; env ids don't
-   change when keys rotate → cache carries a `secret_fingerprint`.
-6. **Discovery**: `discover_models()` live-only; `claude_code_oauth` driver returns
-   `status="ok"` with SEED models (no live listing) → `seed_only` cache state.
-   `_active_auth_mode()` (config_routes.py:77) is DB-only and id-less → replaced
-   by `resolve_active_credential()` for cache addressing.
-7. **New-generation scope (round-3 MF3): FIVE models** — Anthropic **Fable 5** and
-   **Sonnet 5**; OpenAI **gpt-5.6 Sol / Terra / Luna**. Official per-model pages
-   (Task 0 inputs): Fable announcement + effort + context-windows docs; Sol/Terra/
-   Luna model pages; Claude release notes (Sonnet 5). Reviewer-supplied pricing to
+1. **Nine drift sites** (as verified in rounds 1-4): routing `MODEL_CATALOG`
+   (exactly 7) + `TASKS` + `EFFORT_OPTIONS` + `model_provider()` +
+   `is_seed_model()`; CLI `MODEL_CATALOG` (exactly 8; `find_model("opus") ==
+   "claude-opus-4-7"`) + `EFFORT_OPTIONS_BY_MODEL` (opus-4.8 missing = Fix A) +
+   `VALID_*_EFFORT`; `_ADAPTIVE_THINKING_MODELS` / `_EFFORT_MODELS` /
+   `_MODEL_MAX_OUTPUT` (agent.py:102); `_COMPACTION_MODELS` (agent.py:32;
+   opus-4.8 absent — Task 0 item); `_1M_GA_MODELS` / `_1M_BETA_MODELS`
+   (subagent.py:25; opus-4.8 in neither — Fix B, wire-verified);
+   `_OPENAI_MODEL_MAX_OUTPUT` (agent.py:64); `_MODEL_CONTEXT_LIMITS`
+   (context_manager.py:58; opus-4.8 → 200_000 fallback = Fix B);
+   `agents/config.py:43` (NOT changed); `ModelRoutingSection` at
+   `Settings.tsx:2011` (house createRoot/act harness, local `catalog()` fixture +
+   `render()` helper).
+2. **Thinking wire reality (values from live runs — pinned)**:
+   `_build_thinking_param(model, thinking_enabled, config)` with
+   `config.max_tokens=8192`:
+   - `("claude-opus-4-8", True)` → `({"type": "adaptive"}, 128000)`
+   - `("claude-haiku-4-5", True)` → `({"type": "enabled", "budget_tokens": 55808}, 64000)`
+   - `("claude-haiku-4-5", False)` → `(None, 8192)` — **off = OMIT today**, which
+     is exactly why `adaptive_default_on` models need explicit
+     `{"type":"disabled"}` for off (omit would leave them ON).
+   `agents/config.py:80` `anthropic_thinking: bool = False` — the toggle is a
+   bool; there is no None/tri-state.
+3. **Refusal gap (verified)**: the agent loop is **streaming**
+   (`client = live_anthropic_client()` at agent.py:221; `client.messages.stream`
+   / `client.beta.messages.stream` at :371/:376; terminal handling at :412 treats
+   any non-`tool_use`, non-`compaction` stop as a final answer via
+   `pad.log_final_answer`). Public entries: `run_query_stream(question, model=,
+   dal=, effort=, thinking=, ...)` (async generator of AgentEvent) and
+   `run_query` (:566). Card synthesis (`_synthesize_anthropic`, function-local
+   `from src.auth_drivers.live_resolver import live_anthropic_client`;
+   `client.messages.create` with a forced tool) AND card translation
+   (`_translate_anthropic` at card_synthesis.py:460, same pattern) both need the
+   shared refusal error. **Patch point for both card seams =
+   `src.auth_drivers.live_resolver.live_anthropic_client`** (imports happen at
+   call time); patch point for the loop =
+   `src.agents.anthropic_agent.agent.live_anthropic_client` (module-namespace
+   import, called at :221).
+4. **Executability grounding**: `resolve_live_auth()` resolves only DB `api_key`
+   or env fallback; OAuth-active → fail-closed for sync clients (cards);
+   **`api_key_pool` appears nowhere in live_resolver.py** → False for every task
+   until wired. Cards require `supports_tool_calling` (forced tool) and
+   `supports_structured_output`. AI 研究 streaming supports api_key + both OAuth
+   driver paths on their own provider.
+5. **Credential identity mutable under fixed id** (`PUT /config/credentials/{id}`
+   replaces `local:` secrets; env ids stable across rotation) → cache
+   `secret_fingerprint`.
+6. **Discovery**: `discover_models()` live-only; `claude_code_oauth` driver
+   returns `status="ok"` with SEED models → `seed_only`. `_active_auth_mode()` is
+   DB-only and id-less → replaced by `resolve_active_credential()`.
+7. **Catalog API**: real handler = `model_catalog(store: CredentialStore =
+   Depends(get_credential_store))` at `config_routes.py:227`, returns
+   `{**catalog().model_dump(), "routes": {...}, "credentials": ..., ...}`.
+8. **New-generation scope: FIVE models** — Fable 5, Sonnet 5, gpt-5.6
+   Sol/Terra/Luna (per-model official pages; reviewer-supplied pricing to
    re-verify in Task 0: Sol $5/$30, Terra $2.50/$15, Luna $1/$6, Sonnet 5 $2/$10
-   promo (later $3/$15). Known contract shapes to verify: Fable thinking
-   always-on (explicit disable rejected) + refusal stop_reason; Sonnet 5 thinking
-   default-on (omit = on, explicit disable allowed).
-8. **Model-value rationale (user ruling 2026-07-10, drives visibility)**: de facto
-   worth-listing OpenAI set = Sol / Terra / Luna / gpt-5.4-mini (Terra ≈ gpt-5.5
-   capability at lower price; Luna slightly above gpt-5.4-mini price with a bigger
-   capability step; gpt-5.4-mini stays relevant esp. under codex OAuth costing).
-   Strongest-per-family = Fable 5 / Opus 4.8 / Sonnet 5; Haiku 4.5 retained for
-   translation/notes-type work. Previous-generation Opus 4.7 / Sonnet 4.6 keep a
-   path for now (Advanced) with **future removal expected**.
+   promo → $3/$15). Contract shapes to verify: Fable `adaptive_always_on` +
+   refusal stop_reason (+ stop_details shape); Sonnet 5 `adaptive_default_on`
+   (omit = on, explicit disabled allowed).
+9. **Model-value rationale (user ruling, drives visibility)**: worth-listing
+   OpenAI set = Sol/Terra/Luna/gpt-5.4-mini (Terra ≈ gpt-5.5 at lower price; Luna
+   > mini capability at slightly higher price; mini stays relevant under codex
+   OAuth costing). Strongest-per-family = Fable 5 / Opus 4.8 / Sonnet 5; Haiku
+   4.5 for translation/notes work. Opus 4.7 / Sonnet 4.6 keep an Advanced path
+   for now with **future removal expected**.
 
 ---
 
 ## Decisions Locked By This Plan
 
 1. **Registry is code, cache is DB, picker is the per-task intersection.**
-2. **Registry membership = official documentation; entitlement = cache.**
-3. **Behavior-identical consolidation, verified against the LIVE old helpers**
-   (Task 1 test imports the untouched old tables/helpers and compares
-   programmatically; ruled fixes are the only enumerated exceptions).
+2. **Registry membership = official documentation (necessary) AND ArkScope
+   relevance (sufficient)** (round-4 MF6): an entry requires an official
+   per-model page PLUS at least one of — (a) named in the Decision-6 picker
+   policy, (b) required by a compat view, (c) pinned by an existing
+   route/config. Documented-but-irrelevant models (e.g. **Mythos 5**, voice
+   models) do NOT enter; the registry must not drift toward a provider-wide
+   mirror.
+3. **Behavior-identical consolidation, verified against the LIVE old helpers**;
+   ruled fixes are the only enumerated exceptions.
 4. **Ruled fixes**: Fix A (opus-4.8 CLI effort options None → opus tuple), Fix B
    (opus-4.8 context 200_000-fallback → 1_000_000 + `context_mode="ga_1m"`;
-   wire-verified header behavior unchanged). Opus-4.8 compaction = Task 0 item →
-   explicit Fix C proposal if docs support it.
+   `_use_extended_context_beta` wire output unchanged — False both sides).
+   Opus-4.8 compaction = Task 0 item → explicit Fix C proposal if supported.
 5. **Compat views keep EXACT current membership** via `in_routing_seed` /
-   `in_cli_catalog` flags (routing = the 7, CLI = the 8, alias placement
-   preserved); Task 5 additions set both flags (ruled, visible in diff).
-6. **`picker_visibility: "default" | "advanced" | "pinned_only"` replaces the
-   tier axis** (round-3 policy, user-adopted):
-   - `default`: claude-fable-5, claude-opus-4-8, claude-sonnet-5, claude-haiku-4-5,
-     gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.4-mini.
-   - `advanced`: claude-opus-4-7, claude-sonnet-4-6 (previous generation kept as a
-     path; **future-removal note recorded in entry `notes`**).
+   `in_cli_catalog`; Task 5 additions set both flags (ruled, diff-visible).
+6. **`picker_visibility: "default" | "advanced" | "pinned_only"`**:
+   - `default`: claude-fable-5, claude-opus-4-8, claude-sonnet-5,
+     claude-haiku-4-5, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.4-mini.
+   - `advanced`: claude-opus-4-7, claude-sonnet-4-6 (previous generation;
+     future-removal note in entry `notes`).
    - `pinned_only`: gpt-5.5, gpt-5.4, gpt-5.4-nano, gpt-5.2, gpt-5.2-codex,
-     claude-sonnet-4-5, claude-opus-4-5 — shown ONLY when a saved route pins them
-     (badge `route`).
-   - Discovery entitlement remains the final gate for the default list: a
-     default-visibility model NOT visible to the active credential does not enter
-     `verified`.
-   - Visibility is a PICKER axis only — compat view flags (Decision 5) keep
-     CLI/routing seed behavior unchanged.
-7. **Two effort semantics stay split**: `model_routing.EFFORT_OPTIONS` (wire,
-   incl. `default`) untouched + pinned; registry `effort_options` = model-supported
-   set (anthropic per-model; OpenAI transcribe the provider-wide six-value
-   reasoning set). CLI `get_effort_options()` keeps None-for-OpenAI.
-8. **Thinking is a five-mode axis** (round-3 MF4):
-   `thinking_mode: "none" | "manual_budget" | "adaptive_opt_in" |
-   "adaptive_default_on" | "adaptive_always_on"`.
-   Existing mapping per grounding §2; Sonnet 5 = `adaptive_default_on`; Fable 5 =
-   `adaptive_always_on` (the anthropic agent must never emit a disable or
-   budget_tokens for always-on models, and must not emit `thinking` at all for
-   `none`/OpenAI — driven off the registry).
-9. **Executability contract** (round-3 MF1+MF2):
-   `task_auth_executable(task, provider, auth_mode, capability) -> bool`:
-   - card_synthesis / card_translation: auth_mode == `api_key` only
-     (**`api_key_pool` = False until wired**; OAuth fail-closed), AND
-     `capability.supports_tool_calling` (forced-tool synthesis) AND
-     `capability.supports_structured_output`.
-   - ai_research: auth_mode ∈ {api_key, claude_code_oauth→anthropic,
-     chatgpt_oauth→openai} (**pool = False here too**), AND
-     `capability.supports_tool_calling`.
-   - provider mismatch / unknown / None auth_mode → False.
-   `effective_model_view(cache, routes, credentials: dict[Provider,
-   ActiveCredential | None])` — per-task provider comes from that task's route;
-   mixed-provider routing is first-class.
-10. **Structured refusal handling is in scope (Task 5B)**: the anthropic agent
-    loop and card synthesis recognize `stop_reason == "refusal"` and surface a
-    structured refusal (event/error) — never an empty successful answer, never a
-    hidden model fallback. **Escape hatch**: if implementation reveals depth
-    beyond these two seams, Fable ships `runtime_ready=False` (excluded from
-    `verified`, badge 「運行支援未接線」) and a follow-up slice is filed — that
-    stop-loss replaces shipping a half-handled refusal path.
-11. **Cache scope carries `secret_fingerprint`** (`sha256(secret)[:16]` for
-    api_key; constant `"oauth"` for OAuth modes); mismatch reads
-    `never_discovered`. States: `ok` (zero-model representable) / `seed_only`
-    (badge, no nudge) / `never_discovered`. Replace-on-success,
-    preserve-on-failure, no secret columns.
-12. **Effective view carries `cache_state` + `discovered_at`**; UI copy 「最後驗證
-    可見 <time>」; saved route model always selectable.
-13. **API changes additive**; **provenance per entry**; **house store pattern**.
+     claude-sonnet-4-5, claude-opus-4-5 — **rendered NOWHERE unless that task's
+     saved route pins them** (then they appear in Advanced with badge `route`).
+     Discovery visibility alone does NOT surface them (round-4 MF1).
+   - Discovery entitlement remains the final gate for `verified`.
+   - Visibility is a PICKER axis; compat view flags keep CLI/routing seeds
+     unchanged.
+7. **Two effort semantics stay split** (wire tuples untouched + pinned; registry
+   per-model tuples; CLI helper None-for-OpenAI pinned).
+8. **Thinking is a five-mode axis with an implementable wire mapping under
+   today's bool toggle** (round-4 MF4; tri-state deferred to a follow-up):
+   - `none` (OpenAI): never send a thinking param.
+   - `manual_budget`: True → `{"type":"enabled","budget_tokens":N}`; False →
+     omit (today's exact behavior, pinned values).
+   - `adaptive_opt_in` (opus-4.8/4.7, sonnet-4.6): True → `{"type":"adaptive"}`;
+     False → omit (today's exact behavior).
+   - `adaptive_default_on` (Sonnet 5): True → `{"type":"adaptive"}`; **False →
+     explicit `{"type":"disabled"}`** (omit would leave thinking ON, violating
+     the user's off intent).
+   - `adaptive_always_on` (Fable 5): the toggle is ignored — always send the
+     Task 0-verified always-on shape (adaptive or omit per docs); NEVER send
+     disabled or budget_tokens.
+9. **Executability contract**: `task_auth_executable(task, provider, auth_mode,
+   capability)` — cards: auth_mode == `api_key` only (pool False, OAuth False) AND
+   `supports_tool_calling` AND `supports_structured_output`; ai_research:
+   auth_mode ∈ {api_key, claude_code_oauth→anthropic, chatgpt_oauth→openai}
+   (pool False) AND `supports_tool_calling`; provider mismatch / unknown / None →
+   False. `effective_model_view(cache, routes, credentials: dict[Provider,
+   ActiveCredential | None])` — per-task provider from that task's route.
+10. **Structured refusal handling in scope (Task 5B)**: shared
+    `AnthropicRefusalError` + `is_refusal(message)` in a new tiny
+    `src/anthropic_refusal.py`, consumed by the agent loop (streaming terminal
+    classification), `_synthesize_anthropic`, AND `_translate_anthropic`. No
+    fallback, no empty-success. **Escape hatch**: depth beyond these three seams
+    → Fable ships `runtime_ready=False` (excluded from
+    `default_picker_models`/`verified`, badge 「運行支援未接線」) + follow-up
+    slice.
+11. **Cache**: scope (provider, auth_mode, credential_id) + `secret_fingerprint`
+    (`sha256(secret)[:16]`; `"oauth"` constant for OAuth); mismatch →
+    `never_discovered`; states `ok` (zero-model representable) / `seed_only`
+    (badge, no nudge) / `never_discovered`; replace-on-success,
+    preserve-on-failure, no secret columns; house store pattern.
+12. **Effective view carries `cache_state` + `discovered_at`** (UI: 「最後驗證可
+    見 <time>」); saved route model always selectable; API changes additive;
+    provenance per entry.
 
 ---
 
 ## Files
 
 Create: `src/model_capabilities.py`, `src/model_discovery_cache.py`,
-`src/model_effective.py`, `tests/test_model_capabilities.py`,
-`tests/test_model_discovery_cache.py`, `tests/test_model_effective.py`.
+`src/model_effective.py`, `src/anthropic_refusal.py`,
+`tests/test_model_capabilities.py`, `tests/test_model_discovery_cache.py`,
+`tests/test_model_effective.py`.
 
 Modify: `src/model_routing.py`, `src/agents/shared/model_catalog.py`,
-`src/agents/anthropic_agent/agent.py` (tables + **refusal branch**),
+`src/agents/anthropic_agent/agent.py` (tables + streaming refusal branch),
 `src/agents/openai_agent/agent.py`, `src/agents/shared/context_manager.py`,
-`src/agents/shared/subagent.py`, `src/card_synthesis.py` (**refusal branch**),
-`src/model_credentials.py`, `src/api/routes/config_routes.py`,
+`src/agents/shared/subagent.py`, `src/card_synthesis.py` (synthesis + translation
+refusal), `src/model_credentials.py`, `src/api/routes/config_routes.py`,
 `apps/arkscope-web/src/api.ts`, `apps/arkscope-web/src/Settings.tsx`,
 `apps/arkscope-web/src/ModelRoutingSection.test.ts`, `tests/test_model_routing.py`,
 `tests/test_card_synthesis.py`, map + this plan.
@@ -195,14 +203,16 @@ behavior.
 
 ## Stop-Loss Triggers
 
-- A model lacks an official per-model page → not in the registry.
+- A model lacks an official per-model page, or has one but no ArkScope relevance
+  per Decision 2 → not in the registry.
 - Consolidation changes any live-helper output beyond Fixes A/B (+approved C).
 - Compat view membership or alias resolution shifts beyond Task 5's flagged adds.
 - Registry needs DAL/DB/network imports; API shape changes non-additively.
-- Refusal handling needs more than the two named seams → Fable
-  `runtime_ready=False` + follow-up slice (Decision 10), not a wider slice.
+- Refusal handling needs more than the three named seams → Fable
+  `runtime_ready=False` + follow-up (Decision 10).
 - Cache would need secrets; effective view wants to rewrite a route.
-- Any default/recommendation flip; any `api_key_pool` wiring.
+- Any default/recommendation flip; any pool wiring; any thinking tri-state
+  migration.
 
 ---
 
@@ -211,35 +221,38 @@ behavior.
 1. Old-vs-new equivalence (executable, full id set, ruled-fix exceptions only).
 2. View membership pins (7/8 exact; `find_model("opus")` exact).
 3. Single-source grep over the four agent modules.
-4. Prefix precedence structural; alias integrity (unique, no canonical collision,
-   official aliases resolve).
-5. Effort split pins (wire tuples unchanged; registry tuples exact; CLI
+4. Prefix precedence structural; alias integrity.
+5. Effort split pins (wire tuples; registry tuples incl. gpt-5.2-codex; CLI
    None-for-OpenAI).
-6. Executability matrix incl. pool-False, OAuth-cards-False, mixed provider.
-7. Cache contracts incl. fingerprint mismatch, zero-model ok, seed_only.
-8. Effective view: per-task, per-provider credentials, three cache states,
-   `discovered_at` surfaced, route-model invariant.
-9. **Refusal**: agent loop + card synthesis produce structured refusals from
-   `stop_reason="refusal"` fakes; no empty-success path remains.
-10. Frontend suite + typecheck + build; picker behavior incl. 最後驗證可見 copy.
-11. PG smoke; full virgin A/B (sets identical, delta exact, warnings accounted).
+6. Executability matrix (pool-False everywhere, OAuth-cards-False, mixed
+   provider, tool_calling requirement).
+7. Cache contracts (fingerprint mismatch, zero-model ok, seed_only, no secrets).
+8. Effective view: per-task + per-provider credentials; **pinned_only absent
+   unless route-pinned (both polarities tested)**; three cache states;
+   `discovered_at` surfaced; route-model invariant.
+9. Refusal: loop + synthesis + translation produce structured refusals from
+   `stop_reason="refusal"` fakes; loop emits no final-answer/done-success and
+   `pad.log_final_answer` is not called.
+10. Thinking wire mapping pinned (exact tuples from grounding §2) incl.
+    default_on→disabled-when-off and always_on-ignores-toggle.
+11. Frontend suite + typecheck + build.
+12. PG smoke; full virgin A/B.
 
 ---
 
 ## Task 0: Verify New-Generation + Contested Facts (no code)
 
-1. WebFetch per-model pages: Fable 5 (announcement/effort/context), **Sonnet 5**
-   (release notes / model page), Sol, Terra, Luna. Extract per model: canonical
-   id, official aliases (`gpt-5.6` → Sol?), context, max output, thinking contract
-   (five-mode mapping), effort set, compaction, context mode, structured-output,
-   tool-calling, pricing.
-2. Resolve contested facts: opus-4.8 context (→ Fix B confirmation), opus-4.8
-   compaction (→ Fix C proposal or unchanged), Fable refusal contract fields
-   (stop_reason value, stop_details shape) for the Task 5B tests.
+1. WebFetch per-model pages: Fable 5 (announcement/effort/context/refusal
+   contract incl. stop_details shape), Sonnet 5 (release notes/model page),
+   Sol/Terra/Luna. Extract per model: canonical id, official aliases
+   (`gpt-5.6` → Sol?), context, max output, thinking contract (five-mode
+   mapping + always-on wire shape), effort set, compaction, context mode,
+   structured-output, tool-calling, pricing.
+2. Contested facts: opus-4.8 context (→ Fix B confirm), opus-4.8 compaction
+   (→ Fix C proposal or unchanged), legacy 1M-beta story.
 3. Read-only live discovery per configured credential → entitlement table.
-4. Emit both tables (capability + entitlement) into this plan; pricing lines
-   feed the visibility sanity check (Decision 6 assignments re-confirmed against
-   verified pricing).
+4. Emit both tables + pricing lines; re-confirm Decision-6 visibility against
+   verified pricing.
 
 Commit: `docs: verify new model generation facts`.
 **Gate**: reviewer acks both tables + any Fix C before Task 1.
@@ -250,7 +263,7 @@ Commit: `docs: verify new model generation facts`.
 
 **Files:** `src/model_capabilities.py`, `tests/test_model_capabilities.py`.
 
-### Step 1: RED tests (complete, executable)
+### Step 1: RED tests (complete)
 
 ```python
 import pytest
@@ -269,9 +282,9 @@ _PRE_CONSOLIDATION_IDS = {
 }
 
 _RULED_FIXES = {
-    ("claude-opus-4-8", "context_limit"),   # Fix B: 200_000 fallback → 1_000_000
-    ("claude-opus-4-8", "context_mode"),    # Fix B: neither-set → ga_1m
-    ("claude-opus-4-8", "effort_options"),  # Fix A: None → opus tuple (CLI helper)
+    ("claude-opus-4-8", "context_limit"),
+    ("claude-opus-4-8", "context_mode"),
+    ("claude-opus-4-8", "effort_options"),
 }
 
 
@@ -292,20 +305,16 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
 
     for mid in sorted(_PRE_CONSOLIDATION_IDS):
         cap = capability_for(mid)
-        # context limit
         old_ctx = get_model_context_limit(mid)
         if (mid, "context_limit") in _RULED_FIXES:
             assert cap.context_limit == 1_000_000 and old_ctx == 200_000, mid
         else:
             assert cap.context_limit == old_ctx, mid
-        # max output
         if cap.provider == "anthropic":
             old_out = next((v for k, v in OLD_ANTH_OUT.items() if mid.startswith(k)), 64_000)
         else:
             old_out = _get_openai_max_output(mid)
         assert cap.max_output == old_out, mid
-        # thinking mode (round-3 MF4 mapping: adaptive set → adaptive_opt_in;
-        # other anthropic → manual_budget; openai → none)
         if cap.provider == "anthropic":
             expected_mode = (
                 "adaptive_opt_in"
@@ -315,14 +324,12 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
         else:
             expected_mode = "none"
         assert cap.thinking_mode == expected_mode, mid
-        # effort tuple (CLI helper contract is anthropic-only)
         old_tuple = get_effort_options(mid)
         if (mid, "effort_options") in _RULED_FIXES:
             assert old_tuple is None
             assert cap.effort_options == ("max", "xhigh", "high", "medium", "low"), mid
         elif cap.provider == "anthropic":
             assert cap.effort_options == (tuple(old_tuple) if old_tuple else ()), mid
-        # compaction / context mode
         assert cap.supports_compaction == any(mid.startswith(m) for m in OLD_COMPACT), mid
         old_mode = (
             "ga_1m" if mid in _1M_GA_MODELS
@@ -336,7 +343,9 @@ def test_registry_matches_live_legacy_helpers_except_ruled_fixes():
 
 
 def test_openai_models_record_provider_wide_effort_set():
-    for mid in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2"):
+    # round-4 SF1: gpt-5.2-codex included
+    for mid in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
+                "gpt-5.2", "gpt-5.2-codex"):
         assert capability_for(mid).effort_options == (
             "none", "minimal", "low", "medium", "high", "xhigh",
         ), mid
@@ -355,9 +364,8 @@ def test_view_flags_pin_exact_current_memberships():
     }
 
 
-def test_picker_visibility_matches_the_round3_ruling():
+def test_picker_visibility_matches_the_ruling():
     vis = {c.id: c.picker_visibility for c in all_models()}
-    # pre-consolidation ids only (new generation lands in Task 5 with `default`)
     assert vis["claude-opus-4-8"] == "default"
     assert vis["claude-haiku-4-5"] == "default"
     assert vis["gpt-5.4-mini"] == "default"
@@ -369,8 +377,7 @@ def test_picker_visibility_matches_the_round3_ruling():
 
 
 def test_default_picker_models_helper():
-    ids = {c.id for c in default_picker_models("openai")}
-    assert ids == {"gpt-5.4-mini"}   # until Task 5 adds the 5.6 family
+    assert {c.id for c in default_picker_models("openai")} == {"gpt-5.4-mini"}
     assert {c.id for c in default_picker_models("anthropic")} == {
         "claude-opus-4-8", "claude-haiku-4-5",
     }
@@ -387,7 +394,7 @@ def test_unknown_model_returns_none():
     assert capability_for("mystery-model") is None
 
 
-def test_every_entry_carries_provenance_and_visibility():
+def test_every_entry_carries_provenance_visibility_and_mode():
     for cap in all_models():
         assert cap.source_url and cap.verified_at, cap.id
         assert cap.picker_visibility in ("default", "advanced", "pinned_only"), cap.id
@@ -405,57 +412,214 @@ def test_every_entry_carries_provenance_and_visibility():
 `supports_tool_calling`, `runtime_ready: bool = True`, `in_routing_seed`,
 `in_cli_catalog`, `aliases`, `quality`, `speed`, `cost_tier`, `recommended_for`,
 `source_url`, `verified_at`, `notes`. Exact alias/id match then longest-prefix.
-Pure stdlib. `default_picker_models(provider)` filters
-`picker_visibility == "default" and runtime_ready`.
+Pure stdlib. `default_picker_models(provider)` = `picker_visibility == "default"
+and runtime_ready`.
+
+### Step 3: Verify + commit
+
+```bash
+pytest tests/test_model_capabilities.py -q
+python -m compileall -q src/model_capabilities.py
+```
 
 Commit: `feat: add model capability registry`.
 
 ---
 
-## Task 2: Converge the Nine Sites (unchanged from round 3 except thinking modes)
+## Task 2: Converge the Nine Sites (behavior-identical + Fixes A/B)
 
-Same RED/implementation as round 3 with the thinking-mode mapping corrected
-(haiku/sonnet-4.5/opus-4.5 = `manual_budget`; `_build_thinking_param` derives its
-adaptive/enabled+budget branch from `thinking_mode`, preserving today's outputs
-for every existing model — pinned by the Task 1 old-vs-new test plus:
+**Files:** `src/agents/anthropic_agent/agent.py`, `src/agents/openai_agent/agent.py`,
+`src/agents/shared/context_manager.py`, `src/agents/shared/subagent.py`,
+`src/agents/shared/model_catalog.py`, `src/model_routing.py`, their tests.
+
+### Step 1: RED tests (complete — extend `tests/test_model_capabilities.py`)
 
 ```python
-def test_build_thinking_param_wire_shapes_preserved():
+def test_agent_helpers_now_read_the_registry():
+    from src.agents.anthropic_agent.agent import (
+        _get_model_max_output, _supports_adaptive_thinking, _supports_effort,
+        _supports_compaction,
+    )
+    from src.agents.openai_agent.agent import _get_openai_max_output
+    from src.agents.shared.context_manager import get_model_context_limit
+    from src.agents.shared.subagent import _use_extended_context_beta
+
+    assert _get_model_max_output("claude-opus-4-8") == 128_000
+    assert _get_model_max_output("unknown-claude") == 64_000
+    assert _supports_adaptive_thinking("claude-sonnet-4-6-future") is True
+    assert _supports_effort("claude-haiku-4-5") is False
+    assert _supports_compaction("claude-sonnet-4-6") is True
+    assert _supports_compaction("claude-opus-4-8") is False   # pending Task 0/Fix C
+    assert _get_openai_max_output("gpt-5.4-nano") == 128_000
+    assert _get_openai_max_output("totally-unknown") == 128_000
+    assert get_model_context_limit("gpt-5.4-mini") == 400_000
+    assert get_model_context_limit("claude-opus-4-8") == 1_000_000   # Fix B
+    assert get_model_context_limit("unknown") == 200_000
+    assert _use_extended_context_beta("claude-opus-4-8", True) is False  # wire preserved
+    assert _use_extended_context_beta("claude-opus-4-7", True) is False
+    assert _use_extended_context_beta("claude-sonnet-4-5", True) is True
+
+
+def test_build_thinking_param_wire_shapes_pinned():
+    # Exact values from live runs (grounding §2) — round-4 SF2.
     from src.agents.anthropic_agent.agent import _build_thinking_param
 
-    class _Cfg:  # minimal config double, mirrors the attributes the helper reads
+    class _Cfg:
         max_tokens = 8192
         anthropic_thinking = True
 
-    adaptive, max_a = _build_thinking_param("claude-opus-4-8", True, _Cfg())
-    assert adaptive == {"type": "adaptive"}
-    budget, max_b = _build_thinking_param("claude-haiku-4-5", True, _Cfg())
-    assert budget["type"] == "enabled" and budget["budget_tokens"] > 0
-    none_param, _ = _build_thinking_param("claude-haiku-4-5", False, _Cfg())
-    assert none_param is None
+    assert _build_thinking_param("claude-opus-4-8", True, _Cfg()) == (
+        {"type": "adaptive"}, 128000,
+    )
+    assert _build_thinking_param("claude-haiku-4-5", True, _Cfg()) == (
+        {"type": "enabled", "budget_tokens": 55808}, 64000,
+    )
+    assert _build_thinking_param("claude-haiku-4-5", False, _Cfg()) == (None, 8192)
+
+
+def test_cli_effort_helper_contract_preserved_plus_fix_a():
+    from src.agents.shared.model_catalog import get_effort_options
+    assert get_effort_options("claude-opus-4-8") == ("max", "xhigh", "high", "medium", "low")
+    assert get_effort_options("claude-opus-4-7") == ("max", "xhigh", "high", "medium", "low")
+    assert get_effort_options("claude-sonnet-4-6") == ("high", "medium", "low")
+    for openai_id in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2"):
+        assert get_effort_options(openai_id) is None
+
+
+def test_route_wire_effort_values_untouched():
+    from src.model_routing import EFFORT_OPTIONS
+    assert [o.id for o in EFFORT_OPTIONS["openai"]] == [
+        "default", "none", "minimal", "low", "medium", "high", "xhigh",
+    ]
+    assert [o.id for o in EFFORT_OPTIONS["anthropic"]] == [
+        "default", "low", "medium", "high", "xhigh", "max",
+    ]
+
+
+def test_derived_views_keep_exact_membership_and_aliases():
+    from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
+    from src.agents.shared.model_catalog import MODEL_CATALOG as CLI_VIEW, find_model
+    from src.model_capabilities import capability_for
+
+    assert {m.id for m in ROUTING_VIEW} == {
+        "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
+        "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+    }
+    assert {m.id for m in CLI_VIEW} == {
+        "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
+        "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
+    }
+    assert find_model("opus").id == "claude-opus-4-7"
+    assert find_model("mini").id == "gpt-5.4-mini"
+    assert find_model("codex").id == "gpt-5.2-codex"
+    assert is_seed_model("openai", "gpt-5.5")
+    for option in ROUTING_VIEW:
+        cap = capability_for(option.id)
+        assert option.supports_structured_output == cap.supports_structured_output
+        assert option.supports_tool_calling == cap.supports_tool_calling
 ```
 
-(exact expected shapes transcribed from the current helper's behavior at
-implementation time — RED must show the assertion values match reality before the
-registry swap). Views/effort/route-wire pins as in round 3
-(`test_route_wire_effort_values_untouched`,
-`test_derived_views_keep_exact_membership_and_aliases`,
-`test_cli_effort_helper_contract_preserved_plus_fix_a`).
+Expected RED: helpers still read local tables; opus-4.8 effort None / context
+200_000. (`test_build_thinking_param_wire_shapes_pinned` is GREEN before the swap
+— it pins the baseline so the registry-driven rewrite cannot drift it.)
+
+### Step 2: Implement
+
+Replace the fact tables with registry reads; keep every signature and fallback
+constant (`64_000`, `128_000` default, `200_000` default). `_build_thinking_param`
+branches on `capability_for(model).thinking_mode` per Decision 8 (existing modes
+produce today's exact outputs; `adaptive_default_on`/`adaptive_always_on` branches
+land now but no existing model uses them until Task 5).
+`_COMPACTION_MODELS`/`_1M_GA_MODELS`/`_1M_BETA_MODELS` become registry-derived;
+wire/beta header constants stay. Both `MODEL_CATALOG`s become derived views via
+the view flags (same shapes).
+
+### Step 3: Verify + commit
+
+```bash
+pytest tests/test_model_capabilities.py tests/test_model_routing.py tests/test_card_synthesis.py -q
+rg -n "claude-opus-4|claude-sonnet-4|claude-haiku|gpt-5\." \
+  src/agents/anthropic_agent/agent.py src/agents/openai_agent/agent.py \
+  src/agents/shared/context_manager.py src/agents/shared/subagent.py
+```
 
 Commit: `feat: converge model facts onto the registry`.
 
 ---
 
-## Task 3: Discovery Cache Store (round-3 fixtures kept, seam tests now code)
+## Task 3: Discovery Cache Store (runs + models + fingerprint)
 
 **Files:** `src/model_discovery_cache.py`, `src/model_credentials.py`,
 `tests/test_model_discovery_cache.py`, `tests/test_model_routing.py`.
 
-Store RED tests: as round 3 (replace-on-success, zero-model ok, fingerprint
-mismatch → never_discovered + supersede, seed_only, unknown scope, no secret
-columns — complete code already in round 3, carried verbatim).
+### Step 1: RED tests — store (complete)
 
-**Caller-seam RED tests (round-3 MF5 — now code, in `tests/test_model_routing.py`):**
+```python
+from src.model_discovery_cache import ModelDiscoveryCache
+
+_SCOPE = dict(provider="openai", auth_mode="api_key", credential_id="c1")
+
+
+def _mk(tmp_path):
+    return ModelDiscoveryCache(tmp_path / "profile_state.db")
+
+
+def test_successful_run_replaces_scope_rows_and_metadata(tmp_path):
+    cache = _mk(tmp_path)
+    cache.record_run(**_SCOPE, secret_fingerprint="fp-1", status="ok",
+                     models=[{"id": "gpt-5.5", "label": "GPT-5.5", "source": "provider_api"}])
+    cache.record_run(**_SCOPE, secret_fingerprint="fp-1", status="ok",
+                     models=[{"id": "gpt-5.6-luna", "label": "Luna", "source": "provider_api"}])
+    scope = cache.get(**_SCOPE, secret_fingerprint="fp-1")
+    assert scope.status == "ok" and scope.discovered_at is not None
+    assert [m.model_id for m in scope.models] == ["gpt-5.6-luna"]
+
+
+def test_zero_model_success_is_not_never_discovered(tmp_path):
+    cache = _mk(tmp_path)
+    cache.record_run(**_SCOPE, secret_fingerprint="fp-1", status="ok", models=[])
+    scope = cache.get(**_SCOPE, secret_fingerprint="fp-1")
+    assert scope.status == "ok" and scope.models == [] and scope.discovered_at
+
+
+def test_fingerprint_mismatch_reads_never_discovered(tmp_path):
+    cache = _mk(tmp_path)
+    cache.record_run(**_SCOPE, secret_fingerprint="fp-old", status="ok",
+                     models=[{"id": "gpt-5.5", "label": "GPT-5.5", "source": "provider_api"}])
+    scope = cache.get(**_SCOPE, secret_fingerprint="fp-new")
+    assert scope.status == "never_discovered" and scope.models == []
+    cache.record_run(**_SCOPE, secret_fingerprint="fp-new", status="ok",
+                     models=[{"id": "gpt-5.6-sol", "label": "Sol", "source": "provider_api"}])
+    scope = cache.get(**_SCOPE, secret_fingerprint="fp-new")
+    assert [m.model_id for m in scope.models] == ["gpt-5.6-sol"]
+
+
+def test_seed_only_channel_records_seed_only_state(tmp_path):
+    cache = _mk(tmp_path)
+    cache.record_run(provider="anthropic", auth_mode="claude_code_oauth",
+                     credential_id="oauth-1", secret_fingerprint="oauth",
+                     status="seed_only", models=[])
+    scope = cache.get(provider="anthropic", auth_mode="claude_code_oauth",
+                      credential_id="oauth-1", secret_fingerprint="oauth")
+    assert scope.status == "seed_only"
+
+
+def test_unknown_scope_reads_never_discovered(tmp_path):
+    cache = _mk(tmp_path)
+    scope = cache.get(provider="anthropic", auth_mode="api_key",
+                      credential_id="x", secret_fingerprint="fp")
+    assert scope.status == "never_discovered" and scope.models == []
+
+
+def test_schema_has_no_secret_columns(tmp_path):
+    cache = _mk(tmp_path)
+    with cache._connect() as conn:
+        for table in ("model_discovery_runs", "model_discovery_models"):
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            assert not (cols & {"secret", "api_key", "token"}), table
+```
+
+### Step 2: RED tests — caller seam (complete, in `tests/test_model_routing.py`)
 
 ```python
 def test_discover_models_success_writes_cache(monkeypatch, tmp_path):
@@ -470,23 +634,29 @@ def test_discover_models_success_writes_cache(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mc, "ModelDiscoveryCache", lambda *a, **k: _FakeCache())
 
+    class _Cred:  # round-4 MF5: scope needs auth_mode — carry auth_type
+        id = "c1"
+        secret = "sk-x"
+        auth_type = "api_key"
+
+    monkeypatch.setattr(mc, "_resolve_api_credential", lambda *a, **k: _Cred())
+
     class _FakeModels:
         data = [type("M", (), {"id": "gpt-5.6-luna"})()]
 
     class _FakeClient:
         def __init__(self, **kw): ...
-        class models:  # noqa: N801 - mirrors sdk attribute
+        class models:  # noqa: N801
             @staticmethod
             def list():
                 return _FakeModels()
 
-    monkeypatch.setattr(mc, "_resolve_api_credential",
-                        lambda *a, **k: type("C", (), {"id": "c1", "secret": "sk-x"})())
     monkeypatch.setattr("openai.OpenAI", _FakeClient)
 
     out = mc.discover_models("openai", "c1")
     assert out.status == "ok"
     assert recorded["status"] == "ok"
+    assert recorded["auth_mode"] == "api_key"
     assert recorded["secret_fingerprint"] == mc.secret_fingerprint("sk-x")
     assert [m["id"] for m in recorded["models"]] == ["gpt-5.6-luna"]
 
@@ -501,8 +671,13 @@ def test_discover_models_failure_records_nothing(monkeypatch, tmp_path):
             calls.append(kw)
 
     monkeypatch.setattr(mc, "ModelDiscoveryCache", lambda *a, **k: _FakeCache())
-    monkeypatch.setattr(mc, "_resolve_api_credential",
-                        lambda *a, **k: type("C", (), {"id": "c1", "secret": "sk-x"})())
+
+    class _Cred:
+        id = "c1"
+        secret = "sk-x"
+        auth_type = "api_key"
+
+    monkeypatch.setattr(mc, "_resolve_api_credential", lambda *a, **k: _Cred())
 
     class _Boom:
         def __init__(self, **kw):
@@ -513,9 +688,19 @@ def test_discover_models_failure_records_nothing(monkeypatch, tmp_path):
     assert out.status == "error" and calls == []
 ```
 
-(The oauth-route branch gets the same treatment handler-direct in Task 4's route
-test: a fake driver result whose models are all `source="seed"` must record
-`status="seed_only"`.)
+(The oauth route branch — all-seed result records `status="seed_only"` — is pinned
+handler-direct in Task 4's route tests, same fake-cache idiom.)
+
+### Step 3: Implement
+
+Tables `model_discovery_runs(provider, auth_mode, credential_id,
+secret_fingerprint, status, discovered_at, source_url)` PK(provider, auth_mode,
+credential_id) + `model_discovery_models(provider, auth_mode, credential_id,
+model_id, label, source)` PK(scope, model_id); one transaction per `record_run`;
+house pattern. `secret_fingerprint()` helper in `model_credentials.py`.
+Write-through in `discover_models()` (ok + provider_api only) and the oauth
+branch of `discover_provider_models` (all-seed → `seed_only`). Additive
+`cached_at`/`cache_state` in the discovery response.
 
 Commit: `feat: cache per-credential model discovery`.
 
@@ -527,7 +712,7 @@ Commit: `feat: cache per-credential model discovery`.
 `config_routes.py`, `api.ts`, `Settings.tsx`, `ModelRoutingSection.test.ts`,
 `tests/test_model_effective.py`.
 
-### Step 1: RED tests (backend — complete)
+### Step 1: RED tests — backend (complete)
 
 ```python
 import hashlib
@@ -549,24 +734,20 @@ def _fp(secret: str) -> str:
 def test_task_auth_executable_matrix():
     opus = capability_for("claude-opus-4-8")
     gpt = capability_for("gpt-5.5")
-    # card tasks: sync clients → api_key ONLY (pool unwired, oauth fail-closed)
     assert task_auth_executable("card_synthesis", "anthropic", "api_key", opus) is True
     assert task_auth_executable("card_synthesis", "anthropic", "api_key_pool", opus) is False
     assert task_auth_executable("card_synthesis", "anthropic", "claude_code_oauth", opus) is False
     assert task_auth_executable("card_translation", "openai", "chatgpt_oauth", gpt) is False
-    # ai_research: oauth on own provider OK; pool still False (unwired)
     assert task_auth_executable("ai_research", "anthropic", "claude_code_oauth", opus) is True
     assert task_auth_executable("ai_research", "openai", "chatgpt_oauth", gpt) is True
     assert task_auth_executable("ai_research", "openai", "api_key", gpt) is True
     assert task_auth_executable("ai_research", "openai", "api_key_pool", gpt) is False
-    # mixed / unknown fail closed
     assert task_auth_executable("ai_research", "openai", "claude_code_oauth", gpt) is False
     assert task_auth_executable("card_synthesis", "anthropic", None, opus) is False
     assert task_auth_executable("card_synthesis", "openai", "api_key", opus) is False
 
 
 def _routes_mixed() -> dict[str, TaskRoute]:
-    # Round-3 MF1: the DEFAULT config shape — anthropic cards + openai research.
     return {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
                                     model="claude-opus-4-8", effort="default"),
@@ -577,7 +758,7 @@ def _routes_mixed() -> dict[str, TaskRoute]:
     }
 
 
-def _credentials(tmp_path):
+def _credentials():
     return {
         "anthropic": ActiveCredential(provider="anthropic", credential_id="a1",
                                       auth_mode="api_key",
@@ -603,26 +784,46 @@ def _seed_cache(tmp_path):
 
 def test_effective_view_handles_mixed_providers_per_task(tmp_path):
     view = effective_model_view(cache=_seed_cache(tmp_path), routes=_routes_mixed(),
-                                credentials=_credentials(tmp_path))
-    # anthropic api_key cards: opus-4.8 verified (visible+default+executable);
-    # opus-4.7 visible but advanced-visibility → advanced
+                                credentials=_credentials())
     synth = view["tasks"]["card_synthesis"]
     assert [m["id"] for m in synth["verified"]] == ["claude-opus-4-8"]
-    assert any(m["id"] == "claude-opus-4-7" for m in synth["advanced"])
+    assert any(m["id"] == "claude-opus-4-7" and m["badge"] == "advanced"
+               for m in synth["advanced"])   # visible + advanced-visibility
     assert synth["cache_state"] == "ok" and synth["discovered_at"]
-    # card_translation pins sonnet-4.6 (advanced visibility) → appears via route badge
     trans = view["tasks"]["card_translation"]
-    assert any(m["id"] == "claude-sonnet-4-6" and m["badge"] in ("route", "advanced")
-               for m in trans["advanced"])
-    # openai research under chatgpt_oauth: mini verified; gpt-5.5 pinned_only →
-    # NOT verified despite visibility; mystery-model = route badge
+    assert any(m["id"] == "claude-sonnet-4-6" for m in trans["advanced"])  # pinned advanced model
     research = view["tasks"]["ai_research"]
     assert [m["id"] for m in research["verified"]] == ["gpt-5.4-mini"]
     advanced_ids = {m["id"] for m in research["advanced"]}
-    assert {"gpt-5.5", "mystery-model"} <= advanced_ids
+    # round-4 MF1: pinned_only + visible + NOT route-pinned → absent entirely
+    assert "gpt-5.5" not in advanced_ids
+    assert "mystery-model" in advanced_ids   # route badge keeps the pin selectable
 
 
-def test_effective_view_oauth_blocks_card_tasks_even_when_visible(tmp_path):
+def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
+    routes = _routes_mixed()
+    routes["ai_research"] = TaskRoute(task="ai_research", provider="openai",
+                                      model="gpt-5.5", effort="default")
+    view = effective_model_view(cache=_seed_cache(tmp_path), routes=routes,
+                                credentials=_credentials())
+    research = view["tasks"]["ai_research"]
+    pinned = [m for m in research["advanced"] if m["id"] == "gpt-5.5"]
+    assert pinned and pinned[0]["badge"] == "route"
+    # and still absent from every task that does NOT pin it
+    assert all(m["id"] != "gpt-5.5"
+               for m in view["tasks"]["card_synthesis"]["advanced"])
+
+
+def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp_path):
+    # round-4 MF2: research routed to ANTHROPIC under claude_code_oauth.
+    routes = {
+        "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
+                                    model="claude-opus-4-8", effort="default"),
+        "card_translation": TaskRoute(task="card_translation", provider="anthropic",
+                                      model="claude-sonnet-4-6", effort="default"),
+        "ai_research": TaskRoute(task="ai_research", provider="anthropic",
+                                 model="claude-opus-4-8", effort="default"),
+    }
     creds = {
         "anthropic": ActiveCredential(provider="anthropic", credential_id="ao",
                                       auth_mode="claude_code_oauth",
@@ -633,12 +834,15 @@ def test_effective_view_oauth_blocks_card_tasks_even_when_visible(tmp_path):
     cache.record_run(provider="anthropic", auth_mode="claude_code_oauth",
                      credential_id="ao", secret_fingerprint="oauth",
                      status="seed_only", models=[])
-    view = effective_model_view(cache=cache, routes=_routes_mixed(), credentials=creds)
+    view = effective_model_view(cache=cache, routes=routes, credentials=creds)
+    research = view["tasks"]["ai_research"]
+    # executable (oauth research on own provider) BUT nothing verifiable on a
+    # seed_only channel:
+    assert research["verified"] == []
+    assert research["cache_state"] == "seed_only"
+    assert any(m["badge"] == "seed" for m in research["advanced"])
+    # cards under oauth are not even executable:
     assert view["tasks"]["card_synthesis"]["verified"] == []
-    assert view["tasks"]["card_synthesis"]["cache_state"] == "seed_only"
-    # research on anthropic oauth IS executable, but with seed_only cache nothing
-    # is verified — seeds appear in advanced with the seed badge
-    assert view["tasks"]["ai_research"]["verified"] == []
 
 
 def test_effective_view_missing_credential_fails_closed(tmp_path):
@@ -665,32 +869,27 @@ def test_resolver_covers_env_only_keys(monkeypatch, tmp_path):
     assert resolve_active_credential("openai").secret_fingerprint == _fp("sk-rotated")
 ```
 
-**Route RED test (handler-direct, house idiom):**
+**Route RED test (handler-direct, real handler name `model_catalog`):**
 
 ```python
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
     from src.api.routes import config_routes as cr
+    from src.model_credentials import CredentialStore
 
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
-    monkeypatch.setattr(
-        cr, "resolve_active_credential",
-        lambda provider, **kw: None,   # fail-closed shape is enough for the route pin
-    )
-    out = cr.get_model_catalog()
-    # old fields keep their shape
+    monkeypatch.setattr(cr, "resolve_active_credential", lambda provider, **kw: None)
+    out = cr.model_catalog(store=CredentialStore())
     for key in ("providers", "tasks", "models", "effort_options", "routes"):
         assert key in out
-    # additive per-task effective block
-    assert set(out["effective"]["tasks"]) == {"card_synthesis", "card_translation", "ai_research"}
+    assert set(out["effective"]["tasks"]) == {
+        "card_synthesis", "card_translation", "ai_research",
+    }
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
+    assert block["cache_state"] == "never_discovered"   # fail-closed shape
 ```
 
-(Exact handler name/signature checked against `config_routes.py` at implementation
-time — the pinned contract is: same endpoint, additive `effective` key, fail-closed
-renders `never_discovered`.)
-
-### Step 2: RED tests (frontend — house harness, extends the existing fixture)
+### Step 2: RED tests — frontend (house harness; extends the file's `catalog()` fixture)
 
 ```tsx
 it("model picker defaults to verified and reveals advanced with badges", () => {
@@ -700,7 +899,7 @@ it("model picker defaults to verified and reveals advanced with badges", () => {
       ai_research: {
         verified: [{ id: "gpt-5.4-mini", label: "GPT-5.4 mini", badge: null }],
         advanced: [
-          { id: "gpt-5.5", label: "GPT-5.5", badge: "advanced" },
+          { id: "claude-sonnet-4-6", label: "Sonnet 4.6", badge: "advanced" },
           { id: "mystery-model", label: "mystery-model", badge: "route" },
         ],
         cache_state: "ok",
@@ -715,34 +914,35 @@ it("model picker defaults to verified and reveals advanced with badges", () => {
   const research = host!.querySelector('[data-testid="route-ai_research"]')!;
   const options = Array.from(research.querySelectorAll("option")).map((o) => o.value);
   expect(options).toContain("gpt-5.4-mini");
-  expect(options).not.toContain("gpt-5.5");            // advanced hidden by default
+  expect(options).not.toContain("claude-sonnet-4-6");   // advanced hidden by default
 
   act(() => {
     (research.querySelector('[aria-label="顯示進階模型"]') as HTMLInputElement).click();
   });
   const expanded = Array.from(research.querySelectorAll("option")).map((o) => o.value);
-  expect(expanded).toContain("gpt-5.5");
+  expect(expanded).toContain("claude-sonnet-4-6");
   expect(research.textContent).toContain("最後驗證可見");
 
   const synth = host!.querySelector('[data-testid="route-card_synthesis"]')!;
-  expect(synth.textContent).toContain("跑一次模型探索以驗證");   // never_discovered nudge
+  expect(synth.textContent).toContain("跑一次模型探索以驗證");
   const trans = host!.querySelector('[data-testid="route-card_translation"]')!;
-  expect(trans.textContent).toContain("此通道無法線上列出模型"); // seed_only, no nudge
+  expect(trans.textContent).toContain("此通道無法線上列出模型");
   expect(trans.textContent).not.toContain("跑一次模型探索以驗證");
 });
 ```
 
 (`render()` gains an optional catalog argument; `data-testid="route-<task>"`
-wrappers are part of the implementation contract. The saved-route-selected
-invariant reuses the fixture's `mystery-model` route pin: assert the select's value
-is `"mystery-model"` after expanding advanced.)
+wrappers are part of the implementation contract; the saved-route-selected
+invariant is asserted via the fixture's `mystery-model` pin: after expanding
+advanced, the select's value equals `"mystery-model"`.)
 
 ### Step 3: Implement
 
-`resolve_active_credential()` (inventory-based incl. env rows; sha256[:16];
-`"oauth"` constant), `task_auth_executable()` + `effective_model_view(cache,
-routes, credentials)` in `model_effective.py`; additive API block; picker split in
-`ModelRoutingSection`. `PUT /config/model-routes` untouched.
+`resolve_active_credential()` (inventory-based incl. env rows; `secret_fingerprint()`
+sha256[:16]; `"oauth"` for OAuth modes); `task_auth_executable()` +
+`effective_model_view(cache, routes, credentials)`; additive `effective` block in
+`model_catalog`; picker split in `ModelRoutingSection`; oauth discovery route
+branch records `seed_only`. `PUT /config/model-routes` untouched.
 
 Commit: `feat: verified-first per-task model picker`.
 
@@ -750,78 +950,151 @@ Commit: `feat: verified-first per-task model picker`.
 
 ## Task 5: New Generation Lands (5 models) + Refusal Handling
 
-**Files:** `src/model_capabilities.py`, `src/agents/anthropic_agent/agent.py`,
-`src/card_synthesis.py`, `tests/test_card_synthesis.py`, ledger-swept tests.
+**Files:** `src/model_capabilities.py`, `src/anthropic_refusal.py`,
+`src/agents/anthropic_agent/agent.py`, `src/card_synthesis.py`,
+`tests/test_card_synthesis.py`, ledger-swept tests. **No default flips.**
 
 ### 5A: Registry entries (RED first)
 
-- Entries for the Task 0-verified ids — Fable 5 (`adaptive_always_on`, effort
-  tuple per docs, compaction/context per docs), **Sonnet 5**
-  (`adaptive_default_on`), Sol/Terra/Luna (`none`, provider effort set) — all
-  `picker_visibility="default"`, both view flags set (ruled additions), per-model
-  source pages, `verified_at` = Task 0 date.
-- Alias tests: `capability_for("gpt-5.6")` → Sol iff docs define it;
-  `find_model("fable")`; alias uniqueness sweep.
-- `model_provider()` classifies all five.
-- Registry-driven thinking: `_build_thinking_param` for `adaptive_always_on`
-  never returns a disable/budget shape even when `thinking_enabled=False`
-  (always-on models ignore the toggle — assert the exact param per Task 0);
-  `adaptive_default_on` omits the param by default and allows explicit disable.
-
-### 5B: Structured refusal handling (RED first — the two named seams)
+Entries for the Task 0-verified ids — Fable 5 (`adaptive_always_on`), Sonnet 5
+(`adaptive_default_on`), Sol/Terra/Luna (`none`) — all
+`picker_visibility="default"`, both view flags set, per-model source pages,
+`verified_at` = Task 0 date. Tests: alias routing (`gpt-5.6` → Sol iff docs
+define it; `find_model("fable")`), alias uniqueness sweep, `model_provider()`
+classification, and thinking-wire mapping for the two new modes:
 
 ```python
-def test_agent_loop_surfaces_refusal_as_structured_failure(monkeypatch):
-    # stop_reason="refusal" (HTTP 200) must NOT become an empty successful answer.
-    # Build a fake response shaped like anthropic Message: stop_reason="refusal",
-    # content=[] (pre-output refusal per docs).
-    from src.agents.anthropic_agent import agent as mod
+def test_thinking_wire_mapping_for_new_modes():
+    from src.agents.anthropic_agent.agent import _build_thinking_param
 
-    fake_response = type("R", (), {
+    class _Cfg:
+        max_tokens = 8192
+        anthropic_thinking = True
+
+    # adaptive_default_on (Sonnet 5): True → adaptive; False → EXPLICIT disabled
+    on_param, _ = _build_thinking_param("claude-sonnet-5", True, _Cfg())
+    assert on_param == {"type": "adaptive"}
+    off_param, _ = _build_thinking_param("claude-sonnet-5", False, _Cfg())
+    assert off_param == {"type": "disabled"}
+    # adaptive_always_on (Fable): toggle ignored; never disabled/budget
+    for toggle in (True, False):
+        p, _ = _build_thinking_param("claude-fable-5", toggle, _Cfg())
+        assert p is None or p == {"type": "adaptive"}   # exact shape per Task 0
+        assert p != {"type": "disabled"}
+        assert not (isinstance(p, dict) and "budget_tokens" in p)
+```
+
+(The always-on exact shape — omit vs `{"type":"adaptive"}` — is fixed by the Task
+0 doc extract; the assertion tightens to `==` once Task 0 lands.)
+
+### 5B: Structured refusal handling (RED first — the three named seams)
+
+New `src/anthropic_refusal.py`: `class AnthropicRefusalError(RuntimeError)`
+(carries `stop_details`) + `def is_refusal(message) -> bool`
+(`getattr(message, "stop_reason", None) == "refusal"`).
+
+```python
+import pytest
+
+
+def _refusal_message():
+    return type("R", (), {
         "stop_reason": "refusal", "content": [],
         "stop_details": {"category": "safety"}, "usage": None,
     })()
-    outcome = mod._classify_terminal_response(fake_response)   # new seam, named here
-    assert outcome.kind == "refusal"
-    assert outcome.final_text == ""
-    # and the loop maps it to a refusal event/error, never log_final_answer success
-    # (loop-level assertion via the fake-client harness used by existing agent tests)
 
 
 def test_card_synthesis_raises_structured_refusal(monkeypatch):
     from src import card_synthesis as cs
-
-    fake = type("R", (), {"stop_reason": "refusal", "content": [],
-                          "stop_details": {"category": "safety"}})()
+    from src.anthropic_refusal import AnthropicRefusalError
 
     class _FakeClient:
         class messages:  # noqa: N801
             @staticmethod
             def create(**kw):
-                return fake
+                return _refusal_message()
 
-    monkeypatch.setattr(cs, "live_anthropic_client", lambda **kw: _FakeClient())
-    with pytest.raises(cs.CardSynthesisRefused) as exc:
-        cs.synthesize_card_once_for_test(...)   # exact entry adapted to the module's
-                                                # existing test seam at implementation
-    assert "refusal" in str(exc.value)
+    # Function-local import → patch the SOURCE module (round-4 MF3).
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: _FakeClient(),
+    )
+    packet = make_min_packet()   # reuse the existing packet fixture in tests/test_card_synthesis.py
+    with pytest.raises(AnthropicRefusalError):
+        cs._synthesize_anthropic(packet, "claude-fable-5")
+
+
+def test_card_translation_raises_structured_refusal(monkeypatch):
+    # round-4 MF3: _translate_anthropic (card_synthesis.py:460) shares the error.
+    from src import card_synthesis as cs
+    from src.anthropic_refusal import AnthropicRefusalError
+
+    class _FakeClient:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**kw):
+                return _refusal_message()
+
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: _FakeClient(),
+    )
+    with pytest.raises(AnthropicRefusalError):
+        cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW")
+
+
+@pytest.mark.anyio
+async def test_agent_loop_surfaces_refusal_not_final_answer(monkeypatch):
+    # The loop is STREAMING: fake the stream context manager whose final message
+    # is a refusal; assert the event stream contains a refusal-typed event and
+    # NO successful done/final-text, and pad.log_final_answer is never called.
+    from src.agents.anthropic_agent import agent as mod
+
+    class _FakeStream:
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def __iter__(self):
+            return iter(())              # no text/tool events before the refusal
+        def get_final_message(self):
+            return _refusal_message()
+
+    class _FakeMessages:
+        def stream(self, **kw):
+            return _FakeStream()
+
+    class _FakeClient:
+        messages = _FakeMessages()
+
+    monkeypatch.setattr(mod, "live_anthropic_client", lambda **kw: _FakeClient())
+    final_calls = []
+    monkeypatch.setattr(mod, "_log_final_answer_for_test", final_calls.append,
+                        raising=False)   # implementation exposes the seam it uses
+
+    events = []
+    async for ev in mod.run_query_stream("q", dal=object()):
+        events.append(ev)
+    kinds = [getattr(e, "type", getattr(e, "kind", None)) for e in events]
+    assert "refusal" in kinds
+    assert final_calls == []
+    assert not any(k == "done" and getattr(e, "text", "") for k, e in zip(kinds, events))
 ```
 
-(Loop/entry shapes are adapted to the module's existing test seams at
-implementation time; the pinned contract: `stop_reason == "refusal"` → typed
-outcome at BOTH seams, no fallback call to another model, no empty-success.
-Fake shapes re-checked against the Task 0-verified refusal contract fields.)
-
-**Escape hatch** (Decision 10): if 5B reveals depth beyond these seams, Fable
-ships `runtime_ready=False` (excluded from `default_picker_models`/`verified`,
-badge 「運行支援未接線」), follow-up filed; 5A still lands.
+(Exact fake-stream surface — sync vs async iteration, `get_final_message` vs
+`.get_final_message()` awaitable, and how `pad.log_final_answer` is interceptable
+— is transcribed from the real loop at implementation time; RED must fail for
+the RIGHT reason: today the loop treats the refusal as a successful empty final
+answer. If the loop cannot expose a clean interception seam without refactor
+depth, the Decision-10 escape hatch fires: Fable ships `runtime_ready=False` and
+this loop test moves to the follow-up slice — synthesis/translation refusal
+handling still lands.)
 
 ### 5C: Ledger sweep + live smoke
 
-Sweep by NEW ids across `tests/`; smoke = **one minimal live call per provider**:
-the cheapest verified gpt-5.6 id (expected Luna per pricing) and Sonnet 5
-(promo-priced); Fable smoke user-gated (premium). Non-smoked ids annotated
-`runtime-unverified` in notes.
+Sweep by NEW ids across `tests/`; smoke = **one minimal live call per provider**
+(cheapest verified gpt-5.6 id — expected Luna; Sonnet 5 promo-priced); Fable
+smoke user-gated (premium). Non-smoked ids annotated `runtime-unverified`.
 
 Commit: `feat: land fable-5 sonnet-5 and gpt-5.6 generation`.
 
@@ -831,8 +1104,9 @@ Commit: `feat: land fable-5 sonnet-5 and gpt-5.6 generation`.
 
 1. Focused backend: capability/cache/effective/routing/card suites + sweep set.
 2. Frontend: full vitest + typecheck + build.
-3. Static gates: single-source grep; `rg -n "psycopg2|postgres"` over the three
-   new modules → empty.
+3. Static gates: single-source grep; `rg -n "psycopg2|postgres"
+   src/model_capabilities.py src/model_discovery_cache.py src/model_effective.py
+   src/anthropic_refusal.py` → empty.
 4. PG smoke `ok:true` `pg_attempts:[]`.
 5. Full virgin A/B: sets identical; delta = new tests; warnings accounted.
 6. Docs: plan → IMPLEMENTED FOR REVIEW; map §P2.7 + decision-log; MEMORY.md
@@ -840,7 +1114,7 @@ Commit: `feat: land fable-5 sonnet-5 and gpt-5.6 generation`.
 
 Review-ready stop before merge; reviewer reruns focused + final A/B; merge on
 explicit approval; live verification = Settings discovery round + per-task picker
-+ smoke evidence + one real refusal-path observation if reproducible cheaply.
++ smoke evidence.
 
 ---
 
