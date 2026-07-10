@@ -26,7 +26,26 @@ machines.
 > 2026-07-05. PostgreSQL holds frozen archives only (restore/inspect via
 > `docker/README.md`); the app runtime needs no database server.
 
-## Operational quickstart
+## The workbench GUI (primary surface)
+
+The product is a desktop research workbench: an Electron shell (or browser dev
+mode) over a local FastAPI sidecar. Current surfaces (as of 2026-07-10): 工作台
+(Home overview) · 自選股 (Watchlist) · 全部標的 (Universe) · **AI 研究** (research
+threads with per-run model/effort/stance) · **持倉** (Holdings — manual + read-only
+IBKR sync) · 新聞·事件 (News, incl. Seeking Alpha capture) · System health ·
+Settings (data providers, model routing, credentials, 投資人設定 incl. the
+calibration chat). Alerts and Notes are planned (nav present, disabled).
+
+```bash
+# desktop app (starts its own sidecar on an ephemeral port)
+npm install && npm run dev:desktop
+
+# or: browser dev mode against a manually-run sidecar on :8420
+python -m src.api            # FastAPI sidecar
+npm run dev:web              # Vite dev server
+```
+
+## Operational quickstart (CLI / data paths)
 
 Currently-supported runtime paths. These are **protected** during refactors — see
 `docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`.
@@ -66,7 +85,8 @@ High-level only; for the authoritative structure see
 `docs/design/CURRENT_PROJECT_CONTEXT.md` (or `PROJECT_STRUCTURE.md` for the pointer
 stub).
 
-- `src/` — agent, tools, DAL, analysis pipeline, monitor, signals, data ingestion (`src/collectors/`, `src/daily_update.py`)
+- `apps/arkscope-web/` — the workbench GUI (React + Vite); `apps/arkscope-desktop/` — Electron shell
+- `src/` — agent, tools, DAL, API sidecar (`src/api/`), analysis pipeline, monitor, signals, data ingestion (`src/collectors/`, `src/daily_update.py`)
 - `data_sources/` — data-source API clients
 - `scripts/` — historical / one-off utilities only (no runtime paths; those live in `src/`)
 - `extensions/sa_alpha_picks/` — SA browser extension + native host
