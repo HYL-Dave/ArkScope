@@ -90,8 +90,13 @@ class TestModelContextLimit:
         assert get_model_context_limit("claude-sonnet-4-6") == 1_000_000
 
     def test_claude_future_model(self):
-        """Future Claude models should match via prefix fallback."""
-        assert get_model_context_limit("claude-sonnet-5-20260501") == 200_000
+        """Unknown future Claude models fall back to the default limit."""
+        assert get_model_context_limit("claude-nova-1-20260501") == 200_000
+
+    def test_sonnet5_dated_snapshot_matches_registry(self):
+        """claude-sonnet-5 is a real registry model now (1M GA); dated
+        snapshots prefix-match it."""
+        assert get_model_context_limit("claude-sonnet-5-20260501") == 1_000_000
 
     def test_gpt55_default(self):
         assert get_model_context_limit("gpt-5.5") == 1_050_000

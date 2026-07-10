@@ -1203,8 +1203,9 @@ class TestModelCatalogShared:
     def test_effort_options_sonnet(self):
         from src.agents.shared.model_catalog import get_effort_options
         opts = get_effort_options("claude-sonnet-4-6")
-        assert "max" not in opts  # Sonnet doesn't support max
-        assert "high" in opts
+        # Ruled Fix E (2026-07-10): the official effort doc includes max for
+        # Sonnet 4.6 (xhigh remains excluded).
+        assert opts == ("max", "high", "medium", "low")
 
     def test_effort_options_openai_none(self):
         from src.agents.shared.model_catalog import get_effort_options
