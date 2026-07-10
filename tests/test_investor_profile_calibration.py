@@ -1,6 +1,7 @@
 """Track A.5: Investor Profile calibration journal + proposal store."""
 
 import asyncio
+import json
 
 import pytest
 
@@ -100,6 +101,39 @@ def test_calibration_prompt_forbids_research_advice_and_tools():
     assert "profile proposal" in p
 
 
+def test_calibration_prompt_pins_every_enum_value():
+    """Live 2026-07-10: two models emitted holding_horizon "years" because the
+    prompt showed one example per field but never the allowed sets — the whole
+    turn was rejected. Every enum member must appear in the prompt verbatim."""
+    from src.investor_profile import HOLDING_HORIZONS, PRESETS, STANCES
+
+    for value in (*HOLDING_HORIZONS, *PRESETS, *STANCES):
+        assert value in CALIBRATION_SYSTEM_PROMPT, value
+
+
+def test_parse_calibration_json_strips_model_supplied_risk_mismatch():
+    """Live 2026-07-10: gpt-5.4-mini emitted risk_mismatch despite the prompt ban,
+    failing the whole turn. The responder strips it (server re-derives anyway);
+    the API-level rejection for direct callers is unchanged."""
+    result = parse_calibration_model_json(
+        json.dumps(
+            {
+                "assistant_message": "draft ready",
+                "proposal": {
+                    "profile_patch": {
+                        "risk_appetite": 7,
+                        "risk_mismatch": "appetite_above_capacity",
+                    },
+                    "rationales": {},
+                },
+            }
+        )
+    )
+    assert result.profile_patch is not None
+    assert "risk_mismatch" not in result.profile_patch
+    assert result.profile_patch["risk_appetite"] == 7
+
+
 def test_parse_calibration_json_followup_without_proposal():
     result = parse_calibration_model_json(
         '{"assistant_message":"What drawdown would make you sell?","proposal":null}'
@@ -111,11 +145,18 @@ def test_parse_calibration_json_followup_without_proposal():
     )
 
 
-def test_parse_calibration_json_with_proposal_rejects_direct_mismatch():
-    with pytest.raises(ValueError, match="risk_mismatch"):
-        parse_calibration_model_json(
-            '{"assistant_message":"Draft ready","proposal":{"profile_patch":{"risk_mismatch":"none"},"rationales":{}}}'
-        )
+def test_parse_calibration_json_tolerates_model_mismatch_and_discards_its_value():
+    """Contract updated by live verification 2026-07-10: a model-supplied
+    risk_mismatch no longer fails the turn — parse discards the model's value and
+    the server derives the real one on save (direct API callers are still hard-
+    rejected: see test_normalize_proposal_rejects_agent_supplied_mismatch)."""
+    result = parse_calibration_model_json(
+        '{"assistant_message":"Draft ready","proposal":{"profile_patch":'
+        '{"risk_appetite":8,"risk_capacity":4,"risk_mismatch":"none"},"rationales":{}}}'
+    )
+    assert result.profile_patch is not None
+    assert "risk_mismatch" not in result.profile_patch
+    assert result.profile_patch["risk_appetite"] == 8
 
 
 def test_parse_calibration_json_with_default_stance_proposal():

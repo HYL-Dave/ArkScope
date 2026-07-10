@@ -52,6 +52,13 @@ Return JSON only:
   }
 }
 
+Allowed field values (use EXACTLY these tokens; anything else is rejected):
+- primary_preset: growth | value | momentum | income | event_driven | balanced | custom
+- holding_horizon: intraday | days_weeks | months | multi_year | mixed
+- default_stance: off | neutral | aligned | complementary | strict_risk_control | valuation_rationalist | growth_opportunity
+- risk_appetite / risk_capacity: integers 1-10
+- drawdown_tolerance_pct / concentration_limit_pct: numbers, or null when unknown
+
 Never output risk_mismatch; the server derives it.
 """
 
@@ -85,7 +92,17 @@ def parse_calibration_model_json(raw: str) -> CalibrationAgentResult:
     rationales = proposal.get("rationales") or {}
     if not isinstance(patch, dict) or not isinstance(rationales, dict):
         raise ValueError("proposal.profile_patch and proposal.rationales must be objects")
+    # Models sometimes emit risk_mismatch despite the prompt ban (live 2026-07-10).
+    # Strip it before validation: the server re-derives it on save, so dropping the
+    # model's value keeps the server-derived contract; direct API callers still get
+    # the hard reject in normalize_proposal_payload.
+    patch.pop("risk_mismatch", None)
     normalized, _raw, rats = normalize_proposal_payload(patch, rationales)
+    # normalize_* returns the full merged profile INCLUDING the derived risk_mismatch;
+    # create_proposal re-validates with the same rejection, so the derived key must
+    # not travel in the patch either (live 2026-07-10: no model could ever produce
+    # an acceptable proposal before this pop).
+    normalized.pop("risk_mismatch", None)
     return CalibrationAgentResult(msg, normalized, rats)
 
 
