@@ -1014,7 +1014,19 @@ export interface PortfolioPosition {
   last_sync_at?: string | null;
   closed_at?: string | null;
   notes?: string;
+  thesis?: string;
   tags?: string[];
+}
+
+export interface PositionUpdate {
+  notes?: string;
+  thesis?: string;
+  tags?: string[];
+  symbol?: string;
+  asset_class?: string;
+  quantity?: number;
+  avg_cost?: number | null;
+  currency?: string;
 }
 
 export interface PortfolioCurrencyTotal {
@@ -1052,8 +1064,28 @@ export interface PortfolioSyncPreview {
   applies: boolean;
 }
 
-export function getPortfolio(): Promise<PortfolioSnapshot> {
-  return getJSON<PortfolioSnapshot>("/portfolio");
+export function getPortfolio(includeClosed = false): Promise<PortfolioSnapshot> {
+  return getJSON<PortfolioSnapshot>(
+    includeClosed ? "/portfolio?include_closed=true" : "/portfolio",
+  );
+}
+
+export function updatePortfolioPosition(
+  positionId: number,
+  body: PositionUpdate,
+): Promise<PortfolioPosition> {
+  return sendJSON<PortfolioPosition>(
+    `/portfolio/positions/${encodeURIComponent(positionId)}`,
+    "PATCH",
+    body,
+  );
+}
+
+export function closePortfolioPosition(positionId: number): Promise<PortfolioPosition> {
+  return sendJSON<PortfolioPosition>(
+    `/portfolio/positions/${encodeURIComponent(positionId)}`,
+    "DELETE",
+  );
 }
 
 export function createManualPosition(body: {

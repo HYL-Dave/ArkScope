@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyIbkrPortfolioSync,
+  closePortfolioPosition,
   createManualPosition,
   getPortfolio,
   previewIbkrPortfolioSync,
   updatePortfolioAccount,
+  updatePortfolioPosition,
   type PortfolioPosition,
   type PortfolioSnapshot,
   type PortfolioSyncPreview,
+  type PositionUpdate,
 } from "./api";
 
 export function HoldingsView() {
@@ -16,9 +19,19 @@ export function HoldingsView() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [includeClosed, setIncludeClosed] = useState(false);
+  const [editing, setEditing] = useState<PortfolioPosition | null>(null);
   const tickerRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
+  const editSymbolRef = useRef<HTMLInputElement>(null);
+  const editAssetRef = useRef<HTMLInputElement>(null);
+  const editQuantityRef = useRef<HTMLInputElement>(null);
+  const editAvgCostRef = useRef<HTMLInputElement>(null);
+  const editCurrencyRef = useRef<HTMLInputElement>(null);
+  const editNotesRef = useRef<HTMLInputElement>(null);
+  const editThesisRef = useRef<HTMLInputElement>(null);
+  const editTagsRef = useRef<HTMLInputElement>(null);
 
   const manualAccount = useMemo(
     () => snapshot?.accounts.find((a) => a.broker === "manual") ?? snapshot?.accounts[0] ?? null,
@@ -29,13 +42,13 @@ export function HoldingsView() {
     setLoading(true);
     setErr(null);
     try {
-      setSnapshot(await getPortfolio());
+      setSnapshot(await getPortfolio(includeClosed));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includeClosed]);
 
   useEffect(() => {
     void load();
@@ -96,6 +109,55 @@ export function HoldingsView() {
     }
   }
 
+  async function onSaveEdit() {
+    if (!editing) return;
+    const body: PositionUpdate = {
+      notes: editNotesRef.current?.value ?? "",
+      thesis: editThesisRef.current?.value ?? "",
+      tags: splitTags(editTagsRef.current?.value ?? ""),
+    };
+    if (editing.broker === "manual") {
+      body.symbol = editSymbolRef.current?.value.trim() ?? editing.symbol;
+      body.asset_class = editAssetRef.current?.value.trim() ?? editing.asset_class;
+      body.quantity = Number(editQuantityRef.current?.value ?? editing.quantity);
+      const avgRaw = (editAvgCostRef.current?.value ?? "").trim();
+      body.avg_cost = avgRaw === "" ? null : Number(avgRaw);
+      body.currency = editCurrencyRef.current?.value.trim() ?? editing.currency;
+    }
+    setBusy(`edit-${editing.id}`);
+    setErr(null);
+    try {
+      await updatePortfolioPosition(editing.id, body);
+      setEditing(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onCloseRow(position: PortfolioPosition) {
+    if (
+      !window.confirm(
+        `確認關閉 ${position.symbol}?已關閉的持倉仍可在「顯示已關閉」檢視中查看。`,
+      )
+    ) {
+      return;
+    }
+    setBusy(`close-${position.id}`);
+    setErr(null);
+    try {
+      await closePortfolioPosition(position.id);
+      if (editing?.id === position.id) setEditing(null);
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function onToggleAggregate(accountId: number, include: boolean) {
     setBusy(`account-${accountId}`);
     setErr(null);
@@ -114,6 +176,78 @@ export function HoldingsView() {
   const standardPositions = positions.filter((position) => position.asset_class !== "option");
   const accounts = snapshot?.accounts ?? [];
   const totals = snapshot?.totals;
+
+  const editorNode = editing ? (
+    <div className="inline-form" key={editing.id}>
+      {editing.broker === "manual" && (
+        <>
+          <label>
+            <span>Symbol</span>
+            <input ref={editSymbolRef} aria-label="Edit Symbol" defaultValue={editing.symbol} />
+          </label>
+          <label>
+            <span>Asset</span>
+            <input
+              ref={editAssetRef}
+              aria-label="Edit Asset Class"
+              defaultValue={editing.asset_class}
+            />
+          </label>
+          <label>
+            <span>Quantity</span>
+            <input
+              ref={editQuantityRef}
+              aria-label="Edit Quantity"
+              inputMode="decimal"
+              defaultValue={String(editing.quantity)}
+            />
+          </label>
+          <label>
+            <span>Avg Cost</span>
+            <input
+              ref={editAvgCostRef}
+              aria-label="Edit Avg Cost"
+              inputMode="decimal"
+              placeholder="留空清除"
+              defaultValue={editing.avg_cost == null ? "" : String(editing.avg_cost)}
+            />
+          </label>
+          <label>
+            <span>Currency</span>
+            <input ref={editCurrencyRef} aria-label="Edit Currency" defaultValue={editing.currency} />
+          </label>
+        </>
+      )}
+      <label>
+        <span>Notes</span>
+        <input ref={editNotesRef} aria-label="Edit Notes" defaultValue={editing.notes ?? ""} />
+      </label>
+      <label>
+        <span>Thesis</span>
+        <input ref={editThesisRef} aria-label="Edit Thesis" defaultValue={editing.thesis ?? ""} />
+      </label>
+      <label>
+        <span>Tags</span>
+        <input
+          ref={editTagsRef}
+          aria-label="Edit Tags"
+          placeholder="逗號分隔"
+          defaultValue={(editing.tags ?? []).join(", ")}
+        />
+      </label>
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={() => void onSaveEdit()}
+        disabled={busy === `edit-${editing.id}`}
+      >
+        儲存
+      </button>
+      <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>
+        取消
+      </button>
+    </div>
+  ) : null;
 
   return (
     <main className="main">
@@ -252,9 +386,28 @@ export function HoldingsView() {
       <section className="section-band">
         <div className="section-head">
           <h2>Positions</h2>
-          <span className="muted tiny">{standardPositions.length} rows</span>
+          <div className="actions">
+            <label className="muted tiny">
+              <input
+                type="checkbox"
+                aria-label="顯示已關閉持倉"
+                checked={includeClosed}
+                onChange={(event) => setIncludeClosed(event.currentTarget.checked)}
+              />
+              顯示已關閉
+            </label>
+            <span className="muted tiny">{standardPositions.length} rows</span>
+          </div>
         </div>
-        <PositionsTable positions={standardPositions} emptyText="尚無一般持倉" />
+        <PositionsTable
+          positions={standardPositions}
+          emptyText="尚無一般持倉"
+          editingId={editing?.id ?? null}
+          editor={editorNode}
+          busy={busy}
+          onEdit={(position) => setEditing(position)}
+          onClose={(position) => void onCloseRow(position)}
+        />
       </section>
 
       {optionPositions.length > 0 && (
@@ -266,7 +419,15 @@ export function HoldingsView() {
           <p className="muted">
             進階選擇權風險尚未建模；此區只呈現 broker 回傳的持倉快照。
           </p>
-          <PositionsTable positions={optionPositions} emptyText="尚無選擇權持倉" />
+          <PositionsTable
+            positions={optionPositions}
+            emptyText="尚無選擇權持倉"
+            editingId={editing?.id ?? null}
+            editor={editorNode}
+            busy={busy}
+            onEdit={(position) => setEditing(position)}
+            onClose={(position) => void onCloseRow(position)}
+          />
         </section>
       )}
     </main>
@@ -276,9 +437,19 @@ export function HoldingsView() {
 function PositionsTable({
   positions,
   emptyText,
+  editingId,
+  editor,
+  busy,
+  onEdit,
+  onClose,
 }: {
   positions: PortfolioPosition[];
   emptyText: string;
+  editingId: number | null;
+  editor: React.ReactNode;
+  busy: string | null;
+  onEdit: (position: PortfolioPosition) => void;
+  onClose: (position: PortfolioPosition) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -293,22 +464,54 @@ function PositionsTable({
             <th>Market Value</th>
             <th>Unrealized P&amp;L</th>
             <th>Notes</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {positions.length === 0 ? (
-            <tr><td colSpan={8}>{emptyText}</td></tr>
+            <tr><td colSpan={9}>{emptyText}</td></tr>
           ) : positions.map((position) => (
-            <tr key={position.id}>
-              <td>{position.symbol}</td>
-              <td>{position.asset_class}</td>
-              <td>{formatNum(position.quantity)}</td>
-              <td>{position.currency}</td>
-              <td>{formatMaybe(position.avg_cost)}</td>
-              <td>{formatMaybe(position.market_value)}</td>
-              <td>{formatMaybe(position.unrealized_pnl)}</td>
-              <td>{position.notes ?? ""}</td>
-            </tr>
+            <React.Fragment key={position.id}>
+              <tr>
+                <td>{position.symbol}</td>
+                <td>{position.asset_class}</td>
+                <td>{formatNum(position.quantity)}</td>
+                <td>{position.currency}</td>
+                <td>{formatMaybe(position.avg_cost)}</td>
+                <td>{formatMaybe(position.market_value)}</td>
+                <td>{formatMaybe(position.unrealized_pnl)}</td>
+                <td>{position.notes ?? ""}</td>
+                <td className="actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => onEdit(position)}
+                    disabled={busy != null}
+                  >
+                    編輯
+                  </button>
+                  {position.closed_at ? (
+                    <span className="muted tiny">已關閉</span>
+                  ) : position.broker === "manual" ? (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => onClose(position)}
+                      disabled={busy != null}
+                    >
+                      關閉
+                    </button>
+                  ) : (
+                    <span className="muted tiny">broker · synced</span>
+                  )}
+                </td>
+              </tr>
+              {editingId === position.id && (
+                <tr>
+                  <td colSpan={9}>{editor}</td>
+                </tr>
+              )}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
@@ -340,6 +543,13 @@ function formatChangeMetric(
 function finiteNumber(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
   return value;
+}
+
+function splitTags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
 }
 
 function currencySummary(totals: PortfolioSnapshot["totals"] | undefined): string {
