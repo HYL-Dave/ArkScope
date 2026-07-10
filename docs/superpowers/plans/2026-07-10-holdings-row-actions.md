@@ -1,8 +1,12 @@
 # Holdings Row Actions Implementation Plan
 
-> **Status: DRAFT FOR REVIEW 2026-07-10.** Implements the row-action addendum in
-> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. This plan is
-> docs-only; no runtime implementation has started.
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-10.** Implements the row-action addendum in
+> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. Branch
+> `claude/holdings-row-actions`, three TDD commits (store semantics / route contracts /
+> inline editor) + this docs commit. Evidence: backend focused 47 passed (+17 new),
+> frontend 26 files / 241 tests + typecheck + build, no-hard-delete gate zero matches,
+> PG-unreachable smoke `ok:true` `pg_attempts:[]`. Full virgin A/B + user review + live
+> verification remain before merge; live mutation waits for explicit merge approval.
 
 **Goal:** Complete the Holdings position lifecycle: every position can edit its
 user-owned notes/thesis/tags, manual positions can edit their financial fields and be
