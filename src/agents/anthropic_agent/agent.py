@@ -27,6 +27,7 @@ from ..shared.scratchpad import Scratchpad
 from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from ..shared.token_tracker import TokenTracker
 
+from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.model_capabilities import all_models, capability_for
 
 # ── Server-side compaction beta (Phase 7a) ─────────────────────
@@ -432,6 +433,25 @@ async def run_query_stream(
                 logger.info("Server compaction triggered — context summarized, continuing...")
                 pad.log_compaction(source="server")
                 continue
+
+            # HTTP-200 classifier refusal (Fable-class models; P2.7 Task 5B).
+            # Branch on stop_reason only — stop_details may be null on a real
+            # refusal. Surfaced as a typed error event: never a successful empty
+            # done, never a hidden fallback to another model.
+            if is_refusal(response):
+                refusal = AnthropicRefusalError(
+                    model_name, getattr(response, "stop_details", None)
+                )
+                logger.warning("model refusal: %s", refusal)
+                pad.close()
+                yield AgentEvent(EventType.error, {
+                    "code": "model_refusal",
+                    "error": str(refusal),
+                    "stop_details": refusal.stop_details,
+                    "provider": "anthropic",
+                    "model": model_name,
+                })
+                return
 
             # Check if we're done
             if response.stop_reason != "tool_use":

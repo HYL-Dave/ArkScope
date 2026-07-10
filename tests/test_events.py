@@ -171,6 +171,32 @@ class TestAnthropicStream:
             return events
         return asyncio.run(_gather())
 
+    def test_refusal_stop_surfaces_error_not_done(self, mock_deps):
+        """P2.7 Task 5B: stop_reason=refusal (HTTP 200, Fable-class classifier
+        decline) must surface as EventType.error with code=model_refusal — never
+        a successful empty done, never a log_final_answer call."""
+        mock_client = mock_deps["client"]
+        refusal = _make_mock_response(stop_reason="refusal", content_blocks=[])
+        refusal.stop_details = {"category": "safety"}
+        mock_client.messages.stream.return_value = _make_stream_cm(refusal)
+
+        from src.agents.anthropic_agent.agent import run_query_stream
+
+        with patch(
+            "src.agents.shared.scratchpad.Scratchpad.log_final_answer"
+        ) as mock_final:
+            events = self._collect_events(
+                run_query_stream("q", dal=MagicMock())
+            )
+
+        types = [e.type for e in events]
+        assert EventType.done not in types                     # no success event
+        error_events = [e for e in events if e.type == EventType.error]
+        assert error_events, types
+        assert error_events[-1].data["code"] == "model_refusal"
+        assert error_events[-1].data["stop_details"] == {"category": "safety"}
+        mock_final.assert_not_called()                         # never logged as answer
+
     def test_no_tool_calls(self, mock_deps):
         """Direct answer: thinking → done."""
         mock_deps["client"].messages.stream.return_value = _make_stream_cm(_make_mock_response())
@@ -330,7 +356,7 @@ class TestAnthropicStream:
         # Non-Opus model: fallback max_output=64000, budget = 64000 - 16384 = 47616
         self._collect_events(
             run_query_stream(
-                "Test", model="claude-sonnet-5-20260501",
+                "Test", model="claude-nova-1-20260501",
                 dal=MagicMock(), thinking=True,
             )
         )
@@ -351,7 +377,7 @@ class TestAnthropicStream:
         # Non-Opus model doesn't support effort
         self._collect_events(
             run_query_stream(
-                "Test", model="claude-sonnet-5-20260501",
+                "Test", model="claude-nova-1-20260501",
                 dal=MagicMock(), effort="medium",
             )
         )

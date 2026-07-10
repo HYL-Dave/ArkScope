@@ -63,6 +63,38 @@ class ModelCapability:
 _REGISTRY: tuple[ModelCapability, ...] = (
     # ── Anthropic ────────────────────────────────────────────────
     ModelCapability(
+        id="claude-fable-5", provider="anthropic", label="Claude Fable 5",
+        picker_visibility="default", thinking_mode="adaptive_always_on",
+        effort_options=_OPUS_EFFORTS,
+        supports_compaction=True, context_mode="ga_1m",
+        context_limit=1_000_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        aliases=(),
+        quality="frontier", speed="slow", cost_tier="high",
+        recommended_for=(),
+        source_url="https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5",
+        verified_at="2026-07-10",
+        notes="Thinking always-on (disable rejected); refusals return HTTP 200 "
+              "stop_reason=refusal — handled via src/anthropic_refusal.py. "
+              "$10/$50 per MTok.",
+    ),
+    ModelCapability(
+        id="claude-sonnet-5", provider="anthropic", label="Claude Sonnet 5",
+        picker_visibility="default", thinking_mode="adaptive_default_on",
+        effort_options=_OPUS_EFFORTS,
+        supports_compaction=True, context_mode="ga_1m",
+        context_limit=1_000_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        aliases=(),
+        quality="balanced", speed="fast", cost_tier="medium",
+        recommended_for=(),
+        source_url="https://platform.claude.com/docs/en/about-claude/models/overview",
+        verified_at="2026-07-10",
+        notes="Thinking default-on (omit = on; explicit disabled allowed; manual "
+              "budget rejected 400). $3/$15 per MTok (intro $2/$10 through "
+              "2026-08-31).",
+    ),
+    ModelCapability(
         id="claude-opus-4-8", provider="anthropic", label="Claude Opus 4.8",
         picker_visibility="default", thinking_mode="adaptive_opt_in",
         effort_options=_OPUS_EFFORTS,          # Fix A (CLI helper previously None)
@@ -132,6 +164,47 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         notes="Legacy 1M-beta-header model (subagent _1M_BETA_MODELS transcription).",
     ),
     # ── OpenAI ───────────────────────────────────────────────────
+    ModelCapability(
+        id="gpt-5.6-sol", provider="openai", label="GPT-5.6 Sol",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        aliases=("gpt-5.6",),   # official: the gpt-5.6 alias routes to Sol
+        quality="frontier", speed="medium", cost_tier="high",
+        recommended_for=(),
+        source_url="https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+        verified_at="2026-07-10",
+        notes="$5/$30 per MTok (cached in $0.50).",
+    ),
+    ModelCapability(
+        id="gpt-5.6-terra", provider="openai", label="GPT-5.6 Terra",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        aliases=(),
+        quality="high", speed="medium", cost_tier="medium",
+        recommended_for=(),
+        source_url="https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+        verified_at="2026-07-10",
+        notes="~gpt-5.5 capability at half its price: $2.50/$15 per MTok "
+              "(cached in $0.25).",
+    ),
+    ModelCapability(
+        id="gpt-5.6-luna", provider="openai", label="GPT-5.6 Luna",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        in_routing_seed=True, in_cli_catalog=True,
+        aliases=(),
+        quality="balanced", speed="fast", cost_tier="low",
+        recommended_for=(),
+        source_url="https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+        verified_at="2026-07-10",
+        notes="Cost-sensitive high-volume tier (nano successor): $1/$6 per MTok "
+              "(cached in $0.10).",
+    ),
     ModelCapability(
         id="gpt-5.5", provider="openai", label="GPT-5.5",
         picker_visibility="pinned_only", thinking_mode="none",

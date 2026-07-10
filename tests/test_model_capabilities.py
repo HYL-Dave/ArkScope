@@ -91,13 +91,16 @@ def test_openai_models_record_provider_wide_effort_set():
 def test_view_flags_pin_exact_current_memberships():
     routing = {c.id for c in all_models() if c.in_routing_seed}
     cli = {c.id for c in all_models() if c.in_cli_catalog}
+    # pre-consolidation memberships + the ruled Task-5 additions (both flags)
     assert routing == {
         "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
         "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert cli == {
         "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
         "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
+        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
 
 
@@ -114,9 +117,11 @@ def test_picker_visibility_matches_the_ruling():
 
 
 def test_default_picker_models_helper():
-    assert {c.id for c in default_picker_models("openai")} == {"gpt-5.4-mini"}
+    assert {c.id for c in default_picker_models("openai")} == {
+        "gpt-5.4-mini", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+    }
     assert {c.id for c in default_picker_models("anthropic")} == {
-        "claude-opus-4-8", "claude-haiku-4-5",
+        "claude-opus-4-8", "claude-haiku-4-5", "claude-fable-5", "claude-sonnet-5",
     }
 
 
@@ -215,10 +220,12 @@ def test_derived_views_keep_exact_membership_and_aliases():
     assert {m.id for m in ROUTING_VIEW} == {
         "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
         "claude-haiku-4-5", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert {m.id for m in CLI_VIEW} == {
         "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.5", "gpt-5.4-mini",
         "gpt-5.4-nano", "gpt-5.4", "gpt-5.2", "gpt-5.2-codex",
+        "claude-fable-5", "claude-sonnet-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
     assert find_model("opus").id == "claude-opus-4-7"    # exact, not startswith
     assert find_model("mini").id == "gpt-5.4-mini"
@@ -245,3 +252,90 @@ def test_single_source_no_local_fact_tables():
     reg_adaptive = {c.id for c in all_models("anthropic")
                     if c.thinking_mode.startswith("adaptive")}
     assert set(anth._ADAPTIVE_THINKING_MODELS) == reg_adaptive
+
+
+# ── Task 5A: new generation (values from the Task 0 verified table) ─────
+
+
+def test_new_generation_entries_present_with_task0_facts():
+    fable = capability_for("claude-fable-5")
+    assert fable is not None and fable.provider == "anthropic"
+    assert fable.picker_visibility == "default"
+    assert fable.thinking_mode == "adaptive_always_on"
+    assert fable.context_limit == 1_000_000 and fable.max_output == 128_000
+    assert fable.effort_options == ("max", "xhigh", "high", "medium", "low")
+    assert fable.supports_compaction is True and fable.context_mode == "ga_1m"
+    assert fable.in_routing_seed and fable.in_cli_catalog
+
+    sonnet5 = capability_for("claude-sonnet-5")
+    assert sonnet5.thinking_mode == "adaptive_default_on"
+    assert sonnet5.picker_visibility == "default"
+    assert sonnet5.context_limit == 1_000_000 and sonnet5.max_output == 128_000
+    assert sonnet5.effort_options == ("max", "xhigh", "high", "medium", "low")
+    assert sonnet5.supports_compaction is True and sonnet5.context_mode == "ga_1m"
+
+    for mid, cost in (("gpt-5.6-sol", "high"), ("gpt-5.6-terra", "medium"),
+                      ("gpt-5.6-luna", "low")):
+        cap = capability_for(mid)
+        assert cap.provider == "openai" and cap.picker_visibility == "default", mid
+        assert cap.thinking_mode == "none", mid
+        assert cap.context_limit == 1_050_000 and cap.max_output == 128_000, mid
+        assert cap.effort_options == ("none", "minimal", "low", "medium", "high", "xhigh"), mid
+        assert cap.cost_tier == cost, mid
+        assert cap.in_routing_seed and cap.in_cli_catalog, mid
+
+
+def test_official_alias_gpt56_routes_to_sol():
+    # Task 0: "The `gpt-5.6` alias routes requests to GPT-5.6 Sol" (official).
+    assert capability_for("gpt-5.6").id == "gpt-5.6-sol"
+
+
+def test_alias_integrity_unique_and_no_canonical_collisions():
+    seen: dict[str, str] = {}
+    canonical = {c.id for c in all_models()}
+    for cap in all_models():
+        for alias in cap.aliases:
+            assert alias not in seen, f"alias {alias!r} on both {seen[alias]} and {cap.id}"
+            seen[alias] = cap.id
+            assert alias not in canonical, f"alias {alias!r} collides with a canonical id"
+
+
+def test_model_provider_classifies_new_ids():
+    from src.model_routing import model_provider
+
+    assert model_provider("claude-fable-5") == "anthropic"
+    assert model_provider("claude-sonnet-5") == "anthropic"
+    for mid in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+        assert model_provider(mid) == "openai", mid
+
+
+def test_find_model_fable_resolves():
+    from src.agents.shared.model_catalog import find_model
+
+    assert find_model("fable").id == "claude-fable-5"
+
+
+def test_prefix_precedence_for_gpt56_family():
+    assert capability_for("gpt-5.6-sol-2026-x").id == "gpt-5.6-sol"
+    assert capability_for("gpt-5.6-luna-snapshot").id == "gpt-5.6-luna"
+
+
+def test_thinking_wire_mapping_for_new_modes():
+    from src.agents.anthropic_agent.agent import _build_thinking_param
+
+    class _Cfg:
+        max_tokens = 8192
+        anthropic_thinking = True
+
+    # adaptive_default_on (Sonnet 5): True → adaptive; False → EXPLICIT disabled
+    # (omit would leave thinking ON, violating the user's off intent).
+    on_param, on_max = _build_thinking_param("claude-sonnet-5", True, _Cfg())
+    assert on_param == {"type": "adaptive"} and on_max == 128_000
+    off_param, off_max = _build_thinking_param("claude-sonnet-5", False, _Cfg())
+    assert off_param == {"type": "disabled"} and off_max == 8192
+    # adaptive_always_on (Fable): toggle ignored; per docs unset = on → omit the
+    # param entirely; never disabled, never budget_tokens.
+    for toggle in (True, False):
+        p, eff_max = _build_thinking_param("claude-fable-5", toggle, _Cfg())
+        assert p is None, toggle
+        assert eff_max == 128_000, toggle

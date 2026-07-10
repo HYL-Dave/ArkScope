@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 
 from src.agents.config import get_agent_config, task_route
 from src.env_keys import ensure_env_loaded
+from src.anthropic_refusal import AnthropicRefusalError, is_refusal
 from src.evidence_packet import EvidencePacket
 from src.model_credentials import looks_like_effort_error
 from src.result_card import (
@@ -164,6 +165,10 @@ def _synthesize_anthropic(
             tool_choice={"type": "tool", "name": _TOOL_NAME},
             **kwargs,
         )
+        if is_refusal(resp):
+            # HTTP-200 classifier refusal (Fable-class): typed failure, no
+            # fallback model, never an empty-success card.
+            raise AnthropicRefusalError(model, getattr(resp, "stop_details", None))
         for block in resp.content:
             if getattr(block, "type", None) == "tool_use" and block.name == _TOOL_NAME:
                 return CardSynthesis(**block.input)
@@ -487,6 +492,8 @@ def _translate_anthropic(
             tool_choice={"type": "tool", "name": "emit_translation"},
             **kwargs,
         )
+        if is_refusal(resp):
+            raise AnthropicRefusalError(model, getattr(resp, "stop_details", None))
         for block in resp.content:
             if getattr(block, "type", None) == "tool_use" and block.name == "emit_translation":
                 return block.input

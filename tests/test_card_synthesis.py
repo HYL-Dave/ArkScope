@@ -8,6 +8,7 @@ single-model flag) and the markdown promotion path.
 from __future__ import annotations
 
 import pytest
+from unittest.mock import MagicMock
 
 from src.card_synthesis import (
     CardSynthesis,
@@ -142,3 +143,44 @@ def test_render_card_markdown_has_core_sections(monkeypatch):
     assert "## Confidence" in md
     assert "LOW" in md
     assert "## Data sources" in md
+
+
+# ── P2.7 Task 5B: structured refusal handling (card seams) ────────
+
+
+def _refusal_response():
+    response = MagicMock()
+    response.stop_reason = "refusal"
+    response.content = []
+    response.stop_details = {"category": "safety"}
+    return response
+
+
+def test_card_synthesis_raises_structured_refusal(monkeypatch):
+    from src import card_synthesis as cs
+    from src.anthropic_refusal import AnthropicRefusalError
+
+    client = MagicMock()
+    client.messages.create.return_value = _refusal_response()
+    # Function-local import → patch the SOURCE module.
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: client,
+    )
+    with pytest.raises(AnthropicRefusalError):
+        cs._synthesize_anthropic(_packet(), "claude-fable-5")
+
+
+def test_card_translation_raises_structured_refusal(monkeypatch):
+    # _translate_anthropic shares the refusal error (same forced-tool pattern).
+    from src import card_synthesis as cs
+    from src.anthropic_refusal import AnthropicRefusalError
+
+    client = MagicMock()
+    client.messages.create.return_value = _refusal_response()
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: client,
+    )
+    with pytest.raises(AnthropicRefusalError):
+        cs._translate_anthropic("claude-fable-5", "sys", "user", {}, "zh-TW")
