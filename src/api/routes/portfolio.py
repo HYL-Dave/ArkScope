@@ -20,7 +20,7 @@ from src.portfolio_ibkr import (
     preview_or_apply_ibkr_snapshot,
     read_ibkr_portfolio_snapshot,
 )
-from src.portfolio_state import PortfolioStore
+from src.portfolio_state import BrokerPositionManagedBySync, PortfolioStore
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -35,12 +35,28 @@ class ManualPositionBody(BaseModel):
     notes: str = ""
 
 
-class PositionNotesBody(BaseModel):
+class PositionUpdateBody(BaseModel):
+    """Presence-aware row update: omitted = unchanged, explicit null clears
+    nullable fields. Manual-financial fields are rejected by the store for
+    broker-synced rows."""
+
     notes: str | None = None
     thesis: str | None = None
     tags: list[str] | None = None
     strategy_bucket: str | None = None
     target_allocation: float | None = None
+    symbol: str | None = None
+    asset_class: str | None = None
+    quantity: float | None = None
+    avg_cost: float | None = None
+    currency: str | None = None
+
+    def updates(self) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in self.model_dump().items()
+            if key in self.model_fields_set
+        }
 
 
 class PortfolioAccountBody(BaseModel):
@@ -61,9 +77,10 @@ class PortfolioAccountUpdateBody(BaseModel):
 
 @router.get("")
 def get_portfolio(
+    include_closed: bool = False,
     store: PortfolioStore = Depends(get_portfolio_store),
 ) -> dict[str, Any]:
-    return _to_json(store.snapshot())
+    return _to_json(store.snapshot(include_closed=include_closed))
 
 
 @router.get("/accounts")
@@ -155,28 +172,53 @@ def upsert_manual_position(
 
 
 @router.patch("/positions/{position_id}")
-def update_position_notes(
+def update_position(
     position_id: int,
-    body: PositionNotesBody,
+    body: PositionUpdateBody,
     store: PortfolioStore = Depends(get_portfolio_store),
 ) -> dict[str, Any]:
     require_profile_state_write("portfolio_position_write", {"position_id": position_id})
     try:
-        return _to_json(
-            store.update_position_notes(
-                position_id,
-                notes=body.notes,
-                thesis=body.thesis,
-                tags=body.tags,
-                strategy_bucket=body.strategy_bucket,
-                target_allocation=body.target_allocation,
-            )
-        )
+        return _to_json(store.update_position(position_id, fields=body.updates()))
     except KeyError as exc:
+        raise _position_not_found(position_id) from exc
+    except BrokerPositionManagedBySync as exc:
+        raise _managed_by_sync(exc) from exc
+    except ValueError as exc:
         raise HTTPException(
-            status_code=404,
-            detail={"code": "portfolio_position_not_found", "position_id": position_id},
+            status_code=400,
+            detail={"code": "invalid_portfolio_position", "detail": str(exc)},
         ) from exc
+
+
+@router.delete("/positions/{position_id}")
+def close_manual_position(
+    position_id: int,
+    store: PortfolioStore = Depends(get_portfolio_store),
+) -> dict[str, Any]:
+    require_profile_state_write(
+        "portfolio_position_write", {"position_id": position_id, "action": "close"}
+    )
+    try:
+        return _to_json(store.close_position(position_id))
+    except KeyError as exc:
+        raise _position_not_found(position_id) from exc
+    except BrokerPositionManagedBySync as exc:
+        raise _managed_by_sync(exc) from exc
+
+
+def _position_not_found(position_id: int) -> HTTPException:
+    return HTTPException(
+        status_code=404,
+        detail={"code": "portfolio_position_not_found", "position_id": position_id},
+    )
+
+
+def _managed_by_sync(exc: BrokerPositionManagedBySync) -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={"code": "broker_position_managed_by_sync", "detail": str(exc)},
+    )
 
 
 @router.post("/ibkr/preview")

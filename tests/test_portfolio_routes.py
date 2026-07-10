@@ -200,11 +200,201 @@ def test_patch_missing_position_returns_404(tmp_path):
     store = PortfolioStore(tmp_path / "profile_state.db")
 
     with pytest.raises(HTTPException) as exc:
-        routes.update_position_notes(
+        routes.update_position(
             999,
-            routes.PositionNotesBody(notes="missing"),
+            routes.PositionUpdateBody(notes="missing"),
             store=store,
         )
 
     assert exc.value.status_code == 404
     assert exc.value.detail["code"] == "portfolio_position_not_found"
+
+
+def _manual_row(store, **overrides):
+    account = store.ensure_manual_account()
+    params = {
+        "account_id": account.id,
+        "symbol": "NVDA",
+        "quantity": 3,
+        "avg_cost": 100,
+        "currency": "USD",
+        "notes": "start",
+    }
+    params.update(overrides)
+    return store.upsert_manual_position(**params)
+
+
+def _ibkr_row(store):
+    from tests.test_portfolio_state import broker_pos
+
+    account = store.upsert_broker_account("ibkr", "DU123", "IBKR DU123")
+    return store.apply_broker_positions(
+        account_id=account.id,
+        positions=[broker_pos(con_id=1, symbol="AAPL", quantity=1)],
+        source="test",
+    )[0]
+
+
+def test_patch_position_updates_manual_and_user_fields_atomically(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(
+        routes,
+        "require_profile_state_write",
+        lambda action, detail=None: calls.append((action, detail)),
+    )
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _manual_row(store)
+
+    out = routes.update_position(
+        row.id,
+        routes.PositionUpdateBody(
+            symbol="amd",
+            quantity=-2,
+            avg_cost=55.5,
+            currency="twd",
+            notes="rewritten",
+            thesis="cycle",
+            tags=["swing"],
+        ),
+        store=store,
+    )
+
+    assert calls == [("portfolio_position_write", {"position_id": row.id})]
+    assert out["symbol"] == "AMD"
+    assert out["quantity"] == -2
+    assert out["avg_cost"] == 55.5
+    assert out["currency"] == "TWD"
+    assert out["notes"] == "rewritten"
+    assert out["thesis"] == "cycle"
+    assert out["tags"] == ["swing"]
+
+
+def test_patch_position_explicit_null_clears_avg_cost(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _manual_row(store)
+
+    omitted = routes.update_position(
+        row.id, routes.PositionUpdateBody(quantity=4), store=store
+    )
+    assert omitted["avg_cost"] == 100
+
+    cleared = routes.update_position(
+        row.id,
+        routes.PositionUpdateBody.model_validate({"avg_cost": None}),
+        store=store,
+    )
+    assert cleared["avg_cost"] is None
+    assert cleared["quantity"] == 4
+
+
+def test_patch_ibkr_position_rejects_manual_fields_without_partial_note_write(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _ibkr_row(store)
+
+    with pytest.raises(HTTPException) as exc:
+        routes.update_position(
+            row.id,
+            routes.PositionUpdateBody(quantity=99, notes="should not land"),
+            store=store,
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "broker_position_managed_by_sync"
+    after = store.get_position(row.id)
+    assert after.quantity == 1
+    assert after.notes == ""
+
+
+def test_patch_ibkr_position_updates_user_fields(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _ibkr_row(store)
+
+    out = routes.update_position(
+        row.id,
+        routes.PositionUpdateBody(notes="keep", thesis="moat", tags=["core"]),
+        store=store,
+    )
+
+    assert out["notes"] == "keep"
+    assert out["thesis"] == "moat"
+    assert out["tags"] == ["core"]
+    assert out["quantity"] == 1
+
+
+def test_patch_position_invalid_value_returns_400(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _manual_row(store)
+
+    with pytest.raises(HTTPException) as exc:
+        routes.update_position(
+            row.id, routes.PositionUpdateBody(quantity=0), store=store
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "invalid_portfolio_position"
+
+
+def test_delete_manual_position_soft_closes_and_requires_write_gate(
+    monkeypatch, tmp_path
+):
+    calls = []
+    monkeypatch.setattr(
+        routes,
+        "require_profile_state_write",
+        lambda action, detail=None: calls.append((action, detail)),
+    )
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _manual_row(store)
+
+    out = routes.close_manual_position(row.id, store=store)
+
+    assert calls == [
+        ("portfolio_position_write", {"position_id": row.id, "action": "close"})
+    ]
+    assert out["closed_at"] is not None
+    assert out["notes"] == "start"
+    assert store.list_positions() == []
+
+
+def test_delete_ibkr_position_returns_managed_by_sync(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _ibkr_row(store)
+
+    with pytest.raises(HTTPException) as exc:
+        routes.close_manual_position(row.id, store=store)
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "broker_position_managed_by_sync"
+    assert store.get_position(row.id).closed_at is None
+
+
+def test_delete_missing_position_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+
+    with pytest.raises(HTTPException) as exc:
+        routes.close_manual_position(999, store=store)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail["code"] == "portfolio_position_not_found"
+
+
+def test_get_portfolio_include_closed_threads_to_snapshot(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "require_profile_state_write", lambda *a, **k: None)
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    row = _manual_row(store)
+    routes.close_manual_position(row.id, store=store)
+
+    default_view = routes.get_portfolio(store=store)
+    assert default_view["positions"] == []
+
+    closed_view = routes.get_portfolio(include_closed=True, store=store)
+    assert [p["id"] for p in closed_view["positions"]] == [row.id]
+    assert closed_view["positions"][0]["notes"] == "start"
