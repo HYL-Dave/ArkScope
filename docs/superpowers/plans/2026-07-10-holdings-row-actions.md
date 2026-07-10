@@ -1,12 +1,19 @@
 # Holdings Row Actions Implementation Plan
 
-> **Status: IMPLEMENTED FOR REVIEW 2026-07-10.** Implements the row-action addendum in
-> `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`. Branch
-> `claude/holdings-row-actions`, three TDD commits (store semantics / route contracts /
-> inline editor) + this docs commit. Evidence: backend focused 47 passed (+17 new),
-> frontend 26 files / 241 tests + typecheck + build, no-hard-delete gate zero matches,
-> PG-unreachable smoke `ok:true` `pg_attempts:[]`. Full virgin A/B + user review + live
-> verification remain before merge; live mutation waits for explicit merge approval.
+> **Status: MERGED 2026-07-10 (`fcdbd94`) — live verification pending.** Implements the
+> row-action addendum in `docs/superpowers/specs/2026-07-08-holdings-portfolio-design.md`.
+> Roles reversed: Claude implemented (three TDD commits: store semantics / route
+> contracts / inline editor), user reviewed and found 2 must-fix (closed rows leaked into
+> totals when include_closed=true — the repair-round consistency choice now superseded:
+> totals ALWAYS count open rows only; non-numeric Avg Cost input silently serialized to
+> `avg_cost:null` = silent clear — now finite-guarded client-side, only truly blank
+> clears). Fix commit `fcdbd94` re-verified by a 5-way workflow fan-out: two adversarial
+> refuters (38/38 closed-totals attacks failed incl. currency-bucket/broker_base leak
+> probes; NaN-guard confirmed incl. `1e999`/whitespace/`Number("  ")===0` trap), backend
+> 48 passed / no-hard-delete / smoke, frontend 26 files / 242 + typecheck + build. Final
+> virgin A/B (03e1277 vs fcdbd94): failure sets identical 30=30, passed +18 exact,
+> warnings 18=18. FF-merged with user approval. Remaining: restart sidecar + rebuild
+> frontend, run Step 5 Live UI verification below, then flip to LIVE COMPLETE.
 
 **Goal:** Complete the Holdings position lifecycle: every position can edit its
 user-owned notes/thesis/tags, manual positions can edit their financial fields and be
