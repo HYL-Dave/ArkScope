@@ -117,11 +117,26 @@ export function HoldingsView() {
       tags: splitTags(editTagsRef.current?.value ?? ""),
     };
     if (editing.broker === "manual") {
+      const quantity = Number(editQuantityRef.current?.value ?? editing.quantity);
+      if (!Number.isFinite(quantity) || quantity === 0) {
+        setErr("數量必須是非零數字");
+        return;
+      }
+      // Only a truly blank input clears avg_cost; anything non-numeric is an
+      // input error, never a silent clear.
+      const avgRaw = (editAvgCostRef.current?.value ?? "").trim();
+      let avgCost: number | null = null;
+      if (avgRaw !== "") {
+        avgCost = Number(avgRaw);
+        if (!Number.isFinite(avgCost)) {
+          setErr("均價必須留空或為數字");
+          return;
+        }
+      }
       body.symbol = editSymbolRef.current?.value.trim() ?? editing.symbol;
       body.asset_class = editAssetRef.current?.value.trim() ?? editing.asset_class;
-      body.quantity = Number(editQuantityRef.current?.value ?? editing.quantity);
-      const avgRaw = (editAvgCostRef.current?.value ?? "").trim();
-      body.avg_cost = avgRaw === "" ? null : Number(avgRaw);
+      body.quantity = quantity;
+      body.avg_cost = avgCost;
       body.currency = editCurrencyRef.current?.value.trim() ?? editing.currency;
     }
     setBusy(`edit-${editing.id}`);

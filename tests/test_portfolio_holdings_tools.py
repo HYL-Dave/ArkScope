@@ -73,5 +73,6 @@ def test_get_portfolio_holdings_scope_and_totals_match_requested_rows(tmp_path, 
 
     assert [row["id"] for row in out["accounts"]] == [manual.id]
     assert {row["symbol"] for row in out["positions"]} == {"OPEN", "CLOSED"}
-    assert out["totals"]["per_currency"]["USD"]["position_count"] == 2
+    # Totals count open holdings only, even when closed rows are displayed.
+    assert out["totals"]["per_currency"]["USD"]["position_count"] == 1
     assert out["included_account_ids"] == [manual.id]

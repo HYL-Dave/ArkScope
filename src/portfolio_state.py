@@ -700,16 +700,21 @@ class PortfolioStore:
             for position in self.list_positions(include_closed=include_closed)
             if position.account_id in selected_ids
         ]
+        # Closed rows are display-only: they may appear in ``positions`` under
+        # include_closed, but totals always count open holdings only.
+        open_positions = [
+            position for position in positions if position.closed_at is None
+        ]
         if account_id is not None or included_only:
             included_account_ids = sorted(selected_ids)
-            total_positions = positions
+            total_positions = open_positions
         else:
             included_account_ids = sorted(
                 account.id for account in accounts if account.include_in_total
             )
             total_positions = [
                 position
-                for position in positions
+                for position in open_positions
                 if position.account_id in included_account_ids
             ]
         return PortfolioSnapshot(

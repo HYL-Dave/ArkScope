@@ -475,6 +475,35 @@ describe("HoldingsView", () => {
     expect(host!.textContent).toContain("已關閉");
   });
 
+  it("rejects invalid manual numbers without sending a patch", async () => {
+    const calls = stubFetch((url, init) => {
+      if (init?.method === "PATCH") return manualPosition();
+      return snapshot({ positions: [manualPosition()] });
+    });
+    await mount();
+    await flush();
+
+    await act(async () => {
+      (await buttonByText("編輯")).click();
+    });
+    await act(async () => {
+      setInput("Edit Avg Cost", "abc");
+      (await buttonByText("儲存")).click();
+    });
+
+    expect(calls.some((c) => c.method === "PATCH")).toBe(false);
+    expect(host!.textContent).toContain("均價");
+
+    await act(async () => {
+      setInput("Edit Avg Cost", "110");
+      setInput("Edit Quantity", "not-a-number");
+      (await buttonByText("儲存")).click();
+    });
+
+    expect(calls.some((c) => c.method === "PATCH")).toBe(false);
+    expect(host!.textContent).toContain("數量");
+  });
+
   it("does not render a close action for ibkr rows", async () => {
     stubFetch(() => snapshot({ positions: [ibkrPosition()] }));
     await mount();

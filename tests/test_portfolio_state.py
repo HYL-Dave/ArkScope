@@ -388,3 +388,20 @@ def test_nullable_user_fields_distinguish_omitted_from_explicit_null(tmp_path):
     )
     assert cleared.strategy_bucket is None
     assert cleared.target_allocation is None
+
+
+def test_totals_always_exclude_closed_rows_even_when_visible(tmp_path):
+    store = PortfolioStore(tmp_path / "profile_state.db")
+    account = store.ensure_manual_account()
+    row = store.upsert_manual_position(
+        account_id=account.id, symbol="NVDA", quantity=3, currency="USD"
+    )
+    store.close_position(row.id)
+
+    default_view = store.snapshot()
+    closed_view = store.snapshot(include_closed=True)
+
+    assert default_view.positions == []
+    assert [p.id for p in closed_view.positions] == [row.id]
+    assert closed_view.totals == default_view.totals
+    assert "USD" not in closed_view.totals.per_currency
