@@ -945,6 +945,53 @@ def _profile_db_path() -> str:
     )
 
 
+@dataclass(frozen=True)
+class _ActiveCredentialInfo:
+    """Cache-scope identity for the ACTIVE credential (P2.7 effective view)."""
+
+    provider: str
+    credential_id: str
+    auth_mode: str
+    secret_fingerprint: str
+
+
+def resolve_active_credential(
+    provider: Provider,
+    store: CredentialStore | None = None,
+):
+    """Resolve the active credential for ``provider`` into a cache-scope key.
+
+    Unlike the DB-only ``_active_auth_mode`` route helper, this reads the same
+    inventory ``provider_credentials()`` builds — env-only keys included — and
+    returns (credential_id, auth_mode, secret_fingerprint) so discovery-cache
+    scopes are addressable. OAuth modes use the constant "oauth" fingerprint
+    (tokens rotate by design; entitlement follows the account).
+    """
+    from src.model_effective import ActiveCredential
+
+    ensure_env_loaded()
+    store = store or CredentialStore()
+    creds = provider_credentials(store)[provider]
+    active = next((c for c in creds if c.active and c.available), None) \
+        or next((c for c in creds if c.available), None)
+    if active is None:
+        return None
+    if active.auth_type in ("chatgpt_oauth", "claude_code_oauth"):
+        return ActiveCredential(
+            provider=provider, credential_id=active.id,
+            auth_mode=active.auth_type, secret_fingerprint="oauth",
+        )
+    resolved = _resolve_api_credential(provider, active.id, store)
+    if resolved is None or not resolved.secret:
+        # inventory row without a resolvable secret (e.g. retired pool) → no scope
+        return None
+    return ActiveCredential(
+        provider=provider, credential_id=active.id,
+        auth_mode="api_key",
+        secret_fingerprint=secret_fingerprint(resolved.secret),
+    )
+
+
 def discover_models(
     provider: Provider,
     credential_id: str | None = None,

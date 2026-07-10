@@ -26,6 +26,7 @@ from src.env_keys import env_file_path
 from src.model_credentials import (
     CredentialStore,
     discover_models,
+    resolve_active_credential,
     export_env_credentials,
     import_env_credentials,
     provider_credentials,
@@ -234,18 +235,37 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
     """
     store = _credential_store(store)
     route_store = ModelRouteStore(store.db_path)
+    routes = {
+        task: task_route(task, route_store=route_store)
+        for task in _ROUTE_TASKS
+    }
+    # P2.7 additive `effective` block: per-task verified/advanced partition
+    # (registry ∩ discovery cache ∩ executability). Best-effort — the seed
+    # catalog must render even if the cache/resolver hiccups.
+    try:
+        from src.model_effective import effective_model_view
+
+        credentials = {
+            provider: resolve_active_credential(provider, store)
+            for provider in ("anthropic", "openai")
+        }
+        effective = effective_model_view(
+            cache=ModelDiscoveryCache(store.db_path),
+            routes=routes,
+            credentials=credentials,
+        )
+    except Exception:  # noqa: BLE001 - additive view only
+        logger.warning("effective model view failed", exc_info=True)
+        effective = {"tasks": {}}
     return {
         **catalog().model_dump(),
-        "routes": {
-            "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
-            "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
-            "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
-        },
+        "routes": {task: route.model_dump() for task, route in routes.items()},
         "credentials": {
             provider: [c.model_dump() for c in creds]
             for provider, creds in provider_credentials(store).items()
         },
         "custom_allowed": True,
+        "effective": effective,
     }
 
 
