@@ -1,6 +1,9 @@
 # Investment Skills + Investor Profile Design
 
-> **Status: ACTIVE DESIGN - Track A shipped; Track A.5 (calibration chat) MERGED 2026-07-08 (`2bb0ca7`), live verification pending.** Drafted 2026-07-06 after the
+> **Status: ACTIVE DESIGN - Track A shipped; Track A.5 (calibration chat) MERGED 2026-07-08
+> (`2bb0ca7`) + LIVE verified 2026-07-10 (`9bd47ea` fixed two live-only responder defects:
+> enum-less prompt; normalized patch carried derived risk_mismatch so proposals could never
+> validate). Track B (skill suggestions) not started.** Drafted 2026-07-06 after the
 > B6 repo-hygiene ruling moved `config/skills/` and the packaged skill boundary out of
 > cleanup and into product design. This document is the authority for how ArkScope should
 > personalize investment analysis with user profile, assistant stance, and skills. It
