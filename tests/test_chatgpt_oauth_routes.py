@@ -68,8 +68,8 @@ def test_start_returns_auth_url_and_invokes_write_gate(_gate):
 
 
 def test_start_defaults_make_active_false_and_honors_request():
-    # ChatGPT OAuth execution is unwired (fail-closed), so logging in must NOT
-    # auto-activate by default — but the user can opt in.
+    # Logging in must NOT auto-activate by default (never silently switch the
+    # active credential) — but the user can opt in.
     mgr = _FakeManager()
     cr.start_openai_oauth(manager=mgr)  # no body
     assert mgr.make_active is False

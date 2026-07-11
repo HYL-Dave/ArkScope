@@ -137,3 +137,62 @@ describe("CredentialList", () => {
     expect(inputByLabel("season alias").placeholder).toBe("必填；留空則保留原名稱");
   });
 });
+
+describe("CredentialList re-login (S3 credential lifecycle)", () => {
+  const CHATGPT: Partial<ProviderCredential> = {
+    id: "local:7", provider: "openai", auth_type: "chatgpt_oauth", label: "Sub",
+  };
+
+  function renderList(over: Partial<ProviderCredential>, extra: Record<string, unknown> = {}) {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => {
+      root!.render(
+        React.createElement(CredentialList, {
+          credentials: [cred(over)],
+          renames: {},
+          metadataDrafts: {},
+          onRenameDraft: vi.fn(),
+          onMetadataDraft: vi.fn(),
+          onSaveCredentialDetails: vi.fn(),
+          onSetActive: vi.fn(),
+          onDelete: vi.fn(),
+          onDiscover: vi.fn(),
+          discoverLoadingId: null,
+          ...extra,
+        }),
+      );
+    });
+  }
+
+  it("renders 重新登入 on chatgpt_oauth rows and passes the row id", async () => {
+    const onRelogin = vi.fn();
+    renderList(CHATGPT, { onRelogin });
+    await act(async () => {
+      buttonByText("重新登入").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    expect(onRelogin).toHaveBeenCalledWith("local:7");
+  });
+
+  it("does not render 重新登入 for api_key or claude_code_oauth rows (scope ruling)", () => {
+    const onRelogin = vi.fn();
+    renderList({ id: "local:3", provider: "openai", auth_type: "api_key", label: "K" }, { onRelogin });
+    expect(host!.textContent).not.toContain("重新登入");
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    renderList({}, { onRelogin }); // default fixture row = anthropic claude_code_oauth
+    expect(host!.textContent).not.toContain("重新登入");
+  });
+
+  it("disables 重新登入 while a login flow is active", () => {
+    renderList(CHATGPT, { onRelogin: vi.fn(), reloginBusy: true });
+    expect(buttonByText("重新登入").disabled).toBe(true);
+  });
+
+  it("renders no 重新登入 without an onRelogin handler (old render sites stay valid)", () => {
+    renderList(CHATGPT);
+    expect(host!.textContent).not.toContain("重新登入");
+  });
+});

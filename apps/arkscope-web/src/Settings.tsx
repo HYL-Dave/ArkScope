@@ -2461,7 +2461,7 @@ export function ResearchRuntimeSection({
   );
 }
 
-function ProviderSection({
+export function ProviderSection({
   catalog,
   runtime,
   discovery,
@@ -2483,8 +2483,9 @@ function ProviderSection({
   const [newSecret, setNewSecret] = useState<Partial<Record<ModelProvider, string>>>({});
   const [newMakeActive, setNewMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   // OAuth/setup-token "set active on add?" choice (per provider). Undefined = the
-  // unified default (Claude: active iff no local DB credential; ChatGPT: always off,
-  // since its execution is unwired and active = fail-closed Research).
+  // unified default (Claude: active iff no local DB credential; ChatGPT: always off —
+  // logging in must never silently switch the active credential; research runs via
+  // the subscription backend, cards stay api_key-only).
   const [oauthMakeActive, setOauthMakeActive] = useState<Partial<Record<ModelProvider, boolean>>>({});
   const [renames, setRenames] = useState<Record<string, string>>({});
   const [metadataDrafts, setMetadataDrafts] = useState<Record<string, CredentialMetadataDraft>>({});
@@ -2507,6 +2508,9 @@ function ProviderSection({
   const [pollBusy, setPollBusy] = useState(false);
   const [manualBusy, setManualBusy] = useState(false);
   const [manualValue, setManualValue] = useState("");
+  // ONE ChatGPT login/re-login flow at a time: :1455 is a fixed loopback port, so
+  // every trigger (登入 ChatGPT / row 重新登入 / discovery reauth hint) shares this.
+  const chatgptLoginBusy = pollBusy || manualBusy || oauth != null;
   // Cooperative abort for the in-flight poll, so a manual completion or a cancel
   // stops it immediately (rather than leaving it to run — and pin pollBusy — for the
   // full timeout). A per-login token object; the poll closure reads token.aborted.
@@ -2580,14 +2584,14 @@ function ProviderSection({
     }
   }
 
-  async function startChatGPTLogin(makeActive: boolean) {
+  async function startChatGPTLogin(makeActive: boolean, reloginCredentialId?: string) {
     setProviderErr(null);
     setProviderMsg(null);
     setPollBusy(true);
     const token = { aborted: false }; // this login's abort token; manual/cancel flips it
     pollToken.current = token;
     try {
-      const r = await startOpenAIOAuth(makeActive);
+      const r = await startOpenAIOAuth(makeActive, reloginCredentialId);
       setOauth({ state: r.state, authUrl: r.auth_url, phase: "waiting" });
       // open the browser login; if a popup blocker eats it, the copy-link button is the fallback
       window.open(r.auth_url, "_blank", "noopener,noreferrer");
@@ -2618,6 +2622,16 @@ function ProviderSection({
     } finally {
       setPollBusy(false);
     }
+  }
+
+  // S3 re-login: replace an existing chatgpt_oauth credential's token IN PLACE
+  // (no new row; alias/active preserved). First expand the OpenAI setup
+  // disclosure — the waiting/manual/cancel controls already live there — then
+  // run the SAME login flow with the target id. All triggers share the
+  // chatgptLoginBusy guard so two flows can't race for the :1455 callback port.
+  function startChatGPTRelogin(credentialId: string) {
+    setSetupOpen((prev) => ({ ...prev, openai: true }));
+    void startChatGPTLogin(false, credentialId);
   }
 
   function cancelChatGPTLogin() {
@@ -2739,7 +2753,8 @@ function ProviderSection({
           const hasCredential = credentials.some((c) => c.available);
           const setupExpanded = setupOpen[provider] ?? !hasCredential;
           const makeNewKeyActive = newMakeActive[provider] ?? defaultMakeActiveOnAdd(credentials);
-          // Claude import default = same empty-state rule; ChatGPT default = OFF (unwired).
+          // Claude import default = same empty-state rule; ChatGPT default = OFF (never
+          // silently switch the active credential).
           const claudeImportActive = oauthMakeActive.anthropic ?? defaultMakeActiveOnAdd(credentials);
           const chatgptLoginActive = oauthMakeActive.openai ?? false;
           const sourceUrls = Array.from(new Set(models.map((m) => m.source_url)));
@@ -2790,6 +2805,8 @@ function ProviderSection({
                 onDelete={(id) => void removeKey(id)}
                 onDiscover={(id) => void onDiscover(provider, id)}
                 discoverLoadingId={discoveryState?.loading ? discoveryState.credentialId ?? null : null}
+                onRelogin={provider === "openai" ? startChatGPTRelogin : undefined}
+                reloginBusy={chatgptLoginBusy}
               />
               {discoveryState?.result && (
                 <DiscoveryResultView
@@ -2798,6 +2815,12 @@ function ProviderSection({
                   credentialLabel={discoveredCredential?.label ?? null}
                   onClose={() => onClearDiscovery(provider)}
                   onUse={(model, task) => onUseModel(provider, model, task)}
+                  onRelogin={
+                    provider === "openai" && discoveryState.result.credential_id
+                      ? () => startChatGPTRelogin(discoveryState.result!.credential_id!)
+                      : undefined
+                  }
+                  reloginBusy={chatgptLoginBusy}
                 />
               )}
               <div className="settings-actions">
@@ -2934,7 +2957,8 @@ function ProviderSection({
                           <span>登入後設為 active</span>
                         </label>
                         <p className="muted tiny">
-                          目前可做 discovery / probe；AI 研究「執行」尚未接上，設為 active 會讓 OpenAI 研究 fail-closed。
+                          可做 discovery / probe；AI 研究可走 ChatGPT 訂閱後端（experimental）。
+                          卡片合成／翻譯仍需 API key（fail-closed）。預設不設為 active——登入不應悄悄切換使用中的 credential。
                         </p>
                         <button
                           type="button"
@@ -3107,6 +3131,8 @@ export function CredentialList({
   onDelete,
   onDiscover,
   discoverLoadingId,
+  onRelogin,
+  reloginBusy,
 }: {
   credentials: ProviderCredential[];
   renames: Record<string, string>;
@@ -3118,6 +3144,10 @@ export function CredentialList({
   onDelete: (id: string) => void;
   onDiscover: (id: string) => void;
   discoverLoadingId: string | null;
+  // S3 re-login (chatgpt_oauth rows only — scope ruling): replace the row's
+  // token in place. Optional so existing render sites stay valid.
+  onRelogin?: (id: string) => void;
+  reloginBusy?: boolean;
 }) {
   // Per-row probe state (claude_code_oauth only). Local — the probe result is
   // ephemeral and never leaves this view.
@@ -3242,6 +3272,17 @@ export function CredentialList({
                     {discoverLoadingId === cred.id ? "讀取中…" : discoverButtonLabel(cred.auth_type)}
                   </button>
                 )}
+                {cred.auth_type === "chatgpt_oauth" && onRelogin && (
+                  <button
+                    type="button"
+                    className="btn-ghost small"
+                    disabled={reloginBusy}
+                    title="以此列身分重新登入 ChatGPT，原地更換 token（不新增 credential；alias／active 保留）"
+                    onClick={() => onRelogin(cred.id)}
+                  >
+                    重新登入
+                  </button>
+                )}
                 {isLocalOAuth && (
                   <button
                     type="button"
@@ -3334,12 +3375,18 @@ export function DiscoveryResultView({
   credentialLabel,
   onClose,
   onUse,
+  onRelogin,
+  reloginBusy,
 }: {
   result: ModelDiscoveryResult;
   authMode: ProviderCredential["auth_type"] | null;
   credentialLabel: string | null;
   onClose: () => void;
   onUse: (model: string, task: ModelTask) => void;
+  // S3: when the failure is machine-classified as reauth_required, offer the
+  // in-place re-login right where the error is shown. Optional (old sites OK).
+  onRelogin?: () => void;
+  reloginBusy?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const models = result.models.filter((model) =>
@@ -3374,6 +3421,14 @@ export function DiscoveryResultView({
         </button>
       </div>
       {result.error && <p className="warn-text tiny">{result.error}</p>}
+      {result.error_code === "reauth_required" && onRelogin && (
+        <div className="reauth-hint">
+          <span className="warn-text tiny">token 已失效——需要重新登入。</span>
+          <button type="button" className="btn-ghost small" disabled={reloginBusy} onClick={onRelogin}>
+            重新登入
+          </button>
+        </div>
+      )}
       <label className="field discovery-filter">
         <span>搜尋模型</span>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="gpt / claude / mini…" />

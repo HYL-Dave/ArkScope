@@ -59,3 +59,53 @@ describe("DiscoveryResultView", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DiscoveryResultView reauth affordance (S3 credential lifecycle)", () => {
+  function renderView(resultOver: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => {
+      root!.render(
+        React.createElement(DiscoveryResultView, {
+          result: {
+            provider: "openai",
+            credential_id: "local:7",
+            status: "error",
+            models: [],
+            error: "re-login needed (token refresh failed): [REDACTED]",
+            source_url: null,
+            ...resultOver,
+          },
+          authMode: "chatgpt_oauth",
+          credentialLabel: "Sub",
+          onClose: vi.fn(),
+          onUse: vi.fn(),
+          ...extra,
+        }),
+      );
+    });
+  }
+
+  it("renders the re-login affordance for reauth_required and invokes it", async () => {
+    const onRelogin = vi.fn();
+    renderView({ error_code: "reauth_required" }, { onRelogin });
+    const btn = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.trim() === "重新登入");
+    expect(btn).toBeTruthy();
+    await act(async () => {
+      btn!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    expect(onRelogin).toHaveBeenCalled();
+  });
+
+  it("does not render the affordance for a plain error", () => {
+    renderView({ error_code: null }, { onRelogin: vi.fn() });
+    expect(host!.textContent).not.toContain("重新登入");
+  });
+
+  it("disables the affordance while a login flow is active", () => {
+    renderView({ error_code: "reauth_required" }, { onRelogin: vi.fn(), reloginBusy: true });
+    const btn = Array.from(host!.querySelectorAll("button")).find((b) => b.textContent?.trim() === "重新登入");
+    expect(btn!.disabled).toBe(true);
+  });
+});

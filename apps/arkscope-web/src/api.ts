@@ -155,6 +155,9 @@ export interface ModelDiscoveryResult {
   cache_state?: "ok" | "seed_only" | string;
   cached_at?: string | null;
   cached?: boolean;
+  // S3 additive machine-readable failure class: "reauth_required" = a fresh
+  // login repairs it; "missing_credential" = driver wiring, re-login can't fix.
+  error_code?: string | null;
 }
 
 export interface ModelTestResult {
@@ -907,10 +910,14 @@ export interface OAuthStatusResult {
   credential: ProviderCredential | null;
   detail: string | null;
 }
-export function startOpenAIOAuth(makeActive = false): Promise<OAuthStartResult> {
-  // make_active default false: ChatGPT OAuth execution is unwired (Research fail-closes
-  // when active), so logging in must not auto-switch the active credential.
-  return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", { make_active: makeActive }, 8_000);
+export function startOpenAIOAuth(makeActive = false, reloginCredentialId?: string): Promise<OAuthStartResult> {
+  // make_active default false: logging in (or re-logging in) must never silently
+  // switch the active credential. AI 研究 CAN run through chatgpt_oauth (subscription
+  // backend, experimental); card tasks stay api_key-only (fail-closed).
+  // `reloginCredentialId` (S3) replaces that credential's token IN PLACE — no new row.
+  const body: Record<string, unknown> = { make_active: makeActive };
+  if (reloginCredentialId) body.relogin_credential_id = reloginCredentialId;
+  return sendJSON<OAuthStartResult>("/config/credentials/openai/oauth/start", "POST", body, 8_000);
 }
 // Cancel an in-flight login: evicts the pending state server-side so a late browser
 // callback can't still create a credential (UI cancel alone only stops the FE poll).
