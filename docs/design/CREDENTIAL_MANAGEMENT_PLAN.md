@@ -272,8 +272,14 @@ Internally, capability is keyed by `(provider, auth_mode, model)` — never a gl
   (used where no live discovery API exists, e.g. claude_code_oauth).
 - **實測 OAuth (probe OAuth)** = exercise the subscription backend/token capability
   (P1/P2 for ChatGPT, P3 for Claude) — a health check, not a model list.
-- **測試模型 (test model)** = a paid minimal model *call* with model+effort — **API-key
-  path ONLY** (OAuth modes don't do a raw-SDK test call).
+- **直接測試模型 (`/config/model-test`)** = a paid minimal model *call* with
+  model+effort through a direct API key. This compatibility endpoint remains
+  API-key-only.
+- **任務實際測試 (`/config/model-task-test`)** = the Models task card's bounded
+  check through the task's selected provider and the ACTIVE credential. API-key
+  routes reuse the direct test; supported OAuth Research uses a one-turn,
+  no-tools subscription canary; unsupported task/auth combinations are zero-call
+  with a machine-readable reason.
 - **The ACTIVE credential decides** which models + capabilities AI 研究 can use.
 
 ### 11.2 Operations matrix (grounded against HEAD)
@@ -281,7 +287,7 @@ Internally, capability is keyed by `(provider, auth_mode, model)` — never a gl
 | Credential | 列模型 (discovery) | 驗證 token/登入 (probe) | 測試模型呼叫 (model-test) | AI 研究 執行 |
 |---|---|---|---|---|
 | **openai api_key** | OpenAI `/models` — LIVE (`source=provider_api`) | — (key-exists; a real call = model-test) | model+effort test call — LIVE | runs |
-| **openai chatgpt_oauth** | ChatGPT-backend list — LIVE (step 1; `source=provider_api`) | **P1/P2 probe** (real backend calls) | **none** (raw-SDK model-test is the wrong surface; use AI 研究 or the OAuth probe) | AI 研究 uses the ChatGPT-backend driver (S3 execution code wired; live smoke pending) |
+| **openai chatgpt_oauth** | ChatGPT-backend list — LIVE (step 1; `source=provider_api`) | **P1/P2 probe** (real backend calls) | **none** (the direct raw-SDK model-test is the wrong surface; Models uses the bounded task-test instead) | AI 研究 uses the ChatGPT-backend driver (S3 execution live-smoke passed) |
 | **anthropic api_key** | Anthropic `/v1/models` — LIVE | — | model+effort test call — LIVE | runs |
 | **anthropic claude_code_oauth** | **seed candidate list only** (no live discovery API; route returns seed) | **P3 probe** (`claude -p` + raw-SDK-reject) | **none** (no raw-SDK model-test — wrong surface/billing) | runs (subscription Research) |
 
@@ -300,11 +306,11 @@ Each credential row owns its own checks (you're looking at *that* credential):
 | Anthropic API key | `列模型` · (測試模型 — see note) | Anthropic API · live |
 | Claude OAuth (claude_code_oauth) | `查看候選模型` · `測試 token` | seed · 非即時 discovery |
 
-- **`測試模型` (model-test) is NOT a credential-row action** — it needs a specific
-  model + effort, which the user picks in **Settings → Models** (`測試此模型`, the
-  existing `testModelAccess` button). The api_key ROW exposes `列模型` only; the paid
-  test call stays where model+effort are chosen. (Deferring it to the row would mean a
-  context-less call.) Implemented this way; the table above lists it for completeness.
+- **Model testing is NOT a credential-row action** — it needs a task, model, and
+  effort, which the user picks in **Settings → Models** (`實際測試`,
+  `testTaskModelAccess`). The API-key row exposes `列模型` only. The Models
+  endpoint resolves the ACTIVE credential itself and never lets a task bind to a
+  credential id. Deferring the check to a row would produce a context-less call.
 - **Provider copy** (`Settings.tsx:1315`): drop "API key" — say "credential model
   discovery / capability test (依 credential 類型而定)".
 - **Provider-card pill** reflects the ACTIVE credential's mode (API key / ChatGPT OAuth /
@@ -313,8 +319,10 @@ Each credential row owns its own checks (you're looking at *that* credential):
 - **Discovery results** show a **source badge** per result (`OpenAI API` / `ChatGPT
   backend` / `seed`) — data already exists (`DiscoveredModel.source`,
   `ModelDiscoveryResult.source_url`); UI just renders it.
-- **Settings → Models = task routing ONLY** (may show a warning like "active credential is
-  ChatGPT OAuth — confirm models via Providers", per §step-2). No credential checks there.
+- **Settings → Models owns task routing, not credential mutation.** It may show
+  the selected provider's active credential read-only, refresh that credential's
+  discovery cache, and run a task-scoped check. Login, activation, re-login,
+  editing, and deletion remain Providers-only.
 - **AI 研究 page = per-turn selection ONLY** — show active credential / auth mode / model
   source; never credential management.
 

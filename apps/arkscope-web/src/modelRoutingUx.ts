@@ -7,6 +7,39 @@ import type {
   TaskRoute,
 } from "./api";
 
+export const MODEL_UX_LABELS: {
+  groups: readonly string[];
+  reasons: Record<string, string>;
+  authModes: Record<string, string>;
+  thinking: Record<string, string>;
+} = {
+  groups: ["可供此任務使用", "此登入可見", "進階／未驗證", "目前路由"],
+  reasons: {
+    missing_active_credential: "尚未設定此 provider 的登入",
+    task_auth_mode_unsupported: "此登入方式不支援這個任務",
+    task_test_unsupported: "此登入方式尚不支援實際測試",
+    task_capability_missing: "缺少任務能力",
+    model_not_visible: "此登入的探索清單未顯示此模型",
+    model_not_in_registry: "自訂／未知模型，尚未驗證能力",
+    discovery_unavailable: "暫時無法讀取模型探索狀態",
+    provider_call_failed: "provider 實際呼叫失敗",
+    reauth_required: "登入已失效，請重新登入",
+  },
+  authModes: {
+    api_key: "API key",
+    api_key_pool: "API key pool",
+    chatgpt_oauth: "ChatGPT 訂閱登入",
+    claude_code_oauth: "Claude 訂閱登入",
+  },
+  thinking: {
+    none: "無特殊 thinking 行為",
+    manual_budget: "使用手動 thinking budget",
+    adaptive_opt_in: "可選擇 adaptive thinking",
+    adaptive_default_on: "預設開啟 adaptive thinking",
+    adaptive_always_on: "固定開啟 adaptive thinking",
+  },
+};
+
 export interface DraftRouteValue {
   provider: ModelProvider;
   model: string;

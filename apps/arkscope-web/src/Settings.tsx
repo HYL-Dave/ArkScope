@@ -71,6 +71,7 @@ import { runDiscoveryAndRefreshCatalog } from "./modelSelect";
 import {
   blockedRouteSaves,
   isTaskTestSnapshotCurrent,
+  MODEL_UX_LABELS,
   providerContexts,
   type DraftRouteValue,
   type TaskTestSnapshot,
@@ -2107,33 +2108,6 @@ function DataSourcesSection() {
   );
 }
 
-const MODEL_REASON_LABELS: Record<string, string> = {
-  missing_active_credential: "尚未設定此 provider 的登入",
-  task_auth_mode_unsupported: "此登入方式不支援這個任務",
-  task_test_unsupported: "此登入方式尚不支援實際測試",
-  task_capability_missing: "缺少任務能力",
-  model_not_visible: "此登入的探索清單未顯示此模型",
-  model_not_in_registry: "自訂／未知模型，尚未驗證能力",
-  discovery_unavailable: "暫時無法讀取模型探索狀態",
-  provider_call_failed: "provider 實際呼叫失敗",
-  reauth_required: "登入已失效，請重新登入",
-};
-
-const THINKING_LABELS: Record<string, string> = {
-  none: "無特殊 thinking 行為",
-  manual_budget: "使用手動 thinking budget",
-  adaptive_opt_in: "可選擇 adaptive thinking",
-  adaptive_default_on: "預設開啟 adaptive thinking",
-  adaptive_always_on: "固定開啟 adaptive thinking",
-};
-
-const AUTH_MODE_LABELS: Record<string, string> = {
-  api_key: "API key",
-  api_key_pool: "API key pool",
-  chatgpt_oauth: "ChatGPT 訂閱登入",
-  claude_code_oauth: "Claude 訂閱登入",
-};
-
 type ModelEntryGroup = {
   label: string;
   entries: Array<EffectiveProviderModelEntry & { disabledReason: string | null }>;
@@ -2161,19 +2135,19 @@ function groupedModelEntries(
   }));
   return [
     {
-      label: "可供此任務使用",
+      label: MODEL_UX_LABELS.groups[0],
       entries: withReason.filter((entry) => entry.status === "visible" && !entry.disabledReason),
     },
     {
-      label: "此登入可見",
+      label: MODEL_UX_LABELS.groups[1],
       entries: withReason.filter((entry) => entry.status === "visible" && !!entry.disabledReason),
     },
     {
-      label: "進階／未驗證",
+      label: MODEL_UX_LABELS.groups[2],
       entries: withReason.filter((entry) => entry.status === "advanced" || entry.status === "seed"),
     },
     {
-      label: "目前路由",
+      label: MODEL_UX_LABELS.groups[3],
       entries: withReason.filter((entry) => entry.status === "route"),
     },
   ];
@@ -2358,7 +2332,7 @@ export function ModelRoutingSection({
                 {context ? (
                   <>
                     <strong>{context.label}</strong>
-                    <span>{AUTH_MODE_LABELS[context.auth_mode] ?? context.auth_mode}</span>
+                    <span>{MODEL_UX_LABELS.authModes[context.auth_mode] ?? context.auth_mode}</span>
                     <span>
                       {providerBlock?.cache_state === "ok"
                         ? "已取得可見模型清單"
@@ -2417,13 +2391,13 @@ export function ModelRoutingSection({
                           >
                             {entry.label}
                             {entry.disabledReason
-                              ? ` · ${MODEL_REASON_LABELS[entry.disabledReason] ?? entry.disabledReason}`
+                              ? ` · ${MODEL_UX_LABELS.reasons[entry.disabledReason] ?? entry.disabledReason}`
                               : entry.status === "advanced"
                                 ? " · 進階"
                                 : entry.status === "seed"
                                   ? " · 未驗證"
                                   : entry.status === "route" && entry.reason_code
-                                    ? ` · ${MODEL_REASON_LABELS[entry.reason_code] ?? entry.reason_code}`
+                                    ? ` · ${MODEL_UX_LABELS.reasons[entry.reason_code] ?? entry.reason_code}`
                                     : ""}
                           </option>
                         ))}
@@ -2432,7 +2406,7 @@ export function ModelRoutingSection({
                   </select>
                   {disabledReasons.length > 0 && (
                     <p className="field-help" aria-label={`模型限制 ${task.id}`}>
-                      不可選：{disabledReasons.map((reason) => MODEL_REASON_LABELS[reason] ?? reason).join("；")}
+                      不可選：{disabledReasons.map((reason) => MODEL_UX_LABELS.reasons[reason] ?? reason).join("；")}
                     </p>
                   )}
                   <button
@@ -2491,9 +2465,9 @@ export function ModelRoutingSection({
               <div className="model-thinking-line">
                 <span>Thinking</span>
                 <strong>
-                  {THINKING_LABELS[selectedEntry?.thinking_mode ?? "none"]
+                  {MODEL_UX_LABELS.thinking[selectedEntry?.thinking_mode ?? "none"]
                     ?? selectedEntry?.thinking_mode
-                    ?? THINKING_LABELS.none}
+                    ?? MODEL_UX_LABELS.thinking.none}
                 </strong>
               </div>
 
@@ -2543,7 +2517,7 @@ export function ModelRoutingSection({
 
 function TaskModelTestStatus({ result }: { result: TaskModelTestResult }) {
   const ok = result.status === "ok";
-  const action = result.error_code ? MODEL_REASON_LABELS[result.error_code] : null;
+  const action = result.error_code ? MODEL_UX_LABELS.reasons[result.error_code] : null;
   return (
     <div className={`test-status ${ok ? "ok" : "bad"}`}>
       <strong>{ok ? "可實際呼叫" : action ?? "測試失敗"}</strong>

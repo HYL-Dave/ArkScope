@@ -151,6 +151,40 @@ def test_dispatch_matrix_zero_call_arms(monkeypatch, tmp_path):
         assert calls == {"api": [], "driver": []}
 
 
+@pytest.mark.parametrize(
+    ("provider", "auth_mode", "task", "expected", "call_arm"),
+    [
+        *[(provider, "api_key", task, None, "api")
+          for provider in ("openai", "anthropic")
+          for task in ("card_synthesis", "card_translation", "ai_research")],
+        *[(provider, "api_key_pool", task, "task_test_unsupported", None)
+          for provider in ("openai", "anthropic")
+          for task in ("card_synthesis", "card_translation", "ai_research")],
+        ("openai", "chatgpt_oauth", "card_synthesis", "task_auth_mode_unsupported", None),
+        ("openai", "chatgpt_oauth", "card_translation", "task_auth_mode_unsupported", None),
+        ("openai", "chatgpt_oauth", "ai_research", None, "driver"),
+        ("anthropic", "claude_code_oauth", "card_synthesis", "task_auth_mode_unsupported", None),
+        ("anthropic", "claude_code_oauth", "card_translation", "task_auth_mode_unsupported", None),
+        ("anthropic", "claude_code_oauth", "ai_research", "task_test_unsupported", None),
+    ],
+)
+def test_dispatch_matrix_covers_every_task_provider_auth_combination(
+    monkeypatch, tmp_path, provider, auth_mode, task, expected, call_arm
+):
+    model = "gpt-5.4-mini" if provider == "openai" else "claude-opus-4-8"
+    result, calls, _ = _run(
+        monkeypatch,
+        tmp_path,
+        active=_active(auth_mode, provider),
+        task=task,
+        provider=provider,
+        model=model,
+    )
+    assert result.error_code == expected
+    assert len(calls["api"]) == (1 if call_arm == "api" else 0)
+    assert len(calls["driver"]) == (1 if call_arm == "driver" else 0)
+
+
 def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
     result, calls, _ = _run(
         monkeypatch, tmp_path, provider="anthropic", model="gpt-5.4-mini",

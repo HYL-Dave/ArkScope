@@ -1,7 +1,8 @@
 # Model Routing Settings UX Design
 
-> **Status: DRAFT FOR USER REVIEW ROUND 2, 2026-07-11.** This is a focused P2.8 design
-> slice prompted by the first live inspection of the P2.7 picker. It preserves
+> **Status: ADOPTED; IMPLEMENTED FOR REVIEW, 2026-07-11. Live gate pending.**
+> This is a focused P2.8 design slice prompted by the first live inspection of
+> the P2.7 picker. It preserves
 > the existing Settings boundary: `Providers` owns credentials, login, and
 > credential-scoped discovery; `Models` owns per-task provider/model/effort
 > routing. No implementation work starts until this document is approved.
@@ -363,7 +364,7 @@ discovery can prove an OAuth task executable when the task/auth matrix says no.
 
 ## 7. Compatibility and Authority
 
-On adoption, this design narrowly supersedes two statements in
+This adopted design narrowly supersedes two statements in
 `docs/design/CREDENTIAL_MANAGEMENT_PLAN.md` section 11:
 
 1. `Settings -> Models = task routing ONLY; no credential checks there` becomes:

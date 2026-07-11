@@ -267,12 +267,31 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(researchCard().textContent).toContain("ChatGPT Plus");
     expect(researchCard().textContent).toContain("最後驗證可見");
 
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
     cat.effective!.providers!.openai = null;
     render(vi.fn(), cat);
     const card = researchCard();
     expect(card.textContent).toContain("尚未設定此 provider 的登入");
     expect((card.querySelector('[aria-label="模型 ai_research"]') as HTMLSelectElement).disabled).toBe(true);
     expect(card.textContent).toContain("前往 Providers");
+  });
+
+  it("shows the selected Anthropic credential and its seed-only state", () => {
+    render(vi.fn(), catalogV2(), undefined, {
+      draft: {
+        ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "default", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+      },
+    });
+    const card = researchCard();
+    expect(card.textContent).toContain("Claude API");
+    expect(card.textContent).toContain("此通道無法線上列出模型");
+    expect(card.textContent).not.toContain("重新登入");
+    expect(card.textContent).not.toContain("設為 active");
   });
 
   it("refreshes discovery for the selected provider credential", () => {
@@ -324,6 +343,46 @@ describe("ModelRoutingSection provider-first UX", () => {
     });
     expect(researchCard().textContent).toContain("選擇已變更——重新測試");
     expect(researchCard().textContent).not.toContain("12 ms");
+  });
+
+  it("renders an actual-call success only for the current five-field snapshot", () => {
+    const result: TaskModelTestResult = {
+      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "ok",
+      error_code: null, latency_ms: 12, tested_at: "2026-07-11T00:00:00Z",
+      fallback_effort: null, warning: null,
+    };
+    render(vi.fn(), catalogV2(), undefined, {
+      testState: {
+        ai_research: {
+          loading: false, result, stale: false,
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+        },
+      },
+    });
+    expect(researchCard().textContent).toContain("可實際呼叫");
+    expect(researchCard().textContent).toContain("12 ms");
+  });
+
+  it("maps a reauth result to the credential action without exposing mutation controls", () => {
+    const result: TaskModelTestResult = {
+      task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low",
+      auth_mode: "chatgpt_oauth", credential_id: "local:7", status: "error",
+      error_code: "reauth_required", latency_ms: 8, tested_at: "2026-07-11T00:00:00Z",
+      fallback_effort: null, warning: "token expired",
+    };
+    render(vi.fn(), catalogV2(), undefined, {
+      testState: {
+        ai_research: {
+          loading: false, result, stale: false,
+          snapshot: { task: "ai_research", provider: "openai", model: "gpt-5.4-mini", effort: "low", credential_id: "local:7" },
+        },
+      },
+    });
+    const card = researchCard();
+    expect(card.textContent).toContain("登入已失效，請重新登入");
+    expect(card.textContent).not.toContain("刪除 credential");
+    expect(card.textContent).not.toContain("設為 active");
   });
 
   it("degrades honestly against an old sidecar without reviving hidden controls", () => {

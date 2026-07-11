@@ -4,12 +4,24 @@ import type { ModelCatalog, TaskRoute } from "./api";
 import {
   blockedRouteSaves,
   isTaskTestSnapshotCurrent,
+  MODEL_UX_LABELS,
   providerContexts,
   routesSemanticallyEqual,
   type DraftRouteValue,
   type ProviderContextMap,
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
+
+describe("Models terminology", () => {
+  it("keeps status, auth, thinking, and group copy in one canonical table", () => {
+    expect(MODEL_UX_LABELS.groups).toEqual([
+      "可供此任務使用", "此登入可見", "進階／未驗證", "目前路由",
+    ]);
+    expect(MODEL_UX_LABELS.reasons.reauth_required).toBe("登入已失效，請重新登入");
+    expect(MODEL_UX_LABELS.authModes.chatgpt_oauth).toBe("ChatGPT 訂閱登入");
+    expect(MODEL_UX_LABELS.thinking.adaptive_default_on).toBe("預設開啟 adaptive thinking");
+  });
+});
 
 const route = (provider: "openai" | "anthropic", model: string): TaskRoute => ({
   task: "ai_research",
