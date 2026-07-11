@@ -135,6 +135,31 @@ class ModelDiscoveryCache:
                 ],
             )
 
+    def delete_scope(
+        self,
+        *,
+        provider: str,
+        credential_id: str,
+        auth_mode: str | None = None,
+    ) -> int:
+        """Remove a credential's cached entitlement (S3 lifecycle: re-login clears
+        its own scope; credential deletion cascades every mode). One transaction
+        over BOTH tables; returns total rows removed; idempotent (0 on repeat).
+        `auth_mode=None` wipes all modes for that credential."""
+        where = "provider=? AND credential_id=?"
+        params: tuple = (provider, credential_id)
+        if auth_mode is not None:
+            where += " AND auth_mode=?"
+            params = (*params, auth_mode)
+        with self._connect() as conn:
+            models = conn.execute(
+                f"DELETE FROM model_discovery_models WHERE {where}", params,
+            ).rowcount
+            runs = conn.execute(
+                f"DELETE FROM model_discovery_runs WHERE {where}", params,
+            ).rowcount
+        return int(models) + int(runs)
+
     def get(
         self,
         *,
