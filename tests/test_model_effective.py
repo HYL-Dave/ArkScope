@@ -1,11 +1,14 @@
 """Effective picker tests (P2.7 Task 4): per-task verified/advanced partition."""
 
 import hashlib
+from dataclasses import replace
 
+import src.model_effective as model_effective_module
 from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_effective import (
     ActiveCredential,
     effective_model_view,
+    effective_model_view_v2,
     task_auth_executable,
 )
 from src.model_capabilities import capability_for
@@ -269,3 +272,267 @@ def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
     assert "text-embedding-3-large" not in advanced_ids
     assert "mystery-model" in advanced_ids               # route pin survives (badge route)
     assert [m["id"] for m in research["verified"]] == ["gpt-5.6-luna"]
+
+
+def test_v2_both_providers_present_regardless_of_route(tmp_path):
+    routes = {
+        task: TaskRoute(task=task, provider="openai", model="gpt-5.4-mini", effort="default")
+        for task in ("card_synthesis", "card_translation", "ai_research")
+    }
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path),
+        routes=routes,
+        credentials=_credentials(),
+    )
+
+    assert set(view["providers"]) == {"openai", "anthropic"}
+    for task in routes:
+        assert view["tasks"][task]["current_provider"] == "openai"
+        assert set(view["tasks"][task]["providers"]) == {"openai", "anthropic"}
+        assert view["tasks"][task]["providers"]["anthropic"]["models"]
+
+
+def test_v2_entry_schema_and_grouping(tmp_path):
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path), routes=_routes_mixed(), credentials=_credentials(),
+    )
+    synth = view["tasks"]["card_synthesis"]["providers"]["anthropic"]
+    entries = {entry["id"]: entry for entry in synth["models"]}
+
+    assert entries["claude-opus-4-8"]["status"] == "visible"
+    assert entries["claude-opus-4-8"]["visible_to_credential"] is True
+    assert entries["claude-opus-4-7"]["status"] == "advanced"
+    assert entries["claude-opus-4-7"]["visible_to_credential"] is True
+    assert not ({"claude-opus-4-5", "claude-sonnet-4-5"} & entries.keys())
+    for entry in entries.values():
+        assert set(entry) == {
+            "id", "label", "status", "visible_to_credential",
+            "eligible", "reason_code", "thinking_mode",
+        }
+
+    research = view["tasks"]["ai_research"]["providers"]["openai"]
+    research_entries = {entry["id"]: entry for entry in research["models"]}
+    assert research_entries["mystery-model"]["status"] == "route"
+    assert all(entry["id"] not in {"whisper-1", "text-embedding-3-large"}
+               for entry in research["models"])
+
+
+def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
+    base = capability_for("gpt-5.4-mini")
+    no_structured = replace(
+        base,
+        id="gpt-no-structured",
+        label="GPT no structured",
+        supports_structured_output=False,
+    )
+    original_all = model_effective_module.all_models
+    original_capability = model_effective_module.capability_for
+    monkeypatch.setattr(
+        model_effective_module,
+        "all_models",
+        lambda provider=None: (
+            original_all(provider) + ((no_structured,) if provider in (None, "openai") else ())
+        ),
+    )
+    monkeypatch.setattr(
+        model_effective_module,
+        "capability_for",
+        lambda model_id: no_structured if model_id == no_structured.id else original_capability(model_id),
+    )
+
+    cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
+    cache.record_run(
+        provider="openai", auth_mode="api_key", credential_id="o1",
+        secret_fingerprint=_fp("sk-oai"), status="ok",
+        models=[{"id": no_structured.id, "label": no_structured.label, "source": "provider_api"}],
+    )
+    creds = {
+        "openai": ActiveCredential("openai", "o1", "api_key", _fp("sk-oai")),
+        "anthropic": ActiveCredential("anthropic", "ao", "claude_code_oauth", "oauth"),
+    }
+    routes = {
+        "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model=no_structured.id),
+        "card_translation": TaskRoute(task="card_translation", provider="anthropic", model="claude-sonnet-5"),
+        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini"),
+    }
+    view = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
+
+    openai_card = view["tasks"]["card_synthesis"]["providers"]["openai"]
+    missing_cap = next(entry for entry in openai_card["models"] if entry["id"] == no_structured.id)
+    assert openai_card["executable"] is True
+    assert missing_cap["eligible"] is False
+    assert missing_cap["reason_code"] == "task_capability_missing"
+
+    anthropic_card = view["tasks"]["card_translation"]["providers"]["anthropic"]
+    assert anthropic_card["executable"] is False
+    assert anthropic_card["reason_code"] == "task_auth_mode_unsupported"
+    assert anthropic_card["models"]
+    assert all(entry["eligible"] is False for entry in anthropic_card["models"])
+
+
+def test_v2_route_pin_unknown_model_is_eligible_with_warning(tmp_path):
+    routes = _routes_mixed()
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path), routes=routes, credentials=_credentials(),
+    )
+    openai = view["tasks"]["ai_research"]["providers"]["openai"]
+    route = next(entry for entry in openai["models"] if entry["id"] == "mystery-model")
+    assert route["status"] == "route"
+    assert route["eligible"] is True
+    assert route["reason_code"] == "model_not_in_registry"
+    assert route["thinking_mode"] == "none"
+    assert all(entry["id"] != "mystery-model"
+               for entry in view["tasks"]["ai_research"]["providers"]["anthropic"]["models"])
+
+    missing = effective_model_view_v2(
+        cache=ModelDiscoveryCache(tmp_path / "missing.db"),
+        routes=routes,
+        credentials={"openai": None, "anthropic": None},
+    )
+    missing_route = next(
+        entry for entry in missing["tasks"]["ai_research"]["providers"]["openai"]["models"]
+        if entry["id"] == "mystery-model"
+    )
+    assert missing_route["eligible"] is False
+    assert missing_route["reason_code"] == "missing_active_credential"
+
+
+def test_v2_missing_credential_provider_reason(tmp_path):
+    view = effective_model_view_v2(
+        cache=ModelDiscoveryCache(tmp_path / "profile.db"),
+        routes=_routes_mixed(),
+        credentials={"openai": None, "anthropic": None},
+    )
+    assert view["providers"] == {"openai": None, "anthropic": None}
+    for task in view["tasks"].values():
+        for block in task["providers"].values():
+            assert block["executable"] is False
+            assert block["reason_code"] == "missing_active_credential"
+            assert block["cache_state"] == "never_discovered"
+            assert block["models"]
+            assert all(entry["eligible"] is False for entry in block["models"])
+
+
+def test_v2_thinking_mode_carried_from_registry(tmp_path):
+    view = effective_model_view_v2(
+        cache=ModelDiscoveryCache(tmp_path / "profile.db"),
+        routes=_routes_mixed(),
+        credentials={"openai": None, "anthropic": None},
+    )
+    entries = {}
+    for block in view["tasks"]["ai_research"]["providers"].values():
+        entries.update({entry["id"]: entry for entry in block["models"]})
+    assert entries["claude-fable-5"]["thinking_mode"] == "adaptive_always_on"
+    assert entries["claude-sonnet-5"]["thinking_mode"] == "adaptive_default_on"
+    assert entries["claude-opus-4-8"]["thinking_mode"] == "adaptive_opt_in"
+    assert entries["claude-haiku-4-5"]["thinking_mode"] == "manual_budget"
+    assert entries["gpt-5.4-mini"]["thinking_mode"] == "none"
+    assert entries["mystery-model"]["thinking_mode"] == "none"
+
+
+def test_v2_visibility_is_orthogonal_to_tier(tmp_path):
+    view = effective_model_view_v2(
+        cache=_seed_cache(tmp_path), routes=_routes_mixed(), credentials=_credentials(),
+    )
+    entries = {
+        entry["id"]: entry
+        for entry in view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
+    }
+    assert entries["claude-opus-4-7"]["status"] == "advanced"
+    assert entries["claude-opus-4-7"]["visible_to_credential"] is True
+    assert entries["claude-sonnet-4-6"]["status"] == "advanced"
+    assert entries["claude-sonnet-4-6"]["visible_to_credential"] is False
+
+    seed_cache = ModelDiscoveryCache(tmp_path / "seed.db")
+    seed_cache.record_run(
+        provider="anthropic", auth_mode="claude_code_oauth", credential_id="ao",
+        secret_fingerprint="oauth", status="seed_only", models=[],
+    )
+    seed_view = effective_model_view_v2(
+        cache=seed_cache,
+        routes=_routes_mixed(),
+        credentials={
+            "anthropic": ActiveCredential("anthropic", "ao", "claude_code_oauth", "oauth"),
+            "openai": None,
+        },
+    )
+    seed_entries = seed_view["tasks"]["ai_research"]["providers"]["anthropic"]["models"]
+    assert all(entry["visible_to_credential"] is None for entry in seed_entries)
+
+
+def test_v2_discovered_ineligible_default_stays_out_of_alias(tmp_path, monkeypatch):
+    base = capability_for("gpt-5.4-mini")
+    no_structured = replace(
+        base,
+        id="gpt-no-structured",
+        label="GPT no structured",
+        supports_structured_output=False,
+    )
+    original_all = model_effective_module.all_models
+    original_capability = model_effective_module.capability_for
+    monkeypatch.setattr(
+        model_effective_module,
+        "all_models",
+        lambda provider=None: original_all(provider) + ((no_structured,) if provider in (None, "openai") else ()),
+    )
+    monkeypatch.setattr(
+        model_effective_module,
+        "capability_for",
+        lambda model_id: no_structured if model_id == no_structured.id else original_capability(model_id),
+    )
+    cache = ModelDiscoveryCache(tmp_path / "profile.db")
+    cache.record_run(
+        provider="openai", auth_mode="api_key", credential_id="o1",
+        secret_fingerprint=_fp("sk-oai"), status="ok",
+        models=[{"id": no_structured.id, "label": no_structured.label, "source": "provider_api"}],
+    )
+    creds = {
+        "openai": ActiveCredential("openai", "o1", "api_key", _fp("sk-oai")),
+        "anthropic": None,
+    }
+    routes = {
+        "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model="gpt-5.4-mini"),
+        "card_translation": TaskRoute(task="card_translation", provider="openai", model="gpt-5.4-mini"),
+        "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini"),
+    }
+    v2 = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
+    v2_entry = next(
+        entry for entry in v2["tasks"]["card_synthesis"]["providers"]["openai"]["models"]
+        if entry["id"] == no_structured.id
+    )
+    assert v2_entry["status"] == "visible" and v2_entry["eligible"] is False
+
+    legacy = effective_model_view(cache=cache, routes=routes, credentials=creds)
+    legacy_ids = {
+        entry["id"]
+        for group in (legacy["tasks"]["card_synthesis"]["verified"],
+                      legacy["tasks"]["card_synthesis"]["advanced"])
+        for entry in group
+    }
+    assert no_structured.id not in legacy_ids
+
+
+def test_legacy_alias_is_derived_from_v2(tmp_path):
+    cache = _seed_cache(tmp_path)
+    routes = _routes_mixed()
+    creds = _credentials()
+    v2 = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
+    expected = {"tasks": {}}
+    for task, task_block in v2["tasks"].items():
+        provider = task_block["current_provider"]
+        block = task_block["providers"][provider]
+        expected["tasks"][task] = {
+            "verified": [
+                {"id": entry["id"], "label": entry["label"], "badge": None}
+                for entry in block["models"]
+                if entry["status"] == "visible" and entry["eligible"]
+            ],
+            "advanced": [
+                {"id": entry["id"], "label": entry["label"], "badge": entry["status"]}
+                for entry in block["models"]
+                if entry["status"] in {"advanced", "seed", "route"}
+            ],
+            "cache_state": block["cache_state"],
+            "discovered_at": block["discovered_at"],
+        }
+    assert effective_model_view(cache=cache, routes=routes, credentials=creds) == expected
