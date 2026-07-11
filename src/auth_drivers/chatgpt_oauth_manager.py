@@ -107,7 +107,10 @@ class OAuthLoginManager:
 
     def status(self, state: str) -> dict:
         with self._lock:
-            return dict(self._results.get(state, {"status": "unknown", "credential": None, "detail": None}))
+            return dict(self._results.get(state, {
+                "status": "unknown", "credential": None, "detail": None,
+                "manual_completable": False,  # an untracked/evicted state can't be completed
+            }))
 
     def cancel_login(self, state: str) -> None:
         """Cancel an in-flight login. EVICT the pending state FIRST — so a late loopback
@@ -120,7 +123,7 @@ class OAuthLoginManager:
         if not known:
             return
         self._state_store.discard(state)  # the key fix: close the late-callback gap
-        self._finish(state, status="error", detail="login cancelled")
+        self._finish(state, status="error", detail="login cancelled", manual_completable=False)
         self._cancel(state)  # mark cancelled + server.cancel() to unblock wait_for_code
 
     def complete_manual(self, *, state: str, code: str) -> dict:
@@ -133,12 +136,22 @@ class OAuthLoginManager:
 
     # --- internal ---------------------------------------------------------
     def _await_callback(self, state: str, server: Any) -> None:
+        # F4: the two failure families differ in what the user can still do.
+        # wait_for_code failing (timeout / port trouble / cancel) leaves the
+        # single-use pending state ALIVE → the copy-code manual fallback can
+        # still complete this login. completion failing consumed the state →
+        # a manual paste can never succeed, and the result says so.
         try:
             code, recv_state = server.wait_for_code(self._timeout)
+        except ChatGPTOAuthLoginError as exc:
+            self._finish(state, status="error", detail=str(exc))
+            self._drop_server(state)
+            return
+        try:
             credential = self._complete(state=recv_state or state, code=code)
             self._finish(state, status="success", credential=credential)
         except ChatGPTOAuthLoginError as exc:
-            self._finish(state, status="error", detail=str(exc))
+            self._finish(state, status="error", detail=str(exc), manual_completable=False)
         finally:
             self._drop_server(state)
 
@@ -161,12 +174,14 @@ class OAuthLoginManager:
             provider=PROVIDER, credential_id=credential_id, auth_mode=AUTH_MODE,
         )
 
-    def _finish(self, state: str, *, status: str, credential: dict | None = None, detail: str | None = None) -> None:
+    def _finish(self, state: str, *, status: str, credential: dict | None = None, detail: str | None = None,
+                manual_completable: bool = True) -> None:
         with self._lock:
             cur = self._results.get(state)
             if cur and cur.get("status") == "success":
                 return  # sticky: a completed login is never clobbered (e.g. a late loopback timeout/cancel)
-            self._results[state] = {"status": status, "credential": credential, "detail": detail}
+            self._results[state] = {"status": status, "credential": credential, "detail": detail,
+                                    "manual_completable": manual_completable}
             self._result_ts[state] = self._clock()
 
     def _cancel(self, state: str) -> None:

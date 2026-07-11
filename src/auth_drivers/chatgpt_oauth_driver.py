@@ -341,11 +341,18 @@ class OpenAIChatGPTOAuthDriver:
             rec = _refresh_login(credential_id=self._credential_id, token_store=self._token_store)
             token = rec.access_token if rec else None
         except ChatGPTOAuthLoginError as exc:
+            # F3 (round 4): the human-readable text must agree with the code —
+            # only a classified reauth failure may demand a re-login.
+            reauth = getattr(exc, "reauth_required", False)
+            message = (
+                f"re-login needed (token refresh failed): {_err(exc)}" if reauth
+                else f"token refresh failed (temporary — retry later): {_err(exc)}"
+            )
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="error", models=_seed_models("openai"),
-                error=f"re-login needed (token refresh failed): {_err(exc)}",
-                error_code="reauth_required" if getattr(exc, "reauth_required", False) else None,
+                error=message,
+                error_code="reauth_required" if reauth else None,
             )
         if not token:
             return ModelDiscoveryResult(

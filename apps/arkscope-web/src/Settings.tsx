@@ -2610,9 +2610,16 @@ export function ProviderSection({
         setOauth((o) => (o ? { ...o, phase: "manual" } : o));
         setProviderErr("等不到瀏覽器回呼（可能 popup 被擋，或本機 :1455 沒收到）。請改用下方手動貼上授權碼。");
       } else if (res.kind === "error") {
-        // surface the backend reason as-is — NO silent fallback to an API key
-        setOauth((o) => (o ? { ...o, phase: "manual" } : o));
-        setProviderErr(`登入失敗：${res.detail}`);
+        // surface the backend reason as-is — NO silent fallback to an API key.
+        // F4: offer the manual paste ONLY when it can still succeed (the state
+        // wasn't consumed by a failed completion) — else reset the flow.
+        if (res.manualCompletable) {
+          setOauth((o) => (o ? { ...o, phase: "manual" } : o));
+          setProviderErr(`登入失敗：${res.detail}`);
+        } else {
+          setOauth(null);
+          setProviderErr(`登入失敗：${res.detail}（此登入工作階段已失效，請重新點「登入 ChatGPT」）`);
+        }
       } else {
         setOauth(null);
         setProviderErr("登入工作階段不存在或已過期，請重新點「登入 ChatGPT」。");

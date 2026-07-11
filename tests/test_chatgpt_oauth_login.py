@@ -749,3 +749,24 @@ def test_relogin_requires_cache_invalidator():
                          exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1))
     assert out["credential_id"] and cs.added
     assert "relogin" not in out                              # create payload unchanged
+
+
+def test_relogin_vanished_row_message_honest_when_rollback_fails(caplog):
+    # F2 (review round 4): when the row vanished AND removing the just-written
+    # token ALSO fails, the message must not claim "the new token was removed".
+    import logging
+
+    class _NoDeleteTok(_TokStore):
+        def delete(self, **kw):
+            raise RuntimeError("keyring down")
+
+    ss, ts = _StateStore(), _NoDeleteTok()
+    cs = _CredStore(vanish_on_update=True)
+    _seed_cred(cs)
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(ChatGPTOAuthLoginError) as ei:
+            _relogin_complete(ss, cs, ts, s)
+    msg = str(ei.value)
+    assert "was removed" not in msg
+    assert "may still hold" in msg

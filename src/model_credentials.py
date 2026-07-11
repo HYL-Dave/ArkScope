@@ -25,7 +25,7 @@ import httpx
 from pydantic import BaseModel
 
 from src.env_keys import ensure_env_loaded, unquote_env_value
-from src.model_discovery_cache import ModelDiscoveryCache
+from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
 from src.model_routing import MODEL_CATALOG, Provider
 
 logger = logging.getLogger(__name__)
@@ -924,10 +924,13 @@ def _record_discovery(
     models: list[DiscoveredModel],
     source_url: str = "",
     db_path: str | None = None,
+    expected_epoch: int | None = None,
 ) -> bool:
     """Write-through to the discovery cache; best-effort (a cache write must
     never fail a successful discovery). Returns True only when the run actually
-    landed — callers report cached-ness from this, never assume it (SF1)."""
+    landed — callers report cached-ness from this, never assume it (SF1).
+    `expected_epoch` (F1) makes the commit refuse to land when a lifecycle op
+    (re-login / delete) interleaved since the caller captured the epoch."""
     try:
         cache = ModelDiscoveryCache(db_path or _profile_db_path())
         cache.record_run(
@@ -940,7 +943,14 @@ def _record_discovery(
                 {"id": m.id, "label": m.label, "source": m.source} for m in models
             ],
             source_url=source_url,
+            expected_epoch=expected_epoch,
         )
+    except StaleDiscoveryWrite:
+        logger.warning(
+            "stale discovery write skipped for %s/%s (lifecycle op interleaved)",
+            provider, credential_id,
+        )
+        return False
     except Exception:  # noqa: BLE001 - observational cache only
         logger.warning("model discovery cache write failed", exc_info=True)
         return False
@@ -1027,6 +1037,17 @@ def discover_models(
             error="No direct API-key credential is available for model discovery.",
         )
 
+    # F1 (S3 round 4): capture the lifecycle epoch BEFORE the provider call so a
+    # credential delete landing mid-flight makes the cache commit refuse to
+    # resurrect rows for the deleted credential.
+    _db_path = store.db_path if store is not None else None
+    try:
+        epoch_before: int | None = ModelDiscoveryCache(_db_path or _profile_db_path()).lifecycle_epoch(
+            provider=provider, credential_id=cred.id,
+        )
+    except Exception:  # noqa: BLE001 — cache unavailable → the write would fail identically
+        epoch_before = None
+
     try:
         if provider == "openai":
             from openai import OpenAI
@@ -1073,7 +1094,8 @@ def discover_models(
         status="ok",
         models=ordered,
         source_url=source_url,
-        db_path=(store.db_path if store is not None else None),
+        db_path=_db_path,
+        expected_epoch=epoch_before,
     )
     return ModelDiscoveryResult(
         provider=provider,

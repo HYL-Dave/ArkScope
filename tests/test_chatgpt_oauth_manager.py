@@ -350,3 +350,31 @@ def test_relogin_cache_clear_failure_aborts_before_token_replace(stores, monkeyp
     assert rec.access_token == "OLD-ACCESS"                                     # token untouched
     row = cred_store.get(cid)
     assert row.expires_at == "2030-06-01T00:00:00+00:00"                        # metadata untouched
+
+
+def test_completion_failure_is_not_manual_completable(stores):
+    # F4 (review round 4): the loopback DELIVERED a code but completion failed →
+    # the single-use state is consumed; a manual paste can never succeed, and the
+    # result must say so (so the UI doesn't offer a dead-end fallback).
+    def bad_exchange(*, code, code_verifier):
+        raise ChatGPTOAuthLoginError("token exchange failed (400)")
+
+    cred_store, tok_store = stores
+    mgr = OAuthLoginManager(
+        credential_store=cred_store, token_store=tok_store,
+        server_factory=lambda s: _FakeServer(lambda _srv: ("code-1", None)),
+        exchange=bad_exchange, clock=lambda: _NOW, timeout=2.0,
+    )
+    out = mgr.begin()
+    st = _wait_status(mgr, out["state"])
+    assert st["status"] == "error"
+    assert st["manual_completable"] is False
+
+
+def test_callback_never_arrived_stays_manual_completable(stores):
+    # timeout/no-callback errors leave the pending state alive → manual CAN work.
+    mgr = _mgr(stores, lambda s: _FakeServer(_no_callback))
+    out = mgr.begin()
+    st = _wait_status(mgr, out["state"])
+    assert st["status"] == "error"
+    assert st.get("manual_completable", True) is True

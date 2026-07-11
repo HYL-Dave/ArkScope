@@ -6,7 +6,10 @@ import type { OAuthStatusResult, ProbeResult, ProviderCredential } from "./api";
 
 export type PollResult =
   | { kind: "success"; credential: ProviderCredential | null }
-  | { kind: "error"; detail: string }
+  // manualCompletable (F4): false when the backend consumed the single-use state
+  // (completion failed after the callback arrived) — a manual paste can never
+  // succeed then, so the UI must not offer it. Absent/true = fallback still valid.
+  | { kind: "error"; detail: string; manualCompletable: boolean }
   | { kind: "unknown" }
   | { kind: "timeout" }
   | { kind: "aborted" };
@@ -39,7 +42,9 @@ export async function pollOAuthStatus(state: string, opts: PollOptions): Promise
     if (shouldAbort?.()) return { kind: "aborted" };
     const s = await statusFn(state);
     if (s.status === "success") return { kind: "success", credential: s.credential };
-    if (s.status === "error") return { kind: "error", detail: s.detail ?? "unknown error" };
+    if (s.status === "error") {
+      return { kind: "error", detail: s.detail ?? "unknown error", manualCompletable: s.manual_completable !== false };
+    }
     if (s.status === "unknown") return { kind: "unknown" };
     // still pending
     if (now() - start >= timeoutMs) return { kind: "timeout" };

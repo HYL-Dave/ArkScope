@@ -138,6 +138,19 @@ describe("pollOAuthStatus", () => {
     if (res.kind === "error") expect(res.detail).toContain("1455");
   });
 
+  it("threads manual_completable=false through the error result (F4)", async () => {
+    const statusFn = vi.fn().mockResolvedValue({ status: "error", credential: null, detail: "completion failed", manual_completable: false });
+    const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), timeoutMs: 5000, intervalMs: 100 });
+    expect(res).toEqual({ kind: "error", detail: "completion failed", manualCompletable: false });
+  });
+
+  it("defaults manualCompletable to true when the backend omits the flag", async () => {
+    const statusFn = vi.fn().mockResolvedValue({ status: "error", credential: null, detail: "port busy" });
+    const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), timeoutMs: 5000, intervalMs: 100 });
+    expect(res.kind).toBe("error");
+    if (res.kind === "error") expect(res.manualCompletable).toBe(true);
+  });
+
   it("returns unknown and stops (does not spin) when the login is not tracked", async () => {
     const statusFn = vi.fn().mockResolvedValue({ status: "unknown", credential: null, detail: null });
     const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), timeoutMs: 5000, intervalMs: 100 });

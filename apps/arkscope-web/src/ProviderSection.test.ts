@@ -120,3 +120,29 @@ describe("ProviderSection re-login integration (S3 credential lifecycle)", () =>
     expect(host!.textContent).toContain("卡片合成／翻譯仍需 API key");
   });
 });
+
+describe("ProviderSection manual fallback gating (F4)", () => {
+  it("does not offer the dead-end manual paste when the state was consumed", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: unknown) => {
+      const u = String(url);
+      if (u.includes("/oauth/start")) {
+        return { ok: true, status: 200, json: async () => ({ auth_url: "https://auth.openai.com/x", state: "S", expires_at: "t", manual_code_supported: true }) };
+      }
+      if (u.includes("/oauth/status")) {
+        return { ok: true, status: 200, json: async () => ({ status: "error", credential: null, detail: "cache clear failed", manual_completable: false }) };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("open", vi.fn());
+    renderSection();
+    const btn = reloginButtons()[0];
+    await act(async () => {
+      btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    await waitFor(() => (host!.textContent ?? "").includes("登入失敗"));
+    expect(host!.textContent).toContain("已失效");
+    expect(host!.textContent).not.toContain("完成登入");   // no dead-end manual form
+    expect(reloginButtons().every((b) => !b.disabled)).toBe(true); // flow reset, retry allowed
+  });
+});

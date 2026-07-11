@@ -50,7 +50,20 @@ CREATE TABLE IF NOT EXISTS model_discovery_models (
     source        TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (provider, auth_mode, credential_id, model_id)
 );
+
+CREATE TABLE IF NOT EXISTS model_discovery_epochs (
+    provider      TEXT NOT NULL,
+    credential_id TEXT NOT NULL,
+    epoch         INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (provider, credential_id)
+);
 """
+
+
+class StaleDiscoveryWrite(RuntimeError):
+    """A discovery result was produced BEFORE a lifecycle op (re-login / delete)
+    landed on the credential — committing it would resurrect the old account's
+    entitlement. Callers skip the commit and report the run as uncached."""
 
 
 @dataclass(frozen=True)
@@ -87,6 +100,18 @@ class ModelDiscoveryCache:
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
 
+    def lifecycle_epoch(self, *, provider: str, credential_id: str) -> int:
+        """The credential's lifecycle generation. Bumped by every `delete_scope`
+        (re-login clear / credential delete). Discovery captures it BEFORE the
+        provider call and passes it as `expected_epoch` to `record_run` — a moved
+        epoch means the listing predates a lifecycle op and must not be cached."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT epoch FROM model_discovery_epochs WHERE provider=? AND credential_id=?",
+                (provider, credential_id),
+            ).fetchone()
+            return int(row["epoch"]) if row else 0
+
     def record_run(
         self,
         *,
@@ -97,8 +122,15 @@ class ModelDiscoveryCache:
         status: str,
         models: list[dict],
         source_url: str = "",
+        expected_epoch: int | None = None,
     ) -> None:
-        """Record a COMPLETED discovery run (callers never record failures)."""
+        """Record a COMPLETED discovery run (callers never record failures).
+
+        With `expected_epoch`, the write is validated INSIDE the write
+        transaction (after the first DELETE takes the write lock, so a
+        concurrent `delete_scope` — even from another process — serializes
+        before or after the whole commit): if the credential's lifecycle epoch
+        moved since capture, raise `StaleDiscoveryWrite` and roll back."""
         if status not in ("ok", "seed_only"):
             raise ValueError(f"invalid discovery run status: {status!r}")
         now = _now()
@@ -109,6 +141,18 @@ class ModelDiscoveryCache:
                 "WHERE provider=? AND auth_mode=? AND credential_id=?",
                 scope,
             )
+            if expected_epoch is not None:
+                row = conn.execute(
+                    "SELECT epoch FROM model_discovery_epochs WHERE provider=? AND credential_id=?",
+                    (provider, credential_id),
+                ).fetchone()
+                current = int(row["epoch"]) if row else 0
+                if current != expected_epoch:
+                    # context-manager exit rolls the DELETE back on raise
+                    raise StaleDiscoveryWrite(
+                        f"discovery write for {provider}/{credential_id} is stale "
+                        f"(lifecycle epoch {expected_epoch} -> {current})",
+                    )
             conn.execute(
                 """
                 INSERT INTO model_discovery_runs
@@ -158,6 +202,13 @@ class ModelDiscoveryCache:
             runs = conn.execute(
                 f"DELETE FROM model_discovery_runs WHERE {where}", params,
             ).rowcount
+            # ALWAYS bump the lifecycle epoch (even a 0-row clear invalidates an
+            # in-flight discovery capture) — same transaction as the deletes.
+            conn.execute(
+                "INSERT INTO model_discovery_epochs (provider, credential_id, epoch) VALUES (?,?,1) "
+                "ON CONFLICT(provider, credential_id) DO UPDATE SET epoch = epoch + 1",
+                (provider, credential_id),
+            )
         return int(models) + int(runs)
 
     def get(

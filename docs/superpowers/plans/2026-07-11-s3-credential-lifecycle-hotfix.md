@@ -1,6 +1,38 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: IMPLEMENTED FOR REVIEW 2026-07-11.** Branch
+> **Status: IMPLEMENTED FOR REVIEW — ROUND 4 FIXES APPLIED 2026-07-11.**
+> Round-4 review (user, on the implementation): 1 BLOCKING + 2 must-fix +
+> 1 should-fix, all verified real and fixed with RED-first tests:
+> **F1 (BLOCKING — discovery could resurrect stale entitlement after
+> re-login/delete)**: the cache gains a per-credential **lifecycle epoch**
+> (`model_discovery_epochs`, bumped by every `delete_scope` in the same
+> transaction — even 0-row clears); both discovery write sites (oauth route
+> + api_key `discover_models`) capture the epoch BEFORE the provider call
+> and `record_run(expected_epoch=…)` validates it INSIDE the write
+> transaction (after the first DELETE takes the write lock) → a moved epoch
+> raises `StaleDiscoveryWrite`, the commit rolls back, the run reports
+> uncached. Because the check lives in the SQLite transaction, this
+> particular hazard is closed **cross-process** too, beyond D2's
+> process-local lock. Three interleaving tests (oauth×relogin,
+> oauth×delete, api_key×delete) drive the REAL route/store/cache with a
+> scripted driver. **F2**: compensation messages now report the REAL
+> outcome — `_rollback_relogin_token` returns landed-ness and both raise
+> sites append restored/removed/may-still-hold accordingly; the delete
+> route's 502 detail splits the same way; NEW RULING pinned: row-delete
+> returning False after token cleanup (cross-process vanish) = SUCCESS
+> with a logged anomaly, never a misleading 404. **F3**: the driver's
+> refresh-failure text splits with the code (transient → "temporary —
+> retry later", never "re-login"); the pre-classification 401 test was
+> updated to raise the classified shape (obsolete-sibling rule). **F4**:
+> `_await_callback` splits wait-failure (state alive → manual fallback
+> valid) from completion-failure (state consumed → result carries
+> `manual_completable: false`); status route passes it through; the FE
+> only offers 完成登入 when completable, else resets the flow.
+> Evidence after fixes: backend focused 186 passed; frontend 27 files /
+> 263 tests + typecheck + build; smoke `pg_attempts: []`. Fresh full
+> virgin A/B running; verdict reported with exact collect accounting.
+>
+> Prior status: IMPLEMENTED FOR REVIEW 2026-07-11. Branch
 > `claude/s3-credential-lifecycle`, six TDD commits (login core / cache
 > delete_scope / manager+routes / driver classification / frontend /
 > factory-test contract fix); every test RED-first for a predicted reason.

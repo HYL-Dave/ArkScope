@@ -274,16 +274,19 @@ def test_discover_uses_refreshed_token(monkeypatch):
 
 
 def test_discover_refresh_failure_returns_relogin_error_redacted(monkeypatch):
+    # This emulates a 401 refresh rejection — since S3's classification (round 4)
+    # the fake raises the CLASSIFIED shape refresh_if_needed actually produces,
+    # and the re-login hint is only promised on that arm.
     tok = "cg-SECRET-TOKEN-xyz789"
 
     def boom(*, credential_id, token_store, **kw):
-        raise ChatGPTOAuthLoginError(f"refresh failed (401) {tok}")
+        raise ChatGPTOAuthLoginError(f"refresh failed (401) {tok}", status_code=401, reauth_required=True)
 
     monkeypatch.setattr(mod, "_refresh_login", boom)
     res = _run(OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(tok)).discover_models())
     assert res.status == "error" and all(m.source == "seed" for m in res.models)  # honest fallback
     assert res.error and tok not in res.error  # token never leaks
-    assert "login" in res.error.lower() or "auth" in res.error.lower()  # actionable re-login hint
+    assert "re-login" in res.error  # actionable re-login hint (classified arm only)
 
 
 def test_refresh_if_needed_delegates_to_login(monkeypatch):
@@ -592,3 +595,24 @@ def test_stream_missing_driver_wiring_yields_non_reauth_event(monkeypatch):
     errs2 = [e for e in events2 if e.type == EventType.error]
     assert len(errs2) == 1 and errs2[0].data.get("code") == "missing_credential"
     assert called["n"] == 0                                  # never a bare exception, never a call
+
+
+def test_refresh_failure_message_split_by_reauth(monkeypatch):
+    # F3 (review round 4): the human-readable error must not demand re-login for
+    # a transient failure — the message splits with the code.
+    def transient(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError("refresh failed: network unreachable", status_code=None)
+
+    monkeypatch.setattr(mod, "_refresh_login", transient)
+    res = _run(_driver().discover_models())
+    assert res.error_code is None
+    assert "re-login" not in (res.error or "")
+    assert "temporary" in (res.error or "").lower()
+
+    def reauth(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError("refresh failed (401)", status_code=401, reauth_required=True)
+
+    monkeypatch.setattr(mod, "_refresh_login", reauth)
+    res2 = _run(_driver().discover_models())
+    assert res2.error_code == "reauth_required"
+    assert "re-login needed" in (res2.error or "")

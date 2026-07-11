@@ -434,14 +434,20 @@ def _complete_relogin(
         try:
             updated = credential_store.update(target, expires_at=record.expires_at or "", account_label=label)
         except Exception as exc:
-            _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
-            # The ORIGINAL metadata error stays the cause; the message is redacted+bounded.
+            compensated = _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
+            # The ORIGINAL metadata error stays the cause; the message is redacted+bounded
+            # and reports the REAL compensation outcome (F2: never claim a rollback
+            # that did not land).
             raise ChatGPTOAuthLoginError(
-                f"re-login metadata update failed: {redact(str(exc))[:200]}",
+                f"re-login metadata update failed: {redact(str(exc))[:200]}; "
+                f"{_relogin_rollback_outcome(compensated, old_record)}",
             ) from exc
         if updated is None:
-            _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
-            raise ChatGPTOAuthLoginError("re-login target row vanished during completion; the new token was removed")
+            compensated = _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
+            raise ChatGPTOAuthLoginError(
+                "re-login target row vanished during completion; "
+                f"{_relogin_rollback_outcome(compensated, old_record)}",
+            )
         return {
             "credential_id": target,
             "alias": updated.alias,
@@ -454,11 +460,12 @@ def _complete_relogin(
         }
 
 
-def _rollback_relogin_token(*, target: str, old_record: StoredTokenRecord | None, token_store: Any) -> None:
+def _rollback_relogin_token(*, target: str, old_record: StoredTokenRecord | None, token_store: Any) -> bool:
     """Best-effort compensation for a failed re-login after the new token landed:
-    restore the old record, or drop the new one when none existed. A rollback
-    failure is LOGGED and never replaces the original error — a double storage
-    failure cannot honestly promise a clean terminal state."""
+    restore the old record, or drop the new one when none existed. Returns
+    whether the compensation LANDED. A rollback failure is LOGGED and never
+    replaces the original error — a double storage failure cannot honestly
+    promise a clean terminal state."""
     try:
         if old_record is not None:
             token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target, record=old_record)
@@ -469,6 +476,15 @@ def _rollback_relogin_token(*, target: str, old_record: StoredTokenRecord | None
             "re-login rollback failed for %s; the token store may still hold the new token",
             target, exc_info=True,
         )
+        return False
+    return True
+
+
+def _relogin_rollback_outcome(compensated: bool, old_record: StoredTokenRecord | None) -> str:
+    """The honest one-liner for a failed re-login's terminal token state (F2)."""
+    if not compensated:
+        return "the token store may still hold the new token"
+    return "the previous token was restored" if old_record is not None else "the new token was removed"
 
 
 # --- refresh ------------------------------------------------------------------

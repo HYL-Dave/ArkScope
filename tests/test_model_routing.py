@@ -775,3 +775,39 @@ def test_discovery_route_oauth_cache_write_failure_reports_uncached(monkeypatch,
     assert out["status"] == "ok"          # discovery itself still succeeds
     assert out.get("cached") is not True
     assert "cache_state" not in out and "cached_at" not in out
+
+
+def test_api_key_discovery_commit_skipped_after_concurrent_delete(tmp_path, monkeypatch):
+    # F1 (review round 4): the api_key write site must honor the same lifecycle
+    # guard — a delete landing between the provider listing and the cache commit
+    # must not resurrect rows for the deleted credential.
+    import src.model_credentials as mc
+    from src.api.routes import config_routes as cr
+    from src.auth_drivers.token_store import PlaintextTokenStore
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    c = store.add(provider="openai", auth_type="api_key", alias="K",
+                  secret="sk-test-" + "a" * 40, make_active=True)
+    cid = f"local:{c.id}"
+    tok = PlaintextTokenStore(tmp_path / "auth_tokens.json")
+    cache = ModelDiscoveryCache(store.db_path)
+
+    class _FakeModels:
+        data = [type("M", (), {"id": "gpt-5.6-luna"})()]
+
+    class _FakeClient:
+        def __init__(self, **kw): ...
+
+        class models:  # noqa: N801 - mirrors sdk attribute
+            @staticmethod
+            def list():
+                cr.delete_credential(cid, store=store, token_store=tok)  # mid-flight lifecycle op
+                return _FakeModels()
+
+    monkeypatch.setattr("openai.OpenAI", _FakeClient)
+    out = mc.discover_models("openai", cid, store=store)
+    assert out.status == "ok"                                 # the listing itself succeeded
+    assert out.cached is False                                # but the stale commit was skipped
+    assert cache.delete_scope(provider="openai", credential_id=cid) == 0  # nothing resurrected
+    assert store.get(cid) is None

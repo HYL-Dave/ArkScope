@@ -909,6 +909,9 @@ export interface OAuthStatusResult {
   status: "pending" | "success" | "error" | "unknown";
   credential: ProviderCredential | null;
   detail: string | null;
+  // F4 additive: false = the single-use login state was consumed by a failed
+  // completion, so the copy-code manual fallback can no longer succeed.
+  manual_completable?: boolean;
 }
 export function startOpenAIOAuth(makeActive = false, reloginCredentialId?: string): Promise<OAuthStartResult> {
   // make_active default false: logging in (or re-logging in) must never silently

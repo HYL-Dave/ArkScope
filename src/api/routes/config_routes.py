@@ -19,7 +19,7 @@ from src.agents.config import (
     save_local_override,
     task_route,
 )
-from src.model_discovery_cache import ModelDiscoveryCache
+from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
 from src.model_route_store import ModelRouteStore
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
@@ -674,16 +674,32 @@ def delete_credential(
         try:
             row_deleted = store.delete(credential_id)
         except Exception:  # noqa: BLE001
+            restored = False
             if old_record is not None and token_deleted:
                 try:  # best-effort restore; the original error stays authoritative
                     token_store.save(provider=cred.provider, auth_mode=cred.auth_type,
                                      credential_id=credential_id, record=old_record)
+                    restored = True
                 except Exception:  # noqa: BLE001
                     logger.warning("credential delete: token restore after row failure ALSO failed", exc_info=True)
             logger.warning("credential delete: metadata row deletion failed", exc_info=True)
-            raise HTTPException(status_code=502, detail="credential row deletion failed; the token was restored")
+            # F2: the detail reports what ACTUALLY happened — never a claimed
+            # restore that did not land.
+            if old_record is None:
+                detail = "credential row deletion failed; retry the deletion"
+            elif restored:
+                detail = "credential row deletion failed; the token was restored — retry the deletion"
+            else:
+                detail = ("credential row deletion failed and the token restore ALSO failed — "
+                          "the token-store state is unverified; retry the deletion")
+            raise HTTPException(status_code=502, detail=detail)
         if not row_deleted:
-            raise HTTPException(status_code=404, detail="credential not found")
+            # Ruling (round 4): the row was re-read inside the lifecycle lock, so a
+            # False here means another actor (cross-process) removed it mid-flight.
+            # The terminal state the user asked for IS achieved — row gone, token
+            # cleanup done, cache cleared — so report success and log the anomaly
+            # instead of a misleading 404 after real cleanup work.
+            logger.warning("credential delete: row for %s vanished concurrently", credential_id)
     return {
         "deleted": True,
         "id": credential_id,
@@ -721,6 +737,16 @@ def discover_provider_models(
         driver = build_driver(
             provider=cred.provider, auth_mode=cred.auth_type, credential=cred, token_store=token_store,
         )
+        # F1 (round 4): capture the lifecycle epoch BEFORE the provider call —
+        # a re-login/delete landing mid-flight bumps it, and the commit below
+        # then refuses to resurrect the old account's entitlement.
+        scope_credential_id = body.credential_id or f"local:{cred.id}"
+        try:
+            epoch_before = ModelDiscoveryCache(store.db_path).lifecycle_epoch(
+                provider=body.provider, credential_id=scope_credential_id,
+            )
+        except Exception:  # noqa: BLE001 — cache unavailable → record_run will fail the same way
+            epoch_before = None
         result = _run_coro(driver.discover_models())
         out = result.model_dump()
         if out.get("status") == "ok":
@@ -737,12 +763,18 @@ def discover_provider_models(
                 cache.record_run(
                     provider=body.provider,
                     auth_mode=cred.auth_type,
-                    credential_id=body.credential_id or f"local:{cred.id}",
+                    credential_id=scope_credential_id,
                     secret_fingerprint="oauth",
                     status=cache_status,
                     models=[
                         {"id": m.id, "label": m.label, "source": m.source} for m in live
                     ],
+                    expected_epoch=epoch_before,
+                )
+            except StaleDiscoveryWrite:
+                logger.warning(
+                    "stale oauth discovery write skipped for %s (lifecycle op interleaved)",
+                    scope_credential_id,
                 )
             except Exception:  # noqa: BLE001 - best-effort like the api_key path (SF1)
                 logger.warning("oauth discovery cache write failed", exc_info=True)

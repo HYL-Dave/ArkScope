@@ -432,3 +432,102 @@ def test_delete_serializes_with_inflight_refresh(tmp_path):
     assert store.get(cid) is None
     # the process-local stale refresh could NOT resurrect the token
     assert tok.load(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid) is None
+
+
+# --- F1: discovery commit must not resurrect stale entitlement (review round 4) --
+def _relogin_now(store, tok, cache, cid):
+    """Run a full in-place re-login synchronously — the deterministic
+    'mid-flight lifecycle op' (no thread timing)."""
+    from datetime import datetime, timezone
+
+    from src.auth_drivers.chatgpt_oauth_login import _StateStore, complete_login, start_login
+
+    ss = _StateStore()
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    s = start_login(state_store=ss, now=now, relogin_credential_id=cid)["state"]
+    return complete_login(
+        state=s, code="c", credential_store=store, token_store=tok, state_store=ss,
+        exchange=lambda **kw: {"access_token": "h.e30.s", "refresh_token": "refresh-NEW"},
+        now=now, invalidate_relogin_cache=lambda t: cache.delete_scope(
+            provider="openai", credential_id=t, auth_mode="chatgpt_oauth"),
+    )
+
+
+class _ScriptedDriver:
+    def __init__(self, on_discover):
+        self._on = on_discover
+
+    async def discover_models(self):
+        return self._on()
+
+
+def _ok_listing(cid, model_id="old-account-model"):
+    from src.model_credentials import DiscoveredModel, ModelDiscoveryResult
+
+    return ModelDiscoveryResult(
+        provider="openai", credential_id=cid, status="ok",
+        models=[DiscoveredModel(id=model_id, provider="openai", label=model_id, source="provider_api")],
+    )
+
+
+def test_discovery_commit_skipped_after_concurrent_relogin(tmp_path, monkeypatch):
+    import src.auth_drivers.factory as factory_mod
+    from src.auth_drivers.token_store import StoredTokenRecord
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "creds.db")
+    tok = PlaintextTokenStore(tmp_path / "auth_tokens.json")
+    cid = _oauth_row(store)
+    tok.save(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+             record=StoredTokenRecord(access_token="OLD", refresh_token="r-old"))
+    cache = ModelDiscoveryCache(store.db_path)
+
+    # control: no interleaving → the live listing lands in the cache
+    monkeypatch.setattr(factory_mod, "build_driver", lambda **kw: _ScriptedDriver(lambda: _ok_listing(cid)))
+    out = cr.discover_provider_models(cr.ModelDiscoveryRequest(provider="openai", credential_id=cid),
+                                      store=store, token_store=tok)
+    assert out["cached"] is True
+    assert cache.get(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+                     secret_fingerprint="oauth").status == "ok"
+
+    # interleave: the re-login completes AFTER the provider returned the OLD
+    # account's listing but BEFORE the cache commit → the stale write is SKIPPED.
+    def interleaved():
+        _relogin_now(store, tok, cache, cid)
+        return _ok_listing(cid)
+
+    monkeypatch.setattr(factory_mod, "build_driver", lambda **kw: _ScriptedDriver(interleaved))
+    out2 = cr.discover_provider_models(cr.ModelDiscoveryRequest(provider="openai", credential_id=cid),
+                                       store=store, token_store=tok)
+    assert out2.get("cached") is not True                     # commit did NOT land
+    scope = cache.get(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+                      secret_fingerprint="oauth")
+    assert scope.status == "never_discovered"                 # relogin's clear survives
+    rec = tok.load(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid)
+    assert rec.refresh_token == "refresh-NEW"                 # the new login stays untouched
+
+
+def test_discovery_commit_skipped_after_concurrent_delete(tmp_path, monkeypatch):
+    import src.auth_drivers.factory as factory_mod
+    from src.auth_drivers.token_store import StoredTokenRecord
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "creds.db")
+    tok = PlaintextTokenStore(tmp_path / "auth_tokens.json")
+    cid = _oauth_row(store)
+    tok.save(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+             record=StoredTokenRecord(access_token="OLD", refresh_token="r-old"))
+    cache = ModelDiscoveryCache(store.db_path)
+
+    def interleaved():
+        out_del = cr.delete_credential(cid, store=store, token_store=tok)
+        assert out_del["deleted"] is True
+        return _ok_listing(cid)
+
+    monkeypatch.setattr(factory_mod, "build_driver", lambda **kw: _ScriptedDriver(interleaved))
+    out = cr.discover_provider_models(cr.ModelDiscoveryRequest(provider="openai", credential_id=cid),
+                                      store=store, token_store=tok)
+    assert out.get("cached") is not True
+    assert store.get(cid) is None                              # the delete stands
+    # nothing was resurrected for the deleted credential (0 rows to clear)
+    assert cache.delete_scope(provider="openai", credential_id=cid) == 0
