@@ -1,6 +1,36 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: IMPLEMENTED FOR REVIEW — ROUND 5 FIXES APPLIED 2026-07-11.**
+> **Status: LIVE GATE PASSED 2026-07-11 — awaiting merge approval.** Round-5
+> verdict GREEN; §7 executed same day on the REAL profile DB + keyring,
+> single sidecar (branch code on 8420, master sidecar stopped first per the
+> round-4 ruling), branch web UI on 8430. Results, in order:
+> (1) local:3 discovery regression `ok`/cached/129 models; local:7 returned
+> `error_code:"reauth_required"` LIVE with [REDACTED]-sanitized text.
+> (2) User performed the browser re-login from the row's 重新登入 button:
+> SAME `local:7` (no local:8 row), alias 「ChatGPT subscription Plus」 and
+> active=1 preserved, access+refresh token hashes both replaced
+> (`eb8578c9f4dd…`→`ac17748cc4b3…`, `98b3b64ad6e3…`→`21a8348d60f9…`),
+> expires_at renewed to 2026-07-21, **lifecycle epoch bumped to 1, cache
+> rows zero** — old-account entitlement provably gone. (Note: account_label
+> normalized "season ChatGPT plus"→"ChatGPT plus" — the current non-PII
+> label format; expected.) (3) Fresh discovery on local:7 → LIVE
+> ChatGPT-backend list, 7 provider_api models, cached/ok. (4) Research
+> smoke through the subscription backend: **PASS** with `gpt-5.4-mini`
+> (thinking→text→done, answer "ok", 4,658 tokens) — **S3 live P1/P2 closed,
+> the honest-copy claim stands, no revert needed**. Finding: the backend's
+> models.list includes `gpt-5.6-luna` but execution rejects it ("Model not
+> found") — a live list-vs-execute divergence, exactly the 「此登入可見 ≠
+> 實際呼叫通過」 split the Models-UX spec §3.4 designs for; the error path
+> was honest (classified event, [REDACTED], no fallback). ACTION for the
+> user: with local:7 active, the saved ai_research route (gpt-5.6-luna)
+> is not executable on the subscription backend — either point the route
+> at a backend-executable model (e.g. gpt-5.4-mini) or re-activate the
+> api_key credential. (5) Delete cascade with a throwaway api_key
+> credential: `{deleted:true, token_deleted:null,
+> discovery_cache_rows_deleted:0}`, row gone, **epoch bumped even with
+> zero cache rows** (F1 contract live-proven). Merge decision → user.
+>
+> Prior status: ROUND 5 FIXES APPLIED 2026-07-11.
 > Round-5 review (user): 3 must-fix + 1 should-fix, all repro'd real and
 > fixed RED-first. **MF1 (epoch capture failed OPEN)**: my
 > `except → expected_epoch=None` disabled the very guard on transient
