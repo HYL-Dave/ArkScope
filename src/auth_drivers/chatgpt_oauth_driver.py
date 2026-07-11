@@ -27,7 +27,7 @@ from typing import Any, AsyncIterator, Optional
 
 from src.agents.shared.compressor.reducers import get_reducer
 from src.agents.shared.events import AgentEvent, EventType
-from src.auth_drivers.api_key_drivers import MissingCredentialError
+# MissingCredentialError raise removed (S3 D4): early exits yield classified error events.
 from src.auth_drivers.protocol import LLMRequest, LLMResponse, TokenUsage
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
 
@@ -318,11 +318,21 @@ class OpenAIChatGPTOAuthDriver:
 
     # --- ResearchProviderDriver surface ---------------------------------
     async def discover_models(self) -> ModelDiscoveryResult:
-        if self._token_store is None or not self._credential_id or not self._load_token():
-            # No token → can't query the backend; the seed is the honest candidate list.
+        # The pre-refresh early exits are SPLIT (S3 plan D4): a missing token-store
+        # dependency or credential id is driver wiring — re-login cannot repair it;
+        # only "store + id present, stored token absent" earns the reauth code.
+        if self._token_store is None or not self._credential_id:
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="missing_credential", models=_seed_models("openai"),
+                error_code="missing_credential",
+            )
+        if not self._load_token():
+            # No stored token for an existing OAuth row → repairable ONLY by re-login.
+            return ModelDiscoveryResult(
+                provider="openai", credential_id=self._credential_id,
+                status="missing_credential", models=_seed_models("openai"),
+                error_code="reauth_required",
             )
         # Refresh the (possibly expired) access token FIRST so "available models" doesn't
         # intermittently degrade. A refresh failure means the login is stale → surface a
@@ -335,11 +345,13 @@ class OpenAIChatGPTOAuthDriver:
                 provider="openai", credential_id=self._credential_id,
                 status="error", models=_seed_models("openai"),
                 error=f"re-login needed (token refresh failed): {_err(exc)}",
+                error_code="reauth_required" if getattr(exc, "reauth_required", False) else None,
             )
         if not token:
             return ModelDiscoveryResult(
                 provider="openai", credential_id=self._credential_id,
                 status="missing_credential", models=_seed_models("openai"),
+                error_code="reauth_required",
             )
         try:
             client = _discovery_client(token)
@@ -443,14 +455,30 @@ class OpenAIChatGPTOAuthDriver:
             return False, _redact_token(str(exc), token)[:500]
 
     async def _stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
+        # Classified early exits (S3 plan D4) — one machine-readable error event,
+        # never a bare exception, never a backend call. Wiring vs token-absent
+        # arms are split exactly like discover_models.
+        if self._token_store is None or not self._credential_id:
+            yield AgentEvent(EventType.error, {
+                "error": "ChatGPT OAuth driver is missing its token store or credential id",
+                "code": "missing_credential", "provider": "openai", "model": request.model,
+            })
+            return
         token = self._load_token()
         if not token:
-            raise MissingCredentialError("no ChatGPT OAuth token stored for this credential -- log in from Settings")
+            yield AgentEvent(EventType.error, {
+                "error": "no ChatGPT OAuth token stored for this credential -- log in from Settings",
+                "code": "reauth_required", "provider": "openai", "model": request.model,
+            })
+            return
         try:
             rec = _refresh_login(credential_id=self._credential_id, token_store=self._token_store)
             token = rec.access_token if rec and rec.access_token else token
         except ChatGPTOAuthLoginError as exc:
-            yield AgentEvent(EventType.error, {"error": f"ChatGPT OAuth refresh failed: {_err(exc)}", "provider": "openai", "model": request.model})
+            payload = {"error": f"ChatGPT OAuth refresh failed: {_err(exc)}", "provider": "openai", "model": request.model}
+            if getattr(exc, "reauth_required", False):
+                payload["code"] = "reauth_required"
+            yield AgentEvent(EventType.error, payload)
             return
 
         client = _execution_client(token)

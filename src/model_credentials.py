@@ -86,6 +86,9 @@ class ModelDiscoveryResult(BaseModel):
     error: str | None = None
     source_url: str | None = None
     cached: bool = False   # True only when the discovery cache write landed (SF1)
+    # S3 machine-readable failure class: "reauth_required" = only a fresh login
+    # repairs it; "missing_credential" = driver wiring/config, re-login can't fix.
+    error_code: str | None = None
 
 
 class ModelTestResult(BaseModel):

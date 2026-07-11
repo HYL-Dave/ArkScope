@@ -515,3 +515,80 @@ def test_test_defers_to_probe_when_token_present():
     res = _run(_driver().test())
     # honest: NOT a fake "ok"; points at the probe route for the real P1/P2 check.
     assert res.status in ("error", "missing_credential")
+
+
+# --- reauth classification (S3 credential-lifecycle hotfix) ---------------------
+def test_discover_models_refresh_401_sets_reauth_error_code(monkeypatch):
+    def boom(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError("refresh failed (401)", status_code=401, reauth_required=True)
+
+    monkeypatch.setattr(mod, "_refresh_login", boom)
+    res = _run(_driver().discover_models())
+    assert res.status == "error"
+    assert res.error_code == "reauth_required"
+    assert all(m.source == "seed" for m in res.models)      # seeds stay candidates
+
+
+def test_discover_models_transient_failure_has_no_error_code(monkeypatch):
+    def boom(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError("refresh failed: network unreachable", status_code=None)
+
+    monkeypatch.setattr(mod, "_refresh_login", boom)
+    res = _run(_driver().discover_models())
+    assert res.status == "error" and res.error_code is None
+
+
+def test_stream_refresh_401_event_carries_code(monkeypatch):
+    def boom(*, credential_id, token_store, **kw):
+        raise ChatGPTOAuthLoginError("refresh failed (401)", status_code=401, reauth_required=True)
+
+    monkeypatch.setattr(mod, "_refresh_login", boom)
+    events = _run(_collect(_driver().stream_llm(_req())))
+    errs = [e for e in events if e.type == EventType.error]
+    assert len(errs) == 1 and errs[0].data.get("code") == "reauth_required"
+
+
+def test_discover_missing_token_requires_reauth():
+    # token-store dependency + credential id PRESENT, stored token absent →
+    # the OAuth row is repairable ONLY by re-login.
+    res = _run(_driver(token="").discover_models())
+    assert res.status == "missing_credential"
+    assert res.error_code == "reauth_required"
+    assert all(m.source == "seed" for m in res.models)
+
+
+def test_stream_missing_token_yields_reauth_event(monkeypatch):
+    called = {"n": 0}
+    monkeypatch.setattr(mod, "_execution_client",
+                        lambda token: called.__setitem__("n", called["n"] + 1))
+    events = _run(_collect(_driver(token="").stream_llm(_req())))
+    errs = [e for e in events if e.type == EventType.error]
+    assert len(errs) == 1 and errs[0].data.get("code") == "reauth_required"
+    assert called["n"] == 0                                  # classified event, no backend call
+
+
+def test_discover_missing_driver_wiring_is_not_reauth():
+    # wiring/config arms — re-login cannot repair these; NO re-login affordance.
+    no_store = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=None)
+    res = _run(no_store.discover_models())
+    assert res.status == "missing_credential" and res.error_code == "missing_credential"
+    no_cid = _driver()
+    no_cid._credential_id = ""
+    res2 = _run(no_cid.discover_models())
+    assert res2.status == "missing_credential" and res2.error_code == "missing_credential"
+
+
+def test_stream_missing_driver_wiring_yields_non_reauth_event(monkeypatch):
+    called = {"n": 0}
+    monkeypatch.setattr(mod, "_execution_client",
+                        lambda token: called.__setitem__("n", called["n"] + 1))
+    no_store = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=None)
+    events = _run(_collect(no_store.stream_llm(_req())))
+    errs = [e for e in events if e.type == EventType.error]
+    assert len(errs) == 1 and errs[0].data.get("code") == "missing_credential"
+    no_cid = _driver()
+    no_cid._credential_id = ""
+    events2 = _run(_collect(no_cid.stream_llm(_req())))
+    errs2 = [e for e in events2 if e.type == EventType.error]
+    assert len(errs2) == 1 and errs2[0].data.get("code") == "missing_credential"
+    assert called["n"] == 0                                  # never a bare exception, never a call
