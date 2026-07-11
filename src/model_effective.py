@@ -277,14 +277,8 @@ def effective_model_view_v2(
     return {"providers": providers_out, "tasks": tasks_out}
 
 
-def effective_model_view(
-    *,
-    cache: ModelDiscoveryCache,
-    routes: dict[str, Any],
-    credentials: dict[str, ActiveCredential | None],
-) -> dict[str, Any]:
-    """Legacy task-level alias, derived from the provider-indexed v2 view."""
-    v2 = effective_model_view_v2(cache=cache, routes=routes, credentials=credentials)
+def legacy_effective_alias(v2: dict[str, Any]) -> dict[str, Any]:
+    """Fold one already-computed v2 view into the P2.7 compatibility shape."""
     tasks_out: dict[str, Any] = {}
     for task, task_block in v2["tasks"].items():
         block = task_block["providers"][task_block["current_provider"]]
@@ -303,3 +297,15 @@ def effective_model_view(
             "discovered_at": block["discovered_at"],
         }
     return {"tasks": tasks_out}
+
+
+def effective_model_view(
+    *,
+    cache: ModelDiscoveryCache,
+    routes: dict[str, Any],
+    credentials: dict[str, ActiveCredential | None],
+) -> dict[str, Any]:
+    """Legacy task-level alias, derived from the provider-indexed v2 view."""
+    return legacy_effective_alias(
+        effective_model_view_v2(cache=cache, routes=routes, credentials=credentials),
+    )

@@ -536,3 +536,77 @@ def test_legacy_alias_is_derived_from_v2(tmp_path):
             "discovered_at": block["discovered_at"],
         }
     assert effective_model_view(cache=cache, routes=routes, credentials=creds) == expected
+
+
+def test_model_catalog_effective_gains_provider_indexed_shape(monkeypatch, tmp_path):
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import CredentialStore
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEYS", raising=False)
+    db = tmp_path / "profile_state.db"
+    store = CredentialStore(db)
+    anthropic = store.add(
+        provider="anthropic", auth_type="api_key", alias="Claude primary",
+        secret="sk-ant-" + "a" * 32, make_active=True,
+    )
+    openai = store.add(
+        provider="openai", auth_type="api_key", alias="OpenAI primary",
+        secret="sk-openai-" + "b" * 32, make_active=True,
+    )
+
+    out = cr.model_catalog(store=store)
+    assert out["effective"]["providers"] == {
+        "anthropic": {
+            "credential_id": f"local:{anthropic.id}",
+            "auth_mode": "api_key",
+            "label": "Claude primary",
+        },
+        "openai": {
+            "credential_id": f"local:{openai.id}",
+            "auth_mode": "api_key",
+            "label": "OpenAI primary",
+        },
+    }
+    for task, block in out["effective"]["tasks"].items():
+        assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
+        assert block["current_provider"] == out["routes"][task]["provider"]
+        assert set(block["providers"]) == {"openai", "anthropic"}
+
+    monkeypatch.setattr(
+        model_effective_module,
+        "effective_model_view_v2",
+        lambda **_kw: (_ for _ in ()).throw(RuntimeError("cache unavailable")),
+    )
+    assert cr.model_catalog(store=store)["effective"] == {"tasks": {}}
+
+
+def test_v2_resolves_each_provider_scope_once(monkeypatch, tmp_path):
+    from src.api.routes import config_routes as cr
+    from src.model_credentials import CredentialStore
+    from src.model_discovery_cache import DiscoveryScope
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEYS", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEYS", raising=False)
+    store = CredentialStore(tmp_path / "profile_state.db")
+    store.add(provider="anthropic", auth_type="api_key", alias="A",
+              secret="sk-ant-" + "a" * 32, make_active=True)
+    store.add(provider="openai", auth_type="api_key", alias="O",
+              secret="sk-openai-" + "b" * 32, make_active=True)
+    calls = []
+
+    class RecordingCache:
+        def __init__(self, _path):
+            pass
+
+        def get(self, **scope):
+            calls.append(scope)
+            return DiscoveryScope(status="never_discovered", discovered_at=None, models=[])
+
+    monkeypatch.setattr(cr, "ModelDiscoveryCache", RecordingCache)
+    cr.model_catalog(store=store)
+    assert [call["provider"] for call in calls] == ["openai", "anthropic"]

@@ -239,21 +239,41 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
         task: task_route(task, route_store=route_store)
         for task in _ROUTE_TASKS
     }
-    # P2.7 additive `effective` block: per-task verified/advanced partition
-    # (registry ∩ discovery cache ∩ executability). Best-effort — the seed
-    # catalog must render even if the cache/resolver hiccups.
+    credential_inventory = provider_credentials(store)
+    # P2.7/P2.8 additive `effective` block. V2 is computed once for both
+    # providers; the legacy task-level alias is folded from that same result.
+    # Best-effort: the seed catalog still renders if the cache/resolver hiccups.
     try:
-        from src.model_effective import effective_model_view
+        from src.model_effective import effective_model_view_v2, legacy_effective_alias
 
         credentials = {
             provider: resolve_active_credential(provider, store)
             for provider in ("anthropic", "openai")
         }
-        effective = effective_model_view(
+        v2 = effective_model_view_v2(
             cache=ModelDiscoveryCache(store.db_path),
             routes=routes,
             credentials=credentials,
         )
+        for provider, summary in v2["providers"].items():
+            if summary is None:
+                continue
+            inventory_row = next(
+                (
+                    row for row in credential_inventory[provider]
+                    if row.id == summary["credential_id"]
+                ),
+                None,
+            )
+            summary["label"] = inventory_row.label if inventory_row else summary["credential_id"]
+        legacy = legacy_effective_alias(v2)
+        effective = {
+            "providers": v2["providers"],
+            "tasks": {
+                task: {**v2["tasks"][task], **legacy["tasks"][task]}
+                for task in v2["tasks"]
+            },
+        }
     except Exception:  # noqa: BLE001 - additive view only
         logger.warning("effective model view failed", exc_info=True)
         effective = {"tasks": {}}
@@ -262,7 +282,7 @@ def model_catalog(store: CredentialStore = Depends(get_credential_store)):
         "routes": {task: route.model_dump() for task, route in routes.items()},
         "credentials": {
             provider: [c.model_dump() for c in creds]
-            for provider, creds in provider_credentials(store).items()
+            for provider, creds in credential_inventory.items()
         },
         "custom_allowed": True,
         "effective": effective,
