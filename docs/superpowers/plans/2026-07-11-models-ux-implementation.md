@@ -1,7 +1,8 @@
 # Models Routing UX — Implementation Plan (focused P2.8 slice)
 
-> **Status: DRAFT FOR REVIEW ROUND 3 2026-07-11.** Roles: Claude authors the
-> plan; **implementation = user side (role swap confirmed), Claude reviews**. Implements the APPROVED spec
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-11. NOT MERGED; §6 live gate pending.**
+> Roles: Claude authored the plan; **Codex implemented on `codex/models-ux`,
+> user/Claude reviews**. Implements the APPROVED spec
 > `docs/superpowers/specs/2026-07-11-model-routing-settings-ux-design.md`
 > (round 2 absorbed). Authority on any conflict: the spec. Sequence per spec
 > §11: S3 lifecycle hotfix SHIPPED 2026-07-11 (`e7e144b`) — this slice is next.
@@ -11,6 +12,27 @@
 > `gpt-5.4-mini` executes — the exact 「此登入可見 ≠ 實際呼叫通過」 divergence
 > §3.4 splits. That pair is pinned below as the first §4.4 live acceptance
 > case.
+>
+> **Implementation verification ledger (`9f5b664` → `6a8568b`):** focused
+> backend `126 passed`; frontend `30 files / 281 tests`; typecheck and
+> production build pass; no-PG smoke `24/24`, `pg_attempts: []`; Playwright
+> desktop/mobile inspection found no horizontal overflow and confirmed the
+> four model groups plus removal of the old checkbox/duplicate override.
+> Full collect is `4059 → 4106`, exactly `+47 / -0` nodes. A review-time
+> collect gate found that production file `src/model_task_test.py` matched
+> pytest's `*_test.py` pattern and accidentally collected its imported
+> `test_model`; RED pin + rename to `src/model_task_canary.py` removed that
+> phantom node without adding a test (`6a8568b`).
+>
+> **A/B environment limitation:** the required virgin single-process base
+> suite did not finish in this Codex environment because existing
+> TestClient/event-loop state hangs in unrelated base tests. It is therefore
+> NOT claimed as a full-protocol PASS. The broad symmetric fallback ran every
+> test file in its own virgin pytest process with a 60-second file timeout:
+> failure/error nodes `27 = 27`, timeout files `4 = 4` (both directional
+> diffs empty), non-timeout passed `3768 → 3815 = +47`, skipped `73 = 73`,
+> warnings `20 = 20`, errors `1 = 1`. Reviewer still owns the canonical
+> single-process full A/B before merge.
 
 ## 0. Grounding corrections to the spec (verified against code 2026-07-11; round-2 re-verified)
 
@@ -308,7 +330,7 @@ RED (tests/test_model_effective.py route test + tests/test_model_routing.py):
 3. Ledger: `test_model_catalog_route_gains_additive_effective_block` (:170)
    must stay green unchanged.
 
-**Task 3 — task-test endpoint (config_routes.py + src/model_task_test.py).**
+**Task 3 — task-test endpoint (config_routes.py + src/model_task_canary.py).**
 Dispatch core lives in a new module (route stays thin, handler-direct
 testable). RED (new tests/test_model_task_test.py, house fakes):
 1. `test_dispatch_matrix_zero_call_arms` — none/pool/cards×oauth arms AND
