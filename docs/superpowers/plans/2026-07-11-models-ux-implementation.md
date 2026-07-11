@@ -1,6 +1,6 @@
 # Models Routing UX — Implementation Plan (focused P2.8 slice)
 
-> **Status: DRAFT FOR REVIEW ROUND 2 2026-07-11.** Roles: Claude authors the
+> **Status: DRAFT FOR REVIEW ROUND 3 2026-07-11.** Roles: Claude authors the
 > plan; **implementation = user side (role swap confirmed), Claude reviews**. Implements the APPROVED spec
 > `docs/superpowers/specs/2026-07-11-model-routing-settings-ux-design.md`
 > (round 2 absorbed). Authority on any conflict: the spec. Sequence per spec
@@ -68,7 +68,8 @@ source.** Shape per spec §5.1:
       "providers": { "<p>": {
           "executable": bool,            # auth-mode-wide veto for this task
           "reason_code": str | null,
-          "models": [ {id, label, status, eligible, reason_code, thinking_mode} ],
+          "models": [ {id, label, status, visible_to_credential,
+                       eligible, reason_code, thinking_mode} ],
           "cache_state": "ok|seed_only|never_discovered",
           "discovered_at": str | null } } } } }
 ```
@@ -142,24 +143,34 @@ Auth-mode axis:
 | chatgpt_oauth | zero-call `task_auth_mode_unsupported` | bounded canary (below) |
 | claude_code_oauth | zero-call `task_auth_mode_unsupported` | zero-call `task_test_unsupported` (§0-1 ruling; probe = that channel's health check) |
 
-**Model axis (round-2 MF3 — runs BEFORE any provider call, in this order,
-producing the three §6 codes D6 renders):**
-1. Provider mismatch: `model_provider(model)` infers the OTHER provider →
-   zero-call `task_capability_missing`.
-2. Known-registry model failing `task_auth_executable`'s capability leg →
-   zero-call `task_capability_missing`.
-3. Visibility veto: resolve the model through registry aliases FIRST
+**Dispatch precedence (round-3 MF1 — ONE fixed order; each step only runs
+when every earlier step passed, so an auth-mode veto can never be
+misreported as a capability miss):**
+1. **Credential**: no active credential → zero-call
+   `missing_active_credential`.
+2. **Auth-mode-wide veto**: cards×OAuth → `task_auth_mode_unsupported`;
+   api_key_pool → `task_test_unsupported`; ai_research×claude_code_oauth →
+   `task_test_unsupported` (§0-1). All zero-call.
+3. **Model/task capability** — via a NEW standalone helper
+   `task_capability_ok(task, capability) -> bool` extracted from
+   `task_auth_executable`'s capability conditions (cards: tool_calling +
+   structured_output; research: tool_calling) and REUSED by it, so the two
+   can never drift. `task_auth_executable` is NOT called here — it folds the
+   auth axis in and would misreport (e.g. cards×chatgpt_oauth on a fully
+   capable gpt-5.4-mini returns False on the auth leg alone). Provider
+   mismatch (`model_provider(model)` infers the other provider) or a
+   known-registry model failing the helper → zero-call
+   `task_capability_missing`.
+4. **Visibility veto**: resolve the model through registry aliases FIRST
    (`capability_for`), then — ONLY when the active credential's cache is
    `cache_state=ok` — a model absent from the discovered listing →
-   zero-call `model_not_visible` (the live listing is the evidence of
-   absence). `seed_only`/`never_discovered` NEVER veto (spec: the explicit
-   test is allowed to provide the first live evidence). **Ruling:
-   registry-unknown route/custom ids follow the same rule** — vetoed under
-   `cache_state=ok` when unlisted, allowed as first-evidence canaries on
-   seed channels.
-4. Cache read failure at veto time → `discovery_unavailable` only when the
-   veto cannot be evaluated (never blocks api_key `test_model`, which needs
-   no cache).
+   zero-call `model_not_visible`. `seed_only`/`never_discovered` NEVER veto
+   (the explicit test is the first live evidence). Registry-unknown
+   route/custom ids follow the same rule. **Cache READ failure at this step
+   → zero-call `discovery_unavailable` for EVERY auth mode** (round-3 MF1:
+   one fact, one behavior — the veto cannot be evaluated, so no billing
+   path proceeds; api_key is not special-cased).
+5. **Provider call** (api_key `test_model` / chatgpt canary).
 
 OAuth (chatgpt) canary: `build_driver(provider, auth_mode, credential,
 token_store, registry=None, dal=None, max_turns=1, timeout_s=45)` → drive
@@ -192,13 +203,22 @@ translated (`missing_credential` → `missing_active_credential`, error →
    discovery state + 最後驗證可見) from `effective.providers` — read-only;
    missing → 「尚未設定此 provider 的登入」+ 前往 Providers link, selector
    and save disabled **in the frontend only** (backend stays warning-only).
-   **Round-2 MF5 — save gating is PAGE-level**: the 儲存 button and `save()`
-   live in Settings (:252), outside ModelRoutingSection — a new PURE helper
-   `blockedRouteSaves(draft, effective) -> {task, reason}[]` is the single
-   gate authority; `save()` refuses (and the button disables) while any
-   drafted task's selected provider has no active credential. Unit tests on
-   the helper + ONE Settings-level wiring test proving the button/`save()`
-   actually consult it;
+   **Round-2 MF5 + round-3 MF3 — save gating is PAGE-level and
+   compat-safe**: the 儲存 button and `save()` live in Settings (:252),
+   outside ModelRoutingSection. A normalization layer
+   `providerContexts(effective?.providers, catalog.credentials)` is the
+   SINGLE source for per-provider active-credential context (v2 block when
+   present; otherwise derived from the active row in `catalog.credentials` —
+   the spec's compat rule), shared by the task-card summary AND the save
+   gate. The gate itself is `blockedRouteSaves(draft, baseline, contexts) ->
+   {task, reason}[]` where `baseline = catalog.routes`. **Ruling (round-3
+   MF3): only DIRTY tasks block** — a task blocks the global save iff the
+   user changed it this session (`draft[task] != baseline[task]`) AND its
+   drafted provider has no active credential; a pre-existing
+   missing-credential route never locks unrelated tasks out of saving.
+   Unit tests on both helpers (incl. compat-mode derivation and the
+   dirty-vs-pre-existing split) + ONE Settings-level wiring test proving
+   the button/`save()` actually consult the gate;
 4. ONE grouped `<select>`: optgroups 此登入可見 / 候選／未驗證 / 舊版／進階 /
    目前路由; a discovered advanced-tier entry additionally reads
    ·此登入可見 from `visible_to_credential` (round-2 MF2 orthogonality);
@@ -216,7 +236,15 @@ translated (`missing_credential` → `missing_active_credential`, error →
    `runTaskModelTest` api.ts helper whose timeout is **60_000 ms — strictly
    above the backend's 45 s canary bound** (DEFAULT_TIMEOUT_MS=15_000 would
    abort the UI while the paid backend call keeps running); pinned by test.
-   Result line shows status/latency/auth-mode/error-code action text);
+   **Round-3 MF2 — the result is a SNAPSHOT, not a task-level flag**: the
+   stored result carries `{task, provider, model, effort, credential_id}`
+   captured at test time; it renders ONLY while ALL five still equal the
+   current draft + the current active credential (from `providerContexts`).
+   Any provider/model/effort change or a discovery-refresh that lands a
+   different active credential hides it immediately (replaced by 「選擇已
+   變更——重新測試」) — a mini-PASS can never keep claiming 實際呼叫通過
+   after switching to Luna. Result line shows status/latency/auth-mode/
+   error-code action text);
 7. existing reset + status text.
 `reauth_required` anywhere → text + 前往 Providers link (re-login stays in
 Providers, §4.2). **Compat mode** (new frontend, old sidecar — spec §5.1):
@@ -271,9 +299,13 @@ RED (tests/test_model_effective.py, reusing its store/cache fixtures):
 **Task 2 — catalog composition (config_routes.py).**
 RED (tests/test_model_effective.py route test + tests/test_model_routing.py):
 1. `test_model_catalog_effective_gains_provider_indexed_shape` — additive:
-   old task-level alias intact, new `providers` maps present, single
-   best-effort try still swallows a v2 failure into `{"tasks": {}}`.
-2. Ledger: `test_model_catalog_route_gains_additive_effective_block` (:170)
+   old task-level alias intact, new `providers` maps present (label joined
+   from the credentials inventory — exact shape), single best-effort try
+   still swallows a v2 failure into `{"tasks": {}}`.
+2. `test_v2_resolves_each_provider_scope_once` (round-3 SF3) — a recording
+   cache fake counts `get` calls: exactly 2 for the full catalog (the
+   performance contract becomes a test, not prose).
+3. Ledger: `test_model_catalog_route_gains_additive_effective_block` (:170)
    must stay green unchanged.
 
 **Task 3 — task-test endpoint (config_routes.py + src/model_task_test.py).**
@@ -285,12 +317,23 @@ testable). RED (new tests/test_model_task_test.py, house fakes):
    client/driver construction (§10 zero-call requirement).
 2. `test_model_axis_zero_call_vetoes` (round-2 MF3) — provider mismatch →
    `task_capability_missing`; known-registry model missing the task
-   capability → `task_capability_missing`; `cache_state=ok` + model absent
-   from the listing → `model_not_visible`; an ALIAS of a listed model
-   (e.g. `gpt-5.6` → sol) is NOT vetoed; all zero-call.
+   capability (via `task_capability_ok`) → `task_capability_missing`;
+   `cache_state=ok` + model absent from the listing → `model_not_visible`;
+   an ALIAS of a listed model (e.g. `gpt-5.6` → sol) is NOT vetoed; all
+   zero-call.
+2b. `test_dispatch_precedence_auth_before_capability` (round-3 MF1) —
+   cards × chatgpt_oauth with a FULLY capable model (gpt-5.4-mini) →
+   `task_auth_mode_unsupported`, NEVER `task_capability_missing`; and
+   `task_capability_ok` is asserted equal to `task_auth_executable`'s
+   verdict under `auth_mode="api_key"` for every registry model (the
+   no-drift pin between helper and source).
 3. `test_seed_channels_never_visibility_veto` (round-2 MF3) — seed_only /
    never_discovered: unknown/custom model proceeds to the canary (first live
-   evidence); cache-read failure at veto time → `discovery_unavailable`.
+   evidence).
+3b. `test_cache_read_failure_is_discovery_unavailable_for_all_auth_modes`
+   (round-3 MF1) — cache raising at veto time → zero-call
+   `discovery_unavailable` for api_key AND chatgpt_oauth alike (recording
+   fakes prove `test_model`/driver never constructed).
 4. `test_api_key_arm_reuses_test_model_and_translates` — fake `test_model`
    capture: called once with model/effort/credential_id=active; ok passes
    latency/fallback through; missing→`missing_active_credential`;
@@ -341,9 +384,27 @@ RED (ModelRoutingSection.test.ts + new TaskModelCard tests, house harness):
 10. `route-pinned unknown model appears in 目前路由 group, selectable, with
     warning` (evolves :208).
 11. `compat mode: providers absent → provider control still present, legacy
-    partition for current provider, alternate provider = registry seeds
-    unverified, test button disabled with 請重啟／更新 sidecar; checkbox/manual
-    override NOT revived` (replaces :170 — intent moved).
+    partition for current provider, alternate provider = catalog.models seeds
+    ALL marked 未驗證（舊 sidecar 相容模式）, test button disabled with
+    請重啟／更新 sidecar; checkbox/manual override NOT revived` (replaces
+    :170 — intent moved). **Round-3 SF1 ruling: the temporary widening is
+    ACCEPTED and labeled** — `catalog.models` (routing-seed view) includes
+    two pinned_only ids (gpt-5.5 / gpt-5.4) the frontend cannot filter
+    (ModelOption carries no visibility tier); compat is a degraded mode, every
+    entry is explicitly unverified, and upgrading the sidecar restores the
+    honest partition. Pinned by the same test.
+11b. `oauth research test copy: 「消耗訂閱額度，非 API 帳單」 renders beside
+    the task-test control when the selected provider's auth mode is OAuth`
+    (round-3 SF2 — the spec-required billing copy gets a named test).
+11c. `test-result snapshot guard (round-3 MF2): test with mini → result
+    shows; switch model to Luna → result replaced by 選擇已變更; switch
+    back → still hidden (stale); provider/effort switches and an active-
+    credential change via refreshed catalog behave the same`.
+11d. `providerContexts normalization: v2 present → passthrough; absent →
+    derived from catalog.credentials active row; neither → null context
+    (selector disabled)` + `blockedRouteSaves dirty-vs-pre-existing split:
+    a baseline route already on a credential-less provider does NOT block;
+    the same task freshly drafted onto it DOES` (round-3 MF3).
 12. api.ts DTO additions (`EffectiveProviderModels`, provider-indexed
     `EffectiveTaskModels.providers?`, `visible_to_credential`,
     `TaskModelTestResult`) — typecheck-level.
@@ -410,6 +471,27 @@ BEFORE merge.
 
 ## 7. Review log
 
+- Round 2 (2026-07-11): 3 must-fix + 3 should-fix, all verified real. MF1 —
+  `task_auth_executable` has no separable capability leg (cards×oauth returns
+  False on the auth axis before capability is ever evaluated) → D4 now fixes
+  ONE five-step precedence (credential → auth veto → NEW `task_capability_ok`
+  helper extracted from and reused by `task_auth_executable` → visibility →
+  call), plus the :160 contradiction resolved: cache-read failure at veto
+  time → `discovery_unavailable` for EVERY auth mode (one fact, one
+  behavior); precedence + no-drift + all-modes tests added (2b/3b). MF2 —
+  test results become five-field SNAPSHOTS `{task, provider, model, effort,
+  credential_id}` rendered only while equal to the current draft + active
+  credential; any switch or credential change hides them (「選擇已變更——重新
+  測試」); interaction test 11c. MF3 — `providerContexts(effective?.providers,
+  catalog.credentials)` normalization shared by card summary and save gate
+  (compat-safe per the spec's credentials fallback); gate re-signed
+  `blockedRouteSaves(draft, baseline, contexts)` with the RULING that only
+  DIRTY tasks block (pre-existing missing-credential routes never lock
+  unrelated saves); tests 11d. SF1 — compat widening (two pinned_only ids
+  via catalog.models) ACCEPTED + labeled 未驗證（舊 sidecar 相容模式）,
+  frontend cannot filter tiers; SF2 — billing copy gets named test 11b;
+  SF3 — D1 shape example carries `visible_to_credential`, and the 2×
+  cache.get contract becomes counting test (Task 2-2).
 - Round 1 (2026-07-11): 5 must-fix + 4 should-fix, ALL verified real against
   code before fixing. MF1 — my grounding was wrong: `registry=None` fail-fasts
   in `build_ark_mcp_server` (:354) before any model call → RULED
