@@ -28,9 +28,16 @@
 > valid) from completion-failure (state consumed → result carries
 > `manual_completable: false`); status route passes it through; the FE
 > only offers 完成登入 when completable, else resets the flow.
-> Evidence after fixes: backend focused 186 passed; frontend 27 files /
-> 263 tests + typecheck + build; smoke `pg_attempts: []`. Fresh full
-> virgin A/B running; verdict reported with exact collect accounting.
+> Evidence after fixes: backend focused 188 passed; frontend 27 files /
+> 263 tests + typecheck + build; smoke `pg_attempts: []`. Discipline
+> ledger note: the round-4 A/B's exact accounting (+38 vs my announced
+> +40) exposed that TWO F2 delete-route behaviors (502-detail split;
+> row-vanished-after-cleanup = success ruling) had been implemented
+> WITHOUT their tests. Handled per TDD discipline: the route code was
+> reverted to its pre-fix state, both tests were written and proven RED
+> against it, the implementation was restored, and both went GREEN
+> (`test: pin round-4 delete-route compensation contracts`). Final
+> virgin A/B runs against that tip.
 >
 > Prior status: IMPLEMENTED FOR REVIEW 2026-07-11. Branch
 > `claude/s3-credential-lifecycle`, six TDD commits (login core / cache
