@@ -34,7 +34,15 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert "claude-opus-4-8" in ids
     assert "gpt-5.5" in ids
     assert "default" in {x["id"] for x in res["effort_options"]["anthropic"]}
-    assert "minimal" in {x["id"] for x in res["effort_options"]["openai"]}
+    assert "minimal" not in {x["id"] for x in res["effort_options"]["openai"]}
+    assert "max" in {x["id"] for x in res["effort_options"]["openai"]}
+    by_id = {model["id"]: model for model in res["models"]}
+    assert by_id["gpt-5.6-luna"]["effort_options"] == [
+        "none", "low", "medium", "high", "xhigh", "max",
+    ]
+    assert by_id["gpt-5.4-mini"]["effort_options"] == [
+        "none", "low", "medium", "high", "xhigh",
+    ]
     assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research"}
 
 
@@ -227,6 +235,37 @@ def test_invalid_effort_falls_back_to_default(tmp_path, monkeypatch):
     assert res["routes"]["card_translation"]["effort"] == "default"
     assert "future-effort" in res["routes"]["card_translation"]["warning"]
 
+    cfg_mod.get_agent_config.cache_clear()
+
+
+def test_model_specific_effort_validation_preserves_max_only_for_gpt56(tmp_path, monkeypatch):
+    from src.agents import config as cfg_mod
+
+    monkeypatch.setattr(cfg_mod, "_MAIN_CONFIG_PATH", tmp_path / "missing.yaml")
+    monkeypatch.setattr(cfg_mod, "_LOCAL_CONFIG_PATH", tmp_path / "user_profile.local.yaml")
+    cfg_mod.get_agent_config.cache_clear()
+    store = CredentialStore(tmp_path / "profile_state.db")
+
+    accepted = update_model_routes(
+        ModelRoutesUpdate(routes={
+            "ai_research": RouteUpdate(
+                provider="openai", model="gpt-5.6-luna", effort="max",
+            ),
+        }),
+        store=store,
+    )
+    assert accepted["routes"]["ai_research"]["effort"] == "max"
+
+    normalized = update_model_routes(
+        ModelRoutesUpdate(routes={
+            "ai_research": RouteUpdate(
+                provider="openai", model="gpt-5.4-mini", effort="max",
+            ),
+        }),
+        store=store,
+    )
+    assert normalized["routes"]["ai_research"]["effort"] == "default"
+    assert "max" in normalized["routes"]["ai_research"]["warning"]
     cfg_mod.get_agent_config.cache_clear()
 
 

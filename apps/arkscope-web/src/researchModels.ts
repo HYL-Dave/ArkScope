@@ -2,7 +2,13 @@
 // logic is unit-testable without a DOM or network (mirrors researchProvider.ts /
 // chatgptOAuth.ts). The component owns the discovery FETCH; these decide what the
 // dropdown shows and what's selected.
-import type { CredentialAuthType, ProviderCredential, ModelProvider } from "./api";
+import type {
+  CredentialAuthType,
+  EffortOption,
+  ModelCatalog,
+  ModelProvider,
+  ProviderCredential,
+} from "./api";
 
 export function activeCredential(creds: ProviderCredential[] | undefined): ProviderCredential | null {
   return creds?.find((c) => c.active) ?? null;
@@ -44,6 +50,29 @@ export function effortNote(
   void authMode;
   void effort;
   return null;
+}
+
+export function effortOptionsForModel(
+  catalog: ModelCatalog,
+  provider: ModelProvider,
+  model: string,
+  effectiveEffortIds?: string[],
+): EffortOption[] {
+  const providerOptions = catalog.effort_options[provider] ?? [];
+  const modelOption = catalog.models
+    .filter((item) => item.provider === provider && (
+      item.id === model || model.startsWith(`${item.id}-`)
+    ))
+    .sort((left, right) => right.id.length - left.id.length)[0];
+  const supported = effectiveEffortIds ?? modelOption?.effort_options;
+  if (supported === undefined) {
+    const hasModelContracts = catalog.models.some((item) => item.effort_options !== undefined);
+    return hasModelContracts
+      ? providerOptions.filter((item) => item.id === "default")
+      : providerOptions;
+  }
+  const allowed = new Set(["default", ...supported]);
+  return providerOptions.filter((item) => allowed.has(item.id));
 }
 
 export interface MinimalResearchMessage {

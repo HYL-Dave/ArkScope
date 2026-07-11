@@ -32,6 +32,19 @@
 > failure/error nodes `27 = 27`, timeout files `4 = 4`, non-timeout passed
 > `3768 → 3815 = +47`, with flat skipped/warnings/errors. Its difference from
 > the canonical 30-failure family is explained by those four timeout files.
+>
+> **Live-gate amendment (2026-07-12, awaiting user re-test):** visual criteria
+> passed. ChatGPT OAuth reproduced `gpt-5.6-luna` `Model not found` across
+> effort choices while `gpt-5.4-mini` passed; this is model/backend resolution,
+> not evidence that OAuth rejects effort. Inspection found provider-wide effort
+> drift (`minimal` offered to all current OpenAI models, GPT-5.6 `max` absent),
+> silent OAuth wire coercion (`xhigh|max` -> `high`, `none` omitted), and an
+> unclosed execution client after bounded canary teardown. RED-first amendment:
+> model-specific capability sets flow through catalog/v2/UI/route validation;
+> OAuth sends explicit effort unchanged and deterministically closes its client.
+> Focused backend `207 passed`; close-path tests with warnings-as-errors `72
+> passed`; frontend `30 files / 284 tests`; typecheck/build and no-PG smoke
+> `24/24`, `pg_attempts: []`. Final live pair remains user-gated.
 
 ## 0. Grounding corrections to the spec (verified against code 2026-07-11; round-2 re-verified)
 
@@ -494,6 +507,13 @@ BEFORE merge.
    master) — provider control + degraded copy, no crash.
 
 ## 7. Review log
+
+- Live-gate amendment (2026-07-12): visual gate passed; execution exposed the
+  model-specific effort and OAuth client-lifecycle defects recorded in the
+  header. The fix deliberately does not add fallback: unsupported model/auth or
+  model/effort pairs remain explicit failures. Pending user re-test covers
+  `gpt-5.4-mini` with more than one explicit effort and GPT-5.6 through the
+  intended credential path.
 
 - Round 3 / implementation review (2026-07-12): GREEN, no must-fix. Canonical
   virgin single-process A/B is authoritative and exact: failure sets `30=30`,

@@ -840,7 +840,7 @@ def run_provider_model_test(
     store = _credential_store(store)
     effort = body.effort.strip() or "default"
     warning = None
-    if not is_valid_effort(body.provider, effort):
+    if not is_valid_effort(body.provider, effort, model=body.model.strip()):
         warning = (
             f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
             "testing with provider default."
@@ -871,7 +871,7 @@ def run_task_model_test(
         raise HTTPException(status_code=400, detail="model is required")
     effort = body.effort.strip() or "default"
     warning = None
-    if not is_valid_effort(body.provider, effort):
+    if not is_valid_effort(body.provider, effort, model=model):
         warning = (
             f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
             "testing with provider default."
@@ -916,7 +916,7 @@ def update_model_routes(
             raise HTTPException(status_code=400, detail=f"{task}: model is required")
         effort = update.effort.strip() or "default"
         warnings: list[str] = []
-        if not is_valid_effort(update.provider, effort):
+        if not is_valid_effort(update.provider, effort, model=model):
             warnings.append(
                 f"Configured effort '{effort}' is not known for provider '{update.provider}'; "
                 "saved provider default."
@@ -1017,7 +1017,7 @@ def import_model_routes(store: CredentialStore = Depends(get_credential_store)):
         if inferred and inferred != provider:  # same prefix-mismatch guard as update_model_routes
             skipped.append(task)
             continue
-        if not is_valid_effort(provider, effort):  # mirror the save path's effort normalization
+        if not is_valid_effort(provider, effort, model=model):  # mirror the save path's effort normalization
             effort = "default"
         require_profile_state_write("model_route_import", {"task": task})
         route_store.set(task, provider, model, effort)

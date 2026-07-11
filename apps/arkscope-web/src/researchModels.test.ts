@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProviderCredential } from "./api";
-import { activeCredential, defaultModel, effortNote, lastAssistantSelection, modelOptions } from "./researchModels";
+import type { ModelCatalog, ProviderCredential } from "./api";
+import {
+  activeCredential,
+  defaultModel,
+  effortNote,
+  effortOptionsForModel,
+  lastAssistantSelection,
+  modelOptions,
+} from "./researchModels";
 
 const cred = (over: Partial<ProviderCredential>): ProviderCredential => ({
   id: "local:1", provider: "openai", auth_type: "api_key", label: "k", source: "db",
@@ -65,6 +72,36 @@ describe("effortNote", () => {
   it("is silent for api_key and other auth modes", () => {
     expect(effortNote("openai", "api_key", "high")).toBeNull();
     expect(effortNote("anthropic", null, "high")).toBeNull();
+  });
+});
+
+describe("effortOptionsForModel", () => {
+  const options = ["default", "none", "low", "medium", "high", "xhigh", "max"]
+    .map((id) => ({
+      id,
+      provider: "openai" as const,
+      label: id,
+      description: id,
+      applies_to_card_tasks: true,
+    }));
+  const catalog = {
+    effort_options: { openai: options, anthropic: [] },
+    models: [
+      { id: "gpt-5.4-mini", provider: "openai", effort_options: ["none", "low", "medium", "high", "xhigh"] },
+      { id: "gpt-5.6-luna", provider: "openai", effort_options: ["none", "low", "medium", "high", "xhigh", "max"] },
+    ],
+  } as unknown as ModelCatalog;
+
+  it("uses the selected model contract rather than the provider union", () => {
+    expect(effortOptionsForModel(catalog, "openai", "gpt-5.4-mini").map((item) => item.id))
+      .toEqual(["default", "none", "low", "medium", "high", "xhigh"]);
+    expect(effortOptionsForModel(catalog, "openai", "gpt-5.6-luna").map((item) => item.id))
+      .toEqual(["default", "none", "low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("limits a new-sidecar custom model to provider default", () => {
+    expect(effortOptionsForModel(catalog, "openai", "gpt-future-custom").map((item) => item.id))
+      .toEqual(["default"]);
   });
 });
 

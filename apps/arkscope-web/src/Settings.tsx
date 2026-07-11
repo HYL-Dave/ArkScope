@@ -68,6 +68,7 @@ import {
   type TaskRoute,
 } from "./api";
 import { runDiscoveryAndRefreshCatalog } from "./modelSelect";
+import { effortOptionsForModel } from "./researchModels";
 import {
   blockedRouteSaves,
   isTaskTestSnapshotCurrent,
@@ -2166,6 +2167,7 @@ function compatEntries(
     eligible: true,
     reason_code: null,
     thinking_mode: "none",
+    effort_options: model.effort_options,
   }));
   if (row.model && !entries.some((entry) => entry.id === row.model)) {
     entries.push({
@@ -2176,6 +2178,7 @@ function compatEntries(
       eligible: true,
       reason_code: "model_not_in_registry",
       thinking_mode: "none",
+      effort_options: undefined,
     });
   }
   return entries;
@@ -2245,6 +2248,7 @@ export function ModelRoutingSection({
                   eligible: true,
                   reason_code: "model_not_in_registry",
                   thinking_mode: "none",
+                  effort_options: [],
                 },
               ];
           const providerReason = context
@@ -2258,7 +2262,12 @@ export function ModelRoutingSection({
               .map((entry) => entry.disabledReason)
               .filter((reason): reason is string => !!reason),
           ));
-          const effortOptions = catalog.effort_options[row.provider] ?? [];
+          const effortOptions = effortOptionsForModel(
+            catalog,
+            row.provider,
+            row.model,
+            selectedEntry?.effort_options,
+          );
           const currentTest = testState[task.id];
           const testIsCurrent = !!(
             currentTest?.snapshot
@@ -2377,7 +2386,14 @@ export function ModelRoutingSection({
                     onChange={(event) => {
                       const model = event.currentTarget.value;
                       if (!model) return;
-                      updateTask(task.id, { ...row, model, custom: false });
+                      const nextEntry = entries.find((entry) => entry.id === model);
+                      const nextEfforts = effortOptionsForModel(
+                        catalog, row.provider, model, nextEntry?.effort_options,
+                      );
+                      const effort = nextEfforts.some((item) => item.id === row.effort)
+                        ? row.effort
+                        : "default";
+                      updateTask(task.id, { ...row, model, effort, custom: false });
                     }}
                   >
                     <option value="">選擇模型…</option>
@@ -2413,7 +2429,7 @@ export function ModelRoutingSection({
                     type="button"
                     className="btn-ghost small model-custom-toggle"
                     disabled={!context}
-                    onClick={() => updateTask(task.id, { ...row, custom: true })}
+                    onClick={() => updateTask(task.id, { ...row, effort: "default", custom: true })}
                   >
                     輸入自訂 model id
                   </button>
@@ -2446,7 +2462,9 @@ export function ModelRoutingSection({
                 <span>Effort</span>
                 <select
                   aria-label={`Effort ${task.id}`}
-                  value={row.effort || "default"}
+                  value={effortOptions.some((item) => item.id === (row.effort || "default"))
+                    ? (row.effort || "default")
+                    : "default"}
                   onChange={(event) => updateTask(task.id, {
                     ...row,
                     effort: event.currentTarget.value,

@@ -307,7 +307,7 @@ def test_v2_entry_schema_and_grouping(tmp_path):
     for entry in entries.values():
         assert set(entry) == {
             "id", "label", "status", "visible_to_credential",
-            "eligible", "reason_code", "thinking_mode",
+            "eligible", "reason_code", "thinking_mode", "effort_options",
         }
 
     research = view["tasks"]["ai_research"]["providers"]["openai"]
@@ -428,6 +428,24 @@ def test_v2_thinking_mode_carried_from_registry(tmp_path):
     assert entries["claude-haiku-4-5"]["thinking_mode"] == "manual_budget"
     assert entries["gpt-5.4-mini"]["thinking_mode"] == "none"
     assert entries["mystery-model"]["thinking_mode"] == "none"
+
+
+def test_v2_effort_options_are_model_specific(tmp_path):
+    view = effective_model_view_v2(
+        cache=ModelDiscoveryCache(tmp_path / "profile.db"),
+        routes=_routes_mixed(),
+        credentials={"openai": None, "anthropic": None},
+    )
+    entries = {}
+    for block in view["tasks"]["ai_research"]["providers"].values():
+        entries.update({entry["id"]: entry for entry in block["models"]})
+    assert entries["gpt-5.6-luna"]["effort_options"] == [
+        "none", "low", "medium", "high", "xhigh", "max",
+    ]
+    assert entries["gpt-5.4-mini"]["effort_options"] == [
+        "none", "low", "medium", "high", "xhigh",
+    ]
+    assert entries["mystery-model"]["effort_options"] == []
 
 
 def test_v2_visibility_is_orthogonal_to_tier(tmp_path):

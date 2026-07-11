@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import logging
 import re
 from typing import Any, AsyncIterator, Optional
 
@@ -41,6 +42,8 @@ _DEFAULT_TIMEOUT_S = 900.0
 _BRIDGE_RESULT_BUDGET = 12_000
 _SUMMARY_CAP = 200
 _DEFAULT_MAX_TURNS = 60
+
+logger = logging.getLogger(__name__)
 
 _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
     {
@@ -196,9 +199,19 @@ def _request_input_items(request: LLMRequest) -> list[dict]:
 
 
 def _reasoning(effort: Optional[str]) -> Optional[dict]:
-    if not effort or effort in ("default", "none"):
+    if not effort or effort == "default":
         return None
-    return {"effort": "high" if effort in ("xhigh", "max") else effort}
+    return {"effort": effort}
+
+
+async def _close_execution_client(client: Any) -> None:
+    close = getattr(client, "close", None) or getattr(client, "aclose", None)
+    if close is None:
+        return
+    try:
+        await _maybe_await(close())
+    except Exception:  # noqa: BLE001 - cleanup must not replace the provider result
+        logger.warning("failed to close ChatGPT OAuth execution client", exc_info=True)
 
 
 def _response_output_items(response: Any) -> list[dict]:
@@ -418,7 +431,18 @@ class OpenAIChatGPTOAuthDriver:
         return LLMResponse(text=text, usage=usage)
 
     def stream_llm(self, request: Any):
-        return self._stream(request)
+        return self._managed_stream(request)
+
+    async def _managed_stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
+        clients: list[Any] = []
+        stream = self._stream(request, client_sink=clients.append)
+        try:
+            async for event in stream:
+                yield event
+        finally:
+            await stream.aclose()
+            for client in clients:
+                await _close_execution_client(client)
 
     def _build_tools(self) -> list[dict]:
         if self._registry is None:
@@ -461,7 +485,12 @@ class OpenAIChatGPTOAuthDriver:
         except BaseException as exc:  # noqa: BLE001
             return False, _redact_token(str(exc), token)[:500]
 
-    async def _stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
+    async def _stream(
+        self,
+        request: LLMRequest,
+        *,
+        client_sink=None,
+    ) -> AsyncIterator[AgentEvent]:
         # Classified early exits (S3 plan D4) — one machine-readable error event,
         # never a bare exception, never a backend call. Wiring vs token-absent
         # arms are split exactly like discover_models.
@@ -493,6 +522,8 @@ class OpenAIChatGPTOAuthDriver:
             return
 
         client = _execution_client(token)
+        if client_sink is not None:
+            client_sink(client)
         input_items = _request_input_items(request)
         tools = self._build_tools()
         used: list[str] = []

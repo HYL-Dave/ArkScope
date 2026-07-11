@@ -124,6 +124,7 @@ def _v2_entry(
         "eligible": eligible,
         "reason_code": reason,
         "thinking_mode": capability.thinking_mode if capability is not None else "none",
+        "effort_options": list(capability.effort_options) if capability is not None else [],
     }
 
 

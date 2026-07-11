@@ -33,7 +33,7 @@ from src.model_routing import (
 logger = logging.getLogger(__name__)
 
 # Valid reasoning effort levels for GPT-5.x / o-series
-ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 
 class AgentConfig(BaseModel):
@@ -539,7 +539,7 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
             model = default_model_for(provider, task)
 
     warning = None
-    if not is_valid_effort(provider, effort):
+    if not is_valid_effort(provider, effort, model=model):
         warning = (
             f"Configured effort '{effort}' is not known for provider '{provider}'; "
             "using provider default."

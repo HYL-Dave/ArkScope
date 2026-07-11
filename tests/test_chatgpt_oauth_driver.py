@@ -72,6 +72,10 @@ class _Responses:
 class _ExecClient:
     def __init__(self, streams):
         self.responses = _Responses(streams)
+        self.closed = False
+
+    async def close(self):
+        self.closed = True
 
 
 class _Cred:
@@ -328,6 +332,47 @@ def test_stream_llm_streams_text_done_and_strips_max_output_tokens(monkeypatch):
     assert sent["reasoning"] == {"effort": "low"}
     assert "max_output_tokens" not in sent
     assert "previous_response_id" not in sent
+
+
+@pytest.mark.parametrize(
+    ("effort", "expected"),
+    [
+        ("default", None),
+        ("none", {"effort": "none"}),
+        ("low", {"effort": "low"}),
+        ("xhigh", {"effort": "xhigh"}),
+        ("max", {"effort": "max"}),
+    ],
+)
+def test_stream_llm_sends_selected_effort_without_silent_coercion(monkeypatch, effort, expected):
+    client = _ExecClient([[
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ]}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    _run(_collect(_driver().stream_llm(_req(reasoning_effort=effort))))
+
+    assert client.responses.calls[0].get("reasoning") == expected
+
+
+def test_stream_llm_closes_execution_client_when_consumer_stops_early(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ]}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+
+    async def stop_after_first_event():
+        stream = _driver().stream_llm(_req())
+        await stream.__anext__()
+        await stream.aclose()
+
+    _run(stop_after_first_event())
+
+    assert client.closed is True
 
 
 def test_stream_llm_preserves_openai_cached_token_usage(monkeypatch):

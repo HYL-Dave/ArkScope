@@ -215,6 +215,17 @@ artifact.
 V1 stores only `provider`, `model`, and `effort` in `TaskRoute`. It does **not**
 add a task-level thinking toggle or a new route-schema field.
 
+Effort choices are model-specific registry facts, not a provider-wide menu.
+`default` means ArkScope omits the wire override and therefore cannot promise a
+fixed tier; `none` is an explicit no-reasoning value and must be sent as such.
+For the current OpenAI catalog, GPT-5.6 exposes
+`none|low|medium|high|xhigh|max`, while GPT-5.4/5.5/5.2 expose
+`none|low|medium|high|xhigh`; `minimal` is not offered for these models.
+Unknown/custom model ids show only `default` until their capability contract is
+known. Route validation uses the selected model's set and never silently maps
+one valid tier to another. An auth backend may still reject a model/effort pair;
+the task-scoped actual-call test is the authority for that execution path.
+
 The card shows effort as the editable control. Beneath it, a read-only line
 describes the selected model's registry-derived `thinking_mode`:
 
@@ -265,7 +276,8 @@ the alternative provider. The additive target shape is:
                 "status": "visible",
                 "eligible": true,
                 "reason_code": null,
-                "thinking_mode": "none"
+                "thinking_mode": "none",
+                "effort_options": ["none", "low", "medium", "high", "xhigh", "max"]
               }
             ],
             "cache_state": "ok",
@@ -303,6 +315,7 @@ The model-entry contract is:
   status: "visible" | "seed" | "advanced" | "route",
   eligible: bool,
   reason_code: string | null,
+  effort_options: string[],
   thinking_mode: "none" | "manual_budget" | "adaptive_opt_in" |
                  "adaptive_default_on" | "adaptive_always_on"
 }
@@ -421,6 +434,9 @@ Providers ownership remain authoritative.
 10. Providers remains the only surface with credential mutation controls.
 11. Thinking behavior is shown from the registry but no task-level thinking
     field is written to the route store or API.
+12. The effort selector follows the selected model: GPT-5.6 includes `max` and
+    excludes `minimal`; GPT-5.4-class models exclude both `minimal` and `max`.
+    `default` and explicit `none` are visibly distinct.
 
 ## 10. Verification Shape
 
@@ -459,6 +475,17 @@ The implementation plan must include:
    use this focused slice as a substitute for that larger pass.
 
 ## 12. Review Log
+
+- Live-gate amendment (2026-07-12): ChatGPT OAuth listed GPT-5.6 models but
+  rejected `gpt-5.6-luna` before effort validation, while `gpt-5.4-mini`
+  executed. Repeating Luna with different effort values therefore did not test
+  effort support. The inspection also found two implementation defects: OpenAI
+  effort choices were provider-wide (`minimal` everywhere, no `max`), and the
+  OAuth driver silently mapped `xhigh|max` to `high` while omitting explicit
+  `none`. The adopted contract above makes effort model-specific, sends explicit
+  values unchanged, and keeps backend-specific acceptance behind the actual-call
+  test. Early canary termination also exposed an unclosed `AsyncOpenAI` client;
+  deterministic generator cleanup is part of the same pre-merge amendment.
 
 - Implementation review (2026-07-12): GREEN with canonical single-process
   virgin A/B `30=30`, passed `3948→3995` (`+47`, exactly the collect delta),

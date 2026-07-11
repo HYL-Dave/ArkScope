@@ -31,6 +31,7 @@ class ModelOption(BaseModel):
     cost_tier: Literal["high", "medium", "low"]
     supports_structured_output: bool = True
     supports_tool_calling: bool = True
+    effort_options: list[EffortId] = Field(default_factory=list)
     recommended_for: list[TaskId] = Field(default_factory=list)
     source_url: str
     verified_at: str = CATALOG_VERIFIED_AT
@@ -112,6 +113,7 @@ def _routing_view() -> list[ModelOption]:
             cost_tier=cap.cost_tier,  # type: ignore[arg-type]
             supports_structured_output=cap.supports_structured_output,
             supports_tool_calling=cap.supports_tool_calling,
+            effort_options=list(cap.effort_options),  # type: ignore[arg-type]
             recommended_for=list(cap.recommended_for),  # type: ignore[arg-type]
             source_url=cap.source_url,
             verified_at=cap.verified_at,
@@ -130,20 +132,14 @@ EFFORT_OPTIONS: dict[Provider, list[EffortOption]] = {
         EffortOption(
             id="default",
             provider="openai",
-            label="Provider default",
-            description="Do not send a reasoning effort override; use the model/API default.",
+            label="供應商預設",
+            description="不送 effort；實際檔位由目前模型與後端決定。",
         ),
         EffortOption(
             id="none",
             provider="openai",
-            label="None",
-            description="Project sentinel for no reasoning effort where the SDK/model accepts it.",
-        ),
-        EffortOption(
-            id="minimal",
-            provider="openai",
-            label="Minimal",
-            description="Small reasoning budget; useful for cheap translation or short checks.",
+            label="無推理 (none)",
+            description="明確送出 none；這不是未設定或供應商預設。",
         ),
         EffortOption(
             id="low",
@@ -168,6 +164,12 @@ EFFORT_OPTIONS: dict[Provider, list[EffortOption]] = {
             provider="openai",
             label="Extra high",
             description="SDK-supported high-end reasoning effort; only use if the selected model/account accepts it.",
+        ),
+        EffortOption(
+            id="max",
+            provider="openai",
+            label="Max",
+            description="Maximum reasoning effort; currently supported by GPT-5.6 models.",
         ),
     ],
     "anthropic": [
@@ -224,8 +226,25 @@ def effort_options(provider: Provider) -> list[EffortOption]:
     return EFFORT_OPTIONS[provider]
 
 
-def is_valid_effort(provider: Provider, effort: str) -> bool:
-    return any(option.id == effort for option in EFFORT_OPTIONS[provider])
+def effort_ids_for_model(provider: Provider, model: str) -> tuple[str, ...]:
+    """Return route values supported by a known model, including ``default``.
+
+    Unknown/custom ids retain the provider union so forward-compatible model ids
+    can still be tested explicitly instead of being rewritten before the call.
+    """
+    from src.model_capabilities import capability_for
+
+    capability = capability_for(model)
+    if capability is None or capability.provider != provider:
+        return tuple(option.id for option in EFFORT_OPTIONS[provider])
+    return ("default", *capability.effort_options)
+
+
+def is_valid_effort(provider: Provider, effort: str, *, model: str | None = None) -> bool:
+    options = effort_ids_for_model(provider, model) if model else tuple(
+        option.id for option in EFFORT_OPTIONS[provider]
+    )
+    return effort in options
 
 
 def route_capability_warnings(

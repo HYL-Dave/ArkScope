@@ -80,12 +80,18 @@ def test_ruled_fixes_absolute_values():
     assert sonnet46.effort_options == ("max", "high", "medium", "low")         # Fix E
 
 
-def test_openai_models_record_provider_wide_effort_set():
-    for mid in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
-                "gpt-5.2", "gpt-5.2-codex"):
+def test_openai_models_record_model_specific_effort_sets():
+    for mid in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
         assert capability_for(mid).effort_options == (
-            "none", "minimal", "low", "medium", "high", "xhigh",
+            "none", "low", "medium", "high", "xhigh", "max",
         ), mid
+    for mid in ("gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.2"):
+        assert capability_for(mid).effort_options == (
+            "none", "low", "medium", "high", "xhigh",
+        ), mid
+    assert capability_for("gpt-5.2-codex").effort_options == (
+        "low", "medium", "high", "xhigh",
+    )
 
 
 def test_view_flags_pin_exact_current_memberships():
@@ -206,7 +212,7 @@ def test_cli_effort_helper_contract_preserved_plus_fix_a():
 def test_route_wire_effort_values_untouched():
     from src.model_routing import EFFORT_OPTIONS
     assert [o.id for o in EFFORT_OPTIONS["openai"]] == [
-        "default", "none", "minimal", "low", "medium", "high", "xhigh",
+        "default", "none", "low", "medium", "high", "xhigh", "max",
     ]
     assert [o.id for o in EFFORT_OPTIONS["anthropic"]] == [
         "default", "low", "medium", "high", "xhigh", "max",
@@ -280,7 +286,7 @@ def test_new_generation_entries_present_with_task0_facts():
         assert cap.provider == "openai" and cap.picker_visibility == "default", mid
         assert cap.thinking_mode == "none", mid
         assert cap.context_limit == 1_050_000 and cap.max_output == 128_000, mid
-        assert cap.effort_options == ("none", "minimal", "low", "medium", "high", "xhigh"), mid
+        assert cap.effort_options == ("none", "low", "medium", "high", "xhigh", "max"), mid
         assert cap.cost_tier == cost, mid
         assert cap.in_routing_seed and cap.in_cli_catalog, mid
 

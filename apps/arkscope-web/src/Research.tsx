@@ -37,7 +37,14 @@ import {
   RESEARCH_PROVIDER_IDS,
   type ResearchProviderId,
 } from "./researchProvider";
-import { activeCredential, defaultModel, effortNote, lastAssistantSelection, modelOptions } from "./researchModels";
+import {
+  activeCredential,
+  defaultModel,
+  effortNote,
+  effortOptionsForModel,
+  lastAssistantSelection,
+  modelOptions,
+} from "./researchModels";
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
 import { shouldEndResearchReplay } from "./researchRunReplay";
@@ -491,7 +498,21 @@ export function ResearchView({ onOpenTicker }: { onOpenTicker: (ticker: string) 
     setSelEffort(lastSelection.effort ?? routeEffort);
   }, [state.activeThreadId, lastSelection.model, lastSelection.effort, modelOpts, routeModel, routeEffort]);
 
-  const effortOpts = provider && catalog ? (catalog.effort_options[provider] ?? []) : [];
+  const selectedEffectiveModel = provider
+    ? catalog?.effective?.tasks?.ai_research?.providers?.[provider]?.models
+      .find((item) => item.id === selModel)
+    : undefined;
+  const effortOpts = useMemo(
+    () => provider && catalog
+      ? effortOptionsForModel(catalog, provider, selModel ?? "", selectedEffectiveModel?.effort_options)
+      : [],
+    [catalog, provider, selModel, selectedEffectiveModel?.effort_options],
+  );
+  useEffect(() => {
+    if (effortOpts.length && !effortOpts.some((item) => item.id === selEffort)) {
+      setSelEffort("default");
+    }
+  }, [effortOpts, selEffort]);
   const pickerEffortNote = provider ? effortNote(provider, activeAuthMode, selEffort) : null;
 
   const retryLastFailed = useCallback(() => {

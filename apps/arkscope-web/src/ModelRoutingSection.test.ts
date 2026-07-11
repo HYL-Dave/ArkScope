@@ -145,6 +145,14 @@ describe("ModelRoutingSection provider-first UX", () => {
       openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT Plus")],
       anthropic: [cred("anthropic", "local:4", "api_key", "Claude API")],
     };
+    cat.effort_options.openai = ["default", "none", "low", "medium", "high", "xhigh", "max"]
+      .map((id) => ({
+        id: id as "default" | "none" | "low" | "medium" | "high" | "xhigh" | "max",
+        provider: "openai",
+        label: id,
+        description: id,
+        applies_to_card_tasks: true,
+      }));
     const openai = {
       executable: true, reason_code: null, cache_state: "ok",
       discovered_at: "2026-07-10T06:00:00Z",
@@ -306,6 +314,41 @@ describe("ModelRoutingSection provider-first UX", () => {
     const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
     expect(translation.textContent).toContain("可選擇 adaptive thinking");
     expect(translation.querySelector('[aria-label="Thinking card_translation"]')).toBeNull();
+  });
+
+  it("shows only the selected model's supported effort values", () => {
+    const cat = catalogV2();
+    const research = cat.effective!.tasks.ai_research!.providers!.openai!;
+    const mini = research.models.find((model) => model.id === "gpt-5.4-mini")!;
+    const luna = research.models.find((model) => model.id === "gpt-5.6-luna")!;
+    (mini as typeof mini & { effort_options: string[] }).effort_options = [
+      "none", "low", "medium", "high", "xhigh",
+    ];
+    (luna as typeof luna & { effort_options: string[] }).effort_options = [
+      "none", "low", "medium", "high", "xhigh", "max",
+    ];
+
+    render(vi.fn(), cat);
+    const miniEffort = researchCard().querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    expect(Array.from(miniEffort.options).map((option) => option.value)).toEqual([
+      "default", "none", "low", "medium", "high", "xhigh",
+    ]);
+
+    act(() => root!.unmount());
+    root = null;
+    host!.remove();
+    host = null;
+    render(vi.fn(), cat, undefined, {
+      draft: {
+        ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "max", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-4-8", effort: "default", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.4-mini", effort: "default", custom: false },
+      },
+    });
+    const lunaEffort = researchCard().querySelector('[aria-label="Effort ai_research"]') as HTMLSelectElement;
+    expect(Array.from(lunaEffort.options).map((option) => option.value)).toEqual([
+      "default", "none", "low", "medium", "high", "xhigh", "max",
+    ]);
   });
 
   it("uses the task-scoped test and explains subscription billing", () => {

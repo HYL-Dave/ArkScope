@@ -76,6 +76,7 @@ export interface ModelOption {
   cost_tier: "high" | "medium" | "low";
   supports_structured_output: boolean;
   supports_tool_calling: boolean;
+  effort_options?: string[];
   recommended_for: ModelTask[];
   source_url: string;
   verified_at: string;
@@ -105,6 +106,7 @@ export interface EffectiveProviderModelEntry {
   visible_to_credential: boolean | null;
   eligible: boolean;
   reason_code: string | null;
+  effort_options?: string[];
   thinking_mode:
     | "none"
     | "manual_budget"

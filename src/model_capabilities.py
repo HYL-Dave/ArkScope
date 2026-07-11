@@ -24,9 +24,11 @@ _OPENAI_DOCS = "https://developers.openai.com/api/docs/models"
 _ANTHROPIC_CTX_DOC = "https://platform.claude.com/docs/en/build-with-claude/context-windows"
 _ANTHROPIC_OVERVIEW = "https://platform.claude.com/docs/en/about-claude/models/overview"
 
-# Provider-wide OpenAI reasoning-effort wire set (model-supported options; the
-# route-validation wire values incl. "default" stay in model_routing.EFFORT_OPTIONS).
-_OPENAI_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
+# OpenAI effort support is model-specific. ``default`` remains a route sentinel
+# in model_routing; these tuples contain only values accepted by each model.
+_OPENAI_56_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
+_OPENAI_STANDARD_EFFORTS = ("none", "low", "medium", "high", "xhigh")
+_OPENAI_CODEX_EFFORTS = ("low", "medium", "high", "xhigh")
 _OPUS_EFFORTS = ("max", "xhigh", "high", "medium", "low")
 
 
@@ -167,7 +169,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.6-sol", provider="openai", label="GPT-5.6 Sol",
         picker_visibility="default", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         aliases=("gpt-5.6",),   # official: the gpt-5.6 alias routes to Sol
@@ -180,7 +182,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.6-terra", provider="openai", label="GPT-5.6 Terra",
         picker_visibility="default", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         aliases=(),
@@ -194,7 +196,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.6-luna", provider="openai", label="GPT-5.6 Luna",
         picker_visibility="default", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         aliases=(),
@@ -208,7 +210,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.5", provider="openai", label="GPT-5.5",
         picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         quality="frontier", speed="medium", cost_tier="high",
@@ -219,7 +221,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.4-mini", provider="openai", label="GPT-5.4 mini",
         picker_visibility="default", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         quality="balanced", speed="fast", cost_tier="low",
@@ -230,7 +232,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.4-nano", provider="openai", label="GPT-5.4 Nano",
         picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
         quality="fast", speed="fast", cost_tier="low",
@@ -239,7 +241,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.4", provider="openai", label="GPT-5.4",
         picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=1_050_000, max_output=128_000,
         in_routing_seed=True, in_cli_catalog=True,
         quality="high", speed="medium", cost_tier="medium",
@@ -249,7 +251,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.2", provider="openai", label="GPT-5.2 (legacy)",
         picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_STANDARD_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
         quality="high", speed="medium", cost_tier="medium",
@@ -258,7 +260,7 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.2-codex", provider="openai", label="GPT-5.2 Codex (legacy)",
         picker_visibility="pinned_only", thinking_mode="none",
-        effort_options=_OPENAI_EFFORTS, supports_compaction=False,
+        effort_options=_OPENAI_CODEX_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=400_000, max_output=128_000,
         in_cli_catalog=True,
         quality="high", speed="medium", cost_tier="medium",
