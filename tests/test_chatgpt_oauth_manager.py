@@ -378,3 +378,28 @@ def test_callback_never_arrived_stays_manual_completable(stores):
     st = _wait_status(mgr, out["state"])
     assert st["status"] == "error"
     assert st.get("manual_completable", True) is True
+
+
+def test_cancel_keeps_manual_not_completable_after_wakeup(stores):
+    # Round-5 MF3: cancel writes manual_completable=False, but server.cancel()
+    # wakes the waiting thread whose wait-failure _finish must NOT raise the
+    # flag back to true (the pending state is already discarded — a manual
+    # paste can never succeed after cancel).
+    def wait_until_cancelled(srv):
+        assert srv.cancel_event.wait(3)
+        raise ChatGPTOAuthLoginError("loopback wait aborted")
+
+    mgr = _mgr(stores, lambda s: _FakeServer(wait_until_cancelled))
+    out = mgr.begin()
+    mgr.cancel_login(out["state"])
+    immediate = mgr.status(out["state"])
+    assert immediate["status"] == "error" and immediate["manual_completable"] is False
+    # wait for the woken thread's second _finish to land (detail changes)
+    deadline = time.time() + 3.0
+    settled = immediate
+    while time.time() < deadline:
+        settled = mgr.status(out["state"])
+        if settled.get("detail") != "login cancelled":
+            break
+        time.sleep(0.02)
+    assert settled["manual_completable"] is False    # never resurrected

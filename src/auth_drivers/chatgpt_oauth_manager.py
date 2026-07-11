@@ -180,6 +180,11 @@ class OAuthLoginManager:
             cur = self._results.get(state)
             if cur and cur.get("status") == "success":
                 return  # sticky: a completed login is never clobbered (e.g. a late loopback timeout/cancel)
+            # Round-5 MF3: manual_completable is MONOTONIC — once False (state
+            # consumed by cancel or a failed completion), a later error update
+            # (e.g. the cancel-woken wait thread) can never raise it back.
+            if cur and cur.get("manual_completable") is False:
+                manual_completable = False
             self._results[state] = {"status": status, "credential": credential, "detail": detail,
                                     "manual_completable": manual_completable}
             self._result_ts[state] = self._clock()

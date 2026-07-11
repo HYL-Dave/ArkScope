@@ -741,15 +741,21 @@ def discover_provider_models(
         # a re-login/delete landing mid-flight bumps it, and the commit below
         # then refuses to resurrect the old account's entitlement.
         scope_credential_id = body.credential_id or f"local:{cred.id}"
+        epoch_captured = True
+        epoch_before = 0
         try:
             epoch_before = ModelDiscoveryCache(store.db_path).lifecycle_epoch(
                 provider=body.provider, credential_id=scope_credential_id,
             )
-        except Exception:  # noqa: BLE001 — cache unavailable → record_run will fail the same way
-            epoch_before = None
+        except Exception:  # noqa: BLE001
+            # Round-5 MF1: without a captured epoch the stale-write guard cannot
+            # run — fail CLOSED: discovery still succeeds, the cache write is
+            # SKIPPED (expected_epoch=None would mean "validation off").
+            logger.warning("discovery epoch capture failed; skipping cache write", exc_info=True)
+            epoch_captured = False
         result = _run_coro(driver.discover_models())
         out = result.model_dump()
-        if out.get("status") == "ok":
+        if out.get("status") == "ok" and epoch_captured:
             # P2.7 write-through: live listings cache as ok; an all-seed result
             # means this channel has no live listing → seed_only (badge in the
             # picker, not an endless discovery nudge). Seeds are candidates,

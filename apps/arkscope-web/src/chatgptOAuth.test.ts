@@ -138,6 +138,18 @@ describe("pollOAuthStatus", () => {
     if (res.kind === "error") expect(res.detail).toContain("1455");
   });
 
+  it("re-checks abort AFTER an in-flight status response (round-5 SF)", async () => {
+    // the user cancels while the request is in flight — its response (even a
+    // success) must not be processed as a terminal outcome.
+    let aborted = false;
+    const statusFn = vi.fn().mockImplementation(async () => {
+      aborted = true; // cancel lands mid-request
+      return { status: "error", credential: null, detail: "late response" };
+    });
+    const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), shouldAbort: () => aborted });
+    expect(res).toEqual({ kind: "aborted" });
+  });
+
   it("threads manual_completable=false through the error result (F4)", async () => {
     const statusFn = vi.fn().mockResolvedValue({ status: "error", credential: null, detail: "completion failed", manual_completable: false });
     const res = await pollOAuthStatus("S", { statusFn, ...fakeClock(), timeoutMs: 5000, intervalMs: 100 });

@@ -41,6 +41,9 @@ export async function pollOAuthStatus(state: string, opts: PollOptions): Promise
   for (;;) {
     if (shouldAbort?.()) return { kind: "aborted" };
     const s = await statusFn(state);
+    // Round-5 SF: a cancel can land while the request is in flight — re-check
+    // before treating the (now superseded) response as a terminal outcome.
+    if (shouldAbort?.()) return { kind: "aborted" };
     if (s.status === "success") return { kind: "success", credential: s.credential };
     if (s.status === "error") {
       return { kind: "error", detail: s.detail ?? "unknown error", manualCompletable: s.manual_completable !== false };

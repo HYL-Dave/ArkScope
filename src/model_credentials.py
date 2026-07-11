@@ -1039,14 +1039,19 @@ def discover_models(
 
     # F1 (S3 round 4): capture the lifecycle epoch BEFORE the provider call so a
     # credential delete landing mid-flight makes the cache commit refuse to
-    # resurrect rows for the deleted credential.
+    # resurrect rows for the deleted credential. Round-5 MF1: a FAILED capture
+    # fails CLOSED — the cache write is skipped entirely (expected_epoch=None
+    # would disable the guard, which is fail-open).
     _db_path = store.db_path if store is not None else None
+    _epoch_captured = True
+    epoch_before = 0
     try:
-        epoch_before: int | None = ModelDiscoveryCache(_db_path or _profile_db_path()).lifecycle_epoch(
+        epoch_before = ModelDiscoveryCache(_db_path or _profile_db_path()).lifecycle_epoch(
             provider=provider, credential_id=cred.id,
         )
-    except Exception:  # noqa: BLE001 — cache unavailable → the write would fail identically
-        epoch_before = None
+    except Exception:  # noqa: BLE001
+        logger.warning("discovery epoch capture failed; skipping cache write", exc_info=True)
+        _epoch_captured = False
 
     try:
         if provider == "openai":
@@ -1086,7 +1091,7 @@ def discover_models(
         )
 
     ordered = sorted(models, key=lambda m: m.id)
-    cached = _record_discovery(
+    cached = _epoch_captured and _record_discovery(
         provider=provider,
         auth_mode=cred.auth_type,
         credential_id=cred.id,

@@ -577,3 +577,26 @@ def test_credential_delete_row_vanished_after_token_delete_is_success(tmp_path, 
     out = cr.delete_credential(cid, store=store, token_store=tok)
     assert out["deleted"] is True and out["token_deleted"] is True
     assert tok.deleted == [("openai", "chatgpt_oauth", cid)]
+
+
+def test_oauth_discovery_epoch_capture_failure_skips_cache_write(tmp_path, monkeypatch):
+    # Round-5 MF1 (oauth write site): epoch capture failing must skip the cache
+    # write and report uncached — never fall back to unvalidated caching.
+    import src.auth_drivers.factory as factory_mod
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "creds.db")
+    cid = _oauth_row(store)
+    monkeypatch.setattr(factory_mod, "build_driver",
+                        lambda **kw: _ScriptedDriver(lambda: _ok_listing(cid)))
+    monkeypatch.setattr(ModelDiscoveryCache, "lifecycle_epoch",
+                        lambda self, **kw: (_ for _ in ()).throw(RuntimeError("db locked")))
+    out = cr.discover_provider_models(cr.ModelDiscoveryRequest(provider="openai", credential_id=cid),
+                                      store=store, token_store=object())
+    assert out["status"] == "ok"
+    assert out.get("cached") is not True
+    assert "cache_state" not in out and "cached_at" not in out
+    monkeypatch.undo()
+    scope = ModelDiscoveryCache(store.db_path).get(
+        provider="openai", auth_mode="chatgpt_oauth", credential_id=cid, secret_fingerprint="oauth")
+    assert scope.status == "never_discovered"

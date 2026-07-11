@@ -1,6 +1,31 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: IMPLEMENTED FOR REVIEW — ROUND 4 FIXES APPLIED 2026-07-11.**
+> **Status: IMPLEMENTED FOR REVIEW — ROUND 5 FIXES APPLIED 2026-07-11.**
+> Round-5 review (user): 3 must-fix + 1 should-fix, all repro'd real and
+> fixed RED-first. **MF1 (epoch capture failed OPEN)**: my
+> `except → expected_epoch=None` disabled the very guard on transient
+> read failures — both write sites now fail CLOSED (capture failure →
+> discovery succeeds, cache write SKIPPED entirely, uncached reported);
+> two new tests patch `lifecycle_epoch` to raise while `record_run`
+> stays healthy and assert the cache stays `never_discovered`. Ledger:
+> three P2.7 `_FakeCache`/`_BoomCache` fakes gained `lifecycle_epoch`
+> (seam-mock rule — fakes track the real interface). **MF2 (rollback
+> lied on keyring-collapsed delete)**: `token_store.delete()→False` was
+> counted as landed — now False triggers a verify-read: record still
+> loadable (or unreadable) → unproven ("may still hold"); nothing stored
+> → clean terminal state counts as removed. **MF3 (cancel's
+> `manual_completable=False` clobbered)**: the cancel-woken wait thread's
+> error `_finish` restored the default True — the flag is now MONOTONIC
+> (once False, no later error update can raise it); test drives the real
+> wake-up ordering. **SF (poll abort raced an in-flight response)**:
+> `pollOAuthStatus` re-checks `shouldAbort` AFTER the await so a
+> mid-request cancel can't process a superseded response. Evidence:
+> backend focused 250 passed; frontend 27 files / 264 tests + typecheck
+> + build; smoke all-ok. Fresh full virgin A/B pending; verdict with
+> exact collect accounting (+45 expected: 40 + MF1×2 + MF2×2 + MF3×1;
+> SF rides in the existing frontend file).
+>
+> Prior status: ROUND 4 FIXES APPLIED 2026-07-11.
 > Round-4 review (user, on the implementation): 1 BLOCKING + 2 must-fix +
 > 1 should-fix, all verified real and fixed with RED-first tests:
 > **F1 (BLOCKING — discovery could resurrect stale entitlement after

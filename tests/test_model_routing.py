@@ -612,6 +612,8 @@ def test_discover_models_success_writes_cache(monkeypatch, tmp_path):
 
     class _FakeCache:
         def __init__(self, *a, **k): ...
+        def lifecycle_epoch(self, **kw):
+            return 0  # round-5 MF1: the guard needs a captured epoch before any write
         def record_run(self, **kw):
             recorded.update(kw)
 
@@ -688,6 +690,8 @@ def test_discovery_route_records_seed_only_for_oauth_all_seed(monkeypatch, tmp_p
 
     class _FakeCache:
         def __init__(self, *a, **k): ...
+        def lifecycle_epoch(self, **kw):
+            return 0
         def record_run(self, **kw):
             recorded.update(kw)
 
@@ -741,6 +745,8 @@ def test_discovery_route_oauth_cache_write_failure_reports_uncached(monkeypatch,
 
     class _BoomCache:
         def __init__(self, *a, **k): ...
+        def lifecycle_epoch(self, **kw):
+            return 0  # epoch capture succeeds; only the WRITE fails
         def record_run(self, **kw):
             raise RuntimeError("disk full")
 
@@ -811,3 +817,39 @@ def test_api_key_discovery_commit_skipped_after_concurrent_delete(tmp_path, monk
     assert out.cached is False                                # but the stale commit was skipped
     assert cache.delete_scope(provider="openai", credential_id=cid) == 0  # nothing resurrected
     assert store.get(cid) is None
+
+
+def test_api_key_discovery_epoch_capture_failure_skips_cache_write(tmp_path, monkeypatch):
+    # Round-5 MF1: a FAILED epoch capture must fail CLOSED — discovery still
+    # succeeds, but the cache write is skipped entirely (expected_epoch=None
+    # would mean "validation disabled", which is fail-open).
+    import src.model_credentials as mc
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    store = CredentialStore(tmp_path / "profile_state.db")
+    c = store.add(provider="openai", auth_type="api_key", alias="K",
+                  secret="sk-test-" + "a" * 40, make_active=True)
+    cid = f"local:{c.id}"
+
+    class _FakeModels:
+        data = [type("M", (), {"id": "old-account-model"})()]
+
+    class _FakeClient:
+        def __init__(self, **kw): ...
+
+        class models:  # noqa: N801
+            @staticmethod
+            def list():
+                return _FakeModels()
+
+    monkeypatch.setattr("openai.OpenAI", _FakeClient)
+    monkeypatch.setattr(ModelDiscoveryCache, "lifecycle_epoch",
+                        lambda self, **kw: (_ for _ in ()).throw(RuntimeError("db locked")))
+    out = mc.discover_models("openai", cid, store=store)
+    assert out.status == "ok"            # discovery itself still succeeds
+    assert out.cached is False           # but nothing may be cached without the guard
+    monkeypatch.undo()
+    scope = ModelDiscoveryCache(store.db_path).get(
+        provider="openai", auth_mode="api_key", credential_id=cid,
+        secret_fingerprint=mc.secret_fingerprint("sk-test-" + "a" * 40))
+    assert scope.status == "never_discovered"   # the write truly did not land

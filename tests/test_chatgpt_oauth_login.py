@@ -770,3 +770,37 @@ def test_relogin_vanished_row_message_honest_when_rollback_fails(caplog):
     msg = str(ei.value)
     assert "was removed" not in msg
     assert "may still hold" in msg
+
+
+def test_rollback_delete_false_with_token_present_reports_unproven():
+    # Round-5 MF2: keyring-shaped stores collapse backend exceptions into
+    # delete() -> False. With the new token still loadable, compensation is
+    # UNPROVEN — the message must say "may still hold", never "was removed".
+    class _NoRemoveTok(_TokStore):
+        def delete(self, *, provider, auth_mode, credential_id):
+            self.deleted.append((provider, auth_mode, credential_id))
+            return False  # collapsed backend failure; nothing actually removed
+
+    ss, ts = _StateStore(), _NoRemoveTok()
+    cs = _CredStore(vanish_on_update=True)
+    _seed_cred(cs)                                  # no OLD token → rollback = delete the new one
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        _relogin_complete(ss, cs, ts, s)
+    msg = str(ei.value)
+    assert "was removed" not in msg
+    assert "may still hold" in msg
+    assert _KEY in ts.saved                          # the new token really is still there
+
+
+def test_rollback_delete_false_with_nothing_stored_counts_as_removed():
+    # Benign arm: delete() -> False but load() finds nothing → the terminal
+    # state is clean, so compensation counts as landed.
+    from src.auth_drivers.chatgpt_oauth_login import _rollback_relogin_token
+
+    class _GoneTok(_TokStore):
+        def delete(self, *, provider, auth_mode, credential_id):
+            return False  # e.g. removed by another actor already
+
+    ts = _GoneTok()                                  # nothing saved → load returns None
+    assert _rollback_relogin_token(target="local:1", old_record=None, token_store=ts) is True

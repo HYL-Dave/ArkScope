@@ -469,15 +469,31 @@ def _rollback_relogin_token(*, target: str, old_record: StoredTokenRecord | None
     try:
         if old_record is not None:
             token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target, record=old_record)
-        else:
-            token_store.delete(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target)
+            return True
+        if token_store.delete(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target):
+            return True
+        # Round-5 MF2: keyring-shaped stores collapse backend exceptions into
+        # False — treat it as UNPROVEN unless a verify-read shows nothing is
+        # stored (then the terminal state is clean and removal counts).
+        try:
+            still_there = token_store.load(
+                provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target,
+            ) is not None
+        except Exception:  # noqa: BLE001 — unverifiable → fail closed
+            still_there = True
+        if still_there:
+            logger.warning(
+                "re-login rollback unproven for %s; the token store may still hold the new token",
+                target,
+            )
+            return False
+        return True
     except Exception:  # noqa: BLE001
         logger.warning(
             "re-login rollback failed for %s; the token store may still hold the new token",
             target, exc_info=True,
         )
         return False
-    return True
 
 
 def _relogin_rollback_outcome(compensated: bool, old_record: StoredTokenRecord | None) -> str:
