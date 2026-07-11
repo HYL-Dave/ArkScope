@@ -1,12 +1,12 @@
 # Model Routing Settings UX Design
 
-> **Status: ADOPTED; IMPLEMENTATION REVIEW GREEN, 2026-07-12. Live gate pending.**
+> **Status: ADOPTED; LIVE COMPLETE, 2026-07-12. Merged through `2fb1c4f`.**
 > This is a focused P2.8 design slice prompted by the first live inspection of
 > the P2.7 picker. It preserves
 > the existing Settings boundary: `Providers` owns credentials, login, and
 > credential-scoped discovery; `Models` owns per-task provider/model/effort
-> routing. Implementation was approval-gated; review is now green and the live
-> gate remains required before merge.
+> routing. Implementation and review are complete; the live gate proved both
+> the successful-call and honest-failure states before merge.
 
 ## 1. Problem
 
@@ -475,6 +475,16 @@ The implementation plan must include:
    use this focused slice as a substitute for that larger pass.
 
 ## 12. Review Log
+
+- Live closeout (2026-07-12): the amended implementation passed the final
+  user-run acceptance pair. ChatGPT OAuth `gpt-5.6-luna`, although visible in
+  discovery, rendered a redacted `provider_call_failed` after 906 ms;
+  `gpt-5.4-mini` rendered `ok` after 1,589 ms. That is the intended proof that
+  discovery visibility and actual execution are separate facts. Supporting
+  pre-merge verification was backend focused `187 passed`, frontend `284
+  passed`, production build green, and no-PG smoke `24/24` with no PostgreSQL
+  attempts. The unresolved third-party OAuth client-identity behavior is a
+  transport follow-up; no hidden fallback was introduced.
 
 - Live-gate amendment (2026-07-12): ChatGPT OAuth listed GPT-5.6 models but
   rejected `gpt-5.6-luna` before effort validation, while `gpt-5.4-mini`

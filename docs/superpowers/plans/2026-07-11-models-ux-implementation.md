@@ -1,6 +1,6 @@
 # Models Routing UX — Implementation Plan (focused P2.8 slice)
 
-> **Status: IMPLEMENTATION REVIEW GREEN 2026-07-12. NOT MERGED; §6 live gate pending.**
+> **Status: LIVE COMPLETE 2026-07-12; merged FF through `2fb1c4f`.**
 > Roles: Claude authored the plan; **Codex implemented on `codex/models-ux`,
 > user/Claude reviews**. Implements the APPROVED spec
 > `docs/superpowers/specs/2026-07-11-model-routing-settings-ux-design.md`
@@ -33,7 +33,7 @@
 > `3768 → 3815 = +47`, with flat skipped/warnings/errors. Its difference from
 > the canonical 30-failure family is explained by those four timeout files.
 >
-> **Live-gate amendment (2026-07-12, awaiting user re-test):** visual criteria
+> **Live-gate amendment (2026-07-12, COMPLETE):** visual criteria
 > passed. ChatGPT OAuth reproduced `gpt-5.6-luna` `Model not found` across
 > effort choices while `gpt-5.4-mini` passed; this is model/backend resolution,
 > not evidence that OAuth rejects effort. Inspection found provider-wide effort
@@ -44,7 +44,12 @@
 > OAuth sends explicit effort unchanged and deterministically closes its client.
 > Focused backend `207 passed`; close-path tests with warnings-as-errors `72
 > passed`; frontend `30 files / 284 tests`; typecheck/build and no-PG smoke
-> `24/24`, `pg_attempts: []`. Final live pair remains user-gated.
+> `24/24`, `pg_attempts: []`. The user completed the final live pair after the
+> amendment: ChatGPT OAuth `gpt-5.6-luna` returned the expected redacted
+> `provider_call_failed` in 906 ms, while the `gpt-5.4-mini` control returned
+> `ok` in 1,589 ms. This satisfies the slice's explicit list-vs-execute
+> acceptance contract; it does not claim Luna works through the undocumented
+> third-party OAuth transport.
 
 ## 0. Grounding corrections to the spec (verified against code 2026-07-11; round-2 re-verified)
 
@@ -488,6 +493,19 @@ BEFORE merge.
   `mcp_servers={}`, proven by REAL option-building tests (not fake factory
   kwargs) — would upgrade `ai_research × claude_code_oauth` task-test from
   `task_test_unsupported` to a true bounded canary.
+- **ChatGPT OAuth GPT-5.6 client-identity compatibility**: Luna is advertised
+  by the authenticated models endpoint but rejected during execution for this
+  third-party client, while the public API-key path works. Track separately:
+  compare an explicitly gated Codex-compatibility-header canary with using the
+  official Codex app-server/CLI transport. Do not silently fallback or present
+  discovery visibility as execution proof. This is an upstream/transport
+  follow-up, not a Models UX regression. Evidence anchors:
+  [openai/codex#31967](https://github.com/openai/codex/issues/31967) (same
+  list-success/execution-404 split),
+  [NousResearch/hermes-agent#61660](https://github.com/NousResearch/hermes-agent/issues/61660)
+  (Luna 404 while Sol/Terra pass), and
+  [openclaw/openclaw#103884](https://github.com/openclaw/openclaw/issues/103884)
+  (client-version metadata mismatch).
 
 ## 6. Live gate (§7, BEFORE merge; premium calls user-gated)
 
@@ -507,6 +525,17 @@ BEFORE merge.
    master) — provider control + degraded copy, no crash.
 
 ## 7. Review log
+
+- Live closeout (2026-07-12): user re-test on the amended branch completed the
+  required acceptance pair: OAuth Luna failed honestly with the redacted
+  `provider_call_failed` surface (906 ms), and the mini control succeeded
+  (1,589 ms). Fresh pre-merge verification: backend focused `187 passed`,
+  frontend `30 files / 284 tests`, production build green, and no-PG smoke
+  `24/24` with `pg_attempts: []`. Fast-forward merge landed through `2fb1c4f`;
+  the branch sidecar and Vite process were stopped. The known Luna OAuth
+  compatibility issue is filed in §5 and does not block this slice because the
+  adopted contract requires honest separation of visible, eligible, and
+  actually callable states.
 
 - Live-gate amendment (2026-07-12): visual gate passed; execution exposed the
   model-specific effort and OAuth client-lifecycle defects recorded in the
