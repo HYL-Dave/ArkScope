@@ -28,9 +28,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import re
 import secrets
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -55,8 +57,22 @@ _STATE_TTL = timedelta(minutes=10)
 _EXPIRY_BUFFER = timedelta(minutes=5)
 
 
+logger = logging.getLogger(__name__)
+
+
 class ChatGPTOAuthLoginError(RuntimeError):
-    """A login/refresh failure. Routes map it to an HTTP error; it NEVER carries a token."""
+    """A login/refresh failure. Routes map it to an HTTP error; it NEVER carries a token.
+
+    `status_code` carries the upstream HTTP status when one exists (set by
+    `_http_post`; None for transport/parse failures). `reauth_required` marks
+    failures only a fresh browser login can repair (set by `refresh_if_needed`:
+    missing/unrefreshable stored tokens and invalid-grant-family refresh
+    rejections); wiring and transient transport failures stay False."""
+
+    def __init__(self, message: str, *, status_code: int | None = None, reauth_required: bool = False):
+        super().__init__(message)
+        self.status_code = status_code
+        self.reauth_required = reauth_required
 
 
 # --- PKCE + state -------------------------------------------------------------
@@ -100,6 +116,10 @@ class _PendingLogin:
     # carried here, so the SERVER-SIDE loopback callback honors it (it is not a
     # client cosmetic the callback path could bypass). Unified-activation policy.
     make_active: bool = field(default=True)
+    # S3 re-login: when set, completion replaces THIS credential's token in
+    # place (no new row). Carried in pending state exactly like make_active so
+    # BOTH completion paths (loopback + copy-code) honor it.
+    relogin_credential_id: str | None = field(default=None)
 
 
 class _StateStore:
@@ -110,9 +130,13 @@ class _StateStore:
         self._d: dict[str, _PendingLogin] = {}
         self._lock = threading.Lock()  # FastAPI route + loopback callback may run on different threads
 
-    def put(self, state: str, code_verifier: str, *, expires_at: datetime, make_active: bool = True) -> None:
+    def put(self, state: str, code_verifier: str, *, expires_at: datetime, make_active: bool = True,
+            relogin_credential_id: str | None = None) -> None:
         with self._lock:
-            self._d[state] = _PendingLogin(code_verifier=code_verifier, expires_at=expires_at, make_active=make_active)
+            self._d[state] = _PendingLogin(
+                code_verifier=code_verifier, expires_at=expires_at, make_active=make_active,
+                relogin_credential_id=relogin_credential_id,
+            )
 
     def pop(self, state: str, *, now: datetime) -> _PendingLogin | None:
         with self._lock:
@@ -131,18 +155,22 @@ class _StateStore:
 _STATE_STORE = _StateStore()
 
 
-def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None, make_active: bool = False) -> dict:
+def start_login(*, now: datetime | None = None, state_store: _StateStore | None = None, make_active: bool = False,
+                relogin_credential_id: str | None = None) -> dict:
     """Begin a login: mint state + PKCE, stash the verifier (+ the make_active choice),
     return the authorize URL. The response is safe to expose — it carries the
     code_challenge, never the verifier. `make_active` is carried in the pending state
     so the loopback callback completion honors it. Default FALSE (unified-activation
-    policy): adding a credential never silently switches the active one — callers opt in."""
+    policy): adding a credential never silently switches the active one — callers opt in.
+    `relogin_credential_id` (S3) marks this login as an IN-PLACE token replacement for
+    that existing chatgpt_oauth credential — validated again at completion."""
     now = now or datetime.now(timezone.utc)
     store = state_store if state_store is not None else _STATE_STORE
     verifier, challenge = generate_pkce_pair()
     state = generate_state()
     expires_at = now + _STATE_TTL
-    store.put(state, verifier, expires_at=expires_at, make_active=make_active)
+    store.put(state, verifier, expires_at=expires_at, make_active=make_active,
+              relogin_credential_id=relogin_credential_id)
     return {
         "auth_url": build_authorize_url(state=state, code_challenge=challenge),
         "state": state,
@@ -193,7 +221,10 @@ def _http_post(url: str, *, data: bytes, content_type: str, what: str) -> dict:
         # refresh_token (proxy, mock, or a future backend). Keep the status, but
         # fail-closed redact the body before it reaches a route/UI/log.
         detail = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
-        raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed ({exc.code}): {_redact_oauth_error(detail)}") from None
+        raise ChatGPTOAuthLoginError(
+            f"ChatGPT OAuth {what} failed ({exc.code}): {_redact_oauth_error(detail)}",
+            status_code=exc.code,
+        ) from None
     except (OSError, json.JSONDecodeError) as exc:
         raise ChatGPTOAuthLoginError(f"ChatGPT OAuth {what} failed: {_redact_oauth_error(str(exc))}") from None
     if not isinstance(value, dict):
@@ -310,12 +341,18 @@ def complete_login(
     now: datetime | None = None,
     state_store: _StateStore | None = None,
     exchange: Callable[..., dict] | None = None,
+    invalidate_relogin_cache: Callable[[str], int] | None = None,
 ) -> dict:
     """Finish a login (used by BOTH the loopback callback and the copy-code paste). Returns
     masked metadata only — the token is NEVER echoed. Any failure raises; nothing is left
     half-built (a token-store write failure rolls back the credential row). The
     make_active choice comes from the pending state (set at start_login), NOT an arg —
-    so the server-side callback completion can't bypass it."""
+    so the server-side callback completion can't bypass it.
+
+    When the pending state carries `relogin_credential_id` (S3), completion REPLACES that
+    credential's token in place instead of creating a row — see `_complete_relogin`.
+    `invalidate_relogin_cache` (the manager-supplied discovery-cache invalidator) is
+    REQUIRED for that path and unused for creates."""
     now = now or datetime.now(timezone.utc)
     store = state_store if state_store is not None else _STATE_STORE
     pending = store.pop(state, now=now)
@@ -323,8 +360,15 @@ def complete_login(
         raise ChatGPTOAuthLoginError("OAuth state is unknown or expired — the login was not started here or it timed out")
 
     exchange = exchange or _exchange_authorization_code
-    resp = exchange(code=code, code_verifier=pending.code_verifier)  # 400/401 raises — NO fallback
+    resp = exchange(code=code, code_verifier=pending.code_verifier)  # 400/401 raises — NO fallback; BEFORE any lock
     record, plan_type, label = _token_response_to_record(resp)
+
+    if pending.relogin_credential_id:
+        return _complete_relogin(
+            target=pending.relogin_credential_id, record=record, plan_type=plan_type, label=label,
+            credential_store=credential_store, token_store=token_store,
+            invalidate_relogin_cache=invalidate_relogin_cache,
+        )
 
     cred = credential_store.add_oauth_credential(
         provider=PROVIDER, auth_mode=AUTH_MODE, alias=alias, make_active=pending.make_active,
@@ -348,6 +392,85 @@ def complete_login(
     }
 
 
+def _complete_relogin(
+    *,
+    target: str,
+    record: StoredTokenRecord,
+    plan_type: str,
+    label: str,
+    credential_store: Any,
+    token_store: Any,
+    invalidate_relogin_cache: Callable[[str], int] | None,
+) -> dict:
+    """In-place token replacement for an EXISTING openai chatgpt_oauth credential
+    (plan D2/D3). Ordering inside the lifecycle lock: re-validate the target →
+    clear its discovery cache (old-account entitlement must not survive) → save
+    the new token → refresh row metadata. Atomicity is the INVERSE of the create
+    path: every failure leaves the OLD token in place (or removes the new one) —
+    never a half-adopted login, never a fallback to creating a new row.
+    alias and active are deliberately untouched."""
+    if invalidate_relogin_cache is None:
+        raise ChatGPTOAuthLoginError("re-login requires a discovery-cache invalidator; nothing was changed")
+    with oauth_credential_lock(target):
+        cred = credential_store.get(target)
+        if cred is None or getattr(cred, "provider", None) != PROVIDER \
+                or getattr(cred, "auth_type", None) != AUTH_MODE:
+            raise ChatGPTOAuthLoginError(
+                "re-login target is not an existing openai chatgpt_oauth credential; nothing was changed",
+            )
+        old_record = token_store.load(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target)
+        try:
+            rows_deleted = invalidate_relogin_cache(target)
+        except Exception:  # noqa: BLE001 — abort while token + metadata are untouched
+            # An empty cache is safe (picker returns to never_discovered); a stale
+            # one serving the previous account's entitlement is not.
+            raise ChatGPTOAuthLoginError(
+                "re-login aborted: could not clear the discovery cache; nothing was changed",
+            ) from None
+        try:
+            token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target, record=record)
+        except Exception:  # noqa: BLE001 — static message; never carry the record via the cause
+            raise ChatGPTOAuthLoginError("failed to store the new token; the previous token is unchanged") from None
+        try:
+            updated = credential_store.update(target, expires_at=record.expires_at or "", account_label=label)
+        except Exception as exc:
+            _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
+            # The ORIGINAL metadata error stays the cause; the message is redacted+bounded.
+            raise ChatGPTOAuthLoginError(
+                f"re-login metadata update failed: {redact(str(exc))[:200]}",
+            ) from exc
+        if updated is None:
+            _rollback_relogin_token(target=target, old_record=old_record, token_store=token_store)
+            raise ChatGPTOAuthLoginError("re-login target row vanished during completion; the new token was removed")
+        return {
+            "credential_id": target,
+            "alias": updated.alias,
+            "expires_at": updated.expires_at,
+            "account_label": updated.account_label,
+            "plan_type": plan_type,
+            "relogin": True,
+            "discovery_cache_cleared": True,
+            "discovery_cache_rows_deleted": rows_deleted,
+        }
+
+
+def _rollback_relogin_token(*, target: str, old_record: StoredTokenRecord | None, token_store: Any) -> None:
+    """Best-effort compensation for a failed re-login after the new token landed:
+    restore the old record, or drop the new one when none existed. A rollback
+    failure is LOGGED and never replaces the original error — a double storage
+    failure cannot honestly promise a clean terminal state."""
+    try:
+        if old_record is not None:
+            token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target, record=old_record)
+        else:
+            token_store.delete(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=target)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "re-login rollback failed for %s; the token store may still hold the new token",
+            target, exc_info=True,
+        )
+
+
 # --- refresh ------------------------------------------------------------------
 _refresh_locks: dict[str, threading.Lock] = {}
 _refresh_locks_guard = threading.Lock()
@@ -360,6 +483,20 @@ def _lock_for(credential_id: str) -> threading.Lock:
             lock = threading.Lock()
             _refresh_locks[credential_id] = lock
         return lock
+
+
+@contextmanager
+def oauth_credential_lock(credential_id: str):
+    """The per-credential lifecycle lock (plan D2): token refresh, re-login
+    completion, and ChatGPT-OAuth credential deletion all serialize on it, so a
+    stale in-flight refresh can never clobber a freshly authorized token or
+    resurrect a deleted one. PROCESS-LOCAL ONLY — two sidecars sharing one
+    token store do not share this Python lock (cross-process advisory lock =
+    plan §6 follow-up). Never hold it across browser interaction or the
+    authorization-code exchange; it covers completion/storage work only. The
+    lock is NOT re-entrant — callers must not nest it for the same id."""
+    with _lock_for(credential_id):
+        yield
 
 
 def _is_expired(record: StoredTokenRecord, *, now: datetime) -> bool:
@@ -408,16 +545,26 @@ def refresh_if_needed(
     Settings/route surface exposes masked metadata only (the credential DTO or
     `token_store.status()`, which omit the secrets)."""
     now = now or datetime.now(timezone.utc)
-    with _lock_for(credential_id):
+    with oauth_credential_lock(credential_id):
         record = token_store.load(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id)
         if record is None:
-            raise ChatGPTOAuthLoginError("no stored token for this credential")
+            # An OAuth row without a stored token is only repairable by re-login.
+            raise ChatGPTOAuthLoginError("no stored token for this credential", reauth_required=True)
         if not force and not _is_expired(record, now=now):
             return record
         if not record.refresh_token:
-            raise ChatGPTOAuthLoginError("cannot refresh: no refresh_token is stored for this credential")
+            raise ChatGPTOAuthLoginError(
+                "cannot refresh: no refresh_token is stored for this credential", reauth_required=True,
+            )
         refresh = refresh or _refresh_token_grant
-        resp = refresh(refresh_token=record.refresh_token)  # failure raises — NO silent fallback
+        try:
+            resp = refresh(refresh_token=record.refresh_token)  # failure raises — NO silent fallback
+        except ChatGPTOAuthLoginError as exc:
+            # Classify (plan D4): 401/400 on a refresh grant is the invalid-grant
+            # family — the login itself is stale and only a fresh browser login
+            # repairs it. Transport failures (status_code None) stay transient.
+            exc.reauth_required = exc.reauth_required or exc.status_code in (400, 401)
+            raise
         new_record = _refresh_response_to_record(resp, record)
         token_store.save(provider=PROVIDER, auth_mode=AUTH_MODE, credential_id=credential_id, record=new_record)
         return new_record

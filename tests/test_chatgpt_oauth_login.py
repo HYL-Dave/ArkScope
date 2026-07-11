@@ -72,32 +72,71 @@ def _ok_exchange(captured: dict | None = None, *, refresh: str | None = "refresh
 
 
 class _Cred:
-    def __init__(self, cid, alias, expires_at, account_label, make_active=True):
+    def __init__(self, cid, alias, expires_at, account_label, make_active=True,
+                 provider="openai", auth_type="chatgpt_oauth", active=False):
         self.id, self.alias, self.expires_at, self.account_label = cid, alias, expires_at, account_label
         self.make_active = make_active
+        self.provider, self.auth_type, self.active = provider, auth_type, active
 
 
 class _CredStore:
-    def __init__(self):
+    def __init__(self, fail_update=False, vanish_on_update=False):
         self.added: list[_Cred] = []
         self.deleted: list[str] = []
+        self.updated: list[dict] = []
+        self.rows: dict[str, _Cred] = {}
+        self.fail_update = fail_update
+        self.vanish_on_update = vanish_on_update
         self._n = 0
 
     def add_oauth_credential(self, *, provider, auth_mode, alias, make_active=True,
                              expires_at=None, account_label=None):
         self._n += 1
-        c = _Cred(self._n, (alias or "").strip() or f"{provider} {auth_mode}", expires_at, account_label, make_active)
+        c = _Cred(self._n, (alias or "").strip() or f"{provider} {auth_mode}", expires_at, account_label, make_active,
+                  provider=provider, auth_type=auth_mode, active=make_active)
         self.added.append(c)
+        self.rows[f"local:{c.id}"] = c
         return c
+
+    def get(self, credential_id):
+        return self.rows.get(credential_id)
+
+    def update(self, credential_id, *, alias=None, secret=None, active=None,
+               expires_at=None, account_label=None):
+        # Mirrors the REAL CredentialStore.update semantics for the fields the
+        # re-login path uses: "" forces NULL, None means don't-touch.
+        if self.fail_update:
+            raise RuntimeError("update boom")
+        row = self.rows.get(credential_id)
+        if row is None or self.vanish_on_update:
+            return None
+        recorded = {}
+        if alias is not None:
+            recorded["alias"] = alias
+            if alias.strip():
+                row.alias = alias.strip()
+        if active is not None:
+            recorded["active"] = active
+            row.active = bool(active)
+        if expires_at is not None:
+            recorded["expires_at"] = expires_at
+            row.expires_at = expires_at.strip() or None
+        if account_label is not None:
+            recorded["account_label"] = account_label
+            row.account_label = account_label.strip() or None
+        self.updated.append(recorded)
+        return row
 
     def delete(self, credential_id):
         self.deleted.append(credential_id)
+        self.rows.pop(credential_id, None)
         return True
 
 
 class _TokStore:
     def __init__(self, fail_save=False):
         self.saved: dict = {}
+        self.deleted: list = []
         self.fail_save = fail_save
 
     def save(self, *, provider, auth_mode, credential_id, record):
@@ -107,6 +146,21 @@ class _TokStore:
 
     def load(self, *, provider, auth_mode, credential_id):
         return self.saved.get((provider, auth_mode, credential_id))
+
+    def delete(self, *, provider, auth_mode, credential_id):
+        self.deleted.append((provider, auth_mode, credential_id))
+        return self.saved.pop((provider, auth_mode, credential_id), None) is not None
+
+
+def _seed_cred(cs: _CredStore, *, cid="local:1", provider="openai", auth_type="chatgpt_oauth",
+               alias="ChatGPT subscription Plus", active=False, expires_at=None):
+    # Seed an EXISTING credential row without touching cs.added (which the
+    # relogin tests assert stays empty — no new row is ever created in place).
+    n = int(cid.split(":", 1)[1])
+    cs._n = max(cs._n, n)
+    row = _Cred(n, alias, expires_at, "ChatGPT plus", provider=provider, auth_type=auth_type, active=active)
+    cs.rows[cid] = row
+    return row
 
 
 def _seed(ts: _TokStore, *, expires_at, refresh="refresh-1", cid="local:1"):
@@ -421,3 +475,277 @@ def test_state_store_pop_is_single_use_under_threads():
         t.join()
     non_none = [r for r in results if r is not None]
     assert len(non_none) == 1  # exactly one caller gets the pending login
+
+
+# --- re-login (S3 credential-lifecycle hotfix) ---------------------------------
+def _relogin_complete(ss, cs, ts, state, *, exchange=None, invalidator=lambda _t: 0, now=None):
+    return complete_login(
+        state=state, code="c", credential_store=cs, token_store=ts, state_store=ss,
+        exchange=exchange or _ok_exchange(), now=now or (_NOW + timedelta(minutes=1)),
+        invalidate_relogin_cache=invalidator,
+    )
+
+
+_KEY = ("openai", "chatgpt_oauth", "local:1")
+
+
+def test_relogin_replaces_token_in_place():
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    _seed_cred(cs, alias="My ChatGPT", active=True)
+    _seed(ts, expires_at="2030-06-01T00:00:00+00:00")
+    cleared: list = []
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    out = _relogin_complete(ss, cs, ts, s, invalidator=lambda t: cleared.append(t) or 3)
+    assert out["credential_id"] == "local:1"
+    assert out["relogin"] is True
+    assert out["discovery_cache_cleared"] is True
+    assert out["discovery_cache_rows_deleted"] == 3
+    assert out["alias"] == "My ChatGPT"
+    assert cleared == ["local:1"]
+    assert cs.added == []                                   # NO new row
+    rec = ts.saved[_KEY]
+    assert rec.access_token == _access()                    # token replaced
+    assert rec.refresh_token == "refresh-XYZ"
+    upd = cs.updated[-1]
+    assert upd["expires_at"] and upd["account_label"] == "ChatGPT plus"
+    assert "alias" not in upd and "active" not in upd       # preserved fields never passed
+    row = cs.get("local:1")
+    assert row.alias == "My ChatGPT" and row.active is True
+
+
+def test_relogin_token_save_failure_keeps_old_token():
+    # Atomicity INVERSION vs the create path: a save failure must leave the OLD
+    # token untouched (sibling of test_complete_login_token_store_write_fail_rolls_back).
+    ss, cs = _StateStore(), _CredStore()
+    ts = _TokStore(fail_save=True)
+    _seed_cred(cs)
+    _seed(ts, expires_at="2030-06-01T00:00:00+00:00")       # seeded directly, bypasses save()
+    old = ts.saved[_KEY]
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError):
+        _relogin_complete(ss, cs, ts, s)
+    assert ts.saved[_KEY] is old                            # old token untouched
+    assert cs.updated == [] and cs.added == [] and cs.deleted == []
+
+
+def test_relogin_target_vanished_fails_no_new_credential():
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()   # target never seeded
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError):
+        _relogin_complete(ss, cs, ts, s)
+    assert cs.added == [] and cs.updated == [] and ts.saved == {}   # NEVER falls back to create
+
+
+def test_relogin_wrong_target_type_rejected():
+    for provider, auth_type in (("openai", "api_key"), ("anthropic", "claude_code_oauth")):
+        ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+        _seed_cred(cs, provider=provider, auth_type=auth_type)
+        s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+        with pytest.raises(ChatGPTOAuthLoginError):
+            _relogin_complete(ss, cs, ts, s)
+        assert cs.added == [] and cs.updated == [] and ts.saved == {}, (provider, auth_type)
+
+
+def test_relogin_ignores_make_active():
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    _seed_cred(cs, active=False)
+    _seed(ts, expires_at=None)
+    s = start_login(state_store=ss, now=_NOW, make_active=True, relogin_credential_id="local:1")["state"]
+    _relogin_complete(ss, cs, ts, s)
+    assert cs.get("local:1").active is False                # untouched despite make_active=True
+    assert all("active" not in u for u in cs.updated)
+    assert cs.added == []
+
+
+def test_relogin_clears_expiry_when_new_token_has_none():
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    _seed_cred(cs, expires_at="2030-06-01T00:00:00+00:00")
+    _seed(ts, expires_at="2030-06-01T00:00:00+00:00")
+
+    def _noexp_exchange(*, code, code_verifier):
+        return {"access_token": _jwt({"sub": "x"}), "refresh_token": "r2", "id_token": _id_token()}
+
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    _relogin_complete(ss, cs, ts, s, exchange=_noexp_exchange)
+    assert cs.updated[-1]["expires_at"] == ""               # the real store's explicit-NULL form
+    assert cs.get("local:1").expires_at is None
+
+
+def test_relogin_in_place_with_real_credential_store(tmp_path):
+    # Seam-mock discipline: the fake's update() semantics must hold against the
+    # REAL CredentialStore (row count / id / alias / active invariance).
+    from src.model_credentials import CredentialStore
+
+    real = CredentialStore(tmp_path / "creds.db")
+    cred = real.add_oauth_credential(
+        provider="openai", auth_mode="chatgpt_oauth", alias="Sub", make_active=False,
+        expires_at="2030-06-01T00:00:00+00:00", account_label="ChatGPT plus",
+    )
+    cid = f"local:{cred.id}"
+    ss, ts = _StateStore(), _TokStore()
+    _seed(ts, expires_at="2030-06-01T00:00:00+00:00", cid=cid)
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id=cid)["state"]
+    out = complete_login(
+        state=s, code="c", credential_store=real, token_store=ts, state_store=ss,
+        exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1),
+        invalidate_relogin_cache=lambda _t: 0,
+    )
+    assert out["credential_id"] == cid and out["relogin"] is True
+    row = real.get(cid)
+    assert row is not None
+    assert row.alias == "Sub" and row.active is False       # preserved
+    assert row.expires_at and row.expires_at != "2030-06-01T00:00:00+00:00"  # refreshed from new JWT
+    assert real.get(f"local:{cred.id + 1}") is None         # NO second row (AUTOINCREMENT next id)
+    assert ts.saved[("openai", "chatgpt_oauth", cid)].refresh_token == "refresh-XYZ"
+
+
+def test_refresh_failure_classification(monkeypatch):
+    # (a) refresh HTTP 401 → reauth_required, status_code preserved
+    ts = _TokStore()
+    _seed(ts, expires_at=None)
+
+    def _401(*, refresh_token):
+        raise ChatGPTOAuthLoginError("ChatGPT OAuth refresh failed (401): x", status_code=401)
+
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        refresh_if_needed(credential_id="local:1", token_store=ts, force=True, refresh=_401)
+    assert ei.value.reauth_required is True and ei.value.status_code == 401
+
+    # (b) _http_post's wrapped network-error shape (status_code=None) stays transient
+    def _net(*, refresh_token):
+        raise ChatGPTOAuthLoginError("ChatGPT OAuth refresh failed: boom", status_code=None)
+
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        refresh_if_needed(credential_id="local:1", token_store=ts, force=True, refresh=_net)
+    assert ei.value.reauth_required is False
+
+    # (c) missing refresh_token → reauth (re-login is the only fix)
+    ts2 = _TokStore()
+    _seed(ts2, expires_at=None, refresh=None)
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        refresh_if_needed(credential_id="local:1", token_store=ts2, force=True)
+    assert ei.value.reauth_required is True
+
+    # (d) missing stored token → reauth
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        refresh_if_needed(credential_id="local:9", token_store=_TokStore(), force=True)
+    assert ei.value.reauth_required is True
+
+    # (e) _http_post wires the real HTTP status onto the raised error
+    def _boom_401(req, timeout=None):
+        raise HTTPError(OAUTH_TOKEN_URL_FOR_TEST, 401, "unauthorized", {}, io.BytesIO(b'{"error":"invalid_grant"}'))
+
+    monkeypatch.setattr(mod.request, "urlopen", _boom_401)
+    with pytest.raises(ChatGPTOAuthLoginError) as ei:
+        mod._refresh_token_grant(refresh_token="r")
+    assert ei.value.status_code == 401
+
+
+def test_relogin_serializes_with_inflight_refresh():
+    # An in-flight refresh holds the credential lifecycle lock; re-login
+    # completion must WAIT, so the newly authorized token is written LAST and a
+    # stale refreshed old-account token can never clobber it.
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    _seed_cred(cs)
+    _seed(ts, expires_at=None)
+    old_refreshed = _jwt({"exp": _FUTURE_EXP, "marker": "old-refreshed"})
+    new_access = _jwt({"exp": _FUTURE_EXP, "marker": "new-login"})
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_refresh(*, refresh_token):
+        entered.set()
+        assert release.wait(5)
+        return {"access_token": old_refreshed, "refresh_token": "refresh-2"}
+
+    t_refresh = threading.Thread(
+        target=lambda: refresh_if_needed(credential_id="local:1", token_store=ts, force=True, refresh=slow_refresh),
+    )
+    t_refresh.start()
+    assert entered.wait(5)
+
+    def _new_exchange(*, code, code_verifier):
+        return {"access_token": new_access, "refresh_token": "refresh-new", "id_token": _id_token()}
+
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    done = threading.Event()
+
+    def _run_relogin():
+        _relogin_complete(ss, cs, ts, s, exchange=_new_exchange)
+        done.set()
+
+    t_re = threading.Thread(target=_run_relogin)
+    t_re.start()
+    assert not done.wait(0.3)                               # blocked behind the in-flight refresh
+    release.set()
+    t_refresh.join(5)
+    t_re.join(5)
+    assert done.is_set()
+    assert ts.saved[_KEY].access_token == new_access        # last write = the NEW login
+
+
+def test_relogin_metadata_failure_restores_or_deletes_token():
+    # arm 1: update raises, old token present → old token restored
+    ss, ts = _StateStore(), _TokStore()
+    cs = _CredStore(fail_update=True)
+    _seed_cred(cs)
+    _seed(ts, expires_at=None)
+    old = ts.saved[_KEY]
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError):
+        _relogin_complete(ss, cs, ts, s)
+    assert ts.saved[_KEY].access_token == old.access_token  # restored
+
+    # arm 2: row vanishes at update, NO old token → the new token is removed
+    ss2, ts2 = _StateStore(), _TokStore()
+    cs2 = _CredStore(vanish_on_update=True)
+    _seed_cred(cs2)                                          # row exists at validation, no stored token
+    s2 = start_login(state_store=ss2, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError):
+        _relogin_complete(ss2, cs2, ts2, s2)
+    assert _KEY not in ts2.saved                             # no orphan token for a gone row
+
+
+def test_relogin_compensation_failure_preserves_original_error(caplog):
+    import logging
+
+    class _FlakyTok(_TokStore):
+        def __init__(self):
+            super().__init__()
+            self._saves = 0
+
+        def save(self, **kw):
+            self._saves += 1
+            if self._saves >= 2:                             # 1st = new token, 2nd = rollback
+                raise RuntimeError("rollback save boom")
+            super().save(**kw)
+
+    ss, ts = _StateStore(), _FlakyTok()
+    cs = _CredStore(fail_update=True)
+    _seed_cred(cs)
+    _seed(ts, expires_at=None)
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(ChatGPTOAuthLoginError) as ei:
+            _relogin_complete(ss, cs, ts, s)
+    assert isinstance(ei.value.__cause__, RuntimeError)      # ORIGINAL metadata error is the cause
+    assert "update boom" in str(ei.value.__cause__)
+    assert any("rollback" in r.message.lower() for r in caplog.records)  # secondary failure logged
+    # honest: NO claim about a clean token-store state after a double failure
+
+
+def test_relogin_requires_cache_invalidator():
+    ss, cs, ts = _StateStore(), _CredStore(), _TokStore()
+    _seed_cred(cs)
+    _seed(ts, expires_at=None)
+    old = ts.saved[_KEY]
+    s = start_login(state_store=ss, now=_NOW, relogin_credential_id="local:1")["state"]
+    with pytest.raises(ChatGPTOAuthLoginError):
+        complete_login(state=s, code="c", credential_store=cs, token_store=ts, state_store=ss,
+                       exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1))  # no invalidator
+    assert ts.saved[_KEY] is old and cs.updated == [] and cs.added == []
+    # the create path stays valid with the default None callback
+    s2 = start_login(state_store=ss, now=_NOW)["state"]
+    out = complete_login(state=s2, code="c", credential_store=cs, token_store=ts, state_store=ss,
+                         exchange=_ok_exchange(), now=_NOW + timedelta(minutes=1))
+    assert out["credential_id"] and cs.added
+    assert "relogin" not in out                              # create payload unchanged
