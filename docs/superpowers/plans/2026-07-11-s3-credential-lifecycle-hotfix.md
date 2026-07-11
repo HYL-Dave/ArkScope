@@ -1,6 +1,27 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: REVIEWED — CLEARED FOR IMPLEMENTATION 2026-07-11.** Roles: Claude authors + implements,
+> **Status: IMPLEMENTED FOR REVIEW 2026-07-11.** Branch
+> `claude/s3-credential-lifecycle`, six TDD commits (login core / cache
+> delete_scope / manager+routes / driver classification / frontend /
+> factory-test contract fix); every test RED-first for a predicted reason.
+> Evidence: backend focused 154 passed; frontend FULL suite 27 files / 260
+> tests (+1 file / +10 tests = exact) + typecheck + build; stale-copy sweep
+> zero hits across all 7 sites; no-PG smoke `pg_attempts: []`. Final virgin
+> A/B `97f9919` → `788944d`: **failure sets identical 30=30** (both
+> direction diffs empty), passed 3903 → 3934 = **+31 = exact collect diff**
+> (31 added / 0 removed), skips/warnings/errors flat. Reviewer ledger note:
+> A/B round 1 caught two `test_auth_factory.py` regressions the focused
+> sweep missed (the `MissingCredentialError` pin-grep had filtered out
+> `pytest.raises(...)` lines via `-v "raise"` — the filter ate the signal).
+> Closing them surfaced a REAL driver defect — the `_stream` early-exit
+> payload read `request.model` directly, so a None/malformed request would
+> AttributeError instead of yielding the classified event (now
+> `getattr(request, "model", None)`) — and the two tests were updated per
+> the obsolete-sibling rule (fail-closed intent kept: still raises, still
+> zero backend calls, now pinned on the classified wiring message).
+> §7 live gate (the user performs the browser auth) runs BEFORE merge.
+>
+> Prior status: REVIEWED — CLEARED FOR IMPLEMENTATION 2026-07-11. Roles: Claude authors + implements,
 > user reviews. Origin: P2.7 live verification hit local:7 (openai
 > chatgpt_oauth) failing discovery with a refresh-401; the user triaged it as a
 > product lifecycle gap (five code claims, all independently verified) and
