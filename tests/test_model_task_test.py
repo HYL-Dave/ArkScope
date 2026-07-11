@@ -95,7 +95,7 @@ _DEFAULT_ACTIVE = object()
 def _run(monkeypatch, tmp_path, *, active=_DEFAULT_ACTIVE, cache=None, api_result=None,
          stream=None, driver_error=None, task="ai_research", provider="openai",
          model="gpt-5.4-mini", effort="low", timeout_s=0.05):
-    import src.model_task_test as mt
+    import src.model_task_canary as mt
 
     active = _active() if active is _DEFAULT_ACTIVE else active
     cache = cache or _Cache()
@@ -193,7 +193,7 @@ def test_model_axis_zero_call_vetoes(monkeypatch, tmp_path):
     assert result.error_code == "task_capability_missing"
     assert calls == {"api": [], "driver": []}
 
-    import src.model_task_test as mt
+    import src.model_task_canary as mt
 
     real = capability_for("gpt-5.4-mini")
     monkeypatch.setattr(
@@ -339,8 +339,10 @@ def test_canary_timeout_and_bare_raise_never_500(
 
 
 def test_dispatch_module_has_no_persistence_dependencies():
-    import src.model_task_test as mt
+    import src.model_task_canary as mt
 
+    assert mt.__file__ is not None
+    assert not mt.__file__.endswith("_test.py")
     source = inspect.getsource(mt)
     assert "ResearchRun" not in source
     assert "ThreadStore" not in source

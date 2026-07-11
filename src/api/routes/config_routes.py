@@ -21,7 +21,7 @@ from src.agents.config import (
 )
 from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
 from src.model_route_store import ModelRouteStore
-from src.model_task_test import dispatch_task_model_test
+from src.model_task_canary import dispatch_task_model_test
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
 from src.model_credentials import (
