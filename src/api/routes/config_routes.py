@@ -21,6 +21,7 @@ from src.agents.config import (
 )
 from src.model_discovery_cache import ModelDiscoveryCache, StaleDiscoveryWrite
 from src.model_route_store import ModelRouteStore
+from src.model_task_test import dispatch_task_model_test
 from src.research_runtime_config import ResearchRuntimeStore, resolve_research_runtime
 from src.env_keys import env_file_path
 from src.model_credentials import (
@@ -112,6 +113,13 @@ class ModelTestRequest(BaseModel):
     model: str
     effort: str = "default"
     credential_id: str | None = None
+
+
+class TaskModelTestRequest(BaseModel):
+    task: TaskId
+    provider: Provider
+    model: str
+    effort: str = "default"
 
 
 class CredentialCreate(BaseModel):
@@ -845,6 +853,38 @@ def run_provider_model_test(
         credential_id=body.credential_id,
         store=store,
     ).model_dump()
+    if warning:
+        result["warning"] = f"{warning} {result.get('warning') or ''}".strip()
+    return result
+
+
+@router.post("/config/model-task-test")
+def run_task_model_test(
+    body: TaskModelTestRequest,
+    store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
+):
+    """Run one bounded test for the selected task/provider/model route."""
+    store = _credential_store(store)
+    model = body.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    effort = body.effort.strip() or "default"
+    warning = None
+    if not is_valid_effort(body.provider, effort):
+        warning = (
+            f"Requested effort '{effort}' is not known for provider '{body.provider}'; "
+            "testing with provider default."
+        )
+        effort = "default"
+    result = _run_coro(dispatch_task_model_test(
+        task=body.task,
+        provider=body.provider,
+        model=model,
+        effort=effort,
+        store=store,
+        token_store=token_store,
+    )).model_dump()
     if warning:
         result["warning"] = f"{warning} {result.get('warning') or ''}".strip()
     return result
