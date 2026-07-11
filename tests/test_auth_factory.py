@@ -72,7 +72,12 @@ def test_chatgpt_oauth_without_token_fails_closed():
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     import asyncio
 
-    with pytest.raises(MissingCredentialError):
+    # S3 D4: fail-closed is now ONE classified error event (this is the WIRING
+    # arm — a driver built with no token-store; re-login cannot fix it, so the
+    # code is missing_credential, not reauth). call_llm re-raises it; nothing
+    # ever falls through to a backend call. (Previously a bare
+    # MissingCredentialError raise before the stream started.)
+    with pytest.raises(RuntimeError, match="missing its token store"):
         asyncio.run(d.call_llm(None))
 
 
@@ -138,8 +143,9 @@ def test_oauth_mode_is_not_api_key_path():
     assert d.auth_mode == "chatgpt_oauth"  # identity preserved, not collapsed to api_key
     import asyncio
 
-    # Without a token-store token it fails closed; it never falls through to api_key.
-    with pytest.raises(MissingCredentialError):
+    # Without a token-store it fails closed via the classified missing_credential
+    # error (S3 D4); it never falls through to the api_key path.
+    with pytest.raises(RuntimeError, match="missing its token store"):
         asyncio.run(d.call_llm(None))
 
 

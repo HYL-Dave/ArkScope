@@ -459,16 +459,20 @@ class OpenAIChatGPTOAuthDriver:
         # never a bare exception, never a backend call. Wiring vs token-absent
         # arms are split exactly like discover_models.
         if self._token_store is None or not self._credential_id:
+            # getattr: these exits must stay reachable even for a malformed/None
+            # request — the classified event IS the fail-closed surface.
             yield AgentEvent(EventType.error, {
                 "error": "ChatGPT OAuth driver is missing its token store or credential id",
-                "code": "missing_credential", "provider": "openai", "model": request.model,
+                "code": "missing_credential", "provider": "openai",
+                "model": getattr(request, "model", None),
             })
             return
         token = self._load_token()
         if not token:
             yield AgentEvent(EventType.error, {
                 "error": "no ChatGPT OAuth token stored for this credential -- log in from Settings",
-                "code": "reauth_required", "provider": "openai", "model": request.model,
+                "code": "reauth_required", "provider": "openai",
+                "model": getattr(request, "model", None),
             })
             return
         try:
