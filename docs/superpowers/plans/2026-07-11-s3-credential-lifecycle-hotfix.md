@@ -1,6 +1,17 @@
 # S3 Credential-Lifecycle Hotfix — chatgpt_oauth re-login + delete cascade
 
-> **Status: LIVE GATE PASSED 2026-07-11 — awaiting merge approval.** Round-5
+> **Status: COMPLETE — MERGED FF `e7e144b` to master 2026-07-11.** Five
+> review rounds (3 plan-level + rounds 4/5 on the implementation: 1
+> BLOCKING + 5 must-fix + 2 should-fix, every fix RED-first), final A/B
+> failure sets identical 30=30 with passed +45 = exact collect diff, §7
+> live gate passed the same day (details below). Post-merge ruling
+> applied: ai_research route flipped `gpt-5.6-luna` → `gpt-5.4-mini`
+> (backend-executable, live-proven) with local:7 kept active —
+> subscription-first, avoids accidental API-key spend. Gate stack torn
+> down (8420/8430/1455 free); the user's normal app restart picks up the
+> merged code.
+>
+> Prior status: LIVE GATE PASSED 2026-07-11 — awaiting merge approval. Round-5
 > verdict GREEN; §7 executed same day on the REAL profile DB + keyring,
 > single sidecar (branch code on 8420, master sidecar stopped first per the
 > round-4 ruling), branch web UI on 8430. Results, in order:
