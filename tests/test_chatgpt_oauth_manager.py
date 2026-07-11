@@ -286,3 +286,67 @@ def test_results_capped_drops_oldest_terminal(stores):
         states.append(out["state"])
     live = [s for s in states if mgr.status(s)["status"] != "unknown"]
     assert len(live) <= 3  # capped — oldest terminal results were dropped
+
+
+# --- re-login (S3 credential-lifecycle hotfix) ---------------------------------
+def _seed_relogin_target(stores, *, access="OLD-ACCESS"):
+    from src.auth_drivers.token_store import StoredTokenRecord
+    cred_store, tok_store = stores
+    target = cred_store.add_oauth_credential(
+        provider="openai", auth_mode="chatgpt_oauth", alias="Sub", make_active=False,
+        expires_at="2030-06-01T00:00:00+00:00", account_label="ChatGPT plus",
+    )
+    cid = f"local:{target.id}"
+    tok_store.save(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+                   record=StoredTokenRecord(access_token=access, refresh_token="r-old"))
+    return cid
+
+
+def test_begin_threads_relogin_target_to_completion(stores):
+    from src.model_discovery_cache import ModelDiscoveryCache
+
+    cred_store, tok_store = stores
+    cid = _seed_relogin_target(stores)
+    cache = ModelDiscoveryCache(cred_store.db_path)
+    cache.record_run(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+                     secret_fingerprint="oauth", status="ok",
+                     models=[{"id": "old-model", "label": "Old", "source": "provider_api"}])
+    mgr = _mgr(stores, lambda s: _FakeServer(lambda _srv: ("code-1", None)))
+    out = mgr.begin(relogin_credential_id=cid)
+    st = _wait_status(mgr, out["state"])
+    assert st["status"] == "success"
+    assert st["credential"]["credential_id"] == cid
+    assert st["credential"]["relogin"] is True
+    assert st["credential"]["discovery_cache_cleared"] is True
+    assert cred_store.get(f"local:{int(cid.split(':')[1]) + 1}") is None       # NO new row
+    scope = cache.get(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid,
+                      secret_fingerprint="oauth")
+    assert scope.status == "never_discovered"                                   # stale entitlement gone
+    rec = tok_store.load(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid)
+    assert rec.access_token == _ACCESS                                          # token replaced in place
+    row = cred_store.get(cid)
+    assert row.alias == "Sub" and row.active is False                           # preserved
+
+
+def test_relogin_cache_clear_failure_aborts_before_token_replace(stores, monkeypatch):
+    from src.auth_drivers import chatgpt_oauth_manager as mgr_mod
+
+    cred_store, tok_store = stores
+    cid = _seed_relogin_target(stores)
+
+    class _BoomCache:
+        def __init__(self, _path):
+            pass
+
+        def delete_scope(self, **_kw):
+            raise RuntimeError("cache locked")
+
+    monkeypatch.setattr(mgr_mod, "ModelDiscoveryCache", _BoomCache)
+    mgr = _mgr(stores, lambda s: _FakeServer(lambda _srv: ("code-1", None)))
+    out = mgr.begin(relogin_credential_id=cid)
+    st = _wait_status(mgr, out["state"])
+    assert st["status"] == "error"                                              # terminal, no success result
+    rec = tok_store.load(provider="openai", auth_mode="chatgpt_oauth", credential_id=cid)
+    assert rec.access_token == "OLD-ACCESS"                                     # token untouched
+    row = cred_store.get(cid)
+    assert row.expires_at == "2030-06-01T00:00:00+00:00"                        # metadata untouched

@@ -29,8 +29,17 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
+from src.model_discovery_cache import ModelDiscoveryCache
+
 from .chatgpt_oauth_callback_server import LoopbackCallbackServer
-from .chatgpt_oauth_login import ChatGPTOAuthLoginError, _StateStore, complete_login, start_login
+from .chatgpt_oauth_login import (
+    AUTH_MODE,
+    PROVIDER,
+    ChatGPTOAuthLoginError,
+    _StateStore,
+    complete_login,
+    start_login,
+)
 
 _DEFAULT_TIMEOUT = 120.0
 _RESULT_TTL = timedelta(minutes=15)  # evict a settled (success/error) result after this
@@ -68,13 +77,16 @@ class OAuthLoginManager:
         self._servers: dict[str, Any] = {}
         self._lock = threading.Lock()
 
-    def begin(self, make_active: bool = False) -> dict:
+    def begin(self, make_active: bool = False, relogin_credential_id: str | None = None) -> dict:
         """Start a login. Returns {auth_url, state, expires_at, manual_code_supported}.
         make_active (carried through the pending state to the loopback callback) decides
         whether the resulting credential becomes the active one on completion. Default
-        FALSE (unified-activation policy): callers opt in to switching the active one."""
+        FALSE (unified-activation policy): callers opt in to switching the active one.
+        `relogin_credential_id` (S3) marks an IN-PLACE token replacement for that
+        existing chatgpt_oauth credential — no new row; alias/active preserved."""
         now = self._clock()
-        started = start_login(state_store=self._state_store, now=now, make_active=make_active)
+        started = start_login(state_store=self._state_store, now=now, make_active=make_active,
+                              relogin_credential_id=relogin_credential_id)
         state = started["state"]
         server = self._server_factory(state)
         with self._lock:
@@ -134,6 +146,19 @@ class OAuthLoginManager:
         return complete_login(
             state=state, code=code, credential_store=self._cs, token_store=self._ts,
             alias=self._alias, state_store=self._state_store, now=self._clock(), exchange=self._exchange,
+            invalidate_relogin_cache=self._invalidate_discovery_cache,
+        )
+
+    def _invalidate_discovery_cache(self, credential_id: str) -> int:
+        """The re-login discovery-cache invalidator (plan D3). Runs inside the login
+        core's lifecycle lock BEFORE token replacement, so old-account entitlement can
+        never coexist with a new account's token. Raising aborts the re-login while
+        everything is still untouched."""
+        db_path = getattr(self._cs, "db_path", None)
+        if not db_path:
+            raise ChatGPTOAuthLoginError("cannot clear the discovery cache: credential store has no db_path")
+        return ModelDiscoveryCache(db_path).delete_scope(
+            provider=PROVIDER, credential_id=credential_id, auth_mode=AUTH_MODE,
         )
 
     def _finish(self, state: str, *, status: str, credential: dict | None = None, detail: str | None = None) -> None:

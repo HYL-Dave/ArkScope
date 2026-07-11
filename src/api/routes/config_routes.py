@@ -456,19 +456,42 @@ class OAuthStartRequest(BaseModel):
     # closed for it; the user can opt in explicitly. Carried into pending login state
     # so the loopback callback honors it.
     make_active: bool = False
+    # S3 re-login: when set, completion replaces THIS credential's token in place
+    # (no new row; alias/active preserved). openai chatgpt_oauth targets only.
+    relogin_credential_id: str | None = None
 
 
 @router.post("/config/credentials/openai/oauth/start")
-def start_openai_oauth(body: OAuthStartRequest | None = None, manager=Depends(get_oauth_login_manager)):
+def start_openai_oauth(
+    body: OAuthStartRequest | None = None,
+    manager=Depends(get_oauth_login_manager),
+    store: CredentialStore = Depends(get_credential_store),
+):
     """Begin an in-app ChatGPT (OpenAI subscription) OAuth login. Returns the
     authorize URL + state for the browser; the loopback callback (or the manual
     copy-code fallback) completes it. COMPATIBILITY/EXPERIMENTAL path — the
     ChatGPT/Codex backend is not the public OpenAI API. The token never appears in
-    any response; only masked metadata is returned on completion (via /status)."""
+    any response; only masked metadata is returned on completion (via /status).
+    With `relogin_credential_id` the SAME flow replaces that credential's token in
+    place — fail-fast validated here, re-validated at completion (S3 re-login)."""
+    relogin_id = body.relogin_credential_id if body else None
+    if relogin_id:
+        cred = _credential_store(store).get(relogin_id)
+        if cred is None:
+            raise HTTPException(status_code=404, detail="re-login target credential not found")
+        if cred.provider != "openai" or cred.auth_type != "chatgpt_oauth":
+            raise HTTPException(
+                status_code=400,
+                detail="re-login supports only openai chatgpt_oauth credentials (scope ruling)",
+            )
     # Gate the credential-creating intent here (request context); the async loopback
     # completion fulfills this gated start. The detail is token-free by construction.
-    require_profile_state_write("oauth_login_start", {"provider": "openai", "auth_mode": "chatgpt_oauth"})
-    return manager.begin(make_active=body.make_active if body else False)
+    detail = {"provider": "openai", "auth_mode": "chatgpt_oauth"}
+    if relogin_id:
+        detail["relogin_credential_id"] = relogin_id
+    require_profile_state_write("oauth_login_start", detail)
+    return manager.begin(make_active=body.make_active if body else False,
+                         relogin_credential_id=relogin_id)
 
 
 class OAuthCancelRequest(BaseModel):
@@ -593,18 +616,80 @@ def update_credential(
     }
 
 
+_OAUTH_AUTH_MODES = ("chatgpt_oauth", "claude_code_oauth")
+
+
 @router.delete("/config/credentials/{credential_id}")
 def delete_credential(
     credential_id: str,
     store: CredentialStore = Depends(get_credential_store),
+    token_store=Depends(get_oauth_token_store),
 ):
+    """Delete a credential with a FAIL-CLOSED cascade (S3 plan D5): clear the
+    discovery cache first, then (OAuth rows) prove the token is gone, and delete
+    the metadata row LAST — so a failure always leaves a visible retry target and
+    never an orphaned secret. Serialized on the credential lifecycle lock so a
+    process-local in-flight refresh cannot resurrect the token."""
+    from src.auth_drivers.chatgpt_oauth_login import oauth_credential_lock
+
     store = _credential_store(store)
     if not credential_id.startswith("local:"):
         raise HTTPException(status_code=400, detail="only local credentials can be deleted")
-    require_profile_state_write("credential_delete", {"credential_id": credential_id})
-    if not store.delete(credential_id):
+    if store.get(credential_id) is None:
         raise HTTPException(status_code=404, detail="credential not found")
-    return {"deleted": True, "id": credential_id}
+    require_profile_state_write("credential_delete", {"credential_id": credential_id})
+    with oauth_credential_lock(credential_id):
+        cred = store.get(credential_id)  # re-read inside the lock
+        if cred is None:
+            raise HTTPException(status_code=404, detail="credential not found")
+        # 1) discovery cache first — a failure aborts before any mutation.
+        try:
+            cache_rows = ModelDiscoveryCache(store.db_path).delete_scope(
+                provider=cred.provider, credential_id=credential_id,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("credential delete: discovery-cache clear failed", exc_info=True)
+            raise HTTPException(status_code=502, detail="could not clear the discovery cache; nothing was deleted")
+        # 2) OAuth token cleanup, proven before the row goes away.
+        token_deleted: bool | None = None
+        old_record = None
+        if cred.auth_type in _OAUTH_AUTH_MODES:
+            try:
+                old_record = token_store.load(
+                    provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id,
+                )
+                removed = token_store.delete(
+                    provider=cred.provider, auth_mode=cred.auth_type, credential_id=credential_id,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("credential delete: token-store cleanup failed", exc_info=True)
+                raise HTTPException(status_code=502, detail="token cleanup failed; the credential row was kept for retry")
+            if old_record is not None and not removed:
+                # KeyringTokenStore collapses backend exceptions to False — with a
+                # preloaded record, False means "cleanup not proven": keep the row.
+                raise HTTPException(status_code=502, detail="token cleanup not proven; the credential row was kept for retry")
+            # old record absent = nothing secret remained → cleanup wasn't required.
+            token_deleted = True if old_record is not None else None
+        # 3) metadata row LAST.
+        try:
+            row_deleted = store.delete(credential_id)
+        except Exception:  # noqa: BLE001
+            if old_record is not None and token_deleted:
+                try:  # best-effort restore; the original error stays authoritative
+                    token_store.save(provider=cred.provider, auth_mode=cred.auth_type,
+                                     credential_id=credential_id, record=old_record)
+                except Exception:  # noqa: BLE001
+                    logger.warning("credential delete: token restore after row failure ALSO failed", exc_info=True)
+            logger.warning("credential delete: metadata row deletion failed", exc_info=True)
+            raise HTTPException(status_code=502, detail="credential row deletion failed; the token was restored")
+        if not row_deleted:
+            raise HTTPException(status_code=404, detail="credential not found")
+    return {
+        "deleted": True,
+        "id": credential_id,
+        "token_deleted": token_deleted,
+        "discovery_cache_rows_deleted": cache_rows,
+    }
 
 
 @router.post("/config/model-discovery")
